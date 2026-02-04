@@ -1,0 +1,172 @@
+CREATE TABLE `useraccountstbl` (
+  `user_id` varchar(12) NOT NULL,
+  `phone_number` varchar(10) NOT NULL,
+  `phoneNum_verify` tinyint(1) NOT NULL DEFAULT 0,
+  `email` varchar(100) NOT NULL,
+  `email_verify` tinyint(1) NOT NULL,
+  `password_hash` varchar(255) NOT NULL,
+  `status_id_account` varchar(20) NOT NULL,
+  `role_access` enum('Resident','Employee') NOT NULL,
+  `account_created` datetime NOT NULL,
+  `last_login` datetime NOT NULL,
+  `last_password_changed` date DEFAULT NULL,
+  `failed_logins` int(11) DEFAULT 0,
+  `lock_start` datetime DEFAULT NULL,
+  PRIMARY KEY (`user_id`),
+  UNIQUE KEY `phone_number` (`phone_number`),
+  UNIQUE KEY `email` (`email`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+
+
+CREATE TABLE `userpasswordhistorytbl` (
+  `pw_history_id` int(11) NOT NULL AUTO_INCREMENT,
+  `user_id` varchar(12) NOT NULL,
+  `old_pw_hash` varchar(255) NOT NULL,
+  `change_timestamp` datetime DEFAULT current_timestamp(),
+  PRIMARY KEY (`pw_history_id`),
+  KEY `idx_user_time` (`user_id`,`change_timestamp`),
+  CONSTRAINT `fk_user_password_history` FOREIGN KEY (`user_id`) REFERENCES `useraccountstbl` (`user_id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+
+
+CREATE TABLE `statuslookuptbl` (
+  `status_id` int(11) NOT NULL AUTO_INCREMENT,
+  `status_name` varchar(100) NOT NULL,
+  `status_type` varchar(50) NOT NULL,
+  PRIMARY KEY (`status_id`)
+) ENGINE=InnoDB AUTO_INCREMENT=1 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+
+
+CREATE TABLE `residentinformationtbl` (
+  `resident_id` int(10) unsigned NOT NULL AUTO_INCREMENT,
+  `user_id` varchar(12) NOT NULL,
+  `lastname` varchar(100) NOT NULL,
+  `firstname` varchar(100) NOT NULL,
+  `middlename` varchar(100) DEFAULT NULL,
+  `suffix` varchar(20) DEFAULT NULL,
+  `sex` enum('Male','Female') NOT NULL,
+  `birthdate` date NOT NULL,
+  `civil_status` varchar(50) NOT NULL,
+  `head_of_family` tinyint(1) NOT NULL DEFAULT 0,
+  `voter_status` tinyint(1) NOT NULL DEFAULT 0,
+  `occupation` TINYINT(1) NOT NULL DEFAULT 0;,
+  `occupation_detail` varchar(150) DEFAULT NULL,
+  `religion` varchar(100) DEFAULT NULL,
+  `sector_membership` varchar(150) DEFAULT NULL,
+  `privacy_consent` tinyint(1) NOT NULL,
+  `status_id_resident` int(11) DEFAULT NULL,
+  PRIMARY KEY (`resident_id`),
+  KEY `idx_resident_user` (`user_id`),
+  KEY `fk_resident_status` (`status_id_resident`),
+  CONSTRAINT `fk_resident_status` FOREIGN KEY (`status_id_resident`) REFERENCES `statuslookuptbl` (`status_id`),
+  CONSTRAINT `fk_resident_user` FOREIGN KEY (`user_id`) REFERENCES `useraccountstbl` (`user_id`) ON DELETE CASCADE
+) ENGINE=InnoDB AUTO_INCREMENT=1 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+
+CREATE TABLE `residentaddresstbl` (
+  `address_id` int(10) unsigned NOT NULL AUTO_INCREMENT,
+  `resident_id` int(10) unsigned NOT NULL,
+  `street_number` varchar(50) DEFAULT NULL,
+  `street_name` varchar(150) DEFAULT NULL,
+  `subdivision` varchar(150) DEFAULT NULL,
+  `area_number` varchar(50) DEFAULT NULL,
+  `house_type` varchar(100) DEFAULT NULL,
+  `house_ownership` varchar(100) DEFAULT NULL,
+  `residency_duration` varchar(100) DEFAULT NULL,
+  `status_id_residency` int(11) NOT NULL,
+  PRIMARY KEY (`address_id`),
+  KEY `idx_address_resident` (`resident_id`),
+  KEY `fk_address_status` (`status_id_residency`),
+  CONSTRAINT `fk_address_resident` FOREIGN KEY (`resident_id`) REFERENCES `residentinformationtbl` (`resident_id`) ON DELETE CASCADE,
+  CONSTRAINT `fk_address_status` FOREIGN KEY (`status_id_residency`) REFERENCES `statuslookuptbl` (`status_id`)
+) ENGINE=InnoDB AUTO_INCREMENT=1 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+
+
+CREATE TABLE `otprequesttbl` (
+  `otp_id` int(11) NOT NULL AUTO_INCREMENT,
+  `user_id` varchar(12) DEFAULT NULL,
+  `recipient` varchar(50) NOT NULL,
+  `purpose` varchar(50) NOT NULL,
+  `otp_code_hash` varchar(255) NOT NULL,
+  `otp_expiry` datetime NOT NULL,
+  `request_timestamp` datetime NOT NULL DEFAULT current_timestamp(),
+  `status_id_otp` int(11) NOT NULL,
+  PRIMARY KEY (`otp_id`),
+  KEY `user_id` (`user_id`),
+  CONSTRAINT `otprequesttbl_ibfk_1` FOREIGN KEY (`user_id`) REFERENCES `useraccountstbl` (`user_id`)
+) ENGINE=InnoDB AUTO_INCREMENT=1 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+
+
+CREATE TABLE `officialinformationtbl` (
+  `official_id` int(11) NOT NULL AUTO_INCREMENT,
+  `user_id` varchar(12) DEFAULT NULL,
+  `lastname` varchar(100) NOT NULL,
+  `firstname` varchar(100) NOT NULL,
+  `middlename` varchar(100) DEFAULT NULL,
+  `suffix` varchar(20) DEFAULT NULL,
+  `birthdate` date NOT NULL,
+  `sex` enum('Male','Female','Other') NOT NULL,
+  `civil_status` enum('Single','Married','Widowed','Separated') NOT NULL,
+  `contact_number` varchar(15) NOT NULL,
+  `email` varchar(100) NOT NULL,
+  `area_access` enum('Area01','Area1A','Area02','Area03','Area04','Area05','Area06','BarangayWide') NOT NULL,
+  `department` varchar(100) NOT NULL,
+  `role_access` enum('SuperAdmin','Admin','Official','Finance','Issuance','Monitoring','BarangayPolice','Secretary','AreaOIC') NOT NULL,
+  `status_id_employment` int(11) NOT NULL,
+  `date_hired` date NOT NULL,
+  `date_ended` date DEFAULT NULL,
+  `last_updated` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+  PRIMARY KEY (`official_id`),
+  UNIQUE KEY `idx_user_id` (`user_id`),
+  KEY `fk_official_status` (`status_id_employment`),
+  CONSTRAINT `fk_official_status` FOREIGN KEY (`status_id_employment`) REFERENCES `statuslookuptbl` (`status_id`) ON UPDATE CASCADE,
+  CONSTRAINT `fk_official_user` FOREIGN KEY (`user_id`) REFERENCES `useraccountstbl` (`user_id`) ON DELETE CASCADE ON UPDATE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+
+
+
+CREATE TABLE `emergencycontacttbl` (
+  `emergency_id` int(11) NOT NULL AUTO_INCREMENT,
+  `user_id` varchar(12) NOT NULL,
+  `last_name` varchar(100) NOT NULL,
+  `first_name` varchar(100) NOT NULL,
+  `middle_name` varchar(100) DEFAULT NULL,
+  `suffix` varchar(20) DEFAULT NULL,
+  `phone_number` varchar(15) NOT NULL,
+  `relationship` varchar(50) NOT NULL,
+  `address` varchar(255) NOT NULL,
+  `created_at` datetime NOT NULL DEFAULT current_timestamp(),
+  `updated_at` datetime DEFAULT NULL ON UPDATE current_timestamp(),
+  PRIMARY KEY (`emergency_id`),
+  UNIQUE KEY `user_id` (`user_id`),
+  CONSTRAINT `fk_emergency_user` FOREIGN KEY (`user_id`) REFERENCES `useraccountstbl` (`user_id`) ON DELETE CASCADE
+) ENGINE=InnoDB AUTO_INCREMENT=1 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+
+
+
+
+INSERT INTO statuslookuptbl (status_name, status_type) VALUES
+('Active', 'UserAccount'),
+('Inactive', 'UserAccount'),
+('Locked', 'UserAccount'),
+('Deactivated', 'UserAccount'),
+('Deleted', 'UserAccount'),
+
+('Pending', 'OTPVerification'),
+('Verified', 'OTPVerification'),
+('Expired', 'OTPVerification'),
+
+('NotVerified', 'Resident'),
+('PendingVerification', 'Resident'),
+('VerifiedResident', 'Resident'),
+
+('Residing', 'AddressResidency'),
+('NotResiding', 'AddressResidency'),
+('PendingVerification', 'AddressResidency');

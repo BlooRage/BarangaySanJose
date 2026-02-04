@@ -1,0 +1,171 @@
+@font-face {
+    font-family: 'Charis SIL Regular';
+    src: url(../../Fonts/Charis-SIL/CharisSIL-Regular.ttf);
+}
+@font-face {
+    font-family: 'Charis SIL Bold';
+    src: url(../../Fonts/Charis-SIL/CharisSIL-Bold.ttf);
+}
+@font-face {
+    font-family: 'Charis SIL Bold Italic';
+    src: url(../../Fonts/Charis-SIL/CharisSIL-BoldItalic.ttf);
+}
+@font-face {
+    font-family: 'Charis SIL Italic';
+    src: url(../../Fonts/Charis-SIL/CharisSIL-Italic.ttf);
+}
+@font-face {
+    font-family: 'Geist';
+    src: url(../../Fonts/Geist/Geist-VariableFont_wght.ttf);
+}
+
+html, body {
+    height: 100%;
+    margin: 0;
+    background-color: #f8f9fa;
+    color: #000;
+    font-family: 'Geist', sans-serif;
+}
+
+#img-mainLogo {
+    width: 60px;
+}
+
+#div-sidebarWrapper {
+    width: 100%;
+    border-right: 1px solid #e0e0e0;
+    background-color: #ffffff;
+}
+
+#img-sidebarAvatar {
+    width: 120px;
+    height: 120px;
+    border-radius: 50%;
+    object-fit: cover;
+}
+
+#div-mainDisplay {
+    min-height: 80vh;
+}
+
+#textarea-otherReason {
+    resize: none;
+}
+
+.a-sidebarLink {
+    text-decoration: none;
+    color: #333;
+    display: flex;
+    align-items: center;
+    padding: 10px 15px;
+    border-radius: 8px;
+    margin-bottom: 5px;
+    transition: 0.3s;
+}
+
+.a-sidebarLink:hover, .a-sidebarLink.active {
+    background-color: #fff5e6;
+    color: #f3a346;
+    font-weight: bold;
+}
+
+@media (min-width: 768px) {
+    #div-sidebarWrapper {
+        width: 20%; 
+        min-height: calc(100vh - 110px);
+    }
+}
+
+#div-modalSizing {
+    width: 95%; 
+    max-width: 800px;
+}
+
+@media (min-width: 768px) {
+    #div-modalSizing {
+        width: 60%; 
+    }
+}
+
+.div-infoContainer {
+    border: 1px solid #e78924;
+    border-radius: 10px;
+    padding: 20px;
+    margin-bottom: 20px;
+}
+
+#div-statusBanner {
+    width: 100%;
+    padding: 12px;
+    font-weight: bold;
+    color: white;
+    text-align: center;
+    border-radius: 8px;
+    text-transform: uppercase;
+}
+
+.bg-statusApproved { background-color: #28a745 !important; }
+.bg-statusPending { background-color: #ffc107 !important; color: #212529 !important; }
+.bg-statusDenied { background-color: #dc3545 !important; }
+.bg-statusUnset { background-color: #9b9b9b !important; color: white !important; }
+.bg-statusActive { background-color: #28a745 !important; color: white !important; }
+.bg-statusInactive { background-color: #6c757d !important; }
+.bg-statusLocked { background-color: #ffc107 !important; color: #212529 !important; }
+.bg-statusDeactivated { background-color: #dc3545 !important; }
+.bg-statusDeleted { background-color: #343a40 !important; }
+
+.div-hide { display: none; }
+
+#button-closeModal {
+    background-color: #e78924;
+    color: white;
+    border: none;
+    padding: 10px 40px;
+    border-radius: 10px;
+}
+
+h2.section-title {
+    font-size: 1.75rem;
+    font-weight: bold;
+    margin-bottom: 20px;
+    color:#e78924;
+}
+
+.status-filter-btn.active {
+    color: #fff !important;
+    background-color: #0d6efd !important; /* Bootstrap primary */
+    border-color: #0d6efd !important;
+}
+
+/* Default inactive button style */
+.btn-outline-custom {
+    color: #DE710C !important;
+    border-color: #DE710C !important;
+    background-color: #fff !important;
+}
+
+/* Hover effect (optional) */
+.btn-outline-custom:hover {
+    background-color: #DE710C !important;
+    color: #fff !important;
+}
+
+/* Active state */
+.status-filter-btn.active.btn-outline-custom {
+    background-color: #DE710C !important;
+    color: #fff !important;
+    border-color: #DE710C !important;
+}
+
+/* Make search input and filter button align perfectly */
+#searchInput,
+#filterButton {
+    height: 38px; /* same as Bootstrap default form-control height */
+    padding: 0.375rem 0.75rem; /* match Bootstrap input padding */
+}
+
+#filterButton {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}

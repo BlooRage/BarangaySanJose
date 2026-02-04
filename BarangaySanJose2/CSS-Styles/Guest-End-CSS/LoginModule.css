@@ -1,0 +1,418 @@
+:root {
+    --primary-color: #ff9933; 
+    --secondary-color: #ffffff; 
+    --accent-color: #e68a00; 
+    --dark-text-color: #333333;
+    --border-radius: 12px;
+}
+
+/* ===== Global ===== */
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+    font-family: Arial, sans-serif;
+}
+
+html, body {
+    height: 100%;
+    margin: 0;
+}
+
+body {
+    min-height: 100%;
+    display: flex;
+    flex-direction: column;
+    background-image: url('../../Images/login.png');
+    background-size: cover;
+    background-position: center;
+    background-repeat: no-repeat;  
+    background-attachment: fixed;
+}
+
+/* ===== Main Content ===== */
+.main-content {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 50px 20px;
+    margin: 0 auto;
+    max-width: 100%;
+    box-shadow: none;
+}
+
+/* ===== Container ===== */
+.login-signup-container {
+    display: flex;
+    gap: 0;
+    min-width: 300px;
+    min-height: 300px;
+    width: 80vh;
+    height: 70vh;
+    margin: 3% auto 0;
+    border-radius: 10px;
+    overflow: hidden;
+    background-color: #fff;
+    position: relative;
+    z-index: 10;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+}
+
+/* ===== Images ===== */
+.auth-image {
+    width: 50%;
+    height: 100%;
+    background-size: cover;
+    background-position: center;
+    transition: transform 1s ease;
+    z-index: 2;
+    margin: 0;
+}
+
+.login-image {
+    background-image: url('../../Images/LoginSignIn.png');
+}
+
+.signup-image {
+    background-image: url('../../Images/LoginRegister.png');
+}
+
+/* ===== Form Wrapper & Forms ===== */
+.form-wrapper {
+    width: 50%;
+    margin: 0;
+    position: relative;
+    overflow: hidden;
+    transition: transform 1s ease;
+    z-index: 1;
+}
+
+.form-box {
+    position: absolute;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    padding: 40px;
+    background: #fff;
+    transition: opacity 0.8s ease, z-index 0.8s ease, transform 1s ease;
+    opacity: 0;
+    z-index: 1;
+}
+
+.form-box.active {
+    opacity: 1;
+    z-index: 3;
+    transform: translateX(0);
+}
+
+/* ===== Signup Mode Animations ===== */
+.login-signup-container.signup-mode .auth-image {
+    transform: translateX(100%);
+}
+
+.login-signup-container.signup-mode .form-wrapper {
+    transform: translateX(-100%);
+}
+
+.login-signup-container.signup-mode #loginForm {
+    opacity: 0;
+    z-index: 1;
+    transform: translateX(50%);
+}
+
+.login-signup-container.signup-mode #signupForm {
+    opacity: 1;
+    z-index: 3;
+    transform: translateX(0);
+}
+
+/* ===== Input Groups ===== */
+.input-group-text {
+    background: transparent;
+    border-left: 1px solid #ced4da;
+    padding: 0 0.5rem;
+}
+
+.input-group-text i {
+    color: #e68a00;
+    font-size: 1.1rem;
+}
+
+.input-group .form-control {
+    border-right: 1px solid #ced4da;
+}
+
+/* ===== Other Forms (Forgot / OTP) ===== */
+.otherforms {
+    position: absolute;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    display: none;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    padding: 40px;
+    opacity: 1;
+    z-index: 2;
+}
+
+.otherforms.active {
+    display: flex;
+}
+
+.fp-step {
+    display: none;
+}
+
+.fp-step.active {
+    display: block;
+}
+
+/* ===== OTP Form Design ===== */
+#otp-form {
+    position: absolute;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    padding: 40px;
+    background: #fff;
+    display: none;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    z-index: 5;
+    opacity: 0;
+    transition: opacity 0.5s ease, transform 0.5s ease;
+    border-radius: var(--border-radius);
+    box-shadow: 0 4px 15px rgba(0,0,0,0.05);
+}
+
+/* Show OTP Form */
+#otp-form.active {
+    display: flex;
+    opacity: 1;
+}
+
+/* OTP Heading */
+#otp-form h4 {
+    font-size: 1.5rem;
+    margin-bottom: 12px;
+    text-align: center;
+    color: var(--dark-text-color);
+}
+
+/* OTP Instructions */
+#otp-form p.otp-text {
+    font-size: 0.95rem;
+    color: #6c757d;
+    margin-bottom: 20px;
+    text-align: center;
+}
+
+/* ===== OTP Inputs ===== */
+.otp-inputs {
+    display: flex;
+    justify-content: center;
+    gap: 10px; /* keeps spacing between each digit */
+    margin: 0 0 15px 0; /* bottom margin consistent with other inputs */
+    width: 100%; /* take full width to allow side padding */
+    max-width: 300px; /* optional: limit OTP width like form inputs */
+}
+
+.otp-inputs input {
+    flex: 1; /* distribute inputs evenly */
+    min-width: 40px;
+    height: 50px;
+    text-align: center;
+    font-size: 20px;
+    font-weight: bold;
+    border: 1px solid #ced4da;
+    border-radius: 8px;
+    margin: 0 5px; /* add consistent left/right margin */
+    padding: 0; /* no extra padding inside single digit */
+}
+
+.otp-inputs input:focus {
+    border-color: #28a745;
+    box-shadow: 0 0 0 2px rgba(40, 167, 69, 0.25);
+    outline: none;
+}
+
+/* OTP Button */
+#otp-form button {
+    width: 100%;
+    padding: 12px;
+    border: none;
+    border-radius: var(--border-radius);
+    background-color: var(--primary-color);
+    color: #fff;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.3s ease;
+}
+
+#otp-form button:hover {
+    background-color: var(--accent-color);
+}
+
+/* Responsive OTP Inputs */
+@media (max-width: 500px) {
+    .otp-inputs input {
+        width: 40px;
+        height: 45px;
+        font-size: 16px;
+    }
+}
+
+.otp-inputs input:focus {
+    border-color: #28a745;
+    box-shadow: 0 0 0 2px rgba(40, 167, 69, 0.25);
+    outline: none;
+}
+
+/* ===== Error Text ===== */
+.fp-error,
+#formErrors {
+    font-size: 0.9rem;
+    margin-top: 8px;
+    text-align: center;
+}
+
+#formErrors {
+    display: none;
+    background-color: #f8d7da;
+    border: 1px solid #f5c2c7;
+    color: #000;
+    padding: 10px 12px;
+    border-radius: 6px;
+    margin-bottom: 10px;
+}
+
+/* ===== Animations ===== */
+@keyframes fadeSlide {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+/* ===== Responsive ===== */
+@media (max-width: 950px) {
+    .login-signup-container {
+        min-width: 300px;
+        min-height: 430px;
+        width: 30vh;
+        height: 48vh;
+        margin: 10vh auto 20px;
+    }
+
+    .auth-image { display: none; }
+
+    .form-wrapper {
+        width: 100%;
+        min-height: 300px;
+        transform: none !important;
+    }
+
+    .form-box {
+        position: absolute;
+        width: 100%;
+        padding: 10px;
+        transform: none !important;
+        transition: opacity 0.5s ease;
+        background: #fff;
+    }
+
+    .form-box.active {
+        opacity: 1;
+        z-index: 2;
+        transform: none !important;
+    }
+}
+
+#forgotpassword-verify {
+    position: absolute;
+    inset: 0;
+
+    width: 100%;
+    height: 100%;
+
+    display: none;                 /* hidden by default */
+    flex-direction: column;
+    justify-content: center;       /* vertical center */
+    align-items: center;           /* horizontal center */
+
+    padding: 40px;
+    background: #fff;
+    z-index: 4;
+}
+
+#forgotpassword-verify.active {
+    display: flex;                 /* âœ… MUST be flex */
+}
+
+/* ======================================
+   RESET PASSWORD â€“ MATCH INPUT HEIGHT
+====================================== */
+
+#reset-password-step {
+    display: none;
+}
+
+#reset-password-step.active {
+    display: flex;
+}
+
+/* Force EXACT same height as login/signup */
+#reset-password-step .form-control {            /* âœ” exact visual match */
+    padding: 0.375rem 0.75rem;    /* âœ” bootstrap default */
+    font-size: 1rem;
+    line-height: 1.5;
+}
+
+/* Match input group behavior */
+#reset-password-step .input-group {
+    width: 100%;
+}
+
+/* Match eye icon container height */
+#reset-password-step .input-group-text {           /* âœ” critical */
+    display: flex;
+    align-items: center;
+    background: transparent;
+    border-left: none;
+}
+
+/* Button match */
+#submitNewPasswordBtn {
+    height: 50px;                 /* âœ” matches Login button */
+    font-weight: 600;
+}
+
+#submitNewPasswordBtn:hover {
+    background-color: var(--accent-color);
+}
+
+/* Error box consistency */
+#resetPasswordErrors {
+    display: none;
+    background-color: #f8d7da;
+    border: 1px solid #f5c2c7;
+    color: #000;
+    padding: 10px 12px;
+    border-radius: 6px;
+    text-align: center;
+}
+
+.otp-icon {
+    width: clamp(90px, 8vw, 100px);
+    height: auto;
+}
+
+@keyframes popIn {
+    0% { transform: scale(0.2); opacity: 0; }
+    100% { transform: scale(.4); opacity: 1; }
+}
+
+
+
