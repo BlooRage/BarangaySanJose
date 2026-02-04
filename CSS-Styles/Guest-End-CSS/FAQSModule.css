@@ -57,6 +57,7 @@
     display: flex;
     align-items: center;
     width: 100%;
+    gap: 16px;
     padding: 20px;
     font-size: 1.2em;
     font-weight: bold;
@@ -66,10 +67,17 @@
     text-align: left;
     transition: background-color 0.3s;
 }
+.accordionButton .questionTitle {
+    margin: 0;
+    font-size: 1.25rem;
+    font-weight: bold;
+    color: var(--primary-color);
+    flex: 1;
+    font-family: 'Charis SIL Bold', serif;
+}
 
 .accordionButton:hover {
     background-color: #fff8f3;
-    font-size: 0.95em;
 }
 
 
@@ -77,14 +85,17 @@
     display: flex;
     justify-content: center;
     align-items: center;
-    width: 100%;
-    height: auto;
+    width: 48px;
+    height: 48px;
     background-color: var(--primary-color); 
     color: var(--secondary-color); 
     border-radius: 5px;
-    margin-right: 15px;
     font-size: 1em;
     flex-shrink: 0; 
+}
+ .iconWrapper img {
+    width: 26px;
+    height: 26px;
 }
 
 .iconWrapper i {
@@ -122,6 +133,9 @@
     .accordionButton {
         padding: 15px;
         font-size: 1.1em;
+    }
+    .accordionButton .questionTitle {
+        font-size: 0.95rem;
     }
     .iconWrapper {
         width: 35px;

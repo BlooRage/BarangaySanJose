@@ -134,7 +134,7 @@ class POP3
     /**
      * Line break constant.
      */
-    const LE = "\r\n";
+    const LE = "";
 
     /**
      * Debug level for no output.
@@ -468,3 +468,4 @@ class POP3
         );
     }
 }
+

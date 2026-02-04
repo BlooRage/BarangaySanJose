@@ -15,9 +15,7 @@
 
     <button onclick="topFunction()" id="goToTop" title="Go to top"><i class="fa-solid fa-arrow-up"></i>&nbsp;&nbsp;Go to top</button>
     
-    <div class="navbarWrapper">
-        <span class="label">Official Website of Barangay San Jose, Rodriguez, Rizal</span>
-        <nav class="navbar navbar-expand-lg align-items-center navbar-light bg-white shadow-sm">
+    <div class="navbarWrapper"><nav class="navbar navbar-expand-xl align-items-center navbar-light bg-white shadow-sm">
             <div class="container-fluid align-items-center px-4">
                 <a id="navbarBrand" class="navbar-brand" href="../index.html">
                     <img src="Images/San_Jose_LOGO.jpg" alt="Logo" id="navbarLogo" class="d-inline-block align-text-center">
@@ -204,5 +202,24 @@
             document.documentElement.scrollTop = 0;
         }
     </script>
-</body>
+    <script>
+        document.addEventListener("click", function (event) {
+            var navbar = document.getElementById("navbarNav");
+            var toggler = document.querySelector(".navbar-toggler");
+            if (!navbar || !toggler) {
+                return;
+            }
+            var isShown = navbar.classList.contains("show");
+            if (!isShown) {
+                return;
+            }
+            var clickedInside = navbar.contains(event.target) || toggler.contains(event.target);
+            if (!clickedInside) {
+                var collapse = bootstrap.Collapse.getOrCreateInstance(navbar);
+                collapse.hide();
+            }
+        });
+    </script></body>
 </html>
+
+

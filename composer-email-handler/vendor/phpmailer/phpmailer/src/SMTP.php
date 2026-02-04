@@ -43,7 +43,7 @@ class SMTP
      *
      * @var string
      */
-    const LE = "\r\n";
+    const LE = "";
 
     /**
      * The SMTP port to use if one is not specified.
@@ -292,7 +292,7 @@ class SMTP
         //Is this a PSR-3 logger?
         if ($this->Debugoutput instanceof \Psr\Log\LoggerInterface) {
             //Remove trailing line breaks potentially added by calls to SMTP::client_send()
-            $this->Debugoutput->debug(rtrim($str, "\r\n"));
+            $this->Debugoutput->debug(rtrim($str, ""));
 
             return;
         }
@@ -311,7 +311,7 @@ class SMTP
             case 'html':
                 //Cleans up output a bit for a better looking, HTML-safe output
                 echo gmdate('Y-m-d H:i:s'), ' ', htmlentities(
-                    preg_replace('/[\r\n]+/', '', $str),
+                    preg_replace('/[]+/', '', $str),
                     ENT_QUOTES,
                     'UTF-8'
                 ), "<br>\n";
@@ -319,7 +319,7 @@ class SMTP
             case 'echo':
             default:
                 //Normalize line breaks
-                $str = preg_replace('/\r\n|\r/m', "\n", $str);
+                $str = preg_replace('/|\r/m', "\n", $str);
                 echo gmdate('Y-m-d H:i:s'),
                 "\t",
                     //Trim trailing space
@@ -799,7 +799,7 @@ class SMTP
          */
 
         //Normalize line breaks before exploding
-        $lines = explode("\n", str_replace(["\r\n", "\r"], "\n", $msg_data));
+        $lines = explode("\n", str_replace(["", "\r"], "\n", $msg_data));
 
         /* To distinguish between a complete RFC822 message and a plain message body, we check if the first field
          * of the first line (':' separated) does not contain a space then it _should_ be a header, and we will
@@ -1595,3 +1595,4 @@ class SMTP
         return $this->last_smtp_transaction_id;
     }
 }
+

@@ -37,6 +37,13 @@
 .newsArticleGroup {
    padding-right: 30px;
 }
+.newsOuter {
+   padding-top: 40px;
+   padding-bottom: 40px;
+}
+.newsContentGroup {
+   background-color: var(--secondary-color);
+}
 
 .articleImageWrapper {
    width: 100%;
@@ -116,9 +123,9 @@
    .newsArticleGroup {
       padding-right: 15px; 
    }
-   .placeholderImage {
-      height: 200px;
-   }
+    .placeholderImage {
+      height: 160px;
+    }
    .articleHeadline {
       font-size: 2em;
    }

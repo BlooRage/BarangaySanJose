@@ -6,16 +6,25 @@
     <title>Government</title>
     <script src="https://kit.fontawesome.com/3482e00999.js" crossorigin="anonymous"></script>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-sRIl4kxILFvY47J16cr9ZwB07vP4J8+LH7qKQnuqkuIAvNWLzeN8tE5YBujZqJLB" crossorigin="anonymous">
+    <link
+        rel="stylesheet"
+        href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+        integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
+        crossorigin=""
+    />
     <link rel="stylesheet" href="../CSS-Styles/Guest-End-CSS/GuestPage.css">
     <link rel="stylesheet" href="../CSS-Styles/NavbarFooterStyle.css">
 </head>
 <body>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/js/bootstrap.bundle.min.js" integrity="sha384-FKyoEForCGlyvwx9Hj09JcYn3nv7wiPVlz7YYwJrWVcXK/BmnVDxM+D2scQbITxI" crossorigin="anonymous"></script>
+    <script
+        src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+        integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
+        crossorigin=""
+    ></script>
 
     <button onclick="topFunction()" id="goToTop" title="Go to top"><i class="fa-solid fa-arrow-up"></i>&nbsp;&nbsp;Go to top</button>
-    <div class="navbarWrapper"></div>
-        <span class="label">Official Website of Barangay San Jose, Rodriguez, Rizal</span>
-        <nav class="navbar navbar-expand-lg align-items-center navbar-light bg-white shadow-sm">
+    <div class="navbarWrapper">    <nav class="navbar navbar-expand-xl align-items-center navbar-light bg-white shadow-sm">
             <div class="container-fluid align-items-center px-4">
                 <a id="navbarBrand" class="navbar-brand" href="#">
                     <img src="../Images/San_Jose_LOGO.jpg" alt="Logo" id="navbarLogo" class="d-inline-block align-text-center">
@@ -27,10 +36,10 @@
                 <div class="collapse navbar-collapse" id="navbarNav">
                     <ul id="navbarLinks" class="navbar-nav ms-auto">
                         <li class="nav-item mx-lg-3">
-                            <a class="nav-link active" aria-current="page" href="../index.html">Home</a>
+                            <a class="nav-link" href="../index.html">Home</a>
                         </li>
                         <li class="nav-item mx-lg-3">
-                            <a class="nav-link" href="government.html">Government</a>
+                            <a class="nav-link active" aria-current="page" href="government.html">Government</a>
                         </li>
                         <li class="nav-item mx-lg-3">
                             <a class="nav-link" href="services.html">Services</a>
@@ -54,7 +63,7 @@
     </div>
 
     <div class="banner">
-        <img src="../Images/Government_Banner3.jpg" alt="Govt Banner" class="bannerImage">
+        <img src="../Images/Government_Banner.png" alt="Govt Banner" class="bannerImage">
         <div class="bannerText">
             <h1>Government</h1>
             <p>Barangay San Jose exists to serve the people with dedication, fairness, and care. The barangay delivers services that protect your safety, support your needs, and strengthens community life. Every program and action reflects a commitment to public service and shared responsibility. The barangay government stands ready to assist you and work for the welfare of all residents.
@@ -94,17 +103,6 @@
                                 <figcaption class="figure-caption">
                                     <h3 class="mt-1">Minerva D. Quita</h3>
                                     <p>Barangay Secretary</p>
-                                </figcaption>
-                        </figure>
-                    </div>
-                </div>
-                <div class="col">
-                    <div class="p-3">
-                        <figure class="figure">
-                            <img src="../Images/Officials/Hon Kap Glen_MAC8515 copy 2.jpg" id="officialImg" class="img-fluid">
-                                <figcaption class="figure-caption">
-                                    <h3 class="mt-1">Glenn S. Evangelista</h3>
-                                    <p>Punong Barangay</p>
                                 </figcaption>
                         </figure>
                     </div>
@@ -201,51 +199,59 @@
         </div>
     </section>
 
-    <span class="labelDivider">Areas</span>
+    <span class="labelDivider">Barangay Vicinity</span>
 
     <section class="deptSection">
         <div class="container">
-            <div class="row row-cols-1 row-cols-sm-2 row-cols-lg-3 g-3 text-start">
+            <div class="mapCard mb-4">
+                <div class="mapOverlay" id="mapOverlay">Click to enable map interaction</div>
+                <div id="map" class="vicinityMap"></div>
+                <div class="mapBadge" id="mapStatus">
+                    <b>Barangay San Jose (Rodriguez, Rizal)</b>
+                    Loading boundary from OpenStreetMap…
+                </div>
+            </div>
+            <div class="row row-cols-1 row-cols-sm-2 row-cols-lg-3 g-3 text-start vicinityGrid">
                 <div class="col">
-                    <div class="p-4 deptBox">
+                    <div class="p-4 deptBox vicinityCard">
                         <h3>Area 01</h3>
-                        <p>Lorem ipsum dolor sit amet consectetur adipiscing elit. Dolor sit amet consectetur adipiscing elit quisque faucibus.</p>
+                        <p class="vicinitySub">San Jose Proper</p>
                     </div>
                 </div>
                 <div class="col">
-                    <div class="p-4 deptBox">
+                    <div class="p-4 deptBox vicinityCard">
                         <h3>Area 1A</h3>
-                        <p>Lorem ipsum dolor sit amet consectetur adipiscing elit. Dolor sit amet consectetur adipiscing elit quisque faucibus.</p>
+                        <p class="vicinitySub">Litex Village | Abatex Christine Creek | Med. Heights</p>
                     </div>
                 </div>
                 <div class="col">
-                    <div class="p-4 deptBox">
+                    <div class="p-4 deptBox vicinityCard">
                         <h3>Area 02</h3>
-                        <p>Lorem ipsum dolor sit amet consectetur adipiscing elit. Dolor sit amet consectetur adipiscing elit quisque faucibus.</p>
+                        <p class="vicinitySub">VFW | Amychelle | Christine Villa Parnshey | Villa Ana | Zaniga Farm</p>
                     </div>
                 </div>
                 <div class="col">
-                    <div class="p-4 deptBox">
+                    <div class="p-4 deptBox vicinityCard">
                         <h3>Area 03</h3>
-                        <p>Lorem ipsum dolor sit amet consectetur adipiscing elit. Dolor sit amet consectetur adipiscing elit quisque faucibus.</p>
+                        <p class="vicinitySub">Relocation</p>
                     </div>
                 </div>
                 <div class="col">
-                    <div class="p-4 deptBox">
+                    <div class="p-4 deptBox vicinityCard">
                         <h3>Area 04</h3>
-                        <p>Lorem ipsum dolor sit amet consectetur adipiscing elit. Dolor sit amet consectetur adipiscing elit quisque faucibus.</p>
+                        <p class="vicinitySub">Kasiglahan: Phase 1-B | Phase 1-C | Phase 1-D | Phase 1-M | Phase 1-A</p>
                     </div>
                 </div>
                 <div class="col">
-                    <div class="p-4 deptBox">
+                    <div class="p-4 deptBox vicinityCard">
                         <h3>Area 05</h3>
-                        <p>Lorem ipsum dolor sit amet consectetur adipiscing elit. Dolor sit amet consectetur adipiscing elit quisque faucibus.</p>
+                        <p class="vicinitySub">Kasiglahan: Phase 1-K | Phase 1K1 | Phase 1K2 | Phase 1-E | Phase 1-G</p>
                     </div>
                 </div>
                 <div class="col">
-                    <div class="p-4 deptBox">
+                    <div class="p-4 deptBox vicinityCard">
                         <h3>Area 06</h3>
-                        <p>Lorem ipsum dolor sit amet consectetur adipiscing elit. Dolor sit amet consectetur adipiscing elit quisque faucibus.</p>
+                        <p class="vicinitySub">Sub-Urban | Metro Manila Hills</p>
                     </div>
                 </div>
             </div>
@@ -306,5 +312,111 @@
             document.documentElement.scrollTop = 0;
         }
     </script>
-</body>
+    <script>
+        (async () => {
+            const status = document.getElementById("mapStatus");
+            const overlay = document.getElementById("mapOverlay");
+            const map = L.map("map").setView([14.7491, 121.1314], 12);
+
+            L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+                maxZoom: 19,
+                attribution: "&copy; OpenStreetMap contributors"
+            }).addTo(map);
+
+            map.dragging.disable();
+            map.scrollWheelZoom.disable();
+            map.doubleClickZoom.disable();
+            map.boxZoom.disable();
+            map.keyboard.disable();
+            if (map.tap) {
+                map.tap.disable();
+            }
+
+            if (overlay) {
+                overlay.addEventListener("click", function() {
+                    overlay.classList.add("is-hidden");
+                    map.dragging.enable();
+                    map.scrollWheelZoom.enable();
+                    map.doubleClickZoom.enable();
+                    map.boxZoom.enable();
+                    map.keyboard.enable();
+                    if (map.tap) {
+                        map.tap.enable();
+                    }
+                });
+            }
+
+            const base =
+                "https://portal.georisk.gov.ph/arcgis/rest/services/PSA/Barangay/MapServer/4/query";
+            const where =
+                "prov_name='Rizal' AND city_name LIKE 'Rodriguez%' AND brgy_name='San Jose'";
+            const url =
+                base +
+                "?where=" + encodeURIComponent(where) +
+                "&outFields=" + encodeURIComponent("reg_name,prov_name,city_name,brgy_name,psgc_10d") +
+                "&returnGeometry=true" +
+                "&outSR=4326" +
+                "&f=geojson";
+
+            try {
+                const res = await fetch(url);
+                if (!res.ok) {
+                    throw new Error("Request failed: " + res.status);
+                }
+
+                const geojson = await res.json();
+                if (!geojson.features || geojson.features.length === 0) {
+                    throw new Error("No polygon returned. Check PSA layer attributes.");
+                }
+
+                const layer = L.geoJSON(geojson, {
+                    style: {
+                        color: "#ff7a00",
+                        weight: 4,
+                        opacity: 0.95,
+                        fill: true,
+                        fillOpacity: 0.10
+                    }
+                }).addTo(map);
+
+                map.fitBounds(layer.getBounds(), { padding: [20, 20] });
+
+                const p = geojson.features[0].properties || {};
+                status.innerHTML =
+                    "<b>Border loaded</b>" +
+                    "<div style=\"opacity:.9\">PSA Barangay Boundary (GeoRisk portal)</div>" +
+                    `<div style="opacity:.75;margin-top:6px">${p.brgy_name || ""}, ${p.city_name || ""}, ${p.prov_name || ""}</div>`;
+            } catch (e) {
+                status.innerHTML =
+                    "<b>Failed to load border</b>" +
+                    `<div style="opacity:.9;margin-top:6px">${String(e.message || e)}</div>`;
+            }
+        })();
+    </script>
+    <script>
+        document.addEventListener("click", function (event) {
+            var navbar = document.getElementById("navbarNav");
+            var toggler = document.querySelector(".navbar-toggler");
+            if (!navbar || !toggler) {
+                return;
+            }
+            var isShown = navbar.classList.contains("show");
+            if (!isShown) {
+                return;
+            }
+            var clickedInside = navbar.contains(event.target) || toggler.contains(event.target);
+            if (!clickedInside) {
+                var collapse = bootstrap.Collapse.getOrCreateInstance(navbar);
+                collapse.hide();
+            }
+        });
+    </script></body>
 </html>
+
+
+
+
+
+
+
+

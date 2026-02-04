@@ -13,9 +13,7 @@
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/js/bootstrap.bundle.min.js" integrity="sha384-FKyoEForCGlyvwx9Hj09JcYn3nv7wiPVlz7YYwJrWVcXK/BmnVDxM+D2scQbITxI" crossorigin="anonymous"></script>
 
     <button onclick="topFunction()" id="goToTop" title="Go to top"><i class="fa-solid fa-arrow-up"></i>&nbsp;&nbsp;Go to top</button>
-    <div class="navbarWrapper"></div>
-        <span class="label">Official Website of Barangay San Jose, Rodriguez, Rizal</span>
-        <nav class="navbar navbar-expand-lg align-items-center navbar-light bg-white shadow-sm">
+    <div class="navbarWrapper">    <nav class="navbar navbar-expand-xl align-items-center navbar-light bg-white shadow-sm">
             <div class="container-fluid align-items-center px-4">
                 <a id="navbarBrand" class="navbar-brand" href="#">
                     <img src="../Images/San_Jose_LOGO.jpg" alt="Logo" id="navbarLogo" class="d-inline-block align-text-center">
@@ -27,13 +25,13 @@
                 <div class="collapse navbar-collapse" id="navbarNav">
                     <ul id="navbarLinks" class="navbar-nav ms-auto">
                         <li class="nav-item mx-lg-3">
-                            <a class="nav-link active" aria-current="page" href="../index.html">Home</a>
+                            <a class="nav-link" href="../index.html">Home</a>
                         </li>
                         <li class="nav-item mx-lg-3">
                             <a class="nav-link" href="government.html">Government</a>
                         </li>
                         <li class="nav-item mx-lg-3">
-                            <a class="nav-link" href="services.html">Services</a>
+                            <a class="nav-link active" aria-current="page" href="services.html">Services</a>
                         </li>
                         <li class="nav-item mx-lg-3">
                             <a class="nav-link" href="news.html">News</a>
@@ -158,5 +156,29 @@
             document.documentElement.scrollTop = 0;
         }
     </script>
-</body>
+    <script>
+        document.addEventListener("click", function (event) {
+            var navbar = document.getElementById("navbarNav");
+            var toggler = document.querySelector(".navbar-toggler");
+            if (!navbar || !toggler) {
+                return;
+            }
+            var isShown = navbar.classList.contains("show");
+            if (!isShown) {
+                return;
+            }
+            var clickedInside = navbar.contains(event.target) || toggler.contains(event.target);
+            if (!clickedInside) {
+                var collapse = bootstrap.Collapse.getOrCreateInstance(navbar);
+                collapse.hide();
+            }
+        });
+    </script></body>
 </html>
+
+
+
+
+
+
+

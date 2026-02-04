@@ -2,7 +2,6 @@
 // Adds: INACTIVE LOGIN → "Verify your account first" → Continue → OTP (same OTP form) → UniversalModal success → Continue redirect
 // Keeps: your existing transitions + Signup OTP + Forgot OTP using SAME OTP form
 
-console.log("UniversalModal:", typeof UniversalModal);
 
 // ===== DOM Elements =====
 const container = document.querySelector(".login-signup-container");
@@ -392,7 +391,6 @@ async function sendOTP(recipient, purpose, reuse = false) {
       });
 
       const genText = await genRes.text();
-      console.log("GENERATE OTP RAW:", genText);
 
       let genData;
       try {
@@ -416,7 +414,6 @@ async function sendOTP(recipient, purpose, reuse = false) {
     });
 
     const sendText = await sendRes.text();
-    console.log("SEND OTP RAW:", sendText);
 
     let sendData;
     try {
@@ -427,7 +424,6 @@ async function sendOTP(recipient, purpose, reuse = false) {
 
     if (!sendData.success) throw new Error(sendData.error || "OTP sending failed");
   } catch (err) {
-    console.error("Error sending OTP:", err.message);
     showOtpError("Unable to send OTP. Please try again later.");
   }
 }
@@ -447,7 +443,6 @@ if (resendOTPBtn) {
       resendOTPBtn.textContent = "OTP Resent!";
       startResendCountdown(otpFrom, 120);
     } catch (err) {
-      console.error("Resend OTP Error:", err);
       showOtpError("Unable to resend OTP. Please try again later.");
     }
   });
@@ -521,7 +516,6 @@ if (forgotContinueBtn) {
 
       showOTPForm("forgot", { phone });
     } catch (err) {
-      console.error(err);
       showForgotError("Unable to verify account. Please try again later.", [forgotPhoneInput, forgotEmailInput]);
     }
   });
@@ -598,7 +592,6 @@ if (createAccountBtn) {
 
       showOTPForm("signup", { phone }); // auto send OTP
     } catch (err) {
-      console.error("Fetch error:", err);
       showError("Unable to verify account. Please try again later.", "signup");
     }
   });
@@ -625,7 +618,6 @@ if (inactiveContinueBtn) {
         phoneMasked: inactiveSession.phoneMasked,
       });
     } catch (err) {
-      console.error(err);
       const div = document.getElementById("inactiveVerifyErrors");
       setErrorBox(div, "Network error. Please try again.");
     }
@@ -767,7 +759,6 @@ if (verifyOTPBtn) {
         showStep("reset-password-step");
       }
     } catch (err) {
-      console.error(err);
       showOtpError("Unable to verify OTP. Please try again later.");
     }
   });
@@ -857,7 +848,6 @@ if (submitNewPasswordBtn) {
         ],
       });
     } catch (err) {
-      console.error(err);
       showResetPasswordError("Unable to reset password. Please try again later.");
     }
   });
@@ -890,7 +880,6 @@ if (loginForm) {
       });
 
       const raw = await res.text();
-      console.log("SERVER RAW RESPONSE:", raw);
 
       let data = null;
       try {
@@ -923,7 +912,6 @@ if (loginForm) {
       // Active user
       window.location.href = data.redirect;
     } catch (err) {
-      console.error("LOGIN ERROR:", err);
       showError("Unable to login. Please try again later.", "login");
     }
   });

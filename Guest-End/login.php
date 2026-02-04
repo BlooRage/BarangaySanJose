@@ -34,28 +34,28 @@ if (isset($_SESSION['user_id'])) {
   </head>
 
   <body>
-    <div class="navbarWrapper"></div>
-    <span class="label">Official Website of Barangay San Jose, Rodriguez, Rizal</span>
-
-    <nav class="navbar navbar-expand-lg align-items-center navbar-light bg-white shadow-sm">
+    <div class="navbarWrapper">    <nav class="navbar navbar-expand-xl align-items-center navbar-light bg-white shadow-sm">
       <div class="container-fluid align-items-center px-4">
         <a id="navbarBrand" class="navbar-brand" href="#">
           <img src="../Images/San_Jose_LOGO.jpg" alt="Logo" id="navbarLogo" class="d-inline-block align-text-center" />
           Barangay San Jose
         </a>
+        <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
+          <span class="navbar-toggler-icon"></span>
+        </button>
         <div class="collapse navbar-collapse" id="navbarNav">
           <ul id="navbarLinks" class="navbar-nav ms-auto">
-            <li class="nav-item mx-lg-3"><a class="nav-link active" aria-current="page" href="../index.html">Home</a></li>
+            <li class="nav-item mx-lg-3"><a class="nav-link" href="../index.html">Home</a></li>
             <li class="nav-item mx-lg-3"><a class="nav-link" href="government.html">Government</a></li>
             <li class="nav-item mx-lg-3"><a class="nav-link" href="services.html">Services</a></li>
             <li class="nav-item mx-lg-3"><a class="nav-link" href="news.html">News</a></li>
             <li class="nav-item mx-lg-3"><a class="nav-link" href="faq.html">FAQ</a></li>
             <li class="nav-item mx-lg-3"><a class="nav-link" href="contact.html">Contact</a></li>
-            <li class="nav-item"><a class="nav-link" href="login.php">Log in</a></li>
+        <li class="nav-item"><a class="nav-link active" aria-current="page" href="login.php">Log in</a></li>
           </ul>
         </div>
       </div>
-    </nav>
+    </nav>    </div>
 
     <main>
       <div class="login-signup-container">
@@ -268,5 +268,30 @@ if (isset($_SESSION['user_id'])) {
         </div>
       </div>
     </div>
-  </body>
+      <script>
+        document.addEventListener("click", function (event) {
+            var navbar = document.getElementById("navbarNav");
+            var toggler = document.querySelector(".navbar-toggler");
+            if (!navbar || !toggler) {
+                return;
+            }
+            var isShown = navbar.classList.contains("show");
+            if (!isShown) {
+                return;
+            }
+            var clickedInside = navbar.contains(event.target) || toggler.contains(event.target);
+            if (!clickedInside) {
+                var collapse = bootstrap.Collapse.getOrCreateInstance(navbar);
+                collapse.hide();
+            }
+        });
+    </script></body>
 </html>
+
+
+
+
+
+
+
+

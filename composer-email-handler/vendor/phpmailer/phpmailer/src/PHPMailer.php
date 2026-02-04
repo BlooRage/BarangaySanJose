@@ -795,7 +795,7 @@ class PHPMailer
      * The SMTP standard CRLF line break.
      * If you want to change line break format, change static::$LE, not this.
      */
-    const CRLF = "\r\n";
+    const CRLF = "";
 
     /**
      * "Folding White Space" a white space string used for line folding.
@@ -915,7 +915,7 @@ class PHPMailer
         }
         //Is this a PSR-3 logger?
         if ($this->Debugoutput instanceof \Psr\Log\LoggerInterface) {
-            $this->Debugoutput->debug(rtrim($str, "\r\n"));
+            $this->Debugoutput->debug(rtrim($str, ""));
 
             return;
         }
@@ -934,7 +934,7 @@ class PHPMailer
             case 'html':
                 //Cleans up output a bit for a better looking, HTML-safe output
                 echo htmlentities(
-                    preg_replace('/[\r\n]+/', '', $str),
+                    preg_replace('/[]+/', '', $str),
                     ENT_QUOTES,
                     'UTF-8'
                 ), "<br>\n";
@@ -942,7 +942,7 @@ class PHPMailer
             case 'echo':
             default:
                 //Normalize line breaks
-                $str = preg_replace('/\r\n|\r/m', "\n", $str);
+                $str = preg_replace('/|\r/m', "\n", $str);
                 echo gmdate('Y-m-d H:i:s'),
                 "\t",
                     //Trim trailing space
@@ -1116,7 +1116,7 @@ class PHPMailer
             return false;
         }
         if ($name !== null && is_string($name)) {
-            $name = trim(preg_replace('/[\r\n]+/', '', $name)); //Strip breaks and trim
+            $name = trim(preg_replace('/[]+/', '', $name)); //Strip breaks and trim
         } else {
             $name = '';
         }
@@ -1391,7 +1391,7 @@ class PHPMailer
             $name = '';
         }
         $address = trim((string)$address);
-        $name = trim(preg_replace('/[\r\n]+/', '', $name)); //Strip breaks and trim
+        $name = trim(preg_replace('/[]+/', '', $name)); //Strip breaks and trim
         //Don't validate now addresses with IDN. Will be done in send().
         $pos = strrpos($address, '@');
         if (
@@ -4335,7 +4335,7 @@ class PHPMailer
                     unset($this->CustomHeader[$k]);
                     continue;
                 }
-                if (strpbrk($name . $value, "\r\n") !== false) {
+                if (strpbrk($name . $value, "") !== false) {
                     if ($this->exceptions) {
                         throw new Exception(self::lang('invalid_header'));
                     }
@@ -4565,7 +4565,7 @@ class PHPMailer
         $name = trim($name);
         $value = (null === $value) ? '' : trim($value);
         //Ensure name is not empty, and that neither name nor value contain line breaks
-        if (empty($name) || strpbrk($name . $value, "\r\n") !== false) {
+        if (empty($name) || strpbrk($name . $value, "") !== false) {
             if ($this->exceptions) {
                 throw new Exception(self::lang('invalid_header'));
             }
@@ -5017,7 +5017,7 @@ class PHPMailer
      */
     public static function stripTrailingWSP($text)
     {
-        return rtrim($text, " \r\n\t");
+        return rtrim($text, " \t");
     }
 
     /**
@@ -5029,7 +5029,7 @@ class PHPMailer
      */
     public static function stripTrailingBreaks($text)
     {
-        return rtrim($text, "\r\n");
+        return rtrim($text, "");
     }
 
     /**
@@ -5043,7 +5043,7 @@ class PHPMailer
     }
 
     /**
-     * Set the line break format string, e.g. "\r\n".
+     * Set the line break format string, e.g. "".
      *
      * @param string $le
      */
@@ -5152,7 +5152,7 @@ class PHPMailer
         //Note PCRE \s is too broad a definition of whitespace; RFC5322 defines it as `[ \t]`
         //@see https://www.rfc-editor.org/rfc/rfc5322#section-2.2
         //That means this may break if you do something daft like put vertical tabs in your headers.
-        $signHeader = preg_replace('/\r\n[ \t]+/', ' ', $signHeader);
+        $signHeader = preg_replace('/[ \t]+/', ' ', $signHeader);
         //Break headers out into an array
         $lines = explode(self::CRLF, $signHeader);
         foreach ($lines as $key => $line) {
@@ -5474,3 +5474,4 @@ class PHPMailer
         $this->oauth = $oauth;
     }
 }
+
