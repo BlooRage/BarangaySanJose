@@ -1,0 +1,142 @@
+:root {
+    --primary-color: #ff9933; 
+    --secondary-color: #ffffff;
+    --accent-color: #e68a00; 
+--dark-text-color: #333333;
+ --border-radius: 12px;
+}
+
+.mainContentWrapper {
+    padding: 0;
+    margin: 0;
+}
+.serviceHeaderBanner {
+    background-color: #f0f0f0; 
+    width: 100%;
+    padding: 60px 20px;
+    text-align: center;
+    border-bottom: 20px solid var(--primary-color); 
+}
+
+.bannerTitle {
+    font-size: 3em;
+    font-family: 'Charis SIL Bold', serif;
+    color: var(--primary-color);
+    margin-bottom: 20px;
+    font-weight: bold;
+}
+
+.bannerText {
+    font-size: 1em;
+    max-width: 800px;
+    margin: 0 auto;
+}
+
+.mainContentWrapper {
+    padding: 0;
+    margin: 0;
+}
+
+.serviceHeaderGroup {
+    background-color: var(--primary-color);
+    width: 100%;
+    padding: 60px 20px;
+    text-align: center;
+    margin-bottom: 50px;
+}
+
+.serviceHeading {
+    font-size: 3em;
+    font-family: 'Charis SIL Bold', serif;
+    color: var(--secondary-color); 
+    margin-bottom: 20px;
+}
+
+.serviceSubtext {
+    color: var(--secondary-color); 
+    font-size: 1.1em;
+    max-width: 800px;
+    margin: 0 auto;
+}
+
+.serviceCardRow {
+    margin-bottom: 50px;
+    padding: 0 15px; 
+}
+
+.serviceCardGroup {
+    background-color: var(--secondary-color); 
+    border: 2px solid var(--primary-color);
+    border-radius: var(--border-radius);
+    padding: 30px;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+    height: 100%; 
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    transition: transform 0.3s ease;
+}
+
+.serviceCardGroup:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 8px 16px rgba(0, 0, 0, 0.15);
+}
+
+.cardHeading {
+    font-family: 'Geist', sans-serif;
+    font-weight: bold;
+    color: var(--primary-color);
+    font-size: 1.5em;
+    margin-bottom: 10px;
+}
+
+.cardText {
+    font-size: 0.95em;
+    color: var(--dark-text-color);
+    margin-bottom: 20px;
+    flex-grow: 1; 
+}
+
+.buttonAction {
+    display: block; 
+    width: 100%;
+    max-width: 150px; 
+    padding: 10px 15px;
+    background-color: var(--primary-color);
+    color: var(--secondary-color);
+    border: none;
+    border-radius: 5px;
+    font-size: 1em;
+    text-align: center;
+    cursor: pointer;
+    transition: background-color 0.3s;
+    margin-top: 15px;
+}
+
+.buttonAction:hover {
+    background-color: var(--accent-color);
+    color: var(--secondary-color);
+}
+
+@media (max-width: 768px) {
+    .serviceHeaderGroup {
+        padding: 40px 15px;
+    }
+    .serviceHeading {
+        font-size: 2.5em;
+    }
+    .serviceCardRow {
+        margin-bottom: 30px;
+    }
+    .row-cols-md-3 > * {
+        flex: 0 0 100%;
+        max-width: 100%;
+    }
+    .col-md-4 {
+        flex: 0 0 100%;
+        max-width: 100%;
+    }
+    .buttonAction {
+        max-width: 100%;
+    }
+}

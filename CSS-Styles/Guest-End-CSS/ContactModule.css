@@ -1,0 +1,210 @@
+:root {
+    --primary-color: #ff9933; 
+    --secondary-color: #ffffff; 
+    --accent-color: #e68a00; 
+--dark-text-color: #333333;
+ --border-radius: 12px;
+}
+
+.mainContentWrapper {
+    padding: 0;
+    margin: 0;
+}
+.contactHeaderBanner {
+    background-color: #f0f0f0; 
+    width: 100%;
+    padding: 60px 20px;
+    text-align: center;
+    border-bottom: 20px solid var(--primary-color); 
+}
+
+.contactSidebar {
+    background-color: #f0f0f0;
+    min-height: 80vh; 
+    padding: 0;
+}
+
+.contactContentArea {
+    padding: 40px 50px;
+}
+.contactCentered {
+    text-align: center;
+    max-width: 1200px;
+    margin: 0 auto;
+}
+
+
+.contactHeaderGroup {
+    margin-bottom: 50px;
+    text-align: center;
+}
+
+.pageHeading {
+    font-size: 3em;
+    font-family: 'Charis SIL Bold', serif;
+    color: var(--primary-color); 
+    margin-bottom: 10px;
+    font-weight: bold;
+}
+.bherSection {
+    margin-bottom: 50px;
+    text-align: center;
+}
+
+.sectionTitle {
+    font-size: 2em;
+    font-family: 'Geist', sans-serif;
+    color: var(--dark-text-color);
+    margin-bottom: 20px;
+    font-weight: bold;
+}
+
+.sectionText {
+    font-size: 1em;
+    color: #666;
+    margin-bottom: 40px;
+    max-width: 780px;
+    margin-left: auto;
+    margin-right: auto;
+}
+
+
+.areaTitle {
+    font-size: 1.1em;
+    font-weight: bold;
+    color: var(--dark-text-color);
+    margin-bottom: 0;
+}
+
+.phoneNumber {
+    font-size: 1.1em;
+    color: #666;
+    margin-bottom: 15px;
+}
+
+
+.areaHotlinesBanner {
+    background-color: var(--primary-color); 
+    width: 100%;
+    text-align: center;
+    color: var(--secondary-color); 
+}
+
+.bannerTitle2 {
+    font-size: 2.5em;
+    font-family: 'Geist', sans-serif;
+    font-weight: bold;
+    margin-bottom: 15px;
+}
+
+.bannerTitle {
+    font-size: 3em;
+    font-family: 'Charis SIL Bold', serif;
+    color: var(--primary-color);
+    margin-bottom: 20px;
+    font-weight: bold;
+}
+
+.bannerText {
+    font-size: 1em;
+    max-width: 800px;
+    margin: 0 auto;
+}
+
+.contactAreaName {
+    font-size: 1.2em;
+    font-weight: bold;
+    color: var(--dark-text-color);
+    margin-bottom: 0;
+}
+
+.contactSubInfo {
+    font-size: 0.9em;
+    color: #666;
+    margin-bottom: 5px;
+}
+
+.contactNumber {
+    font-size: 1.1em;
+    color: var(--primary-color);
+    font-weight: bold;
+    margin-bottom: 25px;
+}
+.contactContactRow {
+    justify-content: center;
+    text-align: center;
+}
+.contactContactRow--tight {
+    margin-bottom: -50px;
+}
+.contactGridRow {
+    justify-content: center;
+    text-align: center;
+}
+.contactGridRow > [class*="col-"] {
+    display: flex;
+}
+.contactItem {
+    align-items: center;
+    display: flex;
+    flex-direction: column;
+}
+.contactCard.deptBox {
+    width: 100%;
+    min-height: 120px;
+    justify-content: flex-start;
+    margin: 0;
+    padding-bottom: 5px;
+}
+.contactGridGroup {
+    padding-bottom: 5px;
+    padding-left: 15px;
+    padding-right: 15px;
+    margin-top: -25px;
+}
+.areaHotlinesDivider {
+    margin-top: -50px;
+}
+
+@media (max-width: 768px) {
+    .contactSidebar {
+        display: none; 
+    }
+    .contactContentArea {
+        padding: 20px 15px;
+    }
+    .pageHeading {
+        font-size: 2.5em;
+    }
+    .sectionTitle {
+        font-size: 1.7em;
+    }
+    .contactContactRow > div {
+        flex: 0 0 100%;
+        max-width: 100%;
+    }
+    .bannerTitle {
+        font-size: 2em;
+    }
+}
+
+@font-face {
+    font-family: 'Charis SIL Regular';
+    src: url(../Fonts/Charis-SIL/CharisSIL-Regular.ttf);
+}
+@font-face {
+    font-family: 'Charis SIL Bold';
+    src: url(../Fonts/Charis-SIL/CharisSIL-Bold.ttf);
+}
+@font-face {
+    font-family: 'Charis SIL Bold Italic';
+    src: url(../Fonts/Charis-SIL/CharisSIL-BoldItalic.ttf);
+}
+@font-face {
+    font-family: 'Charis SIL Italic';
+    src: url(../Fonts/Charis-SIL/CharisSIL-Italic.ttf);
+}
+@font-face {
+    font-family: 'Geist';
+    src: url(../Fonts/Geist/Geist-VariableFont_wght.ttf);
+}
