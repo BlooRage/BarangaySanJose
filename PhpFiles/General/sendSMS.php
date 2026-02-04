@@ -1,7 +1,7 @@
 <?php
 // ===== CONFIG =====
 $SEMAPHORE_API_KEY = 'ee267d0fbd5c2159bea7d72878c9d4cb';
-$SEMAPHORE_SENDER  = 'SEMAPHORE';
+$SEMAPHORE_SENDER  = 'BrgySanJose';
 
 /**
  * Send SMS (OTP)

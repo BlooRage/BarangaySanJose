@@ -297,20 +297,20 @@ body {
 }
 
 /* ===== Responsive ===== */
-@media (max-width: 950px) {
+@media (max-width: 992px) {
     .login-signup-container {
         min-width: 300px;
-        min-height: 430px;
-        width: 30vh;
-        height: 48vh;
-        margin: 10vh auto 20px;
+        min-height: 520px;
+        width: min(92vw, 560px);
+        height: auto;
+        margin: 8vh auto 20px;
     }
 
     .auth-image { display: none; }
 
     .form-wrapper {
         width: 100%;
-        min-height: 300px;
+        min-height: 520px;
         transform: none !important;
     }
 
@@ -327,6 +327,61 @@ body {
         opacity: 1;
         z-index: 2;
         transform: none !important;
+    }
+}
+
+@media (max-width: 768px) {
+    .main-content {
+        padding: 24px 16px;
+    }
+
+    .login-signup-container {
+        min-height: 480px;
+        width: min(94vw, 520px);
+        margin: 6vh auto 16px;
+        border-radius: 12px;
+    }
+
+    .form-wrapper {
+        min-height: 480px;
+    }
+
+    .form-box {
+        padding: 24px 20px;
+    }
+
+    #otp-form {
+        padding: 24px 20px;
+    }
+}
+
+@media (max-width: 576px) {
+    .login-signup-container {
+        min-height: 440px;
+        width: 94vw;
+        margin: 5vh auto 12px;
+    }
+
+    .form-wrapper {
+        min-height: 440px;
+    }
+
+    .form-box {
+        padding: 20px 16px;
+    }
+
+    #otp-form {
+        padding: 20px 16px;
+    }
+
+    .otp-inputs {
+        gap: 8px;
+    }
+
+    .otp-inputs input {
+        min-width: 34px;
+        height: 42px;
+        font-size: 15px;
     }
 }
 
