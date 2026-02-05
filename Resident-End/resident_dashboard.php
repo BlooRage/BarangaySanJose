@@ -36,32 +36,6 @@
 
       <div id="div-serviceGrid" class="row g-4 justify-content-center">
 
-        <div class="col-12 col-md-6 col-lg-4">
-  <div class="card h-100 p-4 rounded-4 border-0 shadow-sm">
-    <div class="d-flex align-items-center gap-3">
-      <div class="rounded-circle d-flex align-items-center justify-content-center"
-           style="width:48px;height:48px;background:#ff9f43;color:white;">
-        <i class="bi bi-envelope-check fs-4"></i>
-      </div>
-      <div class="flex-grow-1">
-        <div class="fw-bold">Email Verification (TEST)</div>
-        <div class="text-muted small">Send a verification email to your account.</div>
-      </div>
-    </div>
-
-    <a href="../PhpFiles/EmailHandlers/testSendVerify.php"
-       class="btn mt-3"
-       style="background:#ff9f43;color:#fff;font-weight:700;">
-      Send Verify Email
-    </a>
-
-    <div class="text-muted small mt-2">
-      Testing only. Remove before production.
-    </div>
-  </div>
-</div>
-
-
         <div class="col-6 col-md-4 col-lg-3">
           <div id="card-serviceRequest-certificates"
                class="card-action h-100 p-4 rounded-4 text-center d-flex flex-column align-items-center justify-content-center border-0 shadow-sm"
