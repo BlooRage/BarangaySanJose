@@ -148,12 +148,6 @@ body {
         flex: 0 0 100%;
         max-width: 100%;
     }
-    .council-card {
-        order: 2;
-    }
-    .council-card.captain-card {
-        order: 1;
-    }
 }
 @media (max-width: 768px) {
     .council-track {
