@@ -42,8 +42,8 @@ h5 {
     text-align: center;
 }
 #navbarLogo {
-    width: 38px;
-    height: 38px;
+    width: 60px;
+    height: 60px;
     margin-right: 10px;
     border-radius: 50%;
 }
@@ -113,8 +113,8 @@ h5 {
         z-index: 1100;
     }
     #navbarLogo {
-        width: 26px;
-        height: 26px;
+        width: 44px;
+        height: 44px;
         margin-right: 6px;
         border-radius: 50%;
     }

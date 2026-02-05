@@ -51,7 +51,7 @@ body {
     border-color: rgba(255, 255, 255, 0.7);
 }
 .navbarMain .navbar-toggler-icon {
-    filter: invert(1);
+    filter: none;
 }
 .navbarMain.navbar--scrolled {
     background: #FFFFFF;
@@ -66,7 +66,7 @@ body {
     border-color: rgba(0, 0, 0, 0.3);
 }
 .navbarMain.navbar--scrolled .navbar-toggler-icon {
-    filter: invert(0) !important;
+    filter: invert(1) !important;
 }
 .aboutSection {
     margin-top: -25px;
@@ -107,7 +107,7 @@ body {
 .council-track {
     display: flex;
     align-items: center;
-    transition: transform 0.5s ease;
+    transition: transform var(--council-slide-duration, 0.5s) var(--council-slide-ease, ease);
     will-change: transform;
 }
 .council-card {
@@ -135,10 +135,37 @@ body {
     position: absolute;
     right: -70px;
 }
+@media (max-width: 1100px) {
+    .council-btn-prev {
+        left: -20px;
+    }
+    .council-btn-next {
+        right: -20px;
+    }
+}
+@media (max-width: 992px) {
+    .council-card {
+        flex: 0 0 100%;
+        max-width: 100%;
+    }
+    .council-card {
+        order: 2;
+    }
+    .council-card.captain-card {
+        order: 1;
+    }
+}
 @media (max-width: 768px) {
+    .council-track {
+        --council-slide-duration: 0.8s;
+        --council-slide-ease: cubic-bezier(0.22, 0.61, 0.36, 1);
+    }
     .navbarMain {
-        position: sticky;
+        position: fixed;
         top: 0;
+        left: 0;
+        width: 100%;
+        z-index: 1000;
     }
     .council-card {
         flex: 0 0 100%;

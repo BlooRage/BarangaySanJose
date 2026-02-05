@@ -119,7 +119,7 @@
                                 <p>SK Chairperson</p>
                             </figcaption>
                         </figure>
-                        <figure class="figure council-card">
+                        <figure class="figure council-card captain-card">
                             <img src="Images/Officials/Hon Kap Glen_MAC8515 copy 2.jpg" id="carouselImg" class="img-fluid mx-5">
                             <figcaption class="figure-caption">
                                 <h3 class="mt-3">Glenn S. Evangelista</h3>
@@ -250,6 +250,12 @@
                 return;
             }
             let animating = false;
+            function getSlideTransition() {
+                let styles = window.getComputedStyle(track);
+                let duration = styles.getPropertyValue("--council-slide-duration").trim() || "0.5s";
+                let easing = styles.getPropertyValue("--council-slide-ease").trim() || "ease";
+                return "transform " + duration + " " + easing;
+            }
 
             function moveNext() {
                 if (animating) {
@@ -263,7 +269,7 @@
                     track.style.transition = "none";
                     track.style.transform = "translateX(0)";
                     track.offsetHeight;
-                    track.style.transition = "transform 0.5s ease";
+                    track.style.transition = getSlideTransition();
                     animating = false;
                 });
             }
@@ -277,7 +283,7 @@
                 track.insertBefore(track.lastElementChild, track.firstElementChild);
                 track.style.transform = "translateX(-33.333%)";
                 track.offsetHeight;
-                track.style.transition = "transform 0.5s ease";
+                track.style.transition = getSlideTransition();
                 track.style.transform = "translateX(0)";
                 track.addEventListener("transitionend", function handler() {
                     track.removeEventListener("transitionend", handler);
@@ -287,6 +293,7 @@
 
             nextBtn.addEventListener("click", moveNext);
             prevBtn.addEventListener("click", movePrev);
+            setInterval(moveNext, 10000);
         });
 
 
