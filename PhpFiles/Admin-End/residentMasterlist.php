@@ -339,11 +339,8 @@ if (isset($_GET['fetch'])) {
     if ($search !== '') {
         $sql .= " WHERE
             (s.status_name <> 'Archived' OR s.status_name IS NULL)
-            AND (
-                r.resident_id LIKE ? OR
-                r.firstname LIKE ? OR
-                r.lastname LIKE ? OR
-                CONCAT(r.firstname, ' ', r.lastname) LIKE ?
+            AND LOWER(TRIM(REPLACE(REPLACE(REPLACE(IFNULL(a.street_number,''),' ',''),'-',''),'.',''))) <=> ?
+            AND LOWER(TRIM(REPLACE(REPLACE(REPLACE(REPLACE(IFNULL(a.street_name,''),' street',''),' st.',''),' st',''),'.',''))) <=> ?
             )
         ";
     } else {
