@@ -2,12 +2,20 @@
 session_start();
 require_once "../General/connection.php";
 
+function normalizeResidentId($value): ?string {
+    $id = trim((string)$value);
+    if ($id === '' || !preg_match('/^\\d{10}$/', $id)) {
+        return null;
+    }
+    return $id;
+}
+
 /* =====================================================
    1. HANDLE STATUS UPDATE (View Modal)
 ===================================================== */
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['button-saveStatus'])) {
 
-    $residentId = (int)($_POST['input-appId'] ?? 0);
+    $residentId = normalizeResidentId($_POST['input-appId'] ?? '');
     $uiStatus   = $_POST['select-newStatus'] ?? '';
 
     $statusMap = [
@@ -16,7 +24,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['button-saveStatus']))
         'DENIED'   => 'NotVerified'
     ];
 
-    if ($residentId <= 0 || !isset($statusMap[$uiStatus])) {
+    if (!$residentId || !isset($statusMap[$uiStatus])) {
         http_response_code(400);
         exit("Invalid request");
     }
@@ -35,7 +43,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['button-saveStatus']))
         WHERE resident_id = ?
     ");
 
-    $stmt->bind_param("si", $dbStatus, $residentId);
+    $stmt->bind_param("ss", $dbStatus, $residentId);
     $stmt->execute();
     $stmt->close();
 
@@ -49,8 +57,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['button-saveStatus']))
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['archive_resident'])) {
     header('Content-Type: application/json; charset=utf-8');
 
-    $residentId = (int)($_POST['resident_id'] ?? 0);
-    if ($residentId <= 0) {
+    $residentId = normalizeResidentId($_POST['resident_id'] ?? '');
+    if (!$residentId) {
         http_response_code(400);
         echo json_encode(['success' => false, 'message' => 'Invalid resident ID.']);
         exit;
@@ -85,7 +93,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['archive_resident'])) 
             WHERE resident_id = ?
             LIMIT 1
         ");
-        $stmt->bind_param("i", $residentId);
+        $stmt->bind_param("s", $residentId);
         $stmt->execute();
         $stmt->bind_result($userId);
         $stmt->fetch();
@@ -97,7 +105,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['archive_resident'])) 
             SET status_id_resident = ?
             WHERE resident_id = ?
         ");
-        $stmt->bind_param("ii", $statusId, $residentId);
+        $stmt->bind_param("is", $statusId, $residentId);
         $stmt->execute();
         $stmt->close();
 
@@ -141,8 +149,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['archive_resident'])) 
 ===================================================== */
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['resident_id'])) {
 
-    $residentId = (int)$_POST['resident_id'];
-    $userId     = (int)($_POST['user_id'] ?? 0);
+    $residentId = normalizeResidentId($_POST['resident_id'] ?? '');
+    $userId     = trim((string)($_POST['user_id'] ?? ''));
+
+    if (!$residentId) {
+        http_response_code(400);
+        exit("Invalid resident ID.");
+    }
 
     // -----------------------
     // Personal Info
@@ -202,7 +215,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['resident_id'])) {
     ");
 
     $stmt->bind_param(
-        "sssssssiisssi",
+        "sssssssiissss",
         $firstName, $middleName, $lastName, $suffix,
         $birthdate, $sex, $civilStatus, $voterStatus,
         $occupation, $occupationDetail,
@@ -216,7 +229,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['resident_id'])) {
     // -----------------------
     // Update emergencycontacttbl
     // -----------------------
-    if ($userId > 0) {
+    if ($userId !== '') {
         $stmt = $conn->prepare("
             UPDATE emergencycontacttbl
             SET first_name = ?, middle_name = ?, last_name = ?, suffix = ?,
@@ -225,7 +238,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['resident_id'])) {
         ");
 
         $stmt->bind_param(
-            "sssssssi",
+            "ssssssss",
             $emFirst, $emMiddle, $emLast, $emSuffix,
             $emPhone, $emRel, $emAddr, $userId
         );
@@ -241,7 +254,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['resident_id'])) {
             SET updated_at = NOW()
             WHERE user_id = ?
         ");
-        $stmt->bind_param("i", $userId);
+        $stmt->bind_param("s", $userId);
         $stmt->execute();
         $stmt->close();
     }

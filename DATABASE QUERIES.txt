@@ -41,7 +41,7 @@ CREATE TABLE `statuslookuptbl` (
 
 
 CREATE TABLE `residentinformationtbl` (
-  `resident_id` int(10) unsigned NOT NULL AUTO_INCREMENT,
+  `resident_id` char(10) NOT NULL,
   `user_id` varchar(12) NOT NULL,
   `lastname` varchar(100) NOT NULL,
   `firstname` varchar(100) NOT NULL,
@@ -68,7 +68,7 @@ CREATE TABLE `residentinformationtbl` (
 
 CREATE TABLE `residentaddresstbl` (
   `address_id` int(10) unsigned NOT NULL AUTO_INCREMENT,
-  `resident_id` int(10) unsigned NOT NULL,
+  `resident_id` char(10) NOT NULL,
   `street_number` varchar(50) DEFAULT NULL,
   `street_name` varchar(150) DEFAULT NULL,
   `subdivision` varchar(150) DEFAULT NULL,

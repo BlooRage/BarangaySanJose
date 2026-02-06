@@ -1,4 +1,17 @@
 :root {
+    color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+    :root {
+        color-scheme: light;
+    }
+    body {
+        background-color: #ffffff;
+        color: #000000;
+    }
+}
+
+:root {
    --primary-color: #ff9933; 
    --secondary-color: #ffffff; 
    --accent-color: #e68a00; 

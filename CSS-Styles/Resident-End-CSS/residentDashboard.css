@@ -1,3 +1,16 @@
+:root {
+    color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+    :root {
+        color-scheme: light;
+    }
+    body {
+        background-color: #ffffff;
+        color: #000000;
+    }
+}
+
 
 #div-sidebarWrapper {
     width: 100%;

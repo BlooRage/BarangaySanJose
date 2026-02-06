@@ -43,3 +43,34 @@ function GenerateUserID($conn, $roleAccess) {
 
     return $yearMonth . $roleLetter . $newSeq; // e.g., 202601R00001
 }
+
+function GenerateResidentID($conn) {
+    // Format: YYMMXXXXXX (monthly sequence)
+    $yearMonth = date("ym");
+    $like = $yearMonth . "%"; // e.g., 2602%
+
+    $stmt = $conn->prepare("
+        SELECT resident_id
+        FROM residentinformationtbl
+        WHERE resident_id LIKE ?
+        ORDER BY resident_id DESC
+        LIMIT 1
+    ");
+
+    if (!$stmt) {
+        error_log("GenerateResidentID Prepare Failed: " . $conn->error);
+        return false;
+    }
+
+    $stmt->bind_param("s", $like);
+    $stmt->execute();
+    $stmt->bind_result($lastID);
+    $stmt->fetch();
+    $stmt->close();
+
+    $newSeq = $lastID
+        ? str_pad(((int)substr($lastID, -6)) + 1, 6, "0", STR_PAD_LEFT)
+        : "000001";
+
+    return $yearMonth . $newSeq; // e.g., 2602000001
+}

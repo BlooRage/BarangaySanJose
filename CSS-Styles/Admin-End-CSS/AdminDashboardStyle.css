@@ -1,3 +1,16 @@
+:root {
+    color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+    :root {
+        color-scheme: light;
+    }
+    body {
+        background-color: #ffffff;
+        color: #000000;
+    }
+}
+
 @font-face {
     font-family: 'Charis SIL Regular';
     src: url(../../Fonts/Charis-SIL/CharisSIL-Regular.ttf);

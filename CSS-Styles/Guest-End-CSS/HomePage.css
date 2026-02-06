@@ -1,3 +1,16 @@
+:root {
+    color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+    :root {
+        color-scheme: light;
+    }
+    body {
+        background-color: #ffffff;
+        color: #000000;
+    }
+}
+
 @font-face {
     font-family: 'Charis SIL Regular';
     src: url(../Fonts/Charis-SIL/CharisSIL-Regular.ttf);
@@ -41,7 +54,7 @@ body {
 .navbarMain #navbarBrand,
 .navbarMain #navbarLinks a {
     color: #FFFFFF;
-    text-shadow: 0 0 8px rgba(255, 255, 255, 0.55);
+    text-shadow: none;
 }
 .navbarMain .nav-link.active {
     text-decoration: underline;
@@ -147,6 +160,20 @@ body {
     .council-card {
         flex: 0 0 100%;
         max-width: 100%;
+    }
+}
+@media (max-width: 991.98px) {
+    .missionVisionRow .col-md-6 {
+        flex: 0 0 100%;
+        max-width: 100%;
+    }
+}
+@media (max-width: 1199.98px) {
+    .navbarMain #navbarLinks .nav-link::after {
+        background-color: rgba(255, 255, 255, 0.35);
+    }
+    .navbarMain.navbar--scrolled #navbarLinks .nav-link::after {
+        background-color: rgba(0, 0, 0, 0.25);
     }
 }
 @media (max-width: 768px) {
@@ -315,4 +342,3 @@ h1, h2, h3, h4, h5, h6 {
         font-size: 14px;
     }
 }
-

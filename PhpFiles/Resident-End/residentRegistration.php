@@ -1,6 +1,7 @@
 <?php
 session_start();
 include "../General/connection.php";
+require_once "../General/uniqueIDGenerate.php";
 
 header('Content-Type: application/json; charset=utf-8');
 
@@ -138,17 +139,23 @@ try {
     $addressStatusId  = getStatusId($conn, "PendingVerification", "AddressResidency");
 
     // -------- Insert Resident Info --------
+    $resident_id = GenerateResidentID($conn);
+    if (!$resident_id) {
+        throw new Exception("Failed to generate resident ID.");
+    }
+
     $stmt = $conn->prepare("
         INSERT INTO residentinformationtbl 
-        (user_id, lastname, firstname, middlename, suffix, sex, birthdate, civil_status,
+        (resident_id, user_id, lastname, firstname, middlename, suffix, sex, birthdate, civil_status,
          head_of_family, voter_status, occupation, occupation_detail,
          religion, sector_membership, privacy_consent, status_id_resident)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     ");
     if (!$stmt) throw new Exception("Prepare failed (resident insert): " . $conn->error);
 
     $stmt->bind_param(
-        "ssssssssiiisssii",
+        "sssssssssiiisssii",
+        $resident_id,
         $user_id,
         $lastName,
         $firstName,
@@ -168,7 +175,6 @@ try {
     );
 
     if (!$stmt->execute()) throw new Exception("Insert resident failed: " . $stmt->error);
-    $resident_id = (int)$stmt->insert_id;
     $stmt->close();
 
     // -------- Insert Address --------
@@ -180,7 +186,7 @@ try {
     if (!$stmt2) throw new Exception("Prepare failed (address insert): " . $conn->error);
 
     $stmt2->bind_param(
-        "isssssssi",
+        "ssssssssi",
         $resident_id,
         $houseNumber,
         $streetName,
@@ -240,10 +246,10 @@ try {
 
         $pendingResidentStatusId = getStatusId($conn, "PendingVerification", "Resident");
 
-        $updateStatus = $conn->prepare("UPDATE residentinformationtbl SET status_id_resident=? WHERE resident_id=?");
-        if (!$updateStatus) throw new Exception("Prepare failed (update resident status): " . $conn->error);
+    $updateStatus = $conn->prepare("UPDATE residentinformationtbl SET status_id_resident=? WHERE resident_id=?");
+    if (!$updateStatus) throw new Exception("Prepare failed (update resident status): " . $conn->error);
 
-        $updateStatus->bind_param("ii", $pendingResidentStatusId, $resident_id);
+    $updateStatus->bind_param("is", $pendingResidentStatusId, $resident_id);
         if (!$updateStatus->execute()) throw new Exception("Update status failed: " . $updateStatus->error);
         $updateStatus->close();
     }

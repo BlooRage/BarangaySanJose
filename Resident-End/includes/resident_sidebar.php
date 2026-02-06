@@ -114,7 +114,7 @@ function activeLink($page, $current) {
     <!-- ACCOUNT (BOTTOM, ADMIN-STYLE) -->
   <div class="mt-auto">
     <a class="btn btn-outline-info btn-sm w-100 mb-2"
-       href="../PhpFiles/Login/logout.php">
+       href="resident_profile.php">
       <i class="fa-solid fa-circle-user"></i> Account
     </a>
   </div>

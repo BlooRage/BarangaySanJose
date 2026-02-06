@@ -7,9 +7,9 @@ $raw = file_get_contents("php://input");
 $body = json_decode($raw, true);
 
 $action = $body['action'] ?? '';
-$residentId = (int)($body['resident_id'] ?? 0);
+$residentId = trim((string)($body['resident_id'] ?? ''));
 
-if ($residentId <= 0 || ($action !== 'restore' && $action !== 'delete')) {
+if (!preg_match('/^\\d{10}$/', $residentId) || ($action !== 'restore' && $action !== 'delete')) {
     http_response_code(400);
     echo json_encode(['success' => false, 'message' => 'Invalid request.']);
     exit;
@@ -45,7 +45,7 @@ try {
             WHERE resident_id = ?
             LIMIT 1
         ");
-        $stmt->bind_param("i", $residentId);
+        $stmt->bind_param("s", $residentId);
         $stmt->execute();
         $stmt->bind_result($userId);
         $stmt->fetch();
@@ -57,7 +57,7 @@ try {
             SET status_id_resident = ?
             WHERE resident_id = ?
         ");
-        $stmt->bind_param("ii", $statusId, $residentId);
+        $stmt->bind_param("is", $statusId, $residentId);
         $stmt->execute();
         $stmt->close();
 
@@ -100,7 +100,7 @@ try {
         WHERE resident_id = ?
         LIMIT 1
     ");
-    $stmt->bind_param("i", $residentId);
+    $stmt->bind_param("s", $residentId);
     $stmt->execute();
     $stmt->bind_result($userId);
     $stmt->fetch();

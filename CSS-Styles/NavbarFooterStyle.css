@@ -1,3 +1,16 @@
+:root {
+    color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+    :root {
+        color-scheme: light;
+    }
+    body {
+        background-color: #ffffff;
+        color: #000000;
+    }
+}
+
 @font-face {
     font-family: 'Charis SIL Regular';
     src: url(../Fonts/Charis-SIL/CharisSIL-Regular.ttf);
@@ -180,9 +193,23 @@ h5 {
     #navbarLinks .nav-link {
         display: block;
         padding: 12px 0;
-        border-bottom: 1px solid rgba(0, 0, 0, 0.15);
+        text-align: center;
+        position: relative;
+    }
+    #navbarLinks .nav-link::after {
+        content: "";
+        position: absolute;
+        left: 50%;
+        bottom: 0;
+        width: 50%;
+        height: 1px;
+        background-color: rgba(0, 0, 0, 0.15);
+        transform: translateX(-50%);
     }
     #navbarLinks .nav-item:last-child .nav-link {
-        border-bottom: none;
+        padding-bottom: 12px;
+    }
+    #navbarLinks .nav-item:last-child .nav-link::after {
+        display: none;
     }
 }

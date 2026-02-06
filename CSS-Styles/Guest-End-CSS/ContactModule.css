@@ -1,4 +1,17 @@
 :root {
+    color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+    :root {
+        color-scheme: light;
+    }
+    body {
+        background-color: #ffffff;
+        color: #000000;
+    }
+}
+
+:root {
     --primary-color: #ff9933; 
     --secondary-color: #ffffff; 
     --accent-color: #e68a00; 
@@ -164,6 +177,45 @@
 }
 .areaHotlinesDivider {
     margin-top: -50px;
+}
+.emailSection {
+    margin-top: 35px;
+    margin-bottom: 20px;
+}
+.contactEmailList {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 14px 28px;
+    justify-content: center;
+}
+.contactEmailItem {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 10px 14px;
+    border: 1px solid rgba(255, 153, 51, 0.35);
+    border-radius: 12px;
+    background-color: #ffffff;
+    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.06);
+    min-width: 240px;
+}
+.contactEmailLabel {
+    font-size: 0.85em;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: #777777;
+    margin-bottom: 6px;
+}
+.contactEmailLink {
+    font-size: 1em;
+    color: var(--primary-color);
+    font-weight: 600;
+    text-decoration: none;
+    word-break: break-word;
+}
+.contactEmailLink:hover,
+.contactEmailLink:focus {
+    text-decoration: underline;
 }
 
 @media (max-width: 768px) {

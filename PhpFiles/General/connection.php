@@ -1,8 +1,8 @@
 <?php
 $host = "srv1986.hstgr.io";
-$user = "u682055666_DevRome";
-$pass = "Rome5704";
-$dbname = "u682055666_BrgySanJose";
+$user = "u682055666_thesiscaps";
+$pass = "ThesisCaps123.";
+$dbname = "u682055666_testingBrgySJ";
 
 // Create connection
 $conn = new mysqli($host, $user, $pass, $dbname);
