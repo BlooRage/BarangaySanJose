@@ -1,18 +1,5 @@
-<?php
-session_start();
 
-// If user is not logged in, redirect to login page
-if (!isset($_SESSION['user_id'])) {
-    header("Location: login.html"); // change path if needed
-    exit;
-}
 
-$user_id = $_SESSION['user_id'];
-
-// IMPORTANT:
-// This page will NOT include the DB connection.
-// It will fetch phone/email via AJAX from a separate backend PHP file.
-?>
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -41,7 +28,6 @@ $user_id = $_SESSION['user_id'];
 
   <!-- ================= NAVBAR ================= -->
   <div class="navbarWrapper">
-    <span class="label">Official Website of Barangay San Jose, Rodriguez, Rizal</span>
 
     <nav class="navbar navbar-expand-lg navbar-light bg-white shadow-sm">
       <div class="container-fluid px-4">
@@ -70,13 +56,7 @@ $user_id = $_SESSION['user_id'];
 
         <div class="collapse navbar-collapse" id="navbarNav">
           <ul id="navbarLinks" class="navbar-nav ms-auto">
-            <li class="nav-item mx-lg-3"><a class="nav-link active" href="index.html">Home</a></li>
-            <li class="nav-item mx-lg-3"><a class="nav-link" href="government.html">Government</a></li>
-            <li class="nav-item mx-lg-3"><a class="nav-link" href="services.html">Services</a></li>
-            <li class="nav-item mx-lg-3"><a class="nav-link" href="news.html">News</a></li>
-            <li class="nav-item mx-lg-3"><a class="nav-link" href="faq.html">FAQ</a></li>
-            <li class="nav-item mx-lg-3"><a class="nav-link" href="contact.html">Contact</a></li>
-            <li class="nav-item"><a class="nav-link" href="login.html">Login</a></li>
+            <li class="nav-item"><a class="nav-link" href="login.html">Logout</a></li>
           </ul>
         </div>
 
@@ -224,7 +204,7 @@ $user_id = $_SESSION['user_id'];
             Users are responsible for the accuracy of information submitted and for securing their accounts.
           </p>
 
-          <h5 class="mt-4">
+          <h5 class="mt-4 text-dark">
             Do you agree to the Privacy Policy, Terms and Conditions, and Disclaimer?
             <span class="text-danger">*</span>
           </h5>
@@ -733,7 +713,24 @@ $user_id = $_SESSION['user_id'];
           <h2 class="section-title mb-0">Proof of Identity</h2>
           <hr class="section-hr">
 
-          <div id="proofIdentityFields">
+          <div class="row g-3 mb-4">
+            <div>
+              <label class="form-label fw-semibold">
+                Type of Proof of Identification <span class="text-danger">*</span>
+              </label>
+              <select class="form-select" id="proofTypeSelect" required>
+                <option value="">Select</option>
+                <option value="ID">ID</option>
+                <option value="Document">Document</option>
+              </select>
+            </div>
+          </div>
+
+
+          <!-- Document fields -->
+          <div id="proofIdentityFields" >
+            <div id="idProofWrapper" class="d-none">
+            <!-- Row 1 -->
             <div class="row g-3 mb-3">
               <div class="col-md-6">
                 <label class="form-label" for="idTypeSelect">ID Type <span class="text-danger">*</span></label>
@@ -754,6 +751,7 @@ $user_id = $_SESSION['user_id'];
               </div>
             </div>
 
+            <!-- Student ID only -->
             <div class="row g-3 mb-3 d-none" id="schoolNameWrapper">
               <div class="col-12">
                 <label class="form-label" for="schoolNameInput">School Name <span class="text-danger">*</span></label>
@@ -761,49 +759,91 @@ $user_id = $_SESSION['user_id'];
               </div>
             </div>
 
-            <div class="row g-3 mb-3">
-              <div class="col-md-6">
-                <label class="form-label" for="idFrontInput">Upload ID Front <span class="text-danger">*</span></label>
+            <!-- Uploads -->
+            <div class="row mb-2 mt-3">
+              <label class="form-label" for="idFrontInput">Upload ID Front <span class="text-danger">*</span></label>
+              <div class="upload-box">
                 <input
                   type="file"
                   class="form-control"
                   id="idFrontInput"
                   name="idFront"
-                  accept="image/*,.pdf"
-                >
+                  accept="image/*,.pdf">
               </div>
-
-              <div class="col-md-6">
-                <label class="form-label" for="idBackInput">Upload ID Back <span class="text-danger">*</span></label>
+                <label class="form-label mb-2 mt-3" for="idBackInput">Upload ID Back <span class="text-danger">*</span></label>
+              <div class="upload-box">
                 <input
                   type="file"
                   class="form-control"
                   id="idBackInput"
                   name="idBack"
-                  accept="image/*,.pdf"
-                >
+                  accept="image/*,.pdf">
               </div>
             </div>
+</div>
+<div id="documentProofWrapper" class="d-none">
 
+  <label class="form-label fw-semibold mb-3">
+    Upload Supporting Document(s) <span class="text-danger">*</span>
+  </label>
+
+  <div id="documentUploadList" class="row">
+
+    <!-- Attachment 1 -->
+    <div class=" position-relative">
+  <div class="upload-box position-relative">
+
+    <input
+      type="file"
+      class="form-control"
+      name="documentProof[]"
+      accept=".pdf,image/*"
+      required>
+  </div>
+
+  <small class="text-muted d-block text-center mt-2">
+    Attachment 1
+  </small>
+</div>
+
+
+  </div>
+
+  <button
+    type="button"
+    class="btn btn-outline-secondary btn-sm mt-3"
+    id="addDocumentBtn">
+    + Add another attachment
+  </button>
+
+  <div class="small text-muted mt-2">
+    Maximum of 3 attachments allowed.
+  </div>
+</div>
+
+            <!-- 2x2 -->
             <div class="row g-3 mb-4">
-              <div class="col-12">
-                <label class="form-label" for="pictureInput">2x2 Picture <span class="text-danger">*</span></label>
+              <label class="form-label mb-1" for="pictureInput">2x2 Picture <span class="text-danger">*</span></label>
+              <div class="upload-box col-12">
+                
                 <input
                   type="file"
                   class="form-control"
                   id="pictureInput"
                   name="picture"
-                  accept="image/*"
-                >
+                  accept="image/*">
 
                 <div class="small mt-2">
-                  <span class="fw-semibold" style="color:#FE993C;">Required:</span>
-                  <span class="text-muted">White background (2x2 ID photo).</span>
+                  
                 </div>
+                
               </div>
+              <span class="fw-semibold" style="color:#FE993C;">Required:</span>
+                  <span class="text-muted">White background (2x2 ID photo).</span>
             </div>
           </div>
 
+          <!-- Skip switch (above submit) -->
           <div class="alert alert-warning border-0 mb-4" style="background: rgba(254,153,60,.14);">
             <div class="d-flex align-items-start gap-3">
               <div class="form-check form-switch m-0">
@@ -813,8 +853,7 @@ $user_id = $_SESSION['user_id'];
                   role="switch"
                   id="skipProofSwitch"
                   name="skipProofIdentity"
-                  value="1"
-                >
+                  value="1">
               </div>
 
               <div>
@@ -895,6 +934,145 @@ $user_id = $_SESSION['user_id'];
       })
       .catch(() => {});
     });
+    const proofTypeSelect = document.getElementById("proofTypeSelect");
+const idProofWrapper = document.getElementById("idProofWrapper");
+const documentProofWrapper = document.getElementById("documentProofWrapper");
+const addDocumentBtn = document.getElementById("addDocumentBtn");
+const documentUploadList = document.getElementById("documentUploadList");
+
+proofTypeSelect.addEventListener("change", () => {
+  idProofWrapper.classList.add("d-none");
+  documentProofWrapper.classList.add("d-none");
+
+  // Disable all inputs first
+  idProofWrapper.querySelectorAll("input, select").forEach(el => el.disabled = true);
+  documentProofWrapper.querySelectorAll("input").forEach(el => el.disabled = true);
+
+  if (proofTypeSelect.value === "ID") {
+    idProofWrapper.classList.remove("d-none");
+    idProofWrapper.querySelectorAll("input, select").forEach(el => el.disabled = false);
+  }
+
+  if (proofTypeSelect.value === "Document") {
+    documentProofWrapper.classList.remove("d-none");
+    documentProofWrapper.querySelectorAll("input").forEach(el => el.disabled = false);
+  }
+});
+
+// Add up to 3 document uploads
+
+
+document.addEventListener("DOMContentLoaded", () => {
+
+  /* =========================
+     GENERIC UPLOAD BOX HANDLER
+     ========================= */
+
+  function initUploadBox(uploadBox) {
+    const input = uploadBox.querySelector('input[type="file"]');
+    if (!input) return;
+
+    // Click anywhere to open file picker
+    uploadBox.addEventListener("click", () => input.click());
+
+    // Drag over
+    uploadBox.addEventListener("dragover", e => {
+      e.preventDefault();
+      uploadBox.classList.add("dragover");
+    });
+
+    // Drag leave
+    uploadBox.addEventListener("dragleave", () => {
+      uploadBox.classList.remove("dragover");
+    });
+
+    // Drop file
+    uploadBox.addEventListener("drop", e => {
+      e.preventDefault();
+      uploadBox.classList.remove("dragover");
+
+      if (e.dataTransfer.files.length) {
+        input.files = e.dataTransfer.files;
+        markUploaded(uploadBox, input);
+      }
+    });
+
+    // File selected
+    input.addEventListener("change", () => {
+      if (input.files.length) {
+        markUploaded(uploadBox, input);
+      }
+    });
+  }
+
+  function markUploaded(box, input) {
+    box.classList.add("uploaded");
+
+    // Optional: show filename safely (no HTML replacement)
+    let filename = box.querySelector(".uploaded-filename");
+    if (!filename) {
+      filename = document.createElement("div");
+      filename.className = "uploaded-filename small mt-2 text-center";
+      box.appendChild(filename);
+    }
+    filename.textContent = input.files[0].name;
+  }
+
+  /* =========================
+     INITIALIZE EXISTING BOXES
+     ========================= */
+
+  document.querySelectorAll(".upload-box").forEach(initUploadBox);
+
+  /* =========================
+     DOCUMENT ATTACHMENTS (MAX 3)
+     ========================= */
+
+  const addDocumentBtn = document.getElementById("addDocumentBtn");
+  const documentUploadList = document.getElementById("documentUploadList");
+
+  if (addDocumentBtn && documentUploadList) {
+    addDocumentBtn.addEventListener("click", () => {
+      const count = documentUploadList.children.length;
+      if (count >= 3) return;
+
+      const col = document.createElement("div");
+      col.className = "position-relative";
+
+      col.innerHTML = `
+        <div class="upload-box position-relative">
+          <div class="upload-text">
+            Drag & drop file<br>
+          </div>
+          <div class="upload-subtext mt-1">
+            PDF or image
+          </div>
+
+          <input
+            type="file"
+            class="form-control"
+            name="documentProof[]"
+            accept=".pdf,image/*"
+            required>
+        </div>
+
+        <small class="text-muted d-block text-center mt-2">
+          Attachment ${count + 1}
+        </small>
+      `;
+
+      documentUploadList.appendChild(col);
+
+      // IMPORTANT: initialize drag & drop for the new box
+      initUploadBox(col.querySelector(".upload-box"));
+    });
+  }
+
+});
+
+/* Initial boxes */
+document.querySelectorAll(".upload-box").forEach(enableDragDrop);
+</script>
   </script>
 
   <script

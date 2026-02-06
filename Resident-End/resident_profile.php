@@ -153,7 +153,11 @@ if (!empty($residentinformationtbl['profile_pic'])) {
                         <div class="col-12 col-md-6"><a href="javascript:void(0)">Change Password</a></div>
                         <div class="col-12 col-md-6"><a href="javascript:void(0)">Change Email</a></div>
                         <div class="col-12 col-md-6"><a href="javascript:void(0)">Change Phone Number</a></div>
-                        <div class="col-12 col-md-6"><a href="javascript:void(0)" id="verifyEmailLink">Verify Email</a></div>
+                        <?php if (!(int)($useraccountstbl['email_verify'] ?? 0)): ?>
+                            <div class="col-12 col-md-6"><a href="javascript:void(0)" id="verifyEmailLink">Verify Email</a></div>
+                        <?php else: ?>
+                            <div class="col-12 col-md-6 text-muted fst-italic">Email already verified</div>
+                        <?php endif; ?>
                     </div>
                 </div>
             </div>
@@ -354,10 +358,27 @@ if (!empty($residentinformationtbl['profile_pic'])) {
             verifyEmailLink.addEventListener("click", async (e) => {
                 e.preventDefault();
                 try {
-                    const res = await fetch("../PhpFiles/EmailHandlers/testSendVerify.php", {
+                    const controller = new AbortController();
+                    if (window.UniversalModal?.open) {
+                        window.UniversalModal.open({
+                            title: "Please Wait",
+                            message: "Sending verification email...",
+                            buttons: [
+                                {
+                                    label: "Cancel",
+                                    class: "btn btn-outline-secondary",
+                                    onClick: () => {
+                                        controller.abort();
+                                    },
+                                },
+                            ],
+                        });
+                    }
+                    const res = await fetch("../PhpFiles/EmailHandlers/sendEmailVerify.php", {
                         method: "POST",
                         headers: { "Content-Type": "application/json" },
                         body: JSON.stringify({}),
+                        signal: controller.signal,
                     });
                     const data = await res.json().catch(() => ({}));
                     if (!res.ok || !data.success) {
@@ -366,13 +387,16 @@ if (!empty($residentinformationtbl['profile_pic'])) {
                     if (window.UniversalModal?.open) {
                         window.UniversalModal.open({
                             title: "Verification Email Sent",
-                            message: "An email verification has been sent to your email, click the verify button to verify. it will expire in 15 minutes.",
+                            messageHtml: "An email verification has been sent to your email, click the verify button to proceed.<br><b>The verify link will expire in 15 minutes.</b>",
                             buttons: [{ label: "OK", class: "btn btn-primary" }],
                         });
                     } else {
-                        alert("Verification Email Sent\nAn email verification has been sent to your email, click the verify button to verify. It will expire in 15 minutes.");
+                        alert("Verification Email Sent\nAn email verification has been sent to your email, click the verify button to proceed. The verify link will expire in 15 minutes.");
                     }
                 } catch (err) {
+                    if (err?.name === "AbortError" || err?.message === "Aborted" || err?.code === DOMException.ABORT_ERR) {
+                        return;
+                    }
                     if (window.UniversalModal?.open) {
                         window.UniversalModal.open({
                             title: "Error",

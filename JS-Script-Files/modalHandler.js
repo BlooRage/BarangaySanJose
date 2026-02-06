@@ -28,7 +28,7 @@ const UniversalModal = (() => {
 
             <!-- TITLE -->
             <div class="modal-header justify-content-center border-0 pb-0">
-              <h5 class="modal-title text-center w-100" id="umTitle"></h5>
+              <h5 class="modal-title text-center w-100 text-black" id="umTitle"></h5>
             </div>
 
             <hr class="my-3" />
@@ -37,8 +37,6 @@ const UniversalModal = (() => {
             <div class="modal-body text-center pt-0" id="umBody">
               <p class="mb-0" id="umMessage"></p>
             </div>
-
-            <hr class="my-3" />
 
             <!-- BUTTONS -->
             <div class="modal-footer border-0 pt-0 d-flex justify-content-center" id="umActions"></div>
@@ -68,6 +66,7 @@ const UniversalModal = (() => {
       b.type = "button";
       b.textContent = btn.label || "OK";
       b.className = btn.class || "btn btn-primary";
+      if (btn.disabled) b.disabled = true;
 
       if (count === 1) {
         b.classList.add("w-100");
@@ -93,6 +92,7 @@ const UniversalModal = (() => {
   function open({
     title = "",
     message = "",
+    messageHtml = "",
     buttons = [],
     centered = true,
     size = "", // "", "modal-sm", "modal-lg", "modal-xl"
@@ -105,7 +105,11 @@ const UniversalModal = (() => {
     const actionsEl = document.getElementById("umActions");
 
     document.getElementById("umTitle").textContent = title;
-    document.getElementById("umMessage").textContent = message;
+    if (messageHtml) {
+      document.getElementById("umMessage").innerHTML = messageHtml;
+    } else {
+      document.getElementById("umMessage").textContent = message;
+    }
 
     dialogEl.className = "modal-dialog";
     if (centered) dialogEl.classList.add("modal-dialog-centered");
