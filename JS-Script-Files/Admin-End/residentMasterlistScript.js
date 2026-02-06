@@ -81,20 +81,23 @@ document.addEventListener("DOMContentLoaded", () => {
         row.status === "NotVerified" ? "danger" : "secondary";
 
       const tr = document.createElement("tr");
+      const canEditOrArchive = row.status !== "NotVerified" && row.status !== "PendingVerification";
       tr.innerHTML = `
         <td class="fw-bold">${row.resident_id}</td>
         <td>${row.full_name}</td>
         <td><span class="badge bg-${badge}">${statusDisplayMap[row.status] ?? "UNSET"}</span></td>
         <td class="d-flex gap-1">
           <button type="button" class="btn btn-primary btn-sm text-white viewEntryBtn">View</button>
-          <button type="button" class="btn btn-secondary btn-sm text-white editEntryBtn">Edit</button>
-          <button type="button" class="btn btn-warning btn-sm text-dark archiveEntryBtn">Archive</button>
+          ${canEditOrArchive ? `<button type="button" class="btn btn-secondary btn-sm text-white editEntryBtn">Edit</button>` : ""}
+          ${canEditOrArchive ? `<button type="button" class="btn btn-warning btn-sm text-dark archiveEntryBtn">Archive</button>` : ""}
         </td>
       `;
 
       tr.querySelector(".viewEntryBtn").addEventListener("click", () => openViewEntry(row));
-      tr.querySelector(".editEntryBtn").addEventListener("click", () => openEditEntry(row));
-      tr.querySelector(".archiveEntryBtn").addEventListener("click", () => archiveEntry(row));
+      const editBtn = tr.querySelector(".editEntryBtn");
+      if (editBtn) editBtn.addEventListener("click", () => openEditEntry(row));
+      const archiveBtn = tr.querySelector(".archiveEntryBtn");
+      if (archiveBtn) archiveBtn.addEventListener("click", () => archiveEntry(row));
 
       tbody.appendChild(tr);
     });
