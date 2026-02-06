@@ -91,6 +91,7 @@ document.addEventListener("DOMContentLoaded", () => {
           ${canEditOrArchive ? `<button type="button" class="btn btn-secondary btn-sm text-white editEntryBtn">Edit</button>` : ""}
           ${canEditOrArchive ? `<button type="button" class="btn btn-warning btn-sm text-dark archiveEntryBtn">Archive</button>` : ""}
         </td>
+        
       `;
 
       tr.querySelector(".viewEntryBtn").addEventListener("click", () => openViewEntry(row));
@@ -124,7 +125,7 @@ document.addEventListener("DOMContentLoaded", () => {
 // ========================
 function openViewEntry(data) {
   document.getElementById("input-appId").value = data.resident_id;
-  document.getElementById("span-displayID").innerText = "Resident #" + data.resident_id;
+  document.getElementById("span-displayID").innerText = "#" + data.resident_id;
 
   // Personal Info
   document.getElementById("txt-modalName").innerText = data.full_name ?? "—";
