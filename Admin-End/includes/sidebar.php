@@ -24,7 +24,8 @@ $isCertActive = in_array($current, $certPages);
     <!-- DASHBOARD -->
     <li class="mb-1">
       <a href="AdminDashboard.php"
-         class="btn btn-toggle d-flex align-items-center gap-2 rounded <?= $current == 'AdminDashboard.php' ? 'active' : '' ?>">
+         class="btn btn-toggle d-flex align-items-center gap-2 rounded <?= $current == 'AdminDashboard.php' ? 'active' : '' ?>"
+         style="<?= $current == 'AdminDashboard.php' ? 'outline: none; box-shadow: none;' : '' ?>">
         <i class="fas fa-chart-area"></i> Dashboard
       </a>
     </li>
@@ -34,7 +35,8 @@ $isCertActive = in_array($current, $certPages);
       <button class="btn btn-toggle d-flex align-items-center gap-2 rounded <?= $isProfilingActive ? '' : 'collapsed' ?>"
               data-bs-toggle="collapse"
               data-bs-target="#profiling-collapse"
-              aria-expanded="<?= $isProfilingActive ? 'true' : 'false' ?>">
+              aria-expanded="<?= $isProfilingActive ? 'true' : 'false' ?>"
+              style="<?= $isProfilingActive ? 'outline: none; box-shadow: none;' : '' ?>">
         <i class="fas fa-user-group"></i> Resident Profiling
       </button>
 
@@ -57,7 +59,7 @@ $isCertActive = in_array($current, $certPages);
     </li>
 
     <!-- CERTIFICATE ISSUANCE -->
-    <li class="mb-1">
+    <!-- <li class="mb-1">
       <button class="btn btn-toggle d-flex align-items-center gap-2 rounded <?= $isCertActive ? '' : 'collapsed' ?>"
               data-bs-toggle="collapse"
               data-bs-target="#cert-collapse"
@@ -72,7 +74,15 @@ $isCertActive = in_array($current, $certPages);
           <li><a href="denied.php" class="link-dark rounded <?= $current == 'denied.php' ? 'active' : '' ?>">Denied Documents</a></li>
         </ul>
       </div>
-    </li>
+    </li> -->
+
+    <!-- HOUSEHOLD PROFILING -->
+    <li class="mb-1">
+      <a href="HouseholdProfiling.php"
+         class="btn btn-toggle d-flex align-items-center gap-2 rounded <?= $current == 'HouseholdProfiling.php' ? 'active' : '' ?>"
+         style="<?= $current == 'HouseholdProfiling.php' ? 'outline: none; box-shadow: none;' : '' ?>">
+        <i class="fa-solid fa-house"></i> Household Profiling
+      </a>
 
   </ul>
 
