@@ -44,6 +44,11 @@ document.addEventListener("DOMContentLoaded", () => {
         </td>
       `;
 
+      const viewBtn = tr.querySelector(".viewEntryBtn");
+      if (viewBtn) {
+        viewBtn.addEventListener("click", () => openViewEntry(row));
+      }
+
       tbody.appendChild(tr);
     });
   }
@@ -93,5 +98,50 @@ document.addEventListener("DOMContentLoaded", () => {
     btnResetModal.addEventListener("click", () => {
       document.querySelectorAll(".filter-checkbox").forEach(cb => cb.checked = false);
     });
+  }
+
+  // ========================
+  // VIEW MODAL
+  // ========================
+  function openViewEntry(data) {
+    const setText = (id, value) => {
+      const el = document.getElementById(id);
+      if (el) el.innerText = value ?? "—";
+    };
+    const setList = (id, items) => {
+      const el = document.getElementById(id);
+      if (!el) return;
+      el.innerHTML = "";
+      if (!Array.isArray(items) || items.length === 0) return;
+      items.forEach(item => {
+        const li = document.createElement("li");
+        const ageText = item.age !== null && item.age !== undefined ? `${item.age}` : "—";
+        li.innerText = `${item.name ?? "—"} - ${ageText}`;
+        el.appendChild(li);
+      });
+    };
+
+    setText("span-displayID", `#${data.resident_id}`);
+
+    // Address Info
+    setText("txt-modalHouseNum", data.house_number ?? "—");
+    setText("txt-modalStreetName", data.street_name ?? "—");
+    setText("txt-modalSubdivision", data.subdivision ?? "—");
+    setText("txt-modalAreaNumber", data.area_number ?? "—");
+    setText("txt-modalBarangay", "Barangay San Jose");
+    setText("txt-modalMunicipalityCity", "Rodriguez (Montalban)");
+    setText("txt-modalProvince", "Rizal");
+
+    // Household Info
+    setText("txt-householdHeadName", data.head_full_name ?? data.full_name ?? "—");
+    setText("txt-householdAdultCount", data.adult_count ?? "0");
+    setText("txt-householdMinorCount", data.minor_count ?? "0");
+    setList("list-householdAdults", data.adults);
+    setList("list-householdMinors", data.minors);
+
+    new bootstrap.Modal(document.getElementById("modal-viewHousehold"), {
+      backdrop: "static",
+      keyboard: true
+    }).show();
   }
 });

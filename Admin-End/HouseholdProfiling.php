@@ -172,6 +172,90 @@
     </main>
 </div>
 
+<!-- VIEW HOUSEHOLD MODAL (Similar to Resident Masterlist) -->
+<div class="modal fade" id="modal-viewHousehold" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered" id="div-modalSizing">
+        <div class="modal-content border-0 rounded-2 p-4">
+            <div class="modal-header border-0">
+                <h3 class="fw-bold">Resident Details: <span id="span-displayID" class="text-warning"></span></h3>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+
+            <div class="modal-body">
+                <div id="div-infoGroup" class="div-infoContainer">
+
+                    <h5 class="fw-bold mb-3" style="color: #000;">Address Information</h5>
+
+                    <div class="row g-3">
+                        <div class="col-md-3">
+                            <p class="text-muted small mb-0">House Number</p>
+                            <p id="txt-modalHouseNum" class="fw-bold"></p>
+                        </div>
+
+                        <div class="col-md-3">
+                            <p class="text-muted small mb-0">Street Name</p>
+                            <p id="txt-modalStreetName" class="fw-bold"></p>
+                        </div>
+
+                        <div class="col-md-3">
+                            <p class="text-muted small mb-0">Subdivision:</p>
+                            <p id="txt-modalSubdivision" class="fw-bold"></p>
+                        </div>
+
+                        <div class="col-md-3">
+                            <p class="text-muted small mb-0">Area Number:</p>
+                            <p id="txt-modalAreaNumber" class="fw-bold"></p>
+                        </div>
+                    </div>
+
+                    <div class="row g-3 mt-1">
+                        <div class="col-md-4">
+                            <p class="text-muted small mb-0">Barangay:</p>
+                            <p id="txt-modalBarangay" class="fw-bold"></p>
+                        </div>
+
+                        <div class="col-md-4">
+                            <p class="text-muted small mb-0">Municipality / City:</p>
+                            <p id="txt-modalMunicipalityCity" class="fw-bold"></p>
+                        </div>
+
+                        <div class="col-md-4">
+                            <p class="text-muted small mb-0">Province:</p>
+                            <p id="txt-modalProvince" class="fw-bold"></p>
+                        </div>
+                    </div>
+
+                    <hr>
+
+                    <h5 class="fw-bold mb-3" style="color: #000;">Household Information</h5>
+
+                    <div class="row g-3">
+                        <div class="col-md-4">
+                            <p class="text-muted small mb-0">Head of Family:</p>
+                            <p id="txt-householdHeadName" class="fw-bold"></p>
+                        </div>
+                        <div class="col-md-4">
+                            <p class="text-muted small mb-0">Number of Adults:</p>
+                            <p id="txt-householdAdultCount" class="fw-bold"></p>
+                            <ul id="list-householdAdults" class="small mb-0 ps-3"></ul>
+                        </div>
+                        <div class="col-md-4">
+                            <p class="text-muted small mb-0">Number of Minors:</p>
+                            <p id="txt-householdMinorCount" class="fw-bold"></p>
+                            <ul id="list-householdMinors" class="small mb-0 ps-3"></ul>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+
+            <div class="modal-footer border-0">
+                <button type="button" class="btn btn-secondary px-4" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 <script src="../JS-Script-Files/Admin-End/householdProfilingScript.js"></script>
 </body>
