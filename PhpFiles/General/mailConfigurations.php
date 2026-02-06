@@ -1,52 +1,34 @@
 <?php
-// PhpFiles/General/mailConfigurations.php
-// ✅ Pure config only. No PHPMailer usage here.
 
-return [
-  'host' => 'smtp.hostinger.com',
-  'username' => 'official@barangaysanjose-montalban.com',
-  'password' => 'BrgySanJose.Verify@2025',
+use PHPMailer\PHPMailer\PHPMailer;
+use PHPMailer\PHPMailer\Exception;
 
-  'port' => 465,
+require __DIR__ . '/../../composer-email-handler/vendor/autoload.php';
 
-  // ✅ use strings, not PHPMailer constants
-  // 'ssl' for port 465, 'tls' for port 587
-  'secure' => 'ssl',
+$mail = new PHPMailer(true);
 
-  'smtp_auth' => true,
+try {
+    // SMTP
+$mail->isSMTP();
+$mail->Host       = 'smtp.hostinger.com';
+$mail->SMTPAuth   = true;
+$mail->Username   = 'official@barangaysanjose-montalban.com';
+$mail->Password   = 'MAILBOX_PASSWORD';
+$mail->SMTPSecure = PHPMailer::ENCRYPTION_SMTPS; // SSL
+$mail->Port       = 465;
 
-  'from_email' => 'official@barangaysanjose-montalban.com',
-  'from_name'  => 'Barangay San Jose',
+$mail->SMTPDebug  = 2;
+$mail->Debugoutput = 'html';
 
-  // optional per-type sender
-  'senders' => [
-    'verify' => [
-      'from_email' => 'verify@barangaysanjose-montalban.com',
-      'from_name'  => 'Barangay San Jose Verification',
-    ],
-    'one_time' => [
-      'from_email' => 'access@barangaysanjose-montalban.com',
-      'from_name'  => 'Barangay San Jose Access',
-    ],
-    'announcement' => [
-      'from_email' => 'announcements@barangaysanjose-montalban.com',
-      'from_name'  => 'Barangay San Jose Announcements',
-    ],
-    'transaction' => [
-      'from_email' => 'no-reply@barangaysanjose-montalban.com',
-      'from_name'  => 'Barangay San Jose Notifications',
-    ],
-  ],
-];
 
-// ---- SMTP CONFIG (fill these with real values) ----
-        // SMTP configuration
-        //$this->mail->isSMTP();
-        //$this->mail->Host       = 'smtp.hostinger.com';
-        //$this->mail->SMTPAuth   = true;
-        //$this->mail->Username   = 'official@barangaysanjose-montalban.com';
-        //$this->mail->Password   = 'BrgySanJose.Verify@2025';
-        //$this->mail->SMTPSecure = PHPMailer::ENCRYPTION_SMTPS;
-        //$this->mail->Port       = 465;
-        //$this->mail->setFrom('otp_verify@barangaysanjose-montalban.com', 'Barangay San Jose');
-        //$this->mail->isHTML(true);
+    // Email
+    $mail->setFrom('official@barangaysanjose-montalban.com', 'Barangay San Jose');
+    $mail->addAddress('mendoza.jerome@ue.edu.ph', 'Rome');
+    $mail->Subject = 'SMTP Test';
+    $mail->Body    = 'SMTP is working.';
+
+    $mail->send();
+    echo '✅ Email sent';
+} catch (Exception $e) {
+    echo '❌ SMTP Error: ' . $mail->ErrorInfo;
+}

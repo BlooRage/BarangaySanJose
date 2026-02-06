@@ -1,41 +1,26 @@
 <?php
-$residentinformationtbl = [
-    'firstname' => 'Juan',
-    'middlename' => '',
-    'lastname' => 'Dela Cruz',
-    'suffix' => '',
-    'sex' => 'Male',
-    'birthdate' => 'January 1, 1999',
-    'age' => 18,
-    'civil_status' => 'Single',
-    'head_of_family' => 'No',
-    'voter_status' => 'Registered Voter',
-    'occupation' => 'Barista',
-    'employment_status' => 'Employed',
-    'occupation_detail' => '',
-    'religion' => 'Roman Catholic',
-    'sector_membership' => 'Student, PWD',
-    'emergency_name' => 'Maria Dela Cruz',
-    'emergency_contact' => '09123456789',
-    'profile_pic' => 'profile_pic_juan.png'
-];
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
+if (empty($_SESSION['user_id'])) {
+    header("Location: ../Guest-End/login.php");
+    exit;
+}
 
-$residentaddresstbl = [
-    'address_id' => 1,
-    'resident_id' => 101,
-    'street_number' => '14A',
-    'street_name' => 'Chico St',
-    'subdivision' => '',
-    'area_number' => 'Area 01'
-];
+require_once "../PhpFiles/get/getResidentProfile.php";
 
-$useraccountstbl = [
-    'type' => 'Resident',
-    'created' => 'March 12, 2024',
-    'last_password_change' => 'August 3, 2025',
-    'email' => 'juan.delacruz@email.com',
-    'phone_number' => '09123456789'
-];
+$data = getResidentProfileData($conn, $_SESSION['user_id']);
+$residentinformationtbl = $data['residentinformationtbl'];
+$residentaddresstbl = $data['residentaddresstbl'];
+$useraccountstbl = $data['useraccountstbl'];
+
+$profileImage = '../Images/Profile-Placeholder.png';
+if (!empty($residentinformationtbl['profile_pic'])) {
+    $candidate = $residentinformationtbl['profile_pic'];
+    if (file_exists($candidate)) {
+        $profileImage = $candidate;
+    }
+}
 ?>
 
 <!DOCTYPE html>
@@ -45,10 +30,11 @@ $useraccountstbl = [
     <meta charset="UTF-8">
     <title>Resident Profile</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <script src="../JS-Script-Files/modalHandler.js" defer></script>
+    <link rel="stylesheet" href="../CSS-Styles/Resident-End-CSS/residentDashboard.css">
     <style>
         .main-head {
-            background-color: #f6e7d9;
             color: #fcdabc;
         }
     </style>
@@ -56,15 +42,28 @@ $useraccountstbl = [
 
 <body>
 
-    <div class="d-flex min-vh-100">
+    <div class="d-flex" style="min-height: 100vh;">
 
         <?php include 'includes/resident_sidebar.php'; ?>
 
-        <main class="flex-grow-1 p-4 bg-light">
-
-            <div class="main-head text-center py-3 rounded mb-4">
-                <h3 class="mb-0">RESIDENT PROFILE</h3>
+        <header id="mobile-header">
+            <div class="d-flex align-items-center px-3 py-2 shadow-sm bg-white">
+                <div class="d-flex align-items-center gap-2">
+                    <button class="btn" id="btn-burger" type="button">
+                        <i class="fa-solid fa-bars fa-lg"></i>
+                    </button>
+                    <img src="../Images/San_Jose_LOGO.jpg" alt="Logo" style="width:32px;height:32px">
+                    <span class="logo-name">Barangay San Jose</span>
+                </div>
             </div>
+        </header>
+
+        <main id="div-mainDisplay" class="flex-grow-1 px-4 pb-4 pt-0 px-md-5 pb-md-5 pt-md-0 bg-light">
+
+    <div class="main-head text-center py-1 rounded mb-0 mt-0">
+                <h3 class="mb-0 text-black">RESIDENT PROFILE</h3>
+            </div>
+            <hr class="mt-1 mb-2">
             <div class="card shadow-sm mb-4">
                 <div class="card-header d-flex justify-content-between">
                     <strong>PERSONAL INFORMATION</strong>
@@ -73,43 +72,32 @@ $useraccountstbl = [
                     </button>
                 </div>
 
-                <div class="card-body">
-                    <table class="table table-borderless align-middle">
-                        <tr>
-                            <td rowspan="6" style="width:30%; text-align:center;">
-                                <img src="profile.jpg"
-                                    class="img-fluid rounded-circle mb-2"
-                                    style="width:200px; height: 200px;">
-                            </td>
-                            <td><strong>Name:</strong><br>
-                                <?= $residentinformationtbl['firstname'] . ' ' . $residentinformationtbl['lastname'] ?>
-                            </td>
-                            <td><strong>Sex:</strong><br><?= $residentinformationtbl['sex'] ?></td>
-                        </tr>
-
-                        <tr>
-                            <td><strong>Age:</strong><br><?= $residentinformationtbl['age'] ?></td>
-                            <td><strong>Civil Status:</strong><br><?= $residentinformationtbl['civil_status'] ?></td>
-                        </tr>
-
-                        <tr>
-                            <td><strong>Birthdate:</strong><br><?= $residentinformationtbl['birthdate'] ?></td>
-                            <td><strong>Religion:</strong><br><?= $residentinformationtbl['religion'] ?></td>
-                        </tr>
-
-                        <tr>
-                            <td><strong>Voter Status:</strong><br><?= $residentinformationtbl['voter_status'] ?></td>
-                            <td><strong>Head of the Family:</strong><br><?= $residentinformationtbl['head_of_family'] ?></td>
-                        </tr>
-
-                        <tr>
-                            <td><strong>Occupation:</strong><br><?= $residentinformationtbl['occupation'] ?></td>
-                        </tr>
-
-                        <tr>
-                            <td><strong>Sector Membership:</strong><br><?= $residentinformationtbl['sector_membership'] ?></td>
-                        </tr>
-                    </table>
+                <div class="card-body py-2">
+                    <div class="row g-2 align-items-center">
+                        <div class="col-12 col-md-12 col-lg-3 d-flex align-items-center justify-content-center">
+                            <img src="<?= htmlspecialchars($profileImage) ?>"
+                                class="img-fluid rounded-circle mb-2"
+                                style="width:170px; height: 170px;">
+                        </div>
+                        <div class="col-12 col-md-6 col-lg-4">
+                            <div class="d-flex flex-column gap-2">
+                                <div><strong>Name:</strong> <?= $residentinformationtbl['firstname'] . ' ' . $residentinformationtbl['lastname'] ?></div>
+                                <div><strong>Age:</strong> <?= $residentinformationtbl['age'] ?></div>
+                                <div><strong>Birthdate:</strong> <?= $residentinformationtbl['birthdate'] ?></div>
+                                <div><strong>Sex:</strong> <?= $residentinformationtbl['sex'] ?></div>
+                                <div><strong>Civil Status:</strong> <?= $residentinformationtbl['civil_status'] ?></div>
+                            </div>
+                        </div>
+                        <div class="col-12 col-md-6 col-lg-5">
+                            <div class="d-flex flex-column gap-2">
+                                <div><strong>Religion:</strong> <?= $residentinformationtbl['religion'] ?></div>
+                                <div><strong>Voter Status:</strong> <?= $residentinformationtbl['voter_status'] ?></div>
+                                <div><strong>Head of the Family:</strong> <?= $residentinformationtbl['head_of_family'] ?></div>
+                                <div><strong>Occupation:</strong> <?= $residentinformationtbl['occupation'] ?></div>
+                                <div><strong>Sector Membership:</strong> <?= $residentinformationtbl['sector_membership'] ?></div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
             <div class="card shadow-sm mb-4">
@@ -132,26 +120,48 @@ $useraccountstbl = [
                     </button>
                 </div>
                 <div class="card-body">
-                    <p><strong>Contact Person:</strong> <?= $residentinformationtbl['emergency_name'] ?></p>
-                    <p><strong>Contact Number:</strong> <?= $residentinformationtbl['emergency_contact'] ?></p>
+                    <div class="row g-2">
+                        <div class="col-12 col-md-6">
+                            <strong>Contact Person:</strong> <?= $residentinformationtbl['emergency_name'] ?>
+                        </div>
+                        <div class="col-12 col-md-6">
+                            <strong>Contact Number:</strong> <?= $residentinformationtbl['emergency_contact'] ?>
+                        </div>
+                    </div>
                 </div>
             </div>
 
-             <div class="card shadow-sm">
+            <div class="card shadow-sm">
                 <div class="card-header"><strong>ACCOUNT INFORMATION</strong></div>
-                <div class="card-body">
-                    <p><strong>Account Type:</strong> <?= $useraccountstbl['type'] ?></p>
-                    <p><strong>Email:</strong> <?= $useraccountstbl['email'] ?></p>
-                    <p><strong>Account Created:</strong> <?= $useraccountstbl['created'] ?></p>
-                    <p><strong>Last Password Change:</strong> <?= $useraccountstbl['last_password_change'] ?></p>
-                    <p><strong>Password:</strong> •••••••••</p>
+                <div class="card-body small">
+                    <div class="row g-2">
+                        <div class="col-12 col-md-6">
+                            <div><strong>Account Type:</strong> <?= $useraccountstbl['type'] ?></div>
+                            <div><strong>Account Created:</strong> <?= $useraccountstbl['created'] ?></div>
+                        </div>
+                        <div class="col-12 col-md-6">
+                            <div><strong>Mobile Number:</strong> +63<?= $useraccountstbl['phone_number'] ?></div>
+                            <div><strong>Email:</strong> <?= $useraccountstbl['email'] ?>
+                                <span class="text-muted fst-italic ms-2">
+                                    <?= ($useraccountstbl['email_verify'] ?? 0) ? 'Verified' : 'Not Verified' ?>
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+                    <hr class="my-3">
+                    <div class="row g-2">
+                        <div class="col-12 col-md-6"><a href="javascript:void(0)">Change Password</a></div>
+                        <div class="col-12 col-md-6"><a href="javascript:void(0)">Change Email</a></div>
+                        <div class="col-12 col-md-6"><a href="javascript:void(0)">Change Phone Number</a></div>
+                        <div class="col-12 col-md-6"><a href="javascript:void(0)" id="verifyEmailLink">Verify Email</a></div>
+                    </div>
                 </div>
             </div>
 
         </main>
     </div>
 
-     <div class="modal fade" id="editProfileModal" tabindex="-1">
+    <div class="modal fade" id="editProfileModal" tabindex="-1" data-bs-backdrop="static" data-bs-keyboard="false">
         <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
             <div class="modal-content">
 
@@ -260,7 +270,7 @@ $useraccountstbl = [
     </div>
 
 
-     <div class="modal fade" id="addAddressModal" tabindex="-1">
+     <div class="modal fade" id="addAddressModal" tabindex="-1" data-bs-backdrop="static" data-bs-keyboard="false">
         <div class="modal-dialog modal-md modal-dialog-centered">
             <div class="modal-content">
 
@@ -285,7 +295,7 @@ $useraccountstbl = [
         </div>
     </div>
 
-         <div class="modal fade" id="editEmergencyContactModal" tabindex="-1">
+         <div class="modal fade" id="editEmergencyContactModal" tabindex="-1" data-bs-backdrop="static" data-bs-keyboard="false">
             <div class="modal-dialog modal-md modal-dialog-centered">
                 <div class="modal-content">
 
@@ -328,6 +338,54 @@ $useraccountstbl = [
              document.addEventListener('DOMContentLoaded', toggleOccupation);
         </script>
 
+    <script>
+        const burgerBtn = document.getElementById("btn-burger");
+        const sidebar = document.getElementById("div-sidebarWrapper");
+
+        if (burgerBtn && sidebar) {
+            burgerBtn.addEventListener("click", () => {
+                sidebar.classList.toggle("show");
+            });
+        }
+    </script>
+    <script>
+        const verifyEmailLink = document.getElementById("verifyEmailLink");
+        if (verifyEmailLink) {
+            verifyEmailLink.addEventListener("click", async (e) => {
+                e.preventDefault();
+                try {
+                    const res = await fetch("../PhpFiles/EmailHandlers/testSendVerify.php", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({}),
+                    });
+                    const data = await res.json().catch(() => ({}));
+                    if (!res.ok || !data.success) {
+                        throw new Error(data.message || "Unable to send verification email.");
+                    }
+                    if (window.UniversalModal?.open) {
+                        window.UniversalModal.open({
+                            title: "Verification Email Sent",
+                            message: "An email verification has been sent to your email, click the verify button to verify. it will expire in 15 minutes.",
+                            buttons: [{ label: "OK", class: "btn btn-primary" }],
+                        });
+                    } else {
+                        alert("Verification Email Sent\nAn email verification has been sent to your email, click the verify button to verify. It will expire in 15 minutes.");
+                    }
+                } catch (err) {
+                    if (window.UniversalModal?.open) {
+                        window.UniversalModal.open({
+                            title: "Error",
+                            message: err?.message || "Unable to send verification email.",
+                            buttons: [{ label: "OK", class: "btn btn-danger" }],
+                        });
+                    } else {
+                        alert(err?.message || "Unable to send verification email.");
+                    }
+                }
+            });
+        }
+    </script>
 </body>
 
 </html>

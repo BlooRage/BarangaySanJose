@@ -148,6 +148,15 @@ CREATE TABLE `emergencycontacttbl` (
   CONSTRAINT `fk_emergency_user` FOREIGN KEY (`user_id`) REFERENCES `useraccountstbl` (`user_id`) ON DELETE CASCADE
 ) ENGINE=InnoDB AUTO_INCREMENT=1 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
+CREATE TABLE `emailverificationtokens` (
+  `user_id` varchar(12) NOT NULL,
+  `token_hash` varchar(255) NOT NULL,
+  `expires_at` datetime NOT NULL,
+  `used_at` datetime DEFAULT NULL,
+  PRIMARY KEY (`user_id`),
+  CONSTRAINT `fk_email_verif_user` FOREIGN KEY (`user_id`) REFERENCES `useraccountstbl` (`user_id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
 
 
 

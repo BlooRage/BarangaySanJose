@@ -177,7 +177,7 @@ function openViewEntry(data) {
   // STATIC MODAL: cannot close by click outside or Esc
   new bootstrap.Modal(document.getElementById("modal-viewEntry"), {
     backdrop: 'static',
-    keyboard: true
+    keyboard: false
   }).show();
 }
 
@@ -225,7 +225,7 @@ function openEditEntry(data) {
   // ========================
   const editModal = new bootstrap.Modal(modalEl, {
     backdrop: 'static',  // cannot close by clicking outside
-    keyboard: true      // cannot close by pressing Esc
+    keyboard: false     // cannot close by pressing Esc
   });
   editModal.show();
 

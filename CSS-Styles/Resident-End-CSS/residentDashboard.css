@@ -1,44 +1,85 @@
-:root {
-    color-scheme: light;
+@font-face {
+    font-family: 'Charis SIL Regular';
+    src: url(../Fonts/Charis-SIL/CharisSIL-Regular.ttf);
 }
-@media (prefers-color-scheme: dark) {
-    :root {
-        color-scheme: light;
-    }
-    body {
-        background-color: #ffffff;
-        color: #000000;
-    }
+@font-face {
+    font-family: 'Charis SIL Bold';
+    src: url(../Fonts/Charis-SIL/CharisSIL-Bold.ttf);
 }
-
+@font-face {
+    font-family: 'Charis SIL Bold Italic';
+    src: url(../Fonts/Charis-SIL/CharisSIL-BoldItalic.ttf);
+}
+@font-face {
+    font-family: 'Charis SIL Italic';
+    src: url(../Fonts/Charis-SIL/CharisSIL-Italic.ttf);
+}
+@font-face {
+    font-family: 'Geist';
+    src: url(../Fonts/Geist/Geist-VariableFont_wght.ttf);
+}
 
 #div-sidebarWrapper {
-    width: 100%;
-    min-width: 250px;
+    width: 280px;
+    min-width: 0;
     background-color: #fff;
 }
 
-@media (min-width: 768px) {
+@media (min-width: 769px) {
     #div-sidebarWrapper {
-        width: 18%;
+        width: 280px;
         min-height: 100vh;
+        overflow: hidden;
+        position: fixed;
+        top: 0;
+        left: 0;
+        align-self: flex-start;
+    }
+    #div-mainDisplay {
+        margin-left: 280px;
+    }
+    #mobile-header {
+        display: none;
+        height: 0;
+        padding: 0;
+        margin: 0;
+        overflow: hidden;
     }
 }
 
+.logo-name {
+    font-family: 'Charis SIL Regular', serif;
+    color: #000000;
+    font-size: 26px;
+}
+h3 {
+    font-family: 'Charis SIL Bold', serif;
+    color: #FE993C;
+}
+#txt-sectionTitle {
+    font-family: 'Charis SIL Bold', serif;
+}
+
+.texts {
+    font-family: 'Geist', sans-serif;
+    color: #c86400;
+}
 
 .card-action {
-    background-color: #FE993C;
+    background-color: #fff;
     transition: transform 0.2s ease, background-color 0.2s;
     cursor: pointer;
     aspect-ratio: 1 / 1;
     width: 90%;
-    border: 1px solid #000000!important;
-    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1)!important;
+    border: 1px solid #FE993C !important;
+    box-shadow: 1 4px 6px rgba(0, 0, 0, 0.1)!important;
+    color: #000 !important;
 }
 
 .card-action:hover {
     transform: translateY(-5px);
     background-color: #f47c1c;
+    color: #fff !important;
 }
 
 .img-serviceIcon {
@@ -59,7 +100,6 @@
     min-height: 150px;
 }
 
-/* Modal sizing */
 #div-modalSizing {
     width: 90%;
     max-width: 400px;
@@ -91,15 +131,80 @@ body {
 
 .a-sidebarLink {
     display: block;
-    padding: 10px 15px;
+    padding: 8px 12px;
     text-decoration: none;
     color: #666;
     border-radius: 8px;
     margin-bottom: 2px;
 }
+.a-sidebarLink i {
+    color: #000;
+    margin-right: 8px;
+}
 
 .a-sidebarLink:hover, .a-sidebarLink.active {
     background-color: #fff3e6;
-    color: #FE993C;
-    font-weight: bold;
+    color: #000;
+    font-weight: 700;
+}
+.a-sidebarLink:hover i,
+.a-sidebarLink.active i {
+    color: #000;
+}
+
+.account-button {
+    background: linear-gradient(135deg, #0b2a4a 0%, #123a66 50%, #0a1f3b 100%);
+    color: #ffffff;
+    border: none;
+}
+.account-button:hover {
+    background: linear-gradient(135deg, #0e355b 0%, #174679 50%, #0c2746 100%);
+    color: #ffffff;
+}
+
+/* ===== MOBILE INTERFACES ===== */
+@media (max-width: 768px) {
+    #mobile-header {
+        display: block;
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        z-index: 1200;
+    }
+
+    #div-sidebarWrapper {
+        position: fixed;
+        top: 0;
+        left: 0;
+        height: 100vh;
+        width: 100%;
+        min-width: 0;
+        transform: translateX(-100%);
+        transition: transform 0.3s ease;
+        z-index: 1100;
+        background: #fff;
+        overflow-y: auto;
+    }
+    #div-mainDisplay {
+        margin-left: 0;
+    }
+
+    #div-sidebarWrapper.show {
+        transform: translateX(0);
+    }
+
+    body {
+        padding-top: 60px;
+    }
+}
+
+@media (min-width: 769px) {
+    #mobile-header {
+        display: none;
+    }
+}
+
+#mobile-header .d-flex {
+    text-align: left;
 }

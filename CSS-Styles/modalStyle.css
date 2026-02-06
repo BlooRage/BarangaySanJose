@@ -34,6 +34,14 @@
       font-size: 1.1rem;
       margin: 0;
 }
+/* Universal modal title color */
+.modal .modal-title {
+    color: #000000;
+}
+/* Hide X/close button sitewide */
+.modal .btn-close {
+    display: none !important;
+}
 
 /* Login success modal title visibility */
 #accountVerifiedModal .modal-title {

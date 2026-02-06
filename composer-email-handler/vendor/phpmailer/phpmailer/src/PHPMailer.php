@@ -1116,7 +1116,7 @@ class PHPMailer
             return false;
         }
         if ($name !== null && is_string($name)) {
-            $name = trim(preg_replace('/[]+/', '', $name)); //Strip breaks and trim
+            $name = trim(preg_replace('/[\\r\\n]+/', '', $name)); //Strip breaks and trim
         } else {
             $name = '';
         }
@@ -1391,7 +1391,7 @@ class PHPMailer
             $name = '';
         }
         $address = trim((string)$address);
-        $name = trim(preg_replace('/[]+/', '', $name)); //Strip breaks and trim
+        $name = trim(preg_replace('/[\\r\\n]+/', '', $name)); //Strip breaks and trim
         //Don't validate now addresses with IDN. Will be done in send().
         $pos = strrpos($address, '@');
         if (
@@ -5474,4 +5474,3 @@ class PHPMailer
         $this->oauth = $oauth;
     }
 }
-

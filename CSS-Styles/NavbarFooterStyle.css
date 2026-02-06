@@ -183,15 +183,23 @@ h5 {
         text-align: center;
     }
     #navbarLinks {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
         width: 100%;
         justify-content: center;
+        margin-left: 0 !important;
+        margin-right: 0 !important;
     }
     #navbarLinks .nav-item {
         width: 100%;
         margin: 0;
+        display: flex;
+        justify-content: center;
     }
     #navbarLinks .nav-link {
         display: block;
+        width: 100%;
         padding: 12px 0;
         text-align: center;
         position: relative;

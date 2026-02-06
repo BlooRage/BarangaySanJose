@@ -69,7 +69,7 @@
             </div>
 
             <!-- FILTER MODAL -->
-            <div class="modal fade" id="modalFilter" tabindex="-1" aria-hidden="true">
+            <div class="modal fade" id="modalFilter" tabindex="-1" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
                 <div class="modal-dialog modal-dialog-centered">
                     <div class="modal-content p-4">
 
@@ -181,7 +181,7 @@
 </div>
 
 <!-- MODAL stays unchanged -->
-<div class="modal fade" id="modal-viewEntry" tabindex="-1">
+<div class="modal fade" id="modal-viewEntry" tabindex="-1" data-bs-backdrop="static" data-bs-keyboard="false">
     <div class="modal-dialog modal-dialog-centered" id="div-modalSizing">
         <form id="form-updateStatus" method="POST" action="../PhpFiles/Admin-End/residentMasterlist.php" class="modal-content border-0 rounded-2 p-4">
             <div class="modal-header border-0">
@@ -382,7 +382,7 @@
 </div>
 
 <!-- EDIT RESIDENT MODAL -->
-<div class="modal fade" id="modal-editEntry" tabindex="-1">
+<div class="modal fade" id="modal-editEntry" tabindex="-1" data-bs-backdrop="static" data-bs-keyboard="false">
   <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable">
     <form id="form-editResident" class="modal-content p-4" method="POST" action="../PhpFiles/Admin-End/residentMasterlist.php">
 

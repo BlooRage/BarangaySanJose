@@ -18,6 +18,18 @@
     <!-- ✅ SIDEBAR INCLUDE -->
     <?php include 'includes/resident_sidebar.php'; ?>
 
+    <header id="mobile-header">
+      <div class="d-flex align-items-center px-3 py-2 shadow-sm bg-white">
+        <div class="d-flex align-items-center gap-2">
+          <button class="btn" id="btn-burger" type="button">
+            <i class="fa-solid fa-bars fa-lg"></i>
+          </button>
+          <img src="../Images/San_Jose_LOGO.jpg" alt="Logo" style="width:32px;height:32px">
+          <span class="logo-name">Barangay San Jose</span>
+        </div>
+      </div>
+    </header>
+
     <!-- ✅ MAIN -->
     <main id="div-mainDisplay" class="flex-grow-1 p-4 p-md-5 bg-light">
 
@@ -76,6 +88,17 @@
 
     </main>
   </div>
+
+  <script>
+    const burgerBtn = document.getElementById("btn-burger");
+    const sidebar = document.getElementById("div-sidebarWrapper");
+
+    if (burgerBtn && sidebar) {
+      burgerBtn.addEventListener("click", () => {
+        sidebar.classList.toggle("show");
+      });
+    }
+  </script>
 
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 </body>

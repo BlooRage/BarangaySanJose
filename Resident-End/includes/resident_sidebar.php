@@ -12,7 +12,7 @@
     <!-- Bootstrap Icons (for logout icon) -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons/font/bootstrap-icons.css" rel="stylesheet" />
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
-    <link rel="stylesheet" href="../CSS-Styles/GeneralStyle.css">
+    <link rel="stylesheet" href="../CSS-Styles/Guest-End-CSS/GeneralStyle.css">
     <link rel="stylesheet" href="../CSS-Styles/Resident-End-CSS/residentDashboard.css">
     <link rel="stylesheet" href="../CSS-Styles/NavbarFooterStyle.css">
 </head>
@@ -20,21 +20,54 @@
 
 <body>
 <?php
+if (session_status() === PHP_SESSION_NONE) {
+  session_start();
+}
+require_once "../PhpFiles/General/connection.php";
+
 $current = basename($_SERVER['PHP_SELF']);
 
 function activeLink($page, $current) {
   return $page === $current ? 'active' : '';
 }
+
+$displayName = "Resident";
+
+if (!empty($_SESSION['user_id']) && isset($conn) && $conn instanceof mysqli) {
+  $stmt = $conn->prepare("
+    SELECT firstname, middlename, lastname, suffix
+    FROM residentinformationtbl
+    WHERE user_id = ?
+    LIMIT 1
+  ");
+
+  if ($stmt) {
+    $stmt->bind_param("s", $_SESSION['user_id']);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    if ($row = $result->fetch_assoc()) {
+      $fullName = trim(
+        $row['firstname'] . ' ' .
+        ($row['middlename'] ? $row['middlename'][0] . '. ' : '') .
+        $row['lastname'] .
+        ($row['suffix'] ? ' ' . $row['suffix'] : '')
+      );
+      if ($fullName !== '') {
+        $displayName = $fullName;
+      }
+    }
+    $stmt->close();
+  }
+}
 ?>
 
 <aside id="div-sidebarWrapper"
-       class="d-flex flex-column flex-shrink-0 p-3 bg-white border-end shadow-sm"
-       style="width: 280px;">
+       class="d-flex flex-column flex-shrink-0 p-3 bg-white border-end shadow-sm">
 
   <!-- LOGO HEADER (ADMIN-STYLE) -->
   <a href="AdminDashboard.php" class="d-flex align-items-center pb-3 mb-3 link-dark text-decoration-none border-bottom">
     <img src="../Images/San_Jose_LOGO.jpg" class="me-2" style="width: 32px; height: 32px;">
-    <span class="fs-5 fw-semibold">Barangay San Jose</span>
+    <span class="fs-5 fw-semibold logo-name">Barangay San Jose</span>
   </a>
 
   <!-- RESIDENT PROFILE -->
@@ -47,7 +80,7 @@ function activeLink($page, $current) {
       width="90"
       height="90"
     >
-    <h2 id="txt-sidebarName" class="h6 fw-bold mb-0">Juan Dela Cruz</h2>
+    <h2 id="txt-sidebarName" class="h6 fw-bold mb-0"><?= htmlspecialchars($displayName) ?></h2>
   </div>
 
   <!-- NAV LINKS -->
@@ -57,7 +90,7 @@ function activeLink($page, $current) {
       <p class="text-muted small fw-bold mb-1">Home</p>
       <a href="resident_dashboard.php"
          class="a-sidebarLink <?= activeLink('resident_dashboard.php', $current) ?>">
-<i class="fa-solid fa-newspaper" style="color: #ff9739;"></i> Dashboard</i>
+        <i class="fa-solid fa-newspaper"></i>Dashboard
       </a>
     
     </div>
@@ -67,27 +100,27 @@ function activeLink($page, $current) {
       <p class="text-muted small fw-bold mb-1">Services</p>
       <a href="resident_certificates.php"
          class="a-sidebarLink <?= activeLink('resident_certificates.php', $current) ?>">
-<i class="fa-solid fa-certificate" style="color: #ff9739;"></i> Certificates</i>
+        <i class="fa-solid fa-certificate"></i>Certificates
 
       </a>
       <a href="resident_clearances.php"
          class="a-sidebarLink <?= activeLink('resident_clearances.php', $current) ?>">
-<i class="fa-solid fa-file-circle-check fa-sm" style="color: #ff9739;"></i> Clearances</i>
+        <i class="fa-solid fa-file-circle-check fa-sm"></i>Clearances
 
       </a>
       <a href="resident_barangay_id.php"
          class="a-sidebarLink <?= activeLink('resident_barangay_id.php', $current) ?>">
-<i class="fa-solid fa-id-badge fa-lg" style="color: #ff9739;"></i> Barangay ID</i>
+        <i class="fa-solid fa-id-badge fa-lg"></i>Barangay ID
 
       </a>
       <a href="resident_complaints.php"
          class="a-sidebarLink <?= activeLink('resident_complaints.php', $current) ?>">
-<i class="fa-solid fa-comment-dots" style="color: #ff9739;"></i></i> Complaints</i>
+        <i class="fa-solid fa-comment-dots"></i>Complaints
 
       </a>
       <a href="resident_appointments.php"
          class="a-sidebarLink <?= activeLink('resident_appointments.php', $current) ?>">
-<i class="fa-regular fa-calendar-days" style="color: #ff9739;"></i> Appointments</i>
+        <i class="fa-regular fa-calendar-days"></i>Appointments
 
       </a>
     </div>
@@ -96,11 +129,11 @@ function activeLink($page, $current) {
       <p class="text-muted small fw-bold mb-1">Info</p>
       <a href="resident_certificates.php"
          class="a-sidebarLink <?= activeLink('resident_certificates.php', $current) ?>">
-<i class="fa-solid fa-bullhorn" style="color: #ff9739;"></i> Announcements</i>
+        <i class="fa-solid fa-bullhorn"></i>Announcements
 
       <a href="resident_appointments.php"
          class="a-sidebarLink <?= activeLink('resident_appointments.php', $current) ?>">
-<i class="fa-solid fa-clock-rotate-left" style="color: #ff9739;"></i> Transactions</i>
+        <i class="fa-solid fa-clock-rotate-left"></i>Transactions
 
       </a>
 
@@ -113,7 +146,7 @@ function activeLink($page, $current) {
 
     <!-- ACCOUNT (BOTTOM, ADMIN-STYLE) -->
   <div class="mt-auto">
-    <a class="btn btn-outline-info btn-sm w-100 mb-2"
+    <a class="account-button btn btn-sm w-100 mb-2"
        href="resident_profile.php">
       <i class="fa-solid fa-circle-user"></i> Account
     </a>
