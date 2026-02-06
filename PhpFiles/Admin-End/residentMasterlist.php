@@ -2,12 +2,12 @@
 session_start();
 require_once "../General/connection.php";
 
-/* ================================
-   HANDLE STATUS UPDATE (FORM POST)
-================================ */
+/* =====================================================
+   1. HANDLE STATUS UPDATE (View Modal)
+===================================================== */
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['button-saveStatus'])) {
 
-    $residentId = isset($_POST['input-appId']) ? (int)$_POST['input-appId'] : 0;
+    $residentId = (int)($_POST['input-appId'] ?? 0);
     $uiStatus   = $_POST['select-newStatus'] ?? '';
 
     $statusMap = [
@@ -18,10 +18,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['button-saveStatus']))
 
     if ($residentId <= 0 || !isset($statusMap[$uiStatus])) {
         http_response_code(400);
-        exit('Invalid request');
+        exit("Invalid request");
     }
 
-    $dbStatusName = $statusMap[$uiStatus];
+    $dbStatus = $statusMap[$uiStatus];
 
     $stmt = $conn->prepare("
         UPDATE residentinformationtbl
@@ -34,12 +34,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['button-saveStatus']))
         )
         WHERE resident_id = ?
     ");
-    if (!$stmt) {
-        http_response_code(500);
-        exit('Prepare failed: ' . $conn->error);
-    }
 
-    $stmt->bind_param("si", $dbStatusName, $residentId);
+    $stmt->bind_param("si", $dbStatus, $residentId);
     $stmt->execute();
     $stmt->close();
 
@@ -47,10 +43,216 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['button-saveStatus']))
     exit;
 }
 
+/* =====================================================
+   2. HANDLE ARCHIVE RESIDENT (AJAX)
+===================================================== */
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['archive_resident'])) {
+    header('Content-Type: application/json; charset=utf-8');
 
-/* ================================
-   FETCH RESIDENT DATA FOR JS
-================================ */
+    $residentId = (int)($_POST['resident_id'] ?? 0);
+    if ($residentId <= 0) {
+        http_response_code(400);
+        echo json_encode(['success' => false, 'message' => 'Invalid resident ID.']);
+        exit;
+    }
+
+    $conn->begin_transaction();
+
+    try {
+        // Fetch Archived status id
+        $statusId = null;
+        $stmt = $conn->prepare("
+            SELECT status_id
+            FROM statuslookuptbl
+            WHERE status_name = 'Archived'
+              AND status_type = 'Resident'
+            LIMIT 1
+        ");
+        $stmt->execute();
+        $stmt->bind_result($statusId);
+        $stmt->fetch();
+        $stmt->close();
+
+        if (!$statusId) {
+            throw new Exception("Archived status not found. Add it to statuslookuptbl.");
+        }
+
+        // Get user_id for archived_at update (if column exists)
+        $userId = null;
+        $stmt = $conn->prepare("
+            SELECT user_id
+            FROM residentinformationtbl
+            WHERE resident_id = ?
+            LIMIT 1
+        ");
+        $stmt->bind_param("i", $residentId);
+        $stmt->execute();
+        $stmt->bind_result($userId);
+        $stmt->fetch();
+        $stmt->close();
+
+        // Update resident status to Archived
+        $stmt = $conn->prepare("
+            UPDATE residentinformationtbl
+            SET status_id_resident = ?
+            WHERE resident_id = ?
+        ");
+        $stmt->bind_param("ii", $statusId, $residentId);
+        $stmt->execute();
+        $stmt->close();
+
+        // Update archived_at if column exists
+        $colExists = 0;
+        $stmt = $conn->prepare("
+            SELECT COUNT(*)
+            FROM INFORMATION_SCHEMA.COLUMNS
+            WHERE TABLE_SCHEMA = DATABASE()
+              AND TABLE_NAME = 'useraccountstbl'
+              AND COLUMN_NAME = 'archived_at'
+        ");
+        $stmt->execute();
+        $stmt->bind_result($colExists);
+        $stmt->fetch();
+        $stmt->close();
+
+        if ($colExists && $userId) {
+            $stmt = $conn->prepare("
+                UPDATE useraccountstbl
+                SET archived_at = NOW()
+                WHERE user_id = ?
+            ");
+            $stmt->bind_param("s", $userId);
+            $stmt->execute();
+            $stmt->close();
+        }
+
+        $conn->commit();
+        echo json_encode(['success' => true]);
+    } catch (Exception $e) {
+        $conn->rollback();
+        http_response_code(500);
+        echo json_encode(['success' => false, 'message' => $e->getMessage()]);
+    }
+    exit;
+}
+
+/* =====================================================
+   3. HANDLE EDIT RESIDENT UPDATE (Edit Modal)
+===================================================== */
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['resident_id'])) {
+
+    $residentId = (int)$_POST['resident_id'];
+    $userId     = (int)($_POST['user_id'] ?? 0);
+
+    // -----------------------
+    // Personal Info
+    // -----------------------
+    $firstName   = $_POST['firstName'] ?? '';
+    $middleName  = $_POST['middleName'] ?? '';
+    $lastName    = $_POST['lastName'] ?? '';
+    $suffix      = $_POST['suffix'] ?? '';
+    $birthdate   = $_POST['dateOfBirth'] ?? '';
+    $sex         = $_POST['sex'] ?? '';
+    $civilStatus = $_POST['civilStatus'] ?? '';
+    $voterStatus = $_POST['voterStatus'] ?? '';
+    $religion    = $_POST['religion'] ?? '';
+
+    // -----------------------
+    // Occupation (tinyint + detail)
+    // -----------------------
+    $occupationText = trim($_POST['occupation'] ?? '');
+    $isUnemployed = ($occupationText === '') || (strcasecmp($occupationText, 'Unemployed') === 0);
+
+    if ($isUnemployed) {
+        $occupation = 0;
+        $occupationDetail = null;
+    } else {
+        $occupation = 1;
+        $occupationDetail = $occupationText;
+    }
+
+    // -----------------------
+    // Sector membership
+    // -----------------------
+    $sectorMembership = isset($_POST['sectorMembership'])
+        ? implode(",", $_POST['sectorMembership'])
+        : '';
+
+    // -----------------------
+    // Emergency Contact
+    // -----------------------
+    $emFirst  = $_POST['emergencyFirstName'] ?? '';
+    $emMiddle = $_POST['emergencyMiddleName'] ?? '';
+    $emLast   = $_POST['emergencyLastName'] ?? '';
+    $emSuffix = $_POST['emergencySuffix'] ?? '';
+    $emPhone  = $_POST['emergencyPhoneNumber'] ?? '';
+    $emRel    = $_POST['emergencyRelationship'] ?? '';
+    $emAddr   = $_POST['emergencyAddress'] ?? '';
+
+    // -----------------------
+    // Update residentinformationtbl
+    // -----------------------
+    $stmt = $conn->prepare("
+        UPDATE residentinformationtbl
+        SET firstname = ?, middlename = ?, lastname = ?, suffix = ?,
+            birthdate = ?, sex = ?, civil_status = ?, voter_status = ?,
+            occupation = ?, occupation_detail = ?,
+            religion = ?, sector_membership = ?
+        WHERE resident_id = ?
+    ");
+
+    $stmt->bind_param(
+        "sssssssiisssi",
+        $firstName, $middleName, $lastName, $suffix,
+        $birthdate, $sex, $civilStatus, $voterStatus,
+        $occupation, $occupationDetail,
+        $religion, $sectorMembership,
+        $residentId
+    );
+
+    $stmt->execute();
+    $stmt->close();
+
+    // -----------------------
+    // Update emergencycontacttbl
+    // -----------------------
+    if ($userId > 0) {
+        $stmt = $conn->prepare("
+            UPDATE emergencycontacttbl
+            SET first_name = ?, middle_name = ?, last_name = ?, suffix = ?,
+                phone_number = ?, relationship = ?, address = ?
+            WHERE user_id = ?
+        ");
+
+        $stmt->bind_param(
+            "sssssssi",
+            $emFirst, $emMiddle, $emLast, $emSuffix,
+            $emPhone, $emRel, $emAddr, $userId
+        );
+
+        $stmt->execute();
+        $stmt->close();
+
+        // -----------------------
+        // Update useraccountstbl timestamp
+        // -----------------------
+        $stmt = $conn->prepare("
+            UPDATE useraccountstbl
+            SET updated_at = NOW()
+            WHERE user_id = ?
+        ");
+        $stmt->bind_param("i", $userId);
+        $stmt->execute();
+        $stmt->close();
+    }
+
+    header("Location: ../../Admin-End/residentMasterlist.php");
+    exit;
+}
+
+/* =====================================================
+   4. FETCH RESIDENT DATA (AJAX)
+===================================================== */
 if (isset($_GET['fetch'])) {
 
     header('Content-Type: application/json; charset=utf-8');
@@ -70,12 +272,9 @@ if (isset($_GET['fetch'])) {
             r.civil_status,
             r.head_of_family,
             r.voter_status,
-
-            /* stored in DB: occupation is 0/1 (tinyint) */
             r.occupation,
             r.occupation_detail,
 
-            /* ✅ WHAT TO DISPLAY IN MODAL */
             CASE
               WHEN r.occupation = 1
                    AND r.occupation_detail IS NOT NULL
@@ -102,6 +301,11 @@ if (isset($_GET['fetch'])) {
                 e.last_name,
                 IF(e.suffix IS NOT NULL AND e.suffix != '', CONCAT(' ', e.suffix), '')
             ) AS emergency_full_name,
+
+            e.first_name AS emergency_first_name,
+            e.last_name AS emergency_last_name,
+            e.middle_name AS emergency_middle_name,
+            e.suffix AS emergency_suffix,
             e.phone_number AS emergency_contact_number,
             e.relationship AS emergency_relationship,
             e.address AS emergency_address
@@ -121,21 +325,21 @@ if (isset($_GET['fetch'])) {
 
     if ($search !== '') {
         $sql .= " WHERE
-            r.resident_id LIKE ? OR
-            r.firstname LIKE ? OR
-            r.lastname LIKE ? OR
-            CONCAT(r.firstname, ' ', r.lastname) LIKE ?
+            (s.status_name <> 'Archived' OR s.status_name IS NULL)
+            AND (
+                r.resident_id LIKE ? OR
+                r.firstname LIKE ? OR
+                r.lastname LIKE ? OR
+                CONCAT(r.firstname, ' ', r.lastname) LIKE ?
+            )
         ";
+    } else {
+        $sql .= " WHERE (s.status_name <> 'Archived' OR s.status_name IS NULL)";
     }
 
     $sql .= " ORDER BY r.resident_id DESC";
 
     $stmt = $conn->prepare($sql);
-    if (!$stmt) {
-        http_response_code(500);
-        echo json_encode(["success" => false, "message" => "Prepare failed: " . $conn->error]);
-        exit;
-    }
 
     if ($search !== '') {
         $like = "%$search%";
@@ -161,8 +365,5 @@ if (isset($_GET['fetch'])) {
     exit;
 }
 
-/* ================================
-   Fallback if accessed directly
-================================ */
 http_response_code(404);
-exit('Not found');
+exit("Not found");

@@ -374,13 +374,163 @@
             </div>
 
             <div class="modal-footer border-0">
-                <button type="button" id="btn-deleteAccount" class="btn btn-danger me-auto">Delete Account</button>
                 <button type="button" class="btn btn-secondary px-4" data-bs-dismiss="modal">Close</button>
                 <button type="submit" name="button-saveStatus" class="btn btn-success px-5">Save Changes</button>
             </div>
         </form>
     </div>
 </div>
+
+<!-- EDIT RESIDENT MODAL -->
+<div class="modal fade" id="modal-editEntry" tabindex="-1">
+  <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable">
+    <form id="form-editResident" class="modal-content p-4" method="POST" action="../PhpFiles/Admin-End/residentMasterlist.php">
+
+      <div class="modal-header border-0">
+        <h4 class="fw-bold" style="font-family: 'Charis SIL Bold', serif; font-size: 28px; color: #e78924">Edit Resident Profile</h4>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+
+      <div class="modal-body">
+
+        <input type="hidden" id="edit-residentId" name="resident_id">
+
+        <!-- PERSONAL INFORMATION -->
+        <h5 class="fw-bold mb-3">Personal Information</h5>
+        <div class="row g-3">
+          <div class="col-md-3">
+            <label class="small fw-bold">Last Name</label>
+            <input type="text" id="edit-lastname" name="lastName" class="form-control" required autocomplete="family-name">
+          </div>
+          <div class="col-md-3">
+            <label class="small fw-bold">First Name</label>
+            <input type="text" id="edit-firstname" name="firstName" class="form-control" required autocomplete="given-name">
+          </div>
+          <div class="col-md-3">
+            <label class="small fw-bold">Middle Name</label>
+            <input type="text" id="edit-middlename" name="middleName" class="form-control" autocomplete="additional-name">
+          </div>
+          <div class="col-md-3">
+            <label class="small fw-bold">Suffix</label>
+            <input type="text" id="edit-suffix" name="suffix" class="form-control" placeholder="Suffix">
+          </div>
+
+          <div class="col-md-3">
+            <label class="small fw-bold">Date of Birth</label>
+            <input type="date" id="edit-birthdate" name="dateOfBirth" class="form-control" required>
+          </div>
+          <div class="col-md-3">
+            <label class="small fw-bold">Sex</label>
+            <select id="edit-sex" name="sex" class="form-select" required>
+              <option value="">Select</option>
+              <option value="Male">Male</option>
+              <option value="Female">Female</option>
+            </select>
+          </div>
+          <div class="col-md-3">
+            <label class="small fw-bold">Civil Status</label>
+            <select id="edit-civil" name="civilStatus" class="form-select" required>
+              <option value="">Select</option>
+              <option value="Single">Single</option>
+              <option value="Married">Married</option>
+              <option value="Widowed">Widowed</option>
+            </select>
+          </div>
+          <div class="col-md-3">
+            <label class="small fw-bold">Voter Status</label>
+            <select id="edit-voterStatus" name="voterStatus" class="form-select" required>
+              <option value="">Select</option>
+              <option value="1">Registered</option>
+              <option value="0">Not Registered</option>
+            </select>
+          </div>
+
+          <div class="col-md-3">
+            <label class="small fw-bold">Occupation</label>
+            <input type="text" id="edit-occupation" name="occupation" class="form-control" placeholder="Occupation">
+          </div>
+          <div class="col-md-3">
+            <label class="small fw-bold">Religion</label>
+            <input type="text" id="edit-religion" name="religion" class="form-control" placeholder="Religion">
+          </div>
+
+          <div class="col-md-6">
+            <label class="small fw-bold">Sector Membership</label>
+            <div class="d-flex flex-wrap gap-2">
+              <div class="form-check">
+                <input class="form-check-input" type="checkbox" id="sectorPWD" name="sectorMembership[]" value="PWD">
+                <label class="form-check-label small" for="sectorPWD">PWD</label>
+              </div>
+              <div class="form-check">
+                <input class="form-check-input" type="checkbox" id="sectorStudent" name="sectorMembership[]" value="Student">
+                <label class="form-check-label small" for="sectorStudent">Student</label>
+              </div>
+              <div class="form-check">
+                <input class="form-check-input" type="checkbox" id="sectorSP" name="sectorMembership[]" value="Single Parent">
+                <label class="form-check-label small" for="sectorSP">Single Parent</label>
+              </div>
+              <div class="form-check">
+                <input class="form-check-input" type="checkbox" id="sectorSenior" name="sectorMembership[]" value="Senior Citizen">
+                <label class="form-check-label small" for="sectorSenior">Senior Citizen</label>
+              </div>
+              <div class="form-check">
+                <input class="form-check-input" type="checkbox" id="sectorIP" name="sectorMembership[]" value="Indigenous People">
+                <label class="form-check-label small" for="sectorIP">Indigenous People</label>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <br><hr><br>
+
+        <!-- EMERGENCY CONTACT -->
+        <input type="hidden" id="edit-userId" name="user_id">
+        <h5 class="fw-bold mb-3">Emergency Contact</h5>
+        <div class="row g-3">
+          <div class="col-md-3">
+            <label class="small fw-bold">First Name</label>
+            <input type="text" id="edit-ec-firstname" name="emergencyFirstName" class="form-control" required>
+          </div>
+          <div class="col-md-3">
+            <label class="small fw-bold">Last Name</label>
+            <input type="text" id="edit-ec-lastname" name="emergencyLastName" class="form-control" required>
+          </div>
+          <div class="col-md-3">
+            <label class="small fw-bold">Middle Name</label>
+            <input type="text" id="edit-ec-middlename" name="emergencyMiddleName" class="form-control">
+          </div>
+          <div class="col-md-3">
+            <label class="small fw-bold">Suffix</label>
+            <input type="text" id="edit-ec-suffix" name="emergencySuffix" class="form-control" placeholder="Suffix">
+          </div>
+
+          <div class="col-md-4">
+            <label class="small fw-bold">Contact Number</label>
+            <input type="text" id="edit-ec-contact" name="emergencyPhoneNumber" class="form-control phone-input" placeholder="09XXXXXXXXX" required>
+          </div>
+          <div class="col-md-4">
+            <label class="small fw-bold">Relationship</label>
+            <input type="text" id="edit-ec-relationship" name="emergencyRelationship" class="form-control" placeholder="Relationship">
+          </div>
+          <div class="col-md-4">
+            <label class="small fw-bold">Address</label>
+            <input type="text" id="edit-ec-address" name="emergencyAddress" class="form-control" required>
+          </div>
+        </div>
+
+        <br>
+
+      <div class="modal-footer border-0">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+        <button type="submit" class="btn btn-success px-4">Save Changes</button>
+      </div>
+
+    </form>
+  </div>
+</div>
+
+
+
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 <script src="../JS-Script-Files/Admin-End/residentMasterlistScript.js"></script>

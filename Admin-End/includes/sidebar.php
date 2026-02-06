@@ -2,7 +2,7 @@
 $current = basename($_SERVER['PHP_SELF']);
 
 // Group pages by section
-$profilingPages = ['ResidentMasterlist.php', 'AddResident.php'];
+$profilingPages = ['ResidentMasterlist.php', 'ResidentArchive.php'];
 $certPages = ['requests.php', 'approved.php', 'denied.php'];
 
 $isProfilingActive = in_array($current, $profilingPages);
@@ -47,9 +47,9 @@ $isCertActive = in_array($current, $certPages);
             </a>
           </li>
           <li>
-            <a href="AddResident.php"
-               class="link-dark rounded <?= $current == 'AddResident.php' ? 'active' : '' ?>">
-              Add Resident
+            <a href="ResidentArchive.php"
+               class="link-dark rounded <?= $current == 'ResidentArchive.php' ? 'active' : '' ?>">
+              Resident Archive
             </a>
           </li>
         </ul>
