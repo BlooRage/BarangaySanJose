@@ -215,7 +215,6 @@ if (isset($_GET['fetch'])) {
 
     // Preload non-head residents to identify "other residing members" per address key
     $othersByKey = [];
-    $addrByKey = [];
     $nonHeadSql = "
         SELECT
             r.resident_id,
@@ -228,8 +227,7 @@ if (isset($_GET['fetch'])) {
             a.street_name,
             a.phase_number,
             a.subdivision,
-            a.area_number,
-            a.address_id
+            a.area_number
         FROM residentinformationtbl r
         LEFT JOIN statuslookuptbl s ON r.status_id_resident = s.status_id
         LEFT JOIN residentaddresstbl a
@@ -241,7 +239,7 @@ if (isset($_GET['fetch'])) {
                 LIMIT 1
             )
         WHERE r.head_of_family = 0
-          AND (s.status_name NOT IN ('Archived','NotVerified') OR s.status_name IS NULL)
+          AND (s.status_name <> 'Archived' OR s.status_name IS NULL)
           AND NOT EXISTS (
               SELECT 1
               FROM householdmemberinfotbl hm
@@ -269,17 +267,6 @@ if (isset($_GET['fetch'])) {
             normalize_simple($n['area_number'] ?? '')
         ]);
         if (trim($nKey, '|') === '') continue;
-
-        if (!isset($addrByKey[$nKey])) {
-            $addrByKey[$nKey] = [
-                'house_number' => $n['house_number'],
-                'street_name' => $n['street_name'],
-                'phase_number' => $n['phase_number'],
-                'subdivision' => $n['subdivision'],
-                'area_number' => $n['area_number'],
-                'address_id' => $n['address_id']
-            ];
-        }
         $nFullName =
             $n['firstname'] . ' ' .
             ($n['middlename'] ? $n['middlename'][0] . '. ' : '') .
@@ -333,7 +320,7 @@ if (isset($_GET['fetch'])) {
                 LIMIT 1
             )
         WHERE r.head_of_family = 1
-          AND (s.status_name NOT IN ('Archived','NotVerified') OR s.status_name IS NULL)
+          AND (s.status_name <> 'Archived' OR s.status_name IS NULL)
         ORDER BY r.resident_id DESC
     ";
 
@@ -462,69 +449,6 @@ if (isset($_GET['fetch'])) {
 
         // Attach other residing members (non-head, not in household) based on the same address key
         $groups[$key]['other_residents'] = $othersByKey[$key] ?? [];
-    }
-
-    // Add addresses without heads but with residents
-    foreach ($othersByKey as $key => $resList) {
-        if (isset($groups[$key])) continue;
-        $addr = $addrByKey[$key] ?? [
-            'house_number' => null,
-            'street_name' => null,
-            'phase_number' => null,
-            'subdivision' => null,
-            'area_number' => null,
-            'address_id' => null
-        ];
-
-        $addressParts = [];
-        if ($addr['house_number']) $addressParts[] = $addr['house_number'];
-        if ($addr['street_name']) $addressParts[] = $addr['street_name'] . ' Street';
-        if ($addr['phase_number']) $addressParts[] = $addr['phase_number'];
-        if ($addr['subdivision']) $addressParts[] = $addr['subdivision'];
-        if ($addr['area_number']) $addressParts[] = $addr['area_number'];
-        $addressDisplay = $addressParts ? implode(', ', $addressParts) : '—';
-
-        $adults = [];
-        $minors = [];
-        foreach ($resList as $r) {
-            $entry = [
-                'name' => $r['name'],
-                'age' => $r['age'],
-                'resident_id' => $r['resident_id'] ?? null
-            ];
-            if ($r['age'] !== null && $r['age'] >= 18) {
-                $adults[] = $entry;
-            } else {
-                $minors[] = $entry;
-            }
-        }
-
-        $groups[$key] = [
-            'address_display' => $addressDisplay,
-            'house_number' => $addr['house_number'],
-            'street_name' => $addr['street_name'],
-            'phase_number' => $addr['phase_number'],
-            'subdivision' => $addr['subdivision'],
-            'area_number' => $addr['area_number'],
-            'address_id' => $addr['address_id'],
-            'households' => [
-                [
-                    'resident_id' => null,
-                    'head_full_name' => 'No Family Head',
-                    'head_of_family' => 0,
-                    'sex' => null,
-                    'civil_status' => null,
-                    'voter_status' => null,
-                    'occupation_display' => null,
-                    'adult_count' => count($adults),
-                    'member_count' => count($adults) + count($minors),
-                    'members' => array_merge($adults, $minors),
-                    'adults' => $adults,
-                    'minors' => $minors
-                ]
-            ],
-            'other_residents' => []
-        ];
     }
 
     $data = array_values($groups);

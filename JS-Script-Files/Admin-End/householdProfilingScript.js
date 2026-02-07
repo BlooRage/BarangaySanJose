@@ -3,7 +3,6 @@ document.addEventListener("DOMContentLoaded", () => {
   const searchInput = document.getElementById("searchInput");
   const btnApplyFilter = document.getElementById("btnApplyFilter");
   const btnResetModal = document.getElementById("btnResetModalFilters");
-  const filterHouseholdCount = document.getElementById("filter-householdCount");
 
   let allAddresses = [];
 
@@ -16,7 +15,6 @@ document.addEventListener("DOMContentLoaded", () => {
       .then(res => res.json())
       .then(data => {
         allAddresses = Array.isArray(data) ? data : [];
-        renderAreaFilters(allAddresses);
         renderTable(allAddresses);
       })
       .catch(err => console.error("Fetch error:", err));
@@ -76,13 +74,23 @@ document.addEventListener("DOMContentLoaded", () => {
   // ========================
   if (btnApplyFilter) {
     btnApplyFilter.addEventListener("click", () => {
-      const areasChecked = Array.from(document.querySelectorAll(".filter-area-checkbox:checked")).map(cb => cb.value);
-      const minHouseholds = filterHouseholdCount && filterHouseholdCount.value !== "" ? parseInt(filterHouseholdCount.value, 10) : null;
+      const checkedBoxes = document.querySelectorAll(".filter-checkbox:checked");
+      const filters = {};
+      checkedBoxes.forEach(cb => {
+        const field = cb.dataset.field;
+        if (!filters[field]) filters[field] = [];
+        filters[field].push(cb.value);
+      });
 
       const filtered = allAddresses.filter(res => {
-        const areaMatch = !areasChecked.length || areasChecked.includes(String(res.area_number ?? ""));
-        const householdMatch = minHouseholds === null || (res.household_count ?? 0) >= minHouseholds;
-        return areaMatch && householdMatch;
+        if (!Object.keys(filters).length) return true;
+        const households = Array.isArray(res.households) ? res.households : [];
+        return households.some(hh => {
+          for (const field in filters) {
+            if (!filters[field].includes(String(hh[field] ?? ""))) return false;
+          }
+          return true;
+        });
       });
 
       renderTable(filtered);
@@ -97,8 +105,7 @@ document.addEventListener("DOMContentLoaded", () => {
   // ========================
   if (btnResetModal) {
     btnResetModal.addEventListener("click", () => {
-      document.querySelectorAll(".filter-area-checkbox").forEach(cb => cb.checked = false);
-      if (filterHouseholdCount) filterHouseholdCount.value = "";
+      document.querySelectorAll(".filter-checkbox").forEach(cb => cb.checked = false);
     });
   }
 
@@ -198,8 +205,6 @@ document.addEventListener("DOMContentLoaded", () => {
   // ========================
   // ADD HOUSEHOLD MEMBER MODAL
   // ========================
-  let addFormInitial = null;
-
   function openAddMember(data) {
     const form = document.getElementById("form-addHouseholdMember");
     if (form) form.reset();
@@ -231,44 +236,10 @@ document.addEventListener("DOMContentLoaded", () => {
       backdrop: "static",
       keyboard: true
     }).show();
-
-    // snapshot initial values
-    if (form) {
-      addFormInitial = snapshotForm(form);
-      toggleAddSave(false);
-    }
-  }
-
-  function snapshotForm(form) {
-    const fd = new FormData(form);
-    const obj = {};
-    fd.forEach((v, k) => obj[k] = v);
-    return obj;
-  }
-
-  function formsEqual(a, b) {
-    const keys = new Set([...Object.keys(a || {}), ...Object.keys(b || {})]);
-    for (const k of keys) {
-      if ((a[k] ?? "") !== (b[k] ?? "")) return false;
-    }
-    return true;
-  }
-
-  function toggleAddSave(enable) {
-    const btn = document.getElementById("btn-addMemberSave");
-    if (!btn) return;
-    btn.disabled = !enable;
   }
 
   const addMemberForm = document.getElementById("form-addHouseholdMember");
   if (addMemberForm) {
-    addMemberForm.addEventListener("input", () => {
-      if (!addFormInitial) return;
-      const current = snapshotForm(addMemberForm);
-      const changed = !formsEqual(current, addFormInitial);
-      toggleAddSave(changed);
-    });
-
     addMemberForm.addEventListener("submit", e => {
       if (!confirm("Are you sure you want to add this household member?")) {
         e.preventDefault();
