@@ -38,7 +38,7 @@
             <div class="d-flex align-items-center gap-3">
             <!-- SEARCH -->
             <div class="input-group" style="max-width: 300px;">
-                <input type="text" id="searchInput" class="form-control" placeholder="Resident ID or Name">
+                <input type="text" id="searchInput" class="form-control" placeholder="Address ID or Address Name">
                 <span class="input-group-text bg-white"><i class="fas fa-search"></i></span>
             </div>
             <button class="btn btn-outline-secondary" type="button" data-bs-toggle="modal" data-bs-target="#modalFilter" id="filterButton"><i class="fas fa-filter"></i>&nbsp;Filter</button>
@@ -52,9 +52,9 @@
                 <table class="table align-middle">
                     <thead>
                         <tr class="table-light">
-                            <th>Resident ID</th>
-                            <th>Head of Family Name</th>
+                            <th>Address ID</th>
                             <th>Address</th>
+                            <th>Households</th>
                             <th>Action</th>
                         </tr>
                     </thead>
@@ -70,28 +70,13 @@
                     <div class="modal-content p-4">
 
                         <div class="modal-header border-0">
-                            <h5 class="modal-title fw-bold">Filter Residents</h5>
+                            <h5 class="modal-title fw-bold">Filter Households</h5>
                             <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                         </div>
 
                         <hr>
 
                         <div class="modal-body">
-
-                            <!-- Head of Family -->
-                            <div class="mb-3">
-                                <label class="fw-bold small mb-1">Head of Family</label>
-                                <div>
-                                    <div class="form-check">
-                                        <input class="form-check-input filter-checkbox" type="checkbox" value="1" data-field="head_of_family" id="filterHeadYes">
-                                        <label class="form-check-label small" for="filterHeadYes">Yes</label>
-                                    </div>
-                                    <div class="form-check">
-                                        <input class="form-check-input filter-checkbox" type="checkbox" value="0" data-field="head_of_family" id="filterHeadNo">
-                                        <label class="form-check-label small" for="filterHeadNo">No</label>
-                                    </div>
-                                </div>
-                            </div>
 
                             <!-- Sex -->
                             <div class="mb-3">
@@ -177,7 +162,7 @@
     <div class="modal-dialog modal-dialog-centered" id="div-modalSizing">
         <div class="modal-content border-0 rounded-2 p-4">
             <div class="modal-header border-0">
-                <h3 class="fw-bold">Resident Details: <span id="span-displayID" class="text-warning"></span></h3>
+                <h3 class="fw-bold">Address Details: <span id="span-displayAddress" class="text-warning"></span></h3>
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
 
@@ -233,23 +218,12 @@
                     <hr>
 
                     <h5 class="fw-bold mb-3" style="color: #000;">Household Information</h5>
+                    <div id="div-householdGroups"></div>
 
-                    <div class="row g-3">
-                        <div class="col-md-4">
-                            <p class="text-muted small mb-0">Head of Family:</p>
-                            <p id="txt-householdHeadName" class="fw-bold"></p>
-                        </div>
-                        <div class="col-md-4">
-                            <p class="text-muted small mb-0">Number of Adults:</p>
-                            <p id="txt-householdAdultCount" class="fw-bold"></p>
-                            <ul id="list-householdAdults" class="small mb-0 ps-3"></ul>
-                        </div>
-                        <div class="col-md-4">
-                            <p class="text-muted small mb-0">Number of Minors:</p>
-                            <p id="txt-householdMinorCount" class="fw-bold"></p>
-                            <ul id="list-householdMinors" class="small mb-0 ps-3"></ul>
-                        </div>
-                    </div>
+                    <hr>
+
+                    <h5 class="fw-bold mb-3" style="color: #000;">Other Residing Members</h5>
+                    <ul id="list-otherResidents" class="small mb-0 ps-3"></ul>
 
                 </div>
             </div>
@@ -275,9 +249,13 @@
             <div class="modal-body">
                 <p class="text-muted small mb-3">All fields marked with <span class="text-danger">*</span> are required.</p>
                 <h5 class="fw-bold mb-3">Member Information</h5>
-                <input type="hidden" id="add-famHeadId" name="fam_head_id">
-
                 <div class="row g-3">
+                    <div class="col-md-4">
+                        <label class="small fw-bold">Family Head <span class="text-danger">*</span></label>
+                        <select id="add-famHeadId" name="fam_head_id" class="form-select" required></select>
+                    </div>
+                </div>
+                <div class="row g-3 mt-1">
                     <div class="col-md-3">
                         <label class="small fw-bold">Last Name <span class="text-danger">*</span></label>
                         <input type="text" id="add-lastname" name="last_name" class="form-control" required autocomplete="family-name" placeholder="Last Name">
@@ -304,6 +282,29 @@
             <div class="modal-footer border-0">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
                 <button type="submit" class="btn btn-success px-4">Save</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- ASSIGN OTHER RESIDENT MODAL -->
+<div class="modal fade" id="modal-assignResident" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <form id="form-assignResident" class="modal-content p-4">
+            <div class="modal-header border-0">
+                <h5 class="fw-bold mb-0">Assign Resident to Household</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" id="assign-residentId" name="assign_resident_id">
+                <div class="mb-3">
+                    <label class="small fw-bold">Select Household Head</label>
+                    <select id="assign-famHeadSelect" name="assign_fam_head_id" class="form-select" required></select>
+                </div>
+            </div>
+            <div class="modal-footer border-0">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="submit" class="btn btn-primary">Assign</button>
             </div>
         </form>
     </div>
