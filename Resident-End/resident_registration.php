@@ -1308,6 +1308,36 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   </script>
 
+  <script>
+    document.addEventListener("DOMContentLoaded", () => {
+      const dobInput = document.getElementById("dateOfBirth");
+      const seniorCheckbox = document.getElementById("sectorSenior");
+
+      const toggleSenior = () => {
+        if (!dobInput || !seniorCheckbox) return;
+        const value = dobInput.value;
+        if (!value) {
+          seniorCheckbox.checked = false;
+          return;
+        }
+        const dob = new Date(value);
+        if (isNaN(dob.getTime())) return;
+        const today = new Date();
+        let age = today.getFullYear() - dob.getFullYear();
+        const monthDiff = today.getMonth() - dob.getMonth();
+        if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < dob.getDate())) {
+          age--;
+        }
+        seniorCheckbox.checked = age >= 60;
+      };
+
+      if (dobInput) {
+        dobInput.addEventListener("change", toggleSenior);
+        toggleSenior();
+      }
+    });
+  </script>
+
   <script
     src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/js/bootstrap.bundle.min.js"
     integrity="sha384-FKyoEForCGlyvwx9Hj09JcYn3nv7wiPVlz7YYwJrWVcXK/BmnVDxM+D2scQbITxI"
