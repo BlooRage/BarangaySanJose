@@ -92,7 +92,7 @@ $isCertActive = in_array($current, $certPages);
   <div class="dropdown mt-auto">
     <a href="#" class="d-flex align-items-center link-dark text-decoration-none dropdown-toggle"
        data-bs-toggle="dropdown">
-      <img src="../Images/admin_profile.jpg" width="40" height="40" class="rounded-circle me-2">
+      <img src="../Images/Profile-Placeholder.png" width="40" height="40" class="rounded-circle me-2">
       <strong>Admin User</strong>
     </a>
 

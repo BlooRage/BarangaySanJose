@@ -147,7 +147,7 @@ if (!empty($_SESSION['user_id']) && isset($conn) && $conn instanceof mysqli) {
     <!-- ACCOUNT (BOTTOM, ADMIN-STYLE) -->
   <div class="mt-auto">
     <a class="account-button btn btn-sm w-100 mb-2"
-       href="resident_profile.php">
+       href="Resident-End/resident_profile.php">
       <i class="fa-solid fa-circle-user"></i> Account
     </a>
   </div>
