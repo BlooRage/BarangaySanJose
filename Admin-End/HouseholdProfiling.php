@@ -70,7 +70,7 @@
                     <div class="modal-content p-4">
 
                         <div class="modal-header border-0">
-                            <h5 class="modal-title fw-bold">Filter Households</h5>
+                            <h5 class="modal-title fw-bold">Filter Addresses</h5>
                             <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                         </div>
 
@@ -78,68 +78,45 @@
 
                         <div class="modal-body">
 
-                            <!-- Sex -->
+                            <!-- Area Numbers -->
                             <div class="mb-3">
-                                <label class="fw-bold small mb-1">Sex</label>
-                                <div>
-                                    <div class="form-check">
-                                        <input class="form-check-input filter-checkbox" type="checkbox" value="Male" data-field="sex" id="filterSexMale">
-                                        <label class="form-check-label small" for="filterSexMale">Male</label>
+                                <label class="fw-bold small mb-1">Area Number</label>
+                                <div id="filter-areaList" class="d-flex flex-wrap gap-2 small">
+                                    <div class="form-check form-check-inline">
+                                        <input class="form-check-input filter-area-checkbox" type="checkbox" value="Area 01" id="filterArea01">
+                                        <label class="form-check-label small" for="filterArea01">Area 01</label>
                                     </div>
-                                    <div class="form-check">
-                                        <input class="form-check-input filter-checkbox" type="checkbox" value="Female" data-field="sex" id="filterSexFemale">
-                                        <label class="form-check-label small" for="filterSexFemale">Female</label>
+                                    <div class="form-check form-check-inline">
+                                        <input class="form-check-input filter-area-checkbox" type="checkbox" value="Area 1A" id="filterArea1A">
+                                        <label class="form-check-label small" for="filterArea1A">Area 1A</label>
+                                    </div>
+                                    <div class="form-check form-check-inline">
+                                        <input class="form-check-input filter-area-checkbox" type="checkbox" value="Area 02" id="filterArea02">
+                                        <label class="form-check-label small" for="filterArea02">Area 02</label>
+                                    </div>
+                                    <div class="form-check form-check-inline">
+                                        <input class="form-check-input filter-area-checkbox" type="checkbox" value="Area 03" id="filterArea03">
+                                        <label class="form-check-label small" for="filterArea03">Area 03</label>
+                                    </div>
+                                    <div class="form-check form-check-inline">
+                                        <input class="form-check-input filter-area-checkbox" type="checkbox" value="Area 04" id="filterArea04">
+                                        <label class="form-check-label small" for="filterArea04">Area 04</label>
+                                    </div>
+                                    <div class="form-check form-check-inline">
+                                        <input class="form-check-input filter-area-checkbox" type="checkbox" value="Area 05" id="filterArea05">
+                                        <label class="form-check-label small" for="filterArea05">Area 05</label>
+                                    </div>
+                                    <div class="form-check form-check-inline">
+                                        <input class="form-check-input filter-area-checkbox" type="checkbox" value="Area 06" id="filterArea06">
+                                        <label class="form-check-label small" for="filterArea06">Area 06</label>
                                     </div>
                                 </div>
                             </div>
 
-                            <!-- Civil Status -->
+                            <!-- Household Count -->
                             <div class="mb-3">
-                                <label class="fw-bold small mb-1">Civil Status</label>
-                                <div>
-                                    <div class="form-check">
-                                        <input class="form-check-input filter-checkbox" type="checkbox" value="Single" data-field="civil_status" id="filterCivilSingle">
-                                        <label class="form-check-label small" for="filterCivilSingle">Single</label>
-                                    </div>
-                                    <div class="form-check">
-                                        <input class="form-check-input filter-checkbox" type="checkbox" value="Married" data-field="civil_status" id="filterCivilMarried">
-                                        <label class="form-check-label small" for="filterCivilMarried">Married</label>
-                                    </div>
-                                    <div class="form-check">
-                                        <input class="form-check-input filter-checkbox" type="checkbox" value="Widowed" data-field="civil_status" id="filterCivilWidowed">
-                                        <label class="form-check-label small" for="filterCivilWidowed">Widowed</label>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <!-- Voter Status -->
-                            <div class="mb-3">
-                                <label class="fw-bold small mb-1">Voter Status</label>
-                                <div>
-                                    <div class="form-check">
-                                        <input class="form-check-input filter-checkbox" type="checkbox" value="1" data-field="voter_status" id="filterVoterYes">
-                                        <label class="form-check-label small" for="filterVoterYes">Registered</label>
-                                    </div>
-                                    <div class="form-check">
-                                        <input class="form-check-input filter-checkbox" type="checkbox" value="0" data-field="voter_status" id="filterVoterNo">
-                                        <label class="form-check-label small" for="filterVoterNo">Not Registered</label>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <!-- Occupation -->
-                            <div class="mb-3">
-                                <label class="fw-bold small mb-1">Occupation</label>
-                                <div>
-                                    <div class="form-check">
-                                        <input class="form-check-input filter-checkbox" type="checkbox" value="Employed" data-field="occupation_display" id="filterOccEmp">
-                                        <label class="form-check-label small" for="filterOccEmp">Employed</label>
-                                    </div>
-                                    <div class="form-check">
-                                        <input class="form-check-input filter-checkbox" type="checkbox" value="Unemployed" data-field="occupation_display" id="filterOccUnemp">
-                                        <label class="form-check-label small" for="filterOccUnemp">Unemployed</label>
-                                    </div>
-                                </div>
+                                <label class="fw-bold small mb-1">Minimum # of Households</label>
+                                <input type="number" min="0" id="filter-householdCount" class="form-control" placeholder="e.g., 2">
                             </div>
 
                         </div>
@@ -281,7 +258,7 @@
 
             <div class="modal-footer border-0">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                <button type="submit" class="btn btn-success px-4">Save</button>
+                <button type="submit" id="btn-addMemberSave" class="btn btn-success px-4" disabled>Save</button>
             </div>
         </form>
     </div>
