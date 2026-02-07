@@ -84,80 +84,67 @@ if (!empty($_SESSION['user_id']) && isset($conn) && $conn instanceof mysqli) {
   </div>
 
   <!-- NAV LINKS -->
-  <nav id="nav-sidebarLinks" class="text-start flex-grow-1">
+  <div class="sidebar-body d-flex flex-column flex-grow-1">
+    <nav id="nav-sidebarLinks" class="text-start flex-grow-1 overflow-auto">
 
-    <div id="group-navHome" class="mb-3">
-      <p class="text-muted small fw-bold mb-1">Home</p>
-      <a href="resident_dashboard.php"
-         class="a-sidebarLink <?= activeLink('resident_dashboard.php', $current) ?>">
-        <i class="fa-solid fa-newspaper"></i>Dashboard
+      <div id="group-navHome" class="mb-3">
+        <p class="text-muted small fw-bold mb-1">Home</p>
+        <a href="resident_dashboard.php"
+           class="a-sidebarLink <?= activeLink('resident_dashboard.php', $current) ?>">
+          <i class="fa-solid fa-newspaper"></i>Dashboard
+        </a>
+      </div>
+
+      <div id="group-navServices" class="mb-3">
+        <p class="text-muted small fw-bold mb-1">Services</p>
+        <a href="resident_certificates.php"
+           class="a-sidebarLink <?= activeLink('resident_certificates.php', $current) ?>">
+          <i class="fa-solid fa-certificate"></i>Certificates
+        </a>
+        <a href="resident_clearances.php"
+           class="a-sidebarLink <?= activeLink('resident_clearances.php', $current) ?>">
+          <i class="fa-solid fa-file-circle-check fa-sm"></i>Clearances
+        </a>
+        <a href="resident_barangay_id.php"
+           class="a-sidebarLink <?= activeLink('resident_barangay_id.php', $current) ?>">
+          <i class="fa-solid fa-id-badge fa-lg"></i>Barangay ID
+        </a>
+        <a href="resident_complaints.php"
+           class="a-sidebarLink <?= activeLink('resident_complaints.php', $current) ?>">
+          <i class="fa-solid fa-comment-dots"></i>Complaints
+        </a>
+        <a href="resident_appointments.php"
+           class="a-sidebarLink <?= activeLink('resident_appointments.php', $current) ?>">
+          <i class="fa-regular fa-calendar-days"></i>Appointments
+        </a>
+      </div>
+
+      <div id="group-navInfo" class="mb-3">
+        <p class="text-muted small fw-bold mb-1">Info</p>
+        <a href="resident_certificates.php"
+           class="a-sidebarLink <?= activeLink('resident_certificates.php', $current) ?>">
+          <i class="fa-solid fa-bullhorn"></i>Announcements
+        </a>
+        <a href="resident_appointments.php"
+           class="a-sidebarLink <?= activeLink('resident_appointments.php', $current) ?>">
+          <i class="fa-solid fa-clock-rotate-left"></i>Transactions
+        </a>
+      </div>
+    </nav>
+
+    <hr>
+
+    <div class="sidebar-actions">
+      <a class="account-button btn btn-sm w-100 mb-2"
+         href="resident_profile.php">
+        <i class="fa-solid fa-circle-user"></i> Account
       </a>
-    
+      <a class="btn btn-danger btn-sm w-100 logout-link"
+         href="../PhpFiles/Login/logout.php"
+         data-logout-message="Are you sure you want to logout?">
+        <i class="bi bi-box-arrow-right me-1"></i> Logout
+      </a>
     </div>
-
-
-    <div id="group-navServices" class="mb-3">
-      <p class="text-muted small fw-bold mb-1">Services</p>
-      <a href="resident_certificates.php"
-         class="a-sidebarLink <?= activeLink('resident_certificates.php', $current) ?>">
-        <i class="fa-solid fa-certificate"></i>Certificates
-
-      </a>
-      <a href="resident_clearances.php"
-         class="a-sidebarLink <?= activeLink('resident_clearances.php', $current) ?>">
-        <i class="fa-solid fa-file-circle-check fa-sm"></i>Clearances
-
-      </a>
-      <a href="resident_barangay_id.php"
-         class="a-sidebarLink <?= activeLink('resident_barangay_id.php', $current) ?>">
-        <i class="fa-solid fa-id-badge fa-lg"></i>Barangay ID
-
-      </a>
-      <a href="resident_complaints.php"
-         class="a-sidebarLink <?= activeLink('resident_complaints.php', $current) ?>">
-        <i class="fa-solid fa-comment-dots"></i>Complaints
-
-      </a>
-      <a href="resident_appointments.php"
-         class="a-sidebarLink <?= activeLink('resident_appointments.php', $current) ?>">
-        <i class="fa-regular fa-calendar-days"></i>Appointments
-
-      </a>
-    </div>
-
-    <div id="group-navInfo" class="mb-3">
-      <p class="text-muted small fw-bold mb-1">Info</p>
-      <a href="resident_certificates.php"
-         class="a-sidebarLink <?= activeLink('resident_certificates.php', $current) ?>">
-        <i class="fa-solid fa-bullhorn"></i>Announcements
-
-      <a href="resident_appointments.php"
-         class="a-sidebarLink <?= activeLink('resident_appointments.php', $current) ?>">
-        <i class="fa-solid fa-clock-rotate-left"></i>Transactions
-
-      </a>
-
-    </div>
-  
-    
-  </nav>
-
-  <hr>
-
-    <!-- ACCOUNT (BOTTOM, ADMIN-STYLE) -->
-  <div class="mt-auto">
-    <a class="account-button btn btn-sm w-100 mb-2"
-       href="resident_profile.php">
-      <i class="fa-solid fa-circle-user"></i> Account
-    </a>
-  </div>
-  <!-- LOGOUT (BOTTOM, ADMIN-STYLE) -->
-  <div class="mt-auto">
-    <a class="btn btn-danger btn-sm w-100 logout-link"
-       href="../PhpFiles/Login/logout.php"
-       data-logout-message="Are you sure you want to logout?">
-      <i class="bi bi-box-arrow-right me-1"></i> Logout
-    </a>
   </div>
 
 </aside>
