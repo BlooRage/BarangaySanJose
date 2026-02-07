@@ -107,16 +107,22 @@ if (!empty($residentinformationtbl['profile_pic'])) {
                             <div class="text-muted small mb-1">Full Address</div>
                             <div class="fw-semibold">
                                 <?php
+                                  $unitNumber = trim((string)($residentaddresstbl['unit_number'] ?? ''));
                                   $houseNo = trim((string)($residentaddresstbl['street_number'] ?? ''));
                                   $streetName = trim((string)($residentaddresstbl['street_name'] ?? ''));
                                   $phase = trim((string)($residentaddresstbl['phase_number'] ?? ''));
                                   $subdivision = trim((string)($residentaddresstbl['subdivision'] ?? ''));
                                   $area = trim((string)($residentaddresstbl['area_number'] ?? ''));
 
+                                  $streetDisplay = $streetName;
+                                  if ($streetName !== '' && stripos($streetName, 'block') === false) {
+                                    $streetDisplay = $streetName . ' Street';
+                                  }
                                   $parts = [];
+                                  if ($unitNumber !== '') $parts[] = 'Unit ' . $unitNumber;
                                   if ($houseNo !== '') $parts[] = $houseNo;
-                                  if ($streetName !== '') $parts[] = $streetName . ' Street';
-                                  if ($phase !== '') $parts[] = 'Phase ' . $phase;
+                                  if ($streetDisplay !== '') $parts[] = $streetDisplay;
+                                  if ($phase !== '') $parts[] = $phase;
                                   if ($subdivision !== '') $parts[] = $subdivision;
                                   $parts[] = 'San Jose';
                                   if ($area !== '') $parts[] = $area;

@@ -5,8 +5,41 @@ $current = basename($_SERVER['PHP_SELF']);
 $profilingPages = ['ResidentMasterlist.php', 'ResidentArchive.php'];
 $certPages = ['requests.php', 'approved.php', 'denied.php'];
 
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
+
 $isProfilingActive = in_array($current, $profilingPages);
 $isCertActive = in_array($current, $certPages);
+
+$adminDisplayName = "Admin User";
+$adminPosition = "Administrator";
+if (!empty($_SESSION['user_id']) && isset($conn) && $conn instanceof mysqli) {
+    $stmtInfo = $conn->prepare("
+        SELECT firstname, middlename, lastname, suffix, role_access, department
+        FROM officialinformationtbl
+        WHERE user_id = ?
+        LIMIT 1
+    ");
+    if ($stmtInfo) {
+        $stmtInfo->bind_param("s", $_SESSION['user_id']);
+        $stmtInfo->execute();
+        $info = $stmtInfo->get_result()->fetch_assoc();
+        if ($info) {
+            $fullName = trim(
+                $info['firstname'] . ' ' .
+                ($info['middlename'] ? $info['middlename'][0] . '. ' : '') .
+                $info['lastname'] .
+                ($info['suffix'] ? ' ' . $info['suffix'] : '')
+            );
+            if ($fullName !== '') {
+                $adminDisplayName = $fullName;
+            }
+            $adminPosition = $info['role_access'] ?: ($info['department'] ?: $adminPosition);
+        }
+        $stmtInfo->close();
+    }
+}
 ?>
 
 <div class="d-flex flex-column flex-shrink-0 p-3 bg-white shadow-sm"
@@ -95,14 +128,16 @@ $isCertActive = in_array($current, $certPages);
         <a href="#" class="d-flex align-items-center link-dark text-decoration-none dropdown-toggle"
            data-bs-toggle="dropdown">
           <img src="../Images/Profile-Placeholder.png" width="40" height="40" class="rounded-circle me-2">
-          <strong>Admin User</strong>
+          <div class="d-flex flex-column">
+            <span class="fw-bold mb-0"><?= htmlspecialchars($adminDisplayName) ?></span>
+            <small class="text-muted"><?= htmlspecialchars($adminPosition) ?></small>
+          </div>
         </a>
         <ul class="dropdown-menu text-small shadow">
           <li><a class="dropdown-item" href="admin_profile.php">Profile</a></li>
           <li><a class="dropdown-item" href="../PhpFiles/Login/logout.php">Sign out</a></li>
         </ul>
       </div>
-      <a class="btn btn-danger w-100" href="../PhpFiles/Login/logout.php">Logout</a>
     </div>
   </div>
 </div>

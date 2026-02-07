@@ -145,11 +145,13 @@ function openViewEntry(data) {
   document.getElementById("txt-modalEmergencyAddress").innerText = data.emergency_address ?? "—";
 
   // Address Info
-  document.getElementById("txt-modalHouseNum").innerText = data.house_number ?? "—";
-  document.getElementById("txt-modalStreetName").innerText = data.street_name ?? "—";
-  document.getElementById("txt-modalPhaseNumber").innerText = data.phase_number ?? "—";
-  document.getElementById("txt-modalSubdivision").innerText = data.subdivision ?? "—";
-  document.getElementById("txt-modalAreaNumber").innerText = data.area_number ?? "—";
+  document.getElementById("txt-modalUnitNumber").innerText = data.unit_number ?? "—";
+  updateAddressField("modalColumnUnitNumber","txt-modalUnitNumber", data.unit_number);
+  updateAddressField("modalColumnHouse","txt-modalHouseNum", data.house_number);
+  updateAddressField("modalColumnStreet","txt-modalStreetName", data.street_name);
+  updateAddressField("modalColumnPhase","txt-modalPhaseNumber", data.phase_number);
+  updateAddressField("modalColumnSubdivision","txt-modalSubdivision", data.subdivision);
+  updateAddressField("modalColumnArea","txt-modalAreaNumber", data.area_number);
 
   // Read-only
   document.getElementById("txt-modalBarangay").innerText = "Barangay San Jose";
@@ -239,8 +241,20 @@ function openEditEntry(data) {
       if (!form || !hasFormChanges(form) || confirm("You have unsaved changes. Are you sure you want to close?")) {
         editModal.hide();
       }
-    });
+  });
+}
+
+function updateAddressField(containerId, elementId, value) {
+  const container = document.getElementById(containerId);
+  const element = document.getElementById(elementId);
+  const displayValue = value ?? "";
+  if (element) {
+    element.innerText = displayValue !== "" ? displayValue : "—";
   }
+  if (container) {
+    container.style.display = displayValue !== "" ? "" : "none";
+  }
+}
 
   // ========================
   // CONFIRM SAVE CHANGES

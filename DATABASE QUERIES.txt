@@ -125,6 +125,7 @@ CREATE TABLE `residentinformationtbl` (
 CREATE TABLE `residentaddresstbl` (
   `address_id` varchar(10) NOT NULL,
   `resident_id` char(10) NOT NULL,
+  `unit_number` varchar(50) DEFAULT NULL,
   `street_number` varchar(50) DEFAULT NULL,
   `street_name` varchar(150) DEFAULT NULL,
   `phase_number` varchar(50) DEFAULT NULL,
@@ -146,6 +147,10 @@ ALTER TABLE `residentaddresstbl`
   MODIFY COLUMN `address_id` varchar(10) NOT NULL,
   DROP PRIMARY KEY,
   ADD PRIMARY KEY (`address_id`);
+
+-- Migration: add unit_number to residentaddresstbl (optional, nullable)
+ALTER TABLE `residentaddresstbl`
+  ADD COLUMN `unit_number` varchar(50) DEFAULT NULL AFTER `resident_id`;
 
 
 

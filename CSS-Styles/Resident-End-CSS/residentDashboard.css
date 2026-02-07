@@ -111,6 +111,17 @@ h3 {
     row-gap: 1.75rem;
 }
 
+@media (max-width: 576px) {
+    .service-grid .col-12 {
+        padding-left: 0 !important;
+        padding-right: 0 !important;
+    }
+
+    .service-grid .card-action {
+        border-radius: 24px;
+    }
+}
+
 .card-action i {
     font-size: clamp(2.8rem, 6vw, 4.5rem);
     margin-top: 1rem;

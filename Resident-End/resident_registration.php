@@ -638,12 +638,15 @@ require_once __DIR__ . "/includes/resident_access_guard.php";
           <!-- House numbering system -->
           <div id="houseSystemWrapper" class="d-none">
             <div class="row mb-3">
-              <div class="col-md-6">
+              <div class="col-md-4">
+                <label class="form-label" for="unitNumber">Unit / Apartment Number</label>
+                <input type="text" class="form-control" id="unitNumber" name="unitNumber">
+              </div>
+              <div class="col-md-4">
                 <label class="form-label" for="houseNumber">House Number <span class="text-danger">*</span></label>
                 <input type="text" class="form-control" id="houseNumber" name="houseNumber">
               </div>
-
-              <div class="col-md-6">
+              <div class="col-md-4">
                 <label class="form-label" for="streetName">Street Name <span class="text-danger">*</span></label>
                 <input type="text" class="form-control" id="streetName" name="streetName">
               </div>
@@ -674,17 +677,21 @@ require_once __DIR__ . "/includes/resident_access_guard.php";
           <!-- Lot/Block system -->
           <div id="lotBlockSystemWrapper" class="d-none">
             <div class="row mb-3">
-              <div class="col-md-4">
-                <label class="form-label" for="phaseNumber">Phase <span class="text-danger">*</span></label>
-                <input type="text" class="form-control" id="phaseNumber" name="phaseNumber">
+              <div class="col-md-3">
+                <label class="form-label" for="unitNumberLot">Unit / Apartment Number</label>
+                <input type="text" class="form-control" id="unitNumberLot" name="unitNumber">
               </div>
-              <div class="col-md-4">
+              <div class="col-md-3">
+                <label class="form-label" for="lotNumber">Lot <span class="text-danger">*</span></label>
+                <input type="text" class="form-control" id="lotNumber" name="lotNumber">
+              </div>
+              <div class="col-md-3">
                 <label class="form-label" for="blockNumber">Block <span class="text-danger">*</span></label>
                 <input type="text" class="form-control" id="blockNumber" name="blockNumber">
               </div>
-              <div class="col-md-4">
-                <label class="form-label" for="lotNumber">Lot <span class="text-danger">*</span></label>
-                <input type="text" class="form-control" id="lotNumber" name="lotNumber">
+              <div class="col-md-3">
+                <label class="form-label" for="phaseNumber">Phase <span class="text-danger">*</span></label>
+                <input type="text" class="form-control" id="phaseNumber" name="phaseNumber">
               </div>
             </div>
 
@@ -994,7 +1001,7 @@ require_once __DIR__ . "/includes/resident_access_guard.php";
   </section>
 
   <!-- Logout Confirm Modal -->
-  <div class="modal fade" id="logoutConfirmModal" tabindex="-1" aria-hidden="true">
+        <div class="modal fade uniform-modal" id="logoutConfirmModal" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
       <div class="modal-content">
         <div class="modal-header">

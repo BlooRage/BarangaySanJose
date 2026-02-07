@@ -22,7 +22,7 @@ const UniversalModal = (() => {
     document.body.insertAdjacentHTML(
       "beforeend",
       `
-      <div class="modal fade" id="universalModal" tabindex="-1" aria-hidden="true">
+      <div class="modal fade uniform-modal" id="universalModal" tabindex="-1" aria-hidden="true">
         <div class="modal-dialog modal-dialog-centered" id="umDialog">
           <div class="modal-content" id="umContent">
 

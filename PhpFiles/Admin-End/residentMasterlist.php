@@ -300,6 +300,7 @@ if (isset($_GET['fetch'])) {
             r.sector_membership,
             s.status_name AS status,
 
+            a.unit_number,
             a.street_number AS house_number,
             a.street_name,
             a.phase_number,
@@ -350,6 +351,7 @@ if (isset($_GET['fetch'])) {
               OR a.phase_number LIKE ?
               OR a.subdivision LIKE ?
               OR a.area_number LIKE ?
+              OR a.unit_number LIKE ?
             )
         ";
     } else {
@@ -363,7 +365,8 @@ if (isset($_GET['fetch'])) {
     if ($search !== '') {
         $like = "%$search%";
         $stmt->bind_param(
-            "sssssssss",
+            "ssssssssss",
+            $like,
             $like,
             $like,
             $like,

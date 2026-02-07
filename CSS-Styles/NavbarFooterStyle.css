@@ -86,6 +86,65 @@ h5 {
     text-decoration: underline;
     text-underline-offset: 6px;
 }
+
+.btn-orange {
+    background-color: #FE993C;
+    border-color: #FE993C;
+    color: #ffffff;
+    border-radius: 8px;
+    transition: background 0.2s ease;
+}
+
+.btn-orange:hover,
+.btn-orange:focus {
+    background-color: #e47c1c;
+    border-color: #e47c1c;
+    color: #ffffff;
+    text-decoration: none;
+}
+
+.uniform-modal .modal-header,
+.uniform-modal .modal-body,
+.uniform-modal .modal-footer {
+    text-align: center;
+    justify-content: center;
+}
+
+.uniform-modal .modal-header {
+    border-bottom: none;
+}
+
+.uniform-modal .modal-body > * {
+    margin-left: auto;
+    margin-right: auto;
+}
+
+.uniform-modal .modal-footer {
+    border-top: none;
+    gap: 1rem;
+}
+
+.navbar-nav .nav-link[href$="login.php"] {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0.35rem 1.25rem;
+    margin-left: 0.5rem;
+    border-radius: 8px;
+    background-color: #FE993C;
+    border: 1px solid #FE993C;
+    color: #ffffff !important;
+    font-weight: 400;
+    transition: background 0.2s ease, color 0.2s ease;
+}
+
+.navbar-nav .nav-link[href$="login.php"]:hover,
+.navbar-nav .nav-link[href$="login.php"]:focus {
+    background-color: #e47c1c;
+    border-color: #e47c1c;
+    color: #ffffff !important;
+    text-decoration: none;
+}
 .footerWrapper {
     width: 100%;
     display: block;

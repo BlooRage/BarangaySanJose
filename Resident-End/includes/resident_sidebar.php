@@ -150,7 +150,7 @@ if (!empty($_SESSION['user_id']) && isset($conn) && $conn instanceof mysqli) {
 </aside>
 
 <!-- Logout Confirm Modal -->
-<div class="modal fade" id="logoutConfirmModal" tabindex="-1" aria-hidden="true">
+<div class="modal fade uniform-modal" id="logoutConfirmModal" tabindex="-1" aria-hidden="true">
   <div class="modal-dialog modal-dialog-centered">
     <div class="modal-content">
       <div class="modal-header">

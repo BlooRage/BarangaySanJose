@@ -102,6 +102,7 @@ if (isset($_GET['fetch'])) {
             r.birthdate,
             r.head_of_family,
 
+            a.unit_number,
             a.street_number AS house_number,
             a.street_name,
             a.phase_number,

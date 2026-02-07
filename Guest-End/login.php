@@ -67,7 +67,7 @@ if (isset($_SESSION['user_id'])) {
                ========================= -->
           <form class="form-box active" id="loginForm" action="../PhpFiles/Login/login.php" method="post" name="loginForm">
             <h1 class="mb-1 fs-2 text-center"><strong>Welcome Back!</strong></h1>
-            <p class="text-center fs-6 text-muted">Please enter your credentials.</p>
+            <p class="text-center fs-6 text-muted intro-message">Please enter your credentials.</p>
             <h4 class="mb-2 fs-4 text-center"><strong>Login</strong></h4>
 
             <input type="text" name="user" id="userAccount" class="fs-6 form-control mb-3" placeholder="Email / Phone" required />
@@ -99,7 +99,7 @@ if (isset($_SESSION['user_id'])) {
                ========================= -->
           <form class="form-box" id="signupForm" action="../PhpFiles/Login/RegisterAccount.php" method="post" name="signupForm">
             <h1 class="mb-1 fs-2 text-center"><strong>Good to see you!</strong></h1>
-            <p class="text-center fs-6 text-muted">Sign up to get started</p>
+            <p class="text-center fs-6 text-muted intro-message">Sign up to get started</p>
             <h4 class="mb-3 text-center"><strong>Sign Up</strong></h4>
 
             <div class="input-group mb-2">
@@ -287,7 +287,6 @@ if (isset($_SESSION['user_id'])) {
         });
     </script></body>
 </html>
-
 
 
 

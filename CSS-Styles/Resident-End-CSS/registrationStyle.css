@@ -391,10 +391,23 @@ input::placeholder {
     }
 
     #sectorGroupCard {
-      border: 1px solid #DBDBDB;
+      border: 1px solid #000;
       border-radius: 12px;
-      padding: 16px;
+      padding: 18px;
       background: #fff;
+      margin-top: 1rem;
+    }
+
+    #sectorGroupCard .form-check {
+      margin-bottom: .5rem;
+    }
+
+    #sectorGroupCard .form-check-input {
+      border: 1px solid #000;
+      width: 20px;
+      height: 20px;
+      margin-left: -1.25rem;
+      margin-right: .25rem;
     }
 
     .house-info-center {

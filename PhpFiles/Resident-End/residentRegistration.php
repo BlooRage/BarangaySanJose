@@ -47,6 +47,16 @@ function cleanString($v): string {
     return trim((string)$v);
 }
 
+function normalizePhaseNumber(string $value): string {
+    $value = trim($value);
+    if ($value === '') {
+        return '';
+    }
+
+    $value = preg_replace('/^phase\\s*/i', '', $value);
+    return 'Phase ' . trim($value);
+}
+
 function getDocumentTypeId(mysqli $conn, string $name): int {
     $q = $conn->prepare("SELECT document_type_id FROM documenttypelookuptbl WHERE LOWER(document_type_name) = LOWER(?) AND document_category = 'ResidentProfiling' LIMIT 1");
     if (!$q) throw new Exception("Prepare failed (getDocumentTypeId): " . $conn->error);
@@ -129,7 +139,8 @@ try {
     $addressSystem = cleanString($_POST['addressSystem'] ?? '');
     $houseNumber = cleanString($_POST['houseNumber'] ?? '');
     $streetName  = cleanString($_POST['streetName'] ?? '');
-    $phaseNumber = cleanString($_POST['phaseNumber'] ?? '');
+    $phaseNumber = normalizePhaseNumber(cleanString($_POST['phaseNumber'] ?? ''));
+    $unitNumber  = cleanString($_POST['unitNumber'] ?? '');
     $lotNumber   = cleanString($_POST['lotNumber'] ?? '');
     $blockNumber = cleanString($_POST['blockNumber'] ?? '');
     $subd        = cleanString($_POST['subdivisionSitio'] ?? '');
@@ -271,15 +282,16 @@ try {
     // -------- Insert Address --------
     $stmt2 = $conn->prepare("
         INSERT INTO residentaddresstbl
-        (address_id, resident_id, street_number, street_name, phase_number, subdivision, area_number, house_type, house_ownership, residency_duration, status_id_residency)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        (address_id, resident_id, unit_number, street_number, street_name, phase_number, subdivision, area_number, house_type, house_ownership, residency_duration, status_id_residency)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     ");
     if (!$stmt2) throw new Exception("Prepare failed (address insert): " . $conn->error);
 
     $stmt2->bind_param(
-        "ssssssssssi",
+        "sssssssssssi",
         $addressId,
         $resident_id,
+        $unitNumber,
         $houseNumber,
         $streetName,
         $phaseNumber,

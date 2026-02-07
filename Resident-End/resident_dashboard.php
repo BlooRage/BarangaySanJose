@@ -112,7 +112,7 @@
           </div>
         </div>
 
-        <div class="col-6 col-md-4 col-lg-3">
+        <div class="col-12 col-md-4 col-lg-3">
           <div id="card-serviceRequest-profile"
                class="card-action h-100 p-4 rounded-4 text-center d-flex flex-column align-items-center justify-content-center border-0 shadow-sm"
                onclick="location.href='resident_profile.php'">

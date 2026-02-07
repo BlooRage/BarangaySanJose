@@ -60,7 +60,7 @@ body {
     gap: 0;
     min-width: 300px;
     min-height: 300px;
-    width: 80vh;
+    width: min(800px, 90vw);
     height: 70vh;
     margin: 3% auto 0;
     border-radius: 10px;
@@ -119,6 +119,22 @@ body {
     opacity: 1;
     z-index: 3;
     transform: translateX(0);
+}
+
+.form-box h1 {
+    font-size: 1.2rem;
+    letter-spacing: 0.3px;
+}
+
+.form-box h4 {
+    font-size: 1.6rem;
+    font-weight: 600;
+    letter-spacing: 0.5px;
+    margin-bottom: 1rem;
+}
+
+.form-box .intro-message {
+    margin-bottom: 2rem;
 }
 
 /* ===== Signup Mode Animations ===== */
@@ -481,6 +497,3 @@ body {
     0% { transform: scale(0.2); opacity: 0; }
     100% { transform: scale(.4); opacity: 1; }
 }
-
-
-
