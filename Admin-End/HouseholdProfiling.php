@@ -38,7 +38,7 @@
             <div class="d-flex align-items-center gap-3">
             <!-- SEARCH -->
             <div class="input-group" style="max-width: 300px;">
-                <input type="text" id="searchInput" class="form-control" placeholder="Resident ID or Name">
+                <input type="text" id="searchInput" class="form-control" placeholder="Address ID or Address Name">
                 <span class="input-group-text bg-white"><i class="fas fa-search"></i></span>
             </div>
             <button class="btn btn-outline-secondary" type="button" data-bs-toggle="modal" data-bs-target="#modalFilter" id="filterButton"><i class="fas fa-filter"></i>&nbsp;Filter</button>
@@ -52,9 +52,9 @@
                 <table class="table align-middle">
                     <thead>
                         <tr class="table-light">
-                            <th>Resident ID</th>
-                            <th>Head of Family Name</th>
+                            <th>Address ID</th>
                             <th>Address</th>
+                            <th>Households</th>
                             <th>Action</th>
                         </tr>
                     </thead>
@@ -70,7 +70,7 @@
                     <div class="modal-content p-4">
 
                         <div class="modal-header border-0">
-                            <h5 class="modal-title fw-bold">Filter Residents</h5>
+                            <h5 class="modal-title fw-bold">Filter Addresses</h5>
                             <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                         </div>
 
@@ -78,83 +78,45 @@
 
                         <div class="modal-body">
 
-                            <!-- Head of Family -->
+                            <!-- Area Numbers -->
                             <div class="mb-3">
-                                <label class="fw-bold small mb-1">Head of Family</label>
-                                <div>
-                                    <div class="form-check">
-                                        <input class="form-check-input filter-checkbox" type="checkbox" value="1" data-field="head_of_family" id="filterHeadYes">
-                                        <label class="form-check-label small" for="filterHeadYes">Yes</label>
+                                <label class="fw-bold small mb-1">Area Number</label>
+                                <div id="filter-areaList" class="d-flex flex-wrap gap-2 small">
+                                    <div class="form-check form-check-inline">
+                                        <input class="form-check-input filter-area-checkbox" type="checkbox" value="Area 01" id="filterArea01">
+                                        <label class="form-check-label small" for="filterArea01">Area 01</label>
                                     </div>
-                                    <div class="form-check">
-                                        <input class="form-check-input filter-checkbox" type="checkbox" value="0" data-field="head_of_family" id="filterHeadNo">
-                                        <label class="form-check-label small" for="filterHeadNo">No</label>
+                                    <div class="form-check form-check-inline">
+                                        <input class="form-check-input filter-area-checkbox" type="checkbox" value="Area 1A" id="filterArea1A">
+                                        <label class="form-check-label small" for="filterArea1A">Area 1A</label>
+                                    </div>
+                                    <div class="form-check form-check-inline">
+                                        <input class="form-check-input filter-area-checkbox" type="checkbox" value="Area 02" id="filterArea02">
+                                        <label class="form-check-label small" for="filterArea02">Area 02</label>
+                                    </div>
+                                    <div class="form-check form-check-inline">
+                                        <input class="form-check-input filter-area-checkbox" type="checkbox" value="Area 03" id="filterArea03">
+                                        <label class="form-check-label small" for="filterArea03">Area 03</label>
+                                    </div>
+                                    <div class="form-check form-check-inline">
+                                        <input class="form-check-input filter-area-checkbox" type="checkbox" value="Area 04" id="filterArea04">
+                                        <label class="form-check-label small" for="filterArea04">Area 04</label>
+                                    </div>
+                                    <div class="form-check form-check-inline">
+                                        <input class="form-check-input filter-area-checkbox" type="checkbox" value="Area 05" id="filterArea05">
+                                        <label class="form-check-label small" for="filterArea05">Area 05</label>
+                                    </div>
+                                    <div class="form-check form-check-inline">
+                                        <input class="form-check-input filter-area-checkbox" type="checkbox" value="Area 06" id="filterArea06">
+                                        <label class="form-check-label small" for="filterArea06">Area 06</label>
                                     </div>
                                 </div>
                             </div>
 
-                            <!-- Sex -->
+                            <!-- Household Count -->
                             <div class="mb-3">
-                                <label class="fw-bold small mb-1">Sex</label>
-                                <div>
-                                    <div class="form-check">
-                                        <input class="form-check-input filter-checkbox" type="checkbox" value="Male" data-field="sex" id="filterSexMale">
-                                        <label class="form-check-label small" for="filterSexMale">Male</label>
-                                    </div>
-                                    <div class="form-check">
-                                        <input class="form-check-input filter-checkbox" type="checkbox" value="Female" data-field="sex" id="filterSexFemale">
-                                        <label class="form-check-label small" for="filterSexFemale">Female</label>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <!-- Civil Status -->
-                            <div class="mb-3">
-                                <label class="fw-bold small mb-1">Civil Status</label>
-                                <div>
-                                    <div class="form-check">
-                                        <input class="form-check-input filter-checkbox" type="checkbox" value="Single" data-field="civil_status" id="filterCivilSingle">
-                                        <label class="form-check-label small" for="filterCivilSingle">Single</label>
-                                    </div>
-                                    <div class="form-check">
-                                        <input class="form-check-input filter-checkbox" type="checkbox" value="Married" data-field="civil_status" id="filterCivilMarried">
-                                        <label class="form-check-label small" for="filterCivilMarried">Married</label>
-                                    </div>
-                                    <div class="form-check">
-                                        <input class="form-check-input filter-checkbox" type="checkbox" value="Widowed" data-field="civil_status" id="filterCivilWidowed">
-                                        <label class="form-check-label small" for="filterCivilWidowed">Widowed</label>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <!-- Voter Status -->
-                            <div class="mb-3">
-                                <label class="fw-bold small mb-1">Voter Status</label>
-                                <div>
-                                    <div class="form-check">
-                                        <input class="form-check-input filter-checkbox" type="checkbox" value="1" data-field="voter_status" id="filterVoterYes">
-                                        <label class="form-check-label small" for="filterVoterYes">Registered</label>
-                                    </div>
-                                    <div class="form-check">
-                                        <input class="form-check-input filter-checkbox" type="checkbox" value="0" data-field="voter_status" id="filterVoterNo">
-                                        <label class="form-check-label small" for="filterVoterNo">Not Registered</label>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <!-- Occupation -->
-                            <div class="mb-3">
-                                <label class="fw-bold small mb-1">Occupation</label>
-                                <div>
-                                    <div class="form-check">
-                                        <input class="form-check-input filter-checkbox" type="checkbox" value="Employed" data-field="occupation_display" id="filterOccEmp">
-                                        <label class="form-check-label small" for="filterOccEmp">Employed</label>
-                                    </div>
-                                    <div class="form-check">
-                                        <input class="form-check-input filter-checkbox" type="checkbox" value="Unemployed" data-field="occupation_display" id="filterOccUnemp">
-                                        <label class="form-check-label small" for="filterOccUnemp">Unemployed</label>
-                                    </div>
-                                </div>
+                                <label class="fw-bold small mb-1">Minimum # of Households</label>
+                                <input type="number" min="0" id="filter-householdCount" class="form-control" placeholder="e.g., 2">
                             </div>
 
                         </div>
@@ -177,7 +139,7 @@
     <div class="modal-dialog modal-dialog-centered" id="div-modalSizing">
         <div class="modal-content border-0 rounded-2 p-4">
             <div class="modal-header border-0">
-                <h3 class="fw-bold">Resident Details: <span id="span-displayID" class="text-warning"></span></h3>
+                <h3 class="fw-bold">Address Details: <span id="span-displayAddress" class="text-warning"></span></h3>
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
 
@@ -233,23 +195,12 @@
                     <hr>
 
                     <h5 class="fw-bold mb-3" style="color: #000;">Household Information</h5>
+                    <div id="div-householdGroups"></div>
 
-                    <div class="row g-3">
-                        <div class="col-md-4">
-                            <p class="text-muted small mb-0">Head of Family:</p>
-                            <p id="txt-householdHeadName" class="fw-bold"></p>
-                        </div>
-                        <div class="col-md-4">
-                            <p class="text-muted small mb-0">Number of Adults:</p>
-                            <p id="txt-householdAdultCount" class="fw-bold"></p>
-                            <ul id="list-householdAdults" class="small mb-0 ps-3"></ul>
-                        </div>
-                        <div class="col-md-4">
-                            <p class="text-muted small mb-0">Number of Minors:</p>
-                            <p id="txt-householdMinorCount" class="fw-bold"></p>
-                            <ul id="list-householdMinors" class="small mb-0 ps-3"></ul>
-                        </div>
-                    </div>
+                    <hr>
+
+                    <h5 class="fw-bold mb-3" style="color: #000;">Other Residing Members</h5>
+                    <ul id="list-otherResidents" class="small mb-0 ps-3"></ul>
 
                 </div>
             </div>
@@ -275,9 +226,13 @@
             <div class="modal-body">
                 <p class="text-muted small mb-3">All fields marked with <span class="text-danger">*</span> are required.</p>
                 <h5 class="fw-bold mb-3">Member Information</h5>
-                <input type="hidden" id="add-famHeadId" name="fam_head_id">
-
                 <div class="row g-3">
+                    <div class="col-md-4">
+                        <label class="small fw-bold">Family Head <span class="text-danger">*</span></label>
+                        <select id="add-famHeadId" name="fam_head_id" class="form-select" required></select>
+                    </div>
+                </div>
+                <div class="row g-3 mt-1">
                     <div class="col-md-3">
                         <label class="small fw-bold">Last Name <span class="text-danger">*</span></label>
                         <input type="text" id="add-lastname" name="last_name" class="form-control" required autocomplete="family-name" placeholder="Last Name">
@@ -303,7 +258,30 @@
 
             <div class="modal-footer border-0">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                <button type="submit" class="btn btn-success px-4">Save</button>
+                <button type="submit" id="btn-addMemberSave" class="btn btn-success px-4" disabled>Save</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- ASSIGN OTHER RESIDENT MODAL -->
+<div class="modal fade" id="modal-assignResident" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <form id="form-assignResident" class="modal-content p-4">
+            <div class="modal-header border-0">
+                <h5 class="fw-bold mb-0">Assign Resident to Household</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" id="assign-residentId" name="assign_resident_id">
+                <div class="mb-3">
+                    <label class="small fw-bold">Select Household Head</label>
+                    <select id="assign-famHeadSelect" name="assign_fam_head_id" class="form-select" required></select>
+                </div>
+            </div>
+            <div class="modal-footer border-0">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="submit" class="btn btn-primary">Assign</button>
             </div>
         </form>
     </div>
