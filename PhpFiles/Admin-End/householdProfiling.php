@@ -484,4 +484,3 @@ if (isset($_GET['fetch'])) {
 }
 http_response_code(404);
 exit("Not found");
-
