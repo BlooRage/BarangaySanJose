@@ -74,3 +74,40 @@ function GenerateResidentID($conn) {
 
     return $yearMonth . $newSeq; // e.g., 2602000001
 }
+
+function GenerateAddressID(mysqli $conn, string $areaNumber): string {
+    $cleanArea = strtoupper(preg_replace('/[^A-Z0-9]/', '', trim($areaNumber)));
+    if ($cleanArea === '') {
+        $cleanArea = 'A00';
+    }
+    $areaCode = str_pad(substr($cleanArea, 0, 3), 3, '0', STR_PAD_RIGHT);
+    $year = date("y");
+    $prefix = $areaCode . $year;
+    $like = $prefix . "%";
+
+    $stmt = $conn->prepare("
+        SELECT address_id
+        FROM residentaddresstbl
+        WHERE address_id LIKE ?
+        ORDER BY address_id DESC
+        LIMIT 1
+    ");
+
+    if (!$stmt) {
+        error_log("GenerateAddressID prepare failed: " . $conn->error);
+        $fallbackSeq = str_pad((string)random_int(1, 99999), 5, "0", STR_PAD_LEFT);
+        return $prefix . $fallbackSeq;
+    }
+
+    $stmt->bind_param("s", $like);
+    $stmt->execute();
+    $stmt->bind_result($lastId);
+    $stmt->fetch();
+    $stmt->close();
+
+    $nextSeq = $lastId
+        ? str_pad(((int)substr($lastId, -5)) + 1, 5, "0", STR_PAD_LEFT)
+        : "00001";
+
+    return $prefix . $nextSeq;
+}

@@ -184,6 +184,8 @@ try {
         $streetName = "Block " . $blockNumber;
     }
 
+    $addressId = GenerateAddressID($conn, $area);
+
     // ✅ Must be at least 18 years old
     $dobDate = DateTime::createFromFormat('Y-m-d', $dob);
     if (!$dobDate) {
@@ -269,13 +271,14 @@ try {
     // -------- Insert Address --------
     $stmt2 = $conn->prepare("
         INSERT INTO residentaddresstbl
-        (resident_id, street_number, street_name, phase_number, subdivision, area_number, house_type, house_ownership, residency_duration, status_id_residency)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        (address_id, resident_id, street_number, street_name, phase_number, subdivision, area_number, house_type, house_ownership, residency_duration, status_id_residency)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     ");
     if (!$stmt2) throw new Exception("Prepare failed (address insert): " . $conn->error);
 
     $stmt2->bind_param(
-        "sssssssssi",
+        "ssssssssssi",
+        $addressId,
         $resident_id,
         $houseNumber,
         $streetName,
