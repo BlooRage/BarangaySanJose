@@ -29,9 +29,12 @@ switch ($role) {
         header("Location: ../../Resident-End/resident_dashboard.php");
         exit;
 
-    case 'Official':
-    case 'Admin':
-    case 'SuperAdmin':
+case 'Employee':
+    header("Location: ../../Admin-End/AdminDashboard.php");
+    exit;
+case 'Official':
+case 'Admin':
+case 'SuperAdmin':
         // Check official profile
         $stmt = $conn->prepare("SELECT official_id FROM officialinformationtbl WHERE user_id = ? LIMIT 1");
         $stmt->bind_param("s", $userID);
@@ -47,7 +50,7 @@ switch ($role) {
 
         // Redirect based on role
         if ($role === 'SuperAdmin' || $role === 'Admin') {
-            header("Location: ../../Admin-End/admin_dashboard.php");
+            header("Location: ../../Admin-End/AdminDashboard.php");
         } else {
             header("Location: ../../Admin-End/official_dashboard.php");
         }

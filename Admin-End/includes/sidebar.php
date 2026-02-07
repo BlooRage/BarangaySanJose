@@ -92,15 +92,13 @@ $isCertActive = in_array($current, $certPages);
   <div class="dropdown mt-auto">
     <a href="#" class="d-flex align-items-center link-dark text-decoration-none dropdown-toggle"
        data-bs-toggle="dropdown">
-      <img src="../Images/Default Icon.png" width="32" height="32" class="rounded-circle me-2">
-      <strong>Juan Dela Cruz</strong>
+      <img src="../Images/admin_profile.jpg" width="40" height="40" class="rounded-circle me-2">
+      <strong>Admin User</strong>
     </a>
 
     <ul class="dropdown-menu text-small shadow">
-      <li><a class="dropdown-item" href="#">Settings</a></li>
-      <li><a class="dropdown-item" href="#">Profile</a></li>
-      <li><hr class="dropdown-divider"></li>
-      <li><a class="dropdown-item" href="#">Sign out</a></li>
+      <li><a class="dropdown-item" href="admin_profile.php">Profile</a></li>
+      <li><a class="dropdown-item" href="../PhpFiles/Login/logout.php">Sign out</a></li>
     </ul>
   </div>
 </div>

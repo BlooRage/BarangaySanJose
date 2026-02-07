@@ -12,11 +12,11 @@ if (!isset($conn) || $conn->connect_error) {
     exit;
 }
 
-$phone = $_POST['phone'] ?? '';
-$email = $_POST['email'] ?? '';
+$phone = trim((string)($_POST['phone'] ?? ''));
+$email = trim((string)($_POST['email'] ?? ''));
 
-if (!$phone && !$email) {
-    echo json_encode(['success' => false, 'error' => 'No phone or email provided']);
+if ($phone === '' || $email === '') {
+    echo json_encode(['success' => false, 'error' => 'Phone and email are required']);
     exit;
 }
 

@@ -31,7 +31,11 @@ try {
         $errors[] = "Phone number must start with 9 and be exactly 10 digits.";
     }
 
-    if (!filter_var($Email, FILTER_VALIDATE_EMAIL)) $errors[] = "Invalid email address.";
+    if ($Email === '') {
+        $errors[] = "Email address is required.";
+    } elseif (!filter_var($Email, FILTER_VALIDATE_EMAIL)) {
+        $errors[] = "Invalid email address.";
+    }
 
     if (!preg_match('/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[\W_]).{8,}$/', $Password)) {
         $errors[] = "Password must be at least 8 characters, including uppercase, lowercase, number, and special character.";

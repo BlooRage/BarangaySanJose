@@ -499,7 +499,9 @@ if (forgotContinueBtn) {
 
     try {
       const formData = new FormData();
+      const email = (emailInput?.value || "").trim();
       formData.append("phone", phone);
+      formData.append("email", email);
       formData.append("email", email);
 
       const res = await fetch("../PhpFiles/Login/checkForgotPassword.php", {
@@ -535,9 +537,17 @@ const validateForm = (formType = "signup") => {
     const confirmPassword = confirmPasswordInput?.value || "";
 
     // ✅ FIXED REGEX (no double slashes)
+    const email = (emailInput?.value || "").trim();
+
     if (!/^9\d{9}$/.test(phone)) {
       firstError = "Phone number must start with 9 and be exactly 10 digits.";
       errorField = phoneInput;
+    } else if (!email) {
+      firstError = "Email is required.";
+      errorField = emailInput;
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      firstError = "Please enter a valid email address.";
+      errorField = emailInput;
     } else if (!/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[\W_]).{8,}$/.test(password)) {
       firstError = "Password must be at least 8 characters with uppercase, lowercase, number, and special character.";
       errorField = passwordInput;

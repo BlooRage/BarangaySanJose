@@ -17,6 +17,7 @@
     <!-- SIDEBAR INCLUDE -->
 <?php
 require_once "../PhpFiles/General/connection.php";
+require_once 'includes/admin_guard.php';
 include 'includes/sidebar.php';
 ?>
 
