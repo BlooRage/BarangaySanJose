@@ -1338,6 +1338,16 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   </script>
 
+  <script>
+    // Force reload when navigating back so the guard runs and pushes users without a profile back to registration.
+    history.replaceState(null, "", location.href);
+    window.addEventListener("pageshow", (event) => {
+      if (event.persisted || window.performance?.getEntriesByType("navigation")[0]?.type === "back_forward") {
+        window.location.reload();
+      }
+    });
+  </script>
+
   <script
     src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/js/bootstrap.bundle.min.js"
     integrity="sha384-FKyoEForCGlyvwx9Hj09JcYn3nv7wiPVlz7YYwJrWVcXK/BmnVDxM+D2scQbITxI"
