@@ -41,6 +41,10 @@
     border-right: 1px solid #e0e0e0;
     background-color: #ffffff;
     font-family: 'Geist', sans-serif;
+    position: sticky;
+    top: 0;
+    align-self: flex-start;
+    overflow-y: auto;
 }
 
 #sidebar-logo {
@@ -87,6 +91,67 @@
     margin-bottom: 20px;
 }
 
+#dashboard-stats {
+    font-family: 'Geist', sans-serif;
+}
+
+.stats-title {
+    font-family: 'Charis SIL Bold', serif;
+    font-size: 1.6rem;
+    color: #3b3b3b;
+}
+
+.stats-subtitle {
+    color: #7a7a7a;
+    font-size: 0.95rem;
+}
+
+.stats-grid {
+    margin-top: 0.25rem;
+}
+
+.stats-card {
+    display: flex;
+    align-items: center;
+    gap: 0.9rem;
+    background: #ffffff;
+    border: 1px solid rgba(254, 153, 60, 0.35);
+    border-radius: 18px;
+    padding: 1rem 1.25rem;
+    box-shadow: 0 12px 24px rgba(0, 0, 0, 0.08);
+    min-height: 92px;
+}
+
+.stats-icon {
+    width: 46px;
+    height: 46px;
+    display: grid;
+    place-items: center;
+    border-radius: 12px;
+    color: #fff;
+    font-size: 1.2rem;
+    flex: 0 0 auto;
+}
+
+.stats-label {
+    color: #6b6b6b;
+    font-size: 0.85rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.stats-value {
+    color: #1e1e1e;
+    font-size: 1.6rem;
+    font-weight: 700;
+    line-height: 1.1;
+}
+
+.bg-amber { background: #f59f00; }
+.bg-emerald { background: #2f9e44; }
+.bg-sky { background: #1c7ed6; }
+.bg-rose { background: #e03131; }
+
 #requestsSection {
     display: none;
 }
@@ -112,4 +177,57 @@
 .btn-toggle.active {
   background-color: rgba(222, 113, 12, 0.1);
   font-weight: 600;
+}
+
+#dashboard-sidebar .btn {
+    border: none !important;
+}
+
+.card-action {
+    background-color: #fff;
+    transition: transform 0.3s ease, background-color 0.3s, color 0.3s;
+    cursor: pointer;
+    border-radius: 30px;
+    border: 1px solid #FE993C !important;
+    box-shadow: 0 15px 35px rgba(0, 0, 0, 0.12)!important;
+    color: #000 !important;
+    min-height: 200px;
+    padding: 1.5rem;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.35rem;
+    width: 100%;
+    text-align: center;
+}
+
+.service-grid {
+    row-gap: 1.75rem;
+}
+
+.card-action i {
+    font-size: clamp(2.8rem, 6vw, 4.5rem);
+    margin-top: 1rem;
+}
+
+.card-action span {
+    transition: color 0.3s ease;
+    color: #000;
+    display: block;
+    margin-bottom: 0;
+}
+
+.card-action i {
+    margin-bottom: 0.25rem;
+}
+
+.card-action:hover {
+    transform: translateY(-8px);
+    background-color: #FE993C;
+    color: #fff !important;
+}
+
+.card-action:hover span {
+    color: #fff;
 }

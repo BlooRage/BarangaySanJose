@@ -118,6 +118,11 @@ h5 {
 }
 .footerText {
     margin: 20px 0;
+    color: #FFFFFF;
+}
+.footerText h5 {
+    font-family: 'Geist', sans-serif;
+    color: #FFFFFF;
 }
 @media (max-width: 768px) {
     .navbar {

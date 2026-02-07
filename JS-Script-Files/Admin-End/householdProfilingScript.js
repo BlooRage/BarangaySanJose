@@ -41,12 +41,17 @@ document.addEventListener("DOMContentLoaded", () => {
         <td>${row.address_display ?? "—"}</td>
         <td>
           <button type="button" class="btn btn-primary btn-sm text-white viewEntryBtn">View</button>
+          <button type="button" class="btn btn-success btn-sm text-white addMemberBtn">Add Household Member</button>
         </td>
       `;
 
       const viewBtn = tr.querySelector(".viewEntryBtn");
       if (viewBtn) {
         viewBtn.addEventListener("click", () => openViewEntry(row));
+      }
+      const addMemberBtn = tr.querySelector(".addMemberBtn");
+      if (addMemberBtn) {
+        addMemberBtn.addEventListener("click", () => openAddMember(row));
       }
 
       tbody.appendChild(tr);
@@ -126,6 +131,7 @@ document.addEventListener("DOMContentLoaded", () => {
     // Address Info
     setText("txt-modalHouseNum", data.house_number ?? "—");
     setText("txt-modalStreetName", data.street_name ?? "—");
+    setText("txt-modalPhaseNumber", data.phase_number ?? "—");
     setText("txt-modalSubdivision", data.subdivision ?? "—");
     setText("txt-modalAreaNumber", data.area_number ?? "—");
     setText("txt-modalBarangay", "Barangay San Jose");
@@ -143,5 +149,51 @@ document.addEventListener("DOMContentLoaded", () => {
       backdrop: "static",
       keyboard: true
     }).show();
+  }
+
+  // ========================
+  // ADD HOUSEHOLD MEMBER MODAL
+  // ========================
+  function openAddMember(data) {
+    const form = document.getElementById("form-addHouseholdMember");
+    if (form) form.reset();
+    const famHeadInput = document.getElementById("add-famHeadId");
+    if (famHeadInput) famHeadInput.value = data.resident_id;
+
+    new bootstrap.Modal(document.getElementById("modal-addHouseholdMember"), {
+      backdrop: "static",
+      keyboard: true
+    }).show();
+  }
+
+  const addMemberForm = document.getElementById("form-addHouseholdMember");
+  if (addMemberForm) {
+    addMemberForm.addEventListener("submit", e => {
+      if (!confirm("Are you sure you want to add this household member?")) {
+        e.preventDefault();
+        return;
+      }
+      e.preventDefault();
+      const formData = new FormData(addMemberForm);
+
+      fetch("../PhpFiles/Admin-End/householdProfiling.php", {
+        method: "POST",
+        body: formData
+      })
+      .then(res => res.json())
+      .then(data => {
+        if (data.success) {
+          const modal = bootstrap.Modal.getInstance(document.getElementById("modal-addHouseholdMember"));
+          if (modal) modal.hide();
+          fetchHeads(searchInput ? searchInput.value.trim() : "");
+        } else {
+          alert(data.message || "Failed to add household member.");
+        }
+      })
+      .catch(err => {
+        console.error(err);
+        alert("Server error.");
+      });
+    });
   }
 });
