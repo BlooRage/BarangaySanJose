@@ -326,17 +326,17 @@ if (isset($conn) && $conn instanceof mysqli) {
 
                     <div class="row g-3">
                         <div class="col-md-3">
-                            <p class="text-muted small mb-0">House Number</p>
+                            <p class="text-muted small mb-0">House Number:</p>
                             <p id="txt-modalHouseNum" class="fw-bold"></p>
                         </div>
 
                         <div class="col-md-3">
-                            <p class="text-muted small mb-0">Street Name</p>
+                            <p class="text-muted small mb-0">Street Name:</p>
                             <p id="txt-modalStreetName" class="fw-bold"></p>
                         </div>
 
                         <div class="col-md-3">
-                            <p class="text-muted small mb-0">Phase</p>
+                            <p class="text-muted small mb-0">Phase:</p>
                             <p id="txt-modalPhaseNumber" class="fw-bold"></p>
                         </div>
 

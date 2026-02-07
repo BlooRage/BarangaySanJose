@@ -198,11 +198,16 @@
                         </div>
 
                         <div class="col-md-3">
+                            <p class="text-muted small mb-0">Phase Number:</p>
+                            <p id="txt-modalPhaseNumber" class="fw-bold"></p>
+                        </div>
+
+                        <div class="col-md-3">
                             <p class="text-muted small mb-0">Subdivision:</p>
                             <p id="txt-modalSubdivision" class="fw-bold"></p>
                         </div>
 
-                        <div class="col-md-3">
+                        <div class="col-md-3 mt-2">
                             <p class="text-muted small mb-0">Area Number:</p>
                             <p id="txt-modalAreaNumber" class="fw-bold"></p>
                         </div>
@@ -253,6 +258,54 @@
                 <button type="button" class="btn btn-secondary px-4" data-bs-dismiss="modal">Close</button>
             </div>
         </div>
+    </div>
+</div>
+
+<!-- ADD HOUSEHOLD MEMBER MODAL -->
+<div class="modal fade" id="modal-addHouseholdMember" tabindex="-1">
+    <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable">
+        <form id="form-addHouseholdMember" class="modal-content p-4">
+            <div class="modal-header border-0">
+                <h4 class="fw-bold" style="font-family: 'Charis SIL Bold', serif; font-size: 28px; color: #e78924">
+                    Add Household Member
+                </h4>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+
+            <div class="modal-body">
+                <p class="text-muted small mb-3">All fields marked with <span class="text-danger">*</span> are required.</p>
+                <h5 class="fw-bold mb-3">Member Information</h5>
+                <input type="hidden" id="add-famHeadId" name="fam_head_id">
+
+                <div class="row g-3">
+                    <div class="col-md-3">
+                        <label class="small fw-bold">Last Name <span class="text-danger">*</span></label>
+                        <input type="text" id="add-lastname" name="last_name" class="form-control" required autocomplete="family-name" placeholder="Last Name">
+                    </div>
+                    <div class="col-md-3">
+                        <label class="small fw-bold">First Name <span class="text-danger">*</span></label>
+                        <input type="text" id="add-firstname" name="first_name" class="form-control" required autocomplete="given-name" placeholder="First Name">
+                    </div>
+                    <div class="col-md-3">
+                        <label class="small fw-bold">Middle Name</label>
+                        <input type="text" id="add-middlename" name="middle_name" class="form-control" autocomplete="additional-name" placeholder="Middle Name">
+                    </div>
+                    <div class="col-md-3">
+                        <label class="small fw-bold">Suffix (optional)</label>
+                        <input type="text" id="add-suffix" name="suffix" class="form-control" placeholder="Suffix">
+                    </div>
+                    <div class="col-md-3">
+                        <label class="small fw-bold">Birthday <span class="text-danger">*</span></label>
+                        <input type="date" id="add-birthdate" name="birthdate" class="form-control" required>
+                    </div>
+                </div>
+            </div>
+
+            <div class="modal-footer border-0">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="submit" class="btn btn-success px-4">Save</button>
+            </div>
+        </form>
     </div>
 </div>
 
