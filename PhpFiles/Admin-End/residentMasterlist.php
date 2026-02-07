@@ -47,7 +47,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['button-saveStatus']))
     $stmt->execute();
     $stmt->close();
 
-    header("Location: ../../Admin-End/residentMasterlist.php");
+    header("Location: ../../Admin-End/ResidentMasterlist.php");
     exit;
 }
 
