@@ -153,13 +153,60 @@ if (!empty($_SESSION['user_id']) && isset($conn) && $conn instanceof mysqli) {
   </div>
   <!-- LOGOUT (BOTTOM, ADMIN-STYLE) -->
   <div class="mt-auto">
-    <a class="btn btn-danger btn-sm w-100"
-       href="../PhpFiles/Login/logout.php">
+    <a class="btn btn-danger btn-sm w-100 logout-link"
+       href="../PhpFiles/Login/logout.php"
+       data-logout-message="Are you sure you want to logout?">
       <i class="bi bi-box-arrow-right me-1"></i> Logout
     </a>
   </div>
 
 </aside>
+
+<!-- Logout Confirm Modal -->
+<div class="modal fade" id="logoutConfirmModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title text-black">Confirm Logout</h5>
+      </div>
+      <div class="modal-body">
+        <p id="logoutConfirmMessage" class="mb-0">Are you sure you want to logout?</p>
+      </div>
+      <div class="modal-footer">
+        <div class="row g-2 w-100 logout-btn-row">
+          <div class="col-6 logout-btn-col">
+            <button type="button" class="btn btn-outline-secondary w-100" data-bs-dismiss="modal">Cancel</button>
+          </div>
+          <div class="col-6 logout-btn-col">
+            <a id="logoutConfirmBtn" class="btn btn-danger w-100" href="#">Logout</a>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  document.addEventListener("DOMContentLoaded", () => {
+    const links = document.querySelectorAll(".logout-link");
+    if (!links.length) return;
+
+    const modalEl = document.getElementById("logoutConfirmModal");
+    const msgEl = document.getElementById("logoutConfirmMessage");
+    const btnEl = document.getElementById("logoutConfirmBtn");
+    if (!modalEl || !msgEl || !btnEl) return;
+
+    const modal = new bootstrap.Modal(modalEl);
+    links.forEach((link) => {
+      link.addEventListener("click", (e) => {
+        e.preventDefault();
+        msgEl.textContent = link.dataset.logoutMessage || "Are you sure you want to logout?";
+        btnEl.href = link.href;
+        modal.show();
+      });
+    });
+  });
+</script>
 
 </body>
 </html>

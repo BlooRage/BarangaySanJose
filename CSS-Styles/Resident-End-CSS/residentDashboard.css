@@ -67,24 +67,51 @@ h3 {
 
 .card-action {
     background-color: #fff;
-    transition: transform 0.2s ease, background-color 0.2s;
+    transition: transform 0.3s ease, background-color 0.3s, color 0.3s;
     cursor: pointer;
-    aspect-ratio: 1 / 1;
-    width: 90%;
+    border-radius: 30px;
     border: 1px solid #FE993C !important;
-    box-shadow: 1 4px 6px rgba(0, 0, 0, 0.1)!important;
+    box-shadow: 0 15px 35px rgba(0, 0, 0, 0.12)!important;
     color: #000 !important;
+    min-height: 200px;
+    padding: 1.5rem;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.35rem;
+    width: 100%;
+    text-align: center;
+}
+
+.service-grid {
+    row-gap: 1.75rem;
+}
+
+.card-action i {
+    font-size: clamp(2.8rem, 6vw, 4.5rem);
+    margin-top: 1rem;
+}
+
+.card-action span {
+    transition: color 0.3s ease;
+    color: #000;
+    display: block;
+    margin-bottom: 0;
+}
+
+.card-action i {
+    margin-bottom: 0.25rem;
 }
 
 .card-action:hover {
-    transform: translateY(-5px);
-    background-color: #f47c1c;
+    transform: translateY(-8px);
+    background-color: #FE993C;
     color: #fff !important;
 }
 
-.img-serviceIcon {
-    width: 40%;
-    filter: brightness(0) invert(1);
+.card-action:hover span {
+    color: #fff;
 }
 
 
@@ -207,4 +234,13 @@ body {
 
 #mobile-header .d-flex {
     text-align: left;
+}
+.logout-btn-row {
+    display: flex !important;
+    flex-wrap: nowrap !important;
+}
+
+.logout-btn-col {
+    flex: 0 0 50% !important;
+    max-width: 50% !important;
 }

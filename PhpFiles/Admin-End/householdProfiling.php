@@ -23,6 +23,7 @@ if (isset($_GET['fetch'])) {
 
             a.street_number AS house_number,
             a.street_name,
+            a.phase_number,
             a.subdivision,
             a.area_number
         FROM residentinformationtbl r
@@ -80,7 +81,12 @@ if (isset($_GET['fetch'])) {
 
         $addressParts = [];
         if ($row['house_number']) $addressParts[] = $row['house_number'];
-        if ($row['street_name']) $addressParts[] = $row['street_name'] . ' Street';
+        if ($row['phase_number']) $addressParts[] = 'Phase ' . $row['phase_number'];
+        if ($row['street_name']) {
+            $street = $row['street_name'];
+            $isBlock = preg_match('/^block\\s+/i', $street) === 1;
+            $addressParts[] = $isBlock ? $street : ($street . ' Street');
+        }
         if ($row['subdivision']) $addressParts[] = $row['subdivision'];
         if ($row['area_number']) $addressParts[] = $row['area_number'];
 
@@ -98,6 +104,7 @@ if (isset($_GET['fetch'])) {
             $normStreet = strtolower(
                 preg_replace('/( street| st\.?|\.|\s+)/', '', $row['street_name'])
             );
+            $normPhase = strtolower(preg_replace('/[\\s\\-\\.]/', '', (string)($row['phase_number'] ?? '')));
 
             $memberSql = "
                 SELECT
@@ -128,10 +135,11 @@ if (isset($_GET['fetch'])) {
                           ' st',''),
                         '.','')
                       ) = ?
+                  AND LOWER(REPLACE(REPLACE(REPLACE(IFNULL(a.phase_number,''),' ',''),'-',''),'.','')) = ?
             ";
 
             $memberStmt = $conn->prepare($memberSql);
-            $memberStmt->bind_param("ss", $normHouse, $normStreet);
+            $memberStmt->bind_param("sss", $normHouse, $normStreet, $normPhase);
             $memberStmt->execute();
             $memberRes = $memberStmt->get_result();
 

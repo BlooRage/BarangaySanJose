@@ -15,27 +15,73 @@
 <div class="d-flex" style="min-height: 100vh;">
 
     <!-- SIDEBAR INCLUDE -->
-    <?php include 'includes/sidebar.php'; ?>
+<?php
+require_once "../PhpFiles/General/connection.php";
+include 'includes/sidebar.php';
+?>
+
+<?php
+$pendingCount = 0;
+if (isset($conn) && $conn instanceof mysqli) {
+    $statusStmt = $conn->prepare("
+        SELECT status_id
+        FROM statuslookuptbl
+        WHERE status_type = 'Resident' AND (status_name = 'PendingVerification' OR status_name = 'Pending Verification' OR status_name LIKE 'Pending%Review%')
+    ");
+    $pendingStatusIds = [];
+    if ($statusStmt) {
+        $statusStmt->execute();
+        $res = $statusStmt->get_result();
+        while ($row = $res->fetch_assoc()) {
+            $pendingStatusIds[] = (int)$row['status_id'];
+        }
+        $statusStmt->close();
+    }
+
+    if ($pendingStatusIds) {
+        $inClause = implode(',', array_fill(0, count($pendingStatusIds), '?'));
+        $types = str_repeat('i', count($pendingStatusIds));
+        $countStmt = $conn->prepare("
+            SELECT COUNT(*) AS total
+            FROM residentinformationtbl
+            WHERE status_id_resident IN ($inClause)
+        ");
+        if ($countStmt) {
+            $countStmt->bind_param($types, ...$pendingStatusIds);
+            $countStmt->execute();
+            $countRow = $countStmt->get_result()->fetch_assoc();
+            $pendingCount = (int)($countRow['total'] ?? 0);
+            $countStmt->close();
+        }
+    }
+}
+?>
 
     <!-- MAIN CONTENT -->
     <main id="main-display" class="flex-grow-1 p-4 p-md-5 bg-light">
         <h2 class="mb-4" style="font-family: 'Charis SIL Bold'; color: #DE710C; font-size: 48px;">
             Resident Masterlist
         </h2>
-
         <hr><br>
 
         <div id="div-tableContainer" class="bg-white p-4 rounded-4 shadow-sm border">
 
             <!-- FILTER BUTTONS + SEARCH -->
-            <div class="d-flex justify-content-between align-items-center mb-3">
-      
+        <div class="d-flex justify-content-between align-items-center mb-3">
+
             <!-- Status Filter Buttons -->
-            <div>
+            <div class="d-flex align-items-center gap-2">
                 <button class="btn btn-outline-primary btn-sm me-2 status-filter-btn" data-filter="ALL">All</button>
-                <button class="btn btn-outline-custom btn-sm me-2 status-filter-btn fw-bold" data-filter="PendingVerification">Pending Verification</button>
                 <button class="btn btn-outline-custom btn-sm me-2 status-filter-btn fw-bold" data-filter="VerifiedResident">Verified Resident</button>
-                <button class="btn btn-outline-custom btn-sm status-filter-btn fw-bold" data-filter="NotVerified">Not Verified</button>
+                <button class="btn btn-outline-custom btn-sm me-2 status-filter-btn fw-bold" data-filter="NotVerified">Not Verified</button>
+                <div class="position-relative">
+                    <button class="btn btn-outline-custom btn-sm status-filter-btn fw-bold" data-filter="PendingVerification">
+                        Pending Verification
+                    </button>
+                    <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger">
+                        <?= $pendingCount ?>
+                    </span>
+                </div>
             </div>
 
             <div class="d-flex align-items-center gap-3">
@@ -286,6 +332,11 @@
                         <div class="col-md-3">
                             <p class="text-muted small mb-0">Street Name</p>
                             <p id="txt-modalStreetName" class="fw-bold"></p>
+                        </div>
+
+                        <div class="col-md-3">
+                            <p class="text-muted small mb-0">Phase</p>
+                            <p id="txt-modalPhaseNumber" class="fw-bold"></p>
                         </div>
 
                         <div class="col-md-3">

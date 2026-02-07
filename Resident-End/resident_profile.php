@@ -1,12 +1,6 @@
 <?php
-if (session_status() === PHP_SESSION_NONE) {
-    session_start();
-}
-if (empty($_SESSION['user_id'])) {
-    header("Location: ../Guest-End/login.php");
-    exit;
-}
-
+$allowUnregistered = false;
+require_once __DIR__ . "/includes/resident_access_guard.php";
 require_once "../PhpFiles/get/getResidentProfile.php";
 
 $data = getResidentProfileData($conn, $_SESSION['user_id']);
@@ -108,8 +102,37 @@ if (!empty($residentinformationtbl['profile_pic'])) {
                     </button>
                 </div>
                 <div class="card-body">
-                    <?= $residentaddresstbl['street_number'] . ' ' . $residentaddresstbl['street_name'] . ', '
-                        . $residentaddresstbl['subdivision'] . ' ' . $residentaddresstbl['area_number'] ?>
+                    <div class="row g-3 align-items-start">
+                        <div class="col-12 col-md-8">
+                            <div class="text-muted small mb-1">Full Address</div>
+                            <div class="fw-semibold">
+                                <?php
+                                  $houseNo = trim((string)($residentaddresstbl['street_number'] ?? ''));
+                                  $streetName = trim((string)($residentaddresstbl['street_name'] ?? ''));
+                                  $phase = trim((string)($residentaddresstbl['phase_number'] ?? ''));
+                                  $subdivision = trim((string)($residentaddresstbl['subdivision'] ?? ''));
+                                  $area = trim((string)($residentaddresstbl['area_number'] ?? ''));
+
+                                  $parts = [];
+                                  if ($houseNo !== '') $parts[] = $houseNo;
+                                  if ($streetName !== '') $parts[] = $streetName . ' Street';
+                                  if ($phase !== '') $parts[] = 'Phase ' . $phase;
+                                  if ($subdivision !== '') $parts[] = $subdivision;
+                                  $parts[] = 'San Jose';
+                                  if ($area !== '') $parts[] = $area;
+                                  $parts[] = 'Rodriguez';
+                                  $parts[] = 'Rizal';
+                                  $parts[] = '1860';
+
+                                  echo implode(', ', array_filter($parts, fn($v) => $v !== ''));
+                                ?>
+                            </div>
+                        </div>
+                        <div class="col-12 col-md-4">
+                            <div class="text-muted small mb-1">Residency Duration</div>
+                            <div class="fw-semibold"><?= $residentaddresstbl['residency_duration'] ?? '—' ?></div>
+                        </div>
+                    </div>
                 </div>
             </div>
              <div class="card shadow-sm mb-4">
@@ -138,6 +161,21 @@ if (!empty($residentinformationtbl['profile_pic'])) {
                         <div class="col-12 col-md-6">
                             <div><strong>Account Type:</strong> <?= $useraccountstbl['type'] ?></div>
                             <div><strong>Account Created:</strong> <?= $useraccountstbl['created'] ?></div>
+                            <div>
+                                <strong>Account Status:</strong>
+                                <?php
+                                  $statusLabel = $residentinformationtbl['status_name_resident'] ?? '';
+                                  $statusClass = 'text-danger';
+                                  if ($statusLabel === 'PendingVerification' || $statusLabel === 'PendingReview') {
+                                      $statusClass = 'text-warning';
+                                  } elseif ($statusLabel === 'VerifiedResident') {
+                                      $statusClass = 'text-success';
+                                  }
+                                ?>
+                                <span class="<?= $statusClass ?> fw-semibold">
+                                  <?= $statusLabel !== '' ? $statusLabel : 'Not Verified' ?>
+                                </span>
+                            </div>
                         </div>
                         <div class="col-12 col-md-6">
                             <div><strong>Mobile Number:</strong> +63<?= $useraccountstbl['phone_number'] ?></div>

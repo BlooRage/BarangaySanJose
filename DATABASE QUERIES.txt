@@ -38,6 +38,62 @@ CREATE TABLE `statuslookuptbl` (
   PRIMARY KEY (`status_id`)
 ) ENGINE=InnoDB AUTO_INCREMENT=1 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
+-- Migration: add phase_number to residentaddresstbl (run once on existing DB)
+ALTER TABLE residentaddresstbl
+  ADD COLUMN phase_number varchar(50) DEFAULT NULL AFTER street_name;
+
+
+CREATE TABLE `documenttypelookuptbl` (
+  `document_type_id` INT(11) NOT NULL AUTO_INCREMENT,
+  `document_type_name` VARCHAR(100) NOT NULL,
+  `document_category` VARCHAR(100) NOT NULL,
+  PRIMARY KEY (`document_type_id`)
+) ENGINE=InnoDB
+DEFAULT CHARSET=utf8mb4
+COLLATE=utf8mb4_general_ci;
+
+INSERT INTO `documenttypelookuptbl` (`document_type_name`, `document_category`) VALUES
+('HOA Signed Certification of Residency', 'ResidentProfiling'),
+('Billing Statement', 'ResidentProfiling'),
+('2x2 Picture', 'ResidentProfiling'),
+('Passport', 'ResidentProfiling'),
+('Driver''s License', 'ResidentProfiling'),
+('PhilHealth ID', 'ResidentProfiling'),
+('Voter''s ID', 'ResidentProfiling'),
+('National ID', 'ResidentProfiling'),
+('Barangay ID', 'ResidentProfiling'),
+('Student ID', 'ResidentProfiling');
+
+CREATE TABLE `unifiedfileattachmenttbl` (
+  `attachment_id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  `source_type` VARCHAR(50) NOT NULL,
+  `source_id` VARCHAR(12) NOT NULL,
+  `document_type_id` INT(11) NOT NULL,
+  `file_name` VARCHAR(255) NOT NULL,
+  `file_path` VARCHAR(500) NOT NULL,
+  `file_type` VARCHAR(50) NOT NULL,
+  `upload_timestamp` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `user_id_uploaded_by` VARCHAR(12) NOT NULL,
+  `status_id_verify` INT(11) NOT NULL,
+  `remarks` TEXT DEFAULT NULL,
+  PRIMARY KEY (`attachment_id`),
+  KEY `idx_source` (`source_type`, `source_id`),
+  KEY `idx_doc_type` (`document_type_id`),
+  KEY `idx_uploaded_by` (`user_id_uploaded_by`),
+  KEY `idx_verify_status` (`status_id_verify`),
+  CONSTRAINT `fk_ufa_document_type`
+    FOREIGN KEY (`document_type_id`)
+    REFERENCES `documenttypelookuptbl` (`document_type_id`),
+  CONSTRAINT `fk_ufa_uploaded_by`
+    FOREIGN KEY (`user_id_uploaded_by`)
+    REFERENCES `useraccountstbl` (`user_id`),
+  CONSTRAINT `fk_ufa_verify_status`
+    FOREIGN KEY (`status_id_verify`)
+    REFERENCES `statuslookuptbl` (`status_id`)
+) ENGINE=InnoDB
+DEFAULT CHARSET=utf8mb4
+COLLATE=utf8mb4_general_ci;
+
 
 
 CREATE TABLE `residentinformationtbl` (
@@ -71,6 +127,7 @@ CREATE TABLE `residentaddresstbl` (
   `resident_id` char(10) NOT NULL,
   `street_number` varchar(50) DEFAULT NULL,
   `street_name` varchar(150) DEFAULT NULL,
+  `phase_number` varchar(50) DEFAULT NULL,
   `subdivision` varchar(150) DEFAULT NULL,
   `area_number` varchar(50) DEFAULT NULL,
   `house_type` varchar(100) DEFAULT NULL,
@@ -178,4 +235,8 @@ INSERT INTO statuslookuptbl (status_name, status_type) VALUES
 
 ('Residing', 'AddressResidency'),
 ('NotResiding', 'AddressResidency'),
-('PendingVerification', 'AddressResidency');
+('PendingVerification', 'AddressResidency'),
+
+('PendingReview', 'ResidentDocumentProfiling'),
+('Verified', 'ResidentDocumentProfiling'),
+('Rejected', 'ResidentDocumentProfiling');

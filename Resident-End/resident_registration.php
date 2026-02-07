@@ -1,4 +1,7 @@
-
+<?php
+$allowUnregistered = true;
+require_once __DIR__ . "/includes/resident_access_guard.php";
+?>
 
 <!DOCTYPE html>
 <html lang="en">
@@ -11,6 +14,11 @@
     href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/css/bootstrap.min.css"
     rel="stylesheet"
     integrity="sha384-sRIl4kxILFvY47J16cr9ZwB07vP4J8+LH7qKQnuqkuIAvNWLzeN8tE5YBujZqJLB"
+    crossorigin="anonymous"
+  />
+  <link
+    rel="stylesheet"
+    href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.5.2/css/all.min.css"
     crossorigin="anonymous"
   />
 
@@ -56,7 +64,7 @@
 
         <div class="collapse navbar-collapse" id="navbarNav">
           <ul id="navbarLinks" class="navbar-nav ms-auto">
-            <li class="nav-item"><a class="nav-link" href="login.html">Logout</a></li>
+            <li class="nav-item"><a class="nav-link logout-link" href="/BarangaySanJose/PhpFiles/Login/logout.php" data-logout-message="Are you sure you want to logout? Changes won't be saved.">Logout</a></li>
           </ul>
         </div>
 
@@ -204,7 +212,7 @@
             Users are responsible for the accuracy of information submitted and for securing their accounts.
           </p>
 
-          <h5 class="mt-4 text-dark">
+          <h5 class="mt-4 text-dark" style="color: #000;">
             Do you agree to the Privacy Policy, Terms and Conditions, and Disclaimer?
             <span class="text-danger">*</span>
           </h5>
@@ -217,9 +225,10 @@
               id="agreePolicy"
               name="privacyConsent"
               value="1"
+              data-error-target="#div-policyGroup"
               required
             />
-            <label class="form-check-label ms-2" for="agreePolicy">
+            <label class="form-check-label ms-2" for="agreePolicy" style="color: #000;">
               I agree to the Privacy Policy, Terms and Conditions, and Disclaimer.
             </label>
           </div>
@@ -338,7 +347,12 @@
 
             <div class="col-md-3">
               <label class="form-label" for="religionSelect">Religion <span class="text-danger">*</span></label>
-              <select class="form-select" name="religion" id="religionSelect" required>
+              <select
+                class="form-select toggle-other"
+                name="religion"
+                id="religionSelect"
+                data-target="religion-other"
+                required>
                 <option value="">Select</option>
                 <option value="Roman Catholic">Roman Catholic</option>
                 <option value="Iglesia ni Cristo">Iglesia ni Cristo</option>
@@ -348,7 +362,7 @@
 
               <input
                 type="text"
-                class="form-control mt-2 d-none"
+                class="form-control mt-2 d-none religion-other"
                 name="religionOther"
                 id="religionOther"
                 placeholder="Please specify religion"
@@ -372,7 +386,7 @@
             <div class="col-md-6">
               <label class="form-label" for="phoneNumber">Phone Number <span class="text-danger">*</span></label>
 
-              <div class="input-group">
+              <div class="input-group" id="phoneNumberGroup">
                 <span class="input-group-text">
                   <img src="https://upload.wikimedia.org/wikipedia/commons/9/99/Flag_of_the_Philippines.svg" alt="PH Flag" width="24" style="margin-right:5px;">+63
                 </span>
@@ -383,6 +397,7 @@
                   value=""
                   readonly
                   disabled
+                  data-error-target="#phoneNumberGroup"
                 >
               </div>
 
@@ -413,11 +428,11 @@
                 Are you a Registered Voter? <span class="text-danger">*</span>
               </label>
 
-              <div class="btn-group w-100" role="group" aria-label="Registered Voter" style="color:#000">
-                <input type="radio" class="btn-check" name="registeredVoter" id="voterYes" value="yes" required style="color: #000;">
+              <div class="btn-group w-100 voter-toggle-group" id="registeredVoterGroup" role="group" aria-label="Registered Voter" style="color:#000">
+                <input type="radio" class="btn-check" name="registeredVoter" id="voterYes" value="yes" required data-error-target="#registeredVoterGroup" style="color: #000;">
                 <label class="btn btn-outline-warning" for="voterYes">Yes</label>
 
-                <input type="radio" class="btn-check" name="registeredVoter" id="voterNo" value="no" required style="color: #000;">
+                <input type="radio" class="btn-check" name="registeredVoter" id="voterNo" value="no" required data-error-target="#registeredVoterGroup" style="color: #000;">
                 <label class="btn btn-outline-warning" for="voterNo">No</label>
               </div>
             </div>
@@ -427,11 +442,11 @@
                 Employment Status <span class="text-danger">*</span>
               </label>
 
-              <div class="btn-group w-100" role="group" aria-label="Employment Status">
-                <input type="radio" class="btn-check" name="occupationStatus" id="employed" value="employed" required>
+              <div class="btn-group w-100 voter-toggle-group" id="employmentStatusGroup" role="group" aria-label="Employment Status">
+                <input type="radio" class="btn-check" name="occupationStatus" id="employed" value="employed" required data-error-target="#employmentStatusGroup">
                 <label class="btn btn-outline-warning" for="employed">Employed</label>
 
-                <input type="radio" class="btn-check" name="occupationStatus" id="unemployed" value="unemployed" required>
+                <input type="radio" class="btn-check" name="occupationStatus" id="unemployed" value="unemployed" required data-error-target="#employmentStatusGroup">
                 <label class="btn btn-outline-warning" for="unemployed">Unemployed</label>
               </div>
 
@@ -547,7 +562,7 @@
             <div class="col-md-4">
               <label class="form-label" for="emergencyPhoneNumber">Contact Number <span class="text-danger">*</span></label>
 
-              <div class="input-group">
+              <div class="input-group" id="emergencyPhoneGroup">
                 <span class="input-group-text">
                   <img src="https://upload.wikimedia.org/wikipedia/commons/9/99/Flag_of_the_Philippines.svg" alt="PH Flag" width="24" style="margin-right:5px;">+63
                 </span>
@@ -560,13 +575,19 @@
                   maxlength="10"
                   inputmode="numeric"
                   required
+                  data-error-target="#emergencyPhoneGroup"
                 >
               </div>
             </div>
 
             <div class="col-md-4">
               <label class="form-label" for="emergencyRelationship">Relationship <span class="text-danger">*</span></label>
-              <select class="form-select" id="emergencyRelationship" name="emergencyRelationship" required>
+              <select
+                class="form-select toggle-other"
+                id="emergencyRelationship"
+                name="emergencyRelationship"
+                data-target="emergency-relationship-other"
+                required>
                 <option value="">Select</option>
                 <option value="Parent">Parent</option>
                 <option value="Spouse">Spouse</option>
@@ -577,6 +598,13 @@
                 <option value="Guardian">Guardian</option>
                 <option value="Other">Other</option>
               </select>
+              <input
+                type="text"
+                class="form-control mt-2 d-none emergency-relationship-other"
+                id="emergencyRelationshipOther"
+                name="emergencyRelationshipOther"
+                placeholder="Please specify relationship"
+              />
             </div>
 
             <div class="col-md-4">
@@ -597,52 +625,107 @@
           <hr class="section-hr">
 
           <div class="row mb-3">
-            <div class="col-md-3">
-              <label class="form-label" for="houseNumber">House Number <span class="text-danger">*</span></label>
-              <input type="text" class="form-control" id="houseNumber" name="houseNumber" required>
-            </div>
-
-            <div class="col-md-3">
-              <label class="form-label" for="streetName">Street Name <span class="text-danger">*</span></label>
-              <input type="text" class="form-control" id="streetName" name="streetName" required>
-            </div>
-
-            <div class="col-md-3">
-              <label class="form-label" for="subdivisionSitio">Subdivision / Sitio</label>
-              <input type="text" class="form-control" id="subdivisionSitio" name="subdivisionSitio">
-            </div>
-
-            <div class="col-md-3">
-              <label class="form-label" for="areaNumber">Area <span class="text-danger">*</span></label>
-              <select class="form-select" id="areaNumber" name="areaNumber" required>
+            <div class="col-12">
+              <label class="form-label" for="addressSystem">Address System <span class="text-danger">*</span></label>
+              <select class="form-select" id="addressSystem" name="addressSystem" required>
                 <option value="">Select</option>
-                <option value="Area 01">Area 01</option>
-                <option value="Area 1A">Area 1A</option>
-                <option value="Area 02">Area 02</option>
-                <option value="Area 03">Area 03</option>
-                <option value="Area 04">Area 04</option>
-                <option value="Area 05">Area 05</option>
-                <option value="Area 06">Area 06</option>
+                <option value="house">House Numbering System</option>
+                <option value="lot_block">Lot/Block System</option>
               </select>
+            </div>
+          </div>
+
+          <!-- House numbering system -->
+          <div id="houseSystemWrapper" class="d-none">
+            <div class="row mb-3">
+              <div class="col-md-6">
+                <label class="form-label" for="houseNumber">House Number <span class="text-danger">*</span></label>
+                <input type="text" class="form-control" id="houseNumber" name="houseNumber">
+              </div>
+
+              <div class="col-md-6">
+                <label class="form-label" for="streetName">Street Name <span class="text-danger">*</span></label>
+                <input type="text" class="form-control" id="streetName" name="streetName">
+              </div>
+            </div>
+
+            <div class="row mb-3">
+              <div class="col-md-6">
+                <label class="form-label" for="subdivisionSitio">Subdivision</label>
+                <input type="text" class="form-control" id="subdivisionSitio" name="subdivisionSitio">
+              </div>
+
+              <div class="col-md-6">
+                <label class="form-label" for="areaNumber">Area <span class="text-danger">*</span></label>
+                <select class="form-select" id="areaNumber" name="areaNumber">
+                  <option value="">Select</option>
+                  <option value="Area 01">Area 01</option>
+                  <option value="Area 1A">Area 1A</option>
+                  <option value="Area 02">Area 02</option>
+                  <option value="Area 03">Area 03</option>
+                  <option value="Area 04">Area 04</option>
+                  <option value="Area 05">Area 05</option>
+                  <option value="Area 06">Area 06</option>
+                </select>
+              </div>
+            </div>
+          </div>
+
+          <!-- Lot/Block system -->
+          <div id="lotBlockSystemWrapper" class="d-none">
+            <div class="row mb-3">
+              <div class="col-md-4">
+                <label class="form-label" for="phaseNumber">Phase <span class="text-danger">*</span></label>
+                <input type="text" class="form-control" id="phaseNumber" name="phaseNumber">
+              </div>
+              <div class="col-md-4">
+                <label class="form-label" for="blockNumber">Block <span class="text-danger">*</span></label>
+                <input type="text" class="form-control" id="blockNumber" name="blockNumber">
+              </div>
+              <div class="col-md-4">
+                <label class="form-label" for="lotNumber">Lot <span class="text-danger">*</span></label>
+                <input type="text" class="form-control" id="lotNumber" name="lotNumber">
+              </div>
+            </div>
+
+            <div class="row mb-3">
+              <div class="col-md-6">
+                <label class="form-label" for="subdivisionLotBlock">Subdivision</label>
+                <input type="text" class="form-control" id="subdivisionLotBlock" name="subdivisionSitio">
+              </div>
+
+              <div class="col-md-6">
+                <label class="form-label" for="areaNumberLotBlock">Area <span class="text-danger">*</span></label>
+                <select class="form-select" id="areaNumberLotBlock" name="areaNumber">
+                  <option value="">Select</option>
+                  <option value="Area 01">Area 01</option>
+                  <option value="Area 1A">Area 1A</option>
+                  <option value="Area 02">Area 02</option>
+                  <option value="Area 03">Area 03</option>
+                  <option value="Area 04">Area 04</option>
+                  <option value="Area 05">Area 05</option>
+                  <option value="Area 06">Area 06</option>
+                </select>
+              </div>
             </div>
           </div>
 
           <div class="row mb-4">
             <div class="col-md-4">
               <label class="form-label" for="barangayDisplay">Barangay</label>
-              <input type="text" class="form-control" id="barangayDisplay" value="Barangay San Jose" readonly>
+              <input type="text" class="form-control readonly-highlight" id="barangayDisplay" value="Barangay San Jose" readonly>
               <input type="hidden" name="barangay" value="Barangay San Jose">
             </div>
 
             <div class="col-md-4">
               <label class="form-label" for="municipalityDisplay">Municipality / City</label>
-              <input type="text" class="form-control" id="municipalityDisplay" value="Rodriguez" readonly>
+              <input type="text" class="form-control readonly-highlight" id="municipalityDisplay" value="Rodriguez" readonly>
               <input type="hidden" name="municipality" value="Rodriguez">
             </div>
 
             <div class="col-md-4">
               <label class="form-label" for="provinceDisplay">Province</label>
-              <input type="text" class="form-control" id="provinceDisplay" value="Rizal" readonly>
+              <input type="text" class="form-control readonly-highlight" id="provinceDisplay" value="Rizal" readonly>
               <input type="hidden" name="province" value="Rizal">
             </div>
           </div>
@@ -710,10 +793,10 @@
 
         <!-- ================= STEP 5: DOCUMENTS ================= -->
         <div id="form-proofIdentity" class="step">
-          <h2 class="section-title mb-0">Proof of Identity</h2>
+          <h2 class="section-title mb-0">Proof of Identification and Residency</h2>
           <hr class="section-hr">
 
-          <div class="row g-3 mb-4">
+          <div class="row g-3 mb-4" id="proofTypeWrapper">
             <div>
               <label class="form-label fw-semibold">
                 Type of Proof of Identification <span class="text-danger">*</span>
@@ -723,6 +806,9 @@
                 <option value="ID">ID</option>
                 <option value="Document">Document</option>
               </select>
+              <div class="small text-danger mt-1">
+                The document or ID you present must prove you reside in the barangay.
+              </div>
             </div>
           </div>
 
@@ -741,6 +827,7 @@
                   <option value="PhilHealth ID">PhilHealth ID</option>
                   <option value="Voter's ID">Voter's ID</option>
                   <option value="National ID">National ID</option>
+                  <option value="Barangay ID">Barangay ID</option>
                   <option value="Student ID">Student ID</option>
                 </select>
               </div>
@@ -762,26 +849,47 @@
             <!-- Uploads -->
             <div class="row mb-2 mt-3">
               <label class="form-label" for="idFrontInput">Upload ID Front <span class="text-danger">*</span></label>
-              <div class="upload-box">
+              <div class="upload-box position-relative">
+                <div class="upload-text">
+                  <i class="fa-solid fa-upload"></i>
+                  <span>Drag & drop file</span>
+                </div>
+                <div class="upload-subtext mt-1">PDF or image</div>
                 <input
                   type="file"
-                  class="form-control"
+                  class="form-control upload-input"
                   id="idFrontInput"
                   name="idFront"
-                  accept="image/*,.pdf">
+                  accept="image/*,.pdf,.heic,.heif">
               </div>
                 <label class="form-label mb-2 mt-3" for="idBackInput">Upload ID Back <span class="text-danger">*</span></label>
-              <div class="upload-box">
+              <div class="upload-box position-relative">
+                <div class="upload-text">
+                  <i class="fa-solid fa-upload"></i>
+                  <span>Drag & drop file</span>
+                </div>
+                <div class="upload-subtext mt-1">PDF or image</div>
                 <input
                   type="file"
-                  class="form-control"
+                  class="form-control upload-input"
                   id="idBackInput"
                   name="idBack"
-                  accept="image/*,.pdf">
+                  accept="image/*,.pdf,.heic,.heif">
               </div>
             </div>
 </div>
 <div id="documentProofWrapper" class="d-none">
+
+  <div class="row g-3 mb-3">
+    <div class="col-12">
+      <label class="form-label" for="documentTypeSelect">Document Type <span class="text-danger">*</span></label>
+      <select class="form-select" id="documentTypeSelect" name="documentType">
+        <option value="">Select</option>
+        <option value="Billing Statement">Billing Statement</option>
+        <option value="HOA Signed Certification of Residency">HOA Signed Certification of Residency</option>
+      </select>
+    </div>
+  </div>
 
   <label class="form-label fw-semibold mb-3">
     Upload Supporting Document(s) <span class="text-danger">*</span>
@@ -792,12 +900,19 @@
     <!-- Attachment 1 -->
     <div class=" position-relative">
   <div class="upload-box position-relative">
+    <div class="upload-text">
+      <i class="fa-solid fa-upload"></i>
+      <span>Drag & drop file</span>
+    </div>
+    <div class="upload-subtext mt-1">
+      PDF or image
+    </div>
 
     <input
       type="file"
-      class="form-control"
+      class="form-control upload-input"
       name="documentProof[]"
-      accept=".pdf,image/*"
+      accept=".pdf,image/*,.heic,.heif"
       required>
   </div>
 
@@ -824,22 +939,23 @@
             <!-- 2x2 -->
             <div class="row g-3 mb-4">
               <label class="form-label mb-1" for="pictureInput">2x2 Picture <span class="text-danger">*</span></label>
-              <div class="upload-box col-12">
-                
+              <div class="d-flex align-items-center gap-2 mb-1">
+                <span class="fw-semibold text-black">Required:</span>
+                <span class="text-muted">White background (2x2 ID photo).</span>
+              </div>
+              <div class="upload-box position-relative col-12">
+                <div class="upload-text">
+                  <i class="fa-solid fa-upload"></i>
+                  <span>Drag & drop file</span>
+                </div>
+                <div class="upload-subtext mt-1">JPG or PNG</div>
                 <input
                   type="file"
-                  class="form-control"
+                  class="form-control upload-input"
                   id="pictureInput"
                   name="picture"
-                  accept="image/*">
-
-                <div class="small mt-2">
-                  
-                </div>
-                
+                  accept="image/*,.heic,.heif">
               </div>
-              <span class="fw-semibold" style="color:#FE993C;">Required:</span>
-                  <span class="text-muted">White background (2x2 ID photo).</span>
             </div>
           </div>
 
@@ -876,6 +992,30 @@
       </div>
     </form>
   </section>
+
+  <!-- Logout Confirm Modal -->
+  <div class="modal fade" id="logoutConfirmModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title text-black">Confirm Logout</h5>
+        </div>
+        <div class="modal-body">
+          <p id="logoutConfirmMessage" class="mb-0">Are you sure you want to logout?</p>
+        </div>
+        <div class="modal-footer">
+          <div class="row g-2 w-100 logout-btn-row">
+            <div class="col-6 logout-btn-col">
+              <button type="button" class="btn btn-outline-secondary w-100" data-bs-dismiss="modal">Cancel</button>
+            </div>
+            <div class="col-6 logout-btn-col">
+              <a id="logoutConfirmBtn" class="btn btn-danger w-100" href="#">Logout</a>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
 
   <script>
     // Expose user_id (if your JS needs it)
@@ -934,9 +1074,10 @@
       })
       .catch(() => {});
     });
-    const proofTypeSelect = document.getElementById("proofTypeSelect");
+const proofTypeSelect = document.getElementById("proofTypeSelect");
 const idProofWrapper = document.getElementById("idProofWrapper");
 const documentProofWrapper = document.getElementById("documentProofWrapper");
+const documentTypeSelect = document.getElementById("documentTypeSelect");
 const addDocumentBtn = document.getElementById("addDocumentBtn");
 const documentUploadList = document.getElementById("documentUploadList");
 
@@ -946,16 +1087,24 @@ proofTypeSelect.addEventListener("change", () => {
 
   // Disable all inputs first
   idProofWrapper.querySelectorAll("input, select").forEach(el => el.disabled = true);
-  documentProofWrapper.querySelectorAll("input").forEach(el => el.disabled = true);
+  documentProofWrapper.querySelectorAll("input, select").forEach(el => el.disabled = true);
 
   if (proofTypeSelect.value === "ID") {
     idProofWrapper.classList.remove("d-none");
     idProofWrapper.querySelectorAll("input, select").forEach(el => el.disabled = false);
+    if (documentTypeSelect) {
+      documentTypeSelect.value = "";
+      documentTypeSelect.required = false;
+    }
   }
 
   if (proofTypeSelect.value === "Document") {
     documentProofWrapper.classList.remove("d-none");
     documentProofWrapper.querySelectorAll("input").forEach(el => el.disabled = false);
+    documentProofWrapper.querySelectorAll("select").forEach(el => el.disabled = false);
+    if (documentTypeSelect) {
+      documentTypeSelect.required = true;
+    }
   }
 });
 
@@ -968,12 +1117,49 @@ document.addEventListener("DOMContentLoaded", () => {
      GENERIC UPLOAD BOX HANDLER
      ========================= */
 
+  async function convertHeicIfNeeded(input) {
+    if (!input || !input.files || input.files.length === 0) return;
+
+    const files = Array.from(input.files);
+    const converted = [];
+
+    for (const file of files) {
+      const ext = (file.name.split(".").pop() || "").toLowerCase();
+      const isHeic = ext === "heic" || ext === "heif" || file.type === "image/heic" || file.type === "image/heif";
+      if (!isHeic) {
+        converted.push(file);
+        continue;
+      }
+
+      if (typeof heic2any !== "function") {
+        alert("HEIC conversion failed. Please upload JPG or PNG.");
+        return;
+      }
+
+      try {
+        const jpgBlob = await heic2any({ blob: file, toType: "image/jpeg", quality: 0.9 });
+        const safeName = file.name.replace(/\.(heic|heif)$/i, ".jpg");
+        const jpgFile = new File([jpgBlob], safeName, { type: "image/jpeg" });
+        converted.push(jpgFile);
+      } catch (err) {
+        console.error(err);
+        alert("HEIC conversion failed. Please upload JPG or PNG.");
+        return;
+      }
+    }
+
+    const dt = new DataTransfer();
+    converted.forEach((f) => dt.items.add(f));
+    input.files = dt.files;
+  }
+
   function initUploadBox(uploadBox) {
     const input = uploadBox.querySelector('input[type="file"]');
     if (!input) return;
 
     // Click anywhere to open file picker
     uploadBox.addEventListener("click", () => input.click());
+    input.addEventListener("click", (e) => e.stopPropagation());
 
     // Drag over
     uploadBox.addEventListener("dragover", e => {
@@ -987,20 +1173,26 @@ document.addEventListener("DOMContentLoaded", () => {
     });
 
     // Drop file
-    uploadBox.addEventListener("drop", e => {
+    uploadBox.addEventListener("drop", async e => {
       e.preventDefault();
       uploadBox.classList.remove("dragover");
 
       if (e.dataTransfer.files.length) {
         input.files = e.dataTransfer.files;
-        markUploaded(uploadBox, input);
+        await convertHeicIfNeeded(input);
+        if (input.files.length) {
+          markUploaded(uploadBox, input);
+        }
       }
     });
 
     // File selected
-    input.addEventListener("change", () => {
+    input.addEventListener("change", async () => {
       if (input.files.length) {
-        markUploaded(uploadBox, input);
+        await convertHeicIfNeeded(input);
+        if (input.files.length) {
+          markUploaded(uploadBox, input);
+        }
       }
     });
   }
@@ -1016,6 +1208,26 @@ document.addEventListener("DOMContentLoaded", () => {
       box.appendChild(filename);
     }
     filename.textContent = input.files[0].name;
+
+    let removeBtn = box.querySelector(".upload-remove");
+    if (!removeBtn) {
+      removeBtn = document.createElement("button");
+      removeBtn.type = "button";
+      removeBtn.className = "upload-remove";
+      removeBtn.setAttribute("aria-label", "Remove file");
+      removeBtn.innerHTML = "&times;";
+      removeBtn.addEventListener("click", (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        input.value = "";
+        box.classList.remove("uploaded");
+        if (filename && filename.parentNode) filename.parentNode.removeChild(filename);
+        if (removeBtn && removeBtn.parentNode) removeBtn.parentNode.removeChild(removeBtn);
+        updateNextButtonState();
+        updateSubmitButtonState();
+      });
+      box.appendChild(removeBtn);
+    }
   }
 
   /* =========================
@@ -1042,7 +1254,8 @@ document.addEventListener("DOMContentLoaded", () => {
       col.innerHTML = `
         <div class="upload-box position-relative">
           <div class="upload-text">
-            Drag & drop file<br>
+            <i class="fa-solid fa-upload"></i>
+            <span>Drag & drop file</span>
           </div>
           <div class="upload-subtext mt-1">
             PDF or image
@@ -1050,9 +1263,9 @@ document.addEventListener("DOMContentLoaded", () => {
 
           <input
             type="file"
-            class="form-control"
+            class="form-control upload-input"
             name="documentProof[]"
-            accept=".pdf,image/*"
+            accept=".pdf,image/*,.heic,.heif"
             required>
         </div>
 
@@ -1070,9 +1283,29 @@ document.addEventListener("DOMContentLoaded", () => {
 
 });
 
-/* Initial boxes */
-document.querySelectorAll(".upload-box").forEach(enableDragDrop);
 </script>
+  </script>
+
+  <script>
+    document.addEventListener("DOMContentLoaded", () => {
+      const links = document.querySelectorAll(".logout-link");
+      if (!links.length) return;
+
+      const modalEl = document.getElementById("logoutConfirmModal");
+      const msgEl = document.getElementById("logoutConfirmMessage");
+      const btnEl = document.getElementById("logoutConfirmBtn");
+      if (!modalEl || !msgEl || !btnEl) return;
+
+      const modal = new bootstrap.Modal(modalEl);
+      links.forEach((link) => {
+        link.addEventListener("click", (e) => {
+          e.preventDefault();
+          msgEl.textContent = link.dataset.logoutMessage || "Are you sure you want to logout?";
+          btnEl.href = link.href;
+          modal.show();
+        });
+      });
+    });
   </script>
 
   <script
@@ -1080,6 +1313,8 @@ document.querySelectorAll(".upload-box").forEach(enableDragDrop);
     integrity="sha384-FKyoEForCGlyvwx9Hj09JcYn3nv7wiPVlz7YYwJrWVcXK/BmnVDxM+D2scQbITxI"
     crossorigin="anonymous"
   ></script>
+
+  <script src="https://cdn.jsdelivr.net/npm/heic2any/dist/heic2any.min.js"></script>
 
 </body>
 </html>

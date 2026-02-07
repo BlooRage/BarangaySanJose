@@ -21,6 +21,7 @@ function getResidentProfileData(mysqli $conn, string $userId): array {
         'occupation_detail' => '',
         'religion' => '',
         'sector_membership' => '',
+        'status_name_resident' => '',
         'emergency_name' => '',
         'emergency_contact' => '',
         'profile_pic' => ''
@@ -29,8 +30,10 @@ function getResidentProfileData(mysqli $conn, string $userId): array {
     $residentaddresstbl = [
         'street_number' => '',
         'street_name' => '',
+        'phase_number' => '',
         'subdivision' => '',
-        'area_number' => ''
+        'area_number' => '',
+        'residency_duration' => ''
     ];
 
     $useraccountstbl = [
@@ -59,6 +62,7 @@ function getResidentProfileData(mysqli $conn, string $userId): array {
             r.occupation_detail,
             r.religion,
             r.sector_membership,
+        s.status_name AS status_name_resident,
         u.role_access,
         u.account_created,
         u.last_password_changed,
@@ -72,6 +76,7 @@ function getResidentProfileData(mysqli $conn, string $userId): array {
             e.suffix AS emergency_suffix,
             e.phone_number AS emergency_contact
         FROM residentinformationtbl r
+        LEFT JOIN statuslookuptbl s ON r.status_id_resident = s.status_id
         LEFT JOIN useraccountstbl u ON u.user_id = r.user_id
         LEFT JOIN emergencycontacttbl e ON e.user_id = r.user_id
         WHERE r.user_id = ?
@@ -121,6 +126,7 @@ function getResidentProfileData(mysqli $conn, string $userId): array {
                 'occupation_detail' => $row['occupation_detail'] ?? '',
                 'religion' => $row['religion'] ?? '',
                 'sector_membership' => !empty($row['sector_membership']) ? $row['sector_membership'] : 'None',
+                'status_name_resident' => $row['status_name_resident'] ?? '',
                 'emergency_name' => $emergencyName,
                 'emergency_contact' => $row['emergency_contact'] ?? '',
                 'profile_pic' => ''
@@ -141,7 +147,7 @@ function getResidentProfileData(mysqli $conn, string $userId): array {
 
     if ($residentId) {
         $stmtAddr = $conn->prepare("
-            SELECT street_number, street_name, subdivision, area_number
+            SELECT street_number, street_name, phase_number, subdivision, area_number, residency_duration
             FROM residentaddresstbl
             WHERE resident_id = ?
             ORDER BY address_id DESC
@@ -155,8 +161,10 @@ function getResidentProfileData(mysqli $conn, string $userId): array {
                 $residentaddresstbl = [
                     'street_number' => $addr['street_number'] ?? '',
                     'street_name' => $addr['street_name'] ?? '',
+                    'phase_number' => $addr['phase_number'] ?? '',
                     'subdivision' => $addr['subdivision'] ?? '',
-                    'area_number' => $addr['area_number'] ?? ''
+                    'area_number' => $addr['area_number'] ?? '',
+                    'residency_duration' => $addr['residency_duration'] ?? ''
                 ];
             }
             $stmtAddr->close();

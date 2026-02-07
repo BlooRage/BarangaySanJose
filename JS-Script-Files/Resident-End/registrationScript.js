@@ -22,11 +22,19 @@ document.addEventListener("DOMContentLoaded", () => {
   function showError(input, message) {
     input.classList.add("is-invalid");
 
-    let error = input.nextElementSibling;
-    if (!error || !error.classList.contains("error-message")) {
+    const targetSelector = input.getAttribute("data-error-target");
+    const target = targetSelector ? document.querySelector(targetSelector) : null;
+
+    let error = input._errorEl;
+    if (!error || !document.contains(error)) {
       error = document.createElement("div");
       error.className = "error-message text-danger small mt-1";
-      input.insertAdjacentElement("afterend", error);
+      if (target) {
+        target.insertAdjacentElement("afterend", error);
+      } else {
+        input.insertAdjacentElement("afterend", error);
+      }
+      input._errorEl = error;
     }
 
     error.textContent = message;
@@ -34,10 +42,11 @@ document.addEventListener("DOMContentLoaded", () => {
 
   function clearError(input) {
     input.classList.remove("is-invalid");
-    const error = input.nextElementSibling;
-    if (error && error.classList.contains("error-message")) {
+    const error = input._errorEl;
+    if (error && document.contains(error)) {
       error.remove();
     }
+    input._errorEl = null;
   }
 
 function isActuallyVisible(el) {
@@ -98,6 +107,23 @@ function isActuallyVisible(el) {
       }
     }
 
+    // ✅ AGE: must be at least 18 years old
+    if (field.id === "dateOfBirth" && field.value) {
+      const dob = new Date(field.value);
+      if (!isNaN(dob.getTime())) {
+        const today = new Date();
+        let age = today.getFullYear() - dob.getFullYear();
+        const m = today.getMonth() - dob.getMonth();
+        if (m < 0 || (m === 0 && today.getDate() < dob.getDate())) {
+          age--;
+        }
+        if (age < 18) {
+          valid = false;
+          if (showMessages) showError(field, "You must be at least 18 years old to register.");
+        }
+      }
+    }
+
     // EMAIL (simple allowed TLDs)
     if (field.classList.contains("email-input") && field.value.trim()) {
       const emailRegex = /^[^\s@]+@[^\s@]+\.(com|net|org|edu|gov|ph)$/;
@@ -120,7 +146,10 @@ function isActuallyVisible(el) {
     const nextBtn = currentSection.querySelector(".next-btn");
     if (!nextBtn) return;
 
-    nextBtn.disabled = !isStepValid(currentStep);
+    const blocked = !isStepValid(currentStep);
+    nextBtn.disabled = false; // keep clickable so we can focus invalid fields
+    nextBtn.classList.toggle("btn-disabled", blocked);
+    nextBtn.setAttribute("aria-disabled", blocked ? "true" : "false");
   }
 
   function updateUI() {
@@ -222,6 +251,55 @@ function isActuallyVisible(el) {
   });
 
   /* ===============================
+     ADDRESS SYSTEM TOGGLE
+     =============================== */
+  const addressSystemSelect = document.getElementById("addressSystem");
+  const houseSystemWrapper = document.getElementById("houseSystemWrapper");
+  const lotBlockSystemWrapper = document.getElementById("lotBlockSystemWrapper");
+
+  function setWrapperState(wrapper, enabled) {
+    if (!wrapper) return;
+    wrapper.classList.toggle("d-none", !enabled);
+    wrapper.querySelectorAll("input, select").forEach((el) => {
+      el.disabled = !enabled;
+      if (!enabled) {
+        el.value = "";
+        if (el.type === "checkbox" || el.type === "radio") el.checked = false;
+        clearError(el);
+      }
+    });
+  }
+
+  function setRequired(el, required) {
+    if (!el) return;
+    if (required) el.setAttribute("required", "required");
+    else el.removeAttribute("required");
+  }
+
+  function applyAddressSystem() {
+    const val = addressSystemSelect ? addressSystemSelect.value : "";
+
+    setWrapperState(houseSystemWrapper, val === "house");
+    setWrapperState(lotBlockSystemWrapper, val === "lot_block");
+
+    setRequired(document.getElementById("houseNumber"), val === "house");
+    setRequired(document.getElementById("streetName"), val === "house");
+    setRequired(document.getElementById("areaNumber"), val === "house");
+
+    setRequired(document.getElementById("phaseNumber"), false);
+    setRequired(document.getElementById("lotNumber"), val === "lot_block");
+    setRequired(document.getElementById("blockNumber"), val === "lot_block");
+    setRequired(document.getElementById("areaNumberLotBlock"), val === "lot_block");
+
+    updateNextButtonState();
+  }
+
+  if (addressSystemSelect) {
+    addressSystemSelect.addEventListener("change", applyAddressSystem);
+    applyAddressSystem();
+  }
+
+  /* ===============================
      EMPLOYED / UNEMPLOYED TOGGLE
      =============================== */
   const employed = document.getElementById("employed");
@@ -316,6 +394,21 @@ function isActuallyVisible(el) {
   function isProofComplete() {
     if (skipProofSwitch && skipProofSwitch.checked) return true;
 
+    const proofTypeSelect = document.getElementById("proofTypeSelect");
+    if (!proofTypeSelect || !proofTypeSelect.value.trim()) return false;
+
+    if (proofTypeSelect.value === "Document") {
+      const documentTypeSelect = document.getElementById("documentTypeSelect");
+      if (!documentTypeSelect || !documentTypeSelect.value.trim()) return false;
+
+      const docInputs = document.querySelectorAll('input[name="documentProof[]"]');
+      let hasDoc = false;
+      docInputs.forEach((inp) => {
+        if (inp.files && inp.files.length > 0) hasDoc = true;
+      });
+      return hasDoc;
+    }
+
     if (!idTypeSelect || !idNumberInput || !idFrontInput || !idBackInput || !pictureInput) return false;
 
     if (!idTypeSelect.value.trim()) return false;
@@ -334,14 +427,31 @@ function isActuallyVisible(el) {
 
   function updateSubmitButtonState() {
     if (!submitBtn) return;
-    submitBtn.disabled = !isProofComplete();
+    const blocked = !isProofComplete();
+    submitBtn.disabled = false;
+    submitBtn.classList.toggle("btn-disabled", blocked);
+    submitBtn.setAttribute("aria-disabled", blocked ? "true" : "false");
   }
 
   function applySkipState() {
     const skipped = !!(skipProofSwitch && skipProofSwitch.checked);
+    const proofTypeWrapper = document.getElementById("proofTypeWrapper");
+    const proofTypeSelect = document.getElementById("proofTypeSelect");
 
     if (proofIdentityFields) {
       proofIdentityFields.classList.toggle("d-none", skipped);
+    }
+
+    if (proofTypeWrapper) {
+      proofTypeWrapper.classList.toggle("d-none", skipped);
+    }
+
+    if (proofTypeSelect) {
+      proofTypeSelect.disabled = skipped;
+      if (skipped) {
+        proofTypeSelect.value = "";
+        proofTypeSelect.dispatchEvent(new Event("change"));
+      }
     }
 
     setProofRequired(!skipped);
@@ -436,6 +546,22 @@ function isActuallyVisible(el) {
   if (form) {
     form.addEventListener("submit", async (e) => {
       e.preventDefault();
+
+      if (!isProofComplete()) {
+        const fields = sections[currentStep].querySelectorAll("input, select, textarea");
+        let firstInvalid = null;
+
+        fields.forEach((f) => {
+          const valid = validateField(f, true);
+          if (!valid && !firstInvalid) firstInvalid = f;
+        });
+
+        if (firstInvalid) {
+          firstInvalid.scrollIntoView({ behavior: "smooth", block: "center" });
+          firstInvalid.focus();
+        }
+        return;
+      }
 
       // set client timestamp
       if (clientSubmittedAt) clientSubmittedAt.value = new Date().toISOString();

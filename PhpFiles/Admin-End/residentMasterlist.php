@@ -302,6 +302,7 @@ if (isset($_GET['fetch'])) {
 
             a.street_number AS house_number,
             a.street_name,
+            a.phase_number,
             a.subdivision,
             a.area_number,
             a.house_ownership,
@@ -339,8 +340,16 @@ if (isset($_GET['fetch'])) {
     if ($search !== '') {
         $sql .= " WHERE
             (s.status_name <> 'Archived' OR s.status_name IS NULL)
-            AND LOWER(TRIM(REPLACE(REPLACE(REPLACE(IFNULL(a.street_number,''),' ',''),'-',''),'.',''))) <=> ?
-            AND LOWER(TRIM(REPLACE(REPLACE(REPLACE(REPLACE(IFNULL(a.street_name,''),' street',''),' st.',''),' st',''),'.',''))) <=> ?
+            AND (
+              r.resident_id LIKE ?
+              OR r.firstname LIKE ?
+              OR r.lastname LIKE ?
+              OR r.middlename LIKE ?
+              OR a.street_number LIKE ?
+              OR a.street_name LIKE ?
+              OR a.phase_number LIKE ?
+              OR a.subdivision LIKE ?
+              OR a.area_number LIKE ?
             )
         ";
     } else {
@@ -353,7 +362,18 @@ if (isset($_GET['fetch'])) {
 
     if ($search !== '') {
         $like = "%$search%";
-        $stmt->bind_param("ssss", $like, $like, $like, $like);
+        $stmt->bind_param(
+            "sssssssss",
+            $like,
+            $like,
+            $like,
+            $like,
+            $like,
+            $like,
+            $like,
+            $like,
+            $like
+        );
     }
 
     $stmt->execute();

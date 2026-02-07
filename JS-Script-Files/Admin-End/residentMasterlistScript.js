@@ -147,6 +147,7 @@ function openViewEntry(data) {
   // Address Info
   document.getElementById("txt-modalHouseNum").innerText = data.house_number ?? "—";
   document.getElementById("txt-modalStreetName").innerText = data.street_name ?? "—";
+  document.getElementById("txt-modalPhaseNumber").innerText = data.phase_number ?? "—";
   document.getElementById("txt-modalSubdivision").innerText = data.subdivision ?? "—";
   document.getElementById("txt-modalAreaNumber").innerText = data.area_number ?? "—";
 

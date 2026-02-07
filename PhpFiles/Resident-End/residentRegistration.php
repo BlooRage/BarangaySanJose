@@ -47,6 +47,35 @@ function cleanString($v): string {
     return trim((string)$v);
 }
 
+function getDocumentTypeId(mysqli $conn, string $name): int {
+    $q = $conn->prepare("SELECT document_type_id FROM documenttypelookuptbl WHERE LOWER(document_type_name) = LOWER(?) AND document_category = 'ResidentProfiling' LIMIT 1");
+    if (!$q) throw new Exception("Prepare failed (getDocumentTypeId): " . $conn->error);
+    $q->bind_param("s", $name);
+    $q->execute();
+    $res = $q->get_result()->fetch_assoc();
+    $q->close();
+    if (!$res || !isset($res['document_type_id'])) {
+        throw new Exception("Document type not found: {$name}");
+    }
+    return (int)$res['document_type_id'];
+}
+
+function isHeicExt(string $ext): bool {
+    return in_array($ext, ['heic', 'heif'], true);
+}
+
+function convertHeicToJpg(string $tmpPath, string $targetPath): void {
+    if (!class_exists('Imagick')) {
+        throw new Exception("HEIC conversion requires Imagick.");
+    }
+    $img = new Imagick($tmpPath);
+    $img->setImageFormat('jpeg');
+    $img->setImageCompressionQuality(85);
+    $img->writeImage($targetPath);
+    $img->clear();
+    $img->destroy();
+}
+
 try {
     // -------- Collect Inputs --------
     $lastName   = cleanString($_POST['lastName'] ?? '');
@@ -97,8 +126,12 @@ try {
     $privacy = isset($_POST['privacyConsent']) ? 1 : 0;
 
     // Address
+    $addressSystem = cleanString($_POST['addressSystem'] ?? '');
     $houseNumber = cleanString($_POST['houseNumber'] ?? '');
     $streetName  = cleanString($_POST['streetName'] ?? '');
+    $phaseNumber = cleanString($_POST['phaseNumber'] ?? '');
+    $lotNumber   = cleanString($_POST['lotNumber'] ?? '');
+    $blockNumber = cleanString($_POST['blockNumber'] ?? '');
     $subd        = cleanString($_POST['subdivisionSitio'] ?? '');
     $area        = cleanString($_POST['areaNumber'] ?? '');
 
@@ -120,6 +153,59 @@ try {
         exit;
     }
 
+    if ($addressSystem === '') {
+        http_response_code(400);
+        echo json_encode([
+            "success" => false,
+            "message" => "Please select an address system."
+        ]);
+        exit;
+    }
+
+    if ($addressSystem === 'house') {
+        if ($houseNumber === '' || $streetName === '' || $area === '') {
+            http_response_code(400);
+            echo json_encode([
+                "success" => false,
+                "message" => "House number, street name, and area are required."
+            ]);
+            exit;
+        }
+    } elseif ($addressSystem === 'lot_block') {
+        if ($lotNumber === '' || $blockNumber === '' || $area === '') {
+            http_response_code(400);
+            echo json_encode([
+                "success" => false,
+                "message" => "Lot, block, and area are required."
+            ]);
+            exit;
+        }
+        $houseNumber = "Lot " . $lotNumber;
+        $streetName = "Block " . $blockNumber;
+    }
+
+    // ✅ Must be at least 18 years old
+    $dobDate = DateTime::createFromFormat('Y-m-d', $dob);
+    if (!$dobDate) {
+        http_response_code(400);
+        echo json_encode([
+            "success" => false,
+            "message" => "Invalid date of birth."
+        ]);
+        exit;
+    }
+
+    $today = new DateTime('today');
+    $age = $dobDate->diff($today)->y;
+    if ($age < 18) {
+        http_response_code(400);
+        echo json_encode([
+            "success" => false,
+            "message" => "You must be at least 18 years old to register."
+        ]);
+        exit;
+    }
+
     // ✅ If employed, require job title
     if ($occupation === 1 && $occupationDetail === '') {
         http_response_code(400);
@@ -135,8 +221,11 @@ try {
     // Default Resident status = NotVerified (Resident)
     $residentStatusId = getStatusId($conn, "NotVerified", "Resident");
 
-    // Address status (saved address, no proof) = PendingVerification (AddressResidency)
-    $addressStatusId  = getStatusId($conn, "PendingVerification", "AddressResidency");
+    // Address status: PendingVerification if proof is skipped, otherwise Residing
+    $skipProof = isset($_POST['skipProofIdentity']) && $_POST['skipProofIdentity'] === '1';
+    $addressStatusId = $skipProof
+        ? getStatusId($conn, "PendingVerification", "AddressResidency")
+        : getStatusId($conn, "Residing", "AddressResidency");
 
     // -------- Insert Resident Info --------
     $resident_id = GenerateResidentID($conn);
@@ -180,16 +269,17 @@ try {
     // -------- Insert Address --------
     $stmt2 = $conn->prepare("
         INSERT INTO residentaddresstbl
-        (resident_id, street_number, street_name, subdivision, area_number, house_type, house_ownership, residency_duration, status_id_residency)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        (resident_id, street_number, street_name, phase_number, subdivision, area_number, house_type, house_ownership, residency_duration, status_id_residency)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     ");
     if (!$stmt2) throw new Exception("Prepare failed (address insert): " . $conn->error);
 
     $stmt2->bind_param(
-        "ssssssssi",
+        "sssssssssi",
         $resident_id,
         $houseNumber,
         $streetName,
+        $phaseNumber,
         $subd,
         $area,
         $houseType,
@@ -204,10 +294,10 @@ try {
     // -------- Optional Upload Files --------
     $requireFiles = false;
 
-    $files = ['idFront', 'idBack', 'picture'];
+    $idFiles = ['idFront', 'idBack'];
     $allProvided = true;
 
-    foreach ($files as $fileKey) {
+    foreach ($idFiles as $fileKey) {
         if (!isset($_FILES[$fileKey]) || $_FILES[$fileKey]['error'] !== UPLOAD_ERR_OK) {
             $allProvided = false;
             break;
@@ -218,38 +308,201 @@ try {
         throw new Exception("Missing required files.");
     }
 
-    if ($allProvided) {
-        $uploadDir = "../Uploads/Residents/$resident_id/";
+    $hasIdProof = $allProvided;
+    $hasPicture = isset($_FILES['picture']) && $_FILES['picture']['error'] === UPLOAD_ERR_OK;
+    $hasDocumentProof = false;
+    if (isset($_FILES['documentProof']) && is_array($_FILES['documentProof']['name'])) {
+        foreach ($_FILES['documentProof']['name'] as $i => $name) {
+            if (isset($_FILES['documentProof']['error'][$i]) && $_FILES['documentProof']['error'][$i] === UPLOAD_ERR_OK) {
+                $hasDocumentProof = true;
+                break;
+            }
+        }
+    }
+
+    if ($hasIdProof) {
+        $uploadDir = __DIR__ . "/../../UnifiedFileAttachment/Documents/$resident_id/";
         if (!is_dir($uploadDir)) {
             if (!mkdir($uploadDir, 0755, true)) {
                 throw new Exception("Failed to create upload directory.");
             }
         }
 
-        foreach ($files as $fileKey) {
+        foreach ($idFiles as $fileKey) {
             $tmpName = $_FILES[$fileKey]['tmp_name'];
             $name = basename($_FILES[$fileKey]['name']);
             $ext = strtolower(pathinfo($name, PATHINFO_EXTENSION));
 
             $allowed = ['jpg','jpeg','png','webp','pdf'];
+            if (isHeicExt($ext)) {
+                throw new Exception("HEIC is not supported on the server. Please upload JPG or PNG.");
+            }
             if (!in_array($ext, $allowed, true)) {
                 throw new Exception("Invalid file type for {$fileKey}.");
             }
 
-            $newFileName = $fileKey . "." . $ext;
+            $newExt = $ext;
+            $newFileName = $fileKey . "." . $newExt;
             $target = $uploadDir . $newFileName;
 
             if (!move_uploaded_file($tmpName, $target)) {
                 throw new Exception("Failed to upload file: {$fileKey}");
             }
+
+            $docTypeId = getDocumentTypeId($conn, cleanString($_POST['idType'] ?? ''));
+            $statusVerifyId = getStatusId($conn, "PendingReview", "ResidentDocumentProfiling");
+            $ins = $conn->prepare("
+                INSERT INTO unifiedfileattachmenttbl
+                (source_type, source_id, document_type_id, file_name, file_path, file_type, user_id_uploaded_by, status_id_verify, remarks)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ");
+            if (!$ins) throw new Exception("Prepare failed (insert attachment): " . $conn->error);
+            $sourceType = "ResidentProfiling";
+            $remarks = $fileKey;
+            $fileName = $newFileName;
+            $filePath = $target;
+            $fileType = $newExt;
+            $ins->bind_param(
+                "ssissssis",
+                $sourceType,
+                $resident_id,
+                $docTypeId,
+                $fileName,
+                $filePath,
+                $fileType,
+                $user_id,
+                $statusVerifyId,
+                $remarks
+            );
+            if (!$ins->execute()) throw new Exception("Attachment insert failed: " . $ins->error);
+            $ins->close();
         }
 
+    }
+
+    if ($hasPicture) {
+        $uploadDirPic = __DIR__ . "/../../UnifiedFileAttachment/IDPictures/$resident_id/";
+        if (!is_dir($uploadDirPic)) {
+            if (!mkdir($uploadDirPic, 0755, true)) {
+                throw new Exception("Failed to create ID picture upload directory.");
+            }
+        }
+
+        $tmpName = $_FILES['picture']['tmp_name'];
+        $name = basename($_FILES['picture']['name']);
+        $ext = strtolower(pathinfo($name, PATHINFO_EXTENSION));
+        $allowedPic = ['jpg','jpeg','png','webp'];
+        if (isHeicExt($ext)) {
+            throw new Exception("HEIC is not supported on the server. Please upload JPG or PNG.");
+        }
+        if (!in_array($ext, $allowedPic, true)) {
+            throw new Exception("Invalid file type for 2x2 picture.");
+        }
+
+        $newExt = $ext;
+        $target = $uploadDirPic . "2x2." . $newExt;
+
+        if (!move_uploaded_file($tmpName, $target)) {
+            throw new Exception("Failed to upload 2x2 picture.");
+        }
+
+        $docTypeId = getDocumentTypeId($conn, "2x2 Picture");
+        $statusVerifyId = getStatusId($conn, "PendingReview", "ResidentDocumentProfiling");
+        $ins = $conn->prepare("
+            INSERT INTO unifiedfileattachmenttbl
+            (source_type, source_id, document_type_id, file_name, file_path, file_type, user_id_uploaded_by, status_id_verify, remarks)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ");
+        if (!$ins) throw new Exception("Prepare failed (insert attachment): " . $conn->error);
+        $sourceType = "ResidentProfiling";
+        $remarks = "2x2";
+        $fileName = basename($target);
+        $filePath = $target;
+        $fileType = $newExt;
+        $ins->bind_param(
+            "ssissssis",
+            $sourceType,
+            $resident_id,
+            $docTypeId,
+            $fileName,
+            $filePath,
+            $fileType,
+            $user_id,
+            $statusVerifyId,
+            $remarks
+        );
+        if (!$ins->execute()) throw new Exception("Attachment insert failed: " . $ins->error);
+        $ins->close();
+    }
+
+    if ($hasDocumentProof) {
+        $uploadDirDocs = __DIR__ . "/../../UnifiedFileAttachment/Documents/$resident_id/";
+        if (!is_dir($uploadDirDocs)) {
+            if (!mkdir($uploadDirDocs, 0755, true)) {
+                throw new Exception("Failed to create document upload directory.");
+            }
+        }
+
+        $docAllowed = ['jpg','jpeg','png','webp','pdf'];
+        foreach ($_FILES['documentProof']['name'] as $i => $docName) {
+            if ($_FILES['documentProof']['error'][$i] !== UPLOAD_ERR_OK) {
+                continue;
+            }
+            $tmpName = $_FILES['documentProof']['tmp_name'][$i];
+            $ext = strtolower(pathinfo($docName, PATHINFO_EXTENSION));
+            if (isHeicExt($ext)) {
+                throw new Exception("HEIC is not supported on the server. Please upload JPG or PNG.");
+            }
+            if (!in_array($ext, $docAllowed, true)) {
+                throw new Exception("Invalid file type for document attachment.");
+            }
+
+            $safeBase = pathinfo($docName, PATHINFO_FILENAME);
+            $safeBase = preg_replace('/[^a-zA-Z0-9_\-]/', '_', $safeBase);
+            $newExt = $ext;
+            $target = $uploadDirDocs . $safeBase . "_" . time() . "_" . $i . "." . $newExt;
+
+            if (!move_uploaded_file($tmpName, $target)) {
+                throw new Exception("Failed to upload document attachment.");
+            }
+
+            $docTypeId = getDocumentTypeId($conn, cleanString($_POST['documentType'] ?? ''));
+            $statusVerifyId = getStatusId($conn, "PendingReview", "ResidentDocumentProfiling");
+            $ins = $conn->prepare("
+                INSERT INTO unifiedfileattachmenttbl
+                (source_type, source_id, document_type_id, file_name, file_path, file_type, user_id_uploaded_by, status_id_verify, remarks)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ");
+            if (!$ins) throw new Exception("Prepare failed (insert attachment): " . $conn->error);
+            $sourceType = "ResidentProfiling";
+            $remarks = "document";
+            $fileName = basename($target);
+            $filePath = $target;
+            $fileType = $newExt;
+            $ins->bind_param(
+                "ssissssis",
+                $sourceType,
+                $resident_id,
+                $docTypeId,
+                $fileName,
+                $filePath,
+                $fileType,
+                $user_id,
+                $statusVerifyId,
+                $remarks
+            );
+            if (!$ins->execute()) throw new Exception("Attachment insert failed: " . $ins->error);
+            $ins->close();
+        }
+    }
+
+    if ($hasIdProof || $hasDocumentProof || $hasPicture) {
         $pendingResidentStatusId = getStatusId($conn, "PendingVerification", "Resident");
 
-    $updateStatus = $conn->prepare("UPDATE residentinformationtbl SET status_id_resident=? WHERE resident_id=?");
-    if (!$updateStatus) throw new Exception("Prepare failed (update resident status): " . $conn->error);
+        $updateStatus = $conn->prepare("UPDATE residentinformationtbl SET status_id_resident=? WHERE resident_id=?");
+        if (!$updateStatus) throw new Exception("Prepare failed (update resident status): " . $conn->error);
 
-    $updateStatus->bind_param("is", $pendingResidentStatusId, $resident_id);
+        $updateStatus->bind_param("is", $pendingResidentStatusId, $resident_id);
         if (!$updateStatus->execute()) throw new Exception("Update status failed: " . $updateStatus->error);
         $updateStatus->close();
     }
