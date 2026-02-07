@@ -98,7 +98,7 @@ if (!empty($residentinformationtbl['profile_pic'])) {
                 <div class="card-header d-flex justify-content-between">
                     <strong>ADDRESS INFORMATION</strong>
                     <button class="btn btn-success btn-sm" data-bs-toggle="modal" data-bs-target="#addAddressModal">
-                        Add Address
+                        Edit Address
                     </button>
                 </div>
                 <div class="card-body">

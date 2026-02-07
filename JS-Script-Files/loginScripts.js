@@ -535,8 +535,6 @@ const validateForm = (formType = "signup") => {
     const phone = (phoneInput?.value || "").trim();
     const password = passwordInput?.value || "";
     const confirmPassword = confirmPasswordInput?.value || "";
-
-    // ✅ FIXED REGEX (no double slashes)
     const email = (emailInput?.value || "").trim();
 
     if (!/^9\d{9}$/.test(phone)) {
@@ -548,11 +546,17 @@ const validateForm = (formType = "signup") => {
     } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
       firstError = "Please enter a valid email address.";
       errorField = emailInput;
+    } else if (password === "") {
+      firstError = "Password is required.";
+      errorField = passwordInput;
     } else if (!/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[\W_]).{8,}$/.test(password)) {
       firstError = "Password must be at least 8 characters with uppercase, lowercase, number, and special character.";
       errorField = passwordInput;
       clearBothPasswords = true;
-    } else if (password !== confirmPassword || !confirmPassword) {
+    } else if (!confirmPassword) {
+      firstError = "Confirm your password.";
+      errorField = confirmPasswordInput;
+    } else if (password !== confirmPassword) {
       firstError = "Passwords do not match.";
       errorField = confirmPasswordInput;
     }
