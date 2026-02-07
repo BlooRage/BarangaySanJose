@@ -169,6 +169,10 @@ document.addEventListener("DOMContentLoaded", () => {
   const addMemberForm = document.getElementById("form-addHouseholdMember");
   if (addMemberForm) {
     addMemberForm.addEventListener("submit", e => {
+      if (!confirm("Are you sure you want to add this household member?")) {
+        e.preventDefault();
+        return;
+      }
       e.preventDefault();
       const formData = new FormData(addMemberForm);
 
