@@ -3,7 +3,8 @@ $current = basename($_SERVER['PHP_SELF']);
 
 // Group pages by section
 $profilingPages = ['ResidentMasterlist.php', 'ResidentArchive.php'];
-$certPages = ['requests.php', 'approved.php', 'denied.php'];
+$certPages = ['CertificateTracker.php', 'approved.php', 'denied.php'];
+$toolsPages = ['AuditLogs.php'];
 
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
@@ -11,6 +12,7 @@ if (session_status() === PHP_SESSION_NONE) {
 
 $isProfilingActive = in_array($current, $profilingPages);
 $isCertActive = in_array($current, $certPages);
+$isToolsActive = in_array($current, $toolsPages);
 
 $adminDisplayName = "Admin User";
 $adminPosition = "Administrator";
@@ -55,14 +57,18 @@ if (!empty($_SESSION['user_id']) && isset($conn) && $conn instanceof mysqli) {
   <div class="sidebar-body d-flex flex-column flex-grow-1">
     <ul class="list-unstyled ps-0 flex-grow-1 mb-0">
 
+      <li class="mb-1 mt-2 text-muted small fw-semibold px-2">Home</li>
+
       <!-- DASHBOARD -->
-      <li class="mb-1">
+      <li class="mb-2">
         <a href="AdminDashboard.php"
            class="btn btn-toggle d-flex align-items-center gap-2 rounded <?= $current == 'AdminDashboard.php' ? 'active' : '' ?>"
            style="<?= $current == 'AdminDashboard.php' ? 'outline: none; box-shadow: none;' : '' ?>">
           <i class="fas fa-chart-area"></i> Dashboard
         </a>
       </li>
+
+      <li class="mb-1 mt-3 text-muted small fw-semibold px-2">Management</li>
 
       <!-- RESIDENT PROFILING -->
       <li class="mb-1">
@@ -92,8 +98,17 @@ if (!empty($_SESSION['user_id']) && isset($conn) && $conn instanceof mysqli) {
         </div>
       </li>
 
+      <!-- HOUSEHOLD PROFILING -->
+      <li class="mb-1">
+        <a href="HouseholdProfiling.php"
+           class="btn btn-toggle d-flex align-items-center gap-2 rounded <?= $current == 'HouseholdProfiling.php' ? 'active' : '' ?>"
+           style="<?= $current == 'HouseholdProfiling.php' ? 'outline: none; box-shadow: none;' : '' ?>">
+          <i class="fa-solid fa-house"></i> Household Profiling
+        </a>
+      </li>
+
       <!-- CERTIFICATE ISSUANCE -->
-      <!-- <li class="mb-1">
+      <li class="mb-2">
         <button class="btn btn-toggle d-flex align-items-center gap-2 rounded <?= $isCertActive ? '' : 'collapsed' ?>"
                 data-bs-toggle="collapse"
                 data-bs-target="#cert-collapse"
@@ -103,19 +118,20 @@ if (!empty($_SESSION['user_id']) && isset($conn) && $conn instanceof mysqli) {
 
         <div class="collapse <?= $isCertActive ? 'show' : '' ?>" id="cert-collapse">
           <ul class="btn-toggle-nav list-unstyled fw-normal pb-1 small">
-            <li><a href="requests.php" class="link-dark rounded <?= $current == 'requests.php' ? 'active' : '' ?>">Requests</a></li>
+            <li><a href="CertificateTracker.php" class="link-dark rounded <?= $current == 'CertificateTracker.php' ? 'active' : '' ?>">Tracker</a></li>
             <li><a href="approved.php" class="link-dark rounded <?= $current == 'approved.php' ? 'active' : '' ?>">Approved Documents</a></li>
             <li><a href="denied.php" class="link-dark rounded <?= $current == 'denied.php' ? 'active' : '' ?>">Denied Documents</a></li>
           </ul>
         </div>
-      </li> -->
+      </li>
 
-      <!-- HOUSEHOLD PROFILING -->
+      <li class="mb-1 mt-3 text-muted small fw-semibold px-2">Tools</li>
+
       <li class="mb-1">
-        <a href="HouseholdProfiling.php"
-           class="btn btn-toggle d-flex align-items-center gap-2 rounded <?= $current == 'HouseholdProfiling.php' ? 'active' : '' ?>"
-           style="<?= $current == 'HouseholdProfiling.php' ? 'outline: none; box-shadow: none;' : '' ?>">
-          <i class="fa-solid fa-house"></i> Household Profiling
+        <a href="AuditLogs.php"
+           class="btn btn-toggle d-flex align-items-center gap-2 rounded <?= $isToolsActive ? 'active' : '' ?>"
+           style="<?= $isToolsActive ? 'outline: none; box-shadow: none;' : '' ?>">
+          <i class="fas fa-clipboard-list"></i> Audit Logs
         </a>
       </li>
 
