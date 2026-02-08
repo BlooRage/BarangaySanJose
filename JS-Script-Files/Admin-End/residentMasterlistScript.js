@@ -82,12 +82,14 @@ document.addEventListener("DOMContentLoaded", () => {
 
       const tr = document.createElement("tr");
       const canEditOrArchive = row.status !== "NotVerified" && row.status !== "PendingVerification";
+      const canViewDocs = row.status === "PendingVerification";
       tr.innerHTML = `
         <td class="fw-bold">${row.resident_id}</td>
         <td>${row.full_name}</td>
         <td><span class="badge bg-${badge}">${statusDisplayMap[row.status] ?? "UNSET"}</span></td>
         <td class="d-flex gap-1">
           <button type="button" class="btn btn-primary btn-sm text-white viewEntryBtn">View</button>
+          ${canViewDocs ? `<button type="button" class="btn btn-info btn-sm text-white viewDocsBtn">Documents</button>` : ""}
           ${canEditOrArchive ? `<button type="button" class="btn btn-secondary btn-sm text-white editEntryBtn">Edit</button>` : ""}
           ${canEditOrArchive ? `<button type="button" class="btn btn-warning btn-sm text-dark archiveEntryBtn">Archive</button>` : ""}
         </td>
@@ -95,6 +97,8 @@ document.addEventListener("DOMContentLoaded", () => {
       `;
 
       tr.querySelector(".viewEntryBtn").addEventListener("click", () => openViewEntry(row));
+      const docsBtn = tr.querySelector(".viewDocsBtn");
+      if (docsBtn) docsBtn.addEventListener("click", () => openDocsModal(row));
       const editBtn = tr.querySelector(".editEntryBtn");
       if (editBtn) editBtn.addEventListener("click", () => openEditEntry(row));
       const archiveBtn = tr.querySelector(".archiveEntryBtn");
@@ -126,10 +130,36 @@ document.addEventListener("DOMContentLoaded", () => {
 function openViewEntry(data) {
   document.getElementById("input-appId").value = data.resident_id;
   document.getElementById("span-displayID").innerText = "#" + data.resident_id;
+  const idPictureEl = document.getElementById("img-modalIdPicture");
+  if (idPictureEl) {
+    const placeholder = "../Images/Profile-Placeholder.png";
+    const candidate = (data.id_picture_url ?? "").trim();
+    idPictureEl.src = candidate !== "" ? candidate : placeholder;
+  }
 
   // Personal Info
   document.getElementById("txt-modalName").innerText = data.full_name ?? "—";
-  document.getElementById("txt-modalDob").innerText = data.birthdate ?? "—";
+  const dob = data.birthdate ?? "";
+  document.getElementById("txt-modalDob").innerText = dob || "—";
+  const ageEl = document.getElementById("txt-modalAge");
+  if (ageEl) {
+    if (!dob) {
+      ageEl.innerText = "—";
+    } else {
+      const dobDate = new Date(dob);
+      if (Number.isNaN(dobDate.getTime())) {
+        ageEl.innerText = "—";
+      } else {
+        const today = new Date();
+        let age = today.getFullYear() - dobDate.getFullYear();
+        const m = today.getMonth() - dobDate.getMonth();
+        if (m < 0 || (m === 0 && today.getDate() < dobDate.getDate())) {
+          age -= 1;
+        }
+        ageEl.innerText = String(age);
+      }
+    }
+  }
   document.getElementById("txt-modalSex").innerText = data.sex ?? "—";
   document.getElementById("txt-modalCivilStatus").innerText = data.civil_status ?? "—";
   document.getElementById("txt-modalHeadOfFam").innerText = data.head_of_family === 1 ? "Yes" : "No";
@@ -144,14 +174,27 @@ function openViewEntry(data) {
   document.getElementById("txt-modalEmergencyRelationship").innerText = data.emergency_relationship ?? "—";
   document.getElementById("txt-modalEmergencyAddress").innerText = data.emergency_address ?? "—";
 
-  // Address Info
-  document.getElementById("txt-modalUnitNumber").innerText = data.unit_number ?? "—";
-  updateAddressField("modalColumnUnitNumber","txt-modalUnitNumber", data.unit_number);
-  updateAddressField("modalColumnHouse","txt-modalHouseNum", data.house_number);
-  updateAddressField("modalColumnStreet","txt-modalStreetName", data.street_name);
-  updateAddressField("modalColumnPhase","txt-modalPhaseNumber", data.phase_number);
-  updateAddressField("modalColumnSubdivision","txt-modalSubdivision", data.subdivision);
-  updateAddressField("modalColumnArea","txt-modalAreaNumber", data.area_number);
+  // Address Info (hide empty fields including label)
+  const isEmpty = (value) => value === null || value === undefined || String(value).trim() === "";
+  const setAddressField = (containerId, valueId, value) => {
+    const container = document.getElementById(containerId);
+    const valueEl = document.getElementById(valueId);
+    if (!container || !valueEl) return;
+    if (isEmpty(value)) {
+      container.classList.add("d-none");
+      valueEl.innerText = "";
+      return;
+    }
+    container.classList.remove("d-none");
+    valueEl.innerText = value;
+  };
+
+  setAddressField("addr-unit-number", "txt-modalUnitNumber", data.unit_number);
+  setAddressField("addr-house-number", "txt-modalHouseNum", data.house_number);
+  setAddressField("addr-street-name", "txt-modalStreetName", data.street_name);
+  setAddressField("addr-phase-number", "txt-modalPhaseNumber", data.phase_number);
+  setAddressField("addr-subdivision", "txt-modalSubdivision", data.subdivision);
+  setAddressField("addr-area-number", "txt-modalAreaNumber", data.area_number);
 
   // Read-only
   document.getElementById("txt-modalBarangay").innerText = "Barangay San Jose";
@@ -182,6 +225,88 @@ function openViewEntry(data) {
     backdrop: 'static',
     keyboard: false
   }).show();
+}
+
+// ========================
+// VIEW SUBMITTED DOCUMENTS MODAL
+// ========================
+function openDocsModal(data) {
+  const modalEl = document.getElementById("modal-viewDocs");
+  const titleEl = document.getElementById("docs-modal-title");
+  const listEl = document.getElementById("docs-list");
+  const emptyEl = document.getElementById("docs-empty");
+  const loadingEl = document.getElementById("docs-loading");
+
+  if (!modalEl || !listEl || !emptyEl || !loadingEl) return;
+
+  if (modalEl.parentElement !== document.body) {
+    document.body.appendChild(modalEl);
+  }
+
+  titleEl.innerText = `Submitted Documents: #${data.resident_id}`;
+  listEl.innerHTML = "";
+  emptyEl.classList.add("d-none");
+  loadingEl.classList.remove("d-none");
+
+  const url = `../PhpFiles/Admin-End/residentMasterlist.php?fetch_documents=1&resident_id=${encodeURIComponent(data.resident_id)}`;
+  fetch(url)
+    .then(res => res.json())
+    .then(items => {
+      loadingEl.classList.add("d-none");
+      const docs = Array.isArray(items) ? items : [];
+      if (!docs.length) {
+        emptyEl.classList.remove("d-none");
+        return;
+      }
+
+      docs.forEach(doc => {
+        const row = document.createElement("div");
+        row.className = "d-flex flex-wrap align-items-center justify-content-between gap-2 border rounded-3 p-2";
+
+        const left = document.createElement("div");
+        left.className = "me-auto";
+        const name = document.createElement("div");
+        name.className = "fw-bold";
+        name.innerText = doc.document_type_name || doc.file_name || "Document";
+        const meta = document.createElement("div");
+        meta.className = "text-muted small";
+        const uploaded = doc.upload_timestamp ? `Uploaded: ${doc.upload_timestamp}` : "Uploaded: —";
+        const status = doc.verify_status ? `Status: ${doc.verify_status}` : "Status: —";
+        meta.innerText = `${uploaded} • ${status}`;
+        left.appendChild(name);
+        left.appendChild(meta);
+
+        const action = document.createElement("div");
+        if (doc.file_url) {
+          const link = document.createElement("a");
+          link.href = doc.file_url;
+          link.target = "_blank";
+          link.rel = "noopener";
+          link.className = "btn btn-sm btn-outline-primary";
+          link.innerText = "View";
+          action.appendChild(link);
+        } else {
+          const span = document.createElement("span");
+          span.className = "text-muted small";
+          span.innerText = "No file";
+          action.appendChild(span);
+        }
+
+        row.appendChild(left);
+        row.appendChild(action);
+        listEl.appendChild(row);
+      });
+    })
+    .catch(() => {
+      loadingEl.classList.add("d-none");
+      emptyEl.classList.remove("d-none");
+    });
+
+  const modalInstance = bootstrap.Modal.getOrCreateInstance(modalEl, {
+    backdrop: "static",
+    keyboard: false
+  });
+  modalInstance.show();
 }
 
 // ========================
@@ -241,20 +366,8 @@ function openEditEntry(data) {
       if (!form || !hasFormChanges(form) || confirm("You have unsaved changes. Are you sure you want to close?")) {
         editModal.hide();
       }
-  });
-}
-
-function updateAddressField(containerId, elementId, value) {
-  const container = document.getElementById(containerId);
-  const element = document.getElementById(elementId);
-  const displayValue = value ?? "";
-  if (element) {
-    element.innerText = displayValue !== "" ? displayValue : "—";
+    });
   }
-  if (container) {
-    container.style.display = displayValue !== "" ? "" : "none";
-  }
-}
 
   // ========================
   // CONFIRM SAVE CHANGES

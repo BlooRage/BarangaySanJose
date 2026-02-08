@@ -569,7 +569,19 @@ function isActuallyVisible(el) {
       const submitButton = document.getElementById("submitBtn") || form.querySelector('button[type="submit"]');
       if (submitButton) submitButton.disabled = true;
 
+      let temporarilyEnabled = [];
       try {
+        form.querySelectorAll("input, select, textarea").forEach((el) => {
+          if (!el.disabled) return;
+          const hasValue = el.type === "file"
+            ? (el.files && el.files.length > 0)
+            : (String(el.value ?? "").trim() !== "");
+          if (hasValue) {
+            el.disabled = false;
+            temporarilyEnabled.push(el);
+          }
+        });
+
         const res = await fetch(form.action, {
           method: "POST",
           body: new FormData(form),
@@ -611,6 +623,8 @@ function isActuallyVisible(el) {
         });
 
         if (submitButton) submitButton.disabled = false;
+      } finally {
+        temporarilyEnabled.forEach((el) => { el.disabled = true; });
       }
     });
   }

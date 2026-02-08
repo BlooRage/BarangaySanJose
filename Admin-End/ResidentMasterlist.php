@@ -79,9 +79,11 @@ if (isset($conn) && $conn instanceof mysqli) {
                     <button class="btn btn-outline-custom btn-sm status-filter-btn fw-bold" data-filter="PendingVerification">
                         Pending Verification
                     </button>
-                    <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger">
-                        <?= $pendingCount ?>
-                    </span>
+                    <?php if ($pendingCount > 0): ?>
+                        <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger">
+                            <?= $pendingCount ?>
+                        </span>
+                    <?php endif; ?>
                 </div>
             </div>
 
@@ -229,7 +231,7 @@ if (isset($conn) && $conn instanceof mysqli) {
 
 <!-- MODAL stays unchanged -->
 <div class="modal fade" id="modal-viewEntry" tabindex="-1" data-bs-backdrop="static" data-bs-keyboard="false">
-    <div class="modal-dialog modal-dialog-centered" id="div-modalSizing">
+    <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable" id="div-modalSizing" style="max-width: 1500px; width: 75vw;">
         <form id="form-updateStatus" method="POST" action="../PhpFiles/Admin-End/residentMasterlist.php" class="modal-content border-0 rounded-2 p-4">
             <div class="modal-header border-0">
                 <h3 class="fw-bold">Resident Details: <span id="span-displayID" class="text-warning"></span></h3>
@@ -241,151 +243,163 @@ if (isset($conn) && $conn instanceof mysqli) {
 
                 <div id="div-infoGroup" class="div-infoContainer">
 
-                    <h5 class="fw-bold mb-3" style="color: #000;">Personal Information</h5>
-
-                    <div class="row g-1 mt-2">
-                        <div class="col-md-3">
-                            <p class="text-muted small mb-0">Full Name:</p>
-                            <p id="txt-modalName" class="fw-bold"></p>
+                    <div class="p-3 rounded-3 mb-3 border-0 bg-white">
+                        <div class="d-flex align-items-center justify-content-between mb-2">
+                            <h5 class="fw-bold mb-0" style="color: #000;">Personal Information</h5>
                         </div>
 
-                        <div class="col-md-3">
-                            <p class="text-muted small mb-0">Date of Birth:</p>
-                            <p id="txt-modalDob" class="fw-bold"></p>
-                        </div>
+                        <div class="row g-3 align-items-center">
+                            <div class="col-md-3 d-flex justify-content-center align-items-center">
+                                <img id="img-modalIdPicture"
+                                     src="../Images/Profile-Placeholder.png"
+                                     alt="Resident 2x2 image"
+                                     class="img-fluid rounded"
+                                     style="width: clamp(120px, 18vw, 170px); height: clamp(120px, 18vw, 170px); object-fit: cover;">
+                            </div>
 
-                        <div class="col-md-3">
-                            <p class="text-muted small mb-0">Sex:</p>
-                            <p id="txt-modalSex" class="fw-bold"></p>
-                        </div>
-
-                        <div class="col-md-3">
-                            <p class="text-muted small mb-0">Civil Status:</p>
-                            <p id="txt-modalCivilStatus" class="fw-bold"></p>
-                        </div>
-                    </div>
-
-                    <div class="row g-1 mt-2">
-                        <div class="col-md-3">
-                            <p class="text-muted small mb-0">Head of Family:</p>
-                            <p id="txt-modalHeadOfFam" class="fw-bold"></p>
-                        </div>
-
-                        <div class="col-md-3">
-                            <p class="text-muted small mb-0">Voter Status:</p>
-                            <p id="txt-modalVoterStatus" class="fw-bold"></p>
-                        </div>
-
-                        <div class="col-md-3">
-                            <p class="text-muted small mb-0">Occupation:</p>
-                            <p id="txt-modalOccupation" class="fw-bold"></p>
-                        </div>
-
-                        <div class="col-md-3">
-                            <p class="text-muted small mb-0">Religion:</p>
-                            <p id="txt-modalReligion" class="fw-bold"></p>
-                        </div>
-
-                        <div class="col-md-3">
-                            <p class="text-muted small mb-0">Sector Membership:</p>
-                            <p id="txt-modalSectorMembership" class="fw-bold"></p>
-                        </div>
-                    </div>
-
-                    <hr>
-
-                    <h5 class="fw-bold mb-3" style="color: #000;">Emergency Contact Information</h5>
-
-                    <div class="row g-3">
-                        <div class="col-md-4">
-                            <p class="text-muted small mb-0">Full Name:</p>
-                            <p id="txt-modalEmergencyFullName" class="fw-bold"></p>
-                        </div>
-
-                        <div class="col-md-4">
-                            <p class="text-muted small mb-0">Contact Number:</p>
-                            <p id="txt-modalEmergencyContactNumber" class="fw-bold"></p>
-                        </div>
-
-                        <div class="col-md-4">
-                            <p class="text-muted small mb-0">Relationship:</p>
-                            <p id="txt-modalEmergencyRelationship" class="fw-bold"></p>
+                            <div class="col-md-9">
+                                <div class="row g-3">
+                                    <div class="col-md-12 col-lg-4">
+                                        <p class="text-muted small mb-0">Full Name</p>
+                                        <p id="txt-modalName" class="fw-bold mb-0"></p>
+                                    </div>
+                                    <div class="col-md-6 col-lg-4">
+                                        <p class="text-muted small mb-0">Sex</p>
+                                        <p id="txt-modalSex" class="fw-bold mb-0"></p>
+                                    </div>
+                                    <div class="col-md-6 col-lg-4">
+                                        <p class="text-muted small mb-0">Religion</p>
+                                        <p id="txt-modalReligion" class="fw-bold mb-0"></p>
+                                    </div>
+                                    <div class="col-md-6 col-lg-4">
+                                        <p class="text-muted small mb-0">Age</p>
+                                        <p id="txt-modalAge" class="fw-bold mb-0"></p>
+                                    </div>
+                                    <div class="col-md-6 col-lg-4">
+                                        <p class="text-muted small mb-0">Civil Status</p>
+                                        <p id="txt-modalCivilStatus" class="fw-bold mb-0"></p>
+                                    </div>
+                                    <div class="col-md-6 col-lg-4">
+                                        <p class="text-muted small mb-0">Occupation</p>
+                                        <p id="txt-modalOccupation" class="fw-bold mb-0"></p>
+                                    </div>
+                                    <div class="col-md-6 col-lg-4">
+                                        <p class="text-muted small mb-0">Date of Birth</p>
+                                        <p id="txt-modalDob" class="fw-bold mb-0"></p>
+                                    </div>
+                                    <div class="col-md-6 col-lg-4">
+                                        <p class="text-muted small mb-0">Head of Family</p>
+                                        <p id="txt-modalHeadOfFam" class="fw-bold mb-0"></p>
+                                    </div>
+                                    <div class="col-md-6 col-lg-4">
+                                        <p class="text-muted small mb-0">Voter Status</p>
+                                        <p id="txt-modalVoterStatus" class="fw-bold mb-0"></p>
+                                    </div>
+                                    <div class="col-12">
+                                        <p class="text-muted small mb-0">Sector Membership</p>
+                                        <p id="txt-modalSectorMembership" class="fw-bold mb-0"></p>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                     </div>
 
-                    <div class="row g-3">
-                        <div class="col-md-12">
-                            <p class="text-muted small mb-0">Address:</p>
-                            <p id="txt-modalEmergencyAddress" class="fw-bold"></p>
+                    <hr class="my-2">
+
+                    <div class="p-3 rounded-3 mb-3 border-0 bg-white">
+                        <div class="d-flex align-items-center justify-content-between mb-2">
+                            <h5 class="fw-bold mb-0" style="color: #000;">Emergency Contact</h5>
+                        </div>
+
+                        <div class="row g-3">
+                            <div class="col-md-4">
+                                <p class="text-muted small mb-0">Full Name</p>
+                                <p id="txt-modalEmergencyFullName" class="fw-bold mb-0"></p>
+                            </div>
+                            <div class="col-md-4">
+                                <p class="text-muted small mb-0">Contact Number</p>
+                                <p id="txt-modalEmergencyContactNumber" class="fw-bold mb-0"></p>
+                            </div>
+                            <div class="col-md-4">
+                                <p class="text-muted small mb-0">Relationship</p>
+                                <p id="txt-modalEmergencyRelationship" class="fw-bold mb-0"></p>
+                            </div>
+                            <div class="col-md-12">
+                                <p class="text-muted small mb-0">Address</p>
+                                <p id="txt-modalEmergencyAddress" class="fw-bold mb-0"></p>
+                            </div>
                         </div>
                     </div>
 
-                    <hr>
+                    <hr class="my-2">
 
-                    <h5 class="fw-bold mb-3" style="color: #000;">Address Information</h5>
-
-                    <div class="row g-3">
-                        <div class="col-md-3">
-                            <p class="text-muted small mb-0">House Number:</p>
-                            <p id="txt-modalHouseNum" class="fw-bold"></p>
+                    <div class="p-3 rounded-3 mb-3 border-0 bg-white">
+                        <div class="d-flex align-items-center justify-content-between mb-2">
+                            <h5 class="fw-bold mb-0" style="color: #000;">Address Information</h5>
                         </div>
 
-                        <div class="col-md-3">
-                            <p class="text-muted small mb-0">Street Name:</p>
-                            <p id="txt-modalStreetName" class="fw-bold"></p>
-                        </div>
-
-                        <div class="col-md-3">
-                            <p class="text-muted small mb-0">Phase:</p>
-                            <p id="txt-modalPhaseNumber" class="fw-bold"></p>
-                        </div>
-
-                        <div class="col-md-3">
-                            <p class="text-muted small mb-0">Subdivision:</p>
-                            <p id="txt-modalSubdivision" class="fw-bold"></p>
-                        </div>
-
-                        <div class="col-md-3">
-                            <p class="text-muted small mb-0">Area Number:</p>
-                            <p id="txt-modalAreaNumber" class="fw-bold"></p>
+                        <div class="row g-3">
+                            <div class="col-md-3" id="addr-unit-number">
+                                <p class="text-muted small mb-0">Unit Number</p>
+                                <p id="txt-modalUnitNumber" class="fw-bold mb-0"></p>
+                            </div>
+                            <div class="col-md-3" id="addr-house-number">
+                                <p class="text-muted small mb-0">House Number</p>
+                                <p id="txt-modalHouseNum" class="fw-bold mb-0"></p>
+                            </div>
+                            <div class="col-md-3" id="addr-street-name">
+                                <p class="text-muted small mb-0">Street Name</p>
+                                <p id="txt-modalStreetName" class="fw-bold mb-0"></p>
+                            </div>
+                            <div class="col-md-3" id="addr-phase-number">
+                                <p class="text-muted small mb-0">Phase</p>
+                                <p id="txt-modalPhaseNumber" class="fw-bold mb-0"></p>
+                            </div>
+                            <div class="col-md-3" id="addr-subdivision">
+                                <p class="text-muted small mb-0">Subdivision</p>
+                                <p id="txt-modalSubdivision" class="fw-bold mb-0"></p>
+                            </div>
+                            <div class="col-md-3" id="addr-area-number">
+                                <p class="text-muted small mb-0">Area Number</p>
+                                <p id="txt-modalAreaNumber" class="fw-bold mb-0"></p>
+                            </div>
+                            <div class="col-md-4">
+                                <p class="text-muted small mb-0">Barangay</p>
+                                <p id="txt-modalBarangay" class="fw-bold mb-0"></p>
+                            </div>
+                            <div class="col-md-4">
+                                <p class="text-muted small mb-0">Municipality / City</p>
+                                <p id="txt-modalMunicipalityCity" class="fw-bold mb-0"></p>
+                            </div>
+                            <div class="col-md-4">
+                                <p class="text-muted small mb-0">Province</p>
+                                <p id="txt-modalProvince" class="fw-bold mb-0"></p>
+                            </div>
                         </div>
                     </div>
 
-                    <div class="row g-3">
-                        <div class="col-md-4">
-                            <p class="text-muted small mb-0">Barangay:</p>
-                            <p id="txt-modalBarangay" class="fw-bold"></p>
+                    <hr class="my-2">
+
+                    <div class="p-3 rounded-3 border-0 bg-white">
+                        <div class="d-flex align-items-center justify-content-between mb-2">
+                            <h5 class="fw-bold mb-0" style="color: #000;">House Information</h5>
                         </div>
 
-                        <div class="col-md-4">
-                            <p class="text-muted small mb-0">Municipality / City:</p>
-                            <p id="txt-modalMunicipalityCity" class="fw-bold"></p>
-                        </div>
+                        <div class="row g-3">
+                            <div class="col-md-4">
+                                <p class="text-muted small mb-0">House Ownership</p>
+                                <p id="txt-modalHouseOwnership" class="fw-bold mb-0"></p>
+                            </div>
 
-                        <div class="col-md-4">
-                            <p class="text-muted small mb-0">Province:</p>
-                            <p id="txt-modalProvince" class="fw-bold"></p>
-                        </div>
-                    </div>
+                            <div class="col-md-4">
+                                <p class="text-muted small mb-0">House Type</p>
+                                <p id="txt-modalHouseType" class="fw-bold mb-0"></p>
+                            </div>
 
-                    <hr>
-
-                    <h5 class="fw-bold mb-3" style="color: #000;">House Information</h5>
-
-                    <div class="row g-3">
-                        <div class="col-md-4">
-                            <p class="text-muted small mb-0">House Ownership:</p>
-                            <p id="txt-modalHouseOwnership" class="fw-bold"></p>
-                        </div>
-
-                        <div class="col-md-4">
-                            <p class="text-muted small mb-0">House Type:</p>
-                            <p id="txt-modalHouseType" class="fw-bold"></p>
-                        </div>
-
-                        <div class="col-md-4">
-                            <p class="text-muted small mb-0">Residency Duration:</p>
-                            <p id="txt-modalResidencyDuration" class="fw-bold"></p>
+                            <div class="col-md-4">
+                                <p class="text-muted small mb-0">Residency Duration</p>
+                                <p id="txt-modalResidencyDuration" class="fw-bold mb-0"></p>
+                            </div>
                         </div>
                     </div>
 
@@ -578,6 +592,26 @@ if (isset($conn) && $conn instanceof mysqli) {
       </div>
 
     </form>
+  </div>
+</div>
+
+<!-- VIEW SUBMITTED DOCUMENTS MODAL -->
+<div class="modal fade" id="modal-viewDocs" tabindex="-1" data-bs-backdrop="static" data-bs-keyboard="false">
+  <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
+    <div class="modal-content p-4">
+      <div class="modal-header border-0">
+        <h4 class="fw-bold mb-0" id="docs-modal-title">Submitted Documents</h4>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <div id="docs-loading" class="text-muted small mb-2">Loading documents...</div>
+        <div id="docs-empty" class="text-muted small d-none">No submitted documents found.</div>
+        <div id="docs-list" class="d-flex flex-column gap-2"></div>
+      </div>
+      <div class="modal-footer border-0">
+        <button type="button" class="btn btn-secondary px-4" data-bs-dismiss="modal">Close</button>
+      </div>
+    </div>
   </div>
 </div>
 

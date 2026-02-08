@@ -51,7 +51,7 @@ if (isset($_SESSION['user_id'])) {
             <li class="nav-item mx-lg-3"><a class="nav-link" href="news.html">News</a></li>
             <li class="nav-item mx-lg-3"><a class="nav-link" href="faq.html">FAQ</a></li>
             <li class="nav-item mx-lg-3"><a class="nav-link" href="contact.html">Contact</a></li>
-        <li class="nav-item"><a class="nav-link active" aria-current="page" href="login.php">Log in</a></li>
+        <li class="nav-item"><a class="nav-link active" aria-current="page" href="login.php">Login</a></li>
           </ul>
         </div>
       </div>
@@ -287,7 +287,6 @@ if (isset($_SESSION['user_id'])) {
         });
     </script></body>
 </html>
-
 
 
 

@@ -10,6 +10,31 @@ function normalizeResidentId($value): ?string {
     return $id;
 }
 
+function toPublicPath($path): ?string {
+    $path = trim((string)$path);
+    if ($path === '') {
+        return null;
+    }
+
+    $webRoot = realpath(__DIR__ . "/../..");
+    if ($webRoot) {
+        $normalized = str_replace("\\", "/", $path);
+        $rootNorm = str_replace("\\", "/", $webRoot);
+        if (strpos($normalized, $rootNorm) === 0) {
+            $rel = substr($normalized, strlen($rootNorm));
+            if ($rel === '') {
+                return null;
+            }
+            if ($rel[0] !== '/') {
+                $rel = '/' . $rel;
+            }
+            return $rel;
+        }
+    }
+
+    return $path;
+}
+
 /* =====================================================
    1. HANDLE STATUS UPDATE (View Modal)
 ===================================================== */
@@ -300,6 +325,19 @@ if (isset($_GET['fetch'])) {
             r.sector_membership,
             s.status_name AS status,
 
+            (
+                SELECT uf.file_path
+                FROM unifiedfileattachmenttbl uf
+                INNER JOIN documenttypelookuptbl dt
+                    ON uf.document_type_id = dt.document_type_id
+                WHERE uf.source_type = 'ResidentProfiling'
+                  AND uf.source_id = r.resident_id
+                  AND dt.document_type_name = '2x2 Picture'
+                  AND dt.document_category = 'ResidentProfiling'
+                ORDER BY uf.upload_timestamp DESC, uf.attachment_id DESC
+                LIMIT 1
+            ) AS id_picture_path,
+
             a.unit_number,
             a.street_number AS house_number,
             a.street_name,
@@ -391,10 +429,64 @@ if (isset($_GET['fetch'])) {
             ($row['suffix'] ? ' ' . $row['suffix'] : '');
 
         $row['full_name'] = trim($fullName);
+        $row['id_picture_url'] = toPublicPath($row['id_picture_path'] ?? '');
         $data[] = $row;
     }
 
     echo json_encode($data);
+    exit;
+}
+
+/* =====================================================
+   5. FETCH SUBMITTED DOCUMENTS (AJAX)
+===================================================== */
+if (isset($_GET['fetch_documents'])) {
+
+    header('Content-Type: application/json; charset=utf-8');
+
+    $residentId = normalizeResidentId($_GET['resident_id'] ?? '');
+    if (!$residentId) {
+        http_response_code(400);
+        echo json_encode(['success' => false, 'message' => 'Invalid resident ID.']);
+        exit;
+    }
+
+    $stmt = $conn->prepare("
+        SELECT
+            uf.attachment_id,
+            uf.file_name,
+            uf.file_path,
+            uf.upload_timestamp,
+            uf.remarks,
+            dt.document_type_name,
+            s.status_name AS verify_status
+        FROM unifiedfileattachmenttbl uf
+        LEFT JOIN documenttypelookuptbl dt
+            ON uf.document_type_id = dt.document_type_id
+        LEFT JOIN statuslookuptbl s
+            ON uf.status_id_verify = s.status_id
+        WHERE uf.source_type = 'ResidentProfiling'
+          AND uf.source_id = ?
+        ORDER BY uf.upload_timestamp DESC, uf.attachment_id DESC
+    ");
+    if (!$stmt) {
+        http_response_code(500);
+        echo json_encode(['success' => false, 'message' => 'Query prepare failed.']);
+        exit;
+    }
+
+    $stmt->bind_param("s", $residentId);
+    $stmt->execute();
+    $result = $stmt->get_result();
+
+    $docs = [];
+    while ($row = $result->fetch_assoc()) {
+        $row['file_url'] = toPublicPath($row['file_path'] ?? '');
+        $docs[] = $row;
+    }
+    $stmt->close();
+
+    echo json_encode($docs);
     exit;
 }
 
