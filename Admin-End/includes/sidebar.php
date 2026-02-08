@@ -1,9 +1,13 @@
 <?php
 $current = basename($_SERVER['PHP_SELF']);
+$scriptDir = str_replace('\\', '/', dirname($_SERVER['PHP_SELF']));
+$isCertificatesPage = strpos($scriptDir, '/Admin-End/Certificates') !== false;
+$adminBase = $isCertificatesPage ? '../' : '';
+$projectBase = $isCertificatesPage ? '../../' : '../';
 
 // Group pages by section
 $profilingPages = ['ResidentMasterlist.php', 'ResidentArchive.php'];
-$certPages = ['requests.php', 'approved.php', 'denied.php'];
+$certPages = ['CertificateTracker.php', 'approved.php', 'denied.php'];
 
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
@@ -47,8 +51,8 @@ if (!empty($_SESSION['user_id']) && isset($conn) && $conn instanceof mysqli) {
      id="dashboard-sidebar">
 
   <!-- LOGO -->
-  <a href="AdminDashboard.php" class="d-flex align-items-center pb-3 mb-3 link-dark text-decoration-none border-bottom">
-    <img src="../Images/San_Jose_LOGO.jpg" class="me-2" style="width: 32px; height: 32px;">
+  <a href="<?= $adminBase ?>AdminDashboard.php" class="d-flex align-items-center pb-3 mb-3 link-dark text-decoration-none border-bottom">
+    <img src="<?= $projectBase ?>Images/San_Jose_LOGO.jpg" class="me-2" style="width: 32px; height: 32px;">
     <span class="fs-5 fw-semibold">Barangay San Jose</span>
   </a>
 
@@ -57,7 +61,7 @@ if (!empty($_SESSION['user_id']) && isset($conn) && $conn instanceof mysqli) {
 
       <!-- DASHBOARD -->
       <li class="mb-1">
-        <a href="AdminDashboard.php"
+        <a href="<?= $adminBase ?>AdminDashboard.php"
            class="btn btn-toggle d-flex align-items-center gap-2 rounded <?= $current == 'AdminDashboard.php' ? 'active' : '' ?>"
            style="<?= $current == 'AdminDashboard.php' ? 'outline: none; box-shadow: none;' : '' ?>">
           <i class="fas fa-chart-area"></i> Dashboard
@@ -77,13 +81,13 @@ if (!empty($_SESSION['user_id']) && isset($conn) && $conn instanceof mysqli) {
         <div class="collapse <?= $isProfilingActive ? 'show' : '' ?>" id="profiling-collapse">
           <ul class="btn-toggle-nav list-unstyled fw-normal pb-1 small">
             <li>
-              <a href="ResidentMasterlist.php"
+              <a href="<?= $adminBase ?>ResidentMasterlist.php"
                  class="link-dark rounded <?= $current == 'ResidentMasterlist.php' ? 'active' : '' ?>">
                 Masterlist
               </a>
             </li>
             <li>
-              <a href="ResidentArchive.php"
+              <a href="<?= $adminBase ?>ResidentArchive.php"
                  class="link-dark rounded <?= $current == 'ResidentArchive.php' ? 'active' : '' ?>">
                 Resident Archive
               </a>
@@ -92,8 +96,17 @@ if (!empty($_SESSION['user_id']) && isset($conn) && $conn instanceof mysqli) {
         </div>
       </li>
 
+      <!-- HOUSEHOLD PROFILING -->
+      <li class="mb-1">
+        <a href="<?= $adminBase ?>HouseholdProfiling.php"
+           class="btn btn-toggle d-flex align-items-center gap-2 rounded <?= $current == 'HouseholdProfiling.php' ? 'active' : '' ?>"
+           style="<?= $current == 'HouseholdProfiling.php' ? 'outline: none; box-shadow: none;' : '' ?>">
+          <i class="fa-solid fa-house"></i> Household Profiling
+        </a>
+      </li>
+
       <!-- CERTIFICATE ISSUANCE -->
-      <!-- <li class="mb-1">
+      <li class="mb-1">
         <button class="btn btn-toggle d-flex align-items-center gap-2 rounded <?= $isCertActive ? '' : 'collapsed' ?>"
                 data-bs-toggle="collapse"
                 data-bs-target="#cert-collapse"
@@ -103,20 +116,11 @@ if (!empty($_SESSION['user_id']) && isset($conn) && $conn instanceof mysqli) {
 
         <div class="collapse <?= $isCertActive ? 'show' : '' ?>" id="cert-collapse">
           <ul class="btn-toggle-nav list-unstyled fw-normal pb-1 small">
-            <li><a href="requests.php" class="link-dark rounded <?= $current == 'requests.php' ? 'active' : '' ?>">Requests</a></li>
-            <li><a href="approved.php" class="link-dark rounded <?= $current == 'approved.php' ? 'active' : '' ?>">Approved Documents</a></li>
-            <li><a href="denied.php" class="link-dark rounded <?= $current == 'denied.php' ? 'active' : '' ?>">Denied Documents</a></li>
+            <li><a href="<?= $adminBase ?>Certificates/CertificateTracker.php" class="link-dark rounded <?= $current == 'CertificateTracker.php' ? 'active' : '' ?>">Tracker</a></li>
+            <li><a href="<?= $adminBase ?>Certificates/approved.php" class="link-dark rounded <?= $current == 'approved.php' ? 'active' : '' ?>">Approved Documents</a></li>
+            <li><a href="<?= $adminBase ?>Certificates/denied.php" class="link-dark rounded <?= $current == 'denied.php' ? 'active' : '' ?>">Denied Documents</a></li>
           </ul>
         </div>
-      </li> -->
-
-      <!-- HOUSEHOLD PROFILING -->
-      <li class="mb-1">
-        <a href="HouseholdProfiling.php"
-           class="btn btn-toggle d-flex align-items-center gap-2 rounded <?= $current == 'HouseholdProfiling.php' ? 'active' : '' ?>"
-           style="<?= $current == 'HouseholdProfiling.php' ? 'outline: none; box-shadow: none;' : '' ?>">
-          <i class="fa-solid fa-house"></i> Household Profiling
-        </a>
       </li>
 
     </ul>
@@ -127,15 +131,15 @@ if (!empty($_SESSION['user_id']) && isset($conn) && $conn instanceof mysqli) {
       <div class="dropdown mb-2 w-100">
         <a href="#" class="d-flex align-items-center link-dark text-decoration-none dropdown-toggle w-100"
            data-bs-toggle="dropdown">
-          <img src="../Images/Profile-Placeholder.png" width="40" height="40" class="rounded-circle me-2">
+          <img src="<?= $projectBase ?>Images/Profile-Placeholder.png" width="40" height="40" class="rounded-circle me-2">
           <div class="flex-grow-1" style="min-width: 0;">
             <span class="d-block fw-bold text-truncate mb-0"><?= htmlspecialchars($adminDisplayName) ?></span>
             <small class="d-block text-muted text-truncate"><?= htmlspecialchars($adminPosition) ?></small>
           </div>
         </a>
         <ul class="dropdown-menu text-small shadow">
-          <li><a class="dropdown-item" href="admin_profile.php">Profile</a></li>
-          <li><a class="dropdown-item" href="../PhpFiles/Login/logout.php">Sign out</a></li>
+          <li><a class="dropdown-item" href="<?= $adminBase ?>admin_profile.php">Profile</a></li>
+          <li><a class="dropdown-item" href="<?= $projectBase ?>PhpFiles/Login/logout.php">Sign out</a></li>
         </ul>
       </div>
     </div>
