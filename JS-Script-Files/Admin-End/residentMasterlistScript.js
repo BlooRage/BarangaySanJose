@@ -42,27 +42,32 @@ document.addEventListener("DOMContentLoaded", () => {
   // FILTER MODAL
   // ========================
   const btnApplyFilter = document.getElementById("btnApplyFilter");
-  btnApplyFilter.addEventListener("click", () => {
-    const checkedBoxes = document.querySelectorAll(".filter-checkbox:checked");
-    const filters = {};
-    checkedBoxes.forEach(cb => {
-      const field = cb.dataset.field;
-      if (!filters[field]) filters[field] = [];
-      filters[field].push(cb.value);
-    });
+  if (btnApplyFilter) {
+    btnApplyFilter.addEventListener("click", () => {
+      const checkedBoxes = document.querySelectorAll(".filter-checkbox:checked");
+      const filters = {};
+      checkedBoxes.forEach(cb => {
+        const field = cb.dataset.field;
+        if (!filters[field]) filters[field] = [];
+        filters[field].push(cb.value);
+      });
 
-    const filtered = allResidents.filter(res => {
-      for (const field in filters) {
-        if (!filters[field].includes(String(res[field]))) return false;
+      const filtered = allResidents.filter(res => {
+        for (const field in filters) {
+          if (!filters[field].includes(String(res[field]))) return false;
+        }
+        return true;
+      });
+
+      renderTable(filtered);
+
+      const filterModalEl = document.getElementById("modalFilter");
+      if (filterModalEl && window.bootstrap?.Modal) {
+        const filterModal = bootstrap.Modal.getInstance(filterModalEl);
+        filterModal?.hide();
       }
-      return true;
     });
-
-    renderTable(filtered);
-
-    const filterModal = bootstrap.Modal.getInstance(document.getElementById("modalFilter"));
-    filterModal.hide();
-  });
+  }
 
   // ========================
   // TABLE RENDER
@@ -320,13 +325,15 @@ function openDocsModal(data, opts = {}) {
   const emptyEl = document.getElementById("docs-empty");
   const loadingEl = document.getElementById("docs-loading");
 
-  if (!modalEl || !listPending || !listVerified || !listDenied || !sectionPending || !sectionVerified || !sectionDenied || !emptyEl || !loadingEl) return;
+  if (!modalEl) return;
 
   if (modalEl.parentElement !== document.body) {
     document.body.appendChild(modalEl);
   }
 
-  titleEl.innerText = `Submitted Documents: #${data.resident_id}`;
+  if (titleEl) {
+    titleEl.innerText = `Submitted Documents: #${data.resident_id}`;
+  }
   const addressParts = [
     data.unit_number ? `Unit ${data.unit_number}` : "",
     data.house_number || "",
@@ -345,23 +352,23 @@ function openDocsModal(data, opts = {}) {
     full_address: addressParts.join(", ") || "—"
   };
   window.lastDocsResident = { ...data };
-  listPending.innerHTML = "";
-  listVerified.innerHTML = "";
-  listDenied.innerHTML = "";
-  sectionPending.classList.add("d-none");
-  sectionVerified.classList.add("d-none");
-  sectionDenied.classList.add("d-none");
-  emptyEl.classList.add("d-none");
-  loadingEl.classList.remove("d-none");
+  if (listPending) listPending.innerHTML = "";
+  if (listVerified) listVerified.innerHTML = "";
+  if (listDenied) listDenied.innerHTML = "";
+  if (sectionPending) sectionPending.classList.add("d-none");
+  if (sectionVerified) sectionVerified.classList.add("d-none");
+  if (sectionDenied) sectionDenied.classList.add("d-none");
+  if (emptyEl) emptyEl.classList.add("d-none");
+  if (loadingEl) loadingEl.classList.remove("d-none");
 
   const url = `../PhpFiles/Admin-End/residentMasterlist.php?fetch_documents=1&resident_id=${encodeURIComponent(data.resident_id)}`;
   fetch(url)
     .then(res => res.json())
     .then(items => {
-      loadingEl.classList.add("d-none");
+      if (loadingEl) loadingEl.classList.add("d-none");
       const docs = Array.isArray(items) ? items : [];
       if (!docs.length) {
-        emptyEl.classList.remove("d-none");
+        if (emptyEl) emptyEl.classList.remove("d-none");
         return;
       }
 
@@ -425,33 +432,40 @@ function openDocsModal(data, opts = {}) {
         rowGrid.appendChild(action);
 
         row.appendChild(rowGrid);
-        container.appendChild(row);
+        if (container) container.appendChild(row);
       };
 
       if (pendingDocs.length) {
-        sectionPending.classList.remove("d-none");
+        if (sectionPending) sectionPending.classList.remove("d-none");
         pendingDocs.forEach(doc => renderDocRow(doc, listPending));
       }
       if (verifiedDocs.length) {
-        sectionVerified.classList.remove("d-none");
+        if (sectionVerified) sectionVerified.classList.remove("d-none");
         verifiedDocs.forEach(doc => renderDocRow(doc, listVerified));
       }
       if (deniedDocs.length) {
-        sectionDenied.classList.remove("d-none");
+        if (sectionDenied) sectionDenied.classList.remove("d-none");
         deniedDocs.forEach(doc => renderDocRow(doc, listDenied, { showReason: true }));
       }
     })
     .catch(() => {
-      loadingEl.classList.add("d-none");
-      emptyEl.classList.remove("d-none");
+      if (loadingEl) loadingEl.classList.add("d-none");
+      if (emptyEl) emptyEl.classList.remove("d-none");
     });
 
   if (!opts.refreshOnly) {
-    const modalInstance = bootstrap.Modal.getOrCreateInstance(modalEl, {
-      backdrop: "static",
-      keyboard: false
-    });
-    modalInstance.show();
+    if (window.bootstrap?.Modal) {
+      const modalInstance = bootstrap.Modal.getOrCreateInstance(modalEl, {
+        backdrop: "static",
+        keyboard: false
+      });
+      modalInstance.show();
+    } else {
+      modalEl.classList.add("show");
+      modalEl.style.display = "block";
+      modalEl.removeAttribute("aria-hidden");
+      modalEl.setAttribute("aria-modal", "true");
+    }
   }
 }
 
