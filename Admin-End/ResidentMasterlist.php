@@ -253,7 +253,7 @@ if (isset($conn) && $conn instanceof mysqli) {
                                 <img id="img-modalIdPicture"
                                      src="../Images/Profile-Placeholder.png"
                                      alt="Resident 2x2 image"
-                                     class="img-fluid rounded"
+                                     class="img-fluid rounded-circle"
                                      style="width: clamp(120px, 18vw, 170px); height: clamp(120px, 18vw, 170px); object-fit: cover;">
                             </div>
 

@@ -100,6 +100,7 @@ if ($residentId !== '' && isset($conn) && $conn instanceof mysqli) {
                     <div class="row g-2 align-items-center">
                         <div class="col-12 col-md-12 col-lg-3 d-flex align-items-center justify-content-center">
                             <img src="<?= htmlspecialchars($profileImage) ?>"
+                                id="img-profileAvatar"
                                 class="img-fluid rounded-circle mb-2"
                                 style="width:170px; height: 170px;">
                         </div>

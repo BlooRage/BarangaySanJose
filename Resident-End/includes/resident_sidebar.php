@@ -226,5 +226,44 @@ if ($residentId !== '' && isset($conn) && $conn instanceof mysqli) {
   });
 </script>
 
+<script>
+  document.addEventListener("DOMContentLoaded", () => {
+    const sidebarImg = document.getElementById("img-sidebarAvatar");
+    const profileImg = document.getElementById("img-profileAvatar");
+    if (!sidebarImg && !profileImg) return;
+
+    let lastBaseUrl = "";
+    const getBaseUrl = (url) => (url || "").split("?")[0];
+
+    const updateImages = (url) => {
+      if (!url) return;
+      const baseUrl = getBaseUrl(url);
+      if (baseUrl === "" || baseUrl === lastBaseUrl) return;
+      lastBaseUrl = baseUrl;
+      const cacheBusted = `${baseUrl}?v=${Date.now()}`;
+      if (sidebarImg) sidebarImg.src = cacheBusted;
+      if (profileImg) profileImg.src = cacheBusted;
+    };
+
+    const poll = async () => {
+      try {
+        const res = await fetch("../PhpFiles/Resident-End/getVerifiedProfileImage.php", {
+          headers: { "Accept": "application/json" }
+        });
+        if (!res.ok) return;
+        const data = await res.json();
+        if (data && data.success && data.profile_image) {
+          updateImages(data.profile_image);
+        }
+      } catch (e) {
+        // ignore polling errors
+      }
+    };
+
+    poll();
+    setInterval(poll, 15000);
+  });
+</script>
+
 </body>
 </html>
