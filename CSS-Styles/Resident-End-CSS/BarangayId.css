@@ -1,0 +1,237 @@
+
+* {
+    box-sizing: border-box;
+}
+
+body {
+    font-family: 'Geist', sans-serif;
+    background-color: #f6e7d9;
+    margin: 0;
+}
+
+.application-main {
+    display: flex;
+    justify-content: center;
+    padding: 32px 16px;
+    margin: auto;
+}
+
+.application-card {
+    width: 100%;
+    max-width: 900px;
+    background-color: #ffffff;
+    border: 1.5px solid #FE993C;
+    border-radius: 14px;
+    padding: 32px;
+}
+
+.back-link {
+    display: inline-block;
+    margin-bottom: 12px;
+    color: #FE993C;
+    font-size: 14px;
+    text-decoration: none;
+}
+
+.form-title {
+    font-family: 'Charis SIL Bold', serif;
+    text-align: center;
+    color: #FE993C;
+    margin-bottom: 6px;
+}
+
+.form-subtitle {
+    text-align: center;
+    font-size: 14px;
+    color: #666;
+    margin-bottom: 28px;
+}
+
+.section-title {
+    font-family: 'Charis SIL Bold', serif;
+    font-size: 18px;
+    margin: 28px 0 16px;
+}
+
+.status-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 20px;
+    margin-bottom: 20px;
+    font-size: 14px;
+}
+
+.form-row {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 14px;
+    margin-bottom: 16px;
+}
+
+.form-row input {
+    width: 100%;
+    padding: 10px 12px;
+    border: 1px solid #a8a7a7;
+    border-radius: 6px;
+    font-size: 14px;
+}
+
+.form-row input:focus {
+    outline: none;
+    border-color: #e8872f;
+}
+
+.full-width {
+    grid-column: span 4;
+}
+
+.certification-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 16px;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 28px;
+}
+
+.certification-text {
+    font-size: 13px;
+    color: #333;
+    max-width: 70%;
+}
+
+.submit-btn {
+    background-color: #FE993C;
+    color: #ffffff;
+    border: none;
+    padding: 10px 28px;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.submit-btn:hover {
+    background-color: #e8872f;
+}
+
+@media (max-width: 768px) {
+    .application-card {
+        padding: 24px;
+    }
+
+    .form-row {
+        grid-template-columns: repeat(2, 1fr);
+    }
+
+    .full-width {
+        grid-column: span 2;
+    }
+
+    .certification-text {
+        max-width: 100%;
+    }
+}
+
+@media (max-width: 480px) {
+    .application-card {
+        padding: 20px;
+        border-radius: 10px;
+    }
+
+    .form-title {
+        font-size: 22px;
+    }
+
+    .section-title {
+        font-size: 16px;
+    }
+
+    .form-row {
+        grid-template-columns: 1fr;
+    }
+
+    .full-width {
+        grid-column: span 1;
+    }
+
+    .certification-row {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+
+    .submit-btn {
+        width: 100%;
+        text-align: center;
+    }
+}
+
+.phonenum {
+    grid-row: span 2;
+}
+
+.form-row {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 1rem;
+}
+
+#application_date {
+    background-color: #e9ecef;
+    border: 1px solid #ced4da;
+    border-radius: 6px;
+    padding: 10px 12px;
+    font-size: 14px;
+    color: #495057;
+}
+select{
+    width: 100%;
+    padding: 10px 12px;
+    border: 1px solid #a8a7a7;
+    border-radius: 6px;
+    font-size: 14px;
+}
+.option {
+    margin-right: 6px;
+    text-align: center;
+}
+
+span{
+    color: #ff0000;
+}
+
+.status-row {
+    display: flex;
+    justify-content: center;   
+    align-items: center;
+    gap: 2rem;             
+    margin-bottom: 1.5rem;
+}
+
+.status-row label {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    font-weight: 500;
+    cursor: pointer;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    .form-row {
+        grid-template-columns: repeat(2, 1fr);
+    }
+
+    .phonenum {
+        grid-row: span 1;
+    }
+}
+@media (max-width: 480px) {
+    .form-row {
+        grid-template-columns: 1fr;
+    }
+
+    .phonenum {
+        grid-row: span 1;
+    }
+}
