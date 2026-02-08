@@ -3,8 +3,39 @@ document.addEventListener("DOMContentLoaded", () => {
   const searchInput = document.getElementById("searchInput");
   const btnApplyFilter = document.getElementById("btnApplyFilter");
   const btnResetModal = document.getElementById("btnResetModalFilters");
+  const filterHouseholdCountInput = document.getElementById("filterHouseholdCountInput");
 
   let allAddresses = [];
+  let activeAreaFilters = [];
+  let activeHouseholdCountFilter = "";
+
+  function normalizeText(value) {
+    return String(value ?? "").trim().toLowerCase();
+  }
+
+  function normalizeArea(value) {
+    const raw = normalizeText(value).replace(/^area\s*/, "").replace(/\s+/g, "");
+    if (raw === "1a") return "1a";
+    const num = parseInt(raw, 10);
+    if (!Number.isNaN(num)) return String(num).padStart(2, "0");
+    return raw;
+  }
+
+  function getFilteredAddresses() {
+    let filtered = allAddresses;
+
+    if (activeAreaFilters.length) {
+      const selectedAreas = activeAreaFilters.map(normalizeArea);
+      filtered = filtered.filter(item => selectedAreas.includes(normalizeArea(item.area_number)));
+    }
+
+    if (activeHouseholdCountFilter !== "") {
+      const selectedCount = Number(activeHouseholdCountFilter);
+      filtered = filtered.filter(item => Number(item.household_count ?? 0) === selectedCount);
+    }
+
+    return filtered;
+  }
 
   // ========================
   // FETCH HEADS OF FAMILY
@@ -15,7 +46,7 @@ document.addEventListener("DOMContentLoaded", () => {
       .then(res => res.json())
       .then(data => {
         allAddresses = Array.isArray(data) ? data : [];
-        renderTable(allAddresses);
+        renderTable(getFilteredAddresses());
       })
       .catch(err => console.error("Fetch error:", err));
   }
@@ -75,25 +106,9 @@ document.addEventListener("DOMContentLoaded", () => {
   if (btnApplyFilter) {
     btnApplyFilter.addEventListener("click", () => {
       const checkedBoxes = document.querySelectorAll(".filter-checkbox:checked");
-      const filters = {};
-      checkedBoxes.forEach(cb => {
-        const field = cb.dataset.field;
-        if (!filters[field]) filters[field] = [];
-        filters[field].push(cb.value);
-      });
-
-      const filtered = allAddresses.filter(res => {
-        if (!Object.keys(filters).length) return true;
-        const households = Array.isArray(res.households) ? res.households : [];
-        return households.some(hh => {
-          for (const field in filters) {
-            if (!filters[field].includes(String(hh[field] ?? ""))) return false;
-          }
-          return true;
-        });
-      });
-
-      renderTable(filtered);
+      activeAreaFilters = Array.from(checkedBoxes).map(cb => cb.value);
+      activeHouseholdCountFilter = filterHouseholdCountInput ? filterHouseholdCountInput.value.trim() : "";
+      renderTable(getFilteredAddresses());
 
       const filterModal = bootstrap.Modal.getInstance(document.getElementById("modalFilter"));
       if (filterModal) filterModal.hide();
@@ -106,6 +121,10 @@ document.addEventListener("DOMContentLoaded", () => {
   if (btnResetModal) {
     btnResetModal.addEventListener("click", () => {
       document.querySelectorAll(".filter-checkbox").forEach(cb => cb.checked = false);
+      activeAreaFilters = [];
+      activeHouseholdCountFilter = "";
+      if (filterHouseholdCountInput) filterHouseholdCountInput.value = "";
+      renderTable(getFilteredAddresses());
     });
   }
 
