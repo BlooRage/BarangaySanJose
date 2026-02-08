@@ -615,6 +615,24 @@ if (isset($conn) && $conn instanceof mysqli) {
   </div>
 </div>
 
+<!-- DOCUMENT VIEWER MODAL -->
+<div class="modal fade" id="modal-docViewer" tabindex="-1" data-bs-backdrop="static" data-bs-keyboard="false">
+  <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable">
+    <div class="modal-content p-3">
+      <div class="modal-header border-0">
+        <h5 class="fw-bold mb-0" id="doc-viewer-title">Document Preview</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <div id="doc-viewer-body" class="w-100"></div>
+      </div>
+      <div class="modal-footer border-0">
+        <button type="button" class="btn btn-outline-secondary" id="doc-viewer-return">Return</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 
 
 

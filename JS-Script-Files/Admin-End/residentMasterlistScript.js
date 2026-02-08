@@ -261,10 +261,10 @@ function openDocsModal(data) {
 
       docs.forEach(doc => {
         const row = document.createElement("div");
-        row.className = "d-flex flex-wrap align-items-center justify-content-between gap-2 border rounded-3 p-2";
+        row.className = "border rounded-3 p-2";
 
         const left = document.createElement("div");
-        left.className = "me-auto";
+        left.className = "mb-2";
         const name = document.createElement("div");
         name.className = "fw-bold";
         name.innerText = doc.document_type_name || doc.file_name || "Document";
@@ -276,15 +276,17 @@ function openDocsModal(data) {
         left.appendChild(name);
         left.appendChild(meta);
 
+        const actionsRow = document.createElement("div");
+        actionsRow.className = "d-flex flex-wrap align-items-center justify-content-between gap-2";
+
         const action = document.createElement("div");
         if (doc.file_url) {
-          const link = document.createElement("a");
-          link.href = doc.file_url;
-          link.target = "_blank";
-          link.rel = "noopener";
-          link.className = "btn btn-sm btn-outline-primary";
-          link.innerText = "View";
-          action.appendChild(link);
+          const btn = document.createElement("button");
+          btn.type = "button";
+          btn.className = "btn btn-sm btn-outline-primary";
+          btn.innerText = "View";
+          btn.addEventListener("click", () => openDocViewer(doc, modalEl));
+          action.appendChild(btn);
         } else {
           const span = document.createElement("span");
           span.className = "text-muted small";
@@ -292,8 +294,80 @@ function openDocsModal(data) {
           action.appendChild(span);
         }
 
+        const statusControls = document.createElement("div");
+        statusControls.className = "d-flex flex-wrap align-items-center gap-2";
+
+        const statusSelect = document.createElement("select");
+        statusSelect.className = "form-select form-select-sm";
+        statusSelect.style.minWidth = "140px";
+        statusSelect.innerHTML = `
+          <option value="PENDING">Pending</option>
+          <option value="APPROVED">Approved</option>
+          <option value="DENIED">Denied</option>
+        `;
+        const currentStatus = String(doc.verify_status ?? "").toLowerCase();
+        if (currentStatus.includes("verified")) statusSelect.value = "APPROVED";
+        else if (currentStatus.includes("rejected") || currentStatus.includes("denied")) statusSelect.value = "DENIED";
+        else statusSelect.value = "PENDING";
+
+        const scopeSelect = document.createElement("select");
+        scopeSelect.className = "form-select form-select-sm";
+        scopeSelect.style.minWidth = "120px";
+        scopeSelect.innerHTML = `
+          <option value="">Reason For</option>
+          <option value="ID">ID</option>
+          <option value="Profile">Profile</option>
+        `;
+
+        const reasonInput = document.createElement("input");
+        reasonInput.type = "text";
+        reasonInput.className = "form-control form-control-sm";
+        reasonInput.placeholder = "Reason (optional)";
+        reasonInput.style.minWidth = "220px";
+
+        const saveBtn = document.createElement("button");
+        saveBtn.type = "button";
+        saveBtn.className = "btn btn-sm btn-success";
+        saveBtn.innerText = "Update";
+        saveBtn.addEventListener("click", async () => {
+          const fd = new FormData();
+          fd.append("update_document_status", "1");
+          fd.append("attachment_id", doc.attachment_id);
+          fd.append("new_status", statusSelect.value);
+          fd.append("reason_scope", scopeSelect.value);
+          fd.append("reason_text", reasonInput.value.trim());
+
+          saveBtn.disabled = true;
+          saveBtn.innerText = "Saving...";
+          try {
+            const res = await fetch("../PhpFiles/Admin-End/residentMasterlist.php", {
+              method: "POST",
+              body: fd
+            });
+            const result = await res.json().catch(() => null);
+            if (!res.ok || !result || !result.success) {
+              alert(result?.message || "Failed to update document status.");
+              return;
+            }
+            meta.innerText = `${uploaded} • Status: ${result.status}`;
+          } catch (e) {
+            alert("Failed to update document status.");
+          } finally {
+            saveBtn.disabled = false;
+            saveBtn.innerText = "Update";
+          }
+        });
+
+        statusControls.appendChild(statusSelect);
+        statusControls.appendChild(scopeSelect);
+        statusControls.appendChild(reasonInput);
+        statusControls.appendChild(saveBtn);
+
+        actionsRow.appendChild(action);
+        actionsRow.appendChild(statusControls);
+
         row.appendChild(left);
-        row.appendChild(action);
+        row.appendChild(actionsRow);
         listEl.appendChild(row);
       });
     })
@@ -307,6 +381,66 @@ function openDocsModal(data) {
     keyboard: false
   });
   modalInstance.show();
+}
+
+function openDocViewer(doc, parentModalEl) {
+  const viewerEl = document.getElementById("modal-docViewer");
+  const bodyEl = document.getElementById("doc-viewer-body");
+  const titleEl = document.getElementById("doc-viewer-title");
+  const returnBtn = document.getElementById("doc-viewer-return");
+
+  if (!viewerEl || !bodyEl || !returnBtn) return;
+
+  if (viewerEl.parentElement !== document.body) {
+    document.body.appendChild(viewerEl);
+  }
+
+  const fileUrl = doc.file_url || "";
+  const fileName = doc.document_type_name || doc.file_name || "Document";
+  const ext = (doc.file_type || "").toLowerCase() || (fileUrl.split(".").pop() || "").toLowerCase();
+
+  titleEl.innerText = fileName;
+  bodyEl.innerHTML = "";
+
+  let previewEl;
+  if (["jpg", "jpeg", "png", "webp", "gif"].includes(ext)) {
+    previewEl = document.createElement("img");
+    previewEl.src = fileUrl;
+    previewEl.alt = fileName;
+    previewEl.className = "img-fluid d-block mx-auto";
+  } else if (ext === "pdf") {
+    previewEl = document.createElement("iframe");
+    previewEl.src = fileUrl;
+    previewEl.className = "w-100";
+    previewEl.style.height = "70vh";
+  } else {
+    previewEl = document.createElement("div");
+    previewEl.className = "text-muted";
+    previewEl.innerText = "Preview not available for this file type.";
+  }
+
+  bodyEl.appendChild(previewEl);
+
+  const parentModal = parentModalEl ? bootstrap.Modal.getInstance(parentModalEl) : null;
+  if (parentModal) parentModal.hide();
+
+  const viewerModal = bootstrap.Modal.getOrCreateInstance(viewerEl, {
+    backdrop: "static",
+    keyboard: false
+  });
+  viewerModal.show();
+
+  const onReturn = () => {
+    viewerModal.hide();
+    if (parentModalEl) {
+      bootstrap.Modal.getOrCreateInstance(parentModalEl, {
+        backdrop: "static",
+        keyboard: false
+      }).show();
+    }
+    returnBtn.removeEventListener("click", onReturn);
+  };
+  returnBtn.addEventListener("click", onReturn);
 }
 
 // ========================

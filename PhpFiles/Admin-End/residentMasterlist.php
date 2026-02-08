@@ -10,6 +10,19 @@ function normalizeResidentId($value): ?string {
     return $id;
 }
 
+function getStatusId(mysqli $conn, string $name, string $type): int {
+    $q = $conn->prepare("SELECT status_id FROM statuslookuptbl WHERE status_name=? AND status_type=? LIMIT 1");
+    if (!$q) throw new Exception("Prepare failed (getStatusId): " . $conn->error);
+    $q->bind_param("ss", $name, $type);
+    $q->execute();
+    $res = $q->get_result()->fetch_assoc();
+    $q->close();
+    if (!$res || !isset($res['status_id'])) {
+        throw new Exception("Status not found: {$name} ({$type})");
+    }
+    return (int)$res['status_id'];
+}
+
 function toPublicPath($path): ?string {
     $path = trim((string)$path);
     if ($path === '') {
@@ -487,6 +500,60 @@ if (isset($_GET['fetch_documents'])) {
     $stmt->close();
 
     echo json_encode($docs);
+    exit;
+}
+
+/* =====================================================
+   6. UPDATE DOCUMENT STATUS (AJAX)
+===================================================== */
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_document_status'])) {
+    header('Content-Type: application/json; charset=utf-8');
+
+    $attachmentId = (int)($_POST['attachment_id'] ?? 0);
+    $uiStatus = trim((string)($_POST['new_status'] ?? ''));
+    $reasonScope = trim((string)($_POST['reason_scope'] ?? ''));
+    $reasonText = trim((string)($_POST['reason_text'] ?? ''));
+
+    if ($attachmentId <= 0) {
+        http_response_code(400);
+        echo json_encode(['success' => false, 'message' => 'Invalid attachment ID.']);
+        exit;
+    }
+
+    $statusMap = [
+        'APPROVED' => 'Verified',
+        'DENIED'   => 'Rejected',
+        'PENDING'  => 'PendingReview'
+    ];
+    if (!isset($statusMap[$uiStatus])) {
+        http_response_code(400);
+        echo json_encode(['success' => false, 'message' => 'Invalid status.']);
+        exit;
+    }
+
+    try {
+        $statusId = getStatusId($conn, $statusMap[$uiStatus], "ResidentDocumentProfiling");
+        $remarks = '';
+        if ($reasonScope !== '' || $reasonText !== '') {
+            $remarks = trim("scope={$reasonScope}; reason={$reasonText}");
+        }
+
+        $stmt = $conn->prepare("
+            UPDATE unifiedfileattachmenttbl
+            SET status_id_verify = ?, remarks = ?
+            WHERE attachment_id = ?
+            LIMIT 1
+        ");
+        if (!$stmt) throw new Exception("Prepare failed (update document status): " . $conn->error);
+        $stmt->bind_param("isi", $statusId, $remarks, $attachmentId);
+        $stmt->execute();
+        $stmt->close();
+
+        echo json_encode(['success' => true, 'status' => $statusMap[$uiStatus]]);
+    } catch (Exception $e) {
+        http_response_code(500);
+        echo json_encode(['success' => false, 'message' => $e->getMessage()]);
+    }
     exit;
 }
 

@@ -1,7 +1,7 @@
 <?php
 $allowUnregistered = false;
 require_once __DIR__ . "/includes/resident_access_guard.php";
-require_once "../PhpFiles/get/getResidentProfile.php";
+require_once "../PhpFiles/GET/getResidentProfile.php";
 
 $data = getResidentProfileData($conn, $_SESSION['user_id']);
 $residentinformationtbl = $data['residentinformationtbl'];

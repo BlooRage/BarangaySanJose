@@ -32,10 +32,11 @@ function activeLink($page, $current) {
 }
 
 $displayName = "Resident";
+$profileImage = '../Images/Profile-Placeholder.png';
 
 if (!empty($_SESSION['user_id']) && isset($conn) && $conn instanceof mysqli) {
   $stmt = $conn->prepare("
-    SELECT firstname, middlename, lastname, suffix
+    SELECT firstname, middlename, lastname, suffix, profile_pic
     FROM residentinformationtbl
     WHERE user_id = ?
     LIMIT 1
@@ -55,6 +56,9 @@ if (!empty($_SESSION['user_id']) && isset($conn) && $conn instanceof mysqli) {
       if ($fullName !== '') {
         $displayName = $fullName;
       }
+      if (!empty($row['profile_pic']) && file_exists($row['profile_pic'])) {
+        $profileImage = $row['profile_pic'];
+      }
     }
     $stmt->close();
   }
@@ -73,7 +77,7 @@ if (!empty($_SESSION['user_id']) && isset($conn) && $conn instanceof mysqli) {
   <!-- RESIDENT PROFILE -->
   <div id="div-sidebarProfile" class="text-center mb-4">
     <img
-      src="../Images/Profile-Placeholder.png"
+      src="<?= htmlspecialchars($profileImage) ?>"
       alt="Avatar"
       id="img-sidebarAvatar"
       class="rounded-circle mb-2 border shadow-sm"

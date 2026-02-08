@@ -74,18 +74,6 @@ function isHeicExt(string $ext): bool {
     return in_array($ext, ['heic', 'heif'], true);
 }
 
-function convertHeicToJpg(string $tmpPath, string $targetPath): void {
-    if (!class_exists('Imagick')) {
-        throw new Exception("HEIC conversion requires Imagick.");
-    }
-    $img = new Imagick($tmpPath);
-    $img->setImageFormat('jpeg');
-    $img->setImageCompressionQuality(85);
-    $img->writeImage($targetPath);
-    $img->clear();
-    $img->destroy();
-}
-
 try {
     // -------- Collect Inputs --------
     $lastName   = cleanString($_POST['lastName'] ?? '');
