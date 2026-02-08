@@ -580,6 +580,16 @@ function openDocViewer(doc, parentModalEl, opts = {}) {
         alert(result?.message || "Failed to update document status.");
         return;
       }
+      if (result.profile_image_url) {
+        const newUrl = `${result.profile_image_url}?v=${Date.now()}`;
+        if (window.lastDocsResident) {
+          window.lastDocsResident.id_picture_url = result.profile_image_url;
+        }
+        const modalImg = document.getElementById("img-modalIdPicture");
+        if (modalImg) {
+          modalImg.src = newUrl;
+        }
+      }
       doc.verify_status = result.status || doc.verify_status;
       if (statusSelect.value === "DENIED") {
         doc.remarks = reasonInput.value.trim();
