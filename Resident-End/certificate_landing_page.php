@@ -18,7 +18,7 @@
         <main class="main-content">
 
     <h1 class="page-title">
-        Barangay Certifications
+        Barangay Documents
     </h1>
     <hr style="color: #ff7a18 !important;">
 
@@ -32,7 +32,7 @@
     </p>
 
     <p class="section-label">
-        List of certificates:
+        List of documents:
     </p>
 
     <div class="row certificate-grid text-center">
@@ -102,4 +102,5 @@
 
 
            
+
 
