@@ -343,10 +343,14 @@ if (isset($_GET['fetch'])) {
                 FROM unifiedfileattachmenttbl uf
                 INNER JOIN documenttypelookuptbl dt
                     ON uf.document_type_id = dt.document_type_id
+                INNER JOIN statuslookuptbl sv
+                    ON uf.status_id_verify = sv.status_id
                 WHERE uf.source_type = 'ResidentProfiling'
                   AND uf.source_id = r.resident_id
                   AND dt.document_type_name = '2x2 Picture'
                   AND dt.document_category = 'ResidentProfiling'
+                  AND sv.status_name = 'Verified'
+                  AND sv.status_type = 'ResidentDocumentProfiling'
                 ORDER BY uf.upload_timestamp DESC, uf.attachment_id DESC
                 LIMIT 1
             ) AS id_picture_path,
@@ -530,12 +534,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_document_statu
         echo json_encode(['success' => false, 'message' => 'Invalid status.']);
         exit;
     }
+    if ($uiStatus === 'DENIED' && $reasonText === '') {
+        http_response_code(400);
+        echo json_encode(['success' => false, 'message' => 'Cause of denial is required.']);
+        exit;
+    }
 
     try {
         $statusId = getStatusId($conn, $statusMap[$uiStatus], "ResidentDocumentProfiling");
         $remarks = '';
-        if ($reasonScope !== '' || $reasonText !== '') {
-            $remarks = trim("scope={$reasonScope}; reason={$reasonText}");
+        if ($reasonText !== '') {
+            $remarks = $reasonScope !== ''
+                ? trim("scope={$reasonScope}; reason={$reasonText}")
+                : $reasonText;
         }
 
         $stmt = $conn->prepare("

@@ -9,10 +9,32 @@ $residentaddresstbl = $data['residentaddresstbl'];
 $useraccountstbl = $data['useraccountstbl'];
 
 $profileImage = '../Images/Profile-Placeholder.png';
-if (!empty($residentinformationtbl['profile_pic'])) {
-    $candidate = $residentinformationtbl['profile_pic'];
-    if (file_exists($candidate)) {
-        $profileImage = $candidate;
+$residentId = $residentinformationtbl['resident_id'] ?? '';
+if ($residentId !== '' && isset($conn) && $conn instanceof mysqli) {
+    $stmtPic = $conn->prepare("
+        SELECT uf.file_path
+        FROM unifiedfileattachmenttbl uf
+        INNER JOIN documenttypelookuptbl dt
+            ON uf.document_type_id = dt.document_type_id
+        INNER JOIN statuslookuptbl s
+            ON uf.status_id_verify = s.status_id
+        WHERE uf.source_type = 'ResidentProfiling'
+          AND uf.source_id = ?
+          AND dt.document_type_name = '2x2 Picture'
+          AND dt.document_category = 'ResidentProfiling'
+          AND s.status_name = 'Verified'
+          AND s.status_type = 'ResidentDocumentProfiling'
+        ORDER BY uf.upload_timestamp DESC, uf.attachment_id DESC
+        LIMIT 1
+    ");
+    if ($stmtPic) {
+        $stmtPic->bind_param("s", $residentId);
+        $stmtPic->execute();
+        $stmtPic->bind_result($verifiedPicPath);
+        if ($stmtPic->fetch() && !empty($verifiedPicPath)) {
+            $profileImage = $verifiedPicPath;
+        }
+        $stmtPic->close();
     }
 }
 ?>

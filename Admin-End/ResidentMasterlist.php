@@ -403,6 +403,17 @@ if (isset($conn) && $conn instanceof mysqli) {
                         </div>
                     </div>
 
+                    <hr class="my-2">
+
+                    <div class="p-3 rounded-3 border-0 bg-white">
+                        <div class="d-flex align-items-center justify-content-between mb-2">
+                            <h5 class="fw-bold mb-0" style="color: #000;">Verified Documents</h5>
+                        </div>
+                        <div id="view-verified-docs-section" class="d-none">
+                            <div id="view-verified-docs" class="d-flex flex-column gap-2"></div>
+                        </div>
+                    </div>
+
                 </div>
 
                 <div id="div-statusManagementGroup" class="mt-4">
@@ -596,7 +607,7 @@ if (isset($conn) && $conn instanceof mysqli) {
 </div>
 
 <!-- VIEW SUBMITTED DOCUMENTS MODAL -->
-<div class="modal fade" id="modal-viewDocs" tabindex="-1" data-bs-backdrop="static" data-bs-keyboard="false">
+<div class="modal fade docs-modal" id="modal-viewDocs" tabindex="-1" data-bs-backdrop="static" data-bs-keyboard="false">
   <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
     <div class="modal-content p-4">
       <div class="modal-header border-0">
@@ -606,7 +617,21 @@ if (isset($conn) && $conn instanceof mysqli) {
       <div class="modal-body">
         <div id="docs-loading" class="text-muted small mb-2">Loading documents...</div>
         <div id="docs-empty" class="text-muted small d-none">No submitted documents found.</div>
-        <div id="docs-list" class="d-flex flex-column gap-2"></div>
+
+        <div id="docs-section-pending" class="d-none mb-3">
+          <div class="fw-bold mb-2">Pending</div>
+          <div id="docs-list-pending" class="d-flex flex-column gap-2"></div>
+        </div>
+
+        <div id="docs-section-verified" class="d-none mb-3">
+          <div class="fw-bold mb-2">Verified</div>
+          <div id="docs-list-verified" class="d-flex flex-column gap-2"></div>
+        </div>
+
+        <div id="docs-section-denied" class="d-none">
+          <div class="fw-bold mb-2">Denied</div>
+          <div id="docs-list-denied" class="d-flex flex-column gap-2"></div>
+        </div>
       </div>
       <div class="modal-footer border-0">
         <button type="button" class="btn btn-secondary px-4" data-bs-dismiss="modal">Close</button>
@@ -616,7 +641,7 @@ if (isset($conn) && $conn instanceof mysqli) {
 </div>
 
 <!-- DOCUMENT VIEWER MODAL -->
-<div class="modal fade" id="modal-docViewer" tabindex="-1" data-bs-backdrop="static" data-bs-keyboard="false">
+<div class="modal fade doc-viewer-modal" id="modal-docViewer" tabindex="-1" data-bs-backdrop="static" data-bs-keyboard="false">
   <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable">
     <div class="modal-content p-3">
       <div class="modal-header border-0">
@@ -624,7 +649,19 @@ if (isset($conn) && $conn instanceof mysqli) {
         <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
       </div>
       <div class="modal-body">
-        <div id="doc-viewer-body" class="w-100"></div>
+        <div class="mb-3 d-none" id="doc-viewer-info">
+          <div class="fw-bold" id="doc-viewer-fullname">—</div>
+          <div class="row g-2 mt-2">
+            <div class="col-md-4">
+              <div class="fw-bold" id="doc-viewer-birthday">—</div>
+            </div>
+            <div class="col-md-8">
+              <div class="fw-bold" id="doc-viewer-fulladdress">—</div>
+            </div>
+          </div>
+        </div>
+        <div id="doc-viewer-body" class="w-100 mb-3"></div>
+        <div id="doc-viewer-actions" class="d-flex flex-wrap align-items-center gap-2"></div>
       </div>
       <div class="modal-footer border-0">
         <button type="button" class="btn btn-outline-secondary" id="doc-viewer-return">Return</button>

@@ -225,6 +225,81 @@ function openViewEntry(data) {
     backdrop: 'static',
     keyboard: false
   }).show();
+
+  // Load verified documents for this resident
+  const verifiedListEl = document.getElementById("view-verified-docs");
+  const verifiedSectionEl = document.getElementById("view-verified-docs-section");
+  if (verifiedListEl && verifiedSectionEl) {
+    verifiedListEl.innerHTML = "";
+    verifiedSectionEl.classList.add("d-none");
+    fetch(`../PhpFiles/Admin-End/residentMasterlist.php?fetch_documents=1&resident_id=${encodeURIComponent(data.resident_id)}`)
+      .then(res => res.json())
+      .then(items => {
+        const docs = Array.isArray(items) ? items : [];
+        const verified = docs.filter(d => {
+          const isVerified = String(d.verify_status ?? "").toLowerCase().includes("verified");
+          const docName = String(d.document_type_name ?? "").toLowerCase();
+          const is2x2 = docName === "2x2 picture" || docName.includes("2x2");
+          return isVerified && !is2x2;
+        });
+        if (!verified.length) {
+          verifiedSectionEl.classList.add("d-none");
+          return;
+        }
+        verifiedSectionEl.classList.remove("d-none");
+        verified.forEach(doc => {
+          const row = document.createElement("div");
+          row.className = "doc-row border rounded-3 p-2 bg-white";
+
+          const rowGrid = document.createElement("div");
+          rowGrid.className = "doc-row__grid d-flex align-items-center justify-content-between gap-2";
+
+          const left = document.createElement("div");
+          left.className = "doc-row__info";
+
+          const nameRow = document.createElement("div");
+          nameRow.className = "doc-row__name";
+          const name = document.createElement("div");
+          name.className = "fw-bold";
+          name.innerText = doc.document_type_name || doc.file_name || "Document";
+
+          const metaRow = document.createElement("div");
+          metaRow.className = "doc-row__meta text-muted small";
+          const meta = document.createElement("div");
+          const uploaded = doc.upload_timestamp ? `Uploaded: ${doc.upload_timestamp}` : "";
+          if (uploaded) {
+            meta.innerText = uploaded;
+            metaRow.appendChild(meta);
+          }
+
+          nameRow.appendChild(name);
+          left.appendChild(nameRow);
+          if (metaRow.childNodes.length) {
+            left.appendChild(metaRow);
+          }
+
+          const action = document.createElement("div");
+          action.className = "doc-row__view";
+
+          if (doc.file_url) {
+            const btn = document.createElement("button");
+            btn.type = "button";
+            btn.className = "btn btn-sm btn-primary";
+            btn.innerText = "View";
+            btn.addEventListener("click", () => openDocViewer(doc, document.getElementById("modal-viewEntry"), { readOnly: true }));
+            action.appendChild(btn);
+          }
+
+          rowGrid.appendChild(left);
+          rowGrid.appendChild(action);
+          row.appendChild(rowGrid);
+          verifiedListEl.appendChild(row);
+        });
+      })
+      .catch(() => {
+        verifiedSectionEl.classList.add("d-none");
+      });
+  }
 }
 
 // ========================
@@ -233,18 +308,46 @@ function openViewEntry(data) {
 function openDocsModal(data) {
   const modalEl = document.getElementById("modal-viewDocs");
   const titleEl = document.getElementById("docs-modal-title");
-  const listEl = document.getElementById("docs-list");
+  const listPending = document.getElementById("docs-list-pending");
+  const listVerified = document.getElementById("docs-list-verified");
+  const listDenied = document.getElementById("docs-list-denied");
+  const sectionPending = document.getElementById("docs-section-pending");
+  const sectionVerified = document.getElementById("docs-section-verified");
+  const sectionDenied = document.getElementById("docs-section-denied");
   const emptyEl = document.getElementById("docs-empty");
   const loadingEl = document.getElementById("docs-loading");
 
-  if (!modalEl || !listEl || !emptyEl || !loadingEl) return;
+  if (!modalEl || !listPending || !listVerified || !listDenied || !sectionPending || !sectionVerified || !sectionDenied || !emptyEl || !loadingEl) return;
 
   if (modalEl.parentElement !== document.body) {
     document.body.appendChild(modalEl);
   }
 
   titleEl.innerText = `Submitted Documents: #${data.resident_id}`;
-  listEl.innerHTML = "";
+  const addressParts = [
+    data.unit_number ? `Unit ${data.unit_number}` : "",
+    data.house_number || "",
+    data.street_name || "",
+    data.phase_number || "",
+    data.subdivision || "",
+    "San Jose",
+    data.area_number || "",
+    "Rodriguez",
+    "Rizal",
+    "1860"
+  ].filter(Boolean);
+  window.currentDocsResident = {
+    full_name: data.full_name ?? "—",
+    birthdate: data.birthdate ?? "—",
+    full_address: addressParts.join(", ") || "—"
+  };
+  window.lastDocsResident = { ...data };
+  listPending.innerHTML = "";
+  listVerified.innerHTML = "";
+  listDenied.innerHTML = "";
+  sectionPending.classList.add("d-none");
+  sectionVerified.classList.add("d-none");
+  sectionDenied.classList.add("d-none");
   emptyEl.classList.add("d-none");
   loadingEl.classList.remove("d-none");
 
@@ -259,31 +362,52 @@ function openDocsModal(data) {
         return;
       }
 
+      const pendingDocs = [];
+      const verifiedDocs = [];
+      const deniedDocs = [];
+
       docs.forEach(doc => {
+        const status = String(doc.verify_status ?? "").toLowerCase();
+        if (status.includes("verified")) verifiedDocs.push(doc);
+        else if (status.includes("rejected") || status.includes("denied")) deniedDocs.push(doc);
+        else pendingDocs.push(doc);
+      });
+
+      const renderDocRow = (doc, container, opts = {}) => {
         const row = document.createElement("div");
-        row.className = "border rounded-3 p-2";
+        row.className = "doc-row border rounded-3 p-2";
+
+        const rowGrid = document.createElement("div");
+        rowGrid.className = "doc-row__grid d-flex align-items-center justify-content-between gap-2";
 
         const left = document.createElement("div");
-        left.className = "mb-2";
+        left.className = "doc-row__info";
+        const nameRow = document.createElement("div");
+        nameRow.className = "doc-row__name";
         const name = document.createElement("div");
         name.className = "fw-bold";
         name.innerText = doc.document_type_name || doc.file_name || "Document";
-        const meta = document.createElement("div");
-        meta.className = "text-muted small";
-        const uploaded = doc.upload_timestamp ? `Uploaded: ${doc.upload_timestamp}` : "Uploaded: —";
-        const status = doc.verify_status ? `Status: ${doc.verify_status}` : "Status: —";
-        meta.innerText = `${uploaded} • ${status}`;
-        left.appendChild(name);
-        left.appendChild(meta);
 
-        const actionsRow = document.createElement("div");
-        actionsRow.className = "d-flex flex-wrap align-items-center justify-content-between gap-2";
+        const metaRow = document.createElement("div");
+        metaRow.className = "doc-row__meta text-muted small";
+        const meta = document.createElement("div");
+        const uploaded = doc.upload_timestamp ? `Uploaded: ${doc.upload_timestamp}` : "Uploaded: —";
+        let statusText = doc.verify_status ? `Status: ${doc.verify_status}` : "Status: —";
+        if (opts.showReason && doc.remarks) {
+          statusText += ` • Reason: ${doc.remarks}`;
+        }
+        meta.innerText = `${uploaded} • ${statusText}`;
+        metaRow.appendChild(meta);
+        nameRow.appendChild(name);
+        left.appendChild(nameRow);
+        left.appendChild(metaRow);
 
         const action = document.createElement("div");
+        action.className = "doc-row__view";
         if (doc.file_url) {
           const btn = document.createElement("button");
           btn.type = "button";
-          btn.className = "btn btn-sm btn-outline-primary";
+          btn.className = "btn btn-sm btn-primary";
           btn.innerText = "View";
           btn.addEventListener("click", () => openDocViewer(doc, modalEl));
           action.appendChild(btn);
@@ -294,82 +418,25 @@ function openDocsModal(data) {
           action.appendChild(span);
         }
 
-        const statusControls = document.createElement("div");
-        statusControls.className = "d-flex flex-wrap align-items-center gap-2";
+        rowGrid.appendChild(left);
+        rowGrid.appendChild(action);
 
-        const statusSelect = document.createElement("select");
-        statusSelect.className = "form-select form-select-sm";
-        statusSelect.style.minWidth = "140px";
-        statusSelect.innerHTML = `
-          <option value="PENDING">Pending</option>
-          <option value="APPROVED">Approved</option>
-          <option value="DENIED">Denied</option>
-        `;
-        const currentStatus = String(doc.verify_status ?? "").toLowerCase();
-        if (currentStatus.includes("verified")) statusSelect.value = "APPROVED";
-        else if (currentStatus.includes("rejected") || currentStatus.includes("denied")) statusSelect.value = "DENIED";
-        else statusSelect.value = "PENDING";
+        row.appendChild(rowGrid);
+        container.appendChild(row);
+      };
 
-        const scopeSelect = document.createElement("select");
-        scopeSelect.className = "form-select form-select-sm";
-        scopeSelect.style.minWidth = "120px";
-        scopeSelect.innerHTML = `
-          <option value="">Reason For</option>
-          <option value="ID">ID</option>
-          <option value="Profile">Profile</option>
-        `;
-
-        const reasonInput = document.createElement("input");
-        reasonInput.type = "text";
-        reasonInput.className = "form-control form-control-sm";
-        reasonInput.placeholder = "Reason (optional)";
-        reasonInput.style.minWidth = "220px";
-
-        const saveBtn = document.createElement("button");
-        saveBtn.type = "button";
-        saveBtn.className = "btn btn-sm btn-success";
-        saveBtn.innerText = "Update";
-        saveBtn.addEventListener("click", async () => {
-          const fd = new FormData();
-          fd.append("update_document_status", "1");
-          fd.append("attachment_id", doc.attachment_id);
-          fd.append("new_status", statusSelect.value);
-          fd.append("reason_scope", scopeSelect.value);
-          fd.append("reason_text", reasonInput.value.trim());
-
-          saveBtn.disabled = true;
-          saveBtn.innerText = "Saving...";
-          try {
-            const res = await fetch("../PhpFiles/Admin-End/residentMasterlist.php", {
-              method: "POST",
-              body: fd
-            });
-            const result = await res.json().catch(() => null);
-            if (!res.ok || !result || !result.success) {
-              alert(result?.message || "Failed to update document status.");
-              return;
-            }
-            meta.innerText = `${uploaded} • Status: ${result.status}`;
-          } catch (e) {
-            alert("Failed to update document status.");
-          } finally {
-            saveBtn.disabled = false;
-            saveBtn.innerText = "Update";
-          }
-        });
-
-        statusControls.appendChild(statusSelect);
-        statusControls.appendChild(scopeSelect);
-        statusControls.appendChild(reasonInput);
-        statusControls.appendChild(saveBtn);
-
-        actionsRow.appendChild(action);
-        actionsRow.appendChild(statusControls);
-
-        row.appendChild(left);
-        row.appendChild(actionsRow);
-        listEl.appendChild(row);
-      });
+      if (pendingDocs.length) {
+        sectionPending.classList.remove("d-none");
+        pendingDocs.forEach(doc => renderDocRow(doc, listPending));
+      }
+      if (verifiedDocs.length) {
+        sectionVerified.classList.remove("d-none");
+        verifiedDocs.forEach(doc => renderDocRow(doc, listVerified));
+      }
+      if (deniedDocs.length) {
+        sectionDenied.classList.remove("d-none");
+        deniedDocs.forEach(doc => renderDocRow(doc, listDenied, { showReason: true }));
+      }
     })
     .catch(() => {
       loadingEl.classList.add("d-none");
@@ -383,13 +450,17 @@ function openDocsModal(data) {
   modalInstance.show();
 }
 
-function openDocViewer(doc, parentModalEl) {
+function openDocViewer(doc, parentModalEl, opts = {}) {
   const viewerEl = document.getElementById("modal-docViewer");
   const bodyEl = document.getElementById("doc-viewer-body");
   const titleEl = document.getElementById("doc-viewer-title");
   const returnBtn = document.getElementById("doc-viewer-return");
+  const infoNameEl = document.getElementById("doc-viewer-fullname");
+  const infoBirthdayEl = document.getElementById("doc-viewer-birthday");
+  const infoAddressEl = document.getElementById("doc-viewer-fulladdress");
+  const actionsEl = document.getElementById("doc-viewer-actions");
 
-  if (!viewerEl || !bodyEl || !returnBtn) return;
+  if (!viewerEl || !bodyEl || !returnBtn || !actionsEl) return;
 
   if (viewerEl.parentElement !== document.body) {
     document.body.appendChild(viewerEl);
@@ -401,6 +472,12 @@ function openDocViewer(doc, parentModalEl) {
 
   titleEl.innerText = fileName;
   bodyEl.innerHTML = "";
+  actionsEl.innerHTML = "";
+
+  const residentInfo = window.currentDocsResident || {};
+  if (infoNameEl) infoNameEl.innerText = residentInfo.full_name ?? "—";
+  if (infoBirthdayEl) infoBirthdayEl.innerText = residentInfo.birthdate ?? "—";
+  if (infoAddressEl) infoAddressEl.innerText = residentInfo.full_address ?? "—";
 
   let previewEl;
   if (["jpg", "jpeg", "png", "webp", "gif"].includes(ext)) {
@@ -420,6 +497,122 @@ function openDocViewer(doc, parentModalEl) {
   }
 
   bodyEl.appendChild(previewEl);
+
+  if (!opts.readOnly) {
+  const statusSelect = document.createElement("select");
+  statusSelect.className = "form-select form-select-sm doc-viewer__status";
+  statusSelect.style.minWidth = "140px";
+  statusSelect.innerHTML = `
+    <option value="PENDING">Pending</option>
+    <option value="APPROVED">Approved</option>
+    <option value="DENIED">Denied</option>
+  `;
+  const currentStatus = String(doc.verify_status ?? "").toLowerCase();
+  if (currentStatus.includes("verified")) statusSelect.value = "APPROVED";
+  else if (currentStatus.includes("rejected") || currentStatus.includes("denied")) statusSelect.value = "DENIED";
+  else statusSelect.value = "PENDING";
+
+  const reasonInput = document.createElement("input");
+  reasonInput.type = "text";
+  reasonInput.className = "form-control form-control-sm d-none doc-viewer__reason";
+  reasonInput.placeholder = "Cause of denial";
+  reasonInput.style.minWidth = "260px";
+
+  const saveBtn = document.createElement("button");
+  saveBtn.type = "button";
+  saveBtn.className = "btn btn-sm btn-success doc-viewer__update";
+  saveBtn.innerText = "Update";
+  saveBtn.addEventListener("click", async () => {
+    if (statusSelect.value === "DENIED" && !reasonInput.value.trim()) {
+      reasonInput.classList.add("is-invalid");
+      reasonInput.classList.remove("d-none");
+      return;
+    }
+    reasonInput.classList.remove("is-invalid");
+    if (statusSelect.value === "DENIED") {
+      const ok = window.confirm("Are you sure you want to deny this document?");
+      if (!ok) return;
+    }
+
+    const fd = new FormData();
+    fd.append("update_document_status", "1");
+    fd.append("attachment_id", doc.attachment_id);
+    fd.append("new_status", statusSelect.value);
+    fd.append("reason_scope", "");
+    fd.append("reason_text", reasonInput.value.trim());
+
+    saveBtn.disabled = true;
+    saveBtn.innerText = "Saving...";
+    try {
+      const res = await fetch("../PhpFiles/Admin-End/residentMasterlist.php", {
+        method: "POST",
+        body: fd
+      });
+      const result = await res.json().catch(() => null);
+      if (!res.ok || !result || !result.success) {
+        alert(result?.message || "Failed to update document status.");
+        return;
+      }
+      saveBtn.disabled = false;
+      saveBtn.innerText = "Update";
+
+      const viewerModal = bootstrap.Modal.getInstance(viewerEl);
+      if (window.UniversalModal?.open) {
+        window.UniversalModal.open({
+          title: "Success",
+          message: "Document status updated.",
+          buttons: [
+            {
+              label: "Return",
+              class: "btn btn-success",
+              onClick: () => {
+                viewerModal?.hide();
+                if (parentModalEl) {
+                  const listModal = bootstrap.Modal.getOrCreateInstance(parentModalEl, {
+                    backdrop: "static",
+                    keyboard: false
+                  });
+                  listModal.show();
+                  if (window.lastDocsResident) {
+                    openDocsModal(window.lastDocsResident);
+                  }
+                }
+              }
+            }
+          ]
+        });
+      } else {
+        viewerModal?.hide();
+        if (parentModalEl) {
+          const listModal = bootstrap.Modal.getOrCreateInstance(parentModalEl, {
+            backdrop: "static",
+            keyboard: false
+          });
+          listModal.show();
+        }
+      }
+    } catch (e) {
+      alert("Failed to update document status.");
+    } finally {
+      saveBtn.disabled = false;
+      saveBtn.innerText = "Update";
+    }
+  });
+
+  statusSelect.addEventListener("change", () => {
+    if (statusSelect.value === "DENIED") {
+      reasonInput.classList.remove("d-none");
+    } else {
+      reasonInput.classList.add("d-none");
+      reasonInput.value = "";
+      reasonInput.classList.remove("is-invalid");
+    }
+  });
+
+  actionsEl.appendChild(statusSelect);
+  actionsEl.appendChild(reasonInput);
+  actionsEl.appendChild(saveBtn);
+  }
 
   const parentModal = parentModalEl ? bootstrap.Modal.getInstance(parentModalEl) : null;
   if (parentModal) parentModal.hide();
