@@ -3,7 +3,7 @@
 
 <head>
     <meta charset="UTF-8">
-    <title>Certificate Application</title>
+    <title>Document Application</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="../CSS-Styles/GeneralStyle.css">
@@ -18,7 +18,7 @@
         <main class="main-content">
 
     <h1 class="page-title">
-        Barangay Certifications
+        Barangay Documents
     </h1>
     <hr style="color: #ff7a18 !important;">
 
@@ -32,7 +32,7 @@
     </p>
 
     <p class="section-label">
-        List of certificates:
+        List of documents:
     </p>
 
     <div class="row certificate-grid text-center">
@@ -102,4 +102,6 @@
 
 
            
+
+
 
