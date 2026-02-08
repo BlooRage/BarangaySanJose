@@ -405,11 +405,11 @@ if (isset($conn) && $conn instanceof mysqli) {
 
                     <hr class="my-2">
 
-                    <div class="p-3 rounded-3 border-0 bg-white">
+                    <div class="p-3 rounded-3 border-0 bg-white d-none" id="view-verified-docs-wrapper">
                         <div class="d-flex align-items-center justify-content-between mb-2">
                             <h5 class="fw-bold mb-0" style="color: #000;">Verified Documents</h5>
                         </div>
-                        <div id="view-verified-docs-section" class="d-none">
+                        <div id="view-verified-docs-section">
                             <div id="view-verified-docs" class="d-flex flex-column gap-2"></div>
                         </div>
                     </div>

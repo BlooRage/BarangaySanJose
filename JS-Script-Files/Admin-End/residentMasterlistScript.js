@@ -228,10 +228,10 @@ function openViewEntry(data) {
 
   // Load verified documents for this resident
   const verifiedListEl = document.getElementById("view-verified-docs");
-  const verifiedSectionEl = document.getElementById("view-verified-docs-section");
-  if (verifiedListEl && verifiedSectionEl) {
+  const verifiedWrapperEl = document.getElementById("view-verified-docs-wrapper");
+  if (verifiedListEl && verifiedWrapperEl) {
     verifiedListEl.innerHTML = "";
-    verifiedSectionEl.classList.add("d-none");
+    verifiedWrapperEl.classList.add("d-none");
     fetch(`../PhpFiles/Admin-End/residentMasterlist.php?fetch_documents=1&resident_id=${encodeURIComponent(data.resident_id)}`)
       .then(res => res.json())
       .then(items => {
@@ -243,10 +243,10 @@ function openViewEntry(data) {
           return isVerified && !is2x2;
         });
         if (!verified.length) {
-          verifiedSectionEl.classList.add("d-none");
+          verifiedWrapperEl.classList.add("d-none");
           return;
         }
-        verifiedSectionEl.classList.remove("d-none");
+        verifiedWrapperEl.classList.remove("d-none");
         verified.forEach(doc => {
           const row = document.createElement("div");
           row.className = "doc-row border rounded-3 p-2 bg-white";
@@ -296,11 +296,11 @@ function openViewEntry(data) {
           verifiedListEl.appendChild(row);
         });
         if (verifiedListEl.childElementCount === 0) {
-          verifiedSectionEl.classList.add("d-none");
+          verifiedWrapperEl.classList.add("d-none");
         }
       })
       .catch(() => {
-        verifiedSectionEl.classList.add("d-none");
+        verifiedWrapperEl.classList.add("d-none");
       });
   }
 }
@@ -460,6 +460,7 @@ function openDocViewer(doc, parentModalEl, opts = {}) {
   const bodyEl = document.getElementById("doc-viewer-body");
   const titleEl = document.getElementById("doc-viewer-title");
   const returnBtn = document.getElementById("doc-viewer-return");
+  const infoWrapEl = document.getElementById("doc-viewer-info");
   const infoNameEl = document.getElementById("doc-viewer-fullname");
   const infoBirthdayEl = document.getElementById("doc-viewer-birthday");
   const infoAddressEl = document.getElementById("doc-viewer-fulladdress");
@@ -480,6 +481,13 @@ function openDocViewer(doc, parentModalEl, opts = {}) {
   actionsEl.innerHTML = "";
 
   const residentInfo = window.currentDocsResident || {};
+  if (infoWrapEl) {
+    if (opts.readOnly) {
+      infoWrapEl.classList.add("d-none");
+    } else {
+      infoWrapEl.classList.remove("d-none");
+    }
+  }
   if (infoNameEl) infoNameEl.innerText = residentInfo.full_name ?? "—";
   if (infoBirthdayEl) infoBirthdayEl.innerText = residentInfo.birthdate ?? "—";
   if (infoAddressEl) infoAddressEl.innerText = residentInfo.full_address ?? "—";
@@ -558,6 +566,15 @@ function openDocViewer(doc, parentModalEl, opts = {}) {
         alert(result?.message || "Failed to update document status.");
         return;
       }
+      doc.verify_status = result.status || doc.verify_status;
+      if (statusSelect.value === "DENIED") {
+        doc.remarks = reasonInput.value.trim();
+      } else {
+        doc.remarks = "";
+      }
+      if (window.lastDocsResident) {
+        openDocsModal(window.lastDocsResident, { refreshOnly: true });
+      }
       saveBtn.disabled = false;
       saveBtn.innerText = "Update";
 
@@ -572,16 +589,16 @@ function openDocViewer(doc, parentModalEl, opts = {}) {
               class: "btn btn-success",
               onClick: () => {
                 viewerModal?.hide();
-                if (parentModalEl) {
-                  const listModal = bootstrap.Modal.getOrCreateInstance(parentModalEl, {
-                    backdrop: "static",
-                    keyboard: false
-                  });
-                  listModal.show();
-                  if (window.lastDocsResident) {
-                    openDocsModal(window.lastDocsResident, { refreshOnly: true });
+                  if (parentModalEl) {
+                    const listModal = bootstrap.Modal.getOrCreateInstance(parentModalEl, {
+                      backdrop: "static",
+                      keyboard: false
+                    });
+                    listModal.show();
+                    if (window.lastDocsResident) {
+                      openDocsModal(window.lastDocsResident, { refreshOnly: true });
+                    }
                   }
-                }
               }
             }
           ]

@@ -8,6 +8,14 @@ $residentinformationtbl = $data['residentinformationtbl'];
 $residentaddresstbl = $data['residentaddresstbl'];
 $useraccountstbl = $data['useraccountstbl'];
 
+$computedAge = '';
+if (!empty($residentinformationtbl['birthdate'])) {
+    $dobDate = DateTime::createFromFormat('Y-m-d', $residentinformationtbl['birthdate']);
+    if ($dobDate) {
+        $computedAge = $dobDate->diff(new DateTime('today'))->y;
+    }
+}
+
 $profileImage = '../Images/Profile-Placeholder.png';
 $residentId = $residentinformationtbl['resident_id'] ?? '';
 if ($residentId !== '' && isset($conn) && $conn instanceof mysqli) {
@@ -98,7 +106,7 @@ if ($residentId !== '' && isset($conn) && $conn instanceof mysqli) {
                         <div class="col-12 col-md-6 col-lg-4">
                             <div class="d-flex flex-column gap-2">
                                 <div><strong>Name:</strong> <?= $residentinformationtbl['firstname'] . ' ' . $residentinformationtbl['lastname'] ?></div>
-                                <div><strong>Age:</strong> <?= $residentinformationtbl['age'] ?></div>
+                                <div><strong>Age:</strong> <?= $computedAge !== '' ? $computedAge : '—' ?></div>
                                 <div><strong>Birthdate:</strong> <?= $residentinformationtbl['birthdate'] ?></div>
                                 <div><strong>Sex:</strong> <?= $residentinformationtbl['sex'] ?></div>
                                 <div><strong>Civil Status:</strong> <?= $residentinformationtbl['civil_status'] ?></div>

@@ -12,6 +12,12 @@ if (empty($_SESSION['user_id'])) {
     exit;
 }
 
+// Block non-resident roles from Resident pages
+if (!in_array($_SESSION['role'] ?? '', ['Resident'], true)) {
+    header("Location: ../Guest-End/login.php");
+    exit;
+}
+
 require_once __DIR__ . "/../../PhpFiles/General/connection.php";
 
 $userId = $_SESSION['user_id'];
