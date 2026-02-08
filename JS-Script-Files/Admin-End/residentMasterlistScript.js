@@ -295,6 +295,9 @@ function openViewEntry(data) {
           row.appendChild(rowGrid);
           verifiedListEl.appendChild(row);
         });
+        if (verifiedListEl.childElementCount === 0) {
+          verifiedSectionEl.classList.add("d-none");
+        }
       })
       .catch(() => {
         verifiedSectionEl.classList.add("d-none");
@@ -305,7 +308,7 @@ function openViewEntry(data) {
 // ========================
 // VIEW SUBMITTED DOCUMENTS MODAL
 // ========================
-function openDocsModal(data) {
+function openDocsModal(data, opts = {}) {
   const modalEl = document.getElementById("modal-viewDocs");
   const titleEl = document.getElementById("docs-modal-title");
   const listPending = document.getElementById("docs-list-pending");
@@ -443,11 +446,13 @@ function openDocsModal(data) {
       emptyEl.classList.remove("d-none");
     });
 
-  const modalInstance = bootstrap.Modal.getOrCreateInstance(modalEl, {
-    backdrop: "static",
-    keyboard: false
-  });
-  modalInstance.show();
+  if (!opts.refreshOnly) {
+    const modalInstance = bootstrap.Modal.getOrCreateInstance(modalEl, {
+      backdrop: "static",
+      keyboard: false
+    });
+    modalInstance.show();
+  }
 }
 
 function openDocViewer(doc, parentModalEl, opts = {}) {
@@ -574,7 +579,7 @@ function openDocViewer(doc, parentModalEl, opts = {}) {
                   });
                   listModal.show();
                   if (window.lastDocsResident) {
-                    openDocsModal(window.lastDocsResident);
+                    openDocsModal(window.lastDocsResident, { refreshOnly: true });
                   }
                 }
               }
