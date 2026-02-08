@@ -79,7 +79,7 @@
 
         <div class="col-lg-4 certificate-card position-relative">
             <img src="../icons/identity.png" class="certificate-icon" alt="">
-            <h3>IDENTIY</h3>
+            <h3>IDENTITY</h3>
             <p class="certificate-text">
                 Lorem ipsum dolor sit amet, consectetur adipiscing elit,
                 sed do eiusmod tempor incididunt ut
@@ -102,3 +102,4 @@
 
 
            
+
