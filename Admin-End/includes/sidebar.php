@@ -125,12 +125,12 @@ if (!empty($_SESSION['user_id']) && isset($conn) && $conn instanceof mysqli) {
 
     <div class="sidebar-actions">
       <div class="dropdown mb-2 w-100">
-        <a href="#" class="d-flex align-items-center link-dark text-decoration-none dropdown-toggle"
+        <a href="#" class="d-flex align-items-center link-dark text-decoration-none dropdown-toggle w-100"
            data-bs-toggle="dropdown">
           <img src="../Images/Profile-Placeholder.png" width="40" height="40" class="rounded-circle me-2">
-          <div class="d-flex flex-column">
-            <span class="fw-bold mb-0"><?= htmlspecialchars($adminDisplayName) ?></span>
-            <small class="text-muted"><?= htmlspecialchars($adminPosition) ?></small>
+          <div class="flex-grow-1" style="min-width: 0;">
+            <span class="d-block fw-bold text-truncate mb-0"><?= htmlspecialchars($adminDisplayName) ?></span>
+            <small class="d-block text-muted text-truncate"><?= htmlspecialchars($adminPosition) ?></small>
           </div>
         </a>
         <ul class="dropdown-menu text-small shadow">

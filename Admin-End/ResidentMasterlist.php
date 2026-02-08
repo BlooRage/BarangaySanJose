@@ -260,43 +260,43 @@ if (isset($conn) && $conn instanceof mysqli) {
                             <div class="col-md-9">
                                 <div class="row g-3">
                                     <div class="col-md-12 col-lg-4">
-                                        <p class="text-muted small mb-0">Full Name</p>
+                                        <p class="text-muted small mb-0">Full Name:</p>
                                         <p id="txt-modalName" class="fw-bold mb-0"></p>
                                     </div>
                                     <div class="col-md-6 col-lg-4">
-                                        <p class="text-muted small mb-0">Sex</p>
+                                        <p class="text-muted small mb-0">Sex:</p>
                                         <p id="txt-modalSex" class="fw-bold mb-0"></p>
                                     </div>
                                     <div class="col-md-6 col-lg-4">
-                                        <p class="text-muted small mb-0">Religion</p>
+                                        <p class="text-muted small mb-0">Religion:</p>
                                         <p id="txt-modalReligion" class="fw-bold mb-0"></p>
                                     </div>
                                     <div class="col-md-6 col-lg-4">
-                                        <p class="text-muted small mb-0">Age</p>
+                                        <p class="text-muted small mb-0">Age:</p>
                                         <p id="txt-modalAge" class="fw-bold mb-0"></p>
                                     </div>
                                     <div class="col-md-6 col-lg-4">
-                                        <p class="text-muted small mb-0">Civil Status</p>
+                                        <p class="text-muted small mb-0">Civil Status:</p>
                                         <p id="txt-modalCivilStatus" class="fw-bold mb-0"></p>
                                     </div>
                                     <div class="col-md-6 col-lg-4">
-                                        <p class="text-muted small mb-0">Occupation</p>
+                                        <p class="text-muted small mb-0">Occupation:</p>
                                         <p id="txt-modalOccupation" class="fw-bold mb-0"></p>
                                     </div>
                                     <div class="col-md-6 col-lg-4">
-                                        <p class="text-muted small mb-0">Date of Birth</p>
+                                        <p class="text-muted small mb-0">Date of Birth:</p>
                                         <p id="txt-modalDob" class="fw-bold mb-0"></p>
                                     </div>
                                     <div class="col-md-6 col-lg-4">
-                                        <p class="text-muted small mb-0">Head of Family</p>
+                                        <p class="text-muted small mb-0">Head of Family:</p>
                                         <p id="txt-modalHeadOfFam" class="fw-bold mb-0"></p>
                                     </div>
                                     <div class="col-md-6 col-lg-4">
-                                        <p class="text-muted small mb-0">Voter Status</p>
+                                        <p class="text-muted small mb-0">Voter Status:</p>
                                         <p id="txt-modalVoterStatus" class="fw-bold mb-0"></p>
                                     </div>
                                     <div class="col-12">
-                                        <p class="text-muted small mb-0">Sector Membership</p>
+                                        <p class="text-muted small mb-0">Sector Membership:</p>
                                         <p id="txt-modalSectorMembership" class="fw-bold mb-0"></p>
                                     </div>
                                 </div>
@@ -313,19 +313,19 @@ if (isset($conn) && $conn instanceof mysqli) {
 
                         <div class="row g-3">
                             <div class="col-md-4">
-                                <p class="text-muted small mb-0">Full Name</p>
+                                <p class="text-muted small mb-0">Full Name:</p>
                                 <p id="txt-modalEmergencyFullName" class="fw-bold mb-0"></p>
                             </div>
                             <div class="col-md-4">
-                                <p class="text-muted small mb-0">Contact Number</p>
+                                <p class="text-muted small mb-0">Contact Number:</p>
                                 <p id="txt-modalEmergencyContactNumber" class="fw-bold mb-0"></p>
                             </div>
                             <div class="col-md-4">
-                                <p class="text-muted small mb-0">Relationship</p>
+                                <p class="text-muted small mb-0">Relationship:</p>
                                 <p id="txt-modalEmergencyRelationship" class="fw-bold mb-0"></p>
                             </div>
                             <div class="col-md-12">
-                                <p class="text-muted small mb-0">Address</p>
+                                <p class="text-muted small mb-0">Address:</p>
                                 <p id="txt-modalEmergencyAddress" class="fw-bold mb-0"></p>
                             </div>
                         </div>
@@ -340,39 +340,39 @@ if (isset($conn) && $conn instanceof mysqli) {
 
                         <div class="row g-3">
                             <div class="col-md-3" id="addr-unit-number">
-                                <p class="text-muted small mb-0">Unit Number</p>
+                                <p class="text-muted small mb-0">Unit Number:</p>
                                 <p id="txt-modalUnitNumber" class="fw-bold mb-0"></p>
                             </div>
                             <div class="col-md-3" id="addr-house-number">
-                                <p class="text-muted small mb-0">House Number</p>
+                                <p class="text-muted small mb-0">House Number:</p>
                                 <p id="txt-modalHouseNum" class="fw-bold mb-0"></p>
                             </div>
                             <div class="col-md-3" id="addr-street-name">
-                                <p class="text-muted small mb-0">Street Name</p>
+                                <p class="text-muted small mb-0">Street Name:</p>
                                 <p id="txt-modalStreetName" class="fw-bold mb-0"></p>
                             </div>
                             <div class="col-md-3" id="addr-phase-number">
-                                <p class="text-muted small mb-0">Phase</p>
+                                <p class="text-muted small mb-0">Phase:</p>
                                 <p id="txt-modalPhaseNumber" class="fw-bold mb-0"></p>
                             </div>
                             <div class="col-md-3" id="addr-subdivision">
-                                <p class="text-muted small mb-0">Subdivision</p>
+                                <p class="text-muted small mb-0">Subdivision:</p>
                                 <p id="txt-modalSubdivision" class="fw-bold mb-0"></p>
                             </div>
                             <div class="col-md-3" id="addr-area-number">
-                                <p class="text-muted small mb-0">Area Number</p>
+                                <p class="text-muted small mb-0">Area Number:</p>
                                 <p id="txt-modalAreaNumber" class="fw-bold mb-0"></p>
                             </div>
                             <div class="col-md-4">
-                                <p class="text-muted small mb-0">Barangay</p>
+                                <p class="text-muted small mb-0">Barangay:</p>
                                 <p id="txt-modalBarangay" class="fw-bold mb-0"></p>
                             </div>
                             <div class="col-md-4">
-                                <p class="text-muted small mb-0">Municipality / City</p>
+                                <p class="text-muted small mb-0">Municipality / City:</p>
                                 <p id="txt-modalMunicipalityCity" class="fw-bold mb-0"></p>
                             </div>
                             <div class="col-md-4">
-                                <p class="text-muted small mb-0">Province</p>
+                                <p class="text-muted small mb-0">Province:</p>
                                 <p id="txt-modalProvince" class="fw-bold mb-0"></p>
                             </div>
                         </div>
@@ -387,17 +387,17 @@ if (isset($conn) && $conn instanceof mysqli) {
 
                         <div class="row g-3">
                             <div class="col-md-4">
-                                <p class="text-muted small mb-0">House Ownership</p>
+                                <p class="text-muted small mb-0">House Ownership:</p>
                                 <p id="txt-modalHouseOwnership" class="fw-bold mb-0"></p>
                             </div>
 
                             <div class="col-md-4">
-                                <p class="text-muted small mb-0">House Type</p>
+                                <p class="text-muted small mb-0">House Type:</p>
                                 <p id="txt-modalHouseType" class="fw-bold mb-0"></p>
                             </div>
 
                             <div class="col-md-4">
-                                <p class="text-muted small mb-0">Residency Duration</p>
+                                <p class="text-muted small mb-0">Residency Duration:</p>
                                 <p id="txt-modalResidencyDuration" class="fw-bold mb-0"></p>
                             </div>
                         </div>
