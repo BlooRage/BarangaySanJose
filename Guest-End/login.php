@@ -68,7 +68,7 @@ if (isset($_SESSION['user_id'])) {
           <form class="form-box active" id="loginForm" action="../PhpFiles/Login/login.php" method="post" name="loginForm">
             <h1 class="mb-1 fs-2 text-center"><strong>Welcome Back!</strong></h1>
             <p class="text-center fs-6 text-muted intro-message">Please enter your credentials.</p>
-            <h4 class="mb-2 fs-4 text-center"><strong>Login</strong></h4>
+            <h4 class="mb-3 fs-4 text-center"><strong>Login</strong></h4>
 
             <input type="text" name="user" id="userAccount" class="fs-6 form-control mb-3" placeholder="Email / Phone" required />
 
@@ -79,7 +79,7 @@ if (isset($_SESSION['user_id'])) {
               </span>
             </div>
 
-            <div class="w-100 d-flex justify-content-end mb-3">
+            <div class="w-100 d-flex justify-content-center mb-3">
               <a href="javascript:void(0)" id="forgotPasswordLink" class="text-primary text-decoration-underline">Forgot Password?</a>
             </div>
 
@@ -287,8 +287,6 @@ if (isset($_SESSION['user_id'])) {
         });
     </script></body>
 </html>
-
-
 
 
 

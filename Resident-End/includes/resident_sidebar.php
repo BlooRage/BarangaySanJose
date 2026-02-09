@@ -35,6 +35,64 @@ $displayName = "Resident";
 $profileImage = '../Images/Profile-Placeholder.png';
 $residentId = '';
 
+if (!function_exists('toPublicPath')) {
+function toPublicPath($path): ?string {
+  $path = trim((string)$path);
+  if ($path === '') {
+    return null;
+  }
+
+  $normalized = str_replace("\\", "/", $path);
+  $normalized = preg_replace('#/+#', '/', $normalized);
+
+  $parts = explode('/', $normalized);
+  $cleanParts = [];
+  foreach ($parts as $part) {
+    if ($part === '' || $part === '.') {
+      continue;
+    }
+    if ($part === '..') {
+      array_pop($cleanParts);
+      continue;
+    }
+    $cleanParts[] = $part;
+  }
+  $normalized = '/' . implode('/', $cleanParts);
+
+  $scriptName = str_replace("\\", "/", (string)($_SERVER['SCRIPT_NAME'] ?? ''));
+  $appBase = '';
+  $phpFilesPos = strpos($scriptName, '/PhpFiles/');
+  if ($phpFilesPos !== false) {
+    $appBase = substr($scriptName, 0, $phpFilesPos);
+  }
+  $appBase = rtrim($appBase, '/');
+
+  $marker = '/UnifiedFileAttachment/';
+  $markerPos = stripos($normalized, $marker);
+  if ($markerPos !== false) {
+    $public = substr($normalized, $markerPos);
+    return ($appBase !== '' ? $appBase : '') . $public;
+  }
+
+  $webRoot = realpath(__DIR__ . "/../..");
+  if ($webRoot) {
+    $rootNorm = str_replace("\\", "/", $webRoot);
+    if (strpos($normalized, $rootNorm) === 0) {
+      $rel = substr($normalized, strlen($rootNorm));
+      if ($rel === '') {
+        return null;
+      }
+      if ($rel[0] !== '/') {
+        $rel = '/' . $rel;
+      }
+      return ($appBase !== '' ? $appBase : '') . $rel;
+    }
+  }
+
+  return ($appBase !== '' ? $appBase : '') . $normalized;
+}
+}
+
 if (!empty($_SESSION['user_id']) && isset($conn) && $conn instanceof mysqli) {
   $stmt = $conn->prepare("
     SELECT resident_id, firstname, middlename, lastname, suffix
@@ -85,7 +143,10 @@ if ($residentId !== '' && isset($conn) && $conn instanceof mysqli) {
     $stmtPic->execute();
     $stmtPic->bind_result($verifiedPicPath);
     if ($stmtPic->fetch() && !empty($verifiedPicPath)) {
-      $profileImage = $verifiedPicPath;
+      $publicPath = toPublicPath($verifiedPicPath);
+      if (!empty($publicPath)) {
+        $profileImage = $publicPath;
+      }
     }
     $stmtPic->close();
   }
