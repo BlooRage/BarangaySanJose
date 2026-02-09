@@ -29,9 +29,42 @@ function toPublicPath($path): ?string {
         return null;
     }
 
+    $normalized = str_replace("\\", "/", $path);
+    $normalized = preg_replace('#/+#', '/', $normalized);
+
+    // Resolve "." and ".." segments so browser URLs stay clean.
+    $parts = explode('/', $normalized);
+    $cleanParts = [];
+    foreach ($parts as $part) {
+        if ($part === '' || $part === '.') {
+            continue;
+        }
+        if ($part === '..') {
+            array_pop($cleanParts);
+            continue;
+        }
+        $cleanParts[] = $part;
+    }
+    $normalized = '/' . implode('/', $cleanParts);
+
+    $scriptName = str_replace("\\", "/", (string)($_SERVER['SCRIPT_NAME'] ?? ''));
+    $appBase = '';
+    $phpFilesPos = strpos($scriptName, '/PhpFiles/');
+    if ($phpFilesPos !== false) {
+        $appBase = substr($scriptName, 0, $phpFilesPos);
+    }
+    $appBase = rtrim($appBase, '/');
+
+    // Most records contain absolute filesystem paths; map them by folder marker.
+    $marker = '/UnifiedFileAttachment/';
+    $markerPos = stripos($normalized, $marker);
+    if ($markerPos !== false) {
+        $public = substr($normalized, $markerPos);
+        return ($appBase !== '' ? $appBase : '') . $public;
+    }
+
     $webRoot = realpath(__DIR__ . "/../..");
     if ($webRoot) {
-        $normalized = str_replace("\\", "/", $path);
         $rootNorm = str_replace("\\", "/", $webRoot);
         if (strpos($normalized, $rootNorm) === 0) {
             $rel = substr($normalized, strlen($rootNorm));
@@ -41,11 +74,11 @@ function toPublicPath($path): ?string {
             if ($rel[0] !== '/') {
                 $rel = '/' . $rel;
             }
-            return $rel;
+            return ($appBase !== '' ? $appBase : '') . $rel;
         }
     }
 
-    return $path;
+    return ($appBase !== '' ? $appBase : '') . $normalized;
 }
 
 /* =====================================================
@@ -560,7 +593,60 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_document_statu
         $stmt->execute();
         $stmt->close();
 
-        echo json_encode(['success' => true, 'status' => $statusMap[$uiStatus]]);
+        $profileImageUrl = null;
+        $residentId = null;
+        if ($statusMap[$uiStatus] === 'Verified') {
+            $stmt = $conn->prepare("
+                SELECT uf.source_id, dt.document_type_name, dt.document_category
+                FROM unifiedfileattachmenttbl uf
+                INNER JOIN documenttypelookuptbl dt
+                    ON uf.document_type_id = dt.document_type_id
+                WHERE uf.attachment_id = ?
+                LIMIT 1
+            ");
+            if ($stmt) {
+                $stmt->bind_param("i", $attachmentId);
+                $stmt->execute();
+                $stmt->bind_result($residentId, $docTypeName, $docCategory);
+                $stmt->fetch();
+                $stmt->close();
+            }
+
+            if ($residentId && $docTypeName === '2x2 Picture' && $docCategory === 'ResidentProfiling') {
+                $stmt = $conn->prepare("
+                    SELECT uf.file_path
+                    FROM unifiedfileattachmenttbl uf
+                    INNER JOIN documenttypelookuptbl dt
+                        ON uf.document_type_id = dt.document_type_id
+                    INNER JOIN statuslookuptbl s
+                        ON uf.status_id_verify = s.status_id
+                    WHERE uf.source_type = 'ResidentProfiling'
+                      AND uf.source_id = ?
+                      AND dt.document_type_name = '2x2 Picture'
+                      AND dt.document_category = 'ResidentProfiling'
+                      AND s.status_name = 'Verified'
+                      AND s.status_type = 'ResidentDocumentProfiling'
+                    ORDER BY uf.upload_timestamp DESC, uf.attachment_id DESC
+                    LIMIT 1
+                ");
+                if ($stmt) {
+                    $stmt->bind_param("s", $residentId);
+                    $stmt->execute();
+                    $stmt->bind_result($verifiedPicPath);
+                    if ($stmt->fetch() && !empty($verifiedPicPath)) {
+                        $profileImageUrl = toPublicPath($verifiedPicPath);
+                    }
+                    $stmt->close();
+                }
+            }
+        }
+
+        echo json_encode([
+            'success' => true,
+            'status' => $statusMap[$uiStatus],
+            'resident_id' => $residentId,
+            'profile_image_url' => $profileImageUrl
+        ]);
     } catch (Exception $e) {
         http_response_code(500);
         echo json_encode(['success' => false, 'message' => $e->getMessage()]);
