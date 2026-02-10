@@ -9,6 +9,7 @@ use PHPMailer\PHPMailer\Exception;
 class EmailSender
 {
     private PHPMailer $mail;
+    private string $lastError = '';
 
     private string $defaultFromEmail;
     private string $defaultFromName;
@@ -67,6 +68,7 @@ class EmailSender
     public function send(array $options): bool
     {
         try {
+            $this->lastError = '';
             $this->mail->clearAllRecipients();
             $this->mail->clearAttachments();
             $this->mail->clearReplyTos();
@@ -125,12 +127,23 @@ class EmailSender
             $this->mail->Body    = $bodyHtml;
             $this->mail->AltBody = $bodyText ?: $this->htmlToText($bodyHtml);
 
-            return $this->mail->send();
+            $sent = $this->mail->send();
+            if (!$sent) {
+                $this->lastError = $this->mail->ErrorInfo;
+                error_log('[EmailSender] ' . $this->lastError);
+            }
+            return $sent;
 
         } catch (Exception $e) {
-            error_log('[EmailSender] ' . $e->getMessage() . ' | ' . $this->mail->ErrorInfo);
+            $this->lastError = $e->getMessage() . ' | ' . $this->mail->ErrorInfo;
+            error_log('[EmailSender] ' . $this->lastError);
             return false;
         }
+    }
+
+    public function getLastError(): string
+    {
+        return $this->lastError;
     }
 
     private function renderTemplate(string $templateRelativePath, array $data): string

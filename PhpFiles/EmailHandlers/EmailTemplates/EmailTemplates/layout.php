@@ -17,7 +17,7 @@
           <?php include __DIR__ . '/partials/header.php'; ?>
 
           <tr>
-            <td style="padding:40px;color:#000000;background-image:url('https://BarangaySanJose-Montalban.com/Images/SanJose_Email_Watermark.png');background-repeat:no-repeat;background-position:center;background-size:260px auto;background-color:#ffffff;">
+            <td style="padding:40px;color:#000000;">
               <?php include $__content_template; ?>
             </td>
           </tr>

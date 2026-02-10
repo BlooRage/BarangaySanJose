@@ -1,36 +1,14 @@
 <?php
-// PhpFiles/EmailHandlers/sendEmailVerify.php
+// PhpFiles/EmailHandlers/testSendVerify.php
 session_start();
 
 require_once __DIR__ . "/../General/connection.php";
 require_once __DIR__ . "/../General/mailConfigurations.php";
 require_once __DIR__ . "/emailSender.php";
 
-function wantsJsonResponse(): bool
-{
-  $contentType = $_SERVER['CONTENT_TYPE'] ?? '';
-  $accept = $_SERVER['HTTP_ACCEPT'] ?? '';
-  $requestedWith = $_SERVER['HTTP_X_REQUESTED_WITH'] ?? '';
-
-  return stripos($contentType, 'application/json') !== false
-    || stripos($accept, 'application/json') !== false
-    || strtolower($requestedWith) === 'xmlhttprequest';
-}
-
-function jsonResponse(int $status, array $payload): void
-{
-  http_response_code($status);
-  header('Content-Type: application/json');
-  echo json_encode($payload);
-  exit;
-}
-
 // must be logged in
 $userId = $_SESSION['user_id'] ?? '';
 if ($userId === '') {
-  if (wantsJsonResponse()) {
-    jsonResponse(401, ['success' => false, 'message' => 'Not logged in.']);
-  }
   http_response_code(401);
   exit("Not logged in.");
 }
@@ -41,20 +19,12 @@ $stmt->bind_param("s", $userId);
 $stmt->execute();
 $res = $stmt->get_result();
 
-if ($res->num_rows === 0) {
-  if (wantsJsonResponse()) {
-    jsonResponse(404, ['success' => false, 'message' => 'User not found.']);
-  }
-  exit("User not found.");
-}
+if ($res->num_rows === 0) exit("User not found.");
 
 $user = $res->fetch_assoc();
 $email = $user['email'];
 
 if ((int)$user['email_verify'] === 1) {
-  if (wantsJsonResponse()) {
-    jsonResponse(400, ['success' => false, 'message' => 'Email already verified.']);
-  }
   header("Location: ../../Resident-End/resident_dashboard.php?email=already_verified");
   exit;
 }
@@ -77,10 +47,7 @@ $ins->bind_param("sss", $userId, $tokenHash, $expiresAt);
 $ins->execute();
 
 // 4) Build verification link
-$scheme = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
-$host = $_SERVER['HTTP_HOST'] ?? 'localhost';
-$rootPath = dirname(dirname(dirname($_SERVER['SCRIPT_NAME'] ?? '/BarangaySanJose/PhpFiles/EmailHandlers/sendEmailVerify.php')));
-$baseUrl = rtrim($scheme . "://" . $host . $rootPath, '/');
+$baseUrl = "localhost/BarangaySanJose";
 $verifyUrl = $baseUrl . "/Guest-End/verifyEmail.php?uid=" . urlencode($userId) . "&token=" . urlencode($rawToken);
 
 // 5) Load SMTP config + send
@@ -100,15 +67,8 @@ $sent = $emailSender->send([
 ]);
 
 if ($sent) {
-  if (wantsJsonResponse()) {
-    jsonResponse(200, ['success' => true, 'message' => 'Verification email sent.']);
-  }
   header("Location: ../../Resident-End/resident_dashboard.php?email=sent");
   exit;
-}
-
-if (wantsJsonResponse()) {
-  jsonResponse(500, ['success' => false, 'message' => 'Unable to send verification email.']);
 }
 
 header("Location: ../../Resident-End/resident_dashboard.php?email=failed");

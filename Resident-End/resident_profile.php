@@ -293,7 +293,9 @@ if ($residentId !== '' && isset($conn) && $conn instanceof mysqli) {
                         <div class="col-12 col-md-6"><a href="javascript:void(0)">Change Email</a></div>
                         <div class="col-12 col-md-6"><a href="javascript:void(0)">Change Phone Number</a></div>
                         <?php if (!(int)($useraccountstbl['email_verify'] ?? 0)): ?>
-                            <div class="col-12 col-md-6"><a href="javascript:void(0)" id="verifyEmailLink">Verify Email</a></div>
+                            <div class="col-12 col-md-6">
+                                <a href="javascript:void(0)" id="verifyEmailLink">Verify Email</a>
+                            </div>
                         <?php else: ?>
                             <div class="col-12 col-md-6 text-muted fst-italic">Email already verified</div>
                         <?php endif; ?>
@@ -496,55 +498,67 @@ if ($residentId !== '' && isset($conn) && $conn instanceof mysqli) {
         if (verifyEmailLink) {
             verifyEmailLink.addEventListener("click", async (e) => {
                 e.preventDefault();
-                try {
-                    const controller = new AbortController();
-                    if (window.UniversalModal?.open) {
-                        window.UniversalModal.open({
-                            title: "Please Wait",
-                            message: "Sending verification email...",
-                            buttons: [
-                                {
-                                    label: "Cancel",
-                                    class: "btn btn-outline-secondary",
-                                    onClick: () => {
-                                        controller.abort();
+                const sendVerification = async () => {
+                    try {
+                        const controller = new AbortController();
+                        if (window.UniversalModal?.open) {
+                            window.UniversalModal.open({
+                                title: "Please Wait",
+                                message: "Sending verification email...",
+                                buttons: [
+                                    {
+                                        label: "Cancel",
+                                        class: "btn btn-outline-secondary",
+                                        onClick: () => controller.abort(),
                                     },
-                                },
-                            ],
+                                ],
+                            });
+                        }
+                        const res = await fetch("../PhpFiles/EmailHandlers/sendEmailVerify.php", {
+                            method: "POST",
+                            headers: { "Accept": "application/json" },
+                            signal: controller.signal,
                         });
+                        const data = await res.json().catch(() => ({}));
+                        if (!res.ok || !data.success) {
+                            throw new Error(data.message || "Unable to send verification email.");
+                        }
+                        if (window.UniversalModal?.open) {
+                            window.UniversalModal.open({
+                                title: "Verification Email Sent",
+                                messageHtml: "An email verification has been sent to your email. Click the verify button to proceed.<br><b>The verify link will expire in 30 minutes.</b>",
+                                buttons: [{ label: "OK", class: "btn btn-primary" }],
+                            });
+                        } else {
+                            alert("Verification Email Sent\nCheck your inbox. The verify link will expire in 30 minutes.");
+                        }
+                    } catch (err) {
+                        if (err?.name === "AbortError" || err?.message === "Aborted" || err?.code === DOMException.ABORT_ERR) {
+                            return;
+                        }
+                        if (window.UniversalModal?.open) {
+                            window.UniversalModal.open({
+                                title: "Error",
+                                message: err?.message || "Unable to send verification email.",
+                                buttons: [{ label: "OK", class: "btn btn-danger" }],
+                            });
+                        } else {
+                            alert(err?.message || "Unable to send verification email.");
+                        }
                     }
-                    const res = await fetch("../PhpFiles/EmailHandlers/sendEmailVerify.php", {
-                        method: "POST",
-                        headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({}),
-                        signal: controller.signal,
+                };
+
+                if (window.UniversalModal?.open) {
+                    window.UniversalModal.open({
+                        title: "Verify Email",
+                        message: "Send a verification email to your registered address?",
+                        buttons: [
+                            { label: "Cancel", class: "btn btn-outline-secondary" },
+                            { label: "Send Email", class: "btn btn-primary", onClick: sendVerification },
+                        ],
                     });
-                    const data = await res.json().catch(() => ({}));
-                    if (!res.ok || !data.success) {
-                        throw new Error(data.message || "Unable to send verification email.");
-                    }
-                    if (window.UniversalModal?.open) {
-                        window.UniversalModal.open({
-                            title: "Verification Email Sent",
-                            messageHtml: "An email verification has been sent to your email, click the verify button to proceed.<br><b>The verify link will expire in 15 minutes.</b>",
-                            buttons: [{ label: "OK", class: "btn btn-primary" }],
-                        });
-                    } else {
-                        alert("Verification Email Sent\nAn email verification has been sent to your email, click the verify button to proceed. The verify link will expire in 15 minutes.");
-                    }
-                } catch (err) {
-                    if (err?.name === "AbortError" || err?.message === "Aborted" || err?.code === DOMException.ABORT_ERR) {
-                        return;
-                    }
-                    if (window.UniversalModal?.open) {
-                        window.UniversalModal.open({
-                            title: "Error",
-                            message: err?.message || "Unable to send verification email.",
-                            buttons: [{ label: "OK", class: "btn btn-danger" }],
-                        });
-                    } else {
-                        alert(err?.message || "Unable to send verification email.");
-                    }
+                } else {
+                    sendVerification();
                 }
             });
         }
