@@ -251,7 +251,7 @@
 
             <div class="modal-footer border-0">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                <button type="submit" class="btn btn-success px-4">Save</button>
+                <button type="submit" id="btn-addMemberSave" class="btn btn-success px-4" disabled>Save</button>
             </div>
         </form>
     </div>

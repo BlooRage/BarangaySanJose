@@ -168,17 +168,17 @@ document.addEventListener("DOMContentLoaded", () => {
           const adultItems = renderListItems(hh.adults);
           const minorItems = renderListItems(hh.minors);
           const wrapper = document.createElement("div");
-          wrapper.className = "mb-3";
+          wrapper.className = "border rounded-3 p-3 mb-4 bg-light";
           wrapper.innerHTML = `
-            <br>
-            <h6 class="fw-bold mb-2">${hh.head_full_name ?? "—"}</h6>
+            <p class="text-muted small mb-1">Head of the Family:</p>
+            <h6 class="fw-bold mb-3">${hh.head_full_name ?? "—"}</h6>
             <div class="row g-2">
-              <div class="col-md-4">
+              <div class="col-md-6">
                 <p class="text-muted small mb-0">Adults:</p>
                 <p class="fw-bold mb-0">${hh.adult_count ?? 0}</p>
                 <ul class="small mb-0 ps-3">${adultItems}</ul>
               </div>
-              <div class="col-md-4">
+              <div class="col-md-6">
                 <p class="text-muted small mb-0">Minors:</p>
                 <p class="fw-bold mb-0">${(hh.member_count ?? 0) - (hh.adult_count ?? 0)}</p>
                 <ul class="small mb-0 ps-3">${minorItems}</ul>
@@ -224,6 +224,13 @@ document.addEventListener("DOMContentLoaded", () => {
   // ========================
   // ADD HOUSEHOLD MEMBER MODAL
   // ========================
+  function updateAddMemberSaveState() {
+    const form = document.getElementById("form-addHouseholdMember");
+    const saveBtn = document.getElementById("btn-addMemberSave");
+    if (!form || !saveBtn) return;
+    saveBtn.disabled = !form.checkValidity();
+  }
+
   function openAddMember(data) {
     const form = document.getElementById("form-addHouseholdMember");
     if (form) form.reset();
@@ -255,10 +262,16 @@ document.addEventListener("DOMContentLoaded", () => {
       backdrop: "static",
       keyboard: true
     }).show();
+    updateAddMemberSaveState();
   }
 
   const addMemberForm = document.getElementById("form-addHouseholdMember");
   if (addMemberForm) {
+    ["input", "change"].forEach(evt => {
+      addMemberForm.addEventListener(evt, updateAddMemberSaveState);
+    });
+    updateAddMemberSaveState();
+
     addMemberForm.addEventListener("submit", e => {
       if (!confirm("Are you sure you want to add this household member?")) {
         e.preventDefault();
