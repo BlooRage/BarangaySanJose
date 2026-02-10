@@ -363,15 +363,15 @@ if (isset($conn) && $conn instanceof mysqli) {
                                 <p class="text-muted small mb-0">Area Number:</p>
                                 <p id="txt-modalAreaNumber" class="fw-bold mb-0"></p>
                             </div>
-                            <div class="col-md-4">
+                            <div class="col-md-3">
                                 <p class="text-muted small mb-0">Barangay:</p>
                                 <p id="txt-modalBarangay" class="fw-bold mb-0"></p>
                             </div>
-                            <div class="col-md-4">
+                            <div class="col-md-3">
                                 <p class="text-muted small mb-0">Municipality / City:</p>
                                 <p id="txt-modalMunicipalityCity" class="fw-bold mb-0"></p>
                             </div>
-                            <div class="col-md-4">
+                            <div class="col-md-3">
                                 <p class="text-muted small mb-0">Province:</p>
                                 <p id="txt-modalProvince" class="fw-bold mb-0"></p>
                             </div>
