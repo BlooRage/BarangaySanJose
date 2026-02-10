@@ -34,6 +34,7 @@ function activeLink($page, $current) {
 $displayName = "Resident";
 $profileImage = '../Images/Profile-Placeholder.png';
 $residentId = '';
+$isHeadOfFamily = false;
 
 if (!function_exists('toPublicPath')) {
 function toPublicPath($path): ?string {
@@ -95,7 +96,7 @@ function toPublicPath($path): ?string {
 
 if (!empty($_SESSION['user_id']) && isset($conn) && $conn instanceof mysqli) {
   $stmt = $conn->prepare("
-    SELECT resident_id, firstname, middlename, lastname, suffix
+    SELECT resident_id, firstname, middlename, lastname, suffix, head_of_family
     FROM residentinformationtbl
     WHERE user_id = ?
     LIMIT 1
@@ -116,6 +117,9 @@ if (!empty($_SESSION['user_id']) && isset($conn) && $conn instanceof mysqli) {
       if ($fullName !== '') {
         $displayName = $fullName;
       }
+      $headOfFamilyRaw = $row['head_of_family'] ?? '';
+      $headOfFamilyNormalized = strtolower(trim((string)$headOfFamilyRaw));
+      $isHeadOfFamily = in_array($headOfFamilyNormalized, ['yes', 'true', '1', 'y'], true);
     }
     $stmt->close();
   }
@@ -221,6 +225,12 @@ if ($residentId !== '' && isset($conn) && $conn instanceof mysqli) {
            class="a-sidebarLink <?= activeLink('resident_appointments.php', $current) ?>">
           <i class="fa-solid fa-clock-rotate-left"></i>Transactions
         </a>
+        <?php if ($isHeadOfFamily): ?>
+        <a href="resident_household.php"
+           class="a-sidebarLink <?= activeLink('resident_household.php', $current) ?>">
+          <i class="fa-solid fa-people-roof"></i>Household Profiling
+        </a>
+        <?php endif; ?>
       </div>
     </nav>
 

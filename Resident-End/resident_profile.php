@@ -125,11 +125,6 @@ if ($residentId !== '' && isset($conn) && $conn instanceof mysqli) {
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
   <script src="../JS-Script-Files/modalHandler.js" defer></script>
     <link rel="stylesheet" href="../CSS-Styles/Resident-End-CSS/residentDashboard.css">
-    <style>
-        .main-head {
-            color: #fcdabc;
-        }
-    </style>
 </head>
 
 <body>
@@ -152,10 +147,11 @@ if ($residentId !== '' && isset($conn) && $conn instanceof mysqli) {
 
         <main id="div-mainDisplay" class="flex-grow-1 px-4 pb-4 pt-0 px-md-5 pb-md-5 pt-md-0 bg-light">
 
-    <div class="main-head text-center py-1 rounded mb-0 mt-0">
-                <h3 class="mb-0 text-black">RESIDENT PROFILE</h3>
+            <div class="main-head text-center py-1 rounded my-2">
+                <h3 class="mb-0 text-black">ACCOUNT</h3>
             </div>
             <hr class="mt-1 mb-2">
+
             <div class="card shadow-sm mb-4">
                 <div class="card-header d-flex justify-content-between">
                     <strong>PERSONAL INFORMATION</strong>

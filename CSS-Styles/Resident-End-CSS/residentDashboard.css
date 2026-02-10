@@ -279,3 +279,8 @@ body {
     flex: 0 0 50% !important;
     max-width: 50% !important;
 }
+
+.main-head {
+    color: #c76400;
+}
+
