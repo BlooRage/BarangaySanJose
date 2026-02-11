@@ -1,9 +1,4 @@
 <?php
-ini_set('display_errors', 1);
-ini_set('display_startup_errors', 1);
-error_reporting(E_ALL);
-
-
 // PhpFiles/EmailHandlers/sendEmailVerify.php
 session_start();
 
@@ -30,7 +25,7 @@ function jsonResponse(int $status, array $payload): void
   exit;
 }
 
-// ✅ must be logged in
+// must be logged in
 $userId = $_SESSION['user_id'] ?? '';
 if ($userId === '') {
   if (wantsJsonResponse()) {
@@ -57,7 +52,6 @@ $user = $res->fetch_assoc();
 $email = $user['email'];
 
 if ((int)$user['email_verify'] === 1) {
-  // already verified — redirect back
   if (wantsJsonResponse()) {
     jsonResponse(400, ['success' => false, 'message' => 'Email already verified.']);
   }
@@ -82,11 +76,17 @@ $ins = $conn->prepare("
 $ins->bind_param("sss", $userId, $tokenHash, $expiresAt);
 $ins->execute();
 
-// 4) Build verification link (✅ match your real verify handler)
+// 4) Build verification link
 $scheme = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
-$host = $_SERVER['HTTP_HOST'] ?? 'localhost';
+$host = $_SERVER['HTTP_HOST'] ?? '';
 $rootPath = dirname(dirname(dirname($_SERVER['SCRIPT_NAME'] ?? '/BarangaySanJose/PhpFiles/EmailHandlers/sendEmailVerify.php')));
-$baseUrl = rtrim($scheme . "://" . $host . $rootPath, '/');
+
+// Force production domain when running on localhost.
+if ($host === '' || stripos($host, 'localhost') !== false || strpos($host, '127.0.0.1') === 0) {
+  $baseUrl = 'https://barangaysanjose-montalban.com';
+} else {
+  $baseUrl = rtrim($scheme . "://" . $host . $rootPath, '/');
+}
 $verifyUrl = $baseUrl . "/Guest-End/verifyEmail.php?uid=" . urlencode($userId) . "&token=" . urlencode($rawToken);
 
 // 5) Load SMTP config + send

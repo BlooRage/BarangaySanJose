@@ -11,6 +11,13 @@ $useraccountstbl = $data['useraccountstbl'];
 $computedAge = '';
 if (!empty($residentinformationtbl['birthdate'])) {
     $dobDate = DateTime::createFromFormat('Y-m-d', $residentinformationtbl['birthdate']);
+    if (!$dobDate) {
+        try {
+            $dobDate = new DateTime($residentinformationtbl['birthdate']);
+        } catch (Exception $e) {
+            $dobDate = null;
+        }
+    }
     if ($dobDate) {
         $computedAge = $dobDate->diff(new DateTime('today'))->y;
     }
@@ -18,6 +25,59 @@ if (!empty($residentinformationtbl['birthdate'])) {
 
 $profileImage = '../Images/Profile-Placeholder.png';
 $residentId = $residentinformationtbl['resident_id'] ?? '';
+$headOfFamilyRaw = $residentinformationtbl['head_of_family'] ?? '';
+$headOfFamilyNormalized = strtolower(trim((string)$headOfFamilyRaw));
+$isHeadOfFamily = in_array($headOfFamilyNormalized, ['yes', 'true', '1', 'y'], true);
+
+if (!function_exists('toPublicPath')) {
+function toPublicPath($path): ?string {
+    $path = trim((string)$path);
+    if ($path === '') {
+        return null;
+    }
+
+    $normalized = str_replace("\\", "/", $path);
+    $normalized = preg_replace('#/+#', '/', $normalized);
+
+    $parts = explode('/', $normalized);
+    $cleanParts = [];
+    foreach ($parts as $part) {
+        if ($part === '' || $part === '.') {
+            continue;
+        }
+        if ($part === '..') {
+            array_pop($cleanParts);
+            continue;
+        }
+        $cleanParts[] = $part;
+    }
+    $normalized = '/' . implode('/', $cleanParts);
+
+    $marker = '/UnifiedFileAttachment/';
+    $markerPos = stripos($normalized, $marker);
+    if ($markerPos !== false) {
+        $public = substr($normalized, $markerPos);
+        return '..' . $public;
+    }
+
+    $webRoot = realpath(__DIR__ . "/..");
+    if ($webRoot) {
+        $rootNorm = str_replace("\\", "/", $webRoot);
+        if (strpos($normalized, $rootNorm) === 0) {
+            $rel = substr($normalized, strlen($rootNorm));
+            if ($rel === '') {
+                return null;
+            }
+            if ($rel[0] !== '/') {
+                $rel = '/' . $rel;
+            }
+            return '../' . ltrim($rel, '/');
+        }
+    }
+
+    return '../' . ltrim($normalized, '/');
+}
+}
 if ($residentId !== '' && isset($conn) && $conn instanceof mysqli) {
     $stmtPic = $conn->prepare("
         SELECT uf.file_path
@@ -40,7 +100,10 @@ if ($residentId !== '' && isset($conn) && $conn instanceof mysqli) {
         $stmtPic->execute();
         $stmtPic->bind_result($verifiedPicPath);
         if ($stmtPic->fetch() && !empty($verifiedPicPath)) {
-            $profileImage = $verifiedPicPath;
+            $publicPath = toPublicPath($verifiedPicPath);
+            if (!empty($publicPath)) {
+                $profileImage = $publicPath;
+            }
         }
         $stmtPic->close();
     }
@@ -52,16 +115,20 @@ if ($residentId !== '' && isset($conn) && $conn instanceof mysqli) {
 
 <head>
     <meta charset="UTF-8">
-    <title>Resident Profile</title>
+    
+  <link rel="icon" href="/Images/favicon_sanjose.png?v=20260211">
+<title>Resident Profile</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
   <script src="../JS-Script-Files/modalHandler.js" defer></script>
+  <script src="../JS-Script-Files/Resident-End/householdMembers.js" defer></script>
+  <script src="../JS-Script-Files/Resident-End/profileOccupation.js" defer></script>
+  <script src="../JS-Script-Files/Resident-End/profileSidebar.js" defer></script>
+  <script src="../JS-Script-Files/Resident-End/profileVerifyEmail.js" defer></script>
+  <script src="../JS-Script-Files/Resident-End/householdInviteModal.js" defer></script>
+  <script src="../JS-Script-Files/Resident-End/householdJoin.js" defer></script>
+  <script src="../JS-Script-Files/Resident-End/profileTabs.js" defer></script>
     <link rel="stylesheet" href="../CSS-Styles/Resident-End-CSS/residentDashboard.css">
-    <style>
-        .main-head {
-            color: #fcdabc;
-        }
-    </style>
 </head>
 
 <body>
@@ -84,10 +151,27 @@ if ($residentId !== '' && isset($conn) && $conn instanceof mysqli) {
 
         <main id="div-mainDisplay" class="flex-grow-1 px-4 pb-4 pt-0 px-md-5 pb-md-5 pt-md-0 bg-light">
 
-    <div class="main-head text-center py-1 rounded mb-0 mt-0">
-                <h3 class="mb-0 text-black">RESIDENT PROFILE</h3>
+            <div class="main-head text-center py-1 rounded my-2">
+                <h3 class="mb-0 text-black">ACCOUNT</h3>
             </div>
             <hr class="mt-1 mb-2">
+
+            <ul class="nav profile-tabs mb-3" role="tablist">
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link active" id="tab-profile" data-bs-toggle="tab" data-bs-target="#pane-profile" type="button" role="tab" aria-controls="pane-profile" aria-selected="true">
+                        Profile
+                    </button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link" id="tab-household" data-bs-toggle="tab" data-bs-target="#pane-household" type="button" role="tab" aria-controls="pane-household" aria-selected="false">
+                        Household
+                    </button>
+                </li>
+            </ul>
+
+            <div class="tab-content">
+                <div class="tab-pane fade show active" id="pane-profile" role="tabpanel" aria-labelledby="tab-profile" tabindex="0">
+
             <div class="card shadow-sm mb-4">
                 <div class="card-header d-flex justify-content-between">
                     <strong>PERSONAL INFORMATION</strong>
@@ -201,24 +285,40 @@ if ($residentId !== '' && isset($conn) && $conn instanceof mysqli) {
                             <div>
                                 <strong>Account Status:</strong>
                                 <?php
-                                  $statusLabel = $residentinformationtbl['status_name_resident'] ?? '';
-                                  $statusClass = 'text-danger';
-                                  if ($statusLabel === 'PendingVerification' || $statusLabel === 'PendingReview') {
-                                      $statusClass = 'text-warning';
-                                  } elseif ($statusLabel === 'VerifiedResident') {
-                                      $statusClass = 'text-success';
+                                  $statusLabelRaw = trim((string)($residentinformationtbl['status_name_resident'] ?? ''));
+                                  $statusLabel = $statusLabelRaw !== '' ? $statusLabelRaw : 'NotVerified';
+                                  $statusKey = strtolower(str_replace([' ', '_', '-'], '', $statusLabel));
+                                  $statusClass = 'status-badge status-badge--default';
+
+                                  if ($statusKey === 'pendingverification' || $statusKey === 'pendingreview') {
+                                      $statusClass = 'status-badge status-badge--pending';
+                                  } elseif ($statusKey === 'verifiedresident') {
+                                      $statusClass = 'status-badge status-badge--verified';
+                                  } elseif ($statusKey === 'notverified') {
+                                      $statusClass = 'status-badge status-badge--denied';
+                                  } elseif ($statusKey === 'archived') {
+                                      $statusClass = 'status-badge status-badge--archived';
                                   }
+
+                                  $statusDisplay = preg_replace('/(?<!^)([A-Z])/', ' $1', $statusLabel);
                                 ?>
-                                <span class="<?= $statusClass ?> fw-semibold">
-                                  <?= $statusLabel !== '' ? $statusLabel : 'Not Verified' ?>
+                                <span class="<?= htmlspecialchars($statusClass, ENT_QUOTES, 'UTF-8') ?>">
+                                  <?= htmlspecialchars($statusDisplay, ENT_QUOTES, 'UTF-8') ?>
                                 </span>
                             </div>
                         </div>
                         <div class="col-12 col-md-6">
                             <div><strong>Mobile Number:</strong> +63<?= $useraccountstbl['phone_number'] ?></div>
                             <div><strong>Email:</strong> <?= $useraccountstbl['email'] ?>
-                                <span class="text-muted fst-italic ms-2">
-                                    <?= ($useraccountstbl['email_verify'] ?? 0) ? 'Verified' : 'Not Verified' ?>
+                                <?php
+                                  $emailVerified = (int)($useraccountstbl['email_verify'] ?? 0) === 1;
+                                  $emailVerifyClass = $emailVerified
+                                      ? 'status-badge status-badge--verified'
+                                      : 'status-badge status-badge--denied';
+                                  $emailVerifyLabel = $emailVerified ? 'Verified' : 'Not Verified';
+                                ?>
+                                <span class="<?= htmlspecialchars($emailVerifyClass, ENT_QUOTES, 'UTF-8') ?>">
+                                    <?= htmlspecialchars($emailVerifyLabel, ENT_QUOTES, 'UTF-8') ?>
                                 </span>
                             </div>
                         </div>
@@ -229,7 +329,9 @@ if ($residentId !== '' && isset($conn) && $conn instanceof mysqli) {
                         <div class="col-12 col-md-6"><a href="javascript:void(0)">Change Email</a></div>
                         <div class="col-12 col-md-6"><a href="javascript:void(0)">Change Phone Number</a></div>
                         <?php if (!(int)($useraccountstbl['email_verify'] ?? 0)): ?>
-                            <div class="col-12 col-md-6"><a href="javascript:void(0)" id="verifyEmailLink">Verify Email</a></div>
+                            <div class="col-12 col-md-6">
+                                <a href="javascript:void(0)" id="verifyEmailLink">Verify Email</a>
+                            </div>
                         <?php else: ?>
                             <div class="col-12 col-md-6 text-muted fst-italic">Email already verified</div>
                         <?php endif; ?>
@@ -237,8 +339,134 @@ if ($residentId !== '' && isset($conn) && $conn instanceof mysqli) {
                 </div>
             </div>
 
+                </div>
+                <div class="tab-pane fade" id="pane-household" role="tabpanel" aria-labelledby="tab-household" tabindex="0">
+                    <?php if (!$isHeadOfFamily): ?>
+                    <div class="card shadow-sm mb-4">
+                        <div class="card-header">
+                            <strong>JOIN HOUSEHOLD</strong>
+                        </div>
+                        <div class="card-body">
+                            <div class="row g-2 align-items-end">
+                                <div class="col-12 col-md-8">
+                                    <label for="householdJoinCode" class="form-label small text-muted">Invite Code</label>
+                                    <input type="text" class="form-control" id="householdJoinCode" placeholder="Enter invite code">
+                                </div>
+                                <div class="col-12 col-md-4">
+                                    <button class="btn btn-primary w-100" id="btnJoinHousehold">Join Household</button>
+                                </div>
+                            </div>
+                            <div id="householdJoinResult" class="small mt-2"></div>
+                        </div>
+                    </div>
+                    <?php endif; ?>
+                    <div class="card shadow-sm mb-4">
+                        <div class="card-header d-flex justify-content-between align-items-center">
+                            <strong>HOUSEHOLD INFORMATION</strong>
+                            <?php if ($isHeadOfFamily): ?>
+                            <button class="btn btn-success btn-sm" data-bs-toggle="modal" data-bs-target="#householdInviteModal">
+                                Add Household Member
+                            </button>
+                            <?php else: ?>
+                            <button class="btn btn-danger btn-sm" id="btnLeaveHousehold">
+                                Leave Household
+                            </button>
+                            <?php endif; ?>
+                        </div>
+                        <div class="card-body">
+                            <div class="mb-3">
+                                <div class="text-muted small">Address</div>
+                                <div id="householdAddress" class="fw-semibold">—</div>
+                            </div>
+                            <div class="row g-2 mb-3">
+                                <div class="col-6 col-md-4">
+                                    <div class="text-muted small">Minors</div>
+                                    <div id="householdMinorCount" class="fw-semibold">0</div>
+                                </div>
+                                <div class="col-6 col-md-4">
+                                    <div class="text-muted small">Adults</div>
+                                    <div id="householdAdultCount" class="fw-semibold">0</div>
+                                </div>
+                            </div>
+                            <div id="householdMembersGrid" class="row g-3"></div>
+                            <div id="householdMembersEmpty" class="text-muted small mt-2 d-none">
+                                No household members yet.
+                            </div>
+                            <div class="mt-3 text-muted small">
+                                Only the head of the family can add or manage household members.
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
         </main>
     </div>
+
+    <?php if ($isHeadOfFamily): ?>
+    <div class="modal fade" id="householdInviteModal" tabindex="-1" data-bs-backdrop="static" data-bs-keyboard="false">
+        <div class="modal-dialog modal-md modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Invite Household Members</h5>
+                    <button class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <p class="text small mb-2">
+                            Invite members with accounts via SMS.
+                        </p>
+                        <div id="householdInvitePhoneList" class="d-flex flex-column gap-2">
+                            <div class="input-group">
+                                <span class="input-group-text">+63</span>
+                                <input type="text" class="form-control household-invite-phone" placeholder="9XXXXXXXXX" inputmode="numeric" pattern="^\d{9}$" maxlength="9">
+                            </div>
+                        </div>
+                        <button type="button" class="btn btn-primary btn-sm mt-2" id="btnAddInvitePhone">
+                            Add Another Number
+                        </button>
+                        <div class="form-text mt-2">Use PH format starting with +63.</div>
+                        <div id="householdInviteResult" class="small mt-2"></div>
+                    </div>
+                    <hr class="my-3">
+                    <div>
+                        <p class="text small mb-2">
+                            Add member without an account.
+                        </p>
+                        <div class="row g-2">
+                            <div class="col-12 col-md-6">
+                                <label class="form-label small text-muted">Last Name <span class="text-danger">*</span></label>
+                                <input type="text" class="form-control" id="hmLastName" placeholder="Last Name">
+                            </div>
+                            <div class="col-12 col-md-6">
+                                <label class="form-label small text-muted">First Name <span class="text-danger">*</span></label>
+                                <input type="text" class="form-control" id="hmFirstName" placeholder="First Name">
+                            </div>
+                            <div class="col-12 col-md-6">
+                                <label class="form-label small text-muted">Middle Name</label>
+                                <input type="text" class="form-control" id="hmMiddleName" placeholder="Middle Name">
+                            </div>
+                            <div class="col-12 col-md-6">
+                                <label class="form-label small text-muted">Suffix</label>
+                                <input type="text" class="form-control" id="hmSuffix" placeholder="Suffix (e.g. Jr.)">
+                            </div>
+                            <div class="col-12 col-md-6">
+                                <label class="form-label small text-muted">Birthdate</label>
+                                <input type="date" class="form-control" id="hmBirthdate">
+                            </div>
+                        </div>
+                        <div id="householdMemberAddResult" class="small mt-2"></div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button class="btn btn-outline-primary" id="btnAddHouseholdMemberInfo" disabled>Add Member</button>
+                    <button class="btn btn-success" id="btnSendHouseholdInvite">Send Invites</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    <?php endif; ?>
 
     <div class="modal fade" id="editProfileModal" tabindex="-1" data-bs-backdrop="static" data-bs-keyboard="false">
         <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
@@ -402,89 +630,5 @@ if ($residentId !== '' && isset($conn) && $conn instanceof mysqli) {
         </div>
 
         <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-        <script>
-            function toggleOccupation() {
-                const employmentStatus = document.getElementById('employmentStatus').value;
-                const occupationRow = document.getElementById('occupationRow');
-
-                if (employmentStatus === 'Employed') {
-                    occupationRow.style.display = 'flex';
-                } else {
-                    occupationRow.style.display = 'none';
-                }
-            }
-
-             document.addEventListener('DOMContentLoaded', toggleOccupation);
-        </script>
-
-    <script>
-        const burgerBtn = document.getElementById("btn-burger");
-        const sidebar = document.getElementById("div-sidebarWrapper");
-
-        if (burgerBtn && sidebar) {
-            burgerBtn.addEventListener("click", () => {
-                sidebar.classList.toggle("show");
-            });
-        }
-    </script>
-    <script>
-        const verifyEmailLink = document.getElementById("verifyEmailLink");
-        if (verifyEmailLink) {
-            verifyEmailLink.addEventListener("click", async (e) => {
-                e.preventDefault();
-                try {
-                    const controller = new AbortController();
-                    if (window.UniversalModal?.open) {
-                        window.UniversalModal.open({
-                            title: "Please Wait",
-                            message: "Sending verification email...",
-                            buttons: [
-                                {
-                                    label: "Cancel",
-                                    class: "btn btn-outline-secondary",
-                                    onClick: () => {
-                                        controller.abort();
-                                    },
-                                },
-                            ],
-                        });
-                    }
-                    const res = await fetch("../PhpFiles/EmailHandlers/sendEmailVerify.php", {
-                        method: "POST",
-                        headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({}),
-                        signal: controller.signal,
-                    });
-                    const data = await res.json().catch(() => ({}));
-                    if (!res.ok || !data.success) {
-                        throw new Error(data.message || "Unable to send verification email.");
-                    }
-                    if (window.UniversalModal?.open) {
-                        window.UniversalModal.open({
-                            title: "Verification Email Sent",
-                            messageHtml: "An email verification has been sent to your email, click the verify button to proceed.<br><b>The verify link will expire in 15 minutes.</b>",
-                            buttons: [{ label: "OK", class: "btn btn-primary" }],
-                        });
-                    } else {
-                        alert("Verification Email Sent\nAn email verification has been sent to your email, click the verify button to proceed. The verify link will expire in 15 minutes.");
-                    }
-                } catch (err) {
-                    if (err?.name === "AbortError" || err?.message === "Aborted" || err?.code === DOMException.ABORT_ERR) {
-                        return;
-                    }
-                    if (window.UniversalModal?.open) {
-                        window.UniversalModal.open({
-                            title: "Error",
-                            message: err?.message || "Unable to send verification email.",
-                            buttons: [{ label: "OK", class: "btn btn-danger" }],
-                        });
-                    } else {
-                        alert(err?.message || "Unable to send verification email.");
-                    }
-                }
-            });
-        }
-    </script>
 </body>
-
 </html>

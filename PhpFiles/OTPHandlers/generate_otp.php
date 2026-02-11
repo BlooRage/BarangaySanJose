@@ -47,7 +47,7 @@ $stmt = $conn->prepare("
 $stmt->bind_param(
     "ssssssi",
     $user_id,
-    $recipient_db,   // 🔥 ALWAYS 10 DIGITS
+    $recipient_db,   // ðŸ”¥ ALWAYS 10 DIGITS
     $purpose,
     $otp_hash,
     $expiry_time,
@@ -62,7 +62,7 @@ $stmt->close();
 echo json_encode([
     'success' => true,
     'otp_code' => $otp_code,
-    'semaphore_recipient' => '0' . $recipient_db, // 🔥 11 digits
+    'semaphore_recipient' => '0' . $recipient_db, // ðŸ”¥ 11 digits
     'expires_at' => $expiry_time
 ]);
 ?>

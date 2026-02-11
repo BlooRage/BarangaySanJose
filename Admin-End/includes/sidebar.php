@@ -51,7 +51,7 @@ if (!empty($_SESSION['user_id']) && isset($conn) && $conn instanceof mysqli) {
   <!-- LOGO -->
   <a href="AdminDashboard.php" class="d-flex align-items-center pb-3 mb-3 link-dark text-decoration-none border-bottom">
     <img src="../Images/San_Jose_LOGO.jpg" class="me-2" style="width: 32px; height: 32px;">
-    <span class="fs-5 fw-semibold">Barangay San Jose</span>
+    <span class="fs-5 fw-semibold logo-name">Barangay San Jose</span>
   </a>
 
   <div class="sidebar-body d-flex flex-column flex-grow-1">

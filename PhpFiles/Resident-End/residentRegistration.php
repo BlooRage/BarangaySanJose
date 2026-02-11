@@ -2,6 +2,9 @@
 session_start();
 include "../General/connection.php";
 require_once "../General/uniqueIDGenerate.php";
+require_once __DIR__ . "/../../composer-email-handler/vendor/autoload.php";
+
+use setasign\Fpdi\Fpdi;
 
 header('Content-Type: application/json; charset=utf-8');
 
@@ -72,6 +75,61 @@ function getDocumentTypeId(mysqli $conn, string $name): int {
 
 function isHeicExt(string $ext): bool {
     return in_array($ext, ['heic', 'heif'], true);
+}
+
+function appendImagePageToPdf(Fpdi $pdf, string $imagePath): void {
+    $imageInfo = @getimagesize($imagePath);
+    if ($imageInfo === false || !isset($imageInfo[0], $imageInfo[1])) {
+        throw new Exception("Invalid image file for PDF merge.");
+    }
+
+    $imgW = (float)$imageInfo[0];
+    $imgH = (float)$imageInfo[1];
+    $orientation = $imgW > $imgH ? 'L' : 'P';
+    $pdf->AddPage($orientation, 'A4');
+
+    $margin = 10.0;
+    $pageW = (float)$pdf->GetPageWidth();
+    $pageH = (float)$pdf->GetPageHeight();
+    $maxW = $pageW - ($margin * 2);
+    $maxH = $pageH - ($margin * 2);
+
+    $scale = min($maxW / $imgW, $maxH / $imgH);
+    $drawW = $imgW * $scale;
+    $drawH = $imgH * $scale;
+    $x = ($pageW - $drawW) / 2;
+    $y = ($pageH - $drawH) / 2;
+
+    $pdf->Image($imagePath, $x, $y, $drawW, $drawH);
+}
+
+function appendPdfFilePages(Fpdi $pdf, string $pdfPath): void {
+    $pageCount = $pdf->setSourceFile($pdfPath);
+    for ($i = 1; $i <= $pageCount; $i++) {
+        $tpl = $pdf->importPage($i);
+        $size = $pdf->getTemplateSize($tpl);
+        $orientation = $size['width'] > $size['height'] ? 'L' : 'P';
+        $pdf->AddPage($orientation, [$size['width'], $size['height']]);
+        $pdf->useTemplate($tpl);
+    }
+}
+
+function buildMergedIdPdf(string $frontPath, string $frontExt, string $backPath, string $backExt, string $outputPath): void {
+    $pdf = new Fpdi();
+
+    if ($frontExt === 'pdf') {
+        appendPdfFilePages($pdf, $frontPath);
+    } else {
+        appendImagePageToPdf($pdf, $frontPath);
+    }
+
+    if ($backExt === 'pdf') {
+        appendPdfFilePages($pdf, $backPath);
+    } else {
+        appendImagePageToPdf($pdf, $backPath);
+    }
+
+    $pdf->Output('F', $outputPath);
 }
 
 try {
@@ -331,6 +389,7 @@ try {
             }
         }
 
+        $savedIdFiles = [];
         foreach ($idFiles as $fileKey) {
             $tmpName = $_FILES[$fileKey]['tmp_name'];
             $name = basename($_FILES[$fileKey]['name']);
@@ -351,36 +410,57 @@ try {
             if (!move_uploaded_file($tmpName, $target)) {
                 throw new Exception("Failed to upload file: {$fileKey}");
             }
-
-            $docTypeId = getDocumentTypeId($conn, cleanString($_POST['idType'] ?? ''));
-            $statusVerifyId = getStatusId($conn, "PendingReview", "ResidentDocumentProfiling");
-            $ins = $conn->prepare("
-                INSERT INTO unifiedfileattachmenttbl
-                (source_type, source_id, document_type_id, file_name, file_path, file_type, user_id_uploaded_by, status_id_verify, remarks)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-            ");
-            if (!$ins) throw new Exception("Prepare failed (insert attachment): " . $conn->error);
-            $sourceType = "ResidentProfiling";
-            $remarks = $fileKey;
-            $fileName = $newFileName;
-            $filePath = $target;
-            $fileType = $newExt;
-            $ins->bind_param(
-                "ssissssis",
-                $sourceType,
-                $resident_id,
-                $docTypeId,
-                $fileName,
-                $filePath,
-                $fileType,
-                $user_id,
-                $statusVerifyId,
-                $remarks
-            );
-            if (!$ins->execute()) throw new Exception("Attachment insert failed: " . $ins->error);
-            $ins->close();
+            $savedIdFiles[$fileKey] = [
+                'path' => $target,
+                'ext' => $newExt
+            ];
         }
 
+        if (!isset($savedIdFiles['idFront'], $savedIdFiles['idBack'])) {
+            throw new Exception("ID front/back files are incomplete.");
+        }
+
+        $mergedFileName = "id_merged.pdf";
+        $mergedPath = $uploadDir . $mergedFileName;
+        buildMergedIdPdf(
+            $savedIdFiles['idFront']['path'],
+            $savedIdFiles['idFront']['ext'],
+            $savedIdFiles['idBack']['path'],
+            $savedIdFiles['idBack']['ext'],
+            $mergedPath
+        );
+
+        if (!file_exists($mergedPath) || filesize($mergedPath) <= 0) {
+            throw new Exception("Failed to generate merged ID PDF.");
+        }
+
+        $docTypeId = getDocumentTypeId($conn, cleanString($_POST['idType'] ?? ''));
+        $statusVerifyId = getStatusId($conn, "PendingReview", "ResidentDocumentProfiling");
+        $ins = $conn->prepare("
+            INSERT INTO unifiedfileattachmenttbl
+            (source_type, source_id, document_type_id, file_name, file_path, file_type, user_id_uploaded_by, status_id_verify, remarks)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ");
+        if (!$ins) throw new Exception("Prepare failed (insert attachment): " . $conn->error);
+
+        $sourceType = "ResidentProfiling";
+        $remarks = "idMerged";
+        $filePath = $mergedPath;
+        $fileType = "pdf";
+        $ins->bind_param(
+            "ssissssis",
+            $sourceType,
+            $resident_id,
+            $docTypeId,
+            $mergedFileName,
+            $filePath,
+            $fileType,
+            $user_id,
+            $statusVerifyId,
+            $remarks
+        );
+        if (!$ins->execute()) throw new Exception("Merged ID attachment insert failed: " . $ins->error);
+        $ins->close();
     }
 
     if ($hasPicture) {

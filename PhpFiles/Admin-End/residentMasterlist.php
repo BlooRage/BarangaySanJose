@@ -47,20 +47,12 @@ function toPublicPath($path): ?string {
     }
     $normalized = '/' . implode('/', $cleanParts);
 
-    $scriptName = str_replace("\\", "/", (string)($_SERVER['SCRIPT_NAME'] ?? ''));
-    $appBase = '';
-    $phpFilesPos = strpos($scriptName, '/PhpFiles/');
-    if ($phpFilesPos !== false) {
-        $appBase = substr($scriptName, 0, $phpFilesPos);
-    }
-    $appBase = rtrim($appBase, '/');
-
     // Most records contain absolute filesystem paths; map them by folder marker.
     $marker = '/UnifiedFileAttachment/';
     $markerPos = stripos($normalized, $marker);
     if ($markerPos !== false) {
         $public = substr($normalized, $markerPos);
-        return ($appBase !== '' ? $appBase : '') . $public;
+        return '..' . $public;
     }
 
     $webRoot = realpath(__DIR__ . "/../..");
@@ -74,57 +66,116 @@ function toPublicPath($path): ?string {
             if ($rel[0] !== '/') {
                 $rel = '/' . $rel;
             }
-            return ($appBase !== '' ? $appBase : '') . $rel;
+            return '../' . ltrim($rel, '/');
         }
     }
 
-    return ($appBase !== '' ? $appBase : '') . $normalized;
+    return '../' . ltrim($normalized, '/');
 }
 
 /* =====================================================
    1. HANDLE STATUS UPDATE (View Modal)
 ===================================================== */
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['button-saveStatus'])) {
-
-    $residentId = normalizeResidentId($_POST['input-appId'] ?? '');
-    $uiStatus   = $_POST['select-newStatus'] ?? '';
-
-    $statusMap = [
-        'PENDING'  => 'PendingVerification',
-        'APPROVED' => 'VerifiedResident',
-        'DENIED'   => 'NotVerified'
-    ];
-
-    if (!$residentId || !isset($statusMap[$uiStatus])) {
-        http_response_code(400);
-        exit("Invalid request");
-    }
-
-    $dbStatus = $statusMap[$uiStatus];
-
-    $stmt = $conn->prepare("
-        UPDATE residentinformationtbl
-        SET status_id_resident = (
-            SELECT status_id
-            FROM statuslookuptbl
-            WHERE status_name = ?
-              AND status_type = 'Resident'
-            LIMIT 1
-        )
-        WHERE resident_id = ?
-    ");
-
-    $stmt->bind_param("ss", $dbStatus, $residentId);
-    $stmt->execute();
-    $stmt->close();
-
-    header("Location: ../../Admin-End/ResidentMasterlist.php");
+    http_response_code(403);
+    exit("Resident status updates from this modal are disabled.");
     exit;
 }
 
 /* =====================================================
    2. HANDLE ARCHIVE RESIDENT (AJAX)
 ===================================================== */
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_resident_status'])) {
+    header('Content-Type: application/json; charset=utf-8');
+
+    $residentId = normalizeResidentId($_POST['resident_id'] ?? '');
+    $uiStatus = trim((string)($_POST['new_status'] ?? ''));
+    $reasonText = trim((string)($_POST['reason_text'] ?? ''));
+
+    $statusMap = [
+        'APPROVED' => 'VerifiedResident',
+        'DENIED' => 'NotVerified'
+    ];
+
+    if (!$residentId || !isset($statusMap[$uiStatus])) {
+        http_response_code(400);
+        echo json_encode(['success' => false, 'message' => 'Invalid request.']);
+        exit;
+    }
+
+    if ($uiStatus === 'DENIED' && $reasonText === '') {
+        http_response_code(400);
+        echo json_encode(['success' => false, 'message' => 'Reason is required when declining.']);
+        exit;
+    }
+
+    $conn->begin_transaction();
+    try {
+        $statusName = $statusMap[$uiStatus];
+        $stmt = $conn->prepare("
+            UPDATE residentinformationtbl
+            SET status_id_resident = (
+                SELECT status_id
+                FROM statuslookuptbl
+                WHERE status_name = ?
+                  AND status_type = 'Resident'
+                LIMIT 1
+            )
+            WHERE resident_id = ?
+            LIMIT 1
+        ");
+        if (!$stmt) {
+            throw new Exception("Prepare failed.");
+        }
+        $stmt->bind_param("ss", $statusName, $residentId);
+        $stmt->execute();
+        $stmt->close();
+
+        // If a status remarks column exists, persist decline reason there.
+        $remarksColExists = 0;
+        $colCheck = $conn->prepare("
+            SELECT COUNT(*)
+            FROM INFORMATION_SCHEMA.COLUMNS
+            WHERE TABLE_SCHEMA = DATABASE()
+              AND TABLE_NAME = 'residentinformationtbl'
+              AND COLUMN_NAME = 'status_remarks'
+        ");
+        if ($colCheck) {
+            $colCheck->execute();
+            $colCheck->bind_result($remarksColExists);
+            $colCheck->fetch();
+            $colCheck->close();
+        }
+
+        if ($remarksColExists) {
+            $remarksToSave = $uiStatus === 'DENIED' ? $reasonText : null;
+            $stmtRemarks = $conn->prepare("
+                UPDATE residentinformationtbl
+                SET status_remarks = ?
+                WHERE resident_id = ?
+                LIMIT 1
+            ");
+            if ($stmtRemarks) {
+                $stmtRemarks->bind_param("ss", $remarksToSave, $residentId);
+                $stmtRemarks->execute();
+                $stmtRemarks->close();
+            }
+        }
+
+        $conn->commit();
+        echo json_encode([
+            'success' => true,
+            'status' => $statusName,
+            'resident_id' => $residentId
+        ]);
+    } catch (Exception $e) {
+        $conn->rollback();
+        http_response_code(500);
+        echo json_encode(['success' => false, 'message' => 'Failed to update resident status.']);
+    }
+    exit;
+}
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['archive_resident'])) {
     header('Content-Type: application/json; charset=utf-8');
 

@@ -60,7 +60,7 @@ body {
     gap: 0;
     min-width: 300px;
     min-height: 300px;
-    width: min(800px, 90vw);
+    width: min(900px, 90vw);
     height: 70vh;
     margin: 3% auto 0;
     border-radius: 10px;
@@ -172,6 +172,11 @@ body {
 
 .input-group .form-control {
     border-right: 1px solid #ced4da;
+}
+
+/* Match login button padding with other pages */
+#loginForm button[type="submit"] {
+    padding: 10px 20px;
 }
 
 /* ===== Other Forms (Forgot / OTP) ===== */

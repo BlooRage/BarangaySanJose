@@ -10,19 +10,139 @@ document.addEventListener("DOMContentLoaded", () => {
 
   let allResidents = [];
   let activeFilter = "ALL";
+  let currentViewedResident = null;
+
+  const viewModalEl = document.getElementById("modal-viewEntry");
+  const verifyResidentModalEl = document.getElementById("modal-verifyResidentConfirm");
+  const declineResidentModalEl = document.getElementById("modal-declineResidentConfirm");
+  const declineReasonEl = document.getElementById("txt-declineResidentReason");
+  const declineReasonErrorEl = document.getElementById("txt-declineResidentReasonError");
+  const btnOpenDeclineResident = document.getElementById("btn-openDeclineResident");
+  const btnOpenVerifyResident = document.getElementById("btn-openVerifyResident");
+  const residentStatusActionsEl = document.getElementById("div-residentStatusActions");
+  const btnCancelVerifyResident = document.getElementById("btn-cancelVerifyResident");
+  const btnCloseVerifyResidentConfirm = document.getElementById("btn-closeVerifyResidentConfirm");
+  const btnConfirmVerifyResident = document.getElementById("btn-confirmVerifyResident");
+  const btnCancelDeclineResident = document.getElementById("btn-cancelDeclineResident");
+  const btnCloseDeclineResidentConfirm = document.getElementById("btn-closeDeclineResidentConfirm");
+  const btnConfirmDeclineResident = document.getElementById("btn-confirmDeclineResident");
+
+  function getStaticModal(el) {
+    if (!el || !window.bootstrap?.Modal) return null;
+    return bootstrap.Modal.getOrCreateInstance(el, {
+      backdrop: "static",
+      keyboard: false
+    });
+  }
+
+  function showViewModal() {
+    getStaticModal(viewModalEl)?.show();
+  }
+
+  function hideViewModal() {
+    getStaticModal(viewModalEl)?.hide();
+  }
+
+  function showVerifyModal() {
+    getStaticModal(verifyResidentModalEl)?.show();
+  }
+
+  function hideVerifyModal() {
+    getStaticModal(verifyResidentModalEl)?.hide();
+  }
+
+  function showDeclineModal() {
+    getStaticModal(declineResidentModalEl)?.show();
+  }
+
+  function hideDeclineModal() {
+    getStaticModal(declineResidentModalEl)?.hide();
+  }
+
+  function renderResidentStatusBanner(status) {
+    const banner = document.getElementById("div-statusBanner");
+    if (!banner) return;
+
+    banner.innerText = statusDisplayMap[status] ?? "UNSET";
+    banner.className = "mb-0";
+    banner.classList.add(
+      status === "VerifiedResident" ? "bg-statusApproved" :
+      status === "PendingVerification" ? "bg-statusPending" :
+      status === "NotVerified" ? "bg-statusDenied" :
+      "bg-statusUnset"
+    );
+  }
+
+  function setResidentStatusActionsVisibility(status) {
+    if (!residentStatusActionsEl) return;
+    const isPendingVerification = status === "PendingVerification";
+    residentStatusActionsEl.classList.toggle("d-none", !isPendingVerification);
+  }
+
+  function syncResidentStatusLocally(residentId, status) {
+    allResidents = allResidents.map((resident) =>
+      String(resident.resident_id) === String(residentId)
+        ? { ...resident, status }
+        : resident
+    );
+    applyFilterAndRender();
+  }
+
+  async function updateResidentStatus(uiStatus, reasonText, source) {
+    if (!currentViewedResident?.resident_id) return;
+
+    const payload = new URLSearchParams({
+      update_resident_status: "1",
+      resident_id: currentViewedResident.resident_id,
+      new_status: uiStatus,
+      reason_text: reasonText ?? ""
+    });
+
+    const response = await fetch("../PhpFiles/Admin-End/residentMasterlist.php", {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: payload
+    });
+
+    const result = await response.json().catch(() => null);
+    if (!response.ok || !result?.success) {
+      throw new Error(result?.message || "Failed to update resident status.");
+    }
+
+    const updatedStatus = result.status || (uiStatus === "APPROVED" ? "VerifiedResident" : "NotVerified");
+    currentViewedResident.status = updatedStatus;
+    syncResidentStatusLocally(currentViewedResident.resident_id, updatedStatus);
+    renderResidentStatusBanner(updatedStatus);
+    setResidentStatusActionsVisibility(updatedStatus);
+
+    if (source === "verify") {
+      hideVerifyModal();
+    } else {
+      hideDeclineModal();
+      if (declineReasonEl) declineReasonEl.value = "";
+      if (declineReasonErrorEl) declineReasonErrorEl.classList.add("d-none");
+    }
+
+    showViewModal();
+    await fetchResidents(searchInput?.value.trim() ?? "");
+  }
 
   // ========================
   // FETCH RESIDENTS
   // ========================
   function fetchResidents(search = "") {
     const url = `../PhpFiles/Admin-End/residentMasterlist.php?fetch=true&search=${encodeURIComponent(search)}`;
-    fetch(url)
+    return fetch(url)
       .then(res => res.json())
       .then(data => {
         allResidents = Array.isArray(data) ? data : [];
         applyFilterAndRender();
+        return allResidents;
       })
-      .catch(err => console.error("Fetch error:", err));
+      .catch(err => {
+        console.error("Fetch error:", err);
+        return [];
+      });
   }
   fetchResidents();
 
@@ -86,7 +206,7 @@ document.addEventListener("DOMContentLoaded", () => {
         row.status === "NotVerified" ? "danger" : "secondary";
 
       const tr = document.createElement("tr");
-      const canEditOrArchive = row.status !== "NotVerified" && row.status !== "PendingVerification";
+      const canArchive = row.status !== "NotVerified" && row.status !== "PendingVerification";
       const canViewDocs = row.status === "PendingVerification";
       tr.innerHTML = `
         <td class="fw-bold">${row.resident_id}</td>
@@ -95,8 +215,7 @@ document.addEventListener("DOMContentLoaded", () => {
         <td class="d-flex gap-1">
           <button type="button" class="btn btn-primary btn-sm text-white viewEntryBtn">View</button>
           ${canViewDocs ? `<button type="button" class="btn btn-info btn-sm text-white viewDocsBtn">Documents</button>` : ""}
-          ${canEditOrArchive ? `<button type="button" class="btn btn-secondary btn-sm text-white editEntryBtn">Edit</button>` : ""}
-          ${canEditOrArchive ? `<button type="button" class="btn btn-warning btn-sm text-dark archiveEntryBtn">Archive</button>` : ""}
+          ${canArchive ? `<button type="button" class="btn btn-warning btn-sm text-dark archiveEntryBtn">Archive</button>` : ""}
         </td>
         
       `;
@@ -104,8 +223,6 @@ document.addEventListener("DOMContentLoaded", () => {
       tr.querySelector(".viewEntryBtn").addEventListener("click", () => openViewEntry(row));
       const docsBtn = tr.querySelector(".viewDocsBtn");
       if (docsBtn) docsBtn.addEventListener("click", () => openDocsModal(row));
-      const editBtn = tr.querySelector(".editEntryBtn");
-      if (editBtn) editBtn.addEventListener("click", () => openEditEntry(row));
       const archiveBtn = tr.querySelector(".archiveEntryBtn");
       if (archiveBtn) archiveBtn.addEventListener("click", () => archiveEntry(row));
 
@@ -129,10 +246,97 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
+  // ========================
+  // RESIDENT STATUS ACTIONS
+  // ========================
+  if (btnOpenVerifyResident) {
+    btnOpenVerifyResident.addEventListener("click", () => {
+      if (!currentViewedResident) return;
+      hideViewModal();
+      showVerifyModal();
+    });
+  }
+
+  if (btnOpenDeclineResident) {
+    btnOpenDeclineResident.addEventListener("click", () => {
+      if (!currentViewedResident) return;
+      if (declineReasonEl) declineReasonEl.value = "";
+      if (declineReasonErrorEl) declineReasonErrorEl.classList.add("d-none");
+      hideViewModal();
+      showDeclineModal();
+    });
+  }
+
+  const backToViewFromVerify = () => {
+    hideVerifyModal();
+    showViewModal();
+  };
+
+  const backToViewFromDecline = () => {
+    hideDeclineModal();
+    if (declineReasonEl) declineReasonEl.value = "";
+    if (declineReasonErrorEl) declineReasonErrorEl.classList.add("d-none");
+    showViewModal();
+  };
+
+  if (btnCancelVerifyResident) {
+    btnCancelVerifyResident.addEventListener("click", backToViewFromVerify);
+  }
+  if (btnCloseVerifyResidentConfirm) {
+    btnCloseVerifyResidentConfirm.addEventListener("click", backToViewFromVerify);
+  }
+  if (btnCancelDeclineResident) {
+    btnCancelDeclineResident.addEventListener("click", backToViewFromDecline);
+  }
+  if (btnCloseDeclineResidentConfirm) {
+    btnCloseDeclineResidentConfirm.addEventListener("click", backToViewFromDecline);
+  }
+
+  if (btnConfirmVerifyResident) {
+    btnConfirmVerifyResident.addEventListener("click", async () => {
+      if (!currentViewedResident) return;
+      btnConfirmVerifyResident.disabled = true;
+      btnConfirmVerifyResident.innerText = "Verifying...";
+      try {
+        await updateResidentStatus("APPROVED", "", "verify");
+      } catch (e) {
+        alert(e?.message || "Failed to verify resident.");
+      } finally {
+        btnConfirmVerifyResident.disabled = false;
+        btnConfirmVerifyResident.innerText = "Verify";
+      }
+    });
+  }
+
+  if (btnConfirmDeclineResident) {
+    btnConfirmDeclineResident.addEventListener("click", async () => {
+      if (!currentViewedResident) return;
+      const reason = declineReasonEl?.value.trim() ?? "";
+      if (!reason) {
+        if (declineReasonErrorEl) declineReasonErrorEl.classList.remove("d-none");
+        declineReasonEl?.focus();
+        return;
+      }
+      if (declineReasonErrorEl) declineReasonErrorEl.classList.add("d-none");
+
+      btnConfirmDeclineResident.disabled = true;
+      btnConfirmDeclineResident.innerText = "Declining...";
+      try {
+        await updateResidentStatus("DENIED", reason, "decline");
+      } catch (e) {
+        alert(e?.message || "Failed to decline resident.");
+      } finally {
+        btnConfirmDeclineResident.disabled = false;
+        btnConfirmDeclineResident.innerText = "Decline";
+      }
+    });
+  }
+
  // ========================
 // VIEW ENTRY MODAL
 // ========================
 function openViewEntry(data) {
+  currentViewedResident = data;
   document.getElementById("input-appId").value = data.resident_id;
   document.getElementById("span-displayID").innerText = "#" + data.resident_id;
   const idPictureEl = document.getElementById("img-modalIdPicture");
@@ -211,25 +415,12 @@ function openViewEntry(data) {
   document.getElementById("txt-modalHouseType").innerText = data.house_type ?? "—";
   document.getElementById("txt-modalResidencyDuration").innerText = data.residency_duration ?? "—";
 
-  // Status Banner
-  const statusToUi = { "PendingVerification": "PENDING", "VerifiedResident": "APPROVED", "NotVerified": "DENIED" };
-  document.getElementById("select-newStatus").value = statusToUi[data.status] ?? "PENDING";
-
-  const banner = document.getElementById("div-statusBanner");
-  banner.innerText = statusDisplayMap[data.status] ?? "UNSET";
-  banner.className = "mb-3";
-  banner.classList.add(
-    data.status === "VerifiedResident" ? "bg-statusApproved" :
-    data.status === "PendingVerification" ? "bg-statusPending" :
-    data.status === "NotVerified" ? "bg-statusDenied" :
-    "bg-statusUnset"
-  );
+  // Read-only status banner
+  renderResidentStatusBanner(data.status);
+  setResidentStatusActionsVisibility(data.status);
 
   // STATIC MODAL: cannot close by click outside or Esc
-  new bootstrap.Modal(document.getElementById("modal-viewEntry"), {
-    backdrop: 'static',
-    keyboard: false
-  }).show();
+  showViewModal();
 
   // Load verified documents for this resident
   const verifiedListEl = document.getElementById("view-verified-docs");
@@ -383,6 +574,76 @@ function openDocsModal(data, opts = {}) {
         else pendingDocs.push(doc);
       });
 
+      const normalizedRemark = (doc) => String(doc.remarks ?? "").trim().toLowerCase();
+      const isFrontBackDoc = (doc) => {
+        const remark = normalizedRemark(doc);
+        return remark === "idfront" || remark === "idback";
+      };
+      const sideOf = (doc) => (normalizedRemark(doc) === "idfront" ? "front" : "back");
+
+      const mergeFrontBackDocs = (bucketDocs) => {
+        const output = [];
+        const waiting = new Map();
+
+        const byNewest = [...bucketDocs].sort((a, b) => {
+          const at = new Date(a.upload_timestamp || 0).getTime();
+          const bt = new Date(b.upload_timestamp || 0).getTime();
+          return bt - at;
+        });
+
+        byNewest.forEach((doc) => {
+          if (!isFrontBackDoc(doc)) {
+            output.push(doc);
+            return;
+          }
+
+          const side = sideOf(doc);
+          const opposite = side === "front" ? "back" : "front";
+          const key = `${doc.document_type_name || ""}|${doc.verify_status || ""}`;
+          const queueKey = `${key}|${opposite}`;
+          const ownQueueKey = `${key}|${side}`;
+          const queue = waiting.get(queueKey) || [];
+
+          if (queue.length) {
+            const pair = queue.shift();
+            if (!queue.length) waiting.delete(queueKey);
+            else waiting.set(queueKey, queue);
+
+            const frontDoc = side === "front" ? doc : pair;
+            const backDoc = side === "back" ? doc : pair;
+            const latestTimestamp = [frontDoc.upload_timestamp, backDoc.upload_timestamp]
+              .filter(Boolean)
+              .sort()
+              .pop() || "";
+
+            output.push({
+              attachment_id: `${frontDoc.attachment_id}_${backDoc.attachment_id}`,
+              document_type_name: `${frontDoc.document_type_name || "ID"} (Front & Back)`,
+              verify_status: frontDoc.verify_status || backDoc.verify_status || "",
+              upload_timestamp: latestTimestamp,
+              file_type: "combined",
+              remarks: "front+back",
+              combined_files: {
+                front: frontDoc,
+                back: backDoc
+              }
+            });
+            return;
+          }
+
+          const ownQueue = waiting.get(ownQueueKey) || [];
+          ownQueue.push(doc);
+          waiting.set(ownQueueKey, ownQueue);
+        });
+
+        waiting.forEach((q) => q.forEach((doc) => output.push(doc)));
+        return output;
+      };
+
+      const pendingMerged = mergeFrontBackDocs(pendingDocs);
+      const verifiedMerged = mergeFrontBackDocs(verifiedDocs);
+      const deniedMerged = mergeFrontBackDocs(deniedDocs);
+
       const renderDocRow = (doc, container, opts = {}) => {
         const row = document.createElement("div");
         row.className = "doc-row border rounded-3 p-2";
@@ -414,7 +675,7 @@ function openDocsModal(data, opts = {}) {
 
         const action = document.createElement("div");
         action.className = "doc-row__view";
-        if (doc.file_url) {
+        if (doc.file_url || doc.combined_files) {
           const btn = document.createElement("button");
           btn.type = "button";
           btn.className = "btn btn-sm btn-primary";
@@ -435,17 +696,17 @@ function openDocsModal(data, opts = {}) {
         if (container) container.appendChild(row);
       };
 
-      if (pendingDocs.length) {
+      if (pendingMerged.length) {
         if (sectionPending) sectionPending.classList.remove("d-none");
-        pendingDocs.forEach(doc => renderDocRow(doc, listPending));
+        pendingMerged.forEach(doc => renderDocRow(doc, listPending));
       }
-      if (verifiedDocs.length) {
+      if (verifiedMerged.length) {
         if (sectionVerified) sectionVerified.classList.remove("d-none");
-        verifiedDocs.forEach(doc => renderDocRow(doc, listVerified));
+        verifiedMerged.forEach(doc => renderDocRow(doc, listVerified));
       }
-      if (deniedDocs.length) {
+      if (deniedMerged.length) {
         if (sectionDenied) sectionDenied.classList.remove("d-none");
-        deniedDocs.forEach(doc => renderDocRow(doc, listDenied, { showReason: true }));
+        deniedMerged.forEach(doc => renderDocRow(doc, listDenied, { showReason: true }));
       }
     })
     .catch(() => {
@@ -506,24 +767,59 @@ function openDocViewer(doc, parentModalEl, opts = {}) {
   if (infoBirthdayEl) infoBirthdayEl.innerText = residentInfo.birthdate ?? "—";
   if (infoAddressEl) infoAddressEl.innerText = residentInfo.full_address ?? "—";
 
-  let previewEl;
-  if (["jpg", "jpeg", "png", "webp", "gif"].includes(ext)) {
-    previewEl = document.createElement("img");
-    previewEl.src = fileUrl;
-    previewEl.alt = fileName;
-    previewEl.className = "img-fluid d-block mx-auto";
-  } else if (ext === "pdf") {
-    previewEl = document.createElement("iframe");
-    previewEl.src = fileUrl;
-    previewEl.className = "w-100";
-    previewEl.style.height = "70vh";
-  } else {
-    previewEl = document.createElement("div");
-    previewEl.className = "text-muted";
-    previewEl.innerText = "Preview not available for this file type.";
-  }
+  const createPreviewElement = (url, displayName, detectedExt) => {
+    let preview;
+    if (["jpg", "jpeg", "png", "webp", "gif"].includes(detectedExt)) {
+      preview = document.createElement("img");
+      preview.src = url;
+      preview.alt = displayName;
+      preview.className = "img-fluid d-block mx-auto";
+      return preview;
+    }
+    if (detectedExt === "pdf") {
+      preview = document.createElement("iframe");
+      preview.src = url;
+      preview.className = "w-100";
+      preview.style.height = "62vh";
+      return preview;
+    }
+    preview = document.createElement("div");
+    preview.className = "text-muted";
+    preview.innerText = "Preview not available for this file type.";
+    return preview;
+  };
 
-  bodyEl.appendChild(previewEl);
+  if (doc.combined_files?.front && doc.combined_files?.back) {
+    const wrapper = document.createElement("div");
+    wrapper.className = "row g-3";
+
+    const renderSide = (label, fileDoc) => {
+      const col = document.createElement("div");
+      col.className = "col-12 col-lg-6";
+      const card = document.createElement("div");
+      card.className = "border rounded-3 p-2";
+
+      const heading = document.createElement("div");
+      heading.className = "fw-bold mb-2";
+      heading.innerText = label;
+
+      const docUrl = fileDoc.file_url || "";
+      const docExt = (fileDoc.file_type || "").toLowerCase() || (docUrl.split(".").pop() || "").toLowerCase();
+      const preview = createPreviewElement(docUrl, `${fileName} - ${label}`, docExt);
+
+      card.appendChild(heading);
+      card.appendChild(preview);
+      col.appendChild(card);
+      return col;
+    };
+
+    wrapper.appendChild(renderSide("Front", doc.combined_files.front));
+    wrapper.appendChild(renderSide("Back", doc.combined_files.back));
+    bodyEl.appendChild(wrapper);
+  } else {
+    const previewEl = createPreviewElement(fileUrl, fileName, ext);
+    bodyEl.appendChild(previewEl);
+  }
 
   if (!opts.readOnly) {
   const statusSelect = document.createElement("select");
@@ -561,29 +857,40 @@ function openDocViewer(doc, parentModalEl, opts = {}) {
       if (!ok) return;
     }
 
-    const fd = new FormData();
-    fd.append("update_document_status", "1");
-    fd.append("attachment_id", doc.attachment_id);
-    fd.append("new_status", statusSelect.value);
-    fd.append("reason_scope", "");
-    fd.append("reason_text", reasonInput.value.trim());
+    const updateOne = async (attachmentId) => {
+      const fd = new FormData();
+      fd.append("update_document_status", "1");
+      fd.append("attachment_id", attachmentId);
+      fd.append("new_status", statusSelect.value);
+      fd.append("reason_scope", "");
+      fd.append("reason_text", reasonInput.value.trim());
 
-    saveBtn.disabled = true;
-    saveBtn.innerText = "Saving...";
-    try {
       const res = await fetch("../PhpFiles/Admin-End/residentMasterlist.php", {
         method: "POST",
         body: fd
       });
       const result = await res.json().catch(() => null);
       if (!res.ok || !result || !result.success) {
-        alert(result?.message || "Failed to update document status.");
-        return;
+        throw new Error(result?.message || "Failed to update document status.");
       }
-      if (result.profile_image_url) {
-        const newUrl = `${result.profile_image_url}?v=${Date.now()}`;
+      return result;
+    };
+
+    saveBtn.disabled = true;
+    saveBtn.innerText = "Saving...";
+    try {
+      const idsToUpdate = doc.combined_files
+        ? [doc.combined_files.front.attachment_id, doc.combined_files.back.attachment_id]
+        : [doc.attachment_id];
+
+      const results = await Promise.all(idsToUpdate.map((id) => updateOne(id)));
+      const result = results[0];
+
+      const imageResult = results.find((r) => r.profile_image_url);
+      if (imageResult?.profile_image_url) {
+        const newUrl = `${imageResult.profile_image_url}?v=${Date.now()}`;
         if (window.lastDocsResident) {
-          window.lastDocsResident.id_picture_url = result.profile_image_url;
+          window.lastDocsResident.id_picture_url = imageResult.profile_image_url;
         }
         const modalImg = document.getElementById("img-modalIdPicture");
         if (modalImg) {
@@ -591,10 +898,22 @@ function openDocViewer(doc, parentModalEl, opts = {}) {
         }
       }
       doc.verify_status = result.status || doc.verify_status;
+      if (doc.combined_files) {
+        doc.combined_files.front.verify_status = doc.verify_status;
+        doc.combined_files.back.verify_status = doc.verify_status;
+      }
       if (statusSelect.value === "DENIED") {
         doc.remarks = reasonInput.value.trim();
+        if (doc.combined_files) {
+          doc.combined_files.front.remarks = doc.remarks;
+          doc.combined_files.back.remarks = doc.remarks;
+        }
       } else {
         doc.remarks = "";
+        if (doc.combined_files) {
+          doc.combined_files.front.remarks = "";
+          doc.combined_files.back.remarks = "";
+        }
       }
       if (window.lastDocsResident) {
         openDocsModal(window.lastDocsResident, { refreshOnly: true });
@@ -638,7 +957,7 @@ function openDocViewer(doc, parentModalEl, opts = {}) {
         }
       }
     } catch (e) {
-      alert("Failed to update document status.");
+      alert(e?.message || "Failed to update document status.");
     } finally {
       saveBtn.disabled = false;
       saveBtn.innerText = "Update";
@@ -683,8 +1002,9 @@ function openDocViewer(doc, parentModalEl, opts = {}) {
 }
 
 // ========================
-// EDIT ENTRY MODAL
+// EDIT ENTRY MODAL (DISABLED)
 // ========================
+/*
 function openEditEntry(data) {
   const modalEl = document.getElementById("modal-editEntry");
   const form = modalEl ? modalEl.querySelector("form") : null;
@@ -813,6 +1133,7 @@ function hasFormChanges(form) {
   const current = getFormState(form);
   return JSON.stringify(current) !== JSON.stringify(original);
 }
+*/
 
   // ========================
   // "Other" toggle handlers
@@ -826,37 +1147,6 @@ function hasFormChanges(form) {
       else target.classList.add("d-none");
     });
   });
-
-  // ========================
-  // STATUS DENIAL UI
-  // ========================
-  const selectStatus = document.getElementById("select-newStatus");
-  if (selectStatus) {
-    selectStatus.addEventListener("change", () => {
-      const denialDiv = document.getElementById("div-denialOptions");
-      if (!denialDiv) return;
-      selectStatus.value === "DENIED" ? denialDiv.classList.remove("div-hide") : denialDiv.classList.add("div-hide");
-    });
-  }
-
-  const radioOthers = document.getElementById("radio-others");
-  if (radioOthers) {
-    radioOthers.addEventListener("change", () => {
-      const otherBox = document.getElementById("textarea-otherReason");
-      if (!otherBox) return;
-      radioOthers.checked ? otherBox.classList.remove("div-hide") : otherBox.classList.add("div-hide");
-    });
-  }
-
-  // ========================
-  // CONFIRMATION BEFORE SAVE
-  // ========================
-  const formUpdate = document.getElementById("form-updateStatus");
-  if (formUpdate) {
-    formUpdate.addEventListener("submit", e => {
-      if (!confirm("Are you sure you want to save this status?")) e.preventDefault();
-    });
-  }
 
   // ========================
   // RESET FILTER MODAL

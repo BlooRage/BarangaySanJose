@@ -5,7 +5,7 @@
 return [
   'host' => 'smtp.hostinger.com',
   'username' => 'official@barangaysanjose-montalban.com',
-  'password' => 'BrgySanJose.Verify@2025',
+  'password' => 'SanJose.Brgy@2025!',
 
   'port' => 465,
 

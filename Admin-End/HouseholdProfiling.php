@@ -2,7 +2,9 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    
+  <link rel="icon" href="/Images/favicon_sanjose.png?v=20260211">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Household Profiling</title>
 
     <script src="https://kit.fontawesome.com/3482e00999.js" crossorigin="anonymous"></script>
@@ -251,7 +253,7 @@
 
             <div class="modal-footer border-0">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                <button type="submit" class="btn btn-success px-4">Save</button>
+                <button type="submit" id="btn-addMemberSave" class="btn btn-success px-4" disabled>Save</button>
             </div>
         </form>
     </div>
@@ -284,3 +286,5 @@
 <script src="../JS-Script-Files/Admin-End/householdProfilingScript.js"></script>
 </body>
 </html>
+
+

@@ -2,7 +2,9 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  
+  <link rel="icon" href="/Images/favicon_sanjose.png?v=20260211">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Resident Dashboard - Barangay San Jose</title>
 
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
@@ -115,7 +117,7 @@
         <div class="col-6 col-md-4 col-lg-3">
           <div id="card-serviceRequest-profile"
                class="card-action h-100 p-4 rounded-4 text-center d-flex flex-column align-items-center justify-content-center border-0 shadow-sm"
-               onclick="location.href='/resident_profile.php'">
+               onclick="location.href='resident_profile.php'">
             <i class="fa-solid fa-user-circle fa-2xl mb-3"></i><br>
             <span class="fw-bold small">MY PROFILE</span>
           </div>
@@ -140,3 +142,6 @@
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 </body>
 </html>
+
+
+

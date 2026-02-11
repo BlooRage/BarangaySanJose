@@ -21,7 +21,7 @@ if (!isset($_SESSION['pending_user_id']) || ($_SESSION['pending_verify'] ?? '') 
 
 $user_id = $_SESSION['pending_user_id'];
 
-// ✅ Query registered phone from DB
+// âœ… Query registered phone from DB
 $stmt = $conn->prepare("SELECT phone_number FROM useraccountstbl WHERE user_id = ? LIMIT 1");
 $stmt->bind_param("s", $user_id);
 $stmt->execute();
@@ -41,11 +41,11 @@ if (!$phone10 || strlen($phone10) !== 10) {
   exit;
 }
 
-$masked = '+63 •••••• ' . substr($phone10, -4);
+$masked = '+63 â€¢â€¢â€¢â€¢â€¢â€¢ ' . substr($phone10, -4);
 
 echo json_encode([
   'success' => true,
-  'phone10' => $phone10,          // ✅ return real registered phone (10 digits)
+  'phone10' => $phone10,          // âœ… return real registered phone (10 digits)
   'phone_masked' => $masked
 ]);
 exit;

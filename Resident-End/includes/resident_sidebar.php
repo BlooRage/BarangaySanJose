@@ -2,7 +2,9 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    
+  <link rel="icon" href="/Images/favicon_sanjose.png?v=20260211">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Resident Dashboard - Barangay San Jose</title>
 
 
@@ -34,10 +36,61 @@ function activeLink($page, $current) {
 $displayName = "Resident";
 $profileImage = '../Images/Profile-Placeholder.png';
 $residentId = '';
+$isHeadOfFamily = false;
+
+if (!function_exists('toPublicPath')) {
+function toPublicPath($path): ?string {
+  $path = trim((string)$path);
+  if ($path === '') {
+    return null;
+  }
+
+  $normalized = str_replace("\\", "/", $path);
+  $normalized = preg_replace('#/+#', '/', $normalized);
+
+  $parts = explode('/', $normalized);
+  $cleanParts = [];
+  foreach ($parts as $part) {
+    if ($part === '' || $part === '.') {
+      continue;
+    }
+    if ($part === '..') {
+      array_pop($cleanParts);
+      continue;
+    }
+    $cleanParts[] = $part;
+  }
+  $normalized = '/' . implode('/', $cleanParts);
+
+  $marker = '/UnifiedFileAttachment/';
+  $markerPos = stripos($normalized, $marker);
+  if ($markerPos !== false) {
+    $public = substr($normalized, $markerPos);
+    return '..' . $public;
+  }
+
+  $webRoot = realpath(__DIR__ . "/../..");
+  if ($webRoot) {
+    $rootNorm = str_replace("\\", "/", $webRoot);
+    if (strpos($normalized, $rootNorm) === 0) {
+      $rel = substr($normalized, strlen($rootNorm));
+      if ($rel === '') {
+        return null;
+      }
+      if ($rel[0] !== '/') {
+        $rel = '/' . $rel;
+      }
+      return '../' . ltrim($rel, '/');
+    }
+  }
+
+  return '../' . ltrim($normalized, '/');
+}
+}
 
 if (!empty($_SESSION['user_id']) && isset($conn) && $conn instanceof mysqli) {
   $stmt = $conn->prepare("
-    SELECT resident_id, firstname, middlename, lastname, suffix
+    SELECT resident_id, firstname, middlename, lastname, suffix, head_of_family
     FROM residentinformationtbl
     WHERE user_id = ?
     LIMIT 1
@@ -58,6 +111,9 @@ if (!empty($_SESSION['user_id']) && isset($conn) && $conn instanceof mysqli) {
       if ($fullName !== '') {
         $displayName = $fullName;
       }
+      $headOfFamilyRaw = $row['head_of_family'] ?? '';
+      $headOfFamilyNormalized = strtolower(trim((string)$headOfFamilyRaw));
+      $isHeadOfFamily = in_array($headOfFamilyNormalized, ['yes', 'true', '1', 'y'], true);
     }
     $stmt->close();
   }
@@ -85,7 +141,10 @@ if ($residentId !== '' && isset($conn) && $conn instanceof mysqli) {
     $stmtPic->execute();
     $stmtPic->bind_result($verifiedPicPath);
     if ($stmtPic->fetch() && !empty($verifiedPicPath)) {
-      $profileImage = $verifiedPicPath;
+      $publicPath = toPublicPath($verifiedPicPath);
+      if (!empty($publicPath)) {
+        $profileImage = $publicPath;
+      }
     }
     $stmtPic->close();
   }
@@ -267,3 +326,5 @@ if ($residentId !== '' && isset($conn) && $conn instanceof mysqli) {
 
 </body>
 </html>
+
+

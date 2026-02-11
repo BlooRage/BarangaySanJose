@@ -36,6 +36,10 @@
     font-family: 'Charis SIL Bold', serif;
 }
 
+.logo-name {
+    font-family: 'Charis SIL Regular', serif;
+}
+
 #dashboard-sidebar {
     height: 100vh;
     border-right: 1px solid #e0e0e0;
