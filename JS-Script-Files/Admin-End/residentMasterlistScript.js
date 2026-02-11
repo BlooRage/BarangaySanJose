@@ -383,6 +383,76 @@ function openDocsModal(data, opts = {}) {
         else pendingDocs.push(doc);
       });
 
+      const normalizedRemark = (doc) => String(doc.remarks ?? "").trim().toLowerCase();
+      const isFrontBackDoc = (doc) => {
+        const remark = normalizedRemark(doc);
+        return remark === "idfront" || remark === "idback";
+      };
+      const sideOf = (doc) => (normalizedRemark(doc) === "idfront" ? "front" : "back");
+
+      const mergeFrontBackDocs = (bucketDocs) => {
+        const output = [];
+        const waiting = new Map();
+
+        const byNewest = [...bucketDocs].sort((a, b) => {
+          const at = new Date(a.upload_timestamp || 0).getTime();
+          const bt = new Date(b.upload_timestamp || 0).getTime();
+          return bt - at;
+        });
+
+        byNewest.forEach((doc) => {
+          if (!isFrontBackDoc(doc)) {
+            output.push(doc);
+            return;
+          }
+
+          const side = sideOf(doc);
+          const opposite = side === "front" ? "back" : "front";
+          const key = `${doc.document_type_name || ""}|${doc.verify_status || ""}`;
+          const queueKey = `${key}|${opposite}`;
+          const ownQueueKey = `${key}|${side}`;
+          const queue = waiting.get(queueKey) || [];
+
+          if (queue.length) {
+            const pair = queue.shift();
+            if (!queue.length) waiting.delete(queueKey);
+            else waiting.set(queueKey, queue);
+
+            const frontDoc = side === "front" ? doc : pair;
+            const backDoc = side === "back" ? doc : pair;
+            const latestTimestamp = [frontDoc.upload_timestamp, backDoc.upload_timestamp]
+              .filter(Boolean)
+              .sort()
+              .pop() || "";
+
+            output.push({
+              attachment_id: `${frontDoc.attachment_id}_${backDoc.attachment_id}`,
+              document_type_name: `${frontDoc.document_type_name || "ID"} (Front & Back)`,
+              verify_status: frontDoc.verify_status || backDoc.verify_status || "",
+              upload_timestamp: latestTimestamp,
+              file_type: "combined",
+              remarks: "front+back",
+              combined_files: {
+                front: frontDoc,
+                back: backDoc
+              }
+            });
+            return;
+          }
+
+          const ownQueue = waiting.get(ownQueueKey) || [];
+          ownQueue.push(doc);
+          waiting.set(ownQueueKey, ownQueue);
+        });
+
+        waiting.forEach((q) => q.forEach((doc) => output.push(doc)));
+        return output;
+      };
+
+      const pendingMerged = mergeFrontBackDocs(pendingDocs);
+      const verifiedMerged = mergeFrontBackDocs(verifiedDocs);
+      const deniedMerged = mergeFrontBackDocs(deniedDocs);
+
       const renderDocRow = (doc, container, opts = {}) => {
         const row = document.createElement("div");
         row.className = "doc-row border rounded-3 p-2";
@@ -414,7 +484,7 @@ function openDocsModal(data, opts = {}) {
 
         const action = document.createElement("div");
         action.className = "doc-row__view";
-        if (doc.file_url) {
+        if (doc.file_url || doc.combined_files) {
           const btn = document.createElement("button");
           btn.type = "button";
           btn.className = "btn btn-sm btn-primary";
@@ -435,17 +505,17 @@ function openDocsModal(data, opts = {}) {
         if (container) container.appendChild(row);
       };
 
-      if (pendingDocs.length) {
+      if (pendingMerged.length) {
         if (sectionPending) sectionPending.classList.remove("d-none");
-        pendingDocs.forEach(doc => renderDocRow(doc, listPending));
+        pendingMerged.forEach(doc => renderDocRow(doc, listPending));
       }
-      if (verifiedDocs.length) {
+      if (verifiedMerged.length) {
         if (sectionVerified) sectionVerified.classList.remove("d-none");
-        verifiedDocs.forEach(doc => renderDocRow(doc, listVerified));
+        verifiedMerged.forEach(doc => renderDocRow(doc, listVerified));
       }
-      if (deniedDocs.length) {
+      if (deniedMerged.length) {
         if (sectionDenied) sectionDenied.classList.remove("d-none");
-        deniedDocs.forEach(doc => renderDocRow(doc, listDenied, { showReason: true }));
+        deniedMerged.forEach(doc => renderDocRow(doc, listDenied, { showReason: true }));
       }
     })
     .catch(() => {
@@ -506,24 +576,59 @@ function openDocViewer(doc, parentModalEl, opts = {}) {
   if (infoBirthdayEl) infoBirthdayEl.innerText = residentInfo.birthdate ?? "—";
   if (infoAddressEl) infoAddressEl.innerText = residentInfo.full_address ?? "—";
 
-  let previewEl;
-  if (["jpg", "jpeg", "png", "webp", "gif"].includes(ext)) {
-    previewEl = document.createElement("img");
-    previewEl.src = fileUrl;
-    previewEl.alt = fileName;
-    previewEl.className = "img-fluid d-block mx-auto";
-  } else if (ext === "pdf") {
-    previewEl = document.createElement("iframe");
-    previewEl.src = fileUrl;
-    previewEl.className = "w-100";
-    previewEl.style.height = "70vh";
-  } else {
-    previewEl = document.createElement("div");
-    previewEl.className = "text-muted";
-    previewEl.innerText = "Preview not available for this file type.";
-  }
+  const createPreviewElement = (url, displayName, detectedExt) => {
+    let preview;
+    if (["jpg", "jpeg", "png", "webp", "gif"].includes(detectedExt)) {
+      preview = document.createElement("img");
+      preview.src = url;
+      preview.alt = displayName;
+      preview.className = "img-fluid d-block mx-auto";
+      return preview;
+    }
+    if (detectedExt === "pdf") {
+      preview = document.createElement("iframe");
+      preview.src = url;
+      preview.className = "w-100";
+      preview.style.height = "62vh";
+      return preview;
+    }
+    preview = document.createElement("div");
+    preview.className = "text-muted";
+    preview.innerText = "Preview not available for this file type.";
+    return preview;
+  };
 
-  bodyEl.appendChild(previewEl);
+  if (doc.combined_files?.front && doc.combined_files?.back) {
+    const wrapper = document.createElement("div");
+    wrapper.className = "row g-3";
+
+    const renderSide = (label, fileDoc) => {
+      const col = document.createElement("div");
+      col.className = "col-12 col-lg-6";
+      const card = document.createElement("div");
+      card.className = "border rounded-3 p-2";
+
+      const heading = document.createElement("div");
+      heading.className = "fw-bold mb-2";
+      heading.innerText = label;
+
+      const docUrl = fileDoc.file_url || "";
+      const docExt = (fileDoc.file_type || "").toLowerCase() || (docUrl.split(".").pop() || "").toLowerCase();
+      const preview = createPreviewElement(docUrl, `${fileName} - ${label}`, docExt);
+
+      card.appendChild(heading);
+      card.appendChild(preview);
+      col.appendChild(card);
+      return col;
+    };
+
+    wrapper.appendChild(renderSide("Front", doc.combined_files.front));
+    wrapper.appendChild(renderSide("Back", doc.combined_files.back));
+    bodyEl.appendChild(wrapper);
+  } else {
+    const previewEl = createPreviewElement(fileUrl, fileName, ext);
+    bodyEl.appendChild(previewEl);
+  }
 
   if (!opts.readOnly) {
   const statusSelect = document.createElement("select");
@@ -561,29 +666,40 @@ function openDocViewer(doc, parentModalEl, opts = {}) {
       if (!ok) return;
     }
 
-    const fd = new FormData();
-    fd.append("update_document_status", "1");
-    fd.append("attachment_id", doc.attachment_id);
-    fd.append("new_status", statusSelect.value);
-    fd.append("reason_scope", "");
-    fd.append("reason_text", reasonInput.value.trim());
+    const updateOne = async (attachmentId) => {
+      const fd = new FormData();
+      fd.append("update_document_status", "1");
+      fd.append("attachment_id", attachmentId);
+      fd.append("new_status", statusSelect.value);
+      fd.append("reason_scope", "");
+      fd.append("reason_text", reasonInput.value.trim());
 
-    saveBtn.disabled = true;
-    saveBtn.innerText = "Saving...";
-    try {
       const res = await fetch("../PhpFiles/Admin-End/residentMasterlist.php", {
         method: "POST",
         body: fd
       });
       const result = await res.json().catch(() => null);
       if (!res.ok || !result || !result.success) {
-        alert(result?.message || "Failed to update document status.");
-        return;
+        throw new Error(result?.message || "Failed to update document status.");
       }
-      if (result.profile_image_url) {
-        const newUrl = `${result.profile_image_url}?v=${Date.now()}`;
+      return result;
+    };
+
+    saveBtn.disabled = true;
+    saveBtn.innerText = "Saving...";
+    try {
+      const idsToUpdate = doc.combined_files
+        ? [doc.combined_files.front.attachment_id, doc.combined_files.back.attachment_id]
+        : [doc.attachment_id];
+
+      const results = await Promise.all(idsToUpdate.map((id) => updateOne(id)));
+      const result = results[0];
+
+      const imageResult = results.find((r) => r.profile_image_url);
+      if (imageResult?.profile_image_url) {
+        const newUrl = `${imageResult.profile_image_url}?v=${Date.now()}`;
         if (window.lastDocsResident) {
-          window.lastDocsResident.id_picture_url = result.profile_image_url;
+          window.lastDocsResident.id_picture_url = imageResult.profile_image_url;
         }
         const modalImg = document.getElementById("img-modalIdPicture");
         if (modalImg) {
@@ -591,10 +707,22 @@ function openDocViewer(doc, parentModalEl, opts = {}) {
         }
       }
       doc.verify_status = result.status || doc.verify_status;
+      if (doc.combined_files) {
+        doc.combined_files.front.verify_status = doc.verify_status;
+        doc.combined_files.back.verify_status = doc.verify_status;
+      }
       if (statusSelect.value === "DENIED") {
         doc.remarks = reasonInput.value.trim();
+        if (doc.combined_files) {
+          doc.combined_files.front.remarks = doc.remarks;
+          doc.combined_files.back.remarks = doc.remarks;
+        }
       } else {
         doc.remarks = "";
+        if (doc.combined_files) {
+          doc.combined_files.front.remarks = "";
+          doc.combined_files.back.remarks = "";
+        }
       }
       if (window.lastDocsResident) {
         openDocsModal(window.lastDocsResident, { refreshOnly: true });
@@ -638,7 +766,7 @@ function openDocViewer(doc, parentModalEl, opts = {}) {
         }
       }
     } catch (e) {
-      alert("Failed to update document status.");
+      alert(e?.message || "Failed to update document status.");
     } finally {
       saveBtn.disabled = false;
       saveBtn.innerText = "Update";
