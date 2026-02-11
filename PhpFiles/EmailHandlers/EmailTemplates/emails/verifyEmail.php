@@ -7,8 +7,11 @@
 
 <hr style="border:0;border-top:1px solid #eee;margin:15px 0;">
 
-<p style="font-size:14px; line-height:1.6; margin:0 0 18px 0;">
+<p style="font-size:14px; line-height:1.6; margin:0 0 10px 0;">
   Please verify your email address to activate your account.
+</p>
+<p style="font-size:13px; line-height:1.6; margin:0 0 18px 0; color:#333;">
+  This helps us confirm it’s really you and keeps your account secure.
 </p>
 
 <?php if (!empty($expiresNote)): ?>

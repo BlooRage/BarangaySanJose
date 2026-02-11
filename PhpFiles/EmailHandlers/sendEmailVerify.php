@@ -62,7 +62,7 @@ if ((int)$user['email_verify'] === 1) {
 // 2) Generate token (raw in email, hash in DB)
 $rawToken  = bin2hex(random_bytes(32));
 $tokenHash = password_hash($rawToken, PASSWORD_DEFAULT);
-$expiresAt = (new DateTime('+30 minutes'))->format('Y-m-d H:i:s');
+$expiresAt = (new DateTime('+15 minutes'))->format('Y-m-d H:i:s');
 
 // 3) Save/overwrite token
 $ins = $conn->prepare("
@@ -78,9 +78,15 @@ $ins->execute();
 
 // 4) Build verification link
 $scheme = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
-$host = $_SERVER['HTTP_HOST'] ?? 'localhost';
+$host = $_SERVER['HTTP_HOST'] ?? '';
 $rootPath = dirname(dirname(dirname($_SERVER['SCRIPT_NAME'] ?? '/BarangaySanJose/PhpFiles/EmailHandlers/sendEmailVerify.php')));
-$baseUrl = rtrim($scheme . "://" . $host . $rootPath, '/');
+
+// Force production domain when running on localhost.
+if ($host === '' || stripos($host, 'localhost') !== false || strpos($host, '127.0.0.1') === 0) {
+  $baseUrl = 'https://barangaysanjose-montalban.com';
+} else {
+  $baseUrl = rtrim($scheme . "://" . $host . $rootPath, '/');
+}
 $verifyUrl = $baseUrl . "/Guest-End/verifyEmail.php?uid=" . urlencode($userId) . "&token=" . urlencode($rawToken);
 
 // 5) Load SMTP config + send
@@ -95,7 +101,7 @@ $sent = $emailSender->send([
     'headline' => "MALIGAYANG BATI KA-BARANGAY SAN JOSE!",
     'verifyUrl' => $verifyUrl,
     'buttonText' => "VERIFY EMAIL",
-    'expiresNote' => "This link will expire in 30 minutes.",
+    'expiresNote' => "This link will expire in 15 minutes.",
   ],
 ]);
 

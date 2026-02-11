@@ -16,7 +16,9 @@ $isHeadOfFamily = in_array($headOfFamilyNormalized, ['yes', 'true', '1', 'y'], t
 
 <head>
     <meta charset="UTF-8">
-    <title>Household Profiling</title>
+    
+  <link rel="icon" href="/Images/San_Jose_LOGO.jpg">
+<title>Household Profiling</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="../CSS-Styles/Resident-End-CSS/residentDashboard.css">

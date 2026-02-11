@@ -60,7 +60,7 @@ body {
     gap: 0;
     min-width: 300px;
     min-height: 300px;
-    width: min(800px, 90vw);
+    width: min(1000px, 92vw);
     height: 70vh;
     margin: 3% auto 0;
     border-radius: 10px;

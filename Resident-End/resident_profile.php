@@ -120,7 +120,9 @@ if ($residentId !== '' && isset($conn) && $conn instanceof mysqli) {
 
 <head>
     <meta charset="UTF-8">
-    <title>Resident Profile</title>
+    
+  <link rel="icon" href="/Images/San_Jose_LOGO.jpg">
+<title>Resident Profile</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
   <script src="../JS-Script-Files/modalHandler.js" defer></script>
@@ -526,11 +528,11 @@ if ($residentId !== '' && isset($conn) && $conn instanceof mysqli) {
                         if (window.UniversalModal?.open) {
                             window.UniversalModal.open({
                                 title: "Verification Email Sent",
-                                messageHtml: "An email verification has been sent to your email. Click the verify button to proceed.<br><b>The verify link will expire in 30 minutes.</b>",
+                                messageHtml: "An email verification has been sent to your email. Click the verify button to proceed.<br><b>The verify link will expire in 15 minutes.</b>",
                                 buttons: [{ label: "OK", class: "btn btn-primary" }],
                             });
                         } else {
-                            alert("Verification Email Sent\nCheck your inbox. The verify link will expire in 30 minutes.");
+                            alert("Verification Email Sent\nCheck your inbox. The verify link will expire in 15 minutes.");
                         }
                     } catch (err) {
                         if (err?.name === "AbortError" || err?.message === "Aborted" || err?.code === DOMException.ABORT_ERR) {
