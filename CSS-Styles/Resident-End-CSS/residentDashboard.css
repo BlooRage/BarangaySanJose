@@ -224,6 +224,37 @@ body {
     color: #ffffff;
 }
 
+.status-badge {
+    display: inline-block;
+    margin-left: 0.35rem;
+    padding: 0.2rem 0.6rem;
+    border-radius: 999px;
+    font-size: 0.75rem;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    color: #ffffff !important;
+}
+
+.status-badge--verified {
+    background-color: #28a745;
+}
+
+.status-badge--pending {
+    background-color: #d39200;
+}
+
+.status-badge--denied {
+    background-color: #dc3545;
+}
+
+.status-badge--archived {
+    background-color: #6c757d;
+}
+
+.status-badge--default {
+    background-color: #495057;
+}
+
 /* ===== MOBILE INTERFACES ===== */
 @media (max-width: 768px) {
     #mobile-header {

@@ -267,24 +267,40 @@ if ($residentId !== '' && isset($conn) && $conn instanceof mysqli) {
                             <div>
                                 <strong>Account Status:</strong>
                                 <?php
-                                  $statusLabel = $residentinformationtbl['status_name_resident'] ?? '';
-                                  $statusClass = 'text-danger';
-                                  if ($statusLabel === 'PendingVerification' || $statusLabel === 'PendingReview') {
-                                      $statusClass = 'text-warning';
-                                  } elseif ($statusLabel === 'VerifiedResident') {
-                                      $statusClass = 'text-success';
+                                  $statusLabelRaw = trim((string)($residentinformationtbl['status_name_resident'] ?? ''));
+                                  $statusLabel = $statusLabelRaw !== '' ? $statusLabelRaw : 'NotVerified';
+                                  $statusKey = strtolower(str_replace([' ', '_', '-'], '', $statusLabel));
+                                  $statusClass = 'status-badge status-badge--default';
+
+                                  if ($statusKey === 'pendingverification' || $statusKey === 'pendingreview') {
+                                      $statusClass = 'status-badge status-badge--pending';
+                                  } elseif ($statusKey === 'verifiedresident') {
+                                      $statusClass = 'status-badge status-badge--verified';
+                                  } elseif ($statusKey === 'notverified') {
+                                      $statusClass = 'status-badge status-badge--denied';
+                                  } elseif ($statusKey === 'archived') {
+                                      $statusClass = 'status-badge status-badge--archived';
                                   }
+
+                                  $statusDisplay = preg_replace('/(?<!^)([A-Z])/', ' $1', $statusLabel);
                                 ?>
-                                <span class="<?= $statusClass ?> fw-semibold">
-                                  <?= $statusLabel !== '' ? $statusLabel : 'Not Verified' ?>
+                                <span class="<?= htmlspecialchars($statusClass, ENT_QUOTES, 'UTF-8') ?>">
+                                  <?= htmlspecialchars($statusDisplay, ENT_QUOTES, 'UTF-8') ?>
                                 </span>
                             </div>
                         </div>
                         <div class="col-12 col-md-6">
                             <div><strong>Mobile Number:</strong> +63<?= $useraccountstbl['phone_number'] ?></div>
                             <div><strong>Email:</strong> <?= $useraccountstbl['email'] ?>
-                                <span class="text-muted fst-italic ms-2">
-                                    <?= ($useraccountstbl['email_verify'] ?? 0) ? 'Verified' : 'Not Verified' ?>
+                                <?php
+                                  $emailVerified = (int)($useraccountstbl['email_verify'] ?? 0) === 1;
+                                  $emailVerifyClass = $emailVerified
+                                      ? 'status-badge status-badge--verified'
+                                      : 'status-badge status-badge--denied';
+                                  $emailVerifyLabel = $emailVerified ? 'Verified' : 'Not Verified';
+                                ?>
+                                <span class="<?= htmlspecialchars($emailVerifyClass, ENT_QUOTES, 'UTF-8') ?>">
+                                    <?= htmlspecialchars($emailVerifyLabel, ENT_QUOTES, 'UTF-8') ?>
                                 </span>
                             </div>
                         </div>
@@ -568,3 +584,5 @@ if ($residentId !== '' && isset($conn) && $conn instanceof mysqli) {
 </body>
 
 </html>
+
+

@@ -679,3 +679,5 @@ if (isset($conn) && $conn instanceof mysqli) {
 <script src="../JS-Script-Files/Admin-End/residentMasterlistScript.js"></script>
 </body>
 </html>
+
+
