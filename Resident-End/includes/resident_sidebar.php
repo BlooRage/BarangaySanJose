@@ -227,12 +227,6 @@ if ($residentId !== '' && isset($conn) && $conn instanceof mysqli) {
            class="a-sidebarLink <?= activeLink('resident_appointments.php', $current) ?>">
           <i class="fa-solid fa-clock-rotate-left"></i>Transactions
         </a>
-        <?php if ($isHeadOfFamily): ?>
-        <a href="resident_household.php"
-           class="a-sidebarLink <?= activeLink('resident_household.php', $current) ?>">
-          <i class="fa-solid fa-people-roof"></i>Household Profiling
-        </a>
-        <?php endif; ?>
       </div>
     </nav>
 

@@ -25,6 +25,9 @@ if (!empty($residentinformationtbl['birthdate'])) {
 
 $profileImage = '../Images/Profile-Placeholder.png';
 $residentId = $residentinformationtbl['resident_id'] ?? '';
+$headOfFamilyRaw = $residentinformationtbl['head_of_family'] ?? '';
+$headOfFamilyNormalized = strtolower(trim((string)$headOfFamilyRaw));
+$isHeadOfFamily = in_array($headOfFamilyNormalized, ['yes', 'true', '1', 'y'], true);
 
 if (!function_exists('toPublicPath')) {
 function toPublicPath($path): ?string {
@@ -153,6 +156,24 @@ if ($residentId !== '' && isset($conn) && $conn instanceof mysqli) {
                 <h3 class="mb-0 text-black">ACCOUNT</h3>
             </div>
             <hr class="mt-1 mb-2">
+
+            <ul class="nav profile-tabs mb-3" role="tablist">
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link active" id="tab-profile" data-bs-toggle="tab" data-bs-target="#pane-profile" type="button" role="tab" aria-controls="pane-profile" aria-selected="true">
+                        Profile
+                    </button>
+                </li>
+                <?php if ($isHeadOfFamily): ?>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link" id="tab-household" data-bs-toggle="tab" data-bs-target="#pane-household" type="button" role="tab" aria-controls="pane-household" aria-selected="false">
+                        Household
+                    </button>
+                </li>
+                <?php endif; ?>
+            </ul>
+
+            <div class="tab-content">
+                <div class="tab-pane fade show active" id="pane-profile" role="tabpanel" aria-labelledby="tab-profile" tabindex="0">
 
             <div class="card shadow-sm mb-4">
                 <div class="card-header d-flex justify-content-between">
@@ -319,6 +340,50 @@ if ($residentId !== '' && isset($conn) && $conn instanceof mysqli) {
                         <?php endif; ?>
                     </div>
                 </div>
+            </div>
+
+                </div>
+                <?php if ($isHeadOfFamily): ?>
+                <div class="tab-pane fade" id="pane-household" role="tabpanel" aria-labelledby="tab-household" tabindex="0">
+                    <div class="card shadow-sm mb-4">
+                        <div class="card-header d-flex justify-content-between align-items-center">
+                            <strong>HOUSEHOLD PROFILING</strong>
+                            <button class="btn btn-success btn-sm">Add Household Member</button>
+                        </div>
+                        <div class="card-body">
+                            <div class="row g-3">
+                                <div class="col-12 col-md-6 col-lg-4">
+                                    <div class="border rounded p-3 h-100">
+                                        <div class="fw-semibold">Member Name</div>
+                                        <div class="text-muted small">Relationship</div>
+                                        <div class="text-muted small">Age / Sex</div>
+                                        <div class="text-muted small">Civil Status</div>
+                                    </div>
+                                </div>
+                                <div class="col-12 col-md-6 col-lg-4">
+                                    <div class="border rounded p-3 h-100">
+                                        <div class="fw-semibold">Member Name</div>
+                                        <div class="text-muted small">Relationship</div>
+                                        <div class="text-muted small">Age / Sex</div>
+                                        <div class="text-muted small">Civil Status</div>
+                                    </div>
+                                </div>
+                                <div class="col-12 col-md-6 col-lg-4">
+                                    <div class="border rounded p-3 h-100">
+                                        <div class="fw-semibold">Member Name</div>
+                                        <div class="text-muted small">Relationship</div>
+                                        <div class="text-muted small">Age / Sex</div>
+                                        <div class="text-muted small">Civil Status</div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="mt-3 text-muted small">
+                                Only the head of the family can add or manage household members.
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <?php endif; ?>
             </div>
 
         </main>
