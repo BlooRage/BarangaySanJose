@@ -251,3 +251,54 @@ INSERT INTO statuslookuptbl (status_name, status_type) VALUES
 ('PendingReview', 'ResidentDocumentProfiling'),
 ('Verified', 'ResidentDocumentProfiling'),
 ('Rejected', 'ResidentDocumentProfiling');
+
+-- ===== Household Invite + Member (Resident-End) =====
+-- Ensure statuslookuptbl has:
+-- ('Active','Household'), ('Inactive','Household')
+-- ('Active','HouseholdInvite'), ('Expired','HouseholdInvite')
+-- ('Active','HouseholdMember'), ('Removed','HouseholdMember')
+
+CREATE TABLE `householdtbl` (
+  `household_id` int(11) NOT NULL AUTO_INCREMENT,
+  `head_resident_id` varchar(10) NOT NULL,
+  `status_id` int(11) NOT NULL,
+  `created_at` datetime NOT NULL DEFAULT current_timestamp(),
+  PRIMARY KEY (`household_id`),
+  KEY `fk_household_head` (`head_resident_id`),
+  KEY `fk_household_status` (`status_id`),
+  CONSTRAINT `fk_household_head` FOREIGN KEY (`head_resident_id`) REFERENCES `residentinformationtbl` (`resident_id`) ON DELETE RESTRICT ON UPDATE CASCADE,
+  CONSTRAINT `fk_household_status` FOREIGN KEY (`status_id`) REFERENCES `statuslookuptbl` (`status_id`) ON DELETE RESTRICT ON UPDATE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+CREATE TABLE `householdinvitetbl` (
+  `invite_id` int(11) NOT NULL AUTO_INCREMENT,
+  `household_id` int(11) NOT NULL,
+  `code_hash` char(64) NOT NULL,
+  `expires_at` datetime NOT NULL,
+  `max_uses` int(11) NOT NULL DEFAULT 1,
+  `uses_count` int(11) NOT NULL DEFAULT 0,
+  `created_by_resident_id` varchar(10) NOT NULL,
+  `status_id` int(11) NOT NULL,
+  `created_at` datetime NOT NULL DEFAULT current_timestamp(),
+  PRIMARY KEY (`invite_id`),
+  KEY `fk_invite_household` (`household_id`),
+  KEY `fk_invite_status` (`status_id`),
+  CONSTRAINT `fk_invite_household` FOREIGN KEY (`household_id`) REFERENCES `householdtbl` (`household_id`) ON DELETE CASCADE ON UPDATE CASCADE,
+  CONSTRAINT `fk_invite_status` FOREIGN KEY (`status_id`) REFERENCES `statuslookuptbl` (`status_id`) ON DELETE RESTRICT ON UPDATE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+CREATE TABLE `householdmemberresidenttbl` (
+  `household_id` int(11) NOT NULL,
+  `resident_id` varchar(10) NOT NULL,
+  `role` enum('Head','Member') NOT NULL DEFAULT 'Member',
+  `status_id` int(11) NOT NULL,
+  `invited_by_resident_id` varchar(10) DEFAULT NULL,
+  `joined_at` datetime DEFAULT NULL,
+  PRIMARY KEY (`household_id`, `resident_id`),
+  KEY `fk_hmr_household` (`household_id`),
+  KEY `fk_hmr_resident` (`resident_id`),
+  KEY `fk_hmr_status` (`status_id`),
+  CONSTRAINT `fk_hmr_household` FOREIGN KEY (`household_id`) REFERENCES `householdtbl` (`household_id`) ON DELETE CASCADE ON UPDATE CASCADE,
+  CONSTRAINT `fk_hmr_resident` FOREIGN KEY (`resident_id`) REFERENCES `residentinformationtbl` (`resident_id`) ON DELETE CASCADE ON UPDATE CASCADE,
+  CONSTRAINT `fk_hmr_status` FOREIGN KEY (`status_id`) REFERENCES `statuslookuptbl` (`status_id`) ON DELETE RESTRICT ON UPDATE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;

@@ -129,6 +129,13 @@ if ($residentId !== '' && isset($conn) && $conn instanceof mysqli) {
     <meta name="viewport" content="width=device-width, initial-scale=1">
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
   <script src="../JS-Script-Files/modalHandler.js" defer></script>
+  <script src="../JS-Script-Files/Resident-End/householdMembers.js" defer></script>
+  <script src="../JS-Script-Files/Resident-End/profileOccupation.js" defer></script>
+  <script src="../JS-Script-Files/Resident-End/profileSidebar.js" defer></script>
+  <script src="../JS-Script-Files/Resident-End/profileVerifyEmail.js" defer></script>
+  <script src="../JS-Script-Files/Resident-End/householdInviteModal.js" defer></script>
+  <script src="../JS-Script-Files/Resident-End/householdJoin.js" defer></script>
+  <script src="../JS-Script-Files/Resident-End/profileTabs.js" defer></script>
     <link rel="stylesheet" href="../CSS-Styles/Resident-End-CSS/residentDashboard.css">
 </head>
 
@@ -163,13 +170,11 @@ if ($residentId !== '' && isset($conn) && $conn instanceof mysqli) {
                         Profile
                     </button>
                 </li>
-                <?php if ($isHeadOfFamily): ?>
                 <li class="nav-item" role="presentation">
                     <button class="nav-link" id="tab-household" data-bs-toggle="tab" data-bs-target="#pane-household" type="button" role="tab" aria-controls="pane-household" aria-selected="false">
                         Household
                     </button>
                 </li>
-                <?php endif; ?>
             </ul>
 
             <div class="tab-content">
@@ -343,39 +348,57 @@ if ($residentId !== '' && isset($conn) && $conn instanceof mysqli) {
             </div>
 
                 </div>
-                <?php if ($isHeadOfFamily): ?>
                 <div class="tab-pane fade" id="pane-household" role="tabpanel" aria-labelledby="tab-household" tabindex="0">
+                    <?php if (!$isHeadOfFamily): ?>
                     <div class="card shadow-sm mb-4">
-                        <div class="card-header d-flex justify-content-between align-items-center">
-                            <strong>HOUSEHOLD PROFILING</strong>
-                            <button class="btn btn-success btn-sm">Add Household Member</button>
+                        <div class="card-header">
+                            <strong>JOIN HOUSEHOLD</strong>
                         </div>
                         <div class="card-body">
-                            <div class="row g-3">
-                                <div class="col-12 col-md-6 col-lg-4">
-                                    <div class="border rounded p-3 h-100">
-                                        <div class="fw-semibold">Member Name</div>
-                                        <div class="text-muted small">Relationship</div>
-                                        <div class="text-muted small">Age / Sex</div>
-                                        <div class="text-muted small">Civil Status</div>
-                                    </div>
+                            <div class="row g-2 align-items-end">
+                                <div class="col-12 col-md-8">
+                                    <label for="householdJoinCode" class="form-label small text-muted">Invite Code</label>
+                                    <input type="text" class="form-control" id="householdJoinCode" placeholder="Enter invite code">
                                 </div>
-                                <div class="col-12 col-md-6 col-lg-4">
-                                    <div class="border rounded p-3 h-100">
-                                        <div class="fw-semibold">Member Name</div>
-                                        <div class="text-muted small">Relationship</div>
-                                        <div class="text-muted small">Age / Sex</div>
-                                        <div class="text-muted small">Civil Status</div>
-                                    </div>
+                                <div class="col-12 col-md-4">
+                                    <button class="btn btn-primary w-100" id="btnJoinHousehold">Join Household</button>
                                 </div>
-                                <div class="col-12 col-md-6 col-lg-4">
-                                    <div class="border rounded p-3 h-100">
-                                        <div class="fw-semibold">Member Name</div>
-                                        <div class="text-muted small">Relationship</div>
-                                        <div class="text-muted small">Age / Sex</div>
-                                        <div class="text-muted small">Civil Status</div>
-                                    </div>
+                            </div>
+                            <div id="householdJoinResult" class="small mt-2"></div>
+                        </div>
+                    </div>
+                    <?php endif; ?>
+                    <div class="card shadow-sm mb-4">
+                        <div class="card-header d-flex justify-content-between align-items-center">
+                            <strong>HOUSEHOLD INFORMATION</strong>
+                            <?php if ($isHeadOfFamily): ?>
+                            <button class="btn btn-success btn-sm" data-bs-toggle="modal" data-bs-target="#householdInviteModal">
+                                Add Household Member
+                            </button>
+                            <?php else: ?>
+                            <button class="btn btn-danger btn-sm" id="btnLeaveHousehold">
+                                Leave Household
+                            </button>
+                            <?php endif; ?>
+                        </div>
+                        <div class="card-body">
+                            <div class="mb-3">
+                                <div class="text-muted small">Address</div>
+                                <div id="householdAddress" class="fw-semibold">—</div>
+                            </div>
+                            <div class="row g-2 mb-3">
+                                <div class="col-6 col-md-4">
+                                    <div class="text-muted small">Minors</div>
+                                    <div id="householdMinorCount" class="fw-semibold">0</div>
                                 </div>
+                                <div class="col-6 col-md-4">
+                                    <div class="text-muted small">Adults</div>
+                                    <div id="householdAdultCount" class="fw-semibold">0</div>
+                                </div>
+                            </div>
+                            <div id="householdMembersGrid" class="row g-3"></div>
+                            <div id="householdMembersEmpty" class="text-muted small mt-2 d-none">
+                                No household members yet.
                             </div>
                             <div class="mt-3 text-muted small">
                                 Only the head of the family can add or manage household members.
@@ -383,11 +406,75 @@ if ($residentId !== '' && isset($conn) && $conn instanceof mysqli) {
                         </div>
                     </div>
                 </div>
-                <?php endif; ?>
             </div>
 
         </main>
     </div>
+
+    <?php if ($isHeadOfFamily): ?>
+    <div class="modal fade" id="householdInviteModal" tabindex="-1" data-bs-backdrop="static" data-bs-keyboard="false">
+        <div class="modal-dialog modal-md modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Invite Household Members</h5>
+                    <button class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <p class="text small mb-2">
+                            Invite members with accounts via SMS.
+                        </p>
+                        <div id="householdInvitePhoneList" class="d-flex flex-column gap-2">
+                            <div class="input-group">
+                                <span class="input-group-text">+63</span>
+                                <input type="text" class="form-control household-invite-phone" placeholder="9XXXXXXXXX" inputmode="numeric" pattern="^\d{9}$" maxlength="9">
+                            </div>
+                        </div>
+                        <button type="button" class="btn btn-primary btn-sm mt-2" id="btnAddInvitePhone">
+                            Add Another Number
+                        </button>
+                        <div class="form-text mt-2">Use PH format starting with +63.</div>
+                        <div id="householdInviteResult" class="small mt-2"></div>
+                    </div>
+                    <hr class="my-3">
+                    <div>
+                        <p class="text small mb-2">
+                            Add member without an account.
+                        </p>
+                        <div class="row g-2">
+                            <div class="col-12 col-md-6">
+                                <label class="form-label small text-muted">Last Name <span class="text-danger">*</span></label>
+                                <input type="text" class="form-control" id="hmLastName" placeholder="Last Name">
+                            </div>
+                            <div class="col-12 col-md-6">
+                                <label class="form-label small text-muted">First Name <span class="text-danger">*</span></label>
+                                <input type="text" class="form-control" id="hmFirstName" placeholder="First Name">
+                            </div>
+                            <div class="col-12 col-md-6">
+                                <label class="form-label small text-muted">Middle Name</label>
+                                <input type="text" class="form-control" id="hmMiddleName" placeholder="Middle Name">
+                            </div>
+                            <div class="col-12 col-md-6">
+                                <label class="form-label small text-muted">Suffix</label>
+                                <input type="text" class="form-control" id="hmSuffix" placeholder="Suffix (e.g. Jr.)">
+                            </div>
+                            <div class="col-12 col-md-6">
+                                <label class="form-label small text-muted">Birthdate</label>
+                                <input type="date" class="form-control" id="hmBirthdate">
+                            </div>
+                        </div>
+                        <div id="householdMemberAddResult" class="small mt-2"></div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button class="btn btn-outline-primary" id="btnAddHouseholdMemberInfo" disabled>Add Member</button>
+                    <button class="btn btn-success" id="btnSendHouseholdInvite">Send Invites</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    <?php endif; ?>
 
     <div class="modal fade" id="editProfileModal" tabindex="-1" data-bs-backdrop="static" data-bs-keyboard="false">
         <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
@@ -551,103 +638,5 @@ if ($residentId !== '' && isset($conn) && $conn instanceof mysqli) {
         </div>
 
         <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-        <script>
-            function toggleOccupation() {
-                const employmentStatus = document.getElementById('employmentStatus').value;
-                const occupationRow = document.getElementById('occupationRow');
-
-                if (employmentStatus === 'Employed') {
-                    occupationRow.style.display = 'flex';
-                } else {
-                    occupationRow.style.display = 'none';
-                }
-            }
-
-             document.addEventListener('DOMContentLoaded', toggleOccupation);
-        </script>
-
-    <script>
-        const burgerBtn = document.getElementById("btn-burger");
-        const sidebar = document.getElementById("div-sidebarWrapper");
-
-        if (burgerBtn && sidebar) {
-            burgerBtn.addEventListener("click", () => {
-                sidebar.classList.toggle("show");
-            });
-        }
-    </script>
-    <script>
-        const verifyEmailLink = document.getElementById("verifyEmailLink");
-        if (verifyEmailLink) {
-            verifyEmailLink.addEventListener("click", async (e) => {
-                e.preventDefault();
-                const sendVerification = async () => {
-                    try {
-                        const controller = new AbortController();
-                        if (window.UniversalModal?.open) {
-                            window.UniversalModal.open({
-                                title: "Please Wait",
-                                message: "Sending verification email...",
-                                buttons: [
-                                    {
-                                        label: "Cancel",
-                                        class: "btn btn-outline-secondary",
-                                        onClick: () => controller.abort(),
-                                    },
-                                ],
-                            });
-                        }
-                        const res = await fetch("../PhpFiles/EmailHandlers/sendEmailVerify.php", {
-                            method: "POST",
-                            headers: { "Accept": "application/json" },
-                            signal: controller.signal,
-                        });
-                        const data = await res.json().catch(() => ({}));
-                        if (!res.ok || !data.success) {
-                            throw new Error(data.message || "Unable to send verification email.");
-                        }
-                        if (window.UniversalModal?.open) {
-                            window.UniversalModal.open({
-                                title: "Verification Email Sent",
-                                messageHtml: "An email verification has been sent to your email. Click the verify button to proceed.<br><b>The verify link will expire in 15 minutes.</b>",
-                                buttons: [{ label: "OK", class: "btn btn-primary" }],
-                            });
-                        } else {
-                            alert("Verification Email Sent\nCheck your inbox. The verify link will expire in 15 minutes.");
-                        }
-                    } catch (err) {
-                        if (err?.name === "AbortError" || err?.message === "Aborted" || err?.code === DOMException.ABORT_ERR) {
-                            return;
-                        }
-                        if (window.UniversalModal?.open) {
-                            window.UniversalModal.open({
-                                title: "Error",
-                                message: err?.message || "Unable to send verification email.",
-                                buttons: [{ label: "OK", class: "btn btn-danger" }],
-                            });
-                        } else {
-                            alert(err?.message || "Unable to send verification email.");
-                        }
-                    }
-                };
-
-                if (window.UniversalModal?.open) {
-                    window.UniversalModal.open({
-                        title: "Verify Email",
-                        message: "Send a verification email to your registered address?",
-                        buttons: [
-                            { label: "Cancel", class: "btn btn-outline-secondary" },
-                            { label: "Send Email", class: "btn btn-primary", onClick: sendVerification },
-                        ],
-                    });
-                } else {
-                    sendVerification();
-                }
-            });
-        }
-    </script>
 </body>
-
 </html>
-
-
