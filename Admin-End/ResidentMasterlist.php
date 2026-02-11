@@ -234,7 +234,7 @@ if (isset($conn) && $conn instanceof mysqli) {
 <!-- MODAL stays unchanged -->
 <div class="modal fade" id="modal-viewEntry" tabindex="-1" data-bs-backdrop="static" data-bs-keyboard="false">
     <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable" id="div-modalSizing" style="max-width: 1500px; width: 75vw;">
-        <form id="form-updateStatus" method="POST" action="../PhpFiles/Admin-End/residentMasterlist.php" class="modal-content border-0 rounded-2 p-4">
+        <div class="modal-content border-0 rounded-2 p-4">
             <div class="modal-header border-0">
                 <h3 class="fw-bold">Resident Details: <span id="span-displayID" class="text-warning"></span></h3>
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
@@ -418,63 +418,76 @@ if (isset($conn) && $conn instanceof mysqli) {
 
                 </div>
 
-                <div id="div-statusManagementGroup" class="mt-4">
-                    <h5 class="fw-bold mb-2" style="color: #000;">Manage Status</h5>
-                    <div id="div-statusBanner" class="mb-3"></div>
-
-                    <label class="small fw-bold">Update Status:</label>
-                    <select name="select-newStatus" id="select-newStatus" class="form-select mb-3" onchange="toggleDenialUI()">
-                        <option value="PENDING">PENDING</option>
-                        <option value="APPROVED">APPROVED</option>
-                        <option value="DENIED">DENIED</option>
-                    </select>
-
-                    <div id="div-denialOptions" class="div-hide border p-3 rounded-3 bg-light">
-                        <p class="text-danger fw-bold small mb-2">Reason for Denial:</p>
-
-                        <div class="form-check">
-                            <input class="form-check-input" type="radio" name="radio-denialReason" id="radio-incomplete" value="Incomplete Requirements" checked onchange="toggleOthersBox()">
-                            <label class="form-check-label small" for="radio-incomplete">Incomplete Requirements</label>
-                        </div>
-
-                        <div class="form-check">
-                            <input class="form-check-input" type="radio" name="radio-denialReason" id="radio-invalid" value="Invalid Requirements" onchange="toggleOthersBox()">
-                            <label class="form-check-label small" for="radio-invalid">Invalid Requirements</label>
-                        </div>
-
-                        <div class="form-check">
-                            <input class="form-check-input" type="radio" name="radio-denialReason" id="radio-others" value="Others" onchange="toggleOthersBox()">
-                            <label class="form-check-label small" for="radio-others">Others</label>
-                        </div>
-
-                        <textarea name="textarea-otherReason" id="textarea-otherReason" class="form-control mt-2 div-hide" placeholder="State reason..."></textarea>
+                <div id="div-statusReadOnlyGroup" class="mt-4">
+                    <h5 class="fw-bold mb-2" style="color: #000;">Resident Status</h5>
+                    <div id="div-statusBanner" class="mb-0"></div>
+                    <div class="d-flex gap-2 mt-3" id="div-residentStatusActions">
+                        <button type="button" class="btn btn-danger flex-fill" id="btn-openDeclineResident">Decline</button>
+                        <button type="button" class="btn btn-success flex-fill" id="btn-openVerifyResident">Verify</button>
                     </div>
                 </div>
+
             </div>
 
             <div class="modal-footer border-0">
                 <button type="button" class="btn btn-secondary px-4" data-bs-dismiss="modal">Close</button>
-                <button type="submit" name="button-saveStatus" class="btn btn-success px-5">Save Changes</button>
             </div>
-        </form>
+        </div>
     </div>
 </div>
 
-<!-- EDIT RESIDENT MODAL -->
+<!-- VERIFY RESIDENT CONFIRMATION MODAL -->
+<div class="modal fade" id="modal-verifyResidentConfirm" tabindex="-1" data-bs-backdrop="static" data-bs-keyboard="false">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content p-3">
+            <div class="modal-header border-0">
+                <h5 class="modal-title fw-bold">Approval Confirmation</h5>
+                <button type="button" class="btn-close" id="btn-closeVerifyResidentConfirm"></button>
+            </div>
+            <div class="modal-body">
+                <p class="mb-0">Are you sure you want to approve this resident and allow access to all modules?</p>
+            </div>
+            <div class="modal-footer border-0">
+                <button type="button" class="btn btn-secondary" id="btn-cancelVerifyResident">Cancel</button>
+                <button type="button" class="btn btn-success" id="btn-confirmVerifyResident">Verify</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- DECLINE RESIDENT MODAL -->
+<div class="modal fade" id="modal-declineResidentConfirm" tabindex="-1" data-bs-backdrop="static" data-bs-keyboard="false">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content p-3">
+            <div class="modal-header border-0">
+                <h5 class="modal-title fw-bold">Decline Resident Request</h5>
+                <button type="button" class="btn-close" id="btn-closeDeclineResidentConfirm"></button>
+            </div>
+            <div class="modal-body">
+                <label for="txt-declineResidentReason" class="form-label fw-bold mb-1">Reason for decline</label>
+                <textarea id="txt-declineResidentReason" class="form-control" rows="4" placeholder="State why this request is declined."></textarea>
+                <div class="invalid-feedback d-none" id="txt-declineResidentReasonError">Decline reason is required.</div>
+            </div>
+            <div class="modal-footer border-0">
+                <button type="button" class="btn btn-secondary" id="btn-cancelDeclineResident">Cancel</button>
+                <button type="button" class="btn btn-danger" id="btn-confirmDeclineResident">Decline</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- EDIT RESIDENT MODAL (DISABLED)
 <div class="modal fade" id="modal-editEntry" tabindex="-1" data-bs-backdrop="static" data-bs-keyboard="false">
   <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable">
     <form id="form-editResident" class="modal-content p-4" method="POST" action="../PhpFiles/Admin-End/residentMasterlist.php">
-
       <div class="modal-header border-0">
         <h4 class="fw-bold" style="font-family: 'Charis SIL Bold', serif; font-size: 28px; color: #e78924">Edit Resident Profile</h4>
         <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
       </div>
 
       <div class="modal-body">
-
         <input type="hidden" id="edit-residentId" name="resident_id">
 
-        <!-- PERSONAL INFORMATION -->
         <h5 class="fw-bold mb-3">Personal Information</h5>
         <div class="row g-3">
           <div class="col-md-3">
@@ -562,7 +575,6 @@ if (isset($conn) && $conn instanceof mysqli) {
 
         <br><hr><br>
 
-        <!-- EMERGENCY CONTACT -->
         <input type="hidden" id="edit-userId" name="user_id">
         <h5 class="fw-bold mb-3">Emergency Contact</h5>
         <div class="row g-3">
@@ -598,15 +610,16 @@ if (isset($conn) && $conn instanceof mysqli) {
         </div>
 
         <br>
+      </div>
 
       <div class="modal-footer border-0">
         <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
         <button type="submit" class="btn btn-success px-4">Save Changes</button>
       </div>
-
     </form>
   </div>
 </div>
+-->
 
 <!-- VIEW SUBMITTED DOCUMENTS MODAL -->
 <div class="modal fade docs-modal" id="modal-viewDocs" tabindex="-1" data-bs-backdrop="static" data-bs-keyboard="false">
@@ -679,5 +692,6 @@ if (isset($conn) && $conn instanceof mysqli) {
 <script src="../JS-Script-Files/Admin-End/residentMasterlistScript.js"></script>
 </body>
 </html>
+
 
 

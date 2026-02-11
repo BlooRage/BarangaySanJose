@@ -10,19 +10,139 @@ document.addEventListener("DOMContentLoaded", () => {
 
   let allResidents = [];
   let activeFilter = "ALL";
+  let currentViewedResident = null;
+
+  const viewModalEl = document.getElementById("modal-viewEntry");
+  const verifyResidentModalEl = document.getElementById("modal-verifyResidentConfirm");
+  const declineResidentModalEl = document.getElementById("modal-declineResidentConfirm");
+  const declineReasonEl = document.getElementById("txt-declineResidentReason");
+  const declineReasonErrorEl = document.getElementById("txt-declineResidentReasonError");
+  const btnOpenDeclineResident = document.getElementById("btn-openDeclineResident");
+  const btnOpenVerifyResident = document.getElementById("btn-openVerifyResident");
+  const residentStatusActionsEl = document.getElementById("div-residentStatusActions");
+  const btnCancelVerifyResident = document.getElementById("btn-cancelVerifyResident");
+  const btnCloseVerifyResidentConfirm = document.getElementById("btn-closeVerifyResidentConfirm");
+  const btnConfirmVerifyResident = document.getElementById("btn-confirmVerifyResident");
+  const btnCancelDeclineResident = document.getElementById("btn-cancelDeclineResident");
+  const btnCloseDeclineResidentConfirm = document.getElementById("btn-closeDeclineResidentConfirm");
+  const btnConfirmDeclineResident = document.getElementById("btn-confirmDeclineResident");
+
+  function getStaticModal(el) {
+    if (!el || !window.bootstrap?.Modal) return null;
+    return bootstrap.Modal.getOrCreateInstance(el, {
+      backdrop: "static",
+      keyboard: false
+    });
+  }
+
+  function showViewModal() {
+    getStaticModal(viewModalEl)?.show();
+  }
+
+  function hideViewModal() {
+    getStaticModal(viewModalEl)?.hide();
+  }
+
+  function showVerifyModal() {
+    getStaticModal(verifyResidentModalEl)?.show();
+  }
+
+  function hideVerifyModal() {
+    getStaticModal(verifyResidentModalEl)?.hide();
+  }
+
+  function showDeclineModal() {
+    getStaticModal(declineResidentModalEl)?.show();
+  }
+
+  function hideDeclineModal() {
+    getStaticModal(declineResidentModalEl)?.hide();
+  }
+
+  function renderResidentStatusBanner(status) {
+    const banner = document.getElementById("div-statusBanner");
+    if (!banner) return;
+
+    banner.innerText = statusDisplayMap[status] ?? "UNSET";
+    banner.className = "mb-0";
+    banner.classList.add(
+      status === "VerifiedResident" ? "bg-statusApproved" :
+      status === "PendingVerification" ? "bg-statusPending" :
+      status === "NotVerified" ? "bg-statusDenied" :
+      "bg-statusUnset"
+    );
+  }
+
+  function setResidentStatusActionsVisibility(status) {
+    if (!residentStatusActionsEl) return;
+    const isPendingVerification = status === "PendingVerification";
+    residentStatusActionsEl.classList.toggle("d-none", !isPendingVerification);
+  }
+
+  function syncResidentStatusLocally(residentId, status) {
+    allResidents = allResidents.map((resident) =>
+      String(resident.resident_id) === String(residentId)
+        ? { ...resident, status }
+        : resident
+    );
+    applyFilterAndRender();
+  }
+
+  async function updateResidentStatus(uiStatus, reasonText, source) {
+    if (!currentViewedResident?.resident_id) return;
+
+    const payload = new URLSearchParams({
+      update_resident_status: "1",
+      resident_id: currentViewedResident.resident_id,
+      new_status: uiStatus,
+      reason_text: reasonText ?? ""
+    });
+
+    const response = await fetch("../PhpFiles/Admin-End/residentMasterlist.php", {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: payload
+    });
+
+    const result = await response.json().catch(() => null);
+    if (!response.ok || !result?.success) {
+      throw new Error(result?.message || "Failed to update resident status.");
+    }
+
+    const updatedStatus = result.status || (uiStatus === "APPROVED" ? "VerifiedResident" : "NotVerified");
+    currentViewedResident.status = updatedStatus;
+    syncResidentStatusLocally(currentViewedResident.resident_id, updatedStatus);
+    renderResidentStatusBanner(updatedStatus);
+    setResidentStatusActionsVisibility(updatedStatus);
+
+    if (source === "verify") {
+      hideVerifyModal();
+    } else {
+      hideDeclineModal();
+      if (declineReasonEl) declineReasonEl.value = "";
+      if (declineReasonErrorEl) declineReasonErrorEl.classList.add("d-none");
+    }
+
+    showViewModal();
+    await fetchResidents(searchInput?.value.trim() ?? "");
+  }
 
   // ========================
   // FETCH RESIDENTS
   // ========================
   function fetchResidents(search = "") {
     const url = `../PhpFiles/Admin-End/residentMasterlist.php?fetch=true&search=${encodeURIComponent(search)}`;
-    fetch(url)
+    return fetch(url)
       .then(res => res.json())
       .then(data => {
         allResidents = Array.isArray(data) ? data : [];
         applyFilterAndRender();
+        return allResidents;
       })
-      .catch(err => console.error("Fetch error:", err));
+      .catch(err => {
+        console.error("Fetch error:", err);
+        return [];
+      });
   }
   fetchResidents();
 
@@ -86,7 +206,7 @@ document.addEventListener("DOMContentLoaded", () => {
         row.status === "NotVerified" ? "danger" : "secondary";
 
       const tr = document.createElement("tr");
-      const canEditOrArchive = row.status !== "NotVerified" && row.status !== "PendingVerification";
+      const canArchive = row.status !== "NotVerified" && row.status !== "PendingVerification";
       const canViewDocs = row.status === "PendingVerification";
       tr.innerHTML = `
         <td class="fw-bold">${row.resident_id}</td>
@@ -95,8 +215,7 @@ document.addEventListener("DOMContentLoaded", () => {
         <td class="d-flex gap-1">
           <button type="button" class="btn btn-primary btn-sm text-white viewEntryBtn">View</button>
           ${canViewDocs ? `<button type="button" class="btn btn-info btn-sm text-white viewDocsBtn">Documents</button>` : ""}
-          ${canEditOrArchive ? `<button type="button" class="btn btn-secondary btn-sm text-white editEntryBtn">Edit</button>` : ""}
-          ${canEditOrArchive ? `<button type="button" class="btn btn-warning btn-sm text-dark archiveEntryBtn">Archive</button>` : ""}
+          ${canArchive ? `<button type="button" class="btn btn-warning btn-sm text-dark archiveEntryBtn">Archive</button>` : ""}
         </td>
         
       `;
@@ -104,8 +223,6 @@ document.addEventListener("DOMContentLoaded", () => {
       tr.querySelector(".viewEntryBtn").addEventListener("click", () => openViewEntry(row));
       const docsBtn = tr.querySelector(".viewDocsBtn");
       if (docsBtn) docsBtn.addEventListener("click", () => openDocsModal(row));
-      const editBtn = tr.querySelector(".editEntryBtn");
-      if (editBtn) editBtn.addEventListener("click", () => openEditEntry(row));
       const archiveBtn = tr.querySelector(".archiveEntryBtn");
       if (archiveBtn) archiveBtn.addEventListener("click", () => archiveEntry(row));
 
@@ -129,10 +246,97 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
+  // ========================
+  // RESIDENT STATUS ACTIONS
+  // ========================
+  if (btnOpenVerifyResident) {
+    btnOpenVerifyResident.addEventListener("click", () => {
+      if (!currentViewedResident) return;
+      hideViewModal();
+      showVerifyModal();
+    });
+  }
+
+  if (btnOpenDeclineResident) {
+    btnOpenDeclineResident.addEventListener("click", () => {
+      if (!currentViewedResident) return;
+      if (declineReasonEl) declineReasonEl.value = "";
+      if (declineReasonErrorEl) declineReasonErrorEl.classList.add("d-none");
+      hideViewModal();
+      showDeclineModal();
+    });
+  }
+
+  const backToViewFromVerify = () => {
+    hideVerifyModal();
+    showViewModal();
+  };
+
+  const backToViewFromDecline = () => {
+    hideDeclineModal();
+    if (declineReasonEl) declineReasonEl.value = "";
+    if (declineReasonErrorEl) declineReasonErrorEl.classList.add("d-none");
+    showViewModal();
+  };
+
+  if (btnCancelVerifyResident) {
+    btnCancelVerifyResident.addEventListener("click", backToViewFromVerify);
+  }
+  if (btnCloseVerifyResidentConfirm) {
+    btnCloseVerifyResidentConfirm.addEventListener("click", backToViewFromVerify);
+  }
+  if (btnCancelDeclineResident) {
+    btnCancelDeclineResident.addEventListener("click", backToViewFromDecline);
+  }
+  if (btnCloseDeclineResidentConfirm) {
+    btnCloseDeclineResidentConfirm.addEventListener("click", backToViewFromDecline);
+  }
+
+  if (btnConfirmVerifyResident) {
+    btnConfirmVerifyResident.addEventListener("click", async () => {
+      if (!currentViewedResident) return;
+      btnConfirmVerifyResident.disabled = true;
+      btnConfirmVerifyResident.innerText = "Verifying...";
+      try {
+        await updateResidentStatus("APPROVED", "", "verify");
+      } catch (e) {
+        alert(e?.message || "Failed to verify resident.");
+      } finally {
+        btnConfirmVerifyResident.disabled = false;
+        btnConfirmVerifyResident.innerText = "Verify";
+      }
+    });
+  }
+
+  if (btnConfirmDeclineResident) {
+    btnConfirmDeclineResident.addEventListener("click", async () => {
+      if (!currentViewedResident) return;
+      const reason = declineReasonEl?.value.trim() ?? "";
+      if (!reason) {
+        if (declineReasonErrorEl) declineReasonErrorEl.classList.remove("d-none");
+        declineReasonEl?.focus();
+        return;
+      }
+      if (declineReasonErrorEl) declineReasonErrorEl.classList.add("d-none");
+
+      btnConfirmDeclineResident.disabled = true;
+      btnConfirmDeclineResident.innerText = "Declining...";
+      try {
+        await updateResidentStatus("DENIED", reason, "decline");
+      } catch (e) {
+        alert(e?.message || "Failed to decline resident.");
+      } finally {
+        btnConfirmDeclineResident.disabled = false;
+        btnConfirmDeclineResident.innerText = "Decline";
+      }
+    });
+  }
+
  // ========================
 // VIEW ENTRY MODAL
 // ========================
 function openViewEntry(data) {
+  currentViewedResident = data;
   document.getElementById("input-appId").value = data.resident_id;
   document.getElementById("span-displayID").innerText = "#" + data.resident_id;
   const idPictureEl = document.getElementById("img-modalIdPicture");
@@ -211,25 +415,12 @@ function openViewEntry(data) {
   document.getElementById("txt-modalHouseType").innerText = data.house_type ?? "—";
   document.getElementById("txt-modalResidencyDuration").innerText = data.residency_duration ?? "—";
 
-  // Status Banner
-  const statusToUi = { "PendingVerification": "PENDING", "VerifiedResident": "APPROVED", "NotVerified": "DENIED" };
-  document.getElementById("select-newStatus").value = statusToUi[data.status] ?? "PENDING";
-
-  const banner = document.getElementById("div-statusBanner");
-  banner.innerText = statusDisplayMap[data.status] ?? "UNSET";
-  banner.className = "mb-3";
-  banner.classList.add(
-    data.status === "VerifiedResident" ? "bg-statusApproved" :
-    data.status === "PendingVerification" ? "bg-statusPending" :
-    data.status === "NotVerified" ? "bg-statusDenied" :
-    "bg-statusUnset"
-  );
+  // Read-only status banner
+  renderResidentStatusBanner(data.status);
+  setResidentStatusActionsVisibility(data.status);
 
   // STATIC MODAL: cannot close by click outside or Esc
-  new bootstrap.Modal(document.getElementById("modal-viewEntry"), {
-    backdrop: 'static',
-    keyboard: false
-  }).show();
+  showViewModal();
 
   // Load verified documents for this resident
   const verifiedListEl = document.getElementById("view-verified-docs");
@@ -811,8 +1002,9 @@ function openDocViewer(doc, parentModalEl, opts = {}) {
 }
 
 // ========================
-// EDIT ENTRY MODAL
+// EDIT ENTRY MODAL (DISABLED)
 // ========================
+/*
 function openEditEntry(data) {
   const modalEl = document.getElementById("modal-editEntry");
   const form = modalEl ? modalEl.querySelector("form") : null;
@@ -941,6 +1133,7 @@ function hasFormChanges(form) {
   const current = getFormState(form);
   return JSON.stringify(current) !== JSON.stringify(original);
 }
+*/
 
   // ========================
   // "Other" toggle handlers
@@ -954,37 +1147,6 @@ function hasFormChanges(form) {
       else target.classList.add("d-none");
     });
   });
-
-  // ========================
-  // STATUS DENIAL UI
-  // ========================
-  const selectStatus = document.getElementById("select-newStatus");
-  if (selectStatus) {
-    selectStatus.addEventListener("change", () => {
-      const denialDiv = document.getElementById("div-denialOptions");
-      if (!denialDiv) return;
-      selectStatus.value === "DENIED" ? denialDiv.classList.remove("div-hide") : denialDiv.classList.add("div-hide");
-    });
-  }
-
-  const radioOthers = document.getElementById("radio-others");
-  if (radioOthers) {
-    radioOthers.addEventListener("change", () => {
-      const otherBox = document.getElementById("textarea-otherReason");
-      if (!otherBox) return;
-      radioOthers.checked ? otherBox.classList.remove("div-hide") : otherBox.classList.add("div-hide");
-    });
-  }
-
-  // ========================
-  // CONFIRMATION BEFORE SAVE
-  // ========================
-  const formUpdate = document.getElementById("form-updateStatus");
-  if (formUpdate) {
-    formUpdate.addEventListener("submit", e => {
-      if (!confirm("Are you sure you want to save this status?")) e.preventDefault();
-    });
-  }
 
   // ========================
   // RESET FILTER MODAL

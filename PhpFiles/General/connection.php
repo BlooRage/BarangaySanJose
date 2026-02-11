@@ -13,6 +13,6 @@ if ($conn->connect_error) {
     die("Connection Failed: " . $conn->connect_error);
 } else {
     // Optional: Uncomment this line if you want confirmation of success
-    //echo "✅ Connected successfully to $dbname";
+    //echo "âœ… Connected successfully to $dbname";
 }
 ?>
