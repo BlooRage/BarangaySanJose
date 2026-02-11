@@ -5,7 +5,7 @@
 <head>
   <meta charset="utf-8">
   
-  <link rel="icon" href="/Images/favicon_sanjose.png">
+  <link rel="icon" href="/Images/favicon_sanjose.png?v=20260211">
 <meta name="viewport" content="width=device-width,initial-scale=1">
   <meta name="color-scheme" content="light only">
   <meta name="supported-color-schemes" content="light">
