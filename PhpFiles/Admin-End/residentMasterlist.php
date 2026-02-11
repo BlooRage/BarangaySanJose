@@ -47,20 +47,12 @@ function toPublicPath($path): ?string {
     }
     $normalized = '/' . implode('/', $cleanParts);
 
-    $scriptName = str_replace("\\", "/", (string)($_SERVER['SCRIPT_NAME'] ?? ''));
-    $appBase = '';
-    $phpFilesPos = strpos($scriptName, '/PhpFiles/');
-    if ($phpFilesPos !== false) {
-        $appBase = substr($scriptName, 0, $phpFilesPos);
-    }
-    $appBase = rtrim($appBase, '/');
-
     // Most records contain absolute filesystem paths; map them by folder marker.
     $marker = '/UnifiedFileAttachment/';
     $markerPos = stripos($normalized, $marker);
     if ($markerPos !== false) {
         $public = substr($normalized, $markerPos);
-        return ($appBase !== '' ? $appBase : '') . $public;
+        return '..' . $public;
     }
 
     $webRoot = realpath(__DIR__ . "/../..");
@@ -74,11 +66,11 @@ function toPublicPath($path): ?string {
             if ($rel[0] !== '/') {
                 $rel = '/' . $rel;
             }
-            return ($appBase !== '' ? $appBase : '') . $rel;
+            return '../' . ltrim($rel, '/');
         }
     }
 
-    return ($appBase !== '' ? $appBase : '') . $normalized;
+    return '../' . ltrim($normalized, '/');
 }
 
 /* =====================================================
