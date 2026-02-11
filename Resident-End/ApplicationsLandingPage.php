@@ -44,7 +44,7 @@
                 Lorem ipsum dolor sit amet, consectetur adipiscing elit,
                 sed do eiusmod tempor incididunt ut
             </p>
-            <button class="btn apply-btn">Apply Now</button>
+            <button class="btn apply-btn" onclick="location.href='Cohabitation.php'">Apply Now</button>
         </div>
 
         <div class="col-lg-4 certificate-card">
@@ -54,7 +54,7 @@
                 Lorem ipsum dolor sit amet, consectetur adipiscing elit,
                 sed do eiusmod tempor incididunt ut
             </p>
-            <button class="btn apply-btn">Apply Now</button>
+            <button class="btn apply-btn" onclick="location.href='Indigency.php'">Apply Now</button>
         </div>
 
         <div class="col-lg-4 certificate-card">
@@ -74,7 +74,7 @@
                 Lorem ipsum dolor sit amet, consectetur adipiscing elit,
                 sed do eiusmod tempor incididunt ut
             </p>
-            <button class="btn apply-btn">Apply Now</button>
+            <button class="btn apply-btn" onclick="location.href='FirstTimeJobSeekers.php'">Apply Now</button>
         </div>
 
         <div class="col-lg-4 certificate-card position-relative">

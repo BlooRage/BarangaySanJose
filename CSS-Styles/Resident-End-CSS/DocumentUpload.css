@@ -1,0 +1,67 @@
+@font-face {
+    font-family: 'Charis SIL Regular';
+    src: url(../Fonts/Charis-SIL/CharisSIL-Regular.ttf);
+}
+
+@font-face {
+    font-family: 'Charis SIL Bold';
+    src: url(../Fonts/Charis-SIL/CharisSIL-Bold.ttf);
+}
+
+@font-face {
+    font-family: 'Charis SIL Bold Italic';
+    src: url(../Fonts/Charis-SIL/CharisSIL-BoldItalic.ttf);
+}
+
+@font-face {
+    font-family: 'Charis SIL Italic';
+    src: url(../Fonts/Charis-SIL/CharisSIL-Italic.ttf);
+}
+
+@font-face {
+    font-family: 'Geist';
+    src: url(../Fonts/Geist/Geist-VariableFont_wght.ttf);
+}
+
+h2 {
+    font-family: 'Charis SIL Bold', sans-serif !important;
+    font-weight: bold !important;
+    color: #ff7b00 !important;
+    font-size: 18px;
+}
+
+.main-content {
+    flex: 1;
+    padding: 30px;
+    margin-left: 270px;
+}
+
+@media (max-width: 767px) {
+    .main-content {
+        margin-left: 0;
+    }
+}
+
+h2 {
+    font-family: 'geist', sans-serif;
+}
+
+.upload-box {
+    border: 2px dashed #ced4da;
+    border-radius: 8px;
+    padding: 25px;
+    text-align: center;
+    background: #fafafa;
+    cursor: pointer;
+}
+
+.upload-box:hover {
+    background: #f1f1f1;
+}
+
+.upload-input {
+    position: absolute;
+    inset: 0;
+    opacity: 0;
+    cursor: pointer;
+}
