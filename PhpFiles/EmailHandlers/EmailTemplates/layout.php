@@ -5,7 +5,7 @@
 <head>
   <meta charset="utf-8">
   
-  <link rel="icon" href="/Images/San_Jose_LOGO.jpg">
+  <link rel="icon" href="/Images/favicon_sanjose.png">
 <meta name="viewport" content="width=device-width,initial-scale=1">
   <meta name="color-scheme" content="light only">
   <meta name="supported-color-schemes" content="light">
