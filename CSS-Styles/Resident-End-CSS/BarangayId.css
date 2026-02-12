@@ -14,15 +14,18 @@ body {
     justify-content: center;
     padding: 32px 16px;
     margin: auto;
+    width: 100%;
 }
 
 .application-card {
     width: 100%;
-    max-width: 900px;
+    max-width: 1400px !important;
     background-color: #ffffff;
     border: 1.5px solid #FE993C;
     border-radius: 14px;
     padding: 32px;
+    margin: auto;
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
 }
 
 .back-link {
@@ -234,4 +237,42 @@ span{
     .phonenum {
         grid-row: span 1;
     }
+}
+
+.orange-card {
+    background: #ffffff;
+    color: #000;
+    border: 1px solid #FE993C;
+    margin-top: 40px;
+}
+
+.certification-text {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.orange-card .form-title,
+.orange-card .form-subtitle,
+.orange-card .section-title,
+.orange-card .certification-text {
+    color: #FE993C;
+}
+
+.certification-text {
+    color: #000000 !important;
+}
+.orange-card input,
+.orange-card select,
+.orange-card #application_date {
+    background-color: rgba(255,255,255,0.95);
+    color: #000;
+}
+.orange-card .submit-btn {
+    background-color: #ffffff;
+    color: #FE993C;
+    font-weight: 700;
+}
+.orange-card .submit-btn:hover {
+    background-color: #f2f2f2;
 }
