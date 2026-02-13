@@ -27,6 +27,17 @@ require_once __DIR__ . "/includes/resident_access_guard.php";
   <link rel="stylesheet" href="../CSS-Styles/Resident-End-CSS/registrationStyle.css" />
   <link rel="stylesheet" href="../CSS-Styles/NavbarFooterStyle.css" />
 
+  <style>
+.field-error {
+  font-size: 0.85rem;
+  color: #dc3545;
+  margin-top: 4px;
+}
+.is-invalid {
+  border-color: #dc3545 !important;
+}
+</style>
+
   <!-- Optional: server-side alert handling (if you use it) -->
   <script src="../JS-Script-Files/modalHandler.js"></script>
 
@@ -1042,15 +1053,12 @@ require_once __DIR__ . "/includes/resident_access_guard.php";
         });
       }
 
-      // Digits-only and max 10 for phone inputs
       document.querySelectorAll(".phone-input").forEach(inp => {
         inp.addEventListener("input", () => {
           inp.value = inp.value.replace(/\D/g, "").slice(0, 10);
         });
       });
 
-      // Fetch account contact details (phone/email) from backend endpoint
-      // Create this endpoint: ../PhpFiles/GET/getAccountContact.php
       fetch("../PhpFiles/GET/getAccountContact.php", {
         method: "GET",
         credentials: "same-origin",
@@ -1060,18 +1068,15 @@ require_once __DIR__ . "/includes/resident_access_guard.php";
       .then(data => {
         if (!data || !data.success) return;
 
-        // Expect: phone_number = "9XXXXXXXXX" OR "09XXXXXXXXX"
         let phone = String(data.phone_number ?? "");
         phone = phone.replace(/\D/g, "");
-        if (phone.length === 11 && phone.startsWith("0")) phone = phone.slice(1); // -> 10 digits
+        if (phone.length === 11 && phone.startsWith("0")) phone = phone.slice(1); 
 
         const email = String(data.email ?? "");
 
-        // Fill visible disabled inputs
         const phoneVisible = document.getElementById("phoneNumber");
         const emailVisible = document.getElementById("emailAddress");
 
-        // Fill hidden inputs to submit with form
         const phoneHidden = document.getElementById("phoneNumberHidden");
         const emailHidden = document.getElementById("emailAddressHidden");
 
@@ -1094,7 +1099,6 @@ proofTypeSelect.addEventListener("change", () => {
   idProofWrapper.classList.add("d-none");
   documentProofWrapper.classList.add("d-none");
 
-  // Disable all inputs first
   idProofWrapper.querySelectorAll("input, select").forEach(el => el.disabled = true);
   documentProofWrapper.querySelectorAll("input, select").forEach(el => el.disabled = true);
 
@@ -1117,14 +1121,9 @@ proofTypeSelect.addEventListener("change", () => {
   }
 });
 
-// Add up to 3 document uploads
-
 
 document.addEventListener("DOMContentLoaded", () => {
 
-  /* =========================
-     GENERIC UPLOAD BOX HANDLER
-     ========================= */
 
   async function convertHeicIfNeeded(input) {
     if (!input || !input.files || input.files.length === 0) return;
@@ -1166,11 +1165,9 @@ document.addEventListener("DOMContentLoaded", () => {
     const input = uploadBox.querySelector('input[type="file"]');
     if (!input) return;
 
-    // Click anywhere to open file picker
     uploadBox.addEventListener("click", () => input.click());
     input.addEventListener("click", (e) => e.stopPropagation());
 
-    // Drag over
     uploadBox.addEventListener("dragover", e => {
       e.preventDefault();
       uploadBox.classList.add("dragover");
@@ -1356,6 +1353,113 @@ document.addEventListener("DOMContentLoaded", () => {
       }
     });
   </script>
+
+  <!-- vali-->
+   <script>
+document.addEventListener("DOMContentLoaded", () => {
+
+  const nameRegex = /^[A-Za-z][A-Za-z\s'-]+$/;
+  const gibberishRegex = /(asdf|qwer|zxcv|aaaa|bbbb|cccc|qwerty|1234)/i;
+
+  function titleCase(str) {
+    return str
+      .toLowerCase()
+      .replace(/\s+/g, " ")
+      .trim()
+      .replace(/\b\w/g, c => c.toUpperCase());
+  }
+
+  function showError(input, message) {
+    clearError(input);
+    input.classList.add("is-invalid");
+    const div = document.createElement("div");
+    div.className = "field-error";
+    div.textContent = message;
+    input.parentNode.appendChild(div);
+  }
+
+  function clearError(input) {
+    input.classList.remove("is-invalid");
+    const err = input.parentNode.querySelector(".field-error");
+    if (err) err.remove();
+  }
+
+  function validateName(input, required = true) {
+    const val = input.value.trim();
+
+    if (!val && required) {
+      showError(input, "This field is required.");
+      return false;
+    }
+
+    if (val.length < 2) {
+      showError(input, "Must be at least 2 characters.");
+      return false;
+    }
+
+    if (!nameRegex.test(val)) {
+      showError(input, "Only letters, spaces, hyphens, and apostrophes allowed.");
+      return false;
+    }
+
+    if (gibberishRegex.test(val)) {
+      showError(input, "Input appears invalid or random.");
+      return false;
+    }
+
+    input.value = titleCase(val);
+    clearError(input);
+    return true;
+  }
+
+  const nameFields = [
+    "lastName","firstName",
+    "emergencyLastName","emergencyFirstName"
+  ];
+
+  nameFields.forEach(id => {
+    const el = document.getElementById(id);
+    if (!el) return;
+
+    el.addEventListener("blur", () => {
+      validateName(el, el.hasAttribute("required"));
+      updateNextButtonState();
+    });
+  });
+  
+
+  const personalPhone = document.getElementById("phoneNumberHidden");
+  const emergencyPhone = document.getElementById("emergencyPhoneNumber");
+
+  if (emergencyPhone) {
+    emergencyPhone.addEventListener("blur", () => {
+      if (personalPhone.value === emergencyPhone.value) {
+        showError(emergencyPhone, "Emergency contact cannot be your own number.");
+      } else {
+        clearError(emergencyPhone);
+      }
+      updateNextButtonState();
+    });
+  }
+
+  function updateNextButtonState() {
+    document.querySelectorAll(".step.active-step").forEach(step => {
+      const btn = step.querySelector(".next-btn, #submitBtn");
+      if (!btn) return;
+
+      const invalid = step.querySelector(".is-invalid");
+      const requiredEmpty = [...step.querySelectorAll("[required]")]
+        .some(i => !i.value.trim());
+
+      btn.disabled = !!(invalid || requiredEmpty);
+    });
+  }
+
+});
+
+
+</script>
+
 
   <script
     src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/js/bootstrap.bundle.min.js"
