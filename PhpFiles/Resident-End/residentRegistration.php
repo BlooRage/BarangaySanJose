@@ -50,6 +50,49 @@ function cleanString($v): string {
     return trim((string)$v);
 }
 
+function isValidPersonName(string $value, int $minLetters = 1, int $maxLength = 50): bool {
+    $value = trim($value);
+    if ($value === '') {
+        return false;
+    }
+    $length = function_exists('mb_strlen') ? mb_strlen($value, 'UTF-8') : strlen($value);
+    if ($length > $maxLength) {
+        return false;
+    }
+    if (!preg_match("/^[A-Za-zÀ-ÖØ-öø-ÿÑñ.' -]+$/u", $value)) {
+        return false;
+    }
+    if (!preg_match("/^[A-Za-zÀ-ÖØ-öø-ÿÑñ]/u", $value) || !preg_match("/[A-Za-zÀ-ÖØ-öø-ÿÑñ]$/u", $value)) {
+        return false;
+    }
+    preg_match_all("/[A-Za-zÀ-ÖØ-öø-ÿÑñ]/u", $value, $matches);
+    return count($matches[0]) >= $minLetters;
+}
+
+function isValidAlphaText(string $value): bool {
+    $value = trim($value);
+    if ($value === '') {
+        return false;
+    }
+    return (bool)preg_match("/^[A-Za-zÀ-ÖØ-öø-ÿÑñ .,'-]+$/u", $value);
+}
+
+function isValidAddressLikeText(string $value): bool {
+    $value = trim($value);
+    if ($value === '') {
+        return false;
+    }
+    return (bool)preg_match("/^[A-Za-z0-9À-ÖØ-öø-ÿÑñ .,'#()\\/&-]+$/u", $value);
+}
+
+function isValidIdNumber(string $value): bool {
+    $value = trim($value);
+    if ($value === '') {
+        return false;
+    }
+    return (bool)preg_match('/^[A-Za-z0-9-]{3,50}$/', $value);
+}
+
 function normalizePhaseNumber(string $value): string {
     $value = trim($value);
     if ($value === '') {
@@ -67,10 +110,23 @@ function getDocumentTypeId(mysqli $conn, string $name): int {
     $q->execute();
     $res = $q->get_result()->fetch_assoc();
     $q->close();
-    if (!$res || !isset($res['document_type_id'])) {
-        throw new Exception("Document type not found: {$name}");
+    if ($res && isset($res['document_type_id'])) {
+        return (int)$res['document_type_id'];
     }
-    return (int)$res['document_type_id'];
+
+    $ins = $conn->prepare("INSERT INTO documenttypelookuptbl (document_type_name, document_category) VALUES (?, 'ResidentProfiling')");
+    if (!$ins) throw new Exception("Prepare failed (create document type): " . $conn->error);
+    $ins->bind_param("s", $name);
+    if (!$ins->execute()) {
+        $ins->close();
+        throw new Exception("Failed to create document type: {$name}");
+    }
+    $newId = (int)$ins->insert_id;
+    $ins->close();
+    if ($newId <= 0) {
+        throw new Exception("Unable to resolve document type: {$name}");
+    }
+    return $newId;
 }
 
 function isHeicExt(string $ext): bool {
@@ -132,6 +188,61 @@ function buildMergedIdPdf(string $frontPath, string $frontExt, string $backPath,
     $pdf->Output('F', $outputPath);
 }
 
+function sanitizeDocTypeToken(string $docType): string {
+    $token = preg_replace('/[^A-Za-z0-9]+/', '', $docType);
+    return $token !== '' ? $token : 'Document';
+}
+
+function buildAttachmentFileName(string $docType, string $userId, string $ext, int $index = 0): string {
+    $base = sanitizeDocTypeToken($docType) . $userId;
+    if ($index > 0) {
+        $base .= '_' . $index;
+    }
+    return $base . '.' . strtolower($ext);
+}
+
+function toDbWebPath(string $absolutePath): string {
+    $absolutePath = str_replace("\\", "/", trim($absolutePath));
+    $projectRoot = realpath(__DIR__ . "/../..");
+    if ($projectRoot) {
+        $rootNorm = str_replace("\\", "/", $projectRoot);
+        if (strpos($absolutePath, $rootNorm) === 0) {
+            $rel = ltrim(substr($absolutePath, strlen($rootNorm)), "/");
+            return "/BarangaySanJose/" . $rel;
+        }
+    }
+
+    $marker = "/UnifiedFileAttachment/";
+    $markerPos = strpos($absolutePath, $marker);
+    if ($markerPos !== false) {
+        return "/BarangaySanJose" . substr($absolutePath, $markerPos);
+    }
+
+    return "/BarangaySanJose/" . ltrim($absolutePath, "/");
+}
+
+function moveUploadedFileWithDocName(string $tmpName, string $dir, string $docType, string $userId, string $ext): array {
+    $index = 0;
+    $fileName = buildAttachmentFileName($docType, $userId, $ext, $index);
+    $target = rtrim($dir, "/") . "/" . $fileName;
+
+    while (file_exists($target)) {
+        $index++;
+        $fileName = buildAttachmentFileName($docType, $userId, $ext, $index);
+        $target = rtrim($dir, "/") . "/" . $fileName;
+    }
+
+    if (!move_uploaded_file($tmpName, $target)) {
+        throw new Exception("Failed to upload file.");
+    }
+
+    return [
+        'file_name' => $fileName,
+        'file_path' => toDbWebPath($target),
+        'disk_path' => $target
+    ];
+}
+
 try {
     // -------- Collect Inputs --------
     $lastName   = cleanString($_POST['lastName'] ?? '');
@@ -141,11 +252,21 @@ try {
     $suffix = cleanString($_POST['suffix'] ?? '');
     if ($suffix === "Other") {
         $suffix = cleanString($_POST['suffixOther'] ?? '');
+        $suffixLen = function_exists('mb_strlen') ? mb_strlen($suffix, 'UTF-8') : strlen($suffix);
+        if ($suffixLen > 3) {
+            http_response_code(400);
+            echo json_encode([
+                "success" => false,
+                "message" => "Custom suffix must be 3 characters or less."
+            ]);
+            exit;
+        }
     }
 
     $dob   = cleanString($_POST['dateOfBirth'] ?? '');
     $sex   = cleanString($_POST['sex'] ?? '');
     $civil = cleanString($_POST['civilStatus'] ?? '');
+    $familyRole = cleanString($_POST['familyRole'] ?? '');
 
     $religion = cleanString($_POST['religion'] ?? '');
     if ($religion === "Other") {
@@ -174,10 +295,13 @@ try {
         $occupationDetail = '';
     }
 
-    $sector = '';
+    $selectedSectors = [];
     if (isset($_POST['sectorMembership']) && is_array($_POST['sectorMembership'])) {
-        $sector = implode(",", array_map('trim', $_POST['sectorMembership']));
+        $selectedSectors = array_values(array_filter(array_map('trim', $_POST['sectorMembership']), static function ($v) {
+            return $v !== '';
+        }));
     }
+    $sector = implode(",", $selectedSectors);
 
     $privacy = isset($_POST['privacyConsent']) ? 1 : 0;
 
@@ -208,6 +332,80 @@ try {
             "message" => "Missing required fields."
         ]);
         exit;
+    }
+
+    $allowedSex = ['Male', 'Female'];
+    $allowedCivil = ['Single', 'Married', 'Widowed'];
+    $allowedFamilyRole = ['Spouse', 'Child', 'Parent', 'Sibling', 'Grandparents', 'Extended Family'];
+    $allowedAddressSystem = ['house', 'lot_block'];
+
+    if (!in_array($sex, $allowedSex, true)) {
+        http_response_code(400);
+        echo json_encode(["success" => false, "message" => "Invalid sex value."]);
+        exit;
+    }
+    if (!in_array($civil, $allowedCivil, true)) {
+        http_response_code(400);
+        echo json_encode(["success" => false, "message" => "Invalid civil status value."]);
+        exit;
+    }
+    if ($familyRole === '' || !in_array($familyRole, $allowedFamilyRole, true)) {
+        http_response_code(400);
+        echo json_encode(["success" => false, "message" => "Invalid family role value."]);
+        exit;
+    }
+    if (!in_array($addressSystem, $allowedAddressSystem, true)) {
+        http_response_code(400);
+        echo json_encode(["success" => false, "message" => "Please select a valid address system."]);
+        exit;
+    }
+
+    $nameChecks = [
+        'First name' => $firstName,
+        'Last name' => $lastName
+    ];
+    if ($middleName !== '') {
+        $nameChecks['Middle name'] = $middleName;
+    }
+    foreach ($nameChecks as $label => $nameValue) {
+        $minLetters = ($label === 'First name' || $label === 'Last name') ? 2 : 1;
+        $maxLength = ($label === 'First name') ? 30 : (($label === 'Last name' || $label === 'Middle name') ? 20 : 50);
+        if (!isValidPersonName($nameValue, $minLetters, $maxLength)) {
+            http_response_code(400);
+            echo json_encode([
+                "success" => false,
+                "message" => "{$label} contains invalid characters."
+            ]);
+            exit;
+        }
+    }
+
+    $alphaOptionalChecks = [];
+    if ($suffix !== '') $alphaOptionalChecks['Suffix'] = $suffix;
+    if ($religion !== '') $alphaOptionalChecks['Religion'] = $religion;
+    if ($occupationDetail !== '') $alphaOptionalChecks['Occupation'] = $occupationDetail;
+    foreach ($alphaOptionalChecks as $label => $value) {
+        if (!isValidAlphaText($value)) {
+            http_response_code(400);
+            echo json_encode(["success" => false, "message" => "{$label} contains invalid characters."]);
+            exit;
+        }
+    }
+
+    $addressLikeChecks = [];
+    if ($unitNumber !== '') $addressLikeChecks['Unit number'] = $unitNumber;
+    if ($houseNumber !== '') $addressLikeChecks['House number'] = $houseNumber;
+    if ($streetName !== '') $addressLikeChecks['Street name'] = $streetName;
+    if ($phaseNumber !== '') $addressLikeChecks['Phase'] = $phaseNumber;
+    if ($lotNumber !== '') $addressLikeChecks['Lot number'] = $lotNumber;
+    if ($blockNumber !== '') $addressLikeChecks['Block number'] = $blockNumber;
+    if ($subd !== '') $addressLikeChecks['Subdivision'] = $subd;
+    foreach ($addressLikeChecks as $label => $value) {
+        if (!isValidAddressLikeText($value)) {
+            http_response_code(400);
+            echo json_encode(["success" => false, "message" => "{$label} contains invalid characters."]);
+            exit;
+        }
     }
 
     if ($addressSystem === '') {
@@ -273,6 +471,18 @@ try {
             "message" => "Occupation / Job Title is required when Employed."
         ]);
         exit;
+    }
+
+    if ($occupationDetail !== '') {
+        $occupationLen = function_exists('mb_strlen') ? mb_strlen($occupationDetail, 'UTF-8') : strlen($occupationDetail);
+        if ($occupationLen > 20) {
+            http_response_code(400);
+            echo json_encode([
+                "success" => false,
+                "message" => "Occupation / Job Title must be 20 characters or less."
+            ]);
+            exit;
+        }
     }
 
     $conn->begin_transaction();
@@ -353,23 +563,22 @@ try {
     $stmt2->close();
 
     // -------- Optional Upload Files --------
-    $requireFiles = false;
+    $skipProof = isset($_POST['skipProofIdentity']) && $_POST['skipProofIdentity'] === '1';
+    $proofType = cleanString($_POST['proofType'] ?? '');
+    $validProofTypes = ['ID', 'Document'];
+    if (!$skipProof && !in_array($proofType, $validProofTypes, true)) {
+        throw new Exception("Please select a valid proof type.");
+    }
 
     $idFiles = ['idFront', 'idBack'];
-    $allProvided = true;
-
+    $hasIdProof = true;
     foreach ($idFiles as $fileKey) {
         if (!isset($_FILES[$fileKey]) || $_FILES[$fileKey]['error'] !== UPLOAD_ERR_OK) {
-            $allProvided = false;
+            $hasIdProof = false;
             break;
         }
     }
 
-    if ($requireFiles && !$allProvided) {
-        throw new Exception("Missing required files.");
-    }
-
-    $hasIdProof = $allProvided;
     $hasPicture = isset($_FILES['picture']) && $_FILES['picture']['error'] === UPLOAD_ERR_OK;
     $hasDocumentProof = false;
     if (isset($_FILES['documentProof']) && is_array($_FILES['documentProof']['name'])) {
@@ -381,38 +590,59 @@ try {
         }
     }
 
+    if (!$skipProof) {
+        if ($proofType === 'ID' && !$hasIdProof) {
+            throw new Exception("ID Front and Back are required.");
+        }
+        if ($proofType === 'Document' && !$hasDocumentProof) {
+            throw new Exception("Supporting document upload is required.");
+        }
+        if (!$hasPicture) {
+            throw new Exception("2x2 picture is required.");
+        }
+    }
+
+    $sourceType = "ResidentProfiling";
+    $statusVerifyId = getStatusId($conn, "PendingReview", "ResidentDocumentProfiling");
+    $uploadDirDocs = __DIR__ . "/../../UnifiedFileAttachment/Documents/$resident_id/";
+    $uploadDirPic = __DIR__ . "/../../UnifiedFileAttachment/IDPictures/$resident_id/";
+
+    if (!is_dir($uploadDirDocs) && !mkdir($uploadDirDocs, 0755, true)) {
+        throw new Exception("Failed to create document upload directory.");
+    }
+    if (!is_dir($uploadDirPic) && !mkdir($uploadDirPic, 0755, true)) {
+        throw new Exception("Failed to create ID picture upload directory.");
+    }
+
     if ($hasIdProof) {
-        $uploadDir = __DIR__ . "/../../UnifiedFileAttachment/Documents/$resident_id/";
-        if (!is_dir($uploadDir)) {
-            if (!mkdir($uploadDir, 0755, true)) {
-                throw new Exception("Failed to create upload directory.");
-            }
+        $uploadedIdNumber = cleanString($_POST['idNumber'] ?? '');
+        if (!isValidIdNumber($uploadedIdNumber)) {
+            throw new Exception("ID Number must be 3-50 characters (letters, numbers, hyphen only).");
+        }
+
+        $idType = cleanString($_POST['idType'] ?? '');
+        if ($idType === '') {
+            throw new Exception("ID Type is required.");
         }
 
         $savedIdFiles = [];
+        $allowedId = ['jpg','jpeg','png','webp','pdf'];
         foreach ($idFiles as $fileKey) {
             $tmpName = $_FILES[$fileKey]['tmp_name'];
             $name = basename($_FILES[$fileKey]['name']);
             $ext = strtolower(pathinfo($name, PATHINFO_EXTENSION));
 
-            $allowed = ['jpg','jpeg','png','webp','pdf'];
             if (isHeicExt($ext)) {
                 throw new Exception("HEIC is not supported on the server. Please upload JPG or PNG.");
             }
-            if (!in_array($ext, $allowed, true)) {
+            if (!in_array($ext, $allowedId, true)) {
                 throw new Exception("Invalid file type for {$fileKey}.");
             }
 
-            $newExt = $ext;
-            $newFileName = $fileKey . "." . $newExt;
-            $target = $uploadDir . $newFileName;
-
-            if (!move_uploaded_file($tmpName, $target)) {
-                throw new Exception("Failed to upload file: {$fileKey}");
-            }
+            $fileMoved = moveUploadedFileWithDocName($tmpName, $uploadDirDocs, $idType . ' ' . $fileKey, $user_id, $ext);
             $savedIdFiles[$fileKey] = [
-                'path' => $target,
-                'ext' => $newExt
+                'path' => $fileMoved['disk_path'],
+                'ext' => $ext
             ];
         }
 
@@ -420,8 +650,15 @@ try {
             throw new Exception("ID front/back files are incomplete.");
         }
 
-        $mergedFileName = "id_merged.pdf";
-        $mergedPath = $uploadDir . $mergedFileName;
+        $mergedFileName = buildAttachmentFileName($idType, $user_id, 'pdf');
+        $mergedPath = $uploadDirDocs . $mergedFileName;
+        $mergeIndex = 0;
+        while (file_exists($mergedPath)) {
+            $mergeIndex++;
+            $mergedFileName = buildAttachmentFileName($idType, $user_id, 'pdf', $mergeIndex);
+            $mergedPath = $uploadDirDocs . $mergedFileName;
+        }
+
         buildMergedIdPdf(
             $savedIdFiles['idFront']['path'],
             $savedIdFiles['idFront']['ext'],
@@ -434,47 +671,47 @@ try {
             throw new Exception("Failed to generate merged ID PDF.");
         }
 
-        $docTypeId = getDocumentTypeId($conn, cleanString($_POST['idType'] ?? ''));
-        $statusVerifyId = getStatusId($conn, "PendingReview", "ResidentDocumentProfiling");
+        // Keep only the merged PDF; remove temporary front/back files.
+        foreach ($savedIdFiles as $savedFile) {
+            $tmpDiskPath = (string)($savedFile['path'] ?? '');
+            if ($tmpDiskPath !== '' && file_exists($tmpDiskPath)) {
+                @unlink($tmpDiskPath);
+            }
+        }
+
+        $docTypeId = getDocumentTypeId($conn, $idType);
+        $remarks = "idMerged";
+        $fileType = "pdf";
+        $mergedPathDb = toDbWebPath($mergedPath);
         $ins = $conn->prepare("
             INSERT INTO unifiedfileattachmenttbl
-            (source_type, source_id, document_type_id, file_name, file_path, file_type, user_id_uploaded_by, status_id_verify, remarks)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            (source_type, source_id, document_type_id, file_name, file_path, file_type, user_id_uploaded_by, status_id_verify, remarks, id_number)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ");
-        if (!$ins) throw new Exception("Prepare failed (insert attachment): " . $conn->error);
-
-        $sourceType = "ResidentProfiling";
-        $remarks = "idMerged";
-        $filePath = $mergedPath;
-        $fileType = "pdf";
+        if (!$ins) throw new Exception("Prepare failed (insert merged ID): " . $conn->error);
         $ins->bind_param(
-            "ssissssis",
+            "ssissssiss",
             $sourceType,
             $resident_id,
             $docTypeId,
             $mergedFileName,
-            $filePath,
+            $mergedPathDb,
             $fileType,
             $user_id,
             $statusVerifyId,
-            $remarks
+            $remarks,
+            $uploadedIdNumber
         );
         if (!$ins->execute()) throw new Exception("Merged ID attachment insert failed: " . $ins->error);
         $ins->close();
     }
 
     if ($hasPicture) {
-        $uploadDirPic = __DIR__ . "/../../UnifiedFileAttachment/IDPictures/$resident_id/";
-        if (!is_dir($uploadDirPic)) {
-            if (!mkdir($uploadDirPic, 0755, true)) {
-                throw new Exception("Failed to create ID picture upload directory.");
-            }
-        }
-
         $tmpName = $_FILES['picture']['tmp_name'];
         $name = basename($_FILES['picture']['name']);
         $ext = strtolower(pathinfo($name, PATHINFO_EXTENSION));
         $allowedPic = ['jpg','jpeg','png','webp'];
+
         if (isHeicExt($ext)) {
             throw new Exception("HEIC is not supported on the server. Please upload JPG or PNG.");
         }
@@ -482,51 +719,41 @@ try {
             throw new Exception("Invalid file type for 2x2 picture.");
         }
 
-        $newExt = $ext;
-        $target = $uploadDirPic . "2x2." . $newExt;
-
-        if (!move_uploaded_file($tmpName, $target)) {
-            throw new Exception("Failed to upload 2x2 picture.");
-        }
-
+        $moved = moveUploadedFileWithDocName($tmpName, $uploadDirPic, "2x2 Picture", $user_id, $ext);
         $docTypeId = getDocumentTypeId($conn, "2x2 Picture");
-        $statusVerifyId = getStatusId($conn, "PendingReview", "ResidentDocumentProfiling");
+        $remarks = "2x2";
+        $idNumber = null;
         $ins = $conn->prepare("
             INSERT INTO unifiedfileattachmenttbl
-            (source_type, source_id, document_type_id, file_name, file_path, file_type, user_id_uploaded_by, status_id_verify, remarks)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            (source_type, source_id, document_type_id, file_name, file_path, file_type, user_id_uploaded_by, status_id_verify, remarks, id_number)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ");
-        if (!$ins) throw new Exception("Prepare failed (insert attachment): " . $conn->error);
-        $sourceType = "ResidentProfiling";
-        $remarks = "2x2";
-        $fileName = basename($target);
-        $filePath = $target;
-        $fileType = $newExt;
+        if (!$ins) throw new Exception("Prepare failed (insert 2x2): " . $conn->error);
         $ins->bind_param(
-            "ssissssis",
+            "ssissssiss",
             $sourceType,
             $resident_id,
             $docTypeId,
-            $fileName,
-            $filePath,
-            $fileType,
+            $moved['file_name'],
+            $moved['file_path'],
+            $ext,
             $user_id,
             $statusVerifyId,
-            $remarks
+            $remarks,
+            $idNumber
         );
-        if (!$ins->execute()) throw new Exception("Attachment insert failed: " . $ins->error);
+        if (!$ins->execute()) throw new Exception("2x2 attachment insert failed: " . $ins->error);
         $ins->close();
     }
 
     if ($hasDocumentProof) {
-        $uploadDirDocs = __DIR__ . "/../../UnifiedFileAttachment/Documents/$resident_id/";
-        if (!is_dir($uploadDirDocs)) {
-            if (!mkdir($uploadDirDocs, 0755, true)) {
-                throw new Exception("Failed to create document upload directory.");
-            }
+        $documentType = cleanString($_POST['documentType'] ?? '');
+        if (!in_array($documentType, ['Billing Statement', 'HOA Signed Certification of Residency'], true)) {
+            throw new Exception("Invalid document type.");
         }
 
         $docAllowed = ['jpg','jpeg','png','webp','pdf'];
+        $docTypeId = getDocumentTypeId($conn, $documentType);
         foreach ($_FILES['documentProof']['name'] as $i => $docName) {
             if ($_FILES['documentProof']['error'][$i] !== UPLOAD_ERR_OK) {
                 continue;
@@ -540,46 +767,151 @@ try {
                 throw new Exception("Invalid file type for document attachment.");
             }
 
-            $safeBase = pathinfo($docName, PATHINFO_FILENAME);
-            $safeBase = preg_replace('/[^a-zA-Z0-9_\-]/', '_', $safeBase);
-            $newExt = $ext;
-            $target = $uploadDirDocs . $safeBase . "_" . time() . "_" . $i . "." . $newExt;
-
-            if (!move_uploaded_file($tmpName, $target)) {
-                throw new Exception("Failed to upload document attachment.");
-            }
-
-            $docTypeId = getDocumentTypeId($conn, cleanString($_POST['documentType'] ?? ''));
-            $statusVerifyId = getStatusId($conn, "PendingReview", "ResidentDocumentProfiling");
+            $moved = moveUploadedFileWithDocName($tmpName, $uploadDirDocs, $documentType, $user_id, $ext);
+            $remarks = "document";
+            $idNumber = null;
             $ins = $conn->prepare("
                 INSERT INTO unifiedfileattachmenttbl
-                (source_type, source_id, document_type_id, file_name, file_path, file_type, user_id_uploaded_by, status_id_verify, remarks)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                (source_type, source_id, document_type_id, file_name, file_path, file_type, user_id_uploaded_by, status_id_verify, remarks, id_number)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ");
-            if (!$ins) throw new Exception("Prepare failed (insert attachment): " . $conn->error);
-            $sourceType = "ResidentProfiling";
-            $remarks = "document";
-            $fileName = basename($target);
-            $filePath = $target;
-            $fileType = $newExt;
+            if (!$ins) throw new Exception("Prepare failed (insert document): " . $conn->error);
             $ins->bind_param(
-                "ssissssis",
+                "ssissssiss",
                 $sourceType,
                 $resident_id,
                 $docTypeId,
-                $fileName,
-                $filePath,
-                $fileType,
+                $moved['file_name'],
+                $moved['file_path'],
+                $ext,
                 $user_id,
                 $statusVerifyId,
-                $remarks
+                $remarks,
+                $idNumber
             );
-            if (!$ins->execute()) throw new Exception("Attachment insert failed: " . $ins->error);
+            if (!$ins->execute()) throw new Exception("Document attachment insert failed: " . $ins->error);
             $ins->close();
         }
     }
 
-    if ($hasIdProof || $hasDocumentProof || $hasPicture) {
+    // Sector specific proof uploads
+    $sectorPostToKey = [
+        'PWD' => 'PWD',
+        'Single Parent' => 'SingleParent',
+        'Student' => 'Student',
+        'Senior Citizen' => 'SeniorCitizen',
+        'Indigenous People' => 'IndigenousPeople'
+    ];
+    $selectedSectorKeys = [];
+    foreach ($selectedSectors as $sectorLabel) {
+        if (isset($sectorPostToKey[$sectorLabel])) {
+            $selectedSectorKeys[] = $sectorPostToKey[$sectorLabel];
+        }
+    }
+
+    $isIdProofSelected = ($proofType === 'ID');
+    $idTypeSelected = strtolower(cleanString($_POST['idType'] ?? ''));
+    $isNationalIdSelected = ($idTypeSelected === 'national id' || $idTypeSelected === 'philsys id/ephilid');
+
+    foreach ($selectedSectorKeys as $sectorKey) {
+        $docTypeValue = cleanString($_POST['sectorDocType'][$sectorKey] ?? '');
+        $file = $_FILES['sectorDocFile'] ?? null;
+        $sectorErrors = ($file && isset($file['error'][$sectorKey]) && is_array($file['error'][$sectorKey]))
+            ? $file['error'][$sectorKey]
+            : [];
+        $hasFile = false;
+        foreach ($sectorErrors as $errCode) {
+            if ($errCode === UPLOAD_ERR_OK) {
+                $hasFile = true;
+                break;
+            }
+        }
+
+        $isRequired = true;
+        if ($sectorKey === 'SingleParent') {
+            $isRequired = false;
+        } elseif ($sectorKey === 'SeniorCitizen' && $isIdProofSelected) {
+            $isRequired = false;
+        } elseif ($sectorKey === 'IndigenousPeople' && $isIdProofSelected && $isNationalIdSelected) {
+            $isRequired = false;
+        }
+
+        if ($isRequired && ($docTypeValue === '' || !$hasFile)) {
+            throw new Exception("Please upload the required proof for selected sector membership.");
+        }
+
+        if (!$hasFile) {
+            continue;
+        }
+        if ($docTypeValue === '') {
+            throw new Exception("Please select sector document type.");
+        }
+
+        $docTypeId = getDocumentTypeId($conn, $docTypeValue);
+        $allowedSector = ['jpg','jpeg','png','webp','pdf'];
+        $sectorNames = isset($file['name'][$sectorKey]) && is_array($file['name'][$sectorKey]) ? $file['name'][$sectorKey] : [];
+        $sectorTmpNames = isset($file['tmp_name'][$sectorKey]) && is_array($file['tmp_name'][$sectorKey]) ? $file['tmp_name'][$sectorKey] : [];
+        $sectorErrorCodes = isset($file['error'][$sectorKey]) && is_array($file['error'][$sectorKey]) ? $file['error'][$sectorKey] : [];
+
+        foreach ($sectorNames as $idx => $originalRawName) {
+            $errCode = (int)($sectorErrorCodes[$idx] ?? UPLOAD_ERR_NO_FILE);
+            if ($errCode !== UPLOAD_ERR_OK) {
+                continue;
+            }
+
+            $originalName = basename((string)$originalRawName);
+            $tmpName = $sectorTmpNames[$idx] ?? '';
+            $ext = strtolower(pathinfo($originalName, PATHINFO_EXTENSION));
+            if (isHeicExt($ext)) {
+                throw new Exception("HEIC is not supported on the server. Please upload JPG or PNG.");
+            }
+            if (!in_array($ext, $allowedSector, true)) {
+                throw new Exception("Invalid file type for sector proof.");
+            }
+
+            $moved = moveUploadedFileWithDocName($tmpName, $uploadDirDocs, $docTypeValue, $user_id, $ext);
+            $remarks = "sector:" . $sectorKey;
+            $idNumber = null;
+            $ins = $conn->prepare("
+                INSERT INTO unifiedfileattachmenttbl
+                (source_type, source_id, document_type_id, file_name, file_path, file_type, user_id_uploaded_by, status_id_verify, remarks, id_number)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ");
+            if (!$ins) throw new Exception("Prepare failed (insert sector document): " . $conn->error);
+            $ins->bind_param(
+                "ssissssiss",
+                $sourceType,
+                $resident_id,
+                $docTypeId,
+                $moved['file_name'],
+                $moved['file_path'],
+                $ext,
+                $user_id,
+                $statusVerifyId,
+                $remarks,
+                $idNumber
+            );
+            if (!$ins->execute()) throw new Exception("Sector document attachment insert failed: " . $ins->error);
+            $ins->close();
+        }
+    }
+
+    $hasAnySectorProof = false;
+    if (isset($_FILES['sectorDocFile']['name']) && is_array($_FILES['sectorDocFile']['name'])) {
+        foreach ($_FILES['sectorDocFile']['error'] as $sectorKey => $errorsPerSector) {
+            if (!is_array($errorsPerSector)) {
+                continue;
+            }
+            foreach ($errorsPerSector as $errCode) {
+                if ($errCode === UPLOAD_ERR_OK) {
+                    $hasAnySectorProof = true;
+                    break 2;
+                }
+            }
+        }
+    }
+
+    if ($hasIdProof || $hasDocumentProof || $hasPicture || $hasAnySectorProof) {
         $pendingResidentStatusId = getStatusId($conn, "PendingVerification", "Resident");
 
         $updateStatus = $conn->prepare("UPDATE residentinformationtbl SET status_id_resident=? WHERE resident_id=?");
@@ -598,6 +930,10 @@ try {
     $eSuffix = cleanString($_POST['emergencySuffix'] ?? '');
     if ($eSuffix === "Other") {
         $eSuffix = cleanString($_POST['emergencySuffixOther'] ?? '');
+        $eSuffixLen = function_exists('mb_strlen') ? mb_strlen($eSuffix, 'UTF-8') : strlen($eSuffix);
+        if ($eSuffixLen > 3) {
+            throw new Exception("Emergency custom suffix must be 3 characters or less.");
+        }
     }
 
     $ePhone = cleanString($_POST['emergencyPhoneNumber'] ?? '');
@@ -606,6 +942,31 @@ try {
 
     if ($eLast === '' || $eFirst === '' || $ePhone === '' || $eRel === '' || $eAddr === '') {
         throw new Exception("Missing required emergency contact fields.");
+    }
+
+    if (!preg_match('/^9\\d{9}$/', $ePhone)) {
+        throw new Exception("Emergency contact number must be 10 digits and start with 9.");
+    }
+    if (!isValidAddressLikeText($eAddr)) {
+        throw new Exception("Emergency address contains invalid characters.");
+    }
+    if (!isValidAlphaText($eRel)) {
+        throw new Exception("Emergency relationship contains invalid characters.");
+    }
+
+    $emergencyNameChecks = [
+        'Emergency first name' => $eFirst,
+        'Emergency last name' => $eLast
+    ];
+    if ($eMid !== '') {
+        $emergencyNameChecks['Emergency middle name'] = $eMid;
+    }
+    foreach ($emergencyNameChecks as $label => $nameValue) {
+        $minLetters = ($label === 'Emergency first name' || $label === 'Emergency last name') ? 2 : 1;
+        $maxLength = ($label === 'Emergency first name') ? 30 : (($label === 'Emergency last name' || $label === 'Emergency middle name') ? 20 : 50);
+        if (!isValidPersonName($nameValue, $minLetters, $maxLength)) {
+            throw new Exception("{$label} contains invalid characters.");
+        }
     }
 
     $stmtE = $conn->prepare("
@@ -631,7 +992,8 @@ try {
 
     $conn->commit();
 
-    $message = $allProvided
+    $uploadedAnyProof = $hasIdProof || $hasDocumentProof || $hasPicture || $hasAnySectorProof;
+    $message = $uploadedAnyProof
         ? "Information saved successfully! Documents uploaded and pending verification."
         : "Information saved successfully! Address saved (Pending Verification). You can upload documents later.";
 

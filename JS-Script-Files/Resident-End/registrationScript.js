@@ -20,10 +20,52 @@ document.addEventListener("DOMContentLoaded", () => {
      HELPERS
      =============================== */
   function showError(input, message) {
-    input.classList.add("is-invalid");
-
     const targetSelector = input.getAttribute("data-error-target");
     const target = targetSelector ? document.querySelector(targetSelector) : null;
+    const isVoterEmploymentGroup = !!(target && target.classList.contains("voter-toggle-group"));
+    const isBoxedGroupTarget = !!(
+      target &&
+      (
+        target.classList.contains("voter-toggle-group") ||
+        target.id === "div-policyGroup"
+      )
+    );
+
+    if (isBoxedGroupTarget) {
+      // For privacy + voter + employment, highlight the whole group container.
+      input.classList.remove("is-invalid");
+      target.classList.add("invalid-target-box");
+
+      // Force button-level error visuals for voter/employment groups.
+      if (isVoterEmploymentGroup) {
+        target.querySelectorAll(".btn").forEach((btn) => {
+          btn.style.borderColor = "#dc3545";
+          btn.style.backgroundColor = "#ffe5e5";
+          btn.style.color = "#b02a37";
+        });
+        target.querySelectorAll(".btn-check").forEach((radio) => {
+          if (radio.checked) {
+            const checkedLabel = target.querySelector(`label[for="${radio.id}"]`);
+            if (checkedLabel) {
+              checkedLabel.style.borderColor = "#dc3545";
+              checkedLabel.style.backgroundColor = "#ffd6db";
+              checkedLabel.style.color = "#8f1d2c";
+            }
+          }
+        });
+      }
+    } else {
+      // For contact number and other fields, keep classic input border highlight.
+      input.classList.add("is-invalid");
+      if (target) target.classList.remove("invalid-target-box");
+    }
+
+    if (input.type === "file") {
+      const uploadBox = input.closest(".upload-box");
+      if (uploadBox) {
+        uploadBox.classList.add("upload-error");
+      }
+    }
 
     let error = input._errorEl;
     if (!error || !document.contains(error)) {
@@ -42,11 +84,74 @@ document.addEventListener("DOMContentLoaded", () => {
 
   function clearError(input) {
     input.classList.remove("is-invalid");
+    const targetSelector = input.getAttribute("data-error-target");
+    const target = targetSelector ? document.querySelector(targetSelector) : null;
+    if (
+      target &&
+      (
+        target.classList.contains("voter-toggle-group") ||
+        target.id === "div-policyGroup"
+      )
+    ) {
+      target.classList.remove("invalid-target-box");
+
+      if (target.classList.contains("voter-toggle-group")) {
+        target.querySelectorAll(".btn").forEach((btn) => {
+          btn.style.borderColor = "";
+          btn.style.backgroundColor = "";
+          btn.style.color = "";
+        });
+      }
+    }
     const error = input._errorEl;
     if (error && document.contains(error)) {
       error.remove();
     }
     input._errorEl = null;
+
+    if (input.type === "file") {
+      const uploadBox = input.closest(".upload-box");
+      if (uploadBox) {
+        uploadBox.classList.remove("upload-error");
+      }
+    }
+  }
+
+  function clearRadioGroupErrors(name) {
+    if (!name) return;
+    const group = document.querySelectorAll(`input[type="radio"][name="${name}"]`);
+    group.forEach((radio) => clearError(radio));
+  }
+
+  function isValidPersonName(value, minLetters = 1) {
+    const text = String(value ?? "").trim();
+    if (!text) return false;
+    const validChars = /^[A-Za-zÀ-ÖØ-öø-ÿÑñ.' -]+$/;
+    const letters = text.match(/[A-Za-zÀ-ÖØ-öø-ÿÑñ]/g) || [];
+    if (letters.length < minLetters) return false;
+    // Must start/end with a letter for cleaner Philippine-style names.
+    if (!/^[A-Za-zÀ-ÖØ-öø-ÿÑñ]/.test(text) || !/[A-Za-zÀ-ÖØ-öø-ÿÑñ]$/.test(text)) {
+      return false;
+    }
+    return validChars.test(text);
+  }
+
+  function isValidAlphaText(value) {
+    const text = String(value ?? "").trim();
+    if (!text) return false;
+    return /^[A-Za-zÀ-ÖØ-öø-ÿÑñ .,'-]+$/u.test(text);
+  }
+
+  function isValidAddressLikeText(value) {
+    const text = String(value ?? "").trim();
+    if (!text) return false;
+    return /^[A-Za-z0-9À-ÖØ-öø-ÿÑñ .,'#()\/&-]+$/u.test(text);
+  }
+
+  function isValidIdNumber(value) {
+    const text = String(value ?? "").trim();
+    if (!text) return false;
+    return /^[A-Za-z0-9-]{3,50}$/.test(text);
   }
 
 function isActuallyVisible(el) {
@@ -69,9 +174,13 @@ function isActuallyVisible(el) {
 }
 
 
-  function validateField(field, showMessages = false) {
-    // ✅ Skip hidden/disabled fields completely
-    if (!isActuallyVisible(field)) return true;
+  function validateField(field, showMessages = false, options = {}) {
+    const { includeHiddenSteps = false } = options;
+
+    // For full-form submit checks, hidden step fields should still be validated.
+    // Disabled and hidden inputs are always ignored.
+    if (field.type === "hidden" || field.disabled) return true;
+    if (!includeHiddenSteps && !isActuallyVisible(field)) return true;
 
     clearError(field);
     let valid = true;
@@ -82,10 +191,19 @@ function isActuallyVisible(el) {
         valid = false;
         if (showMessages) showError(field, "This field is required.");
       } else if (field.type === "radio") {
-        const group = document.querySelectorAll(`input[name="${field.name}"]`);
+        const group = document.querySelectorAll(`input[type="radio"][name="${field.name}"]`);
+        const firstRadio = group.length ? group[0] : field;
+
+        // Validate radio group once only (prevents duplicate error messages).
+        if (field !== firstRadio) {
+          return true;
+        }
+
+        clearRadioGroupErrors(field.name);
+
         if (![...group].some((r) => r.checked)) {
           valid = false;
-          if (showMessages) showError(field, "Please select an option.");
+          if (showMessages) showError(firstRadio, "Please select an option.");
         }
       } else if (field.type === "file") {
         if (!field.files || field.files.length === 0) {
@@ -95,6 +213,65 @@ function isActuallyVisible(el) {
       } else if (!field.value.trim()) {
         valid = false;
         if (showMessages) showError(field, "This field is required.");
+      }
+    }
+
+    // Name fields: letters, spaces, apostrophe, hyphen only.
+    const nameFieldIds = new Set([
+      "firstName",
+      "lastName",
+      "middleName",
+      "emergencyFirstName",
+      "emergencyLastName",
+      "emergencyMiddleName"
+    ]);
+    if (nameFieldIds.has(field.id) && field.value.trim()) {
+      const requiredNameIds = new Set(["firstName", "lastName", "emergencyFirstName", "emergencyLastName"]);
+      const minLetters = requiredNameIds.has(field.id) ? 2 : 1;
+      if (!isValidPersonName(field.value, minLetters)) {
+        valid = false;
+        if (showMessages) showError(field, "Please enter a valid name.");
+      }
+    }
+
+    const alphaTextIds = new Set([
+      "occupationInput",
+      "religionOther",
+      "suffixOther",
+      "schoolNameInput",
+      "emergencySuffixOther",
+      "emergencyRelationshipOther"
+    ]);
+    if (alphaTextIds.has(field.id) && field.value.trim()) {
+      if (!isValidAlphaText(field.value)) {
+        valid = false;
+        if (showMessages) showError(field, "Please enter valid text.");
+      }
+    }
+
+    const addressLikeIds = new Set([
+      "houseNumber",
+      "streetName",
+      "phaseNumber",
+      "unitNumber",
+      "unitNumberLot",
+      "lotNumber",
+      "blockNumber",
+      "subdivisionSitio",
+      "subdivisionLotBlock",
+      "emergencyAddress"
+    ]);
+    if (addressLikeIds.has(field.id) && field.value.trim()) {
+      if (!isValidAddressLikeText(field.value)) {
+        valid = false;
+        if (showMessages) showError(field, "Please enter valid characters only.");
+      }
+    }
+
+    if (field.id === "idNumberInput" && field.value.trim()) {
+      if (!isValidIdNumber(field.value)) {
+        valid = false;
+        if (showMessages) showError(field, "ID Number must be 3-50 characters (letters, numbers, hyphen only).");
       }
     }
 
@@ -136,6 +313,51 @@ function isActuallyVisible(el) {
     return valid;
   }
 
+  function validateAllSteps(showMessages = false) {
+    let firstInvalid = null;
+    let firstInvalidStep = -1;
+
+    sections.forEach((section, stepIndex) => {
+      const fields = section.querySelectorAll("input, select, textarea");
+      fields.forEach((field) => {
+        const valid = validateField(field, showMessages, { includeHiddenSteps: true });
+        if (!valid && !firstInvalid) {
+          firstInvalid = field;
+          firstInvalidStep = stepIndex;
+        }
+      });
+    });
+
+    return {
+      valid: !firstInvalid,
+      firstInvalid,
+      firstInvalidStep
+    };
+  }
+
+  function validateStepsThrough(maxStepIndex, showMessages = false) {
+    let firstInvalid = null;
+    let firstInvalidStep = -1;
+
+    sections.forEach((section, stepIndex) => {
+      if (stepIndex > maxStepIndex) return;
+      const fields = section.querySelectorAll("input, select, textarea");
+      fields.forEach((field) => {
+        const valid = validateField(field, showMessages, { includeHiddenSteps: true });
+        if (!valid && !firstInvalid) {
+          firstInvalid = field;
+          firstInvalidStep = stepIndex;
+        }
+      });
+    });
+
+    return {
+      valid: !firstInvalid,
+      firstInvalid,
+      firstInvalidStep
+    };
+  }
+
   function isStepValid(stepIndex) {
     const fields = sections[stepIndex].querySelectorAll("input, select, textarea");
     return [...fields].every((field) => validateField(field, false));
@@ -175,6 +397,282 @@ function isActuallyVisible(el) {
     });
   });
 
+  // Strict real-time filter for name fields.
+  const nameFieldIds = [
+    "firstName",
+    "lastName",
+    "middleName",
+    "emergencyFirstName",
+    "emergencyLastName",
+    "emergencyMiddleName"
+  ];
+  nameFieldIds.forEach((id) => {
+    const input = document.getElementById(id);
+    if (!input) return;
+
+    const sanitizeName = (value) => String(value ?? "").replace(/[^A-Za-zÀ-ÖØ-öø-ÿÑñ.' -]/gu, "");
+
+    input.addEventListener("beforeinput", (e) => {
+      const incoming = e.data ?? "";
+      if (!incoming) return;
+      if (sanitizeName(incoming) !== incoming) {
+        e.preventDefault();
+      }
+    });
+
+    input.addEventListener("paste", (e) => {
+      e.preventDefault();
+      const pasted = (e.clipboardData || window.clipboardData)?.getData("text") ?? "";
+      const clean = sanitizeName(pasted);
+      const start = input.selectionStart ?? input.value.length;
+      const end = input.selectionEnd ?? input.value.length;
+      const next = input.value.slice(0, start) + clean + input.value.slice(end);
+      input.value = next;
+      const caret = start + clean.length;
+      input.setSelectionRange(caret, caret);
+      input.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+
+    input.addEventListener("input", () => {
+      const original = input.value;
+      // Allow letters (incl. accented), spaces, apostrophe, and hyphen only.
+      const filtered = sanitizeName(original);
+      if (filtered !== original) {
+        input.value = filtered;
+      }
+    });
+  });
+
+  // Real-time filter for alpha-text fields (letters, spaces, period, apostrophe, hyphen).
+  const alphaTextFieldIds = [
+    "occupationInput",
+    "religionOther",
+    "suffixOther",
+    "schoolNameInput",
+    "emergencySuffixOther",
+    "emergencyRelationshipOther"
+  ];
+  alphaTextFieldIds.forEach((id) => {
+    const input = document.getElementById(id);
+    if (!input) return;
+
+    const sanitizeAlpha = (value) => String(value ?? "").replace(/[^A-Za-zÀ-ÖØ-öø-ÿÑñ .,'-]/gu, "");
+
+    input.addEventListener("beforeinput", (e) => {
+      const incoming = e.data ?? "";
+      if (!incoming) return;
+      if (sanitizeAlpha(incoming) !== incoming) e.preventDefault();
+    });
+
+    input.addEventListener("paste", (e) => {
+      e.preventDefault();
+      const pasted = (e.clipboardData || window.clipboardData)?.getData("text") ?? "";
+      const clean = sanitizeAlpha(pasted);
+      const start = input.selectionStart ?? input.value.length;
+      const end = input.selectionEnd ?? input.value.length;
+      input.value = input.value.slice(0, start) + clean + input.value.slice(end);
+      const caret = start + clean.length;
+      input.setSelectionRange(caret, caret);
+      input.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+
+    input.addEventListener("input", () => {
+      const filtered = sanitizeAlpha(input.value);
+      if (filtered !== input.value) input.value = filtered;
+    });
+  });
+
+  // Real-time filter for address-like fields.
+  const addressLikeFieldIds = [
+    "houseNumber",
+    "streetName",
+    "phaseNumber",
+    "unitNumber",
+    "unitNumberLot",
+    "lotNumber",
+    "blockNumber",
+    "subdivisionSitio",
+    "subdivisionLotBlock",
+    "emergencyAddress"
+  ];
+  addressLikeFieldIds.forEach((id) => {
+    const input = document.getElementById(id);
+    if (!input) return;
+
+    const sanitizeAddress = (value) => String(value ?? "").replace(/[^A-Za-z0-9À-ÖØ-öø-ÿÑñ .,'#()\/&-]/gu, "");
+
+    input.addEventListener("beforeinput", (e) => {
+      const incoming = e.data ?? "";
+      if (!incoming) return;
+      if (sanitizeAddress(incoming) !== incoming) e.preventDefault();
+    });
+
+    input.addEventListener("paste", (e) => {
+      e.preventDefault();
+      const pasted = (e.clipboardData || window.clipboardData)?.getData("text") ?? "";
+      const clean = sanitizeAddress(pasted);
+      const start = input.selectionStart ?? input.value.length;
+      const end = input.selectionEnd ?? input.value.length;
+      input.value = input.value.slice(0, start) + clean + input.value.slice(end);
+      const caret = start + clean.length;
+      input.setSelectionRange(caret, caret);
+      input.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+
+    input.addEventListener("input", () => {
+      const filtered = sanitizeAddress(input.value);
+      if (filtered !== input.value) input.value = filtered;
+    });
+  });
+
+  // Real-time filter for ID number (letters, numbers, hyphen only).
+  const idNumberInputSanitize = document.getElementById("idNumberInput");
+  if (idNumberInputSanitize) {
+    const sanitizeIdNumber = (value) => String(value ?? "").replace(/[^A-Za-z0-9-]/g, "");
+
+    idNumberInputSanitize.addEventListener("beforeinput", (e) => {
+      const incoming = e.data ?? "";
+      if (!incoming) return;
+      if (sanitizeIdNumber(incoming) !== incoming) e.preventDefault();
+    });
+
+    idNumberInputSanitize.addEventListener("paste", (e) => {
+      e.preventDefault();
+      const pasted = (e.clipboardData || window.clipboardData)?.getData("text") ?? "";
+      const clean = sanitizeIdNumber(pasted);
+      const start = idNumberInputSanitize.selectionStart ?? idNumberInputSanitize.value.length;
+      const end = idNumberInputSanitize.selectionEnd ?? idNumberInputSanitize.value.length;
+      idNumberInputSanitize.value = idNumberInputSanitize.value.slice(0, start) + clean + idNumberInputSanitize.value.slice(end);
+      const caret = start + clean.length;
+      idNumberInputSanitize.setSelectionRange(caret, caret);
+      idNumberInputSanitize.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+
+    idNumberInputSanitize.addEventListener("input", () => {
+      const filtered = sanitizeIdNumber(idNumberInputSanitize.value);
+      if (filtered !== idNumberInputSanitize.value) idNumberInputSanitize.value = filtered;
+    });
+  }
+
+  // Catch-all sanitizer for all text-like inputs to prevent random characters.
+  const strictNameIds = new Set([
+    "firstName",
+    "lastName",
+    "middleName",
+    "emergencyFirstName",
+    "emergencyLastName",
+    "emergencyMiddleName"
+  ]);
+  const strictAlphaIds = new Set([
+    "occupationInput",
+    "religionOther",
+    "suffixOther",
+    "schoolNameInput",
+    "emergencySuffixOther",
+    "emergencyRelationshipOther"
+  ]);
+  const strictAddressIds = new Set([
+    "houseNumber",
+    "streetName",
+    "phaseNumber",
+    "unitNumber",
+    "unitNumberLot",
+    "lotNumber",
+    "blockNumber",
+    "subdivisionSitio",
+    "subdivisionLotBlock",
+    "emergencyAddress"
+  ]);
+
+  const sanitizeByField = (field, value) => {
+    const text = String(value ?? "");
+    if (field.classList.contains("phone-input") || field.type === "tel") {
+      return text.replace(/\D/g, "");
+    }
+    if (field.id === "idNumberInput") {
+      return text.replace(/[^A-Za-z0-9-]/g, "");
+    }
+    if (strictNameIds.has(field.id)) {
+      return text.replace(/[^A-Za-zÀ-ÖØ-öø-ÿÑñ.' -]/gu, "");
+    }
+    if (strictAlphaIds.has(field.id)) {
+      return text.replace(/[^A-Za-zÀ-ÖØ-öø-ÿÑñ .,'-]/gu, "");
+    }
+    if (strictAddressIds.has(field.id)) {
+      return text.replace(/[^A-Za-z0-9À-ÖØ-öø-ÿÑñ .,'#()\/&-]/gu, "");
+    }
+    if (field.type === "email" || field.classList.contains("email-input")) {
+      return text.replace(/[^A-Za-z0-9._%+\-@]/g, "");
+    }
+    // Default safe text sanitizer for any other free-text field.
+    return text.replace(/[^A-Za-z0-9À-ÖØ-öø-ÿÑñ .,'#()\/&-]/gu, "");
+  };
+
+  document.querySelectorAll('input[type="text"], input[type="email"], input[type="tel"], textarea').forEach((field) => {
+    field.addEventListener("input", () => {
+      const cleaned = sanitizeByField(field, field.value);
+      if (cleaned !== field.value) {
+        field.value = cleaned;
+      }
+    });
+  });
+
+  // Max length limits for text inputs (enforced live).
+  const maxLengthById = {
+    lastName: 20,
+    firstName: 30,
+    middleName: 20,
+    suffixOther: 3,
+    religionOther: 100,
+    occupationInput: 20,
+    schoolNameInput: 150,
+    idNumberInput: 50,
+    unitNumber: 50,
+    unitNumberLot: 50,
+    houseNumber: 50,
+    streetName: 150,
+    lotNumber: 50,
+    blockNumber: 50,
+    phaseNumber: 50,
+    subdivisionSitio: 150,
+    subdivisionLotBlock: 150,
+    emergencyLastName: 20,
+    emergencyFirstName: 30,
+    emergencyMiddleName: 20,
+    emergencySuffixOther: 3,
+    emergencyRelationshipOther: 100,
+    emergencyAddress: 255
+  };
+
+  Object.entries(maxLengthById).forEach(([id, max]) => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.maxLength = max;
+    el.addEventListener("input", () => {
+      if (el.value.length > max) {
+        el.value = el.value.slice(0, max);
+      }
+    });
+  });
+
+  // Default max length for most text-like fields not explicitly listed above.
+  document.querySelectorAll('input[type="text"], input[type="email"], input[type="tel"], textarea').forEach((el) => {
+    if (el.type === "hidden") return;
+    if (el.maxLength && el.maxLength > 0) return;
+
+    let defaultMax = 150;
+    if (el.classList.contains("phone-input")) defaultMax = 10;
+    if (el.classList.contains("email-input") || el.type === "email") defaultMax = 150;
+    if (el.tagName === "TEXTAREA") defaultMax = 255;
+
+    el.maxLength = defaultMax;
+    el.addEventListener("input", () => {
+      if (el.value.length > defaultMax) {
+        el.value = el.value.slice(0, defaultMax);
+      }
+    });
+  });
+
   document.querySelectorAll("input, select, textarea").forEach((field) => {
     field.addEventListener("input", () => {
       validateField(field, true);
@@ -194,17 +692,17 @@ function isActuallyVisible(el) {
      =============================== */
   document.querySelectorAll(".next-btn").forEach((btn) => {
     btn.addEventListener("click", () => {
-      const fields = sections[currentStep].querySelectorAll("input, select, textarea");
-      let firstInvalid = null;
+      const steppedCheck = validateStepsThrough(currentStep, true);
 
-      fields.forEach((f) => {
-        const valid = validateField(f, true);
-        if (!valid && !firstInvalid) firstInvalid = f;
-      });
-
-      if (firstInvalid) {
-        firstInvalid.scrollIntoView({ behavior: "smooth", block: "center" });
-        firstInvalid.focus();
+      if (!steppedCheck.valid) {
+        if (steppedCheck.firstInvalidStep >= 0 && steppedCheck.firstInvalidStep !== currentStep) {
+          currentStep = steppedCheck.firstInvalidStep;
+          updateUI();
+        }
+        requestAnimationFrame(() => {
+          steppedCheck.firstInvalid.scrollIntoView({ behavior: "smooth", block: "center" });
+          steppedCheck.firstInvalid.focus();
+        });
         return;
       }
 
@@ -332,6 +830,7 @@ function isActuallyVisible(el) {
      =============================== */
   const skipProofSwitch = document.getElementById("skipProofSwitch");
   const proofIdentityFields = document.getElementById("proofIdentityFields");
+  const proofTypeSelect = document.getElementById("proofTypeSelect");
 
   const idTypeSelect = document.getElementById("idTypeSelect");
   const idNumberInput = document.getElementById("idNumberInput");
@@ -341,8 +840,178 @@ function isActuallyVisible(el) {
   const idFrontInput = document.getElementById("idFrontInput");
   const idBackInput = document.getElementById("idBackInput");
   const pictureInput = document.getElementById("pictureInput");
+  const sectorProofSection = document.getElementById("sectorProofSection");
 
   const submitBtn = document.getElementById("submitBtn");
+  const sectorMap = {
+    PWD: { checkboxId: "sectorPWD", cardId: "sectorProofPWD" },
+    SeniorCitizen: { checkboxId: "sectorSenior", cardId: "sectorProofSenior" },
+    Student: { checkboxId: "sectorStudent", cardId: "sectorProofStudent" },
+    IndigenousPeople: { checkboxId: "sectorIP", cardId: "sectorProofIP" },
+    SingleParent: { checkboxId: "sectorSP", cardId: "sectorProofSoloParent" }
+  };
+
+  function getSelectedSectorKeys() {
+    return Object.entries(sectorMap)
+      .filter(([, meta]) => {
+        const checkbox = document.getElementById(meta.checkboxId);
+        return !!(checkbox && checkbox.checked);
+      })
+      .map(([key]) => key);
+  }
+
+  function isNationalIdSelected() {
+    const selected = String(idTypeSelect?.value ?? "").toLowerCase();
+    return selected === "national id" || selected === "philsys id/ephilid";
+  }
+
+  function isSectorDocumentRequired(sectorKey) {
+    if (sectorKey === "SingleParent") return false;
+    if (sectorKey === "SeniorCitizen") {
+      return !(proofTypeSelect && proofTypeSelect.value === "ID");
+    }
+    if (sectorKey === "IndigenousPeople") {
+      return !(proofTypeSelect && proofTypeSelect.value === "ID" && isNationalIdSelected());
+    }
+    return true;
+  }
+
+  function getSectorElements(sectorKey) {
+    const card = document.getElementById(sectorMap[sectorKey].cardId);
+    return {
+      card,
+      docType: card ? card.querySelector(`.sector-doc-type[data-sector="${sectorKey}"]`) : null,
+      uploadZone: card ? card.querySelector(`.sector-upload-zone[data-sector="${sectorKey}"]`) : null,
+      uploadList: card ? card.querySelector(`.sector-upload-list[data-sector="${sectorKey}"]`) : null,
+      addBtn: card ? card.querySelector(`.add-sector-doc-btn[data-sector="${sectorKey}"]`) : null,
+      fileInputs: card ? Array.from(card.querySelectorAll(`.sector-doc-file[data-sector="${sectorKey}"]`)) : []
+    };
+  }
+
+  function resetSectorField(sectorKey) {
+    const { docType, uploadZone, uploadList, addBtn, fileInputs } = getSectorElements(sectorKey);
+    if (docType) {
+      docType.value = "";
+      docType.required = false;
+      docType.disabled = true;
+      clearError(docType);
+    }
+
+    if (uploadZone) {
+      uploadZone.classList.add("d-none");
+    }
+
+    if (addBtn) {
+      addBtn.disabled = true;
+    }
+
+    if (uploadList) {
+      const items = Array.from(uploadList.children);
+      items.forEach((item, idx) => {
+        const input = item.querySelector(`.sector-doc-file[data-sector="${sectorKey}"]`);
+        if (input) {
+          input.value = "";
+          input.required = false;
+          input.disabled = true;
+          clearError(input);
+          const box = input.closest(".upload-box");
+          if (box) {
+            box.classList.remove("uploaded", "upload-error");
+            const filename = box.querySelector(".uploaded-filename");
+            if (filename) filename.remove();
+            const removeBtn = box.querySelector(".upload-remove");
+            if (removeBtn) removeBtn.remove();
+          }
+        }
+
+        // Keep only first attachment box and remove dynamic extras.
+        if (idx > 0) item.remove();
+      });
+    } else {
+      fileInputs.forEach((fileInput) => {
+        fileInput.value = "";
+        fileInput.required = false;
+        fileInput.disabled = true;
+        clearError(fileInput);
+      });
+    }
+  }
+
+  function updateSectorUploadZoneState(sectorKey) {
+    const { docType, uploadZone, addBtn, fileInputs } = getSectorElements(sectorKey);
+    if (!docType) return;
+
+    const hasType = docType.value.trim() !== "";
+    if (uploadZone) {
+      uploadZone.classList.toggle("d-none", !hasType);
+    }
+    if (addBtn) {
+      addBtn.disabled = !hasType;
+    }
+
+    fileInputs.forEach((fileInput, index) => {
+      fileInput.disabled = !hasType;
+      if (!hasType) {
+        fileInput.required = false;
+        fileInput.value = "";
+        clearError(fileInput);
+      } else {
+        // only first box should carry required flag when applicable
+        fileInput.required = index === 0;
+      }
+    });
+
+    if (!hasType) {
+      const { uploadList } = getSectorElements(sectorKey);
+      if (uploadList) {
+        Array.from(uploadList.children).forEach((child, idx) => {
+          if (idx > 0) child.remove();
+        });
+      }
+    }
+  }
+
+  function updateSectorProofVisibility() {
+    const skipped = !!(skipProofSwitch && skipProofSwitch.checked);
+    const selectedSectorKeys = getSelectedSectorKeys();
+    const shouldShowSection = !skipped && selectedSectorKeys.length > 0;
+
+    if (sectorProofSection) {
+      sectorProofSection.classList.toggle("d-none", !shouldShowSection);
+    }
+
+    Object.keys(sectorMap).forEach((sectorKey) => {
+      const { card, docType } = getSectorElements(sectorKey);
+      const isSelected = selectedSectorKeys.includes(sectorKey) && shouldShowSection;
+
+      if (card) {
+        card.classList.toggle("d-none", !isSelected);
+      }
+
+      if (!isSelected) {
+        resetSectorField(sectorKey);
+        return;
+      }
+
+      if (docType) docType.disabled = false;
+      updateSectorUploadZoneState(sectorKey);
+    });
+
+    Object.keys(sectorMap).forEach((sectorKey) => {
+      const selected = selectedSectorKeys.includes(sectorKey) && shouldShowSection;
+      const required = selected && isSectorDocumentRequired(sectorKey);
+      const { docType, fileInputs } = getSectorElements(sectorKey);
+
+      if (docType) {
+        docType.required = required;
+        if (!required) clearError(docType);
+      }
+      fileInputs.forEach((fileInput, index) => {
+        fileInput.required = required && index === 0;
+        if (!required) clearError(fileInput);
+      });
+    });
+  }
 
   function toggleStudentSchool() {
     if (!idTypeSelect || !schoolNameWrapper) return;
@@ -372,9 +1041,7 @@ function isActuallyVisible(el) {
       el.required = isRequired;
 
       if (!isRequired) {
-        el.classList.remove("is-invalid");
-        const err = el.nextElementSibling;
-        if (err && err.classList.contains("error-message")) err.remove();
+        clearError(el);
 
         // optional: clear files when skipping
         if (el.type === "file") el.value = "";
@@ -394,7 +1061,6 @@ function isActuallyVisible(el) {
   function isProofComplete() {
     if (skipProofSwitch && skipProofSwitch.checked) return true;
 
-    const proofTypeSelect = document.getElementById("proofTypeSelect");
     if (!proofTypeSelect || !proofTypeSelect.value.trim()) return false;
 
     if (proofTypeSelect.value === "Document") {
@@ -406,7 +1072,8 @@ function isActuallyVisible(el) {
       docInputs.forEach((inp) => {
         if (inp.files && inp.files.length > 0) hasDoc = true;
       });
-      return hasDoc;
+      if (!hasDoc) return false;
+      return isSectorProofComplete();
     }
 
     if (!idTypeSelect || !idNumberInput || !idFrontInput || !idBackInput || !pictureInput) return false;
@@ -422,6 +1089,27 @@ function isActuallyVisible(el) {
     if (!idBackInput.files || idBackInput.files.length === 0) return false;
     if (!pictureInput.files || pictureInput.files.length === 0) return false;
 
+    return isSectorProofComplete();
+  }
+
+  function isSectorProofComplete() {
+    if (skipProofSwitch && skipProofSwitch.checked) return true;
+
+    const selectedSectorKeys = getSelectedSectorKeys();
+    if (selectedSectorKeys.length === 0) return true;
+
+    for (const sectorKey of selectedSectorKeys) {
+      if (!isSectorDocumentRequired(sectorKey)) continue;
+      const { docType, fileInputs } = getSectorElements(sectorKey);
+
+      if (!docType || !docType.value.trim()) {
+        return false;
+      }
+      const hasAttachment = fileInputs.some((fileInput) => fileInput.files && fileInput.files.length > 0);
+      if (!hasAttachment) {
+        return false;
+      }
+    }
     return true;
   }
 
@@ -436,7 +1124,6 @@ function isActuallyVisible(el) {
   function applySkipState() {
     const skipped = !!(skipProofSwitch && skipProofSwitch.checked);
     const proofTypeWrapper = document.getElementById("proofTypeWrapper");
-    const proofTypeSelect = document.getElementById("proofTypeSelect");
 
     if (proofIdentityFields) {
       proofIdentityFields.classList.toggle("d-none", skipped);
@@ -456,6 +1143,7 @@ function isActuallyVisible(el) {
 
     setProofRequired(!skipped);
     toggleStudentSchool();
+    updateSectorProofVisibility();
     updateNextButtonState();
     updateSubmitButtonState();
   }
@@ -492,13 +1180,42 @@ function isActuallyVisible(el) {
   if (idTypeSelect) {
     idTypeSelect.addEventListener("change", () => {
       toggleStudentSchool();
+      updateSectorProofVisibility();
       updateNextButtonState();
       updateSubmitButtonState();
     });
   }
 
+  if (proofTypeSelect) {
+    proofTypeSelect.addEventListener("change", () => {
+      updateSectorProofVisibility();
+      updateSubmitButtonState();
+    });
+  }
+
+  document.querySelectorAll(".sector-doc-type").forEach((select) => {
+    select.addEventListener("change", () => {
+      const sectorKey = String(select.dataset.sector || "");
+      if (!sectorKey) return;
+      updateSectorUploadZoneState(sectorKey);
+      updateNextButtonState();
+      updateSubmitButtonState();
+    });
+  });
+
+  Object.values(sectorMap).forEach((meta) => {
+    const checkbox = document.getElementById(meta.checkboxId);
+    if (!checkbox) return;
+    checkbox.addEventListener("change", () => {
+      updateSectorProofVisibility();
+      updateNextButtonState();
+      updateSubmitButtonState();
+    });
+  });
+
   // initial
   toggleStudentSchool();
+  updateSectorProofVisibility();
   applySkipState();
   updateUI();
 
@@ -547,18 +1264,17 @@ function isActuallyVisible(el) {
     form.addEventListener("submit", async (e) => {
       e.preventDefault();
 
-      if (!isProofComplete()) {
-        const fields = sections[currentStep].querySelectorAll("input, select, textarea");
-        let firstInvalid = null;
-
-        fields.forEach((f) => {
-          const valid = validateField(f, true);
-          if (!valid && !firstInvalid) firstInvalid = f;
-        });
-
-        if (firstInvalid) {
-          firstInvalid.scrollIntoView({ behavior: "smooth", block: "center" });
-          firstInvalid.focus();
+      const fullCheck = validateAllSteps(true);
+      if (!fullCheck.valid || !isProofComplete()) {
+        if (fullCheck.firstInvalid) {
+          if (fullCheck.firstInvalidStep >= 0 && currentStep !== fullCheck.firstInvalidStep) {
+            currentStep = fullCheck.firstInvalidStep;
+            updateUI();
+          }
+          requestAnimationFrame(() => {
+            fullCheck.firstInvalid.scrollIntoView({ behavior: "smooth", block: "center" });
+            fullCheck.firstInvalid.focus();
+          });
         }
         return;
       }

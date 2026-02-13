@@ -24,7 +24,7 @@ require_once __DIR__ . "/includes/resident_access_guard.php";
     crossorigin="anonymous"
   />
 
-  <link rel="stylesheet" href="../CSS-Styles/Resident-End-CSS/registrationStyle.css" />
+  <link rel="stylesheet" href="../CSS-Styles/Resident-End-CSS/registrationStyle.css?v=20260213-6" />
   <link rel="stylesheet" href="../CSS-Styles/NavbarFooterStyle.css" />
 
   <style>
@@ -42,7 +42,7 @@ require_once __DIR__ . "/includes/resident_access_guard.php";
   <script src="../JS-Script-Files/modalHandler.js"></script>
 
   <!-- Your wizard/validation JS -->
-  <script src="../JS-Script-Files/Resident-End/registrationScript.js" defer></script>
+  <script src="../JS-Script-Files/Resident-End/registrationScript.js?v=20260213-24" defer></script>
 </head>
 
 <body>
@@ -390,6 +390,8 @@ require_once __DIR__ . "/includes/resident_access_guard.php";
                 <option value="Child">Child</option>
                 <option value="Parent">Parent</option>
                 <option value="Sibling">Sibling</option>
+                <option value="Grandparents">Grandparents</option>
+                <option value="Extended Family">Extended Family</option>
               </select>
             </div>
           </div>
@@ -821,7 +823,7 @@ require_once __DIR__ . "/includes/resident_access_guard.php";
               <label class="form-label fw-semibold">
                 Type of Proof of Identification <span class="text-danger">*</span>
               </label>
-              <select class="form-select" id="proofTypeSelect" required>
+              <select class="form-select" id="proofTypeSelect" name="proofType" required>
                 <option value="">Select</option>
                 <option value="ID">ID</option>
                 <option value="Document">Document</option>
@@ -848,7 +850,6 @@ require_once __DIR__ . "/includes/resident_access_guard.php";
                   <option value="Voter's ID">Voter's ID</option>
                   <option value="National ID">National ID</option>
                   <option value="Barangay ID">Barangay ID</option>
-                  <option value="Student ID">Student ID</option>
                 </select>
               </div>
 
@@ -957,13 +958,14 @@ require_once __DIR__ . "/includes/resident_access_guard.php";
 </div>
 
             <!-- 2x2 -->
-            <div class="row g-3 mb-4">
-              <label class="form-label mb-1" for="pictureInput">2x2 Picture <span class="text-danger">*</span></label>
-              <div class="d-flex align-items-center gap-2 mb-1">
-                <span class="fw-semibold text-black">Required:</span>
+            <div class="mb-4">
+              <h3 class="section-title mb-0 mt-3">2x2 Profile Picture:</h3>
+              <hr class="section-hr">
+              <p class="mb-2">
+                <span class="fw-semibold text-black">Required<span class="text-danger">*</span>:</span>
                 <span class="text-muted">White background (2x2 ID photo).</span>
-              </div>
-              <div class="upload-box position-relative col-12">
+              </p>
+              <div class="upload-box position-relative">
                 <div class="upload-text">
                   <i class="fa-solid fa-upload"></i>
                   <span>Drag & drop file</span>
@@ -975,6 +977,151 @@ require_once __DIR__ . "/includes/resident_access_guard.php";
                   id="pictureInput"
                   name="picture"
                   accept="image/*,.heic,.heif">
+              </div>
+            </div>
+
+            <div id="sectorProofSection" class="d-none">
+              <h3 class="section-title mt-2 mb-0">Sector Membership Supporting Documents</h3>
+              <hr class="section-hr">
+
+              <div id="sectorProofPWD" class="sector-proof-card d-none mb-3">
+                <label class="form-label fw-semibold" for="sectorDocTypePWD">PWD Proof of Disability <span class="text-danger">*</span></label>
+                <select class="form-select mb-2 sector-doc-type" id="sectorDocTypePWD" name="sectorDocType[PWD]" data-sector="PWD">
+                  <option value="">Select</option>
+                  <option value="PWD ID">PWD ID</option>
+                  <option value="Certificate of Disability">Certificate of Disability</option>
+                  <option value="Medical Certificate">Medical Certificate</option>
+                </select>
+                <div class="sector-upload-zone d-none" data-sector="PWD">
+                  <div class="sector-upload-list" data-sector="PWD">
+                    <div class="position-relative">
+                      <div class="upload-box position-relative">
+                        <div class="upload-text">
+                          <i class="fa-solid fa-upload"></i>
+                          <span>Drag & drop file</span>
+                        </div>
+                        <div class="upload-subtext mt-1">PDF or image</div>
+                        <input type="file" class="form-control upload-input sector-doc-file" id="sectorDocFilePWD" name="sectorDocFile[PWD][]" data-sector="PWD" accept=".pdf,image/*,.heic,.heif">
+                      </div>
+                      <small class="text-muted d-block text-center mt-2">Attachment 1</small>
+                    </div>
+                  </div>
+                  <button type="button" class="btn btn-outline-secondary btn-sm mt-3 add-sector-doc-btn" data-sector="PWD">+ Add another attachment</button>
+                  <div class="small text-muted mt-2">Maximum of 3 attachments allowed.</div>
+                </div>
+              </div>
+
+              <div id="sectorProofSenior" class="sector-proof-card d-none mb-3">
+                <label class="form-label fw-semibold" for="sectorDocTypeSenior">Senior Citizen Proof</label>
+                <select class="form-select mb-2 sector-doc-type" id="sectorDocTypeSenior" name="sectorDocType[SeniorCitizen]" data-sector="SeniorCitizen">
+                  <option value="">Select</option>
+                  <option value="Birth Certificate">Birth Certificate</option>
+                  <option value="Senior Citizen ID">Senior Citizen ID</option>
+                </select>
+                <div class="sector-upload-zone d-none" data-sector="SeniorCitizen">
+                  <div class="sector-upload-list" data-sector="SeniorCitizen">
+                    <div class="position-relative">
+                      <div class="upload-box position-relative">
+                        <div class="upload-text">
+                          <i class="fa-solid fa-upload"></i>
+                          <span>Drag & drop file</span>
+                        </div>
+                        <div class="upload-subtext mt-1">PDF or image</div>
+                        <input type="file" class="form-control upload-input sector-doc-file" id="sectorDocFileSenior" name="sectorDocFile[SeniorCitizen][]" data-sector="SeniorCitizen" accept=".pdf,image/*,.heic,.heif">
+                      </div>
+                      <small class="text-muted d-block text-center mt-2">Attachment 1</small>
+                    </div>
+                  </div>
+                  <button type="button" class="btn btn-outline-secondary btn-sm mt-3 add-sector-doc-btn" data-sector="SeniorCitizen">+ Add another attachment</button>
+                  <div class="small text-muted mt-2">Maximum of 3 attachments allowed.</div>
+                </div>
+                <div class="small text-muted mt-2">If you already used an ID as proof of identity above, senior-citizen proof is not required.</div>
+              </div>
+
+              <div id="sectorProofStudent" class="sector-proof-card d-none mb-3">
+                <label class="form-label fw-semibold" for="sectorDocTypeStudent">Student Proof <span class="text-danger">*</span></label>
+                <select class="form-select mb-2 sector-doc-type" id="sectorDocTypeStudent" name="sectorDocType[Student]" data-sector="Student">
+                  <option value="">Select</option>
+                  <option value="Registration Form">Registration Form</option>
+                  <option value="Student ID">Student ID</option>
+                  <option value="Report Card">Report Card</option>
+                </select>
+                <div class="sector-upload-zone d-none" data-sector="Student">
+                  <div class="sector-upload-list" data-sector="Student">
+                    <div class="position-relative">
+                      <div class="upload-box position-relative">
+                        <div class="upload-text">
+                          <i class="fa-solid fa-upload"></i>
+                          <span>Drag & drop file</span>
+                        </div>
+                        <div class="upload-subtext mt-1">PDF or image</div>
+                        <input type="file" class="form-control upload-input sector-doc-file" id="sectorDocFileStudent" name="sectorDocFile[Student][]" data-sector="Student" accept=".pdf,image/*,.heic,.heif">
+                      </div>
+                      <small class="text-muted d-block text-center mt-2">Attachment 1</small>
+                    </div>
+                  </div>
+                  <button type="button" class="btn btn-outline-secondary btn-sm mt-3 add-sector-doc-btn" data-sector="Student">+ Add another attachment</button>
+                  <div class="small text-muted mt-2">Maximum of 3 attachments allowed.</div>
+                </div>
+              </div>
+
+              <div id="sectorProofIP" class="sector-proof-card d-none mb-3">
+                <label class="form-label fw-semibold" for="sectorDocTypeIP">Indigenous People Proof <span class="text-danger">*</span></label>
+                <select class="form-select mb-2 sector-doc-type" id="sectorDocTypeIP" name="sectorDocType[IndigenousPeople]" data-sector="IndigenousPeople">
+                  <option value="">Select</option>
+                  <option value="Certificate of IP Membership (CIPM)">Certificate of IP Membership (CIPM)</option>
+                  <option value="Testimony of Elders/Community Members">Testimony of Elders/Community Members</option>
+                  <option value="Birth Certificate">Birth Certificate</option>
+                  <option value="PhilSys ID/ePhilID">PhilSys ID/ePhilID</option>
+                </select>
+                <div class="sector-upload-zone d-none" data-sector="IndigenousPeople">
+                  <div class="sector-upload-list" data-sector="IndigenousPeople">
+                    <div class="position-relative">
+                      <div class="upload-box position-relative">
+                        <div class="upload-text">
+                          <i class="fa-solid fa-upload"></i>
+                          <span>Drag & drop file</span>
+                        </div>
+                        <div class="upload-subtext mt-1">PDF or image</div>
+                        <input type="file" class="form-control upload-input sector-doc-file" id="sectorDocFileIP" name="sectorDocFile[IndigenousPeople][]" data-sector="IndigenousPeople" accept=".pdf,image/*,.heic,.heif">
+                      </div>
+                      <small class="text-muted d-block text-center mt-2">Attachment 1</small>
+                    </div>
+                  </div>
+                  <button type="button" class="btn btn-outline-secondary btn-sm mt-3 add-sector-doc-btn" data-sector="IndigenousPeople">+ Add another attachment</button>
+                  <div class="small text-muted mt-2">Maximum of 3 attachments allowed.</div>
+                </div>
+                <div class="small text-muted mt-2">If you used National ID/PhilSys as proof of identity above, this upload is not required.</div>
+              </div>
+
+              <div id="sectorProofSoloParent" class="sector-proof-card d-none mb-1">
+                <label class="form-label fw-semibold" for="sectorDocTypeSoloParent">Solo Parent Proof (Optional)</label>
+                <select class="form-select mb-2 sector-doc-type" id="sectorDocTypeSoloParent" name="sectorDocType[SingleParent]" data-sector="SingleParent">
+                  <option value="">Select</option>
+                  <option value="Birth Certificate/s">Birth Certificate/s</option>
+                  <option value="Barangay Certificate of Solo Parent">Barangay Certificate of Solo Parent</option>
+                  <option value="CENOMAR">CENOMAR</option>
+                  <option value="Abandoned/De Facto">Abandoned/De Facto</option>
+                  <option value="Spouse Death Certificate">Spouse Death Certificate</option>
+                </select>
+                <div class="sector-upload-zone d-none" data-sector="SingleParent">
+                  <div class="sector-upload-list" data-sector="SingleParent">
+                    <div class="position-relative">
+                      <div class="upload-box position-relative">
+                        <div class="upload-text">
+                          <i class="fa-solid fa-upload"></i>
+                          <span>Drag & drop file</span>
+                        </div>
+                        <div class="upload-subtext mt-1">PDF or image</div>
+                        <input type="file" class="form-control upload-input sector-doc-file" id="sectorDocFileSoloParent" name="sectorDocFile[SingleParent][]" data-sector="SingleParent" accept=".pdf,image/*,.heic,.heif">
+                      </div>
+                      <small class="text-muted d-block text-center mt-2">Attachment 1</small>
+                    </div>
+                  </div>
+                  <button type="button" class="btn btn-outline-secondary btn-sm mt-3 add-sector-doc-btn" data-sector="SingleParent">+ Add another attachment</button>
+                  <div class="small text-muted mt-2">Maximum of 3 attachments allowed.</div>
+                </div>
+                <div class="small text-muted mt-2">You may skip this for now and submit proper documents later.</div>
               </div>
             </div>
           </div>
@@ -1005,7 +1152,7 @@ require_once __DIR__ . "/includes/resident_access_guard.php";
 
           <div class="d-flex justify-content-between">
             <button type="button" class="btn btn-secondary px-4 prev-btn">Previous</button>
-            <button type="submit" class="btn btn-success px-4" id="submitBtn" disabled>Submit</button>
+            <button type="submit" class="btn btn-success px-4 btn-disabled" id="submitBtn" aria-disabled="true">Submit</button>
           </div>
         </div>
 
@@ -1287,6 +1434,42 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
+  // Sector attachments (max 3 per sector)
+  document.querySelectorAll(".add-sector-doc-btn").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const sector = btn.dataset.sector || "";
+      if (!sector) return;
+
+      const list = document.querySelector(`.sector-upload-list[data-sector="${sector}"]`);
+      if (!list) return;
+
+      const count = list.children.length;
+      if (count >= 3) return;
+
+      const col = document.createElement("div");
+      col.className = "position-relative mt-2";
+      col.innerHTML = `
+        <div class="upload-box position-relative">
+          <div class="upload-text">
+            <i class="fa-solid fa-upload"></i>
+            <span>Drag & drop file</span>
+          </div>
+          <div class="upload-subtext mt-1">PDF or image</div>
+          <input
+            type="file"
+            class="form-control upload-input sector-doc-file"
+            name="sectorDocFile[${sector}][]"
+            data-sector="${sector}"
+            accept=".pdf,image/*,.heic,.heif">
+        </div>
+        <small class="text-muted d-block text-center mt-2">Attachment ${count + 1}</small>
+      `;
+
+      list.appendChild(col);
+      initUploadBox(col.querySelector(".upload-box"));
+    });
+  });
+
 });
 
 </script>
@@ -1324,17 +1507,24 @@ document.addEventListener("DOMContentLoaded", () => {
         const value = dobInput.value;
         if (!value) {
           seniorCheckbox.checked = false;
+          seniorCheckbox.disabled = true;
           return;
         }
         const dob = new Date(value);
-        if (isNaN(dob.getTime())) return;
+        if (isNaN(dob.getTime())) {
+          seniorCheckbox.checked = false;
+          seniorCheckbox.disabled = true;
+          return;
+        }
         const today = new Date();
         let age = today.getFullYear() - dob.getFullYear();
         const monthDiff = today.getMonth() - dob.getMonth();
         if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < dob.getDate())) {
           age--;
         }
-        seniorCheckbox.checked = age >= 60;
+        const isEligible = age >= 60;
+        seniorCheckbox.disabled = !isEligible;
+        seniorCheckbox.checked = isEligible;
       };
 
       if (dobInput) {
@@ -1471,5 +1661,3 @@ document.addEventListener("DOMContentLoaded", () => {
 
 </body>
 </html>
-
-

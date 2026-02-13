@@ -40,6 +40,17 @@ html, body {
     font-family: 'Geist', sans-serif;
 }
 
+/* Use project serif font for all modal headers */
+.modal .modal-header .modal-title,
+.modal .modal-header h1,
+.modal .modal-header h2,
+.modal .modal-header h3,
+.modal .modal-header h4,
+.modal .modal-header h5,
+.modal .modal-header h6 {
+    font-family: 'Charis SIL Bold', serif !important;
+}
+
 #img-mainLogo {
     width: 60px;
 }
@@ -132,6 +143,22 @@ html, body {
 /* ===== Documents Modal UI ===== */
 .doc-row {
     background: #fff;
+}
+
+/* Pastel status tiles for documents modal */
+.docs-modal .doc-row.doc-row--verified {
+    background: #e8f7ee;
+    border-color: #b7e5c6 !important;
+}
+
+.docs-modal .doc-row.doc-row--pending {
+    background: #fff8dd;
+    border-color: #f2e3a7 !important;
+}
+
+.docs-modal .doc-row.doc-row--denied {
+    background: #fbe9eb;
+    border-color: #efb9c0 !important;
 }
 
 .doc-row__info .fw-bold {
@@ -254,8 +281,9 @@ html, body {
     border-radius: 0;
     padding: 0;
     display: grid;
-    grid-template-columns: 1fr;
-    row-gap: 0.75rem;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.75rem;
+    width: 100%;
 }
 
 .doc-viewer-modal #doc-viewer-actions .form-select,
@@ -283,17 +311,22 @@ html, body {
     width: 100%;
 }
 
+.doc-viewer-modal #doc-viewer-actions .doc-viewer-action-btn {
+    width: 100%;
+    min-height: 46px;
+}
+
+.doc-viewer-modal #doc-viewer-actions .text-muted {
+    grid-column: 1 / -1;
+}
+
 @media (min-width: 768px) {
     .doc-viewer-modal #doc-viewer-actions {
-        grid-template-columns: 1fr 1fr auto;
-        column-gap: 0.75rem;
-        align-items: center;
+        grid-template-columns: 1fr 1fr;
+        align-items: stretch;
     }
     .doc-viewer-modal #doc-viewer-actions .doc-viewer__reason {
         grid-column: 1 / span 2;
-    }
-    .doc-viewer-modal #doc-viewer-actions .doc-viewer__update {
-        grid-column: 3;
     }
 }
 
@@ -349,4 +382,16 @@ h2.section-title {
     display: flex;
     align-items: center;
     justify-content: center;
+}
+
+/* Keep document confirm modal actions on one row */
+#modal-docApproveConfirm .modal-footer,
+#modal-docDenyConfirm .modal-footer {
+    flex-wrap: nowrap !important;
+}
+
+#modal-docApproveConfirm .modal-footer .btn,
+#modal-docDenyConfirm .modal-footer .btn {
+    flex: 1 1 0;
+    margin: 0 !important;
 }
