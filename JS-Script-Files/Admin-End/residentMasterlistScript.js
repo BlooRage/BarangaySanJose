@@ -14,7 +14,9 @@ document.addEventListener("DOMContentLoaded", () => {
 
   const viewModalEl = document.getElementById("modal-viewEntry");
   const verifyResidentModalEl = document.getElementById("modal-verifyResidentConfirm");
+  const verifyWarningModalEl = document.getElementById("modal-verifyResidentWarning");
   const declineResidentModalEl = document.getElementById("modal-declineResidentConfirm");
+  const declineWarningModalEl = document.getElementById("modal-declineResidentWarning");
   const declineReasonEl = document.getElementById("txt-declineResidentReason");
   const declineReasonErrorEl = document.getElementById("txt-declineResidentReasonError");
   const btnOpenDeclineResident = document.getElementById("btn-openDeclineResident");
@@ -23,9 +25,23 @@ document.addEventListener("DOMContentLoaded", () => {
   const btnCancelVerifyResident = document.getElementById("btn-cancelVerifyResident");
   const btnCloseVerifyResidentConfirm = document.getElementById("btn-closeVerifyResidentConfirm");
   const btnConfirmVerifyResident = document.getElementById("btn-confirmVerifyResident");
+  const btnCloseVerifyResidentWarning = document.getElementById("btn-closeVerifyResidentWarning");
+  const btnReturnVerifyResidentWarning = document.getElementById("btn-returnVerifyResidentWarning");
+  const btnViewDocsVerifyResidentWarning = document.getElementById("btn-viewDocsVerifyResidentWarning");
   const btnCancelDeclineResident = document.getElementById("btn-cancelDeclineResident");
   const btnCloseDeclineResidentConfirm = document.getElementById("btn-closeDeclineResidentConfirm");
   const btnConfirmDeclineResident = document.getElementById("btn-confirmDeclineResident");
+  const btnCloseDeclineResidentWarning = document.getElementById("btn-closeDeclineResidentWarning");
+  const btnReturnDeclineResidentWarning = document.getElementById("btn-returnDeclineResidentWarning");
+  const btnViewDocsDeclineResidentWarning = document.getElementById("btn-viewDocsDeclineResidentWarning");
+  const docApproveModalEl = document.getElementById("modal-docApproveConfirm");
+  const docDenyModalEl = document.getElementById("modal-docDenyConfirm");
+  const btnDocApproveCancel = document.getElementById("btn-docApproveCancel");
+  const btnDocApproveConfirm = document.getElementById("btn-docApproveConfirm");
+  const btnDocDenyCancel = document.getElementById("btn-docDenyCancel");
+  const btnDocDenyConfirm = document.getElementById("btn-docDenyConfirm");
+  const docDenyReasonEl = document.getElementById("txt-docDenyReason");
+  const docDenyReasonErrorEl = document.getElementById("txt-docDenyReasonError");
 
   function getStaticModal(el) {
     if (!el || !window.bootstrap?.Modal) return null;
@@ -55,9 +71,117 @@ document.addEventListener("DOMContentLoaded", () => {
     getStaticModal(declineResidentModalEl)?.show();
   }
 
+  function showVerifyWarningModal() {
+    getStaticModal(verifyWarningModalEl)?.show();
+  }
+
+  function hideVerifyWarningModal() {
+    getStaticModal(verifyWarningModalEl)?.hide();
+  }
+
+  function showDeclineWarningModal() {
+    getStaticModal(declineWarningModalEl)?.show();
+  }
+
+  function hideDeclineWarningModal() {
+    getStaticModal(declineWarningModalEl)?.hide();
+  }
+
+  function openVerifyWarningFromView() {
+    hideViewModal();
+    showVerifyWarningModal();
+  }
+
+  function openDeclineWarningFromView() {
+    hideViewModal();
+    showDeclineWarningModal();
+  }
+
   function hideDeclineModal() {
     getStaticModal(declineResidentModalEl)?.hide();
   }
+
+  function showDocApproveModal() {
+    getStaticModal(docApproveModalEl)?.show();
+  }
+
+  function hideDocApproveModal() {
+    getStaticModal(docApproveModalEl)?.hide();
+  }
+
+  function showDocDenyModal() {
+    if (docDenyReasonEl) docDenyReasonEl.value = "";
+    if (docDenyReasonErrorEl) docDenyReasonErrorEl.classList.add("d-none");
+    getStaticModal(docDenyModalEl)?.show();
+  }
+
+  function hideDocDenyModal() {
+    getStaticModal(docDenyModalEl)?.hide();
+  }
+
+  btnDocApproveCancel?.addEventListener("click", hideDocApproveModal);
+  btnDocDenyCancel?.addEventListener("click", hideDocDenyModal);
+  docDenyReasonEl?.addEventListener("input", () => {
+    if (docDenyReasonErrorEl) docDenyReasonErrorEl.classList.add("d-none");
+  });
+
+  async function validateResidentVerificationEligibility(residentId) {
+    const response = await fetch(
+      `../PhpFiles/Admin-End/residentMasterlist.php?validate_verification=1&resident_id=${encodeURIComponent(residentId)}`
+    );
+    const result = await response.json().catch(() => null);
+    if (!response.ok || !result?.success) {
+      throw new Error(result?.message || "Unable to validate verification requirements.");
+    }
+    return result;
+  }
+
+  const normalizeIdNumber = (value) => {
+    const text = String(value ?? "").trim();
+    if (!text) return "";
+    return text;
+  };
+
+  const resolveDocIdNumber = (doc) => {
+    const direct = normalizeIdNumber(doc.id_number);
+    if (direct) return direct;
+
+    if (doc.combined_files) {
+      const frontCandidate = normalizeIdNumber(doc.combined_files.front?.id_number);
+      if (frontCandidate) return frontCandidate;
+
+      const backCandidate = normalizeIdNumber(doc.combined_files.back?.id_number);
+      if (backCandidate) return backCandidate;
+    }
+
+    return "Not provided";
+  };
+
+  const isIdDocumentType = (name) => {
+    const normalized = String(name ?? "").toLowerCase();
+    const idTypeNames = [
+      "passport",
+      "driver's license",
+      "philhealth id",
+      "voter's id",
+      "national id",
+      "barangay id",
+      "student id"
+    ];
+    return normalized.includes("id") || idTypeNames.some((n) => normalized.includes(n));
+  };
+
+  const computeAgeFromBirthdate = (birthdate) => {
+    const dob = new Date(String(birthdate ?? ""));
+    if (Number.isNaN(dob.getTime())) return "—";
+    const today = new Date();
+    let age = today.getFullYear() - dob.getFullYear();
+    const monthDiff = today.getMonth() - dob.getMonth();
+    if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < dob.getDate())) {
+      age -= 1;
+    }
+    return age >= 0 ? String(age) : "—";
+  };
 
   function renderResidentStatusBanner(status) {
     const banner = document.getElementById("div-statusBanner");
@@ -123,8 +247,7 @@ document.addEventListener("DOMContentLoaded", () => {
       if (declineReasonErrorEl) declineReasonErrorEl.classList.add("d-none");
     }
 
-    showViewModal();
-    await fetchResidents(searchInput?.value.trim() ?? "");
+    window.location.reload();
   }
 
   // ========================
@@ -250,20 +373,38 @@ document.addEventListener("DOMContentLoaded", () => {
   // RESIDENT STATUS ACTIONS
   // ========================
   if (btnOpenVerifyResident) {
-    btnOpenVerifyResident.addEventListener("click", () => {
+    btnOpenVerifyResident.addEventListener("click", async () => {
       if (!currentViewedResident) return;
-      hideViewModal();
-      showVerifyModal();
+      try {
+        const eligibility = await validateResidentVerificationEligibility(currentViewedResident.resident_id);
+        if (!eligibility.can_approve) {
+          openVerifyWarningFromView();
+          return;
+        }
+        hideViewModal();
+        showVerifyModal();
+      } catch (e) {
+        alert(e?.message || "Unable to verify resident.");
+      }
     });
   }
 
   if (btnOpenDeclineResident) {
-    btnOpenDeclineResident.addEventListener("click", () => {
+    btnOpenDeclineResident.addEventListener("click", async () => {
       if (!currentViewedResident) return;
-      if (declineReasonEl) declineReasonEl.value = "";
-      if (declineReasonErrorEl) declineReasonErrorEl.classList.add("d-none");
-      hideViewModal();
-      showDeclineModal();
+      try {
+        const eligibility = await validateResidentVerificationEligibility(currentViewedResident.resident_id);
+        if (!eligibility.can_decline) {
+          openDeclineWarningFromView();
+          return;
+        }
+        if (declineReasonEl) declineReasonEl.value = "";
+        if (declineReasonErrorEl) declineReasonErrorEl.classList.add("d-none");
+        hideViewModal();
+        showDeclineModal();
+      } catch (e) {
+        alert(e?.message || "Unable to decline resident.");
+      }
     });
   }
 
@@ -285,6 +426,50 @@ document.addEventListener("DOMContentLoaded", () => {
   if (btnCloseVerifyResidentConfirm) {
     btnCloseVerifyResidentConfirm.addEventListener("click", backToViewFromVerify);
   }
+  if (btnCloseVerifyResidentWarning) {
+    btnCloseVerifyResidentWarning.addEventListener("click", () => {
+      hideVerifyWarningModal();
+      showViewModal();
+    });
+  }
+  if (btnReturnVerifyResidentWarning) {
+    btnReturnVerifyResidentWarning.addEventListener("click", () => {
+      hideVerifyWarningModal();
+      showViewModal();
+    });
+  }
+  if (btnViewDocsVerifyResidentWarning) {
+    btnViewDocsVerifyResidentWarning.addEventListener("click", () => {
+      hideVerifyWarningModal();
+      if (currentViewedResident) {
+        openDocsModal(currentViewedResident);
+      } else {
+        showViewModal();
+      }
+    });
+  }
+  if (btnCloseDeclineResidentWarning) {
+    btnCloseDeclineResidentWarning.addEventListener("click", () => {
+      hideDeclineWarningModal();
+      showViewModal();
+    });
+  }
+  if (btnReturnDeclineResidentWarning) {
+    btnReturnDeclineResidentWarning.addEventListener("click", () => {
+      hideDeclineWarningModal();
+      showViewModal();
+    });
+  }
+  if (btnViewDocsDeclineResidentWarning) {
+    btnViewDocsDeclineResidentWarning.addEventListener("click", () => {
+      hideDeclineWarningModal();
+      if (currentViewedResident) {
+        openDocsModal(currentViewedResident);
+      } else {
+        showViewModal();
+      }
+    });
+  }
   if (btnCancelDeclineResident) {
     btnCancelDeclineResident.addEventListener("click", backToViewFromDecline);
   }
@@ -300,7 +485,14 @@ document.addEventListener("DOMContentLoaded", () => {
       try {
         await updateResidentStatus("APPROVED", "", "verify");
       } catch (e) {
-        alert(e?.message || "Failed to verify resident.");
+        const message = e?.message || "Failed to verify resident.";
+        const normalized = message.toLowerCase();
+        if (normalized.includes("cannot be verified yet") || normalized.includes("pending review")) {
+          hideVerifyModal();
+          showVerifyWarningModal();
+        } else {
+          alert(message);
+        }
       } finally {
         btnConfirmVerifyResident.disabled = false;
         btnConfirmVerifyResident.innerText = "Verify";
@@ -324,7 +516,14 @@ document.addEventListener("DOMContentLoaded", () => {
       try {
         await updateResidentStatus("DENIED", reason, "decline");
       } catch (e) {
-        alert(e?.message || "Failed to decline resident.");
+        const message = e?.message || "Failed to decline resident.";
+        const normalized = message.toLowerCase();
+        if (normalized.includes("cannot be declined yet") || normalized.includes("pending review")) {
+          hideDeclineModal();
+          showDeclineWarningModal();
+        } else {
+          alert(message);
+        }
       } finally {
         btnConfirmDeclineResident.disabled = false;
         btnConfirmDeclineResident.innerText = "Decline";
@@ -540,7 +739,9 @@ function openDocsModal(data, opts = {}) {
   window.currentDocsResident = {
     full_name: data.full_name ?? "—",
     birthdate: data.birthdate ?? "—",
-    full_address: addressParts.join(", ") || "—"
+    full_address: addressParts.join(", ") || "—",
+    sex: data.sex ?? "—",
+    sector_membership: data.sector_membership ?? "—"
   };
   window.lastDocsResident = { ...data };
   if (listPending) listPending.innerHTML = "";
@@ -623,6 +824,7 @@ function openDocsModal(data, opts = {}) {
               upload_timestamp: latestTimestamp,
               file_type: "combined",
               remarks: "front+back",
+              id_number: frontDoc.id_number || backDoc.id_number || "",
               combined_files: {
                 front: frontDoc,
                 back: backDoc
@@ -645,8 +847,9 @@ function openDocsModal(data, opts = {}) {
       const deniedMerged = mergeFrontBackDocs(deniedDocs);
 
       const renderDocRow = (doc, container, opts = {}) => {
+        const statusTone = opts.statusTone || "pending";
         const row = document.createElement("div");
-        row.className = "doc-row border rounded-3 p-2";
+        row.className = `doc-row doc-row--${statusTone} border rounded-3 p-2`;
 
         const rowGrid = document.createElement("div");
         rowGrid.className = "doc-row__grid d-flex align-items-center justify-content-between gap-2";
@@ -658,6 +861,15 @@ function openDocsModal(data, opts = {}) {
         const name = document.createElement("div");
         name.className = "fw-bold";
         name.innerText = doc.document_type_name || doc.file_name || "Document";
+
+        const typeLine = document.createElement("div");
+        typeLine.className = "small";
+        typeLine.innerText = `Document Type: ${doc.document_type_name || "—"}`;
+
+        const shouldShowIdNumber = isIdDocumentType(doc.document_type_name || doc.file_name || "");
+        const idNumberLine = document.createElement("div");
+        idNumberLine.className = "small";
+        idNumberLine.innerText = `ID Number: ${resolveDocIdNumber(doc)}`;
 
         const metaRow = document.createElement("div");
         metaRow.className = "doc-row__meta text-muted small";
@@ -671,6 +883,10 @@ function openDocsModal(data, opts = {}) {
         metaRow.appendChild(meta);
         nameRow.appendChild(name);
         left.appendChild(nameRow);
+        left.appendChild(typeLine);
+        if (shouldShowIdNumber) {
+          left.appendChild(idNumberLine);
+        }
         left.appendChild(metaRow);
 
         const action = document.createElement("div");
@@ -698,15 +914,15 @@ function openDocsModal(data, opts = {}) {
 
       if (pendingMerged.length) {
         if (sectionPending) sectionPending.classList.remove("d-none");
-        pendingMerged.forEach(doc => renderDocRow(doc, listPending));
+        pendingMerged.forEach(doc => renderDocRow(doc, listPending, { statusTone: "pending" }));
       }
       if (verifiedMerged.length) {
         if (sectionVerified) sectionVerified.classList.remove("d-none");
-        verifiedMerged.forEach(doc => renderDocRow(doc, listVerified));
+        verifiedMerged.forEach(doc => renderDocRow(doc, listVerified, { statusTone: "verified" }));
       }
       if (deniedMerged.length) {
         if (sectionDenied) sectionDenied.classList.remove("d-none");
-        deniedMerged.forEach(doc => renderDocRow(doc, listDenied, { showReason: true }));
+        deniedMerged.forEach(doc => renderDocRow(doc, listDenied, { showReason: true, statusTone: "denied" }));
       }
     })
     .catch(() => {
@@ -736,9 +952,6 @@ function openDocViewer(doc, parentModalEl, opts = {}) {
   const titleEl = document.getElementById("doc-viewer-title");
   const returnBtn = document.getElementById("doc-viewer-return");
   const infoWrapEl = document.getElementById("doc-viewer-info");
-  const infoNameEl = document.getElementById("doc-viewer-fullname");
-  const infoBirthdayEl = document.getElementById("doc-viewer-birthday");
-  const infoAddressEl = document.getElementById("doc-viewer-fulladdress");
   const actionsEl = document.getElementById("doc-viewer-actions");
 
   if (!viewerEl || !bodyEl || !returnBtn || !actionsEl) return;
@@ -754,6 +967,9 @@ function openDocViewer(doc, parentModalEl, opts = {}) {
   titleEl.innerText = fileName;
   bodyEl.innerHTML = "";
   actionsEl.innerHTML = "";
+  actionsEl.style.display = "";
+  actionsEl.style.gridTemplateColumns = "";
+  actionsEl.style.gap = "";
 
   const residentInfo = window.currentDocsResident || {};
   if (infoWrapEl) {
@@ -761,11 +977,24 @@ function openDocViewer(doc, parentModalEl, opts = {}) {
       infoWrapEl.classList.add("d-none");
     } else {
       infoWrapEl.classList.remove("d-none");
+      const ageValue = computeAgeFromBirthdate(residentInfo.birthdate);
+      const isIdDoc = isIdDocumentType(doc.document_type_name || doc.file_name || "");
+      const idNumberValue = resolveDocIdNumber(doc);
+      const showIdNumber = idNumberValue && idNumberValue !== "Not provided";
+
+      infoWrapEl.innerHTML = `
+        <div class="fw-bold mb-2">Resident Basic Information</div>
+        <div class="row g-2">
+          <div class="col-md-6"><strong>Name:</strong> <span>${residentInfo.full_name ?? "—"}</span></div>
+          <div class="col-md-6"><strong>Age:</strong> <span>${ageValue}</span></div>
+          <div class="col-md-6"><strong>Sex:</strong> <span>${residentInfo.sex ?? "—"}</span></div>
+          <div class="col-md-6"><strong>Sector Membership:</strong> <span>${residentInfo.sector_membership ?? "—"}</span></div>
+          <div class="col-12"><strong>Address:</strong> <span>${residentInfo.full_address ?? "—"}</span></div>
+          ${isIdDoc ? `<div class="col-12"><strong>Document:</strong> <span>${doc.document_type_name || "—"}${showIdNumber ? ` - ${idNumberValue}` : ""}</span></div>` : ""}
+        </div>
+      `;
     }
   }
-  if (infoNameEl) infoNameEl.innerText = residentInfo.full_name ?? "—";
-  if (infoBirthdayEl) infoBirthdayEl.innerText = residentInfo.birthdate ?? "—";
-  if (infoAddressEl) infoAddressEl.innerText = residentInfo.full_address ?? "—";
 
   const createPreviewElement = (url, displayName, detectedExt) => {
     let preview;
@@ -822,161 +1051,173 @@ function openDocViewer(doc, parentModalEl, opts = {}) {
   }
 
   if (!opts.readOnly) {
-  const statusSelect = document.createElement("select");
-  statusSelect.className = "form-select form-select-sm doc-viewer__status";
-  statusSelect.style.minWidth = "140px";
-  statusSelect.innerHTML = `
-    <option value="PENDING">Pending</option>
-    <option value="APPROVED">Approved</option>
-    <option value="DENIED">Denied</option>
-  `;
-  const currentStatus = String(doc.verify_status ?? "").toLowerCase();
-  if (currentStatus.includes("verified")) statusSelect.value = "APPROVED";
-  else if (currentStatus.includes("rejected") || currentStatus.includes("denied")) statusSelect.value = "DENIED";
-  else statusSelect.value = "PENDING";
+    const currentStatus = String(doc.verify_status ?? "").toLowerCase();
+    const isPendingReview = currentStatus.includes("pending");
 
-  const reasonInput = document.createElement("input");
-  reasonInput.type = "text";
-  reasonInput.className = "form-control form-control-sm d-none doc-viewer__reason";
-  reasonInput.placeholder = "Cause of denial";
-  reasonInput.style.minWidth = "260px";
+    if (!isPendingReview) {
+      const readOnlyHint = document.createElement("div");
+      readOnlyHint.className = "text-muted small";
+      readOnlyHint.innerText = "Only documents in Pending Review can be verified or declined.";
+      actionsEl.appendChild(readOnlyHint);
+    } else {
+      actionsEl.style.display = "grid";
+      actionsEl.style.gridTemplateColumns = "1fr 1fr";
+      actionsEl.style.gap = "0.75rem";
 
-  const saveBtn = document.createElement("button");
-  saveBtn.type = "button";
-  saveBtn.className = "btn btn-sm btn-success doc-viewer__update";
-  saveBtn.innerText = "Update";
-  saveBtn.addEventListener("click", async () => {
-    if (statusSelect.value === "DENIED" && !reasonInput.value.trim()) {
-      reasonInput.classList.add("is-invalid");
-      reasonInput.classList.remove("d-none");
-      return;
-    }
-    reasonInput.classList.remove("is-invalid");
-    if (statusSelect.value === "DENIED") {
-      const ok = window.confirm("Are you sure you want to deny this document?");
-      if (!ok) return;
-    }
+      const verifyBtn = document.createElement("button");
+      verifyBtn.type = "button";
+      verifyBtn.className = "btn btn-success doc-viewer-action-btn";
+      verifyBtn.innerText = "Approve";
 
-    const updateOne = async (attachmentId) => {
-      const fd = new FormData();
-      fd.append("update_document_status", "1");
-      fd.append("attachment_id", attachmentId);
-      fd.append("new_status", statusSelect.value);
-      fd.append("reason_scope", "");
-      fd.append("reason_text", reasonInput.value.trim());
+      const declineBtn = document.createElement("button");
+      declineBtn.type = "button";
+      declineBtn.className = "btn btn-danger doc-viewer-action-btn";
+      declineBtn.innerText = "Decline";
 
-      const res = await fetch("../PhpFiles/Admin-End/residentMasterlist.php", {
-        method: "POST",
-        body: fd
-      });
-      const result = await res.json().catch(() => null);
-      if (!res.ok || !result || !result.success) {
-        throw new Error(result?.message || "Failed to update document status.");
-      }
-      return result;
-    };
+      const setActionButtonsDisabled = (disabled) => {
+        verifyBtn.disabled = disabled;
+        declineBtn.disabled = disabled;
+      };
 
-    saveBtn.disabled = true;
-    saveBtn.innerText = "Saving...";
-    try {
-      const idsToUpdate = doc.combined_files
-        ? [doc.combined_files.front.attachment_id, doc.combined_files.back.attachment_id]
-        : [doc.attachment_id];
+      const updateOne = async (attachmentId, newStatus, reasonText) => {
+        const fd = new FormData();
+        fd.append("update_document_status", "1");
+        fd.append("attachment_id", attachmentId);
+        fd.append("new_status", newStatus);
+        fd.append("reason_scope", "");
+        fd.append("reason_text", reasonText);
 
-      const results = await Promise.all(idsToUpdate.map((id) => updateOne(id)));
-      const result = results[0];
-
-      const imageResult = results.find((r) => r.profile_image_url);
-      if (imageResult?.profile_image_url) {
-        const newUrl = `${imageResult.profile_image_url}?v=${Date.now()}`;
-        if (window.lastDocsResident) {
-          window.lastDocsResident.id_picture_url = imageResult.profile_image_url;
+        const res = await fetch("../PhpFiles/Admin-End/residentMasterlist.php", {
+          method: "POST",
+          body: fd
+        });
+        const result = await res.json().catch(() => null);
+        if (!res.ok || !result || !result.success) {
+          throw new Error(result?.message || "Failed to update document status.");
         }
-        const modalImg = document.getElementById("img-modalIdPicture");
-        if (modalImg) {
-          modalImg.src = newUrl;
-        }
-      }
-      doc.verify_status = result.status || doc.verify_status;
-      if (doc.combined_files) {
-        doc.combined_files.front.verify_status = doc.verify_status;
-        doc.combined_files.back.verify_status = doc.verify_status;
-      }
-      if (statusSelect.value === "DENIED") {
-        doc.remarks = reasonInput.value.trim();
-        if (doc.combined_files) {
-          doc.combined_files.front.remarks = doc.remarks;
-          doc.combined_files.back.remarks = doc.remarks;
-        }
-      } else {
-        doc.remarks = "";
-        if (doc.combined_files) {
-          doc.combined_files.front.remarks = "";
-          doc.combined_files.back.remarks = "";
-        }
-      }
-      if (window.lastDocsResident) {
-        openDocsModal(window.lastDocsResident, { refreshOnly: true });
-      }
-      saveBtn.disabled = false;
-      saveBtn.innerText = "Update";
+        return result;
+      };
 
-      const viewerModal = bootstrap.Modal.getInstance(viewerEl);
-      if (window.UniversalModal?.open) {
-        window.UniversalModal.open({
-          title: "Success",
-          message: "Document status updated.",
-          buttons: [
-            {
-              label: "Return",
-              class: "btn btn-success",
-              onClick: () => {
-                viewerModal?.hide();
-                  if (parentModalEl) {
-                    const listModal = bootstrap.Modal.getOrCreateInstance(parentModalEl, {
-                      backdrop: "static",
-                      keyboard: false
-                    });
-                    listModal.show();
-                    if (window.lastDocsResident) {
-                      openDocsModal(window.lastDocsResident, { refreshOnly: true });
+      const runDocumentStatusUpdate = async (newStatus, reasonText = "") => {
+        setActionButtonsDisabled(true);
+        try {
+          const idsToUpdate = doc.combined_files
+            ? [doc.combined_files.front.attachment_id, doc.combined_files.back.attachment_id]
+            : [doc.attachment_id];
+
+          const results = await Promise.all(idsToUpdate.map((id) => updateOne(id, newStatus, reasonText)));
+          const result = results[0];
+
+          const imageResult = results.find((r) => r.profile_image_url);
+          if (imageResult?.profile_image_url) {
+            const newUrl = `${imageResult.profile_image_url}?v=${Date.now()}`;
+            if (window.lastDocsResident) {
+              window.lastDocsResident.id_picture_url = imageResult.profile_image_url;
+            }
+            const modalImg = document.getElementById("img-modalIdPicture");
+            if (modalImg) {
+              modalImg.src = newUrl;
+            }
+          }
+
+          doc.verify_status = result.status || doc.verify_status;
+          if (doc.combined_files) {
+            doc.combined_files.front.verify_status = doc.verify_status;
+            doc.combined_files.back.verify_status = doc.verify_status;
+          }
+          if (newStatus === "DENIED") {
+            doc.remarks = reasonText;
+            if (doc.combined_files) {
+              doc.combined_files.front.remarks = doc.remarks;
+              doc.combined_files.back.remarks = doc.remarks;
+            }
+          } else {
+            doc.remarks = "";
+            if (doc.combined_files) {
+              doc.combined_files.front.remarks = "";
+              doc.combined_files.back.remarks = "";
+            }
+          }
+          if (window.lastDocsResident) {
+            openDocsModal(window.lastDocsResident, { refreshOnly: true });
+          }
+
+          const viewerModal = bootstrap.Modal.getInstance(viewerEl);
+          if (window.UniversalModal?.open) {
+            window.UniversalModal.open({
+              title: "Success",
+              message: "Document status updated.",
+              buttons: [
+                {
+                  label: "Return",
+                  class: "btn btn-success",
+                  onClick: () => {
+                    viewerModal?.hide();
+                    if (parentModalEl) {
+                      const listModal = bootstrap.Modal.getOrCreateInstance(parentModalEl, {
+                        backdrop: "static",
+                        keyboard: false
+                      });
+                      listModal.show();
+                      if (window.lastDocsResident) {
+                        openDocsModal(window.lastDocsResident, { refreshOnly: true });
+                      }
                     }
                   }
-              }
+                }
+              ]
+            });
+          } else {
+            viewerModal?.hide();
+            if (parentModalEl) {
+              const listModal = bootstrap.Modal.getOrCreateInstance(parentModalEl, {
+                backdrop: "static",
+                keyboard: false
+              });
+              listModal.show();
             }
-          ]
-        });
-      } else {
-        viewerModal?.hide();
-        if (parentModalEl) {
-          const listModal = bootstrap.Modal.getOrCreateInstance(parentModalEl, {
-            backdrop: "static",
-            keyboard: false
-          });
-          listModal.show();
+          }
+        } catch (e) {
+          alert(e?.message || "Failed to update document status.");
+        } finally {
+          setActionButtonsDisabled(false);
         }
-      }
-    } catch (e) {
-      alert(e?.message || "Failed to update document status.");
-    } finally {
-      saveBtn.disabled = false;
-      saveBtn.innerText = "Update";
-    }
-  });
+      };
 
-  statusSelect.addEventListener("change", () => {
-    if (statusSelect.value === "DENIED") {
-      reasonInput.classList.remove("d-none");
-    } else {
-      reasonInput.classList.add("d-none");
-      reasonInput.value = "";
-      reasonInput.classList.remove("is-invalid");
-    }
-  });
+      verifyBtn.addEventListener("click", () => {
+        const viewerModal = bootstrap.Modal.getInstance(viewerEl);
+        viewerModal?.hide();
+        if (btnDocApproveConfirm) {
+          btnDocApproveConfirm.onclick = async () => {
+            hideDocApproveModal();
+            await runDocumentStatusUpdate("APPROVED", "");
+          };
+        }
+        showDocApproveModal();
+      });
 
-  actionsEl.appendChild(statusSelect);
-  actionsEl.appendChild(reasonInput);
-  actionsEl.appendChild(saveBtn);
+      declineBtn.addEventListener("click", () => {
+        const viewerModal = bootstrap.Modal.getInstance(viewerEl);
+        viewerModal?.hide();
+        if (btnDocDenyConfirm) {
+          btnDocDenyConfirm.onclick = async () => {
+            const reason = docDenyReasonEl?.value.trim() ?? "";
+            if (!reason) {
+              if (docDenyReasonErrorEl) docDenyReasonErrorEl.classList.remove("d-none");
+              docDenyReasonEl?.focus();
+              return;
+            }
+            if (docDenyReasonErrorEl) docDenyReasonErrorEl.classList.add("d-none");
+            hideDocDenyModal();
+            await runDocumentStatusUpdate("DENIED", reason);
+          };
+        }
+        showDocDenyModal();
+      });
+
+      actionsEl.appendChild(declineBtn);
+      actionsEl.appendChild(verifyBtn);
+    }
   }
 
   const parentModal = parentModalEl ? bootstrap.Modal.getInstance(parentModalEl) : null;

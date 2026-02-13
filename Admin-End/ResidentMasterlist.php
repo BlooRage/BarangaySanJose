@@ -10,7 +10,7 @@
     <script src="https://kit.fontawesome.com/3482e00999.js" crossorigin="anonymous"></script>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="../CSS-Styles/Admin-End-CSS/AdminDashboardStyle.css">
-    <link rel="stylesheet" href="../CSS-Styles/Admin-End-CSS/ResidentMasterlistStyle.css">
+    <link rel="stylesheet" href="../CSS-Styles/Admin-End-CSS/ResidentMasterlistStyle.css?v=20260212-5">
 </head>
 
 <body>
@@ -440,16 +440,37 @@ if (isset($conn) && $conn instanceof mysqli) {
 <div class="modal fade" id="modal-verifyResidentConfirm" tabindex="-1" data-bs-backdrop="static" data-bs-keyboard="false">
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content p-3">
-            <div class="modal-header border-0">
-                <h5 class="modal-title fw-bold">Approval Confirmation</h5>
-                <button type="button" class="btn-close" id="btn-closeVerifyResidentConfirm"></button>
+            <div class="modal-header justify-content-center border-0 pb-0">
+                <h5 class="modal-title fw-bold text-center w-100">Approval Confirmation</h5>
             </div>
-            <div class="modal-body">
+            <hr class="my-2">
+            <div class="modal-body text-center">
                 <p class="mb-0">Are you sure you want to approve this resident and allow access to all modules?</p>
             </div>
-            <div class="modal-footer border-0">
-                <button type="button" class="btn btn-secondary" id="btn-cancelVerifyResident">Cancel</button>
-                <button type="button" class="btn btn-success" id="btn-confirmVerifyResident">Verify</button>
+            <div class="modal-footer border-0 pt-0 d-flex gap-2 w-100">
+                <button type="button" class="btn btn-success flex-fill" id="btn-confirmVerifyResident">Verify</button>
+                <button type="button" class="btn btn-secondary flex-fill" id="btn-cancelVerifyResident">Cancel</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- VERIFY RESIDENT WARNING MODAL -->
+<div class="modal fade" id="modal-verifyResidentWarning" tabindex="-1" data-bs-backdrop="static" data-bs-keyboard="false">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content p-3">
+            <div class="modal-header justify-content-center border-0 pb-0">
+                <h5 class="modal-title fw-bold text-danger text-center w-100">Verification Blocked</h5>
+            </div>
+            <hr class="my-2">
+            <div class="modal-body text-center">
+                <p class="mb-0">
+                    Resident cannot be verified yet while registration documents are still pending review, or if the required profile/supporting document was denied.
+                </p>
+            </div>
+            <div class="modal-footer border-0 pt-0 d-flex gap-2 w-100">
+                <button type="button" class="btn btn-secondary flex-fill" id="btn-returnVerifyResidentWarning">Return</button>
+                <button type="button" class="btn btn-primary flex-fill" id="btn-viewDocsVerifyResidentWarning">View Documents</button>
             </div>
         </div>
     </div>
@@ -459,18 +480,39 @@ if (isset($conn) && $conn instanceof mysqli) {
 <div class="modal fade" id="modal-declineResidentConfirm" tabindex="-1" data-bs-backdrop="static" data-bs-keyboard="false">
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content p-3">
-            <div class="modal-header border-0">
-                <h5 class="modal-title fw-bold">Decline Resident Request</h5>
-                <button type="button" class="btn-close" id="btn-closeDeclineResidentConfirm"></button>
+            <div class="modal-header justify-content-center border-0 pb-0">
+                <h5 class="modal-title fw-bold text-center w-100">Decline Resident Request</h5>
             </div>
+            <hr class="my-2">
             <div class="modal-body">
                 <label for="txt-declineResidentReason" class="form-label fw-bold mb-1">Reason for decline</label>
                 <textarea id="txt-declineResidentReason" class="form-control" rows="4" placeholder="State why this request is declined."></textarea>
                 <div class="invalid-feedback d-none" id="txt-declineResidentReasonError">Decline reason is required.</div>
             </div>
-            <div class="modal-footer border-0">
-                <button type="button" class="btn btn-secondary" id="btn-cancelDeclineResident">Cancel</button>
-                <button type="button" class="btn btn-danger" id="btn-confirmDeclineResident">Decline</button>
+            <div class="modal-footer border-0 pt-0 d-flex gap-2 w-100">
+                <button type="button" class="btn btn-danger flex-fill" id="btn-confirmDeclineResident">Decline</button>
+                <button type="button" class="btn btn-secondary flex-fill" id="btn-cancelDeclineResident">Cancel</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- DECLINE RESIDENT WARNING MODAL -->
+<div class="modal fade" id="modal-declineResidentWarning" tabindex="-1" data-bs-backdrop="static" data-bs-keyboard="false">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content p-3">
+            <div class="modal-header justify-content-center border-0 pb-0">
+                <h5 class="modal-title fw-bold text-danger text-center w-100">Decline Blocked</h5>
+            </div>
+            <hr class="my-2">
+            <div class="modal-body text-center">
+                <p class="mb-0">
+                    Resident cannot be declined yet while submitted registration documents are still pending review.
+                </p>
+            </div>
+            <div class="modal-footer border-0 pt-0 d-flex gap-2 w-100">
+                <button type="button" class="btn btn-secondary flex-fill" id="btn-returnDeclineResidentWarning">Return</button>
+                <button type="button" class="btn btn-primary flex-fill" id="btn-viewDocsDeclineResidentWarning">View Documents</button>
             </div>
         </div>
     </div>
@@ -685,13 +727,49 @@ if (isset($conn) && $conn instanceof mysqli) {
   </div>
 </div>
 
+<!-- DOCUMENT VERIFY CONFIRM MODAL -->
+<div class="modal fade" id="modal-docApproveConfirm" tabindex="-1" data-bs-backdrop="static" data-bs-keyboard="false">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content p-3">
+      <div class="modal-header justify-content-center border-0 pb-0">
+        <h5 class="modal-title fw-bold text-center w-100">Verify Document</h5>
+      </div>
+      <hr>
+      <div class="modal-body text-center">
+        <p class="mb-0">Are you sure you want to verify this document?</p>
+      </div>
+      <div class="modal-footer border-0 pt-0 d-flex gap-2 w-100">
+        <button type="button" class="btn btn-outline-secondary flex-fill" id="btn-docApproveCancel">Return</button>
+        <button type="button" class="btn btn-success flex-fill" id="btn-docApproveConfirm">Verify</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- DOCUMENT DENY CONFIRM MODAL -->
+<div class="modal fade" id="modal-docDenyConfirm" tabindex="-1" data-bs-backdrop="static" data-bs-keyboard="false">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content p-3">
+      <div class="modal-header justify-content-center border-0 pb-0">
+        <h5 class="modal-title fw-bold text-center w-100">Decline Document</h5>
+      </div>
+      <hr>
+      <div class="modal-body">
+        <label for="txt-docDenyReason" class="form-label fw-bold mb-1">Reason for denial</label>
+        <textarea id="txt-docDenyReason" class="form-control" rows="4" placeholder="State why this document is denied."></textarea>
+        <div class="invalid-feedback d-none" id="txt-docDenyReasonError">Reason is required.</div>
+      </div>
+      <div class="modal-footer border-0 pt-0 d-flex gap-2 w-100">
+        <button type="button" class="btn btn-outline-secondary flex-fill" id="btn-docDenyCancel">Return</button>
+        <button type="button" class="btn btn-danger flex-fill" id="btn-docDenyConfirm">Decline</button>
+      </div>
+    </div>
+  </div>
+</div>
 
 
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-<script src="../JS-Script-Files/Admin-End/residentMasterlistScript.js"></script>
+<script src="../JS-Script-Files/Admin-End/residentMasterlistScript.js?v=20260212-5"></script>
 </body>
 </html>
-
-
-

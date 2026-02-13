@@ -43,6 +43,10 @@ function toPublicPath($path): ?string {
     }
     $normalized = '/' . implode('/', $cleanParts);
 
+    if (strpos($normalized, '/BarangaySanJose/') === 0) {
+        return $normalized;
+    }
+
     $marker = '/UnifiedFileAttachment/';
     $markerPos = stripos($normalized, $marker);
     if ($markerPos !== false) {

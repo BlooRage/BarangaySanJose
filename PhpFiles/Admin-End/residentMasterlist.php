@@ -23,6 +23,106 @@ function getStatusId(mysqli $conn, string $name, string $type): int {
     return (int)$res['status_id'];
 }
 
+function getResidentVerificationEligibility(mysqli $conn, string $residentId): array {
+    $sql = "
+        SELECT
+            SUM(
+                CASE
+                    WHEN dt.document_category = 'ResidentProfiling'
+                         AND dt.document_type_name = '2x2 Picture'
+                         AND sv.status_name = 'Rejected'
+                         AND sv.status_type = 'ResidentDocumentProfiling'
+                    THEN 1 ELSE 0
+                END
+            ) AS rejected_2x2_count,
+            SUM(
+                CASE
+                    WHEN dt.document_category = 'ResidentProfiling'
+                         AND dt.document_type_name <> '2x2 Picture'
+                         AND sv.status_name = 'Rejected'
+                         AND sv.status_type = 'ResidentDocumentProfiling'
+                    THEN 1 ELSE 0
+                END
+            ) AS rejected_supporting_doc_count,
+            SUM(
+                CASE
+                    WHEN dt.document_category = 'ResidentProfiling'
+                         AND sv.status_name = 'PendingReview'
+                         AND sv.status_type = 'ResidentDocumentProfiling'
+                    THEN 1 ELSE 0
+                END
+            ) AS pending_registration_doc_count
+        FROM unifiedfileattachmenttbl uf
+        INNER JOIN documenttypelookuptbl dt
+            ON uf.document_type_id = dt.document_type_id
+        LEFT JOIN statuslookuptbl sv
+            ON uf.status_id_verify = sv.status_id
+        WHERE uf.source_type = 'ResidentProfiling'
+          AND uf.source_id = ?
+    ";
+
+    $stmt = $conn->prepare($sql);
+    if (!$stmt) {
+        throw new Exception("Prepare failed (verification eligibility): " . $conn->error);
+    }
+    $stmt->bind_param("s", $residentId);
+    $stmt->execute();
+    $row = $stmt->get_result()->fetch_assoc() ?: [];
+    $stmt->close();
+
+    $hasPendingRegistrationDocs = (int)($row['pending_registration_doc_count'] ?? 0) > 0;
+    $hasRejected2x2 = (int)($row['rejected_2x2_count'] ?? 0) > 0;
+    $hasRejectedSupportingDoc = (int)($row['rejected_supporting_doc_count'] ?? 0) > 0;
+
+    return [
+        'has_pending_registration_docs' => $hasPendingRegistrationDocs,
+        'has_rejected_2x2' => $hasRejected2x2,
+        'has_rejected_supporting_doc' => $hasRejectedSupportingDoc,
+        'can_approve' => !$hasPendingRegistrationDocs && !$hasRejected2x2 && !$hasRejectedSupportingDoc,
+        'can_decline' => !$hasPendingRegistrationDocs
+    ];
+}
+
+function getResidentRegistrationDocCount(mysqli $conn, string $residentId): int {
+    $sql = "
+        SELECT COUNT(*) AS doc_count
+        FROM unifiedfileattachmenttbl uf
+        INNER JOIN documenttypelookuptbl dt
+            ON uf.document_type_id = dt.document_type_id
+        WHERE uf.source_type = 'ResidentProfiling'
+          AND uf.source_id = ?
+          AND dt.document_category = 'ResidentProfiling'
+    ";
+    $stmt = $conn->prepare($sql);
+    if (!$stmt) {
+        throw new Exception("Prepare failed (registration doc count): " . $conn->error);
+    }
+    $stmt->bind_param("s", $residentId);
+    $stmt->execute();
+    $row = $stmt->get_result()->fetch_assoc() ?: [];
+    $stmt->close();
+    return (int)($row['doc_count'] ?? 0);
+}
+
+function getResidentStatusName(mysqli $conn, string $residentId): string {
+    $sql = "
+        SELECT s.status_name
+        FROM residentinformationtbl r
+        LEFT JOIN statuslookuptbl s ON r.status_id_resident = s.status_id
+        WHERE r.resident_id = ?
+        LIMIT 1
+    ";
+    $stmt = $conn->prepare($sql);
+    if (!$stmt) {
+        throw new Exception("Prepare failed (resident status): " . $conn->error);
+    }
+    $stmt->bind_param("s", $residentId);
+    $stmt->execute();
+    $row = $stmt->get_result()->fetch_assoc() ?: [];
+    $stmt->close();
+    return trim((string)($row['status_name'] ?? ''));
+}
+
 function toPublicPath($path): ?string {
     $path = trim((string)$path);
     if ($path === '') {
@@ -46,6 +146,10 @@ function toPublicPath($path): ?string {
         $cleanParts[] = $part;
     }
     $normalized = '/' . implode('/', $cleanParts);
+
+    if (strpos($normalized, '/BarangaySanJose/') === 0) {
+        return $normalized;
+    }
 
     // Most records contain absolute filesystem paths; map them by folder marker.
     $marker = '/UnifiedFileAttachment/';
@@ -107,6 +211,45 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_resident_statu
         http_response_code(400);
         echo json_encode(['success' => false, 'message' => 'Reason is required when declining.']);
         exit;
+    }
+
+    if ($uiStatus === 'APPROVED' || $uiStatus === 'DENIED') {
+        try {
+            if ($uiStatus === 'APPROVED') {
+                $statusName = getResidentStatusName($conn, $residentId);
+                $docCount = getResidentRegistrationDocCount($conn, $residentId);
+                if ($statusName === 'PendingVerification' && $docCount <= 0) {
+                    http_response_code(409);
+                    echo json_encode([
+                        'success' => false,
+                        'code' => 'NO_REGISTRATION_DOCUMENTS',
+                        'message' => 'Resident cannot be verified yet. No registration documents are uploaded.'
+                    ]);
+                    exit;
+                }
+            }
+
+            $eligibility = getResidentVerificationEligibility($conn, $residentId);
+            $isBlocked = ($uiStatus === 'APPROVED' && !$eligibility['can_approve'])
+                || ($uiStatus === 'DENIED' && !$eligibility['can_decline']);
+            if ($isBlocked) {
+                http_response_code(409);
+                $actionLabel = $uiStatus === 'DENIED' ? 'declined' : 'verified';
+                $message = $uiStatus === 'APPROVED'
+                    ? "Resident cannot be {$actionLabel} yet while registration documents are pending review or profile/supporting document is denied."
+                    : "Resident cannot be {$actionLabel} yet while submitted registration documents are still pending review.";
+                echo json_encode([
+                    'success' => false,
+                    'code' => 'PENDING_REGISTRATION_DOCUMENTS',
+                    'message' => $message
+                ]);
+                exit;
+            }
+        } catch (Exception $e) {
+            http_response_code(500);
+            echo json_encode(['success' => false, 'message' => 'Unable to validate verification requirements.']);
+            exit;
+        }
     }
 
     $conn->begin_transaction();
@@ -172,6 +315,42 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_resident_statu
         $conn->rollback();
         http_response_code(500);
         echo json_encode(['success' => false, 'message' => 'Failed to update resident status.']);
+    }
+    exit;
+}
+
+if (isset($_GET['validate_verification'])) {
+    header('Content-Type: application/json; charset=utf-8');
+
+    $residentId = normalizeResidentId($_GET['resident_id'] ?? '');
+    if (!$residentId) {
+        http_response_code(400);
+        echo json_encode(['success' => false, 'message' => 'Invalid resident ID.']);
+        exit;
+    }
+
+    try {
+        $eligibility = getResidentVerificationEligibility($conn, $residentId);
+        $docCount = getResidentRegistrationDocCount($conn, $residentId);
+        $statusName = getResidentStatusName($conn, $residentId);
+        $hasRegistrationDocuments = $docCount > 0;
+        $canApprove = $eligibility['can_approve'];
+        if ($statusName === 'PendingVerification' && !$hasRegistrationDocuments) {
+            $canApprove = false;
+        }
+        echo json_encode([
+            'success' => true,
+            'resident_id' => $residentId,
+            'can_approve' => $canApprove,
+            'can_decline' => $eligibility['can_decline'],
+            'has_pending_registration_docs' => $eligibility['has_pending_registration_docs'],
+            'has_rejected_2x2' => $eligibility['has_rejected_2x2'],
+            'has_rejected_supporting_doc' => $eligibility['has_rejected_supporting_doc'],
+            'has_registration_documents' => $hasRegistrationDocuments
+        ]);
+    } catch (Exception $e) {
+        http_response_code(500);
+        echo json_encode(['success' => false, 'message' => 'Unable to validate verification requirements.']);
     }
     exit;
 }
@@ -559,6 +738,7 @@ if (isset($_GET['fetch_documents'])) {
             uf.file_path,
             uf.upload_timestamp,
             uf.remarks,
+            uf.id_number,
             dt.document_type_name,
             s.status_name AS verify_status
         FROM unifiedfileattachmenttbl uf
