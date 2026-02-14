@@ -209,16 +209,13 @@ if ($residentId !== '' && isset($conn) && $conn instanceof mysqli) {
                                   $sectorText = trim((string)($residentinformationtbl['sector_membership'] ?? ''));
                                   $pendingSector = (int)($residentinformationtbl['sector_membership_pending_review'] ?? 0);
                                   $hasVerifiedSector = $sectorText !== '' && strcasecmp($sectorText, 'none') !== 0;
-                                  $pendingLabel = $pendingSector > 1 ? "Pending Review ({$pendingSector})" : "Pending Review";
+                                  $pendingLabel = "Pending Review";
                                 ?>
                                 <?php if ($hasVerifiedSector): ?>
                                     <div>
                                         <strong>Sector Membership:</strong> <?= htmlspecialchars($sectorText, ENT_QUOTES, 'UTF-8') ?>
-                                        <?php if ($pendingSector === 1): ?>
-                                            <span class="small text-muted ms-2">(<?= htmlspecialchars($pendingLabel, ENT_QUOTES, 'UTF-8') ?>)</span>
-                                        <?php endif; ?>
                                     </div>
-                                    <?php if ($pendingSector > 1): ?>
+                                    <?php if ($pendingSector > 0): ?>
                                         <div class="small text-muted">
                                             <strong>Other sector membership:</strong> <?= htmlspecialchars($pendingLabel, ENT_QUOTES, 'UTF-8') ?>
                                         </div>

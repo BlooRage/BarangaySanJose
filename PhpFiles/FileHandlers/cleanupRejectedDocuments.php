@@ -1,9 +1,9 @@
 <?php
 declare(strict_types=1);
 
-// Auto-delete script for rejected resident profiling documents.
+// Auto-delete script for rejected documents (unifiedfileattachmenttbl).
 // Intended to run via cron (CLI only).
-// Retention: 30 days (based on upload_timestamp).
+// Retention: 60 days (based on rejected_at when available, otherwise upload_timestamp).
 
 if (php_sapi_name() !== 'cli') {
     http_response_code(403);
@@ -49,24 +49,40 @@ function resolveFilePath(string $rawPath, string $projectRoot): string {
     return rtrim($projectRoot, "/") . "/" . ltrim($rawPath, "/");
 }
 
-$retentionDays = 30;
+$retentionDays = 60;
+
+function parseRejectedAtFromRemarks(string $remarks): ?DateTimeImmutable {
+    $parts = array_values(array_filter(array_map('trim', explode(';', $remarks))));
+    foreach ($parts as $p) {
+        if (stripos($p, 'rejected_at=') === 0) {
+            $raw = trim(substr($p, strlen('rejected_at=')));
+            if ($raw === '') return null;
+            try {
+                return new DateTimeImmutable($raw);
+            } catch (Throwable $e) {
+                return null;
+            }
+        }
+    }
+    return null;
+}
 
 $sql = "
     SELECT
         uf.attachment_id,
         uf.file_path,
-        uf.upload_timestamp
+        uf.upload_timestamp,
+        uf.remarks,
+        s.status_name,
+        s.status_type
     FROM unifiedfileattachmenttbl uf
     INNER JOIN statuslookuptbl s
         ON uf.status_id_verify = s.status_id
-    WHERE s.status_name = 'Rejected'
-      AND s.status_type = 'ResidentDocumentProfiling'
-      AND uf.upload_timestamp < (NOW() - INTERVAL ? DAY)
+    WHERE (s.status_name = 'Rejected' OR s.status_name = 'Denied')
     ORDER BY uf.attachment_id ASC
 ";
 
 $selectStmt = $conn->prepare($sql);
-$selectStmt->bind_param("i", $retentionDays);
 $selectStmt->execute();
 $result = $selectStmt->get_result();
 $rows = $result->fetch_all(MYSQLI_ASSOC);
@@ -79,12 +95,30 @@ $skippedUnsafe = 0;
 $errors = 0;
 
 $deleteStmt = $conn->prepare("DELETE FROM unifiedfileattachmenttbl WHERE attachment_id = ? LIMIT 1");
+$nullSectorLatestStmt = $conn->prepare("UPDATE residentsectormembershiptbl SET latest_attachment_id = NULL WHERE latest_attachment_id = ?");
+
+$cutoff = new DateTimeImmutable("-{$retentionDays} days");
 
 foreach ($rows as $row) {
     $attachmentId = (int)($row['attachment_id'] ?? 0);
     $storedPath = (string)($row['file_path'] ?? '');
+    $remarks = (string)($row['remarks'] ?? '');
+    $uploadTsRaw = (string)($row['upload_timestamp'] ?? '');
     if ($attachmentId <= 0) {
         continue;
+    }
+
+    $rejectedAt = parseRejectedAtFromRemarks($remarks);
+    $basis = $rejectedAt;
+    if ($basis === null) {
+        try {
+            $basis = $uploadTsRaw !== '' ? new DateTimeImmutable($uploadTsRaw) : null;
+        } catch (Throwable $e) {
+            $basis = null;
+        }
+    }
+    if ($basis === null || $basis >= $cutoff) {
+        continue; // not yet eligible for cleanup
     }
 
     $resolvedPath = resolveFilePath($storedPath, $projectRoot);
@@ -108,6 +142,12 @@ foreach ($rows as $row) {
             $missingFiles++;
         }
 
+        // Clear any FK-style pointers before deleting attachment rows (best-effort).
+        if ($nullSectorLatestStmt) {
+            $nullSectorLatestStmt->bind_param("i", $attachmentId);
+            $nullSectorLatestStmt->execute();
+        }
+
         $deleteStmt->bind_param("i", $attachmentId);
         $deleteStmt->execute();
         if ($deleteStmt->affected_rows > 0) {
@@ -120,6 +160,9 @@ foreach ($rows as $row) {
 }
 
 $deleteStmt->close();
+if ($nullSectorLatestStmt) {
+    $nullSectorLatestStmt->close();
+}
 
 echo "Cleanup complete\n";
 echo "Retention policy: {$retentionDays} days\n";

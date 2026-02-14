@@ -20,6 +20,27 @@ function extractMarkerFromRemarks($remarks): string {
     return trim((string)($parts[0] ?? ''));
 }
 
+function extractSectorKeyFromMarker(string $marker): string {
+    $m = trim((string)$marker);
+    if ($m === '') return '';
+    if (stripos($m, 'sector:') !== 0) return '';
+    $raw = trim(substr($m, strlen('sector:')));
+    if ($raw === '') return '';
+    $parts = explode(':', $raw, 2);
+    return trim((string)($parts[0] ?? ''));
+}
+
+function extractSectorSideFromMarker(string $marker): string {
+    $m = trim((string)$marker);
+    if ($m === '') return '';
+    if (stripos($m, 'sector:') !== 0) return '';
+    $raw = trim(substr($m, strlen('sector:')));
+    $parts = explode(':', $raw, 3);
+    $side = strtolower(trim((string)($parts[1] ?? '')));
+    if ($side === 'front' || $side === 'back') return $side;
+    return '';
+}
+
 function toPublicPath($path): ?string {
     $path = trim((string)$path);
     if ($path === '') {
@@ -68,7 +89,10 @@ if (!isset($_GET['fetch_sector_applications'])) {
 }
 
 try {
-    // Pull all sector-marked uploads, newest first; then pick the latest per (resident, sector marker).
+    // Pull all sector-marked uploads, newest first; group by (resident, base sector key).
+    // If the proof is an ID, we expect two attachments tagged as:
+    // - sector:<KEY>:front
+    // - sector:<KEY>:back
     $stmt = $conn->prepare("
         SELECT
             uf.attachment_id,
@@ -119,8 +143,7 @@ try {
     $stmt->execute();
     $res = $stmt->get_result();
 
-    $seen = [];
-    $rows = [];
+    $groups = [];
     while ($row = $res->fetch_assoc()) {
         $residentId = normalizeResidentId($row['resident_id'] ?? '');
         if (!$residentId) {
@@ -134,11 +157,12 @@ try {
             continue;
         }
 
-        $key = $residentId . '|' . $markerLower;
-        if (isset($seen[$key])) {
-            continue;
-        }
-        $seen[$key] = true;
+        $sectorKey = extractSectorKeyFromMarker($marker);
+        if ($sectorKey === '') continue;
+        $groupKey = $residentId . '|' . strtolower($sectorKey);
+
+        $side = extractSectorSideFromMarker($markerLower);
+        $slot = $side !== '' ? $side : 'single';
 
         $fullName = trim(
             (string)($row['firstname'] ?? '') . ' ' .
@@ -147,19 +171,33 @@ try {
             ((string)($row['suffix'] ?? '') !== '' ? ' ' . (string)$row['suffix'] : '')
         );
 
-        $rows[] = [
+        if (!isset($groups[$groupKey])) {
+            $groups[$groupKey] = [
+                'resident_id' => $residentId,
+                'full_name' => $fullName,
+                'sex' => (string)($row['sex'] ?? ''),
+                'birthdate' => (string)($row['birthdate'] ?? ''),
+                'sector_membership' => (string)($row['sector_membership'] ?? ''),
+                'unit_number' => (string)($row['unit_number'] ?? ''),
+                'house_number' => (string)($row['house_number'] ?? ''),
+                'street_name' => (string)($row['street_name'] ?? ''),
+                'phase_number' => (string)($row['phase_number'] ?? ''),
+                'subdivision' => (string)($row['subdivision'] ?? ''),
+                'area_number' => (string)($row['area_number'] ?? ''),
+                'sector_key' => $sectorKey,
+                // Use a stable base marker for UI label extraction.
+                'marker' => 'sector:' . $sectorKey,
+                'documents' => []
+            ];
+        }
+
+        if (isset($groups[$groupKey]['documents'][$slot])) {
+            continue; // already have the latest doc for this slot
+        }
+
+        $groups[$groupKey]['documents'][$slot] = [
+            'slot' => $slot,
             'attachment_id' => (int)($row['attachment_id'] ?? 0),
-            'resident_id' => $residentId,
-            'full_name' => $fullName,
-            'sex' => (string)($row['sex'] ?? ''),
-            'birthdate' => (string)($row['birthdate'] ?? ''),
-            'sector_membership' => (string)($row['sector_membership'] ?? ''),
-            'unit_number' => (string)($row['unit_number'] ?? ''),
-            'house_number' => (string)($row['house_number'] ?? ''),
-            'street_name' => (string)($row['street_name'] ?? ''),
-            'phase_number' => (string)($row['phase_number'] ?? ''),
-            'subdivision' => (string)($row['subdivision'] ?? ''),
-            'area_number' => (string)($row['area_number'] ?? ''),
             'remarks' => (string)($row['remarks'] ?? ''),
             'marker' => $marker,
             'verify_status' => (string)($row['verify_status'] ?? 'PendingReview'),
@@ -171,6 +209,67 @@ try {
         ];
     }
     $stmt->close();
+
+    $rows = [];
+    foreach ($groups as $g) {
+        $docs = $g['documents'];
+
+        // Normalize order for UI: front, back, single.
+        $docList = [];
+        foreach (['front', 'back', 'single'] as $slot) {
+            if (isset($docs[$slot])) $docList[] = $docs[$slot];
+        }
+
+        // Compute a single application status from its latest attachments.
+        $status = 'PendingReview';
+        $hasAny = false;
+        $anyRejected = false;
+        $anyPending = false;
+        $allVerified = true;
+        foreach ($docList as $d) {
+            $hasAny = true;
+            $s = strtolower((string)($d['verify_status'] ?? ''));
+            if ($s === 'rejected') $anyRejected = true;
+            if ($s === 'pendingreview') $anyPending = true;
+            if ($s !== 'verified') $allVerified = false;
+        }
+        if (!$hasAny) {
+            $status = 'PendingReview';
+        } elseif ($anyRejected) {
+            $status = 'Rejected';
+        } elseif ($anyPending) {
+            $status = 'PendingReview';
+        } elseif ($allVerified) {
+            $status = 'Verified';
+        } else {
+            $status = 'PendingReview';
+        }
+
+        $attachmentIds = array_values(array_filter(array_map(static function ($d) {
+            return (int)($d['attachment_id'] ?? 0);
+        }, $docList)));
+
+        $rows[] = [
+            'resident_id' => $g['resident_id'],
+            'full_name' => $g['full_name'],
+            'sex' => $g['sex'],
+            'birthdate' => $g['birthdate'],
+            'sector_membership' => $g['sector_membership'],
+            'unit_number' => $g['unit_number'],
+            'house_number' => $g['house_number'],
+            'street_name' => $g['street_name'],
+            'phase_number' => $g['phase_number'],
+            'subdivision' => $g['subdivision'],
+            'area_number' => $g['area_number'],
+            'sector_key' => $g['sector_key'],
+            'marker' => $g['marker'],
+            'verify_status' => $status,
+            'attachment_ids' => $attachmentIds,
+            'documents' => $docList,
+            // Backward-compat for older UI code paths.
+            'attachment_id' => (int)($attachmentIds[0] ?? 0)
+        ];
+    }
 
     echo json_encode(['success' => true, 'data' => $rows]);
 } catch (Exception $e) {

@@ -22,6 +22,7 @@ function getResidentProfileData(mysqli $conn, string $userId): array {
         'religion' => '',
         'sector_membership' => '',
         'sector_membership_pending_review' => 0,
+        'sector_membership_pending_labels' => '',
         'status_name_resident' => '',
         'emergency_name' => '',
         'emergency_contact' => '',
@@ -187,33 +188,7 @@ function getResidentProfileData(mysqli $conn, string $userId): array {
         }
     }
 
-    // Sector membership verification status (based on sector proof uploads)
-    if ($residentId) {
-        $pendingCount = 0;
-        $stmtSector = $conn->prepare("
-            SELECT COUNT(*) AS pending_count
-            FROM unifiedfileattachmenttbl uf
-            LEFT JOIN statuslookuptbl s
-                ON uf.status_id_verify = s.status_id
-            WHERE uf.source_type = 'ResidentProfiling'
-              AND uf.source_id = ?
-              AND uf.remarks LIKE 'sector:%'
-              AND s.status_name = 'PendingReview'
-              AND s.status_type = 'ResidentDocumentProfiling'
-        ");
-        if ($stmtSector) {
-            $stmtSector->bind_param("s", $residentId);
-            $stmtSector->execute();
-            $row = $stmtSector->get_result()->fetch_assoc();
-            $pendingCount = (int)($row['pending_count'] ?? 0);
-            $stmtSector->close();
-        }
-        $residentinformationtbl['sector_membership_pending_review'] = $pendingCount;
-    }
-
-    // Only expose VERIFIED sector membership on the resident-end.
-    // Residents can apply for sectors, but should not see them as "sector membership"
-    // until a supporting document is verified by admin.
+    // Sector membership status (prefer normalized table; fallback to legacy unifiedfileattachmenttbl scan).
     if ($residentId) {
         $mapSectorKeyToLabel = static function ($sectorKey): string {
             $normalized = strtolower(trim((string)$sectorKey));
@@ -230,40 +205,136 @@ function getResidentProfileData(mysqli $conn, string $userId): array {
         };
 
         $verified = [];
-        $seen = [];
-        $stmtVerified = $conn->prepare("
-            SELECT uf.remarks
-            FROM unifiedfileattachmenttbl uf
-            INNER JOIN statuslookuptbl s
-                ON uf.status_id_verify = s.status_id
-            WHERE uf.source_type = 'ResidentProfiling'
-              AND uf.source_id = ?
-              AND uf.remarks LIKE 'sector:%'
-              AND s.status_name = 'Verified'
-              AND s.status_type = 'ResidentDocumentProfiling'
-            ORDER BY uf.upload_timestamp DESC, uf.attachment_id DESC
+        $pendingLabels = [];
+        $pendingCount = 0;
+        $usedNewTable = false;
+
+        // Try new normalized table first.
+        $stmtTbl = $conn->prepare("
+            SELECT rsm.sector_key, s.status_name AS status_name
+            FROM residentsectormembershiptbl rsm
+            LEFT JOIN statuslookuptbl s
+                ON rsm.sector_status_id = s.status_id
+            WHERE rsm.resident_id = ?
         ");
-        if ($stmtVerified) {
-            $stmtVerified->bind_param("s", $residentId);
-            $stmtVerified->execute();
-            $res = $stmtVerified->get_result();
-            while ($r = $res->fetch_assoc()) {
-                $remarks = trim((string)($r['remarks'] ?? ''));
-                if ($remarks === '') continue;
-                $marker = trim((string)(explode(';', $remarks)[0] ?? ''));
-                $lower = strtolower($marker);
-                if (strpos($lower, 'sector:') !== 0) continue;
-                $key = trim(substr($marker, strlen('sector:')));
-                if ($key === '') continue;
-                $label = $mapSectorKeyToLabel($key);
-                $dedupeKey = strtolower($label);
-                if (isset($seen[$dedupeKey])) continue;
-                $seen[$dedupeKey] = true;
-                $verified[] = $label;
+        if ($stmtTbl) {
+            $stmtTbl->bind_param("s", $residentId);
+            if ($stmtTbl->execute()) {
+                $usedNewTable = true;
+                $res = $stmtTbl->get_result();
+                $seen = [];
+                while ($r = $res->fetch_assoc()) {
+                    $sectorKey = (string)($r['sector_key'] ?? '');
+                    $statusName = (string)($r['status_name'] ?? '');
+                    if ($sectorKey === '') continue;
+                    $label = $mapSectorKeyToLabel($sectorKey);
+                    $dedupeKey = strtolower($label);
+                    if (strcasecmp($statusName, 'Verified') === 0) {
+                        if (!isset($seen[$dedupeKey])) {
+                            $seen[$dedupeKey] = true;
+                            $verified[] = $label;
+                        }
+                    } elseif (strcasecmp($statusName, 'PendingReview') === 0) {
+                        $pendingCount++;
+                        $pendingLabels[] = $label;
+                    }
+                }
             }
-            $stmtVerified->close();
+            $stmtTbl->close();
         }
 
+        if (!$usedNewTable) {
+            // Legacy fallback: count pending + derive verified from attachments.
+            $stmtPending = $conn->prepare("
+                SELECT uf.remarks
+                FROM unifiedfileattachmenttbl uf
+                INNER JOIN statuslookuptbl s
+                    ON uf.status_id_verify = s.status_id
+                WHERE uf.source_type = 'ResidentProfiling'
+                  AND uf.source_id = ?
+                  AND uf.remarks LIKE 'sector:%'
+                  AND s.status_name = 'PendingReview'
+                  AND s.status_type = 'ResidentDocumentProfiling'
+                ORDER BY uf.upload_timestamp DESC, uf.attachment_id DESC
+            ");
+            if ($stmtPending) {
+                $stmtPending->bind_param("s", $residentId);
+                $stmtPending->execute();
+                $res = $stmtPending->get_result();
+                $seenPending = [];
+	                while ($r = $res->fetch_assoc()) {
+	                    $remarks = trim((string)($r['remarks'] ?? ''));
+	                    if ($remarks === '') continue;
+	                    $marker = trim((string)(explode(';', $remarks)[0] ?? ''));
+	                    $lower = strtolower($marker);
+	                    if (strpos($lower, 'sector:') !== 0) continue;
+	                    $keyRaw = trim(substr($marker, strlen('sector:')));
+	                    $key = trim((string)(explode(':', $keyRaw, 2)[0] ?? ''));
+	                    if ($key === '') continue;
+	                    $label = $mapSectorKeyToLabel($key);
+	                    $dk = strtolower($label);
+	                    if (isset($seenPending[$dk])) continue;
+                    $seenPending[$dk] = true;
+                    $pendingLabels[] = $label;
+                }
+                $stmtPending->close();
+                $pendingCount = count($pendingLabels);
+            }
+
+            $stmtVerified = $conn->prepare("
+                SELECT uf.remarks
+                FROM unifiedfileattachmenttbl uf
+                INNER JOIN statuslookuptbl s
+                    ON uf.status_id_verify = s.status_id
+                WHERE uf.source_type = 'ResidentProfiling'
+                  AND uf.source_id = ?
+                  AND uf.remarks LIKE 'sector:%'
+                  AND s.status_name = 'Verified'
+                  AND s.status_type = 'ResidentDocumentProfiling'
+                ORDER BY uf.upload_timestamp DESC, uf.attachment_id DESC
+            ");
+            if ($stmtVerified) {
+                $stmtVerified->bind_param("s", $residentId);
+                $stmtVerified->execute();
+                $res = $stmtVerified->get_result();
+                $seen = [];
+	                while ($r = $res->fetch_assoc()) {
+	                    $remarks = trim((string)($r['remarks'] ?? ''));
+	                    if ($remarks === '') continue;
+	                    $marker = trim((string)(explode(';', $remarks)[0] ?? ''));
+	                    $lower = strtolower($marker);
+	                    if (strpos($lower, 'sector:') !== 0) continue;
+	                    $keyRaw = trim(substr($marker, strlen('sector:')));
+	                    $key = trim((string)(explode(':', $keyRaw, 2)[0] ?? ''));
+	                    if ($key === '') continue;
+	                    $label = $mapSectorKeyToLabel($key);
+	                    $dedupeKey = strtolower($label);
+	                    if (isset($seen[$dedupeKey])) continue;
+                    $seen[$dedupeKey] = true;
+                    $verified[] = $label;
+                }
+                $stmtVerified->close();
+            }
+        }
+
+        // De-dupe pending labels and remove ones already verified (avoid "Pending Review / PWD" if PWD is verified).
+        $verifiedKeys = [];
+        foreach ($verified as $v) {
+            $verifiedKeys[strtolower($v)] = true;
+        }
+        $pendingOut = [];
+        $seenPendingOut = [];
+        foreach ($pendingLabels as $p) {
+            $k = strtolower(trim((string)$p));
+            if ($k === '' || isset($verifiedKeys[$k]) || isset($seenPendingOut[$k])) continue;
+            $seenPendingOut[$k] = true;
+            $pendingOut[] = $p;
+        }
+        $pendingLabels = $pendingOut;
+        $pendingCount = count($pendingLabels);
+
+        $residentinformationtbl['sector_membership_pending_review'] = $pendingCount;
+        $residentinformationtbl['sector_membership_pending_labels'] = $pendingLabels ? implode(', ', $pendingLabels) : '';
         $residentinformationtbl['sector_membership'] = $verified ? implode(', ', $verified) : 'None';
     }
 

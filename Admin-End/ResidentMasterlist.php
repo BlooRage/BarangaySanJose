@@ -679,6 +679,15 @@ if (isset($conn) && $conn instanceof mysqli) {
         <div id="docs-loading" class="text-muted small mb-2">Loading documents...</div>
         <div id="docs-empty" class="text-muted small d-none">No submitted documents found.</div>
 
+        <div class="d-flex justify-content-end mb-2">
+          <div class="form-check form-switch">
+            <input class="form-check-input" type="checkbox" role="switch" id="toggle-showSectorDocs">
+            <label class="form-check-label small" for="toggle-showSectorDocs">
+              Show sector membership documents <span id="docs-sector-count" class="text-muted"></span>
+            </label>
+          </div>
+        </div>
+
         <div id="docs-section-pending" class="d-none mb-3">
           <div class="fw-bold mb-2">Pending</div>
           <div id="docs-list-pending" class="d-flex flex-column gap-2"></div>
@@ -692,6 +701,25 @@ if (isset($conn) && $conn instanceof mysqli) {
         <div id="docs-section-denied" class="d-none">
           <div class="fw-bold mb-2">Denied</div>
           <div id="docs-list-denied" class="d-flex flex-column gap-2"></div>
+        </div>
+
+        <div id="docs-sector-wrapper" class="d-none mt-4 pt-3 border-top">
+          <div class="fw-bold mb-2">Sector Membership Documents</div>
+
+          <div id="docs-sector-section-pending" class="d-none mb-3">
+            <div class="fw-bold mb-2">Pending</div>
+            <div id="docs-sector-list-pending" class="d-flex flex-column gap-2"></div>
+          </div>
+
+          <div id="docs-sector-section-verified" class="d-none mb-3">
+            <div class="fw-bold mb-2">Verified</div>
+            <div id="docs-sector-list-verified" class="d-flex flex-column gap-2"></div>
+          </div>
+
+          <div id="docs-sector-section-denied" class="d-none">
+            <div class="fw-bold mb-2">Denied</div>
+            <div id="docs-sector-list-denied" class="d-flex flex-column gap-2"></div>
+          </div>
         </div>
       </div>
       <div class="modal-footer border-0">

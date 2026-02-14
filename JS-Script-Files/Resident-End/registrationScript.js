@@ -842,20 +842,27 @@ function isActuallyVisible(el) {
   const pictureInput = document.getElementById("pictureInput");
   const sectorProofSection = document.getElementById("sectorProofSection");
 
-  const submitBtn = document.getElementById("submitBtn");
-  const sectorMap = {
-    PWD: { checkboxId: "sectorPWD", cardId: "sectorProofPWD" },
-    SeniorCitizen: { checkboxId: "sectorSenior", cardId: "sectorProofSenior" },
-    Student: { checkboxId: "sectorStudent", cardId: "sectorProofStudent" },
-    IndigenousPeople: { checkboxId: "sectorIP", cardId: "sectorProofIP" },
-    SingleParent: { checkboxId: "sectorSP", cardId: "sectorProofSoloParent" }
-  };
+	  const submitBtn = document.getElementById("submitBtn");
+	  const sectorMap = {
+	    PWD: { checkboxId: "sectorPWD", cardId: "sectorProofPWD" },
+	    SeniorCitizen: { checkboxId: "sectorSenior", cardId: "sectorProofSenior" },
+	    Student: { checkboxId: "sectorStudent", cardId: "sectorProofStudent" },
+	    IndigenousPeople: { checkboxId: "sectorIP", cardId: "sectorProofIP" },
+	    SingleParent: { checkboxId: "sectorSP", cardId: "sectorProofSoloParent" }
+	  };
 
-  function getSelectedSectorKeys() {
-    return Object.entries(sectorMap)
-      .filter(([, meta]) => {
-        const checkbox = document.getElementById(meta.checkboxId);
-        return !!(checkbox && checkbox.checked);
+	  function isIdLikeSectorDocType(value) {
+	    const raw = String(value ?? "").trim();
+	    if (!raw) return false;
+	    // Treat any doc type containing "ID" as an ID proof (e.g. "Student ID", "PWD ID", "PhilSys ID/ePhilID").
+	    return /\bid\b/i.test(raw);
+	  }
+
+	  function getSelectedSectorKeys() {
+	    return Object.entries(sectorMap)
+	      .filter(([, meta]) => {
+	        const checkbox = document.getElementById(meta.checkboxId);
+	        return !!(checkbox && checkbox.checked);
       })
       .map(([key]) => key);
   }
@@ -895,38 +902,64 @@ function isActuallyVisible(el) {
     return false;
   }
 
-  function getSectorElements(sectorKey) {
-    const card = document.getElementById(sectorMap[sectorKey].cardId);
-    return {
-      card,
-      docType: card ? card.querySelector(`.sector-doc-type[data-sector="${sectorKey}"]`) : null,
-      uploadZone: card ? card.querySelector(`.sector-upload-zone[data-sector="${sectorKey}"]`) : null,
-      uploadList: card ? card.querySelector(`.sector-upload-list[data-sector="${sectorKey}"]`) : null,
-      addBtn: card ? card.querySelector(`.add-sector-doc-btn[data-sector="${sectorKey}"]`) : null,
-      fileInputs: card ? Array.from(card.querySelectorAll(`.sector-doc-file[data-sector="${sectorKey}"]`)) : []
-    };
-  }
+	  function getSectorElements(sectorKey) {
+	    const card = document.getElementById(sectorMap[sectorKey].cardId);
+	    return {
+	      card,
+	      docType: card ? card.querySelector(`.sector-doc-type[data-sector="${sectorKey}"]`) : null,
+	      uploadZone: card ? card.querySelector(`.sector-upload-zone[data-sector="${sectorKey}"]`) : null,
+	      uploadList: card ? card.querySelector(`.sector-upload-list[data-sector="${sectorKey}"]`) : null,
+	      idPair: card ? card.querySelector(`.sector-upload-idpair[data-sector="${sectorKey}"]`) : null,
+	      idHint: card ? card.querySelector(`.sector-idpair-hint[data-sector="${sectorKey}"]`) : null,
+	      idFront: card ? card.querySelector(`.sector-doc-idfront[data-sector="${sectorKey}"]`) : null,
+	      idBack: card ? card.querySelector(`.sector-doc-idback[data-sector="${sectorKey}"]`) : null,
+	      addBtn: card ? card.querySelector(`.add-sector-doc-btn[data-sector="${sectorKey}"]`) : null,
+	      maxNote: card ? card.querySelector(`.sector-upload-maxnote[data-sector="${sectorKey}"]`) : null,
+	      fileInputs: card ? Array.from(card.querySelectorAll(`.sector-doc-file[data-sector="${sectorKey}"]`)) : []
+	    };
+	  }
 
-  function resetSectorField(sectorKey) {
-    const { docType, uploadZone, uploadList, addBtn, fileInputs } = getSectorElements(sectorKey);
-    if (docType) {
-      docType.value = "";
-      docType.required = false;
-      docType.disabled = true;
-      clearError(docType);
+	  function resetSectorField(sectorKey) {
+	    const { docType, uploadZone, uploadList, idPair, idHint, idFront, idBack, addBtn, maxNote, fileInputs } = getSectorElements(sectorKey);
+	    if (docType) {
+	      docType.value = "";
+	      docType.required = false;
+	      docType.disabled = true;
+	      clearError(docType);
     }
 
-    if (uploadZone) {
-      uploadZone.classList.add("d-none");
-    }
+	    if (uploadZone) {
+	      uploadZone.classList.add("d-none");
+	    }
 
-    if (addBtn) {
-      addBtn.disabled = true;
-    }
+	    if (idPair) idPair.classList.add("d-none");
+	    if (idHint) idHint.classList.add("d-none");
 
-    if (uploadList) {
-      const items = Array.from(uploadList.children);
-      items.forEach((item, idx) => {
+	    [idFront, idBack].forEach((input) => {
+	      if (!input) return;
+	      input.value = "";
+	      input.required = false;
+	      input.disabled = true;
+	      clearError(input);
+	      const box = input.closest(".upload-box");
+	      if (box) {
+	        box.classList.remove("uploaded", "upload-error");
+	        const filename = box.querySelector(".uploaded-filename");
+	        if (filename) filename.remove();
+	        const removeBtn = box.querySelector(".upload-remove");
+	        if (removeBtn) removeBtn.remove();
+	      }
+	    });
+
+	    if (addBtn) {
+	      addBtn.disabled = true;
+	      addBtn.classList.remove("d-none");
+	    }
+	    if (maxNote) maxNote.classList.remove("d-none");
+
+	    if (uploadList) {
+	      const items = Array.from(uploadList.children);
+	      items.forEach((item, idx) => {
         const input = item.querySelector(`.sector-doc-file[data-sector="${sectorKey}"]`);
         if (input) {
           input.value = "";
@@ -956,44 +989,84 @@ function isActuallyVisible(el) {
     }
   }
 
-  function updateSectorUploadZoneState(sectorKey) {
-    const { docType, uploadZone, addBtn, fileInputs } = getSectorElements(sectorKey);
-    if (!docType) return;
+	  function updateSectorUploadZoneState(sectorKey) {
+	    const { docType, uploadZone, uploadList, idPair, idHint, idFront, idBack, addBtn, maxNote, fileInputs } = getSectorElements(sectorKey);
+	    if (!docType) return;
 
-    const hasType = docType.value.trim() !== "";
-    if (uploadZone) {
-      uploadZone.classList.toggle("d-none", !hasType);
-    }
-    if (addBtn) {
-      addBtn.disabled = !hasType;
-    }
+	    const hasType = docType.value.trim() !== "";
+	    const isIdLike = hasType && isIdLikeSectorDocType(docType.value);
 
-    fileInputs.forEach((fileInput, index) => {
-      fileInput.disabled = !hasType;
-      if (!hasType) {
-        fileInput.required = false;
-        fileInput.value = "";
-        clearError(fileInput);
-      } else {
-        // only first box should carry required flag when applicable
-        fileInput.required = index === 0;
-      }
-    });
+	    if (uploadZone) {
+	      uploadZone.classList.toggle("d-none", !hasType);
+	    }
 
-    if (!hasType) {
-      const { uploadList } = getSectorElements(sectorKey);
-      if (uploadList) {
-        Array.from(uploadList.children).forEach((child, idx) => {
-          if (idx > 0) child.remove();
-        });
-      }
-    }
-  }
+	    if (idPair) idPair.classList.toggle("d-none", !isIdLike);
+	    if (idHint) idHint.classList.toggle("d-none", !isIdLike);
+	    if (uploadList) uploadList.classList.toggle("d-none", isIdLike);
+	    if (addBtn) addBtn.classList.toggle("d-none", isIdLike);
+	    if (maxNote) maxNote.classList.toggle("d-none", isIdLike);
 
-  function updateSectorProofVisibility() {
-    const skipped = !!(skipProofSwitch && skipProofSwitch.checked);
-    const selectedSectorKeys = getSelectedSectorKeys();
-    const shouldShowSection = !skipped && selectedSectorKeys.length > 0;
+	    // Disable everything when no doc type is selected.
+	    if (!hasType) {
+	      fileInputs.forEach((fileInput) => {
+	        fileInput.disabled = true;
+	        fileInput.required = false;
+	        fileInput.value = "";
+	        clearError(fileInput);
+	      });
+	      [idFront, idBack].forEach((input) => {
+	        if (!input) return;
+	        input.disabled = true;
+	        input.required = false;
+	        input.value = "";
+	        clearError(input);
+	      });
+	      return;
+	    }
+
+	    if (isIdLike) {
+	      // Switching to ID flow: clear any multi-attachment selections and keep only ID front/back enabled.
+	      if (uploadList) {
+	        Array.from(uploadList.children).forEach((child, idx) => {
+	          const input = child.querySelector(`.sector-doc-file[data-sector="${sectorKey}"]`);
+	          if (input) {
+	            input.value = "";
+	            clearError(input);
+	          }
+	          if (idx > 0) child.remove();
+	        });
+	      }
+	      fileInputs.forEach((fileInput) => {
+	        fileInput.disabled = true;
+	        fileInput.required = false;
+	        fileInput.value = "";
+	        clearError(fileInput);
+	      });
+	      [idFront, idBack].forEach((input) => {
+	        if (!input) return;
+	        input.disabled = false;
+	      });
+	    } else {
+	      // Switching to multi-attachment flow: clear ID front/back selections and enable the first attachment.
+	      [idFront, idBack].forEach((input) => {
+	        if (!input) return;
+	        input.disabled = true;
+	        input.required = false;
+	        input.value = "";
+	        clearError(input);
+	      });
+
+	      fileInputs.forEach((fileInput, index) => {
+	        fileInput.disabled = false;
+	        // required flags are set in updateSectorProofVisibility() to reflect business rules.
+	      });
+	    }
+	  }
+
+	  function updateSectorProofVisibility() {
+	    const skipped = !!(skipProofSwitch && skipProofSwitch.checked);
+	    const selectedSectorKeys = getSelectedSectorKeys();
+	    const shouldShowSection = !skipped && selectedSectorKeys.length > 0;
 
     if (sectorProofSection) {
       sectorProofSection.classList.toggle("d-none", !shouldShowSection);
@@ -1024,33 +1097,70 @@ function isActuallyVisible(el) {
       updateSectorUploadZoneState(sectorKey);
     });
 
-    Object.keys(sectorMap).forEach((sectorKey) => {
-      const selected = selectedSectorKeys.includes(sectorKey) && shouldShowSection;
-      const required = selected && isSectorDocumentRequired(sectorKey);
-      const { docType, fileInputs } = getSectorElements(sectorKey);
+	    Object.keys(sectorMap).forEach((sectorKey) => {
+	      const selected = selectedSectorKeys.includes(sectorKey) && shouldShowSection;
+	      const required = selected && isSectorDocumentRequired(sectorKey);
+	      const { docType, fileInputs, idFront, idBack } = getSectorElements(sectorKey);
 
-      if (docType) {
-        if (isSectorUploadProhibited(sectorKey)) {
-          docType.required = false;
-          docType.disabled = true;
-          clearError(docType);
-          return;
-        }
-        docType.required = required;
-        if (!required) clearError(docType);
-      }
-      fileInputs.forEach((fileInput, index) => {
-        if (isSectorUploadProhibited(sectorKey)) {
-          fileInput.required = false;
-          fileInput.disabled = true;
-          clearError(fileInput);
-          return;
-        }
-        fileInput.required = required && index === 0;
-        if (!required) clearError(fileInput);
-      });
-    });
-  }
+	      if (docType) {
+	        if (isSectorUploadProhibited(sectorKey)) {
+	          docType.required = false;
+	          docType.disabled = true;
+	          clearError(docType);
+	          return;
+	        }
+	        docType.required = required;
+	        if (!required) clearError(docType);
+	      }
+
+	      const isIdLike = !!(docType && docType.value && isIdLikeSectorDocType(docType.value));
+
+	      // For ID-like sector proofs, require front+back (when the sector proof is required).
+	      if (isIdLike) {
+	        fileInputs.forEach((fileInput) => {
+	          if (isSectorUploadProhibited(sectorKey)) {
+	            fileInput.required = false;
+	            fileInput.disabled = true;
+	            clearError(fileInput);
+	            return;
+	          }
+	          fileInput.required = false;
+	          clearError(fileInput);
+	        });
+	        [idFront, idBack].forEach((input) => {
+	          if (!input) return;
+	          if (isSectorUploadProhibited(sectorKey)) {
+	            input.required = false;
+	            input.disabled = true;
+	            clearError(input);
+	            return;
+	          }
+	          input.required = required;
+	          if (!required) clearError(input);
+	        });
+	        return;
+	      }
+
+	      // Non-ID proofs behave like the existing multi-attachment flow.
+	      [idFront, idBack].forEach((input) => {
+	        if (!input) return;
+	        input.required = false;
+	        input.disabled = true;
+	        clearError(input);
+	      });
+
+	      fileInputs.forEach((fileInput, index) => {
+	        if (isSectorUploadProhibited(sectorKey)) {
+	          fileInput.required = false;
+	          fileInput.disabled = true;
+	          clearError(fileInput);
+	          return;
+	        }
+	        fileInput.required = required && index === 0;
+	        if (!required) clearError(fileInput);
+	      });
+	    });
+	  }
 
   function toggleStudentSchool() {
     if (!idTypeSelect || !schoolNameWrapper) return;
@@ -1232,15 +1342,14 @@ function isActuallyVisible(el) {
     });
   }
 
-  document.querySelectorAll(".sector-doc-type").forEach((select) => {
-    select.addEventListener("change", () => {
-      const sectorKey = String(select.dataset.sector || "");
-      if (!sectorKey) return;
-      updateSectorUploadZoneState(sectorKey);
-      updateNextButtonState();
-      updateSubmitButtonState();
-    });
-  });
+	  document.querySelectorAll(".sector-doc-type").forEach((select) => {
+	    select.addEventListener("change", () => {
+	      // Re-evaluate show/hide + required flags (ID front/back vs multi-attachment).
+	      updateSectorProofVisibility();
+	      updateNextButtonState();
+	      updateSubmitButtonState();
+	    });
+	  });
 
   Object.values(sectorMap).forEach((meta) => {
     const checkbox = document.getElementById(meta.checkboxId);

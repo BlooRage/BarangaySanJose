@@ -23,22 +23,33 @@
       .toLowerCase()
       .replace(/[^a-z]/g, "");
 
-  const markerToSectorLabel = (marker) => {
-    const m = String(marker || "").trim();
-    if (!m.toLowerCase().startsWith("sector:")) return "";
-    const keyRaw = m.slice("sector:".length).trim();
-    const norm = normalizeSectorKey(keyRaw);
-    return sectorMap[norm] || keyRaw || "Sector";
-  };
+	  const markerToSectorLabel = (marker) => {
+	    const m = String(marker || "").trim();
+	    if (!m.toLowerCase().startsWith("sector:")) return "";
+	    const keyRawFull = m.slice("sector:".length).trim();
+	    const keyRaw = keyRawFull.split(":")[0].trim();
+	    const norm = normalizeSectorKey(keyRaw);
+	    return sectorMap[norm] || keyRaw || "Sector";
+	  };
 
   const extractMarker = (remarks) => String(remarks || "").split(";")[0].trim();
 
-  const extractReason = (remarks) => {
-    const s = String(remarks || "");
-    const idx = s.toLowerCase().indexOf("reason=");
-    if (idx === -1) return "";
-    return s.slice(idx + "reason=".length).trim();
-  };
+	  const extractReason = (remarks) => {
+	    const s = String(remarks || "");
+	    const idx = s.toLowerCase().indexOf("reason=");
+	    if (idx === -1) return "";
+	    return s.slice(idx + "reason=".length).trim();
+	  };
+
+	  const extractRejectedReasonFromApp = (app) => {
+	    // Prefer any per-document remarks (server truth), fall back to app.remarks if present.
+	    const docs = Array.isArray(app?.documents) ? app.documents : [];
+	    for (const d of docs) {
+	      const r = extractReason(d.remarks);
+	      if (r) return r;
+	    }
+	    return extractReason(app?.remarks);
+	  };
 
   const computeAgeFromBirthdate = (birthdate) => {
     const raw = String(birthdate || "").trim();
@@ -79,10 +90,10 @@
     return span;
   };
 
-  const makePreview = (fileUrl, fileName) => {
-    const url = String(fileUrl || "");
-    const name = String(fileName || "");
-    const ext = (name.split(".").pop() || "").toLowerCase();
+	  const makePreview = (fileUrl, fileName) => {
+	    const url = String(fileUrl || "");
+	    const name = String(fileName || "");
+	    const ext = (name.split(".").pop() || "").toLowerCase();
 
     if (!url) {
       const div = document.createElement("div");
@@ -166,12 +177,12 @@
       wrap.className = "d-flex flex-column gap-1";
       const statusLine = document.createElement("div");
       statusLine.appendChild(statusBadge(a.verify_status));
-      if (fmtStatus(a.verify_status) === "Rejected") {
-        const reason = extractReason(a.remarks);
-        if (reason) {
-          const reasonEl = document.createElement("div");
-          reasonEl.className = "small text-muted";
-          reasonEl.innerText = `Reason: ${reason}`;
+	      if (fmtStatus(a.verify_status) === "Rejected") {
+	        const reason = extractRejectedReasonFromApp(a);
+	        if (reason) {
+	          const reasonEl = document.createElement("div");
+	          reasonEl.className = "small text-muted";
+	          reasonEl.innerText = `Reason: ${reason}`;
           wrap.appendChild(reasonEl);
         }
       }
@@ -194,23 +205,24 @@
     });
   };
 
-  const openViewer = (app) => {
-    state.active = app;
+	  const openViewer = (app) => {
+	    state.active = app;
 
-    const marker = extractMarker(app.marker || app.remarks);
-    const sectorLabel = markerToSectorLabel(marker);
-    const status = fmtStatus(app.verify_status);
+	    const marker = extractMarker(app.marker || app.remarks);
+	    const sectorLabel = markerToSectorLabel(marker);
+	    const status = fmtStatus(app.verify_status);
+	    const docs = Array.isArray(app.documents) ? app.documents : [];
 
-    const title = el("sector-docViewer-title");
-    const subtitle = el("sector-docViewer-subtitle");
-    const infoEl = el("sector-docViewer-info");
-    const body = el("sector-docViewer-body");
-    const actions = el("sector-docViewer-actions");
+	    const title = el("sector-docViewer-title");
+	    const subtitle = el("sector-docViewer-subtitle");
+	    const infoEl = el("sector-docViewer-info");
+	    const body = el("sector-docViewer-body");
+	    const actions = el("sector-docViewer-actions");
 
-    if (title) title.innerText = "Sector Membership Proof";
-    if (subtitle) subtitle.innerText = `Purpose: ${sectorLabel} Sector Membership Proof`;
+	    if (title) title.innerText = "Sector Membership Proof";
+	    if (subtitle) subtitle.innerText = `Purpose: ${sectorLabel} Sector Membership Proof`;
 
-    if (infoEl) {
+	    if (infoEl) {
       const safeText = (v, fallback = "—") => {
         const s = String(v ?? "").trim();
         return s !== "" ? s : fallback;
@@ -250,11 +262,11 @@
       heading.innerText = "Resident Basic Information";
       infoEl.appendChild(heading);
 
-      const grid = document.createElement("div");
-      grid.className = "row g-2";
-      addInfoRow(grid, "col-md-6", "Name", app.full_name);
-      addInfoRow(grid, "col-md-6", "Age", ageValue);
-      addInfoRow(grid, "col-md-6", "Sex", app.sex);
+	      const grid = document.createElement("div");
+	      grid.className = "row g-2";
+	      addInfoRow(grid, "col-md-6", "Name", app.full_name);
+	      addInfoRow(grid, "col-md-6", "Age", ageValue);
+	      addInfoRow(grid, "col-md-6", "Sex", app.sex);
       const fmtBirthday = (() => {
         const raw = String(app.birthdate ?? "").trim();
         if (!raw) return "—";
@@ -266,21 +278,53 @@
         return `${mm}/${dd}/${yyyy}`;
       })();
       addInfoRow(grid, "col-md-6", "Birthday", fmtBirthday);
-      addInfoRow(grid, "col-12", "Address", fullAddress);
-      addInfoRow(grid, "col-12", "Sector Membership", app.sector_membership);
-      addInfoRow(grid, "col-12", "Document Type", safeText(app.document_type_name || app.file_name || "—"));
-      addInfoRow(grid, "col-12", "Uploaded", safeText(app.upload_timestamp));
+	      addInfoRow(grid, "col-12", "Address", fullAddress);
+	      addInfoRow(grid, "col-12", "Sector Membership", app.sector_membership);
+	      const docType = docs.length ? (docs[0].document_type_name || docs[0].file_name || "") : "";
+	      const uploaded = (() => {
+	        if (!docs.length) return "";
+	        // show the newest upload timestamp among shown documents
+	        const ts = docs
+	          .map((d) => String(d.upload_timestamp || "").trim())
+	          .filter(Boolean)
+	          .sort()
+	          .pop();
+	        return ts || "";
+	      })();
+	      addInfoRow(grid, "col-12", "Document Type", safeText(docType || "—"));
+	      addInfoRow(grid, "col-12", "Uploaded", safeText(uploaded || "—"));
 
-      infoEl.appendChild(grid);
-    }
+	      infoEl.appendChild(grid);
+	    }
 
-    if (body) {
-      body.innerHTML = "";
-      body.appendChild(makePreview(app.file_url, app.file_name));
-    }
+	    if (body) {
+	      body.innerHTML = "";
+	      if (!docs.length) {
+	        body.appendChild(makePreview("", ""));
+	      } else if (docs.length === 1) {
+	        body.appendChild(makePreview(docs[0].file_url, docs[0].file_name));
+	      } else {
+	        const wrap = document.createElement("div");
+	        wrap.className = "row g-3";
+	        docs.forEach((d) => {
+	          const col = document.createElement("div");
+	          col.className = "col-12 col-lg-6";
 
-    if (actions) {
-      actions.innerHTML = "";
+	          const label = document.createElement("div");
+	          label.className = "small text-muted mb-2 text-center";
+	          const slot = String(d.slot || "").toLowerCase();
+	          label.innerText = slot === "front" ? "Front" : slot === "back" ? "Back" : "Document";
+
+	          col.appendChild(label);
+	          col.appendChild(makePreview(d.file_url, d.file_name));
+	          wrap.appendChild(col);
+	        });
+	        body.appendChild(wrap);
+	      }
+	    }
+
+	    if (actions) {
+	      actions.innerHTML = "";
 
       const approve = document.createElement("button");
       approve.className = "btn btn-success flex-fill";
@@ -299,15 +343,15 @@
     }
 
     const modalEl = el("modal-sectorDocViewer");
-    if (modalEl) bootstrap.Modal.getOrCreateInstance(modalEl).show();
-  };
+	    if (modalEl) bootstrap.Modal.getOrCreateInstance(modalEl).show();
+	  };
 
-  const postUpdateStatus = async (attachmentId, newStatus, reasonText = "") => {
-    const form = new FormData();
-    form.append("update_document_status", "1");
-    form.append("attachment_id", String(attachmentId));
-    form.append("new_status", newStatus); // APPROVED | DENIED | PENDING
-    if (newStatus === "DENIED") {
+	  const postUpdateStatus = async (attachmentId, newStatus, reasonText = "") => {
+	    const form = new FormData();
+	    form.append("update_document_status", "1");
+	    form.append("attachment_id", String(attachmentId));
+	    form.append("new_status", newStatus); // APPROVED | DENIED | PENDING
+	    if (newStatus === "DENIED") {
       form.append("reason_scope", "sector_membership");
       form.append("reason_text", reasonText);
     }
@@ -324,7 +368,7 @@
     return data;
   };
 
-  const showApproveConfirm = () => {
+	  const showApproveConfirm = () => {
     const modalEl = el("modal-sectorApproveConfirm");
     if (!modalEl) return;
 
@@ -333,17 +377,24 @@
     const modal = bootstrap.Modal.getOrCreateInstance(modalEl);
 
     const onCancel = () => modal.hide();
-    const onConfirm = async () => {
-      if (!state.active) return;
-      try {
-        confirm.disabled = true;
-        const data = await postUpdateStatus(state.active.attachment_id, "APPROVED");
-        applyStatusUpdate("Verified", data.sector_membership || null);
-        modal.hide();
-      } catch (e) {
-        alert(e.message || String(e));
-      } finally {
-        confirm.disabled = false;
+	    const onConfirm = async () => {
+	      if (!state.active) return;
+	      try {
+	        confirm.disabled = true;
+	        const ids = Array.isArray(state.active.attachment_ids) && state.active.attachment_ids.length
+	          ? state.active.attachment_ids
+	          : [state.active.attachment_id];
+	        let updatedSectorMembership = null;
+	        for (const id of ids) {
+	          const data = await postUpdateStatus(id, "APPROVED");
+	          if (data && data.sector_membership) updatedSectorMembership = data.sector_membership;
+	        }
+	        applyStatusUpdate("Verified", updatedSectorMembership);
+	        modal.hide();
+	      } catch (e) {
+	        alert(e.message || String(e));
+	      } finally {
+	        confirm.disabled = false;
       }
     };
 
@@ -352,7 +403,7 @@
     modal.show();
   };
 
-  const showDenyConfirm = () => {
+	  const showDenyConfirm = () => {
     const modalEl = el("modal-sectorDenyConfirm");
     if (!modalEl) return;
 
@@ -372,20 +423,25 @@
       resetValidation();
     };
 
-    const onConfirm = async () => {
-      if (!state.active) return;
-      const txt = String(reason && reason.value ? reason.value : "").trim();
+	    const onConfirm = async () => {
+	      if (!state.active) return;
+	      const txt = String(reason && reason.value ? reason.value : "").trim();
       if (!txt) {
         if (err) err.classList.remove("d-none");
         return;
       }
-      try {
-        confirm.disabled = true;
-        await postUpdateStatus(state.active.attachment_id, "DENIED", txt);
-        applyStatusUpdate("Rejected", null, txt);
-        modal.hide();
-        if (reason) reason.value = "";
-        resetValidation();
+	      try {
+	        confirm.disabled = true;
+	        const ids = Array.isArray(state.active.attachment_ids) && state.active.attachment_ids.length
+	          ? state.active.attachment_ids
+	          : [state.active.attachment_id];
+	        for (const id of ids) {
+	          await postUpdateStatus(id, "DENIED", txt);
+	        }
+	        applyStatusUpdate("Rejected", null, txt);
+	        modal.hide();
+	        if (reason) reason.value = "";
+	        resetValidation();
       } catch (e) {
         alert(e.message || String(e));
       } finally {

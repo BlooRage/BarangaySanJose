@@ -597,38 +597,40 @@ document.addEventListener("DOMContentLoaded", () => {
 
   const remarkMarker = (remarks) => String(remarks ?? "").split(";")[0].trim();
 
-  const sectorKeyFromRemarks = (remarks) => {
-    const marker = remarkMarker(remarks);
-    const lower = marker.toLowerCase();
-    if (!lower.startsWith("sector:")) return "";
-    return marker.slice("sector:".length).trim();
-  };
+	  const sectorKeyFromRemarks = (remarks) => {
+	    const marker = remarkMarker(remarks);
+	    const lower = marker.toLowerCase();
+	    if (!lower.startsWith("sector:")) return "";
+	    const raw = marker.slice("sector:".length).trim();
+	    return raw.split(":")[0].trim();
+	  };
 
-  const computeSectorStatuses = (selectedSectorKeys, docs) => {
-    const byKey = {};
-    selectedSectorKeys.forEach((k) => {
-      byKey[k] = { key: k, status: "NO_UPLOAD", lastTimestamp: "" };
-    });
+	  const computeSectorStatuses = (selectedSectorKeys, docs) => {
+	    const byKey = {};
+	    selectedSectorKeys.forEach((k) => {
+	      byKey[k] = { key: k, status: "NO_UPLOAD", lastTimestamp: "" };
+	    });
 
-    docs.forEach((doc) => {
-      const key = sectorKeyFromRemarks(doc.remarks);
-      if (!key || !byKey[key]) return;
+	    docs.forEach((doc) => {
+	      const key = sectorKeyFromRemarks(doc.remarks);
+	      if (!key || !byKey[key]) return;
 
-      const ts = String(doc.upload_timestamp ?? "");
-      const current = byKey[key];
-      if (current.lastTimestamp && ts && current.lastTimestamp > ts) return;
+	      const ts = String(doc.upload_timestamp ?? "");
+	      const status = String(doc.verify_status ?? "").toLowerCase();
+	      let normalizedStatus = "PENDING";
+	      if (status.includes("verified")) normalizedStatus = "VERIFIED";
+	      else if (status.includes("rejected") || status.includes("denied")) normalizedStatus = "REJECTED";
+	      else normalizedStatus = "PENDING";
 
-      const status = String(doc.verify_status ?? "").toLowerCase();
-      let normalizedStatus = "PENDING";
-      if (status.includes("verified")) normalizedStatus = "VERIFIED";
-      else if (status.includes("rejected") || status.includes("denied")) normalizedStatus = "REJECTED";
-      else normalizedStatus = "PENDING";
+	      const current = byKey[key];
+	      const weight = (s) => (s === "REJECTED" ? 3 : s === "PENDING" ? 2 : s === "VERIFIED" ? 1 : 0);
+	      const nextStatus = weight(normalizedStatus) > weight(current.status) ? normalizedStatus : current.status;
+	      const nextTs = ts && (!current.lastTimestamp || current.lastTimestamp < ts) ? ts : current.lastTimestamp;
+	      byKey[key] = { key, status: nextStatus, lastTimestamp: nextTs };
+	    });
 
-      byKey[key] = { key, status: normalizedStatus, lastTimestamp: ts };
-    });
-
-    return byKey;
-  };
+	    return byKey;
+	  };
 
   const renderSectorProofStatuses = (resident, docs = []) => {
     const wrap = document.getElementById("div-modalSectorProofStatuses");
@@ -849,6 +851,15 @@ function openDocsModal(data, opts = {}) {
   const sectionPending = document.getElementById("docs-section-pending");
   const sectionVerified = document.getElementById("docs-section-verified");
   const sectionDenied = document.getElementById("docs-section-denied");
+  const toggleSectorEl = document.getElementById("toggle-showSectorDocs");
+  const sectorCountEl = document.getElementById("docs-sector-count");
+  const sectorWrapperEl = document.getElementById("docs-sector-wrapper");
+  const sectorSectionPending = document.getElementById("docs-sector-section-pending");
+  const sectorSectionVerified = document.getElementById("docs-sector-section-verified");
+  const sectorSectionDenied = document.getElementById("docs-sector-section-denied");
+  const sectorListPending = document.getElementById("docs-sector-list-pending");
+  const sectorListVerified = document.getElementById("docs-sector-list-verified");
+  const sectorListDenied = document.getElementById("docs-sector-list-denied");
   const emptyEl = document.getElementById("docs-empty");
   const loadingEl = document.getElementById("docs-loading");
 
@@ -887,6 +898,13 @@ function openDocsModal(data, opts = {}) {
   if (sectionPending) sectionPending.classList.add("d-none");
   if (sectionVerified) sectionVerified.classList.add("d-none");
   if (sectionDenied) sectionDenied.classList.add("d-none");
+  if (sectorListPending) sectorListPending.innerHTML = "";
+  if (sectorListVerified) sectorListVerified.innerHTML = "";
+  if (sectorListDenied) sectorListDenied.innerHTML = "";
+  if (sectorSectionPending) sectorSectionPending.classList.add("d-none");
+  if (sectorSectionVerified) sectorSectionVerified.classList.add("d-none");
+  if (sectorSectionDenied) sectorSectionDenied.classList.add("d-none");
+  if (sectorWrapperEl) sectorWrapperEl.classList.add("d-none");
   if (emptyEl) emptyEl.classList.add("d-none");
   if (loadingEl) loadingEl.classList.remove("d-none");
 
@@ -901,19 +919,9 @@ function openDocsModal(data, opts = {}) {
         return;
       }
 
-      const pendingDocs = [];
-      const verifiedDocs = [];
-      const deniedDocs = [];
-
-      docs.forEach(doc => {
-        const status = String(doc.verify_status ?? "").toLowerCase();
-        if (status.includes("verified")) verifiedDocs.push(doc);
-        else if (status.includes("rejected") || status.includes("denied")) deniedDocs.push(doc);
-        else pendingDocs.push(doc);
-      });
-
       const normalizedRemark = (doc) => String(doc.remarks ?? "").trim().toLowerCase();
       const remarkMarkerOnly = (doc) => normalizedRemark(doc).split(";")[0].trim();
+      const isSectorDoc = (doc) => remarkMarkerOnly(doc).startsWith("sector:");
       const sectorKeyToLabelPurpose = (key) => {
         const normalized = String(key ?? "").toLowerCase().replace(/[^a-z]/g, "");
         const map = {
@@ -926,20 +934,25 @@ function openDocsModal(data, opts = {}) {
         return map[normalized] || String(key ?? "");
       };
 
-      const describeDocumentPurpose = (doc) => {
-        const marker = remarkMarkerOnly(doc);
-        const lower = marker.toLowerCase();
+	      const describeDocumentPurpose = (doc) => {
+	        const marker = remarkMarkerOnly(doc);
+	        const lower = marker.toLowerCase();
 
         // If the row is a combined front/back doc, treat as ID proof.
         if (doc.combined_files?.front || doc.combined_files?.back || lower === "front+back") {
           return "Resident Profiling - Proof of Identity (ID)";
         }
 
-        if (lower.startsWith("sector:")) {
-          const key = marker.slice("sector:".length).trim();
-          const label = sectorKeyToLabelPurpose(key);
-          return `${label} Sector Membership Proof`;
-        }
+	        if (lower.startsWith("sector:")) {
+	          const raw = marker.slice("sector:".length).trim();
+	          const parts = raw.split(":").map((x) => String(x || "").trim()).filter(Boolean);
+	          const baseKey = parts[0] || raw;
+	          const side = String(parts[1] || "").toLowerCase();
+	          const label = sectorKeyToLabelPurpose(baseKey);
+	          if (side === "front") return `${label} Sector Membership Proof (Front)`;
+	          if (side === "back") return `${label} Sector Membership Proof (Back)`;
+	          return `${label} Sector Membership Proof`;
+	        }
 
         if (lower === "2x2") return "Resident Profiling - ID Image (2x2)";
         if (lower === "idmerged" || lower === "idfront" || lower === "idback") {
@@ -954,6 +967,19 @@ function openDocsModal(data, opts = {}) {
           return "Resident Profiling - Supporting Document";
         }
         return "Supporting Document";
+      };
+
+      const bucketByStatus = (docList) => {
+        const pendingDocs = [];
+        const verifiedDocs = [];
+        const deniedDocs = [];
+        (docList || []).forEach((doc) => {
+          const status = String(doc.verify_status ?? "").toLowerCase();
+          if (status.includes("verified")) verifiedDocs.push(doc);
+          else if (status.includes("rejected") || status.includes("denied")) deniedDocs.push(doc);
+          else pendingDocs.push(doc);
+        });
+        return { pendingDocs, verifiedDocs, deniedDocs };
       };
 
       const extractReasonFromRemarks = (remarks) => {
@@ -1037,9 +1063,19 @@ function openDocsModal(data, opts = {}) {
         return output;
       };
 
-      const pendingMerged = mergeFrontBackDocs(pendingDocs);
-      const verifiedMerged = mergeFrontBackDocs(verifiedDocs);
-      const deniedMerged = mergeFrontBackDocs(deniedDocs);
+      const profilingDocs = docs.filter((d) => !isSectorDoc(d));
+      const sectorDocs = docs.filter((d) => isSectorDoc(d));
+
+      const profilingBuckets = bucketByStatus(profilingDocs);
+      const sectorBuckets = bucketByStatus(sectorDocs);
+
+      const pendingMerged = mergeFrontBackDocs(profilingBuckets.pendingDocs);
+      const verifiedMerged = mergeFrontBackDocs(profilingBuckets.verifiedDocs);
+      const deniedMerged = mergeFrontBackDocs(profilingBuckets.deniedDocs);
+
+      const sectorPendingMerged = mergeFrontBackDocs(sectorBuckets.pendingDocs);
+      const sectorVerifiedMerged = mergeFrontBackDocs(sectorBuckets.verifiedDocs);
+      const sectorDeniedMerged = mergeFrontBackDocs(sectorBuckets.deniedDocs);
 
       const renderDocRow = (doc, container, opts = {}) => {
         const statusTone = opts.statusTone || "pending";
@@ -1115,18 +1151,86 @@ function openDocsModal(data, opts = {}) {
         if (container) container.appendChild(row);
       };
 
-      if (pendingMerged.length) {
-        if (sectionPending) sectionPending.classList.remove("d-none");
-        pendingMerged.forEach(doc => renderDocRow(doc, listPending, { statusTone: "pending" }));
+      const renderAll = () => {
+        if (listPending) listPending.innerHTML = "";
+        if (listVerified) listVerified.innerHTML = "";
+        if (listDenied) listDenied.innerHTML = "";
+        if (sectionPending) sectionPending.classList.add("d-none");
+        if (sectionVerified) sectionVerified.classList.add("d-none");
+        if (sectionDenied) sectionDenied.classList.add("d-none");
+        if (sectorListPending) sectorListPending.innerHTML = "";
+        if (sectorListVerified) sectorListVerified.innerHTML = "";
+        if (sectorListDenied) sectorListDenied.innerHTML = "";
+        if (sectorSectionPending) sectorSectionPending.classList.add("d-none");
+        if (sectorSectionVerified) sectorSectionVerified.classList.add("d-none");
+        if (sectorSectionDenied) sectorSectionDenied.classList.add("d-none");
+        if (sectorWrapperEl) sectorWrapperEl.classList.add("d-none");
+
+        const showSector = !!toggleSectorEl?.checked;
+        if (sectorCountEl) {
+          sectorCountEl.innerText = sectorDocs.length ? `(${sectorDocs.length})` : "";
+        }
+
+        if (!pendingMerged.length && !verifiedMerged.length && !deniedMerged.length) {
+          if (emptyEl) {
+            emptyEl.innerText = sectorDocs.length && !showSector
+              ? "No resident profiling documents found. Turn on sector membership documents to view sector proofs."
+              : "No submitted documents found.";
+            emptyEl.classList.remove("d-none");
+          }
+        } else {
+          if (emptyEl) emptyEl.classList.add("d-none");
+        }
+
+        if (pendingMerged.length) {
+          if (sectionPending) sectionPending.classList.remove("d-none");
+          pendingMerged.forEach((doc) => renderDocRow(doc, listPending, { statusTone: "pending" }));
+        }
+        if (verifiedMerged.length) {
+          if (sectionVerified) sectionVerified.classList.remove("d-none");
+          verifiedMerged.forEach((doc) => renderDocRow(doc, listVerified, { statusTone: "verified" }));
+        }
+        if (deniedMerged.length) {
+          if (sectionDenied) sectionDenied.classList.remove("d-none");
+          deniedMerged.forEach((doc) => renderDocRow(doc, listDenied, { showReason: true, statusTone: "denied" }));
+        }
+
+        if (showSector && sectorDocs.length) {
+          if (sectorWrapperEl) sectorWrapperEl.classList.remove("d-none");
+          if (sectorPendingMerged.length) {
+            if (sectorSectionPending) sectorSectionPending.classList.remove("d-none");
+            sectorPendingMerged.forEach((doc) => renderDocRow(doc, sectorListPending, { statusTone: "pending" }));
+          }
+          if (sectorVerifiedMerged.length) {
+            if (sectorSectionVerified) sectorSectionVerified.classList.remove("d-none");
+            sectorVerifiedMerged.forEach((doc) => renderDocRow(doc, sectorListVerified, { statusTone: "verified" }));
+          }
+          if (sectorDeniedMerged.length) {
+            if (sectorSectionDenied) sectorSectionDenied.classList.remove("d-none");
+            sectorDeniedMerged.forEach((doc) => renderDocRow(doc, sectorListDenied, { showReason: true, statusTone: "denied" }));
+          }
+        }
+      };
+
+      if (toggleSectorEl && !toggleSectorEl.dataset.bound) {
+        toggleSectorEl.dataset.bound = "1";
+        toggleSectorEl.addEventListener("change", () => {
+          if (window.lastDocsItems) {
+            renderAll();
+          }
+        });
       }
-      if (verifiedMerged.length) {
-        if (sectionVerified) sectionVerified.classList.remove("d-none");
-        verifiedMerged.forEach(doc => renderDocRow(doc, listVerified, { statusTone: "verified" }));
+      window.lastDocsItems = docs;
+
+      // Default: keep sector docs hidden to prioritize resident profiling.
+      if (toggleSectorEl && typeof toggleSectorEl.checked === "boolean") {
+        if (!opts.refreshOnly && !toggleSectorEl.dataset.initialized) {
+          toggleSectorEl.checked = false;
+          toggleSectorEl.dataset.initialized = "1";
+        }
       }
-      if (deniedMerged.length) {
-        if (sectionDenied) sectionDenied.classList.remove("d-none");
-        deniedMerged.forEach(doc => renderDocRow(doc, listDenied, { showReason: true, statusTone: "denied" }));
-      }
+
+      renderAll();
     })
     .catch(() => {
       if (loadingEl) loadingEl.classList.add("d-none");
@@ -1210,25 +1314,31 @@ function openDocViewer(doc, parentModalEl, opts = {}) {
         gridEl.appendChild(col);
       };
 
-      const purposeFromDoc = (doc) => {
-        const marker = String(doc.remarks ?? "").split(";")[0].trim();
-        const lower = marker.toLowerCase();
+	      const purposeFromDoc = (doc) => {
+	        const marker = String(doc.remarks ?? "").split(";")[0].trim();
+	        const lower = marker.toLowerCase();
 
         if (doc.combined_files?.front || doc.combined_files?.back || lower === "front+back") {
           return "Resident Profiling - Proof of Identity (ID)";
         }
-        if (lower.startsWith("sector:")) {
-          const key = marker.slice("sector:".length).trim().toLowerCase().replace(/[^a-z]/g, "");
-          const map = {
-            pwd: "PWD",
-            seniorcitizen: "Senior Citizen",
-            student: "Student",
-            indigenouspeople: "Indigenous People",
-            singleparent: "Single Parent",
-          };
-          const label = map[key] || marker.slice("sector:".length).trim();
-          return `${label} Sector Membership Proof`;
-        }
+	        if (lower.startsWith("sector:")) {
+	          const raw = marker.slice("sector:".length).trim();
+	          const parts = raw.split(":").map((x) => String(x || "").trim()).filter(Boolean);
+	          const baseKeyRaw = parts[0] || raw;
+	          const side = String(parts[1] || "").toLowerCase();
+	          const key = baseKeyRaw.toLowerCase().replace(/[^a-z]/g, "");
+	          const map = {
+	            pwd: "PWD",
+	            seniorcitizen: "Senior Citizen",
+	            student: "Student",
+	            indigenouspeople: "Indigenous People",
+	            singleparent: "Single Parent",
+	          };
+	          const label = map[key] || baseKeyRaw;
+	          if (side === "front") return `${label} Sector Membership Proof (Front)`;
+	          if (side === "back") return `${label} Sector Membership Proof (Back)`;
+	          return `${label} Sector Membership Proof`;
+	        }
         if (lower === "2x2") return "Resident Profiling - ID Image (2x2)";
         if (lower === "idmerged" || lower === "idfront" || lower === "idback") {
           return "Resident Profiling - Proof of Identity (ID)";
