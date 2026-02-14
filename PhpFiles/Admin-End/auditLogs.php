@@ -42,8 +42,20 @@ try {
             a.old_value,
             a.new_value,
             a.remarks,
-            a.action_timestamp
+            a.action_timestamp,
+            oi.firstname AS o_firstname,
+            oi.middlename AS o_middlename,
+            oi.lastname AS o_lastname,
+            oi.suffix AS o_suffix,
+            ri.firstname AS r_firstname,
+            ri.middlename AS r_middlename,
+            ri.lastname AS r_lastname,
+            ri.suffix AS r_suffix
         FROM unifiedauditlogstbl a
+        LEFT JOIN officialinformationtbl oi
+            ON oi.user_id COLLATE utf8mb4_general_ci = a.user_id COLLATE utf8mb4_general_ci
+        LEFT JOIN residentinformationtbl ri
+            ON ri.user_id COLLATE utf8mb4_general_ci = a.user_id COLLATE utf8mb4_general_ci
     ";
 
     $params = [];
@@ -61,10 +73,14 @@ try {
                 OR a.old_value LIKE ?
                 OR a.new_value LIKE ?
                 OR a.remarks LIKE ?
+                OR oi.firstname LIKE ?
+                OR oi.lastname LIKE ?
+                OR ri.firstname LIKE ?
+                OR ri.lastname LIKE ?
         ";
         $like = '%' . $q . '%';
-        $params = array_fill(0, 10, $like);
-        $types = str_repeat('s', 10);
+        $params = array_fill(0, 14, $like);
+        $types = str_repeat('s', 14);
     }
 
     $sql .= " ORDER BY a.action_timestamp DESC, a.audit_id DESC LIMIT ?";
@@ -83,6 +99,26 @@ try {
     $res = $stmt->get_result();
     $rows = [];
     while ($row = $res->fetch_assoc()) {
+        $formatName = static function ($fn, $mn, $ln, $suf): string {
+            $fn = trim((string)$fn);
+            $mn = trim((string)$mn);
+            $ln = trim((string)$ln);
+            $suf = trim((string)$suf);
+            if ($fn === '' && $ln === '') return '';
+            $mid = $mn !== '' ? (substr($mn, 0, 1) . '. ') : '';
+            $name = trim($fn . ' ' . $mid . $ln);
+            if ($suf !== '') $name .= ' ' . $suf;
+            return trim($name);
+        };
+
+        $officialName = $formatName($row['o_firstname'] ?? '', $row['o_middlename'] ?? '', $row['o_lastname'] ?? '', $row['o_suffix'] ?? '');
+        $residentName = $formatName($row['r_firstname'] ?? '', $row['r_middlename'] ?? '', $row['r_lastname'] ?? '', $row['r_suffix'] ?? '');
+        $row['display_name'] = $officialName !== '' ? $officialName : ($residentName !== '' ? $residentName : '');
+
+        unset(
+            $row['o_firstname'], $row['o_middlename'], $row['o_lastname'], $row['o_suffix'],
+            $row['r_firstname'], $row['r_middlename'], $row['r_lastname'], $row['r_suffix']
+        );
         $rows[] = $row;
     }
     $stmt->close();

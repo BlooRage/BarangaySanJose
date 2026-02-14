@@ -1,0 +1,109 @@
+:root {
+    color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+    :root { color-scheme: light; }
+    body { background-color: #ffffff; color: #000000; }
+}
+
+.audit-shell {
+    border-color: #f1e1cf !important;
+}
+
+.audit-search .form-control:focus {
+    box-shadow: 0 0 0 .2rem rgba(254, 153, 60, 0.18);
+    border-color: rgba(254, 153, 60, 0.55);
+}
+
+.audit-columns {
+    border-color: rgba(13, 110, 253, 0.25);
+    color: #0d47a1;
+    background: linear-gradient(180deg, #f4f8ff 0%, #eef5ff 100%);
+    font-weight: 700;
+    letter-spacing: 0.2px;
+    transition: transform 120ms ease, box-shadow 120ms ease, background-color 120ms ease, border-color 120ms ease;
+}
+
+.audit-columns:hover {
+    border-color: rgba(13, 110, 253, 0.45);
+    color: #0a3a84;
+    background: linear-gradient(180deg, #eff6ff 0%, #e7f0ff 100%);
+    box-shadow: 0 10px 18px rgba(13, 110, 253, 0.10);
+    transform: translateY(-1px);
+}
+
+.audit-columns:active {
+    transform: translateY(0);
+    box-shadow: 0 6px 12px rgba(13, 110, 253, 0.10);
+}
+
+.audit-columns:focus-visible {
+    box-shadow: 0 0 0 .2rem rgba(13, 110, 253, 0.18);
+}
+
+.audit-columns i {
+    margin-right: 6px;
+}
+
+.audit-columns-check {
+    border: 1px solid #e9ecef;
+    border-radius: 12px;
+    padding: 10px 12px;
+    background: #fff;
+}
+
+.audit-columns-check:hover {
+    border-color: rgba(254, 153, 60, 0.55);
+    background: #fffaf4;
+}
+
+.audit-refresh {
+    border-color: rgba(254, 153, 60, 0.45);
+    color: #b85b00;
+    background: linear-gradient(180deg, #fffaf4 0%, #fff3e4 100%);
+    font-weight: 700;
+    letter-spacing: 0.2px;
+    transition: transform 120ms ease, box-shadow 120ms ease, background-color 120ms ease, border-color 120ms ease;
+}
+
+.audit-refresh:hover {
+    border-color: rgba(254, 153, 60, 0.7);
+    color: #a04f00;
+    background: linear-gradient(180deg, #fff6ec 0%, #ffe9d1 100%);
+    box-shadow: 0 10px 18px rgba(222, 113, 12, 0.14);
+    transform: translateY(-1px);
+}
+
+.audit-refresh:active {
+    transform: translateY(0);
+    box-shadow: 0 6px 12px rgba(222, 113, 12, 0.12);
+}
+
+.audit-refresh:focus-visible {
+    box-shadow: 0 0 0 .2rem rgba(254, 153, 60, 0.25);
+}
+
+.audit-refresh i {
+    margin-right: 6px;
+}
+
+.audit-refresh.is-loading i {
+    animation: auditSpin 900ms linear infinite;
+}
+
+@keyframes auditSpin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+}
+
+.audit-table th {
+    white-space: nowrap;
+}
+
+.audit-table td {
+    vertical-align: middle;
+    max-width: 260px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
