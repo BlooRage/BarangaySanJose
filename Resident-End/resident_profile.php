@@ -173,7 +173,6 @@ if ($residentId !== '' && isset($conn) && $conn instanceof mysqli) {
 
             <div class="tab-content">
                 <div class="tab-pane fade show active" id="pane-profile" role="tabpanel" aria-labelledby="tab-profile" tabindex="0">
-
             <div class="card shadow-sm mb-4">
                 <div class="card-header d-flex justify-content-between">
                     <strong>PERSONAL INFORMATION</strong>
@@ -205,7 +204,29 @@ if ($residentId !== '' && isset($conn) && $conn instanceof mysqli) {
                                 <div><strong>Voter Status:</strong> <?= $residentinformationtbl['voter_status'] ?></div>
                                 <div><strong>Head of the Family:</strong> <?= $residentinformationtbl['head_of_family'] ?></div>
                                 <div><strong>Occupation:</strong> <?= $residentinformationtbl['occupation'] ?></div>
-                                <div><strong>Sector Membership:</strong> <?= $residentinformationtbl['sector_membership'] ?></div>
+                                <?php
+                                  $sectorText = trim((string)($residentinformationtbl['sector_membership'] ?? ''));
+                                  $pendingSector = (int)($residentinformationtbl['sector_membership_pending_review'] ?? 0);
+                                  $hasVerifiedSector = $sectorText !== '' && strcasecmp($sectorText, 'none') !== 0;
+                                  $pendingLabel = $pendingSector > 1 ? "Pending Review ({$pendingSector})" : "Pending Review";
+                                ?>
+                                <?php if ($hasVerifiedSector): ?>
+                                    <div>
+                                        <strong>Sector Membership:</strong> <?= htmlspecialchars($sectorText, ENT_QUOTES, 'UTF-8') ?>
+                                        <?php if ($pendingSector === 1): ?>
+                                            <span class="small text-muted ms-2">(<?= htmlspecialchars($pendingLabel, ENT_QUOTES, 'UTF-8') ?>)</span>
+                                        <?php endif; ?>
+                                    </div>
+                                    <?php if ($pendingSector > 1): ?>
+                                        <div class="small text-muted">
+                                            <strong>Other sector membership:</strong> <?= htmlspecialchars($pendingLabel, ENT_QUOTES, 'UTF-8') ?>
+                                        </div>
+                                    <?php endif; ?>
+                                <?php elseif ($pendingSector > 0): ?>
+                                    <div>
+                                        <strong>Sector Membership:</strong> <?= htmlspecialchars($pendingLabel, ENT_QUOTES, 'UTF-8') ?>
+                                    </div>
+                                <?php endif; ?>
                             </div>
                         </div>
                     </div>
@@ -277,8 +298,8 @@ if ($residentId !== '' && isset($conn) && $conn instanceof mysqli) {
                 </div>
             </div>
 
-            <div class="card shadow-sm">
-                <div class="card-header"><strong>ACCOUNT INFORMATION</strong></div>
+	            <div class="card shadow-sm">
+	                <div class="card-header"><strong>ACCOUNT INFORMATION</strong></div>
                 <div class="card-body small">
                     <div class="row g-2">
                         <div class="col-12 col-md-6">
@@ -339,7 +360,7 @@ if ($residentId !== '' && isset($conn) && $conn instanceof mysqli) {
                         <?php endif; ?>
                     </div>
                 </div>
-            </div>
+	            </div>
 
                 </div>
                 <div class="tab-pane fade" id="pane-household" role="tabpanel" aria-labelledby="tab-household" tabindex="0">
@@ -695,8 +716,8 @@ if ($residentId !== '' && isset($conn) && $conn instanceof mysqli) {
                         <button class="btn btn-primary" id="btnSaveEmergency" type="button">Save</button>
                     </div>
                 </div>
-            </div>
         </div>
+    </div>
 
         <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 </body>

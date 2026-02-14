@@ -261,7 +261,35 @@ html, body {
     border-radius: 16px;
 }
 
+.doc-viewer-modal .modal-header {
+    position: sticky;
+    top: 0;
+    z-index: 2;
+    background: #fff;
+    border-bottom: 1px solid #eef0f3;
+}
+
+.doc-viewer-modal #doc-viewer-subtitle,
+.doc-viewer-modal #sector-docViewer-subtitle {
+    margin-top: 2px;
+}
+
+.doc-viewer-modal .modal-footer {
+    position: sticky;
+    bottom: 0;
+    z-index: 2;
+    background: #fff;
+    border-top: 1px solid #eef0f3;
+}
+
 .doc-viewer-modal #doc-viewer-info {
+    background: #f8f9fb;
+    border: 1px solid #eef0f3;
+    border-radius: 12px;
+    padding: 12px 14px;
+}
+
+.doc-viewer-modal #sector-docViewer-info {
     background: #f8f9fb;
     border: 1px solid #eef0f3;
     border-radius: 12px;
@@ -273,6 +301,31 @@ html, body {
     border-radius: 12px;
     padding: 8px;
     background: #fff;
+    display: flex;
+    justify-content: center;
+    align-items: flex-start;
+}
+
+.doc-viewer-modal #sector-docViewer-body {
+    border: 1px solid #eef0f3;
+    border-radius: 12px;
+    padding: 8px;
+    background: #fff;
+    display: flex;
+    justify-content: center;
+    align-items: flex-start;
+}
+
+.doc-viewer-modal #doc-viewer-body iframe,
+.doc-viewer-modal #sector-docViewer-body iframe {
+    width: 100%;
+    max-width: 1100px;
+    border-radius: 10px;
+}
+
+.doc-viewer-modal #doc-viewer-body img,
+.doc-viewer-modal #sector-docViewer-body img {
+    max-width: 1100px;
 }
 
 .doc-viewer-modal #doc-viewer-actions {
@@ -280,8 +333,8 @@ html, body {
     border: none;
     border-radius: 0;
     padding: 0;
-    display: grid;
-    grid-template-columns: 1fr 1fr;
+    display: flex;
+    flex-wrap: nowrap;
     gap: 0.75rem;
     width: 100%;
 }
@@ -317,16 +370,19 @@ html, body {
 }
 
 .doc-viewer-modal #doc-viewer-actions .text-muted {
-    grid-column: 1 / -1;
+    width: 100%;
+}
+
+.doc-viewer-modal #sector-docViewer-actions .btn {
+    min-height: 46px;
 }
 
 @media (min-width: 768px) {
     .doc-viewer-modal #doc-viewer-actions {
-        grid-template-columns: 1fr 1fr;
         align-items: stretch;
     }
     .doc-viewer-modal #doc-viewer-actions .doc-viewer__reason {
-        grid-column: 1 / span 2;
+        width: 100%;
     }
 }
 

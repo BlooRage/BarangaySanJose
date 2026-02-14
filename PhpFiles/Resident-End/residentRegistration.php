@@ -204,21 +204,24 @@ function buildAttachmentFileName(string $docType, string $userId, string $ext, i
 function toDbWebPath(string $absolutePath): string {
     $absolutePath = str_replace("\\", "/", trim($absolutePath));
     $projectRoot = realpath(__DIR__ . "/../..");
+
+    // Prefer storing a portable, project-relative path (works across local + hosted).
+    // Example stored value: "UnifiedFileAttachment/Documents/<id>/<file>.pdf"
+    $marker = "/UnifiedFileAttachment/";
+    $markerPos = strpos($absolutePath, $marker);
+    if ($markerPos !== false) {
+        return ltrim(substr($absolutePath, $markerPos), "/");
+    }
+
     if ($projectRoot) {
         $rootNorm = str_replace("\\", "/", $projectRoot);
         if (strpos($absolutePath, $rootNorm) === 0) {
             $rel = ltrim(substr($absolutePath, strlen($rootNorm)), "/");
-            return "/BarangaySanJose/" . $rel;
+            return $rel;
         }
     }
 
-    $marker = "/UnifiedFileAttachment/";
-    $markerPos = strpos($absolutePath, $marker);
-    if ($markerPos !== false) {
-        return "/BarangaySanJose" . substr($absolutePath, $markerPos);
-    }
-
-    return "/BarangaySanJose/" . ltrim($absolutePath, "/");
+    return ltrim($absolutePath, "/");
 }
 
 function moveUploadedFileWithDocName(string $tmpName, string $dir, string $docType, string $userId, string $ext): array {
@@ -811,7 +814,8 @@ try {
 
     $isIdProofSelected = ($proofType === 'ID');
     $idTypeSelected = strtolower(cleanString($_POST['idType'] ?? ''));
-    $isNationalIdSelected = ($idTypeSelected === 'national id' || $idTypeSelected === 'philsys id/ephilid');
+    $idTypeSelectedNorm = preg_replace('/[^a-z0-9]/', '', (string)$idTypeSelected);
+    $isNationalIdSelected = in_array($idTypeSelectedNorm, ['nationalid', 'philsysid', 'philsysidephilid', 'ephilid'], true);
 
     foreach ($selectedSectorKeys as $sectorKey) {
         $docTypeValue = cleanString($_POST['sectorDocType'][$sectorKey] ?? '');
@@ -834,6 +838,23 @@ try {
             $isRequired = false;
         } elseif ($sectorKey === 'IndigenousPeople' && $isIdProofSelected && $isNationalIdSelected) {
             $isRequired = false;
+        }
+
+        // Business rule: if Proof Type is ID, prohibit uploading Senior Citizen sector proof.
+        if ($sectorKey === 'SeniorCitizen' && $isIdProofSelected) {
+            if ($hasFile || $docTypeValue !== '') {
+                throw new Exception("Senior Citizen proof upload is not allowed when using ID as proof of identity.");
+            }
+            continue;
+        }
+
+        // Business rule: if Proof Type is ID and (National ID / PhilSys / ePhilID) is used,
+        // prohibit uploading Indigenous People sector proof.
+        if ($sectorKey === 'IndigenousPeople' && $isIdProofSelected && $isNationalIdSelected) {
+            if ($hasFile || $docTypeValue !== '') {
+                throw new Exception("Indigenous People proof upload is not allowed when using National ID/PhilSys as proof of identity.");
+            }
+            continue;
         }
 
         if ($isRequired && ($docTypeValue === '' || !$hasFile)) {

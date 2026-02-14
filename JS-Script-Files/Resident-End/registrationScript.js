@@ -861,8 +861,15 @@ function isActuallyVisible(el) {
   }
 
   function isNationalIdSelected() {
-    const selected = String(idTypeSelect?.value ?? "").toLowerCase();
-    return selected === "national id" || selected === "philsys id/ephilid";
+    const raw = String(idTypeSelect?.value ?? "");
+    const normalized = raw.toLowerCase().replace(/[^a-z0-9]/g, "");
+    // Accept common values/labels.
+    return (
+      normalized === "nationalid" ||
+      normalized === "philsysid" ||
+      normalized === "philsysidephilid" ||
+      normalized === "ephilid"
+    );
   }
 
   function isSectorDocumentRequired(sectorKey) {
@@ -874,6 +881,18 @@ function isActuallyVisible(el) {
       return !(proofTypeSelect && proofTypeSelect.value === "ID" && isNationalIdSelected());
     }
     return true;
+  }
+
+  function isSectorUploadProhibited(sectorKey) {
+    // Business rules:
+    // - If Proof Type is ID: do not allow uploading Senior Citizen sector proof (age can be validated already).
+    // - If Proof Type is ID + (National ID / PhilSys / ePhilID): do not allow uploading Indigenous People proof.
+    const usingId = !!(proofTypeSelect && proofTypeSelect.value === "ID");
+    if (!usingId) return false;
+
+    if (sectorKey === "SeniorCitizen") return true;
+    if (sectorKey === "IndigenousPeople" && isNationalIdSelected()) return true;
+    return false;
   }
 
   function getSectorElements(sectorKey) {
@@ -993,6 +1012,14 @@ function isActuallyVisible(el) {
         return;
       }
 
+      if (isSectorUploadProhibited(sectorKey)) {
+        // Selected but uploads are prohibited: clear any existing selection/files and keep controls disabled.
+        resetSectorField(sectorKey);
+        if (card) card.classList.add("opacity-75");
+        return;
+      }
+
+      if (card) card.classList.remove("opacity-75");
       if (docType) docType.disabled = false;
       updateSectorUploadZoneState(sectorKey);
     });
@@ -1003,10 +1030,22 @@ function isActuallyVisible(el) {
       const { docType, fileInputs } = getSectorElements(sectorKey);
 
       if (docType) {
+        if (isSectorUploadProhibited(sectorKey)) {
+          docType.required = false;
+          docType.disabled = true;
+          clearError(docType);
+          return;
+        }
         docType.required = required;
         if (!required) clearError(docType);
       }
       fileInputs.forEach((fileInput, index) => {
+        if (isSectorUploadProhibited(sectorKey)) {
+          fileInput.required = false;
+          fileInput.disabled = true;
+          clearError(fileInput);
+          return;
+        }
         fileInput.required = required && index === 0;
         if (!required) clearError(fileInput);
       });

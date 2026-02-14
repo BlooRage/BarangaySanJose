@@ -2,7 +2,11 @@
 $current = basename($_SERVER['PHP_SELF']);
 
 // Group pages by section
+<<<<<<< Updated upstream
 $profilingPages = ['ResidentMasterlist.php', 'ResidentArchive.php', 'EditRequests.php'];
+=======
+$profilingPages = ['ResidentMasterlist.php', 'ResidentArchive.php', 'SectorMembershipVerification.php'];
+>>>>>>> Stashed changes
 $certPages = ['CertificateTracker.php', 'approved.php', 'denied.php'];
 $toolsPages = ['AuditLogs.php'];
 
@@ -98,6 +102,12 @@ if (!empty($_SESSION['user_id']) && isset($conn) && $conn instanceof mysqli) {
               <a href="ResidentArchive.php"
                  class="link-dark rounded <?= $current == 'ResidentArchive.php' ? 'active' : '' ?>">
                 Resident Archive
+              </a>
+            </li>
+            <li>
+              <a href="SectorMembershipVerification.php"
+                 class="link-dark rounded <?= $current == 'SectorMembershipVerification.php' ? 'active' : '' ?>">
+                Sector Membership Verification
               </a>
             </li>
           </ul>

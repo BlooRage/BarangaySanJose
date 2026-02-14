@@ -272,6 +272,9 @@ if ($activeStatusId !== null) {
 ============================= */
 unset($_SESSION['pending_user_id'], $_SESSION['pending_verify']);
 
+// Prevent session fixation after successful authentication.
+session_regenerate_id(true);
+
 $_SESSION['user_id']    = $userData['user_id'];
 $_SESSION['role']       = $userData['role_access'];
 $_SESSION['logged_in']  = true;

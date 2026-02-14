@@ -300,6 +300,10 @@ if (isset($conn) && $conn instanceof mysqli) {
                                     <div class="col-12">
                                         <p class="text-muted small mb-0">Sector Membership:</p>
                                         <p id="txt-modalSectorMembership" class="fw-bold mb-0"></p>
+                                        <div id="div-modalSectorProofStatuses" class="mt-2 d-flex flex-wrap gap-2"></div>
+                                        <div id="div-modalSectorProofHint" class="text-muted small mt-1 d-none">
+                                            Sector proof status is based on uploaded documents tagged per sector.
+                                        </div>
                                     </div>
                                 </div>
                             </div>
@@ -702,7 +706,11 @@ if (isset($conn) && $conn instanceof mysqli) {
   <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable">
     <div class="modal-content p-3">
       <div class="modal-header border-0">
-        <h5 class="fw-bold mb-0" id="doc-viewer-title">Document Preview</h5>
+        <div class="w-100">
+          <h5 class="fw-bold mb-0" id="doc-viewer-title">Document Preview</h5>
+          <div class="small text-muted" id="doc-viewer-subtitle"></div>
+          <div class="small text-muted d-none" id="doc-viewer-idnumber"></div>
+        </div>
         <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
       </div>
       <div class="modal-body">
@@ -718,7 +726,7 @@ if (isset($conn) && $conn instanceof mysqli) {
           </div>
         </div>
         <div id="doc-viewer-body" class="w-100 mb-3"></div>
-        <div id="doc-viewer-actions" class="d-flex flex-wrap align-items-center gap-2"></div>
+        <div id="doc-viewer-actions" class="d-flex flex-nowrap w-100 gap-2"></div>
       </div>
       <div class="modal-footer border-0">
         <button type="button" class="btn btn-outline-secondary" id="doc-viewer-return">Return</button>
