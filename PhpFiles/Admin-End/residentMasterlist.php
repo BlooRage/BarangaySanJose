@@ -1,6 +1,9 @@
 <?php
 session_start();
 require_once "../General/connection.php";
+require_once "../General/security.php";
+
+requireRoleSession(['Admin', 'Employee']);
 
 function normalizeResidentId($value): ?string {
     $id = trim((string)$value);
@@ -8,6 +11,93 @@ function normalizeResidentId($value): ?string {
         return null;
     }
     return $id;
+}
+
+function parseSectorMembershipCsv($value): array {
+    $parts = array_map('trim', explode(',', (string)$value));
+    $parts = array_values(array_filter($parts, static function ($v) {
+        return $v !== '';
+    }));
+
+    $seen = [];
+    $output = [];
+    foreach ($parts as $part) {
+        $key = strtolower($part);
+        if (isset($seen[$key])) {
+            continue;
+        }
+        $seen[$key] = true;
+        $output[] = $part;
+    }
+    return $output;
+}
+
+function mapSectorKeyToLabel($sectorKey): ?string {
+    $normalized = strtolower(trim((string)$sectorKey));
+    $normalized = preg_replace('/[^a-z]/', '', $normalized);
+
+    $map = [
+        'pwd' => 'PWD',
+        'seniorcitizen' => 'Senior Citizen',
+        'student' => 'Student',
+        'indigenouspeople' => 'Indigenous People',
+        'indigenousperson' => 'Indigenous People',
+        'singleparent' => 'Single Parent'
+    ];
+    return $map[$normalized] ?? null;
+}
+
+function appendSectorMembership(mysqli $conn, string $residentId, string $sectorLabel): ?string {
+    $stmt = $conn->prepare("
+        SELECT sector_membership
+        FROM residentinformationtbl
+        WHERE resident_id = ?
+        LIMIT 1
+    ");
+    if (!$stmt) {
+        throw new Exception("Prepare failed (read sector membership): " . $conn->error);
+    }
+    $stmt->bind_param("s", $residentId);
+    $stmt->execute();
+    $row = $stmt->get_result()->fetch_assoc();
+    $stmt->close();
+
+    if (!$row) return null;
+
+    $sectors = parseSectorMembershipCsv($row['sector_membership'] ?? '');
+    $alreadyExists = false;
+    foreach ($sectors as $sector) {
+        if (strcasecmp($sector, $sectorLabel) === 0) {
+            $alreadyExists = true;
+            break;
+        }
+    }
+    if (!$alreadyExists) {
+        $sectors[] = $sectorLabel;
+    }
+
+    $updatedSectorMembership = implode(', ', $sectors);
+    $update = $conn->prepare("
+        UPDATE residentinformationtbl
+        SET sector_membership = ?
+        WHERE resident_id = ?
+        LIMIT 1
+    ");
+    if (!$update) {
+        throw new Exception("Prepare failed (update sector membership): " . $conn->error);
+    }
+    $update->bind_param("ss", $updatedSectorMembership, $residentId);
+    $update->execute();
+    $update->close();
+
+    return $updatedSectorMembership;
+}
+
+function extractMarkerFromRemarks($remarks): string {
+    $text = trim((string)$remarks);
+    if ($text === '') return '';
+    $parts = explode(';', $text);
+    return trim((string)($parts[0] ?? ''));
 }
 
 function getStatusId(mysqli $conn, string $name, string $type): int {
@@ -39,6 +129,7 @@ function getResidentVerificationEligibility(mysqli $conn, string $residentId): a
                 CASE
                     WHEN dt.document_category = 'ResidentProfiling'
                          AND dt.document_type_name <> '2x2 Picture'
+                         AND (uf.remarks IS NULL OR uf.remarks NOT LIKE 'sector:%')
                          AND sv.status_name = 'Rejected'
                          AND sv.status_type = 'ResidentDocumentProfiling'
                     THEN 1 ELSE 0
@@ -47,6 +138,7 @@ function getResidentVerificationEligibility(mysqli $conn, string $residentId): a
             SUM(
                 CASE
                     WHEN dt.document_category = 'ResidentProfiling'
+                         AND (uf.remarks IS NULL OR uf.remarks NOT LIKE 'sector:%')
                          AND sv.status_name = 'PendingReview'
                          AND sv.status_type = 'ResidentDocumentProfiling'
                     THEN 1 ELSE 0
@@ -147,16 +239,16 @@ function toPublicPath($path): ?string {
     }
     $normalized = '/' . implode('/', $cleanParts);
 
-    if (strpos($normalized, '/BarangaySanJose/') === 0) {
-        return $normalized;
-    }
-
-    // Most records contain absolute filesystem paths; map them by folder marker.
     $marker = '/UnifiedFileAttachment/';
     $markerPos = stripos($normalized, $marker);
     if ($markerPos !== false) {
         $public = substr($normalized, $markerPos);
         return '..' . $public;
+    }
+
+    // If stored as a full web path, keep it.
+    if (strpos($normalized, '/BarangaySanJose/') === 0) {
+        return $normalized;
     }
 
     $webRoot = realpath(__DIR__ . "/../..");
@@ -734,12 +826,14 @@ if (isset($_GET['fetch_documents'])) {
     $stmt = $conn->prepare("
         SELECT
             uf.attachment_id,
+            uf.source_type,
             uf.file_name,
             uf.file_path,
             uf.upload_timestamp,
             uf.remarks,
             uf.id_number,
             dt.document_type_name,
+            dt.document_category,
             s.status_name AS verify_status
         FROM unifiedfileattachmenttbl uf
         LEFT JOIN documenttypelookuptbl dt
@@ -806,11 +900,36 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_document_statu
 
     try {
         $statusId = getStatusId($conn, $statusMap[$uiStatus], "ResidentDocumentProfiling");
-        $remarks = '';
-        if ($reasonText !== '') {
-            $remarks = $reasonScope !== ''
-                ? trim("scope={$reasonScope}; reason={$reasonText}")
-                : $reasonText;
+        $attachmentResidentId = null;
+        $attachmentRemarks = '';
+        $docTypeName = '';
+        $docCategory = '';
+        $metaStmt = $conn->prepare("
+            SELECT uf.source_id, uf.remarks, dt.document_type_name, dt.document_category
+            FROM unifiedfileattachmenttbl uf
+            LEFT JOIN documenttypelookuptbl dt
+                ON uf.document_type_id = dt.document_type_id
+            WHERE uf.attachment_id = ?
+            LIMIT 1
+        ");
+        if ($metaStmt) {
+            $metaStmt->bind_param("i", $attachmentId);
+            $metaStmt->execute();
+            $metaStmt->bind_result($attachmentResidentId, $attachmentRemarks, $docTypeName, $docCategory);
+            $metaStmt->fetch();
+            $metaStmt->close();
+        }
+
+        // Preserve technical markers in remarks (e.g. idFront/idBack, sector:KEY).
+        // Store denial reason as structured data: "<marker>; reason=...".
+        $marker = extractMarkerFromRemarks($attachmentRemarks);
+        $remarks = $marker;
+        if ($uiStatus === 'DENIED') {
+            $chunks = [];
+            if ($marker !== '') $chunks[] = $marker;
+            if ($reasonScope !== '') $chunks[] = "scope={$reasonScope}";
+            $chunks[] = "reason={$reasonText}";
+            $remarks = implode('; ', $chunks);
         }
 
         $stmt = $conn->prepare("
@@ -826,21 +945,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_document_statu
 
         $profileImageUrl = null;
         $residentId = null;
+        $updatedSectorMembership = null;
         if ($statusMap[$uiStatus] === 'Verified') {
-            $stmt = $conn->prepare("
-                SELECT uf.source_id, dt.document_type_name, dt.document_category
-                FROM unifiedfileattachmenttbl uf
-                INNER JOIN documenttypelookuptbl dt
-                    ON uf.document_type_id = dt.document_type_id
-                WHERE uf.attachment_id = ?
-                LIMIT 1
-            ");
-            if ($stmt) {
-                $stmt->bind_param("i", $attachmentId);
-                $stmt->execute();
-                $stmt->bind_result($residentId, $docTypeName, $docCategory);
-                $stmt->fetch();
-                $stmt->close();
+            $residentId = $attachmentResidentId;
+
+            $remarksLower = strtolower(trim((string)$attachmentRemarks));
+            if ($residentId && strpos($remarksLower, 'sector:') === 0) {
+                $sectorKey = trim(substr((string)$attachmentRemarks, strlen('sector:')));
+                $sectorLabel = mapSectorKeyToLabel($sectorKey);
+                if ($sectorLabel) {
+                    $updatedSectorMembership = appendSectorMembership($conn, $residentId, $sectorLabel);
+                }
             }
 
             if ($residentId && $docTypeName === '2x2 Picture' && $docCategory === 'ResidentProfiling') {
@@ -876,7 +991,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_document_statu
             'success' => true,
             'status' => $statusMap[$uiStatus],
             'resident_id' => $residentId,
-            'profile_image_url' => $profileImageUrl
+            'profile_image_url' => $profileImageUrl,
+            'sector_membership' => $updatedSectorMembership
         ]);
     } catch (Exception $e) {
         http_response_code(500);

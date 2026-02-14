@@ -21,6 +21,7 @@ function getResidentProfileData(mysqli $conn, string $userId): array {
         'occupation_detail' => '',
         'religion' => '',
         'sector_membership' => '',
+        'sector_membership_pending_review' => 0,
         'status_name_resident' => '',
         'emergency_name' => '',
         'emergency_contact' => '',
@@ -184,6 +185,86 @@ function getResidentProfileData(mysqli $conn, string $userId): array {
             }
             $stmtAddr->close();
         }
+    }
+
+    // Sector membership verification status (based on sector proof uploads)
+    if ($residentId) {
+        $pendingCount = 0;
+        $stmtSector = $conn->prepare("
+            SELECT COUNT(*) AS pending_count
+            FROM unifiedfileattachmenttbl uf
+            LEFT JOIN statuslookuptbl s
+                ON uf.status_id_verify = s.status_id
+            WHERE uf.source_type = 'ResidentProfiling'
+              AND uf.source_id = ?
+              AND uf.remarks LIKE 'sector:%'
+              AND s.status_name = 'PendingReview'
+              AND s.status_type = 'ResidentDocumentProfiling'
+        ");
+        if ($stmtSector) {
+            $stmtSector->bind_param("s", $residentId);
+            $stmtSector->execute();
+            $row = $stmtSector->get_result()->fetch_assoc();
+            $pendingCount = (int)($row['pending_count'] ?? 0);
+            $stmtSector->close();
+        }
+        $residentinformationtbl['sector_membership_pending_review'] = $pendingCount;
+    }
+
+    // Only expose VERIFIED sector membership on the resident-end.
+    // Residents can apply for sectors, but should not see them as "sector membership"
+    // until a supporting document is verified by admin.
+    if ($residentId) {
+        $mapSectorKeyToLabel = static function ($sectorKey): string {
+            $normalized = strtolower(trim((string)$sectorKey));
+            $normalized = preg_replace('/[^a-z]/', '', $normalized);
+            $map = [
+                'pwd' => 'PWD',
+                'seniorcitizen' => 'Senior Citizen',
+                'student' => 'Student',
+                'indigenouspeople' => 'Indigenous People',
+                'indigenousperson' => 'Indigenous People',
+                'singleparent' => 'Single Parent'
+            ];
+            return $map[$normalized] ?? trim((string)$sectorKey);
+        };
+
+        $verified = [];
+        $seen = [];
+        $stmtVerified = $conn->prepare("
+            SELECT uf.remarks
+            FROM unifiedfileattachmenttbl uf
+            INNER JOIN statuslookuptbl s
+                ON uf.status_id_verify = s.status_id
+            WHERE uf.source_type = 'ResidentProfiling'
+              AND uf.source_id = ?
+              AND uf.remarks LIKE 'sector:%'
+              AND s.status_name = 'Verified'
+              AND s.status_type = 'ResidentDocumentProfiling'
+            ORDER BY uf.upload_timestamp DESC, uf.attachment_id DESC
+        ");
+        if ($stmtVerified) {
+            $stmtVerified->bind_param("s", $residentId);
+            $stmtVerified->execute();
+            $res = $stmtVerified->get_result();
+            while ($r = $res->fetch_assoc()) {
+                $remarks = trim((string)($r['remarks'] ?? ''));
+                if ($remarks === '') continue;
+                $marker = trim((string)(explode(';', $remarks)[0] ?? ''));
+                $lower = strtolower($marker);
+                if (strpos($lower, 'sector:') !== 0) continue;
+                $key = trim(substr($marker, strlen('sector:')));
+                if ($key === '') continue;
+                $label = $mapSectorKeyToLabel($key);
+                $dedupeKey = strtolower($label);
+                if (isset($seen[$dedupeKey])) continue;
+                $seen[$dedupeKey] = true;
+                $verified[] = $label;
+            }
+            $stmtVerified->close();
+        }
+
+        $residentinformationtbl['sector_membership'] = $verified ? implode(', ', $verified) : 'None';
     }
 
     return [
