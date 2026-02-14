@@ -128,6 +128,8 @@ if ($residentId !== '' && isset($conn) && $conn instanceof mysqli) {
   <script src="../JS-Script-Files/Resident-End/householdInviteModal.js" defer></script>
   <script src="../JS-Script-Files/Resident-End/householdJoin.js" defer></script>
   <script src="../JS-Script-Files/Resident-End/profileTabs.js" defer></script>
+  <script src="../JS-Script-Files/Resident-End/profileAddress.js" defer></script>
+  <script src="../JS-Script-Files/Resident-End/profileEmergency.js" defer></script>
     <link rel="stylesheet" href="../CSS-Styles/Resident-End-CSS/residentDashboard.css">
 </head>
 
@@ -478,6 +480,9 @@ if ($residentId !== '' && isset($conn) && $conn instanceof mysqli) {
                 </div>
 
                 <div class="modal-body">
+                    <div class="alert alert-info small mb-3">
+                        Saving changes will send a request for review.
+                    </div>
 
                     <label class="form-label">Full Name</label>
                     <div class="d-flex gap-2 mb-3">
@@ -587,15 +592,38 @@ if ($residentId !== '' && isset($conn) && $conn instanceof mysqli) {
                 </div>
 
                 <div class="modal-body">
-                    <input type="text" class="form-control mb-2" placeholder="Street Number">
-                    <input type="text" class="form-control mb-2" placeholder="Street Name">
-                    <input type="text" class="form-control mb-2" placeholder="Subdivision">
-                    <input type="text" class="form-control mb-2" placeholder="Area Number">
+                    <div class="alert alert-info small mb-3">
+                        Saving changes will send a request for review.
+                    </div>
+                    <div id="addressDeniedAlert" class="alert alert-danger alert-dismissible fade show small mb-3 d-none" role="alert">
+                        <span id="addressDeniedText"></span>
+                        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                    </div>
+                    <div class="alert alert-warning small mb-3">
+                        Changing your address will remove you from your household.
+                    </div>
+                    <div id="headReassignBlock" class="border rounded p-2 mb-3 d-none">
+                        <label class="form-label fw-bold mb-1">Assign New Head of Household</label>
+                        <select class="form-select" id="newHeadResidentId">
+                            <option value="">Select a member</option>
+                        </select>
+                        <div class="form-text">Required before a household head can change address.</div>
+                        <div id="headReassignEmpty" class="text-danger small mt-2 d-none">
+                            You must have at least one other active household member to reassign the head role.
+                        </div>
+                    </div>
+                    <input type="text" class="form-control mb-2" id="addressUnitNumber" placeholder="Unit Number" value="<?= htmlspecialchars($residentaddresstbl['unit_number'] ?? '') ?>">
+                    <input type="text" class="form-control mb-2" id="addressStreetNumber" placeholder="Street Number" value="<?= htmlspecialchars($residentaddresstbl['street_number'] ?? '') ?>">
+                    <input type="text" class="form-control mb-2" id="addressStreetName" placeholder="Street Name" value="<?= htmlspecialchars($residentaddresstbl['street_name'] ?? '') ?>">
+                    <input type="text" class="form-control mb-2" id="addressPhaseNumber" placeholder="Phase Number" value="<?= htmlspecialchars($residentaddresstbl['phase_number'] ?? '') ?>">
+                    <input type="text" class="form-control mb-2" id="addressSubdivision" placeholder="Subdivision" value="<?= htmlspecialchars($residentaddresstbl['subdivision'] ?? '') ?>">
+                    <input type="text" class="form-control mb-2" id="addressAreaNumber" placeholder="Area Number" value="<?= htmlspecialchars($residentaddresstbl['area_number'] ?? '') ?>">
+                    <div id="addressSaveResult" class="small mt-2"></div>
                 </div>
 
                 <div class="modal-footer">
                     <button class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                    <button class="btn btn-success">Save</button>
+                    <button class="btn btn-success" id="btnSaveAddress" type="button">Save</button>
                 </div>
 
             </div>
@@ -612,18 +640,45 @@ if ($residentId !== '' && isset($conn) && $conn instanceof mysqli) {
                     </div>
 
                     <div class="modal-body">
-                        <div class="mb-3">
-                            <label class="form-label">Contact Person</label>
-                            <input class="form-control" value="<?= $residentinformationtbl['emergency_name'] ?>">
+                        <div class="alert alert-info small mb-3">
+                            Saving changes will send a request for review.
+                        </div>
+                        <div id="emergencyDeniedAlert" class="alert alert-danger alert-dismissible fade show small mb-3 d-none" role="alert">
+                            <span id="emergencyDeniedText"></span>
+                            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                        </div>
+                        <label class="form-label">Contact Person</label>
+                        <div class="d-flex gap-2 mb-3">
+                            <input class="form-control" id="emergencyLastName" value="<?= $residentinformationtbl['emergency_last_name'] ?? '' ?>" placeholder="Last Name">
+                            <input class="form-control" id="emergencyFirstName" value="<?= $residentinformationtbl['emergency_first_name'] ?? '' ?>" placeholder="First Name">
+                            <input class="form-control" id="emergencyMiddleName" value="<?= $residentinformationtbl['emergency_middle_name'] ?? '' ?>" placeholder="Middle Name">
+                            <select class="form-control" id="emergencySuffix">
+                                <option value="" <?= empty($residentinformationtbl['emergency_suffix']) ? 'selected' : '' ?>>N/A</option>
+                                <option value="Jr." <?= ($residentinformationtbl['emergency_suffix'] ?? '') === 'Jr.' ? 'selected' : '' ?>>Jr.</option>
+                                <option value="Sr." <?= ($residentinformationtbl['emergency_suffix'] ?? '') === 'Sr.' ? 'selected' : '' ?>>Sr.</option>
+                                <option value="III" <?= ($residentinformationtbl['emergency_suffix'] ?? '') === 'III' ? 'selected' : '' ?>>III</option>
+                            </select>
                         </div>
                         <div class="mb-3">
                             <label class="form-label">Contact Number</label>
-                            <input class="form-control" value="<?= $residentinformationtbl['emergency_contact'] ?>">
+                            <div class="input-group">
+                                <span class="input-group-text">+63</span>
+                                <input class="form-control" id="emergencyContact" inputmode="numeric" maxlength="10" placeholder="9XXXXXXXXX" value="<?= $residentinformationtbl['emergency_contact'] ?? '' ?>">
+                            </div>
                         </div>
+                        <div class="mb-3">
+                            <label class="form-label">Relationship</label>
+                            <input class="form-control" id="emergencyRelationship" placeholder="Relationship" value="<?= $residentinformationtbl['emergency_relationship'] ?? '' ?>">
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Address</label>
+                            <input class="form-control" id="emergencyAddress" placeholder="Emergency Address" value="<?= $residentinformationtbl['emergency_address'] ?? '' ?>">
+                        </div>
+                        <div id="emergencySaveResult" class="small mt-2"></div>
                     </div>
                     <div class="modal-footer">
                         <button class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                        <button class="btn btn-primary">Save</button>
+                        <button class="btn btn-primary" id="btnSaveEmergency" type="button">Save</button>
                     </div>
                 </div>
             </div>

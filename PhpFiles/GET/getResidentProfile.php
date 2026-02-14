@@ -24,6 +24,12 @@ function getResidentProfileData(mysqli $conn, string $userId): array {
         'status_name_resident' => '',
         'emergency_name' => '',
         'emergency_contact' => '',
+        'emergency_first_name' => '',
+        'emergency_middle_name' => '',
+        'emergency_last_name' => '',
+        'emergency_suffix' => '',
+        'emergency_relationship' => '',
+        'emergency_address' => '',
         'profile_pic' => ''
     ];
 
@@ -74,7 +80,9 @@ function getResidentProfileData(mysqli $conn, string $userId): array {
             e.middle_name AS emergency_middle_name,
             e.last_name AS emergency_last_name,
             e.suffix AS emergency_suffix,
-            e.phone_number AS emergency_contact
+            e.phone_number AS emergency_contact,
+            e.relationship AS emergency_relationship,
+            e.address AS emergency_address
         FROM residentinformationtbl r
         LEFT JOIN statuslookuptbl s ON r.status_id_resident = s.status_id
         LEFT JOIN useraccountstbl u ON u.user_id = r.user_id
@@ -129,6 +137,12 @@ function getResidentProfileData(mysqli $conn, string $userId): array {
                 'status_name_resident' => $row['status_name_resident'] ?? '',
                 'emergency_name' => $emergencyName,
                 'emergency_contact' => $row['emergency_contact'] ?? '',
+                'emergency_first_name' => $row['emergency_first_name'] ?? '',
+                'emergency_middle_name' => $row['emergency_middle_name'] ?? '',
+                'emergency_last_name' => $row['emergency_last_name'] ?? '',
+                'emergency_suffix' => $row['emergency_suffix'] ?? '',
+                'emergency_relationship' => $row['emergency_relationship'] ?? '',
+                'emergency_address' => $row['emergency_address'] ?? '',
                 'profile_pic' => ''
             ];
 

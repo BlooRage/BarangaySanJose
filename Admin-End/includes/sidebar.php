@@ -2,7 +2,7 @@
 $current = basename($_SERVER['PHP_SELF']);
 
 // Group pages by section
-$profilingPages = ['ResidentMasterlist.php', 'ResidentArchive.php'];
+$profilingPages = ['ResidentMasterlist.php', 'ResidentArchive.php', 'EditRequests.php'];
 $certPages = ['CertificateTracker.php', 'approved.php', 'denied.php'];
 $toolsPages = ['AuditLogs.php'];
 
@@ -86,6 +86,12 @@ if (!empty($_SESSION['user_id']) && isset($conn) && $conn instanceof mysqli) {
               <a href="ResidentMasterlist.php"
                  class="link-dark rounded <?= $current == 'ResidentMasterlist.php' ? 'active' : '' ?>">
                 Masterlist
+              </a>
+            </li>
+            <li>
+              <a href="EditRequests.php"
+                 class="link-dark rounded <?= $current == 'EditRequests.php' ? 'active' : '' ?>">
+                Edit Requests
               </a>
             </li>
             <li>
