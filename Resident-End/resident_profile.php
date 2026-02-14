@@ -500,11 +500,11 @@ if ($residentId !== '' && isset($conn) && $conn instanceof mysqli) {
                     <div class="row mb-3">
                         <div class="col-md-6">
                             <label class="form-label">Sex</label>
-                            <input class="form-control" value="<?= $residentinformationtbl['sex'] ?>" readonly>
+                            <input class="form-control input-readonly" value="<?= $residentinformationtbl['sex'] ?>" readonly>
                         </div>
                         <div class="col-md-6">
                             <label class="form-label">Birthdate</label>
-                            <input class="form-control" value="<?= $residentinformationtbl['birthdate'] ?>" readonly>
+                            <input class="form-control input-readonly" value="<?= $residentinformationtbl['birthdate'] ?>" readonly>
                         </div>
                     </div>
 
