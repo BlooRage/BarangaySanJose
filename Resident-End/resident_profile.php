@@ -130,6 +130,7 @@ if ($residentId !== '' && isset($conn) && $conn instanceof mysqli) {
   <script src="../JS-Script-Files/Resident-End/profileTabs.js" defer></script>
   <script src="../JS-Script-Files/Resident-End/profileAddress.js" defer></script>
   <script src="../JS-Script-Files/Resident-End/profileEmergency.js" defer></script>
+  <script src="../JS-Script-Files/Resident-End/profileEdit.js" defer></script>
     <link rel="stylesheet" href="../CSS-Styles/Resident-End-CSS/residentDashboard.css">
 </head>
 
@@ -225,6 +226,10 @@ if ($residentId !== '' && isset($conn) && $conn instanceof mysqli) {
                                 <?php elseif ($pendingSector > 0): ?>
                                     <div>
                                         <strong>Sector Membership:</strong> <?= htmlspecialchars($pendingLabel, ENT_QUOTES, 'UTF-8') ?>
+                                    </div>
+                                <?php else: ?>
+                                    <div>
+                                        <strong>Sector Membership:</strong> N/A
                                     </div>
                                 <?php endif; ?>
                             </div>
@@ -507,15 +512,39 @@ if ($residentId !== '' && isset($conn) && $conn instanceof mysqli) {
 
                     <label class="form-label">Full Name</label>
                     <div class="d-flex gap-2 mb-3">
-                        <input class="form-control" value="<?= $residentinformationtbl['firstname'] ?>" placeholder="First Name" >
-                        <input class="form-control" value="<?= $residentinformationtbl['middlename'] ?>" placeholder="Middle Name" >
-                        <input class="form-control" value="<?= $residentinformationtbl['lastname'] ?>" placeholder="Last Name" >
-                        <select class="form-control" value="<?= $residentinformationtbl['suffix'] ?>" placeholder="Suffix (e.g. Jr., Sr.)" >
+                        <input class="form-control" id="editFirstName" value="<?= $residentinformationtbl['firstname'] ?>" placeholder="First Name" >
+                        <input class="form-control" id="editMiddleName" value="<?= $residentinformationtbl['middlename'] ?>" placeholder="Middle Name" >
+                        <input class="form-control" id="editLastName" value="<?= $residentinformationtbl['lastname'] ?>" placeholder="Last Name" >
+                        <select class="form-control" id="editSuffix">
                             <option value="">N/A</option>
-                            <option value="Jr.">Jr.</option>
-                            <option value="Sr.">Sr.</option>
-                            <option value="III">III</option>
+                            <option value="Jr." <?= ($residentinformationtbl['suffix'] ?? '') === 'Jr.' ? 'selected' : '' ?>>Jr.</option>
+                            <option value="Sr." <?= ($residentinformationtbl['suffix'] ?? '') === 'Sr.' ? 'selected' : '' ?>>Sr.</option>
+                            <option value="III" <?= ($residentinformationtbl['suffix'] ?? '') === 'III' ? 'selected' : '' ?>>III</option>
                         </select>
+                    </div>
+                    <div class="alert alert-warning small mb-3 d-none" id="nameDocNotice">
+                        To change your name, upload a valid ID photo.
+                    </div>
+                    <div class="doc-required-box d-none" id="nameDocSection">
+                        <div class="row g-2">
+                        <div class="col-md-6">
+                            <label class="form-label">Valid ID Type</label>
+                            <select class="form-select" id="nameIdType">
+                                <option value="">Select ID</option>
+                                <option value="Passport">Passport</option>
+                                <option value="Driver's License">Driver's License</option>
+                                <option value="PhilHealth ID">PhilHealth ID</option>
+                                <option value="Voter's ID">Voter's ID</option>
+                                <option value="National ID">National ID</option>
+                                <option value="Barangay ID">Barangay ID</option>
+                                <option value="PRC ID">PRC ID</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Valid ID Photo</label>
+                            <input type="file" class="form-control" id="nameIdFile" accept=".jpg,.jpeg,.png,.webp,.pdf">
+                        </div>
+                        </div>
                     </div>
 
                     <div class="row mb-3">
@@ -532,20 +561,34 @@ if ($residentId !== '' && isset($conn) && $conn instanceof mysqli) {
                     <div class="row mb-3">
                         <div class="col-md-6">
                             <label class="form-label">Civil Status</label>
-                            <select class="form-control" value="<?= $residentinformationtbl['civil_status'] ?>">
-                                <option value="Single">Single</option>
-                                <option value="Married">Married</option>
-                                <option value="Widowed">Widowed</option>
+                            <select class="form-control" id="editCivilStatus">
+                                <option value="Single" <?= ($residentinformationtbl['civil_status'] ?? '') === 'Single' ? 'selected' : '' ?>>Single</option>
+                                <option value="Married" <?= ($residentinformationtbl['civil_status'] ?? '') === 'Married' ? 'selected' : '' ?>>Married</option>
+                                <option value="Widowed" <?= ($residentinformationtbl['civil_status'] ?? '') === 'Widowed' ? 'selected' : '' ?>>Widowed</option>
                             </select>
                         </div>
                         <div class="col-md-6">
                             <label class="form-label">Religion</label>
-                            <select class="form-control" value="<?= $residentinformationtbl['religion'] ?>">
-                                <option value="Roman Catholic">Roman Catholic</option>
-                                <option value="Iglesia ni Cristo">Iglesia ni Cristo</option>
-                                <option value="Muslim">Muslim</option>
-                                <option value="Others">Others</option>
+                            <select class="form-control" id="editReligion">
+                                <option value="Roman Catholic" <?= ($residentinformationtbl['religion'] ?? '') === 'Roman Catholic' ? 'selected' : '' ?>>Roman Catholic</option>
+                                <option value="Iglesia ni Cristo" <?= ($residentinformationtbl['religion'] ?? '') === 'Iglesia ni Cristo' ? 'selected' : '' ?>>Iglesia ni Cristo</option>
+                                <option value="Muslim" <?= ($residentinformationtbl['religion'] ?? '') === 'Muslim' ? 'selected' : '' ?>>Muslim</option>
+                                <option value="Others" <?= ($residentinformationtbl['religion'] ?? '') === 'Others' ? 'selected' : '' ?>>Others</option>
                             </select>
+                        </div>
+                    </div>
+                    <div class="alert alert-warning small mb-3 d-none" id="civilStatusDocNotice">
+                        Changing civil status requires a supporting document.
+                    </div>
+                    <div class="doc-required-box d-none" id="civilStatusDocSection">
+                        <div class="row g-2">
+                        <div class="col-md-6">
+                            <label class="form-label" id="civilStatusDocLabel">Document</label>
+                            <input type="file" class="form-control" id="civilStatusFile" accept=".jpg,.jpeg,.png,.webp,.pdf">
+                        </div>
+                        <div class="col-md-6">
+                            <div class="form-text mt-4" id="civilStatusDocHelp"></div>
+                        </div>
                         </div>
                     </div>
 
@@ -579,21 +622,54 @@ if ($residentId !== '' && isset($conn) && $conn instanceof mysqli) {
 
                     <div class="mb-3">
                         <label class="form-label">Sector Membership</label>
-                        <select class="form-select" value="<?= $residentinformationtbl['sector_membership'] ?>">
-                            <option value="PWD">Person with Disability (PWD)</option>
-                            <option value="Single Parent">Single Parent</option>
-                            <option value="Student">Student</option>
-                            <option value="Senior Citizen">Senior Citizen</option>
-                            <option value="Indigenous People">Indigenous People</option>
-                            <option value="NA">N/A</option>
-                        </select>
+                        <?php
+                          $sectorSelected = array_filter(array_map('trim', explode(',', (string)($residentinformationtbl['sector_membership'] ?? ''))));
+                        ?>
+                        <div class="row g-2">
+                            <div class="col-12 col-md-6">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" id="sectorPWD" name="sectorMembership[]" value="PWD" <?= in_array('PWD', $sectorSelected, true) ? 'checked' : '' ?>>
+                                    <label class="form-check-label" for="sectorPWD">Person with Disability (PWD)</label>
+                                </div>
+                            </div>
+                            <div class="col-12 col-md-6">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" id="sectorSingleParent" name="sectorMembership[]" value="Single Parent" <?= in_array('Single Parent', $sectorSelected, true) ? 'checked' : '' ?>>
+                                    <label class="form-check-label" for="sectorSingleParent">Single Parent</label>
+                                </div>
+                            </div>
+                            <div class="col-12 col-md-6">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" id="sectorStudent" name="sectorMembership[]" value="Student" <?= in_array('Student', $sectorSelected, true) ? 'checked' : '' ?>>
+                                    <label class="form-check-label" for="sectorStudent">Student</label>
+                                </div>
+                            </div>
+                            <div class="col-12 col-md-6">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" id="sectorSenior" name="sectorMembership[]" value="Senior Citizen" <?= in_array('Senior Citizen', $sectorSelected, true) ? 'checked' : '' ?>>
+                                    <label class="form-check-label" for="sectorSenior">Senior Citizen</label>
+                                </div>
+                            </div>
+                            <div class="col-12 col-md-6">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" id="sectorIndigenous" name="sectorMembership[]" value="Indigenous People" <?= in_array('Indigenous People', $sectorSelected, true) ? 'checked' : '' ?>>
+                                    <label class="form-check-label" for="sectorIndigenous">Indigenous People</label>
+                                </div>
+                            </div>
+                            <div class="col-12 col-md-6">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" id="sectorNA" name="sectorMembership[]" value="NA" <?= in_array('NA', $sectorSelected, true) ? 'checked' : '' ?>>
+                                    <label class="form-check-label" for="sectorNA">N/A</label>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </div>
 
-                    <div class="modal-footer">
-                        <button class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                        <button class="btn btn-primary">Next</button>
-                    </div>
+                <div class="modal-footer">
+                    <button class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button class="btn btn-primary" id="btnProfileSave" type="button">Save</button>
+                </div>
 
                 </div>
 

@@ -340,3 +340,11 @@ body {
     color: #6c757d;
     cursor: not-allowed;
 }
+
+.doc-required-box {
+    border: 1px solid #c3c9d2;
+    background: #e9edf2;
+    border-radius: 10px;
+    padding: 12px;
+    margin-bottom: 1rem;
+}
