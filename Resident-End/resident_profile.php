@@ -668,7 +668,21 @@ if ($residentId !== '' && isset($conn) && $conn instanceof mysqli) {
                         </div>
                         <div class="mb-3">
                             <label class="form-label">Relationship</label>
-                            <input class="form-control" id="emergencyRelationship" placeholder="Relationship" value="<?= $residentinformationtbl['emergency_relationship'] ?? '' ?>">
+                            <?php
+                              $relRaw = $residentinformationtbl['emergency_relationship'] ?? '';
+                              $relNorm = strtolower(trim((string)$relRaw));
+                              $relOptions = ['parent' => 'Parent', 'child' => 'Child', 'spouse' => 'Spouse', 'other' => 'Other'];
+                              $relSelectedKey = array_key_exists($relNorm, $relOptions) ? $relNorm : ($relNorm !== '' ? 'other' : '');
+                              $relOtherValue = ($relSelectedKey === 'other' && $relNorm !== '' && !array_key_exists($relNorm, $relOptions)) ? $relRaw : '';
+                            ?>
+                            <select class="form-select" id="emergencyRelationship">
+                                <option value="" <?= $relSelectedKey === '' ? 'selected' : '' ?>>Select relationship</option>
+                                <option value="Parent" <?= $relSelectedKey === 'parent' ? 'selected' : '' ?>>Parent</option>
+                                <option value="Child" <?= $relSelectedKey === 'child' ? 'selected' : '' ?>>Child</option>
+                                <option value="Spouse" <?= $relSelectedKey === 'spouse' ? 'selected' : '' ?>>Spouse</option>
+                                <option value="Other" <?= $relSelectedKey === 'other' ? 'selected' : '' ?>>Other</option>
+                            </select>
+                            <input class="form-control mt-2 d-none" id="emergencyRelationshipOther" placeholder="Please specify" value="<?= htmlspecialchars($relOtherValue) ?>">
                         </div>
                         <div class="mb-3">
                             <label class="form-label">Address</label>

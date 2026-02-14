@@ -12,6 +12,7 @@ document.addEventListener("DOMContentLoaded", () => {
         "emergencySuffix",
         "emergencyContact",
         "emergencyRelationship",
+        "emergencyRelationshipOther",
         "emergencyAddress",
     ];
     const initialValues = {};
@@ -54,12 +55,21 @@ document.addEventListener("DOMContentLoaded", () => {
         const firstName = getValue("emergencyFirstName");
         const middleName = getValue("emergencyMiddleName");
         const contact = getValue("emergencyContact");
-        const relationship = getValue("emergencyRelationship");
+        let relationship = getValue("emergencyRelationship");
+        const relationshipOther = getValue("emergencyRelationshipOther");
         const address = getValue("emergencyAddress");
 
         if (!lastName || !firstName || !contact || !relationship || !address) {
             setMessage("Please fill in all required fields.", true);
             return false;
+        }
+
+        if (relationship.toLowerCase() === "other") {
+            if (!relationshipOther) {
+                setMessage("Please specify the relationship.", true);
+                return false;
+            }
+            relationship = relationshipOther;
         }
 
         if (!isValidPersonName(firstName, 2, 30)) {
@@ -120,6 +130,23 @@ document.addEventListener("DOMContentLoaded", () => {
         if (el) el.addEventListener("input", updateSaveState);
     });
 
+    const relationshipSelectEl = document.getElementById("emergencyRelationship");
+    const relationshipOtherEl = document.getElementById("emergencyRelationshipOther");
+    const toggleRelationshipOther = () => {
+        if (!relationshipSelectEl || !relationshipOtherEl) return;
+        const isOther = relationshipSelectEl.value.toLowerCase() === "other";
+        relationshipOtherEl.classList.toggle("d-none", !isOther);
+        if (!isOther) {
+            relationshipOtherEl.value = "";
+        }
+    };
+    if (relationshipSelectEl) {
+        relationshipSelectEl.addEventListener("change", () => {
+            toggleRelationshipOther();
+            updateSaveState();
+        });
+    }
+
     saveBtn.addEventListener("click", async () => {
         saveBtn.disabled = true;
         setMessage("");
@@ -129,13 +156,20 @@ document.addEventListener("DOMContentLoaded", () => {
             return;
         }
 
+        const relationshipSelect = getValue("emergencyRelationship");
+        const relationshipOther = getValue("emergencyRelationshipOther");
+        const relationshipValue =
+            relationshipSelect.toLowerCase() === "other" && relationshipOther
+                ? relationshipOther
+                : relationshipSelect;
+
         const payload = {
             last_name: getValue("emergencyLastName"),
             first_name: getValue("emergencyFirstName"),
             middle_name: getValue("emergencyMiddleName"),
             suffix: getValue("emergencySuffix"),
             phone_number: getValue("emergencyContact"),
-            relationship: getValue("emergencyRelationship"),
+            relationship: relationshipValue,
             address: getValue("emergencyAddress"),
         };
 
@@ -193,5 +227,6 @@ document.addEventListener("DOMContentLoaded", () => {
             updateSaveState();
         }
     })();
+    toggleRelationshipOther();
     updateSaveState();
 });
