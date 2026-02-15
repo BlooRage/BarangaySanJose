@@ -28,6 +28,10 @@ $residentId = $residentinformationtbl['resident_id'] ?? '';
 $headOfFamilyRaw = $residentinformationtbl['head_of_family'] ?? '';
 $headOfFamilyNormalized = strtolower(trim((string)$headOfFamilyRaw));
 $isHeadOfFamily = in_array($headOfFamilyNormalized, ['yes', 'true', '1', 'y'], true);
+$residentStatusRaw = trim((string)($residentinformationtbl['status_name_resident'] ?? ''));
+$residentStatusKey = strtolower(str_replace([' ', '_', '-'], '', $residentStatusRaw));
+$isResidentVerified = in_array($residentStatusKey, ['verifiedresident', 'verified'], true);
+$canSendHouseholdInvite = $isHeadOfFamily && $isResidentVerified;
 
 if (!function_exists('toPublicPath')) {
 function toPublicPath($path): ?string {
@@ -437,6 +441,11 @@ if ($residentId !== '' && isset($conn) && $conn instanceof mysqli) {
                     <button class="btn-close" data-bs-dismiss="modal"></button>
                 </div>
                 <div class="modal-body">
+                    <?php if (!$isResidentVerified): ?>
+                        <div class="alert alert-warning small mb-2">
+                            Your account must be verified before sending household invite codes via SMS.
+                        </div>
+                    <?php endif; ?>
                     <div class="mb-3">
                         <p class="text small mb-2">
                             Invite members with accounts via SMS.
@@ -444,7 +453,7 @@ if ($residentId !== '' && isset($conn) && $conn instanceof mysqli) {
                         <div id="householdInvitePhoneList" class="d-flex flex-column gap-2">
                             <div class="input-group">
                                 <span class="input-group-text">+63</span>
-                                <input type="text" class="form-control household-invite-phone" placeholder="9XXXXXXXXX" inputmode="numeric" pattern="^\d{9}$" maxlength="9">
+                                <input type="text" class="form-control household-invite-phone" placeholder="9XXXXXXXXX" inputmode="numeric" pattern="^\d{10}$" maxlength="10">
                             </div>
                         </div>
                         <button type="button" class="btn btn-primary btn-sm mt-2" id="btnAddInvitePhone">
@@ -486,7 +495,7 @@ if ($residentId !== '' && isset($conn) && $conn instanceof mysqli) {
                 <div class="modal-footer">
                     <button class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
                     <button class="btn btn-outline-primary" id="btnAddHouseholdMemberInfo" disabled>Add Member</button>
-                    <button class="btn btn-success" id="btnSendHouseholdInvite">Send Invites</button>
+                    <button class="btn btn-success" id="btnSendHouseholdInvite" data-verified="<?= $isResidentVerified ? '1' : '0' ?>" <?= $canSendHouseholdInvite ? '' : 'disabled' ?>>Send Invites</button>
                 </div>
             </div>
         </div>
