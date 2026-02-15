@@ -87,6 +87,10 @@
     margin-right: 6px;
 }
 
+.audit-refresh.btn-icon i {
+    margin-right: 0;
+}
+
 .audit-refresh.is-loading i {
     animation: auditSpin 900ms linear infinite;
 }

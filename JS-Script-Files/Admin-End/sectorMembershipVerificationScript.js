@@ -493,6 +493,59 @@
     renderTable();
   };
 
+  // ========================
+  // AUTO REFRESH + MANUAL REFRESH (60s)
+  // ========================
+  const AUTO_REFRESH_SECONDS = 60;
+  let autoRefreshSecondsLeft = AUTO_REFRESH_SECONDS;
+  let autoRefreshInterval = null;
+  let autoRefreshInFlight = false;
+  const btnRefreshTable = el("btnSectorAppsRefresh");
+  const countdownEl = el("sectorAppsAutoRefreshCountdown");
+
+  const setRefreshLoading = (on) => {
+    if (!btnRefreshTable) return;
+    btnRefreshTable.classList.toggle("is-loading", !!on);
+    btnRefreshTable.disabled = !!on;
+  };
+
+  const renderCountdown = () => {
+    if (!countdownEl) return;
+    countdownEl.textContent = autoRefreshSecondsLeft > 0 ? `Auto refresh in ${autoRefreshSecondsLeft}s` : "";
+  };
+
+  const resetCountdown = () => {
+    autoRefreshSecondsLeft = AUTO_REFRESH_SECONDS;
+    renderCountdown();
+  };
+
+  const triggerRefresh = async () => {
+    if (autoRefreshInFlight) return;
+    autoRefreshInFlight = true;
+    setRefreshLoading(true);
+    try {
+      resetCountdown();
+      await loadApps();
+    } finally {
+      autoRefreshInFlight = false;
+      setRefreshLoading(false);
+    }
+  };
+
+  const startAutoRefresh = () => {
+    renderCountdown();
+    if (autoRefreshInterval) clearInterval(autoRefreshInterval);
+    autoRefreshInterval = setInterval(() => {
+      if (autoRefreshInFlight) return;
+      autoRefreshSecondsLeft -= 1;
+      if (autoRefreshSecondsLeft <= 0) {
+        triggerRefresh().catch(() => {});
+        return;
+      }
+      renderCountdown();
+    }, 1000);
+  };
+
   const wireUI = () => {
     const search = el("searchInput");
     if (search) {
@@ -510,10 +563,17 @@
         renderTable();
       });
     });
+
+    if (btnRefreshTable) {
+      btnRefreshTable.addEventListener("click", () => {
+        triggerRefresh().catch(() => {});
+      });
+    }
   };
 
   document.addEventListener("DOMContentLoaded", () => {
     wireUI();
-    loadApps();
+    triggerRefresh().catch(() => {});
+    startAutoRefresh();
   });
 })();

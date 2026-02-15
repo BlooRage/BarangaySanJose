@@ -1,14 +1,14 @@
 <?php
 session_start();
 require '../General/connection.php';
+require_once __DIR__ . '/../General/security.php';
 
 $userID = $_SESSION['user_id'] ?? null;
 $role   = $_SESSION['role'] ?? null;
 
 if (!$userID || !$role) {
     // Not logged in → redirect to login
-    header("Location: ../Guest-End/login.php");
-    exit;
+    redirectToLogin();
 }
 
 switch ($role) {
@@ -22,19 +22,19 @@ switch ($role) {
         $stmt->close();
 
         if (!$profileData) {
-            header("Location: ../../Resident-End/resident_registration.php");
+            header('Location: ' . appUrl('/Resident-End/resident_registration.php'));
             exit;
         }
 
-        header("Location: ../../Resident-End/resident_dashboard.php");
+        header('Location: ' . appUrl('/Resident-End/resident_dashboard.php'));
         exit;
 
-case 'Employee':
-    header("Location: ../../Admin-End/AdminDashboard.php");
-    exit;
-case 'Official':
-case 'Admin':
-case 'SuperAdmin':
+	case 'Employee':
+	    header('Location: ' . appUrl('/Admin-End/AdminDashboard.php'));
+	    exit;
+	case 'Official':
+	case 'Admin':
+	case 'SuperAdmin':
         // Check official profile
         $stmt = $conn->prepare("SELECT official_id FROM officialinformationtbl WHERE user_id = ? LIMIT 1");
         $stmt->bind_param("s", $userID);
@@ -44,22 +44,21 @@ case 'SuperAdmin':
         $stmt->close();
 
         if (!$profileData) {
-            header("Location: ../../Admin-End/official_profile_form.php");
+            header('Location: ' . appUrl('/Admin-End/official_profile_form.php'));
             exit;
         }
 
         // Redirect based on role
         if ($role === 'SuperAdmin' || $role === 'Admin') {
-            header("Location: ../../Admin-End/AdminDashboard.php");
+            header('Location: ' . appUrl('/Admin-End/AdminDashboard.php'));
         } else {
-            header("Location: ../../Admin-End/official_dashboard.php");
+            header('Location: ' . appUrl('/Admin-End/official_dashboard.php'));
         }
         exit;
 
     default:
         // Unknown role → logout
         session_destroy();
-        header("Location: ../Guest-End/login.php");
-        exit;
+        redirectToLogin();
 }
 ?>

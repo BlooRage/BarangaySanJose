@@ -40,6 +40,152 @@ html, body {
     font-family: 'Geist', sans-serif;
 }
 
+/* ==========================
+   Admin List Button Consistency
+   ========================== */
+.btn-icon {
+    width: 38px;
+    height: 38px;
+    padding: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex: 0 0 38px; /* prevents shrink in flex layouts (keeps square icon button) */
+    border-radius: 10px;
+    line-height: 1;
+}
+
+.btn-icon i {
+    margin: 0 !important;
+}
+
+/* When an icon-button is appended to an input-group, make it flush with the group */
+.input-group .btn-icon {
+    border-top-left-radius: 0;
+    border-bottom-left-radius: 0;
+}
+
+/* ==========================
+   Admin List Header (Tabs + Actions in One Row)
+   ========================== */
+.admin-list-toolbar {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    padding-bottom: 2px; /* gives room if scrollbar appears */
+    margin-top: 8px;
+}
+
+.admin-list-toolbar::-webkit-scrollbar {
+    height: 6px;
+}
+
+.admin-list-toolbar::-webkit-scrollbar-thumb {
+    background: rgba(0, 0, 0, 0.15);
+    border-radius: 999px;
+}
+
+.admin-list-toolbar::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.admin-list-tabs,
+.admin-list-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex: 0 0 auto;
+    white-space: nowrap;
+}
+
+.admin-list-actions {
+    margin-left: auto;
+}
+
+.admin-search {
+    min-width: 260px;
+    max-width: 420px;
+}
+
+/* "Columns" (blue) + "Refresh" (orange) button styling shared across admin list pages. */
+.admin-columns {
+    border-color: rgba(13, 110, 253, 0.25);
+    color: #0d47a1;
+    background: linear-gradient(180deg, #f4f8ff 0%, #eef5ff 100%);
+    font-weight: 700;
+    letter-spacing: 0.2px;
+    transition: transform 120ms ease, box-shadow 120ms ease, background-color 120ms ease, border-color 120ms ease;
+}
+
+.admin-columns:hover {
+    border-color: rgba(13, 110, 253, 0.45);
+    color: #0a3a84;
+    background: linear-gradient(180deg, #eff6ff 0%, #e7f0ff 100%);
+    box-shadow: 0 10px 18px rgba(13, 110, 253, 0.10);
+    transform: translateY(-1px);
+}
+
+.admin-columns:active {
+    transform: translateY(0);
+    box-shadow: 0 6px 12px rgba(13, 110, 253, 0.10);
+}
+
+.admin-columns:focus-visible {
+    box-shadow: 0 0 0 .2rem rgba(13, 110, 253, 0.18);
+}
+
+.admin-refresh {
+    border-color: rgba(254, 153, 60, 0.45);
+    color: #b85b00;
+    background: linear-gradient(180deg, #fffaf4 0%, #fff3e4 100%);
+    font-weight: 700;
+    letter-spacing: 0.2px;
+    transition: transform 120ms ease, box-shadow 120ms ease, background-color 120ms ease, border-color 120ms ease;
+}
+
+.admin-refresh:hover {
+    border-color: rgba(254, 153, 60, 0.7);
+    color: #a04f00;
+    background: linear-gradient(180deg, #fff6ec 0%, #ffe9d1 100%);
+    box-shadow: 0 10px 18px rgba(222, 113, 12, 0.14);
+    transform: translateY(-1px);
+}
+
+.admin-refresh:active {
+    transform: translateY(0);
+    box-shadow: 0 6px 12px rgba(222, 113, 12, 0.12);
+}
+
+.admin-refresh:focus-visible {
+    box-shadow: 0 0 0 .2rem rgba(254, 153, 60, 0.25);
+}
+
+.admin-refresh.is-loading i {
+    animation: adminSpin 900ms linear infinite;
+}
+
+@keyframes adminSpin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+}
+
+/* Generic "Columns" modal checkbox row styling (used across admin list pages). */
+.table-columns-check {
+    border: 1px solid #e9ecef;
+    border-radius: 12px;
+    padding: 10px 12px;
+    background: #fff;
+    cursor: pointer;
+}
+
+.table-columns-check:hover {
+    border-color: rgba(254, 153, 60, 0.55);
+    background: #fffaf4;
+}
+
 /* Use project serif font for all modal headers */
 .modal .modal-header .modal-title,
 .modal .modal-header h1,

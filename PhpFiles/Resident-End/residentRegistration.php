@@ -2,6 +2,7 @@
 session_start();
 include "../General/connection.php";
 require_once "../General/uniqueIDGenerate.php";
+require_once "../General/audit.php";
 require_once __DIR__ . "/../../composer-email-handler/vendor/autoload.php";
 
 use setasign\Fpdi\Fpdi;
@@ -47,7 +48,48 @@ function getStatusId(mysqli $conn, string $name, string $type): int {
 }
 
 function cleanString($v): string {
-    return trim((string)$v);
+    $text = trim((string)$v);
+    // Normalize whitespace to avoid "looks filled" but actually garbage spacing.
+    $text = preg_replace('/\s+/u', ' ', $text);
+    return $text;
+}
+
+function normalizeForGarbageCheck(string $value): string {
+    $value = strtolower($value);
+    // Strip to ASCII a-z0-9 so we can reliably detect keyboard-mash patterns.
+    $value = preg_replace('/[^a-z0-9]+/', '', $value);
+    return (string)$value;
+}
+
+function isLikelyGarbageText(string $value, string $mode = 'general'): bool {
+    $compact = normalizeForGarbageCheck($value);
+    if ($compact === '') {
+        return false;
+    }
+
+    // Excessive repeats like "aaaaa" / "111111".
+    if (preg_match('/(.)\\1{3,}/', $compact)) {
+        return true;
+    }
+
+    // Repeated short patterns like "ababab", "123123123".
+    if (strlen($compact) >= 6 && preg_match('/(.{2,3})\\1{2,}/', $compact)) {
+        return true;
+    }
+
+    // Common keyboard-mash sequences.
+    if (preg_match('/(asdf|qwer|zxcv|qwerty|poiuy|lkjh|mnbv|abcd|1234|0000)/', $compact)) {
+        return true;
+    }
+
+    if ($mode === 'name') {
+        $lettersOnly = strtolower(preg_replace('/[^a-z]+/', '', $value));
+        if (strlen($lettersOnly) >= 8 && !preg_match('/[aeiou]/', $lettersOnly)) {
+            return true;
+        }
+    }
+
+    return false;
 }
 
 function isValidPersonName(string $value, int $minLetters = 1, int $maxLength = 50): bool {
@@ -300,8 +342,9 @@ try {
     $civil = cleanString($_POST['civilStatus'] ?? '');
     $familyRole = cleanString($_POST['familyRole'] ?? '');
 
-    $religion = cleanString($_POST['religion'] ?? '');
-    if ($religion === "Other") {
+    $religionSelect = cleanString($_POST['religion'] ?? '');
+    $religion = $religionSelect;
+    if ($religionSelect === "Other") {
         $religion = cleanString($_POST['religionOther'] ?? '');
     }
 
@@ -348,8 +391,9 @@ try {
     $subd        = cleanString($_POST['subdivisionSitio'] ?? '');
     $area        = cleanString($_POST['areaNumber'] ?? '');
 
-    $houseType = cleanString($_POST['houseType'] ?? '');
-    if ($houseType === "Other") {
+    $houseTypeSelect = cleanString($_POST['houseType'] ?? '');
+    $houseType = $houseTypeSelect;
+    if ($houseTypeSelect === "Other") {
         $houseType = cleanString($_POST['houseTypeOther'] ?? '');
     }
 
@@ -370,6 +414,24 @@ try {
     $allowedCivil = ['Single', 'Married', 'Widowed'];
     $allowedFamilyRole = ['Spouse', 'Child', 'Parent', 'Sibling', 'Grandparents', 'Extended Family'];
     $allowedAddressSystem = ['house', 'lot_block'];
+    $allowedReligionSelect = ['Roman Catholic', 'Iglesia ni Cristo', 'Islam', 'Other'];
+    $allowedOwnership = ['Owner', 'Tenant'];
+    $allowedDuration = [
+        'Less than 6 months',
+        '6 months - 1 year',
+        '2-3 years',
+        '4-5 years',
+        'More than 5 years'
+    ];
+    $allowedAreas = ['Area 01', 'Area 1A', 'Area 02', 'Area 03', 'Area 04', 'Area 05', 'Area 06'];
+    $allowedHouseTypeSelect = [
+        'Concrete',
+        'Semi-Concrete',
+        'Wood/Light Materials',
+        'Makeshift/Salvaged Materials',
+        'Shanty/Informal',
+        'Other'
+    ];
 
     if (!in_array($sex, $allowedSex, true)) {
         http_response_code(400);
@@ -391,6 +453,50 @@ try {
         echo json_encode(["success" => false, "message" => "Please select a valid address system."]);
         exit;
     }
+    if ($religionSelect === '' || !in_array($religionSelect, $allowedReligionSelect, true)) {
+        http_response_code(400);
+        echo json_encode(["success" => false, "message" => "Please select a valid religion."]);
+        exit;
+    }
+    if ($religionSelect === 'Other' && $religion === '') {
+        http_response_code(400);
+        echo json_encode(["success" => false, "message" => "Religion is required."]);
+        exit;
+    }
+
+    if ($ownership === '' || !in_array($ownership, $allowedOwnership, true)) {
+        http_response_code(400);
+        echo json_encode(["success" => false, "message" => "Please select a valid house ownership."]);
+        exit;
+    }
+    if ($duration === '' || !in_array($duration, $allowedDuration, true)) {
+        http_response_code(400);
+        echo json_encode(["success" => false, "message" => "Please select a valid residency duration."]);
+        exit;
+    }
+    if ($houseTypeSelect === '' || !in_array($houseTypeSelect, $allowedHouseTypeSelect, true)) {
+        http_response_code(400);
+        echo json_encode(["success" => false, "message" => "Please select a valid house type."]);
+        exit;
+    }
+    if ($houseTypeSelect === 'Other') {
+        if ($houseType === '') {
+            http_response_code(400);
+            echo json_encode(["success" => false, "message" => "House type is required."]);
+            exit;
+        }
+        if (!isValidAddressLikeText($houseType) || (preg_match('/[A-Za-zÀ-ÖØ-öø-ÿÑñ]/u', $houseType) && isLikelyGarbageText($houseType, 'address'))) {
+            http_response_code(400);
+            echo json_encode(["success" => false, "message" => "House type appears invalid or random."]);
+            exit;
+        }
+    }
+
+    if ($area !== '' && !in_array($area, $allowedAreas, true)) {
+        http_response_code(400);
+        echo json_encode(["success" => false, "message" => "Please select a valid area."]);
+        exit;
+    }
 
     $nameChecks = [
         'First name' => $firstName,
@@ -410,16 +516,32 @@ try {
             ]);
             exit;
         }
+        if (isLikelyGarbageText($nameValue, 'name')) {
+            http_response_code(400);
+            echo json_encode([
+                "success" => false,
+                "message" => "{$label} appears invalid or random."
+            ]);
+            exit;
+        }
     }
 
     $alphaOptionalChecks = [];
     if ($suffix !== '') $alphaOptionalChecks['Suffix'] = $suffix;
     if ($religion !== '') $alphaOptionalChecks['Religion'] = $religion;
     if ($occupationDetail !== '') $alphaOptionalChecks['Occupation'] = $occupationDetail;
+    if (!empty($_POST['schoolName'])) {
+        $alphaOptionalChecks['School name'] = cleanString($_POST['schoolName']);
+    }
     foreach ($alphaOptionalChecks as $label => $value) {
         if (!isValidAlphaText($value)) {
             http_response_code(400);
             echo json_encode(["success" => false, "message" => "{$label} contains invalid characters."]);
+            exit;
+        }
+        if (isLikelyGarbageText($value, 'alpha')) {
+            http_response_code(400);
+            echo json_encode(["success" => false, "message" => "{$label} appears invalid or random."]);
             exit;
         }
     }
@@ -436,6 +558,12 @@ try {
         if (!isValidAddressLikeText($value)) {
             http_response_code(400);
             echo json_encode(["success" => false, "message" => "{$label} contains invalid characters."]);
+            exit;
+        }
+        // Only apply garbage heuristics when the address value contains letters (numeric-only values are fine).
+        if (preg_match('/[A-Za-zÀ-ÖØ-öø-ÿÑñ]/u', $value) && isLikelyGarbageText($value, 'address')) {
+            http_response_code(400);
+            echo json_encode(["success" => false, "message" => "{$label} appears invalid or random."]);
             exit;
         }
     }
@@ -602,7 +730,11 @@ try {
         throw new Exception("Please select a valid proof type.");
     }
 
-    $idFiles = ['idFront', 'idBack'];
+    // Determine ID file requirements (Passport is single-side upload).
+    $idTypeForReq = cleanString($_POST['idType'] ?? '');
+    $isPassportId = $idTypeForReq !== '' && strcasecmp($idTypeForReq, 'Passport') === 0;
+    $idFiles = $isPassportId ? ['idFront'] : ['idFront', 'idBack'];
+
     $hasIdProof = true;
     foreach ($idFiles as $fileKey) {
         if (!isset($_FILES[$fileKey]) || $_FILES[$fileKey]['error'] !== UPLOAD_ERR_OK) {
@@ -624,7 +756,7 @@ try {
 
     if (!$skipProof) {
         if ($proofType === 'ID' && !$hasIdProof) {
-            throw new Exception("ID Front and Back are required.");
+            throw new Exception($isPassportId ? "Passport file is required." : "ID Front and Back are required.");
         }
         if ($proofType === 'Document' && !$hasDocumentProof) {
             throw new Exception("Supporting document upload is required.");
@@ -657,85 +789,128 @@ try {
             throw new Exception("ID Type is required.");
         }
 
-        $savedIdFiles = [];
         $allowedId = ['jpg','jpeg','png','webp','pdf'];
-        foreach ($idFiles as $fileKey) {
-            $tmpName = $_FILES[$fileKey]['tmp_name'];
-            $name = basename($_FILES[$fileKey]['name']);
+
+        // Passport: single-side upload (store as-is, no merge).
+        if (strcasecmp($idType, 'Passport') === 0) {
+            $tmpName = $_FILES['idFront']['tmp_name'];
+            $name = basename($_FILES['idFront']['name']);
             $ext = strtolower(pathinfo($name, PATHINFO_EXTENSION));
 
             if (isHeicExt($ext)) {
                 throw new Exception("HEIC is not supported on the server. Please upload JPG or PNG.");
             }
             if (!in_array($ext, $allowedId, true)) {
-                throw new Exception("Invalid file type for {$fileKey}.");
+                throw new Exception("Invalid file type for passport.");
             }
 
-            $fileMoved = moveUploadedFileWithDocName($tmpName, $uploadDirDocs, $idType . ' ' . $fileKey, $user_id, $ext);
-            $savedIdFiles[$fileKey] = [
-                'path' => $fileMoved['disk_path'],
-                'ext' => $ext
-            ];
-        }
+            $moved = moveUploadedFileWithDocName($tmpName, $uploadDirDocs, $idType, $user_id, $ext);
 
-        if (!isset($savedIdFiles['idFront'], $savedIdFiles['idBack'])) {
-            throw new Exception("ID front/back files are incomplete.");
-        }
+            $docTypeId = getDocumentTypeId($conn, $idType);
+            $remarks = "idSingle";
+            $ins = $conn->prepare("
+                INSERT INTO unifiedfileattachmenttbl
+                (source_type, source_id, document_type_id, file_name, file_path, file_type, user_id_uploaded_by, status_id_verify, remarks, id_number)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ");
+            if (!$ins) throw new Exception("Prepare failed (insert passport): " . $conn->error);
+            $idNumber = $uploadedIdNumber;
+            $ins->bind_param(
+                "ssissssiss",
+                $sourceType,
+                $resident_id,
+                $docTypeId,
+                $moved['file_name'],
+                $moved['file_path'],
+                $ext,
+                $user_id,
+                $statusVerifyId,
+                $remarks,
+                $idNumber
+            );
+            if (!$ins->execute()) throw new Exception("Passport attachment insert failed: " . $ins->error);
+            $ins->close();
+        } else {
+            // Standard ID: requires front + back and stores a merged PDF.
+            $savedIdFiles = [];
+            foreach ($idFiles as $fileKey) {
+                $tmpName = $_FILES[$fileKey]['tmp_name'];
+                $name = basename($_FILES[$fileKey]['name']);
+                $ext = strtolower(pathinfo($name, PATHINFO_EXTENSION));
 
-        $mergedFileName = buildAttachmentFileName($idType, $user_id, 'pdf');
-        $mergedPath = $uploadDirDocs . $mergedFileName;
-        $mergeIndex = 0;
-        while (file_exists($mergedPath)) {
-            $mergeIndex++;
-            $mergedFileName = buildAttachmentFileName($idType, $user_id, 'pdf', $mergeIndex);
+                if (isHeicExt($ext)) {
+                    throw new Exception("HEIC is not supported on the server. Please upload JPG or PNG.");
+                }
+                if (!in_array($ext, $allowedId, true)) {
+                    throw new Exception("Invalid file type for {$fileKey}.");
+                }
+
+                $fileMoved = moveUploadedFileWithDocName($tmpName, $uploadDirDocs, $idType . ' ' . $fileKey, $user_id, $ext);
+                $savedIdFiles[$fileKey] = [
+                    'path' => $fileMoved['disk_path'],
+                    'ext' => $ext
+                ];
+            }
+
+            if (!isset($savedIdFiles['idFront'], $savedIdFiles['idBack'])) {
+                throw new Exception("ID front/back files are incomplete.");
+            }
+
+            $mergedFileName = buildAttachmentFileName($idType, $user_id, 'pdf');
             $mergedPath = $uploadDirDocs . $mergedFileName;
-        }
-
-        buildMergedIdPdf(
-            $savedIdFiles['idFront']['path'],
-            $savedIdFiles['idFront']['ext'],
-            $savedIdFiles['idBack']['path'],
-            $savedIdFiles['idBack']['ext'],
-            $mergedPath
-        );
-
-        if (!file_exists($mergedPath) || filesize($mergedPath) <= 0) {
-            throw new Exception("Failed to generate merged ID PDF.");
-        }
-
-        // Keep only the merged PDF; remove temporary front/back files.
-        foreach ($savedIdFiles as $savedFile) {
-            $tmpDiskPath = (string)($savedFile['path'] ?? '');
-            if ($tmpDiskPath !== '' && file_exists($tmpDiskPath)) {
-                @unlink($tmpDiskPath);
+            $mergeIndex = 0;
+            while (file_exists($mergedPath)) {
+                $mergeIndex++;
+                $mergedFileName = buildAttachmentFileName($idType, $user_id, 'pdf', $mergeIndex);
+                $mergedPath = $uploadDirDocs . $mergedFileName;
             }
-        }
 
-        $docTypeId = getDocumentTypeId($conn, $idType);
-        $remarks = "idMerged";
-        $fileType = "pdf";
-        $mergedPathDb = toDbWebPath($mergedPath);
-        $ins = $conn->prepare("
-            INSERT INTO unifiedfileattachmenttbl
-            (source_type, source_id, document_type_id, file_name, file_path, file_type, user_id_uploaded_by, status_id_verify, remarks, id_number)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        ");
-        if (!$ins) throw new Exception("Prepare failed (insert merged ID): " . $conn->error);
-        $ins->bind_param(
-            "ssissssiss",
-            $sourceType,
-            $resident_id,
-            $docTypeId,
-            $mergedFileName,
-            $mergedPathDb,
-            $fileType,
-            $user_id,
-            $statusVerifyId,
-            $remarks,
-            $uploadedIdNumber
-        );
-        if (!$ins->execute()) throw new Exception("Merged ID attachment insert failed: " . $ins->error);
-        $ins->close();
+            buildMergedIdPdf(
+                $savedIdFiles['idFront']['path'],
+                $savedIdFiles['idFront']['ext'],
+                $savedIdFiles['idBack']['path'],
+                $savedIdFiles['idBack']['ext'],
+                $mergedPath
+            );
+
+            if (!file_exists($mergedPath) || filesize($mergedPath) <= 0) {
+                throw new Exception("Failed to generate merged ID PDF.");
+            }
+
+            // Keep only the merged PDF; remove temporary front/back files.
+            foreach ($savedIdFiles as $savedFile) {
+                $tmpDiskPath = (string)($savedFile['path'] ?? '');
+                if ($tmpDiskPath !== '' && file_exists($tmpDiskPath)) {
+                    @unlink($tmpDiskPath);
+                }
+            }
+
+            $docTypeId = getDocumentTypeId($conn, $idType);
+            $remarks = "idMerged";
+            $fileType = "pdf";
+            $mergedPathDb = toDbWebPath($mergedPath);
+            $ins = $conn->prepare("
+                INSERT INTO unifiedfileattachmenttbl
+                (source_type, source_id, document_type_id, file_name, file_path, file_type, user_id_uploaded_by, status_id_verify, remarks, id_number)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ");
+            if (!$ins) throw new Exception("Prepare failed (insert merged ID): " . $conn->error);
+            $ins->bind_param(
+                "ssissssiss",
+                $sourceType,
+                $resident_id,
+                $docTypeId,
+                $mergedFileName,
+                $mergedPathDb,
+                $fileType,
+                $user_id,
+                $statusVerifyId,
+                $remarks,
+                $uploadedIdNumber
+            );
+            if (!$ins->execute()) throw new Exception("Merged ID attachment insert failed: " . $ins->error);
+            $ins->close();
+        }
     }
 
     if ($hasPicture) {
@@ -1116,11 +1291,20 @@ try {
     }
 
     $ePhone = cleanString($_POST['emergencyPhoneNumber'] ?? '');
-    $eRel   = cleanString($_POST['emergencyRelationship'] ?? '');
+    $eRelSelect = cleanString($_POST['emergencyRelationship'] ?? '');
+    $eRel = $eRelSelect;
+    if ($eRelSelect === 'Other') {
+        $eRel = cleanString($_POST['emergencyRelationshipOther'] ?? '');
+    }
     $eAddr  = cleanString($_POST['emergencyAddress'] ?? '');
 
     if ($eLast === '' || $eFirst === '' || $ePhone === '' || $eRel === '' || $eAddr === '') {
         throw new Exception("Missing required emergency contact fields.");
+    }
+
+    $allowedEmergencyRelationship = ['Parent', 'Spouse', 'Sibling', 'Child', 'Relative', 'Friend', 'Guardian', 'Other'];
+    if ($eRelSelect === '' || !in_array($eRelSelect, $allowedEmergencyRelationship, true)) {
+        throw new Exception("Emergency relationship is invalid.");
     }
 
     if (!preg_match('/^9\\d{9}$/', $ePhone)) {
@@ -1129,8 +1313,14 @@ try {
     if (!isValidAddressLikeText($eAddr)) {
         throw new Exception("Emergency address contains invalid characters.");
     }
+    if (preg_match('/[A-Za-zÀ-ÖØ-öø-ÿÑñ]/u', $eAddr) && isLikelyGarbageText($eAddr, 'address')) {
+        throw new Exception("Emergency address appears invalid or random.");
+    }
     if (!isValidAlphaText($eRel)) {
         throw new Exception("Emergency relationship contains invalid characters.");
+    }
+    if (isLikelyGarbageText($eRel, 'alpha')) {
+        throw new Exception("Emergency relationship appears invalid or random.");
     }
 
     $emergencyNameChecks = [
@@ -1145,6 +1335,9 @@ try {
         $maxLength = ($label === 'Emergency first name') ? 30 : (($label === 'Emergency last name' || $label === 'Emergency middle name') ? 20 : 50);
         if (!isValidPersonName($nameValue, $minLetters, $maxLength)) {
             throw new Exception("{$label} contains invalid characters.");
+        }
+        if (isLikelyGarbageText($nameValue, 'name')) {
+            throw new Exception("{$label} appears invalid or random.");
         }
     }
 
@@ -1169,9 +1362,39 @@ try {
     if (!$stmtE->execute()) throw new Exception("Emergency contact save failed: " . $stmtE->error);
     $stmtE->close();
 
+    // Audit (best-effort): resident submitted profiling form.
+    // Do not log sensitive values; store N/A for old/new.
+    try {
+        $uploadedAnyProof = $hasIdProof || $hasDocumentProof || $hasPicture || $hasAnySectorProof;
+        $finalResidentStatusId = $uploadedAnyProof
+            ? (isset($pendingResidentStatusId) ? (int)$pendingResidentStatusId : null)
+            : (isset($residentStatusId) ? (int)$residentStatusId : null);
+
+        $remarksParts = [];
+        $remarksParts[] = 'skip_proof=' . ($skipProof ? '1' : '0');
+        if (!$skipProof && $proofType !== '') $remarksParts[] = 'proof_type=' . $proofType;
+        if (!empty($selectedSectors)) $remarksParts[] = 'sectors=' . implode(',', $selectedSectors);
+
+        insertUnifiedAuditLog(
+            $conn,
+            (string)$user_id,
+            (string)($_SESSION['role'] ?? 'Resident'),
+            'Resident Registration',
+            'Resident',
+            (string)$resident_id,
+            'RESIDENT_PROFILE_SUBMITTED',
+            null,
+            'N/A',
+            'N/A',
+            implode(' | ', $remarksParts),
+            ($finalResidentStatusId && $finalResidentStatusId > 0) ? $finalResidentStatusId : null
+        );
+    } catch (Throwable $e) {
+        // ignore audit failures
+    }
+
     $conn->commit();
 
-    $uploadedAnyProof = $hasIdProof || $hasDocumentProof || $hasPicture || $hasAnySectorProof;
     $message = $uploadedAnyProof
         ? "Information saved successfully! Documents uploaded and pending verification."
         : "Information saved successfully! Address saved (Pending Verification). You can upload documents later.";

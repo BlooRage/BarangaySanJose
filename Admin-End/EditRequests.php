@@ -28,33 +28,92 @@ include "includes/sidebar.php";
         <hr><br>
 
         <div id="div-tableContainer" class="bg-white p-4 rounded-4 shadow-sm border">
-            <div class="d-flex justify-content-between align-items-center mb-3">
-                <div class="d-flex align-items-center gap-2">
-                    <button class="btn btn-outline-primary btn-sm status-filter-btn active" data-filter="ALL">All</button>
-                    <div class="position-relative">
-                        <button class="btn btn-outline-custom btn-sm status-filter-btn fw-bold" data-filter="Pending">
-                            Pending
-                        </button>
-                        <span id="pendingRequestBadge" class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger d-none">
-                            0
-                        </span>
-                    </div>
-                    <button class="btn btn-outline-custom btn-sm status-filter-btn fw-bold" data-filter="Approved">Approved</button>
-                    <button class="btn btn-outline-custom btn-sm status-filter-btn fw-bold" data-filter="Denied">Denied</button>
-                </div>
+	            <div class="admin-list-toolbar mb-3">
+	                <div class="admin-list-tabs">
+	                    <button class="btn btn-outline-primary btn-sm status-filter-btn active" data-filter="ALL">All</button>
+	                    <div class="position-relative">
+	                        <button class="btn btn-outline-custom btn-sm status-filter-btn fw-bold" data-filter="Pending">
+	                            Pending
+	                        </button>
+	                        <span id="pendingRequestBadge" class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger d-none">
+	                            0
+	                        </span>
+	                    </div>
+	                    <button class="btn btn-outline-custom btn-sm status-filter-btn fw-bold" data-filter="Approved">Approved</button>
+	                    <button class="btn btn-outline-custom btn-sm status-filter-btn fw-bold" data-filter="Denied">Denied</button>
+	                </div>
+	
+	                <div class="admin-list-actions">
+	                    <div class="input-group admin-search">
+	                        <input type="text" id="searchInput" class="form-control" placeholder="Resident ID or Name">
+	                        <span class="input-group-text bg-white"><i class="fas fa-search"></i></span>
+	                    </div>
+	                    <button class="btn btn-outline-secondary btn-icon" type="button" data-bs-toggle="modal" data-bs-target="#modalFilter" id="filterButton" title="Filter" aria-label="Filter">
+	                        <i class="fas fa-filter"></i>
+	                        <span class="visually-hidden">Filter</span>
+	                    </button>
+	                    <button class="btn admin-columns btn-icon" type="button" data-bs-toggle="modal" data-bs-target="#modalTableColumns" id="btnEditRequestsColumns" title="Columns" aria-label="Columns">
+	                        <i class="fa-solid fa-sliders"></i>
+	                        <span class="visually-hidden">Columns</span>
+	                    </button>
+	                    <button class="btn admin-refresh btn-icon" type="button" id="btnEditRequestsRefresh" title="Refresh table" aria-label="Refresh table">
+	                        <i class="fa-solid fa-arrows-rotate"></i>
+	                        <span class="visually-hidden">Refresh</span>
+	                    </button>
+	                    <span id="editRequestsAutoRefreshCountdown" class="small text-muted d-none"></span>
+	                </div>
+	            </div>
 
-                <div class="d-flex align-items-center gap-3">
-                    <select class="form-select form-select-sm request-type-filter" style="max-width: 180px;">
-                        <option value="ALL">All Types</option>
-                        <option value="profile">Profile</option>
-                        <option value="address">Address</option>
-                        <option value="emergency">Emergency</option>
-                    </select>
-                    <div class="input-group" style="max-width: 300px;">
-                        <input type="text" id="searchInput" class="form-control" placeholder="Resident ID or Name">
-                        <span class="input-group-text bg-white"><i class="fas fa-search"></i></span>
+            <!-- FILTER MODAL -->
+            <div class="modal fade" id="modalFilter" tabindex="-1" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
+                <div class="modal-dialog modal-dialog-centered">
+                    <div class="modal-content p-4">
+                        <div class="modal-header border-0">
+                            <h5 class="modal-title fw-bold">Filter Requests</h5>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                        </div>
+	                        <hr>
+	                        <div class="modal-body">
+	                            <div class="form-label fw-semibold mb-2">Request Type</div>
+	                            <div class="d-flex flex-column gap-2">
+	                                <label class="d-flex align-items-center gap-2">
+	                                    <input class="form-check-input m-0 request-type-checkbox" type="checkbox" value="profile" name="requestTypeFilter">
+	                                    <span>Profile</span>
+	                                </label>
+	                                <label class="d-flex align-items-center gap-2">
+	                                    <input class="form-check-input m-0 request-type-checkbox" type="checkbox" value="address" name="requestTypeFilter">
+	                                    <span>Address</span>
+	                                </label>
+	                                <label class="d-flex align-items-center gap-2">
+	                                    <input class="form-check-input m-0 request-type-checkbox" type="checkbox" value="emergency" name="requestTypeFilter">
+	                                    <span>Emergency</span>
+	                                </label>
+	                            </div>
+	                            <div class="small text-muted mt-3">If none are selected, all request types will be shown.</div>
+	                        </div>
+                        <div class="modal-footer border-0">
+                            <button type="button" class="btn btn-primary" data-bs-dismiss="modal">Done</button>
+                        </div>
                     </div>
                 </div>
+            </div>
+
+            <!-- TABLE COLUMNS MODAL -->
+            <div class="modal fade" id="modalTableColumns" tabindex="-1" aria-hidden="true">
+              <div class="modal-dialog modal-dialog-centered modal-lg">
+                <div class="modal-content">
+                  <div class="modal-header">
+                    <h5 class="modal-title">Columns</h5>
+                  </div>
+                  <div class="modal-body">
+                    <div class="row g-2" id="tableColumnsList"></div>
+                  </div>
+                  <div class="modal-footer">
+                    <button type="button" class="btn btn-outline-secondary" id="btnTableColumnsReset">Reset</button>
+                    <button type="button" class="btn btn-primary" data-bs-dismiss="modal">Done</button>
+                  </div>
+                </div>
+              </div>
             </div>
 
             <div class="table-responsive">
@@ -169,6 +228,16 @@ include "includes/sidebar.php";
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+  window.ADMIN_TABLE_COLUMNS_CONFIG = {
+    tableSelector: "#table-editRequests",
+    modalId: "modalTableColumns",
+    listId: "tableColumnsList",
+    resetBtnId: "btnTableColumnsReset",
+    storageKey: "admin_cols_edit_requests_v1"
+  };
+</script>
+<script src="../JS-Script-Files/Admin-End/tableColumnsGeneric.js?v=20260215-1"></script>
 <script src="../JS-Script-Files/Admin-End/editRequestsScript.js"></script>
 </body>
 </html>

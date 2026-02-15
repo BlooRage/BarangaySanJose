@@ -69,37 +69,46 @@ if (isset($conn) && $conn instanceof mysqli) {
 
         <div id="div-tableContainer" class="bg-white p-4 rounded-4 shadow-sm border">
 
-            <!-- FILTER BUTTONS + SEARCH -->
-        <div class="d-flex justify-content-between align-items-center mb-3">
-
-            <!-- Status Filter Buttons -->
-            <div class="d-flex align-items-center gap-2">
-                <button class="btn btn-outline-primary btn-sm me-2 status-filter-btn" data-filter="ALL">All</button>
-                <button class="btn btn-outline-custom btn-sm me-2 status-filter-btn fw-bold" data-filter="VerifiedResident">Verified Resident</button>
-                <button class="btn btn-outline-custom btn-sm me-2 status-filter-btn fw-bold" data-filter="NotVerified">Not Verified</button>
-                <div class="position-relative">
-                    <button class="btn btn-outline-custom btn-sm status-filter-btn fw-bold" data-filter="PendingVerification">
-                        Pending Verification
-                    </button>
-                    <?php if ($pendingCount > 0): ?>
-                        <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger">
-                            <?= $pendingCount ?>
-                        </span>
-                    <?php endif; ?>
-                </div>
-            </div>
-
-            <div class="d-flex align-items-center gap-3">
-            <!-- SEARCH -->
-            <div class="input-group" style="max-width: 300px;">
-                <input type="text" id="searchInput" class="form-control" placeholder="Resident ID or Name">
-                <span class="input-group-text bg-white"><i class="fas fa-search"></i></span>
-            </div>
-            <button class="btn btn-outline-secondary" type="button" data-bs-toggle="modal" data-bs-target="#modalFilter" id="filterButton"><i class="fas fa-filter"></i>&nbsp;Filter</button>
-            </div>
-            
-
-            </div>
+	            <!-- FILTER BUTTONS + SEARCH -->
+	            <div class="admin-list-toolbar mb-3">
+	                <!-- Status Filter Buttons -->
+	                <div class="admin-list-tabs">
+	                    <button class="btn btn-outline-primary btn-sm status-filter-btn" data-filter="ALL">All</button>
+	                    <button class="btn btn-outline-custom btn-sm status-filter-btn fw-bold" data-filter="VerifiedResident">Verified Resident</button>
+	                    <button class="btn btn-outline-custom btn-sm status-filter-btn fw-bold" data-filter="NotVerified">Not Verified</button>
+	                    <div class="position-relative">
+	                        <button class="btn btn-outline-custom btn-sm status-filter-btn fw-bold" data-filter="PendingVerification">
+	                            Pending Verification
+	                        </button>
+	                        <?php if ($pendingCount > 0): ?>
+	                            <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger">
+	                                <?= $pendingCount ?>
+	                            </span>
+	                        <?php endif; ?>
+	                    </div>
+	                </div>
+	
+	                <div class="admin-list-actions">
+	                    <!-- SEARCH -->
+	                    <div class="input-group admin-search">
+	                        <input type="text" id="searchInput" class="form-control" placeholder="Resident ID or Name">
+	                        <span class="input-group-text bg-white"><i class="fas fa-search"></i></span>
+	                    </div>
+	                    <button class="btn btn-outline-secondary btn-icon" type="button" data-bs-toggle="modal" data-bs-target="#modalFilter" id="filterButton" title="Filter" aria-label="Filter">
+	                        <i class="fas fa-filter"></i>
+	                        <span class="visually-hidden">Filter</span>
+	                    </button>
+	                    <button class="btn admin-columns btn-icon" type="button" data-bs-toggle="modal" data-bs-target="#modalTableColumns" id="btnResidentColumns" title="Columns" aria-label="Columns">
+	                        <i class="fa-solid fa-sliders"></i>
+	                        <span class="visually-hidden">Columns</span>
+	                    </button>
+	                    <button class="btn admin-refresh btn-icon" type="button" id="btnResidentTableRefresh" title="Refresh table" aria-label="Refresh table">
+	                        <i class="fa-solid fa-arrows-rotate"></i>
+	                        <span class="visually-hidden">Refresh</span>
+	                    </button>
+	                    <span id="residentAutoRefreshCountdown" class="small text-muted d-none"></span>
+	                </div>
+	            </div>
 
 
             <!-- TABLE -->
@@ -804,8 +813,36 @@ if (isset($conn) && $conn instanceof mysqli) {
 </div>
 
 
+<!-- TABLE COLUMNS MODAL -->
+<div class="modal fade" id="modalTableColumns" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered modal-lg">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Columns</h5>
+      </div>
+      <div class="modal-body">
+        <div class="row g-2" id="tableColumnsList"></div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline-secondary" id="btnTableColumnsReset">Reset</button>
+        <button type="button" class="btn btn-primary" data-bs-dismiss="modal">Done</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+  window.ADMIN_TABLE_COLUMNS_CONFIG = {
+    tableSelector: "#table-appData",
+    modalId: "modalTableColumns",
+    listId: "tableColumnsList",
+    resetBtnId: "btnTableColumnsReset",
+    storageKey: "admin_cols_resident_masterlist_v1"
+  };
+</script>
+<script src="../JS-Script-Files/Admin-End/tableColumnsGeneric.js?v=20260215-1"></script>
 <script src="../JS-Script-Files/Admin-End/residentMasterlistScript.js?v=20260212-5"></script>
 </body>
 </html>

@@ -1,11 +1,24 @@
 document.addEventListener("DOMContentLoaded", () => {
   const tbody = document.getElementById("tableBody");
   const searchInput = document.getElementById("searchInput");
+  const btnRefreshTable = document.getElementById("btnResidentTableRefresh");
+  const countdownEl = document.getElementById("residentAutoRefreshCountdown");
 
   const statusDisplayMap = {
     "VerifiedResident": "Verified Resident",
     "PendingVerification": "Pending Verification",
     "NotVerified": "Not Verified"
+  };
+
+  const AUTO_REFRESH_SECONDS = 60;
+  let autoRefreshSecondsLeft = AUTO_REFRESH_SECONDS;
+  let autoRefreshInterval = null;
+  let autoRefreshInFlight = false;
+
+  const setRefreshLoading = (on) => {
+    if (!btnRefreshTable) return;
+    btnRefreshTable.classList.toggle("is-loading", !!on);
+    btnRefreshTable.disabled = !!on;
   };
 
   let allResidents = [];
@@ -292,7 +305,60 @@ document.addEventListener("DOMContentLoaded", () => {
         return [];
       });
   }
-  fetchResidents();
+  // Initial load should go through the same refresh path so the refresh button
+  // shows loading state consistently.
+
+  const renderCountdown = () => {
+    if (!countdownEl) return;
+    countdownEl.textContent = autoRefreshSecondsLeft > 0 ? `Auto refresh in ${autoRefreshSecondsLeft}s` : "";
+  };
+
+  const resetCountdown = () => {
+    autoRefreshSecondsLeft = AUTO_REFRESH_SECONDS;
+    renderCountdown();
+  };
+
+  const loadTable = async () => {
+    if (autoRefreshInFlight) return;
+    autoRefreshInFlight = true;
+    setRefreshLoading(true);
+    try {
+      const q = (searchInput?.value || "").trim();
+      await fetchResidents(q);
+    } finally {
+      autoRefreshInFlight = false;
+      setRefreshLoading(false);
+    }
+  };
+
+  const triggerRefresh = async () => {
+    resetCountdown();
+    await loadTable();
+  };
+
+  if (btnRefreshTable) {
+    btnRefreshTable.addEventListener("click", () => {
+      triggerRefresh().catch(() => {});
+    });
+  }
+
+  triggerRefresh().catch(() => {});
+
+  const startAutoRefresh = () => {
+    renderCountdown();
+    if (autoRefreshInterval) clearInterval(autoRefreshInterval);
+    autoRefreshInterval = setInterval(() => {
+      if (autoRefreshInFlight) return; // freeze countdown during load
+      autoRefreshSecondsLeft -= 1;
+      if (autoRefreshSecondsLeft <= 0) {
+        triggerRefresh().catch(() => {});
+        return;
+      }
+      renderCountdown();
+    }, 1000);
+  };
+
+  startAutoRefresh();
 
   // ========================
   // FILTER BUTTONS
@@ -955,7 +1021,7 @@ function openDocsModal(data, opts = {}) {
 	        }
 
         if (lower === "2x2") return "Resident Profiling - ID Image (2x2)";
-        if (lower === "idmerged" || lower === "idfront" || lower === "idback") {
+        if (lower === "idmerged" || lower === "idfront" || lower === "idback" || lower === "idsingle") {
           return "Resident Profiling - Proof of Identity (ID)";
         }
         if (lower === "document") return "Resident Profiling - Proof of Residency";
@@ -1339,13 +1405,13 @@ function openDocViewer(doc, parentModalEl, opts = {}) {
 	          if (side === "back") return `${label} Sector Membership Proof (Back)`;
 	          return `${label} Sector Membership Proof`;
 	        }
-        if (lower === "2x2") return "Resident Profiling - ID Image (2x2)";
-        if (lower === "idmerged" || lower === "idfront" || lower === "idback") {
-          return "Resident Profiling - Proof of Identity (ID)";
-        }
-        if (lower === "document") return "Resident Profiling - Proof of Residency";
-        return "Supporting Document";
-      };
+	        if (lower === "2x2") return "Resident Profiling - ID Image (2x2)";
+	        if (lower === "idmerged" || lower === "idfront" || lower === "idback" || lower === "idsingle") {
+	          return "Resident Profiling - Proof of Identity (ID)";
+	        }
+	        if (lower === "document") return "Resident Profiling - Proof of Residency";
+	        return "Supporting Document";
+	      };
 
       if (subtitleEl) {
         subtitleEl.innerText = `Purpose: ${purposeFromDoc(doc)}`;

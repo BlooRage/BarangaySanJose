@@ -1,9 +1,26 @@
 document.addEventListener("DOMContentLoaded", () => {
   const tbody = document.getElementById("tableBody");
   const searchInput = document.getElementById("searchInput");
-  const typeFilter = document.querySelector(".request-type-filter");
+  // Filter modal may provide either a select (legacy) or checkboxes (current).
+  const typeFilterSelect = document.querySelector(".request-type-filter");
+  const typeFilterCheckboxes = Array.from(
+    document.querySelectorAll('input.request-type-checkbox[name="requestTypeFilter"]')
+  );
   const statusButtons = document.querySelectorAll(".status-filter-btn");
   const pendingBadge = document.getElementById("pendingRequestBadge");
+  const btnRefreshTable = document.getElementById("btnEditRequestsRefresh");
+  const countdownEl = document.getElementById("editRequestsAutoRefreshCountdown");
+
+  const setRefreshLoading = (on) => {
+    if (!btnRefreshTable) return;
+    btnRefreshTable.classList.toggle("is-loading", !!on);
+    btnRefreshTable.disabled = !!on;
+  };
+
+  const AUTO_REFRESH_SECONDS = 60;
+  let autoRefreshSecondsLeft = AUTO_REFRESH_SECONDS;
+  let autoRefreshInterval = null;
+  let autoRefreshInFlight = false;
 
   let allRequests = [];
   let activeStatus = "ALL";
@@ -26,12 +43,17 @@ document.addEventListener("DOMContentLoaded", () => {
   const renderTable = () => {
     if (!tbody) return;
     const search = (searchInput?.value || "").trim().toLowerCase();
-    const type = typeFilter?.value || "ALL";
+    const typeSelected = String(typeFilterSelect?.value || "ALL");
+    const checkedTypes = typeFilterCheckboxes
+      .filter((cb) => cb && cb.checked)
+      .map((cb) => String(cb.value || "").trim())
+      .filter(Boolean);
+    const activeTypes = checkedTypes.length ? checkedTypes : (typeSelected !== "ALL" ? [typeSelected] : []);
 
     const filtered = allRequests.filter((row) => {
       const matchStatus =
         activeStatus === "ALL" || statusLabel(row.status_name) === activeStatus;
-      const matchType = type === "ALL" || row.request_type === type;
+      const matchType = activeTypes.length === 0 || activeTypes.includes(String(row.request_type || ""));
       const text = `${row.resident_id || ""} ${row.resident_name || ""}`.toLowerCase();
       const matchSearch = search === "" || text.includes(search);
       return matchStatus && matchType && matchSearch;
@@ -144,6 +166,9 @@ document.addEventListener("DOMContentLoaded", () => {
 
   const loadRequests = async () => {
     if (!tbody) return;
+    if (autoRefreshInFlight) return;
+    autoRefreshInFlight = true;
+    setRefreshLoading(true);
     try {
       const res = await fetch("../PhpFiles/Admin-End/edit_requests.php?fetch=1");
       const data = await res.json().catch(() => ({}));
@@ -165,7 +190,45 @@ document.addEventListener("DOMContentLoaded", () => {
           </td>
         </tr>
       `;
+    } finally {
+      autoRefreshInFlight = false;
+      setRefreshLoading(false);
     }
+  };
+
+  const renderCountdown = () => {
+    if (!countdownEl) return;
+    countdownEl.textContent = autoRefreshSecondsLeft > 0 ? `Auto refresh in ${autoRefreshSecondsLeft}s` : "";
+  };
+
+  const resetCountdown = () => {
+    autoRefreshSecondsLeft = AUTO_REFRESH_SECONDS;
+    renderCountdown();
+  };
+
+  const triggerRefresh = async () => {
+    resetCountdown();
+    await loadRequests();
+  };
+
+  if (btnRefreshTable) {
+    btnRefreshTable.addEventListener("click", () => {
+      triggerRefresh().catch(() => {});
+    });
+  }
+
+  const startAutoRefresh = () => {
+    renderCountdown();
+    if (autoRefreshInterval) clearInterval(autoRefreshInterval);
+    autoRefreshInterval = setInterval(() => {
+      if (autoRefreshInFlight) return;
+      autoRefreshSecondsLeft -= 1;
+      if (autoRefreshSecondsLeft <= 0) {
+        triggerRefresh().catch(() => {});
+        return;
+      }
+      renderCountdown();
+    }, 1000);
   };
 
   const updateRequestStatus = async (requestId, action) => {
@@ -200,8 +263,11 @@ document.addEventListener("DOMContentLoaded", () => {
     searchInput.addEventListener("input", renderTable);
   }
 
-  if (typeFilter) {
-    typeFilter.addEventListener("change", renderTable);
+  if (typeFilterSelect) {
+    typeFilterSelect.addEventListener("change", renderTable);
+  }
+  if (typeFilterCheckboxes.length) {
+    typeFilterCheckboxes.forEach((cb) => cb.addEventListener("change", renderTable));
   }
 
   if (tbody) {
@@ -353,4 +419,5 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   loadRequests();
+  startAutoRefresh();
 });

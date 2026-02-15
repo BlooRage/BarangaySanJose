@@ -278,6 +278,7 @@ session_regenerate_id(true);
 $_SESSION['user_id']    = $userData['user_id'];
 $_SESSION['role']       = $userData['role_access'];
 $_SESSION['logged_in']  = true;
+$_SESSION['last_activity'] = time();
 
 echo json_encode([
     'success'  => true,

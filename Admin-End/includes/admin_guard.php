@@ -7,7 +7,7 @@ header("Cache-Control: no-store, no-cache, must-revalidate, max-age=0");
 header("Pragma: no-cache");
 header("Expires: 0");
 
-if (empty($_SESSION['user_id']) || !in_array($_SESSION['role'] ?? '', ['Admin', 'Employee'], true)) {
-    header("Location: ../Guest-End/login.php");
-    exit;
-}
+require_once __DIR__ . "/../../PhpFiles/General/security.php";
+
+// Enforce auth + 30-min inactivity timeout for Admin/Employee pages.
+requireRoleSession(['Admin', 'Employee'], false);

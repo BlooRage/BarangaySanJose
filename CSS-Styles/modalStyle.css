@@ -29,13 +29,18 @@
 
 /* ===== Modal Title ===== */
 #umContent .modal-title {
-      color: #000000;
-      font-weight: 700;
-      font-size: 1.1rem;
-      margin: 0;
+	      color: #000000;
+	      font-weight: 700;
+	      font-size: 1.1rem;
+	      margin: 0;
 }
 /* Universal modal title color */
 .modal .modal-title {
+    color: #000000;
+}
+
+/* Ensure non-.modal-title headers (e.g. <h4>, <h5>) in modal headers are also black by default. */
+.modal .modal-header {
     color: #000000;
 }
 /* Hide X/close button sitewide */

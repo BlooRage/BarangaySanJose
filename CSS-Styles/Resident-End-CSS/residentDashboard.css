@@ -348,3 +348,145 @@ body {
     padding: 12px;
     margin-bottom: 1rem;
 }
+
+/* Match login password-eye input styling inside Change Password modal */
+#changePasswordModal .change-password-dialog {
+    /* Slightly wider than modal-sm without going full modal-lg */
+    max-width: 520px;
+    width: calc(100% - 2rem);
+}
+
+#changePasswordModal .input-group-text {
+    background: transparent;
+    border-left: 1px solid #ced4da;
+    padding: 0 0.5rem;
+    color: #e68a00 !important;
+}
+
+#changePasswordModal .input-group-text i {
+    color: #e68a00 !important;
+    font-size: 1.1rem;
+}
+
+#changePasswordModal .input-group-text .bi {
+    color: #e68a00 !important;
+}
+
+#changePasswordModal .input-group-text svg {
+    fill: #e68a00 !important;
+}
+
+/* Change Phone Number modal layout (OTP-style) */
+#changePhoneModal .change-phone-dialog {
+    /* No side image now; keep it compact like the login OTP UI */
+    max-width: 560px;
+    width: calc(100% - 2rem);
+}
+
+#changePhoneModal .change-phone-shell {
+    display: block;
+}
+
+#changePhoneModal .change-phone-content {
+    padding: 20px 22px 16px;
+    /* Keeps the form visually centered in wider modals */
+    max-width: 460px;
+    margin: 0 auto;
+}
+
+#changeEmailModal .change-email-dialog {
+    max-width: 560px;
+    width: calc(100% - 2rem);
+}
+
+#changeEmailModal .change-email-shell {
+    display: block;
+}
+
+#changeEmailModal .change-email-content {
+    padding: 20px 22px 16px;
+    max-width: 460px;
+    margin: 0 auto;
+}
+
+#changeEmailModal .cem-otp-icon {
+    width: 64px;
+    height: 64px;
+    object-fit: contain;
+}
+
+#changeEmailModal .cem-otp-inputs {
+    display: flex;
+    justify-content: center;
+    gap: 8px;
+}
+
+#changeEmailModal .cem-otp-inputs input {
+    width: 42px;
+    height: 46px;
+    text-align: center;
+    font-size: 18px;
+    border: 1px solid #ced4da;
+    border-radius: 8px;
+}
+
+@media (max-width: 420px) {
+    #changeEmailModal .cem-otp-inputs {
+        gap: 6px;
+    }
+    #changeEmailModal .cem-otp-inputs input {
+        width: 38px;
+        height: 44px;
+        font-size: 17px;
+    }
+}
+
+@media (max-width: 576px) {
+    #changeEmailModal .change-email-dialog {
+        max-width: 520px;
+        width: calc(100% - 1rem);
+    }
+}
+
+#changePhoneModal .cpn-otp-icon {
+    width: 64px;
+    height: 64px;
+    object-fit: contain;
+}
+
+#changePhoneModal .cpn-otp-inputs {
+    display: flex;
+    justify-content: center;
+    gap: 8px;
+}
+
+#changePhoneModal .cpn-otp-inputs input {
+    width: 42px;
+    height: 46px;
+    text-align: center;
+    font-size: 18px;
+    border: 1px solid #ced4da;
+    border-radius: 8px;
+}
+
+@media (max-width: 420px) {
+    #changePhoneModal .cpn-otp-inputs {
+        gap: 6px;
+    }
+    #changePhoneModal .cpn-otp-inputs input {
+        width: 38px;
+        height: 44px;
+        font-size: 17px;
+    }
+}
+
+@media (max-width: 576px) {
+    #changePhoneModal .change-phone-dialog {
+        max-width: 520px;
+        width: calc(100% - 1rem);
+    }
+}
+
+#changePasswordModal .input-group .form-control {
+    border-right: 1px solid #ced4da;
+}

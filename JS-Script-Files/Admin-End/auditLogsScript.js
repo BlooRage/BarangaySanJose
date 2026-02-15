@@ -5,7 +5,17 @@
     q: "",
     timer: null,
     rows: [],
+    rowsRaw: [],
     visibleCols: null,
+    filters: {
+      from: "", // YYYY-MM-DD
+      to: "",   // YYYY-MM-DD
+    },
+    auto: {
+      secondsLeft: 60,
+      interval: null,
+      inFlight: false,
+    },
   };
 
   const safeText = (v) => {
@@ -106,6 +116,35 @@
     });
   };
 
+  const parseDateOnly = (yyyyMmDd) => {
+    const s = String(yyyyMmDd ?? "").trim();
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(s)) return null;
+    const d = new Date(`${s}T00:00:00`);
+    return Number.isNaN(d.getTime()) ? null : d;
+  };
+
+  const rowTimestampDate = (row) => {
+    const raw = String(row?.action_timestamp ?? "").trim();
+    if (!raw) return null;
+    const d = new Date(raw);
+    return Number.isNaN(d.getTime()) ? null : d;
+  };
+
+  const applyClientFilters = () => {
+    const fromD = parseDateOnly(state.filters.from);
+    const toD = parseDateOnly(state.filters.to);
+    // inclusive "to" (end of day)
+    const toEnd = toD ? new Date(toD.getTime() + 24 * 60 * 60 * 1000 - 1) : null;
+
+    const raw = Array.isArray(state.rowsRaw) ? state.rowsRaw : [];
+    state.rows = raw.filter((r) => {
+      const ts = rowTimestampDate(r);
+      if (fromD && (!ts || ts < fromD)) return false;
+      if (toEnd && (!ts || ts > toEnd)) return false;
+      return true;
+    });
+  };
+
   const renderColumnsModal = () => {
     const list = el("auditColumnsList");
     if (!list) return;
@@ -137,6 +176,9 @@
   };
 
   const load = async () => {
+    if (state.auto.inFlight) return;
+    state.auto.inFlight = true;
+
     const tbody = el("auditTbody");
     const refreshBtn = el("btnAuditRefresh");
     const activeCols = getActiveColumns();
@@ -180,14 +222,49 @@
         return;
       }
 
-      state.rows = Array.isArray(data.data) ? data.data : [];
+      state.rowsRaw = Array.isArray(data.data) ? data.data : [];
+      applyClientFilters();
       renderTable();
     } finally {
       if (refreshBtn) {
         refreshBtn.classList.remove("is-loading");
         refreshBtn.disabled = false;
       }
+      state.auto.inFlight = false;
     }
+  };
+
+  // ========================
+  // AUTO REFRESH + MANUAL REFRESH (60s)
+  // ========================
+  const renderCountdown = () => {
+    const c = el("auditAutoRefreshCountdown");
+    if (!c) return;
+    c.textContent = state.auto.secondsLeft > 0 ? `Auto refresh in ${state.auto.secondsLeft}s` : "";
+  };
+
+  const resetCountdown = () => {
+    state.auto.secondsLeft = 60;
+    renderCountdown();
+  };
+
+  const triggerRefresh = async () => {
+    resetCountdown();
+    await load();
+  };
+
+  const startAutoRefresh = () => {
+    renderCountdown();
+    if (state.auto.interval) window.clearInterval(state.auto.interval);
+    state.auto.interval = window.setInterval(() => {
+      if (state.auto.inFlight) return;
+      state.auto.secondsLeft -= 1;
+      if (state.auto.secondsLeft <= 0) {
+        triggerRefresh().catch(() => {});
+        return;
+      }
+      renderCountdown();
+    }, 1000);
   };
 
   const wire = () => {
@@ -196,6 +273,11 @@
     const applyCols = el("btnAuditColumnsApply");
     const resetCols = el("btnAuditColumnsReset");
     const columnsModalEl = el("modalAuditColumns");
+    const filterModalEl = el("modalAuditFilter");
+    const filterFromEl = el("auditFilterFrom");
+    const filterToEl = el("auditFilterTo");
+    const filterApplyEl = el("btnAuditFilterApply");
+    const filterResetEl = el("btnAuditFilterReset");
 
     if (search) {
       search.addEventListener("input", () => {
@@ -204,11 +286,38 @@
         state.timer = window.setTimeout(load, 250);
       });
     }
-    if (refresh) refresh.addEventListener("click", load);
+    if (refresh) refresh.addEventListener("click", () => triggerRefresh().catch(() => {}));
 
     if (columnsModalEl) {
       columnsModalEl.addEventListener("show.bs.modal", () => {
         renderColumnsModal();
+      });
+    }
+
+    if (filterModalEl) {
+      filterModalEl.addEventListener("show.bs.modal", () => {
+        if (filterFromEl) filterFromEl.value = state.filters.from || "";
+        if (filterToEl) filterToEl.value = state.filters.to || "";
+      });
+    }
+
+    if (filterApplyEl) {
+      filterApplyEl.addEventListener("click", () => {
+        state.filters.from = filterFromEl ? String(filterFromEl.value || "") : "";
+        state.filters.to = filterToEl ? String(filterToEl.value || "") : "";
+        applyClientFilters();
+        renderTable();
+      });
+    }
+
+    if (filterResetEl) {
+      filterResetEl.addEventListener("click", () => {
+        state.filters.from = "";
+        state.filters.to = "";
+        if (filterFromEl) filterFromEl.value = "";
+        if (filterToEl) filterToEl.value = "";
+        applyClientFilters();
+        renderTable();
       });
     }
 
@@ -244,5 +353,6 @@
     wire();
     renderHeader();
     load();
+    startAutoRefresh();
   });
 })();

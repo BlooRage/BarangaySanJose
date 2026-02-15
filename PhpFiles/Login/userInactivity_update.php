@@ -98,6 +98,7 @@ unset($_SESSION['pending_user_id'], $_SESSION['pending_verify']);
 $_SESSION['user_id']   = $user_id;
 $_SESSION['role']      = $user['role_access'];
 $_SESSION['logged_in'] = true;
+$_SESSION['last_activity'] = time();
 
 echo json_encode([
   'success' => true,

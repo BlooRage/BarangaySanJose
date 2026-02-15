@@ -1,5 +1,6 @@
 <?php
 session_start();
+require_once __DIR__ . '/../General/security.php';
 
 $_SESSION = [];
 
@@ -13,7 +14,5 @@ if (ini_get("session.use_cookies")) {
 
 session_destroy();
 
-// change this path if your login file is different
-header("Location: ../../Guest-End/login.php");
-exit;
+redirectToLogin();
 ?>

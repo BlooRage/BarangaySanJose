@@ -2,10 +2,23 @@ document.addEventListener("DOMContentLoaded", () => {
     const searchInput = document.getElementById("searchInput");
     const btnApplyFilter = document.getElementById("btnApplyFilter");
     const btnResetModal = document.getElementById("btnResetModalFilters");
+	    const btnRefreshTable = document.getElementById("btnArchiveRefresh");
+	    const countdownEl = document.getElementById("archiveAutoRefreshCountdown");
 
     let allArchivedResidents = [];
     let activeFilters = {};
     let searchValue = "";
+
+    const AUTO_REFRESH_SECONDS = 60;
+    let autoRefreshSecondsLeft = AUTO_REFRESH_SECONDS;
+	    let autoRefreshInterval = null;
+	    let autoRefreshInFlight = false;
+
+	    const setRefreshLoading = (on) => {
+	        if (!btnRefreshTable) return;
+	        btnRefreshTable.classList.toggle("is-loading", !!on);
+	        btnRefreshTable.disabled = !!on;
+	    };
 
     fetchArchivedResidents();
 
@@ -46,15 +59,55 @@ document.addEventListener("DOMContentLoaded", () => {
         });
     }
 
-    function fetchArchivedResidents() {
-        fetch("../PhpFiles/Admin-End/archiveResident.php")
-            .then(response => response.json())
-            .then(data => {
-                allArchivedResidents = Array.isArray(data) ? data : [];
-                applyFiltersAndRender();
-            })
-            .catch(error => console.error("Error:", error));
+	    function fetchArchivedResidents() {
+	        if (autoRefreshInFlight) return;
+	        autoRefreshInFlight = true;
+	        setRefreshLoading(true);
+	        fetch("../PhpFiles/Admin-End/archiveResident.php")
+	            .then(response => response.json())
+	            .then(data => {
+	                allArchivedResidents = Array.isArray(data) ? data : [];
+	                applyFiltersAndRender();
+	            })
+	            .catch(error => console.error("Error:", error))
+	            .finally(() => {
+	                autoRefreshInFlight = false;
+	                setRefreshLoading(false);
+	            });
+	    }
+
+    const renderCountdown = () => {
+        if (!countdownEl) return;
+        countdownEl.textContent = autoRefreshSecondsLeft > 0 ? `Auto refresh in ${autoRefreshSecondsLeft}s` : "";
+    };
+
+    const resetCountdown = () => {
+        autoRefreshSecondsLeft = AUTO_REFRESH_SECONDS;
+        renderCountdown();
+    };
+
+    const triggerRefresh = () => {
+        resetCountdown();
+        fetchArchivedResidents();
+    };
+
+    if (btnRefreshTable) {
+        btnRefreshTable.addEventListener("click", triggerRefresh);
     }
+
+    const startAutoRefresh = () => {
+        renderCountdown();
+        if (autoRefreshInterval) clearInterval(autoRefreshInterval);
+        autoRefreshInterval = setInterval(() => {
+            if (autoRefreshInFlight) return;
+            autoRefreshSecondsLeft -= 1;
+            if (autoRefreshSecondsLeft <= 0) {
+                triggerRefresh();
+                return;
+            }
+            renderCountdown();
+        }, 1000);
+    };
 
     function applyFiltersAndRender() {
         let filtered = allArchivedResidents;
@@ -111,6 +164,7 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     window.fetchArchivedResidents = fetchArchivedResidents;
+    startAutoRefresh();
 });
 
 function restoreResident(residentId) {

@@ -8,6 +8,8 @@ $residentinformationtbl = $data['residentinformationtbl'];
 $residentaddresstbl = $data['residentaddresstbl'];
 $useraccountstbl = $data['useraccountstbl'];
 
+$emailVerified = (int)($useraccountstbl['email_verify'] ?? 0) === 1;
+
 $computedAge = '';
 if (!empty($residentinformationtbl['birthdate'])) {
     $dobDate = DateTime::createFromFormat('Y-m-d', $residentinformationtbl['birthdate']);
@@ -121,9 +123,15 @@ if ($residentId !== '' && isset($conn) && $conn instanceof mysqli) {
     <meta charset="UTF-8">
     
   <link rel="icon" href="/Images/favicon_sanjose.png?v=20260211">
-<title>Resident Profile</title>
+	<title>Resident Profile</title>
+
+    <script>
+      // Used by JS change-phone flow to decide if email OTP option is allowed.
+      window.RESIDENT_PROFILE_EMAIL_VERIFIED = <?= $emailVerified ? 'true' : 'false' ?>;
+    </script>
     <meta name="viewport" content="width=device-width, initial-scale=1">
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons/font/bootstrap-icons.css" rel="stylesheet" />
   <script src="../JS-Script-Files/modalHandler.js" defer></script>
   <script src="../JS-Script-Files/Resident-End/householdMembers.js" defer></script>
   <script src="../JS-Script-Files/Resident-End/profileOccupation.js" defer></script>
@@ -134,8 +142,12 @@ if ($residentId !== '' && isset($conn) && $conn instanceof mysqli) {
   <script src="../JS-Script-Files/Resident-End/profileTabs.js" defer></script>
   <script src="../JS-Script-Files/Resident-End/profileAddress.js" defer></script>
   <script src="../JS-Script-Files/Resident-End/profileEmergency.js" defer></script>
-  <script src="../JS-Script-Files/Resident-End/profileEdit.js" defer></script>
-    <link rel="stylesheet" href="../CSS-Styles/Resident-End-CSS/residentDashboard.css">
+	  <script src="../JS-Script-Files/Resident-End/profileChangePassword.js?v=20260215-1" defer></script>
+	  <script src="../JS-Script-Files/Resident-End/profileChangePhone.js?v=20260215-1" defer></script>
+	  <script src="../JS-Script-Files/Resident-End/profileChangeEmail.js?v=20260215-1" defer></script>
+	  <script src="../JS-Script-Files/Resident-End/profileUploadedDocuments.js?v=20260215-1" defer></script>
+	  <script src="../JS-Script-Files/Resident-End/profileEdit.js" defer></script>
+	    <link rel="stylesheet" href="../CSS-Styles/Resident-End-CSS/residentDashboard.css">
 </head>
 
 <body>
@@ -172,6 +184,11 @@ if ($residentId !== '' && isset($conn) && $conn instanceof mysqli) {
                 <li class="nav-item" role="presentation">
                     <button class="nav-link" id="tab-household" data-bs-toggle="tab" data-bs-target="#pane-household" type="button" role="tab" aria-controls="pane-household" aria-selected="false">
                         Household
+                    </button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link" id="tab-uploaded-docs" data-bs-toggle="tab" data-bs-target="#pane-uploaded-docs" type="button" role="tab" aria-controls="pane-uploaded-docs" aria-selected="false">
+                        Uploaded Documents
                     </button>
                 </li>
             </ul>
@@ -245,14 +262,14 @@ if ($residentId !== '' && isset($conn) && $conn instanceof mysqli) {
                         Edit Address
                     </button>
                 </div>
-                <div class="card-body">
-                    <div class="row g-3 align-items-start">
-                        <div class="col-12 col-md-8">
-                            <div class="text-muted small mb-1">Full Address</div>
-                            <div class="fw-semibold">
-                                <?php
-                                  $unitNumber = trim((string)($residentaddresstbl['unit_number'] ?? ''));
-                                  $houseNo = trim((string)($residentaddresstbl['street_number'] ?? ''));
+	                <div class="card-body">
+	                    <div class="row g-3 align-items-start">
+	                        <div class="col-12">
+	                            <div class="text-muted small mb-1">Full Address</div>
+	                            <div class="fw-semibold">
+	                                <?php
+	                                  $unitNumber = trim((string)($residentaddresstbl['unit_number'] ?? ''));
+	                                  $houseNo = trim((string)($residentaddresstbl['street_number'] ?? ''));
                                   $streetName = trim((string)($residentaddresstbl['street_name'] ?? ''));
                                   $phase = trim((string)($residentaddresstbl['phase_number'] ?? ''));
                                   $subdivision = trim((string)($residentaddresstbl['subdivision'] ?? ''));
@@ -274,17 +291,31 @@ if ($residentId !== '' && isset($conn) && $conn instanceof mysqli) {
                                   $parts[] = 'Rizal';
                                   $parts[] = '1860';
 
-                                  echo implode(', ', array_filter($parts, fn($v) => $v !== ''));
-                                ?>
-                            </div>
-                        </div>
-                        <div class="col-12 col-md-4">
-                            <div class="text-muted small mb-1">Residency Duration</div>
-                            <div class="fw-semibold"><?= $residentaddresstbl['residency_duration'] ?? '—' ?></div>
-                        </div>
-                    </div>
-                </div>
-            </div>
+	                                  echo implode(', ', array_filter($parts, fn($v) => $v !== ''));
+	                                ?>
+	                            </div>
+	                        </div>
+	                        <div class="col-12 col-md-4">
+	                            <div class="text-muted small mb-1">House Type</div>
+	                            <div class="fw-semibold">
+	                                <?= htmlspecialchars(trim((string)($residentaddresstbl['house_type'] ?? '')) !== '' ? (string)$residentaddresstbl['house_type'] : '—') ?>
+	                            </div>
+	                        </div>
+	                        <div class="col-12 col-md-4">
+	                            <div class="text-muted small mb-1">House Ownership</div>
+	                            <div class="fw-semibold">
+	                                <?= htmlspecialchars(trim((string)($residentaddresstbl['house_ownership'] ?? '')) !== '' ? (string)$residentaddresstbl['house_ownership'] : '—') ?>
+	                            </div>
+	                        </div>
+	                        <div class="col-12 col-md-4">
+	                            <div class="text-muted small mb-1">Length of Residency</div>
+	                            <div class="fw-semibold">
+	                                <?= htmlspecialchars(trim((string)($residentaddresstbl['residency_duration'] ?? '')) !== '' ? (string)$residentaddresstbl['residency_duration'] : '—') ?>
+	                            </div>
+	                        </div>
+	                    </div>
+	                </div>
+	            </div>
              <div class="card shadow-sm mb-4">
                 <div class="card-header d-flex justify-content-between">
                     <strong>EMERGENCY CONTACT INFORMATION</strong>
@@ -295,10 +326,16 @@ if ($residentId !== '' && isset($conn) && $conn instanceof mysqli) {
                 <div class="card-body">
                     <div class="row g-2">
                         <div class="col-12 col-md-6">
-                            <strong>Contact Person:</strong> <?= $residentinformationtbl['emergency_name'] ?>
+                            <strong>Contact Person:</strong> <?= htmlspecialchars(($residentinformationtbl['emergency_name'] ?? '—') !== '' ? $residentinformationtbl['emergency_name'] : '—') ?>
                         </div>
                         <div class="col-12 col-md-6">
-                            <strong>Contact Number:</strong> <?= $residentinformationtbl['emergency_contact'] ?>
+                            <strong>Contact Number:</strong> <?= htmlspecialchars(($residentinformationtbl['emergency_contact'] ?? '—') !== '' ? $residentinformationtbl['emergency_contact'] : '—') ?>
+                        </div>
+                        <div class="col-12 col-md-6">
+                            <strong>Relationship:</strong> <?= htmlspecialchars(($residentinformationtbl['emergency_relationship'] ?? '—') !== '' ? $residentinformationtbl['emergency_relationship'] : '—') ?>
+                        </div>
+                        <div class="col-12 col-md-6">
+                            <strong>Address:</strong> <?= htmlspecialchars(($residentinformationtbl['emergency_address'] ?? '—') !== '' ? $residentinformationtbl['emergency_address'] : '—') ?>
                         </div>
                     </div>
                 </div>
@@ -340,7 +377,6 @@ if ($residentId !== '' && isset($conn) && $conn instanceof mysqli) {
                             <div><strong>Mobile Number:</strong> +63<?= $useraccountstbl['phone_number'] ?></div>
                             <div><strong>Email:</strong> <?= $useraccountstbl['email'] ?>
                                 <?php
-                                  $emailVerified = (int)($useraccountstbl['email_verify'] ?? 0) === 1;
                                   $emailVerifyClass = $emailVerified
                                       ? 'status-badge status-badge--verified'
                                       : 'status-badge status-badge--denied';
@@ -353,10 +389,16 @@ if ($residentId !== '' && isset($conn) && $conn instanceof mysqli) {
                         </div>
                     </div>
                     <hr class="my-3">
-                    <div class="row g-2">
-                        <div class="col-12 col-md-6"><a href="javascript:void(0)">Change Password</a></div>
-                        <div class="col-12 col-md-6"><a href="javascript:void(0)">Change Email</a></div>
-                        <div class="col-12 col-md-6"><a href="javascript:void(0)">Change Phone Number</a></div>
+	                    <div class="row g-2">
+	                        <div class="col-12 col-md-6"><a href="javascript:void(0)" id="changePhoneLink">Change Phone Number</a></div>
+	                        <div class="col-12 col-md-6"><a href="javascript:void(0)" id="changeEmailLink">Change Email</a></div>
+	                        <div class="col-12 col-md-6">
+	                            <a href="javascript:void(0)" id="changePasswordLink">Change Password</a>
+	                            <div class="text-muted fst-italic small mt-1">
+	                                Last changed:
+	                                <?= htmlspecialchars(($useraccountstbl['last_password_change'] ?? '') !== '' ? $useraccountstbl['last_password_change'] : '—', ENT_QUOTES, 'UTF-8') ?>
+                            </div>
+                        </div>
                         <?php if (!(int)($useraccountstbl['email_verify'] ?? 0)): ?>
                             <div class="col-12 col-md-6">
                                 <a href="javascript:void(0)" id="verifyEmailLink">Verify Email</a>
@@ -423,6 +465,45 @@ if ($residentId !== '' && isset($conn) && $conn instanceof mysqli) {
                             </div>
                             <div class="mt-3 text-muted small">
                                 Only the head of the family can add or manage household members.
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="tab-pane fade" id="pane-uploaded-docs" role="tabpanel" aria-labelledby="tab-uploaded-docs" tabindex="0">
+                    <div class="card shadow-sm mb-4">
+                        <div class="card-header d-flex justify-content-between align-items-center">
+                            <strong>VERIFIED UPLOADED DOCUMENTS</strong>
+                            <button class="btn btn-outline-secondary btn-sm" id="btnRefreshUploadedDocs" type="button">
+                                Refresh
+                            </button>
+                        </div>
+                        <div class="card-body">
+                            <div class="text-muted small mb-2">
+                                Only documents marked as Verified by the barangay will appear here.
+                            </div>
+
+                            <div id="uploadedDocsError" class="alert alert-danger d-none" role="alert"></div>
+
+                            <div id="uploadedDocsLoading" class="text-muted small">Loading...</div>
+
+                            <div class="table-responsive d-none" id="uploadedDocsTableWrap">
+                                <table class="table table-hover align-middle mb-0">
+                                    <thead class="table-light">
+                                        <tr>
+                                            <th>Document</th>
+                                            <th>Category</th>
+                                            <th>Uploaded</th>
+                                            <th>ID Number</th>
+                                            <th>File</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="uploadedDocsTbody"></tbody>
+                                </table>
+                            </div>
+
+                            <div id="uploadedDocsEmpty" class="text-muted small d-none">
+                                No verified documents found.
                             </div>
                         </div>
                     </div>
@@ -801,6 +882,272 @@ if ($residentId !== '' && isset($conn) && $conn instanceof mysqli) {
         </div>
     </div>
 
-        <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <!-- Change Password Modal -->
+    <div class="modal fade" id="changePasswordModal" tabindex="-1" data-bs-backdrop="static" data-bs-keyboard="false" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered change-password-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title text-black" style="color:#000;">Change Password</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div id="changePasswordError" class="alert alert-danger small d-none" role="alert"></div>
+
+                    <div class="mb-3">
+                        <div class="input-group">
+                            <input type="password" class="form-control" id="currentPassword" autocomplete="current-password" placeholder="Current password" aria-label="Current password">
+                            <span class="input-group-text" style="cursor: pointer" data-toggle-password="currentPassword" data-eye-id="eyeCurrentPw" aria-label="Show/Hide password">
+                                <i id="eyeCurrentPw" class="bi bi-eye"></i>
+                            </span>
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <div class="input-group">
+                            <input type="password" class="form-control" id="newPassword" autocomplete="new-password" placeholder="New password" aria-label="New password">
+                            <span class="input-group-text" style="cursor: pointer" data-toggle-password="newPassword" data-eye-id="eyeNewPw" aria-label="Show/Hide password">
+                                <i id="eyeNewPw" class="bi bi-eye"></i>
+                            </span>
+                        </div>
+                    </div>
+                    <div class="mb-2">
+                        <div class="input-group">
+                            <input type="password" class="form-control" id="confirmNewPassword" autocomplete="new-password" placeholder="Confirm new password" aria-label="Confirm new password">
+                            <span class="input-group-text" style="cursor: pointer" data-toggle-password="confirmNewPassword" data-eye-id="eyeConfirmPw" aria-label="Show/Hide password">
+                                <i id="eyeConfirmPw" class="bi bi-eye"></i>
+                            </span>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-primary" id="btnOpenConfirmChangePassword">Change</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Confirm Change Password Modal -->
+    <div class="modal fade" id="confirmChangePasswordModal" tabindex="-1" data-bs-backdrop="static" data-bs-keyboard="false" aria-hidden="true">
+        <div class="modal-dialog modal-sm modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title text-black" style="color:#000;">Confirm</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    Are you sure you want to change your password?
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-danger" id="btnConfirmChangePassword">Yes, Change</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+	    <!-- Change Phone Number Modal -->
+	    <div class="modal fade" id="changePhoneModal" tabindex="-1" data-bs-backdrop="static" data-bs-keyboard="false" aria-hidden="true">
+	        <div class="modal-dialog modal-dialog-centered change-phone-dialog">
+	            <div class="modal-content">
+	                <div class="modal-header">
+	                    <h5 class="modal-title text-black" style="color:#000;">Change Phone Number</h5>
+	                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+	                </div>
+
+	                    <div class="modal-body p-0">
+	                    <div class="change-phone-shell">
+	                        <div class="change-phone-content">
+	                            <div id="cpnError" class="alert alert-danger small d-none" role="alert"></div>
+
+                            <!-- Step 1: Choose verification method -->
+                            <div class="cpn-step" data-step="choose">
+                                <p class="mb-3 text-muted">
+                                    To change your mobile number, verify your identity first.
+                                </p>
+                                <div class="d-grid gap-2">
+                                    <button type="button" class="btn btn-primary" id="btnCpnVerifyViaPhone">Verify via Phone</button>
+                                    <button type="button" class="btn btn-outline-primary d-none" id="btnCpnVerifyViaEmail">Verify via Email</button>
+                                </div>
+                            </div>
+
+                            <!-- Step 2: Verify OTP (old phone/email) -->
+                            <div class="cpn-step d-none" data-step="otp_old">
+                                <div class="text-center mb-2">
+                                    <img src="../Images/SMS-OTP.png" alt="OTP" class="cpn-otp-icon" />
+                                </div>
+                                <p class="text-center mb-3" id="cpnOtpOldMessage">
+                                    Check your phone. An OTP has been sent.
+                                </p>
+                                <div class="otp-inputs cpn-otp-inputs" id="cpnOtpOldInputs">
+                                    <input maxlength="1" inputmode="numeric" /><input maxlength="1" inputmode="numeric" /><input maxlength="1" inputmode="numeric" />
+                                    <input maxlength="1" inputmode="numeric" /><input maxlength="1" inputmode="numeric" /><input maxlength="1" inputmode="numeric" />
+                                </div>
+                                <button type="button" class="btn btn-primary w-100 mt-3" id="btnCpnVerifyOldOtp">Verify OTP</button>
+                                <div class="text-center mt-3">
+                                    <div class="d-flex justify-content-center align-items-center gap-2">
+                                        <a href="javascript:void(0)" id="cpnResendOldOtp" class="text-primary text-decoration-underline">Resend OTP</a>
+                                        <span id="cpnResendOldTimer" class="small text-muted"></span>
+                                    </div>
+                                    <div class="mt-2">
+                                        <a href="javascript:void(0)" id="cpnBackToChoose" class="text-primary text-decoration-underline">Back</a>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Step 3: Enter new phone -->
+                            <div class="cpn-step d-none" data-step="new_phone">
+                                <p class="mb-2 text-muted">Enter your new mobile number.</p>
+                                <div class="input-group mb-2">
+                                    <span class="input-group-text">
+                                        <img src="https://upload.wikimedia.org/wikipedia/commons/9/99/Flag_of_the_Philippines.svg" alt="PH" width="22" style="margin-right:6px;">+63
+                                    </span>
+                                    <input type="tel" class="form-control" id="cpnNewPhone" placeholder="9XXXXXXXXX" inputmode="numeric" maxlength="10" />
+                                </div>
+                                <button type="button" class="btn btn-primary w-100" id="btnCpnSendNewOtp">Send OTP</button>
+                                <div class="text-center mt-3">
+                                    <a href="javascript:void(0)" id="cpnBackToOtpOld" class="text-primary text-decoration-underline">Back</a>
+                                </div>
+                            </div>
+
+                            <!-- Step 4: Verify OTP (new phone) -->
+                            <div class="cpn-step d-none" data-step="otp_new">
+                                <div class="text-center mb-2">
+                                    <img src="../Images/SMS-OTP.png" alt="OTP" class="cpn-otp-icon" />
+                                </div>
+                                <p class="text-center mb-3" id="cpnOtpNewMessage">
+                                    Check your phone. An OTP has been sent.
+                                </p>
+                                <div class="otp-inputs cpn-otp-inputs" id="cpnOtpNewInputs">
+                                    <input maxlength="1" inputmode="numeric" /><input maxlength="1" inputmode="numeric" /><input maxlength="1" inputmode="numeric" />
+                                    <input maxlength="1" inputmode="numeric" /><input maxlength="1" inputmode="numeric" /><input maxlength="1" inputmode="numeric" />
+                                </div>
+                                <button type="button" class="btn btn-success w-100 mt-3" id="btnCpnVerifyNewOtp">Verify & Change</button>
+                                <div class="text-center mt-3">
+                                    <div class="d-flex justify-content-center align-items-center gap-2">
+                                        <a href="javascript:void(0)" id="cpnResendNewOtp" class="text-primary text-decoration-underline">Resend OTP</a>
+                                        <span id="cpnResendNewTimer" class="small text-muted"></span>
+                                    </div>
+                                    <div class="mt-2">
+                                        <a href="javascript:void(0)" id="cpnBackToNewPhone" class="text-primary text-decoration-underline">Back</a>
+                                    </div>
+                                </div>
+                            </div>
+
+                        </div>
+                    </div>
+                </div>
+
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                </div>
+            </div>
+	        </div>
+	    </div>
+
+	    <!-- Change Email Modal -->
+	    <div class="modal fade" id="changeEmailModal" tabindex="-1" data-bs-backdrop="static" data-bs-keyboard="false" aria-hidden="true">
+	        <div class="modal-dialog modal-dialog-centered change-email-dialog">
+	            <div class="modal-content">
+	                <div class="modal-header">
+	                    <h5 class="modal-title text-black" style="color:#000;">Change Email</h5>
+	                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+	                </div>
+
+	                <div class="modal-body p-0">
+	                    <div class="change-email-shell">
+	                        <div class="change-email-content">
+	                            <div id="cemError" class="alert alert-danger small d-none" role="alert"></div>
+
+	                            <!-- Step 1: Choose verification method -->
+	                            <div class="cem-step" data-step="choose">
+	                                <p class="mb-3 text-muted">
+	                                    To change your email, verify your identity first.
+	                                </p>
+	                                <div class="d-grid gap-2">
+	                                    <button type="button" class="btn btn-primary" id="btnCemVerifyViaPhone">Verify via Phone</button>
+	                                    <button type="button" class="btn btn-outline-primary d-none" id="btnCemVerifyViaEmail">Verify via Email</button>
+	                                </div>
+	                            </div>
+
+	                            <!-- Step 2: Verify OTP (old phone/email) -->
+	                            <div class="cem-step d-none" data-step="otp_old">
+	                                <div class="text-center mb-2">
+	                                    <img src="../Images/SMS-OTP.png" alt="OTP" class="cem-otp-icon" />
+	                                </div>
+	                                <p class="text-center mb-3" id="cemOtpOldMessage">
+	                                    Check your phone. An OTP has been sent.
+	                                </p>
+	                                <div class="otp-inputs cem-otp-inputs" id="cemOtpOldInputs">
+	                                    <input maxlength="1" inputmode="numeric" /><input maxlength="1" inputmode="numeric" /><input maxlength="1" inputmode="numeric" />
+	                                    <input maxlength="1" inputmode="numeric" /><input maxlength="1" inputmode="numeric" /><input maxlength="1" inputmode="numeric" />
+	                                </div>
+	                                <button type="button" class="btn btn-primary w-100 mt-3" id="btnCemVerifyOldOtp">Verify OTP</button>
+	                                <div class="text-center mt-3">
+	                                    <div class="d-flex justify-content-center align-items-center gap-2">
+	                                        <a href="javascript:void(0)" id="cemResendOldOtp" class="text-primary text-decoration-underline">Resend OTP</a>
+	                                        <span id="cemResendOldTimer" class="small text-muted"></span>
+	                                    </div>
+	                                    <div class="mt-2">
+	                                        <a href="javascript:void(0)" id="cemBackToChoose" class="text-primary text-decoration-underline">Back</a>
+	                                    </div>
+	                                </div>
+	                            </div>
+
+	                            <!-- Step 3: Enter new email -->
+	                            <div class="cem-step d-none" data-step="new_email">
+	                                <p class="mb-2 text-muted">Enter your new email address.</p>
+	                                <div class="input-group mb-2">
+	                                    <input type="email" class="form-control" id="cemNewEmail" placeholder="name@example.com" autocomplete="email" />
+	                                </div>
+	                                <button type="button" class="btn btn-primary w-100" id="btnCemSendVerification">Send Verification Email</button>
+	                                <div class="text-center mt-3">
+	                                    <a href="javascript:void(0)" id="cemBackToOtpOld" class="text-primary text-decoration-underline">Back</a>
+	                                </div>
+	                            </div>
+
+	                            <!-- Step 4: Verification email sent -->
+	                            <div class="cem-step d-none" data-step="sent">
+	                                <div class="text-center mb-2">
+	                                    <img src="../Images/SMS-OTP.png" alt="Email" class="cem-otp-icon" />
+	                                </div>
+	                                <h6 class="text-center mb-2">Verification Email Sent</h6>
+	                                <p class="text-center text-muted mb-0" id="cemSentMessage">
+	                                    Check your email and click the Verify Email button. This link will expire in 15 minutes.
+	                                </p>
+	                            </div>
+	                        </div>
+	                    </div>
+	                </div>
+
+	                <div class="modal-footer">
+	                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+	                </div>
+	            </div>
+	        </div>
+	    </div>
+
+        <!-- Uploaded Document Viewer Modal -->
+        <div class="modal fade" id="modalUploadedDocViewer" tabindex="-1" data-bs-backdrop="static" data-bs-keyboard="true" aria-hidden="true">
+            <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable" style="max-width: 1100px; width: 92vw;">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <div class="w-100">
+                            <h5 class="fw-bold mb-0" id="udvTitle">Document Preview</h5>
+                            <div class="small text-muted" id="udvSubtitle"></div>
+                        </div>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body">
+                        <div id="udvBody" class="w-100"></div>
+                    </div>
+                    <div class="modal-footer">
+                        <a href="#" class="btn btn-outline-primary d-none" id="udvOpenNewTab" target="_blank" rel="noopener">Open</a>
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+	        <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 </body>
 </html>

@@ -4,10 +4,23 @@ document.addEventListener("DOMContentLoaded", () => {
   const btnApplyFilter = document.getElementById("btnApplyFilter");
   const btnResetModal = document.getElementById("btnResetModalFilters");
   const filterHouseholdCountInput = document.getElementById("filterHouseholdCountInput");
+  const btnRefreshTable = document.getElementById("btnHouseholdRefresh");
+  const countdownEl = document.getElementById("householdAutoRefreshCountdown");
 
   let allAddresses = [];
   let activeAreaFilters = [];
   let activeHouseholdCountFilter = "";
+
+  const AUTO_REFRESH_SECONDS = 60;
+  let autoRefreshSecondsLeft = AUTO_REFRESH_SECONDS;
+  let autoRefreshInterval = null;
+  let autoRefreshInFlight = false;
+
+  const setRefreshLoading = (on) => {
+    if (!btnRefreshTable) return;
+    btnRefreshTable.classList.toggle("is-loading", !!on);
+    btnRefreshTable.disabled = !!on;
+  };
 
   function normalizeText(value) {
     return String(value ?? "").trim().toLowerCase();
@@ -42,15 +55,57 @@ document.addEventListener("DOMContentLoaded", () => {
   // ========================
   function fetchHeads(search = "") {
     const url = `../PhpFiles/Admin-End/householdProfiling.php?fetch=true&search=${encodeURIComponent(search)}`;
+    if (autoRefreshInFlight) return;
+    autoRefreshInFlight = true;
+    setRefreshLoading(true);
     fetch(url)
       .then(res => res.json())
       .then(data => {
         allAddresses = Array.isArray(data) ? data : [];
         renderTable(getFilteredAddresses());
       })
-      .catch(err => console.error("Fetch error:", err));
+      .catch(err => console.error("Fetch error:", err))
+      .finally(() => {
+        autoRefreshInFlight = false;
+        setRefreshLoading(false);
+      });
   }
   fetchHeads();
+
+  const renderCountdown = () => {
+    if (!countdownEl) return;
+    countdownEl.textContent = autoRefreshSecondsLeft > 0 ? `Auto refresh in ${autoRefreshSecondsLeft}s` : "";
+  };
+
+  const resetCountdown = () => {
+    autoRefreshSecondsLeft = AUTO_REFRESH_SECONDS;
+    renderCountdown();
+  };
+
+  const triggerRefresh = () => {
+    resetCountdown();
+    fetchHeads(searchInput ? searchInput.value.trim() : "");
+  };
+
+  if (btnRefreshTable) {
+    btnRefreshTable.addEventListener("click", triggerRefresh);
+  }
+
+  const startAutoRefresh = () => {
+    renderCountdown();
+    if (autoRefreshInterval) clearInterval(autoRefreshInterval);
+    autoRefreshInterval = setInterval(() => {
+      if (autoRefreshInFlight) return;
+      autoRefreshSecondsLeft -= 1;
+      if (autoRefreshSecondsLeft <= 0) {
+        triggerRefresh();
+        return;
+      }
+      renderCountdown();
+    }, 1000);
+  };
+
+  startAutoRefresh();
 
   // ========================
   // TABLE RENDER

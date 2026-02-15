@@ -123,6 +123,36 @@ document.addEventListener("DOMContentLoaded", () => {
     group.forEach((radio) => clearError(radio));
   }
 
+  function normalizeForGarbageCheck(value) {
+    const raw = String(value ?? "").toLowerCase();
+    // Keep only ASCII letters/digits so patterns like asdf/qwer/1234 are detected reliably.
+    return raw.replace(/[^a-z0-9]+/g, "");
+  }
+
+  function isLikelyGarbageText(value, mode = "general") {
+    const compact = normalizeForGarbageCheck(value);
+    if (!compact) return false;
+
+    // Excessive repeated characters like "aaaaa", "111111".
+    if (/(.)\1{3,}/.test(compact)) return true;
+
+    // Repeated short patterns like "ababab", "lololol", "123123123".
+    if (compact.length >= 6 && /(.{2,3})\1{2,}/.test(compact)) return true;
+
+    // Common keyboard-mash sequences.
+    if (/(asdf|qwer|zxcv|qwerty|poiuy|lkjh|mnbv|abcd|1234|0000)/.test(compact)) return true;
+
+    if (mode === "name") {
+      const lettersOnly = String(value ?? "").toLowerCase().replace(/[^a-z]/g, "");
+      if (lettersOnly.length >= 8) {
+        // Very long letter strings without any vowels are almost always garbage.
+        if (!/[aeiou]/.test(lettersOnly)) return true;
+      }
+    }
+
+    return false;
+  }
+
   function isValidPersonName(value, minLetters = 1) {
     const text = String(value ?? "").trim();
     if (!text) return false;
@@ -133,18 +163,22 @@ document.addEventListener("DOMContentLoaded", () => {
     if (!/^[A-Za-zÀ-ÖØ-öø-ÿÑñ]/.test(text) || !/[A-Za-zÀ-ÖØ-öø-ÿÑñ]$/.test(text)) {
       return false;
     }
+    if (isLikelyGarbageText(text, "name")) return false;
     return validChars.test(text);
   }
 
   function isValidAlphaText(value) {
     const text = String(value ?? "").trim();
     if (!text) return false;
+    if (isLikelyGarbageText(text, "alpha")) return false;
     return /^[A-Za-zÀ-ÖØ-öø-ÿÑñ .,'-]+$/u.test(text);
   }
 
   function isValidAddressLikeText(value) {
     const text = String(value ?? "").trim();
     if (!text) return false;
+    // Only apply "garbage" heuristics when the address contains letters (so numeric-only house/lot numbers are fine).
+    if (/[A-Za-zÀ-ÖØ-öø-ÿÑñ]/u.test(text) && isLikelyGarbageText(text, "address")) return false;
     return /^[A-Za-z0-9À-ÖØ-öø-ÿÑñ .,'#()\/&-]+$/u.test(text);
   }
 
@@ -230,7 +264,7 @@ function isActuallyVisible(el) {
       const minLetters = requiredNameIds.has(field.id) ? 2 : 1;
       if (!isValidPersonName(field.value, minLetters)) {
         valid = false;
-        if (showMessages) showError(field, "Please enter a valid name.");
+        if (showMessages) showError(field, "Input appears invalid or random.");
       }
     }
 
@@ -245,7 +279,7 @@ function isActuallyVisible(el) {
     if (alphaTextIds.has(field.id) && field.value.trim()) {
       if (!isValidAlphaText(field.value)) {
         valid = false;
-        if (showMessages) showError(field, "Please enter valid text.");
+        if (showMessages) showError(field, "Input appears invalid or random.");
       }
     }
 
@@ -264,7 +298,7 @@ function isActuallyVisible(el) {
     if (addressLikeIds.has(field.id) && field.value.trim()) {
       if (!isValidAddressLikeText(field.value)) {
         valid = false;
-        if (showMessages) showError(field, "Please enter valid characters only.");
+        if (showMessages) showError(field, "Input appears invalid or random.");
       }
     }
 
@@ -307,6 +341,26 @@ function isActuallyVisible(el) {
       if (!emailRegex.test(field.value)) {
         valid = false;
         if (showMessages) showError(field, "Enter a valid email like name@gmail.com");
+      }
+    }
+
+    // Generic garbage detection for any other free-text inputs (future-proofing).
+    // We only apply this when the field contains letters to avoid false-positives on numeric IDs/codes.
+    if (
+      valid &&
+      field.value.trim() &&
+      (field.tagName === "TEXTAREA" || field.type === "text") &&
+      field.id !== "idNumberInput" &&
+      !field.classList.contains("phone-input") &&
+      !field.classList.contains("email-input") &&
+      !nameFieldIds.has(field.id) &&
+      !alphaTextIds.has(field.id) &&
+      !addressLikeIds.has(field.id)
+    ) {
+      const val = field.value.trim();
+      if (/[A-Za-zÀ-ÖØ-öø-ÿÑñ]/u.test(val) && isLikelyGarbageText(val, "general")) {
+        valid = false;
+        if (showMessages) showError(field, "Input appears invalid or random.");
       }
     }
 
@@ -841,6 +895,11 @@ function isActuallyVisible(el) {
   const idBackInput = document.getElementById("idBackInput");
   const pictureInput = document.getElementById("pictureInput");
   const sectorProofSection = document.getElementById("sectorProofSection");
+  const idBackWrapper = document.getElementById("idBackWrapper");
+  const idUploadLabel = document.getElementById("idUploadLabel");
+  const idUploadHint = document.getElementById("idUploadHint");
+  const idFrontCaption = document.getElementById("idFrontCaption");
+  const idBackCaption = document.getElementById("idBackCaption");
 
 	  const submitBtn = document.getElementById("submitBtn");
 	  const sectorMap = {
@@ -877,6 +936,64 @@ function isActuallyVisible(el) {
       normalized === "philsysidephilid" ||
       normalized === "ephilid"
     );
+  }
+
+  function isPassportSelected() {
+    const raw = String(idTypeSelect?.value ?? "");
+    const normalized = raw.toLowerCase().replace(/[^a-z0-9]/g, "");
+    return normalized === "passport";
+  }
+
+  function applyIdUploadUi() {
+    const skipped = !!(skipProofSwitch && skipProofSwitch.checked);
+    const usingId = !!(proofTypeSelect && proofTypeSelect.value === "ID");
+    const passport = usingId && isPassportSelected();
+
+    // Hide/show the back-side uploader for passport
+    if (idBackWrapper) {
+      idBackWrapper.classList.toggle("d-none", passport || skipped || !usingId);
+    }
+    if (idBackInput) {
+      // If passport, back is not used
+      const disableBack = passport || skipped || !usingId;
+      idBackInput.required = usingId && !skipped && !passport;
+      idBackInput.disabled = disableBack;
+      if (disableBack) {
+        idBackInput.value = "";
+        clearError(idBackInput);
+        const box = idBackInput.closest(".upload-box");
+        if (box) {
+          box.classList.remove("uploaded", "upload-error");
+          const filename = box.querySelector(".uploaded-filename");
+          if (filename) filename.remove();
+          const removeBtn = box.querySelector(".upload-remove");
+          if (removeBtn) removeBtn.remove();
+        }
+      }
+    }
+
+    if (idUploadLabel) {
+      idUploadLabel.innerHTML = passport
+        ? `Upload Passport <span class="text-danger">*</span>`
+        : `Upload ID Front and Back <span class="text-danger">*</span>`;
+    }
+    if (idUploadHint) {
+      idUploadHint.textContent = passport
+        ? "Upload a clear photo/scan of your passport."
+        : "Upload clear photos/scans of the front and back of your ID.";
+    }
+    if (idFrontCaption) idFrontCaption.textContent = passport ? "Passport" : "Front";
+    if (idBackCaption) idBackCaption.textContent = "Back";
+
+    // Ensure correct required flags for front when using ID
+    if (idFrontInput) {
+      idFrontInput.required = usingId && !skipped;
+      idFrontInput.disabled = skipped || !usingId;
+      if (idFrontInput.disabled) {
+        idFrontInput.value = "";
+        clearError(idFrontInput);
+      }
+    }
   }
 
   function isSectorDocumentRequired(sectorKey) {
@@ -1178,12 +1295,20 @@ function isActuallyVisible(el) {
       }
     }
 
+    applyIdUploadUi();
     updateNextButtonState();
     updateSubmitButtonState();
   }
 
   function setProofRequired(isRequired) {
-    const requiredFields = [idTypeSelect, idNumberInput, idFrontInput, idBackInput, pictureInput];
+    const requiredFields = [idTypeSelect, idNumberInput, idFrontInput, pictureInput];
+    // Back side is required only when NOT passport
+    if (!isPassportSelected()) {
+      requiredFields.push(idBackInput);
+    } else if (idBackInput) {
+      idBackInput.required = false;
+      clearError(idBackInput);
+    }
 
     requiredFields.forEach((el) => {
       if (!el) return;
@@ -1225,7 +1350,7 @@ function isActuallyVisible(el) {
       return isSectorProofComplete();
     }
 
-    if (!idTypeSelect || !idNumberInput || !idFrontInput || !idBackInput || !pictureInput) return false;
+    if (!idTypeSelect || !idNumberInput || !idFrontInput || !pictureInput) return false;
 
     if (!idTypeSelect.value.trim()) return false;
     if (!idNumberInput.value.trim()) return false;
@@ -1235,7 +1360,9 @@ function isActuallyVisible(el) {
     }
 
     if (!idFrontInput.files || idFrontInput.files.length === 0) return false;
-    if (!idBackInput.files || idBackInput.files.length === 0) return false;
+    if (!isPassportSelected()) {
+      if (!idBackInput || !idBackInput.files || idBackInput.files.length === 0) return false;
+    }
     if (!pictureInput.files || pictureInput.files.length === 0) return false;
 
     return isSectorProofComplete();
@@ -1291,6 +1418,7 @@ function isActuallyVisible(el) {
     }
 
     setProofRequired(!skipped);
+    applyIdUploadUi();
     toggleStudentSchool();
     updateSectorProofVisibility();
     updateNextButtonState();
@@ -1337,6 +1465,7 @@ function isActuallyVisible(el) {
 
   if (proofTypeSelect) {
     proofTypeSelect.addEventListener("change", () => {
+      applyIdUploadUi();
       updateSectorProofVisibility();
       updateSubmitButtonState();
     });
@@ -1492,4 +1621,9 @@ function isActuallyVisible(el) {
       }
     });
   }
+
+  // Some inline scripts on resident_registration.php call these by name (upload box logic).
+  // Expose them to avoid "updateNextButtonState is not defined" breaking button flow.
+  window.updateNextButtonState = updateNextButtonState;
+  window.updateSubmitButtonState = updateSubmitButtonState;
 });

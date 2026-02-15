@@ -32,25 +32,40 @@ include 'includes/sidebar.php';
 
         <div class="bg-white p-4 rounded-4 shadow-sm border">
 
-            <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
-                <div class="d-flex align-items-center gap-2">
-                    <button class="btn btn-outline-primary btn-sm filter-btn active" data-filter="ALL">All</button>
-                    <button class="btn btn-outline-secondary btn-sm filter-btn" data-filter="PendingReview">Pending</button>
-                    <button class="btn btn-outline-success btn-sm filter-btn" data-filter="Verified">Verified</button>
-                    <button class="btn btn-outline-danger btn-sm filter-btn" data-filter="Rejected">Rejected</button>
-                </div>
-
-                <div class="input-group" style="max-width: 360px;">
-                    <input type="text" id="searchInput" class="form-control" placeholder="Search Resident ID / Name / Sector">
-                    <span class="input-group-text bg-white"><i class="fas fa-search"></i></span>
-                </div>
-            </div>
+	            <div class="admin-list-toolbar mb-3">
+	                <div class="admin-list-tabs">
+	                    <button class="btn btn-outline-primary btn-sm filter-btn active" data-filter="ALL">All</button>
+	                    <button class="btn btn-outline-secondary btn-sm filter-btn" data-filter="PendingReview">Pending</button>
+	                    <button class="btn btn-outline-success btn-sm filter-btn" data-filter="Verified">Verified</button>
+	                    <button class="btn btn-outline-danger btn-sm filter-btn" data-filter="Rejected">Rejected</button>
+	                </div>
+	
+	                <div class="admin-list-actions">
+	                    <div class="input-group admin-search">
+	                        <input type="text" id="searchInput" class="form-control" placeholder="Search Resident ID / Name / Sector">
+	                        <span class="input-group-text bg-white"><i class="fas fa-search"></i></span>
+	                    </div>
+	                    <button class="btn btn-outline-secondary btn-icon" type="button" data-bs-toggle="modal" data-bs-target="#modalFilter" id="filterButton" title="Filter" aria-label="Filter">
+	                        <i class="fas fa-filter"></i>
+	                        <span class="visually-hidden">Filter</span>
+	                    </button>
+	                    <button class="btn admin-columns btn-icon" type="button" data-bs-toggle="modal" data-bs-target="#modalTableColumns" id="btnSectorAppsColumns" title="Columns" aria-label="Columns">
+	                        <i class="fa-solid fa-sliders"></i>
+	                        <span class="visually-hidden">Columns</span>
+	                    </button>
+	                    <button class="btn admin-refresh btn-icon" type="button" id="btnSectorAppsRefresh" title="Refresh table" aria-label="Refresh table">
+	                        <i class="fa-solid fa-arrows-rotate"></i>
+	                        <span class="visually-hidden">Refresh</span>
+	                    </button>
+	                    <span id="sectorAppsAutoRefreshCountdown" class="small text-muted d-none"></span>
+	                </div>
+	            </div>
 
             <div id="sectorAppsLoading" class="text-muted small mb-2">Loading applications...</div>
             <div id="sectorAppsEmpty" class="text-muted small d-none">No sector membership applications found.</div>
 
             <div class="table-responsive">
-                <table class="table align-middle">
+                <table class="table align-middle" id="table-sectorApps">
                     <thead>
                         <tr class="table-light">
                             <th>Resident ID</th>
@@ -133,7 +148,60 @@ include 'includes/sidebar.php';
   </div>
 </div>
 
+<!-- FILTER MODAL -->
+<div class="modal fade" id="modalFilter" tabindex="-1" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content p-4">
+      <div class="modal-header border-0">
+        <h5 class="modal-title fw-bold">Filter Applications</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <hr>
+      <div class="modal-body">
+        <div class="d-flex flex-wrap gap-2">
+          <button class="btn btn-outline-primary btn-sm filter-btn active" data-filter="ALL" data-bs-dismiss="modal">All</button>
+          <button class="btn btn-outline-secondary btn-sm filter-btn" data-filter="PendingReview" data-bs-dismiss="modal">Pending</button>
+          <button class="btn btn-outline-success btn-sm filter-btn" data-filter="Verified" data-bs-dismiss="modal">Verified</button>
+          <button class="btn btn-outline-danger btn-sm filter-btn" data-filter="Rejected" data-bs-dismiss="modal">Rejected</button>
+        </div>
+        <div class="small text-muted mt-3">Selecting a filter applies immediately.</div>
+      </div>
+      <div class="modal-footer border-0">
+        <button type="button" class="btn btn-primary" data-bs-dismiss="modal">Done</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- TABLE COLUMNS MODAL -->
+<div class="modal fade" id="modalTableColumns" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered modal-lg">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Columns</h5>
+      </div>
+      <div class="modal-body">
+        <div class="row g-2" id="tableColumnsList"></div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline-secondary" id="btnTableColumnsReset">Reset</button>
+        <button type="button" class="btn btn-primary" data-bs-dismiss="modal">Done</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+  window.ADMIN_TABLE_COLUMNS_CONFIG = {
+    tableSelector: "#table-sectorApps",
+    modalId: "modalTableColumns",
+    listId: "tableColumnsList",
+    resetBtnId: "btnTableColumnsReset",
+    storageKey: "admin_cols_sector_membership_v1"
+  };
+</script>
+<script src="../JS-Script-Files/Admin-End/tableColumnsGeneric.js?v=20260215-1"></script>
 <script src="../JS-Script-Files/Admin-End/sectorMembershipVerificationScript.js?v=20260214-1"></script>
 </body>
 </html>

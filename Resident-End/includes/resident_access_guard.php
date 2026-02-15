@@ -7,16 +7,10 @@ header("Cache-Control: no-store, no-cache, must-revalidate, max-age=0");
 header("Pragma: no-cache");
 header("Expires: 0");
 
-if (empty($_SESSION['user_id'])) {
-    header("Location: ../Guest-End/login.php");
-    exit;
-}
+require_once __DIR__ . "/../../PhpFiles/General/security.php";
 
-// Block non-resident roles from Resident pages
-if (!in_array($_SESSION['role'] ?? '', ['Resident'], true)) {
-    header("Location: ../Guest-End/login.php");
-    exit;
-}
+// Enforce auth + 30-min inactivity timeout for Resident pages.
+requireRoleSession(['Resident'], false);
 
 require_once __DIR__ . "/../../PhpFiles/General/connection.php";
 
