@@ -1,5 +1,6 @@
 <?php
 require_once '../General/connection.php';
+session_start();
 header('Content-Type: application/json');
 
 if (!isset($_POST['recipient']) || !isset($_POST['otp']) || !isset($_POST['purpose'])) {
@@ -85,6 +86,30 @@ if (!password_verify($otp_input, $otp_hash)) {
 $update = $conn->prepare("UPDATE otprequesttbl SET status_id_otp = ? WHERE otp_id = ?");
 $update->bind_param("ii", $STATUS_VERIFIED, $otp_id);
 $update->execute();
+
+// Bind forgot-password flow to a verified server-side session.
+if ($purpose === 'forgot') {
+    $acctStmt = $conn->prepare("
+        SELECT user_id, email, phone_number
+        FROM useraccountstbl
+        WHERE phone_number = ?
+        LIMIT 1
+    ");
+    if ($acctStmt) {
+        $acctStmt->bind_param("s", $recipient);
+        $acctStmt->execute();
+        $acctRes = $acctStmt->get_result();
+        if ($acctRow = $acctRes->fetch_assoc()) {
+            $_SESSION['password_reset_verified'] = [
+                'user_id' => (string)$acctRow['user_id'],
+                'email' => (string)$acctRow['email'],
+                'phone' => (string)$acctRow['phone_number'],
+                'verified_at' => time()
+            ];
+        }
+        $acctStmt->close();
+    }
+}
 
 echo json_encode(['success' => true]);
 ?>

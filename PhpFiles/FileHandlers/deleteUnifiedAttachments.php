@@ -50,6 +50,10 @@ function resolveFilePath(string $rawPath, string $projectRoot): string {
         $rel = substr($normalized, strlen('/BarangaySanJose/'));
         return rtrim($projectRoot, "/") . "/" . ltrim($rel, "/");
     }
+    if (strpos($normalized, '/UnifiedFileAttachment/') === 0) {
+        $rel = substr($normalized, strlen('/UnifiedFileAttachment/'));
+        return rtrim($projectRoot, "/") . "/UnifiedFileAttachment/" . ltrim($rel, "/");
+    }
 
     $isAbsolute = startsWith($rawPath, "/") || (bool)preg_match('/^[A-Za-z]:[\\\\\\/]/', $rawPath);
     if ($isAbsolute) return $rawPath;

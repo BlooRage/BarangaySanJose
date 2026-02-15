@@ -7,15 +7,12 @@ document.addEventListener("DOMContentLoaded", () => {
         if (digits.startsWith("9") && digits.length === 10) {
             return "0" + digits;
         }
-        if (digits.length === 9 && digits.startsWith("9")) {
-            return "0" + digits;
-        }
         return digits;
     };
 
     const sanitizePhoneInput = (input) => {
         if (!input) return;
-        const digits = (input.value || "").replace(/\D/g, "").slice(0, 9);
+        const digits = (input.value || "").replace(/\D/g, "").slice(0, 10);
         input.value = digits;
     };
 
@@ -43,8 +40,8 @@ document.addEventListener("DOMContentLoaded", () => {
             input.className = "form-control household-invite-phone";
             input.placeholder = "9XXXXXXXXX";
             input.inputMode = "numeric";
-            input.maxLength = 9;
-            input.setAttribute("pattern", "^\\d{9}$");
+            input.maxLength = 10;
+            input.setAttribute("pattern", "^\\d{10}$");
             input.addEventListener("input", () => sanitizePhoneInput(input));
             input.addEventListener("keydown", blockNonDigitKeypress);
             const removeBtn = document.createElement("button");
@@ -84,7 +81,7 @@ document.addEventListener("DOMContentLoaded", () => {
             if (invalidNumbers.length) {
                 if (result) {
                     result.className = "small mt-2 text-danger";
-                    result.textContent = "Invalid number(s). Use +63 then 9 digits.";
+                    result.textContent = "Invalid number(s). Use +63 then 10 digits starting with 9.";
                 }
                 return;
             }

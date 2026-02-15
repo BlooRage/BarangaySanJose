@@ -1,6 +1,10 @@
 <?php
 session_start();
 require_once "../General/connection.php";
+require_once "../General/security.php";
+require_once "../General/audit.php";
+
+requireRoleSession(['Admin', 'Employee']);
 
 function normalizeResidentId($value): ?string {
     $id = trim((string)$value);
@@ -9,6 +13,144 @@ function normalizeResidentId($value): ?string {
     }
     return $id;
 }
+
+function parseSectorMembershipCsv($value): array {
+    $parts = array_map('trim', explode(',', (string)$value));
+    $parts = array_values(array_filter($parts, static function ($v) {
+        return $v !== '';
+    }));
+
+    $seen = [];
+    $output = [];
+    foreach ($parts as $part) {
+        $key = strtolower($part);
+        if (isset($seen[$key])) {
+            continue;
+        }
+        $seen[$key] = true;
+        $output[] = $part;
+    }
+    return $output;
+}
+
+function mapSectorKeyToLabel($sectorKey): ?string {
+    $normalized = strtolower(trim((string)$sectorKey));
+    $normalized = preg_replace('/[^a-z]/', '', $normalized);
+
+    $map = [
+        'pwd' => 'PWD',
+        'seniorcitizen' => 'Senior Citizen',
+        'student' => 'Student',
+        'indigenouspeople' => 'Indigenous People',
+        'indigenousperson' => 'Indigenous People',
+        'singleparent' => 'Single Parent'
+    ];
+    return $map[$normalized] ?? null;
+}
+
+function appendSectorMembership(mysqli $conn, string $residentId, string $sectorLabel): ?string {
+    $stmt = $conn->prepare("
+        SELECT sector_membership
+        FROM residentinformationtbl
+        WHERE resident_id = ?
+        LIMIT 1
+    ");
+    if (!$stmt) {
+        throw new Exception("Prepare failed (read sector membership): " . $conn->error);
+    }
+    $stmt->bind_param("s", $residentId);
+    $stmt->execute();
+    $row = $stmt->get_result()->fetch_assoc();
+    $stmt->close();
+
+    if (!$row) return null;
+
+    $sectors = parseSectorMembershipCsv($row['sector_membership'] ?? '');
+    $alreadyExists = false;
+    foreach ($sectors as $sector) {
+        if (strcasecmp($sector, $sectorLabel) === 0) {
+            $alreadyExists = true;
+            break;
+        }
+    }
+    if (!$alreadyExists) {
+        $sectors[] = $sectorLabel;
+    }
+
+    $updatedSectorMembership = implode(', ', $sectors);
+    $update = $conn->prepare("
+        UPDATE residentinformationtbl
+        SET sector_membership = ?
+        WHERE resident_id = ?
+        LIMIT 1
+    ");
+    if (!$update) {
+        throw new Exception("Prepare failed (update sector membership): " . $conn->error);
+    }
+    $update->bind_param("ss", $updatedSectorMembership, $residentId);
+    $update->execute();
+    $update->close();
+
+    return $updatedSectorMembership;
+}
+
+function upsertSectorMembershipStatus(
+    mysqli $conn,
+    string $residentId,
+    string $sectorKey,
+    int $sectorStatusId,
+    int $latestAttachmentId,
+    ?string $reasonText,
+    ?string $uploadTimestamp
+): void {
+    // If the table doesn't exist or schema doesn't match, silently skip (keeps backward compatibility).
+    $stmt = $conn->prepare("
+        INSERT INTO residentsectormembershiptbl
+            (resident_id, sector_key, sector_status_id, latest_attachment_id, remarks, upload_timestamp, last_update_user_id)
+        VALUES
+            (?, ?, ?, ?, ?, ?, NULL)
+        ON DUPLICATE KEY UPDATE
+            sector_status_id = VALUES(sector_status_id),
+            latest_attachment_id = VALUES(latest_attachment_id),
+            remarks = VALUES(remarks),
+            upload_timestamp = VALUES(upload_timestamp),
+            last_update_user_id = NULL,
+            updated_at = CURRENT_TIMESTAMP
+    ");
+    if (!$stmt) {
+        return;
+    }
+    $reason = $reasonText !== null && trim($reasonText) !== '' ? $reasonText : null;
+    $ts = $uploadTimestamp !== null && trim($uploadTimestamp) !== '' ? $uploadTimestamp : null;
+    $stmt->bind_param(
+        "ssiiss",
+        $residentId,
+        $sectorKey,
+        $sectorStatusId,
+        $latestAttachmentId,
+        $reason,
+        $ts
+    );
+    $stmt->execute();
+    $stmt->close();
+}
+
+	function extractMarkerFromRemarks($remarks): string {
+	    $text = trim((string)$remarks);
+	    if ($text === '') return '';
+	    $parts = explode(';', $text);
+	    return trim((string)($parts[0] ?? ''));
+	}
+
+	function extractReasonFromRemarks(string $remarks): string {
+	    $parts = array_values(array_filter(array_map('trim', explode(';', (string)$remarks))));
+	    foreach ($parts as $p) {
+	        if (stripos($p, 'reason=') === 0) {
+	            return trim(substr($p, strlen('reason=')));
+	        }
+	    }
+	    return '';
+	}
 
 function getStatusId(mysqli $conn, string $name, string $type): int {
     $q = $conn->prepare("SELECT status_id FROM statuslookuptbl WHERE status_name=? AND status_type=? LIMIT 1");
@@ -39,6 +181,7 @@ function getResidentVerificationEligibility(mysqli $conn, string $residentId): a
                 CASE
                     WHEN dt.document_category = 'ResidentProfiling'
                          AND dt.document_type_name <> '2x2 Picture'
+                         AND (uf.remarks IS NULL OR uf.remarks NOT LIKE 'sector:%')
                          AND sv.status_name = 'Rejected'
                          AND sv.status_type = 'ResidentDocumentProfiling'
                     THEN 1 ELSE 0
@@ -47,6 +190,7 @@ function getResidentVerificationEligibility(mysqli $conn, string $residentId): a
             SUM(
                 CASE
                     WHEN dt.document_category = 'ResidentProfiling'
+                         AND (uf.remarks IS NULL OR uf.remarks NOT LIKE 'sector:%')
                          AND sv.status_name = 'PendingReview'
                          AND sv.status_type = 'ResidentDocumentProfiling'
                     THEN 1 ELSE 0
@@ -147,16 +291,16 @@ function toPublicPath($path): ?string {
     }
     $normalized = '/' . implode('/', $cleanParts);
 
-    if (strpos($normalized, '/BarangaySanJose/') === 0) {
-        return $normalized;
-    }
-
-    // Most records contain absolute filesystem paths; map them by folder marker.
     $marker = '/UnifiedFileAttachment/';
     $markerPos = stripos($normalized, $marker);
     if ($markerPos !== false) {
         $public = substr($normalized, $markerPos);
         return '..' . $public;
+    }
+
+    // If stored as a full web path, keep it.
+    if (strpos($normalized, '/BarangaySanJose/') === 0) {
+        return $normalized;
     }
 
     $webRoot = realpath(__DIR__ . "/../..");
@@ -254,6 +398,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_resident_statu
 
     $conn->begin_transaction();
     try {
+        $actorUserId = isset($_SESSION['user_id']) ? (string)$_SESSION['user_id'] : null;
+        $actorRole = (string)($_SESSION['role'] ?? 'Unknown');
+
+        // Capture old status for audit trail.
+        $oldResidentStatusName = getResidentStatusName($conn, $residentId);
+
         $statusName = $statusMap[$uiStatus];
         $stmt = $conn->prepare("
             UPDATE residentinformationtbl
@@ -304,6 +454,28 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_resident_statu
                 $stmtRemarks->close();
             }
         }
+
+        // Audit (best-effort): resident verification status change.
+        $newResidentStatusId = null;
+        try {
+            $newResidentStatusId = getStatusId($conn, $statusName, "Resident");
+        } catch (Throwable $e) {
+            $newResidentStatusId = null;
+        }
+        insertUnifiedAuditLog(
+            $conn,
+            $actorUserId,
+            $actorRole,
+            'Resident Masterlist',
+            'Resident',
+            (string)$residentId,
+            'RESIDENT_STATUS_UPDATE',
+            'status_id_resident',
+            (string)$oldResidentStatusName,
+            (string)$statusName,
+            ($uiStatus === 'DENIED' ? ("reason=" . $reasonText) : null),
+            $newResidentStatusId
+        );
 
         $conn->commit();
         echo json_encode([
@@ -368,6 +540,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['archive_resident'])) 
     $conn->begin_transaction();
 
     try {
+        $actorUserId = isset($_SESSION['user_id']) ? (string)$_SESSION['user_id'] : null;
+        $actorRole = (string)($_SESSION['role'] ?? 'Unknown');
+
+        $oldResidentStatusName = getResidentStatusName($conn, $residentId);
+
         // Fetch Archived status id
         $statusId = null;
         $stmt = $conn->prepare("
@@ -409,6 +586,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['archive_resident'])) 
         $stmt->bind_param("is", $statusId, $residentId);
         $stmt->execute();
         $stmt->close();
+
+        // Audit (best-effort): archive action.
+        insertUnifiedAuditLog(
+            $conn,
+            $actorUserId,
+            $actorRole,
+            'Resident Archive',
+            'Resident',
+            (string)$residentId,
+            'RESIDENT_ARCHIVE',
+            'status_id_resident',
+            (string)$oldResidentStatusName,
+            'Archived',
+            null,
+            (int)$statusId
+        );
 
         // Update archived_at if column exists
         $colExists = 0;
@@ -734,12 +927,14 @@ if (isset($_GET['fetch_documents'])) {
     $stmt = $conn->prepare("
         SELECT
             uf.attachment_id,
+            uf.source_type,
             uf.file_name,
             uf.file_path,
             uf.upload_timestamp,
             uf.remarks,
             uf.id_number,
             dt.document_type_name,
+            dt.document_category,
             s.status_name AS verify_status
         FROM unifiedfileattachmenttbl uf
         LEFT JOIN documenttypelookuptbl dt
@@ -804,44 +999,226 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_document_statu
         exit;
     }
 
-    try {
-        $statusId = getStatusId($conn, $statusMap[$uiStatus], "ResidentDocumentProfiling");
-        $remarks = '';
-        if ($reasonText !== '') {
-            $remarks = $reasonScope !== ''
-                ? trim("scope={$reasonScope}; reason={$reasonText}")
-                : $reasonText;
-        }
+	    try {
+	        $statusId = getStatusId($conn, $statusMap[$uiStatus], "ResidentDocumentProfiling");
 
-        $stmt = $conn->prepare("
-            UPDATE unifiedfileattachmenttbl
-            SET status_id_verify = ?, remarks = ?
-            WHERE attachment_id = ?
-            LIMIT 1
-        ");
-        if (!$stmt) throw new Exception("Prepare failed (update document status): " . $conn->error);
-        $stmt->bind_param("isi", $statusId, $remarks, $attachmentId);
-        $stmt->execute();
-        $stmt->close();
+	        $attachmentResidentId = null;
+	        $attachmentRemarks = '';
+	        $docTypeName = '';
+	        $docCategory = '';
+	        $attachmentUploadTs = '';
+	        $currentStatusName = '';
+	        $currentStatusId = 0;
+
+	        $metaStmt = $conn->prepare("
+	            SELECT uf.source_id, uf.remarks, uf.upload_timestamp, dt.document_type_name, dt.document_category, s.status_name, uf.status_id_verify
+	            FROM unifiedfileattachmenttbl uf
+	            LEFT JOIN documenttypelookuptbl dt
+	                ON uf.document_type_id = dt.document_type_id
+	            LEFT JOIN statuslookuptbl s
+	                ON uf.status_id_verify = s.status_id
+	            WHERE uf.attachment_id = ?
+	            LIMIT 1
+	        ");
+	        if ($metaStmt) {
+	            $metaStmt->bind_param("i", $attachmentId);
+	            $metaStmt->execute();
+	            $metaStmt->bind_result($attachmentResidentId, $attachmentRemarks, $attachmentUploadTs, $docTypeName, $docCategory, $currentStatusName, $currentStatusId);
+	            $metaStmt->fetch();
+	            $metaStmt->close();
+	        }
+
+	        $requestedStatusName = $statusMap[$uiStatus]; // Verified | Rejected | PendingReview
+	        $currentLower = strtolower(trim((string)$currentStatusName));
+	        $isTerminal = in_array($currentLower, ['verified', 'rejected', 'denied'], true);
+	        if ($isTerminal) {
+	            $currentTerminal = $currentLower === 'verified' ? 'Verified' : 'Rejected';
+	            if (strcasecmp($requestedStatusName, $currentTerminal) !== 0) {
+	                http_response_code(409);
+	                echo json_encode([
+	                    'success' => false,
+	                    'message' => "This document is already {$currentTerminal} and can no longer be changed. Upload a new document instead."
+	                ]);
+	                exit;
+	            }
+
+	            // Terminal + same-status: do not mutate (keeps rejection reason immutable too).
+	            if ($currentTerminal === 'Rejected' && $uiStatus === 'DENIED' && $reasonText !== '') {
+	                $existingReason = extractReasonFromRemarks((string)$attachmentRemarks);
+	                if ($existingReason !== '' && trim($existingReason) !== trim($reasonText)) {
+	                    http_response_code(409);
+	                    echo json_encode([
+	                        'success' => false,
+	                        'message' => "This document is already Rejected and the rejection reason cannot be changed."
+	                    ]);
+	                    exit;
+	                }
+	            }
+
+	            echo json_encode([
+	                'success' => true,
+	                'status' => $currentTerminal,
+	                'resident_id' => $attachmentResidentId,
+	                'profile_image_url' => null,
+	                'sector_membership' => null
+	            ]);
+	            exit;
+	        }
+
+	        // Preserve technical markers in remarks (e.g. idFront/idBack, sector:KEY).
+	        // Store denial reason as structured data: "<marker>; reason=...".
+	        $marker = extractMarkerFromRemarks($attachmentRemarks);
+	        $remarks = $marker;
+	        if ($uiStatus === 'DENIED') {
+	            $chunks = [];
+	            if ($marker !== '') $chunks[] = $marker;
+	            if ($reasonScope !== '') $chunks[] = "scope={$reasonScope}";
+	            // Used by scheduled cleanup jobs (delete rejected docs after retention period).
+	            $chunks[] = "rejected_at=" . date('Y-m-d H:i:s');
+	            $chunks[] = "reason={$reasonText}";
+	            $remarks = implode('; ', $chunks);
+	        }
+
+	        $stmt = $conn->prepare("
+	            UPDATE unifiedfileattachmenttbl
+	            SET status_id_verify = ?, remarks = ?
+	            WHERE attachment_id = ?
+	            LIMIT 1
+	        ");
+	        if (!$stmt) throw new Exception("Prepare failed (update document status): " . $conn->error);
+	        $stmt->bind_param("isi", $statusId, $remarks, $attachmentId);
+	        $stmt->execute();
+	        $stmt->close();
+
+	        // Audit: document status change (best-effort).
+	        $actorUserId = isset($_SESSION['user_id']) ? (string)$_SESSION['user_id'] : null;
+	        $actorRole = (string)($_SESSION['role'] ?? 'Unknown');
+	        $markerForAudit = extractMarkerFromRemarks($attachmentRemarks);
+	        $auditRemarks = $markerForAudit;
+	        if ($uiStatus === 'DENIED') {
+	            $auditRemarks = trim($markerForAudit . ' | scope=' . $reasonScope . ' | reason=' . $reasonText);
+	        }
+	        insertUnifiedAuditLog(
+	            $conn,
+	            $actorUserId,
+	            $actorRole,
+	            'Resident Masterlist',
+	            'UnifiedFileAttachment',
+	            (string)$attachmentId,
+	            'DOCUMENT_STATUS_UPDATE',
+	            'status_id_verify',
+	            (string)$currentStatusName,
+	            (string)$statusMap[$uiStatus],
+	            $auditRemarks,
+	            (int)$statusId
+	        );
 
         $profileImageUrl = null;
         $residentId = null;
-        if ($statusMap[$uiStatus] === 'Verified') {
-            $stmt = $conn->prepare("
-                SELECT uf.source_id, dt.document_type_name, dt.document_category
-                FROM unifiedfileattachmenttbl uf
-                INNER JOIN documenttypelookuptbl dt
-                    ON uf.document_type_id = dt.document_type_id
-                WHERE uf.attachment_id = ?
-                LIMIT 1
-            ");
-            if ($stmt) {
-                $stmt->bind_param("i", $attachmentId);
-                $stmt->execute();
-                $stmt->bind_result($residentId, $docTypeName, $docCategory);
-                $stmt->fetch();
-                $stmt->close();
-            }
+        $updatedSectorMembership = null;
+	        if ($statusMap[$uiStatus] === 'Verified') {
+	            $residentId = $attachmentResidentId;
+
+	            $remarksLower = strtolower(trim((string)$attachmentRemarks));
+	            if ($residentId && strpos($remarksLower, 'sector:') === 0) {
+	                $sectorKeyRaw = trim(substr((string)$attachmentRemarks, strlen('sector:')));
+	                $sectorKey = trim((string)(explode(':', $sectorKeyRaw, 2)[0] ?? ''));
+	                $sectorSide = strtolower(trim((string)(explode(':', $sectorKeyRaw, 3)[1] ?? '')));
+	                $sectorLabel = mapSectorKeyToLabel($sectorKey);
+
+	                $statusIdForSectorMembership = (int)$statusId;
+	                if (($sectorSide === 'front' || $sectorSide === 'back') && $sectorKey !== '') {
+	                    // For ID-like sector proofs saved as front/back, only mark the sector verified
+	                    // once BOTH sides' latest uploads are verified.
+	                    $getLatestSideStatus = static function (mysqli $conn, string $residentId, string $sectorKey, string $side): ?string {
+	                        $pattern = "sector:" . $sectorKey . ":" . $side . "%";
+	                        $stmt = $conn->prepare("
+	                            SELECT s.status_name
+	                            FROM unifiedfileattachmenttbl uf
+	                            LEFT JOIN statuslookuptbl s
+	                                ON uf.status_id_verify = s.status_id
+	                            WHERE uf.source_type = 'ResidentProfiling'
+	                              AND uf.source_id = ?
+	                              AND uf.remarks LIKE ?
+	                            ORDER BY uf.upload_timestamp DESC, uf.attachment_id DESC
+	                            LIMIT 1
+	                        ");
+	                        if (!$stmt) return null;
+	                        $stmt->bind_param("ss", $residentId, $pattern);
+	                        $stmt->execute();
+	                        $row = $stmt->get_result()->fetch_assoc();
+	                        $stmt->close();
+	                        return $row ? (string)($row['status_name'] ?? '') : null;
+	                    };
+
+	                    $frontStatus = strtolower(trim((string)$getLatestSideStatus($conn, (string)$residentId, (string)$sectorKey, 'front')));
+	                    $backStatus = strtolower(trim((string)$getLatestSideStatus($conn, (string)$residentId, (string)$sectorKey, 'back')));
+	                    $bothVerified = ($frontStatus === 'verified' && $backStatus === 'verified');
+	                    if (!$bothVerified) {
+	                        $statusIdForSectorMembership = getStatusId($conn, "PendingReview", "ResidentDocumentProfiling");
+	                    } elseif ($sectorLabel) {
+	                        // Capture old/new for audit trail.
+	                        $oldSectorMembership = null;
+	                        $qOld = $conn->prepare("SELECT sector_membership FROM residentinformationtbl WHERE resident_id = ? LIMIT 1");
+	                        if ($qOld) {
+	                            $qOld->bind_param("s", $residentId);
+	                            $qOld->execute();
+	                            $rOld = $qOld->get_result()->fetch_assoc();
+	                            $qOld->close();
+	                            $oldSectorMembership = $rOld ? (string)($rOld['sector_membership'] ?? '') : null;
+	                        }
+	                        $updatedSectorMembership = appendSectorMembership($conn, $residentId, $sectorLabel);
+	                        insertUnifiedAuditLog(
+	                            $conn,
+	                            $actorUserId,
+	                            $actorRole,
+	                            'Resident Masterlist',
+	                            'Resident',
+	                            (string)$residentId,
+	                            'RESIDENT_FIELD_UPDATE',
+	                            'sector_membership',
+	                            (string)$oldSectorMembership,
+	                            (string)$updatedSectorMembership,
+	                            "Auto-append sector after verification: {$sectorLabel}",
+	                            null
+	                        );
+	                    }
+	                } elseif ($sectorLabel) {
+	                    $oldSectorMembership = null;
+	                    $qOld = $conn->prepare("SELECT sector_membership FROM residentinformationtbl WHERE resident_id = ? LIMIT 1");
+	                    if ($qOld) {
+	                        $qOld->bind_param("s", $residentId);
+	                        $qOld->execute();
+	                        $rOld = $qOld->get_result()->fetch_assoc();
+	                        $qOld->close();
+	                        $oldSectorMembership = $rOld ? (string)($rOld['sector_membership'] ?? '') : null;
+	                    }
+	                    $updatedSectorMembership = appendSectorMembership($conn, $residentId, $sectorLabel);
+	                    insertUnifiedAuditLog(
+	                        $conn,
+	                        $actorUserId,
+	                        $actorRole,
+	                        'Resident Masterlist',
+	                        'Resident',
+	                        (string)$residentId,
+	                        'RESIDENT_FIELD_UPDATE',
+	                        'sector_membership',
+	                        (string)$oldSectorMembership,
+	                        (string)$updatedSectorMembership,
+	                        "Auto-append sector after verification: {$sectorLabel}",
+	                        null
+	                    );
+	                }
+	                upsertSectorMembershipStatus(
+	                    $conn,
+	                    (string)$residentId,
+	                    (string)$sectorKey,
+	                    (int)$statusIdForSectorMembership,
+	                    (int)$attachmentId,
+	                    null,
+	                    (string)$attachmentUploadTs
+	                );
+	            }
 
             if ($residentId && $docTypeName === '2x2 Picture' && $docCategory === 'ResidentProfiling') {
                 $stmt = $conn->prepare("
@@ -871,12 +1248,47 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_document_statu
                 }
             }
         }
+	        if ($statusMap[$uiStatus] === 'Rejected') {
+	            $residentId = $attachmentResidentId;
+	            $remarksLower = strtolower(trim((string)$attachmentRemarks));
+	            if ($residentId && strpos($remarksLower, 'sector:') === 0) {
+	                $sectorKeyRaw = trim(substr((string)$attachmentRemarks, strlen('sector:')));
+	                $sectorKey = trim((string)(explode(':', $sectorKeyRaw, 2)[0] ?? ''));
+	                upsertSectorMembershipStatus(
+	                    $conn,
+	                    (string)$residentId,
+	                    (string)$sectorKey,
+                    (int)$statusId,
+                    (int)$attachmentId,
+                    $reasonText !== '' ? $reasonText : null,
+                    (string)$attachmentUploadTs
+                );
+            }
+        }
+	        if ($statusMap[$uiStatus] === 'PendingReview') {
+	            $residentId = $attachmentResidentId;
+	            $remarksLower = strtolower(trim((string)$attachmentRemarks));
+	            if ($residentId && strpos($remarksLower, 'sector:') === 0) {
+	                $sectorKeyRaw = trim(substr((string)$attachmentRemarks, strlen('sector:')));
+	                $sectorKey = trim((string)(explode(':', $sectorKeyRaw, 2)[0] ?? ''));
+	                upsertSectorMembershipStatus(
+	                    $conn,
+	                    (string)$residentId,
+	                    (string)$sectorKey,
+                    (int)$statusId,
+                    (int)$attachmentId,
+                    null,
+                    (string)$attachmentUploadTs
+                );
+            }
+        }
 
         echo json_encode([
             'success' => true,
             'status' => $statusMap[$uiStatus],
             'resident_id' => $residentId,
-            'profile_image_url' => $profileImageUrl
+            'profile_image_url' => $profileImageUrl,
+            'sector_membership' => $updatedSectorMembership
         ]);
     } catch (Exception $e) {
         http_response_code(500);

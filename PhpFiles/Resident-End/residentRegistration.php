@@ -133,6 +133,35 @@ function isHeicExt(string $ext): bool {
     return in_array($ext, ['heic', 'heif'], true);
 }
 
+function upsertSectorMembershipStatusFromUpload(
+    mysqli $conn,
+    string $residentId,
+    string $sectorKey,
+    int $sectorStatusId,
+    int $latestAttachmentId
+): void {
+    // Optional feature: only works after the new table is created.
+    $stmt = $conn->prepare("
+        INSERT INTO residentsectormembershiptbl
+            (resident_id, sector_key, sector_status_id, latest_attachment_id, remarks, upload_timestamp, last_update_user_id)
+        VALUES
+            (?, ?, ?, ?, NULL, NOW(), NULL)
+        ON DUPLICATE KEY UPDATE
+            sector_status_id = VALUES(sector_status_id),
+            latest_attachment_id = VALUES(latest_attachment_id),
+            remarks = NULL,
+            upload_timestamp = VALUES(upload_timestamp),
+            last_update_user_id = NULL,
+            updated_at = CURRENT_TIMESTAMP
+    ");
+    if (!$stmt) {
+        return;
+    }
+    $stmt->bind_param("ssii", $residentId, $sectorKey, $sectorStatusId, $latestAttachmentId);
+    $stmt->execute();
+    $stmt->close();
+}
+
 function appendImagePageToPdf(Fpdi $pdf, string $imagePath): void {
     $imageInfo = @getimagesize($imagePath);
     if ($imageInfo === false || !isset($imageInfo[0], $imageInfo[1])) {
@@ -204,21 +233,24 @@ function buildAttachmentFileName(string $docType, string $userId, string $ext, i
 function toDbWebPath(string $absolutePath): string {
     $absolutePath = str_replace("\\", "/", trim($absolutePath));
     $projectRoot = realpath(__DIR__ . "/../..");
+
+    // Prefer storing a portable, project-relative path (works across local + hosted).
+    // Example stored value: "UnifiedFileAttachment/Documents/<id>/<file>.pdf"
+    $marker = "/UnifiedFileAttachment/";
+    $markerPos = strpos($absolutePath, $marker);
+    if ($markerPos !== false) {
+        return ltrim(substr($absolutePath, $markerPos), "/");
+    }
+
     if ($projectRoot) {
         $rootNorm = str_replace("\\", "/", $projectRoot);
         if (strpos($absolutePath, $rootNorm) === 0) {
             $rel = ltrim(substr($absolutePath, strlen($rootNorm)), "/");
-            return "/BarangaySanJose/" . $rel;
+            return $rel;
         }
     }
 
-    $marker = "/UnifiedFileAttachment/";
-    $markerPos = strpos($absolutePath, $marker);
-    if ($markerPos !== false) {
-        return "/BarangaySanJose" . substr($absolutePath, $markerPos);
-    }
-
-    return "/BarangaySanJose/" . ltrim($absolutePath, "/");
+    return ltrim($absolutePath, "/");
 }
 
 function moveUploadedFileWithDocName(string $tmpName, string $dir, string $docType, string $userId, string $ext): array {
@@ -811,11 +843,12 @@ try {
 
     $isIdProofSelected = ($proofType === 'ID');
     $idTypeSelected = strtolower(cleanString($_POST['idType'] ?? ''));
-    $isNationalIdSelected = ($idTypeSelected === 'national id' || $idTypeSelected === 'philsys id/ephilid');
+    $idTypeSelectedNorm = preg_replace('/[^a-z0-9]/', '', (string)$idTypeSelected);
+    $isNationalIdSelected = in_array($idTypeSelectedNorm, ['nationalid', 'philsysid', 'philsysidephilid', 'ephilid'], true);
 
-    foreach ($selectedSectorKeys as $sectorKey) {
-        $docTypeValue = cleanString($_POST['sectorDocType'][$sectorKey] ?? '');
-        $file = $_FILES['sectorDocFile'] ?? null;
+	    foreach ($selectedSectorKeys as $sectorKey) {
+	        $docTypeValue = cleanString($_POST['sectorDocType'][$sectorKey] ?? '');
+	        $file = $_FILES['sectorDocFile'] ?? null;
         $sectorErrors = ($file && isset($file['error'][$sectorKey]) && is_array($file['error'][$sectorKey]))
             ? $file['error'][$sectorKey]
             : [];
@@ -836,45 +869,180 @@ try {
             $isRequired = false;
         }
 
-        if ($isRequired && ($docTypeValue === '' || !$hasFile)) {
-            throw new Exception("Please upload the required proof for selected sector membership.");
+        // Business rule: if Proof Type is ID, prohibit uploading Senior Citizen sector proof.
+        if ($sectorKey === 'SeniorCitizen' && $isIdProofSelected) {
+            if ($hasFile || $docTypeValue !== '') {
+                throw new Exception("Senior Citizen proof upload is not allowed when using ID as proof of identity.");
+            }
+            continue;
         }
+
+        // Business rule: if Proof Type is ID and (National ID / PhilSys / ePhilID) is used,
+        // prohibit uploading Indigenous People sector proof.
+        if ($sectorKey === 'IndigenousPeople' && $isIdProofSelected && $isNationalIdSelected) {
+            if ($hasFile || $docTypeValue !== '') {
+                throw new Exception("Indigenous People proof upload is not allowed when using National ID/PhilSys as proof of identity.");
+            }
+            continue;
+        }
+
+	        if ($isRequired && ($docTypeValue === '' || !$hasFile)) {
+	            throw new Exception("Please upload the required proof for selected sector membership.");
+	        }
 
         if (!$hasFile) {
             continue;
         }
-        if ($docTypeValue === '') {
-            throw new Exception("Please select sector document type.");
-        }
+	        if ($docTypeValue === '') {
+	            throw new Exception("Please select sector document type.");
+	        }
 
-        $docTypeId = getDocumentTypeId($conn, $docTypeValue);
-        $allowedSector = ['jpg','jpeg','png','webp','pdf'];
-        $sectorNames = isset($file['name'][$sectorKey]) && is_array($file['name'][$sectorKey]) ? $file['name'][$sectorKey] : [];
-        $sectorTmpNames = isset($file['tmp_name'][$sectorKey]) && is_array($file['tmp_name'][$sectorKey]) ? $file['tmp_name'][$sectorKey] : [];
-        $sectorErrorCodes = isset($file['error'][$sectorKey]) && is_array($file['error'][$sectorKey]) ? $file['error'][$sectorKey] : [];
+	        $docTypeId = getDocumentTypeId($conn, $docTypeValue);
+	        $allowedSector = ['jpg','jpeg','png','webp','pdf'];
+	        $allowedSectorIdOnly = ['jpg','jpeg','png','webp'];
+	        $sectorNames = isset($file['name'][$sectorKey]) && is_array($file['name'][$sectorKey]) ? $file['name'][$sectorKey] : [];
+	        $sectorTmpNames = isset($file['tmp_name'][$sectorKey]) && is_array($file['tmp_name'][$sectorKey]) ? $file['tmp_name'][$sectorKey] : [];
+	        $sectorErrorCodes = isset($file['error'][$sectorKey]) && is_array($file['error'][$sectorKey]) ? $file['error'][$sectorKey] : [];
 
-        foreach ($sectorNames as $idx => $originalRawName) {
-            $errCode = (int)($sectorErrorCodes[$idx] ?? UPLOAD_ERR_NO_FILE);
-            if ($errCode !== UPLOAD_ERR_OK) {
-                continue;
-            }
+	        $isIdLikeDocType = (bool)preg_match('/\\bid\\b/i', (string)$docTypeValue);
+	        $okIndexes = [];
+	        foreach ($sectorErrorCodes as $idx => $errCode) {
+	            if ((int)$errCode === UPLOAD_ERR_OK) {
+	                $okIndexes[] = (int)$idx;
+	            }
+	        }
+	        if ($isIdLikeDocType) {
+	            if (count($okIndexes) !== 2) {
+	                throw new Exception("Please upload both the front and back photos for the selected ID proof.");
+	            }
+	        }
+
+	        if ($isIdLikeDocType) {
+	            // Mirror resident profiling ID process:
+	            // - Upload front + back images temporarily
+	            // - Merge into a single PDF
+	            // - Store only the merged PDF in unifiedfileattachmenttbl
+	            // - Delete temporary front/back images
+
+	            $frontIdx = $okIndexes[0];
+	            $backIdx = $okIndexes[1];
+
+	            $frontOriginal = basename((string)($sectorNames[$frontIdx] ?? 'front'));
+	            $backOriginal = basename((string)($sectorNames[$backIdx] ?? 'back'));
+	            $frontTmp = (string)($sectorTmpNames[$frontIdx] ?? '');
+	            $backTmp = (string)($sectorTmpNames[$backIdx] ?? '');
+
+	            $frontExt = strtolower(pathinfo($frontOriginal, PATHINFO_EXTENSION));
+	            $backExt = strtolower(pathinfo($backOriginal, PATHINFO_EXTENSION));
+	            if (isHeicExt($frontExt) || isHeicExt($backExt)) {
+	                throw new Exception("HEIC is not supported on the server. Please upload JPG or PNG.");
+	            }
+	            if (!in_array($frontExt, $allowedSectorIdOnly, true) || !in_array($backExt, $allowedSectorIdOnly, true)) {
+	                throw new Exception("Invalid file type for ID proof. Please upload an image (JPG/PNG/WebP).");
+	            }
+
+	            $saved = [];
+	            $frontMoved = moveUploadedFileWithDocName($frontTmp, $uploadDirDocs, $docTypeValue . ' sector front', $user_id, $frontExt);
+	            $backMoved = moveUploadedFileWithDocName($backTmp, $uploadDirDocs, $docTypeValue . ' sector back', $user_id, $backExt);
+	            $saved['front'] = ['path' => (string)($frontMoved['disk_path'] ?? ''), 'ext' => $frontExt];
+	            $saved['back'] = ['path' => (string)($backMoved['disk_path'] ?? ''), 'ext' => $backExt];
+
+	            if ($saved['front']['path'] === '' || $saved['back']['path'] === '') {
+	                throw new Exception("Failed to save ID proof images.");
+	            }
+
+	            $mergedFileName = buildAttachmentFileName($docTypeValue, $user_id, 'pdf');
+	            $mergedPath = $uploadDirDocs . $mergedFileName;
+	            $mergeIndex = 0;
+	            while (file_exists($mergedPath)) {
+	                $mergeIndex++;
+	                $mergedFileName = buildAttachmentFileName($docTypeValue, $user_id, 'pdf', $mergeIndex);
+	                $mergedPath = $uploadDirDocs . $mergedFileName;
+	            }
+
+	            buildMergedIdPdf(
+	                $saved['front']['path'],
+	                $saved['front']['ext'],
+	                $saved['back']['path'],
+	                $saved['back']['ext'],
+	                $mergedPath
+	            );
+
+	            if (!file_exists($mergedPath) || filesize($mergedPath) <= 0) {
+	                throw new Exception("Failed to generate merged sector ID PDF.");
+	            }
+
+	            // Remove temporary front/back files.
+	            foreach ($saved as $tmpFile) {
+	                $tmpDiskPath = (string)($tmpFile['path'] ?? '');
+	                if ($tmpDiskPath !== '' && file_exists($tmpDiskPath)) {
+	                    @unlink($tmpDiskPath);
+	                }
+	            }
+
+	            $remarks = "sector:" . $sectorKey;
+	            $fileType = "pdf";
+	            $mergedPathDb = toDbWebPath($mergedPath);
+	            $idNumber = null;
+	            $ins = $conn->prepare("
+	                INSERT INTO unifiedfileattachmenttbl
+	                (source_type, source_id, document_type_id, file_name, file_path, file_type, user_id_uploaded_by, status_id_verify, remarks, id_number)
+	                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+	            ");
+	            if (!$ins) throw new Exception("Prepare failed (insert merged sector ID): " . $conn->error);
+	            $ins->bind_param(
+	                "ssissssiss",
+	                $sourceType,
+	                $resident_id,
+	                $docTypeId,
+	                $mergedFileName,
+	                $mergedPathDb,
+	                $fileType,
+	                $user_id,
+	                $statusVerifyId,
+	                $remarks,
+	                $idNumber
+	            );
+	            if (!$ins->execute()) throw new Exception("Merged sector ID attachment insert failed: " . $ins->error);
+	            $newAttachmentId = (int)$ins->insert_id;
+	            $ins->close();
+
+	            if ($newAttachmentId > 0) {
+	                upsertSectorMembershipStatusFromUpload(
+	                    $conn,
+	                    (string)$resident_id,
+	                    (string)$sectorKey,
+	                    (int)$statusVerifyId,
+	                    $newAttachmentId
+	                );
+	            }
+
+	            // Done for this sector (ID-type merges into one PDF).
+	            continue;
+	        }
+
+	        foreach ($sectorNames as $idx => $originalRawName) {
+	            $errCode = (int)($sectorErrorCodes[$idx] ?? UPLOAD_ERR_NO_FILE);
+	            if ($errCode !== UPLOAD_ERR_OK) {
+	                continue;
+	            }
 
             $originalName = basename((string)$originalRawName);
             $tmpName = $sectorTmpNames[$idx] ?? '';
             $ext = strtolower(pathinfo($originalName, PATHINFO_EXTENSION));
-            if (isHeicExt($ext)) {
-                throw new Exception("HEIC is not supported on the server. Please upload JPG or PNG.");
-            }
-            if (!in_array($ext, $allowedSector, true)) {
-                throw new Exception("Invalid file type for sector proof.");
-            }
+	            if (isHeicExt($ext)) {
+	                throw new Exception("HEIC is not supported on the server. Please upload JPG or PNG.");
+	            }
+	            if (!in_array($ext, $allowedSector, true)) {
+	                throw new Exception("Invalid file type for sector proof.");
+	            }
 
-            $moved = moveUploadedFileWithDocName($tmpName, $uploadDirDocs, $docTypeValue, $user_id, $ext);
-            $remarks = "sector:" . $sectorKey;
-            $idNumber = null;
-            $ins = $conn->prepare("
-                INSERT INTO unifiedfileattachmenttbl
-                (source_type, source_id, document_type_id, file_name, file_path, file_type, user_id_uploaded_by, status_id_verify, remarks, id_number)
+	            $moved = moveUploadedFileWithDocName($tmpName, $uploadDirDocs, $docTypeValue, $user_id, $ext);
+	            $remarks = "sector:" . $sectorKey;
+	            $idNumber = null;
+	            $ins = $conn->prepare("
+	                INSERT INTO unifiedfileattachmenttbl
+	                (source_type, source_id, document_type_id, file_name, file_path, file_type, user_id_uploaded_by, status_id_verify, remarks, id_number)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ");
             if (!$ins) throw new Exception("Prepare failed (insert sector document): " . $conn->error);
@@ -892,9 +1060,20 @@ try {
                 $idNumber
             );
             if (!$ins->execute()) throw new Exception("Sector document attachment insert failed: " . $ins->error);
+            $newAttachmentId = (int)$ins->insert_id;
             $ins->close();
-        }
-    }
+
+	            if ($newAttachmentId > 0) {
+	                upsertSectorMembershipStatusFromUpload(
+	                    $conn,
+	                    (string)$resident_id,
+	                    (string)$sectorKey,
+	                    (int)$statusVerifyId,
+	                    $newAttachmentId
+	                );
+	            }
+	        }
+	    }
 
     $hasAnySectorProof = false;
     if (isset($_FILES['sectorDocFile']['name']) && is_array($_FILES['sectorDocFile']['name'])) {

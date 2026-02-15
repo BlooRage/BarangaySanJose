@@ -3,6 +3,8 @@ require '../General/connection.php';
 
 header('Content-Type: application/json');
 
+$RESET_VERIFY_TTL_SECONDS = 10 * 60; // 10 minutes
+
 $email       = $_POST['email'] ?? '';
 $phone       = $_POST['phone'] ?? '';
 $newPassword = $_POST['newPassword'] ?? '';
@@ -15,6 +17,27 @@ if (!$email || !$phone || !$newPassword) {
     exit;
 }
 
+session_start();
+$verified = $_SESSION['password_reset_verified'] ?? null;
+if (
+    !is_array($verified)
+    || empty($verified['verified_at'])
+    || (time() - (int)$verified['verified_at']) > $RESET_VERIFY_TTL_SECONDS
+) {
+    $response['error'] = 'Reset session expired. Please request OTP again.';
+    echo json_encode($response);
+    exit;
+}
+
+// Ensure the OTP-verified session matches the reset identifiers.
+if (
+    strcasecmp((string)$verified['email'], (string)$email) !== 0
+    || (string)$verified['phone'] !== (string)$phone
+) {
+    $response['error'] = 'Reset verification mismatch. Please request OTP again.';
+    echo json_encode($response);
+    exit;
+}
 
 $stmt = $conn->prepare("
     SELECT user_id, password_hash
@@ -32,6 +55,12 @@ if (!$stmt->fetch()) {
 }
 $stmt->close();
 
+$userIdFromSession = (string)($verified['user_id'] ?? '');
+if ($userIdFromSession !== '' && (string)$userId !== $userIdFromSession) {
+    $response['error'] = 'Reset verification mismatch. Please request OTP again.';
+    echo json_encode($response);
+    exit;
+}
 
 if (password_verify($newPassword, $currentHash)) {
     $response['error'] = 'New password must be different from old password';
@@ -118,6 +147,9 @@ $stmt = $conn->prepare("
 $stmt->bind_param("ss", $userId, $userId);
 $stmt->execute();
 $stmt->close();
+
+$unset = $_SESSION['password_reset_verified'] ?? null;
+unset($_SESSION['password_reset_verified']);
 
 $response['success'] = true;
 echo json_encode($response);

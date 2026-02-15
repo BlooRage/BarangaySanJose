@@ -28,6 +28,10 @@ $residentId = $residentinformationtbl['resident_id'] ?? '';
 $headOfFamilyRaw = $residentinformationtbl['head_of_family'] ?? '';
 $headOfFamilyNormalized = strtolower(trim((string)$headOfFamilyRaw));
 $isHeadOfFamily = in_array($headOfFamilyNormalized, ['yes', 'true', '1', 'y'], true);
+$residentStatusRaw = trim((string)($residentinformationtbl['status_name_resident'] ?? ''));
+$residentStatusKey = strtolower(str_replace([' ', '_', '-'], '', $residentStatusRaw));
+$isResidentVerified = in_array($residentStatusKey, ['verifiedresident', 'verified'], true);
+$canSendHouseholdInvite = $isHeadOfFamily && $isResidentVerified;
 
 if (!function_exists('toPublicPath')) {
 function toPublicPath($path): ?string {
@@ -128,6 +132,9 @@ if ($residentId !== '' && isset($conn) && $conn instanceof mysqli) {
   <script src="../JS-Script-Files/Resident-End/householdInviteModal.js" defer></script>
   <script src="../JS-Script-Files/Resident-End/householdJoin.js" defer></script>
   <script src="../JS-Script-Files/Resident-End/profileTabs.js" defer></script>
+  <script src="../JS-Script-Files/Resident-End/profileAddress.js" defer></script>
+  <script src="../JS-Script-Files/Resident-End/profileEmergency.js" defer></script>
+  <script src="../JS-Script-Files/Resident-End/profileEdit.js" defer></script>
     <link rel="stylesheet" href="../CSS-Styles/Resident-End-CSS/residentDashboard.css">
 </head>
 
@@ -171,7 +178,6 @@ if ($residentId !== '' && isset($conn) && $conn instanceof mysqli) {
 
             <div class="tab-content">
                 <div class="tab-pane fade show active" id="pane-profile" role="tabpanel" aria-labelledby="tab-profile" tabindex="0">
-
             <div class="card shadow-sm mb-4">
                 <div class="card-header d-flex justify-content-between">
                     <strong>PERSONAL INFORMATION</strong>
@@ -203,7 +209,30 @@ if ($residentId !== '' && isset($conn) && $conn instanceof mysqli) {
                                 <div><strong>Voter Status:</strong> <?= $residentinformationtbl['voter_status'] ?></div>
                                 <div><strong>Head of the Family:</strong> <?= $residentinformationtbl['head_of_family'] ?></div>
                                 <div><strong>Occupation:</strong> <?= $residentinformationtbl['occupation'] ?></div>
-                                <div><strong>Sector Membership:</strong> <?= $residentinformationtbl['sector_membership'] ?></div>
+                                <?php
+                                  $sectorText = trim((string)($residentinformationtbl['sector_membership'] ?? ''));
+                                  $pendingSector = (int)($residentinformationtbl['sector_membership_pending_review'] ?? 0);
+                                  $hasVerifiedSector = $sectorText !== '' && strcasecmp($sectorText, 'none') !== 0;
+                                  $pendingLabel = "Pending Review";
+                                ?>
+                                <?php if ($hasVerifiedSector): ?>
+                                    <div>
+                                        <strong>Sector Membership:</strong> <?= htmlspecialchars($sectorText, ENT_QUOTES, 'UTF-8') ?>
+                                    </div>
+                                    <?php if ($pendingSector > 0): ?>
+                                        <div class="small text-muted">
+                                            <strong>Other sector membership:</strong> <?= htmlspecialchars($pendingLabel, ENT_QUOTES, 'UTF-8') ?>
+                                        </div>
+                                    <?php endif; ?>
+                                <?php elseif ($pendingSector > 0): ?>
+                                    <div>
+                                        <strong>Sector Membership:</strong> <?= htmlspecialchars($pendingLabel, ENT_QUOTES, 'UTF-8') ?>
+                                    </div>
+                                <?php else: ?>
+                                    <div>
+                                        <strong>Sector Membership:</strong> N/A
+                                    </div>
+                                <?php endif; ?>
                             </div>
                         </div>
                     </div>
@@ -275,8 +304,8 @@ if ($residentId !== '' && isset($conn) && $conn instanceof mysqli) {
                 </div>
             </div>
 
-            <div class="card shadow-sm">
-                <div class="card-header"><strong>ACCOUNT INFORMATION</strong></div>
+	            <div class="card shadow-sm">
+	                <div class="card-header"><strong>ACCOUNT INFORMATION</strong></div>
                 <div class="card-body small">
                     <div class="row g-2">
                         <div class="col-12 col-md-6">
@@ -337,7 +366,7 @@ if ($residentId !== '' && isset($conn) && $conn instanceof mysqli) {
                         <?php endif; ?>
                     </div>
                 </div>
-            </div>
+	            </div>
 
                 </div>
                 <div class="tab-pane fade" id="pane-household" role="tabpanel" aria-labelledby="tab-household" tabindex="0">
@@ -412,6 +441,11 @@ if ($residentId !== '' && isset($conn) && $conn instanceof mysqli) {
                     <button class="btn-close" data-bs-dismiss="modal"></button>
                 </div>
                 <div class="modal-body">
+                    <?php if (!$isResidentVerified): ?>
+                        <div class="alert alert-warning small mb-2">
+                            Your account must be verified before sending household invite codes via SMS.
+                        </div>
+                    <?php endif; ?>
                     <div class="mb-3">
                         <p class="text small mb-2">
                             Invite members with accounts via SMS.
@@ -419,7 +453,7 @@ if ($residentId !== '' && isset($conn) && $conn instanceof mysqli) {
                         <div id="householdInvitePhoneList" class="d-flex flex-column gap-2">
                             <div class="input-group">
                                 <span class="input-group-text">+63</span>
-                                <input type="text" class="form-control household-invite-phone" placeholder="9XXXXXXXXX" inputmode="numeric" pattern="^\d{9}$" maxlength="9">
+                                <input type="text" class="form-control household-invite-phone" placeholder="9XXXXXXXXX" inputmode="numeric" pattern="^\d{10}$" maxlength="10">
                             </div>
                         </div>
                         <button type="button" class="btn btn-primary btn-sm mt-2" id="btnAddInvitePhone">
@@ -461,7 +495,7 @@ if ($residentId !== '' && isset($conn) && $conn instanceof mysqli) {
                 <div class="modal-footer">
                     <button class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
                     <button class="btn btn-outline-primary" id="btnAddHouseholdMemberInfo" disabled>Add Member</button>
-                    <button class="btn btn-success" id="btnSendHouseholdInvite">Send Invites</button>
+                    <button class="btn btn-success" id="btnSendHouseholdInvite" data-verified="<?= $isResidentVerified ? '1' : '0' ?>" <?= $canSendHouseholdInvite ? '' : 'disabled' ?>>Send Invites</button>
                 </div>
             </div>
         </div>
@@ -478,48 +512,89 @@ if ($residentId !== '' && isset($conn) && $conn instanceof mysqli) {
                 </div>
 
                 <div class="modal-body">
+                    <div class="alert alert-info small mb-3">
+                        Saving changes will send a request for review.
+                    </div>
 
                     <label class="form-label">Full Name</label>
                     <div class="d-flex gap-2 mb-3">
-                        <input class="form-control" value="<?= $residentinformationtbl['firstname'] ?>" placeholder="First Name" >
-                        <input class="form-control" value="<?= $residentinformationtbl['middlename'] ?>" placeholder="Middle Name" >
-                        <input class="form-control" value="<?= $residentinformationtbl['lastname'] ?>" placeholder="Last Name" >
-                        <select class="form-control" value="<?= $residentinformationtbl['suffix'] ?>" placeholder="Suffix (e.g. Jr., Sr.)" >
+                        <input class="form-control" id="editFirstName" value="<?= $residentinformationtbl['firstname'] ?>" placeholder="First Name" >
+                        <input class="form-control" id="editMiddleName" value="<?= $residentinformationtbl['middlename'] ?>" placeholder="Middle Name" >
+                        <input class="form-control" id="editLastName" value="<?= $residentinformationtbl['lastname'] ?>" placeholder="Last Name" >
+                        <select class="form-control" id="editSuffix">
                             <option value="">N/A</option>
-                            <option value="Jr.">Jr.</option>
-                            <option value="Sr.">Sr.</option>
-                            <option value="III">III</option>
+                            <option value="Jr." <?= ($residentinformationtbl['suffix'] ?? '') === 'Jr.' ? 'selected' : '' ?>>Jr.</option>
+                            <option value="Sr." <?= ($residentinformationtbl['suffix'] ?? '') === 'Sr.' ? 'selected' : '' ?>>Sr.</option>
+                            <option value="III" <?= ($residentinformationtbl['suffix'] ?? '') === 'III' ? 'selected' : '' ?>>III</option>
                         </select>
+                    </div>
+                    <div class="alert alert-warning small mb-3 d-none" id="nameDocNotice">
+                        To change your name, upload a valid ID photo.
+                    </div>
+                    <div class="doc-required-box d-none" id="nameDocSection">
+                        <div class="row g-2">
+                        <div class="col-md-6">
+                            <label class="form-label">Valid ID Type</label>
+                            <select class="form-select" id="nameIdType">
+                                <option value="">Select ID</option>
+                                <option value="Passport">Passport</option>
+                                <option value="Driver's License">Driver's License</option>
+                                <option value="PhilHealth ID">PhilHealth ID</option>
+                                <option value="Voter's ID">Voter's ID</option>
+                                <option value="National ID">National ID</option>
+                                <option value="Barangay ID">Barangay ID</option>
+                                <option value="PRC ID">PRC ID</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Valid ID Photo</label>
+                            <input type="file" class="form-control" id="nameIdFile" accept=".jpg,.jpeg,.png,.webp,.pdf">
+                        </div>
+                        </div>
                     </div>
 
                     <div class="row mb-3">
                         <div class="col-md-6">
                             <label class="form-label">Sex</label>
-                            <input class="form-control" value="<?= $residentinformationtbl['sex'] ?>" readonly>
+                            <input class="form-control input-readonly" value="<?= $residentinformationtbl['sex'] ?>" readonly>
                         </div>
                         <div class="col-md-6">
                             <label class="form-label">Birthdate</label>
-                            <input class="form-control" value="<?= $residentinformationtbl['birthdate'] ?>" readonly>
+                            <input class="form-control input-readonly" value="<?= $residentinformationtbl['birthdate'] ?>" readonly>
                         </div>
                     </div>
 
                     <div class="row mb-3">
                         <div class="col-md-6">
                             <label class="form-label">Civil Status</label>
-                            <select class="form-control" value="<?= $residentinformationtbl['civil_status'] ?>">
-                                <option value="Single">Single</option>
-                                <option value="Married">Married</option>
-                                <option value="Widowed">Widowed</option>
+                            <select class="form-control" id="editCivilStatus">
+                                <option value="Single" <?= ($residentinformationtbl['civil_status'] ?? '') === 'Single' ? 'selected' : '' ?>>Single</option>
+                                <option value="Married" <?= ($residentinformationtbl['civil_status'] ?? '') === 'Married' ? 'selected' : '' ?>>Married</option>
+                                <option value="Widowed" <?= ($residentinformationtbl['civil_status'] ?? '') === 'Widowed' ? 'selected' : '' ?>>Widowed</option>
                             </select>
                         </div>
                         <div class="col-md-6">
                             <label class="form-label">Religion</label>
-                            <select class="form-control" value="<?= $residentinformationtbl['religion'] ?>">
-                                <option value="Roman Catholic">Roman Catholic</option>
-                                <option value="Iglesia ni Cristo">Iglesia ni Cristo</option>
-                                <option value="Muslim">Muslim</option>
-                                <option value="Others">Others</option>
+                            <select class="form-control" id="editReligion">
+                                <option value="Roman Catholic" <?= ($residentinformationtbl['religion'] ?? '') === 'Roman Catholic' ? 'selected' : '' ?>>Roman Catholic</option>
+                                <option value="Iglesia ni Cristo" <?= ($residentinformationtbl['religion'] ?? '') === 'Iglesia ni Cristo' ? 'selected' : '' ?>>Iglesia ni Cristo</option>
+                                <option value="Muslim" <?= ($residentinformationtbl['religion'] ?? '') === 'Muslim' ? 'selected' : '' ?>>Muslim</option>
+                                <option value="Others" <?= ($residentinformationtbl['religion'] ?? '') === 'Others' ? 'selected' : '' ?>>Others</option>
                             </select>
+                        </div>
+                    </div>
+                    <div class="alert alert-warning small mb-3 d-none" id="civilStatusDocNotice">
+                        Changing civil status requires a supporting document.
+                    </div>
+                    <div class="doc-required-box d-none" id="civilStatusDocSection">
+                        <div class="row g-2">
+                        <div class="col-md-6">
+                            <label class="form-label" id="civilStatusDocLabel">Document</label>
+                            <input type="file" class="form-control" id="civilStatusFile" accept=".jpg,.jpeg,.png,.webp,.pdf">
+                        </div>
+                        <div class="col-md-6">
+                            <div class="form-text mt-4" id="civilStatusDocHelp"></div>
+                        </div>
                         </div>
                     </div>
 
@@ -553,21 +628,54 @@ if ($residentId !== '' && isset($conn) && $conn instanceof mysqli) {
 
                     <div class="mb-3">
                         <label class="form-label">Sector Membership</label>
-                        <select class="form-select" value="<?= $residentinformationtbl['sector_membership'] ?>">
-                            <option value="PWD">Person with Disability (PWD)</option>
-                            <option value="Single Parent">Single Parent</option>
-                            <option value="Student">Student</option>
-                            <option value="Senior Citizen">Senior Citizen</option>
-                            <option value="Indigenous People">Indigenous People</option>
-                            <option value="NA">N/A</option>
-                        </select>
+                        <?php
+                          $sectorSelected = array_filter(array_map('trim', explode(',', (string)($residentinformationtbl['sector_membership'] ?? ''))));
+                        ?>
+                        <div class="row g-2">
+                            <div class="col-12 col-md-6">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" id="sectorPWD" name="sectorMembership[]" value="PWD" <?= in_array('PWD', $sectorSelected, true) ? 'checked' : '' ?>>
+                                    <label class="form-check-label" for="sectorPWD">Person with Disability (PWD)</label>
+                                </div>
+                            </div>
+                            <div class="col-12 col-md-6">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" id="sectorSingleParent" name="sectorMembership[]" value="Single Parent" <?= in_array('Single Parent', $sectorSelected, true) ? 'checked' : '' ?>>
+                                    <label class="form-check-label" for="sectorSingleParent">Single Parent</label>
+                                </div>
+                            </div>
+                            <div class="col-12 col-md-6">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" id="sectorStudent" name="sectorMembership[]" value="Student" <?= in_array('Student', $sectorSelected, true) ? 'checked' : '' ?>>
+                                    <label class="form-check-label" for="sectorStudent">Student</label>
+                                </div>
+                            </div>
+                            <div class="col-12 col-md-6">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" id="sectorSenior" name="sectorMembership[]" value="Senior Citizen" <?= in_array('Senior Citizen', $sectorSelected, true) ? 'checked' : '' ?>>
+                                    <label class="form-check-label" for="sectorSenior">Senior Citizen</label>
+                                </div>
+                            </div>
+                            <div class="col-12 col-md-6">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" id="sectorIndigenous" name="sectorMembership[]" value="Indigenous People" <?= in_array('Indigenous People', $sectorSelected, true) ? 'checked' : '' ?>>
+                                    <label class="form-check-label" for="sectorIndigenous">Indigenous People</label>
+                                </div>
+                            </div>
+                            <div class="col-12 col-md-6">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" id="sectorNA" name="sectorMembership[]" value="NA" <?= in_array('NA', $sectorSelected, true) ? 'checked' : '' ?>>
+                                    <label class="form-check-label" for="sectorNA">N/A</label>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </div>
 
-                    <div class="modal-footer">
-                        <button class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                        <button class="btn btn-primary">Next</button>
-                    </div>
+                <div class="modal-footer">
+                    <button class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button class="btn btn-primary" id="btnProfileSave" type="button">Save</button>
+                </div>
 
                 </div>
 
@@ -587,15 +695,38 @@ if ($residentId !== '' && isset($conn) && $conn instanceof mysqli) {
                 </div>
 
                 <div class="modal-body">
-                    <input type="text" class="form-control mb-2" placeholder="Street Number">
-                    <input type="text" class="form-control mb-2" placeholder="Street Name">
-                    <input type="text" class="form-control mb-2" placeholder="Subdivision">
-                    <input type="text" class="form-control mb-2" placeholder="Area Number">
+                    <div class="alert alert-info small mb-3">
+                        Saving changes will send a request for review.
+                    </div>
+                    <div id="addressDeniedAlert" class="alert alert-danger alert-dismissible fade show small mb-3 d-none" role="alert">
+                        <span id="addressDeniedText"></span>
+                        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                    </div>
+                    <div class="alert alert-warning small mb-3">
+                        Changing your address will remove you from your household.
+                    </div>
+                    <div id="headReassignBlock" class="border rounded p-2 mb-3 d-none">
+                        <label class="form-label fw-bold mb-1">Assign New Head of Household</label>
+                        <select class="form-select" id="newHeadResidentId">
+                            <option value="">Select a member</option>
+                        </select>
+                        <div class="form-text">Required before a household head can change address.</div>
+                        <div id="headReassignEmpty" class="text-danger small mt-2 d-none">
+                            You must have at least one other active household member to reassign the head role.
+                        </div>
+                    </div>
+                    <input type="text" class="form-control mb-2" id="addressUnitNumber" placeholder="Unit Number" value="<?= htmlspecialchars($residentaddresstbl['unit_number'] ?? '') ?>">
+                    <input type="text" class="form-control mb-2" id="addressStreetNumber" placeholder="Street Number" value="<?= htmlspecialchars($residentaddresstbl['street_number'] ?? '') ?>">
+                    <input type="text" class="form-control mb-2" id="addressStreetName" placeholder="Street Name" value="<?= htmlspecialchars($residentaddresstbl['street_name'] ?? '') ?>">
+                    <input type="text" class="form-control mb-2" id="addressPhaseNumber" placeholder="Phase Number" value="<?= htmlspecialchars($residentaddresstbl['phase_number'] ?? '') ?>">
+                    <input type="text" class="form-control mb-2" id="addressSubdivision" placeholder="Subdivision" value="<?= htmlspecialchars($residentaddresstbl['subdivision'] ?? '') ?>">
+                    <input type="text" class="form-control mb-2" id="addressAreaNumber" placeholder="Area Number" value="<?= htmlspecialchars($residentaddresstbl['area_number'] ?? '') ?>">
+                    <div id="addressSaveResult" class="small mt-2"></div>
                 </div>
 
                 <div class="modal-footer">
                     <button class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                    <button class="btn btn-success">Save</button>
+                    <button class="btn btn-success" id="btnSaveAddress" type="button">Save</button>
                 </div>
 
             </div>
@@ -612,22 +743,63 @@ if ($residentId !== '' && isset($conn) && $conn instanceof mysqli) {
                     </div>
 
                     <div class="modal-body">
-                        <div class="mb-3">
-                            <label class="form-label">Contact Person</label>
-                            <input class="form-control" value="<?= $residentinformationtbl['emergency_name'] ?>">
+                        <div class="alert alert-info small mb-3">
+                            Saving changes will send a request for review.
+                        </div>
+                        <div id="emergencyDeniedAlert" class="alert alert-danger alert-dismissible fade show small mb-3 d-none" role="alert">
+                            <span id="emergencyDeniedText"></span>
+                            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                        </div>
+                        <label class="form-label">Contact Person</label>
+                        <div class="d-flex gap-2 mb-3">
+                            <input class="form-control" id="emergencyLastName" value="<?= $residentinformationtbl['emergency_last_name'] ?? '' ?>" placeholder="Last Name">
+                            <input class="form-control" id="emergencyFirstName" value="<?= $residentinformationtbl['emergency_first_name'] ?? '' ?>" placeholder="First Name">
+                            <input class="form-control" id="emergencyMiddleName" value="<?= $residentinformationtbl['emergency_middle_name'] ?? '' ?>" placeholder="Middle Name">
+                            <select class="form-control" id="emergencySuffix">
+                                <option value="" <?= empty($residentinformationtbl['emergency_suffix']) ? 'selected' : '' ?>>N/A</option>
+                                <option value="Jr." <?= ($residentinformationtbl['emergency_suffix'] ?? '') === 'Jr.' ? 'selected' : '' ?>>Jr.</option>
+                                <option value="Sr." <?= ($residentinformationtbl['emergency_suffix'] ?? '') === 'Sr.' ? 'selected' : '' ?>>Sr.</option>
+                                <option value="III" <?= ($residentinformationtbl['emergency_suffix'] ?? '') === 'III' ? 'selected' : '' ?>>III</option>
+                            </select>
                         </div>
                         <div class="mb-3">
                             <label class="form-label">Contact Number</label>
-                            <input class="form-control" value="<?= $residentinformationtbl['emergency_contact'] ?>">
+                            <div class="input-group">
+                                <span class="input-group-text">+63</span>
+                                <input class="form-control" id="emergencyContact" inputmode="numeric" maxlength="10" placeholder="9XXXXXXXXX" value="<?= $residentinformationtbl['emergency_contact'] ?? '' ?>">
+                            </div>
                         </div>
+                        <div class="mb-3">
+                            <label class="form-label">Relationship</label>
+                            <?php
+                              $relRaw = $residentinformationtbl['emergency_relationship'] ?? '';
+                              $relNorm = strtolower(trim((string)$relRaw));
+                              $relOptions = ['parent' => 'Parent', 'child' => 'Child', 'spouse' => 'Spouse', 'other' => 'Other'];
+                              $relSelectedKey = array_key_exists($relNorm, $relOptions) ? $relNorm : ($relNorm !== '' ? 'other' : '');
+                              $relOtherValue = ($relSelectedKey === 'other' && $relNorm !== '' && !array_key_exists($relNorm, $relOptions)) ? $relRaw : '';
+                            ?>
+                            <select class="form-select" id="emergencyRelationship">
+                                <option value="" <?= $relSelectedKey === '' ? 'selected' : '' ?>>Select relationship</option>
+                                <option value="Parent" <?= $relSelectedKey === 'parent' ? 'selected' : '' ?>>Parent</option>
+                                <option value="Child" <?= $relSelectedKey === 'child' ? 'selected' : '' ?>>Child</option>
+                                <option value="Spouse" <?= $relSelectedKey === 'spouse' ? 'selected' : '' ?>>Spouse</option>
+                                <option value="Other" <?= $relSelectedKey === 'other' ? 'selected' : '' ?>>Other</option>
+                            </select>
+                            <input class="form-control mt-2 d-none" id="emergencyRelationshipOther" placeholder="Please specify" value="<?= htmlspecialchars($relOtherValue) ?>">
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Address</label>
+                            <input class="form-control" id="emergencyAddress" placeholder="Emergency Address" value="<?= $residentinformationtbl['emergency_address'] ?? '' ?>">
+                        </div>
+                        <div id="emergencySaveResult" class="small mt-2"></div>
                     </div>
                     <div class="modal-footer">
                         <button class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                        <button class="btn btn-primary">Save</button>
+                        <button class="btn btn-primary" id="btnSaveEmergency" type="button">Save</button>
                     </div>
                 </div>
-            </div>
         </div>
+    </div>
 
         <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 </body>

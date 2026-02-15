@@ -1,174 +1,125 @@
-CREATE TABLE `useraccountstbl` (
-  `user_id` varchar(12) NOT NULL,
-  `phone_number` varchar(10) NOT NULL,
-  `phoneNum_verify` tinyint(1) NOT NULL DEFAULT 0,
-  `email` varchar(100) NOT NULL,
-  `email_verify` tinyint(1) NOT NULL,
-  `password_hash` varchar(255) NOT NULL,
-  `status_id_account` varchar(20) NOT NULL,
-  `role_access` enum('Resident','Employee') NOT NULL,
-  `account_created` datetime NOT NULL,
-  `last_login` datetime NOT NULL,
-  `last_password_changed` date DEFAULT NULL,
-  `failed_logins` int(11) DEFAULT 0,
-  `lock_start` datetime DEFAULT NULL,
-  PRIMARY KEY (`user_id`),
-  UNIQUE KEY `phone_number` (`phone_number`),
-  UNIQUE KEY `email` (`email`)
+CREATE TABLE `documentrequesttbl` (
+  `request_id` int(11) NOT NULL AUTO_INCREMENT,
+  `resident_user_id` varchar(10) DEFAULT NULL,
+  `last_name` varchar(255) NOT NULL,
+  `first_name` varchar(255) NOT NULL,
+  `middle_name` varchar(255) DEFAULT NULL,
+  `suffix` varchar(255) DEFAULT NULL,
+  `attachment_id` bigint(20) unsigned NOT NULL,
+  `request_details` varchar(255) NOT NULL,
+  `status_id_request` int(11) DEFAULT NULL,
+  `user_id_official_reviewed_by` varchar(12) DEFAULT NULL,
+  `user_id_official_released_by` varchar(12) DEFAULT NULL,
+  `request_timestamp` datetime NOT NULL,
+  `review_timestamp` datetime NOT NULL,
+  `release_timestamp` datetime NOT NULL,
+  `document_validity` datetime NOT NULL,
+  `qr_code_path` varchar(255) NOT NULL,
+  PRIMARY KEY (`request_id`),
+  KEY `fk_docreq_resident_user` (`resident_user_id`),
+  KEY `fk_docreq_attachment_id` (`attachment_id`),
+  KEY `fk_docreq_status_id` (`status_id_request`),
+  KEY `fk_docreq_official_reviewed_by` (`user_id_official_reviewed_by`),
+  KEY `fk_docreq_official_released_by` (`user_id_official_released_by`),
+  CONSTRAINT `fk_docreq_attachment_id` FOREIGN KEY (`attachment_id`) REFERENCES `unifiedfileattachmenttbl` (`attachment_id`),
+  CONSTRAINT `fk_docreq_official_released_by` FOREIGN KEY (`user_id_official_released_by`) REFERENCES `useraccountstbl` (`user_id`),
+  CONSTRAINT `fk_docreq_official_reviewed_by` FOREIGN KEY (`user_id_official_reviewed_by`) REFERENCES `useraccountstbl` (`user_id`),
+  CONSTRAINT `fk_docreq_resident_user` FOREIGN KEY (`resident_user_id`) REFERENCES `residentinformationtbl` (`resident_id`),
+  CONSTRAINT `fk_docreq_status_id` FOREIGN KEY (`status_id_request`) REFERENCES `statuslookuptbl` (`status_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
-
-
-
-CREATE TABLE `userpasswordhistorytbl` (
-  `pw_history_id` int(11) NOT NULL AUTO_INCREMENT,
-  `user_id` varchar(12) NOT NULL,
-  `old_pw_hash` varchar(255) NOT NULL,
-  `change_timestamp` datetime DEFAULT current_timestamp(),
-  PRIMARY KEY (`pw_history_id`),
-  KEY `idx_user_time` (`user_id`,`change_timestamp`),
-  CONSTRAINT `fk_user_password_history` FOREIGN KEY (`user_id`) REFERENCES `useraccountstbl` (`user_id`) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
-
-
-
-CREATE TABLE `statuslookuptbl` (
-  `status_id` int(11) NOT NULL AUTO_INCREMENT,
-  `status_name` varchar(100) NOT NULL,
-  `status_type` varchar(50) NOT NULL,
-  PRIMARY KEY (`status_id`)
-) ENGINE=InnoDB AUTO_INCREMENT=1 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
-
--- Migration: add phase_number to residentaddresstbl (run once on existing DB)
-ALTER TABLE residentaddresstbl
-  ADD COLUMN phase_number varchar(50) DEFAULT NULL AFTER street_name;
-
 
 CREATE TABLE `documenttypelookuptbl` (
-  `document_type_id` INT(11) NOT NULL AUTO_INCREMENT,
-  `document_type_name` VARCHAR(100) NOT NULL,
-  `document_category` VARCHAR(100) NOT NULL,
+  `document_type_id` int(11) NOT NULL AUTO_INCREMENT,
+  `document_type_name` varchar(100) NOT NULL,
+  `document_category` varchar(100) NOT NULL,
   PRIMARY KEY (`document_type_id`)
-) ENGINE=InnoDB
-DEFAULT CHARSET=utf8mb4
-COLLATE=utf8mb4_general_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=27 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
-INSERT INTO `documenttypelookuptbl` (`document_type_name`, `document_category`) VALUES
-('HOA Signed Certification of Residency', 'ResidentProfiling'),
-('Billing Statement', 'ResidentProfiling'),
-('2x2 Picture', 'ResidentProfiling'),
-('Passport', 'ResidentProfiling'),
-('Driver''s License', 'ResidentProfiling'),
-('PhilHealth ID', 'ResidentProfiling'),
-('Voter''s ID', 'ResidentProfiling'),
-('National ID', 'ResidentProfiling'),
-('Barangay ID', 'ResidentProfiling'),
-('Student ID', 'ResidentProfiling');
-
-CREATE TABLE `unifiedfileattachmenttbl` (
-  `attachment_id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
-  `source_type` VARCHAR(50) NOT NULL,
-  `source_id` VARCHAR(12) NOT NULL,
-  `document_type_id` INT(11) NOT NULL,
-  `file_name` VARCHAR(255) NOT NULL,
-  `file_path` VARCHAR(500) NOT NULL,
-  `file_type` VARCHAR(50) NOT NULL,
-  `upload_timestamp` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  `user_id_uploaded_by` VARCHAR(12) NOT NULL,
-  `status_id_verify` INT(11) NOT NULL,
-  `remarks` TEXT DEFAULT NULL,
-  PRIMARY KEY (`attachment_id`),
-  KEY `idx_source` (`source_type`, `source_id`),
-  KEY `idx_doc_type` (`document_type_id`),
-  KEY `idx_uploaded_by` (`user_id_uploaded_by`),
-  KEY `idx_verify_status` (`status_id_verify`),
-  CONSTRAINT `fk_ufa_document_type`
-    FOREIGN KEY (`document_type_id`)
-    REFERENCES `documenttypelookuptbl` (`document_type_id`),
-  CONSTRAINT `fk_ufa_uploaded_by`
-    FOREIGN KEY (`user_id_uploaded_by`)
-    REFERENCES `useraccountstbl` (`user_id`),
-  CONSTRAINT `fk_ufa_verify_status`
-    FOREIGN KEY (`status_id_verify`)
-    REFERENCES `statuslookuptbl` (`status_id`)
-) ENGINE=InnoDB
-DEFAULT CHARSET=utf8mb4
-COLLATE=utf8mb4_general_ci;
-
-
-
-CREATE TABLE `residentinformationtbl` (
-  `resident_id` char(10) NOT NULL,
+CREATE TABLE `emailverificationtokens` (
+  `id` bigint(20) unsigned NOT NULL AUTO_INCREMENT,
   `user_id` varchar(12) NOT NULL,
-  `lastname` varchar(100) NOT NULL,
-  `firstname` varchar(100) NOT NULL,
-  `middlename` varchar(100) DEFAULT NULL,
+  `token_hash` varchar(255) NOT NULL,
+  `expires_at` datetime NOT NULL,
+  `used_at` datetime DEFAULT NULL,
+  `created_at` datetime NOT NULL DEFAULT current_timestamp(),
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uniq_user` (`user_id`),
+  CONSTRAINT `fk_evt_user` FOREIGN KEY (`user_id`) REFERENCES `useraccountstbl` (`user_id`) ON DELETE CASCADE
+) ENGINE=InnoDB AUTO_INCREMENT=117 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+CREATE TABLE `emergencycontacttbl` (
+  `emergency_id` int(11) NOT NULL AUTO_INCREMENT,
+  `user_id` varchar(12) NOT NULL,
+  `last_name` varchar(100) NOT NULL,
+  `first_name` varchar(100) NOT NULL,
+  `middle_name` varchar(100) DEFAULT NULL,
   `suffix` varchar(20) DEFAULT NULL,
-  `sex` enum('Male','Female') NOT NULL,
+  `phone_number` varchar(15) NOT NULL,
+  `relationship` varchar(50) NOT NULL,
+  `address` varchar(255) NOT NULL,
+  `created_at` datetime NOT NULL DEFAULT current_timestamp(),
+  `updated_at` datetime DEFAULT NULL ON UPDATE current_timestamp(),
+  PRIMARY KEY (`emergency_id`),
+  UNIQUE KEY `user_id` (`user_id`),
+  CONSTRAINT `fk_emergency_user` FOREIGN KEY (`user_id`) REFERENCES `useraccountstbl` (`user_id`) ON DELETE CASCADE
+) ENGINE=InnoDB AUTO_INCREMENT=53 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+CREATE TABLE `householdinvitetbl` (
+  `invite_id` int(11) NOT NULL AUTO_INCREMENT,
+  `household_id` int(11) NOT NULL,
+  `code_hash` char(64) NOT NULL,
+  `expires_at` datetime NOT NULL,
+  `max_uses` int(11) NOT NULL DEFAULT 1,
+  `uses_count` int(11) NOT NULL DEFAULT 0,
+  `created_by_resident_id` varchar(10) NOT NULL,
+  `status_id` int(11) NOT NULL,
+  `created_at` datetime NOT NULL DEFAULT current_timestamp(),
+  PRIMARY KEY (`invite_id`),
+  KEY `fk_invite_household` (`household_id`),
+  KEY `fk_invite_status` (`status_id`),
+  CONSTRAINT `fk_invite_household` FOREIGN KEY (`household_id`) REFERENCES `householdtbl` (`household_id`) ON DELETE CASCADE ON UPDATE CASCADE,
+  CONSTRAINT `fk_invite_status` FOREIGN KEY (`status_id`) REFERENCES `statuslookuptbl` (`status_id`) ON UPDATE CASCADE
+) ENGINE=InnoDB AUTO_INCREMENT=4 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+CREATE TABLE `householdmemberinfotbl` (
+  `household_member_id` int(11) NOT NULL AUTO_INCREMENT,
+  `fam_head_id` varchar(10) NOT NULL,
+  `last_name` varchar(100) NOT NULL,
+  `first_name` varchar(100) NOT NULL,
+  `middle_name` varchar(100) DEFAULT NULL,
+  `suffix` varchar(100) DEFAULT NULL,
   `birthdate` date NOT NULL,
-  `civil_status` varchar(50) NOT NULL,
-  `head_of_family` tinyint(1) NOT NULL DEFAULT 0,
-  `voter_status` tinyint(1) NOT NULL DEFAULT 0,
-  `occupation` TINYINT(1) NOT NULL DEFAULT 0;,
-  `occupation_detail` varchar(150) DEFAULT NULL,
-  `religion` varchar(100) DEFAULT NULL,
-  `sector_membership` varchar(150) DEFAULT NULL,
-  `privacy_consent` tinyint(1) NOT NULL,
-  `status_id_resident` int(11) DEFAULT NULL,
-  PRIMARY KEY (`resident_id`),
-  KEY `idx_resident_user` (`user_id`),
-  KEY `fk_resident_status` (`status_id_resident`),
-  CONSTRAINT `fk_resident_status` FOREIGN KEY (`status_id_resident`) REFERENCES `statuslookuptbl` (`status_id`),
-  CONSTRAINT `fk_resident_user` FOREIGN KEY (`user_id`) REFERENCES `useraccountstbl` (`user_id`) ON DELETE CASCADE
-) ENGINE=InnoDB AUTO_INCREMENT=1 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+  PRIMARY KEY (`household_member_id`),
+  KEY `fk_householdmember_famhead` (`fam_head_id`),
+  CONSTRAINT `fk_householdmember_famhead` FOREIGN KEY (`fam_head_id`) REFERENCES `residentinformationtbl` (`resident_id`) ON DELETE CASCADE ON UPDATE CASCADE
+) ENGINE=InnoDB AUTO_INCREMENT=7 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
-
-CREATE TABLE `residentaddresstbl` (
-  `address_id` varchar(10) NOT NULL,
-  `resident_id` char(10) NOT NULL,
-  `unit_number` varchar(50) DEFAULT NULL,
-  `street_number` varchar(50) DEFAULT NULL,
-  `street_name` varchar(150) DEFAULT NULL,
-  `phase_number` varchar(50) DEFAULT NULL,
-  `subdivision` varchar(150) DEFAULT NULL,
-  `area_number` varchar(50) DEFAULT NULL,
-  `house_type` varchar(100) DEFAULT NULL,
-  `house_ownership` varchar(100) DEFAULT NULL,
-  `residency_duration` varchar(100) DEFAULT NULL,
-  `status_id_residency` int(11) NOT NULL,
-  PRIMARY KEY (`address_id`),
-  KEY `idx_address_resident` (`resident_id`),
-  KEY `fk_address_status` (`status_id_residency`),
-  CONSTRAINT `fk_address_resident` FOREIGN KEY (`resident_id`) REFERENCES `residentinformationtbl` (`resident_id`) ON DELETE CASCADE,
-  CONSTRAINT `fk_address_status` FOREIGN KEY (`status_id_residency`) REFERENCES `statuslookuptbl` (`status_id`)
+CREATE TABLE `householdmemberresidenttbl` (
+  `household_id` int(11) NOT NULL,
+  `resident_id` varchar(10) NOT NULL,
+  `role` enum('Head','Member') NOT NULL DEFAULT 'Member',
+  `status_id` int(11) NOT NULL,
+  `invited_by_resident_id` varchar(10) DEFAULT NULL,
+  `joined_at` datetime DEFAULT NULL,
+  PRIMARY KEY (`household_id`,`resident_id`),
+  KEY `fk_hmr_resident` (`resident_id`),
+  KEY `fk_hmr_status` (`status_id`),
+  CONSTRAINT `fk_hmr_household` FOREIGN KEY (`household_id`) REFERENCES `householdtbl` (`household_id`) ON DELETE CASCADE ON UPDATE CASCADE,
+  CONSTRAINT `fk_hmr_resident` FOREIGN KEY (`resident_id`) REFERENCES `residentinformationtbl` (`resident_id`) ON DELETE CASCADE ON UPDATE CASCADE,
+  CONSTRAINT `fk_hmr_status` FOREIGN KEY (`status_id`) REFERENCES `statuslookuptbl` (`status_id`) ON UPDATE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
--- Migration: convert address_id to ANNYYXXXXX string and keep it primary
-ALTER TABLE `residentaddresstbl`
-  MODIFY COLUMN `address_id` varchar(10) NOT NULL,
-  DROP PRIMARY KEY,
-  ADD PRIMARY KEY (`address_id`);
-
--- Migration: add unit_number to residentaddresstbl (optional, nullable)
-ALTER TABLE `residentaddresstbl`
-  ADD COLUMN `unit_number` varchar(50) DEFAULT NULL AFTER `resident_id`;
-
-
-
-CREATE TABLE `otprequesttbl` (
-  `otp_id` int(11) NOT NULL AUTO_INCREMENT,
-  `user_id` varchar(12) DEFAULT NULL,
-  `recipient` varchar(50) NOT NULL,
-  `purpose` varchar(50) NOT NULL,
-  `otp_code_hash` varchar(255) NOT NULL,
-  `otp_expiry` datetime NOT NULL,
-  `request_timestamp` datetime NOT NULL DEFAULT current_timestamp(),
-  `status_id_otp` int(11) NOT NULL,
-  PRIMARY KEY (`otp_id`),
-  KEY `user_id` (`user_id`),
-  CONSTRAINT `otprequesttbl_ibfk_1` FOREIGN KEY (`user_id`) REFERENCES `useraccountstbl` (`user_id`)
-) ENGINE=InnoDB AUTO_INCREMENT=1 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
-
-
+CREATE TABLE `householdtbl` (
+  `household_id` int(11) NOT NULL AUTO_INCREMENT,
+  `head_resident_id` varchar(10) NOT NULL,
+  `status_id` int(11) NOT NULL,
+  `created_at` datetime NOT NULL DEFAULT current_timestamp(),
+  PRIMARY KEY (`household_id`),
+  KEY `fk_household_head` (`head_resident_id`),
+  KEY `fk_household_status` (`status_id`),
+  CONSTRAINT `fk_household_head` FOREIGN KEY (`head_resident_id`) REFERENCES `residentinformationtbl` (`resident_id`) ON UPDATE CASCADE,
+  CONSTRAINT `fk_household_status` FOREIGN KEY (`status_id`) REFERENCES `statuslookuptbl` (`status_id`) ON UPDATE CASCADE
+) ENGINE=InnoDB AUTO_INCREMENT=2 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 CREATE TABLE `officialinformationtbl` (
   `official_id` int(11) NOT NULL AUTO_INCREMENT,
@@ -196,109 +147,148 @@ CREATE TABLE `officialinformationtbl` (
   CONSTRAINT `fk_official_user` FOREIGN KEY (`user_id`) REFERENCES `useraccountstbl` (`user_id`) ON DELETE CASCADE ON UPDATE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
+CREATE TABLE `otprequesttbl` (
+  `otp_id` int(11) NOT NULL AUTO_INCREMENT,
+  `user_id` varchar(12) DEFAULT NULL,
+  `recipient` varchar(50) NOT NULL,
+  `purpose` varchar(50) NOT NULL,
+  `otp_code_hash` varchar(255) NOT NULL,
+  `otp_expiry` datetime NOT NULL,
+  `request_timestamp` datetime NOT NULL DEFAULT current_timestamp(),
+  `status_id_otp` int(11) NOT NULL,
+  PRIMARY KEY (`otp_id`),
+  KEY `user_id` (`user_id`),
+  CONSTRAINT `otprequesttbl_ibfk_1` FOREIGN KEY (`user_id`) REFERENCES `useraccountstbl` (`user_id`)
+) ENGINE=InnoDB AUTO_INCREMENT=78 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
-
-
-CREATE TABLE `emergencycontacttbl` (
-  `emergency_id` int(11) NOT NULL AUTO_INCREMENT,
-  `user_id` varchar(12) NOT NULL,
-  `last_name` varchar(100) NOT NULL,
-  `first_name` varchar(100) NOT NULL,
-  `middle_name` varchar(100) DEFAULT NULL,
-  `suffix` varchar(20) DEFAULT NULL,
-  `phone_number` varchar(15) NOT NULL,
-  `relationship` varchar(50) NOT NULL,
-  `address` varchar(255) NOT NULL,
-  `created_at` datetime NOT NULL DEFAULT current_timestamp(),
-  `updated_at` datetime DEFAULT NULL ON UPDATE current_timestamp(),
-  PRIMARY KEY (`emergency_id`),
-  UNIQUE KEY `user_id` (`user_id`),
-  CONSTRAINT `fk_emergency_user` FOREIGN KEY (`user_id`) REFERENCES `useraccountstbl` (`user_id`) ON DELETE CASCADE
-) ENGINE=InnoDB AUTO_INCREMENT=1 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
-
-CREATE TABLE `emailverificationtokens` (
-  `user_id` varchar(12) NOT NULL,
-  `token_hash` varchar(255) NOT NULL,
-  `expires_at` datetime NOT NULL,
-  `used_at` datetime DEFAULT NULL,
-  PRIMARY KEY (`user_id`),
-  CONSTRAINT `fk_email_verif_user` FOREIGN KEY (`user_id`) REFERENCES `useraccountstbl` (`user_id`) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
-
-
-
-
-
-INSERT INTO statuslookuptbl (status_name, status_type) VALUES
-('Active', 'UserAccount'),
-('Inactive', 'UserAccount'),
-('Locked', 'UserAccount'),
-('Deactivated', 'UserAccount'),
-('Deleted', 'UserAccount'),
-
-('Pending', 'OTPVerification'),
-('Verified', 'OTPVerification'),
-('Expired', 'OTPVerification'),
-
-('NotVerified', 'Resident'),
-('PendingVerification', 'Resident'),
-('VerifiedResident', 'Resident'),
-
-('Residing', 'AddressResidency'),
-('NotResiding', 'AddressResidency'),
-('PendingVerification', 'AddressResidency'),
-
-('PendingReview', 'ResidentDocumentProfiling'),
-('Verified', 'ResidentDocumentProfiling'),
-('Rejected', 'ResidentDocumentProfiling');
-
--- ===== Household Invite + Member (Resident-End) =====
--- Ensure statuslookuptbl has:
--- ('Active','Household'), ('Inactive','Household')
--- ('Active','HouseholdInvite'), ('Expired','HouseholdInvite')
--- ('Active','HouseholdMember'), ('Removed','HouseholdMember')
-
-CREATE TABLE `householdtbl` (
-  `household_id` int(11) NOT NULL AUTO_INCREMENT,
-  `head_resident_id` varchar(10) NOT NULL,
-  `status_id` int(11) NOT NULL,
-  `created_at` datetime NOT NULL DEFAULT current_timestamp(),
-  PRIMARY KEY (`household_id`),
-  KEY `fk_household_head` (`head_resident_id`),
-  KEY `fk_household_status` (`status_id`),
-  CONSTRAINT `fk_household_head` FOREIGN KEY (`head_resident_id`) REFERENCES `residentinformationtbl` (`resident_id`) ON DELETE RESTRICT ON UPDATE CASCADE,
-  CONSTRAINT `fk_household_status` FOREIGN KEY (`status_id`) REFERENCES `statuslookuptbl` (`status_id`) ON DELETE RESTRICT ON UPDATE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
-
-CREATE TABLE `householdinvitetbl` (
-  `invite_id` int(11) NOT NULL AUTO_INCREMENT,
-  `household_id` int(11) NOT NULL,
-  `code_hash` char(64) NOT NULL,
-  `expires_at` datetime NOT NULL,
-  `max_uses` int(11) NOT NULL DEFAULT 1,
-  `uses_count` int(11) NOT NULL DEFAULT 0,
-  `created_by_resident_id` varchar(10) NOT NULL,
-  `status_id` int(11) NOT NULL,
-  `created_at` datetime NOT NULL DEFAULT current_timestamp(),
-  PRIMARY KEY (`invite_id`),
-  KEY `fk_invite_household` (`household_id`),
-  KEY `fk_invite_status` (`status_id`),
-  CONSTRAINT `fk_invite_household` FOREIGN KEY (`household_id`) REFERENCES `householdtbl` (`household_id`) ON DELETE CASCADE ON UPDATE CASCADE,
-  CONSTRAINT `fk_invite_status` FOREIGN KEY (`status_id`) REFERENCES `statuslookuptbl` (`status_id`) ON DELETE RESTRICT ON UPDATE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
-
-CREATE TABLE `householdmemberresidenttbl` (
-  `household_id` int(11) NOT NULL,
+CREATE TABLE `residentaddresstbl` (
+  `address_id` varchar(10) NOT NULL,
   `resident_id` varchar(10) NOT NULL,
-  `role` enum('Head','Member') NOT NULL DEFAULT 'Member',
-  `status_id` int(11) NOT NULL,
-  `invited_by_resident_id` varchar(10) DEFAULT NULL,
-  `joined_at` datetime DEFAULT NULL,
-  PRIMARY KEY (`household_id`, `resident_id`),
-  KEY `fk_hmr_household` (`household_id`),
-  KEY `fk_hmr_resident` (`resident_id`),
-  KEY `fk_hmr_status` (`status_id`),
-  CONSTRAINT `fk_hmr_household` FOREIGN KEY (`household_id`) REFERENCES `householdtbl` (`household_id`) ON DELETE CASCADE ON UPDATE CASCADE,
-  CONSTRAINT `fk_hmr_resident` FOREIGN KEY (`resident_id`) REFERENCES `residentinformationtbl` (`resident_id`) ON DELETE CASCADE ON UPDATE CASCADE,
-  CONSTRAINT `fk_hmr_status` FOREIGN KEY (`status_id`) REFERENCES `statuslookuptbl` (`status_id`) ON DELETE RESTRICT ON UPDATE CASCADE
+  `unit_number` varchar(50) DEFAULT NULL,
+  `street_number` varchar(50) DEFAULT NULL,
+  `street_name` varchar(150) DEFAULT NULL,
+  `phase_number` varchar(50) DEFAULT NULL,
+  `subdivision` varchar(150) DEFAULT NULL,
+  `area_number` varchar(50) DEFAULT NULL,
+  `house_type` varchar(100) DEFAULT NULL,
+  `house_ownership` varchar(100) DEFAULT NULL,
+  `residency_duration` varchar(100) DEFAULT NULL,
+  `status_id_residency` int(11) NOT NULL,
+  PRIMARY KEY (`address_id`),
+  KEY `idx_address_resident` (`resident_id`),
+  KEY `fk_address_status` (`status_id_residency`),
+  CONSTRAINT `fk_address_resident` FOREIGN KEY (`resident_id`) REFERENCES `residentinformationtbl` (`resident_id`) ON DELETE CASCADE ON UPDATE CASCADE,
+  CONSTRAINT `fk_address_status` FOREIGN KEY (`status_id_residency`) REFERENCES `statuslookuptbl` (`status_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+CREATE TABLE `residentinformationtbl` (
+  `resident_id` varchar(10) NOT NULL,
+  `user_id` varchar(12) NOT NULL,
+  `lastname` varchar(100) NOT NULL,
+  `firstname` varchar(100) NOT NULL,
+  `middlename` varchar(100) DEFAULT NULL,
+  `suffix` varchar(20) DEFAULT NULL,
+  `sex` enum('Male','Female') NOT NULL,
+  `birthdate` date NOT NULL,
+  `civil_status` varchar(50) NOT NULL,
+  `head_of_family` tinyint(1) NOT NULL DEFAULT 0,
+  `voter_status` tinyint(1) NOT NULL DEFAULT 0,
+  `occupation` tinyint(1) NOT NULL DEFAULT 0,
+  `occupation_detail` varchar(150) DEFAULT NULL,
+  `religion` varchar(100) DEFAULT NULL,
+  `sector_membership` varchar(150) DEFAULT NULL,
+  `privacy_consent` tinyint(1) NOT NULL,
+  `status_id_resident` int(11) DEFAULT NULL,
+  PRIMARY KEY (`resident_id`),
+  KEY `idx_resident_user` (`user_id`),
+  KEY `fk_resident_status` (`status_id_resident`),
+  CONSTRAINT `fk_resident_status` FOREIGN KEY (`status_id_resident`) REFERENCES `statuslookuptbl` (`status_id`),
+  CONSTRAINT `fk_resident_user` FOREIGN KEY (`user_id`) REFERENCES `useraccountstbl` (`user_id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+CREATE TABLE `resident_edit_requesttbl` (
+  `request_id` int(11) NOT NULL AUTO_INCREMENT,
+  `resident_id` varchar(10) NOT NULL,
+  `user_id` varchar(12) NOT NULL,
+  `request_type` enum('profile','address','emergency') NOT NULL,
+  `status_id` int(11) NOT NULL,
+  `requested_changes` longtext CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL CHECK (json_valid(`requested_changes`)),
+  `admin_notes` varchar(255) DEFAULT NULL,
+  `created_at` datetime NOT NULL DEFAULT current_timestamp(),
+  `reviewed_at` datetime DEFAULT NULL,
+  `reviewed_by` varchar(12) DEFAULT NULL,
+  PRIMARY KEY (`request_id`),
+  KEY `idx_request_status` (`status_id`),
+  KEY `idx_request_type` (`request_type`),
+  KEY `idx_request_resident` (`resident_id`),
+  KEY `idx_request_user` (`user_id`),
+  KEY `fk_edit_request_reviewer` (`reviewed_by`),
+  CONSTRAINT `fk_edit_request_resident` FOREIGN KEY (`resident_id`) REFERENCES `residentinformationtbl` (`resident_id`) ON DELETE CASCADE,
+  CONSTRAINT `fk_edit_request_reviewer` FOREIGN KEY (`reviewed_by`) REFERENCES `useraccountstbl` (`user_id`) ON DELETE SET NULL,
+  CONSTRAINT `fk_edit_request_status` FOREIGN KEY (`status_id`) REFERENCES `statuslookuptbl` (`status_id`),
+  CONSTRAINT `fk_edit_request_user` FOREIGN KEY (`user_id`) REFERENCES `useraccountstbl` (`user_id`) ON DELETE CASCADE
+) ENGINE=InnoDB AUTO_INCREMENT=3 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+CREATE TABLE `statuslookuptbl` (
+  `status_id` int(11) NOT NULL AUTO_INCREMENT,
+  `status_name` varchar(100) NOT NULL,
+  `status_type` varchar(50) NOT NULL,
+  PRIMARY KEY (`status_id`)
+) ENGINE=InnoDB AUTO_INCREMENT=32 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+CREATE TABLE `unifiedfileattachmenttbl` (
+  `attachment_id` bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+  `source_type` varchar(50) NOT NULL,
+  `source_id` varchar(12) NOT NULL,
+  `document_type_id` int(11) NOT NULL,
+  `file_name` varchar(255) NOT NULL,
+  `file_path` varchar(500) NOT NULL,
+  `file_type` varchar(50) NOT NULL,
+  `upload_timestamp` datetime NOT NULL DEFAULT current_timestamp(),
+  `user_id_uploaded_by` varchar(12) NOT NULL,
+  `status_id_verify` int(11) NOT NULL,
+  `remarks` text DEFAULT NULL,
+  `id_number` varchar(100) DEFAULT NULL,
+  `deleted_at` datetime DEFAULT NULL,
+  `delete_reason` varchar(100) DEFAULT NULL,
+  `updated_at` datetime NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+  PRIMARY KEY (`attachment_id`),
+  KEY `idx_source` (`source_type`,`source_id`),
+  KEY `idx_doc_type` (`document_type_id`),
+  KEY `idx_uploaded_by` (`user_id_uploaded_by`),
+  KEY `idx_verify_status` (`status_id_verify`),
+  CONSTRAINT `fk_ufa_document_type` FOREIGN KEY (`document_type_id`) REFERENCES `documenttypelookuptbl` (`document_type_id`),
+  CONSTRAINT `fk_ufa_uploaded_by` FOREIGN KEY (`user_id_uploaded_by`) REFERENCES `useraccountstbl` (`user_id`),
+  CONSTRAINT `fk_ufa_verify_status` FOREIGN KEY (`status_id_verify`) REFERENCES `statuslookuptbl` (`status_id`)
+) ENGINE=InnoDB AUTO_INCREMENT=95 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+CREATE TABLE `useraccountstbl` (
+  `user_id` varchar(12) NOT NULL,
+  `phone_number` varchar(10) NOT NULL,
+  `phoneNum_verify` tinyint(1) NOT NULL DEFAULT 0,
+  `email` varchar(100) NOT NULL,
+  `email_verify` tinyint(1) NOT NULL,
+  `password_hash` varchar(255) NOT NULL,
+  `status_id_account` varchar(20) NOT NULL,
+  `role_access` enum('Resident','Employee') NOT NULL,
+  `account_created` datetime NOT NULL,
+  `last_login` datetime NOT NULL,
+  `last_password_changed` date DEFAULT NULL,
+  `failed_logins` int(11) DEFAULT 0,
+  `lock_start` datetime DEFAULT NULL,
+  `updated_at` datetime DEFAULT NULL,
+  `archived_at` datetime DEFAULT NULL,
+  PRIMARY KEY (`user_id`),
+  UNIQUE KEY `phone_number` (`phone_number`),
+  UNIQUE KEY `email` (`email`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+CREATE TABLE `userpasswordhistorytbl` (
+  `pw_history_id` int(11) NOT NULL AUTO_INCREMENT,
+  `user_id` varchar(12) NOT NULL,
+  `old_pw_hash` varchar(255) NOT NULL,
+  `change_timestamp` datetime DEFAULT current_timestamp(),
+  PRIMARY KEY (`pw_history_id`),
+  KEY `idx_user_time` (`user_id`,`change_timestamp`),
+  CONSTRAINT `fk_user_password_history` FOREIGN KEY (`user_id`) REFERENCES `useraccountstbl` (`user_id`) ON DELETE CASCADE
+) ENGINE=InnoDB AUTO_INCREMENT=8 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;

@@ -255,15 +255,40 @@ document.addEventListener("DOMContentLoaded", () => {
   // ========================
   function fetchResidents(search = "") {
     const url = `../PhpFiles/Admin-End/residentMasterlist.php?fetch=true&search=${encodeURIComponent(search)}`;
-    return fetch(url)
-      .then(res => res.json())
-      .then(data => {
-        allResidents = Array.isArray(data) ? data : [];
+    return fetch(url, { headers: { "Accept": "application/json" } })
+      .then(async (res) => {
+        const contentType = String(res.headers.get("content-type") || "").toLowerCase();
+        const isJson = contentType.includes("application/json");
+        const data = isJson ? await res.json().catch(() => null) : null;
+
+        if (!res.ok) {
+          const message = data?.message || `Failed to load residents (HTTP ${res.status}).`;
+          // Most common: session expired or role mismatch, so force re-login.
+          if (res.status === 401 || res.status === 403) {
+            window.location.href = "../Guest-End/login.php";
+            return [];
+          }
+          throw new Error(message);
+        }
+
+        if (!Array.isArray(data)) {
+          const message = data?.message || "Unexpected response while loading residents.";
+          // If we got redirected to HTML (e.g., login page), treat as auth failure.
+          if (!isJson) {
+            window.location.href = "../Guest-End/login.php";
+            return [];
+          }
+          throw new Error(message);
+        }
+
+        allResidents = data;
         applyFilterAndRender();
         return allResidents;
       })
-      .catch(err => {
+      .catch((err) => {
         console.error("Fetch error:", err);
+        allResidents = [];
+        applyFilterAndRender();
         return [];
       });
   }
@@ -531,9 +556,121 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
- // ========================
-// VIEW ENTRY MODAL
-// ========================
+  // ========================
+  // VIEW ENTRY MODAL
+  // ========================
+  const parseSectorsFromCsv = (csv) => {
+    const parts = String(csv ?? "")
+      .split(",")
+      .map((s) => s.trim())
+      .filter(Boolean);
+    return Array.from(new Set(parts.map((s) => s)));
+  };
+
+  const sectorLabelToKey = (label) => {
+    const normalized = String(label ?? "")
+      .toLowerCase()
+      .replace(/[^a-z]/g, "");
+    const map = {
+      pwd: "PWD",
+      seniorcitizen: "SeniorCitizen",
+      student: "Student",
+      indigenouspeople: "IndigenousPeople",
+      singleparent: "SingleParent",
+    };
+    return map[normalized] || "";
+  };
+
+  const sectorKeyToLabel = (key) => {
+    const normalized = String(key ?? "")
+      .toLowerCase()
+      .replace(/[^a-z]/g, "");
+    const map = {
+      pwd: "PWD",
+      seniorcitizen: "Senior Citizen",
+      student: "Student",
+      indigenouspeople: "Indigenous People",
+      singleparent: "Single Parent",
+    };
+    return map[normalized] || String(key ?? "");
+  };
+
+  const remarkMarker = (remarks) => String(remarks ?? "").split(";")[0].trim();
+
+	  const sectorKeyFromRemarks = (remarks) => {
+	    const marker = remarkMarker(remarks);
+	    const lower = marker.toLowerCase();
+	    if (!lower.startsWith("sector:")) return "";
+	    const raw = marker.slice("sector:".length).trim();
+	    return raw.split(":")[0].trim();
+	  };
+
+	  const computeSectorStatuses = (selectedSectorKeys, docs) => {
+	    const byKey = {};
+	    selectedSectorKeys.forEach((k) => {
+	      byKey[k] = { key: k, status: "NO_UPLOAD", lastTimestamp: "" };
+	    });
+
+	    docs.forEach((doc) => {
+	      const key = sectorKeyFromRemarks(doc.remarks);
+	      if (!key || !byKey[key]) return;
+
+	      const ts = String(doc.upload_timestamp ?? "");
+	      const status = String(doc.verify_status ?? "").toLowerCase();
+	      let normalizedStatus = "PENDING";
+	      if (status.includes("verified")) normalizedStatus = "VERIFIED";
+	      else if (status.includes("rejected") || status.includes("denied")) normalizedStatus = "REJECTED";
+	      else normalizedStatus = "PENDING";
+
+	      const current = byKey[key];
+	      const weight = (s) => (s === "REJECTED" ? 3 : s === "PENDING" ? 2 : s === "VERIFIED" ? 1 : 0);
+	      const nextStatus = weight(normalizedStatus) > weight(current.status) ? normalizedStatus : current.status;
+	      const nextTs = ts && (!current.lastTimestamp || current.lastTimestamp < ts) ? ts : current.lastTimestamp;
+	      byKey[key] = { key, status: nextStatus, lastTimestamp: nextTs };
+	    });
+
+	    return byKey;
+	  };
+
+  const renderSectorProofStatuses = (resident, docs = []) => {
+    const wrap = document.getElementById("div-modalSectorProofStatuses");
+    const hint = document.getElementById("div-modalSectorProofHint");
+    if (!wrap) return;
+    wrap.innerHTML = "";
+    if (hint) hint.classList.add("d-none");
+
+    const labels = parseSectorsFromCsv(resident?.sector_membership);
+    if (!labels.length) return;
+
+    const keys = labels.map(sectorLabelToKey).filter(Boolean);
+    if (!keys.length) return;
+
+    const statusByKey = computeSectorStatuses(keys, docs);
+    if (hint) hint.classList.remove("d-none");
+
+    keys.forEach((key) => {
+      const meta = statusByKey[key] || { status: "NO_UPLOAD" };
+      const badge = document.createElement("span");
+      badge.className = "badge rounded-pill";
+
+      const status = meta.status;
+      if (status === "VERIFIED") badge.classList.add("bg-success");
+      else if (status === "REJECTED") badge.classList.add("bg-danger");
+      else if (status === "PENDING") badge.classList.add("bg-warning", "text-dark");
+      else badge.classList.add("bg-secondary");
+
+      const label = sectorKeyToLabel(key);
+      const statusText =
+        status === "VERIFIED" ? "Verified" :
+        status === "REJECTED" ? "Rejected" :
+        status === "PENDING" ? "Pending" :
+        "No Upload";
+
+      badge.innerText = `${label}: ${statusText}`;
+      wrap.appendChild(badge);
+    });
+  };
+
 function openViewEntry(data) {
   currentViewedResident = data;
   document.getElementById("input-appId").value = data.resident_id;
@@ -575,6 +712,7 @@ function openViewEntry(data) {
   document.getElementById("txt-modalOccupation").innerText = data.occupation_display || "Unemployed";
   document.getElementById("txt-modalReligion").innerText = data.religion ?? "—";
   document.getElementById("txt-modalSectorMembership").innerText = data.sector_membership ?? "—";
+  renderSectorProofStatuses(data, []);
 
   // Emergency Info
   document.getElementById("txt-modalEmergencyFullName").innerText = data.emergency_full_name ?? "—";
@@ -631,6 +769,7 @@ function openViewEntry(data) {
       .then(res => res.json())
       .then(items => {
         const docs = Array.isArray(items) ? items : [];
+        renderSectorProofStatuses(data, docs);
         const verified = docs.filter(d => {
           const isVerified = String(d.verify_status ?? "").toLowerCase().includes("verified");
           const docName = String(d.document_type_name ?? "").toLowerCase();
@@ -712,6 +851,15 @@ function openDocsModal(data, opts = {}) {
   const sectionPending = document.getElementById("docs-section-pending");
   const sectionVerified = document.getElementById("docs-section-verified");
   const sectionDenied = document.getElementById("docs-section-denied");
+  const toggleSectorEl = document.getElementById("toggle-showSectorDocs");
+  const sectorCountEl = document.getElementById("docs-sector-count");
+  const sectorWrapperEl = document.getElementById("docs-sector-wrapper");
+  const sectorSectionPending = document.getElementById("docs-sector-section-pending");
+  const sectorSectionVerified = document.getElementById("docs-sector-section-verified");
+  const sectorSectionDenied = document.getElementById("docs-sector-section-denied");
+  const sectorListPending = document.getElementById("docs-sector-list-pending");
+  const sectorListVerified = document.getElementById("docs-sector-list-verified");
+  const sectorListDenied = document.getElementById("docs-sector-list-denied");
   const emptyEl = document.getElementById("docs-empty");
   const loadingEl = document.getElementById("docs-loading");
 
@@ -750,6 +898,13 @@ function openDocsModal(data, opts = {}) {
   if (sectionPending) sectionPending.classList.add("d-none");
   if (sectionVerified) sectionVerified.classList.add("d-none");
   if (sectionDenied) sectionDenied.classList.add("d-none");
+  if (sectorListPending) sectorListPending.innerHTML = "";
+  if (sectorListVerified) sectorListVerified.innerHTML = "";
+  if (sectorListDenied) sectorListDenied.innerHTML = "";
+  if (sectorSectionPending) sectorSectionPending.classList.add("d-none");
+  if (sectorSectionVerified) sectorSectionVerified.classList.add("d-none");
+  if (sectorSectionDenied) sectorSectionDenied.classList.add("d-none");
+  if (sectorWrapperEl) sectorWrapperEl.classList.add("d-none");
   if (emptyEl) emptyEl.classList.add("d-none");
   if (loadingEl) loadingEl.classList.remove("d-none");
 
@@ -764,23 +919,89 @@ function openDocsModal(data, opts = {}) {
         return;
       }
 
-      const pendingDocs = [];
-      const verifiedDocs = [];
-      const deniedDocs = [];
-
-      docs.forEach(doc => {
-        const status = String(doc.verify_status ?? "").toLowerCase();
-        if (status.includes("verified")) verifiedDocs.push(doc);
-        else if (status.includes("rejected") || status.includes("denied")) deniedDocs.push(doc);
-        else pendingDocs.push(doc);
-      });
-
       const normalizedRemark = (doc) => String(doc.remarks ?? "").trim().toLowerCase();
+      const remarkMarkerOnly = (doc) => normalizedRemark(doc).split(";")[0].trim();
+      const isSectorDoc = (doc) => remarkMarkerOnly(doc).startsWith("sector:");
+      const sectorKeyToLabelPurpose = (key) => {
+        const normalized = String(key ?? "").toLowerCase().replace(/[^a-z]/g, "");
+        const map = {
+          pwd: "PWD",
+          seniorcitizen: "Senior Citizen",
+          student: "Student",
+          indigenouspeople: "Indigenous People",
+          singleparent: "Single Parent",
+        };
+        return map[normalized] || String(key ?? "");
+      };
+
+	      const describeDocumentPurpose = (doc) => {
+	        const marker = remarkMarkerOnly(doc);
+	        const lower = marker.toLowerCase();
+
+        // If the row is a combined front/back doc, treat as ID proof.
+        if (doc.combined_files?.front || doc.combined_files?.back || lower === "front+back") {
+          return "Resident Profiling - Proof of Identity (ID)";
+        }
+
+	        if (lower.startsWith("sector:")) {
+	          const raw = marker.slice("sector:".length).trim();
+	          const parts = raw.split(":").map((x) => String(x || "").trim()).filter(Boolean);
+	          const baseKey = parts[0] || raw;
+	          const side = String(parts[1] || "").toLowerCase();
+	          const label = sectorKeyToLabelPurpose(baseKey);
+	          if (side === "front") return `${label} Sector Membership Proof (Front)`;
+	          if (side === "back") return `${label} Sector Membership Proof (Back)`;
+	          return `${label} Sector Membership Proof`;
+	        }
+
+        if (lower === "2x2") return "Resident Profiling - ID Image (2x2)";
+        if (lower === "idmerged" || lower === "idfront" || lower === "idback") {
+          return "Resident Profiling - Proof of Identity (ID)";
+        }
+        if (lower === "document") return "Resident Profiling - Proof of Residency";
+
+        // Fallback: use metadata if present, else keep it generic.
+        const src = String(doc.source_type ?? "");
+        const cat = String(doc.document_category ?? "");
+        if (src === "ResidentProfiling" || cat === "ResidentProfiling") {
+          return "Resident Profiling - Supporting Document";
+        }
+        return "Supporting Document";
+      };
+
+      const bucketByStatus = (docList) => {
+        const pendingDocs = [];
+        const verifiedDocs = [];
+        const deniedDocs = [];
+        (docList || []).forEach((doc) => {
+          const status = String(doc.verify_status ?? "").toLowerCase();
+          if (status.includes("verified")) verifiedDocs.push(doc);
+          else if (status.includes("rejected") || status.includes("denied")) deniedDocs.push(doc);
+          else pendingDocs.push(doc);
+        });
+        return { pendingDocs, verifiedDocs, deniedDocs };
+      };
+
+      const extractReasonFromRemarks = (remarks) => {
+        const parts = String(remarks ?? "")
+          .split(";")
+          .map((p) => p.trim())
+          .filter(Boolean);
+        const reasonPart = parts.find((p) => p.toLowerCase().startsWith("reason="));
+        if (reasonPart) return reasonPart.slice("reason=".length).trim();
+
+        // backward compatibility if older data stored raw reason in remarks
+        const marker = (parts[0] ?? "").toLowerCase();
+        if (marker === "idfront" || marker === "idback" || marker.startsWith("sector:")) {
+          return "";
+        }
+        return String(remarks ?? "").trim();
+      };
       const isFrontBackDoc = (doc) => {
-        const remark = normalizedRemark(doc);
+        const remark = remarkMarkerOnly(doc);
         return remark === "idfront" || remark === "idback";
       };
-      const sideOf = (doc) => (normalizedRemark(doc) === "idfront" ? "front" : "back");
+      const sideOf = (doc) => (remarkMarkerOnly(doc) === "idfront" ? "front" : "back");
 
       const mergeFrontBackDocs = (bucketDocs) => {
         const output = [];
@@ -842,9 +1063,19 @@ function openDocsModal(data, opts = {}) {
         return output;
       };
 
-      const pendingMerged = mergeFrontBackDocs(pendingDocs);
-      const verifiedMerged = mergeFrontBackDocs(verifiedDocs);
-      const deniedMerged = mergeFrontBackDocs(deniedDocs);
+      const profilingDocs = docs.filter((d) => !isSectorDoc(d));
+      const sectorDocs = docs.filter((d) => isSectorDoc(d));
+
+      const profilingBuckets = bucketByStatus(profilingDocs);
+      const sectorBuckets = bucketByStatus(sectorDocs);
+
+      const pendingMerged = mergeFrontBackDocs(profilingBuckets.pendingDocs);
+      const verifiedMerged = mergeFrontBackDocs(profilingBuckets.verifiedDocs);
+      const deniedMerged = mergeFrontBackDocs(profilingBuckets.deniedDocs);
+
+      const sectorPendingMerged = mergeFrontBackDocs(sectorBuckets.pendingDocs);
+      const sectorVerifiedMerged = mergeFrontBackDocs(sectorBuckets.verifiedDocs);
+      const sectorDeniedMerged = mergeFrontBackDocs(sectorBuckets.deniedDocs);
 
       const renderDocRow = (doc, container, opts = {}) => {
         const statusTone = opts.statusTone || "pending";
@@ -862,6 +1093,10 @@ function openDocsModal(data, opts = {}) {
         name.className = "fw-bold";
         name.innerText = doc.document_type_name || doc.file_name || "Document";
 
+        const purposeLine = document.createElement("div");
+        purposeLine.className = "small";
+        purposeLine.innerText = `Purpose: ${describeDocumentPurpose(doc)}`;
+
         const typeLine = document.createElement("div");
         typeLine.className = "small";
         typeLine.innerText = `Document Type: ${doc.document_type_name || "—"}`;
@@ -877,12 +1112,16 @@ function openDocsModal(data, opts = {}) {
         const uploaded = doc.upload_timestamp ? `Uploaded: ${doc.upload_timestamp}` : "Uploaded: —";
         let statusText = doc.verify_status ? `Status: ${doc.verify_status}` : "Status: —";
         if (opts.showReason && doc.remarks) {
-          statusText += ` • Reason: ${doc.remarks}`;
+          const reason = extractReasonFromRemarks(doc.remarks);
+          if (reason) {
+            statusText += ` • Reason: ${reason}`;
+          }
         }
         meta.innerText = `${uploaded} • ${statusText}`;
         metaRow.appendChild(meta);
         nameRow.appendChild(name);
         left.appendChild(nameRow);
+        left.appendChild(purposeLine);
         left.appendChild(typeLine);
         if (shouldShowIdNumber) {
           left.appendChild(idNumberLine);
@@ -912,18 +1151,86 @@ function openDocsModal(data, opts = {}) {
         if (container) container.appendChild(row);
       };
 
-      if (pendingMerged.length) {
-        if (sectionPending) sectionPending.classList.remove("d-none");
-        pendingMerged.forEach(doc => renderDocRow(doc, listPending, { statusTone: "pending" }));
+      const renderAll = () => {
+        if (listPending) listPending.innerHTML = "";
+        if (listVerified) listVerified.innerHTML = "";
+        if (listDenied) listDenied.innerHTML = "";
+        if (sectionPending) sectionPending.classList.add("d-none");
+        if (sectionVerified) sectionVerified.classList.add("d-none");
+        if (sectionDenied) sectionDenied.classList.add("d-none");
+        if (sectorListPending) sectorListPending.innerHTML = "";
+        if (sectorListVerified) sectorListVerified.innerHTML = "";
+        if (sectorListDenied) sectorListDenied.innerHTML = "";
+        if (sectorSectionPending) sectorSectionPending.classList.add("d-none");
+        if (sectorSectionVerified) sectorSectionVerified.classList.add("d-none");
+        if (sectorSectionDenied) sectorSectionDenied.classList.add("d-none");
+        if (sectorWrapperEl) sectorWrapperEl.classList.add("d-none");
+
+        const showSector = !!toggleSectorEl?.checked;
+        if (sectorCountEl) {
+          sectorCountEl.innerText = sectorDocs.length ? `(${sectorDocs.length})` : "";
+        }
+
+        if (!pendingMerged.length && !verifiedMerged.length && !deniedMerged.length) {
+          if (emptyEl) {
+            emptyEl.innerText = sectorDocs.length && !showSector
+              ? "No resident profiling documents found. Turn on sector membership documents to view sector proofs."
+              : "No submitted documents found.";
+            emptyEl.classList.remove("d-none");
+          }
+        } else {
+          if (emptyEl) emptyEl.classList.add("d-none");
+        }
+
+        if (pendingMerged.length) {
+          if (sectionPending) sectionPending.classList.remove("d-none");
+          pendingMerged.forEach((doc) => renderDocRow(doc, listPending, { statusTone: "pending" }));
+        }
+        if (verifiedMerged.length) {
+          if (sectionVerified) sectionVerified.classList.remove("d-none");
+          verifiedMerged.forEach((doc) => renderDocRow(doc, listVerified, { statusTone: "verified" }));
+        }
+        if (deniedMerged.length) {
+          if (sectionDenied) sectionDenied.classList.remove("d-none");
+          deniedMerged.forEach((doc) => renderDocRow(doc, listDenied, { showReason: true, statusTone: "denied" }));
+        }
+
+        if (showSector && sectorDocs.length) {
+          if (sectorWrapperEl) sectorWrapperEl.classList.remove("d-none");
+          if (sectorPendingMerged.length) {
+            if (sectorSectionPending) sectorSectionPending.classList.remove("d-none");
+            sectorPendingMerged.forEach((doc) => renderDocRow(doc, sectorListPending, { statusTone: "pending" }));
+          }
+          if (sectorVerifiedMerged.length) {
+            if (sectorSectionVerified) sectorSectionVerified.classList.remove("d-none");
+            sectorVerifiedMerged.forEach((doc) => renderDocRow(doc, sectorListVerified, { statusTone: "verified" }));
+          }
+          if (sectorDeniedMerged.length) {
+            if (sectorSectionDenied) sectorSectionDenied.classList.remove("d-none");
+            sectorDeniedMerged.forEach((doc) => renderDocRow(doc, sectorListDenied, { showReason: true, statusTone: "denied" }));
+          }
+        }
+      };
+
+      if (toggleSectorEl && !toggleSectorEl.dataset.bound) {
+        toggleSectorEl.dataset.bound = "1";
+        toggleSectorEl.addEventListener("change", () => {
+          if (window.lastDocsItems) {
+            renderAll();
+          }
+        });
       }
-      if (verifiedMerged.length) {
-        if (sectionVerified) sectionVerified.classList.remove("d-none");
-        verifiedMerged.forEach(doc => renderDocRow(doc, listVerified, { statusTone: "verified" }));
+      window.lastDocsItems = docs;
+
+      // Default: keep sector docs hidden to prioritize resident profiling.
+      if (toggleSectorEl && typeof toggleSectorEl.checked === "boolean") {
+        if (!opts.refreshOnly && !toggleSectorEl.dataset.initialized) {
+          toggleSectorEl.checked = false;
+          toggleSectorEl.dataset.initialized = "1";
+        }
       }
-      if (deniedMerged.length) {
-        if (sectionDenied) sectionDenied.classList.remove("d-none");
-        deniedMerged.forEach(doc => renderDocRow(doc, listDenied, { showReason: true, statusTone: "denied" }));
-      }
+
+      renderAll();
     })
     .catch(() => {
       if (loadingEl) loadingEl.classList.add("d-none");
@@ -950,6 +1257,8 @@ function openDocViewer(doc, parentModalEl, opts = {}) {
   const viewerEl = document.getElementById("modal-docViewer");
   const bodyEl = document.getElementById("doc-viewer-body");
   const titleEl = document.getElementById("doc-viewer-title");
+  const subtitleEl = document.getElementById("doc-viewer-subtitle");
+  const idNumberEl = document.getElementById("doc-viewer-idnumber");
   const returnBtn = document.getElementById("doc-viewer-return");
   const infoWrapEl = document.getElementById("doc-viewer-info");
   const actionsEl = document.getElementById("doc-viewer-actions");
@@ -961,7 +1270,8 @@ function openDocViewer(doc, parentModalEl, opts = {}) {
   }
 
   const fileUrl = doc.file_url || "";
-  const fileName = doc.document_type_name || doc.file_name || "Document";
+  // Avoid displaying raw file_name in the UI; prefer the document type label.
+  const fileName = doc.document_type_name || "Document";
   const ext = (doc.file_type || "").toLowerCase() || (fileUrl.split(".").pop() || "").toLowerCase();
 
   titleEl.innerText = fileName;
@@ -975,6 +1285,11 @@ function openDocViewer(doc, parentModalEl, opts = {}) {
   if (infoWrapEl) {
     if (opts.readOnly) {
       infoWrapEl.classList.add("d-none");
+      if (subtitleEl) subtitleEl.innerText = "";
+      if (idNumberEl) {
+        idNumberEl.innerText = "";
+        idNumberEl.classList.add("d-none");
+      }
     } else {
       infoWrapEl.classList.remove("d-none");
       const ageValue = computeAgeFromBirthdate(residentInfo.birthdate);
@@ -982,17 +1297,98 @@ function openDocViewer(doc, parentModalEl, opts = {}) {
       const idNumberValue = resolveDocIdNumber(doc);
       const showIdNumber = idNumberValue && idNumberValue !== "Not provided";
 
-      infoWrapEl.innerHTML = `
-        <div class="fw-bold mb-2">Resident Basic Information</div>
-        <div class="row g-2">
-          <div class="col-md-6"><strong>Name:</strong> <span>${residentInfo.full_name ?? "—"}</span></div>
-          <div class="col-md-6"><strong>Age:</strong> <span>${ageValue}</span></div>
-          <div class="col-md-6"><strong>Sex:</strong> <span>${residentInfo.sex ?? "—"}</span></div>
-          <div class="col-md-6"><strong>Sector Membership:</strong> <span>${residentInfo.sector_membership ?? "—"}</span></div>
-          <div class="col-12"><strong>Address:</strong> <span>${residentInfo.full_address ?? "—"}</span></div>
-          ${isIdDoc ? `<div class="col-12"><strong>Document:</strong> <span>${doc.document_type_name || "—"}${showIdNumber ? ` - ${idNumberValue}` : ""}</span></div>` : ""}
-        </div>
-      `;
+      const safeText = (v, fallback = "—") => {
+        const s = String(v ?? "").trim();
+        return s !== "" ? s : fallback;
+      };
+
+      const addInfoRow = (gridEl, colClass, label, value) => {
+        const col = document.createElement("div");
+        col.className = colClass;
+        const strong = document.createElement("strong");
+        strong.innerText = `${label}: `;
+        const span = document.createElement("span");
+        span.innerText = safeText(value);
+        col.appendChild(strong);
+        col.appendChild(span);
+        gridEl.appendChild(col);
+      };
+
+	      const purposeFromDoc = (doc) => {
+	        const marker = String(doc.remarks ?? "").split(";")[0].trim();
+	        const lower = marker.toLowerCase();
+
+        if (doc.combined_files?.front || doc.combined_files?.back || lower === "front+back") {
+          return "Resident Profiling - Proof of Identity (ID)";
+        }
+	        if (lower.startsWith("sector:")) {
+	          const raw = marker.slice("sector:".length).trim();
+	          const parts = raw.split(":").map((x) => String(x || "").trim()).filter(Boolean);
+	          const baseKeyRaw = parts[0] || raw;
+	          const side = String(parts[1] || "").toLowerCase();
+	          const key = baseKeyRaw.toLowerCase().replace(/[^a-z]/g, "");
+	          const map = {
+	            pwd: "PWD",
+	            seniorcitizen: "Senior Citizen",
+	            student: "Student",
+	            indigenouspeople: "Indigenous People",
+	            singleparent: "Single Parent",
+	          };
+	          const label = map[key] || baseKeyRaw;
+	          if (side === "front") return `${label} Sector Membership Proof (Front)`;
+	          if (side === "back") return `${label} Sector Membership Proof (Back)`;
+	          return `${label} Sector Membership Proof`;
+	        }
+        if (lower === "2x2") return "Resident Profiling - ID Image (2x2)";
+        if (lower === "idmerged" || lower === "idfront" || lower === "idback") {
+          return "Resident Profiling - Proof of Identity (ID)";
+        }
+        if (lower === "document") return "Resident Profiling - Proof of Residency";
+        return "Supporting Document";
+      };
+
+      if (subtitleEl) {
+        subtitleEl.innerText = `Purpose: ${purposeFromDoc(doc)}`;
+      }
+      if (idNumberEl) {
+        if (isIdDoc && showIdNumber) {
+          idNumberEl.innerText = `ID Number: ${idNumberValue}`;
+          idNumberEl.classList.remove("d-none");
+        } else {
+          idNumberEl.innerText = "";
+          idNumberEl.classList.add("d-none");
+        }
+      }
+
+      infoWrapEl.innerHTML = "";
+      const heading = document.createElement("div");
+      heading.className = "fw-bold fs-4 mb-1";
+      heading.innerText = "Resident Basic Information";
+      infoWrapEl.appendChild(heading);
+
+      const grid = document.createElement("div");
+      grid.className = "row g-2";
+      addInfoRow(grid, "col-md-6", "Name", residentInfo.full_name);
+      addInfoRow(grid, "col-md-6", "Age", ageValue);
+      addInfoRow(grid, "col-md-6", "Sex", residentInfo.sex);
+      const fmtBirthday = (() => {
+        const raw = String(residentInfo.birthdate ?? "").trim();
+        if (!raw) return "—";
+        const d = new Date(raw);
+        if (Number.isNaN(d.getTime())) return raw;
+        const mm = String(d.getMonth() + 1).padStart(2, "0");
+        const dd = String(d.getDate()).padStart(2, "0");
+        const yyyy = String(d.getFullYear());
+        return `${mm}/${dd}/${yyyy}`;
+      })();
+      addInfoRow(grid, "col-md-6", "Birthday", fmtBirthday);
+      addInfoRow(grid, "col-12", "Address", residentInfo.full_address);
+      // Sector membership in its own row, then uploaded directly under it.
+      addInfoRow(grid, "col-12", "Sector Membership", residentInfo.sector_membership);
+      addInfoRow(grid, "col-12", "Document Type", safeText(doc.document_type_name));
+      addInfoRow(grid, "col-12", "Uploaded", safeText(doc.upload_timestamp));
+
+      infoWrapEl.appendChild(grid);
     }
   }
 
@@ -1056,22 +1452,24 @@ function openDocViewer(doc, parentModalEl, opts = {}) {
 
     if (!isPendingReview) {
       const readOnlyHint = document.createElement("div");
-      readOnlyHint.className = "text-muted small";
+      readOnlyHint.className = "text-muted small w-100";
       readOnlyHint.innerText = "Only documents in Pending Review can be verified or declined.";
       actionsEl.appendChild(readOnlyHint);
     } else {
-      actionsEl.style.display = "grid";
-      actionsEl.style.gridTemplateColumns = "1fr 1fr";
+      // Force a single-row layout even if CSS is cached/missing.
+      actionsEl.style.display = "flex";
+      actionsEl.style.flexWrap = "nowrap";
+      actionsEl.style.width = "100%";
       actionsEl.style.gap = "0.75rem";
 
       const verifyBtn = document.createElement("button");
       verifyBtn.type = "button";
-      verifyBtn.className = "btn btn-success doc-viewer-action-btn";
-      verifyBtn.innerText = "Approve";
+      verifyBtn.className = "btn btn-success doc-viewer-action-btn flex-fill";
+      verifyBtn.innerText = "Verify";
 
       const declineBtn = document.createElement("button");
       declineBtn.type = "button";
-      declineBtn.className = "btn btn-danger doc-viewer-action-btn";
+      declineBtn.className = "btn btn-danger doc-viewer-action-btn flex-fill";
       declineBtn.innerText = "Decline";
 
       const setActionButtonsDisabled = (disabled) => {
@@ -1118,6 +1516,29 @@ function openDocViewer(doc, parentModalEl, opts = {}) {
             if (modalImg) {
               modalImg.src = newUrl;
             }
+          }
+
+          const sectorResult = results.find((r) =>
+            typeof r.sector_membership === "string" && r.sector_membership.trim() !== ""
+          );
+          if (sectorResult?.sector_membership) {
+            if (window.currentDocsResident) {
+              window.currentDocsResident.sector_membership = sectorResult.sector_membership;
+            }
+            if (window.lastDocsResident) {
+              window.lastDocsResident.sector_membership = sectorResult.sector_membership;
+            }
+            if (
+              currentViewedResident &&
+              String(currentViewedResident.resident_id) === String(sectorResult.resident_id || "")
+            ) {
+              currentViewedResident.sector_membership = sectorResult.sector_membership;
+            }
+            allResidents = allResidents.map((resident) =>
+              String(resident.resident_id) === String(sectorResult.resident_id || "")
+                ? { ...resident, sector_membership: sectorResult.sector_membership }
+                : resident
+            );
           }
 
           doc.verify_status = result.status || doc.verify_status;
@@ -1215,8 +1636,8 @@ function openDocViewer(doc, parentModalEl, opts = {}) {
         showDocDenyModal();
       });
 
-      actionsEl.appendChild(declineBtn);
       actionsEl.appendChild(verifyBtn);
+      actionsEl.appendChild(declineBtn);
     }
   }
 
