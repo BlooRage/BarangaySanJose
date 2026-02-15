@@ -87,7 +87,7 @@ document.addEventListener("DOMContentLoaded", () => {
             </td>
             <td>
               <div class="d-flex gap-2">
-                <button class="btn btn-outline-primary btn-sm" data-action="view" data-id="${row.request_id}">View</button>
+                <button class="btn btn-primary btn-sm" data-action="view" data-id="${row.request_id}">View</button>
                 <button class="btn btn-success btn-sm" data-action="approve" data-id="${row.request_id}" ${statusText !== "Pending" ? "disabled" : ""}>Approve</button>
                 <button class="btn btn-danger btn-sm" data-action="deny" data-id="${row.request_id}" ${statusText !== "Pending" ? "disabled" : ""}>Deny</button>
               </div>
