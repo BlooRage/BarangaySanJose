@@ -198,7 +198,7 @@ if ($residentId !== '' && isset($conn) && $conn instanceof mysqli) {
             <div class="card shadow-sm mb-4">
                 <div class="card-header d-flex justify-content-between">
                     <strong>PERSONAL INFORMATION</strong>
-                    <button class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#editProfileModal">
+                    <button class="btn btn-primary btn-sm" id="btnOpenEditProfile">
                         Edit
                     </button>
                 </div>
@@ -258,7 +258,7 @@ if ($residentId !== '' && isset($conn) && $conn instanceof mysqli) {
             <div class="card shadow-sm mb-4">
                 <div class="card-header d-flex justify-content-between">
                     <strong>ADDRESS INFORMATION</strong>
-                    <button class="btn btn-success btn-sm" data-bs-toggle="modal" data-bs-target="#addAddressModal">
+                    <button class="btn btn-success btn-sm" id="btnOpenEditAddress">
                         Edit Address
                     </button>
                 </div>
@@ -319,7 +319,7 @@ if ($residentId !== '' && isset($conn) && $conn instanceof mysqli) {
              <div class="card shadow-sm mb-4">
                 <div class="card-header d-flex justify-content-between">
                     <strong>EMERGENCY CONTACT INFORMATION</strong>
-                    <button class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#editEmergencyContactModal">
+                    <button class="btn btn-primary btn-sm" id="btnOpenEditEmergency">
                         Edit
                     </button>
                 </div>
@@ -824,7 +824,7 @@ if ($residentId !== '' && isset($conn) && $conn instanceof mysqli) {
         </div>
     </div>
 
-         <div class="modal fade" id="editEmergencyContactModal" tabindex="-1" data-bs-backdrop="static" data-bs-keyboard="false">
+<div class="modal fade" id="editEmergencyContactModal" tabindex="-1" data-bs-backdrop="static" data-bs-keyboard="false">
             <div class="modal-dialog modal-md modal-dialog-centered">
                 <div class="modal-content">
 
@@ -1155,9 +1155,25 @@ if ($residentId !== '' && isset($conn) && $conn instanceof mysqli) {
                         <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
                     </div>
                 </div>
+        </div>
+    </div>
+
+    <!-- GENERIC NOTICE MODAL -->
+    <div class="modal fade" id="residentNoticeModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header border-0 justify-content-center">
+                    <h5 class="modal-title text-center w-100 text-dark" id="residentNoticeTitle">Notice</h5>
+                </div>
+                <hr class="my-0">
+                <div class="modal-body text-center" id="residentNoticeBody"></div>
+                <div class="modal-footer border-0">
+                    <button type="button" class="btn btn-secondary w-100 text-center" data-bs-dismiss="modal">Close</button>
+                </div>
             </div>
         </div>
+    </div>
 
-	        <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+        <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 </body>
 </html>

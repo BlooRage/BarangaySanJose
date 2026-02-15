@@ -5,6 +5,13 @@ document.addEventListener("DOMContentLoaded", () => {
     const resultEl = document.getElementById("emergencySaveResult");
     const deniedAlert = document.getElementById("emergencyDeniedAlert");
     const deniedText = document.getElementById("emergencyDeniedText");
+    const modalTrigger =
+        document.getElementById("btnOpenEditEmergency") ||
+        document.querySelector('[data-bs-target="#editEmergencyContactModal"]');
+    const modalEl = document.getElementById("editEmergencyContactModal");
+    const noticeModalEl = document.getElementById("residentNoticeModal");
+    const noticeTitleEl = document.getElementById("residentNoticeTitle");
+    const noticeBodyEl = document.getElementById("residentNoticeBody");
     const fieldIds = [
         "emergencyLastName",
         "emergencyFirstName",
@@ -183,7 +190,12 @@ document.addEventListener("DOMContentLoaded", () => {
             if (!res.ok || !data.success) {
                 throw new Error(data.message || "Failed to update emergency contact.");
             }
-            setMessage(data.message || "Emergency edit request submitted.");
+            if (resultEl) resultEl.textContent = "";
+            if (noticeTitleEl) noticeTitleEl.textContent = "Request Submitted";
+            if (noticeBodyEl) noticeBodyEl.textContent = data.message || "Emergency edit request submitted.";
+            if (noticeModalEl && window.bootstrap?.Modal) {
+                bootstrap.Modal.getOrCreateInstance(noticeModalEl).show();
+            }
             setTimeout(() => {
                 window.location.reload();
             }, 800);
@@ -194,6 +206,48 @@ document.addEventListener("DOMContentLoaded", () => {
         }
     });
 
+    const showNotice = (title, message) => {
+        if (noticeTitleEl) noticeTitleEl.textContent = title || "Notice";
+        if (noticeBodyEl) noticeBodyEl.textContent = message || "";
+        if (!noticeModalEl || !window.bootstrap?.Modal) return;
+        bootstrap.Modal.getOrCreateInstance(noticeModalEl).show();
+    };
+
+    let statusLoaded = false;
+
+    const openModal = () => {
+        if (!modalEl || !window.bootstrap?.Modal) return;
+        bootstrap.Modal.getOrCreateInstance(modalEl).show();
+    };
+
+    const handlePendingClick = async (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+
+        if (!statusLoaded) {
+            try {
+                const res = await fetch("../PhpFiles/Resident-End/edit_request_status.php");
+                const data = await res.json().catch(() => ({}));
+                if (res.ok && data.success) {
+                    isPendingRequest = Boolean(data.pending?.emergency);
+                }
+            } catch (e) {
+                // ignore
+            } finally {
+                statusLoaded = true;
+            }
+        }
+
+        if (isPendingRequest) {
+            showNotice("Pending Request", "You already have a pending emergency edit request.");
+            return;
+        }
+        openModal();
+    };
+    if (modalTrigger) {
+        modalTrigger.addEventListener("click", handlePendingClick);
+    }
+
     (async () => {
         try {
             const res = await fetch("../PhpFiles/Resident-End/edit_request_status.php");
@@ -201,7 +255,11 @@ document.addEventListener("DOMContentLoaded", () => {
             if (res.ok && data.success) {
                 if (data.pending?.emergency) {
                     isPendingRequest = true;
-                    setMessage("You already have a pending emergency edit request.", true);
+                    if (resultEl) resultEl.textContent = "";
+                    if (modalEl && window.bootstrap?.Modal) {
+                        const modal = bootstrap.Modal.getInstance(modalEl);
+                        if (modal) modal.hide();
+                    }
                 }
                 if (data.denied?.emergency && deniedAlert) {
                     const remarks = data.denied.emergency.remarks?.trim();
@@ -224,6 +282,7 @@ document.addEventListener("DOMContentLoaded", () => {
         } catch (e) {
             // ignore
         } finally {
+            statusLoaded = true;
             updateSaveState();
         }
     })();

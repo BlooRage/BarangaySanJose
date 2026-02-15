@@ -8,6 +8,13 @@ document.addEventListener("DOMContentLoaded", () => {
     const headEmpty = document.getElementById("headReassignEmpty");
     const deniedAlert = document.getElementById("addressDeniedAlert");
     const deniedText = document.getElementById("addressDeniedText");
+    const modalTrigger =
+        document.getElementById("btnOpenEditAddress") ||
+        document.querySelector('[data-bs-target="#addAddressModal"]');
+    const modalEl = document.getElementById("addAddressModal");
+    const noticeModalEl = document.getElementById("residentNoticeModal");
+    const noticeTitleEl = document.getElementById("residentNoticeTitle");
+    const noticeBodyEl = document.getElementById("residentNoticeBody");
     let requiresReassign = false;
     const fieldIds = [
         "addressUnitNumber",
@@ -140,7 +147,12 @@ document.addEventListener("DOMContentLoaded", () => {
                 throw new Error(data.message || "Failed to update address.");
             }
 
-            setMessage(data.message || "Address edit request submitted.");
+            if (resultEl) resultEl.textContent = "";
+            if (noticeTitleEl) noticeTitleEl.textContent = "Request Submitted";
+            if (noticeBodyEl) noticeBodyEl.textContent = data.message || "Address edit request submitted.";
+            if (noticeModalEl && window.bootstrap?.Modal) {
+                bootstrap.Modal.getOrCreateInstance(noticeModalEl).show();
+            }
             window.dispatchEvent(new CustomEvent("household:updated"));
             setTimeout(() => {
                 window.location.reload();
@@ -191,6 +203,54 @@ document.addEventListener("DOMContentLoaded", () => {
     };
 
     loadHeadReassign();
+    const showNotice = (title, message) => {
+        if (noticeTitleEl) noticeTitleEl.textContent = title || "Notice";
+        if (noticeBodyEl) noticeBodyEl.textContent = message || "";
+        if (!noticeModalEl || !window.bootstrap?.Modal) return;
+        bootstrap.Modal.getOrCreateInstance(noticeModalEl).show();
+    };
+
+    let statusLoaded = false;
+
+    const openModal = () => {
+        if (!modalEl || !window.bootstrap?.Modal) return;
+        bootstrap.Modal.getOrCreateInstance(modalEl).show();
+    };
+
+    const handlePendingClick = async (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+
+        if (!statusLoaded) {
+            try {
+                const res = await fetch("../PhpFiles/Resident-End/edit_request_status.php");
+                const data = await res.json().catch(() => ({}));
+                if (res.ok && data.success) {
+                    isPendingRequest = Boolean(data.pending?.address);
+                }
+            } catch (e) {
+                // ignore
+            } finally {
+                statusLoaded = true;
+            }
+        }
+
+        if (isPendingRequest) {
+            showNotice("Pending Request", "You already have a pending address edit request.");
+            return;
+        }
+        openModal();
+    };
+    if (modalTrigger) {
+        modalTrigger.addEventListener("click", handlePendingClick);
+    }
+    if (modalEl) {
+        modalEl.addEventListener("show.bs.modal", (event) => {
+            if (!isPendingRequest) return;
+            event.preventDefault();
+            showNotice("Pending Request", "You already have a pending address edit request.");
+        });
+    }
     (async () => {
         try {
             const res = await fetch("../PhpFiles/Resident-End/edit_request_status.php");
@@ -198,7 +258,11 @@ document.addEventListener("DOMContentLoaded", () => {
             if (res.ok && data.success) {
                 if (data.pending?.address) {
                     isPendingRequest = true;
-                    setMessage("You already have a pending address edit request.", true);
+                    if (resultEl) resultEl.textContent = "";
+                    if (modalEl && window.bootstrap?.Modal) {
+                        const modal = bootstrap.Modal.getInstance(modalEl);
+                        if (modal) modal.hide();
+                    }
                 }
                 if (data.denied?.address && deniedAlert) {
                     const remarks = data.denied.address.remarks?.trim();
@@ -221,6 +285,7 @@ document.addEventListener("DOMContentLoaded", () => {
         } catch (e) {
             // ignore
         } finally {
+            statusLoaded = true;
             updateSaveState();
         }
     })();
