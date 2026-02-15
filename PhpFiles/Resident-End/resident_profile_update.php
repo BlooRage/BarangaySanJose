@@ -84,7 +84,7 @@ function toDbWebPath(string $absolutePath): string {
     $projectRoot = realpath(__DIR__ . "/../..");
 
     // Prefer storing a portable, project-relative path (works across local + hosted).
-    // Example stored value: "UnifiedFileAttachment/Documents/<id>/<file>.pdf"
+    // Example stored value: "UnifiedFileAttachment/Documents/<user_id>/<file>.pdf"
     $marker = "/UnifiedFileAttachment/";
     $markerPos = strpos($absolutePath, $marker);
     if ($markerPos !== false) {
@@ -276,8 +276,14 @@ try {
     $requestId = (int)$stmt->insert_id;
     $stmt->close();
 
-    $uploadDir = __DIR__ . "/../../UnifiedFileAttachment/Documents/{$userId}/";
-    if (!is_dir($uploadDir) && !mkdir($uploadDir, 0755, true)) {
+    // Store files under a folder named by user_id (not resident_id).
+    $userFolder = preg_replace('/[^A-Za-z0-9_-]/', '', (string)$userId);
+    if ($userFolder === '') {
+        throw new Exception('Invalid user folder name.');
+    }
+    $uploadDir = __DIR__ . "/../../UnifiedFileAttachment/Documents/{$userFolder}/";
+    // 0777 so the local dev user can manage/delete uploaded folders even if PHP runs as daemon (XAMPP).
+    if (!is_dir($uploadDir) && !mkdir($uploadDir, 0777, true)) {
         throw new Exception('Failed to create upload directory.');
     }
 

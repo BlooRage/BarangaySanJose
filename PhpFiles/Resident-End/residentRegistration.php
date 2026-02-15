@@ -277,7 +277,7 @@ function toDbWebPath(string $absolutePath): string {
     $projectRoot = realpath(__DIR__ . "/../..");
 
     // Prefer storing a portable, project-relative path (works across local + hosted).
-    // Example stored value: "UnifiedFileAttachment/Documents/<id>/<file>.pdf"
+    // Example stored value: "UnifiedFileAttachment/Documents/<user_id>/<file>.pdf"
     $marker = "/UnifiedFileAttachment/";
     $markerPos = strpos($absolutePath, $marker);
     if ($markerPos !== false) {
@@ -768,13 +768,19 @@ try {
 
     $sourceType = "ResidentProfiling";
     $statusVerifyId = getStatusId($conn, "PendingReview", "ResidentDocumentProfiling");
-    $uploadDirDocs = __DIR__ . "/../../UnifiedFileAttachment/Documents/$resident_id/";
-    $uploadDirPic = __DIR__ . "/../../UnifiedFileAttachment/IDPictures/$resident_id/";
+    // Store files under a folder named by user_id (not resident_id).
+    $userFolder = preg_replace('/[^A-Za-z0-9_-]/', '', (string)$user_id);
+    if ($userFolder === '') {
+        throw new Exception("Invalid user folder name.");
+    }
+    $uploadDirDocs = __DIR__ . "/../../UnifiedFileAttachment/Documents/$userFolder/";
+    $uploadDirPic = __DIR__ . "/../../UnifiedFileAttachment/IDPictures/$userFolder/";
 
-    if (!is_dir($uploadDirDocs) && !mkdir($uploadDirDocs, 0755, true)) {
+    // 0777 so the local dev user can manage/delete uploaded folders even if PHP runs as daemon (XAMPP).
+    if (!is_dir($uploadDirDocs) && !mkdir($uploadDirDocs, 0777, true)) {
         throw new Exception("Failed to create document upload directory.");
     }
-    if (!is_dir($uploadDirPic) && !mkdir($uploadDirPic, 0755, true)) {
+    if (!is_dir($uploadDirPic) && !mkdir($uploadDirPic, 0777, true)) {
         throw new Exception("Failed to create ID picture upload directory.");
     }
 
