@@ -46,6 +46,85 @@ function normalizeRequestType(string $value): string {
     return $value;
 }
 
+function startsWith(string $haystack, string $needle): bool {
+    return strncmp($haystack, $needle, strlen($needle)) === 0;
+}
+
+function resolveFilePath(string $rawPath, string $projectRoot): string {
+    $rawPath = trim($rawPath);
+    if ($rawPath === '') return '';
+
+    $normalized = str_replace("\\", "/", $rawPath);
+    if (strpos($normalized, '/BarangaySanJose/') === 0) {
+        $rel = substr($normalized, strlen('/BarangaySanJose/'));
+        return rtrim($projectRoot, "/") . "/" . ltrim($rel, "/");
+    }
+    if (strpos($normalized, '/UnifiedFileAttachment/') === 0) {
+        $rel = substr($normalized, strlen('/UnifiedFileAttachment/'));
+        return rtrim($projectRoot, "/") . "/UnifiedFileAttachment/" . ltrim($rel, "/");
+    }
+
+    $isAbsolute = startsWith($rawPath, "/") || (bool)preg_match('/^[A-Za-z]:[\\\\\\/]/', $rawPath);
+    if ($isAbsolute) return $rawPath;
+
+    return rtrim($projectRoot, "/") . "/" . ltrim($rawPath, "/");
+}
+
+function deleteEditRequestAttachments(mysqli $conn, int $requestId): void {
+    $projectRoot = realpath(__DIR__ . "/../..");
+    $allowedBase = $projectRoot ? realpath($projectRoot . "/UnifiedFileAttachment") : false;
+    if (!$projectRoot || !$allowedBase) {
+        return;
+    }
+
+    $stmt = $conn->prepare("
+        SELECT uf.attachment_id, uf.file_path
+        FROM unifiedfileattachmenttbl uf
+        LEFT JOIN statuslookuptbl s ON uf.status_id_verify = s.status_id
+        WHERE source_type = 'ResidentEditRequest' AND source_id = ?
+          AND (s.status_name IS NULL OR LOWER(s.status_name) NOT IN ('verified', 'approved'))
+        ORDER BY attachment_id ASC
+    ");
+    if (!$stmt) {
+        throw new Exception('Failed to prepare attachment lookup.');
+    }
+    $requestKey = (string)$requestId;
+    $stmt->bind_param("s", $requestKey);
+    $stmt->execute();
+    $rows = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+    $stmt->close();
+
+    if (!$rows) {
+        return;
+    }
+
+    $deleteStmt = $conn->prepare("DELETE FROM unifiedfileattachmenttbl WHERE attachment_id = ? LIMIT 1");
+    if (!$deleteStmt) {
+        throw new Exception('Failed to prepare attachment deletion.');
+    }
+
+    foreach ($rows as $row) {
+        $attachmentId = (int)($row['attachment_id'] ?? 0);
+        if ($attachmentId <= 0) continue;
+
+        $storedPath = (string)($row['file_path'] ?? '');
+        $resolvedPath = resolveFilePath($storedPath, $projectRoot);
+        $real = $resolvedPath !== '' ? realpath($resolvedPath) : false;
+
+        if ($real !== false && startsWith($real, $allowedBase)) {
+            @unlink($real);
+        }
+
+        $deleteStmt->bind_param("i", $attachmentId);
+        if (!$deleteStmt->execute()) {
+            $deleteStmt->close();
+            throw new Exception('Failed to delete attachment record.');
+        }
+    }
+
+    $deleteStmt->close();
+}
+
 function toPublicPath($path): ?string {
     $path = trim((string)$path);
     if ($path === '') {
@@ -623,6 +702,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             throw new Exception('Failed to update request status.');
         }
         $stmt->close();
+
+        if ($action === 'deny') {
+            deleteEditRequestAttachments($conn, $requestId);
+        }
 
         $conn->commit();
         echo json_encode(['success' => true]);
