@@ -596,6 +596,14 @@ if ($residentId !== '' && isset($conn) && $conn instanceof mysqli) {
                     <div class="alert alert-info small mb-3">
                         Saving changes will send a request for review.
                     </div>
+                    <div class="alert alert-success small mb-3 d-none" id="profileSuccessAlert"></div>
+                    <div class="alert alert-warning small mb-3 d-none" id="profilePendingAlert">
+                        You already have a pending profile edit request.
+                    </div>
+                    <div id="profileDeniedAlert" class="alert alert-danger alert-dismissible fade show small mb-3 d-none" role="alert">
+                        <span id="profileDeniedText"></span>
+                        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                    </div>
 
                     <label class="form-label">Full Name</label>
                     <div class="d-flex gap-2 mb-3">
@@ -682,16 +690,23 @@ if ($residentId !== '' && isset($conn) && $conn instanceof mysqli) {
                     <div class="row mb-3">
 
                          <div class="col-md-6">
-                            <label class="form-label">Registered Voter</label>
-                            <input class="form-select" name="voter_status" value="<?= $residentinformationtbl['voter_status'] ?>" readonly>
+                            <label class="form-label">Voter Status</label>
+                            <?php
+                              $voterStatusText = trim((string)($residentinformationtbl['voter_status'] ?? ''));
+                              $isRegisteredVoter = strcasecmp($voterStatusText, 'Registered Voter') === 0;
+                            ?>
+                            <select class="form-select" name="voter_status" id="editVoterStatus">
+                                <option value="Registered" <?= $isRegisteredVoter ? 'selected' : '' ?>>Registered</option>
+                                <option value="Not Registered" <?= !$isRegisteredVoter ? 'selected' : '' ?>>Not Registered</option>
+                            </select>
                         </div>
 
                          <div class="col-md-6">
                             <label class="form-label">Employment Status</label>
-                            <select class="form-select" name="employment_status" id="employmentStatus" onchange="toggleOccupation()">
-                                <option value="Employed" <?= ($residentinformationtbl['employment_status'] == 'Employed') ? 'selected' : '' ?>>Employed</option>
-                                <option value="Unemployed" <?= ($residentinformationtbl['employment_status'] == 'Unemployed') ? 'selected' : '' ?>>Unemployed</option>
-                            </select>
+                        <select class="form-select" name="employment_status" id="employmentStatus" onchange="toggleOccupation()">
+                            <option value="Employed" <?= ($residentinformationtbl['employment_status'] == 'Employed') ? 'selected' : '' ?>>Employed</option>
+                            <option value="Unemployed" <?= ($residentinformationtbl['employment_status'] == 'Unemployed') ? 'selected' : '' ?>>Unemployed</option>
+                        </select>
                         </div>
 
                     </div>
@@ -701,6 +716,7 @@ if ($residentId !== '' && isset($conn) && $conn instanceof mysqli) {
                             <label class="form-label">Occupation</label>
                             <input type="text"
                                 class="form-control"
+                                id="editOccupation"
                                 name="occupation"
                                 value="<?= $residentinformationtbl['occupation'] ?>">
                         </div>
@@ -741,12 +757,6 @@ if ($residentId !== '' && isset($conn) && $conn instanceof mysqli) {
                                 <div class="form-check">
                                     <input class="form-check-input" type="checkbox" id="sectorIndigenous" name="sectorMembership[]" value="Indigenous People" <?= in_array('Indigenous People', $sectorSelected, true) ? 'checked' : '' ?>>
                                     <label class="form-check-label" for="sectorIndigenous">Indigenous People</label>
-                                </div>
-                            </div>
-                            <div class="col-12 col-md-6">
-                                <div class="form-check">
-                                    <input class="form-check-input" type="checkbox" id="sectorNA" name="sectorMembership[]" value="NA" <?= in_array('NA', $sectorSelected, true) ? 'checked' : '' ?>>
-                                    <label class="form-check-label" for="sectorNA">N/A</label>
                                 </div>
                             </div>
                         </div>

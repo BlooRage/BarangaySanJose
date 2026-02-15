@@ -99,11 +99,20 @@ document.addEventListener("DOMContentLoaded", () => {
   };
 
   const viewModalEl = document.getElementById("modal-viewRequest");
+  const editDocsInlineLoading = document.getElementById("edit-docs-inline-loading");
+  const editDocsInlineEmpty = document.getElementById("edit-docs-inline-empty");
+  const editDocsInlineList = document.getElementById("edit-docs-inline-list");
+  const editDocViewerEl = document.getElementById("modal-editDocViewer");
+  const editDocViewerBody = document.getElementById("edit-doc-viewer-body");
+  const editDocViewerTitle = document.getElementById("edit-doc-viewer-title");
+  const editDocViewerSubtitle = document.getElementById("edit-doc-viewer-subtitle");
+  const editDocViewerReturn = document.getElementById("edit-doc-viewer-return");
   const denyModalEl = document.getElementById("modal-denyRequest");
   const denyRemarksEl = document.getElementById("denyRemarks");
   const denyRemarksErrorEl = document.getElementById("denyRemarksError");
   const btnConfirmDeny = document.getElementById("btnConfirmDeny");
   let pendingDenyId = null;
+  let currentViewedRequestId = null;
   const spanRequestId = document.getElementById("span-requestId");
   const spanRequestTypeHeader = document.getElementById("span-requestTypeHeader");
   const txtRequestResident = document.getElementById("txt-requestResident");
@@ -369,24 +378,107 @@ document.addEventListener("DOMContentLoaded", () => {
             });
             renderDetailList(currentDetailsEl, currentWithFlags);
 
-            const requestedItems = Object.keys(changes).map((key) => {
-              const currentItem = currentItems.find((item) => item.key === key);
-              const currentVal = normalizeValue(currentItem ? currentItem.value : "");
-              const requestedVal = normalizeValue(changes[key]);
+            const requestedItems = currentItems.map((item) => {
+              const requestedVal = changeKeys.has(item.key) ? changes[item.key] : item.value;
+              const currentValNorm = normalizeValue(item.value);
+              const requestedValNorm = normalizeValue(requestedVal);
               return {
-                label: humanizeKey(key),
-                value: changes[key],
-                changed: currentVal !== requestedVal,
+                label: item.label,
+                value: requestedVal,
+                key: item.key,
+                changed: currentValNorm !== requestedValNorm,
               };
             });
             renderDetailList(requestedDetailsEl, requestedItems);
 
+            currentViewedRequestId = req.request_id || requestId;
             getStaticModal(viewModalEl)?.show();
+
+            if (editDocsInlineLoading) editDocsInlineLoading.classList.remove("d-none");
+            if (editDocsInlineEmpty) editDocsInlineEmpty.classList.add("d-none");
+            if (editDocsInlineList) editDocsInlineList.innerHTML = "";
+            try {
+              const docsRes = await fetch(`../PhpFiles/Admin-End/edit_requests.php?docs=${currentViewedRequestId}`);
+              const docsData = await docsRes.json().catch(() => ({}));
+              if (!docsRes.ok || !docsData.success) {
+                throw new Error(docsData.message || "Failed to load documents.");
+              }
+              renderDocs(docsData.documents || []);
+            } catch (docErr) {
+              if (editDocsInlineEmpty) {
+                editDocsInlineEmpty.textContent = docErr?.message || "Failed to load documents.";
+                editDocsInlineEmpty.classList.remove("d-none");
+              }
+            } finally {
+              if (editDocsInlineLoading) editDocsInlineLoading.classList.add("d-none");
+            }
           } catch (err) {
             alert(err?.message || "Failed to load request details.");
           }
         })();
       }
+    });
+  }
+
+  const renderDocs = (docs) => {
+    if (!editDocsInlineList) return;
+    if (!docs || docs.length === 0) {
+      editDocsInlineList.innerHTML = "";
+      if (editDocsInlineEmpty) editDocsInlineEmpty.classList.remove("d-none");
+      return;
+    }
+    if (editDocsInlineEmpty) editDocsInlineEmpty.classList.add("d-none");
+    editDocsInlineList.innerHTML = docs
+      .map((doc) => {
+        const statusLabel = doc.status_name || "PendingReview";
+        const statusClass =
+          statusLabel.toLowerCase().includes("verified") ? "doc-row--verified" :
+          statusLabel.toLowerCase().includes("rejected") || statusLabel.toLowerCase().includes("denied") ? "doc-row--denied" :
+          "doc-row--pending";
+        const uploadedAt = doc.upload_timestamp ? new Date(doc.upload_timestamp).toLocaleString() : "—";
+        return `
+          <div class="doc-row border rounded-3 p-3 ${statusClass}">
+            <div class="d-flex justify-content-between align-items-start doc-row__grid">
+              <div class="doc-row__info">
+                <div class="fw-bold">${doc.document_type_name || "Document"}</div>
+                <div class="text-muted small">Uploaded: ${uploadedAt}</div>
+              </div>
+              <div class="doc-row__view">
+                <button class="btn btn-primary btn-sm" data-doc-url="${doc.file_url || doc.file_path}" data-doc-title="${doc.document_type_name || "Document"}">View</button>
+              </div>
+            </div>
+          </div>
+        `;
+      })
+      .join("");
+  };
+
+  if (editDocsInlineList) {
+    editDocsInlineList.addEventListener("click", (event) => {
+      const target = event.target;
+      if (target && target.dataset?.docUrl) {
+        const url = target.dataset.docUrl;
+        const title = target.dataset.docTitle || "Document";
+        if (editDocViewerTitle) editDocViewerTitle.textContent = title;
+        if (editDocViewerSubtitle) editDocViewerSubtitle.textContent = "";
+        if (editDocViewerBody) {
+          const ext = url.split(".").pop()?.toLowerCase() || "";
+          if (ext === "pdf") {
+            editDocViewerBody.innerHTML = `<iframe src="${url}" style="width:100%;height:70vh;border:0;"></iframe>`;
+          } else {
+            editDocViewerBody.innerHTML = `<img src="${url}" alt="${title}" style="max-width:100%;height:auto;display:block;margin:0 auto;">`;
+          }
+        }
+        getStaticModal(viewModalEl)?.hide();
+        getStaticModal(editDocViewerEl)?.show();
+      }
+    });
+  }
+
+  if (editDocViewerReturn) {
+    editDocViewerReturn.addEventListener("click", () => {
+      getStaticModal(editDocViewerEl)?.hide();
+      getStaticModal(viewModalEl)?.show();
     });
   }
 
