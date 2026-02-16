@@ -1702,6 +1702,110 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   </script>
 
+  <!-- vali-->
+  <script>
+    document.addEventListener("DOMContentLoaded", () => {
+
+      const nameRegex = /^[A-Za-z][A-Za-z\s'-]+$/;
+      const gibberishRegex = /(asdf|qwer|zxcv|aaaa|bbbb|cccc|qwerty|1234)/i;
+
+      function titleCase(str) {
+        return str
+          .toLowerCase()
+          .replace(/\s+/g, " ")
+          .trim()
+          .replace(/\b\w/g, c => c.toUpperCase());
+      }
+
+      function showError(input, message) {
+        clearError(input);
+        input.classList.add("is-invalid");
+        const div = document.createElement("div");
+        div.className = "field-error";
+        div.textContent = message;
+        input.parentNode.appendChild(div);
+      }
+
+      function clearError(input) {
+        input.classList.remove("is-invalid");
+        const err = input.parentNode.querySelector(".field-error");
+        if (err) err.remove();
+      }
+
+      function validateName(input, required = true) {
+        const val = input.value.trim();
+
+        if (!val && required) {
+          showError(input, "This field is required.");
+          return false;
+        }
+
+        if (val.length < 2) {
+          showError(input, "Must be at least 2 characters.");
+          return false;
+        }
+
+        if (!nameRegex.test(val)) {
+          showError(input, "Only letters, spaces, hyphens, and apostrophes allowed.");
+          return false;
+        }
+
+        if (gibberishRegex.test(val)) {
+          showError(input, "Input appears invalid or random.");
+          return false;
+        }
+
+        input.value = titleCase(val);
+        clearError(input);
+        return true;
+      }
+
+      const nameFields = [
+        "lastName", "firstName",
+        "emergencyLastName", "emergencyFirstName"
+      ];
+
+      nameFields.forEach(id => {
+        const el = document.getElementById(id);
+        if (!el) return;
+
+        el.addEventListener("blur", () => {
+          validateName(el, el.hasAttribute("required"));
+          updateNextButtonState();
+        });
+      });
+
+
+      const personalPhone = document.getElementById("phoneNumberHidden");
+      const emergencyPhone = document.getElementById("emergencyPhoneNumber");
+
+      if (emergencyPhone) {
+        emergencyPhone.addEventListener("blur", () => {
+          if (personalPhone.value === emergencyPhone.value) {
+            showError(emergencyPhone, "Emergency contact cannot be your own number.");
+          } else {
+            clearError(emergencyPhone);
+          }
+          updateNextButtonState();
+        });
+      }
+
+      function updateNextButtonState() {
+        document.querySelectorAll(".step.active-step").forEach(step => {
+          const btn = step.querySelector(".next-btn, #submitBtn");
+          if (!btn) return;
+
+          const invalid = step.querySelector(".is-invalid");
+          const requiredEmpty = [...step.querySelectorAll("[required]")]
+            .some(i => !i.value.trim());
+
+          btn.disabled = !!(invalid || requiredEmpty);
+        });
+      }
+
+    });
+  </script>
+
   <script
     src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/js/bootstrap.bundle.min.js"
     integrity="sha384-FKyoEForCGlyvwx9Hj09JcYn3nv7wiPVlz7YYwJrWVcXK/BmnVDxM+D2scQbITxI"
