@@ -10,7 +10,7 @@
     <script src="https://kit.fontawesome.com/3482e00999.js" crossorigin="anonymous"></script>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="../CSS-Styles/Admin-End-CSS/AdminDashboardStyle.css">
-    <link rel="stylesheet" href="../CSS-Styles/Admin-End-CSS/ResidentMasterlistStyle.css?v=20260212-5">
+    <link rel="stylesheet" href="../CSS-Styles/Admin-End-CSS/ResidentMasterlistStyle.css?v=20260216-2">
 </head>
 
 <body>
@@ -35,7 +35,7 @@ include 'includes/sidebar.php';
 	            <div class="admin-list-toolbar mb-3">
 	                <div class="admin-list-tabs">
 	                    <button class="btn btn-outline-primary btn-sm filter-btn active" data-filter="ALL">All</button>
-	                    <button class="btn btn-outline-secondary btn-sm filter-btn" data-filter="PendingReview">Pending</button>
+	                    <button class="btn btn-outline-warning text-dark btn-sm filter-btn" data-filter="PendingReview">Pending</button>
 	                    <button class="btn btn-outline-success btn-sm filter-btn" data-filter="Verified">Verified</button>
 	                    <button class="btn btn-outline-danger btn-sm filter-btn" data-filter="Rejected">Rejected</button>
 	                </div>
@@ -160,7 +160,7 @@ include 'includes/sidebar.php';
       <div class="modal-body">
         <div class="d-flex flex-wrap gap-2">
           <button class="btn btn-outline-primary btn-sm filter-btn active" data-filter="ALL" data-bs-dismiss="modal">All</button>
-          <button class="btn btn-outline-secondary btn-sm filter-btn" data-filter="PendingReview" data-bs-dismiss="modal">Pending</button>
+          <button class="btn btn-outline-warning text-dark btn-sm filter-btn" data-filter="PendingReview" data-bs-dismiss="modal">Pending</button>
           <button class="btn btn-outline-success btn-sm filter-btn" data-filter="Verified" data-bs-dismiss="modal">Verified</button>
           <button class="btn btn-outline-danger btn-sm filter-btn" data-filter="Rejected" data-bs-dismiss="modal">Rejected</button>
         </div>
@@ -205,3 +205,4 @@ include 'includes/sidebar.php';
 <script src="../JS-Script-Files/Admin-End/sectorMembershipVerificationScript.js?v=20260214-1"></script>
 </body>
 </html>
+

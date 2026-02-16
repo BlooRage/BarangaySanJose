@@ -547,10 +547,39 @@ h2.section-title {
     color:#e78924;
 }
 
-.status-filter-btn.active {
+.status-filter-btn[data-filter="VerifiedResident"].active {
     color: #fff !important;
-    background-color: #0d6efd !important; /* Bootstrap primary */
-    border-color: #0d6efd !important;
+    background-color: #198754 !important;
+    border-color: #198754 !important;
+}
+
+.status-filter-btn[data-filter="NotVerified"].active {
+    color: #fff !important;
+    background-color: #dc3545 !important;
+    border-color: #dc3545 !important;
+}
+
+.status-filter-btn[data-filter="PendingVerification"].active {
+    color: #212529 !important;
+    background-color: #ffc107 !important;
+    border-color: #ffc107 !important;
+}
+
+.pending-count-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 20px;
+    height: 20px;
+    padding: 0 6px;
+    margin-left: 6px;
+    border-radius: 999px;
+    background-color: #dc3545;
+    color: #fff;
+    font-size: 0.75rem;
+    font-weight: 700;
+    line-height: 1;
+    flex-shrink: 0;
 }
 
 /* Default inactive button style */
@@ -564,13 +593,6 @@ h2.section-title {
 .btn-outline-custom:hover {
     background-color: #DE710C !important;
     color: #fff !important;
-}
-
-/* Active state */
-.status-filter-btn.active.btn-outline-custom {
-    background-color: #DE710C !important;
-    color: #fff !important;
-    border-color: #DE710C !important;
 }
 
 /* Make search input and filter button align perfectly */

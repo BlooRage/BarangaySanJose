@@ -10,7 +10,7 @@
     <script src="https://kit.fontawesome.com/3482e00999.js" crossorigin="anonymous"></script>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="../CSS-Styles/Admin-End-CSS/AdminDashboardStyle.css">
-    <link rel="stylesheet" href="../CSS-Styles/Admin-End-CSS/ResidentMasterlistStyle.css?v=20260212-5">
+    <link rel="stylesheet" href="../CSS-Styles/Admin-End-CSS/ResidentMasterlistStyle.css?v=20260216-2">
 </head>
 
 <body>
@@ -74,18 +74,14 @@ if (isset($conn) && $conn instanceof mysqli) {
 	                <!-- Status Filter Buttons -->
 	                <div class="admin-list-tabs">
 	                    <button class="btn btn-outline-primary btn-sm status-filter-btn" data-filter="ALL">All</button>
-	                    <button class="btn btn-outline-custom btn-sm status-filter-btn fw-bold" data-filter="VerifiedResident">Verified Resident</button>
-	                    <button class="btn btn-outline-custom btn-sm status-filter-btn fw-bold" data-filter="NotVerified">Not Verified</button>
-	                    <div class="position-relative">
-	                        <button class="btn btn-outline-custom btn-sm status-filter-btn fw-bold" data-filter="PendingVerification">
-	                            Pending Verification
-	                        </button>
+	                    <button class="btn btn-outline-success btn-sm status-filter-btn fw-bold" data-filter="VerifiedResident">Verified Resident</button>
+	                    <button class="btn btn-outline-danger btn-sm status-filter-btn fw-bold" data-filter="NotVerified">Not Verified</button>
+	                    <button class="btn btn-outline-warning text-dark btn-sm status-filter-btn fw-bold" data-filter="PendingVerification">
+	                        Pending Verification
 	                        <?php if ($pendingCount > 0): ?>
-	                            <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger">
-	                                <?= $pendingCount ?>
-	                            </span>
+	                            <span class="pending-count-badge"><?= $pendingCount ?></span>
 	                        <?php endif; ?>
-	                    </div>
+	                    </button>
 	                </div>
 	
 	                <div class="admin-list-actions">
@@ -846,3 +842,4 @@ if (isset($conn) && $conn instanceof mysqli) {
 <script src="../JS-Script-Files/Admin-End/residentMasterlistScript.js?v=20260212-5"></script>
 </body>
 </html>
+
