@@ -34,29 +34,25 @@
 	            <div class="admin-list-toolbar mb-3">
 	                <div class="admin-list-tabs"></div>
 	
-	                <div class="admin-list-actions d-flex flex-row flex-nowrap align-items-center gap-2">
-                    <div class="input-group admin-search flex-grow-1 me-2">
-                        <input type="text" id="searchInput" class="form-control" placeholder="Address ID or Address Name">
-                        <span class="input-group-text bg-white"><i class="fas fa-search"></i></span>
-                    </div>
-
-                    <button class="btn btn-outline-secondary btn-icon" type="button" data-bs-toggle="modal" data-bs-target="#modalFilter" id="filterButton" title="Filter" aria-label="Filter">
-                      <i class="fas fa-filter"></i>
-                      <span class="visually-hidden">Filter</span>
-                    </button>
-
-                    <button class="btn admin-columns btn-icon" type="button" data-bs-toggle="modal" data-bs-target="#modalTableColumns" id="btnHouseholdColumns" title="Columns" aria-label="Columns">
-                      <i class="fa-solid fa-sliders"></i>
-                      <span class="visually-hidden">Columns</span>
-                    </button>
-
-                    <button class="btn admin-refresh btn-icon" type="button" id="btnHouseholdRefresh" title="Refresh table" aria-label="Refresh table">
-                        <i class="fa-solid fa-arrows-rotate"></i>
-                        <span class="visually-hidden">Refresh</span>
-                    </button>
-
-                    <span id="householdAutoRefreshCountdown" class="small text-muted d-none"></span>
-                </div>
+	                <div class="admin-list-actions">
+	                    <div class="input-group admin-search">
+	                        <input type="text" id="searchInput" class="form-control" placeholder="Address ID or Address Name">
+	                        <span class="input-group-text bg-white"><i class="fas fa-search"></i></span>
+	                    </div>
+	                    <button class="btn btn-outline-secondary btn-icon" type="button" data-bs-toggle="modal" data-bs-target="#modalFilter" id="filterButton" title="Filter" aria-label="Filter">
+	                      <i class="fas fa-filter"></i>
+	                      <span class="visually-hidden">Filter</span>
+	                    </button>
+	                    <button class="btn admin-columns btn-icon" type="button" data-bs-toggle="modal" data-bs-target="#modalTableColumns" id="btnHouseholdColumns" title="Columns" aria-label="Columns">
+	                      <i class="fa-solid fa-sliders"></i>
+	                      <span class="visually-hidden">Columns</span>
+	                    </button>
+	                    <button class="btn admin-refresh btn-icon" type="button" id="btnHouseholdRefresh" title="Refresh table" aria-label="Refresh table">
+	                        <i class="fa-solid fa-arrows-rotate"></i>
+	                        <span class="visually-hidden">Refresh</span>
+	                    </button>
+	                    <span id="householdAutoRefreshCountdown" class="small text-muted d-none"></span>
+	                </div>
 	            </div>
 
             <!-- TABLE -->
@@ -265,7 +261,7 @@
             </div>
 
             <div class="modal-footer border-0">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Return</button>
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
                 <button type="submit" id="btn-addMemberSave" class="btn btn-success px-4" disabled>Save</button>
             </div>
         </form>

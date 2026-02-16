@@ -5,44 +5,44 @@ require_once __DIR__ . "/includes/resident_access_guard.php";
 
 <!DOCTYPE html>
 <html lang="en">
-
 <head>
   <meta charset="UTF-8" />
-
+  
   <link rel="icon" href="/Images/favicon_sanjose.png?v=20260211">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Resident Registration</title>
 
   <link
     href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/css/bootstrap.min.css"
     rel="stylesheet"
     integrity="sha384-sRIl4kxILFvY47J16cr9ZwB07vP4J8+LH7qKQnuqkuIAvNWLzeN8tE5YBujZqJLB"
-    crossorigin="anonymous" />
+    crossorigin="anonymous"
+  />
   <link
     rel="stylesheet"
     href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.5.2/css/all.min.css"
-    crossorigin="anonymous" />
+    crossorigin="anonymous"
+  />
 
-  <link rel="stylesheet" href="../CSS-Styles/Resident-End-CSS/registrationStyle.css" />
+  <link rel="stylesheet" href="../CSS-Styles/Resident-End-CSS/registrationStyle.css?v=20260213-6" />
   <link rel="stylesheet" href="../CSS-Styles/NavbarFooterStyle.css" />
 
   <style>
-    .field-error {
-      font-size: 0.85rem;
-      color: #dc3545;
-      margin-top: 4px;
-    }
-
-    .is-invalid {
-      border-color: #dc3545 !important;
-    }
-  </style>
+.field-error {
+  font-size: 0.85rem;
+  color: #dc3545;
+  margin-top: 4px;
+}
+.is-invalid {
+  border-color: #dc3545 !important;
+}
+</style>
 
   <!-- Optional: server-side alert handling (if you use it) -->
   <script src="../JS-Script-Files/modalHandler.js"></script>
 
   <!-- Your wizard/validation JS -->
-  <script src="../JS-Script-Files/Resident-End/registrationScript.js" defer></script>
+  <script src="../JS-Script-Files/Resident-End/registrationScript.js?v=20260213-24" defer></script>
 </head>
 
 <body>
@@ -58,7 +58,8 @@ require_once __DIR__ . "/includes/resident_access_guard.php";
             src="../Images/San_Jose_LOGO.jpg"
             alt="Logo"
             id="navbarLogo"
-            class="d-inline-block align-text-center" />
+            class="d-inline-block align-text-center"
+          />
           Barangay San Jose
         </a>
 
@@ -69,7 +70,8 @@ require_once __DIR__ . "/includes/resident_access_guard.php";
           data-bs-target="#navbarNav"
           aria-controls="navbarNav"
           aria-expanded="false"
-          aria-label="Toggle navigation">
+          aria-label="Toggle navigation"
+        >
           <span class="navbar-toggler-icon"></span>
         </button>
 
@@ -89,7 +91,8 @@ require_once __DIR__ . "/includes/resident_access_guard.php";
       action="../PhpFiles/Resident-End/residentRegistration.php"
       method="POST"
       enctype="multipart/form-data"
-      autocomplete="on">
+      autocomplete="on"
+    >
       <input type="hidden" name="wizardStep" id="wizardStep" value="0" />
       <input type="hidden" name="clientSubmittedAt" value="" id="clientSubmittedAt" />
 
@@ -236,7 +239,8 @@ require_once __DIR__ . "/includes/resident_access_guard.php";
               name="privacyConsent"
               value="1"
               data-error-target="#div-policyGroup"
-              required />
+              required
+            />
             <label class="form-check-label ms-2" for="agreePolicy" style="color: #000;">
               I agree to the Privacy Policy, Terms and Conditions, and Disclaimer.
             </label>
@@ -324,7 +328,8 @@ require_once __DIR__ . "/includes/resident_access_guard.php";
                 class="form-control mt-2 d-none suffix-other"
                 name="suffixOther"
                 id="suffixOther"
-                placeholder="Specify suffix" />
+                placeholder="Specify suffix"
+              />
             </div>
           </div>
 
@@ -373,7 +378,8 @@ require_once __DIR__ . "/includes/resident_access_guard.php";
                 class="form-control mt-2 d-none religion-other"
                 name="religionOther"
                 id="religionOther"
-                placeholder="Please specify religion" />
+                placeholder="Please specify religion"
+              />
             </div>
 
             <div class="col-md-3">
@@ -384,6 +390,8 @@ require_once __DIR__ . "/includes/resident_access_guard.php";
                 <option value="Child">Child</option>
                 <option value="Parent">Parent</option>
                 <option value="Sibling">Sibling</option>
+                <option value="Grandparents">Grandparents</option>
+                <option value="Extended Family">Extended Family</option>
               </select>
             </div>
           </div>
@@ -404,7 +412,8 @@ require_once __DIR__ . "/includes/resident_access_guard.php";
                   value=""
                   readonly
                   disabled
-                  data-error-target="#phoneNumberGroup">
+                  data-error-target="#phoneNumberGroup"
+                >
               </div>
 
               <!-- Disabled inputs don't POST; hidden will submit -->
@@ -420,7 +429,8 @@ require_once __DIR__ . "/includes/resident_access_guard.php";
                 id="emailAddress"
                 value=""
                 readonly
-                disabled>
+                disabled
+              >
               <input type="hidden" name="emailAddress" id="emailAddressHidden" value="">
               <div class="small text-muted mt-1">This is your account email and cannot be edited here.</div>
             </div>
@@ -536,7 +546,8 @@ require_once __DIR__ . "/includes/resident_access_guard.php";
                 class="form-select toggle-other"
                 name="emergencySuffix"
                 id="emergencySuffixSelect"
-                data-target="emergency-suffix-other">
+                data-target="emergency-suffix-other"
+              >
                 <option value="">None</option>
                 <option value="Jr.">Jr.</option>
                 <option value="Sr.">Sr.</option>
@@ -558,7 +569,8 @@ require_once __DIR__ . "/includes/resident_access_guard.php";
                 class="form-control mt-2 d-none emergency-suffix-other"
                 name="emergencySuffixOther"
                 id="emergencySuffixOther"
-                placeholder="Specify suffix" />
+                placeholder="Specify suffix"
+              />
             </div>
 
             <!-- Emergency Phone (UPDATED to +63 input-group) -->
@@ -578,7 +590,8 @@ require_once __DIR__ . "/includes/resident_access_guard.php";
                   maxlength="10"
                   inputmode="numeric"
                   required
-                  data-error-target="#emergencyPhoneGroup">
+                  data-error-target="#emergencyPhoneGroup"
+                >
               </div>
             </div>
 
@@ -605,7 +618,8 @@ require_once __DIR__ . "/includes/resident_access_guard.php";
                 class="form-control mt-2 d-none emergency-relationship-other"
                 id="emergencyRelationshipOther"
                 name="emergencyRelationshipOther"
-                placeholder="Please specify relationship" />
+                placeholder="Please specify relationship"
+              />
             </div>
 
             <div class="col-md-4">
@@ -759,7 +773,8 @@ require_once __DIR__ . "/includes/resident_access_guard.php";
                   name="houseType"
                   required
                   data-target="houseType-other"
-                  id="houseTypeSelect">
+                  id="houseTypeSelect"
+                >
                   <option value="">Select</option>
                   <option value="Concrete">Concrete</option>
                   <option value="Semi-Concrete">Semi-Concrete</option>
@@ -774,7 +789,8 @@ require_once __DIR__ . "/includes/resident_access_guard.php";
                   class="form-control mt-2 d-none houseType-other"
                   name="houseTypeOther"
                   id="houseTypeOther"
-                  placeholder="Specify house type">
+                  placeholder="Specify house type"
+                >
               </div>
 
               <div class="col-md-3">
@@ -807,7 +823,7 @@ require_once __DIR__ . "/includes/resident_access_guard.php";
               <label class="form-label fw-semibold">
                 Type of Proof of Identification <span class="text-danger">*</span>
               </label>
-              <select class="form-select" id="proofTypeSelect" required>
+              <select class="form-select" id="proofTypeSelect" name="proofType" required>
                 <option value="">Select</option>
                 <option value="ID">ID</option>
                 <option value="Document">Document</option>
@@ -820,136 +836,150 @@ require_once __DIR__ . "/includes/resident_access_guard.php";
 
 
           <!-- Document fields -->
-          <div id="proofIdentityFields">
+          <div id="proofIdentityFields" >
             <div id="idProofWrapper" class="d-none">
-              <!-- Row 1 -->
-              <div class="row g-3 mb-3">
-                <div class="col-md-6">
-                  <label class="form-label" for="idTypeSelect">ID Type <span class="text-danger">*</span></label>
-                  <select class="form-select" name="idType" id="idTypeSelect">
-                    <option value="">Select</option>
-                    <option value="Passport">Passport</option>
-                    <option value="Driver's License">Driver's License</option>
-                    <option value="PhilHealth ID">PhilHealth ID</option>
-                    <option value="Voter's ID">Voter's ID</option>
-                    <option value="National ID">National ID</option>
-                    <option value="Barangay ID">Barangay ID</option>
-                    <option value="Student ID">Student ID</option>
-                  </select>
-                </div>
-
-                <div class="col-md-6">
-                  <label class="form-label" for="idNumberInput">ID Number <span class="text-danger">*</span></label>
-                  <input type="text" class="form-control" name="idNumber" id="idNumberInput">
-                </div>
+            <!-- Row 1 -->
+            <div class="row g-3 mb-3">
+              <div class="col-md-6">
+                <label class="form-label" for="idTypeSelect">ID Type <span class="text-danger">*</span></label>
+                <select class="form-select" name="idType" id="idTypeSelect">
+                  <option value="">Select</option>
+                  <option value="Passport">Passport</option>
+                  <option value="Driver's License">Driver's License</option>
+                  <option value="PhilHealth ID">PhilHealth ID</option>
+                  <option value="Voter's ID">Voter's ID</option>
+                  <option value="National ID">National ID</option>
+                  <option value="Barangay ID">Barangay ID</option>
+                </select>
               </div>
 
-              <!-- Student ID only -->
-              <div class="row g-3 mb-3 d-none" id="schoolNameWrapper">
-                <div class="col-12">
-                  <label class="form-label" for="schoolNameInput">School Name <span class="text-danger">*</span></label>
-                  <input type="text" class="form-control" name="schoolName" id="schoolNameInput">
-                </div>
-              </div>
-
-              <!-- Uploads -->
-              <div class="row mb-2 mt-3">
-                <label class="form-label" for="idFrontInput">Upload ID Front <span class="text-danger">*</span></label>
-                <div class="upload-box position-relative">
-                  <div class="upload-text">
-                    <i class="fa-solid fa-upload"></i>
-                    <span>Drag & drop file</span>
-                  </div>
-                  <div class="upload-subtext mt-1">PDF or image</div>
-                  <input
-                    type="file"
-                    class="form-control upload-input"
-                    id="idFrontInput"
-                    name="idFront"
-                    accept="image/*,.pdf,.heic,.heif">
-                </div>
-                <label class="form-label mb-2 mt-3" for="idBackInput">Upload ID Back <span class="text-danger">*</span></label>
-                <div class="upload-box position-relative">
-                  <div class="upload-text">
-                    <i class="fa-solid fa-upload"></i>
-                    <span>Drag & drop file</span>
-                  </div>
-                  <div class="upload-subtext mt-1">PDF or image</div>
-                  <input
-                    type="file"
-                    class="form-control upload-input"
-                    id="idBackInput"
-                    name="idBack"
-                    accept="image/*,.pdf,.heic,.heif">
-                </div>
+              <div class="col-md-6">
+                <label class="form-label" for="idNumberInput">ID Number <span class="text-danger">*</span></label>
+                <input type="text" class="form-control" name="idNumber" id="idNumberInput">
               </div>
             </div>
-            <div id="documentProofWrapper" class="d-none">
 
-              <div class="row g-3 mb-3">
-                <div class="col-12">
-                  <label class="form-label" for="documentTypeSelect">Document Type <span class="text-danger">*</span></label>
-                  <select class="form-select" id="documentTypeSelect" name="documentType">
-                    <option value="">Select</option>
-                    <option value="Billing Statement">Billing Statement</option>
-                    <option value="HOA Signed Certification of Residency">HOA Signed Certification of Residency</option>
-                  </select>
-                </div>
+            <!-- Student ID only -->
+            <div class="row g-3 mb-3 d-none" id="schoolNameWrapper">
+              <div class="col-12">
+                <label class="form-label" for="schoolNameInput">School Name <span class="text-danger">*</span></label>
+                <input type="text" class="form-control" name="schoolName" id="schoolNameInput">
               </div>
+            </div>
 
-              <label class="form-label fw-semibold mb-3">
-                Upload Supporting Document(s) <span class="text-danger">*</span>
-              </label>
+	            <!-- Uploads (Front/Back side-by-side) -->
+	            <div class="mt-3">
+	              <label class="form-label fw-semibold mb-2" id="idUploadLabel">
+	                Upload ID Front and Back <span class="text-danger">*</span>
+	              </label>
+	              <div class="small text-muted mb-2" id="idUploadHint">
+	                Upload clear photos/scans of the front and back of your ID.
+	              </div>
 
-              <div id="documentUploadList" class="row">
-
-                <!-- Attachment 1 -->
-                <div class=" position-relative">
-                  <div class="upload-box position-relative">
+	              <div class="row g-2">
+	                <div class="col-md-6">
+	                  <div class="upload-box position-relative">
                     <div class="upload-text">
                       <i class="fa-solid fa-upload"></i>
                       <span>Drag & drop file</span>
                     </div>
-                    <div class="upload-subtext mt-1">
-                      PDF or image
-                    </div>
-
+                    <div class="upload-subtext mt-1">PDF or image</div>
                     <input
                       type="file"
                       class="form-control upload-input"
-                      name="documentProof[]"
-                      accept=".pdf,image/*,.heic,.heif"
-                      required>
-                  </div>
+                      id="idFrontInput"
+	                      name="idFront"
+	                      accept="image/*,.pdf,.heic,.heif">
+	                  </div>
+	                  <small class="text-muted d-block text-center mt-2" id="idFrontCaption">Front</small>
+	                </div>
 
-                  <small class="text-muted d-block text-center mt-2">
-                    Attachment 1
-                  </small>
-                </div>
+	                <div class="col-md-6" id="idBackWrapper">
+	                  <div class="upload-box position-relative">
+	                    <div class="upload-text">
+	                      <i class="fa-solid fa-upload"></i>
+                      <span>Drag & drop file</span>
+                    </div>
+                    <div class="upload-subtext mt-1">PDF or image</div>
+                    <input
+                      type="file"
+                      class="form-control upload-input"
+	                      id="idBackInput"
+	                      name="idBack"
+	                      accept="image/*,.pdf,.heic,.heif">
+	                  </div>
+	                  <small class="text-muted d-block text-center mt-2" id="idBackCaption">Back</small>
+	                </div>
+	              </div>
+	            </div>
+</div>
+<div id="documentProofWrapper" class="d-none">
+
+  <div class="row g-3 mb-3">
+    <div class="col-12">
+      <label class="form-label" for="documentTypeSelect">Document Type <span class="text-danger">*</span></label>
+      <select class="form-select" id="documentTypeSelect" name="documentType">
+        <option value="">Select</option>
+        <option value="Billing Statement">Billing Statement</option>
+        <option value="HOA Signed Certification of Residency">HOA Signed Certification of Residency</option>
+      </select>
+    </div>
+  </div>
+
+  <label class="form-label fw-semibold mb-3">
+    Upload Supporting Document(s) <span class="text-danger">*</span>
+  </label>
+
+  <div id="documentUploadList" class="row">
+
+    <!-- Attachment 1 -->
+    <div class=" position-relative">
+  <div class="upload-box position-relative">
+    <div class="upload-text">
+      <i class="fa-solid fa-upload"></i>
+      <span>Drag & drop file</span>
+    </div>
+    <div class="upload-subtext mt-1">
+      PDF or image
+    </div>
+
+    <input
+      type="file"
+      class="form-control upload-input"
+      name="documentProof[]"
+      accept=".pdf,image/*,.heic,.heif"
+      required>
+  </div>
+
+  <small class="text-muted d-block text-center mt-2">
+    Attachment 1
+  </small>
+</div>
 
 
-              </div>
+  </div>
 
-              <button
-                type="button"
-                class="btn btn-outline-secondary btn-sm mt-3"
-                id="addDocumentBtn">
-                + Add another attachment
-              </button>
+  <button
+    type="button"
+    class="btn btn-outline-secondary btn-sm mt-3"
+    id="addDocumentBtn">
+    + Add another attachment
+  </button>
 
-              <div class="small text-muted mt-2">
-                Maximum of 3 attachments allowed.
-              </div>
-            </div>
+  <div class="small text-muted mt-2">
+    Maximum of 3 attachments allowed.
+  </div>
+</div>
 
             <!-- 2x2 -->
-            <div class="row g-3 mb-4">
-              <label class="form-label mb-1" for="pictureInput">2x2 Picture <span class="text-danger">*</span></label>
-              <div class="d-flex align-items-center gap-2 mb-1">
-                <span class="fw-semibold text-black">Required:</span>
+            <div class="mb-4">
+              <h3 class="section-title mb-0 mt-3">2x2 Profile Picture:</h3>
+              <hr class="section-hr">
+              <p class="mb-2">
+                <span class="fw-semibold text-black">Required<span class="text-danger">*</span>:</span>
                 <span class="text-muted">White background (2x2 ID photo).</span>
-              </div>
-              <div class="upload-box position-relative col-12">
+              </p>
+              <div class="upload-box position-relative">
                 <div class="upload-text">
                   <i class="fa-solid fa-upload"></i>
                   <span>Drag & drop file</span>
@@ -962,6 +992,296 @@ require_once __DIR__ . "/includes/resident_access_guard.php";
                   name="picture"
                   accept="image/*,.heic,.heif">
               </div>
+            </div>
+
+            <div id="sectorProofSection" class="d-none">
+              <h3 class="section-title mt-2 mb-0">Sector Membership Supporting Documents</h3>
+              <hr class="section-hr">
+
+	              <div id="sectorProofPWD" class="sector-proof-card d-none mb-3">
+	                <label class="form-label fw-semibold" for="sectorDocTypePWD">PWD Proof of Disability <span class="text-danger">*</span></label>
+	                <select class="form-select mb-2 sector-doc-type" id="sectorDocTypePWD" name="sectorDocType[PWD]" data-sector="PWD">
+	                  <option value="">Select</option>
+	                  <option value="PWD ID">PWD ID</option>
+	                  <option value="Certificate of Disability">Certificate of Disability</option>
+	                  <option value="Medical Certificate">Medical Certificate</option>
+	                </select>
+	                <div class="sector-upload-zone d-none" data-sector="PWD">
+	                  <div class="small text-muted mb-2 sector-idpair-hint d-none" data-sector="PWD">
+	                    If you selected an ID as proof, upload clear photos of the front and back.
+	                  </div>
+	                  <div class="sector-upload-idpair d-none" data-sector="PWD">
+	                    <div class="row g-2">
+	                      <div class="col-md-6">
+	                        <div class="upload-box position-relative">
+	                          <div class="upload-text">
+	                            <i class="fa-solid fa-upload"></i>
+	                            <span>Drag & drop file</span>
+	                          </div>
+	                          <div class="upload-subtext mt-1">Image only</div>
+	                          <input type="file" class="form-control upload-input sector-doc-idfront" name="sectorDocFile[PWD][]" data-sector="PWD" accept="image/*,.heic,.heif">
+	                        </div>
+	                        <small class="text-muted d-block text-center mt-2">Front</small>
+	                      </div>
+	                      <div class="col-md-6">
+	                        <div class="upload-box position-relative">
+	                          <div class="upload-text">
+	                            <i class="fa-solid fa-upload"></i>
+	                            <span>Drag & drop file</span>
+	                          </div>
+	                          <div class="upload-subtext mt-1">Image only</div>
+	                          <input type="file" class="form-control upload-input sector-doc-idback" name="sectorDocFile[PWD][]" data-sector="PWD" accept="image/*,.heic,.heif">
+	                        </div>
+	                        <small class="text-muted d-block text-center mt-2">Back</small>
+	                      </div>
+	                    </div>
+	                  </div>
+	                  <div class="sector-upload-list" data-sector="PWD">
+	                    <div class="position-relative">
+	                      <div class="upload-box position-relative">
+	                        <div class="upload-text">
+	                          <i class="fa-solid fa-upload"></i>
+	                          <span>Drag & drop file</span>
+	                        </div>
+	                        <div class="upload-subtext mt-1">PDF or image</div>
+	                        <input type="file" class="form-control upload-input sector-doc-file" id="sectorDocFilePWD" name="sectorDocFile[PWD][]" data-sector="PWD" accept=".pdf,image/*,.heic,.heif">
+	                      </div>
+	                      <small class="text-muted d-block text-center mt-2">Attachment 1</small>
+	                    </div>
+	                  </div>
+	                  <button type="button" class="btn btn-outline-secondary btn-sm mt-3 add-sector-doc-btn" data-sector="PWD">+ Add another attachment</button>
+	                  <div class="small text-muted mt-2 sector-upload-maxnote" data-sector="PWD">Maximum of 3 attachments allowed.</div>
+	                </div>
+	              </div>
+
+	              <div id="sectorProofSenior" class="sector-proof-card d-none mb-3">
+	                <label class="form-label fw-semibold" for="sectorDocTypeSenior">Senior Citizen Proof</label>
+	                <select class="form-select mb-2 sector-doc-type" id="sectorDocTypeSenior" name="sectorDocType[SeniorCitizen]" data-sector="SeniorCitizen">
+	                  <option value="">Select</option>
+	                  <option value="Birth Certificate">Birth Certificate</option>
+	                  <option value="Senior Citizen ID">Senior Citizen ID</option>
+	                </select>
+	                <div class="sector-upload-zone d-none" data-sector="SeniorCitizen">
+	                  <div class="small text-muted mb-2 sector-idpair-hint d-none" data-sector="SeniorCitizen">
+	                    If you selected an ID as proof, upload clear photos of the front and back.
+	                  </div>
+	                  <div class="sector-upload-idpair d-none" data-sector="SeniorCitizen">
+	                    <div class="row g-2">
+	                      <div class="col-md-6">
+	                        <div class="upload-box position-relative">
+	                          <div class="upload-text">
+	                            <i class="fa-solid fa-upload"></i>
+	                            <span>Drag & drop file</span>
+	                          </div>
+	                          <div class="upload-subtext mt-1">Image only</div>
+	                          <input type="file" class="form-control upload-input sector-doc-idfront" name="sectorDocFile[SeniorCitizen][]" data-sector="SeniorCitizen" accept="image/*,.heic,.heif">
+	                        </div>
+	                        <small class="text-muted d-block text-center mt-2">Front</small>
+	                      </div>
+	                      <div class="col-md-6">
+	                        <div class="upload-box position-relative">
+	                          <div class="upload-text">
+	                            <i class="fa-solid fa-upload"></i>
+	                            <span>Drag & drop file</span>
+	                          </div>
+	                          <div class="upload-subtext mt-1">Image only</div>
+	                          <input type="file" class="form-control upload-input sector-doc-idback" name="sectorDocFile[SeniorCitizen][]" data-sector="SeniorCitizen" accept="image/*,.heic,.heif">
+	                        </div>
+	                        <small class="text-muted d-block text-center mt-2">Back</small>
+	                      </div>
+	                    </div>
+	                  </div>
+	                  <div class="sector-upload-list" data-sector="SeniorCitizen">
+	                    <div class="position-relative">
+	                      <div class="upload-box position-relative">
+	                        <div class="upload-text">
+	                          <i class="fa-solid fa-upload"></i>
+	                          <span>Drag & drop file</span>
+	                        </div>
+	                        <div class="upload-subtext mt-1">PDF or image</div>
+	                        <input type="file" class="form-control upload-input sector-doc-file" id="sectorDocFileSenior" name="sectorDocFile[SeniorCitizen][]" data-sector="SeniorCitizen" accept=".pdf,image/*,.heic,.heif">
+	                      </div>
+	                      <small class="text-muted d-block text-center mt-2">Attachment 1</small>
+	                    </div>
+	                  </div>
+	                  <button type="button" class="btn btn-outline-secondary btn-sm mt-3 add-sector-doc-btn" data-sector="SeniorCitizen">+ Add another attachment</button>
+	                  <div class="small text-muted mt-2 sector-upload-maxnote" data-sector="SeniorCitizen">Maximum of 3 attachments allowed.</div>
+	                </div>
+	                <div class="small text-muted mt-2">If you already used an ID as proof of identity above, senior-citizen proof is not required.</div>
+	              </div>
+
+	              <div id="sectorProofStudent" class="sector-proof-card d-none mb-3">
+	                <label class="form-label fw-semibold" for="sectorDocTypeStudent">Student Proof <span class="text-danger">*</span></label>
+	                <select class="form-select mb-2 sector-doc-type" id="sectorDocTypeStudent" name="sectorDocType[Student]" data-sector="Student">
+	                  <option value="">Select</option>
+	                  <option value="Registration Form">Registration Form</option>
+	                  <option value="Student ID">Student ID</option>
+	                  <option value="Report Card">Report Card</option>
+	                </select>
+	                <div class="sector-upload-zone d-none" data-sector="Student">
+	                  <div class="small text-muted mb-2 sector-idpair-hint d-none" data-sector="Student">
+	                    If you selected an ID as proof, upload clear photos of the front and back.
+	                  </div>
+	                  <div class="sector-upload-idpair d-none" data-sector="Student">
+	                    <div class="row g-2">
+	                      <div class="col-md-6">
+	                        <div class="upload-box position-relative">
+	                          <div class="upload-text">
+	                            <i class="fa-solid fa-upload"></i>
+	                            <span>Drag & drop file</span>
+	                          </div>
+	                          <div class="upload-subtext mt-1">Image only</div>
+	                          <input type="file" class="form-control upload-input sector-doc-idfront" name="sectorDocFile[Student][]" data-sector="Student" accept="image/*,.heic,.heif">
+	                        </div>
+	                        <small class="text-muted d-block text-center mt-2">Front</small>
+	                      </div>
+	                      <div class="col-md-6">
+	                        <div class="upload-box position-relative">
+	                          <div class="upload-text">
+	                            <i class="fa-solid fa-upload"></i>
+	                            <span>Drag & drop file</span>
+	                          </div>
+	                          <div class="upload-subtext mt-1">Image only</div>
+	                          <input type="file" class="form-control upload-input sector-doc-idback" name="sectorDocFile[Student][]" data-sector="Student" accept="image/*,.heic,.heif">
+	                        </div>
+	                        <small class="text-muted d-block text-center mt-2">Back</small>
+	                      </div>
+	                    </div>
+	                  </div>
+	                  <div class="sector-upload-list" data-sector="Student">
+	                    <div class="position-relative">
+	                      <div class="upload-box position-relative">
+	                        <div class="upload-text">
+	                          <i class="fa-solid fa-upload"></i>
+	                          <span>Drag & drop file</span>
+	                        </div>
+	                        <div class="upload-subtext mt-1">PDF or image</div>
+	                        <input type="file" class="form-control upload-input sector-doc-file" id="sectorDocFileStudent" name="sectorDocFile[Student][]" data-sector="Student" accept=".pdf,image/*,.heic,.heif">
+	                      </div>
+	                      <small class="text-muted d-block text-center mt-2">Attachment 1</small>
+	                    </div>
+	                  </div>
+	                  <button type="button" class="btn btn-outline-secondary btn-sm mt-3 add-sector-doc-btn" data-sector="Student">+ Add another attachment</button>
+	                  <div class="small text-muted mt-2 sector-upload-maxnote" data-sector="Student">Maximum of 3 attachments allowed.</div>
+	                </div>
+	              </div>
+
+	              <div id="sectorProofIP" class="sector-proof-card d-none mb-3">
+	                <label class="form-label fw-semibold" for="sectorDocTypeIP">Indigenous People Proof <span class="text-danger">*</span></label>
+	                <select class="form-select mb-2 sector-doc-type" id="sectorDocTypeIP" name="sectorDocType[IndigenousPeople]" data-sector="IndigenousPeople">
+	                  <option value="">Select</option>
+	                  <option value="Certificate of IP Membership (CIPM)">Certificate of IP Membership (CIPM)</option>
+	                  <option value="Testimony of Elders/Community Members">Testimony of Elders/Community Members</option>
+	                  <option value="Birth Certificate">Birth Certificate</option>
+	                  <option value="PhilSys ID/ePhilID">PhilSys ID/ePhilID</option>
+	                </select>
+	                <div class="sector-upload-zone d-none" data-sector="IndigenousPeople">
+	                  <div class="small text-muted mb-2 sector-idpair-hint d-none" data-sector="IndigenousPeople">
+	                    If you selected an ID as proof, upload clear photos of the front and back.
+	                  </div>
+	                  <div class="sector-upload-idpair d-none" data-sector="IndigenousPeople">
+	                    <div class="row g-2">
+	                      <div class="col-md-6">
+	                        <div class="upload-box position-relative">
+	                          <div class="upload-text">
+	                            <i class="fa-solid fa-upload"></i>
+	                            <span>Drag & drop file</span>
+	                          </div>
+	                          <div class="upload-subtext mt-1">Image only</div>
+	                          <input type="file" class="form-control upload-input sector-doc-idfront" name="sectorDocFile[IndigenousPeople][]" data-sector="IndigenousPeople" accept="image/*,.heic,.heif">
+	                        </div>
+	                        <small class="text-muted d-block text-center mt-2">Front</small>
+	                      </div>
+	                      <div class="col-md-6">
+	                        <div class="upload-box position-relative">
+	                          <div class="upload-text">
+	                            <i class="fa-solid fa-upload"></i>
+	                            <span>Drag & drop file</span>
+	                          </div>
+	                          <div class="upload-subtext mt-1">Image only</div>
+	                          <input type="file" class="form-control upload-input sector-doc-idback" name="sectorDocFile[IndigenousPeople][]" data-sector="IndigenousPeople" accept="image/*,.heic,.heif">
+	                        </div>
+	                        <small class="text-muted d-block text-center mt-2">Back</small>
+	                      </div>
+	                    </div>
+	                  </div>
+	                  <div class="sector-upload-list" data-sector="IndigenousPeople">
+	                    <div class="position-relative">
+	                      <div class="upload-box position-relative">
+	                        <div class="upload-text">
+	                          <i class="fa-solid fa-upload"></i>
+	                          <span>Drag & drop file</span>
+	                        </div>
+	                        <div class="upload-subtext mt-1">PDF or image</div>
+	                        <input type="file" class="form-control upload-input sector-doc-file" id="sectorDocFileIP" name="sectorDocFile[IndigenousPeople][]" data-sector="IndigenousPeople" accept=".pdf,image/*,.heic,.heif">
+	                      </div>
+	                      <small class="text-muted d-block text-center mt-2">Attachment 1</small>
+	                    </div>
+	                  </div>
+	                  <button type="button" class="btn btn-outline-secondary btn-sm mt-3 add-sector-doc-btn" data-sector="IndigenousPeople">+ Add another attachment</button>
+	                  <div class="small text-muted mt-2 sector-upload-maxnote" data-sector="IndigenousPeople">Maximum of 3 attachments allowed.</div>
+	                </div>
+	                <div class="small text-muted mt-2">If you used National ID/PhilSys as proof of identity above, this upload is not required.</div>
+	              </div>
+
+	              <div id="sectorProofSoloParent" class="sector-proof-card d-none mb-1">
+	                <label class="form-label fw-semibold" for="sectorDocTypeSoloParent">Solo Parent Proof (Optional)</label>
+	                <select class="form-select mb-2 sector-doc-type" id="sectorDocTypeSoloParent" name="sectorDocType[SingleParent]" data-sector="SingleParent">
+	                  <option value="">Select</option>
+	                  <option value="Birth Certificate/s">Birth Certificate/s</option>
+	                  <option value="Barangay Certificate of Solo Parent">Barangay Certificate of Solo Parent</option>
+	                  <option value="CENOMAR">CENOMAR</option>
+	                  <option value="Abandoned/De Facto">Abandoned/De Facto</option>
+	                  <option value="Spouse Death Certificate">Spouse Death Certificate</option>
+	                </select>
+	                <div class="sector-upload-zone d-none" data-sector="SingleParent">
+	                  <div class="small text-muted mb-2 sector-idpair-hint d-none" data-sector="SingleParent">
+	                    If you selected an ID as proof, upload clear photos of the front and back.
+	                  </div>
+	                  <div class="sector-upload-idpair d-none" data-sector="SingleParent">
+	                    <div class="row g-2">
+	                      <div class="col-md-6">
+	                        <div class="upload-box position-relative">
+	                          <div class="upload-text">
+	                            <i class="fa-solid fa-upload"></i>
+	                            <span>Drag & drop file</span>
+	                          </div>
+	                          <div class="upload-subtext mt-1">Image only</div>
+	                          <input type="file" class="form-control upload-input sector-doc-idfront" name="sectorDocFile[SingleParent][]" data-sector="SingleParent" accept="image/*,.heic,.heif">
+	                        </div>
+	                        <small class="text-muted d-block text-center mt-2">Front</small>
+	                      </div>
+	                      <div class="col-md-6">
+	                        <div class="upload-box position-relative">
+	                          <div class="upload-text">
+	                            <i class="fa-solid fa-upload"></i>
+	                            <span>Drag & drop file</span>
+	                          </div>
+	                          <div class="upload-subtext mt-1">Image only</div>
+	                          <input type="file" class="form-control upload-input sector-doc-idback" name="sectorDocFile[SingleParent][]" data-sector="SingleParent" accept="image/*,.heic,.heif">
+	                        </div>
+	                        <small class="text-muted d-block text-center mt-2">Back</small>
+	                      </div>
+	                    </div>
+	                  </div>
+	                  <div class="sector-upload-list" data-sector="SingleParent">
+	                    <div class="position-relative">
+	                      <div class="upload-box position-relative">
+	                        <div class="upload-text">
+	                          <i class="fa-solid fa-upload"></i>
+	                          <span>Drag & drop file</span>
+	                        </div>
+	                        <div class="upload-subtext mt-1">PDF or image</div>
+	                        <input type="file" class="form-control upload-input sector-doc-file" id="sectorDocFileSoloParent" name="sectorDocFile[SingleParent][]" data-sector="SingleParent" accept=".pdf,image/*,.heic,.heif">
+	                      </div>
+	                      <small class="text-muted d-block text-center mt-2">Attachment 1</small>
+	                    </div>
+	                  </div>
+	                  <button type="button" class="btn btn-outline-secondary btn-sm mt-3 add-sector-doc-btn" data-sector="SingleParent">+ Add another attachment</button>
+	                  <div class="small text-muted mt-2 sector-upload-maxnote" data-sector="SingleParent">Maximum of 3 attachments allowed.</div>
+	                </div>
+	                <div class="small text-muted mt-2">You may skip this for now and submit proper documents later.</div>
+	              </div>
             </div>
           </div>
 
@@ -991,7 +1311,7 @@ require_once __DIR__ . "/includes/resident_access_guard.php";
 
           <div class="d-flex justify-content-between">
             <button type="button" class="btn btn-secondary px-4 prev-btn">Previous</button>
-            <button type="submit" class="btn btn-success px-4" id="submitBtn" disabled>Submit</button>
+            <button type="submit" class="btn btn-success px-4 btn-disabled" id="submitBtn" aria-disabled="true">Submit</button>
           </div>
         </div>
 
@@ -1000,7 +1320,7 @@ require_once __DIR__ . "/includes/resident_access_guard.php";
   </section>
 
   <!-- Logout Confirm Modal -->
-  <div class="modal fade uniform-modal" id="logoutConfirmModal" tabindex="-1" aria-hidden="true">
+        <div class="modal fade uniform-modal" id="logoutConfirmModal" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
       <div class="modal-content">
         <div class="modal-header">
@@ -1046,212 +1366,204 @@ require_once __DIR__ . "/includes/resident_access_guard.php";
       });
 
       fetch("../PhpFiles/GET/getAccountContact.php", {
-          method: "GET",
-          credentials: "same-origin",
-          headers: {
-            "Accept": "application/json"
-          }
-        })
-        .then(r => r.json())
-        .then(data => {
-          if (!data || !data.success) return;
+        method: "GET",
+        credentials: "same-origin",
+        headers: { "Accept": "application/json" }
+      })
+      .then(r => r.json())
+      .then(data => {
+        if (!data || !data.success) return;
 
-          let phone = String(data.phone_number ?? "");
-          phone = phone.replace(/\D/g, "");
-          if (phone.length === 11 && phone.startsWith("0")) phone = phone.slice(1);
+        let phone = String(data.phone_number ?? "");
+        phone = phone.replace(/\D/g, "");
+        if (phone.length === 11 && phone.startsWith("0")) phone = phone.slice(1); 
 
-          const email = String(data.email ?? "");
+        const email = String(data.email ?? "");
 
-          const phoneVisible = document.getElementById("phoneNumber");
-          const emailVisible = document.getElementById("emailAddress");
+        const phoneVisible = document.getElementById("phoneNumber");
+        const emailVisible = document.getElementById("emailAddress");
 
-          const phoneHidden = document.getElementById("phoneNumberHidden");
-          const emailHidden = document.getElementById("emailAddressHidden");
+        const phoneHidden = document.getElementById("phoneNumberHidden");
+        const emailHidden = document.getElementById("emailAddressHidden");
 
-          if (phoneVisible) phoneVisible.value = phone;
-          if (phoneHidden) phoneHidden.value = phone;
+        if (phoneVisible) phoneVisible.value = phone;
+        if (phoneHidden) phoneHidden.value = phone;
 
-          if (emailVisible) emailVisible.value = email;
-          if (emailHidden) emailHidden.value = email;
-        })
-        .catch(() => {});
+        if (emailVisible) emailVisible.value = email;
+        if (emailHidden) emailHidden.value = email;
+      })
+      .catch(() => {});
     });
-    const proofTypeSelect = document.getElementById("proofTypeSelect");
-    const idProofWrapper = document.getElementById("idProofWrapper");
-    const documentProofWrapper = document.getElementById("documentProofWrapper");
-    const documentTypeSelect = document.getElementById("documentTypeSelect");
-    const addDocumentBtn = document.getElementById("addDocumentBtn");
-    const documentUploadList = document.getElementById("documentUploadList");
+const proofTypeSelect = document.getElementById("proofTypeSelect");
+const idProofWrapper = document.getElementById("idProofWrapper");
+const documentProofWrapper = document.getElementById("documentProofWrapper");
+const documentTypeSelect = document.getElementById("documentTypeSelect");
+const addDocumentBtn = document.getElementById("addDocumentBtn");
+const documentUploadList = document.getElementById("documentUploadList");
 
-    proofTypeSelect.addEventListener("change", () => {
-      idProofWrapper.classList.add("d-none");
-      documentProofWrapper.classList.add("d-none");
+proofTypeSelect.addEventListener("change", () => {
+  idProofWrapper.classList.add("d-none");
+  documentProofWrapper.classList.add("d-none");
 
-      idProofWrapper.querySelectorAll("input, select").forEach(el => el.disabled = true);
-      documentProofWrapper.querySelectorAll("input, select").forEach(el => el.disabled = true);
+  idProofWrapper.querySelectorAll("input, select").forEach(el => el.disabled = true);
+  documentProofWrapper.querySelectorAll("input, select").forEach(el => el.disabled = true);
 
-      if (proofTypeSelect.value === "ID") {
-        idProofWrapper.classList.remove("d-none");
-        idProofWrapper.querySelectorAll("input, select").forEach(el => el.disabled = false);
-        if (documentTypeSelect) {
-          documentTypeSelect.value = "";
-          documentTypeSelect.required = false;
-        }
+  if (proofTypeSelect.value === "ID") {
+    idProofWrapper.classList.remove("d-none");
+    idProofWrapper.querySelectorAll("input, select").forEach(el => el.disabled = false);
+    if (documentTypeSelect) {
+      documentTypeSelect.value = "";
+      documentTypeSelect.required = false;
+    }
+  }
+
+  if (proofTypeSelect.value === "Document") {
+    documentProofWrapper.classList.remove("d-none");
+    documentProofWrapper.querySelectorAll("input").forEach(el => el.disabled = false);
+    documentProofWrapper.querySelectorAll("select").forEach(el => el.disabled = false);
+    if (documentTypeSelect) {
+      documentTypeSelect.required = true;
+    }
+  }
+});
+
+
+document.addEventListener("DOMContentLoaded", () => {
+
+
+  async function convertHeicIfNeeded(input) {
+    if (!input || !input.files || input.files.length === 0) return;
+
+    const files = Array.from(input.files);
+    const converted = [];
+
+    for (const file of files) {
+      const ext = (file.name.split(".").pop() || "").toLowerCase();
+      const isHeic = ext === "heic" || ext === "heif" || file.type === "image/heic" || file.type === "image/heif";
+      if (!isHeic) {
+        converted.push(file);
+        continue;
       }
 
-      if (proofTypeSelect.value === "Document") {
-        documentProofWrapper.classList.remove("d-none");
-        documentProofWrapper.querySelectorAll("input").forEach(el => el.disabled = false);
-        documentProofWrapper.querySelectorAll("select").forEach(el => el.disabled = false);
-        if (documentTypeSelect) {
-          documentTypeSelect.required = true;
+      if (typeof heic2any !== "function") {
+        alert("HEIC conversion failed. Please upload JPG or PNG.");
+        return;
+      }
+
+      try {
+        const jpgBlob = await heic2any({ blob: file, toType: "image/jpeg", quality: 0.9 });
+        const safeName = file.name.replace(/\.(heic|heif)$/i, ".jpg");
+        const jpgFile = new File([jpgBlob], safeName, { type: "image/jpeg" });
+        converted.push(jpgFile);
+      } catch (err) {
+        console.error(err);
+        alert("HEIC conversion failed. Please upload JPG or PNG.");
+        return;
+      }
+    }
+
+    const dt = new DataTransfer();
+    converted.forEach((f) => dt.items.add(f));
+    input.files = dt.files;
+  }
+
+  function initUploadBox(uploadBox) {
+    const input = uploadBox.querySelector('input[type="file"]');
+    if (!input) return;
+
+    uploadBox.addEventListener("click", () => input.click());
+    input.addEventListener("click", (e) => e.stopPropagation());
+
+    uploadBox.addEventListener("dragover", e => {
+      e.preventDefault();
+      uploadBox.classList.add("dragover");
+    });
+
+    // Drag leave
+    uploadBox.addEventListener("dragleave", () => {
+      uploadBox.classList.remove("dragover");
+    });
+
+    // Drop file
+    uploadBox.addEventListener("drop", async e => {
+      e.preventDefault();
+      uploadBox.classList.remove("dragover");
+
+      if (e.dataTransfer.files.length) {
+        input.files = e.dataTransfer.files;
+        await convertHeicIfNeeded(input);
+        if (input.files.length) {
+          markUploaded(uploadBox, input);
         }
       }
     });
 
-
-    document.addEventListener("DOMContentLoaded", () => {
-
-
-      async function convertHeicIfNeeded(input) {
-        if (!input || !input.files || input.files.length === 0) return;
-
-        const files = Array.from(input.files);
-        const converted = [];
-
-        for (const file of files) {
-          const ext = (file.name.split(".").pop() || "").toLowerCase();
-          const isHeic = ext === "heic" || ext === "heif" || file.type === "image/heic" || file.type === "image/heif";
-          if (!isHeic) {
-            converted.push(file);
-            continue;
-          }
-
-          if (typeof heic2any !== "function") {
-            alert("HEIC conversion failed. Please upload JPG or PNG.");
-            return;
-          }
-
-          try {
-            const jpgBlob = await heic2any({
-              blob: file,
-              toType: "image/jpeg",
-              quality: 0.9
-            });
-            const safeName = file.name.replace(/\.(heic|heif)$/i, ".jpg");
-            const jpgFile = new File([jpgBlob], safeName, {
-              type: "image/jpeg"
-            });
-            converted.push(jpgFile);
-          } catch (err) {
-            console.error(err);
-            alert("HEIC conversion failed. Please upload JPG or PNG.");
-            return;
-          }
-        }
-
-        const dt = new DataTransfer();
-        converted.forEach((f) => dt.items.add(f));
-        input.files = dt.files;
-      }
-
-      function initUploadBox(uploadBox) {
-        const input = uploadBox.querySelector('input[type="file"]');
-        if (!input) return;
-
-        uploadBox.addEventListener("click", () => input.click());
-        input.addEventListener("click", (e) => e.stopPropagation());
-
-        uploadBox.addEventListener("dragover", e => {
-          e.preventDefault();
-          uploadBox.classList.add("dragover");
-        });
-
-        // Drag leave
-        uploadBox.addEventListener("dragleave", () => {
-          uploadBox.classList.remove("dragover");
-        });
-
-        // Drop file
-        uploadBox.addEventListener("drop", async e => {
-          e.preventDefault();
-          uploadBox.classList.remove("dragover");
-
-          if (e.dataTransfer.files.length) {
-            input.files = e.dataTransfer.files;
-            await convertHeicIfNeeded(input);
-            if (input.files.length) {
-              markUploaded(uploadBox, input);
-            }
-          }
-        });
-
-        // File selected
-        input.addEventListener("change", async () => {
-          if (input.files.length) {
-            await convertHeicIfNeeded(input);
-            if (input.files.length) {
-              markUploaded(uploadBox, input);
-            }
-          }
-        });
-      }
-
-      function markUploaded(box, input) {
-        box.classList.add("uploaded");
-
-        // Optional: show filename safely (no HTML replacement)
-        let filename = box.querySelector(".uploaded-filename");
-        if (!filename) {
-          filename = document.createElement("div");
-          filename.className = "uploaded-filename small mt-2 text-center";
-          box.appendChild(filename);
-        }
-        filename.textContent = input.files[0].name;
-
-        let removeBtn = box.querySelector(".upload-remove");
-        if (!removeBtn) {
-          removeBtn = document.createElement("button");
-          removeBtn.type = "button";
-          removeBtn.className = "upload-remove";
-          removeBtn.setAttribute("aria-label", "Remove file");
-          removeBtn.innerHTML = "&times;";
-          removeBtn.addEventListener("click", (e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            input.value = "";
-            box.classList.remove("uploaded");
-            if (filename && filename.parentNode) filename.parentNode.removeChild(filename);
-            if (removeBtn && removeBtn.parentNode) removeBtn.parentNode.removeChild(removeBtn);
-            updateNextButtonState();
-            updateSubmitButtonState();
-          });
-          box.appendChild(removeBtn);
+    // File selected
+    input.addEventListener("change", async () => {
+      if (input.files.length) {
+        await convertHeicIfNeeded(input);
+        if (input.files.length) {
+          markUploaded(uploadBox, input);
         }
       }
+    });
+  }
 
-      /* =========================
-         INITIALIZE EXISTING BOXES
-         ========================= */
+  function markUploaded(box, input) {
+    box.classList.add("uploaded");
 
-      document.querySelectorAll(".upload-box").forEach(initUploadBox);
+    // Optional: show filename safely (no HTML replacement)
+    let filename = box.querySelector(".uploaded-filename");
+    if (!filename) {
+      filename = document.createElement("div");
+      filename.className = "uploaded-filename small mt-2 text-center";
+      box.appendChild(filename);
+    }
+    filename.textContent = input.files[0].name;
 
-      /* =========================
-         DOCUMENT ATTACHMENTS (MAX 3)
-         ========================= */
+    let removeBtn = box.querySelector(".upload-remove");
+    if (!removeBtn) {
+      removeBtn = document.createElement("button");
+      removeBtn.type = "button";
+      removeBtn.className = "upload-remove";
+      removeBtn.setAttribute("aria-label", "Remove file");
+      removeBtn.innerHTML = "&times;";
+      removeBtn.addEventListener("click", (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        input.value = "";
+        box.classList.remove("uploaded");
+        if (filename && filename.parentNode) filename.parentNode.removeChild(filename);
+        if (removeBtn && removeBtn.parentNode) removeBtn.parentNode.removeChild(removeBtn);
+        updateNextButtonState();
+        updateSubmitButtonState();
+      });
+      box.appendChild(removeBtn);
+    }
+  }
 
-      const addDocumentBtn = document.getElementById("addDocumentBtn");
-      const documentUploadList = document.getElementById("documentUploadList");
+  /* =========================
+     INITIALIZE EXISTING BOXES
+     ========================= */
 
-      if (addDocumentBtn && documentUploadList) {
-        addDocumentBtn.addEventListener("click", () => {
-          const count = documentUploadList.children.length;
-          if (count >= 3) return;
+  document.querySelectorAll(".upload-box").forEach(initUploadBox);
 
-          const col = document.createElement("div");
-          col.className = "position-relative";
+  /* =========================
+     DOCUMENT ATTACHMENTS (MAX 3)
+     ========================= */
 
-          col.innerHTML = `
+  const addDocumentBtn = document.getElementById("addDocumentBtn");
+  const documentUploadList = document.getElementById("documentUploadList");
+
+  if (addDocumentBtn && documentUploadList) {
+    addDocumentBtn.addEventListener("click", () => {
+      const count = documentUploadList.children.length;
+      if (count >= 3) return;
+
+      const col = document.createElement("div");
+      col.className = "position-relative";
+
+      col.innerHTML = `
         <div class="upload-box position-relative">
           <div class="upload-text">
             <i class="fa-solid fa-upload"></i>
@@ -1274,16 +1586,52 @@ require_once __DIR__ . "/includes/resident_access_guard.php";
         </small>
       `;
 
-          documentUploadList.appendChild(col);
+      documentUploadList.appendChild(col);
 
-          // IMPORTANT: initialize drag & drop for the new box
-          initUploadBox(col.querySelector(".upload-box"));
-        });
-      }
-
+      // IMPORTANT: initialize drag & drop for the new box
+      initUploadBox(col.querySelector(".upload-box"));
     });
-  </script>
-  </script>
+  }
+
+  // Sector attachments (max 3 per sector)
+  document.querySelectorAll(".add-sector-doc-btn").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const sector = btn.dataset.sector || "";
+      if (!sector) return;
+
+      const list = document.querySelector(`.sector-upload-list[data-sector="${sector}"]`);
+      if (!list) return;
+
+      const count = list.children.length;
+      if (count >= 3) return;
+
+      const col = document.createElement("div");
+      col.className = "position-relative mt-2";
+      col.innerHTML = `
+        <div class="upload-box position-relative">
+          <div class="upload-text">
+            <i class="fa-solid fa-upload"></i>
+            <span>Drag & drop file</span>
+          </div>
+          <div class="upload-subtext mt-1">PDF or image</div>
+          <input
+            type="file"
+            class="form-control upload-input sector-doc-file"
+            name="sectorDocFile[${sector}][]"
+            data-sector="${sector}"
+            accept=".pdf,image/*,.heic,.heif">
+        </div>
+        <small class="text-muted d-block text-center mt-2">Attachment ${count + 1}</small>
+      `;
+
+      list.appendChild(col);
+      initUploadBox(col.querySelector(".upload-box"));
+    });
+  });
+
+});
+
+</script>
 
   <script>
     document.addEventListener("DOMContentLoaded", () => {
@@ -1317,17 +1665,24 @@ require_once __DIR__ . "/includes/resident_access_guard.php";
         const value = dobInput.value;
         if (!value) {
           seniorCheckbox.checked = false;
+          seniorCheckbox.disabled = true;
           return;
         }
         const dob = new Date(value);
-        if (isNaN(dob.getTime())) return;
+        if (isNaN(dob.getTime())) {
+          seniorCheckbox.checked = false;
+          seniorCheckbox.disabled = true;
+          return;
+        }
         const today = new Date();
         let age = today.getFullYear() - dob.getFullYear();
         const monthDiff = today.getMonth() - dob.getMonth();
         if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < dob.getDate())) {
           age--;
         }
-        seniorCheckbox.checked = age >= 60;
+        const isEligible = age >= 60;
+        seniorCheckbox.disabled = !isEligible;
+        seniorCheckbox.checked = isEligible;
       };
 
       if (dobInput) {
@@ -1347,118 +1702,13 @@ require_once __DIR__ . "/includes/resident_access_guard.php";
     });
   </script>
 
-  <!-- vali-->
-  <script>
-    document.addEventListener("DOMContentLoaded", () => {
-
-      const nameRegex = /^[A-Za-z][A-Za-z\s'-]+$/;
-      const gibberishRegex = /(asdf|qwer|zxcv|aaaa|bbbb|cccc|qwerty|1234)/i;
-
-      function titleCase(str) {
-        return str
-          .toLowerCase()
-          .replace(/\s+/g, " ")
-          .trim()
-          .replace(/\b\w/g, c => c.toUpperCase());
-      }
-
-      function showError(input, message) {
-        clearError(input);
-        input.classList.add("is-invalid");
-        const div = document.createElement("div");
-        div.className = "field-error";
-        div.textContent = message;
-        input.parentNode.appendChild(div);
-      }
-
-      function clearError(input) {
-        input.classList.remove("is-invalid");
-        const err = input.parentNode.querySelector(".field-error");
-        if (err) err.remove();
-      }
-
-      function validateName(input, required = true) {
-        const val = input.value.trim();
-
-        if (!val && required) {
-          showError(input, "This field is required.");
-          return false;
-        }
-
-        if (val.length < 2) {
-          showError(input, "Must be at least 2 characters.");
-          return false;
-        }
-
-        if (!nameRegex.test(val)) {
-          showError(input, "Only letters, spaces, hyphens, and apostrophes allowed.");
-          return false;
-        }
-
-        if (gibberishRegex.test(val)) {
-          showError(input, "Input appears invalid or random.");
-          return false;
-        }
-
-        input.value = titleCase(val);
-        clearError(input);
-        return true;
-      }
-
-      const nameFields = [
-        "lastName", "firstName",
-        "emergencyLastName", "emergencyFirstName"
-      ];
-
-      nameFields.forEach(id => {
-        const el = document.getElementById(id);
-        if (!el) return;
-
-        el.addEventListener("blur", () => {
-          validateName(el, el.hasAttribute("required"));
-          updateNextButtonState();
-        });
-      });
-
-
-      const personalPhone = document.getElementById("phoneNumberHidden");
-      const emergencyPhone = document.getElementById("emergencyPhoneNumber");
-
-      if (emergencyPhone) {
-        emergencyPhone.addEventListener("blur", () => {
-          if (personalPhone.value === emergencyPhone.value) {
-            showError(emergencyPhone, "Emergency contact cannot be your own number.");
-          } else {
-            clearError(emergencyPhone);
-          }
-          updateNextButtonState();
-        });
-      }
-
-      function updateNextButtonState() {
-        document.querySelectorAll(".step.active-step").forEach(step => {
-          const btn = step.querySelector(".next-btn, #submitBtn");
-          if (!btn) return;
-
-          const invalid = step.querySelector(".is-invalid");
-          const requiredEmpty = [...step.querySelectorAll("[required]")]
-            .some(i => !i.value.trim());
-
-          btn.disabled = !!(invalid || requiredEmpty);
-        });
-      }
-
-    });
-  </script>
-
-
   <script
     src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/js/bootstrap.bundle.min.js"
     integrity="sha384-FKyoEForCGlyvwx9Hj09JcYn3nv7wiPVlz7YYwJrWVcXK/BmnVDxM+D2scQbITxI"
-    crossorigin="anonymous"></script>
+    crossorigin="anonymous"
+  ></script>
 
   <script src="https://cdn.jsdelivr.net/npm/heic2any/dist/heic2any.min.js"></script>
 
 </body>
-
 </html>
