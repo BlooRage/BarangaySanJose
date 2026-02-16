@@ -1007,29 +1007,30 @@ try {
         }
     }
 
-    // Sector specific proof uploads
-    $sectorPostToKey = [
-        'PWD' => 'PWD',
-        'Single Parent' => 'SingleParent',
-        'Student' => 'Student',
-        'Senior Citizen' => 'SeniorCitizen',
-        'Indigenous People' => 'IndigenousPeople'
-    ];
-    $selectedSectorKeys = [];
-    foreach ($selectedSectors as $sectorLabel) {
-        if (isset($sectorPostToKey[$sectorLabel])) {
-            $selectedSectorKeys[] = $sectorPostToKey[$sectorLabel];
+    if (!$skipProof) {
+        // Sector specific proof uploads
+        $sectorPostToKey = [
+            'PWD' => 'PWD',
+            'Single Parent' => 'SingleParent',
+            'Student' => 'Student',
+            'Senior Citizen' => 'SeniorCitizen',
+            'Indigenous People' => 'IndigenousPeople'
+        ];
+        $selectedSectorKeys = [];
+        foreach ($selectedSectors as $sectorLabel) {
+            if (isset($sectorPostToKey[$sectorLabel])) {
+                $selectedSectorKeys[] = $sectorPostToKey[$sectorLabel];
+            }
         }
-    }
 
-    $isIdProofSelected = ($proofType === 'ID');
-    $idTypeSelected = strtolower(cleanString($_POST['idType'] ?? ''));
-    $idTypeSelectedNorm = preg_replace('/[^a-z0-9]/', '', (string)$idTypeSelected);
-    $isNationalIdSelected = in_array($idTypeSelectedNorm, ['nationalid', 'philsysid', 'philsysidephilid', 'ephilid'], true);
+        $isIdProofSelected = ($proofType === 'ID');
+        $idTypeSelected = strtolower(cleanString($_POST['idType'] ?? ''));
+        $idTypeSelectedNorm = preg_replace('/[^a-z0-9]/', '', (string)$idTypeSelected);
+        $isNationalIdSelected = in_array($idTypeSelectedNorm, ['nationalid', 'philsysid', 'philsysidephilid', 'ephilid'], true);
 
-	    foreach ($selectedSectorKeys as $sectorKey) {
-	        $docTypeValue = cleanString($_POST['sectorDocType'][$sectorKey] ?? '');
-	        $file = $_FILES['sectorDocFile'] ?? null;
+    	    foreach ($selectedSectorKeys as $sectorKey) {
+    	        $docTypeValue = cleanString($_POST['sectorDocType'][$sectorKey] ?? '');
+    	        $file = $_FILES['sectorDocFile'] ?? null;
         $sectorErrors = ($file && isset($file['error'][$sectorKey]) && is_array($file['error'][$sectorKey]))
             ? $file['error'][$sectorKey]
             : [];
@@ -1255,6 +1256,7 @@ try {
 	            }
 	        }
 	    }
+    }
 
     $hasAnySectorProof = false;
     if (isset($_FILES['sectorDocFile']['name']) && is_array($_FILES['sectorDocFile']['name'])) {
