@@ -34,6 +34,9 @@ $residentStatusRaw = trim((string)($residentinformationtbl['status_name_resident
 $residentStatusKey = strtolower(str_replace([' ', '_', '-'], '', $residentStatusRaw));
 $isResidentVerified = in_array($residentStatusKey, ['verifiedresident', 'verified'], true);
 $canSendHouseholdInvite = $isHeadOfFamily && $isResidentVerified;
+$editStatusKey = $residentStatusKey !== '' ? $residentStatusKey : 'notverified';
+$canEditProfile = !in_array($editStatusKey, ['notverified', 'pendingverification'], true);
+$editBlockMessage = 'Your account must be verified before you can edit your profile, address, or emergency contact.';
 
 if (!function_exists('toPublicPath')) {
 function toPublicPath($path): ?string {
@@ -128,6 +131,9 @@ if ($residentId !== '' && isset($conn) && $conn instanceof mysqli) {
     <script>
       // Used by JS change-phone flow to decide if email OTP option is allowed.
       window.RESIDENT_PROFILE_EMAIL_VERIFIED = <?= $emailVerified ? 'true' : 'false' ?>;
+      window.RESIDENT_PROFILE_EDIT_ALLOWED = <?= $canEditProfile ? 'true' : 'false' ?>;
+      window.RESIDENT_PROFILE_EDIT_BLOCK_MESSAGE = <?= json_encode($editBlockMessage, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) ?>;
+      window.RESIDENT_PROFILE_AGE = <?= $computedAge !== '' ? (int)$computedAge : 'null' ?>;
     </script>
     <meta name="viewport" content="width=device-width, initial-scale=1">
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
@@ -604,6 +610,7 @@ if ($residentId !== '' && isset($conn) && $conn instanceof mysqli) {
                         <span id="profileDeniedText"></span>
                         <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
                     </div>
+                    <div id="profileSaveResult" class="small mb-2"></div>
 
                     <label class="form-label">Full Name</label>
                     <div class="d-flex gap-2 mb-3">
@@ -796,12 +803,13 @@ if ($residentId !== '' && isset($conn) && $conn instanceof mysqli) {
                     <div class="alert alert-warning small mb-3">
                         Changing your address will remove you from your household.
                     </div>
-                    <div id="headReassignBlock" class="border rounded p-2 mb-3 d-none">
+                    <div id="headReassignBlock" class="border rounded p-2 mb-3 d-none" data-is-head="<?= $isHeadOfFamily ? '1' : '0' ?>">
                         <label class="form-label fw-bold mb-1">Assign New Head of Household</label>
                         <select class="form-select" id="newHeadResidentId">
                             <option value="">Select a member</option>
                         </select>
                         <div class="form-text">Required before a household head can change address.</div>
+                        <div id="headReassignLoading" class="text-muted small mt-2 d-none">Loading household members...</div>
                         <div id="headReassignEmpty" class="text-danger small mt-2 d-none">
                             You must have at least one other active household member to reassign the head role.
                         </div>
@@ -811,7 +819,22 @@ if ($residentId !== '' && isset($conn) && $conn instanceof mysqli) {
                     <input type="text" class="form-control mb-2" id="addressStreetName" placeholder="Street Name" value="<?= htmlspecialchars($residentaddresstbl['street_name'] ?? '') ?>">
                     <input type="text" class="form-control mb-2" id="addressPhaseNumber" placeholder="Phase Number" value="<?= htmlspecialchars($residentaddresstbl['phase_number'] ?? '') ?>">
                     <input type="text" class="form-control mb-2" id="addressSubdivision" placeholder="Subdivision" value="<?= htmlspecialchars($residentaddresstbl['subdivision'] ?? '') ?>">
-                    <input type="text" class="form-control mb-2" id="addressAreaNumber" placeholder="Area Number" value="<?= htmlspecialchars($residentaddresstbl['area_number'] ?? '') ?>">
+                    <?php
+                      $areaOptions = ['Area 01', 'Area 1A', 'Area 02', 'Area 03', 'Area 04', 'Area 05', 'Area 06'];
+                      $currentArea = trim((string)($residentaddresstbl['area_number'] ?? ''));
+                      $allAreaOptions = $areaOptions;
+                      if ($currentArea !== '' && !in_array($currentArea, $areaOptions, true)) {
+                          $allAreaOptions[] = $currentArea;
+                      }
+                    ?>
+                    <select class="form-select mb-2" id="addressAreaNumber">
+                        <option value="">Select Area</option>
+                        <?php foreach ($allAreaOptions as $areaOption): ?>
+                            <option value="<?= htmlspecialchars($areaOption) ?>" <?= $currentArea === $areaOption ? 'selected' : '' ?>>
+                                <?= htmlspecialchars($areaOption) ?>
+                            </option>
+                        <?php endforeach; ?>
+                    </select>
                     <div id="addressSaveResult" class="small mt-2"></div>
                 </div>
 
@@ -1175,5 +1198,19 @@ if ($residentId !== '' && isset($conn) && $conn instanceof mysqli) {
     </div>
 
         <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+        <script>
+            document.addEventListener("DOMContentLoaded", () => {
+                const noticeModal = document.getElementById("residentNoticeModal");
+                if (!noticeModal) return;
+                noticeModal.addEventListener("show.bs.modal", () => {
+                    if (!window.bootstrap?.Modal) return;
+                    document.querySelectorAll(".modal.show").forEach((el) => {
+                        if (el === noticeModal) return;
+                        const instance = bootstrap.Modal.getInstance(el);
+                        if (instance) instance.hide();
+                    });
+                });
+            });
+        </script>
 </body>
 </html>
