@@ -18,6 +18,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const pendingAlert = document.getElementById("profilePendingAlert");
     const deniedAlert = document.getElementById("profileDeniedAlert");
     const deniedText = document.getElementById("profileDeniedText");
+    const resultEl = document.getElementById("profileSaveResult");
     const modalEl = document.getElementById("editProfileModal");
     const religion = document.getElementById("editReligion");
     const employmentStatus = document.getElementById("employmentStatus");
@@ -29,6 +30,10 @@ document.addEventListener("DOMContentLoaded", () => {
     const noticeModalEl = document.getElementById("residentNoticeModal");
     const noticeTitleEl = document.getElementById("residentNoticeTitle");
     const noticeBodyEl = document.getElementById("residentNoticeBody");
+    const canEdit = window.RESIDENT_PROFILE_EDIT_ALLOWED !== false;
+    const editBlockedMessage =
+        window.RESIDENT_PROFILE_EDIT_BLOCK_MESSAGE ||
+        "Your account must be verified before you can edit your profile.";
     let isPendingRequest = false;
 
     if (!firstName || !lastName || !civilStatus || !btnNext) return;
@@ -39,6 +44,21 @@ document.addEventListener("DOMContentLoaded", () => {
             .filter((v) => v !== "")
             .sort()
             .join(",");
+
+    const applySeniorEligibility = () => {
+        const seniorCheckbox = document.getElementById("sectorSenior");
+        if (!seniorCheckbox) return;
+        const age = Number.isFinite(window.RESIDENT_PROFILE_AGE)
+            ? window.RESIDENT_PROFILE_AGE
+            : Number(window.RESIDENT_PROFILE_AGE);
+        const isEligible = Number.isFinite(age) && age >= 60;
+        if (!isEligible) {
+            seniorCheckbox.checked = false;
+            seniorCheckbox.disabled = true;
+        } else {
+            seniorCheckbox.disabled = false;
+        }
+    };
 
     const initial = {
         firstName: firstName.value.trim(),
@@ -93,6 +113,98 @@ document.addEventListener("DOMContentLoaded", () => {
         }
     };
 
+    const sanitizeNameValue = (value) => value.replace(/[^A-Za-z ]+/g, "");
+
+    const enforceMarriedNoSingle = () => {
+        if (!civilStatus) return;
+        const singleOption = civilStatus.querySelector('option[value="Single"]');
+        if (!singleOption) return;
+        if (civilStatus.value === "Married") {
+            singleOption.disabled = true;
+        }
+    };
+
+    const setMessage = (message, isError = false) => {
+        if (!resultEl) return;
+        resultEl.textContent = message || "";
+        resultEl.className = isError ? "small mb-2 text-danger" : "small mb-2 text-success";
+    };
+
+    const looksLikeGibberish = (value) => {
+        const letters = value.match(/[A-Za-z]/g) || [];
+        const letterCount = letters.length;
+        if (letterCount < 6) return false;
+
+        const lower = value.toLowerCase();
+        const vowelCount = (lower.match(/[aeiou]/g) || []).length;
+        let longestConsonantRun = 0;
+        let currentRun = 0;
+        for (const ch of lower) {
+            if (/[a-z]/.test(ch)) {
+                if ("aeiou".includes(ch)) {
+                    currentRun = 0;
+                } else {
+                    currentRun += 1;
+                    if (currentRun > longestConsonantRun) longestConsonantRun = currentRun;
+                }
+            } else {
+                currentRun = 0;
+            }
+        }
+
+        const uniqueLetters = new Set(letters.map((l) => l.toLowerCase())).size;
+        if (letterCount >= 8 && vowelCount === 0) return true;
+        if (letterCount >= 10 && vowelCount <= 1) return true;
+        if (longestConsonantRun >= 6) return true;
+        if (letterCount >= 8 && uniqueLetters <= 3) return true;
+        return false;
+    };
+
+    const isValidPersonName = (value, minLetters, maxLen) => {
+        if (!value) return false;
+        if (value.length > maxLen) return false;
+        if (!/^[A-Za-z ]+$/.test(value)) return false;
+        const letters = value.match(/[A-Za-z]/g) || [];
+        if (letters.length < minLetters) return false;
+        if (looksLikeGibberish(value)) return false;
+        return true;
+    };
+
+    const isValidOccupation = (value, maxLen = 100) => {
+        if (!value) return true;
+        if (value.length > maxLen) return false;
+        if (!/^[A-Za-z ]+$/.test(value)) return false;
+        if (looksLikeGibberish(value)) return false;
+        return true;
+    };
+
+    const validate = () => {
+        const fName = firstName.value.trim();
+        const mName = middleName ? middleName.value.trim() : "";
+        const lName = lastName.value.trim();
+        const occ = occupation ? occupation.value.trim() : "";
+
+        if (!isValidPersonName(fName, 2, 30)) {
+            setMessage("First name looks invalid. Please enter a real first name.", true);
+            return false;
+        }
+        if (mName && !isValidPersonName(mName, 1, 30)) {
+            setMessage("Middle name looks invalid. Please enter a real middle name.", true);
+            return false;
+        }
+        if (!isValidPersonName(lName, 2, 30)) {
+            setMessage("Last name looks invalid. Please enter a real last name.", true);
+            return false;
+        }
+        if (!isValidOccupation(occ)) {
+            setMessage("Occupation looks invalid. Please enter a real occupation.", true);
+            return false;
+        }
+
+        setMessage("");
+        return true;
+    };
+
     const updateSections = () => {
         const nameChanged = isNameChanged();
         if (nameNotice) nameNotice.classList.toggle("d-none", !nameChanged);
@@ -118,10 +230,54 @@ document.addEventListener("DOMContentLoaded", () => {
                 canProceed = canProceed && civilFileOk;
             }
         }
-        btnNext.disabled = !canProceed || isPendingRequest;
+        let valid = true;
+        if (hasChanges) {
+            valid = validate();
+        } else {
+            setMessage("");
+        }
+        btnNext.disabled = !canProceed || !valid || isPendingRequest;
     };
 
-    [firstName, middleName, lastName, suffix, civilStatus].forEach((el) => {
+    const resetForm = () => {
+        firstName.value = initial.firstName;
+        if (middleName) middleName.value = initial.middleName;
+        lastName.value = initial.lastName;
+        if (suffix) suffix.value = initial.suffix;
+        civilStatus.value = initial.civilStatus;
+        if (religion) religion.value = initial.religion;
+        if (employmentStatus) employmentStatus.value = initial.employmentStatus;
+        if (occupation) occupation.value = initial.occupation;
+        if (voterStatus) voterStatus.value = initial.voterStatus;
+
+        document.querySelectorAll("input[name='sectorMembership[]']").forEach((el) => {
+            el.checked = initial.sectorMembership.split(",").includes(el.value.trim());
+        });
+
+        if (nameIdType) nameIdType.value = "";
+        if (nameIdFile) nameIdFile.value = "";
+        if (civilFile) civilFile.value = "";
+
+        if (nameNotice) nameNotice.classList.add("d-none");
+        if (nameSection) nameSection.classList.add("d-none");
+        if (civilNotice) civilNotice.classList.add("d-none");
+        if (civilSection) civilSection.classList.add("d-none");
+        setMessage("");
+        enforceMarriedNoSingle();
+        updateSections();
+    };
+
+    [firstName, middleName, lastName].forEach((el) => {
+        if (!el) return;
+        el.addEventListener("input", () => {
+            const sanitized = sanitizeNameValue(el.value);
+            if (el.value !== sanitized) {
+                el.value = sanitized;
+            }
+            updateSections();
+        });
+    });
+    [suffix, civilStatus].forEach((el) => {
         if (el) el.addEventListener("input", updateSections);
     });
     if (religion) religion.addEventListener("change", updateSections);
@@ -134,95 +290,119 @@ document.addEventListener("DOMContentLoaded", () => {
     if (nameIdType) nameIdType.addEventListener("change", updateSections);
     if (nameIdFile) nameIdFile.addEventListener("change", updateSections);
     if (civilFile) civilFile.addEventListener("change", updateSections);
-    if (civilStatus) civilStatus.addEventListener("change", updateSections);
+    if (civilStatus) civilStatus.addEventListener("change", () => {
+        enforceMarriedNoSingle();
+        updateSections();
+    });
 
+    applySeniorEligibility();
+    enforceMarriedNoSingle();
     updateSections();
 
     const showNotice = (title, message) => {
         if (noticeTitleEl) noticeTitleEl.textContent = title || "Notice";
         if (noticeBodyEl) noticeBodyEl.textContent = message || "";
         if (!noticeModalEl || !window.bootstrap?.Modal) return;
+        if (modalEl && window.bootstrap?.Modal) {
+            const openModal = bootstrap.Modal.getInstance(modalEl);
+            if (openModal) openModal.hide();
+        }
         bootstrap.Modal.getOrCreateInstance(noticeModalEl).show();
     };
 
+    const showEditBlocked = (event) => {
+        if (event) {
+            event.preventDefault();
+            event.stopPropagation();
+        }
+        showNotice("Verification Required", editBlockedMessage);
+    };
+
     let statusLoaded = false;
+    let statusPromise = null;
 
     const openModal = () => {
         if (!modalEl || !window.bootstrap?.Modal) return;
         bootstrap.Modal.getOrCreateInstance(modalEl).show();
     };
 
-    const handlePendingClick = async (event) => {
-        event.preventDefault();
-        event.stopPropagation();
-
-        if (!statusLoaded) {
+    const primeStatus = () => {
+        if (statusPromise) return statusPromise;
+        statusPromise = (async () => {
             try {
                 const res = await fetch("../PhpFiles/Resident-End/edit_request_status.php");
                 const data = await res.json().catch(() => ({}));
                 if (res.ok && data.success) {
                     isPendingRequest = Boolean(data.pending?.profile);
+                    if (data.denied?.profile && deniedAlert) {
+                        const remarks = data.denied.profile.remarks?.trim();
+                        const reviewedAt = data.denied.profile.reviewed_at;
+                        let msg = "Your last profile edit request was denied.";
+                        if (remarks) {
+                            msg += ` Reason: ${remarks}`;
+                        }
+                        if (reviewedAt) {
+                            msg += ` (Reviewed: ${new Date(reviewedAt).toLocaleString()})`;
+                        }
+                        if (deniedText) {
+                            deniedText.textContent = msg;
+                        } else {
+                            deniedAlert.textContent = msg;
+                        }
+                        deniedAlert.classList.remove("d-none");
+                    }
                 }
             } catch (e) {
                 // ignore
             } finally {
                 statusLoaded = true;
+                updateSections();
             }
+        })();
+        return statusPromise;
+    };
+
+    const handlePendingClick = async (event) => {
+        if (!canEdit) {
+            showEditBlocked(event);
+            return;
         }
+        event.preventDefault();
+        event.stopPropagation();
 
         if (isPendingRequest) {
             showNotice("Pending Request", "You already have a pending profile edit request.");
             return;
         }
+
         openModal();
+
+        if (!statusLoaded) {
+            await primeStatus();
+            if (isPendingRequest) {
+                showNotice("Pending Request", "You already have a pending profile edit request.");
+            }
+        }
     };
     if (modalTrigger) {
         modalTrigger.addEventListener("click", handlePendingClick);
     }
     if (modalEl) {
         modalEl.addEventListener("show.bs.modal", (event) => {
+            if (!canEdit) {
+                showEditBlocked(event);
+                return;
+            }
             if (!isPendingRequest) return;
             event.preventDefault();
             showNotice("Pending Request", "You already have a pending profile edit request.");
         });
+        modalEl.addEventListener("hidden.bs.modal", () => {
+            resetForm();
+        });
     }
 
-    (async () => {
-        try {
-            const res = await fetch("../PhpFiles/Resident-End/edit_request_status.php");
-            const data = await res.json().catch(() => ({}));
-            if (res.ok && data.success && data.pending?.profile) {
-                isPendingRequest = true;
-                if (pendingAlert) pendingAlert.classList.add("d-none");
-                if (modalEl && window.bootstrap?.Modal) {
-                    const modal = bootstrap.Modal.getInstance(modalEl);
-                    if (modal) modal.hide();
-                }
-            }
-            if (res.ok && data.success && data.denied?.profile && deniedAlert) {
-                const remarks = data.denied.profile.remarks?.trim();
-                const reviewedAt = data.denied.profile.reviewed_at;
-                let msg = "Your last profile edit request was denied.";
-                if (remarks) {
-                    msg += ` Reason: ${remarks}`;
-                }
-                if (reviewedAt) {
-                    msg += ` (Reviewed: ${new Date(reviewedAt).toLocaleString()})`;
-                }
-                if (deniedText) {
-                    deniedText.textContent = msg;
-                } else {
-                    deniedAlert.textContent = msg;
-                }
-                deniedAlert.classList.remove("d-none");
-            }
-        } catch (e) {
-            // ignore
-        } finally {
-            statusLoaded = true;
-            updateSections();
-        }
-    })();
+    primeStatus();
 
     btnNext.addEventListener("click", async () => {
         btnNext.disabled = true;

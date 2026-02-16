@@ -6,6 +6,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const headBlock = document.getElementById("headReassignBlock");
     const headSelect = document.getElementById("newHeadResidentId");
     const headEmpty = document.getElementById("headReassignEmpty");
+    const headLoading = document.getElementById("headReassignLoading");
     const deniedAlert = document.getElementById("addressDeniedAlert");
     const deniedText = document.getElementById("addressDeniedText");
     const modalTrigger =
@@ -15,7 +16,12 @@ document.addEventListener("DOMContentLoaded", () => {
     const noticeModalEl = document.getElementById("residentNoticeModal");
     const noticeTitleEl = document.getElementById("residentNoticeTitle");
     const noticeBodyEl = document.getElementById("residentNoticeBody");
+    const canEdit = window.RESIDENT_PROFILE_EDIT_ALLOWED !== false;
+    const editBlockedMessage =
+        window.RESIDENT_PROFILE_EDIT_BLOCK_MESSAGE ||
+        "Your account must be verified before you can edit your address.";
     let requiresReassign = false;
+    const isHead = headBlock?.dataset?.isHead === "1";
     const fieldIds = [
         "addressUnitNumber",
         "addressStreetNumber",
@@ -40,9 +46,54 @@ document.addEventListener("DOMContentLoaded", () => {
         resultEl.className = isError ? "small mt-2 text-danger" : "small mt-2 text-success";
     };
 
-    const isValidAddressLike = (value) => {
+    const isValidTextField = (value) => {
         if (value === "") return true;
-        return /^[A-Za-z0-9 .,'#()\/&-]+$/.test(value);
+        return /^[A-Za-z .,'-]+$/.test(value);
+    };
+
+    const isValidNumberField = (value) => {
+        if (value === "") return true;
+        return /^\d+$/.test(value);
+    };
+
+    const areaOptions = new Set([
+        "Area 01",
+        "Area 1A",
+        "Area 02",
+        "Area 03",
+        "Area 04",
+        "Area 05",
+        "Area 06",
+    ]);
+
+    const looksLikeGibberish = (value) => {
+        const letters = value.match(/[A-Za-z]/g) || [];
+        const letterCount = letters.length;
+        if (letterCount < 6) return false;
+
+        const lower = value.toLowerCase();
+        const vowelCount = (lower.match(/[aeiou]/g) || []).length;
+        let longestConsonantRun = 0;
+        let currentRun = 0;
+        for (const ch of lower) {
+            if (/[a-z]/.test(ch)) {
+                if ("aeiou".includes(ch)) {
+                    currentRun = 0;
+                } else {
+                    currentRun += 1;
+                    if (currentRun > longestConsonantRun) longestConsonantRun = currentRun;
+                }
+            } else {
+                currentRun = 0;
+            }
+        }
+
+        const uniqueLetters = new Set(letters.map((l) => l.toLowerCase())).size;
+        if (letterCount >= 8 && vowelCount === 0) return true;
+        if (letterCount >= 10 && vowelCount <= 1) return true;
+        if (longestConsonantRun >= 6) return true;
+        if (letterCount >= 8 && uniqueLetters <= 3) return true;
+        return false;
     };
 
     const validate = () => {
@@ -56,12 +107,12 @@ document.addEventListener("DOMContentLoaded", () => {
         }
 
         const fields = [
-            { id: "addressUnitNumber", label: "Unit number", max: 50 },
-            { id: "addressStreetNumber", label: "Street number", max: 50 },
-            { id: "addressStreetName", label: "Street name", max: 150 },
-            { id: "addressPhaseNumber", label: "Phase number", max: 50 },
-            { id: "addressSubdivision", label: "Subdivision", max: 150 },
-            { id: "addressAreaNumber", label: "Area number", max: 50 },
+            { id: "addressUnitNumber", label: "Unit number", max: 50, type: "number" },
+            { id: "addressStreetNumber", label: "Street number", max: 50, type: "number" },
+            { id: "addressStreetName", label: "Street name", max: 150, type: "text", gibberish: true },
+            { id: "addressPhaseNumber", label: "Phase number", max: 50, type: "number" },
+            { id: "addressSubdivision", label: "Subdivision", max: 150, type: "text", gibberish: true },
+            { id: "addressAreaNumber", label: "Area number", max: 50, type: "area" },
         ];
         for (const field of fields) {
             const value = getValue(field.id);
@@ -69,8 +120,20 @@ document.addEventListener("DOMContentLoaded", () => {
                 setMessage(`${field.label} must be ${field.max} characters or less.`, true);
                 return false;
             }
-            if (value && !isValidAddressLike(value)) {
-                setMessage(`${field.label} contains invalid characters.`, true);
+            if (field.type === "number" && value && !isValidNumberField(value)) {
+                setMessage(`${field.label} must contain numbers only.`, true);
+                return false;
+            }
+            if (field.type === "area" && value && !areaOptions.has(value)) {
+                setMessage("Please select a valid area.", true);
+                return false;
+            }
+            if (field.type === "text" && value && !isValidTextField(value)) {
+                setMessage(`${field.label} must contain letters only.`, true);
+                return false;
+            }
+            if (value && field.gibberish && looksLikeGibberish(value)) {
+                setMessage(`${field.label} looks invalid. Please enter a real ${field.label.toLowerCase()}.`, true);
                 return false;
             }
         }
@@ -85,6 +148,17 @@ document.addEventListener("DOMContentLoaded", () => {
             const current = el ? el.value.trim() : "";
             return current !== (initialValues[id] ?? "");
         });
+    };
+
+    const resetForm = () => {
+        fieldIds.forEach((id) => {
+            const el = document.getElementById(id);
+            if (el) el.value = initialValues[id] ?? "";
+        });
+        if (headSelect) headSelect.value = "";
+        if (resultEl) resultEl.textContent = "";
+        if (headEmpty) headEmpty.classList.add("d-none");
+        updateSaveState();
     };
 
     let isPendingRequest = false;
@@ -166,6 +240,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     const loadHeadReassign = async () => {
         if (!headBlock || !headSelect) return;
+        if (headLoading) headLoading.classList.remove("d-none");
         try {
             const res = await fetch("../PhpFiles/Resident-End/household_members.php");
             const data = await res.json().catch(() => ({}));
@@ -179,12 +254,12 @@ document.addEventListener("DOMContentLoaded", () => {
 
             headSelect.innerHTML = '<option value="">Select a member</option>';
             if (eligible.length === 0) {
-                if (headEmpty) headEmpty.classList.remove("d-none");
-                headBlock.classList.remove("d-none");
-                requiresReassign = true;
-                saveBtn.disabled = true;
-                return;
-            }
+            if (headEmpty) headEmpty.classList.remove("d-none");
+            headBlock.classList.remove("d-none");
+            requiresReassign = true;
+            saveBtn.disabled = true;
+            return;
+        }
 
             eligible.forEach((m) => {
                 const opt = document.createElement("option");
@@ -199,95 +274,126 @@ document.addEventListener("DOMContentLoaded", () => {
             updateSaveState();
         } catch (e) {
             // ignore
+        } finally {
+            if (headLoading) headLoading.classList.add("d-none");
         }
     };
 
+    if (headBlock && isHead) {
+        headBlock.classList.remove("d-none");
+        requiresReassign = true;
+        saveBtn.disabled = true;
+    }
     loadHeadReassign();
     const showNotice = (title, message) => {
         if (noticeTitleEl) noticeTitleEl.textContent = title || "Notice";
         if (noticeBodyEl) noticeBodyEl.textContent = message || "";
         if (!noticeModalEl || !window.bootstrap?.Modal) return;
+        if (modalEl && window.bootstrap?.Modal) {
+            const openModal = bootstrap.Modal.getInstance(modalEl);
+            if (openModal) openModal.hide();
+        }
         bootstrap.Modal.getOrCreateInstance(noticeModalEl).show();
     };
 
+    const showEditBlocked = (event) => {
+        if (event) {
+            event.preventDefault();
+            event.stopPropagation();
+        }
+        showNotice("Verification Required", editBlockedMessage);
+    };
+
     let statusLoaded = false;
+    let statusPromise = null;
 
     const openModal = () => {
         if (!modalEl || !window.bootstrap?.Modal) return;
         bootstrap.Modal.getOrCreateInstance(modalEl).show();
     };
 
-    const handlePendingClick = async (event) => {
-        event.preventDefault();
-        event.stopPropagation();
-
-        if (!statusLoaded) {
+    const primeStatus = () => {
+        if (statusPromise) return statusPromise;
+        statusPromise = (async () => {
             try {
                 const res = await fetch("../PhpFiles/Resident-End/edit_request_status.php");
                 const data = await res.json().catch(() => ({}));
                 if (res.ok && data.success) {
-                    isPendingRequest = Boolean(data.pending?.address);
+                    if (data.pending?.address) {
+                        isPendingRequest = true;
+                        if (resultEl) resultEl.textContent = "";
+                        if (modalEl && window.bootstrap?.Modal) {
+                            const modal = bootstrap.Modal.getInstance(modalEl);
+                            if (modal) modal.hide();
+                        }
+                    }
+                    if (data.denied?.address && deniedAlert) {
+                        const remarks = data.denied.address.remarks?.trim();
+                        const reviewedAt = data.denied.address.reviewed_at;
+                        let msg = "Your last address edit request was denied.";
+                        if (remarks) {
+                            msg += ` Reason: ${remarks}`;
+                        }
+                        if (reviewedAt) {
+                            msg += ` (Reviewed: ${new Date(reviewedAt).toLocaleString()})`;
+                        }
+                        if (deniedText) {
+                            deniedText.textContent = msg;
+                        } else {
+                            deniedAlert.textContent = msg;
+                        }
+                        deniedAlert.classList.remove("d-none");
+                    }
                 }
             } catch (e) {
                 // ignore
             } finally {
                 statusLoaded = true;
+                updateSaveState();
             }
+        })();
+        return statusPromise;
+    };
+
+    const handlePendingClick = async (event) => {
+        if (!canEdit) {
+            showEditBlocked(event);
+            return;
         }
+        event.preventDefault();
+        event.stopPropagation();
 
         if (isPendingRequest) {
             showNotice("Pending Request", "You already have a pending address edit request.");
             return;
         }
+
         openModal();
+
+        if (!statusLoaded) {
+            await primeStatus();
+            if (isPendingRequest) {
+                showNotice("Pending Request", "You already have a pending address edit request.");
+            }
+        }
     };
     if (modalTrigger) {
         modalTrigger.addEventListener("click", handlePendingClick);
     }
     if (modalEl) {
         modalEl.addEventListener("show.bs.modal", (event) => {
+            if (!canEdit) {
+                showEditBlocked(event);
+                return;
+            }
             if (!isPendingRequest) return;
             event.preventDefault();
             showNotice("Pending Request", "You already have a pending address edit request.");
         });
+        modalEl.addEventListener("hidden.bs.modal", () => {
+            resetForm();
+        });
     }
-    (async () => {
-        try {
-            const res = await fetch("../PhpFiles/Resident-End/edit_request_status.php");
-            const data = await res.json().catch(() => ({}));
-            if (res.ok && data.success) {
-                if (data.pending?.address) {
-                    isPendingRequest = true;
-                    if (resultEl) resultEl.textContent = "";
-                    if (modalEl && window.bootstrap?.Modal) {
-                        const modal = bootstrap.Modal.getInstance(modalEl);
-                        if (modal) modal.hide();
-                    }
-                }
-                if (data.denied?.address && deniedAlert) {
-                    const remarks = data.denied.address.remarks?.trim();
-                    const reviewedAt = data.denied.address.reviewed_at;
-                    let msg = "Your last address edit request was denied.";
-                    if (remarks) {
-                        msg += ` Reason: ${remarks}`;
-                    }
-                    if (reviewedAt) {
-                        msg += ` (Reviewed: ${new Date(reviewedAt).toLocaleString()})`;
-                    }
-                    if (deniedText) {
-                        deniedText.textContent = msg;
-                    } else {
-                        deniedAlert.textContent = msg;
-                    }
-                    deniedAlert.classList.remove("d-none");
-                }
-            }
-        } catch (e) {
-            // ignore
-        } finally {
-            statusLoaded = true;
-            updateSaveState();
-        }
-    })();
+    primeStatus();
     updateSaveState();
 });
