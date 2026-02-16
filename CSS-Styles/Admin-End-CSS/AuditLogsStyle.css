@@ -8,11 +8,27 @@
 
 .audit-shell {
     border-color: #f1e1cf !important;
+    width: 100%;
+    max-width: 100%;
+    overflow-x: auto;
+    overflow-y: visible;
+    -webkit-overflow-scrolling: touch;
+}
+
+#main-display {
+    min-width: 0;
 }
 
 .audit-search .form-control:focus {
     box-shadow: 0 0 0 .2rem rgba(254, 153, 60, 0.18);
     border-color: rgba(254, 153, 60, 0.55);
+}
+
+
+#div-tableContainer {
+    overflow-x: auto;
+    overflow-y: hidden;
+    scrollbar-width: thin;
 }
 
 .audit-columns {
@@ -111,3 +127,13 @@
     overflow: hidden;
     text-overflow: ellipsis;
 }
+
+.audit-shell .table-responsive {
+    overflow-x: visible;
+    overflow-y: visible;
+}
+
+.audit-shell .audit-table {
+    min-width: 1100px;
+}
+
