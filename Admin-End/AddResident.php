@@ -12,6 +12,17 @@
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="../CSS-Styles/Admin-End-CSS/AdminDashboardStyle.css">
     <link rel="stylesheet" href="../CSS-Styles/Admin-End-CSS/AddResidentStyle.css">
+    <style>
+        .field-error {
+  font-size: 0.85rem;
+  color: #dc3545;
+  margin-top: 4px;
+}
+.is-invalid {
+  border-color: #dc3545 !important;
+}
+
+    </style>
 </head>
 
 <body>
@@ -33,8 +44,8 @@
                     <p class="mt-2 text-center">
                         Fill out the resident information form to add a new resident to the database.
                     </p>
-
-                    <div id="form-div">
+<form id="residentRegistrationForm" method="POST">
+<div id="form-div">
                                     <div class="row g-3 mt-1">
                                         <h3 id="form-personalInformation" class="step">Qualifications for Head of the Family:</h3>
                                         <hr class="section-hr">
@@ -462,6 +473,7 @@
 
                 </div>
             </div>
+</form>
 
         </main>
     </div>
@@ -487,6 +499,196 @@
             }
         });
     </script>
+    <script>
+document.addEventListener("DOMContentLoaded", function () {
+
+    const form = document.getElementById("residentRegistrationForm");
+    if (!form) return;
+
+    const firstName = document.getElementById("firstName");
+    const middleName = document.getElementById("middleName");
+    const lastName = document.getElementById("lastName");
+    const dob = document.getElementById("dateOfBirth");
+    const personalNumber = document.getElementById("phoneNumber");
+    const emergencyNumber = document.getElementById("emergencyPhoneNumber");
+
+    /* =========================
+       Helper Functions
+    ========================== */
+
+    function showError(input, message) {
+        clearError(input);
+        input.classList.add("is-invalid");
+
+        const error = document.createElement("div");
+        error.className = "field-error";
+        error.innerText = message;
+
+        input.parentNode.appendChild(error);
+    }
+
+    function clearError(input) {
+        input.classList.remove("is-invalid");
+        const existing = input.parentNode.querySelector(".field-error");
+        if (existing) existing.remove();
+    }
+
+    function hasRepeatingChars(str) {
+        return /(.)\1{3,}/.test(str); // aaaa or 1111 etc
+    }
+
+    function looksLikeKeyboardSpam(str) {
+        const patterns = ["asdf", "qwerty", "zxcv", "1234"];
+        str = str.toLowerCase();
+        return patterns.some(p => str.includes(p));
+    }
+
+    /* =========================
+       Name Validation
+    ========================== */
+
+    function validateName(input) {
+        const value = input.value.trim();
+
+        const nameRegex = /^[A-Za-z\s'-]+$/;
+
+        if (value === "") {
+            showError(input, "This field is required.");
+            return false;
+        }
+
+        if (value.length < 2) {
+            showError(input, "Must be at least 2 characters.");
+            return false;
+        }
+
+        if (!nameRegex.test(value)) {
+            showError(input, "Only letters, spaces, hyphens, and apostrophes allowed.");
+            return false;
+        }
+
+        if (hasRepeatingChars(value)) {
+            showError(input, "Invalid name format.");
+            return false;
+        }
+
+        if (looksLikeKeyboardSpam(value)) {
+            showError(input, "Invalid name format.");
+            return false;
+        }
+
+        clearError(input);
+        return true;
+    }
+
+    /* =========================
+       DOB Validation (18+)
+    ========================== */
+
+    function validateDOB(input) {
+        const value = input.value;
+        const today = new Date();
+
+        if (!value) {
+            showError(input, "Date of birth is required.");
+            return false;
+        }
+
+        const dobDate = new Date(value);
+        let age = today.getFullYear() - dobDate.getFullYear();
+        const m = today.getMonth() - dobDate.getMonth();
+
+        if (m < 0 || (m === 0 && today.getDate() < dobDate.getDate())) {
+            age--;
+        }
+
+        if (age < 18) {
+            showError(input, "You must be at least 18 years old.");
+            return false;
+        }
+
+        clearError(input);
+        return true;
+    }
+
+    /* =========================
+       Phone Validation
+    ========================== */
+
+    function validatePhone(input) {
+        const value = input.value.trim();
+        const phoneRegex = /^09\d{9}$/;
+
+        if (!phoneRegex.test(value)) {
+            showError(input, "Enter a valid 11-digit mobile number (09XXXXXXXXX).");
+            return false;
+        }
+
+        clearError(input);
+        return true;
+    }
+
+    function validatePhoneNotSame() {
+        if (personalNumber.value.trim() !== "" &&
+            emergencyNumber.value.trim() !== "" &&
+            personalNumber.value === emergencyNumber.value) {
+
+            showError(emergencyNumber, "Emergency number must be different from personal number.");
+            return false;
+        }
+
+        clearError(emergencyNumber);
+        return true;
+    }
+
+    /* =========================
+       Blur Validation
+    ========================== */
+
+    firstName.addEventListener("blur", () => validateName(firstName));
+    lastName.addEventListener("blur", () => validateName(lastName));
+
+    middleName.addEventListener("blur", function () {
+        if (middleName.value.trim() !== "") {
+            validateName(middleName);
+        } else {
+            clearError(middleName);
+        }
+    });
+
+    dob.addEventListener("blur", () => validateDOB(dob));
+    personalNumber.addEventListener("blur", () => validatePhone(personalNumber));
+    emergencyNumber.addEventListener("blur", () => {
+        validatePhone(emergencyNumber);
+        validatePhoneNotSame();
+    });
+
+    /* =========================
+       Submit Validation
+    ========================== */
+
+    form.addEventListener("submit", function (e) {
+        let isValid = true;
+
+        if (!validateName(firstName)) isValid = false;
+        if (!validateName(lastName)) isValid = false;
+
+        if (middleName.value.trim() !== "") {
+            if (!validateName(middleName)) isValid = false;
+        }
+
+        if (!validateDOB(dob)) isValid = false;
+        if (!validatePhone(personalNumber)) isValid = false;
+        if (!validatePhone(emergencyNumber)) isValid = false;
+        if (!validatePhoneNotSame()) isValid = false;
+
+        if (!isValid) {
+            e.preventDefault();
+        }
+    });
+
+});
+</script>
 </body>
 </html>
 
