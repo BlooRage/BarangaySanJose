@@ -14,7 +14,11 @@
 </head>
 <body>
   <div class="d-flex" style="min-height: 100vh;">
-    
+    <?php
+      require_once "../PhpFiles/General/connection.php";
+      require_once "includes/admin_guard.php";
+      include "includes/sidebar.php";
+    ?>
 
     <main class="flex-grow-1 p-4 p-md-5 bg-light" id="main-display">
       <h2 class="mb-4" style="font-family: 'Charis SIL Bold'; color: #DE710C; font-size: 48px;">
