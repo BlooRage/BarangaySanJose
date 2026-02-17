@@ -1,8 +1,12 @@
+<<<<<<< Updated upstream
 <?php
 $allowUnregistered = false;
 require_once __DIR__ . "/includes/resident_access_guard.php";
 ?>
 <!DOCTYPE html>
+=======
+﻿<!DOCTYPE html>
+>>>>>>> Stashed changes
 <html lang="en">
 <head>
   <meta charset="UTF-8">
@@ -22,7 +26,7 @@ require_once __DIR__ . "/includes/resident_access_guard.php";
 
   <div class="d-flex" style="min-height: 100vh;">
 
-    <!-- ✅ SIDEBAR INCLUDE -->
+    <!-- âœ… SIDEBAR INCLUDE -->
     <?php include 'includes/resident_sidebar.php'; ?>
 
     <header id="mobile-header">
@@ -37,7 +41,7 @@ require_once __DIR__ . "/includes/resident_access_guard.php";
       </div>
     </header>
 
-    <!-- ✅ MAIN -->
+    <!-- âœ… MAIN -->
     <main id="div-mainDisplay" class="flex-grow-1 p-4 p-md-5 bg-light">
 
       <div id="div-welcomeBanner" class="rounded-4 overflow-hidden mb-5 shadow-sm border-orange-thin">
@@ -58,7 +62,7 @@ require_once __DIR__ . "/includes/resident_access_guard.php";
         <div class="col-12 col-md-4 col-lg-3">
           <div id="card-serviceRequest-certificates"
                class="card-action h-100 p-4 rounded-4 text-center d-flex flex-column align-items-center justify-content-center border-0 shadow-sm"
-               onclick="location.href='#'">
+               onclick="location.href='ApplicationsLandingPage.php'">
             <i class="fa-solid fa-file-lines fa-2xl mb-3"></i><br>
             <span class="fw-bold small">CERTIFICATE REQUEST</span>
           </div>
@@ -147,3 +151,10 @@ require_once __DIR__ . "/includes/resident_access_guard.php";
 </body>
 </html>
 
+<<<<<<< Updated upstream
+=======
+
+
+
+
+>>>>>>> Stashed changes

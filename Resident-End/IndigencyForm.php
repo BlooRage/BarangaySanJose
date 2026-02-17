@@ -1,7 +1,11 @@
+<<<<<<< Updated upstream:Resident-End/indigency.php
 <?php
 $allowUnregistered = false;
 require_once __DIR__ . "/includes/resident_access_guard.php";
 
+=======
+﻿<?php
+>>>>>>> Stashed changes:Resident-End/IndigencyForm.php
 $residentinformationtbl = [
     'firstname' => 'Juan',
     'middlename' => '',
@@ -50,8 +54,11 @@ $useraccountstbl = [
     <title>Indigency Application</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="../CSS-Styles/GeneralStyle.css">
-    <link rel="stylesheet" href="../CSS-Styles/Resident-End-CSS/BarangayId.css">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons/font/bootstrap-icons.css" rel="stylesheet" />
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+<link rel="stylesheet" href="../CSS-Styles/Resident-End-CSS/residentDashboard.css">
+<link rel="stylesheet" href="../CSS-Styles/Guest-End-CSS/GeneralStyle.css">
+    <link rel="stylesheet" href="../CSS-Styles/Resident-End-CSS/applicationForms.css">
 </head>
 
 <body>
@@ -67,11 +74,13 @@ $useraccountstbl = [
 
                     <a href="javascript:history.back()" class="back-link">&lt; Go Back</a>
                     <h1 class="form-title">Indigency</h1>
-                    <p class="form-subtitle">All fields marked with * are required</p>
+                    <p class="form-subtitle">All fields marked with <span class="required-asterisk">*</span> are required</p>
+
+                    <form method="POST" action="">
                     
 
                     <!-- PERSONAL INFORMATION -->
-                    <h2 class="section-title text-center text-dark">Information</h2>
+                    <h2 class="section-title text-center text-dark">Personal Information</h2>
                     <div class="status-row">
                         <label for="application_date">Application Date:</label>
                         <input type="text" id="application_date" name="application_date" value="<?php echo date('Y-m-d H:i:s'); ?>" readonly>
@@ -80,7 +89,7 @@ $useraccountstbl = [
 
                     <div class="form-row">
                         <div class="full-width">
-                            <label>Kahilingan para sa <span>*</span> </label>
+                            <label class="top-label">Request for <span class="required-asterisk">*</span> </label>
                             <select type="text" name="request_purpose" required>
                                 <option value="">Select Purpose</option>
                                 <option value="Scholarship">Scholarship</option>
@@ -94,7 +103,7 @@ $useraccountstbl = [
                     </div>
                     <div class="form-row">
                         <div class="full-width">
-                            <label>Ilalapit kay/sa opisina <span>*</span> </label>
+                            <label class="top-label">To be submitted to <span class="required-asterisk">*</span> </label>
                             <input type="text" name="request_officer" required>
                         </div>
                     </div>
@@ -103,40 +112,42 @@ $useraccountstbl = [
                             <div class="full-width">
                                 <div class="row mb-3">
                                     <div class="col-md-4">
-                                        <label class="form-label" for="unitNumber">Unit / Apartment Number</label>
+                                        <label class="top-label" for="unitNumber">Unit / Apartment Number</label>
                                         <input type="text" class="form-control" id="unitNumber" name="unitNumber" readonly value="<?php echo $residentaddresstbl['unit_number']; ?>">
                                     </div>
                                     <div class="col-md-4">
-                                        <label class="form-label" for="houseNumber">House Number <span class="text-danger">*</span></label>
+                                        <label class="top-label" for="houseNumber">House Number <span class="required-asterisk">*</span></label>
                                         <input type="text" class="form-control" id="houseNumber" name="houseNumber" readonly value="<?php echo $residentaddresstbl['street_number']; ?>">
                                     </div>
                                     <div class="col-md-4">
-                                        <label class="form-label" for="streetName">Street Name <span class="text-danger">*</span></label>
+                                        <label class="top-label" for="streetName">Street Name <span class="required-asterisk">*</span></label>
                                         <input type="text" class="form-control" id="streetName" name="streetName" readonly value="<?php echo $residentaddresstbl['street_name']; ?>">
                                     </div>
                                 </div>
+                            </div>
+                    </div>
                     <br>
                     <div class="form-row pb-0">
                         <div class="full-width ">
-                            <label>Pangalan ng inilalakad <span>*</span> </label>
+                            <label class="top-label">Name of Applicant <span class="required-asterisk">*</span> </label>
                         </div>
                     </div>
-                    <div class="form-row PT-0">
+                    <div class="form-row pt-0">
                         <div>
-                            <label>First Name <span>*</span> </label>
+                            <label class="top-label">First Name <span class="required-asterisk">*</span> </label>
                             <input type="text" name="receiver_first" required>
                         </div>
                         <div>
-                            <label>Last Name <span>*</span> </label>
+                            <label class="top-label">Last Name <span class="required-asterisk">*</span> </label>
                             <input type="text" name="receiver_last" required>
                         </div>
                         <div>
-                            <label>Middle Name</label>
+                            <label class="top-label">Middle Name</label>
                             <input type="text" name="receiver_middle">
                         </div>
 
                         <div>
-                            <label>Suffix</label>
+                            <label class="top-label">Suffix</label>
                             <select name="receiver_suffix">
                                 <option value="">None</option>
                                 <option value="Jr.">Jr.</option>
@@ -148,13 +159,13 @@ $useraccountstbl = [
                     </div>
                     <div class="form-row">
                         <div class="full-width">
-                            <label>Kaugnayan (Ex. Anak) <span>*</span> </label>
+                            <label class="top-label">Relationship (Ex. Child) <span class="required-asterisk">*</span> </label>
                             <input type="text" name="request_relationship" required>
                         </div>
                     </div>
                     <div class="form-row">
                         <div class="full-width">
-                            <label>Contact Number <span>*</span> </label>
+                            <label class="top-label">Contact Number <span class="required-asterisk">*</span> </label>
                             <input type="text" name="request_contact_number" required>
                         </div>
                     </div>
@@ -162,8 +173,8 @@ $useraccountstbl = [
 
 
 
-                    <div class="certification-row">
-                        <label class="certification-text">
+                    <div class="agreement-row">
+                        <label class="agreement-text check-item">
     <input type="checkbox" required>
     I hereby certify that the above information is true and correct to the best of my knowledge and belief.
 </label>
@@ -174,9 +185,17 @@ $useraccountstbl = [
 
                 </form>
             </div>
+            </div>
         </main>
 
     </div>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 </body>
 
 </html>
+<<<<<<< Updated upstream:Resident-End/indigency.php
+=======
+
+
+
+>>>>>>> Stashed changes:Resident-End/IndigencyForm.php
