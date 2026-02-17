@@ -317,7 +317,7 @@ if (isset($conn) && $conn instanceof mysqli) {
 
                     <hr class="my-2">
 
-                    <div class="p-3 rounded-3 mb-3 border-0 bg-white">
+                    <div class="p-3 rounded-3 mb-3 border-0 bg-white" id="view-address-single-wrapper">
                         <div class="d-flex align-items-center justify-content-between mb-2">
                             <h5 class="fw-bold mb-0" style="color: #000;">Emergency Contact</h5>
                         </div>
@@ -350,68 +350,69 @@ if (isset($conn) && $conn instanceof mysqli) {
                         </div>
 
                         <div class="row g-3">
-                            <div class="col-md-3" id="addr-unit-number">
+                            <div class="col-md-4" id="addr-unit-number">
                                 <p class="text-muted small mb-0">Unit Number:</p>
                                 <p id="txt-modalUnitNumber" class="fw-bold mb-0"></p>
                             </div>
-                            <div class="col-md-3" id="addr-house-number">
+                            <div class="col-md-4" id="addr-house-number">
                                 <p class="text-muted small mb-0">House Number:</p>
                                 <p id="txt-modalHouseNum" class="fw-bold mb-0"></p>
                             </div>
-                            <div class="col-md-3" id="addr-street-name">
+                            <div class="col-md-4" id="addr-street-name">
                                 <p class="text-muted small mb-0">Street Name:</p>
                                 <p id="txt-modalStreetName" class="fw-bold mb-0"></p>
                             </div>
-                            <div class="col-md-3" id="addr-phase-number">
+                            <div class="col-md-4" id="addr-phase-number">
                                 <p class="text-muted small mb-0">Phase:</p>
                                 <p id="txt-modalPhaseNumber" class="fw-bold mb-0"></p>
                             </div>
-                            <div class="col-md-3" id="addr-subdivision">
+                            <div class="col-md-4" id="addr-subdivision">
                                 <p class="text-muted small mb-0">Subdivision:</p>
                                 <p id="txt-modalSubdivision" class="fw-bold mb-0"></p>
                             </div>
-                            <div class="col-md-3" id="addr-area-number">
+                            <div class="col-md-4" id="addr-area-number">
                                 <p class="text-muted small mb-0">Area Number:</p>
                                 <p id="txt-modalAreaNumber" class="fw-bold mb-0"></p>
                             </div>
-                            <div class="col-md-3">
+                            <div class="col-md-4">
                                 <p class="text-muted small mb-0">Barangay:</p>
                                 <p id="txt-modalBarangay" class="fw-bold mb-0"></p>
                             </div>
-                            <div class="col-md-3">
+                            <div class="col-md-4">
                                 <p class="text-muted small mb-0">Municipality / City:</p>
                                 <p id="txt-modalMunicipalityCity" class="fw-bold mb-0"></p>
                             </div>
-                            <div class="col-md-3">
+                            <div class="col-md-4">
                                 <p class="text-muted small mb-0">Province:</p>
                                 <p id="txt-modalProvince" class="fw-bold mb-0"></p>
                             </div>
-                        </div>
-                    </div>
-
-                    <hr class="my-2">
-
-                    <div class="p-3 rounded-3 border-0 bg-white">
-                        <div class="d-flex align-items-center justify-content-between mb-2">
-                            <h5 class="fw-bold mb-0" style="color: #000;">House Information</h5>
-                        </div>
-
-                        <div class="row g-3">
                             <div class="col-md-4">
                                 <p class="text-muted small mb-0">House Ownership:</p>
                                 <p id="txt-modalHouseOwnership" class="fw-bold mb-0"></p>
                             </div>
-
                             <div class="col-md-4">
                                 <p class="text-muted small mb-0">House Type:</p>
                                 <p id="txt-modalHouseType" class="fw-bold mb-0"></p>
                             </div>
-
                             <div class="col-md-4">
                                 <p class="text-muted small mb-0">Residency Duration:</p>
                                 <p id="txt-modalResidencyDuration" class="fw-bold mb-0"></p>
                             </div>
                         </div>
+                    </div>
+
+                    <div class="d-flex justify-content-center mb-2 d-none" id="view-address-history-toggle-wrap">
+                        <a href="#" class="d-inline-flex align-items-center gap-2 text-primary text-decoration-none fw-semibold" id="btnToggleAddressHistory">
+                            <span id="txtAddressHistoryToggle">See address history</span>
+                            <i id="iconAddressHistoryToggle" class="fa-solid fa-arrow-down"></i>
+                        </a>
+                    </div>
+
+                    <div class="p-3 rounded-3 border-0 bg-white d-none mb-2" id="view-address-history-wrapper">
+                        <div class="d-flex align-items-center justify-content-between mb-2">
+                            <h5 class="fw-bold mb-0" style="color: #000;">Address History</h5>
+                        </div>
+                        <div id="view-address-history-list" class="d-flex flex-column gap-2"></div>
                     </div>
 
                     <hr class="my-2">
@@ -839,7 +840,6 @@ if (isset($conn) && $conn instanceof mysqli) {
   };
 </script>
 <script src="../JS-Script-Files/Admin-End/tableColumnsGeneric.js?v=20260215-1"></script>
-<script src="../JS-Script-Files/Admin-End/residentMasterlistScript.js?v=20260212-5"></script>
+<script src="../JS-Script-Files/Admin-End/residentMasterlistScript.js?v=20260217-2"></script>
 </body>
 </html>
-

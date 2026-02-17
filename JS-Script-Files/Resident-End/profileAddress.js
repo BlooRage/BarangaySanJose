@@ -1,4 +1,5 @@
 document.addEventListener("DOMContentLoaded", () => {
+    const AUTO_RESIDENCY_DURATION = "Less than 6 months";
     const saveBtn = document.getElementById("btnSaveAddress");
     if (!saveBtn) return;
 
@@ -16,19 +17,37 @@ document.addEventListener("DOMContentLoaded", () => {
     const noticeModalEl = document.getElementById("residentNoticeModal");
     const noticeTitleEl = document.getElementById("residentNoticeTitle");
     const noticeBodyEl = document.getElementById("residentNoticeBody");
+    const beforeModalEl = document.getElementById("beforeEditModal");
+    const beforeContinueBtn = document.getElementById("btnBeforeEditContinue");
     const canEdit = window.RESIDENT_PROFILE_EDIT_ALLOWED !== false;
     const editBlockedMessage =
         window.RESIDENT_PROFILE_EDIT_BLOCK_MESSAGE ||
-        "Your account must be verified before you can edit your address.";
+        "Your account must be verified before you can change your address.";
     let requiresReassign = false;
     const isHead = headBlock?.dataset?.isHead === "1";
+    const addressSystemEl = document.getElementById("addressSystemEdit");
+    const houseWrapper = document.getElementById("addressHouseWrapper");
+    const lotBlockWrapper = document.getElementById("addressLotBlockWrapper");
+    const houseTypeEl = document.getElementById("addressHouseType");
+    const houseTypeOtherEl = document.getElementById("addressHouseTypeOther");
     const fieldIds = [
-        "addressUnitNumber",
-        "addressStreetNumber",
-        "addressStreetName",
-        "addressPhaseNumber",
-        "addressSubdivision",
-        "addressAreaNumber",
+        "addressSystemEdit",
+        "addressUnitNumberHouse",
+        "addressStreetNumberHouse",
+        "addressStreetNameHouse",
+        "addressPhaseNumberHouse",
+        "addressSubdivisionHouse",
+        "addressAreaNumberHouse",
+        "addressUnitNumberLot",
+        "addressLotNumber",
+        "addressBlockNumber",
+        "addressStreetNameLot",
+        "addressSubdivisionLot",
+        "addressAreaNumberLot",
+        "addressHouseOwnership",
+        "addressHouseType",
+        "addressHouseTypeOther",
+        "addressResidencyDuration",
     ];
     const initialValues = {};
     fieldIds.forEach((id) => {
@@ -40,10 +59,67 @@ document.addEventListener("DOMContentLoaded", () => {
         return el ? el.value.trim() : "";
     };
 
+    const getAddressSystem = () => (addressSystemEl ? addressSystemEl.value : "");
+
+    const getHouseTypeValue = () => {
+        const selected = getValue("addressHouseType");
+        if (selected !== "Other") return selected;
+        return getValue("addressHouseTypeOther");
+    };
+
+    const getAddressFields = () => {
+        const system = getAddressSystem();
+        if (system === "lot_block") {
+            return {
+                address_system: "lot_block",
+                unit_number: getValue("addressUnitNumberLot"),
+                street_number: getValue("addressLotNumber"),
+                street_name: getValue("addressStreetNameLot"),
+                phase_number: getValue("addressBlockNumber"),
+                subdivision: getValue("addressSubdivisionLot"),
+                area_number: getValue("addressAreaNumberLot"),
+            };
+        }
+        return {
+            address_system: "house",
+            unit_number: getValue("addressUnitNumberHouse"),
+            street_number: getValue("addressStreetNumberHouse"),
+            street_name: getValue("addressStreetNameHouse"),
+            phase_number: getValue("addressPhaseNumberHouse"),
+            subdivision: getValue("addressSubdivisionHouse"),
+            area_number: getValue("addressAreaNumberHouse"),
+        };
+    };
+
+    const buildPayload = () => {
+        const addr = getAddressFields();
+        return {
+            ...addr,
+            house_ownership: getValue("addressHouseOwnership"),
+            house_type: getHouseTypeValue(),
+            residency_duration: AUTO_RESIDENCY_DURATION,
+        };
+    };
+
     const setMessage = (message, isError = false) => {
         if (!resultEl) return;
         resultEl.textContent = message || "";
-        resultEl.className = isError ? "small mt-2 text-danger" : "small mt-2 text-success";
+        resultEl.className = isError ? "small mb-2 text-danger" : "small mb-2 text-success";
+    };
+
+    const clearFieldErrors = () => {
+        fieldIds.forEach((id) => {
+            const el = document.getElementById(id);
+            if (el) el.classList.remove("is-invalid");
+        });
+    };
+
+    const failField = (fieldId, message) => {
+        clearFieldErrors();
+        const el = document.getElementById(fieldId);
+        if (el) el.classList.add("is-invalid");
+        setMessage(message, true);
+        return false;
     };
 
     const isValidTextField = (value) => {
@@ -51,9 +127,9 @@ document.addEventListener("DOMContentLoaded", () => {
         return /^[A-Za-z .,'-]+$/.test(value);
     };
 
-    const isValidNumberField = (value) => {
+    const isValidAddressLikeField = (value) => {
         if (value === "") return true;
-        return /^\d+$/.test(value);
+        return /^[A-Za-z0-9 .,'#()\/&-]+$/.test(value);
     };
 
     const areaOptions = new Set([
@@ -97,57 +173,80 @@ document.addEventListener("DOMContentLoaded", () => {
     };
 
     const validate = () => {
-        const streetNumber = getValue("addressStreetNumber");
-        const streetName = getValue("addressStreetName");
-        const areaNumber = getValue("addressAreaNumber");
+        clearFieldErrors();
+        const system = getAddressSystem();
+        if (!["house", "lot_block"].includes(system)) {
+            return failField("addressSystemEdit", "Please select an address system.");
+        }
+        const address = getAddressFields();
 
-        if (!streetNumber || !streetName || !areaNumber) {
-            setMessage("Street number, street name, and area number are required.", true);
+        if (system === "house") {
+            if (!address.street_number) return failField("addressStreetNumberHouse", "House number is required.");
+            if (!address.street_name) return failField("addressStreetNameHouse", "Street name is required.");
+            if (!address.area_number) return failField("addressAreaNumberHouse", "Area is required.");
+        } else {
+            if (!address.street_number) return failField("addressLotNumber", "Lot number is required.");
+            if (!address.phase_number) return failField("addressBlockNumber", "Block number is required.");
+            if (!address.area_number) return failField("addressAreaNumberLot", "Area is required.");
+        }
+
+        if (!getValue("addressHouseOwnership") || !getHouseTypeValue()) {
+            if (!getValue("addressHouseOwnership")) return failField("addressHouseOwnership", "House ownership is required.");
+            if (!getHouseTypeValue()) return failField("addressHouseType", "House type is required.");
             return false;
         }
 
-        const fields = [
-            { id: "addressUnitNumber", label: "Unit number", max: 50, type: "number" },
-            { id: "addressStreetNumber", label: "Street number", max: 50, type: "number" },
-            { id: "addressStreetName", label: "Street name", max: 150, type: "text", gibberish: true },
-            { id: "addressPhaseNumber", label: "Phase number", max: 50, type: "number" },
-            { id: "addressSubdivision", label: "Subdivision", max: 150, type: "text", gibberish: true },
-            { id: "addressAreaNumber", label: "Area number", max: 50, type: "area" },
-        ];
+        const fields = system === "lot_block"
+            ? [
+                { id: "addressUnitNumberLot", label: "Unit number", max: 50, type: "number" },
+                { id: "addressLotNumber", label: "Lot", max: 50, type: "number" },
+                { id: "addressBlockNumber", label: "Block", max: 50, type: "number" },
+                { id: "addressStreetNameLot", label: "Street name", max: 150, type: "text", gibberish: true },
+                { id: "addressSubdivisionLot", label: "Subdivision", max: 150, type: "text", gibberish: true },
+                { id: "addressAreaNumberLot", label: "Area number", max: 50, type: "area" },
+              ]
+            : [
+                { id: "addressUnitNumberHouse", label: "Unit number", max: 50, type: "number" },
+                { id: "addressStreetNumberHouse", label: "House number", max: 50, type: "number" },
+                { id: "addressStreetNameHouse", label: "Street name", max: 150, type: "text", gibberish: true },
+                { id: "addressPhaseNumberHouse", label: "Phase", max: 50, type: "number" },
+                { id: "addressSubdivisionHouse", label: "Subdivision", max: 150, type: "text", gibberish: true },
+                { id: "addressAreaNumberHouse", label: "Area number", max: 50, type: "area" },
+              ];
         for (const field of fields) {
             const value = getValue(field.id);
             if (value && field.max && value.length > field.max) {
-                setMessage(`${field.label} must be ${field.max} characters or less.`, true);
-                return false;
+                return failField(field.id, `${field.label} must be ${field.max} characters or less.`);
             }
-            if (field.type === "number" && value && !isValidNumberField(value)) {
-                setMessage(`${field.label} must contain numbers only.`, true);
-                return false;
+            if (field.type === "number" && value && !isValidAddressLikeField(value)) {
+                return failField(field.id, `${field.label} contains invalid characters.`);
             }
             if (field.type === "area" && value && !areaOptions.has(value)) {
-                setMessage("Please select a valid area.", true);
-                return false;
+                return failField(field.id, "Please select a valid area.");
             }
-            if (field.type === "text" && value && !isValidTextField(value)) {
-                setMessage(`${field.label} must contain letters only.`, true);
-                return false;
+            if (field.type === "text" && value && !isValidAddressLikeField(value)) {
+                return failField(field.id, `${field.label} contains invalid characters.`);
             }
             if (value && field.gibberish && looksLikeGibberish(value)) {
-                setMessage(`${field.label} looks invalid. Please enter a real ${field.label.toLowerCase()}.`, true);
-                return false;
+                return failField(field.id, `${field.label} looks invalid. Please enter a real ${field.label.toLowerCase()}.`);
             }
+        }
+
+        const houseTypeCustom = getValue("addressHouseTypeOther");
+        if (houseTypeCustom && !isValidTextField(houseTypeCustom)) {
+            return failField("addressHouseTypeOther", "House type must contain valid text only.");
         }
 
         setMessage("");
         return true;
     };
 
+    let initialPayload = {};
+
     const isDirty = () => {
-        return fieldIds.some((id) => {
-            const el = document.getElementById(id);
-            const current = el ? el.value.trim() : "";
-            return current !== (initialValues[id] ?? "");
-        });
+        const current = buildPayload();
+        const initial = initialPayload || {};
+        return JSON.stringify(current) !== JSON.stringify(initial);
     };
 
     const resetForm = () => {
@@ -155,8 +254,13 @@ document.addEventListener("DOMContentLoaded", () => {
             const el = document.getElementById(id);
             if (el) el.value = initialValues[id] ?? "";
         });
+        const residencyEl = document.getElementById("addressResidencyDuration");
+        if (residencyEl) residencyEl.value = AUTO_RESIDENCY_DURATION;
+        toggleAddressSystem();
+        toggleHouseTypeOther();
         if (headSelect) headSelect.value = "";
         if (resultEl) resultEl.textContent = "";
+        clearFieldErrors();
         if (headEmpty) headEmpty.classList.add("d-none");
         updateSaveState();
     };
@@ -167,15 +271,61 @@ document.addEventListener("DOMContentLoaded", () => {
         const hasChanges = isDirty();
         const valid = hasChanges ? validate() : true;
         const needsHead = requiresReassign && headSelect && !headSelect.value.trim();
+        if (!hasChanges) {
+            setMessage("");
+            clearFieldErrors();
+        } else if (needsHead) {
+            setMessage("Please assign a new head of household first.", true);
+        } else if (isPendingRequest) {
+            setMessage("You already have a pending address change request.", true);
+        }
         saveBtn.disabled = !hasChanges || !valid || needsHead || isPendingRequest;
+    };
+
+    const toggleAddressSystem = () => {
+        const mode = getAddressSystem();
+        const isHouse = mode === "house";
+        const isLotBlock = mode === "lot_block";
+        if (houseWrapper) houseWrapper.classList.toggle("d-none", !isHouse);
+        if (lotBlockWrapper) lotBlockWrapper.classList.toggle("d-none", !isLotBlock);
+
+        const clearIds = (ids) => {
+            ids.forEach((id) => {
+                const el = document.getElementById(id);
+                if (el) el.value = "";
+            });
+        };
+        if (isHouse) {
+            clearIds(["addressUnitNumberLot", "addressLotNumber", "addressBlockNumber", "addressStreetNameLot", "addressSubdivisionLot", "addressAreaNumberLot"]);
+        } else if (isLotBlock) {
+            clearIds(["addressUnitNumberHouse", "addressStreetNumberHouse", "addressStreetNameHouse", "addressPhaseNumberHouse", "addressSubdivisionHouse", "addressAreaNumberHouse"]);
+        }
+    };
+
+    const toggleHouseTypeOther = () => {
+        const show = getValue("addressHouseType") === "Other";
+        if (houseTypeOtherEl) houseTypeOtherEl.classList.toggle("d-none", !show);
     };
 
     fieldIds.forEach((id) => {
         const el = document.getElementById(id);
         if (el) {
             el.addEventListener("input", updateSaveState);
+            el.addEventListener("change", updateSaveState);
         }
     });
+    if (addressSystemEl) {
+        addressSystemEl.addEventListener("change", () => {
+            toggleAddressSystem();
+            updateSaveState();
+        });
+    }
+    if (houseTypeEl) {
+        houseTypeEl.addEventListener("change", () => {
+            toggleHouseTypeOther();
+            updateSaveState();
+        });
+    }
     if (headSelect) {
         headSelect.addEventListener("change", updateSaveState);
     }
@@ -198,14 +348,7 @@ document.addEventListener("DOMContentLoaded", () => {
             }
         }
 
-        const payload = {
-            unit_number: getValue("addressUnitNumber"),
-            street_number: getValue("addressStreetNumber"),
-            street_name: getValue("addressStreetName"),
-            phase_number: getValue("addressPhaseNumber"),
-            subdivision: getValue("addressSubdivision"),
-            area_number: getValue("addressAreaNumber"),
-        };
+        const payload = buildPayload();
         if (requiresReassign && headSelect) {
             payload.new_head_resident_id = headSelect.value.trim();
         }
@@ -223,13 +366,13 @@ document.addEventListener("DOMContentLoaded", () => {
             if (isPendingDuplicateResponse(data.message)) {
                 isPendingRequest = true;
                 updateSaveState();
-                showNotice("Pending Request", data.message || "You already have a pending address edit request.");
+                showNotice("Pending Request", data.message || "You already have a pending address change request.");
                 return;
             }
 
             if (resultEl) resultEl.textContent = "";
             if (noticeTitleEl) noticeTitleEl.textContent = "Request Submitted";
-            if (noticeBodyEl) noticeBodyEl.textContent = data.message || "Address edit request submitted.";
+            if (noticeBodyEl) noticeBodyEl.textContent = data.message || "Address change request submitted.";
             if (noticeModalEl && window.bootstrap?.Modal) {
                 bootstrap.Modal.getOrCreateInstance(noticeModalEl).show();
             }
@@ -251,6 +394,10 @@ document.addEventListener("DOMContentLoaded", () => {
             const res = await fetch("../PhpFiles/Resident-End/household_members.php");
             const data = await res.json().catch(() => ({}));
             if (!res.ok || !data.success || !data.is_head || !data.has_household) {
+                requiresReassign = false;
+                headBlock.classList.add("d-none");
+                if (headEmpty) headEmpty.classList.add("d-none");
+                updateSaveState();
                 return;
             }
 
@@ -260,12 +407,12 @@ document.addEventListener("DOMContentLoaded", () => {
 
             headSelect.innerHTML = '<option value="">Select a member</option>';
             if (eligible.length === 0) {
-            if (headEmpty) headEmpty.classList.remove("d-none");
-            headBlock.classList.remove("d-none");
-            requiresReassign = true;
-            saveBtn.disabled = true;
-            return;
-        }
+                requiresReassign = false;
+                if (headEmpty) headEmpty.classList.add("d-none");
+                headBlock.classList.add("d-none");
+                updateSaveState();
+                return;
+            }
 
             eligible.forEach((m) => {
                 const opt = document.createElement("option");
@@ -287,9 +434,20 @@ document.addEventListener("DOMContentLoaded", () => {
 
     if (headBlock && isHead) {
         headBlock.classList.remove("d-none");
-        requiresReassign = true;
-        saveBtn.disabled = true;
+        requiresReassign = false;
     }
+    toggleAddressSystem();
+    toggleHouseTypeOther();
+    fieldIds.forEach((id) => {
+        const el = document.getElementById(id);
+        initialValues[id] = el ? el.value.trim() : "";
+    });
+    const residencyEl = document.getElementById("addressResidencyDuration");
+    if (residencyEl) {
+        residencyEl.value = AUTO_RESIDENCY_DURATION;
+        initialValues.addressResidencyDuration = AUTO_RESIDENCY_DURATION;
+    }
+    initialPayload = buildPayload();
     loadHeadReassign();
     const showNotice = (title, message) => {
         if (noticeTitleEl) noticeTitleEl.textContent = title || "Notice";
@@ -321,6 +479,33 @@ document.addEventListener("DOMContentLoaded", () => {
         bootstrap.Modal.getOrCreateInstance(modalEl).show();
     };
 
+    const showBeforeYouGo = () => {
+        if (!beforeModalEl || !beforeContinueBtn || !window.bootstrap?.Modal) {
+            return Promise.resolve(true);
+        }
+        const modal = bootstrap.Modal.getOrCreateInstance(beforeModalEl);
+        return new Promise((resolve) => {
+            let done = false;
+            const finish = (value) => {
+                if (done) return;
+                done = true;
+                resolve(value);
+            };
+            const onContinue = (event) => {
+                if (event) event.preventDefault();
+                modal.hide();
+                finish(true);
+            };
+            const onHidden = () => {
+                beforeContinueBtn.removeEventListener("click", onContinue);
+                finish(false);
+            };
+            beforeContinueBtn.addEventListener("click", onContinue);
+            beforeModalEl.addEventListener("hidden.bs.modal", onHidden, { once: true });
+            modal.show();
+        });
+    };
+
     const primeStatus = () => {
         if (statusPromise) return statusPromise;
         statusPromise = (async () => {
@@ -339,7 +524,7 @@ document.addEventListener("DOMContentLoaded", () => {
                     if (data.denied?.address && deniedAlert) {
                         const remarks = data.denied.address.remarks?.trim();
                         const reviewedAt = data.denied.address.reviewed_at;
-                        let msg = "Your last address edit request was denied.";
+                        let msg = "Your last address change request was denied.";
                         if (remarks) {
                             msg += ` Reason: ${remarks}`;
                         }
@@ -373,18 +558,21 @@ document.addEventListener("DOMContentLoaded", () => {
         event.stopPropagation();
 
         if (isPendingRequest) {
-            showNotice("Pending Request", "You already have a pending address edit request.");
+            showNotice("Pending Request", "You already have a pending address change request.");
             return;
         }
-
-        openModal();
 
         if (!statusLoaded) {
             await primeStatus();
             if (isPendingRequest) {
-                showNotice("Pending Request", "You already have a pending address edit request.");
+                showNotice("Pending Request", "You already have a pending address change request.");
+                return;
             }
         }
+
+        const proceed = await showBeforeYouGo();
+        if (!proceed) return;
+        openModal();
     };
     if (modalTrigger) {
         modalTrigger.addEventListener("click", handlePendingClick);
@@ -397,7 +585,7 @@ document.addEventListener("DOMContentLoaded", () => {
             }
             if (!isPendingRequest) return;
             event.preventDefault();
-            showNotice("Pending Request", "You already have a pending address edit request.");
+            showNotice("Pending Request", "You already have a pending address change request.");
         });
         modalEl.addEventListener("hidden.bs.modal", () => {
             resetForm();

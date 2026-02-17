@@ -155,6 +155,10 @@ document.addEventListener("DOMContentLoaded", () => {
       phase_number: "Phase Number",
       subdivision: "Subdivision",
       area_number: "Area Number",
+      house_ownership: "House Ownership",
+      house_type: "House Type",
+      residency_duration: "Residency Duration",
+      address_system: "Address System",
       new_head_resident_id: "New Head Resident ID",
       last_name: "Last Name",
       first_name: "First Name",
@@ -338,7 +342,10 @@ document.addEventListener("DOMContentLoaded", () => {
                 { label: "Street Name", value: current.address?.street_name, key: "street_name" },
                 { label: "Phase Number", value: current.address?.phase_number, key: "phase_number" },
                 { label: "Subdivision", value: current.address?.subdivision, key: "subdivision" },
-                { label: "Area Number", value: current.address?.area_number, key: "area_number" }
+                { label: "Area Number", value: current.address?.area_number, key: "area_number" },
+                { label: "House Ownership", value: current.address?.house_ownership, key: "house_ownership" },
+                { label: "House Type", value: current.address?.house_type, key: "house_type" },
+                { label: "Residency Duration", value: current.address?.residency_duration, key: "residency_duration" }
               );
             } else if (req.request_type === "emergency") {
               currentItems.push(

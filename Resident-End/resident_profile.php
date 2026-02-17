@@ -134,6 +134,7 @@ if ($residentId !== '' && isset($conn) && $conn instanceof mysqli) {
       window.RESIDENT_PROFILE_EDIT_ALLOWED = <?= $canEditProfile ? 'true' : 'false' ?>;
       window.RESIDENT_PROFILE_EDIT_BLOCK_MESSAGE = <?= json_encode($editBlockMessage, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) ?>;
       window.RESIDENT_PROFILE_AGE = <?= $computedAge !== '' ? (int)$computedAge : 'null' ?>;
+      window.RESIDENT_PROFILE_SEX = <?= json_encode((string)($residentinformationtbl['sex'] ?? ''), JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) ?>;
     </script>
     <meta name="viewport" content="width=device-width, initial-scale=1">
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
@@ -219,7 +220,20 @@ if ($residentId !== '' && isset($conn) && $conn instanceof mysqli) {
                         </div>
                         <div class="col-12 col-md-6 col-lg-4">
                             <div class="d-flex flex-column gap-2">
-                                <div><strong>Name:</strong> <?= $residentinformationtbl['firstname'] . ' ' . $residentinformationtbl['lastname'] ?></div>
+                                <?php
+                                  $lastName = trim((string)($residentinformationtbl['lastname'] ?? ''));
+                                  $firstName = trim((string)($residentinformationtbl['firstname'] ?? ''));
+                                  $middleName = trim((string)($residentinformationtbl['middlename'] ?? ''));
+                                  $middleInitial = $middleName !== '' ? strtoupper(substr($middleName, 0, 1)) . '.' : '';
+                                  $fullNameDisplay = '—';
+                                  if ($lastName !== '' || $firstName !== '') {
+                                      $fullNameDisplay = trim($lastName . ', ' . $firstName);
+                                      if ($middleInitial !== '') {
+                                          $fullNameDisplay .= ', ' . $middleInitial;
+                                      }
+                                  }
+                                ?>
+                                <div><strong>Full Name:</strong> <?= htmlspecialchars($fullNameDisplay, ENT_QUOTES, 'UTF-8') ?></div>
                                 <div><strong>Age:</strong> <?= $computedAge !== '' ? $computedAge : '—' ?></div>
                                 <div><strong>Birthdate:</strong> <?= $residentinformationtbl['birthdate'] ?></div>
                                 <div><strong>Sex:</strong> <?= $residentinformationtbl['sex'] ?></div>
@@ -265,7 +279,7 @@ if ($residentId !== '' && isset($conn) && $conn instanceof mysqli) {
                 <div class="card-header d-flex justify-content-between">
                     <strong>ADDRESS INFORMATION</strong>
                     <button class="btn btn-primary btn-sm" id="btnOpenEditAddress">
-                        Edit
+                        Change Address
                     </button>
                 </div>
 	                <div class="card-body">
@@ -601,17 +615,6 @@ if ($residentId !== '' && isset($conn) && $conn instanceof mysqli) {
                 </div>
 
                 <div class="modal-body">
-                    <div class="alert alert-info small mb-3">
-                        Saving changes will send a request for review.
-                    </div>
-                    <div class="alert alert-success small mb-3 d-none" id="profileSuccessAlert"></div>
-                    <div class="alert alert-warning small mb-3 d-none" id="profilePendingAlert">
-                        You already have a pending profile edit request.
-                    </div>
-                    <div id="profileDeniedAlert" class="alert alert-danger alert-dismissible fade show small mb-3 d-none" role="alert">
-                        <span id="profileDeniedText"></span>
-                        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-                    </div>
                     <div id="profileSaveResult" class="small mb-2"></div>
 
                     <label class="form-label">Full Name</label>
@@ -623,32 +626,7 @@ if ($residentId !== '' && isset($conn) && $conn instanceof mysqli) {
                             <option value="">N/A</option>
                             <option value="Jr." <?= ($residentinformationtbl['suffix'] ?? '') === 'Jr.' ? 'selected' : '' ?>>Jr.</option>
                             <option value="Sr." <?= ($residentinformationtbl['suffix'] ?? '') === 'Sr.' ? 'selected' : '' ?>>Sr.</option>
-                            <option value="III" <?= ($residentinformationtbl['suffix'] ?? '') === 'III' ? 'selected' : '' ?>>III</option>
                         </select>
-                    </div>
-                    <div class="alert alert-warning small mb-3 d-none" id="nameDocNotice">
-                        To change your name, upload a valid ID photo.
-                    </div>
-                    <div class="doc-required-box d-none" id="nameDocSection">
-                        <div class="row g-2">
-                        <div class="col-md-6">
-                            <label class="form-label">Valid ID Type</label>
-                            <select class="form-select" id="nameIdType">
-                                <option value="">Select ID</option>
-                                <option value="Passport">Passport</option>
-                                <option value="Driver's License">Driver's License</option>
-                                <option value="PhilHealth ID">PhilHealth ID</option>
-                                <option value="Voter's ID">Voter's ID</option>
-                                <option value="National ID">National ID</option>
-                                <option value="Barangay ID">Barangay ID</option>
-                                <option value="PRC ID">PRC ID</option>
-                            </select>
-                        </div>
-                        <div class="col-md-6">
-                            <label class="form-label">Valid ID Photo</label>
-                            <input type="file" class="form-control" id="nameIdFile" accept=".jpg,.jpeg,.png,.webp,.pdf">
-                        </div>
-                        </div>
                     </div>
 
                     <div class="row mb-3">
@@ -669,6 +647,7 @@ if ($residentId !== '' && isset($conn) && $conn instanceof mysqli) {
                                 <option value="Single" <?= ($residentinformationtbl['civil_status'] ?? '') === 'Single' ? 'selected' : '' ?>>Single</option>
                                 <option value="Married" <?= ($residentinformationtbl['civil_status'] ?? '') === 'Married' ? 'selected' : '' ?>>Married</option>
                                 <option value="Widowed" <?= ($residentinformationtbl['civil_status'] ?? '') === 'Widowed' ? 'selected' : '' ?>>Widowed</option>
+                                <option value="Divorced" <?= ($residentinformationtbl['civil_status'] ?? '') === 'Divorced' ? 'selected' : '' ?>>Divorced</option>
                             </select>
                         </div>
                         <div class="col-md-6">
@@ -681,18 +660,10 @@ if ($residentId !== '' && isset($conn) && $conn instanceof mysqli) {
                             </select>
                         </div>
                     </div>
-                    <div class="alert alert-warning small mb-3 d-none" id="civilStatusDocNotice">
-                        Changing civil status requires a supporting document.
-                    </div>
-                    <div class="doc-required-box d-none" id="civilStatusDocSection">
-                        <div class="row g-2">
+                    <div class="row mb-3 d-none" id="newSurnameRow">
                         <div class="col-md-6">
-                            <label class="form-label" id="civilStatusDocLabel">Document</label>
-                            <input type="file" class="form-control" id="civilStatusFile" accept=".jpg,.jpeg,.png,.webp,.pdf">
-                        </div>
-                        <div class="col-md-6">
-                            <div class="form-text mt-4" id="civilStatusDocHelp"></div>
-                        </div>
+                            <label class="form-label">New Surname</label>
+                            <input type="text" class="form-control" id="editNewSurname" placeholder="Enter new surname">
                         </div>
                     </div>
 
@@ -774,7 +745,7 @@ if ($residentId !== '' && isset($conn) && $conn instanceof mysqli) {
 
                 <div class="modal-footer">
                     <button class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                    <button class="btn btn-primary" id="btnProfileSave" type="button">Save</button>
+                    <button class="btn btn-primary" id="btnProfileReview" type="button">Review Changes</button>
                 </div>
 
                 </div>
@@ -782,6 +753,96 @@ if ($residentId !== '' && isset($conn) && $conn instanceof mysqli) {
             </div>
         </div>
     </div>
+
+    <div class="modal fade" id="editProfileUploadModal" tabindex="-1" data-bs-backdrop="static" data-bs-keyboard="false">
+        <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Upload Supporting Documents</h5>
+                    <button class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3" id="generalSupportSection">
+                        <label class="form-label">Supporting Document Type</label>
+                        <select class="form-select mb-2" id="generalSupportType">
+                            <option value="">Select document type</option>
+                            <option value="Certificate of Employment">Certificate of Employment</option>
+                            <option value="Proof of Income">Proof of Income</option>
+                            <option value="Voter Certification">Voter Certification</option>
+                            <option value="Proof of Residency">Proof of Residency</option>
+                            <option value="Barangay Clearance">Barangay Clearance</option>
+                            <option value="Affidavit">Affidavit</option>
+                            <option value="Other Supporting Document">Other Supporting Document</option>
+                        </select>
+                        <label class="form-label">Supporting Document</label>
+                        <input type="file" class="form-control" id="generalSupportFile" accept=".jpg,.jpeg,.png,.webp,.pdf">
+                        <div class="form-text">Upload at least one supporting document for this request.</div>
+                    </div>
+                    <div class="alert alert-warning small mb-3 d-none" id="generalSupportNotice">
+                        Supporting document is required for this profile update request.
+                    </div>
+                    <div class="alert alert-warning small mb-3 d-none" id="nameDocNotice">
+                        To change your name, upload a valid ID photo.
+                    </div>
+                    <div class="doc-required-box d-none mb-3" id="nameDocSection">
+                        <div class="row g-2">
+                            <div class="col-md-6">
+                                <label class="form-label">Valid ID Type</label>
+                                <select class="form-select" id="nameIdType">
+                                    <option value="">Select ID</option>
+                                    <option value="Passport">Passport</option>
+                                    <option value="Driver's License">Driver's License</option>
+                                    <option value="PhilHealth ID">PhilHealth ID</option>
+                                    <option value="Voter's ID">Voter's ID</option>
+                                    <option value="National ID">National ID</option>
+                                    <option value="Barangay ID">Barangay ID</option>
+                                    <option value="PRC ID">PRC ID</option>
+                                </select>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Valid ID Photo</label>
+                                <input type="file" class="form-control" id="nameIdFile" accept=".jpg,.jpeg,.png,.webp,.pdf">
+                            </div>
+                        </div>
+                    </div>
+                    <div class="alert alert-warning small mb-3 d-none" id="civilStatusDocNotice">
+                        Changing civil status requires a supporting document.
+                    </div>
+                    <div class="doc-required-box d-none" id="civilStatusDocSection">
+                        <div class="row g-2">
+                            <div class="col-md-6">
+                                <label class="form-label" id="civilStatusDocLabel">Document</label>
+                                <input type="file" class="form-control" id="civilStatusFile" accept=".jpg,.jpeg,.png,.webp,.pdf">
+                            </div>
+                            <div class="col-md-6">
+                                <div class="form-text mt-4" id="civilStatusDocHelp"></div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="alert alert-warning small mb-3 d-none" id="studentUntickNotice">
+                        Removing Student sector requires proof: upload diploma OR confirm stopped studying.
+                    </div>
+                    <div class="doc-required-box d-none" id="studentUntickSection">
+                        <div class="row g-2 align-items-end">
+                            <div class="col-md-7">
+                                <label class="form-label">Diploma / Proof (Optional if stopped studying)</label>
+                                <input type="file" class="form-control" id="studentStatusFile" accept=".jpg,.jpeg,.png,.webp,.pdf">
+                            </div>
+                            <div class="col-md-5">
+                                <div class="form-check form-switch mt-4">
+                                    <input class="form-check-input" type="checkbox" id="studentStoppedSwitch">
+                                    <label class="form-check-label" for="studentStoppedSwitch">I stopped studying</label>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-outline-secondary" id="btnProfileBackToForm" type="button">Back</button>
+                    <button class="btn btn-primary" id="btnProfileSave" type="button">Submit Request</button>
+                </div>
+            </div>
+        </div>
     </div>
 
 
@@ -789,22 +850,16 @@ if ($residentId !== '' && isset($conn) && $conn instanceof mysqli) {
         <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
             <div class="modal-content">
 
-                <div class="modal-header">
-                    <h5>Add Address</h5>
+                <div class="modal-header justify-content-center position-relative">
+                    <h5 class="modal-title text-center w-100">Change Address</h5>
                     <button class="btn-close" data-bs-dismiss="modal"></button>
                 </div>
 
                 <div class="modal-body">
-                    <div class="alert alert-info small mb-3">
-                        Saving changes will send a request for review.
-                    </div>
-                    <div id="addressDeniedAlert" class="alert alert-danger alert-dismissible fade show small mb-3 d-none" role="alert">
-                        <span id="addressDeniedText"></span>
-                        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-                    </div>
                     <div class="alert alert-warning small mb-3">
                         Changing your address will remove you from your household.
                     </div>
+                    <?php if ($isHeadOfFamily): ?>
                     <div id="headReassignBlock" class="border rounded p-2 mb-3 d-none" data-is-head="<?= $isHeadOfFamily ? '1' : '0' ?>">
                         <label class="form-label fw-bold mb-1">Assign New Head of Household</label>
                         <select class="form-select" id="newHeadResidentId">
@@ -816,27 +871,145 @@ if ($residentId !== '' && isset($conn) && $conn instanceof mysqli) {
                             You must have at least one other active household member to reassign the head role.
                         </div>
                     </div>
-                    <input type="text" class="form-control mb-2" id="addressUnitNumber" placeholder="Unit Number" value="<?= htmlspecialchars($residentaddresstbl['unit_number'] ?? '') ?>">
-                    <input type="text" class="form-control mb-2" id="addressStreetNumber" placeholder="Street Number" value="<?= htmlspecialchars($residentaddresstbl['street_number'] ?? '') ?>">
-                    <input type="text" class="form-control mb-2" id="addressStreetName" placeholder="Street Name" value="<?= htmlspecialchars($residentaddresstbl['street_name'] ?? '') ?>">
-                    <input type="text" class="form-control mb-2" id="addressPhaseNumber" placeholder="Phase Number" value="<?= htmlspecialchars($residentaddresstbl['phase_number'] ?? '') ?>">
-                    <input type="text" class="form-control mb-2" id="addressSubdivision" placeholder="Subdivision" value="<?= htmlspecialchars($residentaddresstbl['subdivision'] ?? '') ?>">
-                    <?php
-                      $areaOptions = ['Area 01', 'Area 1A', 'Area 02', 'Area 03', 'Area 04', 'Area 05', 'Area 06'];
-                      $currentArea = trim((string)($residentaddresstbl['area_number'] ?? ''));
-                      $allAreaOptions = $areaOptions;
-                      if ($currentArea !== '' && !in_array($currentArea, $areaOptions, true)) {
-                          $allAreaOptions[] = $currentArea;
-                      }
-                    ?>
-                    <select class="form-select mb-2" id="addressAreaNumber">
-                        <option value="">Select Area</option>
-                        <?php foreach ($allAreaOptions as $areaOption): ?>
-                            <option value="<?= htmlspecialchars($areaOption) ?>" <?= $currentArea === $areaOption ? 'selected' : '' ?>>
-                                <?= htmlspecialchars($areaOption) ?>
-                            </option>
-                        <?php endforeach; ?>
-                    </select>
+                    <?php endif; ?>
+
+                    <div class="row g-2 mb-2">
+                        <div class="col-12">
+                            <label class="form-label mb-1" for="addressSystemEdit">Address System <span class="text-danger">*</span></label>
+                            <select class="form-select" id="addressSystemEdit">
+                                <option value="" selected>Select</option>
+                                <option value="house">House Numbering System</option>
+                                <option value="lot_block">Lot/Block System</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div id="addressHouseWrapper" class="d-none border rounded p-2 mb-2">
+                        <div class="small fw-semibold text-muted mb-2">House Numbering System</div>
+                        <div class="row g-2 mb-2">
+                            <div class="col-md-4">
+                                <label class="form-label mb-1" for="addressUnitNumberHouse">Unit / Apartment Number</label>
+                                <input type="text" class="form-control" id="addressUnitNumberHouse" value="">
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label mb-1" for="addressStreetNumberHouse">House Number <span class="text-danger">*</span></label>
+                                <input type="text" class="form-control" id="addressStreetNumberHouse" value="">
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label mb-1" for="addressStreetNameHouse">Street Name <span class="text-danger">*</span></label>
+                                <input type="text" class="form-control" id="addressStreetNameHouse" value="">
+                            </div>
+                        </div>
+                        <div class="row g-2 mb-2">
+                            <div class="col-md-4">
+                                <label class="form-label mb-1" for="addressPhaseNumberHouse">Phase</label>
+                                <input type="text" class="form-control" id="addressPhaseNumberHouse" value="">
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label mb-1" for="addressSubdivisionHouse">Subdivision</label>
+                                <input type="text" class="form-control" id="addressSubdivisionHouse" value="">
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label mb-1" for="addressAreaNumberHouse">Area <span class="text-danger">*</span></label>
+                                <select class="form-select" id="addressAreaNumberHouse">
+                                    <option value="">Select Area</option>
+                                    <?php
+                                      $areaOptions = ['Area 01', 'Area 1A', 'Area 02', 'Area 03', 'Area 04', 'Area 05', 'Area 06'];
+                                    ?>
+                                    <?php foreach ($areaOptions as $areaOption): ?>
+                                        <option value="<?= htmlspecialchars($areaOption) ?>">
+                                            <?= htmlspecialchars($areaOption) ?>
+                                        </option>
+                                    <?php endforeach; ?>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div id="addressLotBlockWrapper" class="d-none border rounded p-2 mb-2">
+                        <div class="small fw-semibold text-muted mb-2">Lot/Block System</div>
+                        <div class="row g-2 mb-2">
+                            <div class="col-md-3">
+                                <label class="form-label mb-1" for="addressUnitNumberLot">Unit / Apartment Number</label>
+                                <input type="text" class="form-control" id="addressUnitNumberLot" value="">
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label mb-1" for="addressLotNumber">Lot <span class="text-danger">*</span></label>
+                                <input type="text" class="form-control" id="addressLotNumber" value="">
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label mb-1" for="addressBlockNumber">Block <span class="text-danger">*</span></label>
+                                <input type="text" class="form-control" id="addressBlockNumber" value="">
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label mb-1" for="addressStreetNameLot">Street Name</label>
+                                <input type="text" class="form-control" id="addressStreetNameLot" value="">
+                            </div>
+                        </div>
+                        <div class="row g-2 mb-2">
+                            <div class="col-md-6">
+                                <label class="form-label mb-1" for="addressSubdivisionLot">Subdivision</label>
+                                <input type="text" class="form-control" id="addressSubdivisionLot" value="">
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label mb-1" for="addressAreaNumberLot">Area <span class="text-danger">*</span></label>
+                                <select class="form-select" id="addressAreaNumberLot">
+                                    <option value="">Select Area</option>
+                                    <?php foreach ($areaOptions as $areaOption): ?>
+                                        <option value="<?= htmlspecialchars($areaOption) ?>">
+                                            <?= htmlspecialchars($areaOption) ?>
+                                        </option>
+                                    <?php endforeach; ?>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="row g-2 mb-2">
+                        <div class="col-md-4">
+                            <label class="form-label mb-1">Barangay</label>
+                            <input type="text" class="form-control bg-light text-secondary" value="Barangay San Jose" readonly>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label mb-1">Municipality / City</label>
+                            <input type="text" class="form-control bg-light text-secondary" value="Rodriguez" readonly>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label mb-1">Province</label>
+                            <input type="text" class="form-control bg-light text-secondary" value="Rizal" readonly>
+                        </div>
+                    </div>
+
+                    <hr>
+
+                    <div class="row g-2 mb-2">
+                        <div class="col-md-4">
+                            <label class="form-label mb-1" for="addressHouseOwnership">House Ownership <span class="text-danger">*</span></label>
+                            <select class="form-select" id="addressHouseOwnership">
+                                <option value="">Select</option>
+                                <option value="Owner">Owner</option>
+                                <option value="Tenant">Tenant</option>
+                            </select>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label mb-1" for="addressHouseType">House Type <span class="text-danger">*</span></label>
+                            <?php $houseTypeOptions = ['Concrete', 'Semi-Concrete', 'Wood/Light Materials', 'Makeshift/Salvaged Materials', 'Shanty/Informal']; ?>
+                            <select class="form-select" id="addressHouseType">
+                                <option value="">Select</option>
+                                <?php foreach ($houseTypeOptions as $opt): ?>
+                                    <option value="<?= htmlspecialchars($opt) ?>"><?= htmlspecialchars($opt) ?></option>
+                                <?php endforeach; ?>
+                                <option value="Other">Other</option>
+                            </select>
+                            <input type="text" class="form-control mt-2 d-none" id="addressHouseTypeOther" placeholder="Specify house type" value="">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label mb-1" for="addressResidencyDuration">Residency Duration</label>
+                            <select class="form-select bg-light text-secondary" id="addressResidencyDuration" disabled>
+                                <option value="Less than 6 months" selected>Less than 6 months</option>
+                            </select>
+                        </div>
+                    </div>
                     <div id="addressSaveResult" class="small mt-2"></div>
                 </div>
 
@@ -859,13 +1032,6 @@ if ($residentId !== '' && isset($conn) && $conn instanceof mysqli) {
                     </div>
 
                     <div class="modal-body">
-                        <div class="alert alert-info small mb-3">
-                            Saving changes will send a request for review.
-                        </div>
-                        <div id="emergencyDeniedAlert" class="alert alert-danger alert-dismissible fade show small mb-3 d-none" role="alert">
-                            <span id="emergencyDeniedText"></span>
-                            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-                        </div>
                         <label class="form-label">Contact Person</label>
                         <div class="d-flex gap-2 mb-3">
                             <input class="form-control" id="emergencyLastName" value="<?= $residentinformationtbl['emergency_last_name'] ?? '' ?>" placeholder="Last Name">
@@ -875,7 +1041,6 @@ if ($residentId !== '' && isset($conn) && $conn instanceof mysqli) {
                                 <option value="" <?= empty($residentinformationtbl['emergency_suffix']) ? 'selected' : '' ?>>N/A</option>
                                 <option value="Jr." <?= ($residentinformationtbl['emergency_suffix'] ?? '') === 'Jr.' ? 'selected' : '' ?>>Jr.</option>
                                 <option value="Sr." <?= ($residentinformationtbl['emergency_suffix'] ?? '') === 'Sr.' ? 'selected' : '' ?>>Sr.</option>
-                                <option value="III" <?= ($residentinformationtbl['emergency_suffix'] ?? '') === 'III' ? 'selected' : '' ?>>III</option>
                             </select>
                         </div>
                         <div class="mb-3">
@@ -963,7 +1128,7 @@ if ($residentId !== '' && isset($conn) && $conn instanceof mysqli) {
 
     <!-- Confirm Change Password Modal -->
     <div class="modal fade" id="confirmChangePasswordModal" tabindex="-1" data-bs-backdrop="static" data-bs-keyboard="false" aria-hidden="true">
-        <div class="modal-dialog modal-md modal-dialog-centered">
+        <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
             <div class="modal-content">
                 <div class="modal-header">
                     <h5 class="modal-title text-black" style="color:#000;">Confirm</h5>
@@ -1183,6 +1348,25 @@ if ($residentId !== '' && isset($conn) && $conn instanceof mysqli) {
         </div>
     </div>
 
+    <div class="modal fade" id="beforeEditModal" tabindex="-1" data-bs-backdrop="static" data-bs-keyboard="false" aria-hidden="true">
+        <div class="modal-dialog modal-md modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header border-0 justify-content-center">
+                    <h5 class="modal-title text-dark text-center w-100">Before You Continue</h5>
+                </div>
+                <div class="modal-body">
+                    <p class="mb-0 text-center">
+                        Saving changes will send a request for review. Every applied change request requires supporting document/s for verification.
+                    </p>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-primary" id="btnBeforeEditContinue">Continue</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- GENERIC NOTICE MODAL -->
     <div class="modal fade" id="residentNoticeModal" tabindex="-1" aria-hidden="true">
         <div class="modal-dialog modal-md modal-dialog-centered">
@@ -1202,14 +1386,16 @@ if ($residentId !== '' && isset($conn) && $conn instanceof mysqli) {
         <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
         <script>
             document.addEventListener("DOMContentLoaded", () => {
-                const noticeModal = document.getElementById("residentNoticeModal");
-                if (!noticeModal) return;
-                noticeModal.addEventListener("show.bs.modal", () => {
-                    if (!window.bootstrap?.Modal) return;
-                    document.querySelectorAll(".modal.show").forEach((el) => {
-                        if (el === noticeModal) return;
-                        const instance = bootstrap.Modal.getInstance(el);
-                        if (instance) instance.hide();
+                if (!window.bootstrap?.Modal) return;
+
+                // Enforce one-modal-at-a-time for resident profile page.
+                document.querySelectorAll(".modal").forEach((targetModal) => {
+                    targetModal.addEventListener("show.bs.modal", () => {
+                        document.querySelectorAll(".modal.show").forEach((openModalEl) => {
+                            if (openModalEl === targetModal) return;
+                            const instance = bootstrap.Modal.getInstance(openModalEl);
+                            if (instance) instance.hide();
+                        });
                     });
                 });
             });

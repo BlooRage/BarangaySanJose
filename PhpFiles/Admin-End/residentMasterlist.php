@@ -94,6 +94,45 @@ function appendSectorMembership(mysqli $conn, string $residentId, string $sector
     return $updatedSectorMembership;
 }
 
+function removeSectorMembership(mysqli $conn, string $residentId, string $sectorLabel): ?string {
+    $stmt = $conn->prepare("
+        SELECT sector_membership
+        FROM residentinformationtbl
+        WHERE resident_id = ?
+        LIMIT 1
+    ");
+    if (!$stmt) {
+        throw new Exception("Prepare failed (read sector membership): " . $conn->error);
+    }
+    $stmt->bind_param("s", $residentId);
+    $stmt->execute();
+    $row = $stmt->get_result()->fetch_assoc();
+    $stmt->close();
+    if (!$row) return null;
+
+    $sectors = parseSectorMembershipCsv($row['sector_membership'] ?? '');
+    $filtered = [];
+    foreach ($sectors as $sector) {
+        if (strcasecmp($sector, $sectorLabel) !== 0) {
+            $filtered[] = $sector;
+        }
+    }
+    $updatedSectorMembership = implode(', ', $filtered);
+    $update = $conn->prepare("
+        UPDATE residentinformationtbl
+        SET sector_membership = ?
+        WHERE resident_id = ?
+        LIMIT 1
+    ");
+    if (!$update) {
+        throw new Exception("Prepare failed (update sector membership): " . $conn->error);
+    }
+    $update->bind_param("ss", $updatedSectorMembership, $residentId);
+    $update->execute();
+    $update->close();
+    return $updatedSectorMembership;
+}
+
 function upsertSectorMembershipStatus(
     mysqli $conn,
     string $residentId,
@@ -142,12 +181,22 @@ function upsertSectorMembershipStatus(
 	    return trim((string)($parts[0] ?? ''));
 	}
 
-	function extractReasonFromRemarks(string $remarks): string {
+		function extractReasonFromRemarks(string $remarks): string {
 	    $parts = array_values(array_filter(array_map('trim', explode(';', (string)$remarks))));
 	    foreach ($parts as $p) {
 	        if (stripos($p, 'reason=') === 0) {
 	            return trim(substr($p, strlen('reason=')));
-	        }
+		}
+
+		function extractActionFromRemarks(string $remarks): string {
+		    $parts = array_values(array_filter(array_map('trim', explode(';', (string)$remarks))));
+		    foreach ($parts as $p) {
+		        if (stripos($p, 'action=') === 0) {
+		            return strtolower(trim(substr($p, strlen('action='))));
+		        }
+		    }
+		    return '';
+		}
 	    }
 	    return '';
 	}
@@ -967,7 +1016,65 @@ if (isset($_GET['fetch_documents'])) {
 }
 
 /* =====================================================
-   6. UPDATE DOCUMENT STATUS (AJAX)
+   6. FETCH ADDRESS HISTORY (AJAX)
+===================================================== */
+if (isset($_GET['fetch_address_history'])) {
+
+    header('Content-Type: application/json; charset=utf-8');
+
+    $residentId = normalizeResidentId($_GET['resident_id'] ?? '');
+    if (!$residentId) {
+        http_response_code(400);
+        echo json_encode(['success' => false, 'message' => 'Invalid resident ID.']);
+        exit;
+    }
+
+    $stmt = $conn->prepare("
+        SELECT
+            a.address_id,
+            a.unit_number,
+            a.street_number AS house_number,
+            a.street_name,
+            a.phase_number,
+            a.subdivision,
+            a.area_number,
+            a.house_ownership,
+            a.house_type,
+            a.residency_duration,
+            a.status_id_residency,
+            COALESCE(s.status_name, '') AS residency_status_name
+        FROM residentaddresstbl a
+        LEFT JOIN statuslookuptbl s
+            ON s.status_id = a.status_id_residency
+           AND s.status_type = 'AddressResidency'
+        WHERE a.resident_id = ?
+        ORDER BY
+            CASE
+                WHEN LOWER(REPLACE(COALESCE(s.status_name, ''), ' ', '')) = 'residing' THEN 0
+                WHEN LOWER(REPLACE(COALESCE(s.status_name, ''), ' ', '')) = 'pendingverification' THEN 1
+                WHEN LOWER(REPLACE(COALESCE(s.status_name, ''), ' ', '')) = 'notresiding' THEN 2
+                ELSE 3
+            END,
+            a.address_id DESC
+    ");
+    if (!$stmt) {
+        http_response_code(500);
+        echo json_encode(['success' => false, 'message' => 'Query prepare failed.']);
+        exit;
+    }
+
+    $stmt->bind_param("s", $residentId);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    $items = $result ? $result->fetch_all(MYSQLI_ASSOC) : [];
+    $stmt->close();
+
+    echo json_encode(['success' => true, 'items' => $items]);
+    exit;
+}
+
+/* =====================================================
+   7. UPDATE DOCUMENT STATUS (AJAX)
 ===================================================== */
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_document_status'])) {
     header('Content-Type: application/json; charset=utf-8');
@@ -1119,12 +1226,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_document_statu
 	        if ($statusMap[$uiStatus] === 'Verified') {
 	            $residentId = $attachmentResidentId;
 
-	            $remarksLower = strtolower(trim((string)$attachmentRemarks));
+	            $markerOnly = extractMarkerFromRemarks((string)$attachmentRemarks);
+	            $remarksLower = strtolower(trim((string)$markerOnly));
 	            if ($residentId && strpos($remarksLower, 'sector:') === 0) {
-	                $sectorKeyRaw = trim(substr((string)$attachmentRemarks, strlen('sector:')));
+	                $sectorKeyRaw = trim(substr((string)$markerOnly, strlen('sector:')));
 	                $sectorKey = trim((string)(explode(':', $sectorKeyRaw, 2)[0] ?? ''));
 	                $sectorSide = strtolower(trim((string)(explode(':', $sectorKeyRaw, 3)[1] ?? '')));
 	                $sectorLabel = mapSectorKeyToLabel($sectorKey);
+	                $sectorAction = extractActionFromRemarks((string)$attachmentRemarks);
 
 	                $statusIdForSectorMembership = (int)$statusId;
 	                if (($sectorSide === 'front' || $sectorSide === 'back') && $sectorKey !== '') {
@@ -1167,7 +1276,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_document_statu
 	                            $qOld->close();
 	                            $oldSectorMembership = $rOld ? (string)($rOld['sector_membership'] ?? '') : null;
 	                        }
-	                        $updatedSectorMembership = appendSectorMembership($conn, $residentId, $sectorLabel);
+	                        $updatedSectorMembership = ($sectorAction === 'remove')
+	                            ? removeSectorMembership($conn, $residentId, $sectorLabel)
+	                            : appendSectorMembership($conn, $residentId, $sectorLabel);
 	                        insertUnifiedAuditLog(
 	                            $conn,
 	                            $actorUserId,
@@ -1179,7 +1290,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_document_statu
 	                            'sector_membership',
 	                            (string)$oldSectorMembership,
 	                            (string)$updatedSectorMembership,
-	                            "Auto-append sector after verification: {$sectorLabel}",
+	                            $sectorAction === 'remove'
+	                                ? "Auto-remove sector after verification: {$sectorLabel}"
+	                                : "Auto-append sector after verification: {$sectorLabel}",
 	                            null
 	                        );
 	                    }
@@ -1193,7 +1306,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_document_statu
 	                        $qOld->close();
 	                        $oldSectorMembership = $rOld ? (string)($rOld['sector_membership'] ?? '') : null;
 	                    }
-	                    $updatedSectorMembership = appendSectorMembership($conn, $residentId, $sectorLabel);
+	                    $updatedSectorMembership = ($sectorAction === 'remove')
+	                        ? removeSectorMembership($conn, $residentId, $sectorLabel)
+	                        : appendSectorMembership($conn, $residentId, $sectorLabel);
 	                    insertUnifiedAuditLog(
 	                        $conn,
 	                        $actorUserId,
@@ -1205,7 +1320,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_document_statu
 	                        'sector_membership',
 	                        (string)$oldSectorMembership,
 	                        (string)$updatedSectorMembership,
-	                        "Auto-append sector after verification: {$sectorLabel}",
+	                        $sectorAction === 'remove'
+	                            ? "Auto-remove sector after verification: {$sectorLabel}"
+	                            : "Auto-append sector after verification: {$sectorLabel}",
 	                        null
 	                    );
 	                }
@@ -1250,9 +1367,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_document_statu
         }
 	        if ($statusMap[$uiStatus] === 'Rejected') {
 	            $residentId = $attachmentResidentId;
-	            $remarksLower = strtolower(trim((string)$attachmentRemarks));
+	            $remarksLower = strtolower(trim((string)extractMarkerFromRemarks((string)$attachmentRemarks)));
 	            if ($residentId && strpos($remarksLower, 'sector:') === 0) {
-	                $sectorKeyRaw = trim(substr((string)$attachmentRemarks, strlen('sector:')));
+	                $sectorKeyRaw = trim(substr((string)extractMarkerFromRemarks((string)$attachmentRemarks), strlen('sector:')));
 	                $sectorKey = trim((string)(explode(':', $sectorKeyRaw, 2)[0] ?? ''));
 	                upsertSectorMembershipStatus(
 	                    $conn,
@@ -1267,9 +1384,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_document_statu
         }
 	        if ($statusMap[$uiStatus] === 'PendingReview') {
 	            $residentId = $attachmentResidentId;
-	            $remarksLower = strtolower(trim((string)$attachmentRemarks));
+	            $remarksLower = strtolower(trim((string)extractMarkerFromRemarks((string)$attachmentRemarks)));
 	            if ($residentId && strpos($remarksLower, 'sector:') === 0) {
-	                $sectorKeyRaw = trim(substr((string)$attachmentRemarks, strlen('sector:')));
+	                $sectorKeyRaw = trim(substr((string)extractMarkerFromRemarks((string)$attachmentRemarks), strlen('sector:')));
 	                $sectorKey = trim((string)(explode(':', $sectorKeyRaw, 2)[0] ?? ''));
 	                upsertSectorMembershipStatus(
 	                    $conn,
