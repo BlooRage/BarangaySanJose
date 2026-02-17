@@ -1,3 +1,4 @@
+<<<<<<< Updated upstream
 <<<<<<< Updated upstream:Resident-End/BarangayId.php
 <?php
 $allowUnregistered = false;
@@ -6,6 +7,9 @@ require_once __DIR__ . "/includes/resident_access_guard.php";
 =======
 ﻿<?php
 >>>>>>> Stashed changes:Resident-End/BarangayIdForm.php
+=======
+﻿<?php
+>>>>>>> Stashed changes
 $residentinformationtbl = [
     'firstname' => 'Juan',
     'middlename' => '',
@@ -221,9 +225,15 @@ $useraccountstbl = [
 </body>
 
 </html>
+<<<<<<< Updated upstream
 <<<<<<< Updated upstream:Resident-End/BarangayId.php
 =======
 
 
 
 >>>>>>> Stashed changes:Resident-End/BarangayIdForm.php
+=======
+
+
+
+>>>>>>> Stashed changes

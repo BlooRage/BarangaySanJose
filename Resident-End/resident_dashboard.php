@@ -1,9 +1,13 @@
 <<<<<<< Updated upstream
+<<<<<<< Updated upstream
 <?php
 $allowUnregistered = false;
 require_once __DIR__ . "/includes/resident_access_guard.php";
 ?>
 <!DOCTYPE html>
+=======
+﻿<!DOCTYPE html>
+>>>>>>> Stashed changes
 =======
 ﻿<!DOCTYPE html>
 >>>>>>> Stashed changes
@@ -157,4 +161,7 @@ require_once __DIR__ . "/includes/resident_access_guard.php";
 
 
 
+<<<<<<< Updated upstream
+>>>>>>> Stashed changes
+=======
 >>>>>>> Stashed changes

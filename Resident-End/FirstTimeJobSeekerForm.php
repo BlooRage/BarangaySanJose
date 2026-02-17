@@ -1,3 +1,4 @@
+<<<<<<< Updated upstream
 <<<<<<< Updated upstream:Resident-End/FirstTimeJobSeeker.php
 <?php
 $allowUnregistered = false;
@@ -6,6 +7,9 @@ require_once __DIR__ . "/includes/resident_access_guard.php";
 =======
 ﻿<?php
 >>>>>>> Stashed changes:Resident-End/FirstTimeJobSeekerForm.php
+=======
+﻿<?php
+>>>>>>> Stashed changes
 $residentinformationtbl = [
     'firstname' => 'Juan',
     'middlename' => '',
@@ -199,11 +203,17 @@ $useraccountstbl = [
 </body>
 
 </html>
+<<<<<<< Updated upstream
 <<<<<<< Updated upstream:Resident-End/FirstTimeJobSeeker.php
 =======
+=======
+>>>>>>> Stashed changes
 
 
 
 
 
+<<<<<<< Updated upstream
 >>>>>>> Stashed changes:Resident-End/FirstTimeJobSeekerForm.php
+=======
+>>>>>>> Stashed changes
