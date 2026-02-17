@@ -20,12 +20,6 @@ document.addEventListener("DOMContentLoaded", () => {
     const editBlockedMessage =
         window.RESIDENT_PROFILE_EDIT_BLOCK_MESSAGE ||
         "Your account must be verified before you can edit your address.";
-    const modalInstance =
-        modalEl && window.bootstrap?.Modal ? bootstrap.Modal.getOrCreateInstance(modalEl) : null;
-    const noticeModalInstance =
-        noticeModalEl && window.bootstrap?.Modal
-            ? bootstrap.Modal.getOrCreateInstance(noticeModalEl)
-            : null;
     let requiresReassign = false;
     const isHead = headBlock?.dataset?.isHead === "1";
     const fieldIds = [
@@ -301,42 +295,15 @@ document.addEventListener("DOMContentLoaded", () => {
         if (noticeTitleEl) noticeTitleEl.textContent = title || "Notice";
         if (noticeBodyEl) noticeBodyEl.textContent = message || "";
         if (!noticeModalEl || !window.bootstrap?.Modal) return;
-        if (modalInstance) {
-            modalInstance.hide();
-        }
-        if (noticeModalInstance) {
-            noticeModalInstance.show();
-            return;
+        if (modalEl && window.bootstrap?.Modal) {
+            const openModal = bootstrap.Modal.getInstance(modalEl);
+            if (openModal) openModal.hide();
         }
         bootstrap.Modal.getOrCreateInstance(noticeModalEl).show();
     };
 
     const isPendingDuplicateResponse = (message = "") =>
         /already have a pending/i.test(String(message));
-
-    const confirmDocumentRequirement = () =>
-        new Promise((resolve) => {
-            if (window.UniversalModal?.open) {
-                window.UniversalModal.open({
-                    title: "Before You Continue",
-                    message: "Saving changes will send a request for review. Every applied change request requires supporting document/s for verification. Changing your address will remove you from your household.",
-                    buttons: [
-                        {
-                            label: "Continue",
-                            class: "btn btn-primary",
-                            onClick: () => resolve(true),
-                        },
-                        {
-                            label: "Cancel",
-                            class: "btn btn-outline-secondary",
-                            onClick: () => resolve(false),
-                        },
-                    ],
-                });
-                return;
-            }
-            resolve(window.confirm("Every applied change request requires supporting documents for verification. Continue?"));
-        });
 
     const showEditBlocked = (event) => {
         if (event) {
@@ -351,10 +318,6 @@ document.addEventListener("DOMContentLoaded", () => {
 
     const openModal = () => {
         if (!modalEl || !window.bootstrap?.Modal) return;
-        if (modalInstance) {
-            modalInstance.show();
-            return;
-        }
         bootstrap.Modal.getOrCreateInstance(modalEl).show();
     };
 
@@ -362,16 +325,33 @@ document.addEventListener("DOMContentLoaded", () => {
         if (statusPromise) return statusPromise;
         statusPromise = (async () => {
             try {
-                const res = await fetch("../PhpFiles/Resident-End/edit_request_status.php?scope=pending&request_type=address");
+                const res = await fetch("../PhpFiles/Resident-End/edit_request_status.php");
                 const data = await res.json().catch(() => ({}));
                 if (res.ok && data.success) {
-                    if (data.pending) {
+                    if (data.pending?.address) {
                         isPendingRequest = true;
                         if (resultEl) resultEl.textContent = "";
                         if (modalEl && window.bootstrap?.Modal) {
                             const modal = bootstrap.Modal.getInstance(modalEl);
                             if (modal) modal.hide();
                         }
+                    }
+                    if (data.denied?.address && deniedAlert) {
+                        const remarks = data.denied.address.remarks?.trim();
+                        const reviewedAt = data.denied.address.reviewed_at;
+                        let msg = "Your last address edit request was denied.";
+                        if (remarks) {
+                            msg += ` Reason: ${remarks}`;
+                        }
+                        if (reviewedAt) {
+                            msg += ` (Reviewed: ${new Date(reviewedAt).toLocaleString()})`;
+                        }
+                        if (deniedText) {
+                            deniedText.textContent = msg;
+                        } else {
+                            deniedAlert.textContent = msg;
+                        }
+                        deniedAlert.classList.remove("d-none");
                     }
                 }
             } catch (e) {
@@ -397,13 +377,14 @@ document.addEventListener("DOMContentLoaded", () => {
             return;
         }
 
-        if (!statusLoaded) {
-            primeStatus();
-        }
-
-        const proceed = await confirmDocumentRequirement();
-        if (!proceed) return;
         openModal();
+
+        if (!statusLoaded) {
+            await primeStatus();
+            if (isPendingRequest) {
+                showNotice("Pending Request", "You already have a pending address edit request.");
+            }
+        }
     };
     if (modalTrigger) {
         modalTrigger.addEventListener("click", handlePendingClick);
