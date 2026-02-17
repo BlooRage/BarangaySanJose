@@ -1,16 +1,8 @@
-<<<<<<< Updated upstream
-<<<<<<< Updated upstream
-<?php
+﻿<?php
 $allowUnregistered = false;
 require_once __DIR__ . "/includes/resident_access_guard.php";
 ?>
 <!DOCTYPE html>
-=======
-﻿<!DOCTYPE html>
->>>>>>> Stashed changes
-=======
-﻿<!DOCTYPE html>
->>>>>>> Stashed changes
 <html lang="en">
 
 <head>
@@ -110,16 +102,7 @@ require_once __DIR__ . "/includes/resident_access_guard.php";
         </main>
     </div>
 
-<<<<<<< Updated upstream
-<<<<<<< Updated upstream
-=======
-=======
->>>>>>> Stashed changes
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 </body>
 
 </html>
-<<<<<<< Updated upstream
->>>>>>> Stashed changes
-=======
->>>>>>> Stashed changes

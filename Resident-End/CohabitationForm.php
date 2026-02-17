@@ -1,15 +1,7 @@
-<<<<<<< Updated upstream
-<<<<<<< Updated upstream:Resident-End/Cohabitation.php
-<?php
+﻿<?php
 $allowUnregistered = false;
 require_once __DIR__ . "/includes/resident_access_guard.php";
 
-=======
-﻿<?php
->>>>>>> Stashed changes:Resident-End/CohabitationForm.php
-=======
-﻿<?php
->>>>>>> Stashed changes
 $residentinformationtbl = [
     'firstname' => 'Juan',
     'middlename' => '',
@@ -199,15 +191,12 @@ $useraccountstbl = [
 </body>
 
 </html>
-<<<<<<< Updated upstream
-<<<<<<< Updated upstream:Resident-End/Cohabitation.php
-=======
 
 
 
->>>>>>> Stashed changes:Resident-End/CohabitationForm.php
-=======
 
 
 
->>>>>>> Stashed changes
+
+
+

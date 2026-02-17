@@ -1,15 +1,7 @@
-<<<<<<< Updated upstream
-<<<<<<< Updated upstream:Resident-End/FirstTimeJobSeeker.php
-<?php
+﻿<?php
 $allowUnregistered = false;
 require_once __DIR__ . "/includes/resident_access_guard.php";
 
-=======
-﻿<?php
->>>>>>> Stashed changes:Resident-End/FirstTimeJobSeekerForm.php
-=======
-﻿<?php
->>>>>>> Stashed changes
 $residentinformationtbl = [
     'firstname' => 'Juan',
     'middlename' => '',
@@ -173,7 +165,7 @@ $useraccountstbl = [
                         <hr style="color: #ff7a18 !important; width: 3px !important;" class="my-4">
                         <div>
                             <div class="col-12">
-                                <label class="top-label">Are you a beneficiary of JobStart Program under RA No. 10869 otherwise known as â€œAn Act Institutionalizing the Nationwide Implementation of the JobStart Philippines Program and Providing for its Benefits and Program Componentsâ€? <span class="required-asterisk">*</span></label>
+                                <label class="top-label">Are you a beneficiary of JobStart Program under RA No. 10869 otherwise known as Ã¢â‚¬Å“An Act Institutionalizing the Nationwide Implementation of the JobStart Philippines Program and Providing for its Benefits and Program ComponentsÃ¢â‚¬Â? <span class="required-asterisk">*</span></label>
                                 <div class="checkbox-group pt-2">
                                     <label><input type="radio" name="jobstart_beneficiary" value="Yes" required> Yes</label>
                                     <label><input type="radio" name="jobstart_beneficiary" value="No" required> No</label>
@@ -203,17 +195,8 @@ $useraccountstbl = [
 </body>
 
 </html>
-<<<<<<< Updated upstream
-<<<<<<< Updated upstream:Resident-End/FirstTimeJobSeeker.php
-=======
-=======
->>>>>>> Stashed changes
 
 
 
 
 
-<<<<<<< Updated upstream
->>>>>>> Stashed changes:Resident-End/FirstTimeJobSeekerForm.php
-=======
->>>>>>> Stashed changes
