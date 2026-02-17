@@ -1583,7 +1583,11 @@ function isActuallyVisible(el) {
         const data = await res.json().catch(() => null);
 
         if (!res.ok || !data || !data.success) {
-          const msg = data?.message || "Something went wrong. Please try again.";
+          const rawMsg = String(data?.message || "").trim();
+          const isTechnicalMsg = /foreign key|constraint fails|sqlstate|prepare failed|insert .* failed|update .* failed|duplicate entry/i.test(rawMsg);
+          const msg = rawMsg && !isTechnicalMsg
+            ? rawMsg
+            : "Unable to save your resident profiling request right now. Please log out, log in again, and retry.";
           window.UniversalModal?.open({
             title: "Error",
             message: msg,
