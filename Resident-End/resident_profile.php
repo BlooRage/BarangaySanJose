@@ -1348,19 +1348,20 @@ if ($residentId !== '' && isset($conn) && $conn instanceof mysqli) {
         </div>
     </div>
 
-    <div class="modal fade" id="beforeChangeAddressModal" tabindex="-1" data-bs-backdrop="static" data-bs-keyboard="false" aria-hidden="true">
+    <div class="modal fade" id="beforeEditModal" tabindex="-1" data-bs-backdrop="static" data-bs-keyboard="false" aria-hidden="true">
         <div class="modal-dialog modal-md modal-dialog-centered">
             <div class="modal-content">
                 <div class="modal-header border-0 justify-content-center">
                     <h5 class="modal-title text-dark text-center w-100">Before You Continue</h5>
                 </div>
                 <div class="modal-body">
-                    <p class="mb-2">Changing your address will create a request for admin review.</p>
-                    <p class="mb-0">If approved, your household membership may be updated and your previous residency record will no longer be your active address.</p>
+                    <p class="mb-0 text-center">
+                        Saving changes will send a request for review. Every applied change request requires supporting document/s for verification.
+                    </p>
                 </div>
                 <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                    <button type="button" class="btn btn-primary" id="btnBeforeAddressContinue">Continue</button>
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-primary" id="btnBeforeEditContinue">Continue</button>
                 </div>
             </div>
         </div>

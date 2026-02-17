@@ -33,6 +33,8 @@ document.addEventListener("DOMContentLoaded", () => {
     const resultEl = document.getElementById("profileSaveResult");
     const modalEl = document.getElementById("editProfileModal");
     const uploadModalEl = document.getElementById("editProfileUploadModal");
+    const beforeModalEl = document.getElementById("beforeEditModal");
+    const beforeContinueBtn = document.getElementById("btnBeforeEditContinue");
     const religion = document.getElementById("editReligion");
     const employmentStatus = document.getElementById("employmentStatus");
     const occupation = document.getElementById("editOccupation");
@@ -530,8 +532,30 @@ document.addEventListener("DOMContentLoaded", () => {
     const isPendingDuplicateResponse = (message = "") =>
         /already have a pending/i.test(String(message));
 
-    const confirmBeforeContinue = () =>
+    const showBeforeYouGo = () =>
         new Promise((resolve) => {
+            if (beforeModalEl && beforeContinueBtn && window.bootstrap?.Modal) {
+                const modal = bootstrap.Modal.getOrCreateInstance(beforeModalEl);
+                let done = false;
+                const finish = (value) => {
+                    if (done) return;
+                    done = true;
+                    resolve(value);
+                };
+                const onContinue = (event) => {
+                    if (event) event.preventDefault();
+                    modal.hide();
+                    finish(true);
+                };
+                const onHidden = () => {
+                    beforeContinueBtn.removeEventListener("click", onContinue);
+                    finish(false);
+                };
+                beforeContinueBtn.addEventListener("click", onContinue);
+                beforeModalEl.addEventListener("hidden.bs.modal", onHidden, { once: true });
+                modal.show();
+                return;
+            }
             if (window.UniversalModal?.open) {
                 window.UniversalModal.open({
                     title: "Before You Continue",
@@ -869,7 +893,7 @@ document.addEventListener("DOMContentLoaded", () => {
             }
         }
 
-        const proceed = await confirmBeforeContinue();
+        const proceed = await showBeforeYouGo();
         if (!proceed) return;
         profileStage = "form";
         updateSections();

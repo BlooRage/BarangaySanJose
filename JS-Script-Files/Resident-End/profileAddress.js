@@ -17,8 +17,8 @@ document.addEventListener("DOMContentLoaded", () => {
     const noticeModalEl = document.getElementById("residentNoticeModal");
     const noticeTitleEl = document.getElementById("residentNoticeTitle");
     const noticeBodyEl = document.getElementById("residentNoticeBody");
-    const beforeModalEl = document.getElementById("beforeChangeAddressModal");
-    const beforeContinueBtn = document.getElementById("btnBeforeAddressContinue");
+    const beforeModalEl = document.getElementById("beforeEditModal");
+    const beforeContinueBtn = document.getElementById("btnBeforeEditContinue");
     const canEdit = window.RESIDENT_PROFILE_EDIT_ALLOWED !== false;
     const editBlockedMessage =
         window.RESIDENT_PROFILE_EDIT_BLOCK_MESSAGE ||
