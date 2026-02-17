@@ -4,12 +4,15 @@ document.addEventListener("DOMContentLoaded", () => {
   const btnApplyFilter = document.getElementById("btnApplyFilter");
   const btnResetModal = document.getElementById("btnResetModalFilters");
   const filterHouseholdCountInput = document.getElementById("filterHouseholdCountInput");
+  const displayModeAddresses = document.getElementById("displayModeAddresses");
+  const displayModeHeads = document.getElementById("displayModeHeads");
   const btnRefreshTable = document.getElementById("btnHouseholdRefresh");
   const countdownEl = document.getElementById("householdAutoRefreshCountdown");
 
   let allAddresses = [];
   let activeAreaFilters = [];
   let activeHouseholdCountFilter = "";
+  let activeDisplayMode = "addresses";
 
   const AUTO_REFRESH_SECONDS = 60;
   let autoRefreshSecondsLeft = AUTO_REFRESH_SECONDS;
@@ -42,7 +45,7 @@ document.addEventListener("DOMContentLoaded", () => {
       filtered = filtered.filter(item => selectedAreas.includes(normalizeArea(item.area_number)));
     }
 
-    if (activeHouseholdCountFilter !== "") {
+    if (activeDisplayMode === "addresses" && activeHouseholdCountFilter !== "") {
       const selectedCount = Number(activeHouseholdCountFilter);
       filtered = filtered.filter(item => Number(item.household_count ?? 0) === selectedCount);
     }
@@ -54,7 +57,7 @@ document.addEventListener("DOMContentLoaded", () => {
   // FETCH HEADS OF FAMILY
   // ========================
   function fetchHeads(search = "") {
-    const url = `../PhpFiles/Admin-End/householdProfiling.php?fetch=true&search=${encodeURIComponent(search)}`;
+    const url = `../PhpFiles/Admin-End/householdProfiling.php?fetch=true&mode=${encodeURIComponent(activeDisplayMode)}&search=${encodeURIComponent(search)}`;
     if (autoRefreshInFlight) return;
     autoRefreshInFlight = true;
     setRefreshLoading(true);
@@ -119,15 +122,30 @@ document.addEventListener("DOMContentLoaded", () => {
       return;
     }
 
+    const col1 = document.getElementById("th-col-1");
+    const col2 = document.getElementById("th-col-2");
+    const col3 = document.getElementById("th-col-3");
+    if (activeDisplayMode === "heads") {
+      if (col1) col1.textContent = "Resident ID";
+      if (col2) col2.textContent = "Household Head";
+      if (col3) col3.textContent = "Address";
+    } else {
+      if (col1) col1.textContent = "Address ID";
+      if (col2) col2.textContent = "Address";
+      if (col3) col3.textContent = "Households";
+    }
+
     data.forEach(row => {
       const tr = document.createElement("tr");
+      const col1Value = activeDisplayMode === "heads" ? (row.resident_id ?? "—") : (row.address_id ?? "—");
+      const col2Value = activeDisplayMode === "heads" ? (row.head_full_name ?? "—") : (row.address_display ?? "—");
+      const col3Value = activeDisplayMode === "heads" ? (row.address_display ?? "—") : (row.household_count ?? 0);
       tr.innerHTML = `
-        <td class="fw-bold">${row.address_id ?? "—"}</td>
-        <td>${row.address_display ?? "—"}</td>
-        <td>${row.household_count ?? 0}</td>
+        <td class="fw-bold">${col1Value}</td>
+        <td>${col2Value}</td>
+        <td>${col3Value}</td>
         <td>
           <button type="button" class="btn btn-primary btn-sm text-white viewEntryBtn">View</button>
-          <button type="button" class="btn btn-success btn-sm text-white addMemberBtn">Add Household Member</button>
         </td>
       `;
 
@@ -135,11 +153,6 @@ document.addEventListener("DOMContentLoaded", () => {
       if (viewBtn) {
         viewBtn.addEventListener("click", () => openViewEntry(row));
       }
-      const addMemberBtn = tr.querySelector(".addMemberBtn");
-      if (addMemberBtn) {
-        addMemberBtn.addEventListener("click", () => openAddMember(row));
-      }
-
       tbody.appendChild(tr);
     });
   }
@@ -160,9 +173,25 @@ document.addEventListener("DOMContentLoaded", () => {
   // ========================
   if (btnApplyFilter) {
     btnApplyFilter.addEventListener("click", () => {
+      activeDisplayMode = displayModeHeads && displayModeHeads.checked ? "heads" : "addresses";
       const checkedBoxes = document.querySelectorAll(".filter-checkbox:checked");
       activeAreaFilters = Array.from(checkedBoxes).map(cb => cb.value);
       activeHouseholdCountFilter = filterHouseholdCountInput ? filterHouseholdCountInput.value.trim() : "";
+      if (activeDisplayMode === "heads") {
+        activeHouseholdCountFilter = "";
+        if (filterHouseholdCountInput) {
+          filterHouseholdCountInput.value = "";
+          filterHouseholdCountInput.disabled = true;
+        }
+      } else if (filterHouseholdCountInput) {
+        filterHouseholdCountInput.disabled = false;
+      }
+      if (searchInput) {
+        searchInput.placeholder = activeDisplayMode === "heads"
+          ? "Resident ID, Name, or Address"
+          : "Address ID or Address Name";
+      }
+      fetchHeads(searchInput ? searchInput.value.trim() : "");
       renderTable(getFilteredAddresses());
 
       const filterModal = bootstrap.Modal.getInstance(document.getElementById("modalFilter"));
@@ -179,6 +208,12 @@ document.addEventListener("DOMContentLoaded", () => {
       activeAreaFilters = [];
       activeHouseholdCountFilter = "";
       if (filterHouseholdCountInput) filterHouseholdCountInput.value = "";
+      if (displayModeAddresses) displayModeAddresses.checked = true;
+      if (displayModeHeads) displayModeHeads.checked = false;
+      activeDisplayMode = "addresses";
+      if (filterHouseholdCountInput) filterHouseholdCountInput.disabled = false;
+      if (searchInput) searchInput.placeholder = "Address ID or Address Name";
+      fetchHeads(searchInput ? searchInput.value.trim() : "");
       renderTable(getFilteredAddresses());
     });
   }
@@ -245,188 +280,11 @@ document.addEventListener("DOMContentLoaded", () => {
       }
     }
 
-    // Other residing members (non-household)
-    const otherList = document.getElementById("list-otherResidents");
-    if (otherList) {
-      otherList.innerHTML = "";
-      const others = Array.isArray(data.other_residents) ? data.other_residents : [];
-      if (!others.length) {
-        otherList.innerHTML = `<li class="text-muted">None</li>`;
-      } else {
-        // store households JSON for reuse in assign buttons
-        otherList.dataset.householdsParsed = JSON.stringify(data.households || []);
-
-        others.forEach(o => {
-          const ageText = (o && o.age !== null && o.age !== undefined) ? o.age : "—";
-          const nameText = (o && o.name) ? o.name : "—";
-          const li = document.createElement("li");
-          li.className = "d-flex justify-content-between align-items-center mb-1";
-          li.innerHTML = `
-            <span>${nameText} - ${ageText}</span>
-            <button class="btn btn-sm btn-outline-primary assignResidentBtn" data-resident="${o.resident_id ?? ""}">Assign</button>
-          `;
-          otherList.appendChild(li);
-        });
-      }
-    }
-
     new bootstrap.Modal(document.getElementById("modal-viewHousehold"), {
       backdrop: "static",
       keyboard: true
     }).show();
   }
-
-  // ========================
-  // ADD HOUSEHOLD MEMBER MODAL
-  // ========================
-  function updateAddMemberSaveState() {
-    const form = document.getElementById("form-addHouseholdMember");
-    const saveBtn = document.getElementById("btn-addMemberSave");
-    if (!form || !saveBtn) return;
-    saveBtn.disabled = !form.checkValidity();
-  }
-
-  function openAddMember(data) {
-    const form = document.getElementById("form-addHouseholdMember");
-    if (form) form.reset();
-    const famHeadSelect = document.getElementById("add-famHeadId");
-    if (famHeadSelect) {
-      famHeadSelect.innerHTML = "";
-      const households = Array.isArray(data.households) ? data.households : [];
-      if (!households.length) {
-        const opt = document.createElement("option");
-        opt.value = "";
-        opt.textContent = "No household heads available";
-        famHeadSelect.appendChild(opt);
-        famHeadSelect.disabled = true;
-      } else {
-        famHeadSelect.disabled = false;
-        households.forEach((hh, index) => {
-          const opt = document.createElement("option");
-          opt.value = hh.resident_id ?? "";
-          opt.textContent = hh.head_full_name ?? "—";
-          if (households.length === 1 || index === 0) {
-            opt.selected = true;
-          }
-          famHeadSelect.appendChild(opt);
-        });
-      }
-    }
-
-    new bootstrap.Modal(document.getElementById("modal-addHouseholdMember"), {
-      backdrop: "static",
-      keyboard: true
-    }).show();
-    updateAddMemberSaveState();
-  }
-
-  const addMemberForm = document.getElementById("form-addHouseholdMember");
-  if (addMemberForm) {
-    ["input", "change"].forEach(evt => {
-      addMemberForm.addEventListener(evt, updateAddMemberSaveState);
-    });
-    updateAddMemberSaveState();
-
-    addMemberForm.addEventListener("submit", e => {
-      if (!confirm("Are you sure you want to add this household member?")) {
-        e.preventDefault();
-        return;
-      }
-      e.preventDefault();
-      const formData = new FormData(addMemberForm);
-
-      fetch("../PhpFiles/Admin-End/householdProfiling.php", {
-        method: "POST",
-        body: formData
-      })
-      .then(res => res.json())
-      .then(data => {
-        if (data.success) {
-          const modal = bootstrap.Modal.getInstance(document.getElementById("modal-addHouseholdMember"));
-          if (modal) modal.hide();
-          fetchHeads(searchInput ? searchInput.value.trim() : "");
-        } else {
-          alert(data.message || "Failed to add household member.");
-        }
-      })
-      .catch(err => {
-        console.error(err);
-        alert("Server error.");
-      });
-    });
-  }
-
-  // ========================
-  // ASSIGN OTHER RESIDENT TO HOUSEHOLD
-  // ========================
-  const assignForm = document.getElementById("form-assignResident");
-  const assignModalEl = document.getElementById("modal-assignResident");
-  let cachedHouseholds = [];
-
-  document.addEventListener("click", e => {
-    const btn = e.target.closest(".assignResidentBtn");
-    if (!btn) return;
-    const residentId = btn.dataset.resident || "";
-    const holder = document.getElementById("list-otherResidents");
-    cachedHouseholds = holder && holder.dataset.householdsParsed
-      ? JSON.parse(holder.dataset.householdsParsed)
-      : [];
-    openAssignModal(residentId, cachedHouseholds);
-  });
-
-  function openAssignModal(residentId, households) {
-    const select = document.getElementById("assign-famHeadSelect");
-    const inputResident = document.getElementById("assign-residentId");
-    if (!select || !inputResident) return;
-    inputResident.value = residentId;
-    select.innerHTML = "";
-    const list = Array.isArray(households) ? households : [];
-    list.forEach((hh, idx) => {
-      const opt = document.createElement("option");
-      opt.value = hh.resident_id ?? "";
-      opt.textContent = hh.head_full_name ?? "—";
-      if (idx === 0) opt.selected = true;
-      select.appendChild(opt);
-    });
-    new bootstrap.Modal(assignModalEl, { backdrop: "static", keyboard: true }).show();
-  }
-
-  if (assignForm) {
-    assignForm.addEventListener("submit", e => {
-      e.preventDefault();
-      const formData = new FormData(assignForm);
-      fetch("../PhpFiles/Admin-End/householdProfiling.php", {
-        method: "POST",
-        body: formData
-      })
-      .then(res => res.json())
-      .then(data => {
-        if (data.success) {
-          const residentId = assignForm.querySelector("#assign-residentId")?.value;
-          if (residentId) {
-            const list = document.getElementById("list-otherResidents");
-            const btn = list ? list.querySelector(`.assignResidentBtn[data-resident="${residentId}"]`) : null;
-            const li = btn ? btn.closest("li") : null;
-            if (li) {
-              li.remove();
-              if (list && !list.querySelector("li")) {
-                list.innerHTML = `<li class="text-muted">None</li>`;
-              }
-            }
-          }
-          const modal = bootstrap.Modal.getInstance(assignModalEl);
-          if (modal) modal.hide();
-          const viewModal = bootstrap.Modal.getInstance(document.getElementById("modal-viewHousehold"));
-          if (viewModal) viewModal.hide();
-          fetchHeads(searchInput ? searchInput.value.trim() : "");
-        } else {
-          alert(data.message || "Failed to assign resident.");
-        }
-      })
-      .catch(err => {
-        console.error(err);
-        alert("Server error.");
-      });
-    });
-  }
 });
+
+
