@@ -305,6 +305,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const isPendingDuplicateResponse = (message = "") =>
         /already have a pending/i.test(String(message));
 
+<<<<<<< Updated upstream
     const confirmDocumentRequirement = () =>
         new Promise((resolve) => {
             if (window.UniversalModal?.open) {
@@ -329,6 +330,8 @@ document.addEventListener("DOMContentLoaded", () => {
             resolve(window.confirm("Every applied change request requires supporting documents for verification. Continue?"));
         });
 
+=======
+>>>>>>> Stashed changes
     const showEditBlocked = (event) => {
         if (event) {
             event.preventDefault();
