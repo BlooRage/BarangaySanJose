@@ -20,6 +20,12 @@ document.addEventListener("DOMContentLoaded", () => {
     const editBlockedMessage =
         window.RESIDENT_PROFILE_EDIT_BLOCK_MESSAGE ||
         "Your account must be verified before you can edit your address.";
+    const modalInstance =
+        modalEl && window.bootstrap?.Modal ? bootstrap.Modal.getOrCreateInstance(modalEl) : null;
+    const noticeModalInstance =
+        noticeModalEl && window.bootstrap?.Modal
+            ? bootstrap.Modal.getOrCreateInstance(noticeModalEl)
+            : null;
     let requiresReassign = false;
     const isHead = headBlock?.dataset?.isHead === "1";
     const fieldIds = [
@@ -295,9 +301,12 @@ document.addEventListener("DOMContentLoaded", () => {
         if (noticeTitleEl) noticeTitleEl.textContent = title || "Notice";
         if (noticeBodyEl) noticeBodyEl.textContent = message || "";
         if (!noticeModalEl || !window.bootstrap?.Modal) return;
-        if (modalEl && window.bootstrap?.Modal) {
-            const openModal = bootstrap.Modal.getInstance(modalEl);
-            if (openModal) openModal.hide();
+        if (modalInstance) {
+            modalInstance.hide();
+        }
+        if (noticeModalInstance) {
+            noticeModalInstance.show();
+            return;
         }
         bootstrap.Modal.getOrCreateInstance(noticeModalEl).show();
     };
@@ -372,6 +381,10 @@ document.addEventListener("DOMContentLoaded", () => {
 
     const openModal = () => {
         if (!modalEl || !window.bootstrap?.Modal) return;
+        if (modalInstance) {
+            modalInstance.show();
+            return;
+        }
         bootstrap.Modal.getOrCreateInstance(modalEl).show();
     };
 
