@@ -1,21 +1,25 @@
 .main-content {
     background: #ffffff;
     padding: 3rem;
+    width: 100%;
+    max-width: 100%;
+    box-sizing: border-box;
+    overflow-x: hidden;
 }
 
 /* ===== TITLES ===== */
 .page-title {
-    color: #ff7a18;
+    color: #de710c !important;
     font-family: 'Charis SIL Bold';
     font-size: 3rem;
     margin-bottom: 1.5rem;
 }
-hr{
+.page-divider {
     border: none;
     height: 2px;
-    background-color: #ff7a18 !important;
+    background-color: #de710c !important;
     margin: 1.5rem 0;
-    width: 40% !important;
+    width: 100%;
 }
 .page-description {
     margin: 20px !important; ;
@@ -94,5 +98,12 @@ p.section-label {
     }
     .certificate-icon {
         height: 100px;
+    }
+}
+
+@media (min-width: 769px) {
+    #div-mainDisplay.main-content {
+        flex: 0 0 auto;
+        width: calc(100vw - 280px);
     }
 }

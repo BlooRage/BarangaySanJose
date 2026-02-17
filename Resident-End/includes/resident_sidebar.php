@@ -187,6 +187,11 @@ if ($residentId !== '' && isset($conn) && $conn instanceof mysqli) {
 
       <div id="group-navServices" class="mb-3">
         <p class="text-muted small fw-bold mb-1">Services</p>
+        <!-- add another for ApplicationsLandingPage.php -->
+        <a href="ApplicationsLandingPage.php"
+           class="a-sidebarLink <?= activeLink('ApplicationsLandingPage.php', $current) ?>">
+          <i class="fa-solid fa-file-pen"></i>Document Application
+        </a>
         <a href="resident_certificates.php"
            class="a-sidebarLink <?= activeLink('resident_certificates.php', $current) ?>">
           <i class="fa-solid fa-certificate"></i>Certificates

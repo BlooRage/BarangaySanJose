@@ -25,78 +25,49 @@ require_once __DIR__ . "/includes/resident_access_guard.php";
 
         <main id="div-mainDisplay" class="main-content flex-grow-1">
             <h1 class="page-title">Barangay Documents</h1>
-            <hr style="color: #ff7a18 !important;">
+            <hr class="page-divider">
 
             <p class="page-description">
-                Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor
-                incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis
-                nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat.
-                Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu
-                fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in
-                culpa qui officia deserunt mollit anim id est laborum.
+                Welcome to the Barangay San Jose Online Document Portal. To better serve our community, we have digitized our application process for essential certificates and clearances. Please select the document you require from the list below to begin your application. Ensure all provided information is accurate to avoid delays in processing.
             </p>
 
             <p class="section-label">List of documents:</p>
 
             <div class="row certificate-grid text-center">
-                <div class="col-lg-4 certificate-card">
-                    <img src="../icons/cohab.png" class="certificate-icon" alt="">
+                <div class="col-md-6 col-lg-3 certificate-card">
+                    <img src="../icons/dashboard/cohab.png" class="certificate-icon" alt="">
                     <h3>COHABITATION</h3>
                     <p class="certificate-text">
-                        Lorem ipsum dolor sit amet, consectetur adipiscing elit,
-                        sed do eiusmod tempor incididunt ut
+                        Official proof of common-law partnership for legal or insurance claims.
                     </p>
-                    <button class="btn apply-btn" onclick="location.href='Cohabitation.php'">Apply Now</button>
+                    <button class="btn apply-btn" onclick="location.href='CohabitationForm.php'">Apply Now</button>
                 </div>
 
-                <div class="col-lg-4 certificate-card">
-                    <img src="../icons/indigency.png" class="certificate-icon" alt="">
+                <div class="col-md-6 col-lg-3 certificate-card">
+                    <img src="../icons/dashboard/indigency.png" class="certificate-icon" alt="">
                     <h3>INDIGENCY</h3>
                     <p class="certificate-text">
-                        Lorem ipsum dolor sit amet, consectetur adipiscing elit,
-                        sed do eiusmod tempor incididunt ut
+                        Required for residents seeking financial, medical, or legal assistance.
                     </p>
-                    <button class="btn apply-btn" onclick="location.href='Indigency.php'">Apply Now</button>
+                    <button class="btn apply-btn" onclick="location.href='IndigencyForm.php'">Apply Now</button>
                 </div>
 
-                <div class="col-lg-4 certificate-card">
-                    <img src="../icons/clearance.png" class="certificate-icon" alt="">
-                    <h3>CLEARANCES</h3>
-                    <p class="certificate-text">
-                        Lorem ipsum dolor sit amet, consectetur adipiscing elit,
-                        sed do eiusmod tempor incididunt ut
-                    </p>
-                    <button class="btn apply-btn" onclick="location.href='ClearanceLandingPage.php'">Apply Now</button>
-                </div>
-
-                <div class="col-lg-4 certificate-card">
-                    <img src="../icons/jobseekers.png" class="certificate-icon" alt="">
+                <div class="col-md-6 col-lg-3 certificate-card">
+                    <img src="../icons/dashboard/jobseekers.png" class="certificate-icon" alt="">
                     <h3>FIRST TIME JOB-SEEKERS</h3>
                     <p class="certificate-text">
-                        Lorem ipsum dolor sit amet, consectetur adipiscing elit,
-                        sed do eiusmod tempor incididunt ut
+                        Avail fee waivers for government documents under Republic Act 11261.
                     </p>
-                    <button class="btn apply-btn" onclick="location.href='FirstTimeJobSeekers.php'">Apply Now</button>
+                    <button class="btn apply-btn" onclick="location.href='FirstTimeJobSeekersForm.php'">Apply Now</button>
                 </div>
 
-                <div class="col-lg-4 certificate-card position-relative">
-                    <img src="../icons/identity.png" class="certificate-icon" alt="">
+                <div class="col-md-6 col-lg-3 certificate-card position-relative">
+                    <img src="../icons/dashboard/identity.png" class="certificate-icon" alt="">
                     <h3>IDENTITY</h3>
                     <p class="certificate-text">
-                        Lorem ipsum dolor sit amet, consectetur adipiscing elit,
-                        sed do eiusmod tempor incididunt ut
+                        A standard certification of your identity and residency in our barangay.
                     </p>
-                    <button class="btn apply-btn">Apply Now</button>
-                </div>
-
-                <div class="col-lg-4 certificate-card">
-                    <img src="../icons/brgyid.png" class="certificate-icon" alt="">
-                    <h3>BARANGAY ID</h3>
-                    <p class="certificate-text">
-                        Lorem ipsum dolor sit amet, consectetur adipiscing elit,
-                        sed do eiusmod tempor incididunt ut
-                    </p>
-                    <button class="btn apply-btn" onclick="location.href='BarangayIdApplication.php'">Apply Now</button>
+                    <button class="btn apply-btn" onclick="location.href='IdentityForm.php'">Apply Now</button>
                 </div>
             </div>
         </main>
