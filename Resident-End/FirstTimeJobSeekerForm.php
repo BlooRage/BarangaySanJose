@@ -1,4 +1,4 @@
-<?php
+﻿<?php
 $allowUnregistered = false;
 require_once __DIR__ . "/includes/resident_access_guard.php";
 
@@ -50,8 +50,11 @@ $useraccountstbl = [
     <title>First Time Job Seeker</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="../CSS-Styles/GeneralStyle.css">
-    <link rel="stylesheet" href="../CSS-Styles/Resident-End-CSS/BarangayId.css">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons/font/bootstrap-icons.css" rel="stylesheet" />
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+<link rel="stylesheet" href="../CSS-Styles/Resident-End-CSS/residentDashboard.css">
+<link rel="stylesheet" href="../CSS-Styles/Guest-End-CSS/GeneralStyle.css">
+    <link rel="stylesheet" href="../CSS-Styles/Resident-End-CSS/applicationForms.css">
 </head>
 
 <body>
@@ -68,7 +71,7 @@ $useraccountstbl = [
                     <a href="javascript:history.back()" class="back-link">&lt; Go Back</a>
 
                     <h1 class="form-title">First Time Job Seekers</h1>
-                    <p class="form-subtitle">All fields marked with * are required</p>
+                    <p class="form-subtitle">All fields marked with <span class="required-asterisk">*</span> are required</p>
 
                     <form method="POST" action="">
 
@@ -82,22 +85,22 @@ $useraccountstbl = [
 
                         <div class="form-row">
                             <div>
-                                <label>Last Name <span>* </span></label>
+                                <label class="top-label">Last Name <span class="required-asterisk">*</span></label>
                                 <input type="text" name="last_name" required>
                             </div>
 
                             <div>
-                                <label>First Name <span>* </span></label>
+                                <label class="top-label">First Name <span class="required-asterisk">*</span></label>
                                 <input type="text" name="first_name" required>
                             </div>
 
                             <div>
-                                <label>Middle Name</label>
+                                <label class="top-label">Middle Name</label>
                                 <input type="text" name="middle_name">
                             </div>
 
                             <div>
-                                <label>Suffix</label>
+                                <label class="top-label">Suffix</label>
                                 <select name="suffix">
                                     <option value="">None</option>
                                     <option value="Jr.">Jr.</option>
@@ -111,88 +114,72 @@ $useraccountstbl = [
                         <div class="form-row">
                             <!-- birthdate and age readonly -->
                             <div class="col-12">
-                                <label>Birthdate <span>* </span></label>
+                                <label class="top-label">Birthdate <span class="required-asterisk">*</span></label>
                                 <input type="text" name="birthdate" value="<?php echo $residentinformationtbl['birthdate']; ?>" readonly>
                             </div>
                             <div class="col-12">
-                                <label>Age <span>* </span></label>
+                                <label class="top-label">Age <span class="required-asterisk">*</span></label>
                                 <input type="text" name="age" value="<?php echo $residentinformationtbl['age']; ?>" readonly>
                             </div>
                             <div class="col-12">
                                 <!-- sex/gender readonly -->
-                                <label>Sex/Gender <span>* </span></label>
+                                <label class="top-label">Sex/Gender <span class="required-asterisk">*</span></label>
                                 <input type="text" name="sex" value="<?php echo $residentinformationtbl['sex']; ?>" readonly>
                             </div>
                             <div class="col-12">
                                 <!-- years of residency readonly -->
-                                <label>Years of Residency <span>* </span></label>
+                                <label class="top-label">Years of Residency <span class="required-asterisk">*</span></label>
                                 <input type="text" name="years_of_residency" value="<?php echo ($residentaddresstbl['address_id']); ?> years" readonly>
                             </div>
                         </div>
                         <!-- phone numb readonly and educational attainment input -->
-                        <div class="form-row" style="grid-template-columns: repeat(2, 1fr);">
+                        <div class="form-row two-col-row">
                             <div class="col-12">
-                                <label>Phone Number <span>* </span></label>
+                                <label class="top-label">Contact Number <span class="required-asterisk">*</span></label>
                                 <input type="text" name="phone_number" value="<?php echo $useraccountstbl['phone_number']; ?>" readonly>
                             </div>
                             <div class="col-12">
-                                <label>Educational Attainment <span>* </span></label>
+                                <label class="top-label">Educational Attainment <span class="required-asterisk">*</span></label>
                                 <input type="text" name="educational_attainment" required>
                             </div>
                         </div>
                         <!-- address separate inputs readonly -->
-                        <div class="form-row">
-                            <div class="col-12">
-                                <label>Street Number <span>* </span></label>
-                                <input type="text" name="street_number" value="<?php echo $residentaddresstbl['street_number']; ?>" readonly>
-                            </div>
-                            <div class="col-12">
-                                <label>Street Name <span>* </span></label>
-                                <input type="text" name="street_name" value="<?php echo $residentaddresstbl['street_name']; ?>" readonly>
-                            </div>
-                            <div class="col-12">
-                                <label>Subdivision</label>
-                                <input type="text" name="subdivision" value="<?php echo $residentaddresstbl['subdivision']; ?>" readonly>
-                            </div>
-                            <div class="col-12">
-                                <label>Area Number <span>* </span></label>
-                                <input type="text" name="area_number" value="<?php echo $residentaddresstbl['area_number']; ?>" readonly>
-                            </div>
-                            <div class="col-12">
-                                <label>Unit Number</label>
-                                <input type="text" name="unit_number" value="<?php echo $residentaddresstbl['unit_number']; ?>" readonly>
-                            </div>
-                            <div class="col-12">
-                                <label>Barangay <span>* </span></label>
-                                <input type="text" name="barangay" value="<?php echo $residentaddresstbl['barangay']; ?>" readonly>
-                            </div>
-                            <div class="col-12">
-                                <label>City/Municipality <span>* </span></label>
-                                <input type="text" name="city_municipality" value="San Jose City" readonly>
-                            </div>
-                            <div class="col-12">
-                                <label>Province <span>* </span></label>
-                                <input type="text" name="province" value="Montalban" readonly>
+                        <div id="residentAddressWrapper" class="form-row">
+                            <div class="full-width">
+                                <div class="row mb-3">
+                                    <div class="col-md-4">
+                                        <label class="top-label" for="unitNumber">Unit / Apartment Number</label>
+                                        <input type="text" class="form-control" id="unitNumber" name="unitNumber" readonly value="<?php echo $residentaddresstbl['unit_number']; ?>">
+                                    </div>
+                                    <div class="col-md-4">
+                                        <label class="top-label" for="houseNumber">House Number <span class="required-asterisk">*</span></label>
+                                        <input type="text" class="form-control" id="houseNumber" name="houseNumber" readonly value="<?php echo $residentaddresstbl['street_number']; ?>">
+                                    </div>
+                                    <div class="col-md-4">
+                                        <label class="top-label" for="streetName">Street Name <span class="required-asterisk">*</span></label>
+                                        <input type="text" class="form-control" id="streetName" name="streetName" readonly value="<?php echo $residentaddresstbl['street_name']; ?>">
+                                    </div>
+                                </div>
                             </div>
                         </div>
                         <hr style="color: #ff7a18 !important; width: 3px !important;" class="my-4">
                         <div>
                             <div class="col-12">
-                                <label>Are you a beneficiary of JobStart Program under RA No. 10869 otherwise known as “An Act Institutionalizing the Nationwide Implementation of the JobStart Philippines Program and Providing for its Benefits and Program Components”? <span>* </span></label>
+                                <label class="top-label">Are you a beneficiary of JobStart Program under RA No. 10869 otherwise known as Ã¢â‚¬Å“An Act Institutionalizing the Nationwide Implementation of the JobStart Philippines Program and Providing for its Benefits and Program ComponentsÃ¢â‚¬Â? <span class="required-asterisk">*</span></label>
                                 <div class="checkbox-group pt-2">
-                                    <label><input type="checkbox" name="jobstart_beneficiary" value="Yes"> Yes</label>
-                                    <label><input type="checkbox" name="jobstart_beneficiary" value="No"> No</label>
+                                    <label><input type="radio" name="jobstart_beneficiary" value="Yes" required> Yes</label>
+                                    <label><input type="radio" name="jobstart_beneficiary" value="No" required> No</label>
                                 </div>
                             </div>
                         </div>
-                        <div class="certification-row">
+                        <div class="agreement-row">
 
                             <label class="toggle-wrapper">
                                 <input type="checkbox" class="toggle-input" required>
                                 <span class="toggle-slider"></span>
                             </label>
 
-                            <label class="certification-text">
+                            <label class="agreement-text">
                                 I hereby certify that the above information is true and correct to the best of my knowledge and belief.
                             </label>
 
@@ -208,3 +195,8 @@ $useraccountstbl = [
 </body>
 
 </html>
+
+
+
+
+

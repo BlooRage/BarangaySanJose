@@ -10,7 +10,7 @@
     <script src="https://kit.fontawesome.com/3482e00999.js" crossorigin="anonymous"></script>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="../CSS-Styles/Admin-End-CSS/AdminDashboardStyle.css">
-    <link rel="stylesheet" href="../CSS-Styles/Admin-End-CSS/ResidentMasterlistStyle.css?v=20260216-2">
+    <link rel="stylesheet" href="../CSS-Styles/Admin-End-CSS/ResidentMasterlistStyle.css?v=20260216-3">
 </head>
 
 <body>
@@ -70,13 +70,13 @@ if (isset($conn) && $conn instanceof mysqli) {
         <div id="div-tableContainer" class="bg-white p-4 rounded-4 shadow-sm border">
 
 	            <!-- FILTER BUTTONS + SEARCH -->
-	            <div class="admin-list-toolbar mb-3">
+	            <div class="admin-list-toolbar mb-3 pt-2">
 	                <!-- Status Filter Buttons -->
 	                <div class="admin-list-tabs">
 	                    <button class="btn btn-outline-primary btn-sm status-filter-btn" data-filter="ALL">All</button>
 	                    <button class="btn btn-outline-success btn-sm status-filter-btn fw-bold" data-filter="VerifiedResident">Verified Resident</button>
 	                    <button class="btn btn-outline-danger btn-sm status-filter-btn fw-bold" data-filter="NotVerified">Not Verified</button>
-	                    <button class="btn btn-outline-warning text-dark btn-sm status-filter-btn fw-bold" data-filter="PendingVerification">
+	                    <button class="btn btn-outline-warning text-dark btn-sm status-filter-btn fw-bold has-notif" data-filter="PendingVerification">
 	                        Pending Verification
 	                        <?php if ($pendingCount > 0): ?>
 	                            <span class="pending-count-badge"><?= $pendingCount ?></span>
