@@ -1,4 +1,7 @@
-<?php
+﻿<?php
+$allowUnregistered = false;
+require_once __DIR__ . "/includes/resident_access_guard.php";
+
 $residentinformationtbl = [
     'firstname' => 'Juan',
     'middlename' => '',
@@ -47,8 +50,11 @@ $useraccountstbl = [
     <title>Barangay ID Application</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="../CSS-Styles/GeneralStyle.css">
-    <link rel="stylesheet" href="../CSS-Styles/Resident-End-CSS/BarangayId.css">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons/font/bootstrap-icons.css" rel="stylesheet" />
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+<link rel="stylesheet" href="../CSS-Styles/Resident-End-CSS/residentDashboard.css">
+<link rel="stylesheet" href="../CSS-Styles/Guest-End-CSS/GeneralStyle.css">
+    <link rel="stylesheet" href="../CSS-Styles/Resident-End-CSS/applicationForms.css">
 </head>
 
 <body>
@@ -65,7 +71,7 @@ $useraccountstbl = [
                     <a href="javascript:history.back()" class="back-link">&lt; Go Back</a>
 
                     <h1 class="form-title">Application for Barangay ID</h1>
-                    <p class="form-subtitle">All fields marked with * are required</p>
+                    <p class="form-subtitle">All fields marked with <span class="required-asterisk">*</span> are required</p>
 
                     <form method="POST" action="">
 
@@ -84,22 +90,22 @@ $useraccountstbl = [
 
                         <div class="form-row">
                             <div>
-                                <label>Last Name <span>* </span></label>
+                                <label class="top-label">Last Name <span class="required-asterisk">*</span></label>
                                 <input type="text" name="last_name" required>
                             </div>
 
                             <div>
-                                <label>First Name <span>* </span></label>
+                                <label class="top-label">First Name <span class="required-asterisk">*</span></label>
                                 <input type="text" name="first_name" required>
                             </div>
 
                             <div>
-                                <label>Middle Name</label>
+                                <label class="top-label">Middle Name</label>
                                 <input type="text" name="middle_name">
                             </div>
 
                             <div>
-                                <label>Suffix</label>
+                                <label class="top-label">Suffix</label>
                                 <select name="suffix">
                                     <option value="">None</option>
                                     <option value="Jr.">Jr.</option>
@@ -113,16 +119,16 @@ $useraccountstbl = [
 
                         <div class="form-row">
                             <div>
-                                <label>Date of Birth <span>*</span></label>
+                                <label class="top-label">Date of Birth <span class="required-asterisk">*</span></label>
                                 <input type="date">
                             </div>
 
                             <div>
-                                <label>Birthplace <span>*</span></label>
+                                <label class="top-label">Birthplace <span class="required-asterisk">*</span></label>
                                 <input type="text">
                             </div>
                             <div class="phonenum">
-                                <label>Phone Number <span>*</span></label>
+                                <label class="top-label">Contact Number <span class="required-asterisk">*</span></label>
                                 <input type="tel" name="phone_number" required>
                             </div>
 
@@ -134,18 +140,20 @@ $useraccountstbl = [
                             <div class="full-width">
                                 <div class="row mb-3">
                                     <div class="col-md-4">
-                                        <label class="form-label" for="unitNumber">Unit / Apartment Number</label>
+                                        <label class="top-label" for="unitNumber">Unit / Apartment Number</label>
                                         <input type="text" class="form-control" id="unitNumber" name="unitNumber" readonly value="<?php echo $residentaddresstbl['unit_number']; ?>">
                                     </div>
                                     <div class="col-md-4">
-                                        <label class="form-label" for="houseNumber">House Number <span class="text-danger">*</span></label>
+                                        <label class="top-label" for="houseNumber">House Number <span class="required-asterisk">*</span></label>
                                         <input type="text" class="form-control" id="houseNumber" name="houseNumber" readonly value="<?php echo $residentaddresstbl['street_number']; ?>">
                                     </div>
                                     <div class="col-md-4">
-                                        <label class="form-label" for="streetName">Street Name <span class="text-danger">*</span></label>
+                                        <label class="top-label" for="streetName">Street Name <span class="required-asterisk">*</span></label>
                                         <input type="text" class="form-control" id="streetName" name="streetName" readonly value="<?php echo $residentaddresstbl['street_name']; ?>">
                                     </div>
                                 </div>
+                            </div>
+                        </div>
                         <br>
                         <!-- EMERGENCY CONTACT -->
                         <h2 class="section-title text-center pb-2 text-dark">
@@ -155,23 +163,23 @@ $useraccountstbl = [
 
                         <div class="form-row">
                             <div>
-                                <label>First Name <span>*</span> </label>
+                                <label class="top-label">First Name <span class="required-asterisk">*</span> </label>
                                 <input type="text" name="emergency_first" required>
                             </div>
 
                             <div>
-                                <label>Last Name <span>*</span> </label>
+                                <label class="top-label">Last Name <span class="required-asterisk">*</span> </label>
                                 <input type="text" name="emergency_last" required>
                             </div>
 
                             <div>
-                                <label>Middle Name</label>
+                                <label class="top-label">Middle Name</label>
                                 <input type="text" name="emergency_middle">
                             </div>
 
                             <div>
                                 <!-- suffix is select drop down-->
-                                <label>Suffix</label>
+                                <label class="top-label">Suffix</label>
                                 <select name="emergency_suffix">
                                     <option value="">None</option>
                                     <option value="Jr.">Jr.</option>
@@ -184,14 +192,14 @@ $useraccountstbl = [
 
                         <div class="form-row">
                             <div class="full-width">
-                                <label>Contact Number <span>*</span> </label>
+                                <label class="top-label">Contact Number <span class="required-asterisk">*</span> </label>
                                 <input type="tel" name="emergency_contact" required>
                             </div>
                         </div>
 
                         <!-- CERTIFICATION -->
-                        <div class="certification-row">
-                            <label class="certification-text">
+                        <div class="agreement-row">
+                            <label class="agreement-text">
                                 <input type="checkbox" required>
                                 I hereby certify that the above information is true and correct to the best of my knowledge and belief.
                             </label>
@@ -201,9 +209,20 @@ $useraccountstbl = [
 
                     </form>
                 </div>
+            </div>
         </main>
 
     </div>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 </body>
 
 </html>
+
+
+
+
+
+
+
+
+

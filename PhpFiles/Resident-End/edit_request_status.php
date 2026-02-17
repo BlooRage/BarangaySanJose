@@ -52,6 +52,44 @@ function getResidentId(mysqli $conn, string $userId): ?string {
     return $residentId ?: null;
 }
 
+function mapRequestTypeToTxnType(string $requestType): ?string {
+    $k = strtolower(trim($requestType));
+    if ($k === 'profile') return 'EDIT_REQUEST_PROFILE';
+    if ($k === 'address') return 'EDIT_REQUEST_ADDRESS';
+    if ($k === 'emergency') return 'EDIT_REQUEST_EMERGENCY';
+    return null;
+}
+
+function pendingFromTransaction(
+    mysqli $conn,
+    string $residentUserId,
+    int $pendingStatusId,
+    string $requestType
+): ?bool {
+    $txnType = mapRequestTypeToTxnType($requestType);
+    if ($txnType === null) return null;
+
+    $stmt = $conn->prepare("
+        SELECT 1
+        FROM unifiedtransactiontbl
+        WHERE resident_user_id = ?
+          AND source_type = 'EDIT_REQUEST'
+          AND transaction_type = ?
+          AND status_id = ?
+        LIMIT 1
+    ");
+    if (!$stmt) {
+        return null;
+    }
+
+    $stmt->bind_param("ssi", $residentUserId, $txnType, $pendingStatusId);
+    $stmt->execute();
+    $res = $stmt->get_result();
+    $exists = $res ? ($res->num_rows > 0) : false;
+    $stmt->close();
+    return $exists;
+}
+
 $residentId = getResidentId($conn, $_SESSION['user_id']);
 if (!$residentId) {
     http_response_code(400);
@@ -67,6 +105,38 @@ if ($pendingStatusId === null) {
 }
 
 $deniedStatusId = getStatusId($conn, 'DeniedRequest', 'EditRequest');
+
+$scope = strtolower(trim((string)($_GET['scope'] ?? 'full')));
+$requestType = strtolower(trim((string)($_GET['request_type'] ?? '')));
+
+if ($scope === 'pending' && in_array($requestType, ['profile', 'address', 'emergency'], true)) {
+    $pending = pendingFromTransaction($conn, $residentId, $pendingStatusId, $requestType);
+
+    if ($pending === null) {
+        $stmt = $conn->prepare("
+            SELECT 1
+            FROM resident_edit_requesttbl
+            WHERE resident_id = ? AND request_type = ? AND status_id = ?
+            LIMIT 1
+        ");
+        if ($stmt) {
+            $stmt->bind_param("ssi", $residentId, $requestType, $pendingStatusId);
+            $stmt->execute();
+            $res = $stmt->get_result();
+            $pending = $res ? ($res->num_rows > 0) : false;
+            $stmt->close();
+        } else {
+            $pending = false;
+        }
+    }
+
+    echo json_encode([
+        'success' => true,
+        'request_type' => $requestType,
+        'pending' => (bool)$pending,
+    ]);
+    exit;
+}
 
 $pendingTypes = [];
 $stmt = $conn->prepare("

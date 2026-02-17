@@ -310,6 +310,9 @@ document.addEventListener("DOMContentLoaded", () => {
         bootstrap.Modal.getOrCreateInstance(noticeModalEl).show();
     };
 
+    const isPendingDuplicateResponse = (message = "") =>
+        /already have a pending/i.test(String(message));
+
     const showEditBlocked = (event) => {
         if (event) {
             event.preventDefault();
@@ -444,6 +447,12 @@ document.addEventListener("DOMContentLoaded", () => {
             const data = await res.json().catch(() => ({}));
             if (!res.ok || !data.success) {
                 throw new Error(data.message || "Failed to submit profile edit request.");
+            }
+            if (isPendingDuplicateResponse(data.message)) {
+                isPendingRequest = true;
+                updateSections();
+                showNotice("Pending Request", data.message || "You already have a pending profile edit request.");
+                return;
             }
             if (successAlert) successAlert.classList.add("d-none");
             showNotice("Request Submitted", data.message || "Profile edit request submitted.");

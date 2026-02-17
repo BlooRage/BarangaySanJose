@@ -215,8 +215,8 @@ if ($residentId !== '' && isset($conn) && $conn instanceof mysqli) {
            class="a-sidebarLink <?= activeLink('resident_certificates.php', $current) ?>">
           <i class="fa-solid fa-bullhorn"></i>Announcements
         </a>
-        <a href="resident_appointments.php"
-           class="a-sidebarLink <?= activeLink('resident_appointments.php', $current) ?>">
+        <a href="resident_transactions.php"
+           class="a-sidebarLink <?= activeLink('resident_transactions.php', $current) ?>">
           <i class="fa-solid fa-clock-rotate-left"></i>Transactions
         </a>
       </div>
@@ -326,5 +326,4 @@ if ($residentId !== '' && isset($conn) && $conn instanceof mysqli) {
 
 </body>
 </html>
-
 

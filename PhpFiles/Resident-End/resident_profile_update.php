@@ -12,6 +12,7 @@ if (empty($_SESSION['user_id'])) {
 }
 
 require_once __DIR__ . '/../General/connection.php';
+require_once __DIR__ . '/../General/residentTransaction.php';
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     http_response_code(405);
@@ -365,6 +366,19 @@ try {
         }
         $ins->close();
     }
+
+    createResidentTransaction(
+        $conn,
+        (string)$userId,
+        (string)$userId,
+        'EDIT_REQUEST',
+        (string)$requestId,
+        mapEditRequestTransactionType('profile'),
+        mapEditRequestTitle('profile'),
+        (int)$pendingStatusId,
+        mapEditRequestDescription('profile'),
+        ['request_type' => 'profile']
+    );
 
     $conn->commit();
     echo json_encode(['success' => true, 'message' => 'Profile edit request submitted.']);

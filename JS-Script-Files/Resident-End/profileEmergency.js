@@ -269,6 +269,12 @@ document.addEventListener("DOMContentLoaded", () => {
             if (!res.ok || !data.success) {
                 throw new Error(data.message || "Failed to update emergency contact.");
             }
+            if (isPendingDuplicateResponse(data.message)) {
+                isPendingRequest = true;
+                updateSaveState();
+                showNotice("Pending Request", data.message || "You already have a pending emergency edit request.");
+                return;
+            }
             if (resultEl) resultEl.textContent = "";
             if (noticeTitleEl) noticeTitleEl.textContent = "Request Submitted";
             if (noticeBodyEl) noticeBodyEl.textContent = data.message || "Emergency edit request submitted.";
@@ -295,6 +301,9 @@ document.addEventListener("DOMContentLoaded", () => {
         }
         bootstrap.Modal.getOrCreateInstance(noticeModalEl).show();
     };
+
+    const isPendingDuplicateResponse = (message = "") =>
+        /already have a pending/i.test(String(message));
 
     const showEditBlocked = (event) => {
         if (event) {

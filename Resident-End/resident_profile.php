@@ -264,8 +264,8 @@ if ($residentId !== '' && isset($conn) && $conn instanceof mysqli) {
             <div class="card shadow-sm mb-4">
                 <div class="card-header d-flex justify-content-between">
                     <strong>ADDRESS INFORMATION</strong>
-                    <button class="btn btn-success btn-sm" id="btnOpenEditAddress">
-                        Edit Address
+                    <button class="btn btn-primary btn-sm" id="btnOpenEditAddress">
+                        Edit
                     </button>
                 </div>
 	                <div class="card-body">
@@ -400,10 +400,12 @@ if ($residentId !== '' && isset($conn) && $conn instanceof mysqli) {
 	                        <div class="col-12 col-md-6"><a href="javascript:void(0)" id="changeEmailLink">Change Email</a></div>
 	                        <div class="col-12 col-md-6">
 	                            <a href="javascript:void(0)" id="changePasswordLink">Change Password</a>
+	                            <?php if (!empty($useraccountstbl['last_password_change'])): ?>
 	                            <div class="text-muted fst-italic small mt-1">
 	                                Last changed:
-	                                <?= htmlspecialchars(($useraccountstbl['last_password_change'] ?? '') !== '' ? $useraccountstbl['last_password_change'] : '—', ENT_QUOTES, 'UTF-8') ?>
-                            </div>
+	                                <?= htmlspecialchars($useraccountstbl['last_password_change'], ENT_QUOTES, 'UTF-8') ?>
+	                            </div>
+	                            <?php endif; ?>
                         </div>
                         <?php if (!(int)($useraccountstbl['email_verify'] ?? 0)): ?>
                             <div class="col-12 col-md-6">
@@ -521,7 +523,7 @@ if ($residentId !== '' && isset($conn) && $conn instanceof mysqli) {
 
     <?php if ($isHeadOfFamily): ?>
     <div class="modal fade" id="householdInviteModal" tabindex="-1" data-bs-backdrop="static" data-bs-keyboard="false">
-        <div class="modal-dialog modal-md modal-dialog-centered">
+        <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
             <div class="modal-content">
                 <div class="modal-header">
                     <h5 class="modal-title">Invite Household Members</h5>
@@ -784,7 +786,7 @@ if ($residentId !== '' && isset($conn) && $conn instanceof mysqli) {
 
 
      <div class="modal fade" id="addAddressModal" tabindex="-1" data-bs-backdrop="static" data-bs-keyboard="false">
-        <div class="modal-dialog modal-md modal-dialog-centered">
+        <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
             <div class="modal-content">
 
                 <div class="modal-header">
@@ -848,7 +850,7 @@ if ($residentId !== '' && isset($conn) && $conn instanceof mysqli) {
     </div>
 
 <div class="modal fade" id="editEmergencyContactModal" tabindex="-1" data-bs-backdrop="static" data-bs-keyboard="false">
-            <div class="modal-dialog modal-md modal-dialog-centered">
+            <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
                 <div class="modal-content">
 
                     <div class="modal-header">
@@ -917,7 +919,7 @@ if ($residentId !== '' && isset($conn) && $conn instanceof mysqli) {
 
     <!-- Change Password Modal -->
     <div class="modal fade" id="changePasswordModal" tabindex="-1" data-bs-backdrop="static" data-bs-keyboard="false" aria-hidden="true">
-        <div class="modal-dialog modal-dialog-centered change-password-dialog">
+        <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
             <div class="modal-content">
                 <div class="modal-header">
                     <h5 class="modal-title text-black" style="color:#000;">Change Password</h5>
@@ -961,7 +963,7 @@ if ($residentId !== '' && isset($conn) && $conn instanceof mysqli) {
 
     <!-- Confirm Change Password Modal -->
     <div class="modal fade" id="confirmChangePasswordModal" tabindex="-1" data-bs-backdrop="static" data-bs-keyboard="false" aria-hidden="true">
-        <div class="modal-dialog modal-sm modal-dialog-centered">
+        <div class="modal-dialog modal-md modal-dialog-centered">
             <div class="modal-content">
                 <div class="modal-header">
                     <h5 class="modal-title text-black" style="color:#000;">Confirm</h5>
@@ -980,7 +982,7 @@ if ($residentId !== '' && isset($conn) && $conn instanceof mysqli) {
 
 	    <!-- Change Phone Number Modal -->
 	    <div class="modal fade" id="changePhoneModal" tabindex="-1" data-bs-backdrop="static" data-bs-keyboard="false" aria-hidden="true">
-	        <div class="modal-dialog modal-dialog-centered change-phone-dialog">
+	        <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
 	            <div class="modal-content">
 	                <div class="modal-header">
 	                    <h5 class="modal-title text-black" style="color:#000;">Change Phone Number</h5>
@@ -1079,7 +1081,7 @@ if ($residentId !== '' && isset($conn) && $conn instanceof mysqli) {
 
 	    <!-- Change Email Modal -->
 	    <div class="modal fade" id="changeEmailModal" tabindex="-1" data-bs-backdrop="static" data-bs-keyboard="false" aria-hidden="true">
-	        <div class="modal-dialog modal-dialog-centered change-email-dialog">
+	        <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
 	            <div class="modal-content">
 	                <div class="modal-header">
 	                    <h5 class="modal-title text-black" style="color:#000;">Change Email</h5>
@@ -1183,7 +1185,7 @@ if ($residentId !== '' && isset($conn) && $conn instanceof mysqli) {
 
     <!-- GENERIC NOTICE MODAL -->
     <div class="modal fade" id="residentNoticeModal" tabindex="-1" aria-hidden="true">
-        <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-dialog modal-md modal-dialog-centered">
             <div class="modal-content">
                 <div class="modal-header border-0 justify-content-center">
                     <h5 class="modal-title text-center w-100 text-dark" id="residentNoticeTitle">Notice</h5>
