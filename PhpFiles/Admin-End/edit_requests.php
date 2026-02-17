@@ -13,6 +13,7 @@ if (empty($_SESSION['user_id']) || !in_array($_SESSION['role'] ?? '', ['Admin', 
 
 require_once __DIR__ . '/../General/connection.php';
 require_once __DIR__ . '/../General/uniqueIDGenerate.php';
+require_once __DIR__ . '/../General/residentTransaction.php';
 
 if (!isset($conn) || !($conn instanceof mysqli)) {
     http_response_code(500);
@@ -702,6 +703,27 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             throw new Exception('Failed to update request status.');
         }
         $stmt->close();
+
+        upsertResidentTransaction(
+            $conn,
+            (string)$row['user_id'],
+            (string)$row['user_id'],
+            'EDIT_REQUEST',
+            (string)$requestId,
+            mapEditRequestTransactionType($requestType),
+            mapEditRequestTitle($requestType),
+            (int)$newStatusId,
+            mapEditRequestDescription($requestType),
+            [
+                'request_type' => $requestType,
+                'action' => $action,
+                'admin_notes' => $adminNotes,
+            ],
+            (string)$adminId,
+            date('Y-m-d H:i:s'),
+            null,
+            null
+        );
 
         if ($action === 'deny') {
             deleteEditRequestAttachments($conn, $requestId);

@@ -1,3 +1,6 @@
+<?php
+require_once __DIR__ . "/includes/admin_guard.php";
+?>
 <!DOCTYPE html>
 <html lang="en">
 
@@ -691,5 +694,10 @@
         });
     </script>
 </body>
+<<<<<<< Updated upstream
 
 </html>
+=======
+</html>
+
+>>>>>>> Stashed changes

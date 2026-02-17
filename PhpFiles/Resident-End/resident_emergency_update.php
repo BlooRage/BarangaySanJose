@@ -12,6 +12,7 @@ if (empty($_SESSION['user_id'])) {
 }
 
 require_once __DIR__ . '/../General/connection.php';
+require_once __DIR__ . '/../General/residentTransaction.php';
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     http_response_code(405);
@@ -245,7 +246,21 @@ if (!$stmt->execute()) {
     echo json_encode(['success' => false, 'message' => 'Failed to submit edit request.']);
     exit;
 }
+$requestId = (int)$stmt->insert_id;
 $stmt->close();
+
+createResidentTransaction(
+    $conn,
+    (string)$userId,
+    (string)$userId,
+    'EDIT_REQUEST',
+    (string)$requestId,
+    mapEditRequestTransactionType('emergency'),
+    mapEditRequestTitle('emergency'),
+    (int)$pendingStatusId,
+    mapEditRequestDescription('emergency'),
+    ['request_type' => 'emergency']
+);
 
 $response = [
     'success' => true,

@@ -111,3 +111,46 @@ function GenerateAddressID(mysqli $conn, string $areaNumber): string {
 
     return $prefix . $nextSeq;
 }
+
+function GenerateTransactionID(
+    mysqli $conn,
+    string $tableName = 'unifiedtransactiontbl',
+    string $columnName = 'transaction_id'
+): string {
+    // Format: MMYYYYXXXX (monthly sequence)
+    $prefix = date("mY"); // e.g., 022026
+    $like = $prefix . "%";
+
+    // Validate dynamic identifiers to avoid SQL injection.
+    if (!preg_match('/^[A-Za-z0-9_]+$/', $tableName) || !preg_match('/^[A-Za-z0-9_]+$/', $columnName)) {
+        error_log("GenerateTransactionID: Invalid table or column name.");
+        return $prefix . str_pad((string)random_int(1, 9999), 4, "0", STR_PAD_LEFT);
+    }
+
+    $sql = "
+        SELECT {$columnName}
+        FROM {$tableName}
+        WHERE {$columnName} LIKE ?
+        ORDER BY {$columnName} DESC
+        LIMIT 1
+    ";
+
+    $stmt = $conn->prepare($sql);
+    if (!$stmt) {
+        // Table may not exist yet; allow generation anyway.
+        error_log("GenerateTransactionID Prepare Failed: " . $conn->error);
+        return $prefix . str_pad((string)random_int(1, 9999), 4, "0", STR_PAD_LEFT);
+    }
+
+    $stmt->bind_param("s", $like);
+    $stmt->execute();
+    $stmt->bind_result($lastId);
+    $stmt->fetch();
+    $stmt->close();
+
+    $nextSeq = $lastId
+        ? str_pad(((int)substr((string)$lastId, -4)) + 1, 4, "0", STR_PAD_LEFT)
+        : "0001";
+
+    return $prefix . $nextSeq; // e.g., 0220260001
+}

@@ -3,6 +3,7 @@ session_start();
 include "../General/connection.php";
 require_once "../General/uniqueIDGenerate.php";
 require_once "../General/audit.php";
+require_once "../General/residentTransaction.php";
 require_once __DIR__ . "/../../composer-email-handler/vendor/autoload.php";
 
 use setasign\Fpdi\Fpdi;
@@ -1370,13 +1371,75 @@ try {
     if (!$stmtE->execute()) throw new Exception("Emergency contact save failed: " . $stmtE->error);
     $stmtE->close();
 
+    $uploadedAnyProof = $hasIdProof || $hasDocumentProof || $hasPicture || $hasAnySectorProof;
+    $finalResidentStatusId = $uploadedAnyProof
+        ? (isset($pendingResidentStatusId) ? (int)$pendingResidentStatusId : null)
+        : (isset($residentStatusId) ? (int)$residentStatusId : null);
+    if (!$finalResidentStatusId || $finalResidentStatusId <= 0) {
+        $finalResidentStatusId = (int)$residentStatusId;
+    }
+
+    // Resident transactions (best-effort)
+    try {
+        createResidentTransaction(
+            $conn,
+            (string)$user_id,
+            (string)$user_id,
+            'RESIDENT_PROFILE',
+            (string)$resident_id,
+            'RESIDENT_PROFILING',
+            'Resident Profiling Submission',
+            (int)$finalResidentStatusId,
+            'Resident completed initial profiling form.',
+            [
+                'skip_proof' => $skipProof ? 1 : 0,
+                'proof_type' => $proofType,
+            ]
+        );
+
+        if ($hasIdProof || $hasDocumentProof || $hasPicture) {
+            createResidentTransaction(
+                $conn,
+                (string)$user_id,
+                (string)$user_id,
+                'RESIDENT_PROFILE',
+                (string)$resident_id,
+                'PROOF_OF_RESIDENCY',
+                'Proof of Residency Submission',
+                (int)$statusVerifyId,
+                'Resident uploaded proof documents for verification.',
+                [
+                    'has_id_proof' => $hasIdProof ? 1 : 0,
+                    'has_document_proof' => $hasDocumentProof ? 1 : 0,
+                    'has_2x2' => $hasPicture ? 1 : 0,
+                ]
+            );
+        }
+
+        if (!empty($selectedSectors)) {
+            createResidentTransaction(
+                $conn,
+                (string)$user_id,
+                (string)$user_id,
+                'RESIDENT_PROFILE',
+                (string)$resident_id,
+                'SECTOR_MEMBERSHIP',
+                'Sector Membership Declaration',
+                (int)($hasAnySectorProof ? $statusVerifyId : $finalResidentStatusId),
+                'Resident declared sector membership.',
+                [
+                    'sectors' => array_values($selectedSectors),
+                    'has_sector_proof' => $hasAnySectorProof ? 1 : 0,
+                ]
+            );
+        }
+    } catch (Throwable $e) {
+        // ignore transaction log failures
+    }
+
     // Audit (best-effort): resident submitted profiling form.
     // Do not log sensitive values; store N/A for old/new.
     try {
-        $uploadedAnyProof = $hasIdProof || $hasDocumentProof || $hasPicture || $hasAnySectorProof;
-        $finalResidentStatusId = $uploadedAnyProof
-            ? (isset($pendingResidentStatusId) ? (int)$pendingResidentStatusId : null)
-            : (isset($residentStatusId) ? (int)$residentStatusId : null);
 
         $remarksParts = [];
         $remarksParts[] = 'skip_proof=' . ($skipProof ? '1' : '0');

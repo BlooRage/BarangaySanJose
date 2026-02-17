@@ -310,6 +310,33 @@ document.addEventListener("DOMContentLoaded", () => {
         bootstrap.Modal.getOrCreateInstance(noticeModalEl).show();
     };
 
+    const isPendingDuplicateResponse = (message = "") =>
+        /already have a pending/i.test(String(message));
+
+    const confirmDocumentRequirement = () =>
+        new Promise((resolve) => {
+            if (window.UniversalModal?.open) {
+                window.UniversalModal.open({
+                    title: "Before You Continue",
+                    message: "Saving changes will send a request for review. Every applied change request requires supporting document/s for verification.",
+                    buttons: [
+                        {
+                            label: "Continue",
+                            class: "btn btn-primary",
+                            onClick: () => resolve(true),
+                        },
+                        {
+                            label: "Cancel",
+                            class: "btn btn-outline-secondary",
+                            onClick: () => resolve(false),
+                        },
+                    ],
+                });
+                return;
+            }
+            resolve(window.confirm("Every applied change request requires supporting documents for verification. Continue?"));
+        });
+
     const showEditBlocked = (event) => {
         if (event) {
             event.preventDefault();
@@ -330,27 +357,10 @@ document.addEventListener("DOMContentLoaded", () => {
         if (statusPromise) return statusPromise;
         statusPromise = (async () => {
             try {
-                const res = await fetch("../PhpFiles/Resident-End/edit_request_status.php");
+                const res = await fetch("../PhpFiles/Resident-End/edit_request_status.php?scope=pending&request_type=profile");
                 const data = await res.json().catch(() => ({}));
                 if (res.ok && data.success) {
-                    isPendingRequest = Boolean(data.pending?.profile);
-                    if (data.denied?.profile && deniedAlert) {
-                        const remarks = data.denied.profile.remarks?.trim();
-                        const reviewedAt = data.denied.profile.reviewed_at;
-                        let msg = "Your last profile edit request was denied.";
-                        if (remarks) {
-                            msg += ` Reason: ${remarks}`;
-                        }
-                        if (reviewedAt) {
-                            msg += ` (Reviewed: ${new Date(reviewedAt).toLocaleString()})`;
-                        }
-                        if (deniedText) {
-                            deniedText.textContent = msg;
-                        } else {
-                            deniedAlert.textContent = msg;
-                        }
-                        deniedAlert.classList.remove("d-none");
-                    }
+                    isPendingRequest = Boolean(data.pending);
                 }
             } catch (e) {
                 // ignore
@@ -375,14 +385,13 @@ document.addEventListener("DOMContentLoaded", () => {
             return;
         }
 
-        openModal();
-
         if (!statusLoaded) {
-            await primeStatus();
-            if (isPendingRequest) {
-                showNotice("Pending Request", "You already have a pending profile edit request.");
-            }
+            primeStatus();
         }
+
+        const proceed = await confirmDocumentRequirement();
+        if (!proceed) return;
+        openModal();
     };
     if (modalTrigger) {
         modalTrigger.addEventListener("click", handlePendingClick);
@@ -444,6 +453,12 @@ document.addEventListener("DOMContentLoaded", () => {
             const data = await res.json().catch(() => ({}));
             if (!res.ok || !data.success) {
                 throw new Error(data.message || "Failed to submit profile edit request.");
+            }
+            if (isPendingDuplicateResponse(data.message)) {
+                isPendingRequest = true;
+                updateSections();
+                showNotice("Pending Request", data.message || "You already have a pending profile edit request.");
+                return;
             }
             if (successAlert) successAlert.classList.add("d-none");
             showNotice("Request Submitted", data.message || "Profile edit request submitted.");
