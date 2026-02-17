@@ -123,9 +123,15 @@
     background: #fff;
 }
 
+.status-filter-btn[data-filter="ALL"].active {
+    color: #0d6efd !important;
+    background: #fff !important;
+    border-color: #0d6efd !important;
+}
+
 .status-filter-btn[data-filter="Pending"].active {
-    color: #212529 !important;
-    background: #ffc107 !important;
+    color: #664d03 !important;
+    background: #fff !important;
     border-color: #ffc107 !important;
 }
 
@@ -136,8 +142,8 @@
 }
 
 .status-filter-btn[data-filter="Approved"].active {
-    color: #fff !important;
-    background: #198754 !important;
+    color: #146c43 !important;
+    background: #fff !important;
     border-color: #198754 !important;
 }
 
@@ -148,8 +154,8 @@
 }
 
 .status-filter-btn[data-filter="Denied"].active {
-    color: #fff !important;
-    background: #dc3545 !important;
+    color: #b02a37 !important;
+    background: #fff !important;
     border-color: #dc3545 !important;
 }
 
@@ -165,7 +171,20 @@
     color: #fff;
     font-size: 0.75rem;
     line-height: 1;
-    font-weight: 700;
+    font-weight: 400;
+}
+
+.status-filter-btn.has-notif {
+    position: relative;
+    overflow: visible;
+    padding-right: 16px;
+}
+
+.status-filter-btn.has-notif .pending-count-badge {
+    position: absolute;
+    top: 0;
+    right: 0;
+    transform: translate(45%, -45%);
 }
 
 .admin-list-actions--linear {

@@ -9,7 +9,7 @@
     <script src="https://kit.fontawesome.com/3482e00999.js" crossorigin="anonymous"></script>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="../CSS-Styles/Admin-End-CSS/AdminDashboardStyle.css">
-    <link rel="stylesheet" href="../CSS-Styles/Admin-End-CSS/ResidentMasterlistStyle.css?v=20260216-2">
+    <link rel="stylesheet" href="../CSS-Styles/Admin-End-CSS/ResidentMasterlistStyle.css?v=20260216-3">
     <link rel="stylesheet" href="../CSS-Styles/Admin-End-CSS/EditRequestsStyle.css?v=20260216-2">
 </head>
 <body>
@@ -27,16 +27,16 @@ include "includes/sidebar.php";
         </h2>
         <hr><br>
 
-        <div id="div-tableContainer" class="bg-white p-4 rounded-4 shadow-sm border">
-	            <div class="admin-list-toolbar mb-3">
-	                <div class="admin-list-tabs">
+        <div id="div-tableContainer" class="bg-white p-4 pt-3 rounded-4 shadow-sm border">
+	            <div class="admin-list-toolbar mb-3 pt-2">
+	                <div class="admin-list-tabs pt-2">
 	                    <button class="btn btn-outline-primary btn-sm status-filter-btn active" data-filter="ALL">All</button>
-	                    <button class="btn btn-sm status-filter-btn fw-bold" data-filter="Pending">
+	                    <button class="btn btn-sm status-filter-btn has-notif " data-filter="Pending">
 	                        Pending
 	                        <span id="pendingRequestBadge" class="pending-count-badge d-none">0</span>
 	                    </button>
-	                    <button class="btn btn-sm status-filter-btn fw-bold" data-filter="Approved">Approved</button>
-	                    <button class="btn btn-sm status-filter-btn fw-bold" data-filter="Denied">Denied</button>
+	                    <button class="btn btn-sm status-filter-btn " data-filter="Approved">Approved</button>
+	                    <button class="btn btn-sm status-filter-btn " data-filter="Denied">Denied</button>
 	                </div>
 	
 	                <div class="admin-list-actions admin-list-actions--linear">
@@ -46,15 +46,15 @@ include "includes/sidebar.php";
 	                    </div>
 	                    <button class="btn btn-outline-secondary btn-linear-control" type="button" data-bs-toggle="modal" data-bs-target="#modalFilter" id="filterButton" title="Filter" aria-label="Filter">
 	                        <i class="fas fa-filter"></i>
-	                        <span>Filter</span>
+	                        <span class="visually-hidden">Filter</span>
 	                    </button>
 	                    <button class="btn admin-columns btn-linear-control" type="button" data-bs-toggle="modal" data-bs-target="#modalTableColumns" id="btnEditRequestsColumns" title="Columns" aria-label="Columns">
 	                        <i class="fa-solid fa-sliders"></i>
-	                        <span>Columns</span>
+	                        <span class="visually-hidden">Columns</span>
 	                    </button>
 	                    <button class="btn admin-refresh btn-linear-control" type="button" id="btnEditRequestsRefresh" title="Refresh table" aria-label="Refresh table">
 	                        <i class="fa-solid fa-arrows-rotate"></i>
-	                        <span>Refresh</span>
+	                        <span class="visually-hidden">Refresh</span>
 	                    </button>
 	                    <span id="editRequestsAutoRefreshCountdown" class="small text-muted d-none"></span>
 	                </div>
@@ -265,4 +265,3 @@ include "includes/sidebar.php";
 <script src="../JS-Script-Files/Admin-End/editRequestsScript.js"></script>
 </body>
 </html>
-

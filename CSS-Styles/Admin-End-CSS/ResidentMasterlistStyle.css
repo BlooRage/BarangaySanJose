@@ -548,21 +548,51 @@ h2.section-title {
 }
 
 .status-filter-btn[data-filter="VerifiedResident"].active {
-    color: #fff !important;
-    background-color: #198754 !important;
+    color: #146c43 !important;
+    background-color: #fff !important;
     border-color: #198754 !important;
 }
 
+.status-filter-btn[data-filter="ALL"].active {
+    color: #0d6efd !important;
+    background-color: #fff !important;
+    border-color: #0d6efd !important;
+}
+
 .status-filter-btn[data-filter="NotVerified"].active {
-    color: #fff !important;
-    background-color: #dc3545 !important;
+    color: #b02a37 !important;
+    background-color: #fff !important;
     border-color: #dc3545 !important;
 }
 
 .status-filter-btn[data-filter="PendingVerification"].active {
-    color: #212529 !important;
-    background-color: #ffc107 !important;
+    color: #664d03 !important;
+    background-color: #fff !important;
     border-color: #ffc107 !important;
+}
+
+.filter-btn[data-filter="PendingReview"].active {
+    color: #664d03 !important;
+    background-color: #fff !important;
+    border-color: #ffc107 !important;
+}
+
+.filter-btn[data-filter="Verified"].active {
+    color: #146c43 !important;
+    background-color: #fff !important;
+    border-color: #198754 !important;
+}
+
+.filter-btn[data-filter="Rejected"].active {
+    color: #b02a37 !important;
+    background-color: #fff !important;
+    border-color: #dc3545 !important;
+}
+
+.filter-btn[data-filter="ALL"].active {
+    color: #0d6efd !important;
+    background-color: #fff !important;
+    border-color: #0d6efd !important;
 }
 
 .pending-count-badge {
@@ -577,9 +607,23 @@ h2.section-title {
     background-color: #dc3545;
     color: #fff;
     font-size: 0.75rem;
-    font-weight: 700;
+    font-weight: 400;
     line-height: 1;
     flex-shrink: 0;
+}
+
+.status-filter-btn.has-notif {
+    position: relative;
+    overflow: visible;
+    padding-right: 16px;
+}
+
+.status-filter-btn.has-notif .pending-count-badge {
+    position: absolute;
+    top: 0;
+    right: 0;
+    margin-left: 0;
+    transform: translate(45%, -45%);
 }
 
 /* Default inactive button style */
