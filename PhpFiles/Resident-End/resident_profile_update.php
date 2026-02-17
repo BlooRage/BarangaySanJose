@@ -30,6 +30,42 @@ function cleanString($value): string {
     return trim((string)$value);
 }
 
+function normalizeFilesArray($file): array {
+    if (!$file || !is_array($file) || !isset($file['name'])) {
+        return [];
+    }
+    if (!is_array($file['name'])) {
+        return [$file];
+    }
+    $normalized = [];
+    $count = count($file['name']);
+    for ($i = 0; $i < $count; $i++) {
+        $normalized[] = [
+            'name' => $file['name'][$i] ?? '',
+            'type' => $file['type'][$i] ?? '',
+            'tmp_name' => $file['tmp_name'][$i] ?? '',
+            'error' => $file['error'][$i] ?? UPLOAD_ERR_NO_FILE,
+            'size' => $file['size'][$i] ?? 0,
+        ];
+    }
+    return $normalized;
+}
+
+function hasValidUpload(array $files): bool {
+    foreach ($files as $file) {
+        if (($file['error'] ?? UPLOAD_ERR_NO_FILE) === UPLOAD_ERR_OK) {
+            return true;
+        }
+    }
+    return false;
+}
+
+function filterValidUploads(array $files): array {
+    return array_values(array_filter($files, function ($file) {
+        return ($file['error'] ?? UPLOAD_ERR_NO_FILE) === UPLOAD_ERR_OK;
+    }));
+}
+
 function isValidNameToken(string $value, int $minLetters = 2, int $maxLen = 30): bool {
     if ($value === '' || strlen($value) > $maxLen) return false;
     if (!preg_match('/^[A-Za-z ]+$/', $value)) return false;
@@ -238,6 +274,7 @@ try {
     $civilStatus = cleanString($_POST['civil_status'] ?? '');
     $newSurname = cleanString($_POST['new_surname'] ?? '');
     $religion = cleanString($_POST['religion'] ?? '');
+    $voterStatusRaw = cleanString($_POST['voter_status'] ?? '');
     $employmentStatus = cleanString($_POST['employment_status'] ?? '');
     $occupation = cleanString($_POST['occupation'] ?? '');
     $sectorMembership = cleanString($_POST['sector_membership'] ?? '');
@@ -265,7 +302,7 @@ try {
     if ($suffix !== (string)$current['suffix']) $changes['suffix'] = $suffix;
     if ($civilStatus !== '' && $civilStatus !== (string)$current['civil_status']) $changes['civil_status'] = $civilStatus;
     $isFemaleResident = strcasecmp((string)($current['sex'] ?? ''), 'Female') === 0;
-    if ($isFemaleResident && isset($changes['civil_status']) && in_array($civilStatus, ['Married', 'Widowed', 'Divorced'], true)) {
+    if ($isFemaleResident && isset($changes['civil_status']) && in_array($civilStatus, ['Married', 'Divorced'], true)) {
         if (!isValidNameToken($newSurname, 2, 30)) {
             throw new Exception('New surname is required and must be valid for this civil status change.');
         }
@@ -275,9 +312,25 @@ try {
         }
     }
     if ($religion !== '' && $religion !== (string)$current['religion']) $changes['religion'] = $religion;
+    if ($voterStatusRaw !== '') {
+        $voterNorm = strtolower($voterStatusRaw);
+        $voterValue = null;
+        if (in_array($voterNorm, ['registered', 'registered voter', 'yes', '1'], true)) {
+            $voterValue = 1;
+        } elseif (in_array($voterNorm, ['not registered', 'no', '0'], true)) {
+            $voterValue = 0;
+        }
+        if ($voterValue !== null && (int)($current['voter_status'] ?? 0) !== $voterValue) {
+            $changes['voter_status'] = $voterValue;
+        }
+    }
     if ($employmentStatus !== '') {
-        $changes['occupation'] = $employmentStatus === 'Employed' ? 1 : 0;
-        if ($employmentStatus === 'Employed' && $occupation !== '') {
+        $currentEmployment = ((int)($current['occupation'] ?? 0)) === 1 ? 'Employed' : 'Unemployed';
+        $employmentChanged = $employmentStatus !== $currentEmployment;
+        if ($employmentChanged) {
+            $changes['occupation'] = $employmentStatus === 'Employed' ? 1 : 0;
+        }
+        if ($employmentStatus === 'Employed' && $occupation !== '' && $occupation !== (string)($current['occupation_detail'] ?? '')) {
             $changes['occupation_detail'] = $occupation;
         }
     }
@@ -368,11 +421,17 @@ try {
     $civilChanged = isset($profileChanges['civil_status']);
 
     $nameIdType = cleanString($_POST['name_id_type'] ?? '');
-    $supportingDocType = cleanString($_POST['supporting_doc_type'] ?? '');
-    $nameIdFile = $_FILES['name_id_file'] ?? null;
-    $supportingFile = $_FILES['supporting_file'] ?? null;
-    $civilFile = $_FILES['civil_status_file'] ?? null;
-    $studentStatusFile = $_FILES['student_status_file'] ?? null;
+    $religionDocType = cleanString($_POST['supporting_religion_type'] ?? '');
+    $voterDocType = cleanString($_POST['supporting_voter_type'] ?? '');
+    $employmentDocType = cleanString($_POST['supporting_employment_type'] ?? '');
+    $sectorDocType = cleanString($_POST['supporting_sector_type'] ?? '');
+    $nameIdFiles = normalizeFilesArray($_FILES['name_id_file'] ?? null);
+    $religionFiles = normalizeFilesArray($_FILES['supporting_religion_file'] ?? null);
+    $voterFiles = normalizeFilesArray($_FILES['supporting_voter_file'] ?? null);
+    $employmentFiles = normalizeFilesArray($_FILES['supporting_employment_file'] ?? null);
+    $sectorSupportFiles = normalizeFilesArray($_FILES['supporting_sector_file'] ?? null);
+    $civilFiles = normalizeFilesArray($_FILES['civil_status_file'] ?? null);
+    $studentStatusFiles = normalizeFilesArray($_FILES['student_status_file'] ?? null);
 
     $allowedIdTypes = [
         "Passport",
@@ -397,47 +456,63 @@ try {
         if ($nameIdType === '' || !in_array($nameIdType, $allowedIdTypes, true)) {
             throw new Exception('Please select a valid ID type for name change.');
         }
-        if (!$nameIdFile || ($nameIdFile['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_OK) {
+        if (!hasValidUpload($nameIdFiles)) {
             throw new Exception('Valid ID photo is required for name change.');
         }
     }
 
     if (!$nameChanged && $civilChanged && in_array($civilStatus, ['Married', 'Widowed'], true)) {
-        if (!$civilFile || ($civilFile['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_OK) {
+        if (!hasValidUpload($civilFiles)) {
             throw new Exception('Supporting document is required for civil status change.');
         }
     }
 
     $changeKeys = array_keys($profileChanges);
-    $employmentOnlyChange = !empty($changeKeys)
-        && count(array_diff($changeKeys, ['occupation', 'occupation_detail'])) === 0;
     $requiresStudentUntickProof = !$nameChanged
         && !($civilChanged && in_array($civilStatus, ['Married', 'Widowed'], true))
         && $removedStudent;
     if ($requiresStudentUntickProof) {
-        $studentFile = $_FILES['student_status_file'] ?? null;
-        $hasStudentFile = $studentFile && (($studentFile['error'] ?? UPLOAD_ERR_NO_FILE) === UPLOAD_ERR_OK);
+        $hasStudentFile = hasValidUpload($studentStatusFiles);
         if (!$hasStudentFile && !$studentStopped) {
             throw new Exception('Please upload diploma/proof or confirm that you stopped studying.');
         }
     }
-    $requiresGenericSupport = !empty($changeKeys)
-        && !$nameChanged
-        && !($civilChanged && in_array($civilStatus, ['Married', 'Widowed'], true))
-        && !$requiresStudentUntickProof
-        && !$employmentOnlyChange;
-    if ($requiresGenericSupport) {
-        if (!$supportingFile || ($supportingFile['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_OK) {
-            throw new Exception('Supporting document is required for this profile update request.');
-        }
-        if ($supportingDocType === '' || !in_array($supportingDocType, $allowedSupportDocTypes, true)) {
-            throw new Exception('Please select a valid supporting document type.');
+    $requiresReligionDoc = isset($profileChanges['religion']);
+    $requiresVoterDoc = isset($profileChanges['voter_status']);
+    $requiresEmploymentDoc = isset($profileChanges['occupation']) || isset($profileChanges['occupation_detail']);
+    if (isset($profileChanges['occupation'])) {
+        $employmentToUnemployed = (int)$profileChanges['occupation'] === 0;
+        if ($employmentToUnemployed && !isset($profileChanges['occupation_detail'])) {
+            $requiresEmploymentDoc = false;
         }
     }
-
-    if ($supportingFile && ($supportingFile['error'] ?? UPLOAD_ERR_NO_FILE) === UPLOAD_ERR_OK) {
-        if ($supportingDocType === '' || !in_array($supportingDocType, $allowedSupportDocTypes, true)) {
-            throw new Exception('Please select a valid supporting document type.');
+    if ($requiresReligionDoc) {
+        if (!hasValidUpload($religionFiles)) {
+            throw new Exception('Supporting document is required for religion change.');
+        }
+        if ($religionDocType === '' || !in_array($religionDocType, $allowedSupportDocTypes, true)) {
+            throw new Exception('Please select a valid supporting document type for religion change.');
+        }
+    }
+    if ($requiresVoterDoc) {
+        if (!hasValidUpload($voterFiles)) {
+            throw new Exception('Supporting document is required for voter status change.');
+        }
+        if ($voterDocType === '' || !in_array($voterDocType, $allowedSupportDocTypes, true)) {
+            throw new Exception('Please select a valid supporting document type for voter status change.');
+        }
+    }
+    if ($requiresEmploymentDoc) {
+        if (!hasValidUpload($employmentFiles)) {
+            throw new Exception('Supporting document is required for employment status change.');
+        }
+        if ($employmentDocType === '' || !in_array($employmentDocType, $allowedSupportDocTypes, true)) {
+            throw new Exception('Please select a valid supporting document type for employment status change.');
+        }
+    }
+    if (hasValidUpload($sectorSupportFiles)) {
+        if ($sectorDocType === '' || !in_array($sectorDocType, $allowedSupportDocTypes, true)) {
+            throw new Exception('Please select a valid supporting document type for sector membership change.');
         }
     }
 
@@ -477,186 +552,267 @@ try {
 
     $allowedExt = ['jpg', 'jpeg', 'png', 'webp', 'pdf'];
 
-    if ($requestId > 0 && $nameChanged && $nameIdFile) {
-        $ext = strtolower(pathinfo($nameIdFile['name'] ?? '', PATHINFO_EXTENSION));
-        if (isHeicExt($ext)) {
-            throw new Exception('HEIC is not supported. Please upload JPG or PNG.');
-        }
-        if (!in_array($ext, $allowedExt, true)) {
-            throw new Exception('Invalid file type for ID photo.');
-        }
-        $moved = moveUploadedFileWithDocName($nameIdFile['tmp_name'], $uploadDir, $nameIdType, $userId, $ext);
+    if ($requestId > 0 && $nameChanged && $nameIdFiles) {
         $docTypeId = getDocumentTypeId($conn, $nameIdType);
         $remarks = "edit_request_name_id";
-        $ins = $conn->prepare("
-            INSERT INTO unifiedfileattachmenttbl
-                (source_type, source_id, document_type_id, file_name, file_path, file_type, user_id_uploaded_by, status_id_verify, remarks, id_number)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        ");
-        $sourceType = "ResidentEditRequest";
-        $sourceId = (string)$requestId;
-        $idNumber = null;
-        $ins->bind_param(
-            "ssissssiss",
-            $sourceType,
-            $sourceId,
-            $docTypeId,
-            $moved['file_name'],
-            $moved['file_path'],
-            $ext,
-            $userId,
-            $statusVerifyId,
-            $remarks,
-            $idNumber
-        );
-        if (!$ins->execute()) {
-            throw new Exception('Failed to save ID attachment.');
+        foreach (filterValidUploads($nameIdFiles) as $nameIdFile) {
+            $ext = strtolower(pathinfo($nameIdFile['name'] ?? '', PATHINFO_EXTENSION));
+            if (isHeicExt($ext)) {
+                throw new Exception('HEIC is not supported. Please upload JPG or PNG.');
+            }
+            if (!in_array($ext, $allowedExt, true)) {
+                throw new Exception('Invalid file type for ID photo.');
+            }
+            $moved = moveUploadedFileWithDocName($nameIdFile['tmp_name'], $uploadDir, $nameIdType, $userId, $ext);
+            $ins = $conn->prepare("
+                INSERT INTO unifiedfileattachmenttbl
+                    (source_type, source_id, document_type_id, file_name, file_path, file_type, user_id_uploaded_by, status_id_verify, remarks, id_number)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ");
+            $sourceType = "ResidentEditRequest";
+            $sourceId = (string)$requestId;
+            $idNumber = null;
+            $ins->bind_param(
+                "ssissssiss",
+                $sourceType,
+                $sourceId,
+                $docTypeId,
+                $moved['file_name'],
+                $moved['file_path'],
+                $ext,
+                $userId,
+                $statusVerifyId,
+                $remarks,
+                $idNumber
+            );
+            if (!$ins->execute()) {
+                throw new Exception('Failed to save ID attachment.');
+            }
+            $ins->close();
         }
-        $ins->close();
     }
 
-    if ($requestId > 0 && $civilChanged && $civilFile && in_array($civilStatus, ['Married', 'Widowed'], true)) {
-        $ext = strtolower(pathinfo($civilFile['name'] ?? '', PATHINFO_EXTENSION));
-        if (isHeicExt($ext)) {
-            throw new Exception('HEIC is not supported. Please upload JPG or PNG.');
-        }
-        if (!in_array($ext, $allowedExt, true)) {
-            throw new Exception('Invalid file type for civil status document.');
-        }
+    if ($requestId > 0 && $civilChanged && $civilFiles && in_array($civilStatus, ['Married', 'Widowed'], true)) {
         $docTypeName = $civilStatus === 'Married' ? 'Marriage Certificate' : 'Death Certificate of Spouse';
-        $moved = moveUploadedFileWithDocName($civilFile['tmp_name'], $uploadDir, $docTypeName, $userId, $ext);
         $docTypeId = getDocumentTypeId($conn, $docTypeName);
         $remarks = "edit_request_civil_status";
-        $ins = $conn->prepare("
-            INSERT INTO unifiedfileattachmenttbl
-                (source_type, source_id, document_type_id, file_name, file_path, file_type, user_id_uploaded_by, status_id_verify, remarks, id_number)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        ");
-        $sourceType = "ResidentEditRequest";
-        $sourceId = (string)$requestId;
-        $idNumber = null;
-        $ins->bind_param(
-            "ssissssiss",
-            $sourceType,
-            $sourceId,
-            $docTypeId,
-            $moved['file_name'],
-            $moved['file_path'],
-            $ext,
-            $userId,
-            $statusVerifyId,
-            $remarks,
-            $idNumber
-        );
-        if (!$ins->execute()) {
-            throw new Exception('Failed to save civil status attachment.');
+        foreach (filterValidUploads($civilFiles) as $civilFile) {
+            $ext = strtolower(pathinfo($civilFile['name'] ?? '', PATHINFO_EXTENSION));
+            if (isHeicExt($ext)) {
+                throw new Exception('HEIC is not supported. Please upload JPG or PNG.');
+            }
+            if (!in_array($ext, $allowedExt, true)) {
+                throw new Exception('Invalid file type for civil status document.');
+            }
+            $moved = moveUploadedFileWithDocName($civilFile['tmp_name'], $uploadDir, $docTypeName, $userId, $ext);
+            $ins = $conn->prepare("
+                INSERT INTO unifiedfileattachmenttbl
+                    (source_type, source_id, document_type_id, file_name, file_path, file_type, user_id_uploaded_by, status_id_verify, remarks, id_number)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ");
+            $sourceType = "ResidentEditRequest";
+            $sourceId = (string)$requestId;
+            $idNumber = null;
+            $ins->bind_param(
+                "ssissssiss",
+                $sourceType,
+                $sourceId,
+                $docTypeId,
+                $moved['file_name'],
+                $moved['file_path'],
+                $ext,
+                $userId,
+                $statusVerifyId,
+                $remarks,
+                $idNumber
+            );
+            if (!$ins->execute()) {
+                throw new Exception('Failed to save civil status attachment.');
+            }
+            $ins->close();
         }
-        $ins->close();
     }
 
-    if ($requestId > 0 && !$sectorChanged && $supportingFile && ($supportingFile['error'] ?? UPLOAD_ERR_NO_FILE) === UPLOAD_ERR_OK) {
-        $ext = strtolower(pathinfo($supportingFile['name'] ?? '', PATHINFO_EXTENSION));
-        if (isHeicExt($ext)) {
-            throw new Exception('HEIC is not supported. Please upload JPG or PNG.');
-        }
-        if (!in_array($ext, $allowedExt, true)) {
-            throw new Exception('Invalid file type for supporting document.');
-        }
-        $docTypeName = $supportingDocType;
-        $moved = moveUploadedFileWithDocName($supportingFile['tmp_name'], $uploadDir, $docTypeName, $userId, $ext);
+    if ($requestId > 0 && hasValidUpload($religionFiles)) {
+        $docTypeName = $religionDocType;
         $docTypeId = getDocumentTypeId($conn, $docTypeName);
-        $remarks = "edit_request_supporting";
-        $ins = $conn->prepare("
-            INSERT INTO unifiedfileattachmenttbl
-                (source_type, source_id, document_type_id, file_name, file_path, file_type, user_id_uploaded_by, status_id_verify, remarks, id_number)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        ");
-        $sourceType = "ResidentEditRequest";
-        $sourceId = (string)$requestId;
-        $idNumber = null;
-        $ins->bind_param(
-            "ssissssiss",
-            $sourceType,
-            $sourceId,
-            $docTypeId,
-            $moved['file_name'],
-            $moved['file_path'],
-            $ext,
-            $userId,
-            $statusVerifyId,
-            $remarks,
-            $idNumber
-        );
-        if (!$ins->execute()) {
-            throw new Exception('Failed to save supporting document attachment.');
+        $remarks = "edit_request_supporting:religion";
+        foreach (filterValidUploads($religionFiles) as $supportingFile) {
+            $ext = strtolower(pathinfo($supportingFile['name'] ?? '', PATHINFO_EXTENSION));
+            if (isHeicExt($ext)) {
+                throw new Exception('HEIC is not supported. Please upload JPG or PNG.');
+            }
+            if (!in_array($ext, $allowedExt, true)) {
+                throw new Exception('Invalid file type for supporting document.');
+            }
+            $moved = moveUploadedFileWithDocName($supportingFile['tmp_name'], $uploadDir, $docTypeName, $userId, $ext);
+            $ins = $conn->prepare("
+                INSERT INTO unifiedfileattachmenttbl
+                    (source_type, source_id, document_type_id, file_name, file_path, file_type, user_id_uploaded_by, status_id_verify, remarks, id_number)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ");
+            $sourceType = "ResidentEditRequest";
+            $sourceId = (string)$requestId;
+            $idNumber = null;
+            $ins->bind_param(
+                "ssissssiss",
+                $sourceType,
+                $sourceId,
+                $docTypeId,
+                $moved['file_name'],
+                $moved['file_path'],
+                $ext,
+                $userId,
+                $statusVerifyId,
+                $remarks,
+                $idNumber
+            );
+            if (!$ins->execute()) {
+                throw new Exception('Failed to save supporting document attachment.');
+            }
+            $ins->close();
         }
-        $ins->close();
     }
 
-    if ($requestId > 0 && !$sectorChanged && $studentStatusFile && ($studentStatusFile['error'] ?? UPLOAD_ERR_NO_FILE) === UPLOAD_ERR_OK) {
-        $ext = strtolower(pathinfo($studentStatusFile['name'] ?? '', PATHINFO_EXTENSION));
-        if (isHeicExt($ext)) {
-            throw new Exception('HEIC is not supported. Please upload JPG or PNG.');
+    if ($requestId > 0 && hasValidUpload($voterFiles)) {
+        $docTypeName = $voterDocType;
+        $docTypeId = getDocumentTypeId($conn, $docTypeName);
+        $remarks = "edit_request_supporting:voter_status";
+        foreach (filterValidUploads($voterFiles) as $supportingFile) {
+            $ext = strtolower(pathinfo($supportingFile['name'] ?? '', PATHINFO_EXTENSION));
+            if (isHeicExt($ext)) {
+                throw new Exception('HEIC is not supported. Please upload JPG or PNG.');
+            }
+            if (!in_array($ext, $allowedExt, true)) {
+                throw new Exception('Invalid file type for supporting document.');
+            }
+            $moved = moveUploadedFileWithDocName($supportingFile['tmp_name'], $uploadDir, $docTypeName, $userId, $ext);
+            $ins = $conn->prepare("
+                INSERT INTO unifiedfileattachmenttbl
+                    (source_type, source_id, document_type_id, file_name, file_path, file_type, user_id_uploaded_by, status_id_verify, remarks, id_number)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ");
+            $sourceType = "ResidentEditRequest";
+            $sourceId = (string)$requestId;
+            $idNumber = null;
+            $ins->bind_param(
+                "ssissssiss",
+                $sourceType,
+                $sourceId,
+                $docTypeId,
+                $moved['file_name'],
+                $moved['file_path'],
+                $ext,
+                $userId,
+                $statusVerifyId,
+                $remarks,
+                $idNumber
+            );
+            if (!$ins->execute()) {
+                throw new Exception('Failed to save supporting document attachment.');
+            }
+            $ins->close();
         }
-        if (!in_array($ext, $allowedExt, true)) {
-            throw new Exception('Invalid file type for student proof document.');
+    }
+
+    if ($requestId > 0 && hasValidUpload($employmentFiles)) {
+        $docTypeName = $employmentDocType;
+        $docTypeId = getDocumentTypeId($conn, $docTypeName);
+        $remarks = "edit_request_supporting:employment_status";
+        foreach (filterValidUploads($employmentFiles) as $supportingFile) {
+            $ext = strtolower(pathinfo($supportingFile['name'] ?? '', PATHINFO_EXTENSION));
+            if (isHeicExt($ext)) {
+                throw new Exception('HEIC is not supported. Please upload JPG or PNG.');
+            }
+            if (!in_array($ext, $allowedExt, true)) {
+                throw new Exception('Invalid file type for supporting document.');
+            }
+            $moved = moveUploadedFileWithDocName($supportingFile['tmp_name'], $uploadDir, $docTypeName, $userId, $ext);
+            $ins = $conn->prepare("
+                INSERT INTO unifiedfileattachmenttbl
+                    (source_type, source_id, document_type_id, file_name, file_path, file_type, user_id_uploaded_by, status_id_verify, remarks, id_number)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ");
+            $sourceType = "ResidentEditRequest";
+            $sourceId = (string)$requestId;
+            $idNumber = null;
+            $ins->bind_param(
+                "ssissssiss",
+                $sourceType,
+                $sourceId,
+                $docTypeId,
+                $moved['file_name'],
+                $moved['file_path'],
+                $ext,
+                $userId,
+                $statusVerifyId,
+                $remarks,
+                $idNumber
+            );
+            if (!$ins->execute()) {
+                throw new Exception('Failed to save supporting document attachment.');
+            }
+            $ins->close();
         }
+    }
+
+
+    if ($requestId > 0 && !$sectorChanged && hasValidUpload($studentStatusFiles)) {
         $docTypeName = 'Diploma';
-        $moved = moveUploadedFileWithDocName($studentStatusFile['tmp_name'], $uploadDir, $docTypeName, $userId, $ext);
         $docTypeId = getDocumentTypeId($conn, $docTypeName);
         $remarks = "edit_request_student_status";
-        $ins = $conn->prepare("
-            INSERT INTO unifiedfileattachmenttbl
-                (source_type, source_id, document_type_id, file_name, file_path, file_type, user_id_uploaded_by, status_id_verify, remarks, id_number)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        ");
-        $sourceType = "ResidentEditRequest";
-        $sourceId = (string)$requestId;
-        $idNumber = null;
-        $ins->bind_param(
-            "ssissssiss",
-            $sourceType,
-            $sourceId,
-            $docTypeId,
-            $moved['file_name'],
-            $moved['file_path'],
-            $ext,
-            $userId,
-            $statusVerifyId,
-            $remarks,
-            $idNumber
-        );
-        if (!$ins->execute()) {
-            throw new Exception('Failed to save student proof attachment.');
+        foreach (filterValidUploads($studentStatusFiles) as $studentStatusFile) {
+            $ext = strtolower(pathinfo($studentStatusFile['name'] ?? '', PATHINFO_EXTENSION));
+            if (isHeicExt($ext)) {
+                throw new Exception('HEIC is not supported. Please upload JPG or PNG.');
+            }
+            if (!in_array($ext, $allowedExt, true)) {
+                throw new Exception('Invalid file type for student proof document.');
+            }
+            $moved = moveUploadedFileWithDocName($studentStatusFile['tmp_name'], $uploadDir, $docTypeName, $userId, $ext);
+            $ins = $conn->prepare("
+                INSERT INTO unifiedfileattachmenttbl
+                    (source_type, source_id, document_type_id, file_name, file_path, file_type, user_id_uploaded_by, status_id_verify, remarks, id_number)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ");
+            $sourceType = "ResidentEditRequest";
+            $sourceId = (string)$requestId;
+            $idNumber = null;
+            $ins->bind_param(
+                "ssissssiss",
+                $sourceType,
+                $sourceId,
+                $docTypeId,
+                $moved['file_name'],
+                $moved['file_path'],
+                $ext,
+                $userId,
+                $statusVerifyId,
+                $remarks,
+                $idNumber
+            );
+            if (!$ins->execute()) {
+                throw new Exception('Failed to save student proof attachment.');
+            }
+            $ins->close();
         }
-        $ins->close();
     }
 
     if ($sectorChanged) {
-        $sectorUploadFile = null;
+        $sectorUploadFiles = [];
         $sectorDocType = '';
-        if ($studentStatusFile && ($studentStatusFile['error'] ?? UPLOAD_ERR_NO_FILE) === UPLOAD_ERR_OK) {
-            $sectorUploadFile = $studentStatusFile;
+        if (hasValidUpload($studentStatusFiles)) {
+            $sectorUploadFiles = filterValidUploads($studentStatusFiles);
             $sectorDocType = 'Diploma';
-        } elseif ($supportingFile && ($supportingFile['error'] ?? UPLOAD_ERR_NO_FILE) === UPLOAD_ERR_OK) {
-            $sectorUploadFile = $supportingFile;
-            $sectorDocType = $supportingDocType !== '' ? $supportingDocType : 'Other Supporting Document';
+        } elseif (hasValidUpload($sectorSupportFiles)) {
+            $sectorUploadFiles = filterValidUploads($sectorSupportFiles);
+            $sectorDocType = $sectorDocType !== '' ? $sectorDocType : 'Other Supporting Document';
         }
 
-        if (!$sectorUploadFile) {
+        if (!$sectorUploadFiles) {
             throw new Exception('Sector membership request must include a supporting document for verification.');
         }
 
-        $ext = strtolower(pathinfo($sectorUploadFile['name'] ?? '', PATHINFO_EXTENSION));
-        if (isHeicExt($ext)) {
-            throw new Exception('HEIC is not supported. Please upload JPG or PNG.');
-        }
-        if (!in_array($ext, $allowedExt, true)) {
-            throw new Exception('Invalid file type for sector membership proof.');
-        }
-
-        $moved = moveUploadedFileWithDocName($sectorUploadFile['tmp_name'], $uploadDir, $sectorDocType, $userId, $ext);
-        $docTypeId = getDocumentTypeId($conn, $sectorDocType);
         $attachmentIds = [];
         $markers = [];
         foreach ($addedSectorKeys as $sectorKey) {
@@ -670,46 +826,58 @@ try {
             throw new Exception('No sector membership changes detected.');
         }
 
-        foreach ($markers as $marker) {
-            $ins = $conn->prepare("
-                INSERT INTO unifiedfileattachmenttbl
-                    (source_type, source_id, document_type_id, file_name, file_path, file_type, user_id_uploaded_by, status_id_verify, remarks, id_number)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            ");
-            $sourceType = "ResidentProfiling";
-            $sourceId = (string)$residentId;
-            $idNumber = null;
-            $ins->bind_param(
-                "ssissssiss",
-                $sourceType,
-                $sourceId,
-                $docTypeId,
-                $moved['file_name'],
-                $moved['file_path'],
-                $ext,
-                $userId,
-                $statusVerifyId,
-                $marker,
-                $idNumber
-            );
-            if (!$ins->execute()) {
-                throw new Exception('Failed to save sector membership attachment.');
+        $docTypeId = getDocumentTypeId($conn, $sectorDocType);
+        foreach ($sectorUploadFiles as $sectorUploadFile) {
+            $ext = strtolower(pathinfo($sectorUploadFile['name'] ?? '', PATHINFO_EXTENSION));
+            if (isHeicExt($ext)) {
+                throw new Exception('HEIC is not supported. Please upload JPG or PNG.');
             }
-            $newAttachmentId = (int)$ins->insert_id;
-            $ins->close();
-            if ($newAttachmentId > 0) {
-                $attachmentIds[] = $newAttachmentId;
-                $markerBase = strtolower(trim((string)explode(';', $marker, 2)[0]));
-                if (strpos($markerBase, 'sector:') === 0) {
-                    $sectorKey = trim((string)substr($markerBase, strlen('sector:')));
-                    if ($sectorKey !== '') {
-                        upsertSectorMembershipStatusFromUpload(
-                            $conn,
-                            (string)$residentId,
-                            (string)$sectorKey,
-                            (int)$statusVerifyId,
-                            $newAttachmentId
-                        );
+            if (!in_array($ext, $allowedExt, true)) {
+                throw new Exception('Invalid file type for sector membership proof.');
+            }
+
+            $moved = moveUploadedFileWithDocName($sectorUploadFile['tmp_name'], $uploadDir, $sectorDocType, $userId, $ext);
+            foreach ($markers as $marker) {
+                $ins = $conn->prepare("
+                    INSERT INTO unifiedfileattachmenttbl
+                        (source_type, source_id, document_type_id, file_name, file_path, file_type, user_id_uploaded_by, status_id_verify, remarks, id_number)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ");
+                $sourceType = "ResidentProfiling";
+                $sourceId = (string)$residentId;
+                $idNumber = null;
+                $ins->bind_param(
+                    "ssissssiss",
+                    $sourceType,
+                    $sourceId,
+                    $docTypeId,
+                    $moved['file_name'],
+                    $moved['file_path'],
+                    $ext,
+                    $userId,
+                    $statusVerifyId,
+                    $marker,
+                    $idNumber
+                );
+                if (!$ins->execute()) {
+                    throw new Exception('Failed to save sector membership attachment.');
+                }
+                $newAttachmentId = (int)$ins->insert_id;
+                $ins->close();
+                if ($newAttachmentId > 0) {
+                    $attachmentIds[] = $newAttachmentId;
+                    $markerBase = strtolower(trim((string)explode(';', $marker, 2)[0]));
+                    if (strpos($markerBase, 'sector:') === 0) {
+                        $sectorKey = trim((string)substr($markerBase, strlen('sector:')));
+                        if ($sectorKey !== '') {
+                            upsertSectorMembershipStatusFromUpload(
+                                $conn,
+                                (string)$residentId,
+                                (string)$sectorKey,
+                                (int)$statusVerifyId,
+                                $newAttachmentId
+                            );
+                        }
                     }
                 }
             }

@@ -7,18 +7,28 @@ document.addEventListener("DOMContentLoaded", () => {
     const newSurnameRow = document.getElementById("newSurnameRow");
     const newSurnameInput = document.getElementById("editNewSurname");
     const nameNotice = document.getElementById("nameDocNotice");
+    const nameNoticeInline = document.getElementById("nameDocNoticeInline");
     const nameSection = document.getElementById("nameDocSection");
     const nameIdType = document.getElementById("nameIdType");
     const nameIdFile = document.getElementById("nameIdFile");
-    const generalSupportSection = document.getElementById("generalSupportSection");
-    const generalSupportType = document.getElementById("generalSupportType");
-    const generalSupportFile = document.getElementById("generalSupportFile");
-    const generalSupportNotice = document.getElementById("generalSupportNotice");
+    const supportReligionSection = document.getElementById("supportReligionSection");
+    const supportReligionType = document.getElementById("supportReligionType");
+    const supportReligionFile = document.getElementById("supportReligionFile");
+    const supportVoterSection = document.getElementById("supportVoterSection");
+    const supportVoterType = document.getElementById("supportVoterType");
+    const supportVoterFile = document.getElementById("supportVoterFile");
+    const supportEmploymentSection = document.getElementById("supportEmploymentSection");
+    const supportEmploymentType = document.getElementById("supportEmploymentType");
+    const supportEmploymentFile = document.getElementById("supportEmploymentFile");
+    const supportSectorSection = document.getElementById("supportSectorSection");
+    const supportSectorType = document.getElementById("supportSectorType");
+    const supportSectorFile = document.getElementById("supportSectorFile");
     const studentUntickNotice = document.getElementById("studentUntickNotice");
     const studentUntickSection = document.getElementById("studentUntickSection");
     const studentStatusFile = document.getElementById("studentStatusFile");
     const studentStoppedSwitch = document.getElementById("studentStoppedSwitch");
     const civilNotice = document.getElementById("civilStatusDocNotice");
+    const civilNoticeInline = document.getElementById("civilStatusDocNoticeInline");
     const civilSection = document.getElementById("civilStatusDocSection");
     const civilFile = document.getElementById("civilStatusFile");
     const civilLabel = document.getElementById("civilStatusDocLabel");
@@ -106,7 +116,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const requiresNewSurname = () =>
         isFemaleResident &&
         isCivilChanged() &&
-        ["Married", "Widowed", "Divorced"].includes(civilStatus.value.trim());
+        ["Married", "Divorced"].includes(civilStatus.value.trim());
 
     const isOtherChanged = () => {
         const currentReligion = religion ? religion.value.trim() : "";
@@ -123,25 +133,6 @@ document.addEventListener("DOMContentLoaded", () => {
         );
     };
 
-    const isEmploymentOnlyChanged = () => {
-        const currentReligion = religion ? religion.value.trim() : "";
-        const currentEmployment = employmentStatus ? employmentStatus.value.trim() : "";
-        const currentOccupation = occupation ? occupation.value.trim() : "";
-        const currentVoter = voterStatus ? voterStatus.value.trim() : "";
-        const currentSector = getSectorValues();
-
-        const employmentChanged =
-            currentEmployment !== initial.employmentStatus ||
-            currentOccupation !== initial.occupation;
-        if (!employmentChanged) return false;
-
-        const otherChanged =
-            currentReligion !== initial.religion ||
-            currentVoter !== initial.voterStatus ||
-            currentSector !== initial.sectorMembership;
-        return !otherChanged;
-    };
-
     const getUploadRequirements = () => {
         const nameChanged = isNameChanged();
         const civilChanged = isCivilChanged();
@@ -149,20 +140,30 @@ document.addEventListener("DOMContentLoaded", () => {
         const sectorInfo = getSectorChangeInfo();
         const requiresStudentUntickProof = sectorInfo.studentUnticked;
         const sectorChanged = sectorInfo.changed;
-        const requiresSectorDoc = sectorChanged;
-        const requiresGeneralDoc =
-            !nameChanged &&
-            !requiresCivilDoc &&
-            !isEmploymentOnlyChanged() &&
-            !requiresStudentUntickProof &&
-            !requiresSectorDoc;
+        const requiresSectorDoc = sectorChanged && !requiresStudentUntickProof;
+        const requiresReligionDoc = religion ? religion.value.trim() !== initial.religion : false;
+        const requiresVoterDoc = voterStatus ? voterStatus.value.trim() !== initial.voterStatus : false;
+        const currentEmployment = employmentStatus ? employmentStatus.value.trim() : "";
+        const employmentChanged = currentEmployment !== initial.employmentStatus;
+        const occupationChanged = occupation ? occupation.value.trim() !== initial.occupation : false;
+        const employmentToUnemployed = employmentChanged && currentEmployment === "Unemployed";
+        const requiresEmploymentDoc = !employmentToUnemployed && (employmentChanged || occupationChanged);
         return {
             nameChanged,
             requiresCivilDoc,
             requiresStudentUntickProof,
             requiresSectorDoc,
-            requiresGeneralDoc,
-            requiresAnyDoc: nameChanged || requiresCivilDoc || requiresGeneralDoc || requiresStudentUntickProof || requiresSectorDoc,
+            requiresReligionDoc,
+            requiresVoterDoc,
+            requiresEmploymentDoc,
+            requiresAnyDoc:
+                nameChanged ||
+                requiresCivilDoc ||
+                requiresStudentUntickProof ||
+                requiresSectorDoc ||
+                requiresReligionDoc ||
+                requiresVoterDoc ||
+                requiresEmploymentDoc,
         };
     };
 
@@ -350,7 +351,15 @@ document.addEventListener("DOMContentLoaded", () => {
     };
 
     const updateSections = () => {
-        const { nameChanged, requiresCivilDoc, requiresGeneralDoc, requiresStudentUntickProof, requiresSectorDoc } = getUploadRequirements();
+        const {
+            nameChanged,
+            requiresCivilDoc,
+            requiresStudentUntickProof,
+            requiresSectorDoc,
+            requiresReligionDoc,
+            requiresVoterDoc,
+            requiresEmploymentDoc,
+        } = getUploadRequirements();
         updateCivilDocLabel();
 
         const hasChanges = isNameChanged() || isCivilChanged() || isOtherChanged();
@@ -367,18 +376,19 @@ document.addEventListener("DOMContentLoaded", () => {
             if (studentUntickNotice) studentUntickNotice.classList.toggle("d-none", !requiresStudentUntickProof);
             if (studentUntickSection) studentUntickSection.classList.toggle("d-none", !requiresStudentUntickProof);
             if (newSurnameRow) newSurnameRow.classList.toggle("d-none", !requiresNewSurname());
-            if (generalSupportSection) generalSupportSection.classList.toggle("d-none", !(requiresGeneralDoc || requiresSectorDoc));
-            if (generalSupportNotice) generalSupportNotice.classList.toggle("d-none", !(requiresGeneralDoc || requiresSectorDoc));
+            if (supportReligionSection) supportReligionSection.classList.toggle("d-none", !requiresReligionDoc);
+            if (supportVoterSection) supportVoterSection.classList.toggle("d-none", !requiresVoterDoc);
+            if (supportEmploymentSection) supportEmploymentSection.classList.toggle("d-none", !requiresEmploymentDoc);
+            if (supportSectorSection) supportSectorSection.classList.toggle("d-none", !requiresSectorDoc);
             if (nameNotice) nameNotice.classList.toggle("d-none", !nameChanged);
             if (nameSection) nameSection.classList.toggle("d-none", !nameChanged);
             if (civilNotice) civilNotice.classList.toggle("d-none", !requiresCivilDoc);
             if (civilSection) civilSection.classList.toggle("d-none", !requiresCivilDoc);
+            if (nameNoticeInline) nameNoticeInline.classList.add("d-none");
+            if (civilNoticeInline) civilNoticeInline.classList.add("d-none");
 
-            if (requiresGeneralDoc) {
-                const generalTypeOk = generalSupportType && generalSupportType.value.trim() !== "";
-                const generalFileOk = generalSupportFile && generalSupportFile.files && generalSupportFile.files.length > 0;
-                canProceed = canProceed && generalTypeOk && generalFileOk;
-            }
+            const isDocReady = (typeEl, fileEl) =>
+                Boolean(typeEl && fileEl && typeEl.value.trim() !== "" && fileEl.files && fileEl.files.length > 0);
 
             if (nameChanged) {
                 const idTypeOk = nameIdType && nameIdType.value.trim() !== "";
@@ -389,6 +399,15 @@ document.addEventListener("DOMContentLoaded", () => {
                 const civilFileOk = civilFile && civilFile.files && civilFile.files.length > 0;
                 canProceed = canProceed && civilFileOk;
             }
+            if (requiresReligionDoc) {
+                canProceed = canProceed && isDocReady(supportReligionType, supportReligionFile);
+            }
+            if (requiresVoterDoc) {
+                canProceed = canProceed && isDocReady(supportVoterType, supportVoterFile);
+            }
+            if (requiresEmploymentDoc) {
+                canProceed = canProceed && isDocReady(supportEmploymentType, supportEmploymentFile);
+            }
             if (requiresStudentUntickProof) {
                 const studentFileOk = studentStatusFile && studentStatusFile.files && studentStatusFile.files.length > 0;
                 const stoppedConfirmed = studentStoppedSwitch && studentStoppedSwitch.checked;
@@ -396,10 +415,8 @@ document.addEventListener("DOMContentLoaded", () => {
             }
             if (requiresSectorDoc) {
                 const studentFileOk = studentStatusFile && studentStatusFile.files && studentStatusFile.files.length > 0;
-                const generalFileOk = generalSupportFile && generalSupportFile.files && generalSupportFile.files.length > 0;
-                const generalTypeOk = generalSupportType && generalSupportType.value.trim() !== "";
-                const hasValidGeneralDoc = generalFileOk && generalTypeOk;
-                canProceed = canProceed && (studentFileOk || hasValidGeneralDoc);
+                const sectorDocOk = isDocReady(supportSectorType, supportSectorFile);
+                canProceed = canProceed && (studentFileOk || sectorDocOk);
             }
             btnNext.disabled = !canProceed || !valid || isPendingRequest;
             btnReview.disabled = true;
@@ -407,12 +424,16 @@ document.addEventListener("DOMContentLoaded", () => {
             if (studentUntickNotice) studentUntickNotice.classList.add("d-none");
             if (studentUntickSection) studentUntickSection.classList.add("d-none");
             if (newSurnameRow) newSurnameRow.classList.toggle("d-none", !requiresNewSurname());
-            if (generalSupportSection) generalSupportSection.classList.remove("d-none");
-            if (generalSupportNotice) generalSupportNotice.classList.add("d-none");
+            if (supportReligionSection) supportReligionSection.classList.add("d-none");
+            if (supportVoterSection) supportVoterSection.classList.add("d-none");
+            if (supportEmploymentSection) supportEmploymentSection.classList.add("d-none");
+            if (supportSectorSection) supportSectorSection.classList.add("d-none");
             if (nameNotice) nameNotice.classList.add("d-none");
             if (nameSection) nameSection.classList.add("d-none");
             if (civilNotice) civilNotice.classList.add("d-none");
             if (civilSection) civilSection.classList.add("d-none");
+            if (nameNoticeInline) nameNoticeInline.classList.toggle("d-none", !nameChanged);
+            if (civilNoticeInline) civilNoticeInline.classList.toggle("d-none", !requiresCivilDoc);
             btnReview.disabled = !canProceed || !valid || isPendingRequest;
             btnNext.disabled = true;
         }
@@ -437,16 +458,21 @@ document.addEventListener("DOMContentLoaded", () => {
         });
 
         if (nameIdType) nameIdType.value = "";
-        if (generalSupportType) generalSupportType.value = "";
+        if (supportReligionType) supportReligionType.value = "";
+        if (supportVoterType) supportVoterType.value = "";
+        if (supportEmploymentType) supportEmploymentType.value = "";
+        if (supportSectorType) supportSectorType.value = "";
         if (nameIdFile) nameIdFile.value = "";
-        if (generalSupportFile) generalSupportFile.value = "";
+        if (supportReligionFile) supportReligionFile.value = "";
+        if (supportVoterFile) supportVoterFile.value = "";
+        if (supportEmploymentFile) supportEmploymentFile.value = "";
+        if (supportSectorFile) supportSectorFile.value = "";
         if (studentStatusFile) studentStatusFile.value = "";
         if (studentStoppedSwitch) studentStoppedSwitch.checked = false;
         if (civilFile) civilFile.value = "";
 
         if (studentUntickNotice) studentUntickNotice.classList.add("d-none");
         if (studentUntickSection) studentUntickSection.classList.add("d-none");
-        if (generalSupportNotice) generalSupportNotice.classList.add("d-none");
         if (nameNotice) nameNotice.classList.add("d-none");
         if (nameSection) nameSection.classList.add("d-none");
         if (civilNotice) civilNotice.classList.add("d-none");
@@ -485,9 +511,15 @@ document.addEventListener("DOMContentLoaded", () => {
         el.addEventListener("change", updateSections);
     });
     if (nameIdType) nameIdType.addEventListener("change", updateSections);
-    if (generalSupportType) generalSupportType.addEventListener("change", updateSections);
+    if (supportReligionType) supportReligionType.addEventListener("change", updateSections);
+    if (supportVoterType) supportVoterType.addEventListener("change", updateSections);
+    if (supportEmploymentType) supportEmploymentType.addEventListener("change", updateSections);
+    if (supportSectorType) supportSectorType.addEventListener("change", updateSections);
     if (nameIdFile) nameIdFile.addEventListener("change", updateSections);
-    if (generalSupportFile) generalSupportFile.addEventListener("change", updateSections);
+    if (supportReligionFile) supportReligionFile.addEventListener("change", updateSections);
+    if (supportVoterFile) supportVoterFile.addEventListener("change", updateSections);
+    if (supportEmploymentFile) supportEmploymentFile.addEventListener("change", updateSections);
+    if (supportSectorFile) supportSectorFile.addEventListener("change", updateSections);
     if (studentStatusFile) studentStatusFile.addEventListener("change", updateSections);
     if (studentStoppedSwitch) studentStoppedSwitch.addEventListener("change", updateSections);
     if (civilFile) civilFile.addEventListener("change", updateSections);
@@ -592,26 +624,41 @@ document.addEventListener("DOMContentLoaded", () => {
 
     const buildChangeRows = () => {
         const current = getCurrentValues();
-        const labels = {
-            firstName: "First Name",
-            middleName: "Middle Name",
-            lastName: "Last Name",
-            suffix: "Suffix",
-            civilStatus: "Civil Status",
-            religion: "Religion",
-            employmentStatus: "Employment Status",
-            occupation: "Occupation",
-            voterStatus: "Voter Status",
-            sectorMembership: "Sector Membership",
+        const rows = [];
+
+        const pushIfChanged = (label, fromValue, toValue) => {
+            const from = formatValue(fromValue);
+            const to = formatValue(toValue);
+            if (from !== to) {
+                rows.push({ field: label, from, to });
+            }
         };
 
-        return Object.keys(labels)
-            .filter((k) => (initial[k] ?? "") !== (current[k] ?? ""))
-            .map((k) => ({
-                field: labels[k],
-                from: formatValue(initial[k]),
-                to: formatValue(current[k]),
-            }));
+        pushIfChanged("First Name", initial.firstName, current.firstName);
+        pushIfChanged("Middle Name", initial.middleName, current.middleName);
+        pushIfChanged("Last Name", initial.lastName, current.lastName);
+        pushIfChanged("Suffix", initial.suffix, current.suffix);
+        pushIfChanged("Civil Status", initial.civilStatus, current.civilStatus);
+        pushIfChanged("Religion", initial.religion, current.religion);
+
+        const employmentChanged = initial.employmentStatus !== current.employmentStatus;
+        const unemployedToEmployed =
+            initial.employmentStatus === "Unemployed" && current.employmentStatus === "Employed";
+        if (employmentChanged) {
+            let to = current.employmentStatus;
+            if (unemployedToEmployed) {
+                const occ = current.occupation ? current.occupation : "N/A";
+                to = `${current.employmentStatus} (${occ})`;
+            }
+            pushIfChanged("Employment Status", initial.employmentStatus, to);
+        } else if (current.occupation !== initial.occupation) {
+            pushIfChanged("Occupation", initial.occupation, current.occupation);
+        }
+
+        pushIfChanged("Voter Status", initial.voterStatus, current.voterStatus);
+        pushIfChanged("Sector Membership", initial.sectorMembership, current.sectorMembership);
+
+        return rows;
     };
 
     const reviewHtml = (rows) => {
@@ -747,6 +794,14 @@ document.addEventListener("DOMContentLoaded", () => {
         bootstrap.Modal.getOrCreateInstance(uploadModalEl).show();
     };
 
+    const appendFiles = (form, key, inputEl) => {
+        if (!inputEl || !inputEl.files || !inputEl.files.length) return;
+        const fieldKey = key.endsWith("[]") ? key : `${key}[]`;
+        Array.from(inputEl.files).forEach((file) => {
+            if (file) form.append(fieldKey, file);
+        });
+    };
+
     const buildProfileFormData = () => {
         const form = new FormData();
         form.append("first_name", firstName.value.trim());
@@ -761,6 +816,7 @@ document.addEventListener("DOMContentLoaded", () => {
         if (employmentStatusEl) form.append("employment_status", employmentStatusEl.value.trim());
         const occupationEl = document.getElementById("editOccupation");
         if (occupationEl) form.append("occupation", occupationEl.value.trim());
+        if (voterStatus) form.append("voter_status", voterStatus.value.trim());
 
         const sectors = Array.from(document.querySelectorAll("input[name='sectorMembership[]']:checked"))
             .map((el) => el.value.trim())
@@ -772,22 +828,26 @@ document.addEventListener("DOMContentLoaded", () => {
         if (nameIdType && nameIdType.value.trim() !== "") {
             form.append("name_id_type", nameIdType.value.trim());
         }
-        if (nameIdFile && nameIdFile.files && nameIdFile.files.length) {
-            form.append("name_id_file", nameIdFile.files[0]);
+        appendFiles(form, "name_id_file", nameIdFile);
+        if (supportReligionType && supportReligionType.value.trim() !== "") {
+            form.append("supporting_religion_type", supportReligionType.value.trim());
         }
-        if (generalSupportType && generalSupportType.value.trim() !== "") {
-            form.append("supporting_doc_type", generalSupportType.value.trim());
+        appendFiles(form, "supporting_religion_file", supportReligionFile);
+        if (supportVoterType && supportVoterType.value.trim() !== "") {
+            form.append("supporting_voter_type", supportVoterType.value.trim());
         }
-        if (generalSupportFile && generalSupportFile.files && generalSupportFile.files.length) {
-            form.append("supporting_file", generalSupportFile.files[0]);
+        appendFiles(form, "supporting_voter_file", supportVoterFile);
+        if (supportEmploymentType && supportEmploymentType.value.trim() !== "") {
+            form.append("supporting_employment_type", supportEmploymentType.value.trim());
         }
-        if (studentStatusFile && studentStatusFile.files && studentStatusFile.files.length) {
-            form.append("student_status_file", studentStatusFile.files[0]);
+        appendFiles(form, "supporting_employment_file", supportEmploymentFile);
+        if (supportSectorType && supportSectorType.value.trim() !== "") {
+            form.append("supporting_sector_type", supportSectorType.value.trim());
         }
+        appendFiles(form, "supporting_sector_file", supportSectorFile);
+        appendFiles(form, "student_status_file", studentStatusFile);
         form.append("student_stopped", studentStoppedSwitch && studentStoppedSwitch.checked ? "1" : "0");
-        if (civilFile && civilFile.files && civilFile.files.length) {
-            form.append("civil_status_file", civilFile.files[0]);
-        }
+        appendFiles(form, "civil_status_file", civilFile);
         return form;
     };
 

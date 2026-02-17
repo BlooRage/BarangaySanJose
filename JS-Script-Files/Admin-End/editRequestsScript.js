@@ -385,8 +385,21 @@ document.addEventListener("DOMContentLoaded", () => {
             });
             renderDetailList(currentDetailsEl, currentWithFlags);
 
+            const formatRequestedValue = (key, value) => {
+              if (key === "voter_status") {
+                if (value === 1 || value === "1") return "Registered";
+                if (value === 0 || value === "0") return "Not Registered";
+              }
+              if (key === "occupation") {
+                if (value === 1 || value === "1") return "Employed";
+                if (value === 0 || value === "0") return "Unemployed";
+              }
+              return value;
+            };
+
             const requestedItems = currentItems.map((item) => {
-              const requestedVal = changeKeys.has(item.key) ? changes[item.key] : item.value;
+              const rawRequestedVal = changeKeys.has(item.key) ? changes[item.key] : item.value;
+              const requestedVal = formatRequestedValue(item.key, rawRequestedVal);
               const currentValNorm = normalizeValue(item.value);
               const requestedValNorm = normalizeValue(requestedVal);
               return {
