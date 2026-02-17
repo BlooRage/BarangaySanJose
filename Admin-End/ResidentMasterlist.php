@@ -250,7 +250,7 @@ if (isset($conn) && $conn instanceof mysqli) {
 
                 <div id="div-infoGroup" class="div-infoContainer">
 
-                    <div class="p-3 rounded-3 mb-3 border-0 bg-white">
+                    <div class="p-3 rounded-3 mb-3 border-0 bg-white" id="view-address-single-wrapper">
                         <div class="d-flex align-items-center justify-content-between mb-2">
                             <h5 class="fw-bold mb-0" style="color: #000;">Personal Information</h5>
                         </div>
@@ -391,7 +391,7 @@ if (isset($conn) && $conn instanceof mysqli) {
 
                     <hr class="my-2">
 
-                    <div class="p-3 rounded-3 border-0 bg-white">
+                    <div class="p-3 rounded-3 border-0 bg-white" id="view-house-single-wrapper">
                         <div class="d-flex align-items-center justify-content-between mb-2">
                             <h5 class="fw-bold mb-0" style="color: #000;">House Information</h5>
                         </div>
@@ -415,6 +415,15 @@ if (isset($conn) && $conn instanceof mysqli) {
                     </div>
 
                     <hr class="my-2">
+
+                    <div class="p-3 rounded-3 border-0 bg-white d-none" id="view-address-history-wrapper">
+                        <div class="d-flex align-items-center justify-content-between mb-2">
+                            <h5 class="fw-bold mb-0" style="color: #000;">Address History</h5>
+                        </div>
+                        <div id="view-address-history-list" class="d-flex flex-column gap-2"></div>
+                    </div>
+
+                    <hr class="my-2 d-none" id="view-address-history-divider">
 
                     <div class="p-3 rounded-3 border-0 bg-white d-none" id="view-verified-docs-wrapper">
                         <div class="d-flex align-items-center justify-content-between mb-2">
@@ -839,7 +848,6 @@ if (isset($conn) && $conn instanceof mysqli) {
   };
 </script>
 <script src="../JS-Script-Files/Admin-End/tableColumnsGeneric.js?v=20260215-1"></script>
-<script src="../JS-Script-Files/Admin-End/residentMasterlistScript.js?v=20260212-5"></script>
+<script src="../JS-Script-Files/Admin-End/residentMasterlistScript.js?v=20260217-1"></script>
 </body>
 </html>
-

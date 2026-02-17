@@ -191,8 +191,61 @@ function getResidentProfileData(mysqli $conn, string $userId): array {
 	                ];
 	            }
             $stmtAddr->close();
-        }
-    }
+	        }
+
+            // Ensure profile reflects the most recently approved address change request,
+            // even when address_id lexicographic ordering is not chronological.
+            $approvedAddressStatusId = null;
+            $stmtStatus = $conn->prepare("
+                SELECT status_id
+                FROM statuslookuptbl
+                WHERE status_name = 'ApprovedRequest' AND status_type = 'EditRequest'
+                LIMIT 1
+            ");
+            if ($stmtStatus) {
+                $stmtStatus->execute();
+                $stmtStatus->bind_result($approvedAddressStatusId);
+                if (!$stmtStatus->fetch()) {
+                    $approvedAddressStatusId = null;
+                }
+                $stmtStatus->close();
+            }
+
+            if ($approvedAddressStatusId !== null) {
+                $stmtLatestApproved = $conn->prepare("
+                    SELECT requested_changes
+                    FROM resident_edit_requesttbl
+                    WHERE resident_id = ?
+                      AND request_type = 'address'
+                      AND status_id = ?
+                    ORDER BY reviewed_at DESC, request_id DESC
+                    LIMIT 1
+                ");
+                if ($stmtLatestApproved) {
+                    $stmtLatestApproved->bind_param("si", $residentId, $approvedAddressStatusId);
+                    $stmtLatestApproved->execute();
+                    $rowApproved = $stmtLatestApproved->get_result()->fetch_assoc();
+                    $stmtLatestApproved->close();
+
+                    if ($rowApproved && isset($rowApproved['requested_changes'])) {
+                        $approvedChanges = json_decode((string)$rowApproved['requested_changes'], true);
+                        if (is_array($approvedChanges)) {
+                            $residentaddresstbl = [
+                                'unit_number' => (string)($approvedChanges['unit_number'] ?? $residentaddresstbl['unit_number']),
+                                'street_number' => (string)($approvedChanges['street_number'] ?? $residentaddresstbl['street_number']),
+                                'street_name' => (string)($approvedChanges['street_name'] ?? $residentaddresstbl['street_name']),
+                                'phase_number' => (string)($approvedChanges['phase_number'] ?? $residentaddresstbl['phase_number']),
+                                'subdivision' => (string)($approvedChanges['subdivision'] ?? $residentaddresstbl['subdivision']),
+                                'area_number' => (string)($approvedChanges['area_number'] ?? $residentaddresstbl['area_number']),
+                                'house_type' => (string)($approvedChanges['house_type'] ?? $residentaddresstbl['house_type']),
+                                'house_ownership' => (string)($approvedChanges['house_ownership'] ?? $residentaddresstbl['house_ownership']),
+                                'residency_duration' => (string)($approvedChanges['residency_duration'] ?? $residentaddresstbl['residency_duration'])
+                            ];
+                        }
+                    }
+                }
+            }
+	    }
 
     // Sector membership status (prefer normalized table; fallback to legacy unifiedfileattachmenttbl scan).
     if ($residentId) {

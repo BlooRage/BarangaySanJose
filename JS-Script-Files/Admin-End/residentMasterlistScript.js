@@ -737,6 +737,133 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   };
 
+  const normalizeResidencyStatus = (value) =>
+    String(value ?? "")
+      .toLowerCase()
+      .replace(/[\s_-]/g, "");
+
+  const residencyRank = (value) => {
+    const normalized = normalizeResidencyStatus(value);
+    if (normalized === "residing") return 0;
+    if (normalized === "pendingverification") return 1;
+    if (normalized === "notresiding") return 2;
+    return 3;
+  };
+
+  const residencyBadgeClass = (value) => {
+    const normalized = normalizeResidencyStatus(value);
+    if (normalized === "residing") return "bg-success";
+    if (normalized === "pendingverification") return "bg-warning text-dark";
+    if (normalized === "notresiding") return "bg-secondary";
+    return "bg-dark";
+  };
+
+  const formatAddressLine = (address) => {
+    const parts = [
+      address.unit_number ? `Unit ${address.unit_number}` : "",
+      address.house_number || "",
+      address.street_name || "",
+      address.phase_number || "",
+      address.subdivision || "",
+      "Barangay San Jose",
+      address.area_number || "",
+      "Rodriguez",
+      "Rizal"
+    ].filter(Boolean);
+    return parts.join(", ") || "—";
+  };
+
+  const renderGroupedAddressHistory = (resident, historyItems = []) => {
+    const singleAddressWrap = document.getElementById("view-address-single-wrapper");
+    const singleHouseWrap = document.getElementById("view-house-single-wrapper");
+    const historyWrap = document.getElementById("view-address-history-wrapper");
+    const historyList = document.getElementById("view-address-history-list");
+    const historyDivider = document.getElementById("view-address-history-divider");
+    if (!singleAddressWrap || !singleHouseWrap || !historyWrap || !historyList || !historyDivider) return;
+
+    const dedupeKey = (item) =>
+      [
+        item.unit_number ?? "",
+        item.house_number ?? "",
+        item.street_name ?? "",
+        item.phase_number ?? "",
+        item.subdivision ?? "",
+        item.area_number ?? "",
+        item.house_ownership ?? "",
+        item.house_type ?? "",
+        item.residency_duration ?? "",
+        normalizeResidencyStatus(item.residency_status_name ?? "")
+      ].join("|");
+
+    const map = new Map();
+    (Array.isArray(historyItems) ? historyItems : []).forEach((item) => {
+      const key = dedupeKey(item);
+      if (!map.has(key)) map.set(key, item);
+    });
+    const uniqueItems = Array.from(map.values());
+
+    if (uniqueItems.length <= 1) {
+      historyWrap.classList.add("d-none");
+      historyDivider.classList.add("d-none");
+      historyList.innerHTML = "";
+      singleAddressWrap.classList.remove("d-none");
+      singleHouseWrap.classList.remove("d-none");
+      return;
+    }
+
+    const sorted = [...uniqueItems].sort((a, b) => {
+      const rankDiff = residencyRank(a.residency_status_name) - residencyRank(b.residency_status_name);
+      if (rankDiff !== 0) return rankDiff;
+      const aid = String(a.address_id ?? "");
+      const bid = String(b.address_id ?? "");
+      return bid.localeCompare(aid);
+    });
+
+    singleAddressWrap.classList.add("d-none");
+    singleHouseWrap.classList.add("d-none");
+    historyWrap.classList.remove("d-none");
+    historyDivider.classList.remove("d-none");
+    historyList.innerHTML = "";
+
+    let previousCount = 0;
+    sorted.forEach((item, index) => {
+      const statusText = String(item.residency_status_name || "Unknown");
+      const statusNorm = normalizeResidencyStatus(statusText);
+      const isCurrent = index === 0 && (statusNorm === "residing" || statusNorm === "pendingverification");
+      const label = isCurrent ? "Current Address" : `Previous Address ${++previousCount}`;
+
+      const card = document.createElement("div");
+      card.className = "border rounded-3 p-3 bg-white";
+      card.innerHTML = `
+        <div class="d-flex justify-content-between align-items-start gap-2 mb-2">
+          <div class="fw-bold">${label}</div>
+          <span class="badge ${residencyBadgeClass(statusText)}">${statusText || "Unknown"}</span>
+        </div>
+        <div class="small text-muted mb-1">Address:</div>
+        <div class="fw-bold mb-2">${formatAddressLine(item)}</div>
+        <div class="row g-2 small">
+          <div class="col-md-4"><span class="text-muted">House Ownership:</span> <span class="fw-bold">${item.house_ownership || "—"}</span></div>
+          <div class="col-md-4"><span class="text-muted">House Type:</span> <span class="fw-bold">${item.house_type || "—"}</span></div>
+          <div class="col-md-4"><span class="text-muted">Residency Duration:</span> <span class="fw-bold">${item.residency_duration || "—"}</span></div>
+        </div>
+      `;
+      historyList.appendChild(card);
+    });
+  };
+
+  const loadAddressHistoryForView = (resident) => {
+    if (!resident?.resident_id) return Promise.resolve();
+    return fetch(`../PhpFiles/Admin-End/residentMasterlist.php?fetch_address_history=1&resident_id=${encodeURIComponent(resident.resident_id)}`)
+      .then((res) => res.json())
+      .then((payload) => {
+        const items = Array.isArray(payload?.items) ? payload.items : [];
+        renderGroupedAddressHistory(resident, items);
+      })
+      .catch(() => {
+        renderGroupedAddressHistory(resident, []);
+      });
+  };
+
 function openViewEntry(data) {
   currentViewedResident = data;
   document.getElementById("input-appId").value = data.resident_id;
@@ -817,6 +944,8 @@ function openViewEntry(data) {
   document.getElementById("txt-modalHouseOwnership").innerText = data.house_ownership ?? "—";
   document.getElementById("txt-modalHouseType").innerText = data.house_type ?? "—";
   document.getElementById("txt-modalResidencyDuration").innerText = data.residency_duration ?? "—";
+  renderGroupedAddressHistory(data, []);
+  loadAddressHistoryForView(data);
 
   // Read-only status banner
   renderResidentStatusBanner(data.status);

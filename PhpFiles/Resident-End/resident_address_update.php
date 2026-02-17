@@ -79,6 +79,86 @@ function getResidentId(mysqli $conn, string $userId): ?string {
     return $residentId ?: null;
 }
 
+function isHeadOfFamily(mysqli $conn, string $residentId): bool {
+    $stmt = $conn->prepare("
+        SELECT head_of_family
+        FROM residentinformationtbl
+        WHERE resident_id = ?
+        LIMIT 1
+    ");
+    if (!$stmt) {
+        return false;
+    }
+    $stmt->bind_param("s", $residentId);
+    $stmt->execute();
+    $stmt->bind_result($headRaw);
+    $value = '';
+    if ($stmt->fetch()) {
+        $value = strtolower(trim((string)$headRaw));
+    }
+    $stmt->close();
+    return in_array($value, ['yes', 'true', '1', 'y'], true);
+}
+
+function getActiveHouseholdId(mysqli $conn, string $residentId, int $activeStatusId): ?int {
+    $stmt = $conn->prepare("
+        SELECT household_id
+        FROM householdmemberresidenttbl
+        WHERE resident_id = ? AND status_id = ?
+        ORDER BY household_id DESC
+        LIMIT 1
+    ");
+    if (!$stmt) {
+        return null;
+    }
+    $stmt->bind_param("si", $residentId, $activeStatusId);
+    $stmt->execute();
+    $stmt->bind_result($householdId);
+    $value = $stmt->fetch() ? (int)$householdId : null;
+    $stmt->close();
+    return $value ?: null;
+}
+
+function countOtherActiveResidentMembers(mysqli $conn, int $householdId, string $residentId, int $activeStatusId): int {
+    $stmt = $conn->prepare("
+        SELECT COUNT(*)
+        FROM householdmemberresidenttbl
+        WHERE household_id = ?
+          AND status_id = ?
+          AND resident_id IS NOT NULL
+          AND resident_id <> ?
+    ");
+    if (!$stmt) {
+        return 0;
+    }
+    $stmt->bind_param("iis", $householdId, $activeStatusId, $residentId);
+    $stmt->execute();
+    $stmt->bind_result($count);
+    $value = $stmt->fetch() ? (int)$count : 0;
+    $stmt->close();
+    return $value;
+}
+
+function isResidentEligibleNewHead(mysqli $conn, int $householdId, string $candidateResidentId, int $activeStatusId): bool {
+    $stmt = $conn->prepare("
+        SELECT 1
+        FROM householdmemberresidenttbl
+        WHERE household_id = ?
+          AND status_id = ?
+          AND resident_id = ?
+          AND role <> 'Head'
+        LIMIT 1
+    ");
+    if (!$stmt) {
+        return false;
+    }
+    $stmt->bind_param("iis", $householdId, $activeStatusId, $candidateResidentId);
+    $stmt->execute();
+    $ok = $stmt->get_result()->num_rows > 0;
+    $stmt->close();
+    return $ok;
+}
+
 if (!isset($conn) || !($conn instanceof mysqli)) {
     http_response_code(500);
     echo json_encode(['success' => false, 'message' => 'Database connection unavailable']);
@@ -98,10 +178,34 @@ $streetName = cleanString($payload['street_name'] ?? '');
 $phaseNumber = cleanString($payload['phase_number'] ?? '');
 $subdivision = cleanString($payload['subdivision'] ?? '');
 $areaNumber = cleanString($payload['area_number'] ?? '');
+$addressSystem = strtolower(cleanString($payload['address_system'] ?? 'house'));
+$houseOwnership = cleanString($payload['house_ownership'] ?? '');
+$houseType = cleanString($payload['house_type'] ?? '');
+$residencyDuration = 'Less than 6 months';
 
-if ($streetNumber === '' || $streetName === '' || $areaNumber === '') {
+if (!in_array($addressSystem, ['house', 'lot_block'], true)) {
     http_response_code(400);
-    echo json_encode(['success' => false, 'message' => 'Street number, street name, and area number are required.']);
+    echo json_encode(['success' => false, 'message' => 'Invalid address system selected.']);
+    exit;
+}
+
+if ($addressSystem === 'house') {
+    if ($streetNumber === '' || $streetName === '' || $areaNumber === '') {
+        http_response_code(400);
+        echo json_encode(['success' => false, 'message' => 'House number, street name, and area are required.']);
+        exit;
+    }
+} else { // lot_block
+    if ($streetNumber === '' || $phaseNumber === '' || $areaNumber === '') {
+        http_response_code(400);
+        echo json_encode(['success' => false, 'message' => 'Lot number, block number, and area are required.']);
+        exit;
+    }
+}
+
+if ($houseOwnership === '' || $houseType === '') {
+    http_response_code(400);
+    echo json_encode(['success' => false, 'message' => 'House ownership and house type are required.']);
     exit;
 }
 
@@ -111,6 +215,9 @@ assertMaxLength('Street name', $streetName, 150);
 assertMaxLength('Phase number', $phaseNumber, 50);
 assertMaxLength('Subdivision', $subdivision, 150);
 assertMaxLength('Area number', $areaNumber, 50);
+assertMaxLength('House ownership', $houseOwnership, 50);
+assertMaxLength('House type', $houseType, 100);
+assertMaxLength('Residency duration', $residencyDuration, 100);
 
 $addressLikeChecks = [
     'Unit number' => $unitNumber,
@@ -119,6 +226,9 @@ $addressLikeChecks = [
     'Phase number' => $phaseNumber,
     'Subdivision' => $subdivision,
     'Area number' => $areaNumber,
+    'House ownership' => $houseOwnership,
+    'House type' => $houseType,
+    'Residency duration' => $residencyDuration,
 ];
 foreach ($addressLikeChecks as $label => $value) {
     if ($value !== '' && !isValidAddressLikeText($value)) {
@@ -150,6 +260,46 @@ if (!$latestAddress) {
     exit;
 }
 
+// Align with profile display baseline: use the latest approved address edit request values.
+$approvedAddressStatusId = getStatusId($conn, 'ApprovedRequest', 'EditRequest');
+if ($approvedAddressStatusId !== null) {
+    $stmtLatestApproved = $conn->prepare("
+        SELECT requested_changes
+        FROM resident_edit_requesttbl
+        WHERE resident_id = ?
+          AND request_type = 'address'
+          AND status_id = ?
+        ORDER BY reviewed_at DESC, request_id DESC
+        LIMIT 1
+    ");
+    if ($stmtLatestApproved) {
+        $stmtLatestApproved->bind_param("si", $residentId, $approvedAddressStatusId);
+        $stmtLatestApproved->execute();
+        $rowApproved = $stmtLatestApproved->get_result()->fetch_assoc();
+        $stmtLatestApproved->close();
+        if ($rowApproved && isset($rowApproved['requested_changes'])) {
+            $approvedChanges = json_decode((string)$rowApproved['requested_changes'], true);
+            if (is_array($approvedChanges)) {
+                foreach ([
+                    'unit_number',
+                    'street_number',
+                    'street_name',
+                    'phase_number',
+                    'subdivision',
+                    'area_number',
+                    'house_type',
+                    'house_ownership',
+                    'residency_duration'
+                ] as $key) {
+                    if (array_key_exists($key, $approvedChanges)) {
+                        $latestAddress[$key] = (string)$approvedChanges[$key];
+                    }
+                }
+            }
+        }
+    }
+}
+
 $newAddress = [
     'unit_number' => $unitNumber !== '' ? $unitNumber : (string)($latestAddress['unit_number'] ?? ''),
     'street_number' => $streetNumber,
@@ -157,13 +307,14 @@ $newAddress = [
     'phase_number' => $phaseNumber !== '' ? $phaseNumber : (string)($latestAddress['phase_number'] ?? ''),
     'subdivision' => $subdivision !== '' ? $subdivision : (string)($latestAddress['subdivision'] ?? ''),
     'area_number' => $areaNumber,
-    'house_type' => (string)($latestAddress['house_type'] ?? ''),
-    'house_ownership' => (string)($latestAddress['house_ownership'] ?? ''),
-    'residency_duration' => (string)($latestAddress['residency_duration'] ?? ''),
+    'house_type' => $houseType,
+    'house_ownership' => $houseOwnership,
+    'residency_duration' => $residencyDuration,
+    'address_system' => $addressSystem,
 ];
 
 $changed = false;
-foreach (['unit_number', 'street_number', 'street_name', 'phase_number', 'subdivision', 'area_number'] as $field) {
+foreach (['unit_number', 'street_number', 'street_name', 'phase_number', 'subdivision', 'area_number', 'house_type', 'house_ownership', 'residency_duration'] as $field) {
     $oldVal = trim((string)($latestAddress[$field] ?? ''));
     $newVal = trim((string)($newAddress[$field] ?? ''));
     if ($oldVal !== $newVal) {
@@ -196,7 +347,7 @@ $dup->execute();
 $dupExists = $dup->get_result()->num_rows > 0;
 $dup->close();
 if ($dupExists) {
-    echo json_encode(['success' => true, 'message' => 'You already have a pending address edit request.']);
+    echo json_encode(['success' => true, 'message' => 'You already have a pending address change request.']);
     exit;
 }
 
@@ -207,9 +358,51 @@ $changes = [
     'phase_number' => $newAddress['phase_number'],
     'subdivision' => $newAddress['subdivision'],
     'area_number' => $newAddress['area_number'],
+    'house_type' => $newAddress['house_type'],
+    'house_ownership' => $newAddress['house_ownership'],
+    'residency_duration' => $newAddress['residency_duration'],
+    'address_system' => $newAddress['address_system'],
 ];
 $newHeadResidentId = cleanString($payload['new_head_resident_id'] ?? '');
+$activeHouseholdMemberStatusId = getStatusId($conn, 'Active', 'HouseholdMember');
+$isHead = isHeadOfFamily($conn, $residentId);
+if ($activeHouseholdMemberStatusId !== null && $isHead) {
+    $householdId = getActiveHouseholdId($conn, $residentId, $activeHouseholdMemberStatusId);
+    if ($householdId !== null) {
+        $otherActiveResidentCount = countOtherActiveResidentMembers(
+            $conn,
+            $householdId,
+            $residentId,
+            $activeHouseholdMemberStatusId
+        );
+        if ($otherActiveResidentCount > 0 && $newHeadResidentId === '') {
+            http_response_code(400);
+            echo json_encode([
+                'success' => false,
+                'message' => 'Please assign a new head of household before submitting.'
+            ]);
+            exit;
+        }
+        if ($newHeadResidentId !== '' && !isResidentEligibleNewHead($conn, $householdId, $newHeadResidentId, $activeHouseholdMemberStatusId)) {
+            http_response_code(400);
+            echo json_encode([
+                'success' => false,
+                'message' => 'Selected new head is not an eligible active household member.'
+            ]);
+            exit;
+        }
+    }
+}
+
 if ($newHeadResidentId !== '') {
+    if (!$isHead) {
+        http_response_code(400);
+        echo json_encode([
+            'success' => false,
+            'message' => 'Only the head of family can assign a new head of household.'
+        ]);
+        exit;
+    }
     $changes['new_head_resident_id'] = $newHeadResidentId;
 }
 
@@ -246,4 +439,4 @@ createResidentTransaction(
     ['request_type' => 'address']
 );
 
-echo json_encode(['success' => true, 'message' => 'Address edit request submitted.']);
+echo json_encode(['success' => true, 'message' => 'Address change request submitted.']);
