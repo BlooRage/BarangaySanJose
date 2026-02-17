@@ -1,6 +1,4 @@
-<<<<<<< Updated upstream
-<<<<<<< Updated upstream
-<?php
+﻿<?php
 $allowUnregistered = false;
 require_once __DIR__ . "/includes/resident_access_guard.php";
 ?>
@@ -24,7 +22,6 @@ require_once __DIR__ . "/includes/resident_access_guard.php";
 
   <div class="d-flex" style="min-height: 100vh;">
 
-    <!-- âœ… SIDEBAR INCLUDE -->
     <?php include 'includes/resident_sidebar.php'; ?>
 
     <header id="mobile-header">
@@ -39,7 +36,6 @@ require_once __DIR__ . "/includes/resident_access_guard.php";
       </div>
     </header>
 
-    <!-- âœ… MAIN -->
     <main id="div-mainDisplay" class="flex-grow-1 p-4 p-md-5 bg-light">
 
       <div id="div-welcomeBanner" class="rounded-4 overflow-hidden mb-5 shadow-sm border-orange-thin">
