@@ -63,10 +63,10 @@ require_once __DIR__ . "/includes/admin_guard.php";
                 <table class="table align-middle" id="table-householdProfiling">
                     <thead>
                         <tr class="table-light">
-                            <th>Address ID</th>
-                            <th>Address</th>
-                            <th>Households</th>
-                            <th>Action</th>
+                            <th id="th-col-1">Address ID</th>
+                            <th id="th-col-2">Address</th>
+                            <th id="th-col-3">Households</th>
+                            <th id="th-col-4">Action</th>
                         </tr>
                     </thead>
                     <tbody id="tableBody">
@@ -88,6 +88,20 @@ require_once __DIR__ . "/includes/admin_guard.php";
                         <hr>
 
                         <div class="modal-body">
+                            <div class="mb-3">
+                                <label class="fw-bold small mb-2">Display</label>
+                                <div>
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="radio" name="displayMode" id="displayModeAddresses" value="addresses" checked>
+                                        <label class="form-check-label small" for="displayModeAddresses">Addresses</label>
+                                    </div>
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="radio" name="displayMode" id="displayModeHeads" value="heads">
+                                        <label class="form-check-label small" for="displayModeHeads">Household Heads</label>
+                                    </div>
+                                </div>
+                            </div>
+
                             <div class="mb-2">
                                 <label class="fw-bold small mb-2">Area Number</label>
                                 <div>
@@ -206,9 +220,6 @@ require_once __DIR__ . "/includes/admin_guard.php";
 
                     <hr>
 
-                    <h5 class="fw-bold mb-3" style="color: #000;">Other Residing Members</h5>
-                    <ul id="list-otherResidents" class="small mb-0 ps-3"></ul>
-
                 </div>
             </div>
 
@@ -216,81 +227,6 @@ require_once __DIR__ . "/includes/admin_guard.php";
                 <button type="button" class="btn btn-secondary px-4" data-bs-dismiss="modal">Close</button>
             </div>
         </div>
-    </div>
-</div>
-
-<!-- ADD HOUSEHOLD MEMBER MODAL -->
-<div class="modal fade" id="modal-addHouseholdMember" tabindex="-1">
-    <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable">
-        <form id="form-addHouseholdMember" class="modal-content p-4">
-            <div class="modal-header border-0">
-                <h4 class="fw-bold" style="font-family: 'Charis SIL Bold', serif; font-size: 28px; color: #e78924">
-                    Add Household Member
-                </h4>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-            </div>
-
-            <div class="modal-body">
-                <p class="text-muted small mb-3">All fields marked with <span class="text-danger">*</span> are required.</p>
-                <h5 class="fw-bold mb-3">Member Information</h5>
-                <div class="row g-3">
-                    <div class="col-md-4">
-                        <label class="small fw-bold">Family Head <span class="text-danger">*</span></label>
-                        <select id="add-famHeadId" name="fam_head_id" class="form-select" required></select>
-                    </div>
-                </div>
-                <div class="row g-3 mt-1">
-                    <div class="col-md-3">
-                        <label class="small fw-bold">Last Name <span class="text-danger">*</span></label>
-                        <input type="text" id="add-lastname" name="last_name" class="form-control" required autocomplete="family-name" placeholder="Last Name">
-                    </div>
-                    <div class="col-md-3">
-                        <label class="small fw-bold">First Name <span class="text-danger">*</span></label>
-                        <input type="text" id="add-firstname" name="first_name" class="form-control" required autocomplete="given-name" placeholder="First Name">
-                    </div>
-                    <div class="col-md-3">
-                        <label class="small fw-bold">Middle Name</label>
-                        <input type="text" id="add-middlename" name="middle_name" class="form-control" autocomplete="additional-name" placeholder="Middle Name">
-                    </div>
-                    <div class="col-md-3">
-                        <label class="small fw-bold">Suffix (optional)</label>
-                        <input type="text" id="add-suffix" name="suffix" class="form-control" placeholder="Suffix">
-                    </div>
-                    <div class="col-md-3">
-                        <label class="small fw-bold">Birthday <span class="text-danger">*</span></label>
-                        <input type="date" id="add-birthdate" name="birthdate" class="form-control" required>
-                    </div>
-                </div>
-            </div>
-
-            <div class="modal-footer border-0">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                <button type="submit" id="btn-addMemberSave" class="btn btn-success px-4" disabled>Save</button>
-            </div>
-        </form>
-    </div>
-</div>
-
-<!-- ASSIGN OTHER RESIDENT MODAL -->
-<div class="modal fade" id="modal-assignResident" tabindex="-1">
-    <div class="modal-dialog modal-dialog-centered">
-        <form id="form-assignResident" class="modal-content p-4">
-            <div class="modal-header border-0">
-                <h5 class="fw-bold mb-0">Assign Resident to Household</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-            </div>
-            <div class="modal-body">
-                <input type="hidden" id="assign-residentId" name="assign_resident_id">
-                <div class="mb-3">
-                    <label class="small fw-bold">Select Household Head</label>
-                    <select id="assign-famHeadSelect" name="assign_fam_head_id" class="form-select" required></select>
-                </div>
-            </div>
-            <div class="modal-footer border-0">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                <button type="submit" class="btn btn-primary">Assign</button>
-            </div>
-        </form>
     </div>
 </div>
 
