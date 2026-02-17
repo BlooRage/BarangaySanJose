@@ -5,12 +5,6 @@ $allowUnregistered = false;
 require_once __DIR__ . "/includes/resident_access_guard.php";
 ?>
 <!DOCTYPE html>
-=======
-﻿<!DOCTYPE html>
->>>>>>> Stashed changes
-=======
-﻿<!DOCTYPE html>
->>>>>>> Stashed changes
 <html lang="en">
 <head>
   <meta charset="UTF-8">
@@ -155,13 +149,4 @@ require_once __DIR__ . "/includes/resident_access_guard.php";
 </body>
 </html>
 
-<<<<<<< Updated upstream
-=======
 
-
-
-
-<<<<<<< Updated upstream
->>>>>>> Stashed changes
-=======
->>>>>>> Stashed changes
