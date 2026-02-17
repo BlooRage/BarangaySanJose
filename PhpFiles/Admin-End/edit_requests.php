@@ -549,13 +549,36 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     throw new Exception('No address record found.');
                 }
 
-                $addressStatusId = getFirstStatusId(
+                $previousAddressStatusId = getFirstStatusId(
                     $conn,
                     'AddressResidency',
                     ['NotResiding', 'Not Residing', 'PendingVerification']
                 );
-                if ($addressStatusId === null) {
-                    $addressStatusId = (int)$latest['status_id_residency'];
+                if ($previousAddressStatusId === null) {
+                    $previousAddressStatusId = (int)$latest['status_id_residency'];
+                }
+                $currentAddressStatusId = getFirstStatusId(
+                    $conn,
+                    'AddressResidency',
+                    ['Residing', 'PendingVerification']
+                );
+                if ($currentAddressStatusId === null) {
+                    $currentAddressStatusId = (int)$latest['status_id_residency'];
+                }
+
+                $stmtMarkOld = $conn->prepare("
+                    UPDATE residentaddresstbl
+                    SET status_id_residency = ?
+                    WHERE resident_id = ? AND address_id = ?
+                    LIMIT 1
+                ");
+                if ($stmtMarkOld) {
+                    $oldAddressId = (string)$latest['address_id'];
+                    $stmtMarkOld->bind_param("iss", $previousAddressStatusId, $row['resident_id'], $oldAddressId);
+                    if (!$stmtMarkOld->execute()) {
+                        throw new Exception('Failed to update previous address residency status.');
+                    }
+                    $stmtMarkOld->close();
                 }
                 $newAddress = [
                     'unit_number' => (string)($changes['unit_number'] ?? $latest['unit_number']),
@@ -589,7 +612,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $newAddress['house_type'],
                     $newAddress['house_ownership'],
                     $newAddress['residency_duration'],
-                    $addressStatusId
+                    $currentAddressStatusId
                 );
                 if (!$stmt->execute()) {
                     throw new Exception('Failed to insert address.');

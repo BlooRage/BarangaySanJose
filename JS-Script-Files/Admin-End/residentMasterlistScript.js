@@ -737,6 +737,32 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   };
 
+  let addressHistoryExpanded = false;
+  const addressHistoryToggleWrapEl = document.getElementById("view-address-history-toggle-wrap");
+  const addressHistoryToggleBtnEl = document.getElementById("btnToggleAddressHistory");
+  const addressHistoryToggleTextEl = document.getElementById("txtAddressHistoryToggle");
+  const addressHistoryToggleIconEl = document.getElementById("iconAddressHistoryToggle");
+
+  const syncAddressHistoryToggleUI = () => {
+    const historyWrap = document.getElementById("view-address-history-wrapper");
+    if (!historyWrap) return;
+    historyWrap.classList.toggle("d-none", !addressHistoryExpanded);
+    if (addressHistoryToggleTextEl) {
+      addressHistoryToggleTextEl.textContent = addressHistoryExpanded ? "Hide address history" : "See address history";
+    }
+    if (addressHistoryToggleIconEl) {
+      addressHistoryToggleIconEl.className = addressHistoryExpanded ? "fa-solid fa-arrow-up" : "fa-solid fa-arrow-down";
+    }
+  };
+
+  if (addressHistoryToggleBtnEl) {
+    addressHistoryToggleBtnEl.addEventListener("click", (event) => {
+      if (event) event.preventDefault();
+      addressHistoryExpanded = !addressHistoryExpanded;
+      syncAddressHistoryToggleUI();
+    });
+  }
+
   const normalizeResidencyStatus = (value) =>
     String(value ?? "")
       .toLowerCase()
@@ -774,12 +800,9 @@ document.addEventListener("DOMContentLoaded", () => {
   };
 
   const renderGroupedAddressHistory = (resident, historyItems = []) => {
-    const singleAddressWrap = document.getElementById("view-address-single-wrapper");
-    const singleHouseWrap = document.getElementById("view-house-single-wrapper");
     const historyWrap = document.getElementById("view-address-history-wrapper");
     const historyList = document.getElementById("view-address-history-list");
-    const historyDivider = document.getElementById("view-address-history-divider");
-    if (!singleAddressWrap || !singleHouseWrap || !historyWrap || !historyList || !historyDivider) return;
+    if (!historyWrap || !historyList) return;
 
     const dedupeKey = (item) =>
       [
@@ -801,13 +824,13 @@ document.addEventListener("DOMContentLoaded", () => {
       if (!map.has(key)) map.set(key, item);
     });
     const uniqueItems = Array.from(map.values());
+    addressHistoryExpanded = false;
 
     if (uniqueItems.length <= 1) {
+      if (addressHistoryToggleWrapEl) addressHistoryToggleWrapEl.classList.add("d-none");
       historyWrap.classList.add("d-none");
-      historyDivider.classList.add("d-none");
       historyList.innerHTML = "";
-      singleAddressWrap.classList.remove("d-none");
-      singleHouseWrap.classList.remove("d-none");
+      syncAddressHistoryToggleUI();
       return;
     }
 
@@ -819,10 +842,7 @@ document.addEventListener("DOMContentLoaded", () => {
       return bid.localeCompare(aid);
     });
 
-    singleAddressWrap.classList.add("d-none");
-    singleHouseWrap.classList.add("d-none");
-    historyWrap.classList.remove("d-none");
-    historyDivider.classList.remove("d-none");
+    if (addressHistoryToggleWrapEl) addressHistoryToggleWrapEl.classList.remove("d-none");
     historyList.innerHTML = "";
 
     let previousCount = 0;
@@ -849,6 +869,8 @@ document.addEventListener("DOMContentLoaded", () => {
       `;
       historyList.appendChild(card);
     });
+
+    syncAddressHistoryToggleUI();
   };
 
   const loadAddressHistoryForView = (resident) => {
