@@ -33,41 +33,60 @@ require_once __DIR__ . "/includes/resident_access_guard.php";
 
             <p class="section-label">List of documents:</p>
 
-            <div class="row certificate-grid text-center">
-                <div class="col-md-6 col-lg-3 certificate-card">
-                    <img src="../icons/dashboard/cohab.png" class="certificate-icon" alt="">
-                    <h3>COHABITATION</h3>
-                    <p class="certificate-text">
-                        Official proof of common-law partnership for legal or insurance claims.
-                    </p>
-                    <button class="btn apply-btn" onclick="location.href='CohabitationForm.php'">Apply Now</button>
+            <div class="row certificate-grid text-center justify-content-center">
+                <div class="col-md-6 col-lg-4 d-flex">
+                    <div class="certificate-card card-action w-100">
+                        <img src="../icons/dashboard/cohab.png" class="certificate-icon" alt="">
+                        <h3>COHABITATION</h3>
+                        <p class="certificate-text">
+                            Official proof of common-law partnership for legal or insurance claims.
+                        </p>
+                        <button class="btn apply-btn" onclick="location.href='Document-Applications/CohabitationForm.php'">Apply Now</button>
+                    </div>
                 </div>
 
-                <div class="col-md-6 col-lg-3 certificate-card">
-                    <img src="../icons/dashboard/indigency.png" class="certificate-icon" alt="">
-                    <h3>INDIGENCY</h3>
-                    <p class="certificate-text">
-                        Required for residents seeking financial, medical, or legal assistance.
-                    </p>
-                    <button class="btn apply-btn" onclick="location.href='IndigencyForm.php'">Apply Now</button>
+                <div class="col-md-6 col-lg-4 d-flex">
+                    <div class="certificate-card card-action w-100">
+                        <img src="../icons/dashboard/indigency.png" class="certificate-icon" alt="">
+                        <h3>INDIGENCY</h3>
+                        <p class="certificate-text">
+                            Required for residents seeking financial, medical, or legal assistance.
+                        </p>
+                        <button class="btn apply-btn" onclick="location.href='Document-Applications/IndigencyForm.php'">Apply Now</button>
+                    </div>
                 </div>
 
-                <div class="col-md-6 col-lg-3 certificate-card">
-                    <img src="../icons/dashboard/jobseekers.png" class="certificate-icon" alt="">
-                    <h3>FIRST TIME JOB-SEEKERS</h3>
-                    <p class="certificate-text">
-                        Avail fee waivers for government documents under Republic Act 11261.
-                    </p>
-                    <button class="btn apply-btn" onclick="location.href='FirstTimeJobSeekersForm.php'">Apply Now</button>
+                <div class="col-md-6 col-lg-4 d-flex">
+                    <div class="certificate-card card-action w-100">
+                        <img src="../icons/dashboard/jobseekers.png" class="certificate-icon" alt="">
+                        <h3>FIRST TIME JOB-SEEKERS</h3>
+                        <p class="certificate-text">
+                            Avail fee waivers for government documents under Republic Act 11261.
+                        </p>
+                        <button class="btn apply-btn" onclick="location.href='Document-Applications/FirstTimeJobSeekerForm.php'">Apply Now</button>
+                    </div>
                 </div>
 
-                <div class="col-md-6 col-lg-3 certificate-card position-relative">
-                    <img src="../icons/dashboard/identity.png" class="certificate-icon" alt="">
-                    <h3>IDENTITY</h3>
-                    <p class="certificate-text">
-                        A standard certification of your identity and residency in our barangay.
-                    </p>
-                    <button class="btn apply-btn" onclick="location.href='IdentityForm.php'">Apply Now</button>
+                <div class="col-md-6 col-lg-4 d-flex">
+                    <div class="certificate-card card-action w-100">
+                        <img src="../icons/dashboard/goodmoral.png" class="certificate-icon" alt="">
+                        <h3>GOOD MORAL</h3>
+                        <p class="certificate-text">
+                            Request a good moral certificate for school, employment, or other requirements.
+                        </p>
+                        <button class="btn apply-btn" onclick="location.href='Document-Applications/GoodMoralForm.php'">Apply Now</button>
+                    </div>
+                </div>
+
+                <div class="col-md-6 col-lg-4 d-flex">
+                    <div class="certificate-card card-action w-100">
+                        <img src="../icons/dashboard/residency.png" class="certificate-icon" alt="">
+                        <h3>RESIDENCY</h3>
+                        <p class="certificate-text">
+                            Request a residency certificate as proof of address and community residence.
+                        </p>
+                        <button class="btn apply-btn" onclick="location.href='Document-Applications/ResidencyForm.php'">Apply Now</button>
+                    </div>
                 </div>
             </div>
         </main>
