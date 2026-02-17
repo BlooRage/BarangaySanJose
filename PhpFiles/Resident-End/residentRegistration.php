@@ -1481,10 +1481,39 @@ try {
     if (isset($conn) && $conn instanceof mysqli) {
         $conn->rollback();
     }
-    http_response_code(500);
+
+    $rawMessage = trim((string)$e->getMessage());
+    error_log("[residentRegistration] " . $rawMessage);
+
+    $normalized = strtolower($rawMessage);
+    $safeMessage = $rawMessage !== '' ? $rawMessage : "We could not process your resident profiling request. Please try again.";
+    $statusCode = 400;
+
+    $isTechnicalDbError =
+        strpos($normalized, 'foreign key') !== false ||
+        strpos($normalized, 'constraint fails') !== false ||
+        strpos($normalized, 'sqlstate') !== false ||
+        strpos($normalized, 'prepare failed') !== false ||
+        strpos($normalized, 'insert resident failed') !== false ||
+        strpos($normalized, 'insert address failed') !== false ||
+        strpos($normalized, 'attachment insert failed') !== false ||
+        strpos($normalized, 'update status failed') !== false ||
+        strpos($normalized, 'duplicate entry') !== false;
+
+    if ($isTechnicalDbError) {
+        $statusCode = 500;
+        $safeMessage = "Unable to save your resident profiling request right now. Please log out, log in again, and retry.";
+
+        // Specific guidance for resident-user linkage failures.
+        if (strpos($normalized, 'fk_resident_user') !== false || strpos($normalized, 'residentinformationtbl') !== false) {
+            $safeMessage = "Your account session could not be validated for profiling. Please log out, log in again, and submit the form again.";
+        }
+    }
+
+    http_response_code($statusCode);
     echo json_encode([
         "success" => false,
-        "message" => "Error: " . $e->getMessage()
+        "message" => $safeMessage
     ]);
     exit;
 }

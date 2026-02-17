@@ -1,6 +1,39 @@
 ﻿<?php
 $allowUnregistered = false;
 require_once __DIR__ . "/includes/resident_access_guard.php";
+
+$isResidentNotVerified = false;
+$showNotVerifiedModal = false;
+
+if (isset($conn) && $conn instanceof mysqli) {
+  $statusName = '';
+  $stmt = $conn->prepare("
+    SELECT s.status_name
+    FROM residentinformationtbl r
+    LEFT JOIN statuslookuptbl s ON r.status_id_resident = s.status_id
+    WHERE r.user_id = ?
+    LIMIT 1
+  ");
+
+  if ($stmt) {
+    $stmt->bind_param("s", $_SESSION['user_id']);
+    $stmt->execute();
+    $stmt->bind_result($statusName);
+    if ($stmt->fetch()) {
+      $statusKey = strtolower((string)preg_replace('/[^a-z0-9]/i', '', (string)$statusName));
+      $isResidentNotVerified = ($statusKey === 'notverified');
+    }
+    $stmt->close();
+  }
+}
+
+if (!empty($_SESSION['show_not_verified_modal']) && $isResidentNotVerified) {
+  $showNotVerifiedModal = true;
+}
+
+if (isset($_SESSION['show_not_verified_modal'])) {
+  unset($_SESSION['show_not_verified_modal']);
+}
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -16,6 +49,31 @@ require_once __DIR__ . "/includes/resident_access_guard.php";
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
 
   <link rel="stylesheet" href="../CSS-Styles/Resident-End-CSS/residentDashboard.css">
+  <style>
+    .verify-cta-card {
+      position: relative;
+    }
+    .verify-cta-close {
+      position: absolute;
+      top: 8px;
+      right: 10px;
+      width: 28px;
+      height: 28px;
+      border: none;
+      border-radius: 50%;
+      background: rgba(0, 0, 0, 0.15);
+      color: #fff;
+      font-size: 18px;
+      line-height: 1;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.2s ease;
+    }
+    .verify-cta-card:hover .verify-cta-close {
+      opacity: 1;
+      pointer-events: auto;
+    }
+  </style>
 </head>
 
 <body>
@@ -38,7 +96,7 @@ require_once __DIR__ . "/includes/resident_access_guard.php";
 
     <main id="div-mainDisplay" class="flex-grow-1 p-4 p-md-5 bg-light">
 
-      <div id="div-welcomeBanner" class="rounded-4 overflow-hidden mb-5 shadow-sm border-orange-thin">
+      <div id="div-welcomeBanner" class="rounded-4 overflow-hidden mb-3 shadow-sm border-orange-thin">
         <div id="div-bannerHeader" class="bg-orange text-center py-3">
           <h3 class="text-white fw-bold mb-0">WELCOME, RESIDENTS OF BARANGAY SAN JOSE!</h3>
         </div>
@@ -48,6 +106,19 @@ require_once __DIR__ . "/includes/resident_access_guard.php";
           </p>
         </div>
       </div>
+
+      <?php if ($isResidentNotVerified): ?>
+        <div class="verify-cta-card rounded-4 overflow-hidden shadow-sm border-orange-thin bg-white mb-4" id="verifyCtaCard">
+          <button type="button" class="verify-cta-close" id="verifyCtaCloseBtn" aria-label="Close">×</button>
+          <div class="bg-orange text-center py-2">
+            <h3 class="text-white fw-bold mb-0">ACCOUNT VERIFICATION</h3>
+          </div>
+          <div class="p-3 p-md-4 text-center">
+            <p class="text-muted mb-2">Want to access most modules? Verify now.</p>
+            <a href="DocumentUpload.php" class="btn btn-primary px-4">Verify Now</a>
+          </div>
+        </div>
+      <?php endif; ?>
 
       <h2 id="txt-sectionTitle" class="fw-bold border-bottom pb-2 mb-4">DASHBOARD</h2>
 
@@ -130,6 +201,23 @@ require_once __DIR__ . "/includes/resident_access_guard.php";
     </main>
   </div>
 
+  <div class="modal fade" id="notVerifiedResidentModal" tabindex="-1" data-bs-backdrop="static" data-bs-keyboard="false" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content">
+        <div class="modal-header border-0 pb-0 bg-orange">
+          <h5 class="modal-title w-100 text-center text-white">Resident Verification</h5>
+        </div>
+        <div class="modal-body text-center">
+          You are not yet a verified resident, which means you cannot access most modules.
+        </div>
+        <div class="modal-footer border-0 pt-0 d-flex gap-2">
+          <a href="DocumentUpload.php" class="btn btn-primary flex-fill">Verify Now</a>
+          <button type="button" class="btn btn-secondary flex-fill" data-bs-dismiss="modal">Later</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <script>
     const burgerBtn = document.getElementById("btn-burger");
     const sidebar = document.getElementById("div-sidebarWrapper");
@@ -139,10 +227,27 @@ require_once __DIR__ . "/includes/resident_access_guard.php";
         sidebar.classList.toggle("show");
       });
     }
+
+    document.addEventListener("DOMContentLoaded", () => {
+      const shouldShow = <?= $showNotVerifiedModal ? 'true' : 'false' ?>;
+      if (!shouldShow || !window.bootstrap?.Modal) return;
+
+      const modalEl = document.getElementById("notVerifiedResidentModal");
+      if (!modalEl) return;
+
+      const modal = new bootstrap.Modal(modalEl);
+      modal.show();
+    });
+
+    const verifyCtaCard = document.getElementById("verifyCtaCard");
+    const verifyCtaCloseBtn = document.getElementById("verifyCtaCloseBtn");
+    if (verifyCtaCard && verifyCtaCloseBtn) {
+      verifyCtaCloseBtn.addEventListener("click", () => {
+        verifyCtaCard.classList.add("d-none");
+      });
+    }
   </script>
 
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 </body>
 </html>
-
-
