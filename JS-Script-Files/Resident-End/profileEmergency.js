@@ -308,6 +308,7 @@ document.addEventListener("DOMContentLoaded", () => {
 <<<<<<< Updated upstream
 <<<<<<< Updated upstream
 <<<<<<< Updated upstream
+<<<<<<< Updated upstream
     const confirmDocumentRequirement = () =>
         new Promise((resolve) => {
             if (window.UniversalModal?.open) {
@@ -332,6 +333,8 @@ document.addEventListener("DOMContentLoaded", () => {
             resolve(window.confirm("Every applied change request requires supporting documents for verification. Continue?"));
         });
 
+=======
+>>>>>>> Stashed changes
 =======
 >>>>>>> Stashed changes
 =======
