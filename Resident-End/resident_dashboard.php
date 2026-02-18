@@ -113,7 +113,7 @@ if (isset($_SESSION['show_not_verified_modal'])) {
           <div class="bg-orange text-center py-2">
             <h3 class="text-white fw-bold mb-0">ACCOUNT VERIFICATION</h3>
           </div>
-          <div class="p-3 p-md-4 text-center">
+          <div class="verify-cta-body p-3 p-md-4 text-center">
             <p class="text-muted mb-2">Want to access most modules? Verify now.</p>
             <a href="DocumentUpload.php" class="btn btn-primary px-4">Verify Now</a>
           </div>
@@ -204,9 +204,10 @@ if (isset($_SESSION['show_not_verified_modal'])) {
   <div class="modal fade" id="notVerifiedResidentModal" tabindex="-1" data-bs-backdrop="static" data-bs-keyboard="false" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
       <div class="modal-content">
-        <div class="modal-header border-0 pb-0 bg-orange">
-          <h5 class="modal-title w-100 text-center text-white">Resident Verification</h5>
+        <div class="modal-header border-0 pb-0 bg-white">
+          <h5 class="modal-title w-100 text-center text-dark">Resident Verification</h5>
         </div>
+        <hr class="my-0">
         <div class="modal-body text-center">
           You are not yet a verified resident, which means you cannot access most modules.
         </div>

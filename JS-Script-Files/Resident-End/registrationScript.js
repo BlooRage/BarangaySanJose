@@ -1347,6 +1347,7 @@ function isActuallyVisible(el) {
         if (inp.files && inp.files.length > 0) hasDoc = true;
       });
       if (!hasDoc) return false;
+      if (!pictureInput || !pictureInput.files || pictureInput.files.length === 0) return false;
       return isSectorProofComplete();
     }
 
@@ -1376,14 +1377,19 @@ function isActuallyVisible(el) {
 
     for (const sectorKey of selectedSectorKeys) {
       if (!isSectorDocumentRequired(sectorKey)) continue;
-      const { docType, fileInputs } = getSectorElements(sectorKey);
+      const { docType, fileInputs, idFront, idBack } = getSectorElements(sectorKey);
 
       if (!docType || !docType.value.trim()) {
         return false;
       }
-      const hasAttachment = fileInputs.some((fileInput) => fileInput.files && fileInput.files.length > 0);
-      if (!hasAttachment) {
-        return false;
+      const isIdLike = isIdLikeSectorDocType(docType.value);
+      if (isIdLike) {
+        const hasFront = !!(idFront && idFront.files && idFront.files.length > 0);
+        const hasBack = !!(idBack && idBack.files && idBack.files.length > 0);
+        if (!hasFront || !hasBack) return false;
+      } else {
+        const hasAttachment = fileInputs.some((fileInput) => fileInput.files && fileInput.files.length > 0);
+        if (!hasAttachment) return false;
       }
     }
     return true;

@@ -755,7 +755,41 @@ try {
         }
     }
 
+    $hasAnySectorProofRaw = false;
+    if (isset($_FILES['sectorDocFile']['error']) && is_array($_FILES['sectorDocFile']['error'])) {
+        foreach ($_FILES['sectorDocFile']['error'] as $errorsPerSector) {
+            if (!is_array($errorsPerSector)) {
+                continue;
+            }
+            foreach ($errorsPerSector as $errCode) {
+                if ((int)$errCode === UPLOAD_ERR_OK) {
+                    $hasAnySectorProofRaw = true;
+                    break 2;
+                }
+            }
+        }
+    }
+
+    $hasAnyUploadAttempt = $hasIdProof || $hasDocumentProof || $hasPicture || $hasAnySectorProofRaw;
+
+    // Strict skip behavior: when resident explicitly skips proof upload,
+    // treat all proof flags as not uploaded.
+    if ($skipProof) {
+        if ($hasAnyUploadAttempt) {
+            throw new Exception("You selected Skip. Please remove all uploads or uncheck Skip to submit documents.");
+        }
+        $hasIdProof = false;
+        $hasPicture = false;
+        $hasDocumentProof = false;
+    }
+
     if (!$skipProof) {
+        if ($proofType === 'ID' && $hasDocumentProof) {
+            throw new Exception("Document proof files were uploaded while Proof Type is ID. Remove document uploads or switch to Document.");
+        }
+        if ($proofType === 'Document' && $hasIdProof) {
+            throw new Exception("ID files were uploaded while Proof Type is Document. Remove ID uploads or switch to ID.");
+        }
         if ($proofType === 'ID' && !$hasIdProof) {
             throw new Exception($isPassportId ? "Passport file is required." : "ID Front and Back are required.");
         }
@@ -769,6 +803,8 @@ try {
 
     $sourceType = "ResidentProfiling";
     $statusVerifyId = getStatusId($conn, "PendingReview", "ResidentDocumentProfiling");
+    $proofAttachmentIds = [];
+    $sectorAttachmentIds = [];
     // Store files under a folder named by user_id (not resident_id).
     $userFolder = preg_replace('/[^A-Za-z0-9_-]/', '', (string)$user_id);
     if ($userFolder === '') {
@@ -836,6 +872,10 @@ try {
                 $idNumber
             );
             if (!$ins->execute()) throw new Exception("Passport attachment insert failed: " . $ins->error);
+            $newAttachmentId = (int)$ins->insert_id;
+            if ($newAttachmentId > 0) {
+                $proofAttachmentIds[] = $newAttachmentId;
+            }
             $ins->close();
         } else {
             // Standard ID: requires front + back and stores a merged PDF.
@@ -916,6 +956,10 @@ try {
                 $uploadedIdNumber
             );
             if (!$ins->execute()) throw new Exception("Merged ID attachment insert failed: " . $ins->error);
+            $newAttachmentId = (int)$ins->insert_id;
+            if ($newAttachmentId > 0) {
+                $proofAttachmentIds[] = $newAttachmentId;
+            }
             $ins->close();
         }
     }
@@ -957,6 +1001,10 @@ try {
             $idNumber
         );
         if (!$ins->execute()) throw new Exception("2x2 attachment insert failed: " . $ins->error);
+        $newAttachmentId = (int)$ins->insert_id;
+        if ($newAttachmentId > 0) {
+            $proofAttachmentIds[] = $newAttachmentId;
+        }
         $ins->close();
     }
 
@@ -1004,6 +1052,10 @@ try {
                 $idNumber
             );
             if (!$ins->execute()) throw new Exception("Document attachment insert failed: " . $ins->error);
+            $newAttachmentId = (int)$ins->insert_id;
+            if ($newAttachmentId > 0) {
+                $proofAttachmentIds[] = $newAttachmentId;
+            }
             $ins->close();
         }
     }
@@ -1191,6 +1243,7 @@ try {
 	            $ins->close();
 
 	            if ($newAttachmentId > 0) {
+                    $sectorAttachmentIds[] = $newAttachmentId;
 	                upsertSectorMembershipStatusFromUpload(
 	                    $conn,
 	                    (string)$resident_id,
@@ -1247,6 +1300,7 @@ try {
             $ins->close();
 
 	            if ($newAttachmentId > 0) {
+                    $sectorAttachmentIds[] = $newAttachmentId;
 	                upsertSectorMembershipStatusFromUpload(
 	                    $conn,
 	                    (string)$resident_id,
@@ -1260,7 +1314,7 @@ try {
     }
 
     $hasAnySectorProof = false;
-    if (isset($_FILES['sectorDocFile']['name']) && is_array($_FILES['sectorDocFile']['name'])) {
+    if (!$skipProof && isset($_FILES['sectorDocFile']['name']) && is_array($_FILES['sectorDocFile']['name'])) {
         foreach ($_FILES['sectorDocFile']['error'] as $sectorKey => $errorsPerSector) {
             if (!is_array($errorsPerSector)) {
                 continue;
@@ -1381,21 +1435,44 @@ try {
 
     // Resident transactions (best-effort)
     try {
-        createResidentTransaction(
-            $conn,
-            (string)$user_id,
-            (string)$user_id,
-            'RESIDENT_PROFILE',
-            (string)$resident_id,
-            'RESIDENT_PROFILING',
-            'Resident Profiling Submission',
-            (int)$finalResidentStatusId,
-            'Resident completed initial profiling form.',
-            [
-                'skip_proof' => $skipProof ? 1 : 0,
-                'proof_type' => $proofType,
-            ]
-        );
+        if (!$uploadedAnyProof) {
+            // Keep transactions aligned with current registration submission.
+            // If proof upload was skipped (or nothing uploaded), remove profiling proof transactions.
+            $cleanupTx = $conn->prepare("
+                DELETE FROM unifiedtransactiontbl
+                WHERE resident_user_id = ?
+                  AND source_type = 'RESIDENT_PROFILE'
+                  AND source_id = ?
+                  AND transaction_type IN ('RESIDENT_PROFILING', 'PROOF_OF_RESIDENCY', 'SECTOR_MEMBERSHIP')
+            ");
+            if ($cleanupTx) {
+                $cleanupTx->bind_param("ss", $user_id, $resident_id);
+                $cleanupTx->execute();
+                $cleanupTx->close();
+            }
+        }
+
+        if ($uploadedAnyProof) {
+            createResidentTransaction(
+                $conn,
+                (string)$user_id,
+                (string)$user_id,
+                'RESIDENT_PROFILE',
+                (string)$resident_id,
+                'RESIDENT_PROFILING',
+                'Resident Profiling Submission',
+                (int)$finalResidentStatusId,
+                'Resident completed initial profiling form.',
+                [
+                    'skip_proof' => $skipProof ? 1 : 0,
+                    'proof_type' => $proofType,
+                    'attachment_ids' => array_values(array_unique(array_merge(
+                        array_map('intval', $proofAttachmentIds),
+                        array_map('intval', $sectorAttachmentIds)
+                    ))),
+                ]
+            );
+        }
 
         if ($hasIdProof || $hasDocumentProof || $hasPicture) {
             createResidentTransaction(
@@ -1412,11 +1489,12 @@ try {
                     'has_id_proof' => $hasIdProof ? 1 : 0,
                     'has_document_proof' => $hasDocumentProof ? 1 : 0,
                     'has_2x2' => $hasPicture ? 1 : 0,
+                    'attachment_ids' => array_values(array_unique(array_map('intval', $proofAttachmentIds))),
                 ]
             );
         }
 
-        if (!empty($selectedSectors)) {
+        if (!empty($selectedSectors) && $hasAnySectorProof) {
             createResidentTransaction(
                 $conn,
                 (string)$user_id,
@@ -1430,6 +1508,7 @@ try {
                 [
                     'sectors' => array_values($selectedSectors),
                     'has_sector_proof' => $hasAnySectorProof ? 1 : 0,
+                    'attachment_ids' => array_values(array_unique(array_map('intval', $sectorAttachmentIds))),
                 ]
             );
         }

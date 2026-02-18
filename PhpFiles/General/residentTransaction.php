@@ -87,7 +87,14 @@ function upsertResidentTransaction(
 
     $transactionId = (string)residentTxClamp($transactionId, 10);
     $userId = (string)residentTxClamp($userId, 12);
+    if ($userId === '') {
+        return;
+    }
+
     $residentUserId = (string)residentTxClamp($residentUserId, 12);
+    if ($residentUserId === '') {
+        $residentUserId = $userId;
+    }
     $sourceType = (string)residentTxClamp($sourceType, 50);
     $sourceId = (string)residentTxClamp($sourceId, 64);
     $transactionType = (string)residentTxClamp($transactionType, 50);
@@ -195,4 +202,3 @@ function updateResidentTransactionStatus(
     $stmt->execute();
     $stmt->close();
 }
-
