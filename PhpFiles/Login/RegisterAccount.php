@@ -8,6 +8,18 @@ ini_set('display_errors', 0); // Never show errors to browser
 ini_set('log_errors', 1);
 error_reporting(E_ALL);
 
+function isSequentialPhone($phone) {
+    if (!preg_match('/^\d{10}$/', $phone)) return false;
+    $digits = array_map('intval', str_split($phone));
+    $asc = true;
+    $desc = true;
+    for ($i = 1; $i < count($digits); $i++) {
+        if ($digits[$i] !== $digits[$i - 1] + 1) $asc = false;
+        if ($digits[$i] !== $digits[$i - 1] - 1) $desc = false;
+    }
+    return $asc || $desc;
+}
+
 try {
     // Only allow POST
     if ($_SERVER["REQUEST_METHOD"] !== "POST") {
@@ -19,22 +31,22 @@ try {
     $Email       = trim($_POST['REmail'] ?? '');
     $Password    = $_POST['RPassword'] ?? '';
 
-    // ✅ Normalize phone: digits only, keep last 10
-    $PhoneNumber = preg_replace('/\D+/', '', $PhoneNumber);
-    $PhoneNumber = substr($PhoneNumber, -10);
-
     // ===== Validation =====
     $errors = [];
 
     // ✅ Must start with 9 and be exactly 10 digits
     if (!preg_match('/^9[0-9]{9}$/', $PhoneNumber)) {
-        $errors[] = "Phone number must start with 9 and be exactly 10 digits.";
+        $errors[] = "Invalid phone number.";
+    } elseif (preg_match('/^9(\d)\1{8}$/', $PhoneNumber)) {
+        $errors[] = "Invalid phone number.";
+    } elseif (isSequentialPhone($PhoneNumber)) {
+        $errors[] = "Invalid phone number.";
     }
 
     if ($Email === '') {
         $errors[] = "Email address is required.";
-    } elseif (!filter_var($Email, FILTER_VALIDATE_EMAIL)) {
-        $errors[] = "Invalid email address.";
+    } elseif (!preg_match('/^[A-Za-z0-9._%+-]{2,}@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$/', $Email)) {
+        $errors[] = "Invalid email address (at least 2 characters before @).";
     }
 
     if (!preg_match('/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[\W_]).{8,}$/', $Password)) {

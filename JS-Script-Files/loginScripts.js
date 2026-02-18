@@ -261,6 +261,18 @@ function phoneForOTP(phone) {
   return "0" + digits;
 }
 
+function isSequentialPhone(phone) {
+  if (!/^\d{10}$/.test(phone)) return false;
+  const digits = phone.split("").map((d) => parseInt(d, 10));
+  let asc = true;
+  let desc = true;
+  for (let i = 1; i < digits.length; i++) {
+    if (digits[i] !== digits[i - 1] + 1) asc = false;
+    if (digits[i] !== digits[i - 1] - 1) desc = false;
+  }
+  return asc || desc;
+}
+
 // ===== Force numeric input for phones (RESTORED OLD VERSION) =====
 if (phoneInput) {
   phoneInput.addEventListener("input", () => {
@@ -616,7 +628,11 @@ if (forgotContinueBtn) {
 
     // ✅ FIXED REGEX (no double slashes)
     if (!/^9\d{9}$/.test(phone)) {
-      showForgotError("Phone number must start with 9 and be exactly 10 digits.", [forgotPhoneInput]);
+      showForgotError("Invalid phone number.", [forgotPhoneInput]);
+      return;
+    }
+    if (/^9(\d)\1{8}$/.test(phone) || isSequentialPhone(phone)) {
+      showForgotError("Invalid phone number.", [forgotPhoneInput]);
       return;
     }
 
@@ -667,13 +683,19 @@ const validateForm = (formType = "signup") => {
     const email = (emailInput?.value || "").trim();
 
     if (!/^9\d{9}$/.test(phone)) {
-      firstError = "Phone number must start with 9 and be exactly 10 digits.";
+      firstError = "Invalid phone number.";
+      errorField = phoneInput;
+    } else if (/^9(\d)\1{8}$/.test(phone)) {
+      firstError = "Invalid phone number.";
+      errorField = phoneInput;
+    } else if (isSequentialPhone(phone)) {
+      firstError = "Invalid phone number.";
       errorField = phoneInput;
     } else if (!email) {
       firstError = "Email is required.";
       errorField = emailInput;
-    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-      firstError = "Please enter a valid email address.";
+    } else if (!/^[A-Za-z0-9._%+-]{2,}@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$/.test(email)) {
+      firstError = "Please enter a valid email address (at least 2 characters before @).";
       errorField = emailInput;
     } else if (password === "") {
       firstError = "Password is required.";
