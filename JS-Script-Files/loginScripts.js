@@ -204,6 +204,18 @@ const showError = (message, formType = "signup", field = null, clearBothPassword
   }
 };
 
+const clearSignupFieldError = (field) => {
+  if (!signupErrors) return;
+  hideErrorBox(signupErrors);
+  if (field) field.style.border = "";
+};
+
+const clearForgotFieldError = (field) => {
+  if (!forgotFormErrors) return;
+  hideErrorBox(forgotFormErrors);
+  if (field) field.style.border = "";
+};
+
 function hideAllAuthScreens() {
   // main forms
   if (loginForm) loginForm.classList.remove("active");
@@ -263,14 +275,14 @@ function phoneForOTP(phone) {
 
 function isSequentialPhone(phone) {
   if (!/^\d{10}$/.test(phone)) return false;
-  const digits = phone.split("").map((d) => parseInt(d, 10));
-  let asc = true;
-  let desc = true;
-  for (let i = 1; i < digits.length; i++) {
-    if (digits[i] !== digits[i - 1] + 1) asc = false;
-    if (digits[i] !== digits[i - 1] - 1) desc = false;
-  }
-  return asc || desc;
+  const seqAsc = "0123456789";
+  const seqDesc = "9876543210";
+  const last9 = phone.slice(1);
+
+  if (seqAsc.includes(phone) || seqDesc.includes(phone)) return true;
+  if (seqAsc.includes(last9) || seqDesc.includes(last9)) return true;
+
+  return false;
 }
 
 // ===== Force numeric input for phones (RESTORED OLD VERSION) =====
@@ -321,6 +333,74 @@ if (newPasswordInput) {
   newPasswordInput.addEventListener("blur", (e) => {
     if (!e.target.value) showPasswordRequirements(false, resetPasswordRequirements);
   });
+}
+
+// ===== Real-time Validation (Signup Phone/Email) =====
+const validateSignupField = (field) => {
+  const phone = (phoneInput?.value || "").trim();
+  const email = (emailInput?.value || "").trim();
+
+  if (field === phoneInput) {
+    if (!phone) return clearSignupFieldError(phoneInput);
+    if (!/^9\d{9}$/.test(phone)) {
+      return showError("Phone number must start with 9 and be exactly 10 digits.", "signup", phoneInput);
+    }
+    if (/^9(\d)\1{8}$/.test(phone) || isSequentialPhone(phone)) {
+      return showError("Invalid phone number.", "signup", phoneInput);
+    }
+    return clearSignupFieldError(phoneInput);
+  }
+
+  if (field === emailInput) {
+    if (!email) return clearSignupFieldError(emailInput);
+    if (!/^[A-Za-z0-9._%+-]{2,}@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$/.test(email)) {
+      return showError("Please enter a valid email address (at least 2 characters before @).", "signup", emailInput);
+    }
+    return clearSignupFieldError(emailInput);
+  }
+};
+
+if (phoneInput) {
+  phoneInput.addEventListener("input", () => validateSignupField(phoneInput));
+  phoneInput.addEventListener("blur", () => validateSignupField(phoneInput));
+}
+if (emailInput) {
+  emailInput.addEventListener("input", () => validateSignupField(emailInput));
+  emailInput.addEventListener("blur", () => validateSignupField(emailInput));
+}
+
+// ===== Real-time Validation (Forgot Password Phone/Email) =====
+const validateForgotField = (field) => {
+  const phone = (forgotPhoneInput?.value || "").trim();
+  const email = (forgotEmailInput?.value || "").trim();
+
+  if (field === forgotPhoneInput) {
+    if (!phone) return clearForgotFieldError(forgotPhoneInput);
+    if (!/^9\d{9}$/.test(phone)) {
+      return showForgotError("Phone number must start with 9 and be exactly 10 digits.", [forgotPhoneInput]);
+    }
+    if (/^9(\d)\1{8}$/.test(phone) || isSequentialPhone(phone)) {
+      return showForgotError("Invalid phone number.", [forgotPhoneInput]);
+    }
+    return clearForgotFieldError(forgotPhoneInput);
+  }
+
+  if (field === forgotEmailInput) {
+    if (!email) return clearForgotFieldError(forgotEmailInput);
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      return showForgotError("Please enter a valid email address.", [forgotEmailInput]);
+    }
+    return clearForgotFieldError(forgotEmailInput);
+  }
+};
+
+if (forgotPhoneInput) {
+  forgotPhoneInput.addEventListener("input", () => validateForgotField(forgotPhoneInput));
+  forgotPhoneInput.addEventListener("blur", () => validateForgotField(forgotPhoneInput));
+}
+if (forgotEmailInput) {
+  forgotEmailInput.addEventListener("input", () => validateForgotField(forgotEmailInput));
+  forgotEmailInput.addEventListener("blur", () => validateForgotField(forgotEmailInput));
 }
 
 // ===== Toggle Password Visibility (needed by inline onclick in HTML) =====
@@ -628,7 +708,7 @@ if (forgotContinueBtn) {
 
     // ✅ FIXED REGEX (no double slashes)
     if (!/^9\d{9}$/.test(phone)) {
-      showForgotError("Invalid phone number.", [forgotPhoneInput]);
+      showForgotError("Phone number must start with 9 and be exactly 10 digits.", [forgotPhoneInput]);
       return;
     }
     if (/^9(\d)\1{8}$/.test(phone) || isSequentialPhone(phone)) {
@@ -683,7 +763,7 @@ const validateForm = (formType = "signup") => {
     const email = (emailInput?.value || "").trim();
 
     if (!/^9\d{9}$/.test(phone)) {
-      firstError = "Invalid phone number.";
+      firstError = "Phone number must start with 9 and be exactly 10 digits.";
       errorField = phoneInput;
     } else if (/^9(\d)\1{8}$/.test(phone)) {
       firstError = "Invalid phone number.";

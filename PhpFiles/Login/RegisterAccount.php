@@ -10,14 +10,14 @@ error_reporting(E_ALL);
 
 function isSequentialPhone($phone) {
     if (!preg_match('/^\d{10}$/', $phone)) return false;
-    $digits = array_map('intval', str_split($phone));
-    $asc = true;
-    $desc = true;
-    for ($i = 1; $i < count($digits); $i++) {
-        if ($digits[$i] !== $digits[$i - 1] + 1) $asc = false;
-        if ($digits[$i] !== $digits[$i - 1] - 1) $desc = false;
-    }
-    return $asc || $desc;
+    $seqAsc = "0123456789";
+    $seqDesc = "9876543210";
+    $last9 = substr($phone, 1);
+
+    if (strpos($seqAsc, $phone) !== false || strpos($seqDesc, $phone) !== false) return true;
+    if (strpos($seqAsc, $last9) !== false || strpos($seqDesc, $last9) !== false) return true;
+
+    return false;
 }
 
 try {
