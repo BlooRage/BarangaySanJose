@@ -493,6 +493,64 @@ body {
     text-align: center;
 }
 
+.password-reqs {
+    width: 100%;
+    font-size: 0.8rem;
+    color: #6c757d;
+    background: #f8f9fa;
+    border: 1px solid #dee2e6;
+    border-radius: 8px;
+    padding: 6px 10px;
+}
+
+.password-reqs-title {
+    font-weight: 600;
+    margin-bottom: 2px;
+    color: #333333;
+}
+
+.password-reqs-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+}
+
+.password-reqs-list li {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    margin: 1px 0;
+}
+
+.password-reqs-list li::before {
+    content: "•";
+    color: #adb5bd;
+    font-size: 1rem;
+    line-height: 1;
+}
+
+.password-reqs-list li.req-valid {
+    color: #198754;
+}
+
+.password-reqs-list li.req-valid::before {
+    content: "✓";
+    color: #198754;
+}
+
+.password-reqs-list li.req-invalid {
+    color: #dc3545;
+}
+
+.password-reqs-list li.req-invalid::before {
+    content: "✗";
+    color: #dc3545;
+}
+
+.password-reqs.is-hidden {
+    display: none;
+}
+
 .otp-icon {
     width: clamp(90px, 8vw, 100px);
     height: auto;

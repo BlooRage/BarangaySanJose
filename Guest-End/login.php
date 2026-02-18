@@ -121,6 +121,17 @@ if (isset($_SESSION['user_id'])) {
               </span>
             </div>
 
+            <div id="passwordRequirements" class="password-reqs mb-2 is-hidden" aria-live="polite">
+              <div class="password-reqs-title">Password must contain:</div>
+              <ul class="password-reqs-list">
+                <li data-req="uppercase">1 uppercase letter</li>
+                <li data-req="lowercase">1 lowercase letter</li>
+                <li data-req="number">1 number</li>
+                <li data-req="special">1 special character</li>
+                <li data-req="length">At least 8 characters</li>
+              </ul>
+            </div>
+
             <div class="input-group mb-2">
               <input type="password" id="RConfirmPassword" name="RConfirmPassword" class="form-control" placeholder="Confirm Password" required />
               <span class="input-group-text" style="cursor: pointer" onclick="togglePassword('RConfirmPassword','eye3')">
@@ -233,6 +244,17 @@ if (isset($_SESSION['user_id'])) {
               <span class="input-group-text" onclick="togglePassword('newPassword','eyeNew')" style="cursor: pointer">
                 <i id="eyeNew" class="bi bi-eye"></i>
               </span>
+            </div>
+
+            <div id="resetPasswordRequirements" class="password-reqs mb-2 is-hidden" aria-live="polite">
+              <div class="password-reqs-title">Password must contain:</div>
+              <ul class="password-reqs-list">
+                <li data-req="uppercase">1 uppercase letter</li>
+                <li data-req="lowercase">1 lowercase letter</li>
+                <li data-req="number">1 number</li>
+                <li data-req="special">1 special character</li>
+                <li data-req="length">At least 8 characters</li>
+              </ul>
             </div>
 
             <div class="input-group mb-2">

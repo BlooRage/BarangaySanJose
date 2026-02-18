@@ -20,6 +20,7 @@ const phoneInput = document.getElementById("RPhoneNumber");
 const emailInput = document.getElementById("REmail");
 const passwordInput = document.getElementById("RPassword");
 const confirmPasswordInput = document.getElementById("RConfirmPassword");
+const passwordRequirements = document.getElementById("passwordRequirements");
 
 const createAccountBtn = document.getElementById("createAccountBtn");
 const forgotLink = document.getElementById("forgotPasswordLink");
@@ -35,6 +36,7 @@ const newPasswordInput = document.getElementById("newPassword");
 const confirmNewPasswordInput = document.getElementById("confirmNewPassword");
 const submitNewPasswordBtn = document.getElementById("submitNewPasswordBtn");
 const resetPasswordErrors = document.getElementById("resetPasswordErrors");
+const resetPasswordRequirements = document.getElementById("resetPasswordRequirements");
 
 const forgotEmailInput = document.getElementById("forgotEmail");
 const forgotPhoneInput = document.getElementById("forgotPhone");
@@ -58,6 +60,20 @@ const resendIntervalByPurpose = {};    // interval per purpose
 let tempSignupData = null;
 let otpFrom = ""; // 'signup' | 'forgot' | 'inactive'
 let otpRecipient = ""; // 11-digit recipient used for SMS sending: 0XXXXXXXXXX
+let otpVerifying = false;
+
+const tryAutoVerifyOtp = () => {
+  if (otpVerifying) return;
+  if (otpInputFields.length !== 6) return;
+
+  const otp = Array.from(otpInputFields).map((el) => (el.value || "").trim()).join("");
+  if (otp.length !== 6) return;
+
+  if (verifyOTPBtn) {
+    // Ensure the last input value is fully applied before verifying
+    setTimeout(() => verifyOTPBtn.click(), 0);
+  }
+};
 
 let verifiedResetEmail = "";
 let verifiedResetPhone = "";
@@ -74,6 +90,58 @@ let inactiveSession = {
 const toggleActiveForm = (show, hide) => {
   if (show) show.classList.add("active");
   if (hide) hide.classList.remove("active");
+};
+
+// ===== Password Requirements (Signup Real-Time) =====
+const passwordReqItems = passwordRequirements
+  ? {
+      uppercase: passwordRequirements.querySelector('[data-req="uppercase"]'),
+      lowercase: passwordRequirements.querySelector('[data-req="lowercase"]'),
+      number: passwordRequirements.querySelector('[data-req="number"]'),
+      special: passwordRequirements.querySelector('[data-req="special"]'),
+      length: passwordRequirements.querySelector('[data-req="length"]'),
+    }
+  : null;
+const resetPasswordReqItems = resetPasswordRequirements
+  ? {
+      uppercase: resetPasswordRequirements.querySelector('[data-req="uppercase"]'),
+      lowercase: resetPasswordRequirements.querySelector('[data-req="lowercase"]'),
+      number: resetPasswordRequirements.querySelector('[data-req="number"]'),
+      special: resetPasswordRequirements.querySelector('[data-req="special"]'),
+      length: resetPasswordRequirements.querySelector('[data-req="length"]'),
+    }
+  : null;
+
+const setReqState = (el, ok) => {
+  if (!el) return;
+  el.classList.remove("req-valid", "req-invalid");
+  if (ok === null) return;
+  el.classList.add(ok ? "req-valid" : "req-invalid");
+};
+
+const updatePasswordRequirements = (password = "", itemsOverride = null) => {
+  const items = itemsOverride || passwordReqItems;
+  if (!items) return;
+
+  const hasUpper = /[A-Z]/.test(password);
+  const hasLower = /[a-z]/.test(password);
+  const hasNumber = /\d/.test(password);
+  const hasSpecial = /[\W_]/.test(password);
+  const hasLength = password.length >= 8;
+
+  // Empty input keeps neutral state
+  const isEmpty = password.length === 0;
+  setReqState(items.uppercase, isEmpty ? null : hasUpper);
+  setReqState(items.lowercase, isEmpty ? null : hasLower);
+  setReqState(items.number, isEmpty ? null : hasNumber);
+  setReqState(items.special, isEmpty ? null : hasSpecial);
+  setReqState(items.length, isEmpty ? null : hasLength);
+};
+
+const showPasswordRequirements = (show, target = null) => {
+  const el = target || passwordRequirements;
+  if (!el) return;
+  el.classList.toggle("is-hidden", !show);
 };
 
 const setErrorBox = (div, message) => {
@@ -128,6 +196,7 @@ const showError = (message, formType = "signup", field = null, clearBothPassword
       if (clearBothPasswords) {
         if (passwordInput) passwordInput.value = "";
         if (confirmPasswordInput) confirmPasswordInput.value = "";
+        updatePasswordRequirements(passwordInput?.value || "");
       } else if (field === confirmPasswordInput && confirmPasswordInput) {
         confirmPasswordInput.value = "";
       }
@@ -204,6 +273,44 @@ if (forgotPhoneInput) {
   });
 }
 
+// ===== Real-time Password Requirements (Signup) =====
+if (passwordInput) {
+  updatePasswordRequirements(passwordInput.value || "");
+  showPasswordRequirements(false);
+
+  passwordInput.addEventListener("focus", () => {
+    showPasswordRequirements(true);
+  });
+
+  passwordInput.addEventListener("input", (e) => {
+    updatePasswordRequirements(e.target.value || "");
+    showPasswordRequirements(true);
+  });
+
+  passwordInput.addEventListener("blur", (e) => {
+    if (!e.target.value) showPasswordRequirements(false);
+  });
+}
+
+// ===== Real-time Password Requirements (Reset Password) =====
+if (newPasswordInput) {
+  updatePasswordRequirements(newPasswordInput.value || "", resetPasswordReqItems);
+  showPasswordRequirements(false, resetPasswordRequirements);
+
+  newPasswordInput.addEventListener("focus", () => {
+    showPasswordRequirements(true, resetPasswordRequirements);
+  });
+
+  newPasswordInput.addEventListener("input", (e) => {
+    updatePasswordRequirements(e.target.value || "", resetPasswordReqItems);
+    showPasswordRequirements(true, resetPasswordRequirements);
+  });
+
+  newPasswordInput.addEventListener("blur", (e) => {
+    if (!e.target.value) showPasswordRequirements(false, resetPasswordRequirements);
+  });
+}
+
 // ===== Toggle Password Visibility (needed by inline onclick in HTML) =====
 const togglePassword = (inputId, eyeId) => {
   const input = document.getElementById(inputId);
@@ -227,6 +334,9 @@ otpInputFields.forEach((input, index) => {
     if (input.value && index < otpInputFields.length - 1) {
       otpInputFields[index + 1].focus();
     }
+
+    // Auto-verify when all 6 digits are filled
+    tryAutoVerifyOtp();
   });
 
   input.addEventListener("keydown", (e) => {
@@ -234,7 +344,26 @@ otpInputFields.forEach((input, index) => {
       otpInputFields[index - 1].focus();
     }
   });
+
+  input.addEventListener("keyup", () => {
+    tryAutoVerifyOtp();
+  });
 });
+
+// Handle paste into OTP inputs
+if (otpForm) {
+  otpForm.addEventListener("paste", (e) => {
+    const pasted = (e.clipboardData || window.clipboardData)?.getData("text") || "";
+    const digits = pasted.replace(/\D/g, "").slice(0, 6);
+    if (digits.length !== 6) return;
+    e.preventDefault();
+    otpInputFields.forEach((el, i) => {
+      el.value = digits[i] || "";
+    });
+    if (otpInputFields[5]) otpInputFields[5].focus();
+    tryAutoVerifyOtp();
+  });
+}
 
 // ===== OTP Error =====
 function showOtpError(message) {
@@ -641,11 +770,14 @@ if (inactiveContinueBtn) {
 // ===== Verify OTP (signup/forgot/inactive) =====
 if (verifyOTPBtn) {
   verifyOTPBtn.addEventListener("click", async () => {
+    if (otpVerifying) return;
+    otpVerifying = true;
     let otp = "";
     otpInputFields.forEach((input) => (otp += (input.value || "").trim()));
 
     if (otp.length !== 6) {
       showOtpError("Please enter a 6-digit OTP");
+      otpVerifying = false;
       return;
     }
 
@@ -690,6 +822,7 @@ if (verifyOTPBtn) {
         showOtpError(data.error || "Incorrect OTP");
         otpInputFields.forEach((input) => (input.value = ""));
         if (otpInputFields[0]) otpInputFields[0].focus();
+        otpVerifying = false;
         return;
       }
 
@@ -708,6 +841,7 @@ if (verifyOTPBtn) {
 
         if (!vData.success) {
           showOtpError(vData.error || "Unable to verify account. Please try again.");
+          otpVerifying = false;
           return;
         }
 
@@ -759,6 +893,7 @@ if (verifyOTPBtn) {
         } else {
           showError(signupResult.error || "Unable to create account.", "signup");
           switchToSignup();
+          otpVerifying = false;
         }
 
         return;
@@ -771,9 +906,11 @@ if (verifyOTPBtn) {
 
         if (otpForm) otpForm.classList.remove("active");
         showStep("reset-password-step");
+        otpVerifying = false;
       }
     } catch (err) {
       showOtpError("Unable to verify OTP. Please try again later.");
+      otpVerifying = false;
     }
   });
 }
@@ -786,6 +923,7 @@ function showResetPasswordError(message, field = null, clearBoth = false) {
   if (clearBoth) {
     if (newPasswordInput) newPasswordInput.value = "";
     if (confirmNewPasswordInput) confirmNewPasswordInput.value = "";
+    updatePasswordRequirements(newPasswordInput?.value || "", resetPasswordReqItems);
     if (newPasswordInput) newPasswordInput.focus();
     return;
   }
