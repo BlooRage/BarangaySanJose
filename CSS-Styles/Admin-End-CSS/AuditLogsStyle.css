@@ -10,7 +10,7 @@
     border-color: #f1e1cf !important;
     width: 100%;
     max-width: 100%;
-    overflow-x: auto;
+    overflow-x: hidden;
     overflow-y: visible;
     -webkit-overflow-scrolling: touch;
 }
@@ -26,9 +26,7 @@
 
 
 #div-tableContainer {
-    overflow-x: auto;
-    overflow-y: hidden;
-    scrollbar-width: thin;
+    overflow: hidden;
 }
 
 .audit-columns {
@@ -129,11 +127,39 @@
 }
 
 .audit-shell .table-responsive {
-    overflow-x: visible;
+    overflow-x: auto;
     overflow-y: visible;
+    -webkit-overflow-scrolling: touch;
 }
 
 .audit-shell .audit-table {
     min-width: 1100px;
+}
+
+.audit-shell .admin-list-toolbar {
+    overflow-x: visible;
+    overflow-y: visible;
+    flex-wrap: nowrap;
+    gap: 12px;
+}
+
+.audit-shell .admin-list-actions {
+    flex-wrap: nowrap;
+    overflow: visible;
+    margin-left: auto;
+}
+
+.audit-shell .audit-actions-row {
+    min-width: 0;
+}
+
+.audit-shell .audit-search {
+    flex: 0 0 clamp(280px, 34vw, 440px);
+    min-width: 280px;
+    max-width: 440px;
+}
+
+#btnAuditRefresh.is-loading i {
+    animation: auditSpin 900ms linear infinite;
 }
 

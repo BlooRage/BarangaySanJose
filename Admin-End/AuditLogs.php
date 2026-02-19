@@ -9,8 +9,8 @@
   <script src="https://kit.fontawesome.com/3482e00999.js" crossorigin="anonymous"></script>
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
   <link rel="stylesheet" href="../CSS-Styles/Admin-End-CSS/AdminDashboardStyle.css">
-  <link rel="stylesheet" href="../CSS-Styles/Admin-End-CSS/ResidentMasterlistStyle.css?v=20260212-5">
-  <link rel="stylesheet" href="../CSS-Styles/Admin-End-CSS/AuditLogsStyle.css?v=20260216-2">
+  <link rel="stylesheet" href="../CSS-Styles/Admin-End-CSS/ResidentMasterlistStyle.css?v=20260219-2">
+  <link rel="stylesheet" href="../CSS-Styles/Admin-End-CSS/AuditLogsStyle.css?v=20260219-2">
 </head>
 <body>
   <div class="d-flex" style="min-height: 100vh;">
@@ -31,24 +31,26 @@
           <div class="admin-list-tabs">
             <div class="text-muted small">System activity trail (latest first)</div>
           </div>
-          <div class="admin-list-actions d-flex flex-row flex-nowrap align-items-center gap-2">
-            <div class="input-group admin-search audit-search flex-grow-1 me-2">
+          <div class="admin-list-actions audit-actions-row d-flex flex-row flex-nowrap align-items-center gap-2 ms-auto">
+            <div class="input-group admin-search audit-search me-2">
               <input id="auditSearch" class="form-control" placeholder="Search user/module/target/action..." />
-              <span class="input-group-text bg-white"><i class="fas fa-search"></i></span>
+              <span class="input-group-text bg-white"><i class="fas fa-search"></i>
+            </span>
             </div>
             <button id="btnAuditFilter" class="btn btn-outline-secondary btn-icon" type="button" title="Filter" aria-label="Filter" data-bs-toggle="modal" data-bs-target="#modalAuditFilter">
               <i class="fas fa-filter"></i>
               <span class="visually-hidden">Filter</span>
             </button>
-            <button id="btnAuditColumns" class="btn audit-columns admin-columns btn-icon" type="button" title="Columns" aria-label="Columns" data-bs-toggle="modal" data-bs-target="#modalAuditColumns">
+            <button id="btnAuditColumns" class="btn btn-outline-secondary btn-icon" type="button" title="Columns" aria-label="Columns" data-bs-toggle="modal" data-bs-target="#modalAuditColumns">
               <i class="fa-solid fa-sliders"></i>
               <span class="visually-hidden">Columns</span>
             </button>
-            <button id="btnAuditRefresh" class="btn audit-refresh admin-refresh btn-icon" type="button" title="Refresh table" aria-label="Refresh table">
+            <button id="btnAuditRefresh" class="btn btn-outline-secondary btn-icon" type="button" title="Refresh table" aria-label="Refresh table">
               <i class="fa-solid fa-arrows-rotate"></i>
               <span class="visually-hidden">Refresh</span>
             </button>
             <span id="auditAutoRefreshCountdown" class="small text-muted d-none"></span>
+            
           </div>
         </div>
 
@@ -61,6 +63,23 @@
               <tr><td colspan="6" class="text-center text-muted py-4">Loading...</td></tr>
             </tbody>
           </table>
+        </div>
+
+        <div class="resident-table-footer mt-3 d-flex flex-wrap justify-content-between align-items-center gap-3">
+          <div class="d-flex align-items-center gap-2">
+            <label for="auditEntriesPerPageInput" class="small text-muted mb-0">Entries</label>
+            <input
+              id="auditEntriesPerPageInput"
+              type="number"
+              min="1"
+              step="1"
+              value="20"
+              class="form-control form-control-sm resident-entries-input"
+            />
+          </div>
+          <nav aria-label="Audit logs pagination">
+            <ul class="pagination pagination-sm mb-0" id="auditPagination"></ul>
+          </nav>
         </div>
       </div>
     </main>
@@ -125,6 +144,6 @@
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-  <script src="../JS-Script-Files/Admin-End/auditLogsScript.js?v=20260215"></script>
+  <script src="../JS-Script-Files/Admin-End/auditLogsScript.js?v=20260219-1"></script>
 </body>
 </html>

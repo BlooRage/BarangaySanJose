@@ -3,6 +3,8 @@ document.addEventListener("DOMContentLoaded", () => {
   const searchInput = document.getElementById("searchInput");
   const btnRefreshTable = document.getElementById("btnResidentTableRefresh");
   const countdownEl = document.getElementById("residentAutoRefreshCountdown");
+  const entriesPerPageInput = document.getElementById("entriesPerPageInput");
+  const paginationEl = document.getElementById("residentPagination");
 
   const statusDisplayMap = {
     "VerifiedResident": "Verified Resident",
@@ -23,6 +25,9 @@ document.addEventListener("DOMContentLoaded", () => {
 
   let allResidents = [];
   let activeFilter = "ALL";
+  let activeModalFilters = {};
+  let currentPage = 1;
+  let entriesPerPage = Math.max(1, Number.parseInt(entriesPerPageInput?.value || "20", 10) || 20);
   let currentViewedResident = null;
 
   const viewModalEl = document.getElementById("modal-viewEntry");
@@ -368,6 +373,7 @@ document.addEventListener("DOMContentLoaded", () => {
       document.querySelectorAll(".status-filter-btn").forEach(b => b.classList.remove("active"));
       btn.classList.add("active");
       activeFilter = btn.dataset.filter;
+      currentPage = 1;
       applyFilterAndRender();
     });
   });
@@ -393,7 +399,9 @@ document.addEventListener("DOMContentLoaded", () => {
         return true;
       });
 
-      renderTable(filtered);
+      activeModalFilters = filters;
+      currentPage = 1;
+      applyFilterAndRender();
 
       const filterModalEl = document.getElementById("modalFilter");
       if (filterModalEl && window.bootstrap?.Modal) {
@@ -408,12 +416,22 @@ document.addEventListener("DOMContentLoaded", () => {
   // ========================
   function renderTable(data) {
     tbody.innerHTML = "";
-    if (!data.length) {
+    const rows = Array.isArray(data) ? data : [];
+    const totalRows = rows.length;
+    const totalPages = Math.max(1, Math.ceil(totalRows / entriesPerPage));
+    if (currentPage > totalPages) currentPage = totalPages;
+    if (currentPage < 1) currentPage = 1;
+    const startIdx = (currentPage - 1) * entriesPerPage;
+    const pageRows = rows.slice(startIdx, startIdx + entriesPerPage);
+
+    renderPagination(totalPages, totalRows);
+
+    if (!pageRows.length) {
       tbody.innerHTML = `<tr><td colspan="4" class="text-center text-muted">No records found</td></tr>`;
       return;
     }
 
-    data.forEach(row => {
+    pageRows.forEach(row => {
       const badge =
         row.status === "VerifiedResident" ? "success" :
         row.status === "PendingVerification" ? "warning text-dark" :
@@ -445,8 +463,71 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   function applyFilterAndRender() {
-    if (activeFilter === "ALL") renderTable(allResidents);
-    else renderTable(allResidents.filter(r => r.status === activeFilter));
+    let filtered = allResidents;
+
+    if (activeFilter !== "ALL") {
+      filtered = filtered.filter((r) => r.status === activeFilter);
+    }
+
+    const filterKeys = Object.keys(activeModalFilters || {});
+    if (filterKeys.length) {
+      filtered = filtered.filter((res) => {
+        for (const field of filterKeys) {
+          const allowed = activeModalFilters[field];
+          if (Array.isArray(allowed) && allowed.length) {
+            if (!allowed.includes(String(res[field]))) return false;
+          }
+        }
+        return true;
+      });
+    }
+
+    renderTable(filtered);
+  }
+
+  function renderPagination(totalPages, totalRows) {
+    if (!paginationEl) return;
+    paginationEl.innerHTML = "";
+
+    const addPageButton = (label, page, disabled = false, isActive = false) => {
+      const li = document.createElement("li");
+      li.className = `page-item${disabled ? " disabled" : ""}${isActive ? " active" : ""}`;
+
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = `page-link${isActive ? " fw-bold" : ""}`;
+      btn.textContent = label;
+      btn.disabled = disabled;
+      btn.addEventListener("click", () => {
+        if (disabled || page === currentPage) return;
+        currentPage = page;
+        applyFilterAndRender();
+      });
+
+      li.appendChild(btn);
+      paginationEl.appendChild(li);
+    };
+
+    if (totalRows <= 0) {
+      addPageButton("<", 1, true, false);
+      addPageButton("1", 1, false, true);
+      addPageButton(">", 1, true, false);
+      return;
+    }
+
+    addPageButton("<", Math.max(1, currentPage - 1), currentPage <= 1, false);
+
+    let startPage = Math.max(1, currentPage - 2);
+    let endPage = Math.min(totalPages, startPage + 4);
+    if (endPage - startPage < 4) {
+      startPage = Math.max(1, endPage - 4);
+    }
+
+    for (let page = startPage; page <= endPage; page += 1) {
+      addPageButton(String(page), page, false, page === currentPage);
+    }
+
+    addPageButton(">", Math.min(totalPages, currentPage + 1), currentPage >= totalPages, false);
   }
 
   // ========================
@@ -457,6 +538,16 @@ document.addEventListener("DOMContentLoaded", () => {
     searchInput.addEventListener("input", () => {
       clearTimeout(searchTimeout);
       searchTimeout = setTimeout(() => fetchResidents(searchInput.value.trim()), 300);
+    });
+  }
+
+  if (entriesPerPageInput) {
+    entriesPerPageInput.addEventListener("change", () => {
+      const next = Math.max(1, Number.parseInt(entriesPerPageInput.value || "20", 10) || 20);
+      entriesPerPage = next;
+      entriesPerPageInput.value = String(next);
+      currentPage = 1;
+      applyFilterAndRender();
     });
   }
 
@@ -2032,7 +2123,12 @@ function hasFormChanges(form) {
   // ========================
   const btnResetModal = document.getElementById("btnResetModalFilters");
   if (btnResetModal) {
-    btnResetModal.addEventListener("click", () => document.querySelectorAll(".filter-checkbox").forEach(cb => cb.checked = false));
+    btnResetModal.addEventListener("click", () => {
+      document.querySelectorAll(".filter-checkbox").forEach(cb => cb.checked = false);
+      activeModalFilters = {};
+      currentPage = 1;
+      applyFilterAndRender();
+    });
   }
 
   // ========================

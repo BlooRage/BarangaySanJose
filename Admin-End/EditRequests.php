@@ -9,8 +9,8 @@
     <script src="https://kit.fontawesome.com/3482e00999.js" crossorigin="anonymous"></script>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="../CSS-Styles/Admin-End-CSS/AdminDashboardStyle.css">
-    <link rel="stylesheet" href="../CSS-Styles/Admin-End-CSS/ResidentMasterlistStyle.css?v=20260216-3">
-    <link rel="stylesheet" href="../CSS-Styles/Admin-End-CSS/EditRequestsStyle.css?v=20260216-2">
+    <link rel="stylesheet" href="../CSS-Styles/Admin-End-CSS/ResidentMasterlistStyle.css?v=20260219-2">
+    <link rel="stylesheet" href="../CSS-Styles/Admin-End-CSS/EditRequestsStyle.css?v=20260219-1">
 </head>
 <body>
 <div class="d-flex" style="min-height: 100vh;">
@@ -27,16 +27,16 @@ include "includes/sidebar.php";
         </h2>
         <hr><br>
 
-        <div id="div-tableContainer" class="bg-white p-4 pt-3 rounded-4 shadow-sm border">
+        <div id="div-tableContainer" class="bg-white p-4 pt-3 rounded-4 shadow-sm border edit-requests-shell">
 	            <div class="admin-list-toolbar mb-3 pt-2">
 	                <div class="admin-list-tabs pt-2">
 	                    <button class="btn btn-outline-primary btn-sm status-filter-btn active" data-filter="ALL">All</button>
-	                    <button class="btn btn-sm status-filter-btn has-notif " data-filter="Pending">
+	                    <button class="btn btn-outline-secondary btn-sm status-filter-btn has-notif " data-filter="Pending">
 	                        Pending
 	                        <span id="pendingRequestBadge" class="pending-count-badge d-none">0</span>
 	                    </button>
-	                    <button class="btn btn-sm status-filter-btn " data-filter="Approved">Approved</button>
-	                    <button class="btn btn-sm status-filter-btn " data-filter="Denied">Denied</button>
+	                    <button class="btn btn-outline-secondary btn-sm status-filter-btn " data-filter="Approved">Approved</button>
+	                    <button class="btn btn-outline-secondary btn-sm status-filter-btn " data-filter="Denied">Denied</button>
 	                </div>
 	
 	                <div class="admin-list-actions admin-list-actions--linear">
@@ -48,11 +48,11 @@ include "includes/sidebar.php";
 	                        <i class="fas fa-filter"></i>
 	                        <span class="visually-hidden">Filter</span>
 	                    </button>
-	                    <button class="btn admin-columns btn-linear-control" type="button" data-bs-toggle="modal" data-bs-target="#modalTableColumns" id="btnEditRequestsColumns" title="Columns" aria-label="Columns">
+	                    <button class="btn btn-outline-secondary btn-linear-control" type="button" data-bs-toggle="modal" data-bs-target="#modalTableColumns" id="btnEditRequestsColumns" title="Columns" aria-label="Columns">
 	                        <i class="fa-solid fa-sliders"></i>
 	                        <span class="visually-hidden">Columns</span>
 	                    </button>
-	                    <button class="btn admin-refresh btn-linear-control" type="button" id="btnEditRequestsRefresh" title="Refresh table" aria-label="Refresh table">
+	                    <button class="btn btn-outline-secondary btn-linear-control" type="button" id="btnEditRequestsRefresh" title="Refresh table" aria-label="Refresh table">
 	                        <i class="fa-solid fa-arrows-rotate"></i>
 	                        <span class="visually-hidden">Refresh</span>
 	                    </button>
@@ -132,6 +132,23 @@ include "includes/sidebar.php";
                         </tr>
                     </tbody>
                 </table>
+            </div>
+
+            <div class="resident-table-footer mt-3 d-flex flex-wrap justify-content-between align-items-center gap-3">
+                <div class="d-flex align-items-center gap-2">
+                    <label for="editRequestsEntriesPerPageInput" class="small text-muted mb-0">Entries</label>
+                    <input
+                        id="editRequestsEntriesPerPageInput"
+                        type="number"
+                        min="1"
+                        step="1"
+                        value="20"
+                        class="form-control form-control-sm resident-entries-input"
+                    />
+                </div>
+                <nav aria-label="Edit requests pagination">
+                    <ul class="pagination pagination-sm mb-0" id="editRequestsPagination"></ul>
+                </nav>
             </div>
         </div>
     </main>
@@ -262,6 +279,6 @@ include "includes/sidebar.php";
   };
 </script>
 <script src="../JS-Script-Files/Admin-End/tableColumnsGeneric.js?v=20260215-1"></script>
-<script src="../JS-Script-Files/Admin-End/editRequestsScript.js"></script>
+<script src="../JS-Script-Files/Admin-End/editRequestsScript.js?v=20260219-1"></script>
 </body>
 </html>

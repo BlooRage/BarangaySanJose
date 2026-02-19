@@ -13,7 +13,7 @@ require_once __DIR__ . "/includes/admin_guard.php";
     <script src="https://kit.fontawesome.com/3482e00999.js" crossorigin="anonymous"></script>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="../CSS-Styles/Admin-End-CSS/AdminDashboardStyle.css">
-    <link rel="stylesheet" href="../CSS-Styles/Admin-End-CSS/ResidentMasterlistStyle.css?v=20260216-3">
+    <link rel="stylesheet" href="../CSS-Styles/Admin-End-CSS/ResidentMasterlistStyle.css?v=20260219-2">
 </head>
 
 <body>
@@ -31,7 +31,7 @@ require_once __DIR__ . "/includes/admin_guard.php";
 
         <hr><br>
 
-        <div class="bg-white p-4 rounded-4 shadow-sm border">
+        <div class="bg-white p-4 rounded-4 shadow-sm border archive-shell">
 
 	            <!-- SEARCH -->
 	            <div class="admin-list-toolbar mb-3">
@@ -46,11 +46,11 @@ require_once __DIR__ . "/includes/admin_guard.php";
 	                      <i class="fas fa-filter"></i>
 	                      <span class="visually-hidden">Filter</span>
 	                    </button>
-	                    <button class="btn admin-columns btn-icon" type="button" data-bs-toggle="modal" data-bs-target="#modalTableColumns" id="btnArchiveColumns" title="Columns" aria-label="Columns">
+	                    <button class="btn btn-outline-secondary btn-icon" type="button" data-bs-toggle="modal" data-bs-target="#modalTableColumns" id="btnArchiveColumns" title="Columns" aria-label="Columns">
 	                      <i class="fa-solid fa-sliders"></i>
 	                      <span class="visually-hidden">Columns</span>
 	                    </button>
-	                    <button class="btn admin-refresh btn-icon" type="button" id="btnArchiveRefresh" title="Refresh table" aria-label="Refresh table">
+	                    <button class="btn btn-outline-secondary btn-icon" type="button" id="btnArchiveRefresh" title="Refresh table" aria-label="Refresh table">
 	                        <i class="fa-solid fa-arrows-rotate"></i>
 	                        <span class="visually-hidden">Refresh</span>
 	                    </button>
@@ -73,6 +73,23 @@ require_once __DIR__ . "/includes/admin_guard.php";
                         <!-- Filled by JS -->
                     </tbody>
                 </table>
+            </div>
+
+            <div class="resident-table-footer mt-3 d-flex flex-wrap justify-content-between align-items-center gap-3">
+                <div class="d-flex align-items-center gap-2">
+                    <label for="archiveEntriesPerPageInput" class="small text-muted mb-0">Entries</label>
+                    <input
+                        id="archiveEntriesPerPageInput"
+                        type="number"
+                        min="1"
+                        step="1"
+                        value="20"
+                        class="form-control form-control-sm resident-entries-input"
+                    />
+                </div>
+                <nav aria-label="Archive pagination">
+                    <ul class="pagination pagination-sm mb-0" id="archivePagination"></ul>
+                </nav>
             </div>
 
             <!-- FILTER MODAL -->
@@ -212,7 +229,7 @@ require_once __DIR__ . "/includes/admin_guard.php";
   };
 </script>
 <script src="../JS-Script-Files/Admin-End/tableColumnsGeneric.js?v=20260215-1"></script>
-<script src="../JS-Script-Files/Admin-End/archiveResidentScript.js"></script>
+<script src="../JS-Script-Files/Admin-End/archiveResidentScript.js?v=20260219-1"></script>
 </body>
 </html>
 

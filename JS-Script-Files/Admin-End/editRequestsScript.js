@@ -10,6 +10,8 @@ document.addEventListener("DOMContentLoaded", () => {
   const pendingBadge = document.getElementById("pendingRequestBadge");
   const btnRefreshTable = document.getElementById("btnEditRequestsRefresh");
   const countdownEl = document.getElementById("editRequestsAutoRefreshCountdown");
+  const entriesPerPageInput = document.getElementById("editRequestsEntriesPerPageInput");
+  const paginationEl = document.getElementById("editRequestsPagination");
 
   const setRefreshLoading = (on) => {
     if (!btnRefreshTable) return;
@@ -24,6 +26,8 @@ document.addEventListener("DOMContentLoaded", () => {
 
   let allRequests = [];
   let activeStatus = "ALL";
+  let currentPage = 1;
+  let entriesPerPage = Math.max(1, Number.parseInt(entriesPerPageInput?.value || "20", 10) || 20);
 
   const statusLabel = (statusName) => {
     if (!statusName) return "Unknown";
@@ -58,8 +62,14 @@ document.addEventListener("DOMContentLoaded", () => {
       const matchSearch = search === "" || text.includes(search);
       return matchStatus && matchType && matchSearch;
     });
+    const totalPages = Math.max(1, Math.ceil(filtered.length / entriesPerPage));
+    if (currentPage > totalPages) currentPage = totalPages;
+    if (currentPage < 1) currentPage = 1;
+    const start = (currentPage - 1) * entriesPerPage;
+    const pageRows = filtered.slice(start, start + entriesPerPage);
+    renderPagination(totalPages, filtered.length);
 
-    if (filtered.length === 0) {
+    if (pageRows.length === 0) {
       tbody.innerHTML = `
         <tr>
           <td colspan="6" class="text-center text-muted py-4">
@@ -71,6 +81,7 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     tbody.innerHTML = filtered
+      .slice(start, start + entriesPerPage)
       .map((row) => {
         const statusText = statusLabel(row.status_name);
         return `
@@ -96,6 +107,44 @@ document.addEventListener("DOMContentLoaded", () => {
         `;
       })
       .join("");
+  };
+
+  const renderPagination = (totalPages, totalRows) => {
+    if (!paginationEl) return;
+    paginationEl.innerHTML = "";
+
+    const addBtn = (label, page, disabled = false, active = false) => {
+      const li = document.createElement("li");
+      li.className = `page-item${disabled ? " disabled" : ""}${active ? " active" : ""}`;
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = `page-link${active ? " fw-bold" : ""}`;
+      btn.textContent = label;
+      btn.disabled = disabled;
+      btn.addEventListener("click", () => {
+        if (disabled || page === currentPage) return;
+        currentPage = page;
+        renderTable();
+      });
+      li.appendChild(btn);
+      paginationEl.appendChild(li);
+    };
+
+    if (totalRows <= 0) {
+      addBtn("<", 1, true, false);
+      addBtn("1", 1, false, true);
+      addBtn(">", 1, true, false);
+      return;
+    }
+
+    addBtn("<", Math.max(1, currentPage - 1), currentPage <= 1, false);
+    let startPage = Math.max(1, currentPage - 2);
+    let endPage = Math.min(totalPages, startPage + 4);
+    if (endPage - startPage < 4) startPage = Math.max(1, endPage - 4);
+    for (let p = startPage; p <= endPage; p += 1) {
+      addBtn(String(p), p, false, p === currentPage);
+    }
+    addBtn(">", Math.min(totalPages, currentPage + 1), currentPage >= totalPages, false);
   };
 
   const viewModalEl = document.getElementById("modal-viewRequest");
@@ -268,19 +317,39 @@ document.addEventListener("DOMContentLoaded", () => {
       statusButtons.forEach((b) => b.classList.remove("active"));
       btn.classList.add("active");
       activeStatus = btn.dataset.filter || "ALL";
+      currentPage = 1;
       renderTable();
     });
   });
 
   if (searchInput) {
-    searchInput.addEventListener("input", renderTable);
+    searchInput.addEventListener("input", () => {
+      currentPage = 1;
+      renderTable();
+    });
   }
 
   if (typeFilterSelect) {
-    typeFilterSelect.addEventListener("change", renderTable);
+    typeFilterSelect.addEventListener("change", () => {
+      currentPage = 1;
+      renderTable();
+    });
   }
   if (typeFilterCheckboxes.length) {
-    typeFilterCheckboxes.forEach((cb) => cb.addEventListener("change", renderTable));
+    typeFilterCheckboxes.forEach((cb) => cb.addEventListener("change", () => {
+      currentPage = 1;
+      renderTable();
+    }));
+  }
+
+  if (entriesPerPageInput) {
+    entriesPerPageInput.addEventListener("change", () => {
+      const next = Math.max(1, Number.parseInt(entriesPerPageInput.value || "20", 10) || 20);
+      entriesPerPage = next;
+      entriesPerPageInput.value = String(next);
+      currentPage = 1;
+      renderTable();
+    });
   }
 
   if (tbody) {

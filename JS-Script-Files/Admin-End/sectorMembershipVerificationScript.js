@@ -5,8 +5,16 @@
     apps: [],
     filter: "ALL",
     search: "",
+    currentPage: 1,
+    entriesPerPage: 20,
     active: null, // currently opened application row
   };
+
+  const entriesPerPageInput = el("sectorEntriesPerPageInput");
+  const paginationEl = el("sectorPagination");
+  if (entriesPerPageInput) {
+    state.entriesPerPage = Math.max(1, Number.parseInt(entriesPerPageInput.value || "20", 10) || 20);
+  }
 
   const sectorMap = {
     pwd: "PWD",
@@ -154,12 +162,18 @@
     if (!body) return;
 
     const rows = applyFilterAndSearch(state.apps);
+    const totalPages = Math.max(1, Math.ceil(rows.length / state.entriesPerPage));
+    if (state.currentPage > totalPages) state.currentPage = totalPages;
+    if (state.currentPage < 1) state.currentPage = 1;
+    const start = (state.currentPage - 1) * state.entriesPerPage;
+    const pageRows = rows.slice(start, start + state.entriesPerPage);
     body.innerHTML = "";
+    renderPagination(totalPages, rows.length);
 
     if (loading) loading.classList.add("d-none");
-    if (empty) empty.classList.toggle("d-none", rows.length !== 0);
+    if (empty) empty.classList.toggle("d-none", pageRows.length !== 0);
 
-    rows.forEach((a) => {
+    pageRows.forEach((a) => {
       const tr = document.createElement("tr");
 
       const tdId = document.createElement("td");
@@ -203,6 +217,44 @@
       tr.appendChild(tdAction);
       body.appendChild(tr);
     });
+  };
+
+  const renderPagination = (totalPages, totalRows) => {
+    if (!paginationEl) return;
+    paginationEl.innerHTML = "";
+
+    const addBtn = (label, page, disabled = false, active = false) => {
+      const li = document.createElement("li");
+      li.className = `page-item${disabled ? " disabled" : ""}${active ? " active" : ""}`;
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = `page-link${active ? " fw-bold" : ""}`;
+      btn.textContent = label;
+      btn.disabled = disabled;
+      btn.addEventListener("click", () => {
+        if (disabled || page === state.currentPage) return;
+        state.currentPage = page;
+        renderTable();
+      });
+      li.appendChild(btn);
+      paginationEl.appendChild(li);
+    };
+
+    if (totalRows <= 0) {
+      addBtn("<", 1, true, false);
+      addBtn("1", 1, false, true);
+      addBtn(">", 1, true, false);
+      return;
+    }
+
+    addBtn("<", Math.max(1, state.currentPage - 1), state.currentPage <= 1, false);
+    let startPage = Math.max(1, state.currentPage - 2);
+    let endPage = Math.min(totalPages, startPage + 4);
+    if (endPage - startPage < 4) startPage = Math.max(1, endPage - 4);
+    for (let p = startPage; p <= endPage; p += 1) {
+      addBtn(String(p), p, false, p === state.currentPage);
+    }
+    addBtn(">", Math.min(totalPages, state.currentPage + 1), state.currentPage >= totalPages, false);
   };
 
 	  const openViewer = (app) => {
@@ -551,6 +603,17 @@
     if (search) {
       search.addEventListener("input", () => {
         state.search = search.value || "";
+        state.currentPage = 1;
+        renderTable();
+      });
+    }
+
+    if (entriesPerPageInput) {
+      entriesPerPageInput.addEventListener("change", () => {
+        const next = Math.max(1, Number.parseInt(entriesPerPageInput.value || "20", 10) || 20);
+        state.entriesPerPage = next;
+        entriesPerPageInput.value = String(next);
+        state.currentPage = 1;
         renderTable();
       });
     }
@@ -560,6 +623,7 @@
         document.querySelectorAll(".filter-btn").forEach((x) => x.classList.remove("active"));
         b.classList.add("active");
         state.filter = b.dataset.filter || "ALL";
+        state.currentPage = 1;
         renderTable();
       });
     });

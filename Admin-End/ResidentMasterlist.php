@@ -10,7 +10,7 @@
     <script src="https://kit.fontawesome.com/3482e00999.js" crossorigin="anonymous"></script>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="../CSS-Styles/Admin-End-CSS/AdminDashboardStyle.css">
-    <link rel="stylesheet" href="../CSS-Styles/Admin-End-CSS/ResidentMasterlistStyle.css?v=20260216-3">
+    <link rel="stylesheet" href="../CSS-Styles/Admin-End-CSS/ResidentMasterlistStyle.css?v=20260219-1">
 </head>
 
 <body>
@@ -67,17 +67,17 @@ if (isset($conn) && $conn instanceof mysqli) {
         </h2>
         <hr><br>
 
-        <div id="div-tableContainer" class="bg-white p-4 rounded-4 shadow-sm border">
+        <div id="div-tableContainer" class="bg-white p-4 rounded-4 shadow-sm border resident-masterlist-shell">
 
 	            <!-- FILTER BUTTONS + SEARCH -->
 	            <div class="admin-list-toolbar mb-3 pt-2">
 	                <!-- Status Filter Buttons -->
 	                <div class="admin-list-tabs">
 	                    <button class="btn btn-outline-primary btn-sm status-filter-btn" data-filter="ALL">All</button>
-	                    <button class="btn btn-outline-success btn-sm status-filter-btn fw-bold" data-filter="VerifiedResident">Verified Resident</button>
-	                    <button class="btn btn-outline-danger btn-sm status-filter-btn fw-bold" data-filter="NotVerified">Not Verified</button>
-	                    <button class="btn btn-outline-warning text-dark btn-sm status-filter-btn fw-bold has-notif" data-filter="PendingVerification">
-	                        Pending Verification
+	                    <button class="btn btn-outline-secondary btn-sm status-filter-btn fw-semibold" data-filter="VerifiedResident">Verified</button>
+	                    <button class="btn btn-outline-secondary btn-sm status-filter-btn fw-semibold" data-filter="NotVerified">Not</button>
+	                    <button class="btn btn-outline-secondary btn-sm status-filter-btn fw-semibold has-notif" data-filter="PendingVerification">
+	                        Pending
 	                        <?php if ($pendingCount > 0): ?>
 	                            <span class="pending-count-badge"><?= $pendingCount ?></span>
 	                        <?php endif; ?>
@@ -94,11 +94,11 @@ if (isset($conn) && $conn instanceof mysqli) {
 	                        <i class="fas fa-filter"></i>
 	                        <span class="visually-hidden">Filter</span>
 	                    </button>
-	                    <button class="btn admin-columns btn-icon" type="button" data-bs-toggle="modal" data-bs-target="#modalTableColumns" id="btnResidentColumns" title="Columns" aria-label="Columns">
+	                    <button class="btn btn-outline-secondary btn-icon" type="button" data-bs-toggle="modal" data-bs-target="#modalTableColumns" id="btnResidentColumns" title="Columns" aria-label="Columns">
 	                        <i class="fa-solid fa-sliders"></i>
 	                        <span class="visually-hidden">Columns</span>
 	                    </button>
-	                    <button class="btn admin-refresh btn-icon" type="button" id="btnResidentTableRefresh" title="Refresh table" aria-label="Refresh table">
+	                    <button class="btn btn-outline-secondary btn-icon" type="button" id="btnResidentTableRefresh" title="Refresh table" aria-label="Refresh table">
 	                        <i class="fa-solid fa-arrows-rotate"></i>
 	                        <span class="visually-hidden">Refresh</span>
 	                    </button>
@@ -122,6 +122,23 @@ if (isset($conn) && $conn instanceof mysqli) {
                         <!-- Filled dynamically by JS -->
                     </tbody>
                 </table>
+            </div>
+
+            <div class="resident-table-footer mt-3 d-flex flex-wrap justify-content-between align-items-center gap-3">
+                <div class="d-flex align-items-center gap-2">
+                    <label for="entriesPerPageInput" class="small text-muted mb-0">Entries</label>
+                    <input
+                        id="entriesPerPageInput"
+                        type="number"
+                        min="1"
+                        step="1"
+                        value="20"
+                        class="form-control form-control-sm resident-entries-input"
+                    />
+                </div>
+                <nav aria-label="Resident pagination">
+                    <ul class="pagination pagination-sm mb-0" id="residentPagination"></ul>
+                </nav>
             </div>
 
             <!-- FILTER MODAL -->
@@ -840,6 +857,6 @@ if (isset($conn) && $conn instanceof mysqli) {
   };
 </script>
 <script src="../JS-Script-Files/Admin-End/tableColumnsGeneric.js?v=20260215-1"></script>
-<script src="../JS-Script-Files/Admin-End/residentMasterlistScript.js?v=20260217-2"></script>
+<script src="../JS-Script-Files/Admin-End/residentMasterlistScript.js?v=20260219-1"></script>
 </body>
 </html>

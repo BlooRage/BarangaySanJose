@@ -16,7 +16,17 @@
       interval: null,
       inFlight: false,
     },
+    pagination: {
+      currentPage: 1,
+      entriesPerPage: 20,
+    },
   };
+
+  const entriesPerPageInput = el("auditEntriesPerPageInput");
+  const paginationEl = el("auditPagination");
+  if (entriesPerPageInput) {
+    state.pagination.entriesPerPage = Math.max(1, Number.parseInt(entriesPerPageInput.value || "20", 10) || 20);
+  }
 
   const safeText = (v) => {
     const s = String(v ?? "").trim();
@@ -95,13 +105,20 @@
 
     if (!tbody) return;
     const rows = state.rows || [];
-    if (!rows.length) {
+    const totalPages = Math.max(1, Math.ceil(rows.length / state.pagination.entriesPerPage));
+    if (state.pagination.currentPage > totalPages) state.pagination.currentPage = totalPages;
+    if (state.pagination.currentPage < 1) state.pagination.currentPage = 1;
+    const start = (state.pagination.currentPage - 1) * state.pagination.entriesPerPage;
+    const pageRows = rows.slice(start, start + state.pagination.entriesPerPage);
+    renderPagination(totalPages, rows.length);
+
+    if (!pageRows.length) {
       tbody.innerHTML = `<tr><td colspan="${activeCols.length}" class="text-center text-muted py-4">No records found.</td></tr>`;
       return;
     }
 
     tbody.innerHTML = "";
-    rows.forEach((r) => {
+    pageRows.forEach((r) => {
       const tr = document.createElement("tr");
       activeCols.forEach((c) => {
         const td = document.createElement("td");
@@ -114,6 +131,44 @@
       });
       tbody.appendChild(tr);
     });
+  };
+
+  const renderPagination = (totalPages, totalRows) => {
+    if (!paginationEl) return;
+    paginationEl.innerHTML = "";
+
+    const addBtn = (label, page, disabled = false, active = false) => {
+      const li = document.createElement("li");
+      li.className = `page-item${disabled ? " disabled" : ""}${active ? " active" : ""}`;
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = `page-link${active ? " fw-bold" : ""}`;
+      btn.textContent = label;
+      btn.disabled = disabled;
+      btn.addEventListener("click", () => {
+        if (disabled || page === state.pagination.currentPage) return;
+        state.pagination.currentPage = page;
+        renderTable();
+      });
+      li.appendChild(btn);
+      paginationEl.appendChild(li);
+    };
+
+    if (totalRows <= 0) {
+      addBtn("<", 1, true, false);
+      addBtn("1", 1, false, true);
+      addBtn(">", 1, true, false);
+      return;
+    }
+
+    addBtn("<", Math.max(1, state.pagination.currentPage - 1), state.pagination.currentPage <= 1, false);
+    let startPage = Math.max(1, state.pagination.currentPage - 2);
+    let endPage = Math.min(totalPages, startPage + 4);
+    if (endPage - startPage < 4) startPage = Math.max(1, endPage - 4);
+    for (let p = startPage; p <= endPage; p += 1) {
+      addBtn(String(p), p, false, p === state.pagination.currentPage);
+    }
+    addBtn(">", Math.min(totalPages, state.pagination.currentPage + 1), state.pagination.currentPage >= totalPages, false);
   };
 
   const parseDateOnly = (yyyyMmDd) => {
@@ -282,6 +337,7 @@
     if (search) {
       search.addEventListener("input", () => {
         state.q = search.value || "";
+        state.pagination.currentPage = 1;
         if (state.timer) window.clearTimeout(state.timer);
         state.timer = window.setTimeout(load, 250);
       });
@@ -305,6 +361,7 @@
       filterApplyEl.addEventListener("click", () => {
         state.filters.from = filterFromEl ? String(filterFromEl.value || "") : "";
         state.filters.to = filterToEl ? String(filterToEl.value || "") : "";
+        state.pagination.currentPage = 1;
         applyClientFilters();
         renderTable();
       });
@@ -316,7 +373,18 @@
         state.filters.to = "";
         if (filterFromEl) filterFromEl.value = "";
         if (filterToEl) filterToEl.value = "";
+        state.pagination.currentPage = 1;
         applyClientFilters();
+        renderTable();
+      });
+    }
+
+    if (entriesPerPageInput) {
+      entriesPerPageInput.addEventListener("change", () => {
+        const next = Math.max(1, Number.parseInt(entriesPerPageInput.value || "20", 10) || 20);
+        state.pagination.entriesPerPage = next;
+        entriesPerPageInput.value = String(next);
+        state.pagination.currentPage = 1;
         renderTable();
       });
     }

@@ -663,3 +663,169 @@ h2.section-title {
     flex: 1 1 0;
     margin: 0 !important;
 }
+
+/* ==========================
+   Resident Masterlist Controls
+   ========================== */
+.resident-masterlist-shell .admin-list-toolbar {
+    overflow-x: visible;
+    overflow-y: visible;
+    flex-wrap: wrap;
+    row-gap: 12px;
+}
+
+.resident-masterlist-shell .admin-list-tabs {
+    gap: 12px;
+    overflow: visible;
+}
+
+.resident-masterlist-shell .status-filter-btn {
+    border-radius: 10px;
+    border-width: 1px;
+    overflow: visible;
+}
+
+.resident-masterlist-shell .status-filter-btn[data-filter="ALL"] {
+    color: #0d6efd;
+    border-color: #0d6efd;
+    background: #fff;
+}
+
+.resident-masterlist-shell .status-filter-btn[data-filter="VerifiedResident"],
+.resident-masterlist-shell .status-filter-btn[data-filter="NotVerified"],
+.resident-masterlist-shell .status-filter-btn[data-filter="PendingVerification"] {
+    color: #495057;
+    border-color: #6c757d;
+    background: #fff;
+}
+
+.resident-masterlist-shell .status-filter-btn[data-filter="ALL"].active {
+    color: #fff !important;
+    background-color: #0d6efd !important;
+    border-color: #0d6efd !important;
+    font-weight: 700;
+}
+
+.resident-masterlist-shell .status-filter-btn[data-filter="VerifiedResident"].active,
+.resident-masterlist-shell .status-filter-btn[data-filter="NotVerified"].active,
+.resident-masterlist-shell .status-filter-btn[data-filter="PendingVerification"].active {
+    color: #fff !important;
+    background-color: #495057 !important;
+    border-color: #495057 !important;
+    font-weight: 700;
+}
+
+.resident-masterlist-shell .pending-count-badge {
+    z-index: 2;
+}
+
+.resident-masterlist-shell #filterButton,
+.resident-masterlist-shell #btnResidentColumns,
+.resident-masterlist-shell #btnResidentTableRefresh {
+    color: #6c757d;
+    border-color: #6c757d;
+    background-color: #fff;
+}
+
+.resident-masterlist-shell #filterButton:hover,
+.resident-masterlist-shell #btnResidentColumns:hover,
+.resident-masterlist-shell #btnResidentTableRefresh:hover {
+    color: #495057;
+    border-color: #495057;
+    background-color: #f8f9fa;
+}
+
+.resident-masterlist-shell #btnResidentTableRefresh.is-loading i {
+    animation: adminSpin 900ms linear infinite;
+}
+
+.resident-entries-input {
+    width: 88px;
+}
+
+#residentPagination .page-link {
+    color: #495057;
+}
+
+#residentPagination .page-item.active .page-link {
+    font-weight: 700;
+    color: #fff;
+    background-color: #0d6efd;
+    border-color: #0d6efd;
+}
+
+/* ==========================
+   Shared List Shells
+   ========================== */
+.sector-apps-shell .admin-list-toolbar,
+.archive-shell .admin-list-toolbar {
+    overflow-x: visible;
+    overflow-y: visible;
+    flex-wrap: wrap;
+    row-gap: 12px;
+}
+
+.sector-apps-shell .admin-list-tabs {
+    gap: 12px;
+    overflow: visible;
+}
+
+.sector-apps-shell .filter-btn {
+    border-radius: 10px;
+}
+
+.sector-apps-shell .filter-btn[data-filter="ALL"] {
+    color: #0d6efd;
+    border-color: #0d6efd;
+    background: #fff;
+}
+
+.sector-apps-shell .filter-btn[data-filter="PendingReview"],
+.sector-apps-shell .filter-btn[data-filter="Verified"],
+.sector-apps-shell .filter-btn[data-filter="Rejected"] {
+    color: #495057;
+    border-color: #6c757d;
+    background: #fff;
+}
+
+.sector-apps-shell .filter-btn[data-filter="ALL"].active {
+    color: #fff !important;
+    background-color: #0d6efd !important;
+    border-color: #0d6efd !important;
+    font-weight: 700;
+}
+
+.sector-apps-shell .filter-btn[data-filter="PendingReview"].active,
+.sector-apps-shell .filter-btn[data-filter="Verified"].active,
+.sector-apps-shell .filter-btn[data-filter="Rejected"].active {
+    color: #fff !important;
+    background-color: #495057 !important;
+    border-color: #495057 !important;
+    font-weight: 700;
+}
+
+.sector-apps-shell #btnSectorAppsRefresh.is-loading i,
+.archive-shell #btnArchiveRefresh.is-loading i {
+    animation: adminSpin 900ms linear infinite;
+}
+
+.resident-entries-input {
+    width: 88px;
+}
+
+#sectorPagination .page-link,
+#editRequestsPagination .page-link,
+#archivePagination .page-link,
+#auditPagination .page-link {
+    color: #495057;
+}
+
+#sectorPagination .page-item.active .page-link,
+#editRequestsPagination .page-item.active .page-link,
+#archivePagination .page-item.active .page-link,
+#auditPagination .page-item.active .page-link {
+    font-weight: 700;
+    color: #fff;
+    background-color: #0d6efd;
+    border-color: #0d6efd;
+}

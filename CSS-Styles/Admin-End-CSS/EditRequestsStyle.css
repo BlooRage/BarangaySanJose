@@ -205,3 +205,56 @@
 .btn-linear-control i {
     margin: 0 !important;
 }
+
+/* ==========================
+   Edit Requests Toolbar
+   ========================== */
+.edit-requests-shell .admin-list-toolbar {
+    overflow-x: visible;
+    overflow-y: visible;
+    flex-wrap: wrap;
+    row-gap: 12px;
+}
+
+.edit-requests-shell .admin-list-tabs {
+    gap: 12px;
+    overflow: visible;
+}
+
+.edit-requests-shell .status-filter-btn {
+    border-radius: 10px;
+}
+
+.edit-requests-shell .status-filter-btn[data-filter="ALL"] {
+    color: #0d6efd;
+    border-color: #0d6efd;
+    background: #fff;
+}
+
+.edit-requests-shell .status-filter-btn[data-filter="Pending"],
+.edit-requests-shell .status-filter-btn[data-filter="Approved"],
+.edit-requests-shell .status-filter-btn[data-filter="Denied"] {
+    color: #495057;
+    border-color: #6c757d;
+    background: #fff;
+}
+
+.edit-requests-shell .status-filter-btn[data-filter="ALL"].active {
+    color: #fff !important;
+    background-color: #0d6efd !important;
+    border-color: #0d6efd !important;
+    font-weight: 700;
+}
+
+.edit-requests-shell .status-filter-btn[data-filter="Pending"].active,
+.edit-requests-shell .status-filter-btn[data-filter="Approved"].active,
+.edit-requests-shell .status-filter-btn[data-filter="Denied"].active {
+    color: #fff !important;
+    background-color: #495057 !important;
+    border-color: #495057 !important;
+    font-weight: 700;
+}
+
+.edit-requests-shell #btnEditRequestsRefresh.is-loading i {
+    animation: adminSpin 900ms linear infinite;
+}

@@ -4,10 +4,14 @@ document.addEventListener("DOMContentLoaded", () => {
     const btnResetModal = document.getElementById("btnResetModalFilters");
 	    const btnRefreshTable = document.getElementById("btnArchiveRefresh");
 	    const countdownEl = document.getElementById("archiveAutoRefreshCountdown");
+    const entriesPerPageInput = document.getElementById("archiveEntriesPerPageInput");
+    const paginationEl = document.getElementById("archivePagination");
 
     let allArchivedResidents = [];
     let activeFilters = {};
     let searchValue = "";
+    let currentPage = 1;
+    let entriesPerPage = Math.max(1, Number.parseInt(entriesPerPageInput?.value || "20", 10) || 20);
 
     const AUTO_REFRESH_SECONDS = 60;
     let autoRefreshSecondsLeft = AUTO_REFRESH_SECONDS;
@@ -25,6 +29,7 @@ document.addEventListener("DOMContentLoaded", () => {
     if (searchInput) {
         searchInput.addEventListener("input", () => {
             searchValue = searchInput.value.trim().toLowerCase();
+            currentPage = 1;
             applyFiltersAndRender();
         });
     }
@@ -41,6 +46,7 @@ document.addEventListener("DOMContentLoaded", () => {
             });
 
             activeFilters = filters;
+            currentPage = 1;
             applyFiltersAndRender();
 
             const modalEl = document.getElementById("modalFilter");
@@ -55,6 +61,7 @@ document.addEventListener("DOMContentLoaded", () => {
         btnResetModal.addEventListener("click", () => {
             document.querySelectorAll(".filter-checkbox").forEach(cb => cb.checked = false);
             activeFilters = {};
+            currentPage = 1;
             applyFiltersAndRender();
         });
     }
@@ -131,8 +138,15 @@ document.addEventListener("DOMContentLoaded", () => {
     function renderTable(data) {
         const tableBody = document.getElementById("tableBody");
         tableBody.innerHTML = "";
+        const rows = Array.isArray(data) ? data : [];
+        const totalPages = Math.max(1, Math.ceil(rows.length / entriesPerPage));
+        if (currentPage > totalPages) currentPage = totalPages;
+        if (currentPage < 1) currentPage = 1;
+        const start = (currentPage - 1) * entriesPerPage;
+        const pageRows = rows.slice(start, start + entriesPerPage);
+        renderPagination(totalPages, rows.length);
 
-        if (!data.length) {
+        if (!pageRows.length) {
             tableBody.innerHTML = `
                 <tr>
                     <td colspan="4" class="text-center text-muted">No archived residents found</td>
@@ -141,7 +155,7 @@ document.addEventListener("DOMContentLoaded", () => {
             return;
         }
 
-        data.forEach(resident => {
+        pageRows.forEach(resident => {
             const archivedDate = resident.archived_at ?? "N/A";
             tableBody.innerHTML += `
                 <tr>
@@ -160,6 +174,54 @@ document.addEventListener("DOMContentLoaded", () => {
                     </td>
                 </tr>
             `;
+        });
+    }
+
+    function renderPagination(totalPages, totalRows) {
+        if (!paginationEl) return;
+        paginationEl.innerHTML = "";
+
+        const addBtn = (label, page, disabled = false, active = false) => {
+            const li = document.createElement("li");
+            li.className = `page-item${disabled ? " disabled" : ""}${active ? " active" : ""}`;
+            const btn = document.createElement("button");
+            btn.type = "button";
+            btn.className = `page-link${active ? " fw-bold" : ""}`;
+            btn.textContent = label;
+            btn.disabled = disabled;
+            btn.addEventListener("click", () => {
+                if (disabled || page === currentPage) return;
+                currentPage = page;
+                applyFiltersAndRender();
+            });
+            li.appendChild(btn);
+            paginationEl.appendChild(li);
+        };
+
+        if (totalRows <= 0) {
+            addBtn("<", 1, true, false);
+            addBtn("1", 1, false, true);
+            addBtn(">", 1, true, false);
+            return;
+        }
+
+        addBtn("<", Math.max(1, currentPage - 1), currentPage <= 1, false);
+        let startPage = Math.max(1, currentPage - 2);
+        let endPage = Math.min(totalPages, startPage + 4);
+        if (endPage - startPage < 4) startPage = Math.max(1, endPage - 4);
+        for (let p = startPage; p <= endPage; p += 1) {
+            addBtn(String(p), p, false, p === currentPage);
+        }
+        addBtn(">", Math.min(totalPages, currentPage + 1), currentPage >= totalPages, false);
+    }
+
+    if (entriesPerPageInput) {
+        entriesPerPageInput.addEventListener("change", () => {
+            const next = Math.max(1, Number.parseInt(entriesPerPageInput.value || "20", 10) || 20);
+            entriesPerPage = next;
+            entriesPerPageInput.value = String(next);
+            currentPage = 1;
+            applyFiltersAndRender();
         });
     }
 
