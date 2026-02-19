@@ -19,14 +19,38 @@ body {
 }
 
 .application-card {
-    width: 100%;
-    max-width: 900px;
+    width: 90%;
+    max-width: none;
     margin-left: auto;
     margin-right: auto;
     background-color: #ffffff;
-    border: 1.5px solid #FE993C;
+    border: 1.5px solid #fc8b20;
     border-radius: 14px;
     padding: 36px;
+}
+
+.application-card.application-card--muted {
+    max-width: 1040px;
+    background-color: #fffdfb;
+    border-color: #f2b37a;
+}
+
+.application-card.application-card--muted .form-title {
+    color: #e57f27;
+}
+
+.application-card.application-card--muted .form-subtitle {
+    color: #7a7a7a;
+}
+
+.application-card.application-card--muted .form-row input,
+.application-card.application-card--muted .form-row select,
+.application-card.application-card--muted .form-row textarea {
+    border-color: #bcbcbc;
+}
+
+.application-card.application-card--full {
+    width: 90%;
 }
 
 /* Navigation */
@@ -42,7 +66,7 @@ body {
 .form-title {
     font-family: 'Charis SIL Bold', serif;
     text-align: center;
-    color: #FE993C;
+    color: #de710c !important;
     margin-bottom: 6px;
     font-weight: bold !important;
     font-size: 36px;
@@ -111,6 +135,23 @@ body {
     border-color: #e8872f;
 }
 
+/* Muted readonly / disabled fields */
+.application-card input[readonly],
+.application-card textarea[readonly],
+.application-card select[disabled],
+.application-card input:disabled,
+.form-row input[readonly],
+.form-row textarea[readonly],
+.form-row select[disabled],
+.form-row input:disabled,
+.status-row input[readonly],
+.status-row input:disabled {
+    background-color: #f3f4f6 !important;
+    color: #6b7280 !important;
+    border-color: #d1d5db !important;
+    cursor: not-allowed;
+}
+
 /* Column Spans */
 .full-width {
     grid-column: span 4;
@@ -160,6 +201,67 @@ body {
     justify-content: flex-start;
     align-items: center;
     margin-top: 28px;
+}
+
+/* Agreement checkbox as toggle switch (scoped only to agreement row) */
+.agreement-row input[type="checkbox"] {
+    appearance: none;
+    -webkit-appearance: none;
+    width: 58px;
+    height: 28px;
+    border-radius: 999px;
+    border: 1px solid #c7c7c7;
+    background: #d7d7d7;
+    position: relative;
+    cursor: pointer;
+    transition: background-color 0.2s ease, border-color 0.2s ease;
+    flex: 0 0 auto;
+}
+
+.agreement-row input[type="checkbox"]::before {
+    content: "";
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    background: #ffffff;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25);
+    transition: transform 0.2s ease;
+}
+
+.agreement-row input[type="checkbox"]::after {
+    content: "OFF";
+    position: absolute;
+    right: 8px;
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 0.3px;
+    color: #555555;
+}
+
+.agreement-row input[type="checkbox"]:checked {
+    background: #FE993C;
+    border-color: #FE993C;
+}
+
+.agreement-row input[type="checkbox"]:checked::before {
+    transform: translateX(30px);
+}
+
+.agreement-row input[type="checkbox"]:checked::after {
+    content: "ON";
+    left: 10px;
+    right: auto;
+    color: #ffffff;
+}
+
+.agreement-row input[type="checkbox"]:focus-visible {
+    outline: 2px solid rgba(254, 153, 60, 0.35);
+    outline-offset: 2px;
 }
 
 .agreement-text {
@@ -234,6 +336,7 @@ body {
 /* Responsiveness */
 @media (max-width: 768px) {
     .application-card {
+        width: 100%;
         padding: 24px;
     }
     .form-row {
