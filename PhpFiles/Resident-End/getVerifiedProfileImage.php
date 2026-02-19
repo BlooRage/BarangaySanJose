@@ -16,7 +16,8 @@ if (empty($_SESSION['user_id'])) {
 
 require_once __DIR__ . '/../General/connection.php';
 
-$profileImage = '../Images/Profile-Placeholder.png';
+$baseUrl = '/BarangaySanJose';
+$profileImage = $baseUrl . '/Images/Profile-Placeholder.png';
 $residentId = '';
 
 if (!function_exists('toPublicPath')) {
@@ -47,7 +48,7 @@ function toPublicPath($path): ?string {
     $markerPos = stripos($normalized, $marker);
     if ($markerPos !== false) {
         $public = substr($normalized, $markerPos);
-        return '..' . $public;
+        return $baseUrl . $public;
     }
 
     if (strpos($normalized, '/BarangaySanJose/') === 0) {
@@ -65,11 +66,11 @@ function toPublicPath($path): ?string {
             if ($rel[0] !== '/') {
                 $rel = '/' . $rel;
             }
-            return '../' . ltrim($rel, '/');
+            return $baseUrl . $rel;
         }
     }
 
-    return '../' . ltrim($normalized, '/');
+    return $baseUrl . '/' . ltrim($normalized, '/');
 }
 }
 
