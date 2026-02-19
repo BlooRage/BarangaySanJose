@@ -31,16 +31,16 @@ $useraccountstbl = $data['useraccountstbl'] ?? [];
 
         <?php include __DIR__ . '/../includes/resident_sidebar.php'; ?>
 
-        <main id="div-mainDisplay" class="flex-grow-1 px-4 pb-4 pt-0 px-md-5 pb-md-5 pt-md-0 bg-light">
+        <main id="div-mainDisplay" class="flex-grow-1 px-4 pb-4 pt-0 px-md-5 bg-light">
 
-            <div class="main-head application-card orange-card py-3 rounded">
+            <div class="main-head application-card orange-card py-3 my-md-5 rounded">
                 <div class="main-head-content">
 
                     <a href="javascript:history.back()" class="back-link">&lt; Go Back</a>
                     <h1 class="form-title">Cohabitation</h1>
                     <p class="form-subtitle">All fields marked with <span class="required-asterisk">*</span> are required</p>
 
-                    <form method="POST" action="">
+                    <form method="POST" action="" id="cohabitationForm">
 
                         <!-- PERSONAL INFORMATION -->
                         <h2 class="section-title text-center text-dark">Personal Information</h2>
@@ -142,10 +142,11 @@ $useraccountstbl = $data['useraccountstbl'] ?? [];
 
                                 <div class="agreement-row">
                                     <label class="agreement-text check-item">
-                                        <input type="checkbox" required>I hereby certify that the above information is true and correct to the best of my knowledge and belief.
+                                        <input type="checkbox" id="cohabitationAgree" name="cohabitationAgree" required>
+                                        I hereby certify that the above information is true and correct to the best of my knowledge and belief.
                                     </label>
 
-                                    <button type="submit" class="submit-btn">SUBMIT</button>
+                                    <button type="submit" class="submit-btn" id="cohabitationSubmit" disabled>SUBMIT</button>
                                 </div>
 
                     </form>
@@ -155,6 +156,7 @@ $useraccountstbl = $data['useraccountstbl'] ?? [];
 
     </div>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="/BarangaySanJose/JS-Script-Files/Resident-End/Certificates/cohabitationFormScript.js"></script>
 </body>
 
 </html>
