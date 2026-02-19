@@ -1,22 +1,22 @@
 @font-face {
     font-family: 'Charis SIL Regular';
-    src: url(../Fonts/Charis-SIL/CharisSIL-Regular.ttf);
+    src: url(/BarangaySanJose/Fonts/Charis-SIL/CharisSIL-Regular.ttf) format('truetype');
 }
 @font-face {
     font-family: 'Charis SIL Bold';
-    src: url(../Fonts/Charis-SIL/CharisSIL-Bold.ttf);
+    src: url(/BarangaySanJose/Fonts/Charis-SIL/CharisSIL-Bold.ttf) format('truetype');
 }
 @font-face {
     font-family: 'Charis SIL Bold Italic';
-    src: url(../Fonts/Charis-SIL/CharisSIL-BoldItalic.ttf);
+    src: url(/BarangaySanJose/Fonts/Charis-SIL/CharisSIL-BoldItalic.ttf) format('truetype');
 }
 @font-face {
     font-family: 'Charis SIL Italic';
-    src: url(../Fonts/Charis-SIL/CharisSIL-Italic.ttf);
+    src: url(/BarangaySanJose/Fonts/Charis-SIL/CharisSIL-Italic.ttf) format('truetype');
 }
 @font-face {
     font-family: 'Geist';
-    src: url(../Fonts/Geist/Geist-VariableFont_wght.ttf);
+    src: url(/BarangaySanJose/Fonts/Geist/Geist-VariableFont_wght.ttf) format('truetype');
 }
 
 #div-sidebarWrapper {

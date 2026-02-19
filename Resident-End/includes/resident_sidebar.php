@@ -14,9 +14,9 @@
     <!-- Bootstrap Icons (for logout icon) -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons/font/bootstrap-icons.css" rel="stylesheet" />
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
-    <link rel="stylesheet" href="../CSS-Styles/Guest-End-CSS/GeneralStyle.css">
-    <link rel="stylesheet" href="../CSS-Styles/Resident-End-CSS/residentDashboard.css">
-    <link rel="stylesheet" href="../CSS-Styles/NavbarFooterStyle.css">
+    <link rel="stylesheet" href="/BarangaySanJose/CSS-Styles/Guest-End-CSS/GeneralStyle.css">
+    <link rel="stylesheet" href="/BarangaySanJose/CSS-Styles/Resident-End-CSS/residentDashboard.css">
+    <link rel="stylesheet" href="/BarangaySanJose/CSS-Styles/NavbarFooterStyle.css">
 </head>
 
 
@@ -25,7 +25,7 @@
 if (session_status() === PHP_SESSION_NONE) {
   session_start();
 }
-require_once "../PhpFiles/General/connection.php";
+require_once __DIR__ . "/../../PhpFiles/General/connection.php";
 
 $current = basename($_SERVER['PHP_SELF']);
 
@@ -34,7 +34,8 @@ function activeLink($page, $current) {
 }
 
 $displayName = "Resident";
-$profileImage = '../Images/Profile-Placeholder.png';
+$baseUrl = '/BarangaySanJose';
+$profileImage = $baseUrl . '/Images/Profile-Placeholder.png';
 $residentId = '';
 $isHeadOfFamily = false;
 
@@ -66,7 +67,7 @@ function toPublicPath($path): ?string {
   $markerPos = stripos($normalized, $marker);
   if ($markerPos !== false) {
     $public = substr($normalized, $markerPos);
-    return '..' . $public;
+    return $baseUrl . $public;
   }
 
   $webRoot = realpath(__DIR__ . "/../..");
@@ -80,11 +81,11 @@ function toPublicPath($path): ?string {
       if ($rel[0] !== '/') {
         $rel = '/' . $rel;
       }
-      return '../' . ltrim($rel, '/');
+      return $baseUrl . $rel;
     }
   }
 
-  return '../' . ltrim($normalized, '/');
+  return $baseUrl . '/' . ltrim($normalized, '/');
 }
 }
 
@@ -155,8 +156,8 @@ if ($residentId !== '' && isset($conn) && $conn instanceof mysqli) {
        class="d-flex flex-column flex-shrink-0 p-3 bg-white border-end shadow-sm">
 
   <!-- LOGO HEADER (ADMIN-STYLE) -->
-  <a href="AdminDashboard.php" class="d-flex align-items-center pb-3 mb-3 link-dark text-decoration-none border-bottom">
-    <img src="../Images/San_Jose_LOGO.jpg" class="me-2" style="width: 32px; height: 32px;">
+  <a href="/BarangaySanJose/Resident-End/AdminDashboard.php" class="d-flex align-items-center pb-3 mb-3 link-dark text-decoration-none border-bottom">
+    <img src="/BarangaySanJose/Images/San_Jose_LOGO.jpg" class="me-2" style="width: 32px; height: 32px;">
     <span class="fs-5 fw-semibold logo-name">Barangay San Jose</span>
   </a>
 
@@ -179,7 +180,7 @@ if ($residentId !== '' && isset($conn) && $conn instanceof mysqli) {
 
       <div id="group-navHome" class="mb-3">
         <p class="text-muted small fw-bold mb-1">Home</p>
-        <a href="resident_dashboard.php"
+        <a href="/BarangaySanJose/Resident-End/resident_dashboard.php"
            class="a-sidebarLink <?= activeLink('resident_dashboard.php', $current) ?>">
           <i class="fa-solid fa-newspaper"></i>Dashboard
         </a>
@@ -187,23 +188,23 @@ if ($residentId !== '' && isset($conn) && $conn instanceof mysqli) {
 
       <div id="group-navServices" class="mb-3">
         <p class="text-muted small fw-bold mb-1">Services</p>
-        <a href="ApplicationsLandingPage.php"
+        <a href="/BarangaySanJose/Resident-End/ApplicationsLandingPage.php"
            class="a-sidebarLink <?= activeLink('resident_certificates.php', $current) ?>">
           <i class="fa-solid fa-certificate"></i>Certificates
         </a>
-        <a href="Clearances.php"
+        <a href="/BarangaySanJose/Resident-End/Clearances.php"
            class="a-sidebarLink <?= activeLink('resident_clearances.php', $current) ?>">
           <i class="fa-solid fa-file-circle-check fa-sm"></i>Clearances
         </a>
-        <a href="resident_barangay_id.php"
+        <a href="/BarangaySanJose/Resident-End/resident_barangay_id.php"
            class="a-sidebarLink <?= activeLink('resident_barangay_id.php', $current) ?>">
           <i class="fa-solid fa-id-badge fa-lg"></i>Barangay ID
         </a>
-        <a href="resident_complaints.php"
+        <a href="/BarangaySanJose/Resident-End/resident_complaints.php"
            class="a-sidebarLink <?= activeLink('resident_complaints.php', $current) ?>">
           <i class="fa-solid fa-comment-dots"></i>Complaints
         </a>
-        <a href="resident_appointments.php"
+        <a href="/BarangaySanJose/Resident-End/resident_appointments.php"
            class="a-sidebarLink <?= activeLink('resident_appointments.php', $current) ?>">
           <i class="fa-regular fa-calendar-days"></i>Appointments
         </a>
@@ -211,11 +212,11 @@ if ($residentId !== '' && isset($conn) && $conn instanceof mysqli) {
 
       <div id="group-navInfo" class="mb-3">
         <p class="text-muted small fw-bold mb-1">Info</p>
-        <a href="resident_certificates.php"
+        <a href="/BarangaySanJose/Resident-End/resident_certificates.php"
            class="a-sidebarLink <?= activeLink('resident_certificates.php', $current) ?>">
           <i class="fa-solid fa-bullhorn"></i>Announcements
         </a>
-        <a href="resident_transactions.php"
+        <a href="/BarangaySanJose/Resident-End/resident_transactions.php"
            class="a-sidebarLink <?= activeLink('resident_transactions.php', $current) ?>">
           <i class="fa-solid fa-clock-rotate-left"></i>Transactions
         </a>
@@ -226,11 +227,11 @@ if ($residentId !== '' && isset($conn) && $conn instanceof mysqli) {
 
     <div class="sidebar-actions">
       <a class="account-button btn btn-sm w-100 mb-2"
-         href="resident_profile.php">
+         href="/BarangaySanJose/Resident-End/resident_profile.php">
         <i class="fa-solid fa-circle-user"></i> Account
       </a>
       <a class="btn btn-danger btn-sm w-100 logout-link"
-         href="../PhpFiles/Login/logout.php"
+         href="/BarangaySanJose/PhpFiles/Login/logout.php"
          data-logout-message="Are you sure you want to logout?">
         <i class="bi bi-box-arrow-right me-1"></i> Logout
       </a>
@@ -306,7 +307,7 @@ if ($residentId !== '' && isset($conn) && $conn instanceof mysqli) {
 
     const poll = async () => {
       try {
-        const res = await fetch("../PhpFiles/Resident-End/getVerifiedProfileImage.php", {
+        const res = await fetch("/BarangaySanJose/PhpFiles/Resident-End/getVerifiedProfileImage.php", {
           headers: { "Accept": "application/json" }
         });
         if (!res.ok) return;

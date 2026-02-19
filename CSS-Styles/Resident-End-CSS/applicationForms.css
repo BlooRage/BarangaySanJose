@@ -1,4 +1,23 @@
-* {
+@font-face {
+    font-family: 'Charis SIL Regular';
+    src: url(../../Fonts/Charis-SIL/CharisSIL-Regular.ttf);
+}
+@font-face {
+    font-family: 'Charis SIL Bold';
+    src: url(../../Fonts/Charis-SIL/CharisSIL-Bold.ttf);
+}
+@font-face {
+    font-family: 'Charis SIL Bold Italic';
+    src: url(../../Fonts/Charis-SIL/CharisSIL-BoldItalic.ttf);
+}
+@font-face {
+    font-family: 'Charis SIL Italic';
+    src: url(../../Fonts/Charis-SIL/CharisSIL-Italic.ttf);
+}
+@font-face {
+    font-family: 'Geist';
+    src: url(../../Fonts/Geist/Geist-VariableFont_wght.ttf);
+}* {
     box-sizing: border-box;
 }
 

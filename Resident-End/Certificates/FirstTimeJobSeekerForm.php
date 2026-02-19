@@ -1,6 +1,6 @@
 ﻿<?php
 $allowUnregistered = false;
-require_once __DIR__ . "/includes/resident_access_guard.php";
+require_once __DIR__ . "/../includes/resident_access_guard.php";
 
 $residentinformationtbl = [
     'firstname' => 'Juan',
