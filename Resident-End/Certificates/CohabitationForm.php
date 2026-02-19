@@ -4,7 +4,8 @@ require_once __DIR__ . "/../includes/resident_access_guard.php";
 
 require_once __DIR__ . "/../../PhpFiles/GET/getResidentProfile.php";
 
-$data = getResidentProfileData($conn, $_SESSION['user_id']);
+$userId = $_SESSION['user_id'] ?? '';
+$data = getResidentProfileData($conn, $userId);
 $residentinformationtbl = $data['residentinformationtbl'] ?? [];
 $residentaddresstbl = $data['residentaddresstbl'] ?? [];
 $useraccountstbl = $data['useraccountstbl'] ?? [];
@@ -36,7 +37,7 @@ $useraccountstbl = $data['useraccountstbl'] ?? [];
             <div class="main-head application-card orange-card py-3 my-md-5 rounded">
                 <div class="main-head-content">
 
-                    <a href="javascript:history.back()" class="back-link">&lt; Go Back</a>
+                    <a href="/BarangaySanJose/Resident-End/ApplicationsLandingPage.php" class="back-link">&lt; Go Back</a>
                     <h1 class="form-title">Cohabitation</h1>
                     <p class="form-subtitle">All fields marked with <span class="required-asterisk">*</span> are required</p>
 
@@ -160,6 +161,7 @@ $useraccountstbl = $data['useraccountstbl'] ?? [];
 </body>
 
 </html>
+
 
 
 

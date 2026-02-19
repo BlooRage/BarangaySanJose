@@ -41,6 +41,8 @@ $isHeadOfFamily = false;
 
 if (!function_exists('toPublicPath')) {
 function toPublicPath($path): ?string {
+  global $baseUrl;
+
   $path = trim((string)$path);
   if ($path === '') {
     return null;

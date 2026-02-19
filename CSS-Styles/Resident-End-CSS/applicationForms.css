@@ -212,6 +212,37 @@ body {
     width: 100%;
 }
 
+.beneficiary-block {
+    border: 1px solid #e2e2e2;
+    border-radius: 10px;
+    padding: 14px 16px;
+    background-color: #fafafa;
+}
+
+.beneficiary-question {
+    margin-bottom: 10px;
+    line-height: 1.4;
+}
+
+.beneficiary-options {
+    display: flex;
+    gap: 18px;
+    flex-wrap: wrap;
+}
+
+.beneficiary-option {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    margin: 0;
+    color: #333;
+    font-size: 14px;
+}
+
+.beneficiary-option input[type="radio"] {
+    margin: 0;
+}
+
 /* Footer & Button */
 .agreement-row {
     display: flex;
@@ -251,7 +282,6 @@ body {
 }
 
 .agreement-row input[type="checkbox"]::after {
-    content: "OFF";
     position: absolute;
     right: 8px;
     top: 50%;
@@ -272,7 +302,6 @@ body {
 }
 
 .agreement-row input[type="checkbox"]:checked::after {
-    content: "ON";
     left: 10px;
     right: auto;
     color: #ffffff;

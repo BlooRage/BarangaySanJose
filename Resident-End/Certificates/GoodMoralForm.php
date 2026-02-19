@@ -1,4 +1,4 @@
-<!-- THIS FORM IS FOR APPOINTMENTFORM.PHP. IGNORE THIS FILE FOR NOW. -->
+﻿<!-- THIS FORM IS FOR APPOINTMENTFORM.PHP. IGNORE THIS FILE FOR NOW. -->
 
 <!-- <?php
 $allowUnregistered = false;
@@ -69,7 +69,7 @@ $useraccountstbl = [
             <div class="main-head application-card orange-card py-3 rounded application-card--muted">
                 <div class="main-head-content">
 
-                    <a href="javascript:history.back()" class="back-link">&lt; Go Back</a>
+                    <a href="/BarangaySanJose/Resident-End/ApplicationsLandingPage.php" class="back-link">&lt; Go Back</a>
                     <h1 class="form-title">Good Moral</h1>
                     <p class="form-subtitle">All fields marked with <span class="required-asterisk">*</span> are required</p>
 
