@@ -4,12 +4,422 @@ document.addEventListener("DOMContentLoaded", () => {
     const submitBtn = document.getElementById("cohabitationSubmit");
     if (!form || !agree || !submitBtn) return;
 
+    const applicantUnit = document.getElementById("unitNumber");
+    const applicantHouse = document.getElementById("houseNumber");
+    const applicantStreet = document.getElementById("streetName");
+    const applicantSubdivision = document.getElementById("applicantSubdivision");
+    const applicantArea = document.getElementById("applicantAreaNumber");
+
+    const cohabSameAddress = document.getElementById("cohabitantSameAddress");
+    const cohabitantAddressSystem = document.getElementById("cohabitantAddressSystem");
+    const cohabitantHouseWrapper = document.getElementById("cohabitantHouseSystemWrapper");
+    const cohabitantLotWrapper = document.getElementById("cohabitantLotBlockSystemWrapper");
+    const cohabitantLocationWrapper = document.getElementById("cohabitantLocationWrapper");
+
+    const cohabUnit = document.getElementById("cohabUnitNumber");
+    const cohabHouse = document.getElementById("cohabHouseNumber");
+    const cohabStreet = document.getElementById("cohabStreetName");
+    const cohabSubdivision = document.getElementById("cohabSubdivision");
+    const cohabUnitLot = document.getElementById("cohabUnitNumberLot");
+    const cohabLot = document.getElementById("cohabLotNumber");
+    const cohabBlock = document.getElementById("cohabBlockNumber");
+    const cohabPhase = document.getElementById("cohabPhaseNumber");
+
+    const cohabitantProvince = document.getElementById("cohabitantProvince");
+    const cohabitantCity = document.getElementById("cohabitantCity");
+    const cohabitantBarangay = document.getElementById("cohabitantBarangay");
+    const cohabitantPostal = document.getElementById("cohabitantPostalCode");
+    const cohabitantRegionSelect = document.getElementById("cohabitantRegionSelect");
+
+    const cohabitationSameAddress = document.getElementById("cohabitationSameAddress");
+    const cohabitationAddressSystem = document.getElementById("cohabitationAddressSystem");
+    const cohabitationHouseWrapper = document.getElementById("cohabitationHouseSystemWrapper");
+    const cohabitationLotWrapper = document.getElementById("cohabitationLotBlockSystemWrapper");
+
+    const cohabitationUnit = document.getElementById("cohabitationUnitNumber");
+    const cohabitationHouse = document.getElementById("cohabitationHouseNumber");
+    const cohabitationStreet = document.getElementById("cohabitationStreetName");
+    const cohabitationSubdivision = document.getElementById("cohabitationSubdivision");
+    const cohabitationArea = document.getElementById("cohabitationAreaNumber");
+    const cohabitationUnitLot = document.getElementById("cohabitationUnitNumberLot");
+    const cohabitationLot = document.getElementById("cohabitationLotNumber");
+    const cohabitationBlock = document.getElementById("cohabitationBlockNumber");
+    const cohabitationPhase = document.getElementById("cohabitationPhaseNumber");
+    const cohabitationSubdivisionLot = document.getElementById("cohabitationSubdivisionLot");
+    const cohabitationAreaLot = document.getElementById("cohabitationAreaNumberLot");
+
+    const setReadOnly = (el, isReadOnly) => {
+        if (!el) return;
+        if (el.tagName === "SELECT") {
+            el.disabled = isReadOnly;
+        } else {
+            el.readOnly = isReadOnly;
+        }
+        if (isReadOnly) {
+            el.classList.add("text-bg-light");
+        } else {
+            el.classList.remove("text-bg-light");
+        }
+    };
+
+    const setWrapperState = (wrapper, enabled) => {
+        if (!wrapper) return;
+        wrapper.classList.toggle("d-none", !enabled);
+        wrapper.querySelectorAll("input, select").forEach((el) => {
+            el.disabled = !enabled;
+            if (!enabled) {
+                el.value = "";
+                if (el.type === "checkbox" || el.type === "radio") el.checked = false;
+            }
+        });
+    };
+
+    const setRequired = (el, required) => {
+        if (!el) return;
+        if (required) el.setAttribute("required", "required");
+        else el.removeAttribute("required");
+    };
+
+    const lockSelect = (el, locked, value) => {
+        if (!el) return;
+        if (locked) {
+            el.dataset.locked = "true";
+            if (value !== undefined) el.value = value;
+            el.classList.add("text-bg-light");
+        } else {
+            delete el.dataset.locked;
+            el.classList.remove("text-bg-light");
+        }
+    };
+
+    const applyCohabitantAddressSystem = () => {
+        const val = cohabitantAddressSystem ? cohabitantAddressSystem.value : "";
+        setWrapperState(cohabitantHouseWrapper, val === "house");
+        setWrapperState(cohabitantLotWrapper, val === "lot_block");
+        if (cohabitantLocationWrapper) {
+            cohabitantLocationWrapper.classList.toggle("d-none", !val);
+        }
+
+        setRequired(cohabHouse, val === "house");
+        setRequired(cohabStreet, val === "house");
+
+        setRequired(cohabLot, val === "lot_block");
+        setRequired(cohabBlock, val === "lot_block");
+        setRequired(cohabPhase, val === "lot_block");
+    };
+
+    const applyCohabitationAddressSystem = () => {
+        const val = cohabitationAddressSystem ? cohabitationAddressSystem.value : "";
+        setWrapperState(cohabitationHouseWrapper, val === "house");
+        setWrapperState(cohabitationLotWrapper, val === "lot_block");
+
+        setRequired(cohabitationHouse, val === "house");
+        setRequired(cohabitationStreet, val === "house");
+        setRequired(cohabitationArea, val === "house");
+
+        setRequired(cohabitationLot, val === "lot_block");
+        setRequired(cohabitationBlock, val === "lot_block");
+        setRequired(cohabitationPhase, val === "lot_block");
+        setRequired(cohabitationAreaLot, val === "lot_block");
+    };
+
+    const fillFromApplicant = (targets) => {
+        const unit = applicantUnit?.value || "";
+        const house = applicantHouse?.value || "";
+        const street = applicantStreet?.value || "";
+        const subdivision = applicantSubdivision?.value || "";
+        const area = applicantArea?.value || "";
+        if (targets.unit) targets.unit.value = unit;
+        if (targets.house) targets.house.value = house;
+        if (targets.street) targets.street.value = street;
+        if (targets.subdivision) targets.subdivision.value = subdivision;
+        if (targets.area) targets.area.value = area;
+    };
+
+    let regionIndex = null;
+
+    const buildRegionIndex = (data) => {
+        const index = {};
+        if (!data || typeof data !== "object") return index;
+        Object.values(data).forEach((region) => {
+            const regionName = region?.region_name;
+            if (!regionName) return;
+            const provinces = region?.province_list || {};
+            const provinceIndex = {};
+            Object.entries(provinces).forEach(([provinceName, provinceData]) => {
+                const municipalityList = provinceData?.municipality_list || {};
+                const cityIndex = {};
+                Object.entries(municipalityList).forEach(([cityName, cityData]) => {
+                    cityIndex[cityName] = cityData?.barangay_list || [];
+                });
+                provinceIndex[provinceName] = cityIndex;
+            });
+            index[regionName] = provinceIndex;
+        });
+        return index;
+    };
+
+    const populateRegions = (selectedRegion = "") => {
+        if (!cohabitantRegionSelect || !regionIndex) return;
+        const regions = Object.keys(regionIndex).sort((a, b) => a.localeCompare(b));
+        cohabitantRegionSelect.innerHTML = "";
+
+        const placeholder = document.createElement("option");
+        placeholder.value = "";
+        placeholder.textContent = "Select";
+        cohabitantRegionSelect.appendChild(placeholder);
+
+        regions.forEach((region) => {
+            const opt = document.createElement("option");
+            opt.value = region;
+            opt.textContent = region;
+            if (selectedRegion && selectedRegion === region) opt.selected = true;
+            cohabitantRegionSelect.appendChild(opt);
+        });
+    };
+
+    const populateProvinces = (region, selectedProvince = "") => {
+        if (!cohabitantProvince || !regionIndex) return;
+        const provinces = regionIndex[region] ? Object.keys(regionIndex[region]) : [];
+        const sorted = [...provinces].sort((a, b) => a.localeCompare(b));
+        cohabitantProvince.innerHTML = "";
+
+        const placeholder = document.createElement("option");
+        placeholder.value = "";
+        placeholder.textContent = sorted.length ? "Select" : "Select region first";
+        cohabitantProvince.appendChild(placeholder);
+
+        sorted.forEach((province) => {
+            const opt = document.createElement("option");
+            opt.value = province;
+            opt.textContent = province;
+            if (selectedProvince && selectedProvince === province) opt.selected = true;
+            cohabitantProvince.appendChild(opt);
+        });
+    };
+
+    const populateCities = (region, province, selectedCity = "") => {
+        if (!cohabitantCity) return;
+        const cities =
+            regionIndex &&
+            regionIndex[region] &&
+            regionIndex[region][province]
+                ? Object.keys(regionIndex[region][province])
+                : [];
+        const sortedCities = [...cities].sort((a, b) => a.localeCompare(b));
+        cohabitantCity.innerHTML = "";
+
+        const placeholder = document.createElement("option");
+        placeholder.value = "";
+        placeholder.textContent = sortedCities.length ? "Select" : "Select province first";
+        cohabitantCity.appendChild(placeholder);
+
+        sortedCities.forEach((city) => {
+            const opt = document.createElement("option");
+            opt.value = city;
+            opt.textContent = city;
+            if (selectedCity && selectedCity === city) opt.selected = true;
+            cohabitantCity.appendChild(opt);
+        });
+    };
+
+    const populateBarangays = (region, province, city, selectedBarangay = "") => {
+        if (!cohabitantBarangay) return;
+        const barangays =
+            regionIndex &&
+            regionIndex[region] &&
+            regionIndex[region][province] &&
+            regionIndex[region][province][city]
+                ? regionIndex[region][province][city]
+                : [];
+        const sorted = [...barangays].sort((a, b) => a.localeCompare(b));
+        cohabitantBarangay.innerHTML = "";
+
+        const placeholder = document.createElement("option");
+        placeholder.value = "";
+        placeholder.textContent = sorted.length ? "Select" : "Select city first";
+        cohabitantBarangay.appendChild(placeholder);
+
+        sorted.forEach((brgy) => {
+            const opt = document.createElement("option");
+            opt.value = brgy;
+            opt.textContent = brgy;
+            if (selectedBarangay && selectedBarangay === brgy) opt.selected = true;
+            cohabitantBarangay.appendChild(opt);
+        });
+    };
+
+
+    const syncCohabitantAddress = () => {
+        if (!cohabSameAddress || !cohabitantAddressSystem) return;
+        const useApplicant = cohabSameAddress.checked;
+
+        if (useApplicant) {
+            lockSelect(cohabitantAddressSystem, true, "house");
+            applyCohabitantAddressSystem();
+            fillFromApplicant({
+                unit: cohabUnit,
+                house: cohabHouse,
+                street: cohabStreet,
+                subdivision: cohabSubdivision
+            });
+
+            lockSelect(cohabitantRegionSelect, true, "REGION IV-A");
+            populateProvinces("REGION IV-A", "RIZAL");
+            lockSelect(cohabitantProvince, true, "RIZAL");
+            populateCities("REGION IV-A", "RIZAL", "RODRIGUEZ (MONTALBAN)");
+            lockSelect(cohabitantCity, true, "RODRIGUEZ (MONTALBAN)");
+            populateBarangays("REGION IV-A", "RIZAL", "RODRIGUEZ (MONTALBAN)");
+            if (cohabitantRegionSelect) {
+                cohabitantRegionSelect.value = "REGION IV-A";
+            }
+        } else {
+            lockSelect(cohabitantAddressSystem, false);
+            lockSelect(cohabitantProvince, false);
+            lockSelect(cohabitantCity, false);
+            lockSelect(cohabitantRegionSelect, false);
+        }
+
+        [cohabUnit, cohabHouse, cohabStreet, cohabSubdivision].forEach((el) => setReadOnly(el, useApplicant));
+    };
+
+    const syncCohabitationAddress = () => {
+        if (!cohabitationSameAddress || !cohabitationAddressSystem) return;
+        const useApplicant = cohabitationSameAddress.checked;
+
+        if (useApplicant) {
+            lockSelect(cohabitationAddressSystem, true, "house");
+            applyCohabitationAddressSystem();
+            fillFromApplicant({
+                unit: cohabitationUnit,
+                house: cohabitationHouse,
+                street: cohabitationStreet,
+                subdivision: cohabitationSubdivision,
+                area: cohabitationArea
+            });
+        } else {
+            lockSelect(cohabitationAddressSystem, false);
+        }
+
+        [cohabitationUnit, cohabitationHouse, cohabitationStreet, cohabitationSubdivision, cohabitationArea].forEach((el) => setReadOnly(el, useApplicant));
+    };
+
     const updateSubmitState = () => {
         const isValid = form.checkValidity();
         submitBtn.disabled = !(agree.checked && isValid);
     };
 
+    if (cohabitantAddressSystem) {
+        cohabitantAddressSystem.addEventListener("change", (e) => {
+            if (cohabitantAddressSystem.dataset.locked === "true") {
+                e.target.value = "house";
+                return;
+            }
+            applyCohabitantAddressSystem();
+            updateSubmitState();
+        });
+        applyCohabitantAddressSystem();
+    }
+
+    const initAddressData = async () => {
+        try {
+            const res = await fetch("/BarangaySanJose/JS-Script-Files/Resident-End/Certificates/data/cluster.json", {
+                cache: "no-store"
+            });
+            if (!res.ok) return;
+            const data = await res.json();
+            regionIndex = buildRegionIndex(data);
+            populateRegions(cohabitantRegionSelect?.value || "");
+            if (cohabitantRegionSelect?.value) {
+                populateProvinces(cohabitantRegionSelect.value, cohabitantProvince?.value || "");
+            }
+            if (cohabitantRegionSelect?.value && cohabitantProvince?.value) {
+                populateCities(cohabitantRegionSelect.value, cohabitantProvince.value, cohabitantCity?.value || "");
+            }
+            if (cohabitantRegionSelect?.value && cohabitantProvince?.value && cohabitantCity?.value) {
+                populateBarangays(
+                    cohabitantRegionSelect.value,
+                    cohabitantProvince.value,
+                    cohabitantCity.value,
+                    cohabitantBarangay?.value || ""
+                );
+            }
+
+            syncCohabitantAddress();
+        } catch (err) {
+            // silently fail; fallback keeps existing placeholders
+        }
+    };
+
+    if (cohabitantRegionSelect) {
+        cohabitantRegionSelect.addEventListener("change", (e) => {
+            if (cohabitantRegionSelect.dataset.locked === "true") {
+                e.target.value = cohabitantRegionSelect.value || "REGION IV-A";
+                return;
+            }
+            populateProvinces(e.target.value);
+            populateCities(e.target.value, "");
+            populateBarangays("", "", "");
+            updateSubmitState();
+        });
+    }
+
+    if (cohabitantProvince) {
+        cohabitantProvince.addEventListener("change", (e) => {
+            if (cohabitantProvince.dataset.locked === "true") {
+                e.target.value = cohabitantProvince.value || "RIZAL";
+                return;
+            }
+            const region = cohabitantRegionSelect ? cohabitantRegionSelect.value : "";
+            populateCities(region, e.target.value);
+            populateBarangays("", "", "");
+            updateSubmitState();
+        });
+    }
+
+    if (cohabitantCity) {
+        cohabitantCity.addEventListener("change", (e) => {
+            if (cohabitantCity.dataset.locked === "true") {
+                e.target.value = cohabitantCity.value || "RODRIGUEZ (MONTALBAN)";
+                return;
+            }
+            const region = cohabitantRegionSelect ? cohabitantRegionSelect.value : "";
+            const province = cohabitantProvince ? cohabitantProvince.value : "";
+            populateBarangays(region, province, e.target.value);
+            updateSubmitState();
+        });
+    }
+
+    if (cohabitationAddressSystem) {
+        cohabitationAddressSystem.addEventListener("change", (e) => {
+            if (cohabitationAddressSystem.dataset.locked === "true") {
+                e.target.value = "house";
+                return;
+            }
+            applyCohabitationAddressSystem();
+            updateSubmitState();
+        });
+        applyCohabitationAddressSystem();
+    }
+
+    if (cohabSameAddress) {
+        cohabSameAddress.addEventListener("change", () => {
+            syncCohabitantAddress();
+            updateSubmitState();
+        });
+    }
+
+    if (cohabitationSameAddress) {
+        cohabitationSameAddress.addEventListener("change", () => {
+            syncCohabitationAddress();
+            updateSubmitState();
+        });
+    }
+
     updateSubmitState();
+    syncCohabitantAddress();
+    syncCohabitationAddress();
+    initAddressData();
     form.addEventListener("input", updateSubmitState);
     form.addEventListener("change", updateSubmitState);
 });

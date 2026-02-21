@@ -20,6 +20,8 @@ $sex = htmlspecialchars($residentinformationtbl['sex'] ?? '', ENT_QUOTES, 'UTF-8
 $unitNumber = htmlspecialchars($residentaddresstbl['unit_number'] ?? '', ENT_QUOTES, 'UTF-8');
 $streetNumber = htmlspecialchars($residentaddresstbl['street_number'] ?? '', ENT_QUOTES, 'UTF-8');
 $streetName = htmlspecialchars($residentaddresstbl['street_name'] ?? '', ENT_QUOTES, 'UTF-8');
+$subdivision = htmlspecialchars($residentaddresstbl['subdivision'] ?? '', ENT_QUOTES, 'UTF-8');
+$areaNumber = htmlspecialchars($residentaddresstbl['area_number'] ?? '', ENT_QUOTES, 'UTF-8');
 $phoneNumber = htmlspecialchars($useraccountstbl['phone_number'] ?? '', ENT_QUOTES, 'UTF-8');
 $yearsOfResidency = htmlspecialchars((string)($residentaddresstbl['address_id'] ?? ''), ENT_QUOTES, 'UTF-8');
 ?>
@@ -142,6 +144,16 @@ $yearsOfResidency = htmlspecialchars((string)($residentaddresstbl['address_id'] 
                                     <div class="col-md-4">
                                         <label class="top-label" for="streetName">Street Name <span class="required-asterisk">*</span></label>
                                         <input type="text" class="form-control" id="streetName" name="streetName" readonly value="<?php echo $streetName; ?>">
+                                    </div>
+                                </div>
+                                <div class="row mb-3">
+                                    <div class="col-md-6">
+                                        <label class="top-label" for="applicantSubdivision">Subdivision</label>
+                                        <input type="text" class="form-control" id="applicantSubdivision" name="applicantSubdivision" readonly value="<?php echo $subdivision; ?>">
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label class="top-label" for="applicantAreaNumber">Area <span class="required-asterisk">*</span></label>
+                                        <input type="text" class="form-control" id="applicantAreaNumber" name="applicantAreaNumber" readonly value="<?php echo $areaNumber; ?>">
                                     </div>
                                 </div>
                             </div>
