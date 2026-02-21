@@ -25,10 +25,10 @@ require_once __DIR__ . "/includes/resident_access_guard.php";
 
         <main id="div-mainDisplay" class="main-content flex-grow-1">
             <h1 class="page-title">Barangay Documents</h1>
-            <hr class="page-divider">
+            <hr>
 
             <p class="page-description">
-                Welcome to the Barangay San Jose Online Document Portal. To better serve our community, we have digitized our application process for essential certificates and clearances. Please select the document you require from the list below to begin your application. Ensure all provided information is accurate to avoid delays in processing.
+                Welcome to the Barangay San Jose Online Document Application. To better serve our community, we have digitized our application process for essential certificates and clearances. Please select the document you require from the list below to begin your application. Ensure all provided information is accurate to avoid delays in processing.
             </p>
 
             <p class="section-label">List of documents:</p>

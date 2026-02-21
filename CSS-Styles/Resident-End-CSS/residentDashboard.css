@@ -490,3 +490,14 @@ body {
 #changePasswordModal .input-group .form-control {
     border-right: 1px solid #ced4da;
 }
+
+/* Ensure all modal header titles are black across resident pages */
+.modal .modal-header .modal-title,
+.modal .modal-header h1,
+.modal .modal-header h2,
+.modal .modal-header h3,
+.modal .modal-header h4,
+.modal .modal-header h5,
+.modal .modal-header h6 {
+  color: #000 !important;
+}

@@ -255,3 +255,14 @@
 .card-action:hover span {
     color: #fff;
 }
+
+/* Ensure all modal header titles are black across admin pages */
+.modal .modal-header .modal-title,
+.modal .modal-header h1,
+.modal .modal-header h2,
+.modal .modal-header h3,
+.modal .modal-header h4,
+.modal .modal-header h5,
+.modal .modal-header h6 {
+  color: #000 !important;
+}

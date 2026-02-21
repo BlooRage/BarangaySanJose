@@ -4,7 +4,7 @@ $current = basename($_SERVER['PHP_SELF']);
 // Group pages by section
 $profilingPages = ['ResidentMasterlist.php', 'ResidentArchive.php', 'EditRequests.php', 'SectorMembershipVerification.php'];
 $certPages = ['CertificateTracker.php', 'approved.php', 'denied.php'];
-$toolsPages = ['AuditLogs.php'];
+$toolsPages = ['AuditLogs.php', 'OfficialInvites.php'];
 
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
@@ -17,8 +17,14 @@ $isToolsActive = in_array($current, $toolsPages);
 $adminDisplayName = "Admin User";
 $adminPosition = "Administrator";
 if (!empty($_SESSION['user_id']) && isset($conn) && $conn instanceof mysqli) {
+    $hasPositionAccess = false;
+    $colRes = $conn->query("SHOW COLUMNS FROM officialinformationtbl LIKE 'position_access'");
+    if ($colRes instanceof mysqli_result && $colRes->num_rows > 0) {
+        $hasPositionAccess = true;
+    }
+    $selectPosition = $hasPositionAccess ? "position_access" : "NULL AS position_access";
     $stmtInfo = $conn->prepare("
-        SELECT firstname, middlename, lastname, suffix, role_access, department
+        SELECT firstname, middlename, lastname, suffix, role_access, {$selectPosition}, department
         FROM officialinformationtbl
         WHERE user_id = ?
         LIMIT 1
@@ -37,7 +43,7 @@ if (!empty($_SESSION['user_id']) && isset($conn) && $conn instanceof mysqli) {
             if ($fullName !== '') {
                 $adminDisplayName = $fullName;
             }
-            $adminPosition = $info['role_access'] ?: ($info['department'] ?: $adminPosition);
+            $adminPosition = ($info['position_access'] ?? '') ?: ($info['role_access'] ?: ($info['department'] ?: $adminPosition));
         }
         $stmtInfo->close();
     }
@@ -146,6 +152,16 @@ if (!empty($_SESSION['user_id']) && isset($conn) && $conn instanceof mysqli) {
           <i class="fas fa-clipboard-list"></i> Audit Logs
         </a>
       </li>
+
+      <?php if (in_array((string)($_SESSION['role'] ?? ''), ['SuperAdmin', 'Official', 'Officials', 'Personnel', 'Personnels', 'Admin', 'Employee'], true)): ?>
+      <li class="mb-1">
+        <a href="OfficialInvites.php"
+           class="btn btn-toggle d-flex align-items-center gap-2 rounded <?= $current == 'OfficialInvites.php' ? 'active' : '' ?>"
+           style="<?= $current == 'OfficialInvites.php' ? 'outline: none; box-shadow: none;' : '' ?>">
+          <i class="fas fa-user-plus"></i> Official Invites
+        </a>
+      </li>
+      <?php endif; ?>
 
     </ul>
 

@@ -91,6 +91,25 @@ function toPublicPath($path): ?string {
 }
 }
 
+if (!function_exists('publicPathExists')) {
+function publicPathExists(?string $publicPath): bool {
+  $publicPath = trim((string)$publicPath);
+  if ($publicPath === '') {
+    return false;
+  }
+  if (preg_match('#^https?://#i', $publicPath)) {
+    return true;
+  }
+  $relative = preg_replace('#^/BarangaySanJose#', '', $publicPath);
+  $relative = '/' . ltrim((string)$relative, '/');
+  $absolute = realpath(__DIR__ . "/../.." . $relative);
+  if ($absolute === false) {
+    return false;
+  }
+  return is_file($absolute);
+}
+}
+
 if (!empty($_SESSION['user_id']) && isset($conn) && $conn instanceof mysqli) {
   $stmt = $conn->prepare("
     SELECT resident_id, firstname, middlename, lastname, suffix, head_of_family
@@ -130,12 +149,11 @@ if ($residentId !== '' && isset($conn) && $conn instanceof mysqli) {
       ON uf.document_type_id = dt.document_type_id
     INNER JOIN statuslookuptbl s
       ON uf.status_id_verify = s.status_id
-    WHERE uf.source_type = 'ResidentProfiling'
+    WHERE uf.source_type IN ('ResidentProfiling', 'RESIDENT_PROFILE')
       AND uf.source_id = ?
-      AND dt.document_type_name = '2x2 Picture'
-      AND dt.document_category = 'ResidentProfiling'
-      AND s.status_name = 'Verified'
-      AND s.status_type = 'ResidentDocumentProfiling'
+      AND LOWER(dt.document_type_name) = LOWER('2x2 Picture')
+      AND (dt.document_category = 'ResidentProfiling' OR dt.document_category = 'EditRequest' OR dt.document_category IS NULL)
+      AND (s.status_name = 'Verified' OR s.status_name = 'Approved')
     ORDER BY uf.upload_timestamp DESC, uf.attachment_id DESC
     LIMIT 1
   ");
@@ -145,7 +163,7 @@ if ($residentId !== '' && isset($conn) && $conn instanceof mysqli) {
     $stmtPic->bind_result($verifiedPicPath);
     if ($stmtPic->fetch() && !empty($verifiedPicPath)) {
       $publicPath = toPublicPath($verifiedPicPath);
-      if (!empty($publicPath)) {
+      if (!empty($publicPath) && publicPathExists($publicPath)) {
         $profileImage = $publicPath;
       }
     }
@@ -169,6 +187,7 @@ if ($residentId !== '' && isset($conn) && $conn instanceof mysqli) {
       src="<?= htmlspecialchars($profileImage) ?>"
       alt="Avatar"
       id="img-sidebarAvatar"
+      onerror="this.onerror=null;this.src='/BarangaySanJose/Images/Profile-Placeholder.png';"
       class="rounded-circle mb-2 border shadow-sm"
       width="90"
       height="90"
@@ -296,11 +315,22 @@ if ($residentId !== '' && isset($conn) && $conn instanceof mysqli) {
 
     let lastBaseUrl = "";
     const getBaseUrl = (url) => (url || "").split("?")[0];
+    const PLACEHOLDER_PATH = "/BarangaySanJose/Images/Profile-Placeholder.png";
+    const isPlaceholder = (url) => getBaseUrl(url).includes(PLACEHOLDER_PATH);
 
     const updateImages = (url) => {
       if (!url) return;
       const baseUrl = getBaseUrl(url);
       if (baseUrl === "" || baseUrl === lastBaseUrl) return;
+
+      // Never downgrade a currently loaded real image to placeholder during polling.
+      const currentSidebar = getBaseUrl(sidebarImg?.src || "");
+      const currentProfile = getBaseUrl(profileImg?.src || "");
+      const hasRealLoaded = (currentSidebar && !isPlaceholder(currentSidebar)) || (currentProfile && !isPlaceholder(currentProfile));
+      if (isPlaceholder(baseUrl) && hasRealLoaded) {
+        return;
+      }
+
       lastBaseUrl = baseUrl;
       const cacheBusted = `${baseUrl}?v=${Date.now()}`;
       if (sidebarImg) sidebarImg.src = cacheBusted;
@@ -329,4 +359,3 @@ if ($residentId !== '' && isset($conn) && $conn instanceof mysqli) {
 
 </body>
 </html>
-

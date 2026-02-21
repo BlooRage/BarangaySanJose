@@ -262,42 +262,75 @@ function getResidentProfileData(mysqli $conn, string $userId): array {
             ];
             return $map[$normalized] ?? trim((string)$sectorKey);
         };
+        $toSectorNormKey = static function ($value): string {
+            $normalized = strtolower(trim((string)$value));
+            return preg_replace('/[^a-z]/', '', $normalized);
+        };
+        $parseSectorCsv = static function ($csv): array {
+            $parts = array_map('trim', explode(',', (string)$csv));
+            $parts = array_filter($parts, static fn($v) => $v !== '');
+            return array_values(array_unique($parts));
+        };
 
         $verified = [];
         $pendingLabels = [];
         $pendingCount = 0;
         $usedNewTable = false;
+        $declaredSectors = $parseSectorCsv((string)($residentinformationtbl['sector_membership'] ?? ''));
 
         // Try new normalized table first.
         $stmtTbl = $conn->prepare("
-            SELECT rsm.sector_key, s.status_name AS status_name
+            SELECT
+                rsm.sector_key,
+                s.status_name AS status_name,
+                COALESCE(rsm.updated_at, rsm.upload_timestamp, rsm.created_at) AS status_ts,
+                COALESCE(rsm.latest_attachment_id, 0) AS latest_attachment_id
             FROM residentsectormembershiptbl rsm
             LEFT JOIN statuslookuptbl s
                 ON rsm.sector_status_id = s.status_id
             WHERE rsm.resident_id = ?
+            ORDER BY status_ts DESC, latest_attachment_id DESC
         ");
         if ($stmtTbl) {
             $stmtTbl->bind_param("s", $residentId);
             if ($stmtTbl->execute()) {
                 $usedNewTable = true;
                 $res = $stmtTbl->get_result();
-                $seen = [];
+                $sectorState = []; // dedupeKey => ['label'=>..., 'has_verified'=>bool, 'has_pending'=>bool]
                 while ($r = $res->fetch_assoc()) {
                     $sectorKey = (string)($r['sector_key'] ?? '');
                     $statusName = (string)($r['status_name'] ?? '');
                     if ($sectorKey === '') continue;
                     $label = $mapSectorKeyToLabel($sectorKey);
                     $dedupeKey = strtolower($label);
-                    if (strcasecmp($statusName, 'Verified') === 0) {
-                        if (!isset($seen[$dedupeKey])) {
-                            $seen[$dedupeKey] = true;
-                            $verified[] = $label;
-                        }
-                    } elseif (strcasecmp($statusName, 'PendingReview') === 0) {
-                        $pendingCount++;
-                        $pendingLabels[] = $label;
+                    if (!isset($sectorState[$dedupeKey])) {
+                        $sectorState[$dedupeKey] = [
+                            'label' => $label,
+                            'has_verified' => false,
+                            'has_pending' => false
+                        ];
+                    }
+
+                    $statusKey = strtolower(trim((string)$statusName));
+                    $statusKey = preg_replace('/[\s_-]+/', '', $statusKey);
+                    $isVerified = in_array($statusKey, ['verified', 'approved', 'verifiedresident'], true);
+                    $isPending = (strpos($statusKey, 'pending') !== false || strpos($statusKey, 'review') !== false);
+
+                    if ($isVerified) {
+                        $sectorState[$dedupeKey]['has_verified'] = true;
+                    } elseif ($isPending) {
+                        $sectorState[$dedupeKey]['has_pending'] = true;
                     }
                 }
+
+                foreach ($sectorState as $state) {
+                    if (!empty($state['has_verified'])) {
+                        $verified[] = (string)$state['label'];
+                    } elseif (!empty($state['has_pending'])) {
+                        $pendingLabels[] = (string)$state['label'];
+                    }
+                }
+                $pendingCount = count($pendingLabels);
             }
             $stmtTbl->close();
         }
@@ -391,6 +424,29 @@ function getResidentProfileData(mysqli $conn, string $userId): array {
         }
         $pendingLabels = $pendingOut;
         $pendingCount = count($pendingLabels);
+
+        // Fallback: when declared sectors exist but no normalized status rows yet,
+        // treat undeclared-as-verified entries as pending review on profile display.
+        if ($pendingCount === 0 && !empty($declaredSectors)) {
+            $verifiedKeysNorm = [];
+            foreach ($verified as $v) {
+                $verifiedKeysNorm[$toSectorNormKey($v)] = true;
+            }
+
+            foreach ($declaredSectors as $declared) {
+                $label = $mapSectorKeyToLabel($declared);
+                $norm = $toSectorNormKey($label);
+                if ($norm === '' || isset($verifiedKeysNorm[$norm])) {
+                    continue;
+                }
+                $pendingLabels[] = $label;
+            }
+
+            if (!empty($pendingLabels)) {
+                $pendingLabels = array_values(array_unique($pendingLabels));
+                $pendingCount = count($pendingLabels);
+            }
+        }
 
         $residentinformationtbl['sector_membership_pending_review'] = $pendingCount;
         $residentinformationtbl['sector_membership_pending_labels'] = $pendingLabels ? implode(', ', $pendingLabels) : '';

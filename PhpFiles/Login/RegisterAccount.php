@@ -55,6 +55,49 @@ try {
 
     if (!empty($errors)) throw new Exception(implode(" ", $errors));
 
+    // ===== Require server-side OTP verification for signup =====
+    $signupOtp = $_SESSION['signup_otp_verified'] ?? null;
+    if (!is_array($signupOtp)) {
+        throw new Exception("Phone OTP verification is required before creating an account.");
+    }
+
+    $verifiedPhone = (string)($signupOtp['phone'] ?? '');
+    $verifiedAt = (int)($signupOtp['verified_at'] ?? 0);
+    if ($verifiedPhone !== $PhoneNumber) {
+        throw new Exception("Phone OTP verification does not match the provided phone number.");
+    }
+    if ($verifiedAt <= 0 || (time() - $verifiedAt) > 600) {
+        unset($_SESSION['signup_otp_verified']);
+        throw new Exception("Phone OTP session expired. Please verify again.");
+    }
+
+    $verifiedOtpId = (int)($signupOtp['otp_id'] ?? 0);
+    if ($verifiedOtpId <= 0) {
+        unset($_SESSION['signup_otp_verified']);
+        throw new Exception("Invalid OTP verification session. Please verify again.");
+    }
+
+    $otpStatusVerified = 7;
+    $otpCheck = $conn->prepare("
+        SELECT otp_id
+        FROM otprequesttbl
+        WHERE otp_id = ?
+          AND recipient = ?
+          AND purpose = 'signup'
+          AND status_id_otp = ?
+        LIMIT 1
+    ");
+    if (!$otpCheck) throw new Exception("Database error (otp check): " . $conn->error);
+    $otpCheck->bind_param("isi", $verifiedOtpId, $PhoneNumber, $otpStatusVerified);
+    $otpCheck->execute();
+    $otpRes = $otpCheck->get_result();
+    $otpValid = $otpRes && $otpRes->num_rows > 0;
+    $otpCheck->close();
+    if (!$otpValid) {
+        unset($_SESSION['signup_otp_verified']);
+        throw new Exception("Phone OTP verification is invalid. Please verify again.");
+    }
+
     // ===== Check Existing Phone/Email =====
     $stmt = $conn->prepare("SELECT phone_number, email FROM useraccountstbl WHERE phone_number = ? OR email = ?");
     if (!$stmt) throw new Exception("Database error: " . $conn->error);
@@ -123,6 +166,9 @@ VALUES (?, ?, 1, ?, 0, ?, ?, ?, ?, ?)
     if (!$stmt->execute()) throw new Exception("Unable to create account. " . $stmt->error);
     $stmt->close();
 
+    // Consume signup OTP session so it cannot be reused.
+    unset($_SESSION['signup_otp_verified']);
+
     // ===== Auto Login =====
     $_SESSION['user_id'] = $UserID;
     $_SESSION['phone'] = $PhoneNumber;
@@ -130,6 +176,7 @@ VALUES (?, ?, 1, ?, 0, ?, ?, ?, ?, ?)
     $_SESSION['role'] = $RoleAccess;
     $_SESSION['status'] = 'Active';
     $_SESSION['logged_in'] = true;
+    $_SESSION['last_activity'] = time();
 
     echo json_encode([
         "success" => true,

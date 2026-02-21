@@ -36,6 +36,93 @@ function cleanString($v): string {
     return (string)$text;
 }
 
+function getSectorKeyToLabelMap(): array {
+    return [
+        'PWD' => 'PWD',
+        'SingleParent' => 'Single Parent',
+        'Student' => 'Student',
+        'SeniorCitizen' => 'Senior Citizen',
+        'IndigenousPeople' => 'Indigenous People',
+    ];
+}
+
+function getSectorLabelToKeyMap(): array {
+    return [
+        'PWD' => 'PWD',
+        'Single Parent' => 'SingleParent',
+        'Student' => 'Student',
+        'Senior Citizen' => 'SeniorCitizen',
+        'Indigenous People' => 'IndigenousPeople',
+    ];
+}
+
+function getResidentSectorsFromDb(mysqli $conn, string $residentId): array {
+    $sectorKeyToLabel = getSectorKeyToLabelMap();
+    $sectorLabelToKey = getSectorLabelToKeyMap();
+    $keys = [];
+    $statusByKey = [];
+
+    $stmtInfo = $conn->prepare("SELECT sector_membership FROM residentinformationtbl WHERE resident_id = ? LIMIT 1");
+    if ($stmtInfo) {
+        $stmtInfo->bind_param("s", $residentId);
+        $stmtInfo->execute();
+        $stmtInfo->bind_result($sectorRaw);
+        if ($stmtInfo->fetch() && !empty($sectorRaw)) {
+            $labels = array_values(array_filter(array_map('trim', explode(',', (string)$sectorRaw))));
+            foreach ($labels as $label) {
+                foreach ($sectorLabelToKey as $knownLabel => $key) {
+                    if (strcasecmp($label, $knownLabel) === 0) {
+                        $keys[] = $key;
+                        break;
+                    }
+                }
+            }
+        }
+        $stmtInfo->close();
+    }
+
+    $stmtSector = $conn->prepare("
+        SELECT DISTINCT rsm.sector_key, COALESCE(s.status_name, '') AS status_name
+        FROM residentsectormembershiptbl rsm
+        LEFT JOIN statuslookuptbl s ON s.status_id = rsm.sector_status_id
+        WHERE rsm.resident_id = ?
+    ");
+    if ($stmtSector) {
+        $stmtSector->bind_param("s", $residentId);
+        $stmtSector->execute();
+        $resSector = $stmtSector->get_result();
+        while ($row = $resSector ? $resSector->fetch_assoc() : null) {
+            $rawKey = trim((string)($row['sector_key'] ?? ''));
+            if ($rawKey === '') continue;
+            foreach (array_keys($sectorKeyToLabel) as $knownKey) {
+                if (strcasecmp($rawKey, $knownKey) === 0) {
+                    $keys[] = $knownKey;
+                    $statusByKey[$knownKey] = (string)($row['status_name'] ?? '');
+                    break;
+                }
+            }
+        }
+        $stmtSector->close();
+    }
+
+    $keys = array_values(array_unique($keys));
+    $labels = [];
+    foreach ($keys as $key) {
+        $statusName = strtolower(trim((string)($statusByKey[$key] ?? '')));
+        $statusKey = preg_replace('/[\s_-]+/', '', $statusName);
+        $isPendingOrVerified = (
+            $statusKey === 'verified' ||
+            $statusKey === 'approved' ||
+            strpos($statusKey, 'pending') !== false ||
+            strpos($statusKey, 'review') !== false
+        );
+        if (!$isPendingOrVerified && isset($sectorKeyToLabel[$key])) {
+            $labels[] = $sectorKeyToLabel[$key];
+        }
+    }
+    return $labels;
+}
+
 function getStatusId(mysqli $conn, string $name, string $type): int {
     $q = $conn->prepare("SELECT status_id FROM statuslookuptbl WHERE status_name=? AND status_type=? LIMIT 1");
     if (!$q) throw new Exception("Prepare failed (getStatusId): " . $conn->error);
@@ -98,6 +185,14 @@ function toDbWebPath(string $absolutePath): string {
 }
 
 function moveUploadedFileWithDocName(string $tmpName, string $dir, string $docType, string $userId, string $ext): array {
+    if ($tmpName === '' || !is_uploaded_file($tmpName)) {
+        throw new Exception("Invalid upload source.");
+    }
+    $tmpSize = @filesize($tmpName);
+    if ($tmpSize === false || (int)$tmpSize <= 0) {
+        throw new Exception("Uploaded file is empty.");
+    }
+
     $index = 0;
     $fileName = buildAttachmentFileName($docType, $userId, $ext, $index);
     $target = rtrim($dir, "/") . "/" . $fileName;
@@ -110,6 +205,11 @@ function moveUploadedFileWithDocName(string $tmpName, string $dir, string $docTy
 
     if (!move_uploaded_file($tmpName, $target)) {
         throw new Exception("Failed to upload file.");
+    }
+    $movedSize = @filesize($target);
+    if ($movedSize === false || (int)$movedSize <= 0) {
+        @unlink($target);
+        throw new Exception("Uploaded file is empty.");
     }
 
     return [
@@ -277,6 +377,16 @@ try {
     $requirements = getCurrentUploadRequirements($conn, $residentId);
     $needsProof = (bool)$requirements['needs_proof'];
     $needsPicture = (bool)$requirements['needs_picture'];
+    $resubmitMode = strtolower(trim((string)($_POST['resubmit_mode'] ?? '')));
+    if (!in_array($resubmitMode, ['sector', 'profiling'], true)) {
+        $resubmitMode = '';
+    }
+    $forceSectorOnly = ($resubmitMode === 'sector');
+    $forceProfilingOnly = ($resubmitMode === 'profiling');
+    if ($forceSectorOnly) {
+        $needsProof = false;
+        $needsPicture = false;
+    }
 
     $proofType = cleanString($_POST['proofType'] ?? '');
     if ($needsProof && !in_array($proofType, ['ID', 'Document'], true)) {
@@ -290,17 +400,13 @@ try {
     $idNumber = cleanString($_POST['idNumber'] ?? '');
     $documentType = cleanString($_POST['documentType'] ?? '');
 
-    $selectedSectors = [];
-    if (isset($_POST['sectorMembership']) && is_array($_POST['sectorMembership'])) {
-        $selectedSectors = array_values(array_filter(array_map('trim', $_POST['sectorMembership']), static function ($v) {
-            return $v !== '';
-        }));
-    }
+    // Sector scope is driven by resident profile/sector membership records, not by client checklist.
+    $selectedSectors = $forceProfilingOnly ? [] : getResidentSectorsFromDb($conn, $residentId);
 
     $allowedIdTypes = ['Passport', "Driver's License", 'PhilHealth ID', "Voter's ID", 'National ID', 'Barangay ID'];
     $allowedDocTypes = ['Billing Statement', 'HOA Signed Certification of Residency'];
 
-    if ($proofType === 'ID') {
+    if (!$forceSectorOnly && $proofType === 'ID') {
         if (!in_array($idType, $allowedIdTypes, true)) {
             throw new Exception('Please select a valid ID type.');
         }
@@ -309,7 +415,7 @@ try {
         }
     }
 
-    if ($proofType === 'Document' && !in_array($documentType, $allowedDocTypes, true)) {
+    if (!$forceSectorOnly && $proofType === 'Document' && !in_array($documentType, $allowedDocTypes, true)) {
         throw new Exception('Please select a valid document type.');
     }
 
@@ -317,7 +423,7 @@ try {
         throw new Exception('2x2 picture is required.');
     }
 
-    if (!$needsProof && !$needsPicture) {
+    if (!$forceSectorOnly && !$needsProof && !$needsPicture) {
         http_response_code(400);
         echo json_encode([
             'success' => false,
@@ -337,6 +443,7 @@ try {
     $uploadedSectorKeys = [];
     $proofAttachmentIds = [];
     $sectorAttachmentIds = [];
+    $sectorAttachmentIdsByKey = [];
     $txSourceType = buildUploadTransactionSourceType();
 
     $sourceType = 'ResidentProfiling';
@@ -354,44 +461,10 @@ try {
         throw new Exception('Failed to create ID picture upload directory.');
     }
 
-    if ($needsProof) {
-        $cleanupProofRejected = $conn->prepare("
-            DELETE uf
-            FROM unifiedfileattachmenttbl uf
-            INNER JOIN documenttypelookuptbl dt ON uf.document_type_id = dt.document_type_id
-            WHERE uf.source_type = 'ResidentProfiling'
-              AND uf.source_id = ?
-              AND uf.status_id_verify = ?
-              AND dt.document_category = 'ResidentProfiling'
-              AND dt.document_type_name <> '2x2 Picture'
-              AND (uf.remarks IS NULL OR uf.remarks NOT LIKE 'sector:%')
-        ");
-        if ($cleanupProofRejected) {
-            $cleanupProofRejected->bind_param('si', $residentId, $rejectedDocStatusId);
-            $cleanupProofRejected->execute();
-            $cleanupProofRejected->close();
-        }
-    }
+    // Keep rejected attachment records for transaction history.
+    // Physical files are cleaned by scheduled cleanup (retention policy).
 
-    if ($needsPicture) {
-        $cleanup2x2Rejected = $conn->prepare("
-            DELETE uf
-            FROM unifiedfileattachmenttbl uf
-            INNER JOIN documenttypelookuptbl dt ON uf.document_type_id = dt.document_type_id
-            WHERE uf.source_type = 'ResidentProfiling'
-              AND uf.source_id = ?
-              AND uf.status_id_verify = ?
-              AND dt.document_category = 'ResidentProfiling'
-              AND dt.document_type_name = '2x2 Picture'
-        ");
-        if ($cleanup2x2Rejected) {
-            $cleanup2x2Rejected->bind_param('si', $residentId, $rejectedDocStatusId);
-            $cleanup2x2Rejected->execute();
-            $cleanup2x2Rejected->close();
-        }
-    }
-
-    if ($proofType === 'ID') {
+    if (!$forceSectorOnly && $proofType === 'ID') {
         $isPassport = strcasecmp($idType, 'Passport') === 0;
         $idFiles = $isPassport ? ['idFront'] : ['idFront', 'idBack'];
         foreach ($idFiles as $fileKey) {
@@ -473,7 +546,7 @@ try {
         }
     }
 
-    if ($proofType === 'Document') {
+    if (!$forceSectorOnly && $proofType === 'Document') {
         $hasDocumentProof = false;
         if (isset($_FILES['documentProof']) && is_array($_FILES['documentProof']['name'])) {
             foreach ($_FILES['documentProof']['error'] as $i => $errCode) {
@@ -543,13 +616,7 @@ try {
     }
 
     // Sector proofs
-    $sectorPostToKey = [
-        'PWD' => 'PWD',
-        'Single Parent' => 'SingleParent',
-        'Student' => 'Student',
-        'Senior Citizen' => 'SeniorCitizen',
-        'Indigenous People' => 'IndigenousPeople',
-    ];
+    $sectorPostToKey = getSectorLabelToKeyMap();
 
     $selectedSectorKeys = [];
     foreach ($selectedSectors as $label) {
@@ -672,6 +739,10 @@ try {
             if ($newAttachmentId > 0) {
                 upsertSectorMembershipStatusFromUpload($conn, $residentId, $sectorKey, $statusVerifyId, $newAttachmentId);
                 $sectorAttachmentIds[] = $newAttachmentId;
+                if (!isset($sectorAttachmentIdsByKey[$sectorKey])) {
+                    $sectorAttachmentIdsByKey[$sectorKey] = [];
+                }
+                $sectorAttachmentIdsByKey[$sectorKey][] = $newAttachmentId;
             }
             continue;
         }
@@ -704,6 +775,10 @@ try {
             if ($newAttachmentId > 0) {
                 upsertSectorMembershipStatusFromUpload($conn, $residentId, $sectorKey, $statusVerifyId, $newAttachmentId);
                 $sectorAttachmentIds[] = $newAttachmentId;
+                if (!isset($sectorAttachmentIdsByKey[$sectorKey])) {
+                    $sectorAttachmentIdsByKey[$sectorKey] = [];
+                }
+                $sectorAttachmentIdsByKey[$sectorKey][] = $newAttachmentId;
             }
         }
     }
@@ -750,29 +825,33 @@ try {
                 'SeniorCitizen' => 'Senior Citizen',
                 'IndigenousPeople' => 'Indigenous People',
             ];
-            $sectorLabels = [];
             foreach ($uploadedSectorKeys as $k) {
-                $sectorLabels[] = $sectorKeyToLabel[$k] ?? $k;
-            }
+                $sectorLabel = $sectorKeyToLabel[$k] ?? $k;
+                $sectorIds = isset($sectorAttachmentIdsByKey[$k])
+                    ? $sectorAttachmentIdsByKey[$k]
+                    : $sectorAttachmentIds;
+                $sectorIds = array_values(array_unique(array_map('intval', (array)$sectorIds)));
 
-            createResidentTransaction(
-                $conn,
-                (string)$userId,
-                (string)$userId,
-                $txSourceType,
-                (string)$residentId,
-                'SECTOR_MEMBERSHIP',
-                'Sector Membership Declaration',
-                (int)$statusVerifyId,
-                'Resident uploaded/resubmitted sector proof documents for verification.',
-                [
-                    'upload_channel' => 'DocumentUpload',
-                    'submission_kind' => 'resubmit',
-                    'sectors' => array_values($sectorLabels),
-                    'has_sector_proof' => 1,
-                    'attachment_ids' => array_values(array_unique(array_map('intval', $sectorAttachmentIds))),
-                ]
-            );
+                createResidentTransaction(
+                    $conn,
+                    (string)$userId,
+                    (string)$userId,
+                    $txSourceType,
+                    (string)$residentId,
+                    'SECTOR_MEMBERSHIP',
+                    'Sector Membership Declaration',
+                    (int)$statusVerifyId,
+                    'Resident uploaded/resubmitted sector proof documents for verification.',
+                    [
+                        'upload_channel' => 'DocumentUpload',
+                        'submission_kind' => 'resubmit',
+                        'sectors' => [$sectorLabel],
+                        'sector_key' => (string)$k,
+                        'has_sector_proof' => 1,
+                        'attachment_ids' => $sectorIds,
+                    ]
+                );
+            }
         }
     } catch (Throwable $txe) {
         error_log('[residentDocumentUpload][transaction] ' . $txe->getMessage());
@@ -801,6 +880,8 @@ try {
         strpos($known, 'invalid') !== false ||
         strpos($known, 'please select') !== false ||
         strpos($known, 'not allowed') !== false ||
+        strpos($known, 'empty') !== false ||
+        strpos($known, 'invalid upload source') !== false ||
         strpos($known, 'no new documents') !== false ||
         strpos($known, 'heic is not supported') !== false ||
         strpos($known, 'failed to upload file') !== false

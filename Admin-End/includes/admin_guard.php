@@ -9,5 +9,5 @@ header("Expires: 0");
 
 require_once __DIR__ . "/../../PhpFiles/General/security.php";
 
-// Enforce auth + 30-min inactivity timeout for Admin/Employee pages.
-requireRoleSession(['Admin', 'Employee'], false);
+// Enforce auth + 30-min inactivity timeout for admin-panel pages.
+requireRoleSession(['SuperAdmin', 'Official', 'Officials', 'Personnel', 'Personnels', 'Admin', 'Employee'], false);

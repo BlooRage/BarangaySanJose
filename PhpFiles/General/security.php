@@ -80,7 +80,7 @@ function destroySessionAndExit(bool $json = true, int $statusCode = 401, string 
     redirectToLogin('?session=expired');
 }
 
-// Enforce inactivity-based auto logout. Default: 30 minutes.
+// Enforce inactivity-based auto logout. Default: 30 minutes idle.
 function enforceSessionInactivityTimeout(int $timeoutSeconds = 1800, bool $json = true): void
 {
     if (empty($_SESSION['user_id'])) {

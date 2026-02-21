@@ -37,6 +37,16 @@ $canSendHouseholdInvite = $isHeadOfFamily && $isResidentVerified;
 $editStatusKey = $residentStatusKey !== '' ? $residentStatusKey : 'notverified';
 $canEditProfile = !in_array($editStatusKey, ['notverified', 'pendingverification'], true);
 $editBlockMessage = 'Your account must be verified before you can edit your profile, address, or emergency contact.';
+$profileImageFlash = ['type' => '', 'message' => ''];
+
+if (!empty($_SESSION['resident_profile_image_flash']) && is_array($_SESSION['resident_profile_image_flash'])) {
+    $profileImageFlash = $_SESSION['resident_profile_image_flash'];
+    unset($_SESSION['resident_profile_image_flash']);
+}
+
+function rp_set_image_flash(string $type, string $message): void {
+    $_SESSION['resident_profile_image_flash'] = ['type' => $type, 'message' => $message];
+}
 
 if (!function_exists('toPublicPath')) {
 function toPublicPath($path): ?string {
@@ -87,6 +97,181 @@ function toPublicPath($path): ?string {
     return '../' . ltrim($normalized, '/');
 }
 }
+
+if (!function_exists('toDbWebPath')) {
+function toDbWebPath(string $absolutePath): string {
+    $absolutePath = str_replace("\\", "/", trim($absolutePath));
+    $projectRoot = realpath(__DIR__ . "/..");
+    $marker = "/UnifiedFileAttachment/";
+    $markerPos = strpos($absolutePath, $marker);
+    if ($markerPos !== false) {
+        return ltrim(substr($absolutePath, $markerPos), "/");
+    }
+    if ($projectRoot) {
+        $rootNorm = str_replace("\\", "/", $projectRoot);
+        if (strpos($absolutePath, $rootNorm) === 0) {
+            return ltrim(substr($absolutePath, strlen($rootNorm)), "/");
+        }
+    }
+    return ltrim($absolutePath, "/");
+}
+}
+
+if (!function_exists('getStatusId')) {
+function getStatusId(mysqli $conn, string $name, string $type): ?int {
+    $stmt = $conn->prepare("SELECT status_id FROM statuslookuptbl WHERE status_name = ? AND status_type = ? LIMIT 1");
+    if (!$stmt) return null;
+    $stmt->bind_param("ss", $name, $type);
+    $stmt->execute();
+    $stmt->bind_result($statusId);
+    $found = $stmt->fetch();
+    $stmt->close();
+    return $found ? (int)$statusId : null;
+}
+}
+
+if (!function_exists('getDocumentTypeIdByCategory')) {
+function getDocumentTypeIdByCategory(mysqli $conn, string $name, string $category): int {
+    $q = $conn->prepare("SELECT document_type_id FROM documenttypelookuptbl WHERE LOWER(document_type_name) = LOWER(?) AND document_category = ? LIMIT 1");
+    if (!$q) throw new RuntimeException("Failed to prepare document type lookup.");
+    $q->bind_param("ss", $name, $category);
+    $q->execute();
+    $row = $q->get_result()->fetch_assoc();
+    $q->close();
+    if ($row && isset($row['document_type_id'])) return (int)$row['document_type_id'];
+
+    $ins = $conn->prepare("INSERT INTO documenttypelookuptbl (document_type_name, document_category) VALUES (?, ?)");
+    if (!$ins) throw new RuntimeException("Failed to prepare document type create.");
+    $ins->bind_param("ss", $name, $category);
+    if (!$ins->execute()) {
+        $ins->close();
+        throw new RuntimeException("Failed to create document type.");
+    }
+    $newId = (int)$ins->insert_id;
+    $ins->close();
+    if ($newId <= 0) throw new RuntimeException("Failed to resolve document type.");
+    return $newId;
+}
+}
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && (string)($_POST['action'] ?? '') === 'update_profile_image') {
+    try {
+        $userId = (string)($_SESSION['user_id'] ?? '');
+        if ($userId === '') throw new RuntimeException('Session expired. Please login again.');
+        if ($residentId === '') throw new RuntimeException('Resident profile not found.');
+        $pendingRequestStatusId = getStatusId($conn, 'PendingRequest', 'EditRequest');
+        if ($pendingRequestStatusId === null) throw new RuntimeException('Edit request status is missing.');
+
+        $dupStmt = $conn->prepare("
+            SELECT request_id
+            FROM resident_edit_requesttbl
+            WHERE resident_id = ? AND request_type = 'profile' AND status_id = ?
+            LIMIT 1
+        ");
+        if (!$dupStmt) throw new RuntimeException('Failed to check pending edit request.');
+        $dupStmt->bind_param("si", $residentId, $pendingRequestStatusId);
+        $dupStmt->execute();
+        $dup = $dupStmt->get_result()->fetch_assoc();
+        $dupStmt->close();
+        if ($dup) throw new RuntimeException('You already have a pending profile edit request.');
+
+        if (!isset($_FILES['profile_image']) || !is_array($_FILES['profile_image'])) {
+            throw new RuntimeException('Please select an image to upload.');
+        }
+        $err = (int)($_FILES['profile_image']['error'] ?? UPLOAD_ERR_NO_FILE);
+        if ($err !== UPLOAD_ERR_OK) throw new RuntimeException('Please select an image to upload.');
+        $tmpName = (string)($_FILES['profile_image']['tmp_name'] ?? '');
+        if ($tmpName === '' || !is_uploaded_file($tmpName)) throw new RuntimeException('Invalid upload source.');
+        $size = @filesize($tmpName);
+        if ($size === false || (int)$size <= 0) throw new RuntimeException('Uploaded image is empty.');
+        $maxBytes = 5 * 1024 * 1024; // 5MB
+        if ((int)$size > $maxBytes) throw new RuntimeException('Image must be 5MB or below.');
+
+        $origName = (string)($_FILES['profile_image']['name'] ?? '');
+        $ext = strtolower((string)pathinfo($origName, PATHINFO_EXTENSION));
+        $allowed = ['jpg', 'jpeg', 'png', 'webp'];
+        if (!in_array($ext, $allowed, true)) {
+            throw new RuntimeException('Invalid image type. Allowed: JPG, JPEG, PNG, WEBP.');
+        }
+        $imgInfo = @getimagesize($tmpName);
+        if ($imgInfo === false) {
+            throw new RuntimeException('Uploaded file must be a valid image.');
+        }
+
+        $uploadDir = __DIR__ . "/../UnifiedFileAttachment/Documents/{$userId}/";
+        if (!is_dir($uploadDir) && !mkdir($uploadDir, 0777, true)) {
+            throw new RuntimeException('Failed to prepare upload directory.');
+        }
+        $base = "2x2Picture" . $userId;
+        $index = 0;
+        do {
+            $fileName = $base . ($index > 0 ? "_{$index}" : '') . "." . $ext;
+            $target = rtrim($uploadDir, "/") . "/" . $fileName;
+            $index++;
+        } while (file_exists($target));
+
+        if (!move_uploaded_file($tmpName, $target)) {
+            throw new RuntimeException('Failed to upload image.');
+        }
+
+        $statusIdVerify = getStatusId($conn, 'PendingReview', 'ResidentDocumentProfiling');
+        if ($statusIdVerify === null) throw new RuntimeException('Document verification status is missing.');
+
+        $changesJson = json_encode(['profile_image' => '2x2 Picture'], JSON_UNESCAPED_SLASHES);
+        $reqIns = $conn->prepare("
+            INSERT INTO resident_edit_requesttbl
+                (resident_id, user_id, request_type, status_id, requested_changes)
+            VALUES (?, ?, 'profile', ?, ?)
+        ");
+        if (!$reqIns) throw new RuntimeException('Failed to create edit request.');
+        $reqIns->bind_param("ssis", $residentId, $userId, $pendingRequestStatusId, $changesJson);
+        if (!$reqIns->execute()) {
+            $reqIns->close();
+            throw new RuntimeException('Failed to create edit request.');
+        }
+        $requestId = (int)$reqIns->insert_id;
+        $reqIns->close();
+        if ($requestId <= 0) throw new RuntimeException('Failed to create edit request.');
+
+        $docTypeId = getDocumentTypeIdByCategory($conn, '2x2 Picture', 'EditRequest');
+        $sourceType = 'ResidentEditRequest';
+        $sourceId = (string)$requestId;
+        $remarks = 'edit_request_profile_image';
+        $idNumber = null;
+        $filePathDb = toDbWebPath($target);
+        $ins = $conn->prepare("
+            INSERT INTO unifiedfileattachmenttbl
+                (source_type, source_id, document_type_id, file_name, file_path, file_type, user_id_uploaded_by, status_id_verify, remarks, id_number)
+            VALUES
+                (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ");
+        if (!$ins) throw new RuntimeException('Failed to save uploaded image.');
+        $ins->bind_param(
+            "ssissssiss",
+            $sourceType,
+            $sourceId,
+            $docTypeId,
+            $fileName,
+            $filePathDb,
+            $ext,
+            $userId,
+            $statusIdVerify,
+            $remarks,
+            $idNumber
+        );
+        if (!$ins->execute()) {
+            $ins->close();
+            throw new RuntimeException('Failed to save uploaded image.');
+        }
+        $ins->close();
+        rp_set_image_flash('success', 'Profile image change request submitted for review.');
+    } catch (Throwable $e) {
+        rp_set_image_flash('danger', $e->getMessage());
+    }
+    header('Location: resident_profile.php');
+    exit;
+}
+
 if ($residentId !== '' && isset($conn) && $conn instanceof mysqli) {
     $stmtPic = $conn->prepare("
         SELECT uf.file_path
@@ -95,12 +280,11 @@ if ($residentId !== '' && isset($conn) && $conn instanceof mysqli) {
             ON uf.document_type_id = dt.document_type_id
         INNER JOIN statuslookuptbl s
             ON uf.status_id_verify = s.status_id
-        WHERE uf.source_type = 'ResidentProfiling'
+        WHERE uf.source_type IN ('ResidentProfiling', 'RESIDENT_PROFILE')
           AND uf.source_id = ?
-          AND dt.document_type_name = '2x2 Picture'
-          AND dt.document_category = 'ResidentProfiling'
-          AND s.status_name = 'Verified'
-          AND s.status_type = 'ResidentDocumentProfiling'
+          AND LOWER(dt.document_type_name) = LOWER('2x2 Picture')
+          AND (dt.document_category = 'ResidentProfiling' OR dt.document_category = 'EditRequest' OR dt.document_category IS NULL)
+          AND (s.status_name = 'Verified' OR s.status_name = 'Approved')
         ORDER BY uf.upload_timestamp DESC, uf.attachment_id DESC
         LIMIT 1
     ");
@@ -152,9 +336,40 @@ if ($residentId !== '' && isset($conn) && $conn instanceof mysqli) {
 	  <script src="../JS-Script-Files/Resident-End/profileChangePassword.js?v=20260215-1" defer></script>
 	  <script src="../JS-Script-Files/Resident-End/profileChangePhone.js?v=20260215-1" defer></script>
 	  <script src="../JS-Script-Files/Resident-End/profileChangeEmail.js?v=20260215-1" defer></script>
-	  <script src="../JS-Script-Files/Resident-End/profileUploadedDocuments.js?v=20260215-1" defer></script>
+  <script src="../JS-Script-Files/Resident-End/profileUploadedDocuments.js?v=20260215-1" defer></script>
 	  <script src="../JS-Script-Files/Resident-End/profileEdit.js" defer></script>
 	    <link rel="stylesheet" href="../CSS-Styles/Resident-End-CSS/residentDashboard.css">
+    <style>
+      .resident-avatar-wrap {
+        position: relative;
+        width: 170px;
+        height: 170px;
+      }
+      .resident-avatar-wrap #img-profileAvatar {
+        width: 170px;
+        height: 170px;
+        object-fit: cover;
+      }
+      .resident-avatar-edit-btn {
+        position: absolute;
+        right: 8px;
+        bottom: 8px;
+        width: 34px;
+        height: 34px;
+        border-radius: 999px;
+        border: 1px solid #d0d5dd;
+        background: #ffffff;
+        color: #175cd3;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        box-shadow: 0 2px 10px rgba(0,0,0,.2);
+      }
+      .resident-avatar-edit-btn:hover {
+        background: #eff6ff;
+        color: #1e3a8a;
+      }
+    </style>
 </head>
 
 <body>
@@ -180,6 +395,11 @@ if ($residentId !== '' && isset($conn) && $conn instanceof mysqli) {
             <div class="main-head text-center py-1 rounded my-2">
                 <h3 class="mb-0 text-black">ACCOUNT</h3>
             </div>
+            <?php if (!empty($profileImageFlash['message'])): ?>
+                <div class="alert alert-<?= htmlspecialchars((string)($profileImageFlash['type'] ?: 'info'), ENT_QUOTES, 'UTF-8') ?> mb-2">
+                    <?= htmlspecialchars((string)$profileImageFlash['message'], ENT_QUOTES, 'UTF-8') ?>
+                </div>
+            <?php endif; ?>
             <hr class="mt-1 mb-2">
 
             <ul class="nav profile-tabs mb-3" role="tablist">
@@ -213,10 +433,19 @@ if ($residentId !== '' && isset($conn) && $conn instanceof mysqli) {
                 <div class="card-body py-2">
                     <div class="row g-2 align-items-center">
                         <div class="col-12 col-md-12 col-lg-3 d-flex align-items-center justify-content-center">
-                            <img src="<?= htmlspecialchars($profileImage) ?>"
-                                id="img-profileAvatar"
-                                class="img-fluid rounded-circle mb-2"
-                                style="width:170px; height: 170px;">
+                            <div class="resident-avatar-wrap mb-2">
+                                <img src="<?= htmlspecialchars($profileImage) ?>"
+                                    id="img-profileAvatar"
+                                    onerror="this.onerror=null;this.src='../Images/Profile-Placeholder.png';"
+                                    class="img-fluid rounded-circle">
+                                <button type="button"
+                                        class="resident-avatar-edit-btn"
+                                        data-bs-toggle="modal"
+                                        data-bs-target="#residentProfileImageModal"
+                                        aria-label="Edit profile image">
+                                    <i class="bi bi-pencil-fill"></i>
+                                </button>
+                            </div>
                         </div>
                         <div class="col-12 col-md-6 col-lg-4">
                             <div class="d-flex flex-column gap-2">
@@ -249,8 +478,11 @@ if ($residentId !== '' && isset($conn) && $conn instanceof mysqli) {
                                 <?php
                                   $sectorText = trim((string)($residentinformationtbl['sector_membership'] ?? ''));
                                   $pendingSector = (int)($residentinformationtbl['sector_membership_pending_review'] ?? 0);
+                                  $pendingSectorLabels = trim((string)($residentinformationtbl['sector_membership_pending_labels'] ?? ''));
                                   $hasVerifiedSector = $sectorText !== '' && strcasecmp($sectorText, 'none') !== 0;
-                                  $pendingLabel = "Pending Review";
+                                  $pendingLabel = $pendingSectorLabels !== ''
+                                      ? ($pendingSectorLabels . ' (Pending Review)')
+                                      : 'Pending Review';
                                 ?>
                                 <?php if ($hasVerifiedSector): ?>
                                     <div>
@@ -378,7 +610,7 @@ if ($residentId !== '' && isset($conn) && $conn instanceof mysqli) {
 
                                   if ($statusKey === 'pendingverification' || $statusKey === 'pendingreview') {
                                       $statusClass = 'status-badge status-badge--pending';
-                                  } elseif ($statusKey === 'verifiedresident') {
+                                  } elseif ($statusKey === 'verifiedresident' || $statusKey === 'verified') {
                                       $statusClass = 'status-badge status-badge--verified';
                                   } elseif ($statusKey === 'notverified') {
                                       $statusClass = 'status-badge status-badge--denied';
@@ -1435,6 +1667,49 @@ if ($residentId !== '' && isset($conn) && $conn instanceof mysqli) {
             </div>
         </div>
     </div>
+    
+    <div class="modal fade" id="residentProfileImageModal" tabindex="-1" data-bs-backdrop="static" data-bs-keyboard="false" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title text-black">Update Profile Image</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <form method="post" enctype="multipart/form-data">
+                    <div class="modal-body">
+                        <input type="hidden" name="action" value="update_profile_image">
+                        <div class="alert alert-info small mb-3">
+                            <div class="fw-bold mb-1">Upload Requirements</div>
+                            <ul class="mb-0 ps-3">
+                                <li>Accepted formats: JPG, JPEG, PNG, WEBP</li>
+                                <li>Maximum file size: 5MB</li>
+                                <li>Use a clear 2x2-style portrait image for review</li>
+                                <li>Change will be submitted as a pending edit request</li>
+                            </ul>
+                        </div>
+                        <div class="text-center mb-3">
+                            <img id="residentProfileImagePreview"
+                                 src="<?= htmlspecialchars($profileImage, ENT_QUOTES, 'UTF-8') ?>"
+                                 alt="Profile Preview"
+                                 class="rounded-circle border"
+                                 style="width:120px;height:120px;object-fit:cover;">
+                        </div>
+                        <label class="form-label">Choose image (JPG, JPEG, PNG, WEBP)</label>
+                        <input type="file"
+                               class="form-control"
+                               id="residentProfileImageInput"
+                               name="profile_image"
+                               accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp"
+                               required>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                        <button type="submit" class="btn btn-primary">Save Image</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
 
         <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
         <script>
@@ -1450,6 +1725,23 @@ if ($residentId !== '' && isset($conn) && $conn instanceof mysqli) {
                             if (instance) instance.hide();
                         });
                     });
+                });
+            });
+
+            document.addEventListener("DOMContentLoaded", () => {
+                const input = document.getElementById("residentProfileImageInput");
+                const preview = document.getElementById("residentProfileImagePreview");
+                if (!input || !preview) return;
+                input.addEventListener("change", () => {
+                    const file = input.files && input.files[0] ? input.files[0] : null;
+                    if (!file) return;
+                    const reader = new FileReader();
+                    reader.onload = (e) => {
+                        if (e.target && typeof e.target.result === "string") {
+                            preview.src = e.target.result;
+                        }
+                    };
+                    reader.readAsDataURL(file);
                 });
             });
         </script>

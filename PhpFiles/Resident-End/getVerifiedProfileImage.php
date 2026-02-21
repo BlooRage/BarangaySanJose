@@ -74,6 +74,25 @@ function toPublicPath($path): ?string {
 }
 }
 
+if (!function_exists('publicPathExists')) {
+function publicPathExists(?string $publicPath): bool {
+    $publicPath = trim((string)$publicPath);
+    if ($publicPath === '') {
+        return false;
+    }
+    if (preg_match('#^https?://#i', $publicPath)) {
+        return true;
+    }
+    $relative = preg_replace('#^/BarangaySanJose#', '', $publicPath);
+    $relative = '/' . ltrim((string)$relative, '/');
+    $absolute = realpath(__DIR__ . "/../.." . $relative);
+    if ($absolute === false) {
+        return false;
+    }
+    return is_file($absolute);
+}
+}
+
 if (isset($conn) && $conn instanceof mysqli) {
     $stmt = $conn->prepare("
         SELECT resident_id
@@ -100,12 +119,11 @@ if ($residentId !== '' && isset($conn) && $conn instanceof mysqli) {
             ON uf.document_type_id = dt.document_type_id
         INNER JOIN statuslookuptbl s
             ON uf.status_id_verify = s.status_id
-        WHERE uf.source_type = 'ResidentProfiling'
+        WHERE uf.source_type IN ('ResidentProfiling', 'RESIDENT_PROFILE')
           AND uf.source_id = ?
-          AND dt.document_type_name = '2x2 Picture'
-          AND dt.document_category = 'ResidentProfiling'
-          AND s.status_name = 'Verified'
-          AND s.status_type = 'ResidentDocumentProfiling'
+          AND LOWER(dt.document_type_name) = LOWER('2x2 Picture')
+          AND (dt.document_category = 'ResidentProfiling' OR dt.document_category = 'EditRequest' OR dt.document_category IS NULL)
+          AND (s.status_name = 'Verified' OR s.status_name = 'Approved')
         ORDER BY uf.upload_timestamp DESC, uf.attachment_id DESC
         LIMIT 1
     ");
@@ -115,7 +133,7 @@ if ($residentId !== '' && isset($conn) && $conn instanceof mysqli) {
         $stmtPic->bind_result($verifiedPicPath);
         if ($stmtPic->fetch() && !empty($verifiedPicPath)) {
             $publicPath = toPublicPath($verifiedPicPath);
-            if (!empty($publicPath)) {
+            if (!empty($publicPath) && publicPathExists($publicPath)) {
                 $profileImage = $publicPath;
             }
         }

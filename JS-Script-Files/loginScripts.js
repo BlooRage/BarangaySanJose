@@ -594,58 +594,31 @@ function startResendCountdown(purpose, seconds = 120) {
   }, 1000);
 }
 
-// ===== Send OTP (generate_otp.php -> send_otp.php) =====
+// ===== Send OTP (server-side generation + SMS dispatch) =====
 async function sendOTP(recipient, purpose, reuse = false) {
   try {
-    let otpCode;
+    const genForm = new FormData();
+    genForm.append("recipient", recipient); // 0XXXXXXXXXX
+    genForm.append("purpose", purpose);
 
-    if (reuse && currentOTPByPurpose[purpose]) {
-      otpCode = currentOTPByPurpose[purpose];
-    } else {
-      const genForm = new FormData();
-      genForm.append("recipient", recipient); // 0XXXXXXXXXX
-      genForm.append("purpose", purpose);
-
-      const genRes = await fetch("../PhpFiles/OTPHandlers/generate_otp.php", {
-        method: "POST",
-        body: genForm,
-      });
-
-      const genText = await genRes.text();
-
-      let genData;
-      try {
-        genData = JSON.parse(genText);
-      } catch {
-        throw new Error("Invalid JSON from generate_otp.php");
-      }
-
-      if (!genData.success || !genData.otp_code) {
-        throw new Error(genData.error || "OTP generation failed");
-      }
-
-      otpCode = genData.otp_code;
-      currentOTPByPurpose[purpose] = otpCode;
-    }
-
-    const sendRes = await fetch("../PhpFiles/OTPHandlers/send_otp.php", {
+    const genRes = await fetch("../PhpFiles/OTPHandlers/generate_otp.php", {
       method: "POST",
-      headers: { "Content-Type": "application/x-www-form-urlencoded" },
-      body: new URLSearchParams({ recipient, otp_code: otpCode }),
+      body: genForm,
     });
 
-    const sendText = await sendRes.text();
+    const genText = await genRes.text();
 
-    let sendData;
+    let genData;
     try {
-      sendData = JSON.parse(sendText);
+      genData = JSON.parse(genText);
     } catch {
-      throw new Error("Invalid JSON from send_otp.php");
+      throw new Error("Invalid JSON from generate_otp.php");
     }
 
-    if (!sendData.success) throw new Error(sendData.error || "OTP sending failed");
+    if (!genData.success) throw new Error(genData.error || "OTP sending failed");
   } catch (err) {
     showOtpError("Unable to send OTP. Please try again later.");
+    throw err;
   }
 }
 
@@ -724,9 +697,7 @@ if (forgotContinueBtn) {
 
     try {
       const formData = new FormData();
-      const email = (emailInput?.value || "").trim();
       formData.append("phone", phone);
-      formData.append("email", email);
       formData.append("email", email);
 
       const res = await fetch("../PhpFiles/Login/checkForgotPassword.php", {
@@ -734,10 +705,15 @@ if (forgotContinueBtn) {
         body: formData,
       });
 
-      const data = await res.json();
+      const data = await res.json().catch(() => ({}));
+
+      if (!res.ok) {
+        showForgotError(data?.error || `Unable to verify account. HTTP ${res.status}`, [forgotPhoneInput, forgotEmailInput]);
+        return;
+      }
 
       if (!data.success) {
-        showForgotError(data.error, [forgotPhoneInput, forgotEmailInput]);
+        showForgotError(data.error || "No account found matching the provided email and phone number.", [forgotPhoneInput, forgotEmailInput]);
         return;
       }
 

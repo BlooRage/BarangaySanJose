@@ -45,15 +45,11 @@ $useraccountstbl = $data['useraccountstbl'] ?? [];
 
                         <!-- PERSONAL INFORMATION -->
                         <h2 class="section-title text-center text-dark">Personal Information</h2>
-                        <div class="status-row">
-                            <label for="application_date">Application Date:</label>
-                            <input type="text" id="application_date" name="application_date" value="<?php echo date('Y-m-d H:i:s'); ?>" readonly>
-                        </div>
-                        <br>
-                        <div class="status-row">
+                        <input type="hidden" id="application_date" name="application_date" value="<?php echo date('Y-m-d H:i:s'); ?>">
+                        <!-- <div class="status-row">
                             <label><input type="checkbox" name="pwd" class="text-center"> PWD</label>
                             <label><input type="checkbox" name="senior" class="text-center"> Senior Citizen</label>
-                        </div>
+                        </div> -->
                         <div class="form-row pt-0">
                             <div>
                                 <label class="top-label">First Name <span class="required-asterisk">*</span> </label>
@@ -96,47 +92,342 @@ $useraccountstbl = $data['useraccountstbl'] ?? [];
                                         <input type="text" class="form-control" id="streetName" name="streetName" readonly value="<?php echo htmlspecialchars($residentaddresstbl['street_name'] ?? ''); ?>">
                                     </div>
                                 </div>
+                                <div class="row mb-3">
+                                    <div class="col-md-6">
+                                        <label class="top-label" for="applicantSubdivision">Subdivision</label>
+                                        <input type="text" class="form-control" id="applicantSubdivision" name="applicantSubdivision" readonly value="<?php echo htmlspecialchars($residentaddresstbl['subdivision'] ?? ''); ?>">
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label class="top-label" for="applicantAreaNumber">Area <span class="required-asterisk">*</span></label>
+                                        <input type="text" class="form-control" id="applicantAreaNumber" name="applicantAreaNumber" readonly value="<?php echo htmlspecialchars($residentaddresstbl['area_number'] ?? ''); ?>">
+                                    </div>
+                                </div>
                             </div>
                         </div>
 
-                                <h2 class="section-title text-center text-dark">Detainee's Information</h2>
-                                <div class="form-row pt-0">
-                                    <div>
-                                        <label class="top-label">First Name <span class="required-asterisk">*</span> </label>
-                                        <input type="text" name="detainee_first" required>
-                                    </div>
-                                    <div>
-                                        <label class="top-label">Last Name <span class="required-asterisk">*</span> </label>
-                                        <input type="text" name="detainee_last" required>
-                                    </div>
-                                    <div>
-                                        <label class="top-label">Middle Name</label>
-                                        <input type="text" name="detainee_middle">
-                                    </div>
+                        <h2 class="section-title text-center text-dark">Cohabitant / Partner Information</h2>
+                        <div class="form-row pt-0">
+                            <div>
+                                <label class="top-label">First Name <span class="required-asterisk">*</span> </label>
+                                <input type="text" name="cohabitant_first" required>
+                            </div>
+                            <div>
+                                <label class="top-label">Last Name <span class="required-asterisk">*</span> </label>
+                                <input type="text" name="cohabitant_last" required>
+                            </div>
+                            <div>
+                                <label class="top-label">Middle Name</label>
+                                <input type="text" name="cohabitant_middle">
+                            </div>
 
-                                    <div>
-                                        <label class="top-label">Suffix</label>
-                                        <select name="detainee_suffix">
-                                            <option value="">None</option>
-                                            <option value="Jr.">Jr.</option>
-                                            <option value="Sr.">Sr.</option>
-                                            <option value="III">III</option>
-                                            <option value="IV">IV</option>
+                            <div>
+                                <label class="top-label">Suffix</label>
+                                <select name="cohabitant_suffix">
+                                    <option value="">None</option>
+                                    <option value="Jr.">Jr.</option>
+                                    <option value="Sr.">Sr.</option>
+                                    <option value="III">III</option>
+                                    <option value="IV">IV</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="form-row">
+                            <div>
+                                <label class="top-label">Civil Status <span class="required-asterisk">*</span></label>
+                                <select name="cohabitant_civil_status" required>
+                                    <option value="" selected>Select</option>
+                                    <option value="Single">Single</option>
+                                    <option value="Married">Married</option>
+                                    <option value="Widowed">Widowed</option>
+                                    <option value="Separated">Separated</option>
+                                    <option value="Annulled">Annulled</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="top-label">Nationality <span class="required-asterisk">*</span></label>
+                                <input type="text" name="cohabitant_nationality" required>
+                            </div>
+                            <div>
+                                <label class="top-label">Date of Birth <span class="required-asterisk">*</span></label>
+                                <input type="date" name="cohabitant_dob" required>
+                            </div>
+                            <div>
+                                <label class="top-label">Occupation</label>
+                                <input type="text" name="cohabitant_occupation">
+                            </div>
+                        </div>
+
+                        <div class="form-row">
+                            <div class="full-width">
+                                <label class="top-label check-item">
+                                    <input type="checkbox" id="cohabitantSameAddress" name="cohabitantSameAddress">
+                                    Same address as applicant
+                                </label>
+                            </div>
+                        </div>
+
+                        <div class="form-row">
+                            <div class="full-width">
+                                <label class="top-label" for="cohabitantAddressSystem">Address System <span class="required-asterisk">*</span></label>
+                                <select id="cohabitantAddressSystem" name="cohabitant_address_system" required>
+                                    <option value="">Select</option>
+                                    <option value="house">House Numbering System</option>
+                                    <option value="lot_block">Lot/Block System</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div id="cohabitantHouseSystemWrapper" class="form-row pt-0 d-none">
+                            <div class="full-width">
+                                <div class="row mb-3">
+                                    <div class="col-md-4">
+                                        <label class="top-label" for="cohabUnitNumber">Unit / Apartment Number</label>
+                                        <input type="text" class="form-control" id="cohabUnitNumber" name="cohabitant_unit_number">
+                                    </div>
+                                    <div class="col-md-4">
+                                        <label class="top-label" for="cohabHouseNumber">House Number <span class="required-asterisk">*</span></label>
+                                        <input type="text" class="form-control" id="cohabHouseNumber" name="cohabitant_house_number">
+                                    </div>
+                                    <div class="col-md-4">
+                                        <label class="top-label" for="cohabStreetName">Street Name <span class="required-asterisk">*</span></label>
+                                        <input type="text" class="form-control" id="cohabStreetName" name="cohabitant_street_name">
+                                    </div>
+                                </div>
+                                <div class="row mb-3">
+                                    <div class="col-md-6">
+                                        <label class="top-label" for="cohabitantSubdivision">Subdivision</label>
+                                        <input type="text" class="form-control" id="cohabitantSubdivision" name="cohabitant_subdivision">
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label class="top-label" for="cohabitantAreaNumber">Area <span class="required-asterisk">*</span></label>
+                                        <select class="form-select" id="cohabitantAreaNumber" name="cohabitant_area_number">
+                                            <option value="">Select</option>
+                                            <option value="Area 01">Area 01</option>
+                                            <option value="Area 1A">Area 1A</option>
+                                            <option value="Area 02">Area 02</option>
+                                            <option value="Area 03">Area 03</option>
+                                            <option value="Area 04">Area 04</option>
+                                            <option value="Area 05">Area 05</option>
+                                            <option value="Area 06">Area 06</option>
                                         </select>
                                     </div>
                                 </div>
-                                <div class="form-row">
-                                    <div class="full-width">
-                                        <label class="top-label">Kaugnayan (Ex. Anak) <span class="required-asterisk">*</span> </label>
-                                        <input type="text" name="detainee_relationship" required>
+                            </div>
+                        </div>
+
+                        <div id="cohabitantLotBlockSystemWrapper" class="form-row pt-0 d-none">
+                            <div class="full-width">
+                                <div class="row mb-3">
+                                    <div class="col-md-3">
+                                        <label class="top-label" for="cohabUnitNumberLot">Unit / Apartment Number</label>
+                                        <input type="text" class="form-control" id="cohabUnitNumberLot" name="cohabitant_unit_number_lot">
+                                    </div>
+                                    <div class="col-md-3">
+                                        <label class="top-label" for="cohabLotNumber">Lot <span class="required-asterisk">*</span></label>
+                                        <input type="text" class="form-control" id="cohabLotNumber" name="cohabitant_lot_number">
+                                    </div>
+                                    <div class="col-md-3">
+                                        <label class="top-label" for="cohabBlockNumber">Block <span class="required-asterisk">*</span></label>
+                                        <input type="text" class="form-control" id="cohabBlockNumber" name="cohabitant_block_number">
+                                    </div>
+                                    <div class="col-md-3">
+                                        <label class="top-label" for="cohabPhaseNumber">Phase <span class="required-asterisk">*</span></label>
+                                        <input type="text" class="form-control" id="cohabPhaseNumber" name="cohabitant_phase_number">
                                     </div>
                                 </div>
-                                <div class="form-row">
-                                    <div class="full-width">
-                                        <label class="top-label">Place of Detention <span class="required-asterisk">*</span> </label>
-                                        <input type="text" name="detainee_place_of_detention" required>
+                                <div class="row mb-3">
+                                    <div class="col-md-6">
+                                        <label class="top-label" for="cohabitantSubdivisionLot">Subdivision</label>
+                                        <input type="text" class="form-control" id="cohabitantSubdivisionLot" name="cohabitant_subdivision_lot">
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label class="top-label" for="cohabitantAreaNumberLot">Area <span class="required-asterisk">*</span></label>
+                                        <select class="form-select" id="cohabitantAreaNumberLot" name="cohabitant_area_number_lot">
+                                            <option value="">Select</option>
+                                            <option value="Area 01">Area 01</option>
+                                            <option value="Area 1A">Area 1A</option>
+                                            <option value="Area 02">Area 02</option>
+                                            <option value="Area 03">Area 03</option>
+                                            <option value="Area 04">Area 04</option>
+                                            <option value="Area 05">Area 05</option>
+                                            <option value="Area 06">Area 06</option>
+                                        </select>
                                     </div>
                                 </div>
+                            </div>
+                        </div>
+
+                        <div id="cohabitantLocationWrapper" class="form-row d-none">
+                            <div class="full-width">
+                                <div class="row mb-3">
+                                    <div class="col-md-4">
+                                        <label class="top-label" for="cohabitantRegionSelect">Region <span class="required-asterisk">*</span></label>
+                                        <select class="form-select" id="cohabitantRegionSelect" name="cohabitant_region_select" required>
+                                            <option value="">Select</option>
+                                        </select>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <label class="top-label" for="cohabitantProvince">Province <span class="required-asterisk">*</span></label>
+                                        <select class="form-select" id="cohabitantProvince" name="cohabitant_province" required>
+                                            <option value="">Select region first</option>
+                                        </select>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <label class="top-label" for="cohabitantCity">City / Municipality <span class="required-asterisk">*</span></label>
+                                        <select class="form-select" id="cohabitantCity" name="cohabitant_city" required>
+                                            <option value="">Select province first</option>
+                                        </select>
+                                    </div>
+                                </div>
+                                <div class="row mb-3">
+                                    <div class="col-md-4">
+                                        <label class="top-label" for="cohabitantBarangay">Barangay <span class="required-asterisk">*</span></label>
+                                        <select class="form-select" id="cohabitantBarangay" name="cohabitant_barangay" required>
+                                            <option value="">Select city first</option>
+                                        </select>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <label class="top-label" for="cohabSubdivision">Subdivision</label>
+                                        <input type="text" class="form-control" id="cohabSubdivision" name="cohabitant_subdivision">
+                                    </div>
+                                    <div class="col-md-4">
+                                        <label class="top-label" for="cohabitantPostalCode">Postal Code <span class="required-asterisk">*</span></label>
+                                        <input type="text" class="form-control" id="cohabitantPostalCode" name="cohabitant_postal_code" inputmode="numeric" maxlength="10" required>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="form-row">
+                            <div>
+                                <label class="top-label">Relationship to Applicant <span class="required-asterisk">*</span></label>
+                                <input type="text" name="cohabitant_relationship" required placeholder="e.g., Partner / Spouse">
+                            </div>
+                            <div>
+                                <label class="top-label">Cohabitation Duration <span class="required-asterisk">*</span></label>
+                                <div class="row g-2">
+                                    <div class="col-6">
+                                        <input type="number" min="1" name="cohabitation_duration_value" class="form-control" required placeholder="e.g., 3">
+                                    </div>
+                                    <div class="col-6">
+                                        <select name="cohabitation_duration_unit" class="form-select" required>
+                                            <option value="">Select</option>
+                                            <option value="Years">Years</option>
+                                            <option value="Months">Months</option>
+                                        </select>
+                                    </div>
+                                </div>
+                            </div>
+                            <div>
+                                <label class="top-label">Started Cohabitation On <span class="required-asterisk">*</span></label>
+                                <input type="date" name="cohabitation_start_date" required>
+                            </div>
+                            <div>
+                                <label class="top-label">Purpose of Certificate <span class="required-asterisk">*</span></label>
+                                <input type="text" name="cohabitation_purpose" required placeholder="e.g., Legal requirement">
+                            </div>
+                        </div>
+
+                        <div class="form-row">
+                            <div class="full-width">
+                                <label class="top-label check-item">
+                                    <input type="checkbox" id="cohabitationSameAddress" name="cohabitationSameAddress">
+                                    Cohabitation address is same as applicant address
+                                </label>
+                            </div>
+                        </div>
+
+                        <div class="form-row">
+                            <div class="full-width">
+                                <label class="top-label" for="cohabitationAddressSystem">Cohabitation Address System <span class="required-asterisk">*</span></label>
+                                <select id="cohabitationAddressSystem" name="cohabitation_address_system" required>
+                                    <option value="">Select</option>
+                                    <option value="house">House Numbering System</option>
+                                    <option value="lot_block">Lot/Block System</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div id="cohabitationHouseSystemWrapper" class="form-row pt-0 d-none">
+                            <div class="full-width">
+                                <div class="row mb-3">
+                                    <div class="col-md-4">
+                                        <label class="top-label" for="cohabitationUnitNumber">Unit / Apartment Number</label>
+                                        <input type="text" class="form-control" id="cohabitationUnitNumber" name="cohabitation_unit_number">
+                                    </div>
+                                    <div class="col-md-4">
+                                        <label class="top-label" for="cohabitationHouseNumber">House Number <span class="required-asterisk">*</span></label>
+                                        <input type="text" class="form-control" id="cohabitationHouseNumber" name="cohabitation_house_number">
+                                    </div>
+                                    <div class="col-md-4">
+                                        <label class="top-label" for="cohabitationStreetName">Street Name <span class="required-asterisk">*</span></label>
+                                        <input type="text" class="form-control" id="cohabitationStreetName" name="cohabitation_street_name">
+                                    </div>
+                                </div>
+                                <div class="row mb-3">
+                                    <div class="col-md-6">
+                                        <label class="top-label" for="cohabitationSubdivision">Subdivision</label>
+                                        <input type="text" class="form-control" id="cohabitationSubdivision" name="cohabitation_subdivision">
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label class="top-label" for="cohabitationAreaNumber">Area <span class="required-asterisk">*</span></label>
+                                        <select class="form-select" id="cohabitationAreaNumber" name="cohabitation_area_number">
+                                            <option value="">Select</option>
+                                            <option value="Area 01">Area 01</option>
+                                            <option value="Area 1A">Area 1A</option>
+                                            <option value="Area 02">Area 02</option>
+                                            <option value="Area 03">Area 03</option>
+                                            <option value="Area 04">Area 04</option>
+                                            <option value="Area 05">Area 05</option>
+                                            <option value="Area 06">Area 06</option>
+                                        </select>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div id="cohabitationLotBlockSystemWrapper" class="form-row pt-0 d-none">
+                            <div class="full-width">
+                                <div class="row mb-3">
+                                    <div class="col-md-3">
+                                        <label class="top-label" for="cohabitationUnitNumberLot">Unit / Apartment Number</label>
+                                        <input type="text" class="form-control" id="cohabitationUnitNumberLot" name="cohabitation_unit_number_lot">
+                                    </div>
+                                    <div class="col-md-3">
+                                        <label class="top-label" for="cohabitationLotNumber">Lot <span class="required-asterisk">*</span></label>
+                                        <input type="text" class="form-control" id="cohabitationLotNumber" name="cohabitation_lot_number">
+                                    </div>
+                                    <div class="col-md-3">
+                                        <label class="top-label" for="cohabitationBlockNumber">Block <span class="required-asterisk">*</span></label>
+                                        <input type="text" class="form-control" id="cohabitationBlockNumber" name="cohabitation_block_number">
+                                    </div>
+                                    <div class="col-md-3">
+                                        <label class="top-label" for="cohabitationPhaseNumber">Phase <span class="required-asterisk">*</span></label>
+                                        <input type="text" class="form-control" id="cohabitationPhaseNumber" name="cohabitation_phase_number">
+                                    </div>
+                                </div>
+                                <div class="row mb-3">
+                                    <div class="col-md-6">
+                                        <label class="top-label" for="cohabitationSubdivisionLot">Subdivision</label>
+                                        <input type="text" class="form-control" id="cohabitationSubdivisionLot" name="cohabitation_subdivision_lot">
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label class="top-label" for="cohabitationAreaNumberLot">Area <span class="required-asterisk">*</span></label>
+                                        <select class="form-select" id="cohabitationAreaNumberLot" name="cohabitation_area_number_lot">
+                                            <option value="">Select</option>
+                                            <option value="Area 01">Area 01</option>
+                                            <option value="Area 1A">Area 1A</option>
+                                            <option value="Area 02">Area 02</option>
+                                            <option value="Area 03">Area 03</option>
+                                            <option value="Area 04">Area 04</option>
+                                            <option value="Area 05">Area 05</option>
+                                            <option value="Area 06">Area 06</option>
+                                        </select>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
 
 
 
@@ -161,12 +452,6 @@ $useraccountstbl = $data['useraccountstbl'] ?? [];
 </body>
 
 </html>
-
-
-
-
-
-
 
 
 

@@ -87,6 +87,15 @@ $update = $conn->prepare("UPDATE otprequesttbl SET status_id_otp = ? WHERE otp_i
 $update->bind_param("ii", $STATUS_VERIFIED, $otp_id);
 $update->execute();
 
+// Bind signup flow to a verified server-side session.
+if ($purpose === 'signup') {
+    $_SESSION['signup_otp_verified'] = [
+        'phone' => (string)$recipient,
+        'otp_id' => (int)$otp_id,
+        'verified_at' => time()
+    ];
+}
+
 // Bind forgot-password flow to a verified server-side session.
 if ($purpose === 'forgot') {
     $acctStmt = $conn->prepare("

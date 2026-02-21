@@ -3,26 +3,90 @@ $allowUnregistered = false;
 require_once __DIR__ . "/includes/resident_access_guard.php";
 
 $existingSectorMembership = [];
+$existingSectorKeys = [];
+$sectorStatusByKey = [];
+$sectorKeysNeedingProof = [];
+$sectorKeyToLabel = [
+    'PWD' => 'PWD',
+    'SingleParent' => 'Single Parent',
+    'Student' => 'Student',
+    'SeniorCitizen' => 'Senior Citizen',
+    'IndigenousPeople' => 'Indigenous People',
+];
+$sectorLabelToKey = [
+    'PWD' => 'PWD',
+    'Single Parent' => 'SingleParent',
+    'Student' => 'Student',
+    'Senior Citizen' => 'SeniorCitizen',
+    'Indigenous People' => 'IndigenousPeople',
+];
 if (isset($conn) && $conn instanceof mysqli) {
-    $stmt = $conn->prepare("SELECT sector_membership FROM residentinformationtbl WHERE user_id = ? LIMIT 1");
+    $residentId = '';
+    $stmt = $conn->prepare("SELECT resident_id, sector_membership FROM residentinformationtbl WHERE user_id = ? LIMIT 1");
     if ($stmt) {
         $stmt->bind_param("s", $_SESSION['user_id']);
         $stmt->execute();
-        $stmt->bind_result($sectorRaw);
+        $stmt->bind_result($residentId, $sectorRaw);
         if ($stmt->fetch() && !empty($sectorRaw)) {
             $existingSectorMembership = array_values(array_filter(array_map('trim', explode(',', (string)$sectorRaw))));
         }
         $stmt->close();
     }
-}
 
-function sectorChecked(array $existing, string $label): string {
-    foreach ($existing as $value) {
-        if (strcasecmp($value, $label) === 0) {
-            return 'checked';
+    foreach ($existingSectorMembership as $label) {
+        foreach ($sectorLabelToKey as $knownLabel => $key) {
+            if (strcasecmp($label, $knownLabel) === 0) {
+                $existingSectorKeys[] = $key;
+                break;
+            }
         }
     }
-    return '';
+
+    if ($residentId !== '') {
+        $stmtSector = $conn->prepare("
+            SELECT DISTINCT rsm.sector_key, COALESCE(s.status_name, '') AS status_name
+            FROM residentsectormembershiptbl rsm
+            LEFT JOIN statuslookuptbl s ON s.status_id = rsm.sector_status_id
+            WHERE rsm.resident_id = ?
+        ");
+        if ($stmtSector) {
+            $stmtSector->bind_param("s", $residentId);
+            $stmtSector->execute();
+            $resSector = $stmtSector->get_result();
+            while ($row = $resSector ? $resSector->fetch_assoc() : null) {
+                $rawKey = trim((string)($row['sector_key'] ?? ''));
+                if ($rawKey === '') continue;
+                foreach (array_keys($sectorKeyToLabel) as $knownKey) {
+                    if (strcasecmp($rawKey, $knownKey) === 0) {
+                        $existingSectorKeys[] = $knownKey;
+                        $sectorStatusByKey[$knownKey] = (string)($row['status_name'] ?? '');
+                        break;
+                    }
+                }
+            }
+            $stmtSector->close();
+        }
+    }
+}
+
+$existingSectorKeys = array_values(array_unique($existingSectorKeys));
+foreach ($existingSectorKeys as $key) {
+    $statusName = strtolower(trim((string)($sectorStatusByKey[$key] ?? '')));
+    $statusKey = preg_replace('/[\s_-]+/', '', $statusName);
+    $isPendingOrVerified = (
+        $statusKey === 'verified' ||
+        $statusKey === 'approved' ||
+        strpos($statusKey, 'pending') !== false ||
+        strpos($statusKey, 'review') !== false
+    );
+    if (!$isPendingOrVerified) {
+        $sectorKeysNeedingProof[] = $key;
+    }
+}
+$sectorKeysNeedingProof = array_values(array_unique($sectorKeysNeedingProof));
+$resubmitMode = strtolower(trim((string)($_GET['mode'] ?? '')));
+if (!in_array($resubmitMode, ['sector', 'profiling'], true)) {
+    $resubmitMode = '';
 }
 ?>
 <!DOCTYPE html>
@@ -51,6 +115,7 @@ function sectorChecked(array $existing, string $label): string {
                     <div id="uploadRequirementsNotice" class="alert alert-info d-none small" role="alert"></div>
 
                     <form id="documentUploadForm" method="POST" action="../PhpFiles/Resident-End/residentDocumentUpload.php" enctype="multipart/form-data">
+                        <input type="hidden" name="resubmit_mode" value="<?= htmlspecialchars($resubmitMode, ENT_QUOTES, 'UTF-8') ?>">
                         <div id="proofRequirementSection">
                         <div class="row g-3 mb-4" id="proofTypeWrapper">
                             <div>
@@ -146,16 +211,12 @@ function sectorChecked(array $existing, string $label): string {
                             </div>
                         </div>
 
-                        <div class="mb-4">
-                            <label class="form-label fw-semibold d-block">Sector Membership (optional)</label>
-                            <div class="row row-cols-1 row-cols-md-2 g-2">
-                                <div class="col"><div class="form-check"><input class="form-check-input" type="checkbox" id="sectorPWD" name="sectorMembership[]" value="PWD" <?= sectorChecked($existingSectorMembership, 'PWD') ?>><label class="form-check-label" for="sectorPWD">PWD</label></div></div>
-                                <div class="col"><div class="form-check"><input class="form-check-input" type="checkbox" id="sectorSP" name="sectorMembership[]" value="Single Parent" <?= sectorChecked($existingSectorMembership, 'Single Parent') ?>><label class="form-check-label" for="sectorSP">Single Parent</label></div></div>
-                                <div class="col"><div class="form-check"><input class="form-check-input" type="checkbox" id="sectorStudent" name="sectorMembership[]" value="Student" <?= sectorChecked($existingSectorMembership, 'Student') ?>><label class="form-check-label" for="sectorStudent">Student</label></div></div>
-                                <div class="col"><div class="form-check"><input class="form-check-input" type="checkbox" id="sectorSenior" name="sectorMembership[]" value="Senior Citizen" <?= sectorChecked($existingSectorMembership, 'Senior Citizen') ?>><label class="form-check-label" for="sectorSenior">Senior Citizen</label></div></div>
-                                <div class="col"><div class="form-check"><input class="form-check-input" type="checkbox" id="sectorIP" name="sectorMembership[]" value="Indigenous People" <?= sectorChecked($existingSectorMembership, 'Indigenous People') ?>><label class="form-check-label" for="sectorIP">Indigenous People</label></div></div>
-                            </div>
+                        <?php if (!empty($existingSectorKeys)): ?>
+                        <div class="mb-3 small text-muted">
+                            Sector memberships on record:
+                            <?= htmlspecialchars(implode(', ', array_values(array_map(static function ($key) use ($sectorKeyToLabel) { return $sectorKeyToLabel[$key] ?? $key; }, $existingSectorKeys))), ENT_QUOTES, 'UTF-8') ?>
                         </div>
+                        <?php endif; ?>
 
                         <div id="sectorProofSection" class="d-none">
                             <h3 class="section-title mt-2 mb-0">Sector Membership Supporting Documents</h3>
@@ -309,13 +370,17 @@ document.addEventListener("DOMContentLoaded", () => {
   const sectorProofSection = document.getElementById("sectorProofSection");
   let needsProof = true;
   let needsPicture = true;
+  const resubmitMode = <?= json_encode($resubmitMode, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) ?>;
+  const forceSectorOnly = resubmitMode === "sector";
+  const forceProfilingOnly = resubmitMode === "profiling";
+  const availableSectorKeys = <?= json_encode(array_values($sectorKeysNeedingProof), JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) ?>;
 
   const sectorMap = {
-    PWD: { checkboxId: "sectorPWD", cardId: "sectorProofPWD", required: false },
-    SeniorCitizen: { checkboxId: "sectorSenior", cardId: "sectorProofSenior", required: false },
-    Student: { checkboxId: "sectorStudent", cardId: "sectorProofStudent", required: false },
-    IndigenousPeople: { checkboxId: "sectorIP", cardId: "sectorProofIP", required: false },
-    SingleParent: { checkboxId: "sectorSP", cardId: "sectorProofSoloParent", required: false }
+    PWD: { cardId: "sectorProofPWD", required: false },
+    SeniorCitizen: { cardId: "sectorProofSenior", required: false },
+    Student: { cardId: "sectorProofStudent", required: false },
+    IndigenousPeople: { cardId: "sectorProofIP", required: false },
+    SingleParent: { cardId: "sectorProofSoloParent", required: false }
   };
 
   function modalError(message) {
@@ -368,12 +433,7 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   function getSelectedSectorKeys() {
-    const keys = [];
-    Object.keys(sectorMap).forEach((key) => {
-      const cb = document.getElementById(sectorMap[key].checkboxId);
-      if (cb && cb.checked) keys.push(key);
-    });
-    return keys;
+    return availableSectorKeys.filter((key) => !!sectorMap[key]);
   }
 
   function isSectorUploadProhibited(sectorKey) {
@@ -501,6 +561,18 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   function setProofUi() {
+    if (forceSectorOnly) {
+      if (proofRequirementSection) {
+        proofRequirementSection.classList.add("d-none");
+        disableInputsInSection(proofRequirementSection, true);
+      }
+      if (pictureRequirementSection) {
+        pictureRequirementSection.classList.add("d-none");
+        disableInputsInSection(pictureRequirementSection, true);
+      }
+      return;
+    }
+
     if (!needsProof) {
       if (proofRequirementSection) proofRequirementSection.classList.add("d-none");
       return;
@@ -515,6 +587,14 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   function updateSectorUi() {
+    if (forceProfilingOnly) {
+      if (sectorProofSection) {
+        sectorProofSection.classList.add("d-none");
+        disableInputsInSection(sectorProofSection, true);
+      }
+      return;
+    }
+
     const selectedKeys = getSelectedSectorKeys();
     sectorProofSection.classList.toggle("d-none", selectedKeys.length === 0);
 
@@ -602,27 +682,31 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   function validateBeforeSubmit() {
-    if (needsProof && !proofTypeSelect.value) {
+    if (!forceSectorOnly && needsProof && !proofTypeSelect.value) {
       modalError("Please select a proof type.");
       return false;
     }
 
-    if (needsProof && proofTypeSelect.value === "ID") {
+    if (!forceSectorOnly && needsProof && proofTypeSelect.value === "ID") {
       if (!idTypeSelect.value) return modalError("Please select an ID type."), false;
       if (!idNumberInput.value.trim()) return modalError("Please provide your ID number."), false;
       if (!idFrontInput.files.length) return modalError("Please upload the ID front file."), false;
       if (!isPassportSelected() && !idBackInput.files.length) return modalError("Please upload the ID back file."), false;
     }
 
-    if (needsProof && proofTypeSelect.value === "Document") {
+    if (!forceSectorOnly && needsProof && proofTypeSelect.value === "Document") {
       if (!documentTypeSelect.value) return modalError("Please select a document type."), false;
       const docFiles = Array.from(document.querySelectorAll('input[name="documentProof[]"]'));
       if (countFiles(docFiles) === 0) return modalError("Please upload at least one supporting document."), false;
     }
 
-    if (needsPicture && !pictureInput.files.length) {
+    if (!forceSectorOnly && needsPicture && !pictureInput.files.length) {
       modalError("Please upload a 2x2 profile picture.");
       return false;
+    }
+
+    if (forceProfilingOnly) {
+      return true;
     }
 
     const selectedKeys = getSelectedSectorKeys();
@@ -683,25 +767,48 @@ document.addEventListener("DOMContentLoaded", () => {
     needsProof = !!requirements?.proof?.needs_upload;
     needsPicture = !!requirements?.picture?.needs_upload;
 
+    if (forceSectorOnly) {
+      needsProof = false;
+      needsPicture = false;
+    }
+
     if (proofRequirementSection) {
       proofRequirementSection.classList.toggle("d-none", !needsProof);
-      disableInputsInSection(proofRequirementSection, !needsProof);
+      disableInputsInSection(proofRequirementSection, !needsProof || forceSectorOnly);
     }
 
     if (pictureRequirementSection) {
       pictureRequirementSection.classList.toggle("d-none", !needsPicture);
-      disableInputsInSection(pictureRequirementSection, !needsPicture);
+      disableInputsInSection(pictureRequirementSection, !needsPicture || forceSectorOnly);
+    }
+
+    if (forceProfilingOnly && sectorProofSection) {
+      sectorProofSection.classList.add("d-none");
+      disableInputsInSection(sectorProofSection, true);
+    } else if (sectorProofSection) {
+      disableInputsInSection(sectorProofSection, false);
     }
 
     if (!needsProof && !needsPicture) {
-      setNotice("All required documents are already submitted or verified. No re-upload is needed right now.", "success");
-      if (submitBtn) submitBtn.disabled = true;
+      if (forceSectorOnly) {
+        setNotice("Resubmit mode: upload sector membership supporting document(s) only.", "info");
+        if (submitBtn) submitBtn.disabled = false;
+      } else {
+        setNotice("All required documents are already submitted or verified. No re-upload is needed right now.", "success");
+        if (submitBtn) submitBtn.disabled = true;
+      }
     } else {
       if (submitBtn) submitBtn.disabled = false;
       const parts = [];
       if (needsProof) parts.push(`proof of residency/identification (${proofState})`);
       if (needsPicture) parts.push(`2x2 profile image (${pictureState})`);
-      setNotice(`Please upload only the required item(s): ${parts.join(" and ")}.`, "warning");
+      if (forceProfilingOnly) {
+        setNotice(`Resubmit mode: upload resident profiling requirement(s) only: ${parts.join(" and ")}.`, "warning");
+      } else if (forceSectorOnly) {
+        setNotice("Resubmit mode: upload sector membership supporting document(s) only.", "info");
+      } else {
+        setNotice(`Please upload only the required item(s): ${parts.join(" and ")}.`, "warning");
+      }
     }
   }
 
@@ -728,9 +835,6 @@ document.addEventListener("DOMContentLoaded", () => {
   if (addDocumentBtn) addDocumentBtn.addEventListener("click", addDocumentAttachment);
 
   Object.keys(sectorMap).forEach((sectorKey) => {
-    const checkbox = document.getElementById(sectorMap[sectorKey].checkboxId);
-    if (checkbox) checkbox.addEventListener("change", updateSectorUi);
-
     const { docType, addBtn } = getSectorElements(sectorKey);
     if (docType) docType.addEventListener("change", updateSectorUi);
     if (addBtn) addBtn.addEventListener("click", () => addSectorAttachment(sectorKey));

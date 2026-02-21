@@ -16,6 +16,8 @@ $suffix = $residentinformationtbl['suffix'] ?? '';
 $unitNumber = htmlspecialchars($residentaddresstbl['unit_number'] ?? '', ENT_QUOTES, 'UTF-8');
 $streetNumber = htmlspecialchars($residentaddresstbl['street_number'] ?? '', ENT_QUOTES, 'UTF-8');
 $streetName = htmlspecialchars($residentaddresstbl['street_name'] ?? '', ENT_QUOTES, 'UTF-8');
+$subdivision = htmlspecialchars($residentaddresstbl['subdivision'] ?? '', ENT_QUOTES, 'UTF-8');
+$areaNumber = htmlspecialchars($residentaddresstbl['area_number'] ?? '', ENT_QUOTES, 'UTF-8');
 $phoneNumber = htmlspecialchars($useraccountstbl['phone_number'] ?? '', ENT_QUOTES, 'UTF-8');
 ?>
 <!DOCTYPE html>
@@ -126,51 +128,16 @@ $phoneNumber = htmlspecialchars($useraccountstbl['phone_number'] ?? '', ENT_QUOT
                                         <input type="text" class="form-control" id="streetName" name="streetName" readonly value="<?php echo $streetName; ?>">
                                     </div>
                                 </div>
-                            </div>
-                        </div>
-
-                        <div class="form-row pb-0">
-                            <div class="full-width">
-                                <label class="top-label">Name of Applicant <span class="required-asterisk">*</span></label>
-                            </div>
-                        </div>
-
-                        <div class="form-row pt-0">
-                            <div>
-                                <label class="top-label">First Name <span class="required-asterisk">*</span></label>
-                                <input type="text" name="receiver_first" required>
-                            </div>
-                            <div>
-                                <label class="top-label">Last Name <span class="required-asterisk">*</span></label>
-                                <input type="text" name="receiver_last" required>
-                            </div>
-                            <div>
-                                <label class="top-label">Middle Name</label>
-                                <input type="text" name="receiver_middle">
-                            </div>
-                            <div>
-                                <label class="top-label">Suffix</label>
-                                <select name="receiver_suffix">
-                                    <option value="">None</option>
-                                    <option value="Jr.">Jr.</option>
-                                    <option value="Sr.">Sr.</option>
-                                    <option value="III">III</option>
-                                    <option value="IV">IV</option>
-                                </select>
-                            </div>
-                        </div>
-
-                        <div class="form-row">
-                            <div class="full-width">
-                                <label class="top-label">Relationship (Ex. Child) <span class="required-asterisk">*</span></label>
-                                <input type="text" name="request_relationship" required>
-                            </div>
-                        </div>
-
-                        <div class="form-row">
-                            <div class="full-width">
-                                <label class="top-label">Contact Number <span class="required-asterisk">*</span></label>
-                                <input type="text" name="request_contact_number" required>
+                                <div class="row mb-3">
+                                    <div class="col-md-6">
+                                        <label class="top-label" for="applicantSubdivision">Subdivision</label>
+                                        <input type="text" class="form-control" id="applicantSubdivision" name="applicantSubdivision" readonly value="<?php echo $subdivision; ?>">
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label class="top-label" for="applicantAreaNumber">Area <span class="required-asterisk">*</span></label>
+                                        <input type="text" class="form-control" id="applicantAreaNumber" name="applicantAreaNumber" readonly value="<?php echo $areaNumber; ?>">
+                                    </div>
+                                </div>
                             </div>
                         </div>
 
