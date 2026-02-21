@@ -626,6 +626,20 @@ h2.section-title {
     transform: translate(45%, -45%);
 }
 
+.filter-btn.has-notif {
+    position: relative;
+    overflow: visible;
+    padding-right: 16px;
+}
+
+.filter-btn.has-notif .pending-count-badge {
+    position: absolute;
+    top: 0;
+    right: 0;
+    margin-left: 0;
+    transform: translate(45%, -45%);
+}
+
 /* Default inactive button style */
 .btn-outline-custom {
     color: #DE710C !important;

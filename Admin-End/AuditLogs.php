@@ -17,6 +17,7 @@
     <?php
       require_once "../PhpFiles/General/connection.php";
       require_once "includes/admin_guard.php";
+      requireRoleSession(['SuperAdmin'], false);
       include "includes/sidebar.php";
     ?>
 

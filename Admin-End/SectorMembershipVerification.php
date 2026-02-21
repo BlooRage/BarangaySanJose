@@ -10,7 +10,7 @@
     <script src="https://kit.fontawesome.com/3482e00999.js" crossorigin="anonymous"></script>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="../CSS-Styles/Admin-End-CSS/AdminDashboardStyle.css">
-    <link rel="stylesheet" href="../CSS-Styles/Admin-End-CSS/ResidentMasterlistStyle.css?v=20260219-2">
+    <link rel="stylesheet" href="../CSS-Styles/Admin-End-CSS/ResidentMasterlistStyle.css?v=20260222-1">
 </head>
 
 <body>
@@ -35,7 +35,10 @@ include 'includes/sidebar.php';
 	            <div class="admin-list-toolbar mb-3">
 	                <div class="admin-list-tabs">
 	                    <button class="btn btn-outline-primary btn-sm filter-btn active" data-filter="ALL">All</button>
-	                    <button class="btn btn-outline-secondary btn-sm filter-btn" data-filter="PendingReview">Pending</button>
+	                    <button class="btn btn-outline-secondary btn-sm filter-btn has-notif" data-filter="PendingReview">
+                        Pending
+                        <span id="pendingSectorBadge" class="pending-count-badge d-none">0</span>
+                      </button>
 	                    <button class="btn btn-outline-secondary btn-sm filter-btn" data-filter="Verified">Verified</button>
 	                    <button class="btn btn-outline-secondary btn-sm filter-btn" data-filter="Rejected">Rejected</button>
 	                </div>
@@ -222,5 +225,3 @@ include 'includes/sidebar.php';
 <script src="../JS-Script-Files/Admin-End/sectorMembershipVerificationScript.js?v=20260219-1"></script>
 </body>
 </html>
-
-

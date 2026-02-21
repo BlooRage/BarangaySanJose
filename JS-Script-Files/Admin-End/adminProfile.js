@@ -69,8 +69,11 @@ document.addEventListener("DOMContentLoaded", () => {
 
   bindSave("btnSaveAddress", "addressSaveResult", () => ({
     section: "address",
+    address_mode: (document.getElementById("adminAddressMode")?.value || "street").trim(),
     house_number: (document.getElementById("adminHouseNumber")?.value || "").trim(),
     street_name: (document.getElementById("adminStreetName")?.value || "").trim(),
+    block_number: (document.getElementById("adminBlockNumber")?.value || "").trim(),
+    lot_number: (document.getElementById("adminLotNumber")?.value || "").trim(),
     barangay: (document.getElementById("adminBarangay")?.value || "").trim(),
     municipality_city: (document.getElementById("adminMunicipalityCity")?.value || "").trim(),
     province: (document.getElementById("adminProvince")?.value || "").trim(),

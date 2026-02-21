@@ -24,6 +24,9 @@ $conn->query("ALTER TABLE officialinformationtbl ADD COLUMN IF NOT EXISTS emerge
 $conn->query("ALTER TABLE officialinformationtbl ADD COLUMN IF NOT EXISTS emergency_contact_address VARCHAR(255) NULL");
 $conn->query("ALTER TABLE officialinformationtbl ADD COLUMN IF NOT EXISTS house_number VARCHAR(50) NULL");
 $conn->query("ALTER TABLE officialinformationtbl ADD COLUMN IF NOT EXISTS street_name VARCHAR(150) NULL");
+$conn->query("ALTER TABLE officialinformationtbl ADD COLUMN IF NOT EXISTS address_mode VARCHAR(20) NULL");
+$conn->query("ALTER TABLE officialinformationtbl ADD COLUMN IF NOT EXISTS block_number VARCHAR(50) NULL");
+$conn->query("ALTER TABLE officialinformationtbl ADD COLUMN IF NOT EXISTS lot_number VARCHAR(50) NULL");
 $conn->query("ALTER TABLE officialinformationtbl ADD COLUMN IF NOT EXISTS barangay VARCHAR(150) NULL");
 $conn->query("ALTER TABLE officialinformationtbl ADD COLUMN IF NOT EXISTS municipality_city VARCHAR(150) NULL");
 $conn->query("ALTER TABLE officialinformationtbl ADD COLUMN IF NOT EXISTS province VARCHAR(150) NULL");
@@ -154,25 +157,41 @@ if ($section === 'emergency') {
 }
 
 if ($section === 'address') {
+    $addressMode = strtolower(trim((string)($data['address_mode'] ?? 'street')));
+    if (!in_array($addressMode, ['street', 'block_lot'], true)) {
+        $addressMode = 'street';
+    }
     $house = trim((string)($data['house_number'] ?? ''));
     $street = trim((string)($data['street_name'] ?? ''));
+    $block = trim((string)($data['block_number'] ?? ''));
+    $lot = trim((string)($data['lot_number'] ?? ''));
     $barangay = trim((string)($data['barangay'] ?? ''));
     $city = trim((string)($data['municipality_city'] ?? ''));
     $province = trim((string)($data['province'] ?? ''));
 
-    if ($house === '' || $street === '' || $barangay === '' || $city === '' || $province === '') {
+    $missingCore = ($barangay === '' || $city === '' || $province === '');
+    $missingStreet = ($addressMode === 'street' && ($house === '' || $street === ''));
+    $missingBlockLot = ($addressMode === 'block_lot' && ($block === '' || $lot === ''));
+    if ($missingCore || $missingStreet || $missingBlockLot) {
         http_response_code(422);
         echo json_encode(['success' => false, 'message' => 'All address fields are required.']);
         exit;
     }
+    if ($addressMode === 'street') {
+        $block = '';
+        $lot = '';
+    } else {
+        $house = '';
+        $street = '';
+    }
 
-    $stmt = $conn->prepare("UPDATE officialinformationtbl SET house_number=?, street_name=?, barangay=?, municipality_city=?, province=?, last_updated=CURRENT_TIMESTAMP WHERE user_id=? LIMIT 1");
+    $stmt = $conn->prepare("UPDATE officialinformationtbl SET address_mode=?, house_number=?, street_name=?, block_number=?, lot_number=?, barangay=?, municipality_city=?, province=?, last_updated=CURRENT_TIMESTAMP WHERE user_id=? LIMIT 1");
     if (!$stmt) {
         http_response_code(500);
         echo json_encode(['success' => false, 'message' => 'Failed to prepare address update.']);
         exit;
     }
-    $stmt->bind_param('ssssss', $house, $street, $barangay, $city, $province, $userId);
+    $stmt->bind_param('sssssssss', $addressMode, $house, $street, $block, $lot, $barangay, $city, $province, $userId);
     $ok = $stmt->execute();
     $stmt->close();
     if (!$ok) {

@@ -28,6 +28,10 @@ return [
       'from_email' => 'access@barangaysanjose-montalban.com',
       'from_name'  => 'Barangay San Jose Access',
     ],
+    'onboarding_access' => [
+      'from_email' => 'access@barangaysanjose-montalban.com',
+      'from_name'  => 'Barangay San Jose',
+    ],
     'announcement' => [
       'from_email' => 'announcements@barangaysanjose-montalban.com',
       'from_name'  => 'Barangay San Jose Announcements',

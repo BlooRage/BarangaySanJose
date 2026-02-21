@@ -277,6 +277,16 @@ if (!function_exists('oi_ensure_invite_table')) {
             $conn->query("ALTER TABLE officialinvitetbl ADD COLUMN position_access VARCHAR(100) DEFAULT NULL AFTER role_access");
         }
 
+        $hasEmploymentStatus = $conn->query("SHOW COLUMNS FROM officialinvitetbl LIKE 'employment_status'");
+        if ($hasEmploymentStatus instanceof mysqli_result && $hasEmploymentStatus->num_rows === 0) {
+            $conn->query("ALTER TABLE officialinvitetbl ADD COLUMN employment_status VARCHAR(120) DEFAULT NULL AFTER department");
+        }
+
+        $hasAreaNumber = $conn->query("SHOW COLUMNS FROM officialinvitetbl LIKE 'area_number'");
+        if ($hasAreaNumber instanceof mysqli_result && $hasAreaNumber->num_rows === 0) {
+            $conn->query("ALTER TABLE officialinvitetbl ADD COLUMN area_number VARCHAR(50) DEFAULT NULL AFTER employment_status");
+        }
+
         $hasOfficialPosition = $conn->query("SHOW COLUMNS FROM officialinformationtbl LIKE 'position_access'");
         if ($hasOfficialPosition instanceof mysqli_result && $hasOfficialPosition->num_rows === 0) {
             $conn->query("ALTER TABLE officialinformationtbl ADD COLUMN position_access VARCHAR(100) DEFAULT NULL AFTER role_access");
@@ -285,6 +295,11 @@ if (!function_exists('oi_ensure_invite_table')) {
                 SET position_access = role_access
                 WHERE role_access IS NOT NULL AND TRIM(role_access) <> ''
             ");
+        }
+
+        $hasOfficialArea = $conn->query("SHOW COLUMNS FROM officialinformationtbl LIKE 'area_number'");
+        if ($hasOfficialArea instanceof mysqli_result && $hasOfficialArea->num_rows === 0) {
+            $conn->query("ALTER TABLE officialinformationtbl ADD COLUMN area_number VARCHAR(50) NULL AFTER department");
         }
     }
 }

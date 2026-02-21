@@ -17,9 +17,13 @@ $conn->query("ALTER TABLE officialinformationtbl ADD COLUMN IF NOT EXISTS emerge
 $conn->query("ALTER TABLE officialinformationtbl ADD COLUMN IF NOT EXISTS emergency_contact_address VARCHAR(255) NULL");
 $conn->query("ALTER TABLE officialinformationtbl ADD COLUMN IF NOT EXISTS house_number VARCHAR(50) NULL");
 $conn->query("ALTER TABLE officialinformationtbl ADD COLUMN IF NOT EXISTS street_name VARCHAR(150) NULL");
+$conn->query("ALTER TABLE officialinformationtbl ADD COLUMN IF NOT EXISTS address_mode VARCHAR(20) NULL");
+$conn->query("ALTER TABLE officialinformationtbl ADD COLUMN IF NOT EXISTS block_number VARCHAR(50) NULL");
+$conn->query("ALTER TABLE officialinformationtbl ADD COLUMN IF NOT EXISTS lot_number VARCHAR(50) NULL");
 $conn->query("ALTER TABLE officialinformationtbl ADD COLUMN IF NOT EXISTS barangay VARCHAR(150) NULL");
 $conn->query("ALTER TABLE officialinformationtbl ADD COLUMN IF NOT EXISTS municipality_city VARCHAR(150) NULL");
 $conn->query("ALTER TABLE officialinformationtbl ADD COLUMN IF NOT EXISTS province VARCHAR(150) NULL");
+$conn->query("ALTER TABLE officialinformationtbl ADD COLUMN IF NOT EXISTS area_number VARCHAR(50) NULL");
 
 $userId = (string)($_SESSION['user_id'] ?? '');
 $account = null;
@@ -270,6 +274,50 @@ function ap_view_value($value): string
     $v = trim((string)$value);
     return $v !== '' ? $v : 'N/A';
 }
+
+function ap_format_position_label(string $systemRole, string $positionAccess, string $department, string $areaNumber): string
+{
+    $systemRole = trim($systemRole);
+    $positionAccess = trim($positionAccess);
+    $department = trim($department);
+    $areaNumber = trim($areaNumber);
+
+    if ($positionAccess === '') {
+        $positionAccess = $systemRole;
+    }
+    if ($positionAccess === '') {
+        return 'N/A';
+    }
+
+    if ($positionAccess === 'IT Administrator' || $positionAccess === 'Barangay Chairman' || $positionAccess === 'Barangay Official') {
+        return $positionAccess;
+    }
+
+    if (in_array($positionAccess, ['Barangay Police', 'Desk Officer', 'Barangay Secretary', 'Area OIC'], true)) {
+        return ($areaNumber !== '' ? $areaNumber : 'Area N/A') . ' - ' . $positionAccess;
+    }
+
+    if ($positionAccess === 'Department OIC (Officer In Charge)' && strcasecmp($department, 'Barangay Peace and Order') === 0) {
+        return ($areaNumber !== '' ? $areaNumber : 'Area N/A') . ' - OIC (Barangay Police)';
+    }
+
+    if (stripos($positionAccess, 'Department ') === 0) {
+        $positionAccess = trim(substr($positionAccess, strlen('Department ')));
+    }
+
+    if ($department !== '' && strcasecmp($department, 'Office of the Barangay') !== 0) {
+        return $department . ' - ' . $positionAccess;
+    }
+
+    return $positionAccess;
+}
+
+$positionDisplayLabel = ap_format_position_label(
+    (string)($account['role_access'] ?? ''),
+    (string)($profile['position_access'] ?? $profile['role_access'] ?? ''),
+    (string)($profile['department'] ?? ''),
+    (string)($profile['area_number'] ?? '')
+);
 ?>
 <!doctype html>
 <html lang="en">
@@ -497,7 +545,7 @@ function ap_view_value($value): string
                             <?= htmlspecialchars($displayName, ENT_QUOTES, 'UTF-8') ?>
                         </div>
                         <div class="profile-topbar-role">
-                            <?= htmlspecialchars($positionAccess !== '' ? $positionAccess : (string)($account['role_access'] ?? ''), ENT_QUOTES, 'UTF-8') ?>
+                            <?= htmlspecialchars($positionDisplayLabel, ENT_QUOTES, 'UTF-8') ?>
                         </div>
                     </div>
                 </div>
@@ -553,9 +601,16 @@ function ap_view_value($value): string
                 <span>Address</span>
             </div>
             <div class="card-body">
+                <?php $apAddressMode = strtolower(trim((string)($profile['address_mode'] ?? 'street'))); ?>
                 <div class="view-grid">
+                    <div class="view-item"><div class="view-label">Address System</div><div class="view-value"><?= htmlspecialchars($apAddressMode === 'block_lot' ? 'Block / Lot System' : 'Street System', ENT_QUOTES, 'UTF-8') ?></div></div>
+                    <?php if ($apAddressMode === 'block_lot'): ?>
+                    <div class="view-item"><div class="view-label">Block Number</div><div class="view-value"><?= htmlspecialchars(ap_view_value($profile['block_number'] ?? ''), ENT_QUOTES, 'UTF-8') ?></div></div>
+                    <div class="view-item"><div class="view-label">Lot Number</div><div class="view-value"><?= htmlspecialchars(ap_view_value($profile['lot_number'] ?? ''), ENT_QUOTES, 'UTF-8') ?></div></div>
+                    <?php else: ?>
                     <div class="view-item"><div class="view-label">House Number</div><div class="view-value"><?= htmlspecialchars(ap_view_value($profile['house_number'] ?? ''), ENT_QUOTES, 'UTF-8') ?></div></div>
                     <div class="view-item"><div class="view-label">Street Name</div><div class="view-value"><?= htmlspecialchars(ap_view_value($profile['street_name'] ?? ''), ENT_QUOTES, 'UTF-8') ?></div></div>
+                    <?php endif; ?>
                     <div class="view-item"><div class="view-label">Barangay</div><div class="view-value"><?= htmlspecialchars(ap_view_value($profile['barangay'] ?? ''), ENT_QUOTES, 'UTF-8') ?></div></div>
                     <div class="view-item"><div class="view-label">Municipality / City</div><div class="view-value"><?= htmlspecialchars(ap_view_value($profile['municipality_city'] ?? ''), ENT_QUOTES, 'UTF-8') ?></div></div>
                     <div class="view-item"><div class="view-label">Province</div><div class="view-value"><?= htmlspecialchars(ap_view_value($profile['province'] ?? ''), ENT_QUOTES, 'UTF-8') ?></div></div>

@@ -9,6 +9,7 @@
     entriesPerPage: 20,
     active: null, // currently opened application row
   };
+  const pendingBadge = el("pendingSectorBadge");
 
   const entriesPerPageInput = el("sectorEntriesPerPageInput");
   const paginationEl = el("sectorPagination");
@@ -96,6 +97,13 @@
     span.className = meta.cls;
     span.innerText = meta.label;
     return span;
+  };
+
+  const updatePendingCount = () => {
+    if (!pendingBadge) return;
+    const count = (state.apps || []).filter((a) => fmtStatus(a?.verify_status) === "PendingReview").length;
+    pendingBadge.textContent = String(count);
+    pendingBadge.classList.toggle("d-none", count <= 0);
   };
 
 	  const makePreview = (fileUrl, fileName) => {
@@ -521,6 +529,7 @@
     }
 
     // Re-open viewer with updated status, then rerender table.
+    updatePendingCount();
     renderTable();
     openViewer(a);
   };
@@ -542,6 +551,7 @@
     }
 
     state.apps = Array.isArray(data.data) ? data.data : [];
+    updatePendingCount();
     renderTable();
   };
 

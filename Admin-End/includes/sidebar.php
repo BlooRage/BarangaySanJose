@@ -4,6 +4,7 @@ $current = basename($_SERVER['PHP_SELF']);
 // Group pages by section
 $profilingPages = ['ResidentMasterlist.php', 'ResidentArchive.php', 'EditRequests.php', 'SectorMembershipVerification.php'];
 $certPages = ['CertificateTracker.php', 'approved.php', 'denied.php'];
+$userMgmtPages = ['UserMasterlist.php', 'OfficialsManagement.php', 'OfficialInvites.php'];
 $toolsPages = ['AuditLogs.php', 'OfficialInvites.php'];
 
 if (session_status() === PHP_SESSION_NONE) {
@@ -12,19 +13,65 @@ if (session_status() === PHP_SESSION_NONE) {
 
 $isProfilingActive = in_array($current, $profilingPages);
 $isCertActive = in_array($current, $certPages);
+$isUserMgmtActive = in_array($current, $userMgmtPages);
 $isToolsActive = in_array($current, $toolsPages);
+$isSuperAdminSidebar = ((string)($_SESSION['role'] ?? '') === 'SuperAdmin');
 
 $adminDisplayName = "Admin User";
 $adminPosition = "Administrator";
+
+function sb_format_position_label(string $systemRole, string $positionAccess, string $department, string $areaNumber): string
+{
+    $systemRole = trim($systemRole);
+    $positionAccess = trim($positionAccess);
+    $department = trim($department);
+    $areaNumber = trim($areaNumber);
+
+    if ($positionAccess === '') {
+        $positionAccess = $systemRole;
+    }
+    if ($positionAccess === '') {
+        return 'Administrator';
+    }
+
+    if ($positionAccess === 'IT Administrator' || $positionAccess === 'Barangay Chairman' || $positionAccess === 'Barangay Official') {
+        return $positionAccess;
+    }
+
+    if (in_array($positionAccess, ['Barangay Police', 'Desk Officer', 'Barangay Secretary', 'Area OIC'], true)) {
+        return ($areaNumber !== '' ? $areaNumber : 'Area N/A') . ' - ' . $positionAccess;
+    }
+
+    if ($positionAccess === 'Department OIC (Officer In Charge)' && strcasecmp($department, 'Barangay Peace and Order') === 0) {
+        return ($areaNumber !== '' ? $areaNumber : 'Area N/A') . ' - OIC (Barangay Police)';
+    }
+
+    if (stripos($positionAccess, 'Department ') === 0) {
+        $positionAccess = trim(substr($positionAccess, strlen('Department ')));
+    }
+
+    if ($department !== '' && strcasecmp($department, 'Office of the Barangay') !== 0) {
+        return $department . ' - ' . $positionAccess;
+    }
+
+    return $positionAccess;
+}
+
 if (!empty($_SESSION['user_id']) && isset($conn) && $conn instanceof mysqli) {
     $hasPositionAccess = false;
     $colRes = $conn->query("SHOW COLUMNS FROM officialinformationtbl LIKE 'position_access'");
     if ($colRes instanceof mysqli_result && $colRes->num_rows > 0) {
         $hasPositionAccess = true;
     }
+    $hasAreaNumber = false;
+    $areaColRes = $conn->query("SHOW COLUMNS FROM officialinformationtbl LIKE 'area_number'");
+    if ($areaColRes instanceof mysqli_result && $areaColRes->num_rows > 0) {
+        $hasAreaNumber = true;
+    }
     $selectPosition = $hasPositionAccess ? "position_access" : "NULL AS position_access";
+    $selectAreaNumber = $hasAreaNumber ? "area_number" : "NULL AS area_number";
     $stmtInfo = $conn->prepare("
-        SELECT firstname, middlename, lastname, suffix, role_access, {$selectPosition}, department
+        SELECT firstname, middlename, lastname, suffix, role_access, {$selectPosition}, department, {$selectAreaNumber}
         FROM officialinformationtbl
         WHERE user_id = ?
         LIMIT 1
@@ -43,7 +90,12 @@ if (!empty($_SESSION['user_id']) && isset($conn) && $conn instanceof mysqli) {
             if ($fullName !== '') {
                 $adminDisplayName = $fullName;
             }
-            $adminPosition = ($info['position_access'] ?? '') ?: ($info['role_access'] ?: ($info['department'] ?: $adminPosition));
+            $adminPosition = sb_format_position_label(
+                (string)($info['role_access'] ?? ''),
+                (string)($info['position_access'] ?? ''),
+                (string)($info['department'] ?? ''),
+                (string)($info['area_number'] ?? '')
+            );
         }
         $stmtInfo->close();
     }
@@ -125,6 +177,40 @@ if (!empty($_SESSION['user_id']) && isset($conn) && $conn instanceof mysqli) {
         </a>
       </li>
 
+      <?php if ($isSuperAdminSidebar): ?>
+      <li class="mb-1">
+        <button class="btn btn-toggle d-flex align-items-center gap-2 rounded <?= $isUserMgmtActive ? '' : 'collapsed' ?>"
+                data-bs-toggle="collapse"
+                data-bs-target="#usermgmt-collapse"
+                aria-expanded="<?= $isUserMgmtActive ? 'true' : 'false' ?>">
+          <i class="fas fa-users-cog"></i> User Management
+        </button>
+
+        <div class="collapse <?= $isUserMgmtActive ? 'show' : '' ?>" id="usermgmt-collapse">
+          <ul class="btn-toggle-nav list-unstyled fw-normal pb-1 small">
+            <li>
+              <a href="UserMasterlist.php"
+                 class="link-dark rounded <?= $current == 'UserMasterlist.php' ? 'active' : '' ?>">
+                User Masterlist
+              </a>
+            </li>
+            <li>
+              <a href="OfficialsManagement.php"
+                 class="link-dark rounded <?= $current == 'OfficialsManagement.php' ? 'active' : '' ?>">
+                Officials Management
+              </a>
+            </li>
+            <li>
+              <a href="OfficialInvites.php"
+                 class="link-dark rounded <?= $current == 'OfficialInvites.php' ? 'active' : '' ?>">
+                Official Invites
+              </a>
+            </li>
+          </ul>
+        </div>
+      </li>
+      <?php endif; ?>
+
       <!-- CERTIFICATE ISSUANCE -->
       <li class="mb-2">
         <button class="btn btn-toggle d-flex align-items-center gap-2 rounded <?= $isCertActive ? '' : 'collapsed' ?>"
@@ -143,6 +229,7 @@ if (!empty($_SESSION['user_id']) && isset($conn) && $conn instanceof mysqli) {
         </div>
       </li>
 
+      <?php if ($isSuperAdminSidebar): ?>
       <li class="mb-1 mt-3 text-muted small fw-semibold px-2">Tools</li>
 
       <li class="mb-1">
@@ -150,15 +237,6 @@ if (!empty($_SESSION['user_id']) && isset($conn) && $conn instanceof mysqli) {
            class="btn btn-toggle d-flex align-items-center gap-2 rounded <?= $isToolsActive ? 'active' : '' ?>"
            style="<?= $isToolsActive ? 'outline: none; box-shadow: none;' : '' ?>">
           <i class="fas fa-clipboard-list"></i> Audit Logs
-        </a>
-      </li>
-
-      <?php if (in_array((string)($_SESSION['role'] ?? ''), ['SuperAdmin', 'Official', 'Officials', 'Personnel', 'Personnels', 'Admin', 'Employee'], true)): ?>
-      <li class="mb-1">
-        <a href="OfficialInvites.php"
-           class="btn btn-toggle d-flex align-items-center gap-2 rounded <?= $current == 'OfficialInvites.php' ? 'active' : '' ?>"
-           style="<?= $current == 'OfficialInvites.php' ? 'outline: none; box-shadow: none;' : '' ?>">
-          <i class="fas fa-user-plus"></i> Official Invites
         </a>
       </li>
       <?php endif; ?>

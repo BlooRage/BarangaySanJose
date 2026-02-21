@@ -33,10 +33,14 @@ function oi_ensure_official_info_columns(mysqli $conn): void
         "emergency_contact_address VARCHAR(255) NULL",
         "house_number VARCHAR(50) NULL",
         "street_name VARCHAR(150) NULL",
+        "address_mode VARCHAR(20) NULL",
+        "block_number VARCHAR(50) NULL",
+        "lot_number VARCHAR(50) NULL",
         "barangay VARCHAR(150) NULL",
         "municipality_city VARCHAR(150) NULL",
         "province VARCHAR(150) NULL",
         "position_access VARCHAR(100) NULL",
+        "area_number VARCHAR(50) NULL",
     ];
 
     foreach ($columns as $definition) {
@@ -178,11 +182,17 @@ function oi_has_info_and_contact(?array $row): bool
 function oi_has_address(?array $row): bool
 {
     if (!$row) return false;
-    return oi_non_empty((string)($row['house_number'] ?? ''))
-        && oi_non_empty((string)($row['street_name'] ?? ''))
-        && oi_non_empty((string)($row['barangay'] ?? ''))
+    $mode = strtolower(trim((string)($row['address_mode'] ?? 'street')));
+    $hasCore = oi_non_empty((string)($row['barangay'] ?? ''))
         && oi_non_empty((string)($row['municipality_city'] ?? ''))
         && oi_non_empty((string)($row['province'] ?? ''));
+    if (!$hasCore) return false;
+    if ($mode === 'block_lot') {
+        return oi_non_empty((string)($row['block_number'] ?? ''))
+            && oi_non_empty((string)($row['lot_number'] ?? ''));
+    }
+    return oi_non_empty((string)($row['house_number'] ?? ''))
+        && oi_non_empty((string)($row['street_name'] ?? ''));
 }
 
 function oi_get_document_type_id(mysqli $conn, string $name, string $category = 'OfficialProfiling'): int
@@ -220,6 +230,48 @@ function oi_get_document_type_id(mysqli $conn, string $name, string $category = 
         throw new RuntimeException("Unable to resolve document type {$name}.");
     }
     return $newId;
+}
+
+function oi_get_or_create_status_id(mysqli $conn, string $name, array $types): ?int
+{
+    $id = oi_get_status_id($conn, $name, $types);
+    if ($id !== null) {
+        return $id;
+    }
+    $targetType = trim((string)($types[0] ?? ''));
+    if ($targetType === '') {
+        return null;
+    }
+
+    $ins = $conn->prepare("INSERT INTO statuslookuptbl (status_name, status_type) VALUES (?, ?)");
+    if (!$ins) {
+        return null;
+    }
+    $ins->bind_param("ss", $name, $targetType);
+    $ok = $ins->execute();
+    $newId = $ok ? (int)$ins->insert_id : 0;
+    $ins->close();
+    if ($newId > 0) {
+        return $newId;
+    }
+
+    // If insert failed due to duplicates/race, try fetch again.
+    return oi_get_status_id($conn, $name, $types);
+}
+
+function oi_resolve_pending_review_status_id(mysqli $conn): ?int
+{
+    $types = ['DocumentVerification', 'VerificationStatus', 'Verification'];
+    $id = oi_get_status_id($conn, 'PendingReview', $types);
+    if ($id !== null) {
+        return $id;
+    }
+    // Legacy fallback if installation used "Pending" for document review.
+    $id = oi_get_status_id($conn, 'Pending', $types);
+    if ($id !== null) {
+        return $id;
+    }
+    return oi_get_or_create_status_id($conn, 'PendingReview', ['DocumentVerification']);
 }
 
 function oi_to_db_web_path(string $absolutePath): string
@@ -362,7 +414,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
 
             if (empty($errors)) {
-                $activeStatusId = oi_get_status_id($conn, 'Active', ['UserAccount']);
+                $activeStatusId = oi_get_or_create_status_id($conn, 'Active', ['UserAccount']);
                 if ($activeStatusId === null) {
                     $errors[] = 'UserAccount Active status is missing.';
                 } else {
@@ -516,9 +568,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     throw new RuntimeException('Emergency contact number must be 9XXXXXXXXX.');
                 }
 
-                $employmentStatusId = oi_get_status_id($conn, 'Active', ['Employment', 'OfficialEmployment', 'UserAccount']);
+                $employmentStatusName = trim((string)($sessionInvite['employment_status'] ?? ''));
+                if ($employmentStatusName === '') {
+                    $employmentStatusName = 'Regular';
+                }
+                $employmentStatusId = oi_get_status_id($conn, $employmentStatusName, ['Official/Personnel Management', 'Employment', 'OfficialEmployment', 'UserAccount']);
                 if ($employmentStatusId === null) {
-                    throw new RuntimeException('Active employment status is missing.');
+                    $employmentStatusId = oi_get_status_id($conn, 'Active', ['Official/Personnel Management', 'Employment', 'OfficialEmployment', 'UserAccount']);
+                }
+                if ($employmentStatusId === null) {
+                    throw new RuntimeException('Employment status is missing in status lookups.');
                 }
 
                 $inviteId = (int)$sessionInvite['invite_id'];
@@ -529,6 +588,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $roleAccess = (string)$sessionInvite['role_access'];
                 $positionAccess = trim((string)($sessionInvite['position_access'] ?? ''));
                 $department = (string)$sessionInvite['department'];
+                $areaNumber = trim((string)($sessionInvite['area_number'] ?? ''));
                 $phone10 = oi_normalize_phone10((string)$account['phone_number']);
                 $email = (string)$account['email'];
                 if ($positionAccess === '') {
@@ -537,9 +597,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
                 $stmt = $conn->prepare("
                     INSERT INTO officialinformationtbl
-                        (user_id, lastname, firstname, middlename, suffix, birthdate, sex, civil_status, contact_number, email, role_access, position_access, department, status_id_employment, date_hired, emergency_contact_name, emergency_contact_relationship, emergency_contact_phone, emergency_contact_address)
+                        (user_id, lastname, firstname, middlename, suffix, birthdate, sex, civil_status, contact_number, email, role_access, position_access, department, area_number, status_id_employment, date_hired, emergency_contact_name, emergency_contact_relationship, emergency_contact_phone, emergency_contact_address)
                     VALUES
-                        (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURDATE(), ?, ?, ?, ?)
+                        (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURDATE(), ?, ?, ?, ?)
                     ON DUPLICATE KEY UPDATE
                         lastname = VALUES(lastname),
                         firstname = VALUES(firstname),
@@ -553,6 +613,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         role_access = VALUES(role_access),
                         position_access = VALUES(position_access),
                         department = VALUES(department),
+                        area_number = VALUES(area_number),
                         status_id_employment = VALUES(status_id_employment),
                         emergency_contact_name = VALUES(emergency_contact_name),
                         emergency_contact_relationship = VALUES(emergency_contact_relationship),
@@ -564,7 +625,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     throw new RuntimeException('Failed to save official profile.');
                 }
                 $stmt->bind_param(
-                    "sssssssssssssissss",
+                    "ssssssssssssssissss",
                     $loggedUserId,
                     $lastname,
                     $firstname,
@@ -578,6 +639,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $roleAccess,
                     $positionAccess,
                     $department,
+                    $areaNumber,
                     $employmentStatusId,
                     $emergencyName,
                     $emergencyRelationship,
@@ -611,19 +673,38 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 if (!oi_official_info_exists($conn, $loggedUserId)) {
                     throw new RuntimeException('Complete information and emergency contact first.');
                 }
+                $addressMode = strtolower(trim((string)($_POST['address_mode'] ?? 'street')));
+                if (!in_array($addressMode, ['street', 'block_lot'], true)) {
+                    $addressMode = 'street';
+                }
                 $houseNumber = trim((string)($_POST['house_number'] ?? ''));
                 $streetName = trim((string)($_POST['street_name'] ?? ''));
+                $blockNumber = trim((string)($_POST['block_number'] ?? ''));
+                $lotNumber = trim((string)($_POST['lot_number'] ?? ''));
                 $barangay = trim((string)($_POST['barangay'] ?? ''));
                 $municipalityCity = trim((string)($_POST['municipality_city'] ?? ''));
                 $province = trim((string)($_POST['province'] ?? ''));
-                if ($houseNumber === '' || $streetName === '' || $barangay === '' || $municipalityCity === '' || $province === '') {
+                $missingCore = ($barangay === '' || $municipalityCity === '' || $province === '');
+                $missingStreet = ($addressMode === 'street' && ($houseNumber === '' || $streetName === ''));
+                $missingBlockLot = ($addressMode === 'block_lot' && ($blockNumber === '' || $lotNumber === ''));
+                if ($missingCore || $missingStreet || $missingBlockLot) {
                     throw new RuntimeException('All address fields are required.');
+                }
+                if ($addressMode === 'street') {
+                    $blockNumber = '';
+                    $lotNumber = '';
+                } else {
+                    $houseNumber = '';
+                    $streetName = '';
                 }
 
                 $stmt = $conn->prepare("
                     UPDATE officialinformationtbl
-                    SET house_number = ?,
+                    SET address_mode = ?,
+                        house_number = ?,
                         street_name = ?,
+                        block_number = ?,
+                        lot_number = ?,
                         barangay = ?,
                         municipality_city = ?,
                         province = ?,
@@ -635,9 +716,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     throw new RuntimeException('Failed to save address.');
                 }
                 $stmt->bind_param(
-                    "ssssss",
+                    "sssssssss",
+                    $addressMode,
                     $houseNumber,
                     $streetName,
+                    $blockNumber,
+                    $lotNumber,
                     $barangay,
                     $municipalityCity,
                     $province,
@@ -696,7 +780,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 }
                 $moved = oi_move_uploaded_file_with_doc_name($tmpName, $uploadDir, '2x2 Picture', $loggedUserId, $ext);
                 $docTypeId = oi_get_document_type_id($conn, '2x2 Picture', 'OfficialProfiling');
-                $statusVerifyId = oi_get_status_id($conn, 'PendingReview', ['DocumentVerification', 'VerificationStatus', 'Verification']);
+                $statusVerifyId = oi_resolve_pending_review_status_id($conn);
                 if ($statusVerifyId === null) {
                     throw new RuntimeException('Pending review status is missing.');
                 }
@@ -1101,6 +1185,14 @@ if ($mode === 'password') {
                         <label class="form-label">Department</label>
                         <input class="form-control" value="<?= htmlspecialchars((string)$sessionInvite['department'], ENT_QUOTES, 'UTF-8') ?>" readonly>
                     </div>
+                    <div class="col-md-6">
+                        <label class="form-label">Area Number</label>
+                        <input class="form-control" value="<?= htmlspecialchars((string)(trim((string)($sessionInvite['area_number'] ?? '')) !== '' ? $sessionInvite['area_number'] : 'N/A'), ENT_QUOTES, 'UTF-8') ?>" readonly>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label">Employment Status</label>
+                        <input class="form-control" value="<?= htmlspecialchars((string)($sessionInvite['employment_status'] ?? 'Regular'), ENT_QUOTES, 'UTF-8') ?>" readonly>
+                    </div>
                     <div class="col-md-4">
                         <label class="form-label">Birthdate</label>
                         <input type="date" class="form-control" name="birthdate" value="<?= htmlspecialchars((string)($officialInfo['birthdate'] ?? ''), ENT_QUOTES, 'UTF-8') ?>" required>
@@ -1151,13 +1243,29 @@ if ($mode === 'password') {
                 <p class="text-muted">Complete your address.</p>
                 <form method="post" class="row g-3">
                     <input type="hidden" name="action" value="save_official_address">
+                    <?php $addressMode = strtolower(trim((string)($officialInfo['address_mode'] ?? 'street'))); ?>
+                    <div class="col-md-6">
+                        <label class="form-label">Address System</label>
+                        <select class="form-select" name="address_mode" id="officialAddressMode" required>
+                            <option value="street" <?= $addressMode === 'block_lot' ? '' : 'selected' ?>>Street System</option>
+                            <option value="block_lot" <?= $addressMode === 'block_lot' ? 'selected' : '' ?>>Block / Lot System</option>
+                        </select>
+                    </div>
                     <div class="col-md-6">
                         <label class="form-label">House Number</label>
-                        <input class="form-control" name="house_number" value="<?= htmlspecialchars((string)($officialInfo['house_number'] ?? ''), ENT_QUOTES, 'UTF-8') ?>" required>
+                        <input class="form-control" id="officialHouseNumber" name="house_number" value="<?= htmlspecialchars((string)($officialInfo['house_number'] ?? ''), ENT_QUOTES, 'UTF-8') ?>">
                     </div>
                     <div class="col-md-6">
                         <label class="form-label">Street Name</label>
-                        <input class="form-control" name="street_name" value="<?= htmlspecialchars((string)($officialInfo['street_name'] ?? ''), ENT_QUOTES, 'UTF-8') ?>" required>
+                        <input class="form-control" id="officialStreetName" name="street_name" value="<?= htmlspecialchars((string)($officialInfo['street_name'] ?? ''), ENT_QUOTES, 'UTF-8') ?>">
+                    </div>
+                    <div class="col-md-6 d-none" id="officialBlockWrap">
+                        <label class="form-label">Block Number</label>
+                        <input class="form-control" id="officialBlockNumber" name="block_number" value="<?= htmlspecialchars((string)($officialInfo['block_number'] ?? ''), ENT_QUOTES, 'UTF-8') ?>">
+                    </div>
+                    <div class="col-md-6 d-none" id="officialLotWrap">
+                        <label class="form-label">Lot Number</label>
+                        <input class="form-control" id="officialLotNumber" name="lot_number" value="<?= htmlspecialchars((string)($officialInfo['lot_number'] ?? ''), ENT_QUOTES, 'UTF-8') ?>">
                     </div>
                     <div class="col-md-4">
                         <label class="form-label">Barangay</label>
@@ -1196,6 +1304,33 @@ if ($mode === 'password') {
         </div>
     </div>
 </section>
+
+<script>
+document.addEventListener("DOMContentLoaded", () => {
+  const modeEl = document.getElementById("officialAddressMode");
+  const houseEl = document.getElementById("officialHouseNumber");
+  const streetEl = document.getElementById("officialStreetName");
+  const blockWrap = document.getElementById("officialBlockWrap");
+  const lotWrap = document.getElementById("officialLotWrap");
+  const blockEl = document.getElementById("officialBlockNumber");
+  const lotEl = document.getElementById("officialLotNumber");
+  if (!modeEl) return;
+
+  const syncAddressMode = () => {
+    const mode = String(modeEl.value || "street").toLowerCase();
+    const isBlockLot = mode === "block_lot";
+    if (blockWrap) blockWrap.classList.toggle("d-none", !isBlockLot);
+    if (lotWrap) lotWrap.classList.toggle("d-none", !isBlockLot);
+    if (houseEl) houseEl.required = !isBlockLot;
+    if (streetEl) streetEl.required = !isBlockLot;
+    if (blockEl) blockEl.required = isBlockLot;
+    if (lotEl) lotEl.required = isBlockLot;
+  };
+
+  modeEl.addEventListener("change", syncAddressMode);
+  syncAddressMode();
+});
+</script>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 <script>
 (() => {

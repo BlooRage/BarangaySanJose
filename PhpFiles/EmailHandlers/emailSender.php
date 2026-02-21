@@ -18,6 +18,7 @@ class EmailSender
     private array $templateMap = [
         'verify'       => 'emails/verifyEmail.php',
         'one_time'     => 'emails/oneTimeAccess.php',
+        'onboarding_access' => 'emails/onboardingAccess.php',
         'announcement' => 'emails/announcement.php',
         'transaction'  => 'emails/transactionNotification.php',
     ];
