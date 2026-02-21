@@ -16,6 +16,51 @@ oi_ensure_invite_table($conn);
 $errors = [];
 $success = '';
 
+function oi_column_exists(mysqli $conn, string $table, string $column): bool
+{
+    $tableEsc = $conn->real_escape_string($table);
+    $columnEsc = $conn->real_escape_string($column);
+    $res = $conn->query("SHOW COLUMNS FROM `{$tableEsc}` LIKE '{$columnEsc}'");
+    return $res instanceof mysqli_result && $res->num_rows > 0;
+}
+
+function oi_ensure_official_info_columns(mysqli $conn): void
+{
+    $columns = [
+        "emergency_contact_name VARCHAR(150) NULL",
+        "emergency_contact_relationship VARCHAR(80) NULL",
+        "emergency_contact_phone VARCHAR(15) NULL",
+        "emergency_contact_address VARCHAR(255) NULL",
+        "house_number VARCHAR(50) NULL",
+        "street_name VARCHAR(150) NULL",
+        "barangay VARCHAR(150) NULL",
+        "municipality_city VARCHAR(150) NULL",
+        "province VARCHAR(150) NULL",
+        "position_access VARCHAR(100) NULL",
+    ];
+
+    foreach ($columns as $definition) {
+        $columnName = strtok($definition, " ");
+        if ($columnName === false || $columnName === '') {
+            continue;
+        }
+        if (oi_column_exists($conn, 'officialinformationtbl', $columnName)) {
+            continue;
+        }
+        $conn->query("ALTER TABLE officialinformationtbl ADD COLUMN {$definition}");
+    }
+    // Keep legacy role_access values visible in new column where available.
+    $conn->query("
+        UPDATE officialinformationtbl
+        SET position_access = role_access
+        WHERE (position_access IS NULL OR TRIM(position_access) = '')
+          AND role_access IS NOT NULL
+          AND TRIM(role_access) <> ''
+    ");
+}
+
+oi_ensure_official_info_columns($conn);
+
 function oi_find_invite_by_token(mysqli $conn, string $rawToken): ?array
 {
     $rawToken = trim($rawToken);
@@ -98,6 +143,48 @@ function oi_official_info_exists(mysqli $conn, string $userId): bool
     return (bool)$found;
 }
 
+function oi_get_official_info(mysqli $conn, string $userId): ?array
+{
+    $stmt = $conn->prepare("
+        SELECT *
+        FROM officialinformationtbl
+        WHERE user_id = ?
+        LIMIT 1
+    ");
+    if (!$stmt) return null;
+    $stmt->bind_param("s", $userId);
+    $stmt->execute();
+    $row = $stmt->get_result()->fetch_assoc();
+    $stmt->close();
+    return $row ?: null;
+}
+
+function oi_non_empty(?string $v): bool
+{
+    return trim((string)$v) !== '';
+}
+
+function oi_has_info_and_contact(?array $row): bool
+{
+    if (!$row) return false;
+    return oi_non_empty((string)($row['birthdate'] ?? ''))
+        && oi_non_empty((string)($row['sex'] ?? ''))
+        && oi_non_empty((string)($row['civil_status'] ?? ''))
+        && oi_non_empty((string)($row['emergency_contact_name'] ?? ''))
+        && oi_non_empty((string)($row['emergency_contact_relationship'] ?? ''))
+        && oi_non_empty((string)($row['emergency_contact_phone'] ?? ''));
+}
+
+function oi_has_address(?array $row): bool
+{
+    if (!$row) return false;
+    return oi_non_empty((string)($row['house_number'] ?? ''))
+        && oi_non_empty((string)($row['street_name'] ?? ''))
+        && oi_non_empty((string)($row['barangay'] ?? ''))
+        && oi_non_empty((string)($row['municipality_city'] ?? ''))
+        && oi_non_empty((string)($row['province'] ?? ''));
+}
+
 $inviteToken = trim((string)($_GET['invite'] ?? ''));
 $tokenInvite = $inviteToken !== '' ? oi_find_invite_by_token($conn, $inviteToken) : null;
 
@@ -105,10 +192,12 @@ $loggedUserId = (string)($_SESSION['user_id'] ?? '');
 $loggedRole = (string)($_SESSION['role'] ?? '');
 $sessionInvite = null;
 $account = null;
+$officialInfo = null;
 
 if ($loggedUserId !== '' && in_array($loggedRole, ['Official', 'Officials', 'Personnel', 'Personnels', 'SuperAdmin', 'Admin', 'Employee'], true)) {
     $sessionInvite = oi_find_active_invite_by_user($conn, $loggedUserId);
     $account = oi_get_account($conn, $loggedUserId);
+    $officialInfo = oi_get_official_info($conn, $loggedUserId);
 }
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
@@ -285,6 +374,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $birthdate = trim((string)($_POST['birthdate'] ?? ''));
                 $sex = trim((string)($_POST['sex'] ?? ''));
                 $civil = trim((string)($_POST['civil_status'] ?? ''));
+                $emergencyName = trim((string)($_POST['emergency_contact_name'] ?? ''));
+                $emergencyRelationship = trim((string)($_POST['emergency_contact_relationship'] ?? ''));
+                $emergencyPhone = oi_normalize_phone10((string)($_POST['emergency_contact_phone'] ?? ''));
+                $emergencyAddress = trim((string)($_POST['emergency_contact_address'] ?? ''));
 
                 if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $birthdate)) {
                     throw new RuntimeException('Birthdate is required.');
@@ -294,6 +387,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 }
                 if (!in_array($civil, ['Single', 'Married', 'Widowed', 'Separated'], true)) {
                     throw new RuntimeException('Select a valid civil status.');
+                }
+                if ($emergencyName === '' || $emergencyRelationship === '' || $emergencyAddress === '') {
+                    throw new RuntimeException('All emergency contact fields are required.');
+                }
+                if (!oi_is_valid_phone10($emergencyPhone)) {
+                    throw new RuntimeException('Emergency contact number must be 9XXXXXXXXX.');
                 }
 
                 $employmentStatusId = oi_get_status_id($conn, 'Active', ['Employment', 'OfficialEmployment', 'UserAccount']);
@@ -307,15 +406,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $lastname = (string)$sessionInvite['lastname'];
                 $suffix = (string)$sessionInvite['suffix'];
                 $roleAccess = (string)$sessionInvite['role_access'];
+                $positionAccess = trim((string)($sessionInvite['position_access'] ?? ''));
                 $department = (string)$sessionInvite['department'];
                 $phone10 = oi_normalize_phone10((string)$account['phone_number']);
                 $email = (string)$account['email'];
+                if ($positionAccess === '') {
+                    $positionAccess = $roleAccess;
+                }
 
                 $stmt = $conn->prepare("
                     INSERT INTO officialinformationtbl
-                        (user_id, lastname, firstname, middlename, suffix, birthdate, sex, civil_status, contact_number, email, role_access, department, status_id_employment, date_hired)
+                        (user_id, lastname, firstname, middlename, suffix, birthdate, sex, civil_status, contact_number, email, role_access, position_access, department, status_id_employment, date_hired, emergency_contact_name, emergency_contact_relationship, emergency_contact_phone, emergency_contact_address)
                     VALUES
-                        (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURDATE())
+                        (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURDATE(), ?, ?, ?, ?)
                     ON DUPLICATE KEY UPDATE
                         lastname = VALUES(lastname),
                         firstname = VALUES(firstname),
@@ -327,15 +430,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         contact_number = VALUES(contact_number),
                         email = VALUES(email),
                         role_access = VALUES(role_access),
+                        position_access = VALUES(position_access),
                         department = VALUES(department),
                         status_id_employment = VALUES(status_id_employment),
+                        emergency_contact_name = VALUES(emergency_contact_name),
+                        emergency_contact_relationship = VALUES(emergency_contact_relationship),
+                        emergency_contact_phone = VALUES(emergency_contact_phone),
+                        emergency_contact_address = VALUES(emergency_contact_address),
                         last_updated = CURRENT_TIMESTAMP
                 ");
                 if (!$stmt) {
                     throw new RuntimeException('Failed to save official profile.');
                 }
                 $stmt->bind_param(
-                    "ssssssssssssi",
+                    "sssssssssssssissss",
                     $loggedUserId,
                     $lastname,
                     $firstname,
@@ -347,8 +455,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $phone10,
                     $email,
                     $roleAccess,
+                    $positionAccess,
                     $department,
-                    $employmentStatusId
+                    $employmentStatusId,
+                    $emergencyName,
+                    $emergencyRelationship,
+                    $emergencyPhone,
+                    $emergencyAddress
                 );
                 if (!$stmt->execute()) {
                     $stmt->close();
@@ -356,6 +469,66 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 }
                 $stmt->close();
 
+                $upInvite = $conn->prepare("
+                    UPDATE officialinvitetbl
+                    SET onboarding_step = 'address_info',
+                        status = 'InProgress'
+                    WHERE invite_id = ?
+                    LIMIT 1
+                ");
+                if ($upInvite) {
+                    $upInvite->bind_param("i", $inviteId);
+                    $upInvite->execute();
+                    $upInvite->close();
+                }
+                $success = 'Information and emergency contact saved. Continue with address.';
+            } catch (Throwable $e) {
+                $errors[] = $e->getMessage();
+            }
+        } elseif ($action === 'save_official_address') {
+            try {
+                if (!oi_official_info_exists($conn, $loggedUserId)) {
+                    throw new RuntimeException('Complete information and emergency contact first.');
+                }
+                $houseNumber = trim((string)($_POST['house_number'] ?? ''));
+                $streetName = trim((string)($_POST['street_name'] ?? ''));
+                $barangay = trim((string)($_POST['barangay'] ?? ''));
+                $municipalityCity = trim((string)($_POST['municipality_city'] ?? ''));
+                $province = trim((string)($_POST['province'] ?? ''));
+                if ($houseNumber === '' || $streetName === '' || $barangay === '' || $municipalityCity === '' || $province === '') {
+                    throw new RuntimeException('All address fields are required.');
+                }
+
+                $stmt = $conn->prepare("
+                    UPDATE officialinformationtbl
+                    SET house_number = ?,
+                        street_name = ?,
+                        barangay = ?,
+                        municipality_city = ?,
+                        province = ?,
+                        last_updated = CURRENT_TIMESTAMP
+                    WHERE user_id = ?
+                    LIMIT 1
+                ");
+                if (!$stmt) {
+                    throw new RuntimeException('Failed to save address.');
+                }
+                $stmt->bind_param(
+                    "ssssss",
+                    $houseNumber,
+                    $streetName,
+                    $barangay,
+                    $municipalityCity,
+                    $province,
+                    $loggedUserId
+                );
+                if (!$stmt->execute()) {
+                    $stmt->close();
+                    throw new RuntimeException('Failed to save address.');
+                }
+                $stmt->close();
+
+                $inviteId = (int)$sessionInvite['invite_id'];
                 $upInvite = $conn->prepare("
                     UPDATE officialinvitetbl
                     SET profile_completed_at = NOW(),
@@ -370,6 +543,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $upInvite->execute();
                     $upInvite->close();
                 }
+
                 header('Location: ../PhpFiles/Login/unifiedProfileCheck.php');
                 exit;
             } catch (Throwable $e) {
@@ -384,6 +558,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if ($loggedUserId !== '' && in_array($loggedRole, ['Official', 'Officials', 'Personnel', 'Personnels', 'SuperAdmin', 'Admin', 'Employee'], true)) {
         $sessionInvite = oi_find_active_invite_by_user($conn, $loggedUserId);
         $account = oi_get_account($conn, $loggedUserId);
+        $officialInfo = oi_get_official_info($conn, $loggedUserId);
     }
 }
 
@@ -400,8 +575,10 @@ if ($mode === 'resume') {
         $resumeStep = 'email_verify';
     } elseif ((int)($account['phoneNum_verify'] ?? 0) !== 1) {
         $resumeStep = 'phone_verify';
-    } elseif (!oi_official_info_exists($conn, $loggedUserId)) {
+    } elseif (!oi_has_info_and_contact($officialInfo)) {
         $resumeStep = 'official_info';
+    } elseif (!oi_has_address($officialInfo)) {
+        $resumeStep = 'address_info';
     } else {
         header('Location: ../PhpFiles/Login/unifiedProfileCheck.php');
         exit;
@@ -418,6 +595,8 @@ if ($mode === 'password') {
         $onboardingStep = 3;
     } elseif ($resumeStep === 'official_info') {
         $onboardingStep = 4;
+    } elseif ($resumeStep === 'address_info') {
+        $onboardingStep = 5;
     }
 }
 ?>
@@ -575,8 +754,9 @@ if ($mode === 'password') {
                         <ol class="progress-steps">
                             <li class="<?= $onboardingStep === 1 ? 'active' : ($onboardingStep > 1 ? 'is-completed' : '') ?>">Create Password</li>
                             <li class="<?= $onboardingStep === 2 ? 'active' : ($onboardingStep > 2 ? 'is-completed' : '') ?>">Verify Email</li>
-                            <li class="<?= $onboardingStep === 3 ? 'active' : ($onboardingStep > 3 ? 'is-completed' : '') ?>">Verify Mobile</li>
-                            <li class="<?= $onboardingStep === 4 ? 'active' : '' ?>">Official Information</li>
+                            <li class="<?= $onboardingStep === 3 ? 'active' : ($onboardingStep > 3 ? 'is-completed' : '') ?>">Verify Phone Number</li>
+                            <li class="<?= $onboardingStep === 4 ? 'active' : ($onboardingStep > 4 ? 'is-completed' : '') ?>">Information and Contact</li>
+                            <li class="<?= $onboardingStep === 5 ? 'active' : '' ?>">Address</li>
                         </ol>
                     </div>
                 <?php endif; ?>
@@ -683,7 +863,7 @@ if ($mode === 'password') {
                     </div>
                 </div>
             <?php elseif ($mode === 'resume' && $resumeStep === 'official_info'): ?>
-                <p class="text-muted">Complete your official information.</p>
+                <p class="text-muted">Complete your information and emergency contact.</p>
                 <form method="post" class="row g-3">
                     <input type="hidden" name="action" value="save_official_info">
                     <div class="col-md-6">
@@ -703,8 +883,8 @@ if ($mode === 'password') {
                         <input class="form-control" value="<?= htmlspecialchars((string)$sessionInvite['suffix'], ENT_QUOTES, 'UTF-8') ?>" readonly>
                     </div>
                     <div class="col-md-4">
-                        <label class="form-label">Role Access</label>
-                        <input class="form-control" value="<?= htmlspecialchars((string)$sessionInvite['role_access'], ENT_QUOTES, 'UTF-8') ?>" readonly>
+                        <label class="form-label">Position Access</label>
+                        <input class="form-control" value="<?= htmlspecialchars((string)($sessionInvite['position_access'] ?? $sessionInvite['role_access'] ?? ''), ENT_QUOTES, 'UTF-8') ?>" readonly>
                     </div>
                     <div class="col-md-12">
                         <label class="form-label">Department</label>
@@ -712,29 +892,76 @@ if ($mode === 'password') {
                     </div>
                     <div class="col-md-4">
                         <label class="form-label">Birthdate</label>
-                        <input type="date" class="form-control" name="birthdate" required>
+                        <input type="date" class="form-control" name="birthdate" value="<?= htmlspecialchars((string)($officialInfo['birthdate'] ?? ''), ENT_QUOTES, 'UTF-8') ?>" required>
                     </div>
                     <div class="col-md-4">
                         <label class="form-label">Sex</label>
                         <select class="form-select" name="sex" required>
                             <option value="">Select</option>
-                            <option value="Male">Male</option>
-                            <option value="Female">Female</option>
-                            <option value="Other">Other</option>
+                            <option value="Male" <?= (($officialInfo['sex'] ?? '') === 'Male') ? 'selected' : '' ?>>Male</option>
+                            <option value="Female" <?= (($officialInfo['sex'] ?? '') === 'Female') ? 'selected' : '' ?>>Female</option>
+                            <option value="Other" <?= (($officialInfo['sex'] ?? '') === 'Other') ? 'selected' : '' ?>>Other</option>
                         </select>
                     </div>
                     <div class="col-md-4">
                         <label class="form-label">Civil Status</label>
                         <select class="form-select" name="civil_status" required>
                             <option value="">Select</option>
-                            <option value="Single">Single</option>
-                            <option value="Married">Married</option>
-                            <option value="Widowed">Widowed</option>
-                            <option value="Separated">Separated</option>
+                            <option value="Single" <?= (($officialInfo['civil_status'] ?? '') === 'Single') ? 'selected' : '' ?>>Single</option>
+                            <option value="Married" <?= (($officialInfo['civil_status'] ?? '') === 'Married') ? 'selected' : '' ?>>Married</option>
+                            <option value="Widowed" <?= (($officialInfo['civil_status'] ?? '') === 'Widowed') ? 'selected' : '' ?>>Widowed</option>
+                            <option value="Separated" <?= (($officialInfo['civil_status'] ?? '') === 'Separated') ? 'selected' : '' ?>>Separated</option>
                         </select>
+                    </div>
+                    <div class="col-12 pt-2">
+                        <h5 class="mb-2">Emergency Contact</h5>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label">Emergency Contact Name</label>
+                        <input class="form-control" name="emergency_contact_name" value="<?= htmlspecialchars((string)($officialInfo['emergency_contact_name'] ?? ''), ENT_QUOTES, 'UTF-8') ?>" required>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label">Relationship</label>
+                        <input class="form-control" name="emergency_contact_relationship" value="<?= htmlspecialchars((string)($officialInfo['emergency_contact_relationship'] ?? ''), ENT_QUOTES, 'UTF-8') ?>" required>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label">Emergency Contact Number (+63)</label>
+                        <input class="form-control" name="emergency_contact_phone" inputmode="numeric" maxlength="10" placeholder="9XXXXXXXXX" value="<?= htmlspecialchars((string)($officialInfo['emergency_contact_phone'] ?? ''), ENT_QUOTES, 'UTF-8') ?>" required>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label">Emergency Contact Address</label>
+                        <input class="form-control" name="emergency_contact_address" value="<?= htmlspecialchars((string)($officialInfo['emergency_contact_address'] ?? ''), ENT_QUOTES, 'UTF-8') ?>" required>
                     </div>
                     <div class="col-12">
                         <button class="btn btn-primary" type="submit">Save and Continue</button>
+                    </div>
+                </form>
+            <?php elseif ($mode === 'resume' && $resumeStep === 'address_info'): ?>
+                <p class="text-muted">Complete your address.</p>
+                <form method="post" class="row g-3">
+                    <input type="hidden" name="action" value="save_official_address">
+                    <div class="col-md-6">
+                        <label class="form-label">House Number</label>
+                        <input class="form-control" name="house_number" value="<?= htmlspecialchars((string)($officialInfo['house_number'] ?? ''), ENT_QUOTES, 'UTF-8') ?>" required>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label">Street Name</label>
+                        <input class="form-control" name="street_name" value="<?= htmlspecialchars((string)($officialInfo['street_name'] ?? ''), ENT_QUOTES, 'UTF-8') ?>" required>
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label">Barangay</label>
+                        <input class="form-control" name="barangay" value="<?= htmlspecialchars((string)($officialInfo['barangay'] ?? 'Barangay San Jose'), ENT_QUOTES, 'UTF-8') ?>" required>
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label">Municipality / City</label>
+                        <input class="form-control" name="municipality_city" value="<?= htmlspecialchars((string)($officialInfo['municipality_city'] ?? 'Rodriguez (Montalban)'), ENT_QUOTES, 'UTF-8') ?>" required>
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label">Province</label>
+                        <input class="form-control" name="province" value="<?= htmlspecialchars((string)($officialInfo['province'] ?? 'Rizal'), ENT_QUOTES, 'UTF-8') ?>" required>
+                    </div>
+                    <div class="col-12">
+                        <button class="btn btn-primary" type="submit">Submit</button>
                     </div>
                 </form>
             <?php else: ?>

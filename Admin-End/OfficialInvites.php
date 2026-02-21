@@ -30,6 +30,16 @@ $departmentOptions = [
     'Barangay Social Services',
     'Barangay Operations',
 ];
+$positionAccessOptions = [
+    'Barangay Secretary',
+    'Certificate Issuance',
+    'Treasury',
+    'Records Management',
+    'Public Assistance Desk',
+    'Monitoring',
+    'Barangay Police',
+    'Area Coordinator',
+];
 $deptRes = $conn->query("
     SELECT DISTINCT department
     FROM officialinformationtbl
@@ -100,11 +110,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $suffix = trim((string)($_POST['suffix'] ?? ''));
         $email = strtolower(trim((string)($_POST['email'] ?? '')));
         $phone10 = oi_normalize_phone10((string)($_POST['phone_number'] ?? ''));
-        $roleAccess = trim((string)($_POST['role_access'] ?? 'Official'));
+        $roleAccess = trim((string)($_POST['role_access'] ?? ''));
+        $positionAccess = trim((string)($_POST['position_access'] ?? ''));
         $department = trim((string)($_POST['department'] ?? ''));
 
-        if ($lastName === '' || $firstName === '' || $email === '' || $department === '') {
-            set_invite_flash('danger', 'Last name, first name, email, and department are required.');
+        if ($lastName === '' || $firstName === '' || $email === '' || $roleAccess === '' || $department === '') {
+            set_invite_flash('danger', 'Last name, first name, email, role, and department are required.');
             redirect_self();
         }
         if (!preg_match('/^[A-Za-z][A-Za-z .\'-]{0,99}$/', $lastName) || !preg_match('/^[A-Za-z][A-Za-z .\'-]{0,99}$/', $firstName)) {
@@ -127,9 +138,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             set_invite_flash('danger', 'Invalid mobile number. Use 9XXXXXXXXX.');
             redirect_self();
         }
-        if (!in_array($roleAccess, ['Official', 'Officials', 'Personnel', 'Personnels', 'SuperAdmin'], true)) {
-            set_invite_flash('danger', 'Role must be Official/Officials, Personnel/Personnels, or SuperAdmin.');
+        if ($roleAccess === 'Officials') {
+            $roleAccess = 'Official';
+        } elseif ($roleAccess === 'Personnels') {
+            $roleAccess = 'Personnel';
+        }
+        if (!in_array($roleAccess, ['Official', 'Personnel', 'SuperAdmin'], true)) {
+            set_invite_flash('danger', 'Role must be Official, Personnel, or SuperAdmin.');
             redirect_self();
+        }
+        if (in_array($roleAccess, ['Official', 'Personnel'], true) && $positionAccess === '') {
+            set_invite_flash('danger', 'Position access is required for Official and Personnel.');
+            redirect_self();
+        }
+        if ($roleAccess === 'SuperAdmin' && $positionAccess === '') {
+            $positionAccess = 'System Administrator';
         }
 
         $exists = $conn->prepare("SELECT user_id FROM useraccountstbl WHERE email = ? OR phone_number = ? LIMIT 1");
@@ -149,16 +172,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         $stmt = $conn->prepare("
             INSERT INTO officialinvitetbl
-                (invite_token_hash, invite_email, invite_phone, firstname, middlename, lastname, suffix, role_access, department, status, onboarding_step, invited_by_user_id, expires_at)
+                (invite_token_hash, invite_email, invite_phone, firstname, middlename, lastname, suffix, role_access, position_access, department, status, onboarding_step, invited_by_user_id, expires_at)
             VALUES
-                (?, ?, ?, ?, ?, ?, ?, ?, ?, 'Pending', 'password', ?, ?)
+                (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'Pending', 'password', ?, ?)
         ");
         if (!$stmt) {
             set_invite_flash('danger', 'Failed to create invite.');
             redirect_self();
         }
         $stmt->bind_param(
-            "sssssssssss",
+            "ssssssssssss",
             $token['hash'],
             $email,
             $phone10,
@@ -167,6 +190,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $lastName,
             $suffix,
             $roleAccess,
+            $positionAccess,
             $department,
             $actorUserId,
             $expiresAt
@@ -267,7 +291,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
 $rows = [];
 $q = $conn->query("
-    SELECT invite_id, invite_email, invite_phone, firstname, middlename, lastname, suffix, role_access, department, status, onboarding_step, expires_at, created_at, updated_at
+    SELECT invite_id, invite_email, invite_phone, firstname, middlename, lastname, suffix, role_access, position_access, department, status, onboarding_step, expires_at, created_at, updated_at
     FROM officialinvitetbl
     ORDER BY invite_id DESC
     LIMIT 100
@@ -284,150 +308,174 @@ if ($q) {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Official Invites</title>
+    <script src="https://kit.fontawesome.com/3482e00999.js" crossorigin="anonymous"></script>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css">
+    <link rel="stylesheet" href="../CSS-Styles/Admin-End-CSS/AdminDashboardStyle.css">
 </head>
 <body class="bg-light">
-<div class="container py-4">
-    <h2 class="mb-3">Official Invites</h2>
-    <?php if (!empty($flash['message'])): ?>
-        <div class="alert alert-<?= htmlspecialchars($flash['type'] ?: 'info', ENT_QUOTES, 'UTF-8') ?>">
-            <?= htmlspecialchars((string)$flash['message'], ENT_QUOTES, 'UTF-8') ?>
-        </div>
-    <?php endif; ?>
+<div class="d-flex" style="min-height: 100vh;">
+    <?php include 'includes/sidebar.php'; ?>
 
-    <div class="card shadow-sm mb-4">
-        <div class="card-body">
-            <h5 class="card-title">Send Invite</h5>
-            <form method="post">
-                <input type="hidden" name="action" value="create_invite">
-                    <p class="small text-muted mb-2"><span class="text-danger">*</span> Required fields</p>
-                    <div class="row g-3">
-                    <div class="col-md-4">
-                        <label class="form-label">Last Name <span class="text-danger">*</span></label>
-                        <input class="form-control" name="last_name" required>
-                    </div>
-                    <div class="col-md-4">
-                        <label class="form-label">First Name <span class="text-danger">*</span></label>
-                        <input class="form-control" name="first_name" required>
-                    </div>
-                    <div class="col-md-4">
-                        <label class="form-label">Middle Name</label>
-                        <input class="form-control" name="middle_name">
-                    </div>
-                    <div class="col-md-2">
-                        <label class="form-label">Suffix</label>
-                        <select class="form-select" name="suffix">
-                            <option value="">None</option>
-                            <option value="Jr.">Jr.</option>
-                            <option value="Sr.">Sr.</option>
-                            <option value="II">II</option>
-                            <option value="III">III</option>
-                            <option value="IV">IV</option>
-                            <option value="V">V</option>
-                        </select>
-                    </div>
-                    <div class="col-md-5">
-                        <label class="form-label">Email <span class="text-danger">*</span></label>
-                        <input class="form-control" name="email" type="email" required>
-                    </div>
-                    <div class="col-md-5">
-                        <label class="form-label">Mobile Number <span class="text-danger">*</span></label>
-                        <div class="input-group">
-                            <span class="input-group-text">+63</span>
-                            <input
-                                class="form-control"
-                                name="phone_number"
-                                placeholder="9XXXXXXXXX"
-                                inputmode="numeric"
-                                pattern="9[0-9]{9}"
-                                maxlength="10"
-                                required
-                            >
+    <main id="main-display" class="flex-grow-1 p-4 p-md-5 bg-light">
+        <h2 class="mb-4" style="font-family: 'Charis SIL Bold'; color: #DE710C; font-size: 48px;">
+            Official Invites
+        </h2>
+        <hr>
+        <br>
+
+        <?php if (!empty($flash['message'])): ?>
+            <div class="alert alert-<?= htmlspecialchars($flash['type'] ?: 'info', ENT_QUOTES, 'UTF-8') ?>">
+                <?= htmlspecialchars((string)$flash['message'], ENT_QUOTES, 'UTF-8') ?>
+            </div>
+        <?php endif; ?>
+
+        <div class="card shadow-sm mb-4">
+            <div class="card-body">
+                <h5 class="card-title">Send Invite</h5>
+                <form method="post">
+                    <input type="hidden" name="action" value="create_invite">
+                        <p class="small text-muted mb-2"><span class="text-danger">*</span> Required fields</p>
+                        <div class="row g-3">
+                        <div class="col-md-4">
+                            <label class="form-label">Last Name <span class="text-danger">*</span></label>
+                            <input class="form-control" name="last_name" required>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">First Name <span class="text-danger">*</span></label>
+                            <input class="form-control" name="first_name" required>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Middle Name</label>
+                            <input class="form-control" name="middle_name">
+                        </div>
+                        <div class="col-md-2">
+                            <label class="form-label">Suffix</label>
+                            <select class="form-select" name="suffix">
+                                <option value="">None</option>
+                                <option value="Jr.">Jr.</option>
+                                <option value="Sr.">Sr.</option>
+                                <option value="II">II</option>
+                                <option value="III">III</option>
+                                <option value="IV">IV</option>
+                                <option value="V">V</option>
+                            </select>
+                        </div>
+                        <div class="col-md-5">
+                            <label class="form-label">Email <span class="text-danger">*</span></label>
+                            <input class="form-control" name="email" type="email" required>
+                        </div>
+                        <div class="col-md-5">
+                            <label class="form-label">Mobile Number <span class="text-danger">*</span></label>
+                            <div class="input-group">
+                                <span class="input-group-text">+63</span>
+                                <input
+                                    class="form-control"
+                                    name="phone_number"
+                                    placeholder="9XXXXXXXXX"
+                                    inputmode="numeric"
+                                    pattern="9[0-9]{9}"
+                                    maxlength="10"
+                                    required
+                                >
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Role <span class="text-danger">*</span></label>
+                            <select class="form-select" name="role_access" required>
+                                <option value="" selected disabled>Select Role</option>
+                                <option value="Official">Official</option>
+                                <option value="Personnel">Personnel</option>
+                                <option value="SuperAdmin">SuperAdmin</option>
+                            </select>
+                        </div>
+                        <div class="col-md-8">
+                            <label class="form-label">Department <span class="text-danger">*</span></label>
+                            <select class="form-select" name="department" required>
+                                <option value="">Select Department</option>
+                                <?php foreach ($departmentOptions as $dept): ?>
+                                    <option value="<?= htmlspecialchars((string)$dept, ENT_QUOTES, 'UTF-8') ?>"><?= htmlspecialchars((string)$dept, ENT_QUOTES, 'UTF-8') ?></option>
+                                <?php endforeach; ?>
+                            </select>
+                        </div>
+                        <div class="col-md-8">
+                            <label class="form-label">Position Access <span class="text-danger">*</span></label>
+                            <select class="form-select" name="position_access">
+                                <option value="">Select Position Access</option>
+                                <?php foreach ($positionAccessOptions as $position): ?>
+                                    <option value="<?= htmlspecialchars((string)$position, ENT_QUOTES, 'UTF-8') ?>"><?= htmlspecialchars((string)$position, ENT_QUOTES, 'UTF-8') ?></option>
+                                <?php endforeach; ?>
+                            </select>
+                            <div class="form-text">Required for Official and Personnel roles.</div>
                         </div>
                     </div>
-                    <div class="col-md-4">
-                        <label class="form-label">Role <span class="text-danger">*</span></label>
-                        <select class="form-select" name="role_access" required>
-                            <option value="Official">Official</option>
-                            <option value="Officials">Officials</option>
-                            <option value="Personnel">Personnel</option>
-                            <option value="Personnels">Personnels</option>
-                            <option value="SuperAdmin">SuperAdmin</option>
-                        </select>
+                    <div class="mt-3">
+                        <button type="submit" class="btn btn-primary">Send Invite</button>
                     </div>
-                    <div class="col-md-8">
-                        <label class="form-label">Department <span class="text-danger">*</span></label>
-                        <select class="form-select" name="department" required>
-                            <option value="">Select Department</option>
-                            <?php foreach ($departmentOptions as $dept): ?>
-                                <option value="<?= htmlspecialchars((string)$dept, ENT_QUOTES, 'UTF-8') ?>"><?= htmlspecialchars((string)$dept, ENT_QUOTES, 'UTF-8') ?></option>
-                            <?php endforeach; ?>
-                        </select>
-                    </div>
-                </div>
-                <div class="mt-3">
-                    <button type="submit" class="btn btn-primary">Send Invite</button>
-                </div>
-            </form>
-        </div>
-    </div>
-
-    <div class="card shadow-sm">
-        <div class="card-body">
-            <h5 class="card-title">Recent Invites</h5>
-            <div class="table-responsive">
-                <table class="table table-sm align-middle">
-                    <thead>
-                    <tr>
-                        <th>ID</th>
-                        <th>Name</th>
-                        <th>Role</th>
-                        <th>Contact</th>
-                        <th>Status</th>
-                        <th>Step</th>
-                        <th>Expires</th>
-                        <th>Action</th>
-                    </tr>
-                    </thead>
-                    <tbody>
-                    <?php foreach ($rows as $r): ?>
-                        <?php
-                        $name = trim(($r['firstname'] ?? '') . ' ' . (($r['middlename'] ?? '') !== '' ? ($r['middlename'] . ' ') : '') . ($r['lastname'] ?? '') . (($r['suffix'] ?? '') !== '' ? (' ' . $r['suffix']) : ''));
-                        ?>
-                        <tr>
-                            <td><?= (int)$r['invite_id'] ?></td>
-                            <td><?= htmlspecialchars($name, ENT_QUOTES, 'UTF-8') ?></td>
-                            <td><?= htmlspecialchars((string)$r['role_access'], ENT_QUOTES, 'UTF-8') ?></td>
-                            <td>
-                                <div><?= htmlspecialchars((string)$r['invite_email'], ENT_QUOTES, 'UTF-8') ?></div>
-                                <div class="text-muted">+63<?= htmlspecialchars((string)$r['invite_phone'], ENT_QUOTES, 'UTF-8') ?></div>
-                            </td>
-                            <td><?= htmlspecialchars((string)$r['status'], ENT_QUOTES, 'UTF-8') ?></td>
-                            <td><?= htmlspecialchars((string)$r['onboarding_step'], ENT_QUOTES, 'UTF-8') ?></td>
-                            <td><?= htmlspecialchars((string)$r['expires_at'], ENT_QUOTES, 'UTF-8') ?></td>
-                            <td>
-                                <?php if ((string)$r['status'] === 'Pending'): ?>
-                                    <form method="post" class="d-inline">
-                                        <input type="hidden" name="action" value="resend_invite">
-                                        <input type="hidden" name="invite_id" value="<?= (int)$r['invite_id'] ?>">
-                                        <button type="submit" class="btn btn-outline-primary btn-sm">Resend</button>
-                                    </form>
-                                <?php endif; ?>
-                                <?php if (in_array((string)$r['status'], ['Pending', 'InProgress'], true)): ?>
-                                    <form method="post" class="d-inline">
-                                        <input type="hidden" name="action" value="revoke_invite">
-                                        <input type="hidden" name="invite_id" value="<?= (int)$r['invite_id'] ?>">
-                                        <button type="submit" class="btn btn-outline-danger btn-sm">Revoke</button>
-                                    </form>
-                                <?php endif; ?>
-                            </td>
-                        </tr>
-                    <?php endforeach; ?>
-                    </tbody>
-                </table>
+                </form>
             </div>
         </div>
-    </div>
+
+        <div class="card shadow-sm">
+            <div class="card-body">
+                <h5 class="card-title">Recent Invites</h5>
+                <div class="table-responsive">
+                    <table class="table table-sm align-middle">
+                        <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>Name</th>
+                            <th>Role</th>
+                            <th>Position Access</th>
+                            <th>Contact</th>
+                            <th>Status</th>
+                            <th>Step</th>
+                            <th>Expires</th>
+                            <th>Action</th>
+                        </tr>
+                        </thead>
+                        <tbody>
+                        <?php foreach ($rows as $r): ?>
+                            <?php
+                            $name = trim(($r['firstname'] ?? '') . ' ' . (($r['middlename'] ?? '') !== '' ? ($r['middlename'] . ' ') : '') . ($r['lastname'] ?? '') . (($r['suffix'] ?? '') !== '' ? (' ' . $r['suffix']) : ''));
+                            ?>
+                            <tr>
+                                <td><?= (int)$r['invite_id'] ?></td>
+                                <td><?= htmlspecialchars($name, ENT_QUOTES, 'UTF-8') ?></td>
+                                <td><?= htmlspecialchars((string)$r['role_access'], ENT_QUOTES, 'UTF-8') ?></td>
+                                <td><?= htmlspecialchars((string)($r['position_access'] ?? '—'), ENT_QUOTES, 'UTF-8') ?></td>
+                                <td>
+                                    <div><?= htmlspecialchars((string)$r['invite_email'], ENT_QUOTES, 'UTF-8') ?></div>
+                                    <div class="text-muted">+63<?= htmlspecialchars((string)$r['invite_phone'], ENT_QUOTES, 'UTF-8') ?></div>
+                                </td>
+                                <td><?= htmlspecialchars((string)$r['status'], ENT_QUOTES, 'UTF-8') ?></td>
+                                <td><?= htmlspecialchars((string)$r['onboarding_step'], ENT_QUOTES, 'UTF-8') ?></td>
+                                <td><?= htmlspecialchars((string)$r['expires_at'], ENT_QUOTES, 'UTF-8') ?></td>
+                                <td>
+                                    <?php if ((string)$r['status'] === 'Pending'): ?>
+                                        <form method="post" class="d-inline">
+                                            <input type="hidden" name="action" value="resend_invite">
+                                            <input type="hidden" name="invite_id" value="<?= (int)$r['invite_id'] ?>">
+                                            <button type="submit" class="btn btn-outline-primary btn-sm">Resend</button>
+                                        </form>
+                                    <?php endif; ?>
+                                    <?php if (in_array((string)$r['status'], ['Pending', 'InProgress'], true)): ?>
+                                        <form method="post" class="d-inline">
+                                            <input type="hidden" name="action" value="revoke_invite">
+                                            <input type="hidden" name="invite_id" value="<?= (int)$r['invite_id'] ?>">
+                                            <button type="submit" class="btn btn-outline-danger btn-sm">Revoke</button>
+                                        </form>
+                                    <?php endif; ?>
+                                </td>
+                            </tr>
+                        <?php endforeach; ?>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+    </main>
 </div>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 </body>
 </html>

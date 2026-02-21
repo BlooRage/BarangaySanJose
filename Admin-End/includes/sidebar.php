@@ -17,8 +17,14 @@ $isToolsActive = in_array($current, $toolsPages);
 $adminDisplayName = "Admin User";
 $adminPosition = "Administrator";
 if (!empty($_SESSION['user_id']) && isset($conn) && $conn instanceof mysqli) {
+    $hasPositionAccess = false;
+    $colRes = $conn->query("SHOW COLUMNS FROM officialinformationtbl LIKE 'position_access'");
+    if ($colRes instanceof mysqli_result && $colRes->num_rows > 0) {
+        $hasPositionAccess = true;
+    }
+    $selectPosition = $hasPositionAccess ? "position_access" : "NULL AS position_access";
     $stmtInfo = $conn->prepare("
-        SELECT firstname, middlename, lastname, suffix, role_access, department
+        SELECT firstname, middlename, lastname, suffix, role_access, {$selectPosition}, department
         FROM officialinformationtbl
         WHERE user_id = ?
         LIMIT 1
@@ -37,7 +43,7 @@ if (!empty($_SESSION['user_id']) && isset($conn) && $conn instanceof mysqli) {
             if ($fullName !== '') {
                 $adminDisplayName = $fullName;
             }
-            $adminPosition = $info['role_access'] ?: ($info['department'] ?: $adminPosition);
+            $adminPosition = ($info['position_access'] ?? '') ?: ($info['role_access'] ?: ($info['department'] ?: $adminPosition));
         }
         $stmtInfo->close();
     }

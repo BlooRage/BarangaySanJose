@@ -270,6 +270,21 @@ if (!function_exists('oi_ensure_invite_table')) {
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
         ";
         $conn->query($sql);
+
+        // Backward-compatible column additions for evolving invite metadata.
+        $hasPosition = $conn->query("SHOW COLUMNS FROM officialinvitetbl LIKE 'position_access'");
+        if ($hasPosition instanceof mysqli_result && $hasPosition->num_rows === 0) {
+            $conn->query("ALTER TABLE officialinvitetbl ADD COLUMN position_access VARCHAR(100) DEFAULT NULL AFTER role_access");
+        }
+
+        $hasOfficialPosition = $conn->query("SHOW COLUMNS FROM officialinformationtbl LIKE 'position_access'");
+        if ($hasOfficialPosition instanceof mysqli_result && $hasOfficialPosition->num_rows === 0) {
+            $conn->query("ALTER TABLE officialinformationtbl ADD COLUMN position_access VARCHAR(100) DEFAULT NULL AFTER role_access");
+            $conn->query("
+                UPDATE officialinformationtbl
+                SET position_access = role_access
+                WHERE role_access IS NOT NULL AND TRIM(role_access) <> ''
+            ");
+        }
     }
 }
-
