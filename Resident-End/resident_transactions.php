@@ -56,6 +56,31 @@ require_once __DIR__ . "/includes/resident_access_guard.php";
       margin-left: auto;
       flex-wrap: nowrap;
     }
+    .pending-summary-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      border: 1px solid #f3d9ad;
+      background: #fff7eb;
+      color: #8a4b00;
+      font-weight: 700;
+      border-radius: 999px;
+      padding: 6px 10px;
+      line-height: 1;
+      white-space: nowrap;
+    }
+    .pending-summary-badge .count {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-width: 24px;
+      height: 24px;
+      border-radius: 999px;
+      background: #de710c;
+      color: #fff;
+      font-size: 0.8rem;
+      padding: 0 7px;
+    }
     .admin-search {
       min-width: 260px;
       max-width: 420px;
@@ -496,6 +521,10 @@ require_once __DIR__ . "/includes/resident_access_guard.php";
             <button type="button" class="btn txn-tab" data-tab="pending">Pending</button>
           </div>
           <div class="admin-list-actions">
+            <div id="txnPendingSummary" class="pending-summary-badge d-none" aria-live="polite">
+              <span>Pending</span>
+              <span id="txnPendingCount" class="count">0</span>
+            </div>
             <div class="input-group admin-search audit-search">
               <input id="txnSearch" class="form-control" placeholder="Search..." />
               <span class="input-group-text bg-white"><i class="fas fa-search"></i></span>
@@ -786,6 +815,32 @@ require_once __DIR__ . "/includes/resident_access_guard.php";
       if (activeTab === "denied") return key.includes("denied") || key.includes("rejected") || key.includes("notverified");
       if (activeTab === "pending") return key.includes("pending") || key.includes("review");
       return true;
+    }
+
+    function isPendingStatus(statusName) {
+      const key = String(statusName || "").toLowerCase();
+      return (
+        key.includes("pending") ||
+        key.includes("review") ||
+        key.includes("verify") ||
+        key.includes("verification") ||
+        key.includes("await")
+      ) && !(
+        key.includes("approved") ||
+        key.includes("verified") ||
+        key.includes("rejected") ||
+        key.includes("denied") ||
+        key.includes("notverified")
+      );
+    }
+
+    function updatePendingSummary() {
+      const wrap = document.getElementById("txnPendingSummary");
+      const countEl = document.getElementById("txnPendingCount");
+      if (!wrap || !countEl) return;
+      const count = allTransactions.filter((row) => isPendingStatus(row?.status_name)).length;
+      countEl.textContent = String(count);
+      wrap.classList.toggle("d-none", count <= 0);
     }
 
     function isDeniedStatus(statusName) {
@@ -1267,10 +1322,13 @@ require_once __DIR__ . "/includes/resident_access_guard.php";
           throw new Error(data?.message || "Failed to load transactions.");
         }
         allTransactions = Array.isArray(data.items) ? data.items : [];
+        updatePendingSummary();
         renderTransactions();
       } catch (err) {
         tbody.innerHTML = `<tr><td colspan="5" class="text-center text-danger py-4">${escapeHtml(err?.message || "Unable to load transactions.")}</td></tr>`;
         if (cards) cards.innerHTML = `<div class="text-center text-danger py-4">${escapeHtml(err?.message || "Unable to load transactions.")}</div>`;
+        const wrap = document.getElementById("txnPendingSummary");
+        if (wrap) wrap.classList.add("d-none");
       } finally {
         if (refreshBtn) refreshBtn.classList.remove("is-loading");
       }

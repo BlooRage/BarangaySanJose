@@ -296,18 +296,20 @@ function getResidentProfileData(mysqli $conn, string $userId): array {
             if ($stmtTbl->execute()) {
                 $usedNewTable = true;
                 $res = $stmtTbl->get_result();
-                $seen = [];
+                $sectorState = []; // dedupeKey => ['label'=>..., 'has_verified'=>bool, 'has_pending'=>bool]
                 while ($r = $res->fetch_assoc()) {
                     $sectorKey = (string)($r['sector_key'] ?? '');
                     $statusName = (string)($r['status_name'] ?? '');
                     if ($sectorKey === '') continue;
                     $label = $mapSectorKeyToLabel($sectorKey);
                     $dedupeKey = strtolower($label);
-                    // Use only the latest status per sector key.
-                    if (isset($seen[$dedupeKey])) {
-                        continue;
+                    if (!isset($sectorState[$dedupeKey])) {
+                        $sectorState[$dedupeKey] = [
+                            'label' => $label,
+                            'has_verified' => false,
+                            'has_pending' => false
+                        ];
                     }
-                    $seen[$dedupeKey] = true;
 
                     $statusKey = strtolower(trim((string)$statusName));
                     $statusKey = preg_replace('/[\s_-]+/', '', $statusKey);
@@ -315,12 +317,20 @@ function getResidentProfileData(mysqli $conn, string $userId): array {
                     $isPending = (strpos($statusKey, 'pending') !== false || strpos($statusKey, 'review') !== false);
 
                     if ($isVerified) {
-                        $verified[] = $label;
+                        $sectorState[$dedupeKey]['has_verified'] = true;
                     } elseif ($isPending) {
-                        $pendingCount++;
-                        $pendingLabels[] = $label;
+                        $sectorState[$dedupeKey]['has_pending'] = true;
                     }
                 }
+
+                foreach ($sectorState as $state) {
+                    if (!empty($state['has_verified'])) {
+                        $verified[] = (string)$state['label'];
+                    } elseif (!empty($state['has_pending'])) {
+                        $pendingLabels[] = (string)$state['label'];
+                    }
+                }
+                $pendingCount = count($pendingLabels);
             }
             $stmtTbl->close();
         }
