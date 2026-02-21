@@ -697,9 +697,7 @@ if (forgotContinueBtn) {
 
     try {
       const formData = new FormData();
-      const email = (emailInput?.value || "").trim();
       formData.append("phone", phone);
-      formData.append("email", email);
       formData.append("email", email);
 
       const res = await fetch("../PhpFiles/Login/checkForgotPassword.php", {
@@ -707,10 +705,15 @@ if (forgotContinueBtn) {
         body: formData,
       });
 
-      const data = await res.json();
+      const data = await res.json().catch(() => ({}));
+
+      if (!res.ok) {
+        showForgotError(data?.error || `Unable to verify account. HTTP ${res.status}`, [forgotPhoneInput, forgotEmailInput]);
+        return;
+      }
 
       if (!data.success) {
-        showForgotError(data.error, [forgotPhoneInput, forgotEmailInput]);
+        showForgotError(data.error || "No account found matching the provided email and phone number.", [forgotPhoneInput, forgotEmailInput]);
         return;
       }
 

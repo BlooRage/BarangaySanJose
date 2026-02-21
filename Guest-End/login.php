@@ -6,9 +6,13 @@
 
 session_start();
 
-if (isset($_SESSION['user_id'])) {
-  header("Location: ../Resident-End/resident_dashboard.php");
+// Prevent redirect loops when a stale session has user_id but missing role.
+if (!empty($_SESSION['user_id']) && !empty($_SESSION['role'])) {
+  header("Location: ../PhpFiles/Login/unifiedProfileCheck.php");
   exit;
+}
+if (!empty($_SESSION['user_id']) && empty($_SESSION['role'])) {
+  unset($_SESSION['user_id'], $_SESSION['logged_in'], $_SESSION['last_activity'], $_SESSION['hard_expire_at']);
 }
 ?>
 <!DOCTYPE html>
@@ -311,8 +315,6 @@ if (isset($_SESSION['user_id'])) {
         });
     </script></body>
 </html>
-
-
 
 
 

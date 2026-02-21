@@ -3,7 +3,7 @@ session_start();
 require_once "../General/connection.php";
 require_once "../General/security.php";
 
-requireRoleSession(['Admin', 'Employee']);
+requireRoleSession(['SuperAdmin', 'Official', 'Officials', 'Personnel', 'Personnels', 'Admin', 'Employee']);
 
 function normalize_simple($value) {
     $value = strtolower(trim((string)$value));

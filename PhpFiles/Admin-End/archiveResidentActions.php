@@ -5,7 +5,7 @@ header('Content-Type: application/json; charset=utf-8');
 require_once "../General/connection.php";
 require_once "../General/security.php";
 
-requireRoleSession(['Admin', 'Employee']);
+requireRoleSession(['SuperAdmin', 'Official', 'Officials', 'Personnel', 'Personnels', 'Admin', 'Employee']);
 
 $raw = file_get_contents("php://input");
 $body = json_decode($raw, true);

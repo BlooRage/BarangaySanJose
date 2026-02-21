@@ -2,6 +2,7 @@
 session_start();
 require '../General/connection.php';
 require_once __DIR__ . '/../General/security.php';
+require_once __DIR__ . '/../General/officialInviteCommon.php';
 
 $userID = $_SESSION['user_id'] ?? null;
 $role   = $_SESSION['role'] ?? null;
@@ -9,6 +10,29 @@ $role   = $_SESSION['role'] ?? null;
 if (!$userID || !$role) {
     // Not logged in → redirect to login
     redirectToLogin();
+}
+
+// Resume pending official/employee onboarding after login.
+if (in_array($role, ['Official', 'Officials', 'Personnel', 'Personnels', 'SuperAdmin', 'Admin', 'Employee'], true) && isset($conn) && $conn instanceof mysqli) {
+    oi_ensure_invite_table($conn);
+    $stmtInvite = $conn->prepare("
+        SELECT invite_id
+        FROM officialinvitetbl
+        WHERE user_id = ?
+          AND status = 'InProgress'
+        ORDER BY invite_id DESC
+        LIMIT 1
+    ");
+    if ($stmtInvite) {
+        $stmtInvite->bind_param("s", $userID);
+        $stmtInvite->execute();
+        $invite = $stmtInvite->get_result()->fetch_assoc();
+        $stmtInvite->close();
+        if ($invite) {
+            header('Location: ' . appUrl('/Guest-End/official_onboarding.php'));
+            exit;
+        }
+    }
 }
 
 switch ($role) {
@@ -29,12 +53,13 @@ switch ($role) {
         header('Location: ' . appUrl('/Resident-End/resident_dashboard.php'));
         exit;
 
-	case 'Employee':
-	    header('Location: ' . appUrl('/Admin-End/AdminDashboard.php'));
-	    exit;
 	case 'Official':
+	case 'Officials':
+	case 'Personnel':
+	case 'Personnels':
 	case 'Admin':
 	case 'SuperAdmin':
+	case 'Employee':
         // Check official profile
         $stmt = $conn->prepare("SELECT official_id FROM officialinformationtbl WHERE user_id = ? LIMIT 1");
         $stmt->bind_param("s", $userID);
@@ -43,17 +68,13 @@ switch ($role) {
         $profileData = $result->fetch_assoc();
         $stmt->close();
 
-        if (!$profileData) {
-            header('Location: ' . appUrl('/Admin-End/official_profile_form.php'));
+        if (!$profileData && in_array($role, ['Official', 'Officials', 'Personnel', 'Personnels', 'SuperAdmin', 'Admin', 'Employee'], true)) {
+            header('Location: ' . appUrl('/Guest-End/official_onboarding.php'));
             exit;
         }
 
-        // Redirect based on role
-        if ($role === 'SuperAdmin' || $role === 'Admin') {
-            header('Location: ' . appUrl('/Admin-End/AdminDashboard.php'));
-        } else {
-            header('Location: ' . appUrl('/Admin-End/official_dashboard.php'));
-        }
+        // Current admin surface uses AdminDashboard for all non-resident internal users.
+        header('Location: ' . appUrl('/Admin-End/AdminDashboard.php'));
         exit;
 
     default:

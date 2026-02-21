@@ -4,7 +4,7 @@ require_once "../General/connection.php";
 require_once "../General/security.php";
 require_once "../General/audit.php";
 
-requireRoleSession(['Admin', 'Employee']);
+requireRoleSession(['SuperAdmin', 'Official', 'Officials', 'Personnel', 'Personnels', 'Admin', 'Employee']);
 
 function normalizeResidentId($value): ?string {
     $id = trim((string)$value);

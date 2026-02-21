@@ -88,6 +88,15 @@ function enforceSessionInactivityTimeout(int $timeoutSeconds = 1800, bool $json 
     }
 
     $now = time();
+    $hardExpireAt = (int)($_SESSION['hard_expire_at'] ?? 0);
+    if ($hardExpireAt > 0 && $now > $hardExpireAt) {
+        destroySessionAndExit($json, 401, 'Session expired. Please login again.');
+    }
+    if ($hardExpireAt <= 0) {
+        // Backward-compatible: initialize hard expiry for sessions created before this key existed.
+        $_SESSION['hard_expire_at'] = $now + $timeoutSeconds;
+    }
+
     $last = (int)($_SESSION['last_activity'] ?? 0);
 
     if ($last > 0 && ($now - $last) > $timeoutSeconds) {
