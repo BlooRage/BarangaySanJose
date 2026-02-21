@@ -53,7 +53,15 @@ function normalizeFilesArray($file): array {
 
 function hasValidUpload(array $files): bool {
     foreach ($files as $file) {
-        if (($file['error'] ?? UPLOAD_ERR_NO_FILE) === UPLOAD_ERR_OK) {
+        $error = (int)($file['error'] ?? UPLOAD_ERR_NO_FILE);
+        $tmpName = (string)($file['tmp_name'] ?? '');
+        $size = (int)($file['size'] ?? 0);
+        if (
+            $error === UPLOAD_ERR_OK &&
+            $tmpName !== '' &&
+            is_uploaded_file($tmpName) &&
+            $size > 0
+        ) {
             return true;
         }
     }
@@ -62,7 +70,15 @@ function hasValidUpload(array $files): bool {
 
 function filterValidUploads(array $files): array {
     return array_values(array_filter($files, function ($file) {
-        return ($file['error'] ?? UPLOAD_ERR_NO_FILE) === UPLOAD_ERR_OK;
+        $error = (int)($file['error'] ?? UPLOAD_ERR_NO_FILE);
+        $tmpName = (string)($file['tmp_name'] ?? '');
+        $size = (int)($file['size'] ?? 0);
+        return (
+            $error === UPLOAD_ERR_OK &&
+            $tmpName !== '' &&
+            is_uploaded_file($tmpName) &&
+            $size > 0
+        );
     }));
 }
 
@@ -104,6 +120,19 @@ function sectorKeyFromLabel(string $label): string {
         'singleparent' => 'SingleParent'
     ];
     return $map[$normalized] ?? '';
+}
+
+function sectorLabelFromKey(string $sectorKey): string {
+    $normalized = strtolower(trim($sectorKey));
+    $normalized = preg_replace('/[^a-z]/', '', $normalized);
+    $map = [
+        'pwd' => 'PWD',
+        'seniorcitizen' => 'Senior Citizen',
+        'student' => 'Student',
+        'indigenouspeople' => 'Indigenous People',
+        'singleparent' => 'Single Parent'
+    ];
+    return $map[$normalized] ?? trim($sectorKey);
 }
 
 function upsertSectorMembershipStatusFromUpload(
@@ -208,6 +237,14 @@ function toDbWebPath(string $absolutePath): string {
 }
 
 function moveUploadedFileWithDocName(string $tmpName, string $dir, string $docType, string $userId, string $ext): array {
+    if ($tmpName === '' || !is_uploaded_file($tmpName)) {
+        throw new Exception("Invalid upload source.");
+    }
+    $tmpSize = @filesize($tmpName);
+    if ($tmpSize === false || (int)$tmpSize <= 0) {
+        throw new Exception("Uploaded file is empty.");
+    }
+
     $index = 0;
     $fileName = buildAttachmentFileName($docType, $userId, $ext, $index);
     $target = rtrim($dir, "/") . "/" . $fileName;
@@ -220,6 +257,11 @@ function moveUploadedFileWithDocName(string $tmpName, string $dir, string $docTy
 
     if (!move_uploaded_file($tmpName, $target)) {
         throw new Exception("Failed to upload file.");
+    }
+    $movedSize = @filesize($target);
+    if ($movedSize === false || (int)$movedSize <= 0) {
+        @unlink($target);
+        throw new Exception("Uploaded file is empty.");
     }
 
     return [
@@ -814,6 +856,7 @@ try {
         }
 
         $attachmentIds = [];
+        $attachmentIdsBySectorKey = [];
         $markers = [];
         foreach ($addedSectorKeys as $sectorKey) {
             $markers[] = 'sector:' . $sectorKey;
@@ -870,6 +913,10 @@ try {
                     if (strpos($markerBase, 'sector:') === 0) {
                         $sectorKey = trim((string)substr($markerBase, strlen('sector:')));
                         if ($sectorKey !== '') {
+                            if (!isset($attachmentIdsBySectorKey[$sectorKey])) {
+                                $attachmentIdsBySectorKey[$sectorKey] = [];
+                            }
+                            $attachmentIdsBySectorKey[$sectorKey][] = $newAttachmentId;
                             upsertSectorMembershipStatusFromUpload(
                                 $conn,
                                 (string)$residentId,
@@ -884,21 +931,39 @@ try {
         }
 
         $sectorSourceId = !empty($attachmentIds) ? (string)$attachmentIds[0] : (string)$residentId;
-        createResidentTransaction(
-            $conn,
-            (string)$userId,
-            (string)$userId,
-            'SECTOR_MEMBERSHIP',
-            $sectorSourceId,
-            'SECTOR_MEMBERSHIP_VERIFICATION',
-            'Sector Membership Verification',
-            (int)$statusVerifyId,
-            'Resident submitted a sector membership request for verification.',
-            [
-                'added_sectors' => $addedSectorKeys,
-                'removed_student' => $removedStudent ? 1 : 0
-            ]
-        );
+        $changedSectorKeys = array_values(array_unique(array_merge(
+            array_values($addedSectorKeys),
+            $removedStudent ? ['Student'] : []
+        )));
+        foreach ($changedSectorKeys as $changedSectorKey) {
+            $sectorIds = isset($attachmentIdsBySectorKey[$changedSectorKey])
+                ? $attachmentIdsBySectorKey[$changedSectorKey]
+                : $attachmentIds;
+            $sectorIds = array_values(array_unique(array_map('intval', (array)$sectorIds)));
+            $sectorSourceIdCurrent = !empty($sectorIds) ? (string)$sectorIds[0] : $sectorSourceId;
+            $isRemoval = ($changedSectorKey === 'Student' && $removedStudent);
+            $sectorLabel = sectorLabelFromKey($changedSectorKey);
+
+            createResidentTransaction(
+                $conn,
+                (string)$userId,
+                (string)$userId,
+                'SECTOR_MEMBERSHIP',
+                $sectorSourceIdCurrent,
+                'SECTOR_MEMBERSHIP_VERIFICATION',
+                'Sector Membership Verification',
+                (int)$statusVerifyId,
+                'Resident submitted a sector membership request for verification.',
+                [
+                    'sectors' => [$sectorLabel],
+                    'sector_key' => $changedSectorKey,
+                    'action' => $isRemoval ? 'remove' : 'add',
+                    'added_sectors' => $isRemoval ? [] : [$changedSectorKey],
+                    'removed_student' => $isRemoval ? 1 : 0,
+                    'attachment_ids' => $sectorIds
+                ]
+            );
+        }
     }
 
     if ($requestId > 0) {

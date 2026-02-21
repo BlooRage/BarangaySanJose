@@ -3,7 +3,7 @@ declare(strict_types=1);
 
 // Auto-delete script for rejected documents (unifiedfileattachmenttbl).
 // Intended to run via cron (CLI only).
-// Retention: 60 days (based on rejected_at when available, otherwise upload_timestamp).
+// Retention: 30 days (based on rejected_at when available, otherwise upload_timestamp).
 
 if (php_sapi_name() !== 'cli') {
     http_response_code(403);
@@ -49,7 +49,7 @@ function resolveFilePath(string $rawPath, string $projectRoot): string {
     return rtrim($projectRoot, "/") . "/" . ltrim($rawPath, "/");
 }
 
-$retentionDays = 60;
+$retentionDays = 30;
 
 function parseRejectedAtFromRemarks(string $remarks): ?DateTimeImmutable {
     $parts = array_values(array_filter(array_map('trim', explode(';', $remarks))));

@@ -643,25 +643,47 @@ require_once __DIR__ . "/includes/resident_access_guard.php";
     </div>
   </div>
 
+  <div class="modal fade" id="txnDocViewerModal" tabindex="-1" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="true">
+    <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable" style="max-width: 1100px; width: 92vw;">
+      <div class="modal-content">
+        <div class="modal-header">
+          <div>
+            <h5 class="fw-bold mb-0" id="txnDocViewerTitle">Document Preview</h5>
+            <div class="small text-muted" id="txnDocViewerSubtitle"></div>
+          </div>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body" id="txnDocViewerBody"></div>
+        <div class="modal-footer">
+          <a href="#" class="btn btn-outline-primary d-none" id="txnDocViewerOpenNewTab" target="_blank" rel="noopener">Open</a>
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <script>
     let allTransactions = [];
     let activeTab = "all";
     let txnViewModalInstance = null;
+    let txnDocViewerModalInstance = null;
+    let txnViewDocsCurrent = [];
     const expandedRows = new Set();
     const docStatusCache = new Map();
 
     function statusBadgeClass(statusName) {
       const raw = String(statusName || "").toLowerCase();
       const key = raw.replace(/[\s_-]+/g, "");
-      if (key === "notverified" || key.includes("pending") || key.includes("review")) return "bg-warning-subtle text-warning-emphasis";
-      if (key.includes("denied") || key.includes("rejected")) return "bg-danger-subtle text-danger";
+      if (key.includes("pending") || key.includes("review")) return "bg-warning-subtle text-warning-emphasis";
+      if (key === "notverified" || key.includes("denied") || key.includes("rejected")) return "bg-danger-subtle text-danger";
       if (key.includes("approved") || key.includes("verified")) return "bg-success-subtle text-success";
       return "bg-warning-subtle text-warning-emphasis";
     }
 
     function displayStatusName(statusName) {
       const key = String(statusName || "").toLowerCase().trim();
-      if (key === "notverified" || key === "pendingverification") return "Pending";
+      if (key === "notverified") return "Declined";
+      if (key === "pendingverification") return "Pending";
       return String(statusName || "Pending");
     }
 
@@ -682,6 +704,73 @@ require_once __DIR__ . "/includes/resident_access_guard.php";
       return d.toLocaleString();
     }
 
+    function getFileExtFromDoc(doc) {
+      const fromType = String(doc?.file_type || "").toLowerCase().trim();
+      if (fromType) return fromType;
+      const url = String(doc?.file_url || "");
+      if (!url) return "";
+      const noQuery = url.split("?")[0];
+      return (noQuery.split(".").pop() || "").toLowerCase();
+    }
+
+    function openTxnDocViewer(doc) {
+      const modalEl = document.getElementById("txnDocViewerModal");
+      const bodyEl = document.getElementById("txnDocViewerBody");
+      const titleEl = document.getElementById("txnDocViewerTitle");
+      const subtitleEl = document.getElementById("txnDocViewerSubtitle");
+      const openNewTabEl = document.getElementById("txnDocViewerOpenNewTab");
+      if (!modalEl || !bodyEl || !window.bootstrap?.Modal) return;
+
+      const url = String(doc?.file_url || "").trim();
+      const ext = getFileExtFromDoc(doc);
+      const docName = String(doc?.document_type_name || "Document");
+      const uploaded = formatDateTime(doc?.uploaded_at || "");
+
+      if (titleEl) titleEl.textContent = docName || "Document Preview";
+      if (subtitleEl) subtitleEl.textContent = uploaded && uploaded !== "-" ? `Uploaded: ${uploaded}` : "";
+
+      bodyEl.innerHTML = "";
+      if (!url) {
+        const div = document.createElement("div");
+        div.className = "text-muted";
+        div.textContent = "File is unavailable.";
+        bodyEl.appendChild(div);
+      } else if (["jpg", "jpeg", "png", "webp", "gif"].includes(ext)) {
+        const img = document.createElement("img");
+        img.src = url;
+        img.alt = docName;
+        img.className = "img-fluid d-block mx-auto";
+        bodyEl.appendChild(img);
+      } else if (ext === "pdf") {
+        const iframe = document.createElement("iframe");
+        iframe.src = url;
+        iframe.className = "w-100";
+        iframe.style.height = "70vh";
+        iframe.title = docName;
+        bodyEl.appendChild(iframe);
+      } else {
+        const div = document.createElement("div");
+        div.className = "text-muted";
+        div.textContent = "Preview not available for this file type.";
+        bodyEl.appendChild(div);
+      }
+
+      if (openNewTabEl) {
+        if (url) {
+          openNewTabEl.href = url;
+          openNewTabEl.classList.remove("d-none");
+        } else {
+          openNewTabEl.href = "#";
+          openNewTabEl.classList.add("d-none");
+        }
+      }
+
+      if (!txnDocViewerModalInstance) {
+        txnDocViewerModalInstance = new bootstrap.Modal(modalEl);
+      }
+      txnDocViewerModalInstance.show();
+    }
+
     function escapeHtml(str) {
       return String(str ?? "")
         .replaceAll("&", "&amp;")
@@ -694,19 +783,30 @@ require_once __DIR__ . "/includes/resident_access_guard.php";
     function getTabMatches(statusName) {
       const key = String(statusName || "").toLowerCase();
       if (activeTab === "verified") return key.includes("approved") || key.includes("verified");
-      if (activeTab === "denied") return key.includes("denied") || key.includes("rejected");
-      if (activeTab === "pending") return key.includes("pending") || key.includes("review") || key.includes("notverified");
+      if (activeTab === "denied") return key.includes("denied") || key.includes("rejected") || key.includes("notverified");
+      if (activeTab === "pending") return key.includes("pending") || key.includes("review");
       return true;
     }
 
     function isDeniedStatus(statusName) {
       const key = String(statusName || "").toLowerCase();
-      return key.includes("denied") || key.includes("rejected");
+      return key.includes("denied") || key.includes("rejected") || key.includes("notverified");
     }
 
     function getDeniedReason(row) {
       if (!isDeniedStatus(row?.status_name)) return "";
-      return String(row?.metadata?.admin_notes || "").trim();
+      const fromMeta = String(
+        row?.metadata?.admin_notes ||
+        row?.metadata?.denied_reason ||
+        row?.metadata?.reason ||
+        ""
+      ).trim();
+      if (fromMeta) return fromMeta;
+
+      const desc = String(row?.description || "").trim();
+      if (!desc) return "";
+      const match = desc.match(/reason\s*:\s*(.+)$/i);
+      return match ? String(match[1] || "").trim() : "";
     }
 
     function getResubmitUrl(row) {
@@ -1088,6 +1188,7 @@ require_once __DIR__ . "/includes/resident_access_guard.php";
       const docsBody = document.getElementById("txnViewDocsTbody");
       const noDocsNote = document.getElementById("txnViewNoDocsNote");
       const resubmitBtn = document.getElementById("txnViewResubmitBtn");
+      txnViewDocsCurrent = [];
 
       titleEl.textContent = row.transaction_id || "-";
       typeEl.textContent = row.transaction_type || "-";
@@ -1118,12 +1219,13 @@ require_once __DIR__ . "/includes/resident_access_guard.php";
 
         try {
           const docs = await loadTransactionDocuments(row);
+          txnViewDocsCurrent = docs;
           if (!docs.length) {
             docsBody.innerHTML = `<tr><td colspan="4" class="text-muted text-center py-3">No uploaded documents found.</td></tr>`;
           } else {
-            docsBody.innerHTML = docs.map((doc) => {
+            docsBody.innerHTML = docs.map((doc, idx) => {
               const fileLink = doc.file_url
-                ? `<a href="${escapeHtml(doc.file_url)}" target="_blank" rel="noopener">View</a>`
+                ? `<button type="button" class="btn btn-sm btn-outline-primary txn-doc-view-btn" data-doc-idx="${escapeHtml(String(idx))}">View</button>`
                 : `<span class="text-muted">-</span>`;
               return `
                 <tr>
@@ -1137,6 +1239,7 @@ require_once __DIR__ . "/includes/resident_access_guard.php";
           }
         } catch (err) {
           docsBody.innerHTML = `<tr><td colspan="4" class="text-danger text-center py-3">${escapeHtml(err?.message || "Unable to load documents.")}</td></tr>`;
+          txnViewDocsCurrent = [];
         }
       }
 
@@ -1313,6 +1416,15 @@ require_once __DIR__ . "/includes/resident_access_guard.php";
           renderTransactions();
         });
       }
+
+      const txnViewDocsTbody = document.getElementById("txnViewDocsTbody");
+      txnViewDocsTbody?.addEventListener("click", (event) => {
+        const btn = event.target?.closest?.(".txn-doc-view-btn");
+        if (!btn) return;
+        const idx = Number(btn.getAttribute("data-doc-idx"));
+        if (!Number.isInteger(idx) || idx < 0 || idx >= txnViewDocsCurrent.length) return;
+        openTxnDocViewer(txnViewDocsCurrent[idx]);
+      });
 
       loadTransactions();
     });

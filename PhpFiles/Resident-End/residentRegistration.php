@@ -297,6 +297,14 @@ function toDbWebPath(string $absolutePath): string {
 }
 
 function moveUploadedFileWithDocName(string $tmpName, string $dir, string $docType, string $userId, string $ext): array {
+    if ($tmpName === '' || !is_uploaded_file($tmpName)) {
+        throw new Exception("Invalid upload source.");
+    }
+    $tmpSize = @filesize($tmpName);
+    if ($tmpSize === false || (int)$tmpSize <= 0) {
+        throw new Exception("Uploaded file is empty.");
+    }
+
     $index = 0;
     $fileName = buildAttachmentFileName($docType, $userId, $ext, $index);
     $target = rtrim($dir, "/") . "/" . $fileName;
@@ -309,6 +317,11 @@ function moveUploadedFileWithDocName(string $tmpName, string $dir, string $docTy
 
     if (!move_uploaded_file($tmpName, $target)) {
         throw new Exception("Failed to upload file.");
+    }
+    $movedSize = @filesize($target);
+    if ($movedSize === false || (int)$movedSize <= 0) {
+        @unlink($target);
+        throw new Exception("Uploaded file is empty.");
     }
 
     return [
@@ -805,6 +818,7 @@ try {
     $statusVerifyId = getStatusId($conn, "PendingReview", "ResidentDocumentProfiling");
     $proofAttachmentIds = [];
     $sectorAttachmentIds = [];
+    $sectorAttachmentIdsByKey = [];
     // Store files under a folder named by user_id (not resident_id).
     $userFolder = preg_replace('/[^A-Za-z0-9_-]/', '', (string)$user_id);
     if ($userFolder === '') {
@@ -1242,8 +1256,12 @@ try {
 	            $newAttachmentId = (int)$ins->insert_id;
 	            $ins->close();
 
-	            if ($newAttachmentId > 0) {
-                    $sectorAttachmentIds[] = $newAttachmentId;
+            if ($newAttachmentId > 0) {
+                $sectorAttachmentIds[] = $newAttachmentId;
+                if (!isset($sectorAttachmentIdsByKey[$sectorKey])) {
+                    $sectorAttachmentIdsByKey[$sectorKey] = [];
+                }
+                $sectorAttachmentIdsByKey[$sectorKey][] = $newAttachmentId;
 	                upsertSectorMembershipStatusFromUpload(
 	                    $conn,
 	                    (string)$resident_id,
@@ -1299,8 +1317,12 @@ try {
             $newAttachmentId = (int)$ins->insert_id;
             $ins->close();
 
-	            if ($newAttachmentId > 0) {
-                    $sectorAttachmentIds[] = $newAttachmentId;
+            if ($newAttachmentId > 0) {
+                $sectorAttachmentIds[] = $newAttachmentId;
+                if (!isset($sectorAttachmentIdsByKey[$sectorKey])) {
+                    $sectorAttachmentIdsByKey[$sectorKey] = [];
+                }
+                $sectorAttachmentIdsByKey[$sectorKey][] = $newAttachmentId;
 	                upsertSectorMembershipStatusFromUpload(
 	                    $conn,
 	                    (string)$resident_id,
@@ -1495,22 +1517,38 @@ try {
         }
 
         if (!empty($selectedSectors) && $hasAnySectorProof) {
-            createResidentTransaction(
-                $conn,
-                (string)$user_id,
-                (string)$user_id,
-                'RESIDENT_PROFILE',
-                (string)$resident_id,
-                'SECTOR_MEMBERSHIP',
-                'Sector Membership Declaration',
-                (int)($hasAnySectorProof ? $statusVerifyId : $finalResidentStatusId),
-                'Resident declared sector membership.',
-                [
-                    'sectors' => array_values($selectedSectors),
-                    'has_sector_proof' => $hasAnySectorProof ? 1 : 0,
-                    'attachment_ids' => array_values(array_unique(array_map('intval', $sectorAttachmentIds))),
-                ]
-            );
+            $sectorLabelToKeyForTxn = [
+                'PWD' => 'PWD',
+                'Single Parent' => 'SingleParent',
+                'Student' => 'Student',
+                'Senior Citizen' => 'SeniorCitizen',
+                'Indigenous People' => 'IndigenousPeople',
+            ];
+            foreach ($selectedSectors as $sectorLabel) {
+                $sectorKey = $sectorLabelToKeyForTxn[$sectorLabel] ?? null;
+                $sectorIds = ($sectorKey && isset($sectorAttachmentIdsByKey[$sectorKey]))
+                    ? $sectorAttachmentIdsByKey[$sectorKey]
+                    : $sectorAttachmentIds;
+                $sectorIds = array_values(array_unique(array_map('intval', (array)$sectorIds)));
+
+                createResidentTransaction(
+                    $conn,
+                    (string)$user_id,
+                    (string)$user_id,
+                    'RESIDENT_PROFILE',
+                    (string)$resident_id,
+                    'SECTOR_MEMBERSHIP',
+                    'Sector Membership Declaration',
+                    (int)($hasAnySectorProof ? $statusVerifyId : $finalResidentStatusId),
+                    'Resident declared sector membership.',
+                    [
+                        'sectors' => [$sectorLabel],
+                        'sector_key' => $sectorKey,
+                        'has_sector_proof' => $hasAnySectorProof ? 1 : 0,
+                        'attachment_ids' => $sectorIds,
+                    ]
+                );
+            }
         }
     } catch (Throwable $e) {
         // ignore transaction log failures

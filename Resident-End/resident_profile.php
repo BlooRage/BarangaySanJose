@@ -249,8 +249,11 @@ if ($residentId !== '' && isset($conn) && $conn instanceof mysqli) {
                                 <?php
                                   $sectorText = trim((string)($residentinformationtbl['sector_membership'] ?? ''));
                                   $pendingSector = (int)($residentinformationtbl['sector_membership_pending_review'] ?? 0);
+                                  $pendingSectorLabels = trim((string)($residentinformationtbl['sector_membership_pending_labels'] ?? ''));
                                   $hasVerifiedSector = $sectorText !== '' && strcasecmp($sectorText, 'none') !== 0;
-                                  $pendingLabel = "Pending Review";
+                                  $pendingLabel = $pendingSectorLabels !== ''
+                                      ? ($pendingSectorLabels . ' (Pending Review)')
+                                      : 'Pending Review';
                                 ?>
                                 <?php if ($hasVerifiedSector): ?>
                                     <div>
@@ -378,7 +381,7 @@ if ($residentId !== '' && isset($conn) && $conn instanceof mysqli) {
 
                                   if ($statusKey === 'pendingverification' || $statusKey === 'pendingreview') {
                                       $statusClass = 'status-badge status-badge--pending';
-                                  } elseif ($statusKey === 'verifiedresident') {
+                                  } elseif ($statusKey === 'verifiedresident' || $statusKey === 'verified') {
                                       $statusClass = 'status-badge status-badge--verified';
                                   } elseif ($statusKey === 'notverified') {
                                       $statusClass = 'status-badge status-badge--denied';

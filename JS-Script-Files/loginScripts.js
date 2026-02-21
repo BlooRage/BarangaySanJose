@@ -594,58 +594,31 @@ function startResendCountdown(purpose, seconds = 120) {
   }, 1000);
 }
 
-// ===== Send OTP (generate_otp.php -> send_otp.php) =====
+// ===== Send OTP (server-side generation + SMS dispatch) =====
 async function sendOTP(recipient, purpose, reuse = false) {
   try {
-    let otpCode;
+    const genForm = new FormData();
+    genForm.append("recipient", recipient); // 0XXXXXXXXXX
+    genForm.append("purpose", purpose);
 
-    if (reuse && currentOTPByPurpose[purpose]) {
-      otpCode = currentOTPByPurpose[purpose];
-    } else {
-      const genForm = new FormData();
-      genForm.append("recipient", recipient); // 0XXXXXXXXXX
-      genForm.append("purpose", purpose);
-
-      const genRes = await fetch("../PhpFiles/OTPHandlers/generate_otp.php", {
-        method: "POST",
-        body: genForm,
-      });
-
-      const genText = await genRes.text();
-
-      let genData;
-      try {
-        genData = JSON.parse(genText);
-      } catch {
-        throw new Error("Invalid JSON from generate_otp.php");
-      }
-
-      if (!genData.success || !genData.otp_code) {
-        throw new Error(genData.error || "OTP generation failed");
-      }
-
-      otpCode = genData.otp_code;
-      currentOTPByPurpose[purpose] = otpCode;
-    }
-
-    const sendRes = await fetch("../PhpFiles/OTPHandlers/send_otp.php", {
+    const genRes = await fetch("../PhpFiles/OTPHandlers/generate_otp.php", {
       method: "POST",
-      headers: { "Content-Type": "application/x-www-form-urlencoded" },
-      body: new URLSearchParams({ recipient, otp_code: otpCode }),
+      body: genForm,
     });
 
-    const sendText = await sendRes.text();
+    const genText = await genRes.text();
 
-    let sendData;
+    let genData;
     try {
-      sendData = JSON.parse(sendText);
+      genData = JSON.parse(genText);
     } catch {
-      throw new Error("Invalid JSON from send_otp.php");
+      throw new Error("Invalid JSON from generate_otp.php");
     }
 
-    if (!sendData.success) throw new Error(sendData.error || "OTP sending failed");
+    if (!genData.success) throw new Error(genData.error || "OTP sending failed");
   } catch (err) {
     showOtpError("Unable to send OTP. Please try again later.");
+    throw err;
   }
 }
 

@@ -131,6 +131,169 @@ function txnAggregateDocStatus(
     return 'PendingReview';
 }
 
+function txnNormalizeResidentStatusToParent(string $residentStatusName): ?string {
+    $key = strtolower(trim($residentStatusName));
+    $key = preg_replace('/[\s_-]+/', '', $key);
+    if ($key === 'verifiedresident' || $key === 'verified' || $key === 'approved') {
+        return 'Verified';
+    }
+    if ($key === 'notverified' || $key === 'rejected' || $key === 'denied') {
+        return 'Rejected';
+    }
+    if ($key === 'pendingverification' || $key === 'pendingreview') {
+        return 'PendingReview';
+    }
+    return null;
+}
+
+function txnIsDeniedStatus(string $statusName): bool {
+    $k = strtolower(trim($statusName));
+    if ($k === '') return false;
+    return (strpos($k, 'rejected') !== false || strpos($k, 'denied') !== false || $k === 'notverified');
+}
+
+function txnParseRejectReasonFromRemarks(string $remarks): string {
+    $raw = trim($remarks);
+    if ($raw === '') return '';
+    if (preg_match('/(?:^|;)\s*reason\s*=\s*(.+)$/i', $raw, $m)) {
+        return trim((string)($m[1] ?? ''));
+    }
+    return '';
+}
+
+function txnFindLatestRejectedReason(
+    mysqli $conn,
+    string $residentId,
+    string $purpose,
+    array $attachmentIds = [],
+    ?string $cutoffAt = null
+): string {
+    if ($residentId === '') return '';
+
+    $sql = "
+        SELECT
+            COALESCE(s.status_name, 'PendingReview') AS status_name,
+            COALESCE(uf.remarks, '') AS remarks
+        FROM unifiedfileattachmenttbl uf
+        INNER JOIN documenttypelookuptbl dt ON dt.document_type_id = uf.document_type_id
+        LEFT JOIN statuslookuptbl s ON s.status_id = uf.status_id_verify
+        WHERE uf.source_type = 'ResidentProfiling'
+          AND uf.source_id = ?
+          AND dt.document_category = 'ResidentProfiling'
+    ";
+    $types = "s";
+    $params = [$residentId];
+
+    if ($purpose === 'proof') {
+        $sql .= " AND (uf.remarks IS NULL OR uf.remarks NOT LIKE 'sector:%') ";
+    } elseif ($purpose === 'sector') {
+        $sql .= " AND uf.remarks LIKE 'sector:%' ";
+    }
+
+    if (!empty($attachmentIds)) {
+        $sql .= " AND uf.attachment_id IN (" . implode(',', array_fill(0, count($attachmentIds), '?')) . ") ";
+        $types .= str_repeat('i', count($attachmentIds));
+        foreach ($attachmentIds as $id) {
+            $params[] = (int)$id;
+        }
+    }
+
+    $cutoffAt = trim((string)$cutoffAt);
+    if ($cutoffAt !== '') {
+        $sql .= " AND COALESCE(uf.updated_at, uf.upload_timestamp) <= ? ";
+        $types .= "s";
+        $params[] = $cutoffAt;
+    }
+
+    $sql .= " ORDER BY COALESCE(uf.updated_at, uf.upload_timestamp) DESC, uf.attachment_id DESC ";
+
+    $stmt = $conn->prepare($sql);
+    if (!$stmt) return '';
+    $stmt->bind_param($types, ...$params);
+    $stmt->execute();
+    $res = $stmt->get_result();
+
+    while ($row = $res->fetch_assoc()) {
+        $statusKey = strtolower(trim((string)($row['status_name'] ?? '')));
+        if (strpos($statusKey, 'rejected') === false && strpos($statusKey, 'denied') === false) {
+            continue;
+        }
+        $reason = txnParseRejectReasonFromRemarks((string)($row['remarks'] ?? ''));
+        if ($reason !== '') {
+            $stmt->close();
+            return $reason;
+        }
+    }
+
+    $stmt->close();
+    return '';
+}
+
+function txnSectorKeyFromMeta(?array $meta): string {
+    if (!$meta || !is_array($meta)) return '';
+    $raw = trim((string)($meta['sector_key'] ?? ''));
+    if ($raw === '' && isset($meta['sectors']) && is_array($meta['sectors']) && !empty($meta['sectors'][0])) {
+        $raw = trim((string)$meta['sectors'][0]);
+    }
+    if ($raw === '') return '';
+
+    $normalized = strtolower(preg_replace('/[^a-z]/', '', $raw));
+    $map = [
+        'pwd' => 'PWD',
+        'singleparent' => 'SingleParent',
+        'student' => 'Student',
+        'seniorcitizen' => 'SeniorCitizen',
+        'indigenouspeople' => 'IndigenousPeople',
+    ];
+    return $map[$normalized] ?? $raw;
+}
+
+function txnResubmitScopeKey(array $row): string {
+    $txnType = strtoupper(trim((string)($row['transaction_type'] ?? '')));
+    if (in_array($txnType, ['PROOF_OF_RESIDENCY', 'RESIDENT_PROFILING'], true)) {
+        return 'profiling';
+    }
+    if (in_array($txnType, ['SECTOR_MEMBERSHIP', 'SECTOR_MEMBERSHIP_VERIFICATION'], true)) {
+        $sectorKey = txnSectorKeyFromMeta(is_array($row['metadata'] ?? null) ? $row['metadata'] : null);
+        return $sectorKey !== '' ? ('sector:' . $sectorKey) : 'sector:*';
+    }
+    return '';
+}
+
+function txnSuppressStaleResubmitUrls(array $items): array {
+    if (empty($items)) return $items;
+
+    $latestTxByScope = [];
+    foreach ($items as $row) {
+        $scope = txnResubmitScopeKey($row);
+        if ($scope === '') continue;
+        $txid = (string)($row['transaction_id'] ?? '');
+        if (!isset($latestTxByScope[$scope])) {
+            $latestTxByScope[$scope] = $txid;
+        }
+    }
+
+    for ($i = 0; $i < count($items); $i++) {
+        $meta = is_array($items[$i]['metadata'] ?? null) ? $items[$i]['metadata'] : [];
+        $hasResubmit = isset($meta['resubmit_url']) && trim((string)$meta['resubmit_url']) !== '';
+        if (!$hasResubmit) continue;
+        if (!txnIsDeniedStatus((string)($items[$i]['status_name'] ?? ''))) continue;
+
+        $scope = txnResubmitScopeKey($items[$i]);
+        if ($scope === '') continue;
+        $currentTxId = (string)($items[$i]['transaction_id'] ?? '');
+        $latestScopeTxId = (string)($latestTxByScope[$scope] ?? '');
+
+        // Keep resubmit only for the latest transaction in the same scope.
+        if ($latestScopeTxId !== '' && $latestScopeTxId !== $currentTxId) {
+            unset($meta['resubmit_url']);
+            $items[$i]['metadata'] = $meta;
+        }
+    }
+
+    return $items;
+}
+
 // Prefer unifiedtransactiontbl (new generalized ledger).
 $sql = "
     SELECT
@@ -212,6 +375,7 @@ $stmt->close();
 
 // Resolve resident_id once for document-context flags.
 $residentId = '';
+$residentStatusName = '';
 $residentStmt = $conn->prepare("SELECT resident_id FROM residentinformationtbl WHERE user_id = ? LIMIT 1");
 if ($residentStmt) {
     $residentStmt->bind_param("s", $userId);
@@ -219,6 +383,23 @@ if ($residentStmt) {
     $residentStmt->bind_result($residentId);
     $residentStmt->fetch();
     $residentStmt->close();
+}
+
+if ($residentId !== '') {
+    $residentStatusStmt = $conn->prepare("
+        SELECT COALESCE(s.status_name, '') AS status_name
+        FROM residentinformationtbl r
+        LEFT JOIN statuslookuptbl s ON s.status_id = r.status_id_resident
+        WHERE r.resident_id = ?
+        LIMIT 1
+    ");
+    if ($residentStatusStmt) {
+        $residentStatusStmt->bind_param("s", $residentId);
+        $residentStatusStmt->execute();
+        $residentStatusStmt->bind_result($residentStatusName);
+        $residentStatusStmt->fetch();
+        $residentStatusStmt->close();
+    }
 }
 
 // Mark regular transactions that can expose resident profiling document statuses.
@@ -239,14 +420,99 @@ for ($i = 0; $i < count($items); $i++) {
     }
     $items[$i]['has_documents'] = true;
 
-    // Keep parent transaction status aligned with its relevant document statuses.
-    $purpose = txnDocPurposeFromType($rowTxnType);
-    $attachmentIds = txnExtractAttachmentIds(is_array($items[$i]['metadata'] ?? null) ? $items[$i]['metadata'] : null);
-    $docStatus = txnAggregateDocStatus($conn, $residentId, $purpose, $attachmentIds, null);
-    if ($docStatus !== null) {
-        $items[$i]['status_name'] = $docStatus;
+    if ($rowTxnType === 'RESIDENT_PROFILING') {
+        $derivedParentStatus = txnNormalizeResidentStatusToParent((string)$residentStatusName);
+        if ($derivedParentStatus !== null) {
+            $items[$i]['status_name'] = $derivedParentStatus;
+        }
+        if (txnIsDeniedStatus((string)($items[$i]['status_name'] ?? ''))) {
+            $metaCurrent = is_array($items[$i]['metadata'] ?? null) ? $items[$i]['metadata'] : [];
+            if (!isset($metaCurrent['resubmit_url']) || trim((string)$metaCurrent['resubmit_url']) === '') {
+                $metaCurrent['resubmit_url'] = 'DocumentUpload.php?mode=profiling';
+            }
+            $items[$i]['metadata'] = $metaCurrent;
+        }
+        continue;
+    }
+
+    if ($rowTxnType === 'PROOF_OF_RESIDENCY') {
+        $attachmentIds = txnExtractAttachmentIds(is_array($items[$i]['metadata'] ?? null) ? $items[$i]['metadata'] : null);
+        $cutoffAt = (string)($items[$i]['reviewed_at'] ?? '');
+        if ($cutoffAt === '') {
+            $cutoffAt = (string)($items[$i]['updated_at'] ?? '');
+        }
+        if ($cutoffAt === '') {
+            $cutoffAt = (string)($items[$i]['created_at'] ?? '');
+        }
+
+        $docStatus = txnAggregateDocStatus($conn, $residentId, 'proof', $attachmentIds, $cutoffAt);
+        if ($docStatus !== null) {
+            $items[$i]['status_name'] = $docStatus;
+        }
+
+        if (txnIsDeniedStatus((string)($items[$i]['status_name'] ?? ''))) {
+            $derivedReason = txnFindLatestRejectedReason($conn, $residentId, 'proof', $attachmentIds, $cutoffAt);
+            $metaCurrent = is_array($items[$i]['metadata'] ?? null) ? $items[$i]['metadata'] : [];
+            if ($derivedReason !== '' && (!isset($metaCurrent['denied_reason']) || trim((string)$metaCurrent['denied_reason']) === '')) {
+                $metaCurrent['denied_reason'] = $derivedReason;
+            }
+            if (!isset($metaCurrent['resubmit_url']) || trim((string)$metaCurrent['resubmit_url']) === '') {
+                $metaCurrent['resubmit_url'] = 'DocumentUpload.php?mode=profiling';
+            }
+            $items[$i]['metadata'] = $metaCurrent;
+        }
+        continue;
+    }
+
+    // Sector parent transactions auto-follow their document verification.
+    // Resident registration parent transactions are driven by resident status.
+    $isDocDrivenTxn = in_array($rowTxnType, [
+        'SECTOR_MEMBERSHIP',
+        'SECTOR_MEMBERSHIP_VERIFICATION'
+    ], true);
+    if ($isDocDrivenTxn) {
+        $purpose = txnDocPurposeFromType($rowTxnType);
+        $attachmentIds = txnExtractAttachmentIds(is_array($items[$i]['metadata'] ?? null) ? $items[$i]['metadata'] : null);
+        $docStatus = txnAggregateDocStatus($conn, $residentId, $purpose, $attachmentIds, null);
+        if ($docStatus !== null) {
+            $items[$i]['status_name'] = $docStatus;
+        }
+        if (strcasecmp((string)($items[$i]['status_name'] ?? ''), 'Rejected') === 0) {
+            $derivedReason = txnFindLatestRejectedReason($conn, $residentId, $purpose, $attachmentIds, null);
+            if ($derivedReason !== '') {
+                $metaCurrent = is_array($items[$i]['metadata'] ?? null) ? $items[$i]['metadata'] : [];
+                if (!isset($metaCurrent['denied_reason']) || trim((string)$metaCurrent['denied_reason']) === '') {
+                    $metaCurrent['denied_reason'] = $derivedReason;
+                }
+                $items[$i]['metadata'] = $metaCurrent;
+            }
+        }
+    }
+
+    // Rejected resident proof/registration requests should also be resubmittable.
+    if (in_array($rowTxnType, ['RESIDENT_PROFILING', 'PROOF_OF_RESIDENCY'], true)
+        && txnIsDeniedStatus((string)($items[$i]['status_name'] ?? ''))
+    ) {
+        $metaCurrent = is_array($items[$i]['metadata'] ?? null) ? $items[$i]['metadata'] : [];
+        if (!isset($metaCurrent['resubmit_url']) || trim((string)$metaCurrent['resubmit_url']) === '') {
+            $metaCurrent['resubmit_url'] = 'DocumentUpload.php?mode=profiling';
+        }
+        $items[$i]['metadata'] = $metaCurrent;
+    }
+
+    // Rejected sector requests should be closed and immediately resubmittable from transactions.
+    if (in_array($rowTxnType, ['SECTOR_MEMBERSHIP', 'SECTOR_MEMBERSHIP_VERIFICATION'], true)
+        && txnIsDeniedStatus((string)($items[$i]['status_name'] ?? ''))
+    ) {
+        $metaCurrent = is_array($items[$i]['metadata'] ?? null) ? $items[$i]['metadata'] : [];
+        if (!isset($metaCurrent['resubmit_url']) || trim((string)$metaCurrent['resubmit_url']) === '') {
+            $metaCurrent['resubmit_url'] = 'DocumentUpload.php?mode=sector';
+        }
+        $items[$i]['metadata'] = $metaCurrent;
     }
 }
+
+$items = txnSuppressStaleResubmitUrls($items);
 
 usort($items, static function (array $a, array $b): int {
     $aTsSource = (string)($a['updated_at'] ?? '');

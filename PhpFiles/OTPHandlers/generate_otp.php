@@ -1,6 +1,7 @@
 <?php
 header('Content-Type: application/json');
 require_once '../General/connection.php';
+require_once '../General/sendSMS.php';
 
 // ===== Validate input =====
 if (!isset($_POST['recipient']) || !isset($_POST['purpose'])) {
@@ -58,11 +59,21 @@ $stmt->bind_param(
 $stmt->execute();
 $stmt->close();
 
-// ===== Return OTP & formatted number for Semaphore =====
+// ===== Send OTP on server-side only (do not expose OTP to client) =====
+$recipient_sms = '0' . $recipient_db; // 11 digits
+$message = "Your OTP code is $otp_code";
+$sent = sendSMS($recipient_sms, $message, $otp_code);
+
+if (!$sent) {
+    echo json_encode([
+        'success' => false,
+        'error' => 'Failed to send OTP. Please try again.'
+    ]);
+    exit;
+}
+
 echo json_encode([
     'success' => true,
-    'otp_code' => $otp_code,
-    'semaphore_recipient' => '0' . $recipient_db, // ðŸ”¥ 11 digits
     'expires_at' => $expiry_time
 ]);
 ?>

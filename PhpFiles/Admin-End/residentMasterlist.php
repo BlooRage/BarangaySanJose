@@ -214,37 +214,53 @@ function getStatusId(mysqli $conn, string $name, string $type): int {
     return (int)$res['status_id'];
 }
 
+function getFirstStatusMatch(mysqli $conn, array $names, string $type): ?array {
+    foreach ($names as $name) {
+        $label = trim((string)$name);
+        if ($label === '') {
+            continue;
+        }
+        $q = $conn->prepare("
+            SELECT status_id, status_name
+            FROM statuslookuptbl
+            WHERE status_name = ?
+              AND status_type = ?
+            LIMIT 1
+        ");
+        if (!$q) {
+            throw new Exception("Prepare failed (getFirstStatusMatch): " . $conn->error);
+        }
+        $q->bind_param("ss", $label, $type);
+        $q->execute();
+        $row = $q->get_result()->fetch_assoc();
+        $q->close();
+        if ($row && isset($row['status_id'])) {
+            return [
+                'status_id' => (int)$row['status_id'],
+                'status_name' => (string)($row['status_name'] ?? $label),
+            ];
+        }
+    }
+    return null;
+}
+
+function getFirstStatusMatchByTypes(mysqli $conn, array $names, array $types): ?array {
+    foreach ($types as $type) {
+        $match = getFirstStatusMatch($conn, $names, (string)$type);
+        if ($match) {
+            return $match;
+        }
+    }
+    return null;
+}
+
 function getResidentVerificationEligibility(mysqli $conn, string $residentId): array {
     $sql = "
         SELECT
-            SUM(
-                CASE
-                    WHEN dt.document_category = 'ResidentProfiling'
-                         AND dt.document_type_name = '2x2 Picture'
-                         AND sv.status_name = 'Rejected'
-                         AND sv.status_type = 'ResidentDocumentProfiling'
-                    THEN 1 ELSE 0
-                END
-            ) AS rejected_2x2_count,
-            SUM(
-                CASE
-                    WHEN dt.document_category = 'ResidentProfiling'
-                         AND dt.document_type_name <> '2x2 Picture'
-                         AND (uf.remarks IS NULL OR uf.remarks NOT LIKE 'sector:%')
-                         AND sv.status_name = 'Rejected'
-                         AND sv.status_type = 'ResidentDocumentProfiling'
-                    THEN 1 ELSE 0
-                END
-            ) AS rejected_supporting_doc_count,
-            SUM(
-                CASE
-                    WHEN dt.document_category = 'ResidentProfiling'
-                         AND (uf.remarks IS NULL OR uf.remarks NOT LIKE 'sector:%')
-                         AND sv.status_name = 'PendingReview'
-                         AND sv.status_type = 'ResidentDocumentProfiling'
-                    THEN 1 ELSE 0
-                END
-            ) AS pending_registration_doc_count
+            uf.attachment_id,
+            uf.upload_timestamp,
+            dt.document_type_name,
+            COALESCE(sv.status_name, '') AS verify_status
         FROM unifiedfileattachmenttbl uf
         INNER JOIN documenttypelookuptbl dt
             ON uf.document_type_id = dt.document_type_id
@@ -252,6 +268,9 @@ function getResidentVerificationEligibility(mysqli $conn, string $residentId): a
             ON uf.status_id_verify = sv.status_id
         WHERE uf.source_type = 'ResidentProfiling'
           AND uf.source_id = ?
+          AND dt.document_category = 'ResidentProfiling'
+          AND (uf.remarks IS NULL OR uf.remarks NOT LIKE 'sector:%')
+        ORDER BY uf.upload_timestamp DESC, uf.attachment_id DESC
     ";
 
     $stmt = $conn->prepare($sql);
@@ -260,12 +279,45 @@ function getResidentVerificationEligibility(mysqli $conn, string $residentId): a
     }
     $stmt->bind_param("s", $residentId);
     $stmt->execute();
-    $row = $stmt->get_result()->fetch_assoc() ?: [];
+    $rows = $stmt->get_result()->fetch_all(MYSQLI_ASSOC) ?: [];
     $stmt->close();
 
-    $hasPendingRegistrationDocs = (int)($row['pending_registration_doc_count'] ?? 0) > 0;
-    $hasRejected2x2 = (int)($row['rejected_2x2_count'] ?? 0) > 0;
-    $hasRejectedSupportingDoc = (int)($row['rejected_supporting_doc_count'] ?? 0) > 0;
+    $latestByType = [];
+    $latest2x2Status = null;
+    $latestSupportingStatus = null;
+
+    foreach ($rows as $row) {
+        $docType = trim((string)($row['document_type_name'] ?? ''));
+        if ($docType === '') {
+            continue;
+        }
+        $statusLower = strtolower(trim((string)($row['verify_status'] ?? '')));
+
+        if (!array_key_exists($docType, $latestByType)) {
+            $latestByType[$docType] = $statusLower;
+        }
+
+        if ($docType === '2x2 Picture') {
+            if ($latest2x2Status === null) {
+                $latest2x2Status = $statusLower;
+            }
+            continue;
+        }
+
+        if ($latestSupportingStatus === null) {
+            $latestSupportingStatus = $statusLower;
+        }
+    }
+
+    $hasPendingRegistrationDocs = false;
+    foreach ($latestByType as $statusLower) {
+        if ($statusLower === 'pendingreview') {
+            $hasPendingRegistrationDocs = true;
+            break;
+        }
+    }
+    $hasRejected2x2 = in_array($latest2x2Status, ['rejected', 'denied'], true);
+    $hasRejectedSupportingDoc = in_array($latestSupportingStatus, ['rejected', 'denied'], true);
 
     return [
         'has_pending_registration_docs' => $hasPendingRegistrationDocs,
@@ -389,12 +441,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_resident_statu
     $uiStatus = trim((string)($_POST['new_status'] ?? ''));
     $reasonText = trim((string)($_POST['reason_text'] ?? ''));
 
-    $statusMap = [
-        'APPROVED' => 'VerifiedResident',
-        'DENIED' => 'NotVerified'
+    $statusCandidates = [
+        'APPROVED' => ['VerifiedResident', 'Verified'],
+        'DENIED' => ['NotVerified', 'Rejected', 'Denied']
     ];
 
-    if (!$residentId || !isset($statusMap[$uiStatus])) {
+    if (!$residentId || !isset($statusCandidates[$uiStatus])) {
         http_response_code(400);
         echo json_encode(['success' => false, 'message' => 'Invalid request.']);
         exit;
@@ -453,23 +505,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_resident_statu
         // Capture old status for audit trail.
         $oldResidentStatusName = getResidentStatusName($conn, $residentId);
 
-        $statusName = $statusMap[$uiStatus];
+        $statusResolved = getFirstStatusMatch($conn, $statusCandidates[$uiStatus], 'Resident');
+        if (!$statusResolved) {
+            throw new Exception("Resident status mapping not found in statuslookuptbl.");
+        }
+        $statusName = (string)$statusResolved['status_name'];
+        $statusIdResident = (int)$statusResolved['status_id'];
+
         $stmt = $conn->prepare("
             UPDATE residentinformationtbl
-            SET status_id_resident = (
-                SELECT status_id
-                FROM statuslookuptbl
-                WHERE status_name = ?
-                  AND status_type = 'Resident'
-                LIMIT 1
-            )
+            SET status_id_resident = ?
             WHERE resident_id = ?
             LIMIT 1
         ");
         if (!$stmt) {
             throw new Exception("Prepare failed.");
         }
-        $stmt->bind_param("ss", $statusName, $residentId);
+        $stmt->bind_param("is", $statusIdResident, $residentId);
         $stmt->execute();
         $stmt->close();
 
@@ -504,13 +556,77 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_resident_statu
             }
         }
 
-        // Audit (best-effort): resident verification status change.
-        $newResidentStatusId = null;
+        // Keep resident profiling parent transaction(s) aligned with admin decision.
+        $txnStatusCandidates = $uiStatus === 'APPROVED'
+            ? ['Verified', 'Approved', 'VerifiedResident']
+            : ['Rejected', 'Denied', 'NotVerified'];
         try {
-            $newResidentStatusId = getStatusId($conn, $statusName, "Resident");
-        } catch (Throwable $e) {
-            $newResidentStatusId = null;
+            $txnStatusResolved = getFirstStatusMatchByTypes(
+                $conn,
+                $txnStatusCandidates,
+                ['ResidentDocumentProfiling', 'Resident']
+            );
+            if (!$txnStatusResolved) {
+                throw new Exception('No compatible transaction status found.');
+            }
+            $txnStatusId = (int)$txnStatusResolved['status_id'];
+
+            $residentUserIdForTxn = null;
+            $txnResidentUserStmt = $conn->prepare("
+                SELECT user_id
+                FROM residentinformationtbl
+                WHERE resident_id = ?
+                LIMIT 1
+            ");
+            if ($txnResidentUserStmt) {
+                $txnResidentUserStmt->bind_param("s", $residentId);
+                $txnResidentUserStmt->execute();
+                $txnResidentUserStmt->bind_result($residentUserIdForTxn);
+                $txnResidentUserStmt->fetch();
+                $txnResidentUserStmt->close();
+            }
+
+            $txnUpdate = $conn->prepare("
+                UPDATE unifiedtransactiontbl
+                SET
+                    status_id = ?,
+                    details = CASE
+                        WHEN ? <> '' THEN CONCAT('Resident status declined. Reason: ', ?)
+                        ELSE details
+                    END,
+                    reviewed_by = ?,
+                    reviewed_at = NOW(),
+                    updated_at = CURRENT_TIMESTAMP
+                WHERE transaction_type IN ('RESIDENT_PROFILING', 'PROOF_OF_RESIDENCY')
+                  AND (
+                        source_id = ?
+                        OR resident_user_id = ?
+                        OR user_id = ?
+                  )
+            ");
+            if ($txnUpdate) {
+                $reviewedBy = isset($_SESSION['user_id']) ? (string)$_SESSION['user_id'] : null;
+                $residentUserIdForTxn = (string)($residentUserIdForTxn ?? '');
+                $declineReasonForTxn = $uiStatus === 'DENIED' ? (string)$reasonText : '';
+                $txnUpdate->bind_param(
+                    "issssss",
+                    $txnStatusId,
+                    $declineReasonForTxn,
+                    $declineReasonForTxn,
+                    $reviewedBy,
+                    $residentId,
+                    $residentUserIdForTxn,
+                    $residentUserIdForTxn
+                );
+                $txnUpdate->execute();
+                $txnUpdate->close();
+            }
+        } catch (Throwable $txe) {
+            // Do not block resident status updates when transaction ledger sync is unavailable.
         }
+
+        // Audit (best-effort): resident verification status change.
+        $newResidentStatusId = $statusIdResident > 0 ? $statusIdResident : null;
         insertUnifiedAuditLog(
             $conn,
             $actorUserId,
