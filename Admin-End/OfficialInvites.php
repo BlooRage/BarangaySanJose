@@ -75,6 +75,30 @@ function fetch_invite_by_id(mysqli $conn, int $inviteId): ?array {
     return $row ?: null;
 }
 
+function verify_actor_password_or_fail(mysqli $conn, string $actorUserId, bool $isSuperAdminActor, string $actorPassword): void {
+    if (!$isSuperAdminActor) {
+        return;
+    }
+    if (trim($actorPassword) === '') {
+        set_invite_flash('danger', 'Please enter your current password to authorize this action.');
+        redirect_self();
+    }
+    $pwdStmt = $conn->prepare("SELECT password_hash FROM useraccountstbl WHERE user_id = ? LIMIT 1");
+    if (!$pwdStmt) {
+        set_invite_flash('danger', 'Unable to verify your password right now.');
+        redirect_self();
+    }
+    $pwdStmt->bind_param("s", $actorUserId);
+    $pwdStmt->execute();
+    $pwdRow = $pwdStmt->get_result()->fetch_assoc();
+    $pwdStmt->close();
+    $actorHash = (string)($pwdRow['password_hash'] ?? '');
+    if ($actorHash === '' || !password_verify($actorPassword, $actorHash)) {
+        set_invite_flash('danger', 'Authorization failed: incorrect current password.');
+        redirect_self();
+    }
+}
+
 function send_invite_email(array $invite, string $rawToken): bool {
     $smtpConfig = require __DIR__ . "/../PhpFiles/General/mailConfigurations.php";
     $sender = new EmailSender($smtpConfig);
@@ -102,6 +126,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $action = trim((string)($_POST['action'] ?? ''));
     $actorUserId = (string)($_SESSION['user_id'] ?? '');
     $actorRole = (string)($_SESSION['role'] ?? 'SuperAdmin');
+    $isSuperAdminActor = in_array($actorRole, ['SuperAdmin'], true);
 
     if ($action === 'create_invite') {
         $lastName = trim((string)($_POST['last_name'] ?? ''));
@@ -113,6 +138,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $roleAccess = trim((string)($_POST['role_access'] ?? ''));
         $positionAccess = trim((string)($_POST['position_access'] ?? ''));
         $department = trim((string)($_POST['department'] ?? ''));
+        $actorPassword = (string)($_POST['actor_password'] ?? '');
 
         if ($lastName === '' || $firstName === '' || $email === '' || $roleAccess === '' || $department === '') {
             set_invite_flash('danger', 'Last name, first name, email, role, and department are required.');
@@ -154,6 +180,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if ($roleAccess === 'SuperAdmin' && $positionAccess === '') {
             $positionAccess = 'System Administrator';
         }
+
+        verify_actor_password_or_fail($conn, $actorUserId, $isSuperAdminActor, $actorPassword);
 
         $exists = $conn->prepare("SELECT user_id FROM useraccountstbl WHERE email = ? OR phone_number = ? LIMIT 1");
         if ($exists) {
@@ -235,6 +263,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     if ($action === 'revoke_invite') {
         $inviteId = (int)($_POST['invite_id'] ?? 0);
+        $actorPassword = (string)($_POST['actor_password'] ?? '');
+        verify_actor_password_or_fail($conn, $actorUserId, $isSuperAdminActor, $actorPassword);
         if ($inviteId <= 0) {
             set_invite_flash('danger', 'Invalid invite.');
             redirect_self();
@@ -256,6 +286,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     if ($action === 'resend_invite') {
         $inviteId = (int)($_POST['invite_id'] ?? 0);
+        $actorPassword = (string)($_POST['actor_password'] ?? '');
+        verify_actor_password_or_fail($conn, $actorUserId, $isSuperAdminActor, $actorPassword);
         $invite = fetch_invite_by_id($conn, $inviteId);
         if (!$invite) {
             set_invite_flash('danger', 'Invite not found.');
@@ -407,6 +439,19 @@ if ($q) {
                             </select>
                             <div class="form-text">Required for Official and Personnel roles.</div>
                         </div>
+                        <?php if (in_array((string)($_SESSION['role'] ?? ''), ['SuperAdmin'], true)): ?>
+                        <div class="col-md-8">
+                            <label class="form-label">Your Current Password <span class="text-danger">*</span></label>
+                            <input
+                                class="form-control"
+                                type="password"
+                                name="actor_password"
+                                autocomplete="current-password"
+                                required
+                            >
+                            <div class="form-text">Security check required before sending an invite.</div>
+                        </div>
+                        <?php endif; ?>
                     </div>
                     <div class="mt-3">
                         <button type="submit" class="btn btn-primary">Send Invite</button>
@@ -455,6 +500,9 @@ if ($q) {
                                         <form method="post" class="d-inline">
                                             <input type="hidden" name="action" value="resend_invite">
                                             <input type="hidden" name="invite_id" value="<?= (int)$r['invite_id'] ?>">
+                                            <?php if (in_array((string)($_SESSION['role'] ?? ''), ['SuperAdmin'], true)): ?>
+                                                <input type="password" name="actor_password" class="form-control form-control-sm d-inline-block me-1" style="width: 170px;" placeholder="Your password" autocomplete="current-password" required>
+                                            <?php endif; ?>
                                             <button type="submit" class="btn btn-outline-primary btn-sm">Resend</button>
                                         </form>
                                     <?php endif; ?>
@@ -462,6 +510,9 @@ if ($q) {
                                         <form method="post" class="d-inline">
                                             <input type="hidden" name="action" value="revoke_invite">
                                             <input type="hidden" name="invite_id" value="<?= (int)$r['invite_id'] ?>">
+                                            <?php if (in_array((string)($_SESSION['role'] ?? ''), ['SuperAdmin'], true)): ?>
+                                                <input type="password" name="actor_password" class="form-control form-control-sm d-inline-block me-1" style="width: 170px;" placeholder="Your password" autocomplete="current-password" required>
+                                            <?php endif; ?>
                                             <button type="submit" class="btn btn-outline-danger btn-sm">Revoke</button>
                                         </form>
                                     <?php endif; ?>

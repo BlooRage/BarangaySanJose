@@ -176,7 +176,7 @@ VALUES (?, ?, 1, ?, 0, ?, ?, ?, ?, ?)
     $_SESSION['role'] = $RoleAccess;
     $_SESSION['status'] = 'Active';
     $_SESSION['logged_in'] = true;
-    $_SESSION['hard_expire_at'] = time() + 1800;
+    $_SESSION['last_activity'] = time();
 
     echo json_encode([
         "success" => true,

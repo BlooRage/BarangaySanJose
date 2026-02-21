@@ -24,6 +24,175 @@ $conn->query("ALTER TABLE officialinformationtbl ADD COLUMN IF NOT EXISTS provin
 $userId = (string)($_SESSION['user_id'] ?? '');
 $account = null;
 $profile = null;
+$flash = ['type' => '', 'message' => ''];
+
+if (!empty($_SESSION['admin_profile_flash']) && is_array($_SESSION['admin_profile_flash'])) {
+    $flash = $_SESSION['admin_profile_flash'];
+    unset($_SESSION['admin_profile_flash']);
+}
+
+function ap_set_flash(string $type, string $message): void
+{
+    $_SESSION['admin_profile_flash'] = ['type' => $type, 'message' => $message];
+}
+
+function ap_redirect_self(): void
+{
+    header('Location: admin_profile.php');
+    exit;
+}
+
+function ap_to_db_web_path(string $absolutePath): string
+{
+    $absolutePath = str_replace("\\", "/", trim($absolutePath));
+    $projectRoot = realpath(__DIR__ . "/..");
+    $marker = "/UnifiedFileAttachment/";
+    $markerPos = strpos($absolutePath, $marker);
+    if ($markerPos !== false) {
+        return ltrim(substr($absolutePath, $markerPos), "/");
+    }
+    if ($projectRoot) {
+        $rootNorm = str_replace("\\", "/", $projectRoot);
+        if (strpos($absolutePath, $rootNorm) === 0) {
+            return ltrim(substr($absolutePath, strlen($rootNorm)), "/");
+        }
+    }
+    return ltrim($absolutePath, "/");
+}
+
+function ap_get_document_type_id(mysqli $conn, string $name, string $category = 'OfficialProfiling'): int
+{
+    $q = $conn->prepare("
+        SELECT document_type_id
+        FROM documenttypelookuptbl
+        WHERE LOWER(document_type_name) = LOWER(?)
+          AND document_category = ?
+        LIMIT 1
+    ");
+    if (!$q) {
+        throw new RuntimeException('Failed to prepare document type lookup.');
+    }
+    $q->bind_param("ss", $name, $category);
+    $q->execute();
+    $row = $q->get_result()->fetch_assoc();
+    $q->close();
+    if ($row && isset($row['document_type_id'])) {
+        return (int)$row['document_type_id'];
+    }
+
+    $ins = $conn->prepare("INSERT INTO documenttypelookuptbl (document_type_name, document_category) VALUES (?, ?)");
+    if (!$ins) {
+        throw new RuntimeException('Failed to prepare document type creation.');
+    }
+    $ins->bind_param("ss", $name, $category);
+    if (!$ins->execute()) {
+        $ins->close();
+        throw new RuntimeException('Failed to create document type.');
+    }
+    $newId = (int)$ins->insert_id;
+    $ins->close();
+    if ($newId <= 0) {
+        throw new RuntimeException('Unable to resolve document type.');
+    }
+    return $newId;
+}
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && (string)($_POST['action'] ?? '') === 'update_profile_image') {
+    try {
+        if ($userId === '') {
+            throw new RuntimeException('Session expired. Please login again.');
+        }
+        if (!isset($_FILES['profile_image']) || !is_array($_FILES['profile_image'])) {
+            throw new RuntimeException('Please choose an image file.');
+        }
+        $err = (int)($_FILES['profile_image']['error'] ?? UPLOAD_ERR_NO_FILE);
+        if ($err !== UPLOAD_ERR_OK) {
+            throw new RuntimeException('Please choose an image file.');
+        }
+        $tmpName = (string)($_FILES['profile_image']['tmp_name'] ?? '');
+        if ($tmpName === '' || !is_uploaded_file($tmpName)) {
+            throw new RuntimeException('Invalid upload source.');
+        }
+        $tmpSize = @filesize($tmpName);
+        if ($tmpSize === false || (int)$tmpSize <= 0) {
+            throw new RuntimeException('Uploaded image is empty.');
+        }
+        $origName = (string)($_FILES['profile_image']['name'] ?? '');
+        $ext = strtolower((string)pathinfo($origName, PATHINFO_EXTENSION));
+        $allowed = ['jpg', 'jpeg', 'png', 'webp'];
+        if (!in_array($ext, $allowed, true)) {
+            throw new RuntimeException('Invalid image type. Allowed: JPG, JPEG, PNG, WEBP.');
+        }
+
+        $uploadDir = __DIR__ . "/../UnifiedFileAttachment/Documents/{$userId}/";
+        if (!is_dir($uploadDir) && !mkdir($uploadDir, 0777, true)) {
+            throw new RuntimeException('Failed to prepare upload directory.');
+        }
+
+        $fileBase = '2x2Picture' . $userId;
+        $index = 0;
+        do {
+            $fileName = $fileBase . ($index > 0 ? '_' . $index : '') . '.' . $ext;
+            $target = rtrim($uploadDir, "/") . "/" . $fileName;
+            $index++;
+        } while (file_exists($target));
+
+        if (!move_uploaded_file($tmpName, $target)) {
+            throw new RuntimeException('Failed to upload image.');
+        }
+
+        $docTypeId = ap_get_document_type_id($conn, '2x2 Picture', 'OfficialProfiling');
+        $statusIdVerify = oi_get_status_id($conn, 'Verified', ['DocumentVerification', 'VerificationStatus', 'Verification']);
+        if ($statusIdVerify === null) {
+            $statusIdVerify = oi_get_status_id($conn, 'Approved', ['DocumentVerification', 'VerificationStatus', 'Verification']);
+        }
+        if ($statusIdVerify === null) {
+            $statusIdVerify = oi_get_status_id($conn, 'PendingReview', ['DocumentVerification', 'VerificationStatus', 'Verification']);
+        }
+        if ($statusIdVerify === null) {
+            throw new RuntimeException('Verification status lookup missing.');
+        }
+
+        $sourceType = 'OFFICIAL_PROFILE';
+        $sourceId = $userId;
+        $filePathDb = ap_to_db_web_path($target);
+        $remarks = 'Admin profile image';
+        $idNumber = null;
+
+        $ins = $conn->prepare("
+            INSERT INTO unifiedfileattachmenttbl
+                (source_type, source_id, document_type_id, file_name, file_path, file_type, user_id_uploaded_by, status_id_verify, remarks, id_number)
+            VALUES
+                (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ");
+        if (!$ins) {
+            throw new RuntimeException('Failed to save uploaded image.');
+        }
+        $ins->bind_param(
+            "ssissssiss",
+            $sourceType,
+            $sourceId,
+            $docTypeId,
+            $fileName,
+            $filePathDb,
+            $ext,
+            $userId,
+            $statusIdVerify,
+            $remarks,
+            $idNumber
+        );
+        if (!$ins->execute()) {
+            $ins->close();
+            throw new RuntimeException('Failed to save uploaded image.');
+        }
+        $ins->close();
+
+        ap_set_flash('success', 'Profile image updated.');
+    } catch (Throwable $e) {
+        ap_set_flash('danger', $e->getMessage());
+    }
+    ap_redirect_self();
+}
 
 if ($userId !== '') {
     $stmtAcc = $conn->prepare("SELECT email, email_verify, phone_number, phoneNum_verify, role_access FROM useraccountstbl WHERE user_id = ? LIMIT 1");
@@ -86,7 +255,12 @@ if ($stmtAvatar) {
     }
 }
 
-$displayName = trim((string)($profile['firstname'] ?? '') . ' ' . (string)($profile['lastname'] ?? ''));
+$firstName = trim((string)($profile['firstname'] ?? ''));
+$middleName = trim((string)($profile['middlename'] ?? ''));
+$lastName = trim((string)($profile['lastname'] ?? ''));
+$suffix = trim((string)($profile['suffix'] ?? ''));
+$middleInitial = $middleName !== '' ? (strtoupper(substr($middleName, 0, 1)) . '.') : '';
+$displayName = trim($firstName . ' ' . $middleInitial . ' ' . $lastName . ($suffix !== '' ? (' ' . $suffix) : ''));
 if ($displayName === '') {
     $displayName = "Official User";
 }
@@ -134,12 +308,33 @@ function ap_view_value($value): string
             overflow: hidden;
             background: #fff;
             flex-shrink: 0;
+            position: relative;
         }
         .profile-avatar-wrap img {
             width: 100%;
             height: 100%;
             object-fit: cover;
             display: block;
+        }
+        .avatar-edit-btn {
+            position: absolute;
+            right: 2px;
+            bottom: 2px;
+            width: 30px;
+            height: 30px;
+            border-radius: 999px;
+            border: 1px solid #d0d5dd;
+            background: #ffffff;
+            color: #175cd3;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, .15);
+            cursor: pointer;
+        }
+        .avatar-edit-btn:hover {
+            background: #eff6ff;
+            color: #1e3a8a;
         }
         .profile-topbar-name {
             font-size: 1.2rem;
@@ -199,11 +394,12 @@ function ap_view_value($value): string
             .view-grid { grid-template-columns: 1fr; }
         }
         .view-item {
-            background: #f8fafc;
-            border: 1px solid #eaecf0;
-            border-radius: 12px;
-            padding: .7rem .8rem;
-            min-height: 68px;
+            padding: .2rem 0 .55rem;
+            min-height: 54px;
+            border-bottom: 1px solid #eef2f6;
+        }
+        .view-item:last-child {
+            border-bottom: 0;
         }
         .view-label {
             font-size: .78rem;
@@ -214,7 +410,7 @@ function ap_view_value($value): string
         }
         .view-value {
             color: #1f2937;
-            font-weight: 700;
+            font-weight: 600;
             word-break: break-word;
         }
         .account-info {
@@ -226,19 +422,50 @@ function ap_view_value($value): string
             font-size: .83rem;
             margin-bottom: .15rem;
         }
-        .account-action-btn {
-            border-radius: 10px;
-            padding: .55rem .9rem;
-            font-weight: 600;
-            border: 1px solid #d0d5dd;
-            background: #fff;
-            color: #344054;
-            text-decoration: none;
+        .account-action-link {
+            display: inline-flex;
+            align-items: center;
+            gap: .35rem;
+            font-weight: 700;
+            color: #175cd3;
+            text-decoration: underline;
+            text-underline-offset: 2px;
         }
-        .account-action-btn:hover {
-            border-color: #98a2b3;
-            color: #1d2939;
-            background: #f9fafb;
+        .account-action-link:hover {
+            color: #1849a9;
+        }
+        .account-actions-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            align-items: center;
+            gap: .5rem;
+        }
+        .account-actions-wrap {
+            margin-top: .6rem;
+            margin-bottom: .3rem;
+            padding-top: .9rem;
+            border-top: 1px solid #eaecf0;
+            padding-inline: .45rem;
+        }
+        .account-actions-row .account-action-link {
+            justify-self: start;
+        }
+        .account-actions-row .account-action-link:nth-child(2) {
+            justify-self: center;
+        }
+        .account-actions-row .account-action-link:nth-child(3) {
+            justify-self: end;
+        }
+        @media (max-width: 767.98px) {
+            .account-actions-row {
+                grid-template-columns: 1fr;
+                gap: .45rem;
+            }
+            .account-actions-row .account-action-link,
+            .account-actions-row .account-action-link:nth-child(2),
+            .account-actions-row .account-action-link:nth-child(3) {
+                justify-self: start;
+            }
         }
     </style>
 </head>
@@ -250,12 +477,20 @@ function ap_view_value($value): string
         <div class="d-flex justify-content-between align-items-end flex-wrap gap-2 mb-3">
             <h2 class="profile-page-title">My Profile</h2>
         </div>
+        <?php if (!empty($flash['message'])): ?>
+            <div class="alert alert-<?= htmlspecialchars((string)($flash['type'] ?: 'info'), ENT_QUOTES, 'UTF-8') ?> mb-3">
+                <?= htmlspecialchars((string)$flash['message'], ENT_QUOTES, 'UTF-8') ?>
+            </div>
+        <?php endif; ?>
 
         <div class="profile-topbar">
             <div class="d-flex flex-wrap justify-content-between align-items-center gap-3">
                 <div class="d-flex align-items-center gap-3">
                     <div class="profile-avatar-wrap">
                         <img src="<?= htmlspecialchars($profileImageUrl, ENT_QUOTES, 'UTF-8') ?>" alt="Official Profile Image" onerror="this.onerror=null;this.src='../Images/Profile-Placeholder.png';">
+                        <button type="button" class="avatar-edit-btn" data-bs-toggle="modal" data-bs-target="#profileImageModal" aria-label="Edit profile image">
+                            <i class="bi bi-pencil-fill"></i>
+                        </button>
                     </div>
                     <div>
                         <div class="profile-topbar-name">
@@ -275,29 +510,6 @@ function ap_view_value($value): string
                         <i class="bi <?= ((int)($account['phoneNum_verify'] ?? 0) === 1) ? 'bi-check-circle-fill' : 'bi-clock-fill' ?>"></i>
                         Phone <?= ((int)($account['phoneNum_verify'] ?? 0) === 1) ? 'Verified' : 'Pending' ?>
                     </span>
-                </div>
-            </div>
-        </div>
-
-        <div class="card shadow-sm mb-4 profile-card">
-            <div class="card-header d-flex justify-content-between align-items-center">
-                <span>Account Settings</span>
-            </div>
-            <div class="card-body">
-                <div class="row g-3">
-                    <div class="col-md-6">
-                        <div class="account-label">Email</div>
-                        <div class="account-info"><?= htmlspecialchars((string)$account['email'], ENT_QUOTES, 'UTF-8') ?></div>
-                    </div>
-                    <div class="col-md-6">
-                        <div class="account-label">Phone</div>
-                        <div class="account-info">+63<?= htmlspecialchars((string)$account['phone_number'], ENT_QUOTES, 'UTF-8') ?></div>
-                    </div>
-                    <div class="col-md-12 d-flex flex-wrap gap-2 pt-1">
-                        <a href="javascript:void(0)" id="changePhoneLink" class="account-action-btn">Change Phone Number</a>
-                        <a href="javascript:void(0)" id="changeEmailLink" class="account-action-btn">Change Email</a>
-                        <a href="javascript:void(0)" id="changePasswordLink" class="account-action-btn">Change Password</a>
-                    </div>
                 </div>
             </div>
         </div>
@@ -350,7 +562,69 @@ function ap_view_value($value): string
                 </div>
             </div>
         </div>
+
+        <div class="card shadow-sm mb-4 profile-card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <span>Account Settings</span>
+            </div>
+            <div class="card-body">
+                <div class="row g-3">
+                    <div class="col-md-6">
+                        <div class="account-label">Email</div>
+                        <div class="account-info"><?= htmlspecialchars((string)$account['email'], ENT_QUOTES, 'UTF-8') ?></div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="account-label">Phone</div>
+                        <div class="account-info">+63<?= htmlspecialchars((string)$account['phone_number'], ENT_QUOTES, 'UTF-8') ?></div>
+                    </div>
+                    <div class="col-md-12">
+                        <div class="account-actions-wrap">
+                            <div class="account-actions-row">
+                            <a href="javascript:void(0)" id="changePhoneLink" class="account-action-link"><i class="bi bi-telephone"></i>Change Phone Number</a>
+                            <a href="javascript:void(0)" id="changeEmailLink" class="account-action-link"><i class="bi bi-envelope"></i>Change Email</a>
+                            <a href="javascript:void(0)" id="changePasswordLink" class="account-action-link"><i class="bi bi-shield-lock"></i>Change Password</a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
     </main>
+</div>
+
+<!-- Update Profile Image Modal -->
+<div class="modal fade" id="profileImageModal" tabindex="-1" data-bs-backdrop="static" data-bs-keyboard="false" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title text-black">Update Profile Image</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <form method="post" enctype="multipart/form-data">
+        <div class="modal-body">
+          <input type="hidden" name="action" value="update_profile_image">
+          <div class="text-center mb-3">
+            <img id="imgProfilePreview"
+                 src="<?= htmlspecialchars($profileImageUrl, ENT_QUOTES, 'UTF-8') ?>"
+                 alt="Profile Preview"
+                 class="rounded-circle border"
+                 style="width:120px;height:120px;object-fit:cover;">
+          </div>
+          <label class="form-label">Choose image (JPG, JPEG, PNG, WEBP)</label>
+          <input type="file"
+                 name="profile_image"
+                 id="profileImageInput"
+                 class="form-control"
+                 accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp"
+                 required>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn btn-primary">Save Image</button>
+        </div>
+      </form>
+    </div>
+  </div>
 </div>
 
 <!-- Change Password Modal -->
@@ -430,6 +704,24 @@ function ap_view_value($value): string
           if (instance) instance.hide();
         });
       });
+    });
+  });
+
+  document.addEventListener("DOMContentLoaded", () => {
+    const input = document.getElementById("profileImageInput");
+    const preview = document.getElementById("imgProfilePreview");
+    if (!input || !preview) return;
+
+    input.addEventListener("change", () => {
+      const file = input.files && input.files[0] ? input.files[0] : null;
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        if (e.target && typeof e.target.result === "string") {
+          preview.src = e.target.result;
+        }
+      };
+      reader.readAsDataURL(file);
     });
   });
 </script>

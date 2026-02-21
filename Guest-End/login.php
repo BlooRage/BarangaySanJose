@@ -12,7 +12,7 @@ if (!empty($_SESSION['user_id']) && !empty($_SESSION['role'])) {
   exit;
 }
 if (!empty($_SESSION['user_id']) && empty($_SESSION['role'])) {
-  unset($_SESSION['user_id'], $_SESSION['logged_in'], $_SESSION['last_activity'], $_SESSION['hard_expire_at']);
+  unset($_SESSION['user_id'], $_SESSION['logged_in'], $_SESSION['last_activity']);
 }
 ?>
 <!DOCTYPE html>
@@ -315,7 +315,6 @@ if (!empty($_SESSION['user_id']) && empty($_SESSION['role'])) {
         });
     </script></body>
 </html>
-
 
 
 

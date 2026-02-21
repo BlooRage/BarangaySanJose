@@ -406,7 +406,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         $_SESSION['role'] = $roleAccess;
                         $_SESSION['logged_in'] = true;
                         $_SESSION['last_activity'] = time();
-                        $_SESSION['hard_expire_at'] = time() + 1800;
                         header('Location: official_onboarding.php');
                         exit;
                     } catch (Throwable $e) {

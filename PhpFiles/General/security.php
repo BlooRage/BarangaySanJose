@@ -80,7 +80,7 @@ function destroySessionAndExit(bool $json = true, int $statusCode = 401, string 
     redirectToLogin('?session=expired');
 }
 
-// Enforce inactivity-based auto logout. Default: 30 minutes.
+// Enforce inactivity-based auto logout. Default: 30 minutes idle.
 function enforceSessionInactivityTimeout(int $timeoutSeconds = 1800, bool $json = true): void
 {
     if (empty($_SESSION['user_id'])) {
@@ -88,15 +88,6 @@ function enforceSessionInactivityTimeout(int $timeoutSeconds = 1800, bool $json 
     }
 
     $now = time();
-    $hardExpireAt = (int)($_SESSION['hard_expire_at'] ?? 0);
-    if ($hardExpireAt > 0 && $now > $hardExpireAt) {
-        destroySessionAndExit($json, 401, 'Session expired. Please login again.');
-    }
-    if ($hardExpireAt <= 0) {
-        // Backward-compatible: initialize hard expiry for sessions created before this key existed.
-        $_SESSION['hard_expire_at'] = $now + $timeoutSeconds;
-    }
-
     $last = (int)($_SESSION['last_activity'] ?? 0);
 
     if ($last > 0 && ($now - $last) > $timeoutSeconds) {

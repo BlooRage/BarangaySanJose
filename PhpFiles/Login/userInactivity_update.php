@@ -99,7 +99,6 @@ $_SESSION['user_id']   = $user_id;
 $_SESSION['role']      = $user['role_access'];
 $_SESSION['logged_in'] = true;
 $_SESSION['last_activity'] = time();
-$_SESSION['hard_expire_at'] = time() + 1800;
 $_SESSION['show_not_verified_modal'] = true;
 
 echo json_encode([
