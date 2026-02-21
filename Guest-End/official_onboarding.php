@@ -185,6 +185,128 @@ function oi_has_address(?array $row): bool
         && oi_non_empty((string)($row['province'] ?? ''));
 }
 
+function oi_get_document_type_id(mysqli $conn, string $name, string $category = 'OfficialProfiling'): int
+{
+    $q = $conn->prepare("
+        SELECT document_type_id
+        FROM documenttypelookuptbl
+        WHERE LOWER(document_type_name) = LOWER(?)
+          AND document_category = ?
+        LIMIT 1
+    ");
+    if (!$q) {
+        throw new RuntimeException('Failed to prepare document type lookup.');
+    }
+    $q->bind_param("ss", $name, $category);
+    $q->execute();
+    $row = $q->get_result()->fetch_assoc();
+    $q->close();
+    if ($row && isset($row['document_type_id'])) {
+        return (int)$row['document_type_id'];
+    }
+
+    $ins = $conn->prepare("INSERT INTO documenttypelookuptbl (document_type_name, document_category) VALUES (?, ?)");
+    if (!$ins) {
+        throw new RuntimeException('Failed to prepare document type creation.');
+    }
+    $ins->bind_param("ss", $name, $category);
+    if (!$ins->execute()) {
+        $ins->close();
+        throw new RuntimeException("Failed to create document type {$name}.");
+    }
+    $newId = (int)$ins->insert_id;
+    $ins->close();
+    if ($newId <= 0) {
+        throw new RuntimeException("Unable to resolve document type {$name}.");
+    }
+    return $newId;
+}
+
+function oi_to_db_web_path(string $absolutePath): string
+{
+    $absolutePath = str_replace("\\", "/", trim($absolutePath));
+    $projectRoot = realpath(__DIR__ . "/..");
+    $marker = "/UnifiedFileAttachment/";
+    $markerPos = strpos($absolutePath, $marker);
+    if ($markerPos !== false) {
+        return ltrim(substr($absolutePath, $markerPos), "/");
+    }
+    if ($projectRoot) {
+        $rootNorm = str_replace("\\", "/", $projectRoot);
+        if (strpos($absolutePath, $rootNorm) === 0) {
+            return ltrim(substr($absolutePath, strlen($rootNorm)), "/");
+        }
+    }
+    return ltrim($absolutePath, "/");
+}
+
+function oi_sanitize_doc_type_token(string $docType): string
+{
+    $token = preg_replace('/[^A-Za-z0-9]+/', '', $docType);
+    return $token !== '' ? $token : 'Document';
+}
+
+function oi_move_uploaded_file_with_doc_name(string $tmpName, string $dir, string $docType, string $userId, string $ext): array
+{
+    if ($tmpName === '' || !is_uploaded_file($tmpName)) {
+        throw new RuntimeException('Invalid upload source.');
+    }
+
+    $tmpSize = @filesize($tmpName);
+    if ($tmpSize === false || (int)$tmpSize <= 0) {
+        throw new RuntimeException('Uploaded file is empty.');
+    }
+
+    $index = 0;
+    $ext = strtolower($ext);
+    do {
+        $base = oi_sanitize_doc_type_token($docType) . $userId . ($index > 0 ? "_{$index}" : '');
+        $fileName = $base . '.' . $ext;
+        $target = rtrim($dir, "/") . "/" . $fileName;
+        $index++;
+    } while (file_exists($target));
+
+    if (!move_uploaded_file($tmpName, $target)) {
+        throw new RuntimeException('Failed to upload file.');
+    }
+
+    $movedSize = @filesize($target);
+    if ($movedSize === false || (int)$movedSize <= 0) {
+        @unlink($target);
+        throw new RuntimeException('Uploaded file is empty.');
+    }
+
+    return [
+        'file_name' => $fileName,
+        'file_path' => oi_to_db_web_path($target),
+        'disk_path' => $target,
+    ];
+}
+
+function oi_has_uploaded_2x2(mysqli $conn, string $userId): bool
+{
+    $stmt = $conn->prepare("
+        SELECT uf.attachment_id
+        FROM unifiedfileattachmenttbl uf
+        INNER JOIN documenttypelookuptbl dt
+            ON dt.document_type_id = uf.document_type_id
+        WHERE uf.source_type = 'OFFICIAL_PROFILE'
+          AND uf.source_id = ?
+          AND LOWER(dt.document_type_name) = LOWER('2x2 Picture')
+          AND dt.document_category = 'OfficialProfiling'
+        ORDER BY COALESCE(uf.updated_at, uf.upload_timestamp) DESC, uf.attachment_id DESC
+        LIMIT 1
+    ");
+    if (!$stmt) {
+        return false;
+    }
+    $stmt->bind_param("s", $userId);
+    $stmt->execute();
+    $row = $stmt->get_result()->fetch_assoc();
+    $stmt->close();
+    return (bool)$row;
+}
+
 $inviteToken = trim((string)($_GET['invite'] ?? ''));
 $tokenInvite = $inviteToken !== '' ? oi_find_invite_by_token($conn, $inviteToken) : null;
 
@@ -531,6 +653,91 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $inviteId = (int)$sessionInvite['invite_id'];
                 $upInvite = $conn->prepare("
                     UPDATE officialinvitetbl
+                    SET onboarding_step = 'document_upload',
+                        status = 'InProgress'
+                    WHERE invite_id = ?
+                    LIMIT 1
+                ");
+                if ($upInvite) {
+                    $upInvite->bind_param("i", $inviteId);
+                    $upInvite->execute();
+                    $upInvite->close();
+                }
+                $success = 'Address saved. Upload your required 2x2 picture to complete onboarding.';
+            } catch (Throwable $e) {
+                $errors[] = $e->getMessage();
+            }
+        } elseif ($action === 'upload_official_2x2') {
+            try {
+                if (!oi_official_info_exists($conn, $loggedUserId)) {
+                    throw new RuntimeException('Complete your information first.');
+                }
+                if (!oi_has_address(oi_get_official_info($conn, $loggedUserId))) {
+                    throw new RuntimeException('Complete your address first.');
+                }
+                if (!isset($_FILES['official_2x2']) || !is_array($_FILES['official_2x2'])) {
+                    throw new RuntimeException('2x2 picture is required.');
+                }
+
+                $fileErr = (int)($_FILES['official_2x2']['error'] ?? UPLOAD_ERR_NO_FILE);
+                if ($fileErr !== UPLOAD_ERR_OK) {
+                    throw new RuntimeException('2x2 picture is required.');
+                }
+                $tmpName = (string)($_FILES['official_2x2']['tmp_name'] ?? '');
+                $origName = (string)($_FILES['official_2x2']['name'] ?? '');
+                $ext = strtolower((string)pathinfo($origName, PATHINFO_EXTENSION));
+                $allowed = ['jpg', 'jpeg', 'png', 'webp'];
+                if (!in_array($ext, $allowed, true)) {
+                    throw new RuntimeException('Invalid file type for 2x2 picture. Allowed: JPG, JPEG, PNG, WEBP.');
+                }
+
+                $uploadDir = __DIR__ . "/../UnifiedFileAttachment/Documents/{$loggedUserId}/";
+                if (!is_dir($uploadDir) && !mkdir($uploadDir, 0777, true)) {
+                    throw new RuntimeException('Failed to create upload directory.');
+                }
+                $moved = oi_move_uploaded_file_with_doc_name($tmpName, $uploadDir, '2x2 Picture', $loggedUserId, $ext);
+                $docTypeId = oi_get_document_type_id($conn, '2x2 Picture', 'OfficialProfiling');
+                $statusVerifyId = oi_get_status_id($conn, 'PendingReview', ['DocumentVerification', 'VerificationStatus', 'Verification']);
+                if ($statusVerifyId === null) {
+                    throw new RuntimeException('Pending review status is missing.');
+                }
+
+                $sourceType = 'OFFICIAL_PROFILE';
+                $sourceId = $loggedUserId;
+                $remarks = 'Official onboarding 2x2';
+                $idNumber = null;
+
+                $ins = $conn->prepare("
+                    INSERT INTO unifiedfileattachmenttbl
+                        (source_type, source_id, document_type_id, file_name, file_path, file_type, user_id_uploaded_by, status_id_verify, remarks, id_number)
+                    VALUES
+                        (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ");
+                if (!$ins) {
+                    throw new RuntimeException('Failed to prepare document upload save.');
+                }
+                $ins->bind_param(
+                    "ssissssiss",
+                    $sourceType,
+                    $sourceId,
+                    $docTypeId,
+                    $moved['file_name'],
+                    $moved['file_path'],
+                    $ext,
+                    $loggedUserId,
+                    $statusVerifyId,
+                    $remarks,
+                    $idNumber
+                );
+                if (!$ins->execute()) {
+                    $ins->close();
+                    throw new RuntimeException('Failed to save uploaded 2x2 picture.');
+                }
+                $ins->close();
+
+                $inviteId = (int)$sessionInvite['invite_id'];
+                $upInvite = $conn->prepare("
+                    UPDATE officialinvitetbl
                     SET profile_completed_at = NOW(),
                         accepted_at = NOW(),
                         onboarding_step = 'completed',
@@ -579,6 +786,8 @@ if ($mode === 'resume') {
         $resumeStep = 'official_info';
     } elseif (!oi_has_address($officialInfo)) {
         $resumeStep = 'address_info';
+    } elseif (!oi_has_uploaded_2x2($conn, $loggedUserId)) {
+        $resumeStep = 'document_upload';
     } else {
         header('Location: ../PhpFiles/Login/unifiedProfileCheck.php');
         exit;
@@ -597,6 +806,8 @@ if ($mode === 'password') {
         $onboardingStep = 4;
     } elseif ($resumeStep === 'address_info') {
         $onboardingStep = 5;
+    } elseif ($resumeStep === 'document_upload') {
+        $onboardingStep = 6;
     }
 }
 ?>
@@ -756,7 +967,8 @@ if ($mode === 'password') {
                             <li class="<?= $onboardingStep === 2 ? 'active' : ($onboardingStep > 2 ? 'is-completed' : '') ?>">Verify Email</li>
                             <li class="<?= $onboardingStep === 3 ? 'active' : ($onboardingStep > 3 ? 'is-completed' : '') ?>">Verify Phone Number</li>
                             <li class="<?= $onboardingStep === 4 ? 'active' : ($onboardingStep > 4 ? 'is-completed' : '') ?>">Information and Contact</li>
-                            <li class="<?= $onboardingStep === 5 ? 'active' : '' ?>">Address</li>
+                            <li class="<?= $onboardingStep === 5 ? 'active' : ($onboardingStep > 5 ? 'is-completed' : '') ?>">Address</li>
+                            <li class="<?= $onboardingStep === 6 ? 'active' : '' ?>">Upload 2x2 Picture</li>
                         </ol>
                     </div>
                 <?php endif; ?>
@@ -961,7 +1173,20 @@ if ($mode === 'password') {
                         <input class="form-control" name="province" value="<?= htmlspecialchars((string)($officialInfo['province'] ?? 'Rizal'), ENT_QUOTES, 'UTF-8') ?>" required>
                     </div>
                     <div class="col-12">
-                        <button class="btn btn-primary" type="submit">Submit</button>
+                        <button class="btn btn-primary" type="submit">Save and Continue</button>
+                    </div>
+                </form>
+            <?php elseif ($mode === 'resume' && $resumeStep === 'document_upload'): ?>
+                <p class="text-muted">Upload your required 2x2 picture to complete onboarding.</p>
+                <form method="post" class="row g-3" enctype="multipart/form-data">
+                    <input type="hidden" name="action" value="upload_official_2x2">
+                    <div class="col-12">
+                        <label class="form-label">2x2 Picture <span class="text-danger">*</span></label>
+                        <input type="file" class="form-control" name="official_2x2" accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp" required>
+                        <div class="form-text">Accepted formats: JPG, JPEG, PNG, WEBP</div>
+                    </div>
+                    <div class="col-12">
+                        <button class="btn btn-primary" type="submit">Upload and Submit</button>
                     </div>
                 </form>
             <?php else: ?>
