@@ -1,8 +1,40 @@
 <?php
 
-if (session_status() === PHP_SESSION_NONE) {
+function applyBaselineSecurityHeaders(): void
+{
+    if (headers_sent()) {
+        return;
+    }
+    header('X-Frame-Options: SAMEORIGIN');
+    header('X-Content-Type-Options: nosniff');
+    header('Referrer-Policy: strict-origin-when-cross-origin');
+    header('Permissions-Policy: geolocation=(), microphone=(), camera=()');
+}
+
+function initializeSecureSession(): void
+{
+    if (session_status() !== PHP_SESSION_NONE) {
+        return;
+    }
+    $isHttps = (
+        (!empty($_SERVER['HTTPS']) && strtolower((string)$_SERVER['HTTPS']) !== 'off')
+        || ((string)($_SERVER['SERVER_PORT'] ?? '') === '443')
+    );
+    ini_set('session.use_strict_mode', '1');
+    ini_set('session.use_only_cookies', '1');
+    session_set_cookie_params([
+        'lifetime' => 0,
+        'path' => '/',
+        'domain' => '',
+        'secure' => $isHttps,
+        'httponly' => true,
+        'samesite' => 'Lax',
+    ]);
     session_start();
 }
+
+applyBaselineSecurityHeaders();
+initializeSecureSession();
 
 // Build a stable app-root URL prefix so redirects work whether the app is hosted at:
 // - domain root (e.g. "/Admin-End/..."), or
@@ -40,6 +72,38 @@ function appUrl(string $path): string
 {
     $p = '/' . ltrim($path, '/');
     return appRootPath() . $p;
+}
+
+function ensureCsrfToken(): string
+{
+    $existing = (string)($_SESSION['csrf_token'] ?? '');
+    if ($existing !== '' && strlen($existing) >= 32) {
+        return $existing;
+    }
+    $token = bin2hex(random_bytes(32));
+    $_SESSION['csrf_token'] = $token;
+    return $token;
+}
+
+function csrfTokenField(): string
+{
+    $token = ensureCsrfToken();
+    return '<input type="hidden" name="csrf_token" value="' . htmlspecialchars($token, ENT_QUOTES, 'UTF-8') . '">';
+}
+
+function verifyCsrfToken(bool $json = false): void
+{
+    $sessionToken = (string)($_SESSION['csrf_token'] ?? '');
+    $requestToken = (string)($_POST['csrf_token'] ?? $_SERVER['HTTP_X_CSRF_TOKEN'] ?? '');
+    $ok = $sessionToken !== '' && $requestToken !== '' && hash_equals($sessionToken, $requestToken);
+    if ($ok) {
+        return;
+    }
+    if ($json) {
+        sendJsonErrorAndExit(419, 'Invalid or missing CSRF token.');
+    }
+    http_response_code(419);
+    exit('Invalid or missing CSRF token.');
 }
 
 function redirectToLogin(string $queryString = ''): void

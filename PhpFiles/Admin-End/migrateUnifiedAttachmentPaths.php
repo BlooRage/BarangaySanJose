@@ -12,8 +12,8 @@ require_once "../General/security.php";
 // - POST with mode=dry_run (default) to preview changes
 // - POST with mode=apply&confirm=YES to apply
 //
-// This must remain admin-only.
-requireRoleSession(['Admin']);
+// This must remain superadmin-only.
+requireRoleSession(['SuperAdmin']);
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     http_response_code(405);
@@ -126,4 +126,3 @@ try {
     echo json_encode(['success' => false, 'message' => $e->getMessage()]);
     exit;
 }
-

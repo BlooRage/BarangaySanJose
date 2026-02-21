@@ -127,6 +127,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && (string)($_POST['action'] ?? '') ==
         if (!in_array($ext, $allowed, true)) {
             throw new RuntimeException('Invalid image type. Allowed: JPG, JPEG, PNG, WEBP.');
         }
+        $imgInfo = @getimagesize($tmpName);
+        if ($imgInfo === false) {
+            throw new RuntimeException('Uploaded file must be a valid image.');
+        }
+        $mime = strtolower((string)($imgInfo['mime'] ?? ''));
+        if (!in_array($mime, ['image/jpeg', 'image/png', 'image/webp'], true)) {
+            throw new RuntimeException('Invalid image content. Allowed: JPG, JPEG, PNG, WEBP.');
+        }
 
         $uploadDir = __DIR__ . "/../UnifiedFileAttachment/Documents/{$userId}/";
         if (!is_dir($uploadDir) && !mkdir($uploadDir, 0777, true)) {

@@ -773,6 +773,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 if (!in_array($ext, $allowed, true)) {
                     throw new RuntimeException('Invalid file type for 2x2 picture. Allowed: JPG, JPEG, PNG, WEBP.');
                 }
+                $imageInfo = @getimagesize($tmpName);
+                if ($imageInfo === false) {
+                    throw new RuntimeException('Uploaded 2x2 file is not a valid image.');
+                }
+                $mime = strtolower((string)($imageInfo['mime'] ?? ''));
+                $allowedMime = ['image/jpeg', 'image/png', 'image/webp'];
+                if (!in_array($mime, $allowedMime, true)) {
+                    throw new RuntimeException('Invalid image content. Allowed: JPG, JPEG, PNG, WEBP.');
+                }
 
                 $uploadDir = __DIR__ . "/../UnifiedFileAttachment/Documents/{$loggedUserId}/";
                 if (!is_dir($uploadDir) && !mkdir($uploadDir, 0777, true)) {

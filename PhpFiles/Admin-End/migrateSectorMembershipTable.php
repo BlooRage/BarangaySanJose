@@ -3,7 +3,7 @@ session_start();
 require_once "../General/connection.php";
 require_once "../General/security.php";
 
-requireRoleSession(['SuperAdmin', 'Official', 'Officials', 'Personnel', 'Personnels', 'Admin', 'Employee']);
+requireRoleSession(['SuperAdmin']);
 
 header('Content-Type: application/json; charset=utf-8');
 

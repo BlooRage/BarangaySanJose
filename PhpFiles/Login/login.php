@@ -3,7 +3,7 @@ ini_set('display_errors', 0);
 ini_set('log_errors', 1);
 error_reporting(E_ALL);
 
-session_start();
+require_once "../General/security.php";
 header('Content-Type: application/json');
 date_default_timezone_set('Asia/Manila');
 

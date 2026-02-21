@@ -1,8 +1,4 @@
 <?php
-if (session_status() === PHP_SESSION_NONE) {
-    session_start();
-}
-
 require_once __DIR__ . "/../PhpFiles/General/security.php";
 require_once __DIR__ . "/../PhpFiles/General/connection.php";
 require_once __DIR__ . "/../PhpFiles/General/officialInviteCommon.php";
@@ -16,6 +12,7 @@ oi_ensure_invite_table($conn);
 
 $flash = ['type' => '', 'message' => ''];
 $flashOrigin = '';
+$csrfToken = ensureCsrfToken();
 if (!empty($_SESSION['official_invite_flash']) && is_array($_SESSION['official_invite_flash'])) {
     $flash = $_SESSION['official_invite_flash'];
     unset($_SESSION['official_invite_flash']);
@@ -234,6 +231,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $isSuperAdminActor = in_array($actorRole, ['SuperAdmin'], true);
 
     if ($action === 'precheck_invite') {
+        verifyCsrfToken(true);
         header('Content-Type: application/json');
         $email = strtolower(trim((string)($_POST['email'] ?? '')));
         $phone10 = oi_normalize_phone10((string)($_POST['phone_number'] ?? ''));
@@ -265,6 +263,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 
     if ($action === 'create_invite') {
+        verifyCsrfToken(false);
         $lastName = trim((string)($_POST['last_name'] ?? ''));
         $firstName = trim((string)($_POST['first_name'] ?? ''));
         $middleName = trim((string)($_POST['middle_name'] ?? ''));
@@ -439,6 +438,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 
     if ($action === 'revoke_invite') {
+        verifyCsrfToken(false);
         $inviteId = (int)($_POST['invite_id'] ?? 0);
         $actorPassword = (string)($_POST['actor_password'] ?? '');
         verify_actor_password_or_fail($conn, $actorUserId, $isSuperAdminActor, $actorPassword);
@@ -463,6 +463,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 
     if ($action === 'resend_invite') {
+        verifyCsrfToken(false);
         $inviteId = (int)($_POST['invite_id'] ?? 0);
         $actorPassword = (string)($_POST['actor_password'] ?? '');
         verify_actor_password_or_fail($conn, $actorUserId, $isSuperAdminActor, $actorPassword);
@@ -570,6 +571,7 @@ if ($q) {
                 <form method="post" id="createInviteForm">
                     <input type="hidden" name="action" value="create_invite">
                     <input type="hidden" name="actor_password" id="inviteActorPasswordHidden" value="">
+                    <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($csrfToken, ENT_QUOTES, 'UTF-8') ?>">
                     <p class="small text-muted mb-3"><span class="invite-required">*</span> Required fields</p>
 
                     <div class="invite-section mb-3">
@@ -734,6 +736,7 @@ if ($q) {
                                         <form method="post" class="d-inline">
                                             <input type="hidden" name="action" value="resend_invite">
                                             <input type="hidden" name="invite_id" value="<?= (int)$r['invite_id'] ?>">
+                                            <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($csrfToken, ENT_QUOTES, 'UTF-8') ?>">
                                             <?php if (in_array((string)($_SESSION['role'] ?? ''), ['SuperAdmin'], true)): ?>
                                                 <input type="password" name="actor_password" class="form-control form-control-sm d-inline-block me-1" style="width: 170px;" placeholder="Your password" autocomplete="current-password" required>
                                             <?php endif; ?>
@@ -744,6 +747,7 @@ if ($q) {
                                         <form method="post" class="d-inline">
                                             <input type="hidden" name="action" value="revoke_invite">
                                             <input type="hidden" name="invite_id" value="<?= (int)$r['invite_id'] ?>">
+                                            <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($csrfToken, ENT_QUOTES, 'UTF-8') ?>">
                                             <?php if (in_array((string)($_SESSION['role'] ?? ''), ['SuperAdmin'], true)): ?>
                                                 <input type="password" name="actor_password" class="form-control form-control-sm d-inline-block me-1" style="width: 170px;" placeholder="Your password" autocomplete="current-password" required>
                                             <?php endif; ?>
@@ -922,6 +926,7 @@ if ($q) {
       payload.append('action', 'precheck_invite');
       payload.append('email', email ? email.value : '');
       payload.append('phone_number', phone ? phone.value : '');
+      payload.append('csrf_token', '<?= htmlspecialchars($csrfToken, ENT_QUOTES, 'UTF-8') ?>');
 
       fetch('OfficialInvites.php', {
         method: 'POST',
