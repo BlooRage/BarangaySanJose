@@ -243,6 +243,65 @@ body {
     margin: 0;
 }
 
+.requirements-box {
+    border: 1px solid #e8d9ca;
+    background: #fff7f1;
+    border-radius: 12px;
+    padding: 16px 18px;
+    margin-bottom: 22px;
+}
+
+.requirements-subtitle {
+    font-size: 15px;
+    margin: 10px 0 6px;
+    color: #5f4a34;
+    font-weight: 700;
+}
+
+.requirements-list {
+    margin: 0;
+    padding-left: 20px;
+}
+
+.requirements-list li {
+    margin-bottom: 6px;
+    color: #4a4a4a;
+    line-height: 1.4;
+}
+
+.upload-dropzone {
+    width: 100%;
+    border: 2px dashed #d5b18f;
+    border-radius: 10px;
+    background: #fffaf6;
+    color: #5e5e5e;
+    padding: 18px 14px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+    text-align: center;
+    cursor: pointer;
+}
+
+.upload-dropzone i {
+    font-size: 24px;
+    color: #e8872f;
+}
+
+.upload-dropzone small {
+    color: #7a7a7a;
+}
+
+.upload-dropzone.is-dragging {
+    border-color: #fe993c;
+    background: #fff2e6;
+}
+
+.selected-files {
+    word-break: break-word;
+}
+
 /* Footer & Button */
 .agreement-row {
     display: flex;
