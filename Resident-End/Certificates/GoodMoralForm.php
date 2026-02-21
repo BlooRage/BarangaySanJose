@@ -43,21 +43,6 @@ $phoneNumber = htmlspecialchars($useraccountstbl['phone_number'] ?? '', ENT_QUOT
                     <h1 class="form-title">Good Moral</h1>
                     <p class="form-subtitle">All fields marked with <span class="required-asterisk">*</span> are required</p>
 
-                    <section class="requirements-box" aria-label="Good moral requirements">
-                        <h2 class="section-title text-dark mt-0">Requirements</h2>
-                        <ul class="requirements-list">
-                            <li>Valid government ID (Passport, Driver's License, PRC ID, SSS ID, Voter's ID)</li>
-                            <li>Proof of residency in the barangay (Barangay ID, Certificate of Residency, utility bill such as electric or water)</li>
-                            <li>Cedula or Community Tax Certificate (if required)</li>
-                        </ul>
-                        <h3 class="requirements-subtitle">If Minor or Student</h3>
-                        <ul class="requirements-list">
-                            <li>Parent or guardian valid ID</li>
-                            <li>Authorization letter from parent/guardian</li>
-                            <li>School ID or Birth Certificate</li>
-                        </ul>
-                    </section>
-
                     <form method="POST" action="" enctype="multipart/form-data">
                         <h2 class="section-title text-center text-dark">Information</h2>
 

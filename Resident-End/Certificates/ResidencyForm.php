@@ -43,26 +43,7 @@ $phoneNumber = htmlspecialchars($useraccountstbl['phone_number'] ?? '', ENT_QUOT
                     <h1 class="form-title">Residency</h1>
                     <p class="form-subtitle">All fields marked with <span class="required-asterisk">*</span> are required</p>
 
-                    <section class="requirements-box" aria-label="Residency requirements">
-                        <h2 class="section-title text-dark mt-0">Typical Requirements</h2>
-                        <ul class="requirements-list">
-                            <li>Valid government ID (Passport, Driver's License, PRC ID, SSS ID, Voter's ID)</li>
-                            <li>Proof of residency (utility bill such as water, electricity, internet, or Barangay ID)</li>
-                            <li>Cedula or Community Tax Certificate (if required)</li>
-                        </ul>
-                        <h3 class="requirements-subtitle">If Renting</h3>
-                        <ul class="requirements-list">
-                            <li>Lease contract or written confirmation from homeowner</li>
-                            <li>Homeowner valid ID</li>
-                        </ul>
-                        <h3 class="requirements-subtitle">If Living With Relatives</h3>
-                        <ul class="requirements-list">
-                            <li>Authorization from homeowner</li>
-                            <li>Homeowner valid ID</li>
-                        </ul>
-                    </section>
-
-                    <form method="POST" action="">
+                    <form method="POST" action="" enctype="multipart/form-data">
                         <h2 class="section-title text-center text-dark">Information</h2>
 
                         <div class="form-row pt-0">
@@ -135,6 +116,45 @@ $phoneNumber = htmlspecialchars($useraccountstbl['phone_number'] ?? '', ENT_QUOT
                             </div>
                         </div>
 
+                        <h2 class="section-title text-center text-dark">Document Upload</h2>
+
+                        <div class="form-row two-col-row">
+                            <div>
+                                <label class="top-label" for="residencyArrangement">Living Arrangement <span class="required-asterisk">*</span></label>
+                                <select id="residencyArrangement" name="residency_arrangement" required>
+                                    <option value="renting" selected>Renting</option>
+                                    <option value="relatives">Living with relatives</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="top-label" for="residencyDocumentType">Supporting Document Type <span class="required-asterisk">*</span></label>
+                                <select id="residencyDocumentType" name="supporting_document_type" required></select>
+                            </div>
+                        </div>
+
+                        <div class="form-row two-col-row">
+                            <div>
+                                <label class="top-label" for="validIdFile">Upload 1: Valid ID <span class="required-asterisk">*</span></label>
+                                <label class="upload-dropzone" id="validIdDropzone" for="validIdFile">
+                                    <i class="fa-solid fa-cloud-arrow-up"></i>
+                                    <span>Drag files here or click to upload</span>
+                                    <small>Accepted: PDF, JPG, JPEG, PNG</small>
+                                </label>
+                                <input type="file" id="validIdFile" name="valid_id_file" class="visually-hidden" accept=".pdf,.jpg,.jpeg,.png" required>
+                                <div id="validIdSelectedFile" class="selected-files small text-muted mt-2"></div>
+                            </div>
+                            <div>
+                                <label class="top-label" for="supportingFile">Upload 2: Supporting Document <span class="required-asterisk">*</span></label>
+                                <label class="upload-dropzone" id="supportingDropzone" for="supportingFile">
+                                    <i class="fa-solid fa-cloud-arrow-up"></i>
+                                    <span>Drag files here or click to upload</span>
+                                    <small>Accepted: PDF, JPG, JPEG, PNG</small>
+                                </label>
+                                <input type="file" id="supportingFile" name="supporting_file" class="visually-hidden" accept=".pdf,.jpg,.jpeg,.png" required>
+                                <div id="supportingSelectedFile" class="selected-files small text-muted mt-2"></div>
+                            </div>
+                        </div>
+
                         <div class="agreement-row">
                             <label class="agreement-text check-item" for="agreementResidency">
                                 <input type="checkbox" id="agreementResidency" required>
@@ -148,5 +168,81 @@ $phoneNumber = htmlspecialchars($useraccountstbl['phone_number'] ?? '', ENT_QUOT
         </main>
     </div>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+      (() => {
+        const arrangement = document.getElementById("residencyArrangement");
+        const docType = document.getElementById("residencyDocumentType");
+        const validIdInput = document.getElementById("validIdFile");
+        const supportingInput = document.getElementById("supportingFile");
+        const validIdList = document.getElementById("validIdSelectedFile");
+        const supportingList = document.getElementById("supportingSelectedFile");
+        const validIdDropzone = document.getElementById("validIdDropzone");
+        const supportingDropzone = document.getElementById("supportingDropzone");
+        if (!arrangement || !docType || !validIdInput || !supportingInput || !validIdList || !supportingList || !validIdDropzone || !supportingDropzone) return;
+
+        const options = {
+          renting: [
+            "Lease contract",
+            "Written confirmation from homeowner",
+            "Homeowner valid ID"
+          ],
+          relatives: [
+            "Authorization from homeowner",
+            "Homeowner valid ID"
+          ]
+        };
+
+        const renderDocOptions = () => {
+          const key = arrangement.value === "relatives" ? "relatives" : "renting";
+          docType.innerHTML = "";
+          options[key].forEach((label) => {
+            const option = document.createElement("option");
+            option.value = label;
+            option.textContent = label;
+            docType.appendChild(option);
+          });
+        };
+
+        const renderFile = (input, target) => {
+          const names = Array.from(input.files || []).map((f) => f.name);
+          target.textContent = names.length ? `Selected: ${names.join(", ")}` : "No file selected";
+        };
+
+        arrangement.addEventListener("change", renderDocOptions);
+        validIdInput.addEventListener("change", () => renderFile(validIdInput, validIdList));
+        supportingInput.addEventListener("change", () => renderFile(supportingInput, supportingList));
+
+        const bindDropzone = (dropzone, input, preview) => {
+          ["dragenter", "dragover"].forEach((eventName) => {
+            dropzone.addEventListener(eventName, (e) => {
+              e.preventDefault();
+              dropzone.classList.add("is-dragging");
+            });
+          });
+
+          ["dragleave", "drop"].forEach((eventName) => {
+            dropzone.addEventListener(eventName, (e) => {
+              e.preventDefault();
+              dropzone.classList.remove("is-dragging");
+            });
+          });
+
+          dropzone.addEventListener("drop", (e) => {
+            const dt = e.dataTransfer;
+            if (dt && dt.files && dt.files.length) {
+              input.files = dt.files;
+              renderFile(input, preview);
+            }
+          });
+        };
+
+        bindDropzone(validIdDropzone, validIdInput, validIdList);
+        bindDropzone(supportingDropzone, supportingInput, supportingList);
+
+        renderDocOptions();
+        renderFile(validIdInput, validIdList);
+        renderFile(supportingInput, supportingList);
+      })();
+    </script>
 </body>
 </html>
