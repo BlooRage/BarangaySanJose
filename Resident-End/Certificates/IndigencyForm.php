@@ -113,13 +113,14 @@ $fullAddress = htmlspecialchars(implode(', ', $fullAddressParts), ENT_QUOTES, 'U
 
                         <div class="form-row pt-0">
                             <div>
-                                <label class="top-label">First Name <span class="required-asterisk">*</span> </label>
-                                <input type="text" name="first_name" readonly value="<?php echo $firstName; ?>">
-                            </div>
-                            <div>
                                 <label class="top-label">Last Name <span class="required-asterisk">*</span> </label>
                                 <input type="text" name="last_name" readonly value="<?php echo $lastName; ?>">
                             </div>
+                            <div>
+                                <label class="top-label">First Name <span class="required-asterisk">*</span> </label>
+                                <input type="text" name="first_name" readonly value="<?php echo $firstName; ?>">
+                            </div>
+                            
                             <div>
                                 <label class="top-label">Middle Name</label>
                                 <input type="text" name="middle_name" readonly value="<?php echo $middleName; ?>">
