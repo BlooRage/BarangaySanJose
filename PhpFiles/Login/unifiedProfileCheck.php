@@ -73,6 +73,33 @@ switch ($role) {
             exit;
         }
 
+        $normalizedRole = strtolower(trim((string)$role));
+        if ($normalizedRole === 'officials') $normalizedRole = 'official';
+        if ($normalizedRole === 'personnels') $normalizedRole = 'personnel';
+        if ($normalizedRole === 'admin') $normalizedRole = 'official';
+        if ($normalizedRole === 'employee') $normalizedRole = 'official';
+
+        if (in_array($normalizedRole, ['official', 'personnel'], true)) {
+            $stmtApproval = $conn->prepare("
+                SELECT status
+                FROM officialinvitetbl
+                WHERE user_id = ?
+                ORDER BY invite_id DESC
+                LIMIT 1
+            ");
+            if ($stmtApproval) {
+                $stmtApproval->bind_param("s", $userID);
+                $stmtApproval->execute();
+                $approvalRow = $stmtApproval->get_result()->fetch_assoc();
+                $stmtApproval->close();
+                $inviteStatus = strtolower(trim((string)($approvalRow['status'] ?? '')));
+                if ($inviteStatus !== 'completed') {
+                    header('Location: ' . appUrl('/Guest-End/official_onboarding.php'));
+                    exit;
+                }
+            }
+        }
+
         // Current admin surface uses AdminDashboard for all non-resident internal users.
         header('Location: ' . appUrl('/Admin-End/AdminDashboard.php'));
         exit;

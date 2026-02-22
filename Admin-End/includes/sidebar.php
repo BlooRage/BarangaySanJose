@@ -2,19 +2,19 @@
 $current = basename($_SERVER['PHP_SELF']);
 
 // Group pages by section
-$profilingPages = ['ResidentMasterlist.php', 'ResidentArchive.php', 'EditRequests.php', 'SectorMembershipVerification.php'];
+$residentMgmtPages = ['ResidentMasterlist.php', 'ResidentArchive.php', 'EditRequests.php', 'SectorMembershipVerification.php', 'HouseholdProfiling.php'];
 $certPages = ['CertificateTracker.php', 'approved.php', 'denied.php'];
-$userMgmtPages = ['UserMasterlist.php', 'OfficialsManagement.php', 'OfficialInvites.php'];
-$toolsPages = ['AuditLogs.php', 'OfficialInvites.php'];
+$userMgmtPages = ['UserMasterlist.php'];
+$adminMgmtPages = ['OfficialsManagement.php', 'OfficialInvites.php'];
 
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 
-$isProfilingActive = in_array($current, $profilingPages);
+$isResidentMgmtActive = in_array($current, $residentMgmtPages);
 $isCertActive = in_array($current, $certPages);
 $isUserMgmtActive = in_array($current, $userMgmtPages);
-$isToolsActive = in_array($current, $toolsPages);
+$isAdminMgmtActive = in_array($current, $adminMgmtPages);
 $isSuperAdminSidebar = ((string)($_SESSION['role'] ?? '') === 'SuperAdmin');
 
 $adminDisplayName = "Admin User";
@@ -126,19 +126,19 @@ if (!empty($_SESSION['user_id']) && isset($conn) && $conn instanceof mysqli) {
         </a>
       </li>
 
-      <li class="mb-1 mt-3 text-muted small fw-semibold px-2">Management</li>
+      <li class="mb-1 mt-2 text-muted small fw-semibold px-2">Resident Management</li>
 
-      <!-- RESIDENT PROFILING -->
+      <!-- RESIDENT MANAGEMENT -->
       <li class="mb-1">
-        <button class="btn btn-toggle d-flex align-items-center gap-2 rounded <?= $isProfilingActive ? '' : 'collapsed' ?>"
+        <button class="btn btn-toggle d-flex align-items-center gap-2 rounded <?= $isResidentMgmtActive ? '' : 'collapsed' ?>"
                 data-bs-toggle="collapse"
-                data-bs-target="#profiling-collapse"
-                aria-expanded="<?= $isProfilingActive ? 'true' : 'false' ?>"
-                style="<?= $isProfilingActive ? 'outline: none; box-shadow: none;' : '' ?>">
+                data-bs-target="#resident-mgmt-collapse"
+                aria-expanded="<?= $isResidentMgmtActive ? 'true' : 'false' ?>"
+                style="<?= $isResidentMgmtActive ? 'outline: none; box-shadow: none;' : '' ?>">
           <i class="fas fa-user-group"></i> Resident Profiling
         </button>
 
-        <div class="collapse <?= $isProfilingActive ? 'show' : '' ?>" id="profiling-collapse">
+        <div class="collapse <?= $isResidentMgmtActive ? 'show' : '' ?>" id="resident-mgmt-collapse">
           <ul class="btn-toggle-nav list-unstyled fw-normal pb-1 small">
             <li>
               <a href="ResidentMasterlist.php"
@@ -164,54 +164,17 @@ if (!empty($_SESSION['user_id']) && isset($conn) && $conn instanceof mysqli) {
                 Sector Membership Verification
               </a>
             </li>
-          </ul>
-        </div>
-      </li>
-
-      <!-- HOUSEHOLD PROFILING -->
-      <li class="mb-1">
-        <a href="HouseholdProfiling.php"
-           class="btn btn-toggle d-flex align-items-center gap-2 rounded <?= $current == 'HouseholdProfiling.php' ? 'active' : '' ?>"
-           style="<?= $current == 'HouseholdProfiling.php' ? 'outline: none; box-shadow: none;' : '' ?>">
-          <i class="fa-solid fa-house"></i> Household Profiling
-        </a>
-      </li>
-
-      <?php if ($isSuperAdminSidebar): ?>
-      <li class="mb-1">
-        <button class="btn btn-toggle d-flex align-items-center gap-2 rounded <?= $isUserMgmtActive ? '' : 'collapsed' ?>"
-                data-bs-toggle="collapse"
-                data-bs-target="#usermgmt-collapse"
-                aria-expanded="<?= $isUserMgmtActive ? 'true' : 'false' ?>">
-          <i class="fas fa-users-cog"></i> User Management
-        </button>
-
-        <div class="collapse <?= $isUserMgmtActive ? 'show' : '' ?>" id="usermgmt-collapse">
-          <ul class="btn-toggle-nav list-unstyled fw-normal pb-1 small">
             <li>
-              <a href="UserMasterlist.php"
-                 class="link-dark rounded <?= $current == 'UserMasterlist.php' ? 'active' : '' ?>">
-                User Masterlist
-              </a>
-            </li>
-            <li>
-              <a href="OfficialsManagement.php"
-                 class="link-dark rounded <?= $current == 'OfficialsManagement.php' ? 'active' : '' ?>">
-                Officials Management
-              </a>
-            </li>
-            <li>
-              <a href="OfficialInvites.php"
-                 class="link-dark rounded <?= $current == 'OfficialInvites.php' ? 'active' : '' ?>">
-                Official Invites
+              <a href="HouseholdProfiling.php"
+                 class="link-dark rounded <?= $current == 'HouseholdProfiling.php' ? 'active' : '' ?>">
+                Household Profiling
               </a>
             </li>
           </ul>
         </div>
       </li>
-      <?php endif; ?>
 
-      <!-- CERTIFICATE ISSUANCE -->
+      <!-- CERTIFICATE ISSUANCE (Resident Management) -->
       <li class="mb-2">
         <button class="btn btn-toggle d-flex align-items-center gap-2 rounded <?= $isCertActive ? '' : 'collapsed' ?>"
                 data-bs-toggle="collapse"
@@ -230,12 +193,67 @@ if (!empty($_SESSION['user_id']) && isset($conn) && $conn instanceof mysqli) {
       </li>
 
       <?php if ($isSuperAdminSidebar): ?>
-      <li class="mb-1 mt-3 text-muted small fw-semibold px-2">Tools</li>
+      <li class="mb-1 mt-3 text-muted small fw-semibold px-2">Admin Management</li>
+      <!-- PERSONNEL MANAGEMENT -->
+      <li class="mb-1">
+        <button class="btn btn-toggle d-flex align-items-center gap-2 rounded <?= $isAdminMgmtActive ? '' : 'collapsed' ?>"
+                data-bs-toggle="collapse"
+                data-bs-target="#adminmgmt-collapse"
+                aria-expanded="<?= $isAdminMgmtActive ? 'true' : 'false' ?>">
+          <i class="fas fa-user-shield"></i> Personnel Management
+        </button>
+
+        <div class="collapse <?= $isAdminMgmtActive ? 'show' : '' ?>" id="adminmgmt-collapse">
+          <ul class="btn-toggle-nav list-unstyled fw-normal pb-1 small">
+            <li>
+              <a href="OfficialsManagement.php"
+                 class="link-dark rounded <?= $current == 'OfficialsManagement.php' ? 'active' : '' ?>">
+                Officials Management
+              </a>
+            </li>
+            <li>
+              <a href="OfficialInvites.php"
+                 class="link-dark rounded <?= $current == 'OfficialInvites.php' ? 'active' : '' ?>">
+                Personnel Invite
+              </a>
+            </li>
+          </ul>
+        </div>
+      </li>
+
+      <li class="mb-1">
+        <a href="javascript:void(0)"
+           class="btn btn-toggle d-flex align-items-center justify-content-start text-start gap-2 rounded w-100 text-muted"
+           style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis; cursor: default; opacity: 0.8;"
+           aria-disabled="true">
+          <i class="fas fa-right-left"></i> Official Transition Module
+        </a>
+      </li>
+
+      <li class="mb-1">
+        <button class="btn btn-toggle d-flex align-items-center gap-2 rounded <?= $isUserMgmtActive ? '' : 'collapsed' ?>"
+                data-bs-toggle="collapse"
+                data-bs-target="#usermgmt-collapse"
+                aria-expanded="<?= $isUserMgmtActive ? 'true' : 'false' ?>">
+          <i class="fas fa-users-cog"></i> User Management
+        </button>
+
+        <div class="collapse <?= $isUserMgmtActive ? 'show' : '' ?>" id="usermgmt-collapse">
+          <ul class="btn-toggle-nav list-unstyled fw-normal pb-1 small">
+            <li>
+              <a href="UserMasterlist.php"
+                 class="link-dark rounded <?= $current == 'UserMasterlist.php' ? 'active' : '' ?>">
+                User Masterlist
+              </a>
+            </li>
+          </ul>
+        </div>
+      </li>
 
       <li class="mb-1">
         <a href="AuditLogs.php"
-           class="btn btn-toggle d-flex align-items-center gap-2 rounded <?= $isToolsActive ? 'active' : '' ?>"
-           style="<?= $isToolsActive ? 'outline: none; box-shadow: none;' : '' ?>">
+           class="btn btn-toggle d-flex align-items-center gap-2 rounded <?= $current == 'AuditLogs.php' ? 'active' : '' ?>"
+           style="<?= $current == 'AuditLogs.php' ? 'outline: none; box-shadow: none;' : '' ?>">
           <i class="fas fa-clipboard-list"></i> Audit Logs
         </a>
       </li>

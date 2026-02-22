@@ -234,6 +234,7 @@ if (!function_exists('oi_ensure_invite_table')) {
         $sql = "
             CREATE TABLE IF NOT EXISTS officialinvitetbl (
                 invite_id INT NOT NULL AUTO_INCREMENT,
+                invite_code VARCHAR(12) DEFAULT NULL,
                 invite_token_hash VARCHAR(255) NOT NULL,
                 invite_email VARCHAR(120) NOT NULL,
                 invite_phone VARCHAR(20) NOT NULL,
@@ -258,6 +259,7 @@ if (!function_exists('oi_ensure_invite_table')) {
                 created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
                 updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
                 PRIMARY KEY (invite_id),
+                UNIQUE KEY uq_officialinvite_code (invite_code),
                 KEY idx_officialinvite_email (invite_email),
                 KEY idx_officialinvite_phone (invite_phone),
                 KEY idx_officialinvite_user (user_id),
@@ -287,6 +289,16 @@ if (!function_exists('oi_ensure_invite_table')) {
             $conn->query("ALTER TABLE officialinvitetbl ADD COLUMN area_number VARCHAR(50) DEFAULT NULL AFTER employment_status");
         }
 
+        $hasInviteCode = $conn->query("SHOW COLUMNS FROM officialinvitetbl LIKE 'invite_code'");
+        if ($hasInviteCode instanceof mysqli_result && $hasInviteCode->num_rows === 0) {
+            $conn->query("ALTER TABLE officialinvitetbl ADD COLUMN invite_code VARCHAR(12) DEFAULT NULL AFTER invite_id");
+        }
+
+        $hasInviteCodeIndex = $conn->query("SHOW INDEX FROM officialinvitetbl WHERE Key_name = 'uq_officialinvite_code'");
+        if ($hasInviteCodeIndex instanceof mysqli_result && $hasInviteCodeIndex->num_rows === 0) {
+            $conn->query("ALTER TABLE officialinvitetbl ADD UNIQUE KEY uq_officialinvite_code (invite_code)");
+        }
+
         $hasOfficialPosition = $conn->query("SHOW COLUMNS FROM officialinformationtbl LIKE 'position_access'");
         if ($hasOfficialPosition instanceof mysqli_result && $hasOfficialPosition->num_rows === 0) {
             $conn->query("ALTER TABLE officialinformationtbl ADD COLUMN position_access VARCHAR(100) DEFAULT NULL AFTER role_access");
@@ -301,5 +313,58 @@ if (!function_exists('oi_ensure_invite_table')) {
         if ($hasOfficialArea instanceof mysqli_result && $hasOfficialArea->num_rows === 0) {
             $conn->query("ALTER TABLE officialinformationtbl ADD COLUMN area_number VARCHAR(50) NULL AFTER department");
         }
+    }
+}
+
+if (!function_exists('oi_normalize_area_code')) {
+    function oi_normalize_area_code(string $areaNumber): string
+    {
+        $value = strtoupper(trim($areaNumber));
+        if ($value === '' || $value === 'BARANGAY WIDE' || $value === 'BW') {
+            return 'BW';
+        }
+
+        if (preg_match('/^AREA\s*1A$/i', $value)) {
+            return '1A';
+        }
+
+        if (preg_match('/^AREA\s*0*([1-9])$/i', $value, $m)) {
+            return str_pad($m[1], 2, '0', STR_PAD_LEFT);
+        }
+
+        if (preg_match('/^(0[1-9]|1A|BW)$/i', $value, $m)) {
+            return strtoupper($m[1]);
+        }
+
+        return 'BW';
+    }
+}
+
+if (!function_exists('oi_generate_invite_code')) {
+    function oi_generate_invite_code(mysqli $conn, string $areaNumber): string
+    {
+        $areaCode = oi_normalize_area_code($areaNumber);
+        $prefix = date('ym') . $areaCode;
+        $like = $prefix . '%';
+
+        $stmt = $conn->prepare("
+            SELECT MAX(CAST(RIGHT(invite_code, 3) AS UNSIGNED)) AS max_seq
+            FROM officialinvitetbl
+            WHERE invite_code LIKE ?
+        ");
+        if (!$stmt) {
+            throw new RuntimeException('Unable to generate invite code.');
+        }
+        $stmt->bind_param("s", $like);
+        $stmt->execute();
+        $row = $stmt->get_result()->fetch_assoc();
+        $stmt->close();
+
+        $nextSeq = (int)($row['max_seq'] ?? 0) + 1;
+        if ($nextSeq > 999) {
+            throw new RuntimeException("Invite code limit reached for {$prefix}.");
+        }
+
+        return $prefix . str_pad((string)$nextSeq, 3, '0', STR_PAD_LEFT);
     }
 }

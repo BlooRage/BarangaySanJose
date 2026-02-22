@@ -104,6 +104,15 @@
     if (!state.canManageActions) {
       return `<span class="text-muted small">SuperAdmin only</span>`;
     }
+    const approvalState = String(row.profile_approval_state || "");
+    if (approvalState === "PendingApproval") {
+      return `
+        <div class="d-flex gap-1 flex-wrap">
+          <button class="btn btn-sm btn-success officials-action-btn" data-action="approve_profile" data-official-id="${safe(row.official_id)}">Approve</button>
+          <button class="btn btn-sm btn-outline-danger officials-action-btn" data-action="reject_profile" data-official-id="${safe(row.official_id)}">Reject</button>
+        </div>
+      `;
+    }
     const isRevoked = String(row.permission_state || "") === "Revoked";
     if (isRevoked) {
       return `<button class="btn btn-sm btn-success officials-action-btn" data-action="restore_permission" data-official-id="${safe(row.official_id)}">Restore</button>`;
@@ -142,6 +151,7 @@
         <td>${safe(r.date_hired)}</td>
         <td>${safe(r.account_status)}</td>
         <td>${badgeHtml(r.permission_state, permTone)}</td>
+        <td>${badgeHtml(r.profile_approval_state || "PendingApproval", (String(r.profile_approval_state || "") === "Approved" ? "ok" : (String(r.profile_approval_state || "") === "Rejected" ? "danger" : "secondary")))}</td>
         <td>${actionButtonHtml(r)}</td>
       </tr>
     `;
@@ -179,8 +189,15 @@
         const officialId = String(btn.getAttribute("data-official-id") || "");
         if (!action || !officialId) return;
 
-        const label = action === "revoke_permission" ? "revoke" : "restore";
-        const ok = window.confirm(`Are you sure you want to ${label} this account permission?`);
+        let label = "update";
+        if (action === "revoke_permission") label = "revoke";
+        else if (action === "restore_permission") label = "restore";
+        else if (action === "approve_profile") label = "approve";
+        else if (action === "reject_profile") label = "reject";
+        const target = (action === "approve_profile" || action === "reject_profile")
+          ? "this profile approval"
+          : "this account permission";
+        const ok = window.confirm(`Are you sure you want to ${label} ${target}?`);
         if (!ok) return;
 
         try {
@@ -219,7 +236,7 @@
       updateRevokedBadge();
       renderTable();
     } catch (err) {
-      if (tbody) tbody.innerHTML = `<tr><td colspan="11" class="text-center text-danger py-4">${safe(err?.message || "Unable to load officials.")}</td></tr>`;
+      if (tbody) tbody.innerHTML = `<tr><td colspan="12" class="text-center text-danger py-4">${safe(err?.message || "Unable to load officials.")}</td></tr>`;
     } finally {
       state.auto.inFlight = false;
       state.auto.secondsLeft = 60;
