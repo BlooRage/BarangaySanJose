@@ -88,6 +88,17 @@ require_once __DIR__ . "/../includes/resident_access_guard.php";
                         <button class="btn apply-btn" onclick="location.href='ResidencyForm.php'">Apply Now</button>
                     </div>
                 </div>
+
+                <div class="col-md-6 col-lg-4 d-flex">
+                    <div class="certificate-card card-action w-100">
+                        <img src="../../icons/dashboard/identity.png" class="certificate-icon" alt="">
+                        <h3>IDENTITY</h3>
+                        <p class="certificate-text">
+                            Request an identity certificate for official identification and verification purposes.
+                        </p>
+                        <button class="btn apply-btn" onclick="location.href='IdentityForm.php'">Apply Now</button>
+                    </div>
+                </div>
             </div>
         </main>
     </div>

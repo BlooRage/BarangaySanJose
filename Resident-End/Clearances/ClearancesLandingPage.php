@@ -36,7 +36,7 @@ require_once __DIR__ . "/../includes/resident_access_guard.php";
             <div class="row certificate-grid text-center justify-content-center">
                 <div class="col-md-6 col-lg-4 d-flex">
                     <div class="certificate-card card-action w-100">
-                        <img src="../../icons/dashboard/placeholder-certification.png" class="certificate-icon" alt="Barangay Certification placeholder image">
+                        <img src="../../icons/dashboard/brgycert.png" class="certificate-icon" alt="Barangay Certification">
                         <h3>BARANGAY CERTIFICATION</h3>
                         <p class="certificate-text">
                             Apply for a barangay certification for general legal, educational, or personal requirements.
@@ -47,7 +47,7 @@ require_once __DIR__ . "/../includes/resident_access_guard.php";
 
                 <div class="col-md-6 col-lg-4 d-flex">
                     <div class="certificate-card card-action w-100">
-                        <img src="../../icons/dashboard/placeholder-permits.png" class="certificate-icon" alt="Barangay Clearance for Permits placeholder image">
+                        <img src="../../icons/dashboard/clearancepermits.png" class="certificate-icon" alt="Barangay Clearance for Permits">
                         <h3>BARANGAY CLEARANCE FOR PERMITS</h3>
                         <p class="certificate-text">
                             Apply for barangay clearance required for permit processing and related approvals.
@@ -58,7 +58,7 @@ require_once __DIR__ . "/../includes/resident_access_guard.php";
 
                 <div class="col-md-6 col-lg-4 d-flex">
                     <div class="certificate-card card-action w-100">
-                        <img src="../../icons/dashboard/placeholder-business.png" class="certificate-icon" alt="Barangay Business Clearance placeholder image">
+                        <img src="../../icons/dashboard/businessclearance.png" class="certificate-icon" alt="Barangay Business Clearance">
                         <h3>BARANGAY BUSINESS CLEARANCE</h3>
                         <p class="certificate-text">
                             Apply for barangay business clearance for new applications, renewals, and compliance checks.
