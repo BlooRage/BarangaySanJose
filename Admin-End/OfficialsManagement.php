@@ -66,11 +66,12 @@
                 <th>Date Hired</th>
                 <th>Account Status</th>
                 <th>Permissions</th>
+                <th>Profile Approval</th>
                 <th>Action</th>
               </tr>
             </thead>
             <tbody id="officialsMgmtTbody">
-              <tr><td colspan="11" class="text-center text-muted py-4">Loading...</td></tr>
+              <tr><td colspan="12" class="text-center text-muted py-4">Loading...</td></tr>
             </tbody>
           </table>
         </div>

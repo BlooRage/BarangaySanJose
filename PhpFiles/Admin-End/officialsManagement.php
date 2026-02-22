@@ -3,8 +3,10 @@ session_start();
 require_once "../General/connection.php";
 require_once "../General/security.php";
 require_once "../General/audit.php";
+require_once "../General/officialInviteCommon.php";
 
 requireRoleSession(['SuperAdmin']);
+oi_ensure_invite_table($conn);
 
 header('Content-Type: application/json; charset=utf-8');
 
@@ -27,6 +29,19 @@ function permissionStateFromAccountStatus(string $statusName): string {
         return 'Revoked';
     }
     return 'Active';
+}
+
+function profileApprovalStateFromInvite(?string $inviteStatus, string $role): string {
+    $roleKey = strtolower(trim($role));
+    if ($roleKey === 'superadmin') {
+        return 'Approved';
+    }
+    $s = strtolower(trim((string)$inviteStatus));
+    if ($s === 'completed') return 'Approved';
+    if ($s === 'rejectedapproval') return 'Rejected';
+    if ($s === 'pendingapproval') return 'PendingApproval';
+    if ($s === 'inprogress' || $s === 'pending') return 'Onboarding';
+    return 'PendingApproval';
 }
 
 function getStatusIdByNames(mysqli $conn, string $statusType, array $preferredNames): ?int {
@@ -72,10 +87,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
         }
 
         $targetStmt = $conn->prepare("
-            SELECT oi.official_id, oi.user_id, ua.status_id_account, ua.role_access
+            SELECT oi.official_id, oi.user_id, ua.status_id_account, ua.role_access,
+                   iv.invite_id, iv.status AS invite_status
             FROM officialinformationtbl oi
             INNER JOIN useraccountstbl ua
                 ON ua.user_id COLLATE utf8mb4_general_ci = oi.user_id COLLATE utf8mb4_general_ci
+            LEFT JOIN officialinvitetbl iv
+                ON iv.user_id COLLATE utf8mb4_general_ci = oi.user_id COLLATE utf8mb4_general_ci
+               AND iv.invite_id = (
+                    SELECT MAX(oi2.invite_id)
+                    FROM officialinvitetbl oi2
+                    WHERE oi2.user_id COLLATE utf8mb4_general_ci = oi.user_id COLLATE utf8mb4_general_ci
+               )
             WHERE oi.official_id = ?
             LIMIT 1
         ");
@@ -100,6 +123,51 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
         } elseif ($action === 'restore_permission') {
             $nextStatusId = $statusActiveId;
             $auditAction = 'OFFICIAL_PERMISSION_RESTORE';
+        } elseif ($action === 'approve_profile' || $action === 'reject_profile') {
+            $inviteId = (int)($target['invite_id'] ?? 0);
+            if ($inviteId <= 0) {
+                throw new Exception('No onboarding invite found for this account.');
+            }
+            $newInviteStatus = $action === 'approve_profile' ? 'Completed' : 'RejectedApproval';
+            $acceptedAtSql = $action === 'approve_profile' ? "NOW()" : "NULL";
+            $nextOnboardingStep = $action === 'approve_profile' ? 'completed' : 'document_upload';
+            $upInvite = $conn->prepare("
+                UPDATE officialinvitetbl
+                SET status = ?,
+                    onboarding_step = ?,
+                    accepted_at = {$acceptedAtSql},
+                    updated_at = NOW()
+                WHERE invite_id = ?
+                LIMIT 1
+            ");
+            if (!$upInvite) {
+                throw new Exception('Failed to update profile approval state.');
+            }
+            $upInvite->bind_param("ssi", $newInviteStatus, $nextOnboardingStep, $inviteId);
+            $upInvite->execute();
+            $upInvite->close();
+
+            insertUnifiedAuditLog(
+                $conn,
+                (string)($_SESSION['user_id'] ?? ''),
+                $actorRole,
+                'Officials Management',
+                'OfficialProfileApproval',
+                $officialId,
+                $action === 'approve_profile' ? 'OFFICIAL_PROFILE_APPROVE' : 'OFFICIAL_PROFILE_REJECT',
+                'invite_status',
+                (string)($target['invite_status'] ?? ''),
+                $newInviteStatus,
+                $action === 'approve_profile' ? 'Official/Personnel profile approved.' : 'Official/Personnel profile rejected.',
+                null
+            );
+
+            echo json_encode([
+                'success' => true,
+                'message' => $action === 'approve_profile' ? 'Profile approved successfully.' : 'Profile rejected successfully.',
+                'updated' => true
+            ]);
+            exit;
         } else {
             throw new Exception('Invalid action.');
         }
@@ -178,11 +246,19 @@ try {
             ua.email,
             ua.phone_number,
             ua.role_access AS account_role_access,
-            COALESCE(sa.status_name, CONCAT('Status #', ua.status_id_account)) AS account_status
+            COALESCE(sa.status_name, CONCAT('Status #', ua.status_id_account)) AS account_status,
+            iv.status AS invite_status
         FROM officialinformationtbl oi
         INNER JOIN useraccountstbl ua ON ua.user_id COLLATE utf8mb4_general_ci = oi.user_id COLLATE utf8mb4_general_ci
         LEFT JOIN statuslookuptbl se ON se.status_id = oi.status_id_employment
         LEFT JOIN statuslookuptbl sa ON sa.status_id = ua.status_id_account
+        LEFT JOIN officialinvitetbl iv
+            ON iv.user_id COLLATE utf8mb4_general_ci = oi.user_id COLLATE utf8mb4_general_ci
+           AND iv.invite_id = (
+                SELECT MAX(oi2.invite_id)
+                FROM officialinvitetbl oi2
+                WHERE oi2.user_id COLLATE utf8mb4_general_ci = oi.user_id COLLATE utf8mb4_general_ci
+           )
     ";
 
     $params = [];
@@ -251,6 +327,7 @@ try {
             'phone_number' => (string)($row['phone_number'] ?? ''),
             'account_status' => (string)($row['account_status'] ?? ''),
             'permission_state' => permissionStateFromAccountStatus((string)($row['account_status'] ?? '')),
+            'profile_approval_state' => profileApprovalStateFromInvite((string)($row['invite_status'] ?? ''), $role),
         ];
     }
     $stmt->close();

@@ -93,7 +93,7 @@ function oi_find_active_invite_by_user(mysqli $conn, string $userId): ?array
         SELECT *
         FROM officialinvitetbl
         WHERE user_id = ?
-          AND status IN ('InProgress', 'Completed')
+          AND status IN ('InProgress', 'Completed', 'PendingApproval', 'RejectedApproval')
         ORDER BY invite_id DESC
         LIMIT 1
     ");
@@ -828,17 +828,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $ins->close();
 
                 $inviteId = (int)$sessionInvite['invite_id'];
+                $roleNormalized = strtolower(trim((string)($account['role_access'] ?? $sessionInvite['role_access'] ?? '')));
+                $requiresProfileApproval = ($roleNormalized !== 'superadmin');
+                $nextInviteStatus = $requiresProfileApproval ? 'PendingApproval' : 'Completed';
+                $acceptedAtSql = $requiresProfileApproval ? "NULL" : "NOW()";
                 $upInvite = $conn->prepare("
                     UPDATE officialinvitetbl
                     SET profile_completed_at = NOW(),
-                        accepted_at = NOW(),
+                        accepted_at = {$acceptedAtSql},
                         onboarding_step = 'completed',
-                        status = 'Completed'
+                        status = ?
                     WHERE invite_id = ?
                     LIMIT 1
                 ");
                 if ($upInvite) {
-                    $upInvite->bind_param("i", $inviteId);
+                    $upInvite->bind_param("si", $nextInviteStatus, $inviteId);
                     $upInvite->execute();
                     $upInvite->close();
                 }
@@ -870,6 +874,7 @@ if ($loggedUserId !== '' && $sessionInvite && $account && in_array($loggedRole, 
 
 $resumeStep = 'email_verify';
 if ($mode === 'resume') {
+    $inviteStatus = strtolower(trim((string)($sessionInvite['status'] ?? '')));
     if ((int)($account['email_verify'] ?? 0) !== 1) {
         $resumeStep = 'email_verify';
     } elseif ((int)($account['phoneNum_verify'] ?? 0) !== 1) {
@@ -878,11 +883,18 @@ if ($mode === 'resume') {
         $resumeStep = 'official_info';
     } elseif (!oi_has_address($officialInfo)) {
         $resumeStep = 'address_info';
+    } elseif ($inviteStatus === 'rejectedapproval') {
+        $resumeStep = 'document_upload';
     } elseif (!oi_has_uploaded_2x2($conn, $loggedUserId)) {
         $resumeStep = 'document_upload';
     } else {
-        header('Location: ../PhpFiles/Login/unifiedProfileCheck.php');
-        exit;
+        $roleNormalized = strtolower(trim((string)($account['role_access'] ?? '')));
+        if ($roleNormalized !== 'superadmin' && $inviteStatus !== 'completed') {
+            $resumeStep = 'pending_approval';
+        } else {
+            header('Location: ../PhpFiles/Login/unifiedProfileCheck.php');
+            exit;
+        }
     }
 }
 
@@ -898,7 +910,7 @@ if ($mode === 'password') {
         $onboardingStep = 4;
     } elseif ($resumeStep === 'address_info') {
         $onboardingStep = 5;
-    } elseif ($resumeStep === 'document_upload') {
+    } elseif ($resumeStep === 'document_upload' || $resumeStep === 'pending_approval') {
         $onboardingStep = 6;
     }
 }
@@ -1293,6 +1305,11 @@ if ($mode === 'password') {
                     </div>
                 </form>
             <?php elseif ($mode === 'resume' && $resumeStep === 'document_upload'): ?>
+                <?php if (strtolower(trim((string)($sessionInvite['status'] ?? ''))) === 'rejectedapproval'): ?>
+                    <div class="alert alert-danger">
+                        Your previous profile submission was not approved. Please upload a new 2x2 picture for re-review.
+                    </div>
+                <?php endif; ?>
                 <p class="text-muted">Upload your required 2x2 picture to complete onboarding.</p>
                 <form method="post" class="row g-3" enctype="multipart/form-data">
                     <input type="hidden" name="action" value="upload_official_2x2">
@@ -1305,6 +1322,12 @@ if ($mode === 'password') {
                         <button class="btn btn-primary" type="submit">Upload and Submit</button>
                     </div>
                 </form>
+            <?php elseif ($mode === 'resume' && $resumeStep === 'pending_approval'): ?>
+                <div class="alert alert-warning">
+                    Your onboarding is complete and your profile is now waiting for SuperAdmin approval.
+                </div>
+                <p class="text-muted mb-3">You can logout and login later. Access will be enabled after approval.</p>
+                <a href="../PhpFiles/Login/logout.php" class="btn btn-outline-secondary">Logout</a>
             <?php else: ?>
                 <div class="alert alert-danger mb-0">
                     Invite link is invalid or already used. If you already saved your password, login using your account to resume onboarding.

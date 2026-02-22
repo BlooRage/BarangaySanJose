@@ -370,37 +370,57 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         $token = oi_generate_invite_token();
         $expiresAt = (new DateTimeImmutable('+48 hours'))->format('Y-m-d H:i:s');
+        $inviteId = 0;
+        $ok = false;
 
-        $stmt = $conn->prepare("
-            INSERT INTO officialinvitetbl
-                (invite_token_hash, invite_email, invite_phone, firstname, middlename, lastname, suffix, role_access, position_access, department, employment_status, area_number, status, onboarding_step, invited_by_user_id, expires_at)
-            VALUES
-                (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'Pending', 'password', ?, ?)
-        ");
-        if (!$stmt) {
-            set_invite_flash('danger', 'Failed to create invite.');
-            redirect_self();
+        for ($attempt = 0; $attempt < 3; $attempt++) {
+            try {
+                $inviteCode = oi_generate_invite_code($conn, $areaNumber);
+            } catch (Throwable $e) {
+                set_invite_flash('danger', $e->getMessage());
+                redirect_self();
+            }
+
+            $stmt = $conn->prepare("
+                INSERT INTO officialinvitetbl
+                    (invite_code, invite_token_hash, invite_email, invite_phone, firstname, middlename, lastname, suffix, role_access, position_access, department, employment_status, area_number, status, onboarding_step, invited_by_user_id, expires_at)
+                VALUES
+                    (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'Pending', 'password', ?, ?)
+            ");
+            if (!$stmt) {
+                set_invite_flash('danger', 'Failed to create invite.');
+                redirect_self();
+            }
+            $stmt->bind_param(
+                "sssssssssssssss",
+                $inviteCode,
+                $token['hash'],
+                $email,
+                $phone10,
+                $firstName,
+                $middleName,
+                $lastName,
+                $suffix,
+                $roleAccess,
+                $positionAccess,
+                $department,
+                $employmentStatus,
+                $areaNumber,
+                $actorUserId,
+                $expiresAt
+            );
+            $ok = $stmt->execute();
+            $inviteId = (int)$stmt->insert_id;
+            $errNo = (int)$stmt->errno;
+            $stmt->close();
+
+            if ($ok && $inviteId > 0) {
+                break;
+            }
+            if ($errNo !== 1062) {
+                break;
+            }
         }
-        $stmt->bind_param(
-            "ssssssssssssss",
-            $token['hash'],
-            $email,
-            $phone10,
-            $firstName,
-            $middleName,
-            $lastName,
-            $suffix,
-            $roleAccess,
-            $positionAccess,
-            $department,
-            $employmentStatus,
-            $areaNumber,
-            $actorUserId,
-            $expiresAt
-        );
-        $ok = $stmt->execute();
-        $inviteId = (int)$stmt->insert_id;
-        $stmt->close();
 
         if (!$ok || $inviteId <= 0) {
             set_invite_flash('danger', 'Failed to create invite.');
@@ -503,7 +523,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
 $rows = [];
 $q = $conn->query("
-    SELECT invite_id, invite_email, invite_phone, firstname, middlename, lastname, suffix, role_access, position_access, department, employment_status, area_number, status, onboarding_step, expires_at, created_at, updated_at
+    SELECT invite_id, invite_code, invite_email, invite_phone, firstname, middlename, lastname, suffix, role_access, position_access, department, employment_status, area_number, status, onboarding_step, expires_at, created_at, updated_at
     FROM officialinvitetbl
     ORDER BY invite_id DESC
     LIMIT 100
@@ -709,7 +729,7 @@ if ($q) {
                             $name = trim(($r['firstname'] ?? '') . ' ' . (($r['middlename'] ?? '') !== '' ? ($r['middlename'] . ' ') : '') . ($r['lastname'] ?? '') . (($r['suffix'] ?? '') !== '' ? (' ' . $r['suffix']) : ''));
                             ?>
                             <tr>
-                                <td><?= (int)$r['invite_id'] ?></td>
+                                <td><?= htmlspecialchars((string)((trim((string)($r['invite_code'] ?? '')) !== '') ? $r['invite_code'] : (string)((int)$r['invite_id'])), ENT_QUOTES, 'UTF-8') ?></td>
                                 <td><?= htmlspecialchars($name, ENT_QUOTES, 'UTF-8') ?></td>
                                 <td>
                                     <?= htmlspecialchars((string)$r['role_access'], ENT_QUOTES, 'UTF-8') ?>
