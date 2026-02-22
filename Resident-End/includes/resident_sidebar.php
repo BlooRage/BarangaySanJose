@@ -217,8 +217,8 @@ if ($residentId !== '' && isset($conn) && $conn instanceof mysqli) {
            class="a-sidebarLink <?= activeLink('resident_clearances.php', $current) ?>">
           <i class="fa-solid fa-file-circle-check fa-sm"></i>Clearances
         </a>
-        <a href="/BarangaySanJose/Resident-End/resident_barangay_id.php"
-           class="a-sidebarLink <?= activeLink('resident_barangay_id.php', $current) ?>">
+        <a href="/BarangaySanJose/Resident-End/BarangayId/BarangayIdLandingPage.php"
+           class="a-sidebarLink <?= (in_array($current, ['BarangayIdLandingPage.php', 'BarangayIdForm.php'], true) ? 'active' : '') ?>">
           <i class="fa-solid fa-id-badge fa-lg"></i>Barangay ID
         </a>
         <a href="/BarangaySanJose/Resident-End/resident_complaints.php"
