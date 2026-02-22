@@ -154,7 +154,7 @@ if (isset($_SESSION['show_not_verified_modal'])) {
         <div class="col-12 col-md-4 col-lg-3">
           <div id="card-serviceRequest-appointments"
                class="card-action h-100 p-4 rounded-4 text-center d-flex flex-column align-items-center justify-content-center border-0 shadow-sm"
-               onclick="location.href='#'">
+               onclick="location.href='Appointments/AppointmentsLandingPage.php'">
             <i class="fa-solid fa-calendar-check fa-2xl mb-3"></i><br>
             <span class="fw-bold small">APPOINTMENTS</span>
           </div>
@@ -181,7 +181,7 @@ if (isset($_SESSION['show_not_verified_modal'])) {
         <div class="col-12 col-md-4 col-lg-3">
           <div id="card-serviceRequest-complaints"
                class="card-action h-100 p-4 rounded-4 text-center d-flex flex-column align-items-center justify-content-center border-0 shadow-sm"
-               onclick="location.href='#'">
+               onclick="location.href='Complaints/ComplaintsLandingPage.php'">
             <i class="fa-solid fa-comment-dots fa-2xl mb-3"></i><br>
             <span class="fw-bold small">COMPLAINTS</span>
           </div>

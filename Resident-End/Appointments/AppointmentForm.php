@@ -1,6 +1,6 @@
 <?php
 $allowUnregistered = false;
-require_once __DIR__ . "/includes/resident_access_guard.php";
+require_once __DIR__ . "/../includes/resident_access_guard.php";
 
 $residentinformationtbl = [
     "firstname" => "Juan",
@@ -61,20 +61,20 @@ $fullAddress = implode(", ", $addressParts);
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons/font/bootstrap-icons.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
-    <link rel="stylesheet" href="../CSS-Styles/Resident-End-CSS/residentDashboard.css">
-    <link rel="stylesheet" href="../CSS-Styles/Guest-End-CSS/GeneralStyle.css">
-    <link rel="stylesheet" href="../CSS-Styles/Resident-End-CSS/applicationForms.css">
+    <link rel="stylesheet" href="../../CSS-Styles/Resident-End-CSS/residentDashboard.css">
+    <link rel="stylesheet" href="../../CSS-Styles/Guest-End-CSS/GeneralStyle.css">
+    <link rel="stylesheet" href="../../CSS-Styles/Resident-End-CSS/applicationForms.css">
 </head>
 <body>
     <div class="d-flex min-vh-100">
 
-        <?php include 'includes/resident_sidebar.php'; ?>
+        <?php include '../includes/resident_sidebar.php'; ?>
 
         <main id="div-mainDisplay" class="flex-grow-1 px-4 pb-4 pt-0 px-md-5 pb-md-5 pt-md-0 bg-light">
 
             <div class="main-head application-card orange-card py-3 mt-5 rounded">
                 <div class="main-head-content">
-                    <a href="/BarangaySanJose/Resident-End/Certificates/CertificatesLandingPage.php" class="back-link">&lt; Go Back</a>
+                    <a href="/BarangaySanJose/Resident-End/Appointments/AppointmentsLandingPage.php" class="back-link">&lt; Go Back</a>
                     <h1 class="form-title" style="color: #de710c">Appointment Form</h1>
                     <p class="form-subtitle">All fields marked with <span class="required-asterisk">*</span> are required</p>
 
