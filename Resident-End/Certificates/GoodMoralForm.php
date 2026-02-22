@@ -37,7 +37,6 @@ $phoneNumber = htmlspecialchars($useraccountstbl['phone_number'] ?? '', ENT_QUOT
         <?php include __DIR__ . '/../includes/resident_sidebar.php'; ?>
 
         <main id="div-mainDisplay" class="flex-grow-1 px-4 pb-4 pt-0 px-md-5 pb-md-5 pt-md-0 bg-light">
-            <div class="main-head application-card orange-card py-3 rounded application-card--muted">
                 <div class="main-head-content">
                     <a href="/BarangaySanJose/Resident-End/Certificates/CertificatesLandingPage.php" class="back-link">&lt; Go Back</a>
                     <h1 class="form-title">Good Moral</h1>
