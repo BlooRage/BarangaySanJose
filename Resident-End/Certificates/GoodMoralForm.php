@@ -14,10 +14,67 @@ $firstName = htmlspecialchars($residentinformationtbl['firstname'] ?? '', ENT_QU
 $lastName = htmlspecialchars($residentinformationtbl['lastname'] ?? '', ENT_QUOTES, 'UTF-8');
 $middleName = htmlspecialchars($residentinformationtbl['middlename'] ?? '', ENT_QUOTES, 'UTF-8');
 $suffix = $residentinformationtbl['suffix'] ?? '';
-$unitNumber = htmlspecialchars($residentaddresstbl['unit_number'] ?? '', ENT_QUOTES, 'UTF-8');
-$streetNumber = htmlspecialchars($residentaddresstbl['street_number'] ?? '', ENT_QUOTES, 'UTF-8');
-$streetName = htmlspecialchars($residentaddresstbl['street_name'] ?? '', ENT_QUOTES, 'UTF-8');
+$unitNumber = trim((string)($residentaddresstbl['unit_number'] ?? ''));
+$streetNumber = trim((string)($residentaddresstbl['street_number'] ?? ''));
+$streetName = trim((string)($residentaddresstbl['street_name'] ?? ''));
+$phaseNumber = trim((string)($residentaddresstbl['phase_number'] ?? ''));
+$subdivision = trim((string)($residentaddresstbl['subdivision'] ?? ''));
+$areaNumber = trim((string)($residentaddresstbl['area_number'] ?? ''));
 $phoneNumber = htmlspecialchars($useraccountstbl['phone_number'] ?? '', ENT_QUOTES, 'UTF-8');
+
+$streetNameHasBlock = $streetName !== '' && stripos($streetName, 'block') !== false;
+$streetNumberHasLot = $streetNumber !== '' && stripos($streetNumber, 'lot') !== false;
+$isLotBlockSystem = $streetNameHasBlock || $streetNumberHasLot;
+
+$streetLabel = $streetName;
+if ($streetLabel !== '' && stripos($streetLabel, 'street') === false && !$streetNameHasBlock) {
+    $streetLabel .= ' Street';
+}
+
+$subdivisionLabel = $subdivision !== '' ? $subdivision . ' Subdivision' : '';
+
+$fullAddressParts = [];
+if ($isLotBlockSystem) {
+    $lotNumber = trim((string)preg_replace('/^lot\\s*/i', '', $streetNumber));
+    $blockNumber = trim((string)preg_replace('/^(block|blk)\\s*/i', '', $streetName));
+    $phaseValue = trim((string)preg_replace('/^phase\\s*/i', '', $phaseNumber));
+
+    $lotLabel = $lotNumber !== '' ? 'Lot ' . $lotNumber : $streetNumber;
+    $blockLabel = $blockNumber !== '' ? 'Blk ' . $blockNumber : $streetName;
+    $phaseLabel = $phaseValue !== '' ? 'Phase ' . $phaseValue : ($phaseNumber !== '' ? $phaseNumber : '');
+
+    $fullAddressParts = array_filter([
+        $lotLabel,
+        $blockLabel,
+        $phaseLabel,
+        $subdivisionLabel,
+        'San Jose',
+        'Rodriguez',
+        'Rizal'
+    ], fn($part) => $part !== '');
+} else {
+    if ($unitNumber !== '') {
+        $fullAddressParts = array_filter([
+            'Unit ' . $unitNumber,
+            $streetLabel,
+            $subdivisionLabel,
+            'San Jose',
+            'Rodriguez',
+            'Rizal'
+        ], fn($part) => $part !== '');
+    } else {
+        $streetLine = trim(implode(' ', array_filter([$streetNumber, $streetLabel], fn($part) => $part !== '')));
+        $fullAddressParts = array_filter([
+            $streetLine,
+            $subdivisionLabel,
+            'San Jose',
+            'Rodriguez',
+            'Rizal'
+        ], fn($part) => $part !== '');
+    }
+}
+
+$fullAddress = htmlspecialchars(implode(', ', $fullAddressParts), ENT_QUOTES, 'UTF-8');
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -79,22 +136,10 @@ $phoneNumber = htmlspecialchars($useraccountstbl['phone_number'] ?? '', ENT_QUOT
                             </div>
                         </div>
 
-                        <div id="houseSystemWrapper" class="form-row">
+                        <div class="form-row">
                             <div class="full-width">
-                                <div class="row mb-3">
-                                    <div class="col-md-4">
-                                        <label class="top-label" for="unitNumber">Unit / Apartment Number</label>
-                                        <input type="text" class="form-control" id="unitNumber" name="unitNumber" readonly value="<?php echo $unitNumber; ?>">
-                                    </div>
-                                    <div class="col-md-4">
-                                        <label class="top-label" for="houseNumber">House Number <span class="required-asterisk">*</span></label>
-                                        <input type="text" class="form-control" id="houseNumber" name="houseNumber" readonly value="<?php echo $streetNumber; ?>">
-                                    </div>
-                                    <div class="col-md-4">
-                                        <label class="top-label" for="streetName">Street Name <span class="required-asterisk">*</span></label>
-                                        <input type="text" class="form-control" id="streetName" name="streetName" readonly value="<?php echo $streetName; ?>">
-                                    </div>
-                                </div>
+                                <label class="top-label">Full Address <span class="required-asterisk">*</span></label>
+                                <input type="text" name="full_address" readonly value="<?php echo $fullAddress; ?>">
                             </div>
                         </div>
 
@@ -102,35 +147,6 @@ $phoneNumber = htmlspecialchars($useraccountstbl['phone_number'] ?? '', ENT_QUOT
                             <div class="full-width">
                                 <label class="top-label">Purpose <span class="required-asterisk">*</span></label>
                                 <textarea name="purpose" rows="5" required></textarea>
-                            </div>
-                        </div>
-
-                        <h2 class="section-title text-center text-dark">Document Upload</h2>
-
-                        <div class="form-row two-col-row">
-                            <div>
-                                <label class="top-label" for="applicantType">Applicant Type <span class="required-asterisk">*</span></label>
-                                <select id="applicantType" name="applicant_type" required>
-                                    <option value="non_minor" selected>Non-minor</option>
-                                    <option value="minor">Minor / Student</option>
-                                </select>
-                            </div>
-                            <div>
-                                <label class="top-label" for="documentType">Document Type <span class="required-asterisk">*</span></label>
-                                <select id="documentType" name="document_type" required></select>
-                            </div>
-                        </div>
-
-                        <div class="form-row">
-                            <div class="full-width">
-                                <label class="top-label" for="supportingFiles">Upload File(s) <span class="required-asterisk">*</span></label>
-                                <label class="upload-dropzone" id="uploadDropzone" for="supportingFiles">
-                                    <i class="fa-solid fa-cloud-arrow-up"></i>
-                                    <span>Drag files here or click to upload</span>
-                                    <small>Accepted: PDF, JPG, JPEG, PNG</small>
-                                </label>
-                                <input type="file" id="supportingFiles" name="supporting_files[]" class="visually-hidden" accept=".pdf,.jpg,.jpeg,.png" multiple required>
-                                <div id="selectedFiles" class="selected-files small text-muted mt-2"></div>
                             </div>
                         </div>
 
@@ -147,73 +163,5 @@ $phoneNumber = htmlspecialchars($useraccountstbl['phone_number'] ?? '', ENT_QUOT
         </main>
     </div>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-    <script>
-  (() => {
-    const applicantType = document.getElementById("applicantType");
-    const documentType = document.getElementById("documentType");
-    const fileInput = document.getElementById("supportingFiles");
-    const fileList = document.getElementById("selectedFiles");
-    const dropzone = document.getElementById("uploadDropzone");
-
-    if (!applicantType || !documentType || !fileInput || !fileList || !dropzone) return;
-
-    const documentOptions = {
-      non_minor: [
-        "Valid government ID",
-        "Proof of residency",
-        "Cedula / Community Tax Certificate"
-      ],
-      minor: [
-        "Parent or guardian valid ID",
-        "Authorization letter from parent/guardian",
-        "School ID or Birth Certificate"
-      ]
-    };
-
-    const renderDocOptions = () => {
-      const key = applicantType.value === "minor" ? "minor" : "non_minor";
-      documentType.innerHTML = "";
-      documentOptions[key].forEach((label) => {
-        const option = document.createElement("option");
-        option.value = label;
-        option.textContent = label;
-        documentType.appendChild(option);
-      });
-    };
-
-    const renderFiles = () => {
-      const names = Array.from(fileInput.files || []).map((f) => f.name);
-      fileList.textContent = names.length ? `Selected: ${names.join(", ")}` : "No file selected";
-    };
-
-    applicantType.addEventListener("change", renderDocOptions);
-    fileInput.addEventListener("change", renderFiles);
-
-    ["dragenter", "dragover"].forEach((eventName) => {
-      dropzone.addEventListener(eventName, (e) => {
-        e.preventDefault();
-        dropzone.classList.add("is-dragging");
-      });
-    });
-
-    ["dragleave", "drop"].forEach((eventName) => {
-      dropzone.addEventListener(eventName, (e) => {
-        e.preventDefault();
-        dropzone.classList.remove("is-dragging");
-      });
-    });
-
-    dropzone.addEventListener("drop", (e) => {
-      const dt = e.dataTransfer;
-      if (dt && dt.files && dt.files.length) {
-        fileInput.files = dt.files;
-        renderFiles();
-      }
-    });
-
-    renderDocOptions();
-    renderFiles();
-  })();
-    </script>
 </body>
 </html>

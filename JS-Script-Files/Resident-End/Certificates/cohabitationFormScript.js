@@ -3,6 +3,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const agree = document.getElementById("cohabitationAgree");
     const submitBtn = document.getElementById("cohabitationSubmit");
     if (!form || !agree || !submitBtn) return;
+    submitBtn.disabled = true;
 
     const applicantUnit = document.getElementById("unitNumber");
     const applicantHouse = document.getElementById("houseNumber");
@@ -11,6 +12,9 @@ document.addEventListener("DOMContentLoaded", () => {
     const applicantArea = document.getElementById("applicantAreaNumber");
 
     const cohabSameAddress = document.getElementById("cohabitantSameAddress");
+    const cohabitantFullAddressWrapper = document.getElementById("cohabitantFullAddressWrapper");
+    const cohabitantFullAddress = document.getElementById("cohabitantFullAddress");
+    const cohabitantAddressSystemRow = document.getElementById("cohabitantAddressSystemRow");
     const cohabitantAddressSystem = document.getElementById("cohabitantAddressSystem");
     const cohabitantHouseWrapper = document.getElementById("cohabitantHouseSystemWrapper");
     const cohabitantLotWrapper = document.getElementById("cohabitantLotBlockSystemWrapper");
@@ -32,6 +36,9 @@ document.addEventListener("DOMContentLoaded", () => {
     const cohabitantRegionSelect = document.getElementById("cohabitantRegionSelect");
 
     const cohabitationSameAddress = document.getElementById("cohabitationSameAddress");
+    const cohabitationFullAddressWrapper = document.getElementById("cohabitationFullAddressWrapper");
+    const cohabitationFullAddress = document.getElementById("cohabitationFullAddress");
+    const cohabitationAddressSystemRow = document.getElementById("cohabitationAddressSystemRow");
     const cohabitationAddressSystem = document.getElementById("cohabitationAddressSystem");
     const cohabitationHouseWrapper = document.getElementById("cohabitationHouseSystemWrapper");
     const cohabitationLotWrapper = document.getElementById("cohabitationLotBlockSystemWrapper");
@@ -256,13 +263,26 @@ document.addEventListener("DOMContentLoaded", () => {
 
         if (useApplicant) {
             lockSelect(cohabitantAddressSystem, true, "house");
-            applyCohabitantAddressSystem();
-            fillFromApplicant({
-                unit: cohabUnit,
-                house: cohabHouse,
-                street: cohabStreet,
-                subdivision: cohabSubdivision
-            });
+            if (cohabitantAddressSystemRow) {
+                cohabitantAddressSystemRow.classList.add("d-none");
+            }
+            if (cohabitantFullAddressWrapper) {
+                cohabitantFullAddressWrapper.classList.remove("d-none");
+            }
+            if (cohabitantFullAddress) {
+                cohabitantFullAddress.value = cohabitantFullAddress.value || "";
+            }
+            setWrapperState(cohabitantHouseWrapper, false);
+            setWrapperState(cohabitantLotWrapper, false);
+            if (cohabitantLocationWrapper) {
+                cohabitantLocationWrapper.classList.add("d-none");
+            }
+
+            setRequired(cohabHouse, false);
+            setRequired(cohabStreet, false);
+            setRequired(cohabLot, false);
+            setRequired(cohabBlock, false);
+            setRequired(cohabPhase, false);
 
             lockSelect(cohabitantRegionSelect, true, "REGION IV-A");
             populateProvinces("REGION IV-A", "RIZAL");
@@ -278,6 +298,26 @@ document.addEventListener("DOMContentLoaded", () => {
             lockSelect(cohabitantProvince, false);
             lockSelect(cohabitantCity, false);
             lockSelect(cohabitantRegionSelect, false);
+            if (cohabitantAddressSystemRow) {
+                cohabitantAddressSystemRow.classList.remove("d-none");
+            }
+            if (cohabitantFullAddressWrapper) {
+                cohabitantFullAddressWrapper.classList.add("d-none");
+            }
+            if (cohabitantLocationWrapper) {
+                cohabitantLocationWrapper.classList.remove("d-none");
+            }
+            if (cohabitantAddressSystem) cohabitantAddressSystem.value = "";
+            if (cohabitantRegionSelect) cohabitantRegionSelect.value = "";
+            if (cohabitantProvince) cohabitantProvince.value = "";
+            if (cohabitantCity) cohabitantCity.value = "";
+            if (cohabitantBarangay) cohabitantBarangay.value = "";
+            if (cohabitantPostal) cohabitantPostal.value = "";
+            [cohabUnit, cohabHouse, cohabStreet, cohabSubdivision, cohabUnitLot, cohabLot, cohabBlock, cohabPhase].forEach((el) => {
+                if (!el) return;
+                el.value = "";
+            });
+            applyCohabitantAddressSystem();
         }
 
         [cohabUnit, cohabHouse, cohabStreet, cohabSubdivision].forEach((el) => setReadOnly(el, useApplicant));
@@ -289,19 +329,60 @@ document.addEventListener("DOMContentLoaded", () => {
 
         if (useApplicant) {
             lockSelect(cohabitationAddressSystem, true, "house");
-            applyCohabitationAddressSystem();
-            fillFromApplicant({
-                unit: cohabitationUnit,
-                house: cohabitationHouse,
-                street: cohabitationStreet,
-                subdivision: cohabitationSubdivision,
-                area: cohabitationArea
-            });
+            if (cohabitationAddressSystemRow) {
+                cohabitationAddressSystemRow.classList.add("d-none");
+            }
+            if (cohabitationFullAddressWrapper) {
+                cohabitationFullAddressWrapper.classList.remove("d-none");
+            }
+            if (cohabitationFullAddress) {
+                cohabitationFullAddress.value = cohabitationFullAddress.value || "";
+            }
+            setWrapperState(cohabitationHouseWrapper, false);
+            setWrapperState(cohabitationLotWrapper, false);
+
+            setRequired(cohabitationHouse, false);
+            setRequired(cohabitationStreet, false);
+            setRequired(cohabitationArea, false);
+            setRequired(cohabitationLot, false);
+            setRequired(cohabitationBlock, false);
+            setRequired(cohabitationPhase, false);
+            setRequired(cohabitationAreaLot, false);
         } else {
             lockSelect(cohabitationAddressSystem, false);
+            cohabitationAddressSystem.value = "";
+            if (cohabitationAddressSystemRow) {
+                cohabitationAddressSystemRow.classList.remove("d-none");
+            }
+            if (cohabitationFullAddressWrapper) {
+                cohabitationFullAddressWrapper.classList.add("d-none");
+            }
+            [
+                cohabitationUnit,
+                cohabitationHouse,
+                cohabitationStreet,
+                cohabitationSubdivision,
+                cohabitationArea,
+                cohabitationUnitLot,
+                cohabitationLot,
+                cohabitationBlock,
+                cohabitationPhase,
+                cohabitationSubdivisionLot,
+                cohabitationAreaLot
+            ].forEach((el) => {
+                if (!el) return;
+                if (el.tagName === "SELECT") {
+                    el.value = "";
+                } else {
+                    el.value = "";
+                }
+            });
+            applyCohabitationAddressSystem();
         }
 
-        [cohabitationUnit, cohabitationHouse, cohabitationStreet, cohabitationSubdivision, cohabitationArea].forEach((el) => setReadOnly(el, useApplicant));
+        [cohabitationUnit, cohabitationHouse, cohabitationStreet, cohabitationSubdivision, cohabitationArea].forEach((el) =>
+            setReadOnly(el, useApplicant)
+        );
     };
 
     const updateSubmitState = () => {
@@ -420,6 +501,7 @@ document.addEventListener("DOMContentLoaded", () => {
     syncCohabitantAddress();
     syncCohabitationAddress();
     initAddressData();
-    form.addEventListener("input", updateSubmitState);
+    agree.addEventListener("change", updateSubmitState);
+        form.addEventListener("input", updateSubmitState);
     form.addEventListener("change", updateSubmitState);
 });

@@ -9,6 +9,67 @@ $data = getResidentProfileData($conn, $userId);
 $residentinformationtbl = $data['residentinformationtbl'] ?? [];
 $residentaddresstbl = $data['residentaddresstbl'] ?? [];
 $useraccountstbl = $data['useraccountstbl'] ?? [];
+
+$unitNumber = trim((string)($residentaddresstbl['unit_number'] ?? ''));
+$streetNumber = trim((string)($residentaddresstbl['street_number'] ?? ''));
+$streetName = trim((string)($residentaddresstbl['street_name'] ?? ''));
+$phaseNumber = trim((string)($residentaddresstbl['phase_number'] ?? ''));
+$subdivision = trim((string)($residentaddresstbl['subdivision'] ?? ''));
+$areaNumber = trim((string)($residentaddresstbl['area_number'] ?? ''));
+
+$streetNameHasBlock = $streetName !== '' && stripos($streetName, 'block') !== false;
+$streetNumberHasLot = $streetNumber !== '' && stripos($streetNumber, 'lot') !== false;
+$isLotBlockSystem = $streetNameHasBlock || $streetNumberHasLot;
+
+$streetLabel = $streetName;
+if ($streetLabel !== '' && stripos($streetLabel, 'street') === false && !$streetNameHasBlock) {
+    $streetLabel .= ' Street';
+}
+
+$subdivisionLabel = $subdivision !== '' ? $subdivision . ' Subdivision' : '';
+
+$fullAddressParts = [];
+if ($isLotBlockSystem) {
+    $lotNumber = trim((string)preg_replace('/^lot\\s*/i', '', $streetNumber));
+    $blockNumber = trim((string)preg_replace('/^(block|blk)\\s*/i', '', $streetName));
+    $phaseValue = trim((string)preg_replace('/^phase\\s*/i', '', $phaseNumber));
+
+    $lotLabel = $lotNumber !== '' ? 'Lot ' . $lotNumber : $streetNumber;
+    $blockLabel = $blockNumber !== '' ? 'Blk ' . $blockNumber : $streetName;
+    $phaseLabel = $phaseValue !== '' ? 'Phase ' . $phaseValue : ($phaseNumber !== '' ? $phaseNumber : '');
+
+    $fullAddressParts = array_filter([
+        $lotLabel,
+        $blockLabel,
+        $phaseLabel,
+        $subdivisionLabel,
+        'San Jose',
+        'Rodriguez',
+        'Rizal'
+    ], fn($part) => $part !== '');
+} else {
+    if ($unitNumber !== '') {
+        $fullAddressParts = array_filter([
+            'Unit ' . $unitNumber,
+            $streetLabel,
+            $subdivisionLabel,
+            'San Jose',
+            'Rodriguez',
+            'Rizal'
+        ], fn($part) => $part !== '');
+    } else {
+        $streetLine = trim(implode(' ', array_filter([$streetNumber, $streetLabel], fn($part) => $part !== '')));
+        $fullAddressParts = array_filter([
+            $streetLine,
+            $subdivisionLabel,
+            'San Jose',
+            'Rodriguez',
+            'Rizal'
+        ], fn($part) => $part !== '');
+    }
+}
+
+$fullAddress = htmlspecialchars(implode(', ', $fullAddressParts), ENT_QUOTES, 'UTF-8');
 ?>
 
 <!DOCTYPE html>
@@ -76,32 +137,10 @@ $useraccountstbl = $data['useraccountstbl'] ?? [];
                             </div>
                         </div>
 
-                        <div id="houseSystemWrapper" class="form-row">
+                        <div class="form-row">
                             <div class="full-width">
-                                <div class="row mb-3">
-                                    <div class="col-md-4">
-                                        <label class="top-label" for="unitNumber">Unit / Apartment Number</label>
-                                        <input type="text" class="form-control" id="unitNumber" name="unitNumber" readonly value="<?php echo htmlspecialchars($residentaddresstbl['unit_number'] ?? ''); ?>">
-                                    </div>
-                                    <div class="col-md-4">
-                                        <label class="top-label" for="houseNumber">House Number <span class="required-asterisk">*</span></label>
-                                        <input type="text" class="form-control" id="houseNumber" name="houseNumber" readonly value="<?php echo htmlspecialchars($residentaddresstbl['street_number'] ?? ''); ?>">
-                                    </div>
-                                    <div class="col-md-4">
-                                        <label class="top-label" for="streetName">Street Name <span class="required-asterisk">*</span></label>
-                                        <input type="text" class="form-control" id="streetName" name="streetName" readonly value="<?php echo htmlspecialchars($residentaddresstbl['street_name'] ?? ''); ?>">
-                                    </div>
-                                </div>
-                                <div class="row mb-3">
-                                    <div class="col-md-6">
-                                        <label class="top-label" for="applicantSubdivision">Subdivision</label>
-                                        <input type="text" class="form-control" id="applicantSubdivision" name="applicantSubdivision" readonly value="<?php echo htmlspecialchars($residentaddresstbl['subdivision'] ?? ''); ?>">
-                                    </div>
-                                    <div class="col-md-6">
-                                        <label class="top-label" for="applicantAreaNumber">Area <span class="required-asterisk">*</span></label>
-                                        <input type="text" class="form-control" id="applicantAreaNumber" name="applicantAreaNumber" readonly value="<?php echo htmlspecialchars($residentaddresstbl['area_number'] ?? ''); ?>">
-                                    </div>
-                                </div>
+                                <label class="top-label">Full Address <span class="required-asterisk">*</span></label>
+                                <input type="text" name="full_address" readonly value="<?php echo $fullAddress; ?>">
                             </div>
                         </div>
 
@@ -167,7 +206,14 @@ $useraccountstbl = $data['useraccountstbl'] ?? [];
                             </div>
                         </div>
 
-                        <div class="form-row">
+                        <div id="cohabitantFullAddressWrapper" class="form-row d-none">
+                            <div class="full-width">
+                                <label class="top-label">Full Address <span class="required-asterisk">*</span></label>
+                                <input type="text" id="cohabitantFullAddress" name="cohabitant_full_address" readonly value="<?php echo $fullAddress; ?>">
+                            </div>
+                        </div>
+
+                        <div id="cohabitantAddressSystemRow" class="form-row">
                             <div class="full-width">
                                 <label class="top-label" for="cohabitantAddressSystem">Address System <span class="required-asterisk">*</span></label>
                                 <select id="cohabitantAddressSystem" name="cohabitant_address_system" required>
@@ -181,36 +227,21 @@ $useraccountstbl = $data['useraccountstbl'] ?? [];
                         <div id="cohabitantHouseSystemWrapper" class="form-row pt-0 d-none">
                             <div class="full-width">
                                 <div class="row mb-3">
-                                    <div class="col-md-4">
+                                    <div class="col-md-3">
                                         <label class="top-label" for="cohabUnitNumber">Unit / Apartment Number</label>
                                         <input type="text" class="form-control" id="cohabUnitNumber" name="cohabitant_unit_number">
                                     </div>
-                                    <div class="col-md-4">
+                                    <div class="col-md-3">
                                         <label class="top-label" for="cohabHouseNumber">House Number <span class="required-asterisk">*</span></label>
                                         <input type="text" class="form-control" id="cohabHouseNumber" name="cohabitant_house_number">
                                     </div>
-                                    <div class="col-md-4">
+                                    <div class="col-md-3">
                                         <label class="top-label" for="cohabStreetName">Street Name <span class="required-asterisk">*</span></label>
                                         <input type="text" class="form-control" id="cohabStreetName" name="cohabitant_street_name">
                                     </div>
-                                </div>
-                                <div class="row mb-3">
-                                    <div class="col-md-6">
+                                    <div class="col-md-3">
                                         <label class="top-label" for="cohabitantSubdivision">Subdivision</label>
                                         <input type="text" class="form-control" id="cohabitantSubdivision" name="cohabitant_subdivision">
-                                    </div>
-                                    <div class="col-md-6">
-                                        <label class="top-label" for="cohabitantAreaNumber">Area <span class="required-asterisk">*</span></label>
-                                        <select class="form-select" id="cohabitantAreaNumber" name="cohabitant_area_number">
-                                            <option value="">Select</option>
-                                            <option value="Area 01">Area 01</option>
-                                            <option value="Area 1A">Area 1A</option>
-                                            <option value="Area 02">Area 02</option>
-                                            <option value="Area 03">Area 03</option>
-                                            <option value="Area 04">Area 04</option>
-                                            <option value="Area 05">Area 05</option>
-                                            <option value="Area 06">Area 06</option>
-                                        </select>
                                     </div>
                                 </div>
                             </div>
@@ -237,22 +268,9 @@ $useraccountstbl = $data['useraccountstbl'] ?? [];
                                     </div>
                                 </div>
                                 <div class="row mb-3">
-                                    <div class="col-md-6">
+                                    <div class="col-md-12">
                                         <label class="top-label" for="cohabitantSubdivisionLot">Subdivision</label>
                                         <input type="text" class="form-control" id="cohabitantSubdivisionLot" name="cohabitant_subdivision_lot">
-                                    </div>
-                                    <div class="col-md-6">
-                                        <label class="top-label" for="cohabitantAreaNumberLot">Area <span class="required-asterisk">*</span></label>
-                                        <select class="form-select" id="cohabitantAreaNumberLot" name="cohabitant_area_number_lot">
-                                            <option value="">Select</option>
-                                            <option value="Area 01">Area 01</option>
-                                            <option value="Area 1A">Area 1A</option>
-                                            <option value="Area 02">Area 02</option>
-                                            <option value="Area 03">Area 03</option>
-                                            <option value="Area 04">Area 04</option>
-                                            <option value="Area 05">Area 05</option>
-                                            <option value="Area 06">Area 06</option>
-                                        </select>
                                     </div>
                                 </div>
                             </div>
@@ -338,7 +356,14 @@ $useraccountstbl = $data['useraccountstbl'] ?? [];
                             </div>
                         </div>
 
-                        <div class="form-row">
+                        <div id="cohabitationFullAddressWrapper" class="form-row d-none">
+                            <div class="full-width">
+                                <label class="top-label">Full Address <span class="required-asterisk">*</span></label>
+                                <input type="text" id="cohabitationFullAddress" name="cohabitation_full_address" readonly value="<?php echo $fullAddress; ?>">
+                            </div>
+                        </div>
+
+                        <div id="cohabitationAddressSystemRow" class="form-row">
                             <div class="full-width">
                                 <label class="top-label" for="cohabitationAddressSystem">Cohabitation Address System <span class="required-asterisk">*</span></label>
                                 <select id="cohabitationAddressSystem" name="cohabitation_address_system" required>

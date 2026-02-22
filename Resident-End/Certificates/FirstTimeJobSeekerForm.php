@@ -17,13 +17,68 @@ $suffix = $residentinformationtbl['suffix'] ?? '';
 $birthdate = htmlspecialchars($residentinformationtbl['birthdate'] ?? '', ENT_QUOTES, 'UTF-8');
 $age = htmlspecialchars((string)($residentinformationtbl['age'] ?? ''), ENT_QUOTES, 'UTF-8');
 $sex = htmlspecialchars($residentinformationtbl['sex'] ?? '', ENT_QUOTES, 'UTF-8');
-$unitNumber = htmlspecialchars($residentaddresstbl['unit_number'] ?? '', ENT_QUOTES, 'UTF-8');
-$streetNumber = htmlspecialchars($residentaddresstbl['street_number'] ?? '', ENT_QUOTES, 'UTF-8');
-$streetName = htmlspecialchars($residentaddresstbl['street_name'] ?? '', ENT_QUOTES, 'UTF-8');
-$subdivision = htmlspecialchars($residentaddresstbl['subdivision'] ?? '', ENT_QUOTES, 'UTF-8');
-$areaNumber = htmlspecialchars($residentaddresstbl['area_number'] ?? '', ENT_QUOTES, 'UTF-8');
+$unitNumber = trim((string)($residentaddresstbl['unit_number'] ?? ''));
+$streetNumber = trim((string)($residentaddresstbl['street_number'] ?? ''));
+$streetName = trim((string)($residentaddresstbl['street_name'] ?? ''));
+$phaseNumber = trim((string)($residentaddresstbl['phase_number'] ?? ''));
+$subdivision = trim((string)($residentaddresstbl['subdivision'] ?? ''));
+$areaNumber = trim((string)($residentaddresstbl['area_number'] ?? ''));
 $phoneNumber = htmlspecialchars($useraccountstbl['phone_number'] ?? '', ENT_QUOTES, 'UTF-8');
 $yearsOfResidency = htmlspecialchars((string)($residentaddresstbl['address_id'] ?? ''), ENT_QUOTES, 'UTF-8');
+
+$streetNameHasBlock = $streetName !== '' && stripos($streetName, 'block') !== false;
+$streetNumberHasLot = $streetNumber !== '' && stripos($streetNumber, 'lot') !== false;
+$isLotBlockSystem = $streetNameHasBlock || $streetNumberHasLot;
+
+$streetLabel = $streetName;
+if ($streetLabel !== '' && stripos($streetLabel, 'street') === false && !$streetNameHasBlock) {
+    $streetLabel .= ' Street';
+}
+
+$subdivisionLabel = $subdivision !== '' ? $subdivision . ' Subdivision' : '';
+
+$fullAddressParts = [];
+if ($isLotBlockSystem) {
+    $lotNumber = trim((string)preg_replace('/^lot\\s*/i', '', $streetNumber));
+    $blockNumber = trim((string)preg_replace('/^(block|blk)\\s*/i', '', $streetName));
+    $phaseValue = trim((string)preg_replace('/^phase\\s*/i', '', $phaseNumber));
+
+    $lotLabel = $lotNumber !== '' ? 'Lot ' . $lotNumber : $streetNumber;
+    $blockLabel = $blockNumber !== '' ? 'Blk ' . $blockNumber : $streetName;
+    $phaseLabel = $phaseValue !== '' ? 'Phase ' . $phaseValue : ($phaseNumber !== '' ? $phaseNumber : '');
+
+    $fullAddressParts = array_filter([
+        $lotLabel,
+        $blockLabel,
+        $phaseLabel,
+        $subdivisionLabel,
+        'San Jose',
+        'Rodriguez',
+        'Rizal'
+    ], fn($part) => $part !== '');
+} else {
+    if ($unitNumber !== '') {
+        $fullAddressParts = array_filter([
+            'Unit ' . $unitNumber,
+            $streetLabel,
+            $subdivisionLabel,
+            'San Jose',
+            'Rodriguez',
+            'Rizal'
+        ], fn($part) => $part !== '');
+    } else {
+        $streetLine = trim(implode(' ', array_filter([$streetNumber, $streetLabel], fn($part) => $part !== '')));
+        $fullAddressParts = array_filter([
+            $streetLine,
+            $subdivisionLabel,
+            'San Jose',
+            'Rodriguez',
+            'Rizal'
+        ], fn($part) => $part !== '');
+    }
+}
+
+$fullAddress = htmlspecialchars(implode(', ', $fullAddressParts), ENT_QUOTES, 'UTF-8');
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -130,32 +185,10 @@ $yearsOfResidency = htmlspecialchars((string)($residentaddresstbl['address_id'] 
                             </div>
                         </div>
 
-                        <div id="residentAddressWrapper" class="form-row">
+                        <div class="form-row">
                             <div class="full-width">
-                                <div class="row mb-3">
-                                    <div class="col-md-4">
-                                        <label class="top-label" for="unitNumber">Unit / Apartment Number</label>
-                                        <input type="text" class="form-control" id="unitNumber" name="unitNumber" readonly value="<?php echo $unitNumber; ?>">
-                                    </div>
-                                    <div class="col-md-4">
-                                        <label class="top-label" for="houseNumber">House Number <span class="required-asterisk">*</span></label>
-                                        <input type="text" class="form-control" id="houseNumber" name="houseNumber" readonly value="<?php echo $streetNumber; ?>">
-                                    </div>
-                                    <div class="col-md-4">
-                                        <label class="top-label" for="streetName">Street Name <span class="required-asterisk">*</span></label>
-                                        <input type="text" class="form-control" id="streetName" name="streetName" readonly value="<?php echo $streetName; ?>">
-                                    </div>
-                                </div>
-                                <div class="row mb-3">
-                                    <div class="col-md-6">
-                                        <label class="top-label" for="applicantSubdivision">Subdivision</label>
-                                        <input type="text" class="form-control" id="applicantSubdivision" name="applicantSubdivision" readonly value="<?php echo $subdivision; ?>">
-                                    </div>
-                                    <div class="col-md-6">
-                                        <label class="top-label" for="applicantAreaNumber">Area <span class="required-asterisk">*</span></label>
-                                        <input type="text" class="form-control" id="applicantAreaNumber" name="applicantAreaNumber" readonly value="<?php echo $areaNumber; ?>">
-                                    </div>
-                                </div>
+                                <label class="top-label">Full Address <span class="required-asterisk">*</span></label>
+                                <input type="text" name="full_address" readonly value="<?php echo $fullAddress; ?>">
                             </div>
                         </div>
 
@@ -184,7 +217,7 @@ $yearsOfResidency = htmlspecialchars((string)($residentaddresstbl['address_id'] 
                                 I hereby certify that the above information is true and correct to the best of my knowledge and belief.
                             </label>
 
-                            <button type="submit" class="submit-btn">SUBMIT</button>
+                            <button type="submit" class="submit-btn" disabled>SUBMIT</button>
                         </div>
                     </form>
                 </div>
@@ -192,6 +225,7 @@ $yearsOfResidency = htmlspecialchars((string)($residentaddresstbl['address_id'] 
         </main>
     </div>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="/BarangaySanJose/JS-Script-Files/Resident-End/Certificates/firstTimeJobSeekerFormScript.js"></script>
 </body>
 
 </html>
