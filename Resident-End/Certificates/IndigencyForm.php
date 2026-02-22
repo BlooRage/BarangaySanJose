@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 $allowUnregistered = false;
 require_once __DIR__ . "/../includes/resident_access_guard.php";
 
@@ -45,7 +45,7 @@ $phoneNumber = htmlspecialchars($useraccountstbl['phone_number'] ?? '', ENT_QUOT
             <div class="main-head application-card orange-card py-3 rounded application-card--muted">
                 <div class="main-head-content">
 
-                    <a href="/BarangaySanJose/Resident-End/ApplicationsLandingPage.php" class="back-link">&lt; Go Back</a>
+                    <a href="/BarangaySanJose/Resident-End/Certificates/CertificatesLandingPage.php" class="back-link">&lt; Go Back</a>
                     <h1 class="form-title">Indigency</h1>
                     <p class="form-subtitle">All fields marked with <span class="required-asterisk">*</span> are required</p>
 

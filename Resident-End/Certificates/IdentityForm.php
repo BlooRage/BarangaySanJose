@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
@@ -18,14 +18,14 @@
     <main id="div-mainDisplay" class="flex-grow-1 px-4 pb-4 pt-0 px-md-5 pb-md-5 pt-md-0 bg-light">
         <div class="main-head application-card orange-card py-3 rounded">
             <div class="main-head-content">
-            <a href="/BarangaySanJose/Resident-End/ApplicationsLandingPage.php" class="back-link">< Go Back</a>
+            <a href="/BarangaySanJose/Resident-End/Certificates/CertificatesLandingPage.php" class="back-link">< Go Back</a>
             
             <h1 class="form-title">Identity</h1>
             <p class="form-subtitle">All fields marked with <span class="required-asterisk">*</span> are required</p>
 
            <form action="#" method="POST">
 
-                <h2 class="section-title text-center text-dark">Childâ€™s Information</h2>
+                <h2 class="section-title text-center text-dark">Child’s Information</h2>
                 <div class="form-row">
                     <div class="input-stack">
                         <label class="top-label">Last Name<span class="required-asterisk">*</span></label>
@@ -98,7 +98,7 @@
                     </div>
                 </div>
 
-                <h2 class="section-title text-center text-dark">Fatherâ€™s Information</h2>
+                <h2 class="section-title text-center text-dark">Father’s Information</h2>
                 <div class="form-row">
                     <div class="input-stack">
                         <label class="top-label">Last Name<span class="required-asterisk">*</span></label>
@@ -118,7 +118,7 @@
                     </div>
                 </div>
 
-                <h2 class="section-title text-center text-dark">Motherâ€™s Information</h2>
+                <h2 class="section-title text-center text-dark">Mother’s Information</h2>
                 <div class="form-row">
                     <div class="input-stack">
                         <label class="top-label">Last Name<span class="required-asterisk">*</span></label>

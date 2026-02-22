@@ -209,11 +209,11 @@ if ($residentId !== '' && isset($conn) && $conn instanceof mysqli) {
 
       <div id="group-navServices" class="mb-3">
         <p class="text-muted small fw-bold mb-1">Services</p>
-        <a href="/BarangaySanJose/Resident-End/ApplicationsLandingPage.php"
+        <a href="/BarangaySanJose/Resident-End/Certificates/CertificatesLandingPage.php"
            class="a-sidebarLink <?= activeLink('resident_certificates.php', $current) ?>">
           <i class="fa-solid fa-certificate"></i>Certificates
         </a>
-        <a href="/BarangaySanJose/Resident-End/Clearances.php"
+        <a href="/BarangaySanJose/Resident-End/Clearances/ClearancesLandingPage.php"
            class="a-sidebarLink <?= activeLink('resident_clearances.php', $current) ?>">
           <i class="fa-solid fa-file-circle-check fa-sm"></i>Clearances
         </a>
