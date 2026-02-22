@@ -106,11 +106,6 @@ $fullAddress = htmlspecialchars(implode(', ', $fullAddressParts), ENT_QUOTES, 'U
 
                         <!-- PERSONAL INFORMATION -->
                         <h2 class="section-title text-center text-dark">Personal Information</h2>
-                        <input type="hidden" id="application_date" name="application_date" value="<?php echo date('Y-m-d H:i:s'); ?>">
-                        <!-- <div class="status-row">
-                            <label><input type="checkbox" name="pwd" class="text-center"> PWD</label>
-                            <label><input type="checkbox" name="senior" class="text-center"> Senior Citizen</label>
-                        </div> -->
                         <div class="form-row pt-0">
                             <div>
                                 <label class="top-label">First Name <span class="required-asterisk">*</span> </label>

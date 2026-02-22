@@ -115,11 +115,6 @@ $fullAddress = htmlspecialchars(implode(', ', $fullAddressParts), ENT_QUOTES, 'U
 
                         <h2 class="section-title text-center text-dark">Personal Information</h2>
 
-                        <div class="status-row">
-                            <label for="application_date">Application Date:</label>
-                            <input type="text" id="application_date" name="application_date" value="<?php echo date('Y-m-d H:i:s'); ?>" readonly>
-                        </div>
-
                         <div class="form-row pt-0">
                             <div>
                                 <label class="top-label">Last Name <span class="required-asterisk">*</span></label>
