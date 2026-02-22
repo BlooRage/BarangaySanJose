@@ -1,4 +1,4 @@
-<?php
+﻿<?php
 $allowUnregistered = false;
 require_once __DIR__ . "/includes/resident_access_guard.php";
 
@@ -109,7 +109,7 @@ if (isset($_SESSION['show_not_verified_modal'])) {
 
       <?php if ($isResidentNotVerified): ?>
         <div class="verify-cta-card rounded-4 overflow-hidden shadow-sm border-orange-thin bg-white mb-4" id="verifyCtaCard">
-          <button type="button" class="verify-cta-close" id="verifyCtaCloseBtn" aria-label="Close">�</button>
+          <button type="button" class="verify-cta-close" id="verifyCtaCloseBtn" aria-label="Close">×</button>
           <div class="bg-orange text-center py-2">
             <h3 class="text-white fw-bold mb-0">ACCOUNT VERIFICATION</h3>
           </div>
@@ -145,7 +145,7 @@ if (isset($_SESSION['show_not_verified_modal'])) {
         <div class="col-12 col-md-4 col-lg-3">
           <div id="card-serviceRequest-brgyId"
                class="card-action h-100 p-4 rounded-4 text-center d-flex flex-column align-items-center justify-content-center border-0 shadow-sm"
-               onclick="location.href='BarangayId/BarangayIdLandingPage.php'">
+               onclick="location.href='BarangayId/BarangayIdForm.php'">
             <i class="fa-solid fa-id-card fa-2xl mb-3"></i><br>
             <span class="fw-bold small">BARANGAY ID</span>
           </div>
@@ -154,7 +154,7 @@ if (isset($_SESSION['show_not_verified_modal'])) {
         <div class="col-12 col-md-4 col-lg-3">
           <div id="card-serviceRequest-appointments"
                class="card-action h-100 p-4 rounded-4 text-center d-flex flex-column align-items-center justify-content-center border-0 shadow-sm"
-               onclick="location.href='Appointments/AppointmentsLandingPage.php'">
+               onclick="location.href='Appointments/AppointmentForm.php'">
             <i class="fa-solid fa-calendar-check fa-2xl mb-3"></i><br>
             <span class="fw-bold small">APPOINTMENTS</span>
           </div>
@@ -181,7 +181,7 @@ if (isset($_SESSION['show_not_verified_modal'])) {
         <div class="col-12 col-md-4 col-lg-3">
           <div id="card-serviceRequest-complaints"
                class="card-action h-100 p-4 rounded-4 text-center d-flex flex-column align-items-center justify-content-center border-0 shadow-sm"
-               onclick="location.href='Complaints/ComplaintsLandingPage.php'">
+               onclick="location.href='Complaints/ComplaintsForm.php'">
             <i class="fa-solid fa-comment-dots fa-2xl mb-3"></i><br>
             <span class="fw-bold small">COMPLAINTS</span>
           </div>

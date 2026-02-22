@@ -1,4 +1,4 @@
-<?php
+﻿<?php
 $allowUnregistered = false;
 require_once __DIR__ . "/../includes/resident_access_guard.php";
 
@@ -74,7 +74,7 @@ $fullAddress = implode(", ", $addressParts);
 
             <div class="main-head application-card orange-card py-3 mt-5 rounded">
                 <div class="main-head-content">
-                    <a href="/BarangaySanJose/Resident-End/Appointments/AppointmentsLandingPage.php" class="back-link">&lt; Go Back</a>
+                    <a href="/BarangaySanJose/Resident-End/resident_dashboard.php" class="back-link">&lt; Go Back</a>
                     <h1 class="form-title" style="color: #de710c">Appointment Form</h1>
                     <p class="form-subtitle">All fields marked with <span class="required-asterisk">*</span> are required</p>
 
