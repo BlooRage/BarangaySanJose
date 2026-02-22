@@ -6,7 +6,7 @@ require_once __DIR__ . '/../includes/admin_guard.php';
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Certificate Tracker</title>
+  <title>Finance Payments</title>
   <script src="https://kit.fontawesome.com/3482e00999.js" crossorigin="anonymous"></script>
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
   <link rel="stylesheet" href="../../CSS-Styles/Admin-End-CSS/AdminDashboardStyle.css">
@@ -17,21 +17,14 @@ require_once __DIR__ . '/../includes/admin_guard.php';
   <?php include __DIR__ . '/../includes/sidebar.php'; ?>
 
   <main id="main-display" class="flex-grow-1 p-4 p-md-5 bg-light">
-    <h2 class="mb-4" style="font-family: 'Charis SIL Bold'; color: #DE710C; font-size: 48px;">Certificate Issuance</h2>
+    <h2 class="mb-4" style="font-family: 'Charis SIL Bold'; color: #DE710C; font-size: 48px;">Finance Payments</h2>
     <hr class="mb-4">
 
     <div class="bg-white p-4 rounded-4 shadow-sm border">
       <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
-        <div class="btn-group" role="group" aria-label="Stage filter">
-          <button type="button" class="btn btn-outline-secondary active" data-stage-filter="">All</button>
-          <button type="button" class="btn btn-outline-secondary" data-stage-filter="submitted">Submitted</button>
-          <button type="button" class="btn btn-outline-secondary" data-stage-filter="for_payment">For Payment</button>
-          <button type="button" class="btn btn-outline-secondary" data-stage-filter="payment_submitted">Pending Payment</button>
-          <button type="button" class="btn btn-outline-secondary" data-stage-filter="ready_for_claim">Ready</button>
-          <button type="button" class="btn btn-outline-secondary" data-stage-filter="completed">Completed</button>
-          <button type="button" class="btn btn-outline-secondary" data-stage-filter="rejected">Rejected</button>
+        <div class="alert alert-info mb-0 py-2 px-3">
+          Showing requests waiting for finance verification.
         </div>
-
         <div class="input-group" style="max-width: 360px;">
           <input type="text" id="searchInput" class="form-control" placeholder="Request ID, resident ID, document">
           <span class="input-group-text bg-white"><i class="fas fa-search"></i></span>
@@ -142,6 +135,9 @@ require_once __DIR__ . '/../includes/admin_guard.php';
   </div>
 </div>
 
+<script>
+window.CERT_TRACKER_DEFAULT_STAGE = 'payment_submitted';
+</script>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 <script src="../../JS-Script-Files/Admin-End/certificateTrackerScript.js"></script>
 </body>

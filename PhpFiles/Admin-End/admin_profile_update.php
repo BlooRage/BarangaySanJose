@@ -1,12 +1,9 @@
 <?php
-if (session_status() === PHP_SESSION_NONE) {
-    session_start();
-}
+require_once __DIR__ . '/../General/security.php';
 
 header('Content-Type: application/json');
 
 require_once __DIR__ . '/../General/connection.php';
-require_once __DIR__ . '/../General/security.php';
 
 requireRoleSession(['SuperAdmin', 'Official', 'Officials', 'Personnel', 'Personnels', 'Admin', 'Employee'], true);
 

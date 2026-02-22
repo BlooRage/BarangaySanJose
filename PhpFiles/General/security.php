@@ -9,6 +9,13 @@ function applyBaselineSecurityHeaders(): void
     header('X-Content-Type-Options: nosniff');
     header('Referrer-Policy: strict-origin-when-cross-origin');
     header('Permissions-Policy: geolocation=(), microphone=(), camera=()');
+    header("Content-Security-Policy: default-src 'self' https: data: blob:; script-src 'self' https: 'unsafe-inline'; style-src 'self' https: 'unsafe-inline'; img-src 'self' https: data: blob:; font-src 'self' https: data:; frame-ancestors 'self'; base-uri 'self'; form-action 'self'");
+    if (
+        (!empty($_SERVER['HTTPS']) && strtolower((string)$_SERVER['HTTPS']) !== 'off')
+        || ((string)($_SERVER['SERVER_PORT'] ?? '') === '443')
+    ) {
+        header('Strict-Transport-Security: max-age=31536000; includeSubDomains');
+    }
 }
 
 function initializeSecureSession(): void
@@ -176,11 +183,24 @@ function requireAuthenticatedSession(bool $json = true): void {
 function requireRoleSession(array $allowedRoles, bool $json = true): void {
     requireAuthenticatedSession($json);
 
-    $role = (string)($_SESSION['role'] ?? '');
-    if (!in_array($role, $allowedRoles, true)) {
+    $role = normalizeRoleName((string)($_SESSION['role'] ?? ''));
+    $allowed = array_map('normalizeRoleName', $allowedRoles);
+    if (!in_array($role, $allowed, true)) {
         if ($json) {
             sendJsonErrorAndExit(403, 'Forbidden');
         }
         redirectToLogin();
     }
+}
+
+function normalizeRoleName(string $role): string
+{
+    $role = strtolower(trim($role));
+    $map = [
+        'officials' => 'official',
+        'admin' => 'official',
+        'employee' => 'official',
+        'personnels' => 'personnel',
+    ];
+    return $map[$role] ?? $role;
 }

@@ -2,6 +2,7 @@
 ini_set('display_errors', 0);
 ini_set('log_errors', 1);
 error_reporting(E_ALL);
+require_once __DIR__ . '/../General/security.php';
 require '../General/connection.php';
 header('Content-Type: application/json');
 

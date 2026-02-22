@@ -61,6 +61,10 @@ if ($email) {
         WHERE email = ?
         LIMIT 1
     ");
+    if (!$stmt) {
+        echo json_encode(['success' => false, 'error' => 'Unable to process login right now.']);
+        exit;
+    }
     $stmt->bind_param('s', $email);
 } else {
     $stmt = $conn->prepare("
@@ -77,6 +81,10 @@ if ($email) {
         WHERE RIGHT(phone_number,10) = ?
         LIMIT 1
     ");
+    if (!$stmt) {
+        echo json_encode(['success' => false, 'error' => 'Unable to process login right now.']);
+        exit;
+    }
     $stmt->bind_param('s', $phone);
 }
 
@@ -261,7 +269,7 @@ if ($activeStatusId !== null) {
         SET failed_logins = 0,
             lock_start = NULL,
             last_login = NOW()
-        WHERE user_id = ?s
+        WHERE user_id = ?
     ");
     $updateStmt->bind_param('s', $userData['user_id']);
     $updateStmt->execute();

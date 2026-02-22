@@ -3,7 +3,7 @@ $current = basename($_SERVER['PHP_SELF']);
 
 // Group pages by section
 $residentMgmtPages = ['ResidentMasterlist.php', 'ResidentArchive.php', 'EditRequests.php', 'SectorMembershipVerification.php', 'HouseholdProfiling.php'];
-$certPages = ['CertificateTracker.php', 'approved.php', 'denied.php'];
+$certPages = ['CertificateTracker.php', 'FinancePayments.php'];
 $userMgmtPages = ['UserMasterlist.php'];
 $adminMgmtPages = ['OfficialsManagement.php', 'OfficialInvites.php'];
 
@@ -185,9 +185,8 @@ if (!empty($_SESSION['user_id']) && isset($conn) && $conn instanceof mysqli) {
 
         <div class="collapse <?= $isCertActive ? 'show' : '' ?>" id="cert-collapse">
           <ul class="btn-toggle-nav list-unstyled fw-normal pb-1 small">
-            <li><a href="CertificateTracker.php" class="link-dark rounded <?= $current == 'CertificateTracker.php' ? 'active' : '' ?>">Tracker</a></li>
-            <li><a href="approved.php" class="link-dark rounded <?= $current == 'approved.php' ? 'active' : '' ?>">Approved Documents</a></li>
-            <li><a href="denied.php" class="link-dark rounded <?= $current == 'denied.php' ? 'active' : '' ?>">Denied Documents</a></li>
+            <li><a href="/BarangaySanJose/Admin-End/Certificates/CertificateTracker.php" class="link-dark rounded <?= $current == 'CertificateTracker.php' ? 'active' : '' ?>">Tracker</a></li>
+            <li><a href="/BarangaySanJose/Admin-End/Certificates/FinancePayments.php" class="link-dark rounded <?= $current == 'FinancePayments.php' ? 'active' : '' ?>">Finance Payments</a></li>
           </ul>
         </div>
       </li>

@@ -1,6 +1,6 @@
 <?php
+require_once __DIR__ . '/../General/security.php';
 require_once '../General/connection.php';
-session_start();
 header('Content-Type: application/json');
 
 if (!isset($_POST['recipient']) || !isset($_POST['otp']) || !isset($_POST['purpose'])) {

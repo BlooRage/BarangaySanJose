@@ -1,8 +1,8 @@
 <?php
-if (session_status() === PHP_SESSION_NONE) {
-    session_start();
-}
+require_once __DIR__ . '/../General/security.php';
 require_once __DIR__ . "/../General/connection.php";
+
+requireAuthenticatedSession(true);
 
 function getResidentProfileData(mysqli $conn, string $userId): array {
     $residentinformationtbl = [

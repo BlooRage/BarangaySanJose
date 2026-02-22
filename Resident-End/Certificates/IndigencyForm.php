@@ -104,7 +104,9 @@ $fullAddress = htmlspecialchars(implode(', ', $fullAddressParts), ENT_QUOTES, 'U
                     <h1 class="form-title">Indigency</h1>
                     <p class="form-subtitle">All fields marked with <span class="required-asterisk">*</span> are required</p>
 
-                    <form method="POST" action="">
+                    <form method="POST" action="../../PhpFiles/Resident-End/documentRequestWorkflow.php">
+                        <input type="hidden" name="action" value="submit_request">
+                        <input type="hidden" name="document_type" value="indigency">
 
                         <h2 class="section-title text-center text-dark">Personal Information</h2>
 
@@ -192,4 +194,3 @@ $fullAddress = htmlspecialchars(implode(', ', $fullAddressParts), ENT_QUOTES, 'U
 </body>
 
 </html>
-
