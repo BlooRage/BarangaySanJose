@@ -241,6 +241,10 @@ if ($residentId !== '' && isset($conn) && $conn instanceof mysqli) {
            class="a-sidebarLink <?= activeLink('resident_transactions.php', $current) ?>">
           <i class="fa-solid fa-clock-rotate-left"></i>Transactions
         </a>
+        <a href="/BarangaySanJose/Resident-End/document_requests.php"
+           class="a-sidebarLink <?= activeLink('document_requests.php', $current) ?>">
+          <i class="fa-solid fa-file-lines"></i>Document Requests
+        </a>
       </div>
     </nav>
 

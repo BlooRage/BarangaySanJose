@@ -108,7 +108,9 @@ $applicantArea = htmlspecialchars($areaNumber, ENT_QUOTES, 'UTF-8');
                     <h1 class="form-title">Cohabitation</h1>
                     <p class="form-subtitle">All fields marked with <span class="required-asterisk">*</span> are required</p>
 
-                    <form method="POST" action="" id="cohabitationForm">
+                    <form method="POST" action="../../PhpFiles/Resident-End/documentRequestWorkflow.php" id="cohabitationForm">
+                        <input type="hidden" name="action" value="submit_request">
+                        <input type="hidden" name="document_type" value="cohabitation">
 
                         <!-- PERSONAL INFORMATION -->
                         <h2 class="section-title text-center text-dark">Personal Information</h2>
@@ -563,7 +565,6 @@ $applicantArea = htmlspecialchars($areaNumber, ENT_QUOTES, 'UTF-8');
 </body>
 
 </html>
-
 
 
 

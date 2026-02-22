@@ -59,25 +59,34 @@
                     <h2 class="info-header">
                         <i class="fa-solid fa-receipt"></i> Transaction
                     </h2>
+
+                    <div id="verification-banner" class="verification-banner verification-loading">
+                        Validating certificate link...
+                    </div>
                     
                     <div class="detail-row">
                         <label>Transaction Id</label>
-                        <div class="detail-value" id="transaction-id">TXN-2026-0815</div>
+                        <div class="detail-value" id="transaction-id">-</div>
                     </div>
 
                     <div class="detail-row">
                         <label>OR Number</label>
-                        <div class="detail-value" id="or-number">99283741</div>
+                        <div class="detail-value" id="or-number">-</div>
+                    </div>
+
+                    <div class="detail-row">
+                        <label>Certificate Number</label>
+                        <div class="detail-value" id="certificate-number">-</div>
                     </div>
 
                     <div class="detail-row">
                         <label>Status</label>
-                        <div class="detail-value" id="transaction-status">Processed</div>
+                        <div class="detail-value" id="transaction-status">-</div>
                     </div>
 
                     <div class="detail-row">
                         <label>Validity</label>
-                        <div class="detail-value" id="validity-date">March 1, 2026</div>
+                        <div class="detail-value" id="validity-date">-</div>
                     </div>
                 </section>
 
@@ -88,17 +97,17 @@
                     
                     <div class="detail-row">
                         <label>Document Type</label>
-                        <div class="detail-value" id="doc-type">Barangay Clearance</div>
+                        <div class="detail-value" id="doc-type">-</div>
                     </div>
 
                     <div class="detail-row">
                         <label>Full Name</label>
-                        <div class="detail-value" id="full-name">JUAN DELA CRUZ</div>
+                        <div class="detail-value" id="full-name">-</div>
                     </div>
 
                     <div class="detail-row">
                         <label>Purpose</label>
-                        <div class="detail-value" id="purpose">Local Employment</div>
+                        <div class="detail-value" id="purpose">-</div>
                     </div>
                 </section>
             </div>
@@ -164,6 +173,68 @@
         }
 
         document.addEventListener("DOMContentLoaded", function() {
+            const banner = document.getElementById("verification-banner");
+            const fields = {
+                transactionId: document.getElementById("transaction-id"),
+                orNumber: document.getElementById("or-number"),
+                certificateNumber: document.getElementById("certificate-number"),
+                status: document.getElementById("transaction-status"),
+                validity: document.getElementById("validity-date"),
+                docType: document.getElementById("doc-type"),
+                fullName: document.getElementById("full-name"),
+                purpose: document.getElementById("purpose")
+            };
+
+            function setField(el, value) {
+                if (!el) return;
+                const text = value && String(value).trim() !== "" ? String(value) : "-";
+                el.textContent = text;
+            }
+
+            function setBanner(message, type) {
+                if (!banner) return;
+                banner.textContent = message;
+                banner.className = "verification-banner verification-" + type;
+            }
+
+            async function loadTransactionInformation() {
+                const params = new URLSearchParams(window.location.search);
+                const requestId = (params.get("request_id") || "").trim();
+                const verificationCode = (params.get("vc") || "").trim();
+
+                if (!requestId || !verificationCode) {
+                    setBanner("Invalid verification link. Missing request details.", "error");
+                    return;
+                }
+
+                setBanner("Validating certificate link...", "loading");
+                try {
+                    const url = "../PhpFiles/GET/getTransactionInformation.php?request_id="
+                        + encodeURIComponent(requestId) + "&vc=" + encodeURIComponent(verificationCode);
+                    const response = await fetch(url, { credentials: "omit" });
+                    const data = await response.json();
+
+                    if (!response.ok || !data || !data.success || !data.data) {
+                        throw new Error((data && data.message) ? data.message : "Unable to verify transaction.");
+                    }
+
+                    const item = data.data;
+                    setField(fields.transactionId, item.request_id);
+                    setField(fields.orNumber, item.or_number);
+                    setField(fields.certificateNumber, item.certificate_number);
+                    setField(fields.status, item.status);
+                    setField(fields.validity, item.validity);
+                    setField(fields.docType, item.document_type);
+                    setField(fields.fullName, item.full_name);
+                    setField(fields.purpose, item.purpose);
+                    setBanner("Verified document record.", "ok");
+                } catch (err) {
+                    setBanner("Invalid or expired verification link.", "error");
+                }
+            }
+
+            loadTransactionInformation();
+
             let track = document.querySelector(".council-track");
             let prevBtn = document.querySelector(".council-btn-prev");
             let nextBtn = document.querySelector(".council-btn-next");
@@ -249,7 +320,6 @@
         });
     </script></body>
 </html>
-
 
 
 
