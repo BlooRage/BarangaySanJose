@@ -1,4 +1,4 @@
-<?php
+﻿<?php
 $allowUnregistered = false;
 require_once __DIR__ . "/../includes/resident_access_guard.php";
 
@@ -68,7 +68,7 @@ $useraccountstbl = [
             <div class="main-head application-card orange-card py-3 rounded">
                 <div class="main-head-content">
 
-                    <a href="/BarangaySanJose/Resident-End/BarangayId/BarangayIdLandingPage.php" class="back-link">&lt; Go Back</a>
+                    <a href="/BarangaySanJose/Resident-End/resident_dashboard.php" class="back-link">&lt; Go Back</a>
 
                     <h1 class="form-title">Application for Barangay ID</h1>
                     <p class="form-subtitle">All fields marked with <span class="required-asterisk">*</span> are required</p>
