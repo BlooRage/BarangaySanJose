@@ -1,19 +1,12 @@
 <?php
 // FILE: ../PhpFiles/GET/getAccountContact.php
 
-session_start();
+require_once __DIR__ . '/../General/security.php';
 header('Content-Type: application/json; charset=utf-8');
 
 require_once "../General/connection.php"; // adjust if your path differs
 
-if (!isset($_SESSION['user_id'])) {
-    http_response_code(401);
-    echo json_encode([
-        "success" => false,
-        "message" => "Not logged in."
-    ]);
-    exit;
-}
+requireAuthenticatedSession(true);
 
 $user_id = $_SESSION['user_id'];
 

@@ -1,13 +1,10 @@
 <?php
-if (session_status() === PHP_SESSION_NONE) {
-    session_start();
-}
+require_once __DIR__ . "/../../PhpFiles/General/security.php";
 
 header("Cache-Control: no-store, no-cache, must-revalidate, max-age=0");
 header("Pragma: no-cache");
 header("Expires: 0");
 
-require_once __DIR__ . "/../../PhpFiles/General/security.php";
 require_once __DIR__ . "/../../PhpFiles/General/officialInviteCommon.php";
 
 // Enforce auth + 30-min inactivity timeout for admin-panel pages.

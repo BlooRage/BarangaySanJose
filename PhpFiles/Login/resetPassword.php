@@ -1,4 +1,5 @@
 <?php
+require_once __DIR__ . '/../General/security.php';
 require '../General/connection.php';
 
 header('Content-Type: application/json');
@@ -17,7 +18,6 @@ if (!$email || !$phone || !$newPassword) {
     exit;
 }
 
-session_start();
 $verified = $_SESSION['password_reset_verified'] ?? null;
 if (
     !is_array($verified)

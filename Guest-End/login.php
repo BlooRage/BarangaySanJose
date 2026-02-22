@@ -4,7 +4,7 @@
 // ✅ Keeps NEW inactive verify step + success modal
 // ✅ JS include order matches OLD (loginScripts.js then modalHandler.js)
 
-session_start();
+require_once __DIR__ . "/../PhpFiles/General/security.php";
 
 // Prevent redirect loops when a stale session has user_id but missing role.
 if (!empty($_SESSION['user_id']) && !empty($_SESSION['role'])) {
@@ -315,6 +315,5 @@ if (!empty($_SESSION['user_id']) && empty($_SESSION['role'])) {
         });
     </script></body>
 </html>
-
 
 
