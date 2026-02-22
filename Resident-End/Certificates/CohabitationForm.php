@@ -175,12 +175,12 @@ $applicantArea = htmlspecialchars($areaNumber, ENT_QUOTES, 'UTF-8');
                         <h2 class="section-title text-center text-dark">Cohabitant / Partner Information</h2>
                         <div class="form-row pt-0">
                             <div>
-                                <label class="top-label">First Name <span class="required-asterisk">*</span> </label>
-                                <input type="text" name="cohabitant_first" required>
-                            </div>
-                            <div>
                                 <label class="top-label">Last Name <span class="required-asterisk">*</span> </label>
                                 <input type="text" name="cohabitant_last" required>
+                            </div>
+                            <div>
+                                <label class="top-label">First Name <span class="required-asterisk">*</span> </label>
+                                <input type="text" name="cohabitant_first" required>
                             </div>
                             <div>
                                 <label class="top-label">Middle Name</label>
