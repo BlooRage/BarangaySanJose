@@ -70,6 +70,12 @@ if ($isLotBlockSystem) {
 }
 
 $fullAddress = htmlspecialchars(implode(', ', $fullAddressParts), ENT_QUOTES, 'UTF-8');
+$applicantUnit = htmlspecialchars($unitNumber, ENT_QUOTES, 'UTF-8');
+$applicantHouseOrLot = htmlspecialchars($streetNumber, ENT_QUOTES, 'UTF-8');
+$applicantStreetOrBlock = htmlspecialchars($streetName, ENT_QUOTES, 'UTF-8');
+$applicantSubdivision = htmlspecialchars($subdivision, ENT_QUOTES, 'UTF-8');
+$applicantBarangay = 'San Jose';
+$applicantArea = htmlspecialchars($areaNumber, ENT_QUOTES, 'UTF-8');
 ?>
 
 <!DOCTYPE html>
@@ -93,9 +99,9 @@ $fullAddress = htmlspecialchars(implode(', ', $fullAddressParts), ENT_QUOTES, 'U
 
         <?php include __DIR__ . '/../includes/resident_sidebar.php'; ?>
 
-        <main id="div-mainDisplay" class="flex-grow-1 px-4 pb-4 pt-0 px-md-5 bg-light">
+        <main id="div-mainDisplay" class="flex-grow-1 px-4 pb-4 pt-0 px-md-5 pb-md-5 pt-md-0 bg-light">
 
-            <div class="main-head application-card orange-card py-3 my-md-5 rounded">
+            <div class="main-head application-card orange-card py-3 my-5 rounded application-card--muted">
                 <div class="main-head-content">
 
                     <a href="/BarangaySanJose/Resident-End/Certificates/CertificatesLandingPage.php" class="back-link">&lt; Go Back</a>
@@ -122,20 +128,47 @@ $fullAddress = htmlspecialchars(implode(', ', $fullAddressParts), ENT_QUOTES, 'U
 
                             <div>
                                 <label class="top-label">Suffix</label>
-                                <select name="suffix_name" class="text-bg-light" readonly>
+                                <select name="suffix_name_display" class="text-bg-light" disabled>
                                     <option value="" <?php echo (($residentinformationtbl['suffix'] ?? '') === '') ? 'selected' : ''; ?>>None</option>
                                     <option value="Jr." <?php echo (($residentinformationtbl['suffix'] ?? '') === 'Jr.') ? 'selected' : ''; ?>>Jr.</option>
                                     <option value="Sr." <?php echo (($residentinformationtbl['suffix'] ?? '') === 'Sr.') ? 'selected' : ''; ?>>Sr.</option>
                                     <option value="III" <?php echo (($residentinformationtbl['suffix'] ?? '') === 'III') ? 'selected' : ''; ?>>III</option>
                                     <option value="IV" <?php echo (($residentinformationtbl['suffix'] ?? '') === 'IV') ? 'selected' : ''; ?>>IV</option>
                                 </select>
+                                <input type="hidden" name="suffix_name" value="<?php echo htmlspecialchars($residentinformationtbl['suffix'] ?? '', ENT_QUOTES, 'UTF-8'); ?>">
                             </div>
                         </div>
 
                         <div class="form-row">
                             <div class="full-width">
-                                <label class="top-label">Full Address <span class="required-asterisk">*</span></label>
-                                <input type="text" name="full_address" readonly value="<?php echo $fullAddress; ?>">
+                                <label class="top-label">Complete Address <span class="required-asterisk">*</span></label>
+                                <div class="row g-3">
+                                    <div class="col-md-4">
+                                        <label class="top-label">Unit / Apartment Number</label>
+                                        <input type="text" class="form-control" name="full_unit_number" readonly value="<?php echo $applicantUnit; ?>">
+                                    </div>
+                                    <div class="col-md-4">
+                                        <label class="top-label">House / Lot Number</label>
+                                        <input type="text" class="form-control" name="full_house_lot_number" readonly value="<?php echo $applicantHouseOrLot; ?>">
+                                    </div>
+                                    <div class="col-md-4">
+                                        <label class="top-label">Street / Block Name</label>
+                                        <input type="text" class="form-control" name="full_street_block_name" readonly value="<?php echo $applicantStreetOrBlock; ?>">
+                                    </div>
+                                    <div class="col-md-4">
+                                        <label class="top-label">Subdivision</label>
+                                        <input type="text" class="form-control" name="full_subdivision" readonly value="<?php echo $applicantSubdivision; ?>">
+                                    </div>
+                                    <div class="col-md-4">
+                                        <label class="top-label">Barangay</label>
+                                        <input type="text" class="form-control" name="full_barangay" readonly value="<?php echo $applicantBarangay; ?>">
+                                    </div>
+                                    <div class="col-md-4">
+                                        <label class="top-label">Area</label>
+                                        <input type="text" class="form-control" name="full_area_number" readonly value="<?php echo $applicantArea; ?>">
+                                    </div>
+                                </div>
+                                <input type="hidden" name="full_address" value="<?php echo $fullAddress; ?>">
                             </div>
                         </div>
 
@@ -192,21 +225,48 @@ $fullAddress = htmlspecialchars(implode(', ', $fullAddressParts), ENT_QUOTES, 'U
                             </div>
                         </div>
 
-                        <div class="form-row">
+                        <h2 class="section-title text-center text-dark">Cohabitant Address</h2>
                             <div class="full-width">
-                                <label class="top-label check-item">
-                                    <input type="checkbox" id="cohabitantSameAddress" name="cohabitantSameAddress">
-                                    Same address as applicant
-                                </label>
+                                <div class="beneficiary-block">
+                                    <label class="top-label check-item">
+                                        <input type="checkbox" id="cohabitantSameAddress" name="cohabitantSameAddress">
+                                        Same address as applicant
+                                    </label>
+                                </div>
                             </div>
-                        </div>
 
-                        <div id="cohabitantFullAddressWrapper" class="form-row d-none">
-                            <div class="full-width">
-                                <label class="top-label">Full Address <span class="required-asterisk">*</span></label>
-                                <input type="text" id="cohabitantFullAddress" name="cohabitant_full_address" readonly value="<?php echo $fullAddress; ?>">
+                            <div id="cohabitantFullAddressWrapper" class="form-row d-none">
+                                <div class="full-width">
+                                    <label class="top-label">Address Details (Same as Applicant) <span class="required-asterisk">*</span></label>
+                                    <div class="row g-3">
+                                        <div class="col-md-4">
+                                            <label class="top-label">Unit / Apartment Number</label>
+                                            <input type="text" class="form-control" name="cohabitant_full_unit_number" readonly value="<?php echo $applicantUnit; ?>">
+                                        </div>
+                                        <div class="col-md-4">
+                                            <label class="top-label">House / Lot Number</label>
+                                            <input type="text" class="form-control" name="cohabitant_full_house_lot_number" readonly value="<?php echo $applicantHouseOrLot; ?>">
+                                        </div>
+                                        <div class="col-md-4">
+                                            <label class="top-label">Street / Block Name</label>
+                                            <input type="text" class="form-control" name="cohabitant_full_street_block_name" readonly value="<?php echo $applicantStreetOrBlock; ?>">
+                                        </div>
+                                        <div class="col-md-4">
+                                            <label class="top-label">Subdivision</label>
+                                            <input type="text" class="form-control" name="cohabitant_full_subdivision" readonly value="<?php echo $applicantSubdivision; ?>">
+                                        </div>
+                                        <div class="col-md-4">
+                                            <label class="top-label">Barangay</label>
+                                            <input type="text" class="form-control" name="cohabitant_full_barangay" readonly value="<?php echo $applicantBarangay; ?>">
+                                        </div>
+                                        <div class="col-md-4">
+                                            <label class="top-label">Area</label>
+                                            <input type="text" class="form-control" name="cohabitant_full_area_number" readonly value="<?php echo $applicantArea; ?>">
+                                        </div>
+                                    </div>
+                                    <input type="hidden" id="cohabitantFullAddress" name="cohabitant_full_address" value="<?php echo $fullAddress; ?>">
+                                </div>
                             </div>
-                        </div>
 
                         <div id="cohabitantAddressSystemRow" class="form-row">
                             <div class="full-width">
@@ -312,7 +372,7 @@ $fullAddress = htmlspecialchars(implode(', ', $fullAddressParts), ENT_QUOTES, 'U
                             </div>
                         </div>
 
-                        <div class="form-row">
+                        <div class="form-row two-col-row">
                             <div>
                                 <label class="top-label">Relationship to Applicant <span class="required-asterisk">*</span></label>
                                 <input type="text" name="cohabitant_relationship" required placeholder="e.g., Partner / Spouse">
@@ -332,6 +392,9 @@ $fullAddress = htmlspecialchars(implode(', ', $fullAddressParts), ENT_QUOTES, 'U
                                     </div>
                                 </div>
                             </div>
+                        </div>
+
+                        <div class="form-row two-col-row">
                             <div>
                                 <label class="top-label">Started Cohabitation On <span class="required-asterisk">*</span></label>
                                 <input type="date" name="cohabitation_start_date" required>
@@ -342,21 +405,49 @@ $fullAddress = htmlspecialchars(implode(', ', $fullAddressParts), ENT_QUOTES, 'U
                             </div>
                         </div>
 
-                        <div class="form-row">
+                        <h2 class="section-title text-center text-dark">Cohabitation Address</h2>
                             <div class="full-width">
-                                <label class="top-label check-item">
-                                    <input type="checkbox" id="cohabitationSameAddress" name="cohabitationSameAddress">
-                                    Cohabitation address is same as applicant address
-                                </label>
+                                <div class="beneficiary-block">
+                                    <label class="top-label check-item">
+                                        <input type="checkbox" id="cohabitationSameAddress" name="cohabitationSameAddress">
+                                        Cohabitation address is same as applicant address
+                                    </label>
+                                </div>
                             </div>
-                        </div>
+  
 
-                        <div id="cohabitationFullAddressWrapper" class="form-row d-none">
-                            <div class="full-width">
-                                <label class="top-label">Full Address <span class="required-asterisk">*</span></label>
-                                <input type="text" id="cohabitationFullAddress" name="cohabitation_full_address" readonly value="<?php echo $fullAddress; ?>">
+                            <div id="cohabitationFullAddressWrapper" class="form-row d-none">
+                                <div class="full-width">
+                                    <label class="top-label">Address Details (Same as Applicant) <span class="required-asterisk">*</span></label>
+                                    <div class="row g-3">
+                                        <div class="col-md-4">
+                                            <label class="top-label">Unit / Apartment Number</label>
+                                            <input type="text" class="form-control" name="cohabitation_full_unit_number" readonly value="<?php echo $applicantUnit; ?>">
+                                        </div>
+                                        <div class="col-md-4">
+                                            <label class="top-label">House / Lot Number</label>
+                                            <input type="text" class="form-control" name="cohabitation_full_house_lot_number" readonly value="<?php echo $applicantHouseOrLot; ?>">
+                                        </div>
+                                        <div class="col-md-4">
+                                            <label class="top-label">Street / Block Name</label>
+                                            <input type="text" class="form-control" name="cohabitation_full_street_block_name" readonly value="<?php echo $applicantStreetOrBlock; ?>">
+                                        </div>
+                                        <div class="col-md-4">
+                                            <label class="top-label">Subdivision</label>
+                                            <input type="text" class="form-control" name="cohabitation_full_subdivision" readonly value="<?php echo $applicantSubdivision; ?>">
+                                        </div>
+                                        <div class="col-md-4">
+                                            <label class="top-label">Barangay</label>
+                                            <input type="text" class="form-control" name="cohabitation_full_barangay" readonly value="<?php echo $applicantBarangay; ?>">
+                                        </div>
+                                        <div class="col-md-4">
+                                            <label class="top-label">Area</label>
+                                            <input type="text" class="form-control" name="cohabitation_full_area_number" readonly value="<?php echo $applicantArea; ?>">
+                                        </div>
+                                    </div>
+                                    <input type="hidden" id="cohabitationFullAddress" name="cohabitation_full_address" value="<?php echo $fullAddress; ?>">
+                                </div>
                             </div>
-                        </div>
 
                         <div id="cohabitationAddressSystemRow" class="form-row">
                             <div class="full-width">

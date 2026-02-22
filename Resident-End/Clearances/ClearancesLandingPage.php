@@ -33,19 +33,8 @@ require_once __DIR__ . "/../includes/resident_access_guard.php";
 
             <p class="section-label">List of clearances:</p>
 
-            <div class="row certificate-grid text-center justify-content-center">
-                <div class="col-md-6 col-lg-4 d-flex">
-                    <div class="certificate-card card-action w-100">
-                        <img src="../../icons/dashboard/brgycert.png" class="certificate-icon" alt="Barangay Certification">
-                        <h3>BARANGAY CERTIFICATION</h3>
-                        <p class="certificate-text">
-                            Apply for a barangay certification for general legal, educational, or personal requirements.
-                        </p>
-                        <button class="btn apply-btn" onclick="location.href='BarangayCertificationForm.php'">Apply Now</button>
-                    </div>
-                </div>
-
-                <div class="col-md-6 col-lg-4 d-flex">
+            <div class="row row-cols-1 row-cols-md-2 g-4 certificate-grid justify-content-center">
+                <div class="col d-flex">
                     <div class="certificate-card card-action w-100">
                         <img src="../../icons/dashboard/clearancepermits.png" class="certificate-icon" alt="Barangay Clearance for Permits">
                         <h3>BARANGAY CLEARANCE FOR PERMITS</h3>
@@ -56,7 +45,7 @@ require_once __DIR__ . "/../includes/resident_access_guard.php";
                     </div>
                 </div>
 
-                <div class="col-md-6 col-lg-4 d-flex">
+                <div class="col d-flex">
                     <div class="certificate-card card-action w-100">
                         <img src="../../icons/dashboard/businessclearance.png" class="certificate-icon" alt="Barangay Business Clearance">
                         <h3>BARANGAY BUSINESS CLEARANCE</h3>
