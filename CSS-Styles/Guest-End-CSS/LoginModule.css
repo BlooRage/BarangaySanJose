@@ -493,14 +493,24 @@ body {
     text-align: center;
 }
 
-.password-reqs {
+.password-reqs-anchor {
     width: 100%;
+    position: relative;
+}
+
+.password-reqs {
+    width: min(300px, 100%);
     font-size: 0.8rem;
     color: #6c757d;
-    background: #f8f9fa;
-    border: 1px solid #dee2e6;
+    background: #ffffff;
+    border: 1px solid #ced4da;
     border-radius: 8px;
-    padding: 6px 10px;
+    padding: 8px 10px;
+    position: absolute;
+    top: calc(100% - 2px);
+    left: 0;
+    z-index: 20;
+    box-shadow: 0 6px 14px rgba(0, 0, 0, 0.12);
 }
 
 .password-reqs-title {
