@@ -103,7 +103,7 @@ $fullAddress = htmlspecialchars(implode(', ', $fullAddressParts), ENT_QUOTES, 'U
 
         <main id="div-mainDisplay" class="flex-grow-1 px-4 pb-4 pt-0 px-md-5 pb-md-5 pt-md-0 bg-light">
 
-            <div class="main-head application-card orange-card py-3 rounded application-card--muted">
+            <div class="main-head application-card orange-card py-3 my-5 rounded application-card--muted">
                 <div class="main-head-content">
 
                     <a href="/BarangaySanJose/Resident-End/Certificates/CertificatesLandingPage.php" class="back-link">&lt; Go Back</a>
