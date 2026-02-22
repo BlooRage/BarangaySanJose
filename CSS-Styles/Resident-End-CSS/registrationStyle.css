@@ -491,3 +491,164 @@ input::placeholder {
     flex: 0 0 50% !important;
     max-width: 50% !important;
 }
+
+/* =========================
+   Responsive Enhancements
+   ========================= */
+.formWizard {
+    width: 100%;
+    max-width: 1240px;
+}
+
+#progressHeader h1 {
+    line-height: 1.15;
+    word-break: break-word;
+}
+
+@media (max-width: 1199.98px) {
+    .formWizard {
+        padding: 30px 24px;
+        border-radius: 22px;
+    }
+
+    #form-proofIdentity,
+    #form-personalInformation,
+    #form-addressInformation,
+    #form-headFamily,
+    #form-privacyPolicy {
+        padding: 28px 18px;
+    }
+
+    #progressHeader h1 {
+        font-size: 40px !important;
+    }
+}
+
+@media (max-width: 991.98px) {
+    body {
+        display: block;
+        background-attachment: scroll;
+    }
+
+    section.container.my-5 {
+        margin-top: 1.5rem !important;
+        margin-bottom: 1.5rem !important;
+    }
+
+    .formWizard {
+        padding: 24px 18px;
+        border-radius: 18px;
+    }
+
+    :root {
+        --step-size: 40px;
+    }
+
+    #progressContainer ol.progress-steps {
+        gap: 10px;
+        overflow-x: auto;
+        justify-content: flex-start;
+        padding-bottom: 6px;
+        scrollbar-width: thin;
+    }
+
+    #progressContainer li {
+        min-width: 120px;
+        flex: 0 0 auto;
+        font-size: 13px;
+    }
+
+    #headQualifications {
+        width: 100%;
+        padding: 20px 18px;
+    }
+}
+
+@media (max-width: 767.98px) {
+    :root {
+        --step-size: 34px;
+    }
+
+    .formWizard {
+        padding: 18px 14px;
+        border-radius: 14px;
+    }
+
+    #progressHeader {
+        margin-bottom: 1.5rem !important;
+    }
+
+    #progressHeader h1 {
+        font-size: 30px !important;
+    }
+
+    #form-proofIdentity h2,
+    #form-personalInformation h2,
+    #form-addressInformation h2,
+    #form-headFamily h2,
+    #form-privacyPolicy h2 {
+        font-size: 26px;
+    }
+
+    #form-proofIdentity h3,
+    #form-personalInformation h3,
+    #form-addressInformation h3,
+    #form-headFamily h3,
+    #form-privacyPolicy h3 {
+        font-size: 20px;
+    }
+
+    #form-proofIdentity,
+    #form-personalInformation,
+    #form-addressInformation,
+    #form-headFamily,
+    #form-privacyPolicy {
+        padding: 16px 8px;
+    }
+
+    .upload-box {
+        min-height: 96px;
+        padding: 14px;
+    }
+
+    .formWizard .d-flex.justify-content-between {
+        gap: 10px;
+        flex-wrap: wrap;
+    }
+
+    .formWizard .d-flex.justify-content-between > .btn {
+        flex: 1 1 100%;
+    }
+}
+
+@media (max-width: 575.98px) {
+    :root {
+        --step-size: 30px;
+    }
+
+    .formWizard {
+        padding: 14px 10px;
+        border-radius: 12px;
+    }
+
+    #progressHeader h1 {
+        font-size: 26px !important;
+    }
+
+    #progressContainer li {
+        min-width: 102px;
+        font-size: 12px;
+    }
+
+    #progressContainer li::before {
+        outline-width: 1.5px;
+    }
+
+    .form-check-label {
+        font-size: 0.95rem;
+    }
+
+    button {
+        width: 100%;
+    }
+}
