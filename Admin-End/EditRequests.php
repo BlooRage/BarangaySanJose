@@ -179,7 +179,7 @@ include "includes/sidebar.php";
                         </div>
                         <div class="request-meta__cell">
                             <div class="request-meta__label">Status:</div>
-                            <span id="badge-requestStatus" class="status-pill pending">Pending</span>
+                            <span id="badge-requestStatus" class="badge bg-warning text-white">Pending</span>
                         </div>
                         <div class="request-meta__cell">
                             <div class="request-meta__label">Submitted:</div>

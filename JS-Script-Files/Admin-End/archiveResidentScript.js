@@ -149,7 +149,7 @@ document.addEventListener("DOMContentLoaded", () => {
         if (!pageRows.length) {
             tableBody.innerHTML = `
                 <tr>
-                    <td colspan="4" class="text-center text-muted">No archived residents found</td>
+                    <td colspan="5" class="text-center text-muted">No archived residents found</td>
                 </tr>
             `;
             return;
@@ -161,6 +161,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 <tr>
                     <td>${resident.resident_id}</td>
                     <td>${resident.full_name}</td>
+                    <td><span class="badge bg-secondary">Archived</span></td>
                     <td>${archivedDate}</td>
                     <td>
                         <button class="btn btn-sm btn-primary" 

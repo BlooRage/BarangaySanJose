@@ -14,6 +14,26 @@ require_once __DIR__ . "/includes/admin_guard.php";
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="../CSS-Styles/Admin-End-CSS/AdminDashboardStyle.css">
     <link rel="stylesheet" href="../CSS-Styles/Admin-End-CSS/ResidentMasterlistStyle.css">
+    <style>
+        .household-shell .table-responsive {
+            overflow-x: auto;
+            overflow-y: visible;
+            -webkit-overflow-scrolling: touch;
+        }
+
+        .household-shell #table-householdProfiling {
+            min-width: 760px;
+        }
+
+        .household-shell #table-householdProfiling th,
+        .household-shell #table-householdProfiling td {
+            white-space: nowrap;
+        }
+
+        .household-shell #btnHouseholdRefresh.is-loading i {
+            animation: adminSpin 900ms linear infinite;
+        }
+    </style>
 </head>
 
 <body>
@@ -31,7 +51,7 @@ require_once __DIR__ . "/includes/admin_guard.php";
 
         <hr><br>
 
-        <div class="bg-white p-4 rounded-4 shadow-sm border">
+        <div class="bg-white p-4 rounded-4 shadow-sm border household-shell">
 
 	            <!-- SEARCH -->
 	            <div class="admin-list-toolbar mb-3">
@@ -46,11 +66,11 @@ require_once __DIR__ . "/includes/admin_guard.php";
 	                      <i class="fas fa-filter"></i>
 	                      <span class="visually-hidden">Filter</span>
 	                    </button>
-	                    <button class="btn admin-columns btn-icon" type="button" data-bs-toggle="modal" data-bs-target="#modalTableColumns" id="btnHouseholdColumns" title="Columns" aria-label="Columns">
+	                    <button class="btn btn-outline-secondary btn-icon" type="button" data-bs-toggle="modal" data-bs-target="#modalTableColumns" id="btnHouseholdColumns" title="Columns" aria-label="Columns">
 	                      <i class="fa-solid fa-sliders"></i>
 	                      <span class="visually-hidden">Columns</span>
 	                    </button>
-	                    <button class="btn admin-refresh btn-icon" type="button" id="btnHouseholdRefresh" title="Refresh table" aria-label="Refresh table">
+	                    <button class="btn btn-outline-secondary btn-icon" type="button" id="btnHouseholdRefresh" title="Refresh table" aria-label="Refresh table">
 	                        <i class="fa-solid fa-arrows-rotate"></i>
 	                        <span class="visually-hidden">Refresh</span>
 	                    </button>

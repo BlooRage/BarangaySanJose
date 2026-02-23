@@ -65,6 +65,7 @@ require_once __DIR__ . "/includes/admin_guard.php";
                         <tr class="table-light">
                             <th>Resident ID</th>
                             <th>Resident Name</th>
+                            <th>Account Status</th>
                             <th>Archived Date</th>
                             <th>Action</th>
                         </tr>

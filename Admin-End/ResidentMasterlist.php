@@ -11,6 +11,22 @@
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="../CSS-Styles/Admin-End-CSS/AdminDashboardStyle.css">
     <link rel="stylesheet" href="../CSS-Styles/Admin-End-CSS/ResidentMasterlistStyle.css?v=20260219-1">
+    <style>
+        .resident-masterlist-shell .table-responsive {
+            overflow-x: auto;
+            overflow-y: visible;
+            -webkit-overflow-scrolling: touch;
+        }
+
+        .resident-masterlist-shell #table-appData {
+            min-width: 760px;
+        }
+
+        .resident-masterlist-shell #table-appData th,
+        .resident-masterlist-shell #table-appData td {
+            white-space: nowrap;
+        }
+    </style>
 </head>
 
 <body>
