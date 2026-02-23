@@ -118,45 +118,49 @@
 }
 
 .status-filter-btn[data-filter="Pending"] {
-    color: #664d03;
-    border-color: #ffc107;
+    color: #495057;
+    border-color: #6c757d;
     background: #fff;
 }
 
 .status-filter-btn[data-filter="ALL"].active {
-    color: #0d6efd !important;
-    background: #fff !important;
+    color: #fff !important;
+    background-color: #0d6efd !important;
     border-color: #0d6efd !important;
+    font-weight: 700;
 }
 
 .status-filter-btn[data-filter="Pending"].active {
-    color: #664d03 !important;
-    background: #fff !important;
-    border-color: #ffc107 !important;
+    color: #fff !important;
+    background-color: #495057 !important;
+    border-color: #495057 !important;
+    font-weight: 700;
 }
 
 .status-filter-btn[data-filter="Approved"] {
-    color: #146c43;
-    border-color: #198754;
+    color: #495057;
+    border-color: #6c757d;
     background: #fff;
 }
 
 .status-filter-btn[data-filter="Approved"].active {
-    color: #146c43 !important;
-    background: #fff !important;
-    border-color: #198754 !important;
+    color: #fff !important;
+    background-color: #495057 !important;
+    border-color: #495057 !important;
+    font-weight: 700;
 }
 
 .status-filter-btn[data-filter="Denied"] {
-    color: #b02a37;
-    border-color: #dc3545;
+    color: #495057;
+    border-color: #6c757d;
     background: #fff;
 }
 
 .status-filter-btn[data-filter="Denied"].active {
-    color: #b02a37 !important;
-    background: #fff !important;
-    border-color: #dc3545 !important;
+    color: #fff !important;
+    background-color: #495057 !important;
+    border-color: #495057 !important;
+    font-weight: 700;
 }
 
 .pending-count-badge {
@@ -177,7 +181,7 @@
 .status-filter-btn.has-notif {
     position: relative;
     overflow: visible;
-    padding-right: 16px;
+    padding-right: 0;
 }
 
 .status-filter-btn.has-notif .pending-count-badge {
