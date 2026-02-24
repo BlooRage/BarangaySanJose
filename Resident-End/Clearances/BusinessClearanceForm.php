@@ -29,7 +29,7 @@ if (!isset($baseUrl)) {
 </head>
 <body>
 <div class="d-flex min-vh-100">
-    <?php include '../includes/resident_sidebar.php'; ?>
+    <?php include __DIR__ . '/../includes/resident_sidebar.php'; ?>
     <main id="div-mainDisplay" class="flex-grow-1 px-4 pb-4 pt-0 px-md-5 pb-md-5 pt-md-0 bg-light">
         <div class="main-head application-card orange-card py-3 my-5 rounded">
             <div class="main-head-content">

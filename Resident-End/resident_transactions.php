@@ -494,7 +494,7 @@ require_once __DIR__ . "/includes/resident_access_guard.php";
 </head>
 <body>
   <div class="d-flex" style="min-height: 100vh;">
-    <?php include 'includes/resident_sidebar.php'; ?>
+    <?php include __DIR__ . '/includes/resident_sidebar.php'; ?>
 
     <header id="mobile-header">
       <div class="d-flex align-items-center px-3 py-2 shadow-sm bg-white">

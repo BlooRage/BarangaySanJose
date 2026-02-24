@@ -128,9 +128,9 @@ if (!empty($_SESSION['user_id']) && isset($conn) && $conn instanceof mysqli) {
      id="dashboard-sidebar">
 
   <!-- LOGO -->
-  <a href="<?= htmlspecialchars(appUrl('Admin-End/AdminDashboard.php')) ?>" class="d-flex align-items-center pb-3 mb-3 link-dark text-decoration-none border-bottom">
-    <img src="<?= htmlspecialchars(appUrl('Images/San_Jose_LOGO.jpg')) ?>" class="me-2" style="width: 32px; height: 32px;">
-    <span class="fs-5 fw-semibold logo-name">Barangay San Jose</span>
+  <a href="<?= htmlspecialchars(appUrl('Admin-End/AdminDashboard.php')) ?>" class="sidebar-brand-link pb-3 mb-3 link-dark text-decoration-none border-bottom">
+    <img src="<?= htmlspecialchars(appUrl('Images/San_Jose_LOGO.jpg')) ?>" class="sidebar-brand-logo" alt="Barangay San Jose Logo">
+    <span class="sidebar-brand-title">Barangay San Jose</span>
   </a>
 
   <div class="sidebar-body d-flex flex-column flex-grow-1">

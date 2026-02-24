@@ -40,6 +40,43 @@
     font-family: 'Charis SIL Regular', serif;
 }
 
+.sidebar-brand-link {
+    display: flex;
+    align-items: center;
+    gap: clamp(8px, 1.2vw, 12px);
+    min-width: 0;
+}
+
+.sidebar-brand-logo {
+    width: clamp(30px, 2.4vw, 38px);
+    height: clamp(30px, 2.4vw, 38px);
+    object-fit: cover;
+    border-radius: 50%;
+    flex: 0 0 clamp(30px, 2.4vw, 38px);
+}
+
+.sidebar-brand-title {
+    font-family: 'Charis SIL Bold', serif;
+    font-size: clamp(1.02rem, 1.35vw, 1.35rem);
+    line-height: 1.1;
+    color: #1f2328;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    min-width: 0;
+}
+
+@media (max-width: 768px) {
+    .sidebar-brand-logo {
+        width: 30px;
+        height: 30px;
+        flex-basis: 30px;
+    }
+    .sidebar-brand-title {
+        font-size: 1.05rem;
+    }
+}
+
 #dashboard-sidebar {
     height: 100vh;
     border-right: 1px solid #e0e0e0;

@@ -21,9 +21,9 @@ require_once __DIR__ . "/../includes/resident_access_guard.php";
 
 <body>
     <div class="d-flex min-vh-100">
-        <?php include '../includes/resident_sidebar.php'; ?>
+        <?php include __DIR__ . '/../includes/resident_sidebar.php'; ?>
 
-        <main id="div-mainDisplay" class="main-content flex-grow-1">
+        <main id="div-mainDisplay" class="main-content flex-grow-1 p-4 p-md-5 bg-light">
             <h1 class="page-title">Barangay Documents</h1>
             <hr>
 

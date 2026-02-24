@@ -1,27 +1,4 @@
-﻿<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    
-  <link rel="icon" href="/Images/favicon_sanjose.png?v=20260211">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Resident Dashboard - Barangay San Jose</title>
-
-
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-
-
-    <!-- Bootstrap Icons (for logout icon) -->
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons/font/bootstrap-icons.css" rel="stylesheet" />
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
-    <link rel="stylesheet" href="CSS-Styles/Guest-End-CSS/GeneralStyle.css">
-    <link rel="stylesheet" href="CSS-Styles/Resident-End-CSS/residentDashboard.css">
-    <link rel="stylesheet" href="CSS-Styles/NavbarFooterStyle.css">
-</head>
-
-
-<body>
-<?php
+﻿<?php
 if (session_status() === PHP_SESSION_NONE) {
   session_start();
 }
@@ -199,9 +176,9 @@ if ($residentId !== '' && isset($conn) && $conn instanceof mysqli) {
        class="d-flex flex-column flex-shrink-0 p-3 bg-white border-end shadow-sm">
 
   <!-- LOGO HEADER (ADMIN-STYLE) -->
-  <a href="<?= htmlspecialchars(appUrl('Resident-End/AdminDashboard.php')) ?>" class="d-flex align-items-center pb-3 mb-3 link-dark text-decoration-none border-bottom">
-    <img src="<?= htmlspecialchars(appUrl('Images/San_Jose_LOGO.jpg')) ?>" class="me-2" style="width: 32px; height: 32px;">
-    <span class="fs-5 fw-semibold logo-name">Barangay San Jose</span>
+  <a href="<?= htmlspecialchars(appUrl('Resident-End/resident_dashboard.php')) ?>" class="sidebar-brand-link pb-3 mb-3 link-dark text-decoration-none border-bottom">
+    <img src="<?= htmlspecialchars(appUrl('Images/San_Jose_LOGO.jpg')) ?>" class="sidebar-brand-logo" alt="Barangay San Jose Logo">
+    <span class="sidebar-brand-title">Barangay San Jose</span>
   </a>
 
   <!-- RESIDENT PROFILE -->
@@ -384,6 +361,3 @@ if ($residentId !== '' && isset($conn) && $conn instanceof mysqli) {
     setInterval(poll, 15000);
   });
 </script>
-
-</body>
-</html>

@@ -320,9 +320,10 @@ if ($residentId !== '' && isset($conn) && $conn instanceof mysqli) {
       window.RESIDENT_PROFILE_AGE = <?= $computedAge !== '' ? (int)$computedAge : 'null' ?>;
       window.RESIDENT_PROFILE_SEX = <?= json_encode((string)($residentinformationtbl['sex'] ?? ''), JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) ?>;
     </script>
-    <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
   <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons/font/bootstrap-icons.css" rel="stylesheet" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
   <script src="../JS-Script-Files/modalHandler.js" defer></script>
   <script src="../JS-Script-Files/Resident-End/householdMembers.js" defer></script>
   <script src="../JS-Script-Files/Resident-End/profileOccupation.js" defer></script>
@@ -376,7 +377,7 @@ if ($residentId !== '' && isset($conn) && $conn instanceof mysqli) {
 
     <div class="d-flex" style="min-height: 100vh;">
 
-        <?php include 'includes/resident_sidebar.php'; ?>
+        <?php include __DIR__ . '/includes/resident_sidebar.php'; ?>
 
         <header id="mobile-header">
             <div class="d-flex align-items-center px-3 py-2 shadow-sm bg-white">
@@ -390,7 +391,7 @@ if ($residentId !== '' && isset($conn) && $conn instanceof mysqli) {
             </div>
         </header>
 
-        <main id="div-mainDisplay" class="flex-grow-1 px-4 pb-4 pt-0 px-md-5 pb-md-5 pt-md-0 bg-light">
+        <main id="div-mainDisplay" class="flex-grow-1 p-4 p-md-5 bg-light">
 
             <div class="main-head text-center py-1 rounded my-2">
                 <h3 class="mb-0 text-black">ACCOUNT</h3>

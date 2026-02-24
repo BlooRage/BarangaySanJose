@@ -48,21 +48,21 @@ $useraccountstbl = [
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons/font/bootstrap-icons.css" rel="stylesheet" />
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
-<link rel="stylesheet" href="../CSS-Styles/Resident-End-CSS/residentDashboard.css">
-<link rel="stylesheet" href="../CSS-Styles/Guest-End-CSS/GeneralStyle.css">
-    <link rel="stylesheet" href="../CSS-Styles/Resident-End-CSS/applicationForms.css">
+<link rel="stylesheet" href="../../CSS-Styles/Resident-End-CSS/residentDashboard.css">
+<link rel="stylesheet" href="../../CSS-Styles/Guest-End-CSS/GeneralStyle.css">
+    <link rel="stylesheet" href="../../CSS-Styles/Resident-End-CSS/applicationForms.css">
 </head>
 
 <body>
     <div class="d-flex min-vh-100">
 
-        <?php include 'includes/resident_sidebar.php'; ?>
+        <?php include __DIR__ . '/../includes/resident_sidebar.php'; ?>
 
         <main id="div-mainDisplay" class="flex-grow-1 px-4 pb-4 pt-0 px-md-5 pb-md-5 pt-md-0 bg-light">
             <div class="main-head application-card orange-card py-3 my-5 rounded">
                 <div class="main-head-content">
 
-                    <a href="<?= htmlspecialchars($baseUrl) ?>/Resident-End/ApplicationsLandingPage.php" class="back-link">&lt; Go Back</a>
+                    <a href="<?= htmlspecialchars($baseUrl) ?>/Resident-End/Certificates/CertificatesLandingPage.php" class="back-link">&lt; Go Back</a>
 
                     <h1 class="form-title">Application for Barangay Certification</h1>
                     <p class="form-subtitle">First Time Job Seeker</p>
@@ -180,7 +180,5 @@ $useraccountstbl = [
 </body>
 
 </html>
-
-
 
 

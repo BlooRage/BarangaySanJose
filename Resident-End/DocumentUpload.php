@@ -104,9 +104,9 @@ if (!in_array($resubmitMode, ['sector', 'profiling'], true)) {
 </head>
 <body>
 <div class="page-wrapper d-flex" style="min-height: 100vh;">
-    <?php include 'includes/resident_sidebar.php'; ?>
+    <?php include __DIR__ . '/includes/resident_sidebar.php'; ?>
 
-    <div class="main-content flex-grow-1">
+    <div id="div-mainDisplay" class="main-content flex-grow-1 p-4 p-md-5 bg-light">
         <div class="container-fluid">
             <div class="card shadow-sm border-0">
                 <div class="card-body p-4">
