@@ -11,6 +11,22 @@
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="../CSS-Styles/Admin-End-CSS/AdminDashboardStyle.css">
     <link rel="stylesheet" href="../CSS-Styles/Admin-End-CSS/ResidentMasterlistStyle.css?v=20260219-1">
+    <style>
+        .resident-masterlist-shell .table-responsive {
+            overflow-x: auto;
+            overflow-y: visible;
+            -webkit-overflow-scrolling: touch;
+        }
+
+        .resident-masterlist-shell #table-appData {
+            min-width: 760px;
+        }
+
+        .resident-masterlist-shell #table-appData th,
+        .resident-masterlist-shell #table-appData td {
+            white-space: nowrap;
+        }
+    </style>
 </head>
 
 <body>
@@ -73,11 +89,11 @@ if (isset($conn) && $conn instanceof mysqli) {
 	            <div class="admin-list-toolbar mb-3 pt-2">
 	                <!-- Status Filter Buttons -->
 	                <div class="admin-list-tabs">
-	                    <button class="btn btn-outline-primary btn-sm status-filter-btn" data-filter="ALL">All</button>
-	                    <button class="btn btn-outline-secondary btn-sm status-filter-btn fw-semibold" data-filter="VerifiedResident">Verified</button>
-	                    <button class="btn btn-outline-secondary btn-sm status-filter-btn fw-semibold" data-filter="NotVerified">Not</button>
+	                    <button class="btn btn-outline-primary btn-sm status-filter-btn" data-filter="ALL">&nbsp;&nbsp;All&nbsp;&nbsp;</button>
+	                    <button class="btn btn-outline-secondary btn-sm status-filter-btn fw-semibold" data-filter="VerifiedResident">&nbsp;&nbsp;Verified&nbsp;&nbsp;</button>
+	                    <button class="btn btn-outline-secondary btn-sm status-filter-btn fw-semibold" data-filter="NotVerified">&nbsp;&nbsp;Not Verified&nbsp;&nbsp;</button>
 	                    <button class="btn btn-outline-secondary btn-sm status-filter-btn fw-semibold has-notif" data-filter="PendingVerification">
-	                        Pending
+	                        &nbsp;&nbsp;Pending
 	                        <?php if ($pendingCount > 0): ?>
 	                            <span class="pending-count-badge"><?= $pendingCount ?></span>
 	                        <?php endif; ?>

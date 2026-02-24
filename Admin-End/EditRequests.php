@@ -30,13 +30,13 @@ include "includes/sidebar.php";
         <div id="div-tableContainer" class="bg-white p-4 pt-3 rounded-4 shadow-sm border edit-requests-shell">
 	            <div class="admin-list-toolbar mb-3 pt-2">
 	                <div class="admin-list-tabs pt-2">
-	                    <button class="btn btn-outline-primary btn-sm status-filter-btn active" data-filter="ALL">All</button>
-	                    <button class="btn btn-outline-secondary btn-sm status-filter-btn has-notif " data-filter="Pending">
-	                        Pending
-	                        <span id="pendingRequestBadge" class="pending-count-badge d-none">0</span>
+	                    <button class="btn btn-outline-primary btn-sm status-filter-btn active fw-bold" data-filter="ALL">&nbsp;&nbsp;All&nbsp;&nbsp;</button>
+	                    <button class="btn btn-outline-secondary btn-sm status-filter-btn text-center has-notif fw-bold " data-filter="Pending">
+	                        &nbsp;&nbsp;Pending
+	                        <span id="pendingRequestBadge" class="pending-count-badge d-none text-center fw-bold">0</span>
 	                    </button>
-	                    <button class="btn btn-outline-secondary btn-sm status-filter-btn " data-filter="Approved">Approved</button>
-	                    <button class="btn btn-outline-secondary btn-sm status-filter-btn " data-filter="Denied">Denied</button>
+	                    <button class="btn btn-outline-secondary btn-sm status-filter-btn fw-bold" data-filter="Approved">&nbsp;&nbsp;Approved&nbsp;&nbsp;</button>
+	                    <button class="btn btn-outline-secondary btn-sm status-filter-btn fw-bold" data-filter="Denied">&nbsp;&nbsp;Denied&nbsp;&nbsp;</button>
 	                </div>
 	
 	                <div class="admin-list-actions admin-list-actions--linear">
@@ -179,7 +179,7 @@ include "includes/sidebar.php";
                         </div>
                         <div class="request-meta__cell">
                             <div class="request-meta__label">Status:</div>
-                            <span id="badge-requestStatus" class="status-pill pending">Pending</span>
+                            <span id="badge-requestStatus" class="badge bg-warning text-white">Pending</span>
                         </div>
                         <div class="request-meta__cell">
                             <div class="request-meta__label">Submitted:</div>

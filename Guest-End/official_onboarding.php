@@ -168,6 +168,65 @@ function oi_non_empty(?string $v): bool
     return trim((string)$v) !== '';
 }
 
+function oi_valid_name_text(string $v, int $max = 150): bool
+{
+    $v = trim($v);
+    if ($v === '' || strlen($v) > $max) return false;
+    return (bool)preg_match("/^[A-Za-z][A-Za-z .'-]*$/", $v);
+}
+
+function oi_valid_relationship_text(string $v, int $max = 80): bool
+{
+    $v = trim($v);
+    if ($v === '' || strlen($v) > $max) return false;
+    return (bool)preg_match("/^[A-Za-z][A-Za-z0-9 .,'\\/-]*$/", $v);
+}
+
+function oi_valid_address_text(string $v, int $max = 255): bool
+{
+    $v = trim($v);
+    if ($v === '' || strlen($v) > $max) {
+        return false;
+    }
+    // Allow common address characters while avoiding fragile slash-delimited escaping.
+    if (!preg_match('~^[A-Za-z0-9#.,\'/\-][A-Za-z0-9#.,\'/\- ]*$~', $v)) {
+        return false;
+    }
+    return (bool)preg_match('/[A-Za-z]/', $v);
+}
+
+function oi_valid_short_address_part(string $v, int $max = 50): bool
+{
+    $v = trim($v);
+    if ($v === '' || strlen($v) > $max) {
+        return false;
+    }
+    return (bool)preg_match('~^[A-Za-z0-9#/\-][A-Za-z0-9#/\- ]*$~', $v);
+}
+
+function oi_allowed_relationships(): array
+{
+    return [
+        'Spouse',
+        'Partner',
+        'Father',
+        'Mother',
+        'Son',
+        'Daughter',
+        'Brother',
+        'Sister',
+        'God Parent',
+        'Cousin',
+        'Father-in-law',
+        'Mother-in-law',
+        'Brother-in-law',
+        'Sister-in-law',
+        'Friend',
+        'Colleague',
+        'Other',
+    ];
+}
+
 function oi_has_info_and_contact(?array $row): bool
 {
     if (!$row) return false;
@@ -551,9 +610,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $emergencyRelationship = trim((string)($_POST['emergency_contact_relationship'] ?? ''));
                 $emergencyPhone = oi_normalize_phone10((string)($_POST['emergency_contact_phone'] ?? ''));
                 $emergencyAddress = trim((string)($_POST['emergency_contact_address'] ?? ''));
+                $phone10 = oi_normalize_phone10((string)$account['phone_number']);
 
                 if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $birthdate)) {
                     throw new RuntimeException('Birthdate is required.');
+                }
+                $birthTs = strtotime($birthdate);
+                if ($birthTs === false || $birthTs > time()) {
+                    throw new RuntimeException('Birthdate must be a valid past date.');
                 }
                 if (!in_array($sex, ['Male', 'Female', 'Other'], true)) {
                     throw new RuntimeException('Select a valid sex.');
@@ -564,8 +628,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 if ($emergencyName === '' || $emergencyRelationship === '' || $emergencyAddress === '') {
                     throw new RuntimeException('All emergency contact fields are required.');
                 }
+                if (!oi_valid_name_text($emergencyName, 150)) {
+                    throw new RuntimeException('Emergency contact name is invalid.');
+                }
+                if (!in_array($emergencyRelationship, oi_allowed_relationships(), true)) {
+                    throw new RuntimeException('Select a valid emergency relationship.');
+                }
                 if (!oi_is_valid_phone10($emergencyPhone)) {
                     throw new RuntimeException('Emergency contact number must be 9XXXXXXXXX.');
+                }
+                if ($emergencyPhone === $phone10) {
+                    throw new RuntimeException('Emergency contact number must be different from your registered mobile number.');
+                }
+                if (!oi_valid_address_text($emergencyAddress, 255)) {
+                    throw new RuntimeException('Emergency contact address is invalid.');
                 }
 
                 $employmentStatusName = trim((string)($sessionInvite['employment_status'] ?? ''));
@@ -589,7 +665,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $positionAccess = trim((string)($sessionInvite['position_access'] ?? ''));
                 $department = (string)$sessionInvite['department'];
                 $areaNumber = trim((string)($sessionInvite['area_number'] ?? ''));
-                $phone10 = oi_normalize_phone10((string)$account['phone_number']);
                 $email = (string)$account['email'];
                 if ($positionAccess === '') {
                     $positionAccess = $roleAccess;
@@ -689,6 +764,25 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $missingBlockLot = ($addressMode === 'block_lot' && ($blockNumber === '' || $lotNumber === ''));
                 if ($missingCore || $missingStreet || $missingBlockLot) {
                     throw new RuntimeException('All address fields are required.');
+                }
+                if (!oi_valid_address_text($barangay, 150) || !oi_valid_address_text($municipalityCity, 150) || !oi_valid_address_text($province, 150)) {
+                    throw new RuntimeException('Barangay, city/municipality, and province must contain valid text.');
+                }
+                if ($addressMode === 'street') {
+                    if (!oi_valid_short_address_part($houseNumber, 50)) {
+                        throw new RuntimeException('House number is invalid.');
+                    }
+                    if (!oi_valid_address_text($streetName, 150)) {
+                        throw new RuntimeException('Street name is invalid.');
+                    }
+                }
+                if ($addressMode === 'block_lot') {
+                    if (!oi_valid_short_address_part($lotNumber, 50)) {
+                        throw new RuntimeException('Lot number is invalid.');
+                    }
+                    if (!oi_valid_short_address_part($blockNumber, 50)) {
+                        throw new RuntimeException('Block number is invalid.');
+                    }
                 }
                 if ($addressMode === 'street') {
                     $blockNumber = '';
@@ -933,11 +1027,27 @@ if ($mode === 'password') {
         .onboarding-shell {
             max-width: 860px;
         }
+        .onboarding-shell .btn {
+            min-height: 44px;
+        }
+        .onboarding-shell .form-control,
+        .onboarding-shell .form-select {
+            min-height: 44px;
+        }
+        .onboarding-shell .form-control[readonly],
+        .onboarding-shell .form-control:disabled,
+        .onboarding-shell .form-select:disabled {
+            background-color: #f3f4f6 !important;
+            color: #6b7280 !important;
+            border-color: #d1d5db !important;
+            cursor: not-allowed;
+        }
         .onboarding-title {
-            font-size: 48px;
+            font-size: clamp(1.75rem, 4.5vw, 3rem);
             text-align: center;
             font-family: 'Charis SIL Bold', serif;
             margin-bottom: 0.5rem;
+            line-height: 1.15;
         }
         .onboarding-subtitle {
             text-align: center;
@@ -945,10 +1055,30 @@ if ($mode === 'password') {
             margin-bottom: 1.5rem;
         }
         .password-reqs.is-hidden { display: none; }
-        .password-reqs-list { margin: 0; padding-left: 1.1rem; }
-        .password-reqs-list li { color: #6c757d; }
+        .password-reqs-list {
+            margin: 0;
+            padding-left: 0;
+            list-style: none;
+        }
+        .password-reqs-list li {
+            color: #6c757d;
+            display: flex;
+            align-items: center;
+            gap: 0.45rem;
+            margin-bottom: 0.25rem;
+        }
+        .password-reqs-list li:last-child {
+            margin-bottom: 0;
+        }
+        .password-reqs-list .req-icon {
+            width: 1rem;
+            text-align: center;
+            color: #6c757d;
+        }
         .password-reqs-list li.req-valid { color: #198754; }
+        .password-reqs-list li.req-valid .req-icon { color: #198754; }
         .password-reqs-list li.req-invalid { color: #dc3545; }
+        .password-reqs-list li.req-invalid .req-icon { color: #dc3545; }
         .progress-steps li.is-completed::before {
             content: "\2713";
             background-color: #198754;
@@ -1011,13 +1141,97 @@ if ($mode === 'password') {
             min-height: 46px;
             white-space: nowrap;
         }
+        .address-ui-card {
+            border: 1px solid #e5e7eb;
+            border-radius: 14px;
+            background: #ffffff;
+            padding: 1rem;
+        }
+        .address-ui-title {
+            font-size: 1rem;
+            font-weight: 700;
+            color: #1f2937;
+            margin-bottom: 0.75rem;
+        }
+        .address-ui-caption {
+            color: #667085;
+            font-size: 0.9rem;
+            margin-bottom: 0.25rem;
+        }
+        @media (max-width: 991.98px) {
+            #navbarBrand {
+                font-size: clamp(1.05rem, 4.2vw, 1.45rem) !important;
+                line-height: 1.15;
+                white-space: normal;
+                word-break: keep-all;
+            }
+            #navbarLogo {
+                width: 42px;
+                height: 42px;
+                margin-right: 6px;
+            }
+            .navbar .container-fluid {
+                padding-left: 0.75rem !important;
+                padding-right: 0.75rem !important;
+            }
+        }
         @media (max-width: 767.98px) {
+            section.container.onboarding-shell {
+                margin-top: 1.25rem !important;
+                margin-bottom: 1.25rem !important;
+                padding-left: 0.75rem;
+                padding-right: 0.75rem;
+            }
+            .card-body {
+                padding: 1rem !important;
+            }
+            #progressHeader {
+                margin-bottom: 1.5rem !important;
+            }
+            #progressContainer {
+                overflow-x: auto;
+                -webkit-overflow-scrolling: touch;
+                padding-bottom: 0.25rem;
+            }
+            .progress-steps {
+                min-width: 620px;
+                width: max-content;
+            }
+            #progressContainer .progress-steps li {
+                min-width: 96px;
+                font-size: 12px;
+            }
+            .verification-contact-value {
+                font-size: 1rem;
+            }
+            .verification-card {
+                padding: 1rem;
+            }
+            .address-ui-card {
+                padding: 0.85rem;
+            }
+            .onboarding-shell .btn {
+                width: 100%;
+            }
             .otp-verify-row {
                 grid-template-columns: 1fr;
             }
             .otp-submit-btn,
             .otp-send-btn {
                 width: 100%;
+            }
+        }
+        @media (max-width: 575.98px) {
+            section.container.onboarding-shell {
+                padding-left: 0.5rem;
+                padding-right: 0.5rem;
+            }
+            .card-body {
+                padding: 0.9rem !important;
+            }
+            .onboarding-subtitle {
+                font-size: 0.92rem;
+                margin-bottom: 1rem;
             }
         }
     </style>
@@ -1109,11 +1323,11 @@ if ($mode === 'password') {
                     <div id="onboardPasswordRequirements" class="password-reqs is-hidden">
                         <div class="password-reqs-title fw-semibold small mb-1">Password must contain:</div>
                         <ul class="password-reqs-list small">
-                            <li data-req="uppercase">1 uppercase letter</li>
-                            <li data-req="lowercase">1 lowercase letter</li>
-                            <li data-req="number">1 number</li>
-                            <li data-req="special">1 special character</li>
-                            <li data-req="length">At least 8 characters</li>
+                            <li data-req="uppercase"><i class="bi bi-circle req-icon" aria-hidden="true"></i><span>1 uppercase letter</span></li>
+                            <li data-req="lowercase"><i class="bi bi-circle req-icon" aria-hidden="true"></i><span>1 lowercase letter</span></li>
+                            <li data-req="number"><i class="bi bi-circle req-icon" aria-hidden="true"></i><span>1 number</span></li>
+                            <li data-req="special"><i class="bi bi-circle req-icon" aria-hidden="true"></i><span>1 special character</span></li>
+                            <li data-req="length"><i class="bi bi-circle req-icon" aria-hidden="true"></i><span>At least 8 characters</span></li>
                         </ul>
                     </div>
                     <div class="col-12">
@@ -1182,6 +1396,7 @@ if ($mode === 'password') {
                 <p class="text-muted">Complete your information and emergency contact.</p>
                 <form method="post" class="row g-3">
                     <input type="hidden" name="action" value="save_official_info">
+                    <input type="hidden" name="registered_phone" value="<?= htmlspecialchars((string)oi_normalize_phone10((string)$account['phone_number']), ENT_QUOTES, 'UTF-8') ?>">
                     <div class="col-md-6">
                         <label class="form-label">First Name</label>
                         <input class="form-control" value="<?= htmlspecialchars((string)$sessionInvite['firstname'], ENT_QUOTES, 'UTF-8') ?>" readonly>
@@ -1216,7 +1431,7 @@ if ($mode === 'password') {
                     </div>
                     <div class="col-md-4">
                         <label class="form-label">Birthdate</label>
-                        <input type="date" class="form-control" name="birthdate" value="<?= htmlspecialchars((string)($officialInfo['birthdate'] ?? ''), ENT_QUOTES, 'UTF-8') ?>" required>
+                        <input type="date" class="form-control" name="birthdate" max="<?= date('Y-m-d') ?>" value="<?= htmlspecialchars((string)($officialInfo['birthdate'] ?? ''), ENT_QUOTES, 'UTF-8') ?>" required>
                     </div>
                     <div class="col-md-4">
                         <label class="form-label">Sex</label>
@@ -1242,19 +1457,38 @@ if ($mode === 'password') {
                     </div>
                     <div class="col-md-6">
                         <label class="form-label">Emergency Contact Name</label>
-                        <input class="form-control" name="emergency_contact_name" value="<?= htmlspecialchars((string)($officialInfo['emergency_contact_name'] ?? ''), ENT_QUOTES, 'UTF-8') ?>" required>
+                        <input class="form-control" name="emergency_contact_name" maxlength="150" pattern="[A-Za-z][A-Za-z .'-]*" value="<?= htmlspecialchars((string)($officialInfo['emergency_contact_name'] ?? ''), ENT_QUOTES, 'UTF-8') ?>" required>
                     </div>
                     <div class="col-md-6">
                         <label class="form-label">Relationship</label>
-                        <input class="form-control" name="emergency_contact_relationship" value="<?= htmlspecialchars((string)($officialInfo['emergency_contact_relationship'] ?? ''), ENT_QUOTES, 'UTF-8') ?>" required>
+                        <?php
+                        $savedRelationship = trim((string)($officialInfo['emergency_contact_relationship'] ?? ''));
+                        $allowedRelationships = oi_allowed_relationships();
+                        ?>
+                        <select class="form-select" name="emergency_contact_relationship" required>
+                            <option value="">Select relationship</option>
+                            <?php foreach ($allowedRelationships as $rel): ?>
+                                <option value="<?= htmlspecialchars($rel, ENT_QUOTES, 'UTF-8') ?>" <?= ($savedRelationship === $rel) ? 'selected' : '' ?>>
+                                    <?= htmlspecialchars($rel, ENT_QUOTES, 'UTF-8') ?>
+                                </option>
+                            <?php endforeach; ?>
+                            <?php if ($savedRelationship !== '' && !in_array($savedRelationship, $allowedRelationships, true)): ?>
+                                <option value="<?= htmlspecialchars($savedRelationship, ENT_QUOTES, 'UTF-8') ?>" selected>
+                                    <?= htmlspecialchars($savedRelationship, ENT_QUOTES, 'UTF-8') ?>
+                                </option>
+                            <?php endif; ?>
+                        </select>
                     </div>
                     <div class="col-md-6">
                         <label class="form-label">Emergency Contact Number (+63)</label>
-                        <input class="form-control" name="emergency_contact_phone" inputmode="numeric" maxlength="10" placeholder="9XXXXXXXXX" value="<?= htmlspecialchars((string)($officialInfo['emergency_contact_phone'] ?? ''), ENT_QUOTES, 'UTF-8') ?>" required>
+                        <input class="form-control" name="emergency_contact_phone" inputmode="numeric" pattern="9[0-9]{9}" maxlength="10" placeholder="9XXXXXXXXX" value="<?= htmlspecialchars((string)($officialInfo['emergency_contact_phone'] ?? ''), ENT_QUOTES, 'UTF-8') ?>" required>
+                        <div id="emergencyPhoneSameWarning" class="small text-danger mt-1 d-none">
+                            Emergency contact number should not be the same as your registered mobile number.
+                        </div>
                     </div>
                     <div class="col-md-6">
                         <label class="form-label">Emergency Contact Address</label>
-                        <input class="form-control" name="emergency_contact_address" value="<?= htmlspecialchars((string)($officialInfo['emergency_contact_address'] ?? ''), ENT_QUOTES, 'UTF-8') ?>" required>
+                        <input class="form-control" name="emergency_contact_address" maxlength="255" value="<?= htmlspecialchars((string)($officialInfo['emergency_contact_address'] ?? ''), ENT_QUOTES, 'UTF-8') ?>" required>
                     </div>
                     <div class="col-12">
                         <button class="btn btn-primary" type="submit">Save and Continue</button>
@@ -1265,40 +1499,50 @@ if ($mode === 'password') {
                 <form method="post" class="row g-3">
                     <input type="hidden" name="action" value="save_official_address">
                     <?php $addressMode = strtolower(trim((string)($officialInfo['address_mode'] ?? 'street'))); ?>
-                    <div class="col-md-6">
-                        <label class="form-label">Address System</label>
-                        <select class="form-select" name="address_mode" id="officialAddressMode" required>
-                            <option value="street" <?= $addressMode === 'block_lot' ? '' : 'selected' ?>>Street System</option>
-                            <option value="block_lot" <?= $addressMode === 'block_lot' ? 'selected' : '' ?>>Block / Lot System</option>
-                        </select>
-                    </div>
-                    <div class="col-md-6">
-                        <label class="form-label">House Number</label>
-                        <input class="form-control" id="officialHouseNumber" name="house_number" value="<?= htmlspecialchars((string)($officialInfo['house_number'] ?? ''), ENT_QUOTES, 'UTF-8') ?>">
-                    </div>
-                    <div class="col-md-6">
-                        <label class="form-label">Street Name</label>
-                        <input class="form-control" id="officialStreetName" name="street_name" value="<?= htmlspecialchars((string)($officialInfo['street_name'] ?? ''), ENT_QUOTES, 'UTF-8') ?>">
-                    </div>
-                    <div class="col-md-6 d-none" id="officialBlockWrap">
-                        <label class="form-label">Block Number</label>
-                        <input class="form-control" id="officialBlockNumber" name="block_number" value="<?= htmlspecialchars((string)($officialInfo['block_number'] ?? ''), ENT_QUOTES, 'UTF-8') ?>">
-                    </div>
-                    <div class="col-md-6 d-none" id="officialLotWrap">
-                        <label class="form-label">Lot Number</label>
-                        <input class="form-control" id="officialLotNumber" name="lot_number" value="<?= htmlspecialchars((string)($officialInfo['lot_number'] ?? ''), ENT_QUOTES, 'UTF-8') ?>">
-                    </div>
-                    <div class="col-md-4">
-                        <label class="form-label">Barangay</label>
-                        <input class="form-control" name="barangay" value="<?= htmlspecialchars((string)($officialInfo['barangay'] ?? 'Barangay San Jose'), ENT_QUOTES, 'UTF-8') ?>" required>
-                    </div>
-                    <div class="col-md-4">
-                        <label class="form-label">Municipality / City</label>
-                        <input class="form-control" name="municipality_city" value="<?= htmlspecialchars((string)($officialInfo['municipality_city'] ?? 'Rodriguez (Montalban)'), ENT_QUOTES, 'UTF-8') ?>" required>
-                    </div>
-                    <div class="col-md-4">
-                        <label class="form-label">Province</label>
-                        <input class="form-control" name="province" value="<?= htmlspecialchars((string)($officialInfo['province'] ?? 'Rizal'), ENT_QUOTES, 'UTF-8') ?>" required>
+                    <div class="col-12">
+                        <div class="address-ui-card">
+                            <div class="address-ui-title">Address Details</div>
+                            <div class="address-ui-caption">Select an address system first, then complete the required fields.</div>
+                            <div class="row g-3">
+                                <div class="col-md-12">
+                                    <label class="form-label">Address System</label>
+                                    <select class="form-select" name="address_mode" id="officialAddressMode" required>
+                                        <option value="street" <?= $addressMode === 'block_lot' ? '' : 'selected' ?>>Street System</option>
+                                        <option value="block_lot" <?= $addressMode === 'block_lot' ? 'selected' : '' ?>>Block / Lot System</option>
+                                    </select>
+                                </div>
+
+                                <div class="col-md-6" id="officialHouseWrap">
+                                    <label class="form-label">House Number</label>
+                                    <input class="form-control" id="officialHouseNumber" name="house_number" maxlength="50" pattern="[A-Za-z0-9#/-][A-Za-z0-9#/- ]*" value="<?= htmlspecialchars((string)($officialInfo['house_number'] ?? ''), ENT_QUOTES, 'UTF-8') ?>">
+                                </div>
+                                <div class="col-md-6 d-none" id="officialLotWrap">
+                                    <label class="form-label">Lot Number</label>
+                                    <input class="form-control" id="officialLotNumber" name="lot_number" maxlength="50" pattern="[A-Za-z0-9#/-][A-Za-z0-9#/- ]*" value="<?= htmlspecialchars((string)($officialInfo['lot_number'] ?? ''), ENT_QUOTES, 'UTF-8') ?>">
+                                </div>
+                                <div class="col-md-4 d-none" id="officialBlockWrap">
+                                    <label class="form-label">Block Number</label>
+                                    <input class="form-control" id="officialBlockNumber" name="block_number" maxlength="50" pattern="[A-Za-z0-9#/-][A-Za-z0-9#/- ]*" value="<?= htmlspecialchars((string)($officialInfo['block_number'] ?? ''), ENT_QUOTES, 'UTF-8') ?>">
+                                </div>
+                                <div class="col-md-6" id="officialStreetWrap">
+                                    <label class="form-label">Street Name</label>
+                                    <input class="form-control" id="officialStreetName" name="street_name" maxlength="150" value="<?= htmlspecialchars((string)($officialInfo['street_name'] ?? ''), ENT_QUOTES, 'UTF-8') ?>">
+                                </div>
+
+                                <div class="col-md-4">
+                                    <label class="form-label">Barangay</label>
+                                    <input class="form-control" name="barangay" maxlength="150" value="<?= htmlspecialchars((string)($officialInfo['barangay'] ?? 'Barangay San Jose'), ENT_QUOTES, 'UTF-8') ?>" required>
+                                </div>
+                                <div class="col-md-4">
+                                    <label class="form-label">City</label>
+                                    <input class="form-control" name="municipality_city" maxlength="150" value="<?= htmlspecialchars((string)($officialInfo['municipality_city'] ?? 'Rodriguez (Montalban)'), ENT_QUOTES, 'UTF-8') ?>" required>
+                                </div>
+                                <div class="col-md-4">
+                                    <label class="form-label">Province</label>
+                                    <input class="form-control" name="province" maxlength="150" value="<?= htmlspecialchars((string)($officialInfo['province'] ?? 'Rizal'), ENT_QUOTES, 'UTF-8') ?>" required>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                     <div class="col-12">
                         <button class="btn btn-primary" type="submit">Save and Continue</button>
@@ -1342,15 +1586,19 @@ document.addEventListener("DOMContentLoaded", () => {
   const modeEl = document.getElementById("officialAddressMode");
   const houseEl = document.getElementById("officialHouseNumber");
   const streetEl = document.getElementById("officialStreetName");
+  const houseWrap = document.getElementById("officialHouseWrap");
+  const streetWrap = document.getElementById("officialStreetWrap");
   const blockWrap = document.getElementById("officialBlockWrap");
   const lotWrap = document.getElementById("officialLotWrap");
   const blockEl = document.getElementById("officialBlockNumber");
   const lotEl = document.getElementById("officialLotNumber");
-  if (!modeEl) return;
 
   const syncAddressMode = () => {
+    if (!modeEl) return;
     const mode = String(modeEl.value || "street").toLowerCase();
     const isBlockLot = mode === "block_lot";
+    if (houseWrap) houseWrap.classList.toggle("d-none", isBlockLot);
+    if (streetWrap) streetWrap.classList.toggle("d-none", isBlockLot);
     if (blockWrap) blockWrap.classList.toggle("d-none", !isBlockLot);
     if (lotWrap) lotWrap.classList.toggle("d-none", !isBlockLot);
     if (houseEl) houseEl.required = !isBlockLot;
@@ -1359,8 +1607,134 @@ document.addEventListener("DOMContentLoaded", () => {
     if (lotEl) lotEl.required = isBlockLot;
   };
 
-  modeEl.addEventListener("change", syncAddressMode);
-  syncAddressMode();
+  if (modeEl) {
+    modeEl.addEventListener("change", syncAddressMode);
+    syncAddressMode();
+  }
+
+  const infoAction = document.querySelector('input[name="action"][value="save_official_info"]');
+  const infoForm = infoAction ? infoAction.closest("form") : null;
+  const addressAction = document.querySelector('input[name="action"][value="save_official_address"]');
+  const addressForm = addressAction ? addressAction.closest("form") : null;
+
+  const nameRegex = /^[A-Za-z][A-Za-z .'-]*$/;
+  const addressRegex = /^[A-Za-z0-9#.,'/-][A-Za-z0-9#.,'/- ]*$/;
+  const shortAddressRegex = /^[A-Za-z0-9#/-][A-Za-z0-9#/- ]*$/;
+
+  const hasLetter = (v) => /[A-Za-z]/.test(String(v || ""));
+  const normalizePhone10 = (value) => {
+    let digits = String(value || "").replace(/\D/g, "");
+    if (digits.startsWith("63") && digits.length === 12) {
+      digits = digits.slice(2);
+    }
+    if (digits.startsWith("0") && digits.length === 11) {
+      digits = digits.slice(1);
+    }
+    if (digits.length > 10) {
+      digits = digits.slice(-10);
+    }
+    return digits;
+  };
+
+  if (infoForm) {
+    const emergencyPhone = infoForm.querySelector('input[name="emergency_contact_phone"]');
+    const emergencyPhoneSameWarning = document.getElementById("emergencyPhoneSameWarning");
+    const updateEmergencyPhoneWarning = () => {
+      const phone = normalizePhone10((emergencyPhone?.value || "").trim());
+      const registeredPhone = normalizePhone10((infoForm.querySelector('input[name="registered_phone"]')?.value || "").trim());
+      const isSame = phone !== "" && registeredPhone !== "" && phone === registeredPhone;
+      emergencyPhoneSameWarning?.classList.toggle("d-none", !isSame);
+      if (emergencyPhone) {
+        emergencyPhone.classList.toggle("is-invalid", isSame);
+        emergencyPhone.setCustomValidity(isSame ? "Emergency contact number must be different from your registered mobile number." : "");
+      }
+      return isSame;
+    };
+    emergencyPhone?.addEventListener("input", () => {
+      emergencyPhone.value = normalizePhone10(emergencyPhone.value);
+      updateEmergencyPhoneWarning();
+    });
+    emergencyPhone?.addEventListener("blur", updateEmergencyPhoneWarning);
+
+    infoForm.addEventListener("submit", (e) => {
+      const emergencyName = (infoForm.querySelector('input[name="emergency_contact_name"]')?.value || "").trim();
+      const relationship = (infoForm.querySelector('[name="emergency_contact_relationship"]')?.value || "").trim();
+      const phone = normalizePhone10((infoForm.querySelector('input[name="emergency_contact_phone"]')?.value || "").trim());
+      const registeredPhone = normalizePhone10((infoForm.querySelector('input[name="registered_phone"]')?.value || "").trim());
+      const emergencyAddress = (infoForm.querySelector('input[name="emergency_contact_address"]')?.value || "").trim();
+      const birthdate = (infoForm.querySelector('input[name="birthdate"]')?.value || "").trim();
+
+      const today = new Date();
+      const bday = birthdate ? new Date(`${birthdate}T00:00:00`) : null;
+      const isBirthValid = bday instanceof Date && !Number.isNaN(bday.getTime()) && bday <= today;
+
+      if (!isBirthValid) {
+        e.preventDefault();
+        alert("Birthdate must be a valid past date.");
+        return;
+      }
+      if (!nameRegex.test(emergencyName)) {
+        e.preventDefault();
+        alert("Emergency contact name is invalid.");
+        return;
+      }
+      if (!relationship) {
+        e.preventDefault();
+        alert("Please select an emergency relationship.");
+        return;
+      }
+      if (!/^9\d{9}$/.test(phone)) {
+        e.preventDefault();
+        alert("Emergency contact number must be in 9XXXXXXXXX format.");
+        return;
+      }
+      if (registeredPhone && phone === registeredPhone) {
+        e.preventDefault();
+        updateEmergencyPhoneWarning();
+        emergencyPhone?.focus();
+        return;
+      }
+      if (!addressRegex.test(emergencyAddress) || !hasLetter(emergencyAddress)) {
+        e.preventDefault();
+        alert("Emergency contact address is invalid.");
+      }
+    });
+    updateEmergencyPhoneWarning();
+  }
+
+  if (addressForm) {
+    addressForm.addEventListener("submit", (e) => {
+      const mode = String(modeEl?.value || "street").toLowerCase();
+      const house = (houseEl?.value || "").trim();
+      const street = (streetEl?.value || "").trim();
+      const lot = (lotEl?.value || "").trim();
+      const block = (blockEl?.value || "").trim();
+      const barangay = (addressForm.querySelector('input[name="barangay"]')?.value || "").trim();
+      const city = (addressForm.querySelector('input[name="municipality_city"]')?.value || "").trim();
+      const province = (addressForm.querySelector('input[name="province"]')?.value || "").trim();
+
+      if (!addressRegex.test(barangay) || !hasLetter(barangay) ||
+          !addressRegex.test(city) || !hasLetter(city) ||
+          !addressRegex.test(province) || !hasLetter(province)) {
+        e.preventDefault();
+        alert("Barangay, municipality/city, and province must contain valid text.");
+        return;
+      }
+      if (mode === "street") {
+        if (!shortAddressRegex.test(house) || !addressRegex.test(street) || !hasLetter(street)) {
+          e.preventDefault();
+          alert("Please provide a valid house number and street name.");
+          return;
+        }
+      } else {
+        if (!shortAddressRegex.test(lot) || !shortAddressRegex.test(block)) {
+          e.preventDefault();
+          alert("Please provide valid lot and block numbers.");
+          return;
+        }
+      }
+    });
+  }
 });
 </script>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
@@ -1384,9 +1758,18 @@ document.addEventListener("DOMContentLoaded", () => {
 
     const setReqState = (el, ok) => {
         if (!el) return;
+        const icon = el.querySelector('.req-icon');
         el.classList.remove('req-valid', 'req-invalid');
+        if (icon) {
+            icon.classList.remove('bi-circle', 'bi-check-circle-fill', 'bi-x-circle-fill');
+            icon.classList.add('bi-circle');
+        }
         if (ok === null) return;
         el.classList.add(ok ? 'req-valid' : 'req-invalid');
+        if (icon) {
+            icon.classList.remove('bi-circle');
+            icon.classList.add(ok ? 'bi-check-circle-fill' : 'bi-x-circle-fill');
+        }
     };
 
     const updateRequirements = (password) => {
