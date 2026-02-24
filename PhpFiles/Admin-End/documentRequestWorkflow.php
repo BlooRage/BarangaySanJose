@@ -32,6 +32,21 @@ function dra_format_full_name_from_payload(array $payload): string {
     return trim(implode(' ', $parts));
 }
 
+function dra_public_base_url(): string {
+    $configured = trim((string)(getenv('APP_BASE_URL') ?: ''));
+    if ($configured !== '') {
+        return rtrim($configured, '/');
+    }
+
+    $scheme = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
+    $host = trim((string)($_SERVER['HTTP_HOST'] ?? ''));
+    if ($host === '' || stripos($host, 'localhost') !== false || strpos($host, '127.0.0.1') === 0) {
+        return 'https://barangaysanjose-montalban.com';
+    }
+
+    return rtrim($scheme . '://' . $host . appRootPath(), '/');
+}
+
 function dra_generate_issued_document(array $requestRow): ?string {
     $baseDir = realpath(__DIR__ . '/../../');
     if ($baseDir === false) {
@@ -70,10 +85,8 @@ function dra_generate_issued_document(array $requestRow): ?string {
     $orNo = trim((string)($requestRow['or_number'] ?? ''));
 
     $verificationCode = trim((string)($requestRow['verification_code'] ?? ''));
-    $baseUrl = ((isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http')
-        . '://' . ($_SERVER['HTTP_HOST'] ?? 'localhost');
-    $verifyUrl = $baseUrl
-        . '/BarangaySanJose/Guest-End/TransactionInformation.html?request_id='
+    $verifyUrl = dra_public_base_url()
+        . appUrl('/Guest-End/TransactionInformation.html?request_id=')
         . rawurlencode($requestId)
         . '&vc=' . rawurlencode($verificationCode !== '' ? $verificationCode : $requestId);
 
