@@ -18,6 +18,20 @@ if ($action === '') {
 
 $currentUserId = (string)($_SESSION['user_id'] ?? '');
 
+function dra_strip_legacy_base(string $publicPath): string {
+    $publicPath = trim($publicPath);
+    $base = rtrim((string)appRootPath(), '/');
+    if ($base !== '' && strpos($publicPath, $base) === 0) {
+        return substr($publicPath, strlen($base));
+    }
+    $projectRoot = realpath(__DIR__ . '/../../');
+    $projectBase = $projectRoot ? trim((string)basename($projectRoot)) : '';
+    if ($projectBase !== '' && strpos($publicPath, '/' . $projectBase) === 0) {
+        return substr($publicPath, strlen('/' . $projectBase));
+    }
+    return $publicPath;
+}
+
 function dra_h(string $v): string {
     return htmlspecialchars($v, ENT_QUOTES, 'UTF-8');
 }
@@ -40,8 +54,8 @@ function dra_public_base_url(): string {
 
     $scheme = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
     $host = trim((string)($_SERVER['HTTP_HOST'] ?? ''));
-    if ($host === '' || stripos($host, 'localhost') !== false || strpos($host, '127.0.0.1') === 0) {
-        return 'https://barangaysanjose-montalban.com';
+    if ($host === '') {
+        $host = 'localhost';
     }
 
     return rtrim($scheme . '://' . $host . appRootPath(), '/');
@@ -331,7 +345,7 @@ if ($action === 'view_payment_proof') {
         http_response_code(500);
         exit('Path resolution failed.');
     }
-    $relative = '/' . ltrim(preg_replace('#^/BarangaySanJose#', '', $publicPath), '/');
+    $relative = '/' . ltrim(dra_strip_legacy_base($publicPath), '/');
     $absolute = realpath($baseDir . $relative);
     if ($absolute === false || !is_file($absolute) || strpos($absolute, $baseDir . '/UnifiedFileAttachment/') !== 0) {
         http_response_code(404);

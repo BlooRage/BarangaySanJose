@@ -46,8 +46,10 @@ function resolveFilePath(string $rawPath, string $projectRoot): string {
     if ($rawPath === '') return '';
 
     $normalized = str_replace("\\", "/", $rawPath);
-    if (strpos($normalized, '/BarangaySanJose/') === 0) {
-        $rel = substr($normalized, strlen('/BarangaySanJose/'));
+    $projectBase = trim((string)basename($projectRoot));
+    $projectPrefix = '/' . $projectBase . '/';
+    if ($projectBase !== '' && strpos($normalized, $projectPrefix) === 0) {
+        $rel = substr($normalized, strlen($projectPrefix));
         return rtrim($projectRoot, "/") . "/" . ltrim($rel, "/");
     }
     if (strpos($normalized, '/UnifiedFileAttachment/') === 0) {

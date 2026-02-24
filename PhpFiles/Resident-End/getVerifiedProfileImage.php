@@ -16,7 +16,19 @@ if (empty($_SESSION['user_id'])) {
 
 require_once __DIR__ . '/../General/connection.php';
 
-$baseUrl = '/BarangaySanJose';
+$scriptName = str_replace("\\", "/", (string)($_SERVER['SCRIPT_NAME'] ?? ''));
+$phpSegmentPos = strpos($scriptName, '/PhpFiles/');
+$baseUrl = '';
+if ($phpSegmentPos !== false) {
+    $baseUrl = substr($scriptName, 0, $phpSegmentPos);
+} else {
+    $baseUrl = dirname($scriptName);
+}
+$baseUrl = rtrim((string)$baseUrl, '/');
+if ($baseUrl === '.' || $baseUrl === '/') {
+    $baseUrl = '';
+}
+
 $profileImage = $baseUrl . '/Images/Profile-Placeholder.png';
 $residentId = '';
 
@@ -51,8 +63,15 @@ function toPublicPath($path): ?string {
         return $baseUrl . $public;
     }
 
-    if (strpos($normalized, '/BarangaySanJose/') === 0) {
+    if ($baseUrl !== '' && strpos($normalized, $baseUrl . '/') === 0) {
         return $normalized;
+    }
+
+    $projectRoot = realpath(__DIR__ . "/../..");
+    $projectBase = $projectRoot ? trim((string)basename($projectRoot)) : '';
+    $projectPrefix = '/' . $projectBase . '/';
+    if ($projectBase !== '' && strpos($normalized, $projectPrefix) === 0) {
+        return ($baseUrl === '' ? '' : $baseUrl) . substr($normalized, strlen('/' . $projectBase));
     }
 
     $webRoot = realpath(__DIR__ . "/../..");
@@ -83,7 +102,17 @@ function publicPathExists(?string $publicPath): bool {
     if (preg_match('#^https?://#i', $publicPath)) {
         return true;
     }
-    $relative = preg_replace('#^/BarangaySanJose#', '', $publicPath);
+    if ($baseUrl !== '' && strpos($publicPath, $baseUrl) === 0) {
+        $relative = substr($publicPath, strlen($baseUrl));
+    } else {
+        $projectRoot = realpath(__DIR__ . "/../..");
+        $projectBase = $projectRoot ? trim((string)basename($projectRoot)) : '';
+        if ($projectBase !== '' && strpos($publicPath, '/' . $projectBase) === 0) {
+            $relative = substr($publicPath, strlen('/' . $projectBase));
+        } else {
+            $relative = $publicPath;
+        }
+    }
     $relative = '/' . ltrim((string)$relative, '/');
     $absolute = realpath(__DIR__ . "/../.." . $relative);
     if ($absolute === false) {

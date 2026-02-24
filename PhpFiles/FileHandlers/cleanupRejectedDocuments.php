@@ -35,11 +35,12 @@ function resolveFilePath(string $rawPath, string $projectRoot): string {
     }
 
     $normalized = str_replace("\\", "/", $rawPath);
-    if (strpos($normalized, '/BarangaySanJose/') === 0) {
-        $rel = substr($normalized, strlen('/BarangaySanJose/'));
+    $projectBase = trim((string)basename($projectRoot));
+    $projectPrefix = '/' . $projectBase . '/';
+    if ($projectBase !== '' && strpos($normalized, $projectPrefix) === 0) {
+        $rel = substr($normalized, strlen($projectPrefix));
         return rtrim($projectRoot, "/") . "/" . ltrim($rel, "/");
     }
-
     // Absolute path (Unix or Windows drive).
     $isAbsolute = startsWith($rawPath, "/") || (bool)preg_match('/^[A-Za-z]:[\\\\\\/]/', $rawPath);
     if ($isAbsolute) {

@@ -1,5 +1,11 @@
 (() => {
-  const endpoint = '/BarangaySanJose/PhpFiles/Admin-End/documentRequestWorkflow.php';
+  const appBase = (() => {
+    const marker = '/Admin-End/';
+    const idx = window.location.pathname.indexOf(marker);
+    if (idx === -1) return '';
+    return window.location.pathname.slice(0, idx);
+  })();
+  const endpoint = `${appBase}/PhpFiles/Admin-End/documentRequestWorkflow.php`;
   const tableBody = document.getElementById('tableBody');
   const searchInput = document.getElementById('searchInput');
   const stageTabs = Array.from(document.querySelectorAll('[data-stage-filter]'));
@@ -210,7 +216,7 @@
         const row = itemById.get(id);
         if (!row || !row.payment_proof_path || !paymentProofModal || !paymentProofWrap || !paymentProofOpenNew) return;
 
-        const proofUrl = '/BarangaySanJose/PhpFiles/Admin-End/documentRequestWorkflow.php?action=view_payment_proof&request_id=' + encodeURIComponent(id);
+        const proofUrl = `${appBase}/PhpFiles/Admin-End/documentRequestWorkflow.php?action=view_payment_proof&request_id=` + encodeURIComponent(id);
         paymentProofOpenNew.href = proofUrl;
 
         const path = String(row.payment_proof_path || '').toLowerCase();

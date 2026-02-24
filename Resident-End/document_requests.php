@@ -165,11 +165,42 @@ require_once __DIR__ . '/includes/resident_access_guard.php';
     return String(v ?? '').replace(/[&<>\"']/g, (m) => ({'&':'&amp;','<':'&lt;','>':'&gt;','\"':'&quot;',"'":'&#39;'}[m]));
   }
 
+  async function fetchJson(url, options = {}) {
+    const headers = new Headers(options.headers || {});
+    if (!headers.has('Accept')) {
+      headers.set('Accept', 'application/json');
+    }
+    headers.set('X-Requested-With', 'XMLHttpRequest');
+
+    const res = await fetch(url, { ...options, headers, credentials: 'same-origin' });
+    const contentType = (res.headers.get('content-type') || '').toLowerCase();
+    const text = await res.text();
+    const looksHtml = text.trim().startsWith('<!DOCTYPE') || text.trim().startsWith('<html');
+
+    if (!contentType.includes('application/json')) {
+      if (looksHtml) {
+        throw new Error('Session expired or invalid endpoint response. Please reload and login again.');
+      }
+      throw new Error('Unexpected response format from server.');
+    }
+
+    let data;
+    try {
+      data = JSON.parse(text);
+    } catch (_) {
+      throw new Error('Invalid JSON response from server.');
+    }
+
+    if (!res.ok) {
+      throw new Error(data?.message || `Request failed (${res.status}).`);
+    }
+    return data;
+  }
+
   async function load() {
     tbody.innerHTML = '<tr><td colspan="7" class="text-center text-muted py-4">Loading requests...</td></tr>';
     try {
-      const res = await fetch(endpoint + '?action=list', { credentials: 'same-origin' });
-      const data = await res.json();
+      const data = await fetchJson(endpoint + '?action=list');
       if (!data.success) throw new Error(data.message || 'Unable to load requests');
 
       const items = Array.isArray(data.items) ? data.items : [];
@@ -290,12 +321,10 @@ require_once __DIR__ . '/includes/resident_access_guard.php';
     fd.append('action', 'submit_payment');
 
     try {
-      const res = await fetch(endpoint, {
+      const data = await fetchJson(endpoint, {
         method: 'POST',
-        body: fd,
-        credentials: 'same-origin'
+        body: fd
       });
-      const data = await res.json();
       if (!data.success) throw new Error(data.message || 'Unable to submit payment.');
       paymentModal.hide();
       await load();

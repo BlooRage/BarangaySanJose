@@ -64,11 +64,11 @@ if (!function_exists('oi_app_base_url')) {
             $prefix = '/' . $parts[0];
         }
 
-        if ($host === '' || stripos($host, 'localhost') !== false || str_starts_with($host, '127.0.0.1')) {
-            return 'https://barangaysanjose-montalban.com';
+        $baseHost = trim((string)$host);
+        if ($baseHost === '') {
+            $baseHost = 'localhost';
         }
-
-        return rtrim($scheme . '://' . $host . $prefix, '/');
+        return rtrim($scheme . '://' . $baseHost . $prefix, '/');
     }
 }
 

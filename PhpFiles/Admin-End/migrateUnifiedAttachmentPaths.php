@@ -6,7 +6,7 @@ require_once "../General/connection.php";
 require_once "../General/security.php";
 
 // Migration tool: rewrites unifiedfileattachmenttbl.file_path to a portable, project-relative format
-// e.g. "/BarangaySanJose/UnifiedFileAttachment/..." or absolute paths -> "UnifiedFileAttachment/..."
+// e.g. "/your-app/UnifiedFileAttachment/..." or absolute paths -> "UnifiedFileAttachment/..."
 //
 // Usage:
 // - POST with mode=dry_run (default) to preview changes

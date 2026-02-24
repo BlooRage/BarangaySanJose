@@ -89,12 +89,12 @@ try {
     // Build verification link (same as sendEmailVerify.php)
     $scheme = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
     $host = $_SERVER['HTTP_HOST'] ?? '';
-    $rootPath = dirname(dirname(dirname($_SERVER['SCRIPT_NAME'] ?? '/BarangaySanJose/PhpFiles/Login/changeEmailSendVerification.php')));
-    if ($host === '' || stripos($host, 'localhost') !== false || strpos($host, '127.0.0.1') === 0) {
-        $baseUrl = 'https://barangaysanjose-montalban.com';
-    } else {
-        $baseUrl = rtrim($scheme . "://" . $host . $rootPath, '/');
+    $rootPath = dirname(dirname(dirname($_SERVER['SCRIPT_NAME'] ?? '/PhpFiles/Login/changeEmailSendVerification.php')));
+    $baseHost = trim((string)$host);
+    if ($baseHost === '') {
+        $baseHost = 'localhost';
     }
+    $baseUrl = rtrim($scheme . "://" . $baseHost . $rootPath, '/');
     $verifyUrl = $baseUrl . "/Guest-End/verifyEmail.php?uid=" . urlencode($userId) . "&token=" . urlencode($rawToken);
 
     // Send verification email (verify template)
@@ -169,4 +169,3 @@ try {
     }
     cem_json(500, ['success' => false, 'message' => 'Server error. Please try again.']);
 }
-

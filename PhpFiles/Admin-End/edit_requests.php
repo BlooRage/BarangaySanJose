@@ -66,8 +66,10 @@ function resolveFilePath(string $rawPath, string $projectRoot): string {
     if ($rawPath === '') return '';
 
     $normalized = str_replace("\\", "/", $rawPath);
-    if (strpos($normalized, '/BarangaySanJose/') === 0) {
-        $rel = substr($normalized, strlen('/BarangaySanJose/'));
+    $projectBase = trim((string)basename($projectRoot));
+    $legacyPrefix = '/' . $projectBase . '/';
+    if ($projectBase !== '' && strpos($normalized, $legacyPrefix) === 0) {
+        $rel = substr($normalized, strlen($legacyPrefix));
         return rtrim($projectRoot, "/") . "/" . ltrim($rel, "/");
     }
     if (strpos($normalized, '/UnifiedFileAttachment/') === 0) {
@@ -166,8 +168,20 @@ function toPublicPath($path): ?string {
         return '..' . $public;
     }
 
-    if (strpos($normalized, '/BarangaySanJose/') === 0) {
+    $baseFromScript = '';
+    $scriptName = str_replace("\\", "/", (string)($_SERVER['SCRIPT_NAME'] ?? ''));
+    $phpPos = strpos($scriptName, '/PhpFiles/');
+    if ($phpPos !== false) {
+        $baseFromScript = rtrim(substr($scriptName, 0, $phpPos), '/');
+    }
+    if ($baseFromScript !== '' && strpos($normalized, $baseFromScript . '/') === 0) {
         return $normalized;
+    }
+    $projectRoot = realpath(__DIR__ . "/../..");
+    $projectBase = $projectRoot ? trim((string)basename($projectRoot)) : '';
+    $projectPrefix = '/' . $projectBase . '/';
+    if ($projectBase !== '' && strpos($normalized, $projectPrefix) === 0) {
+        return ($baseFromScript === '' ? '' : $baseFromScript) . substr($normalized, strlen('/' . $projectBase));
     }
 
     $webRoot = realpath(__DIR__ . "/../..");

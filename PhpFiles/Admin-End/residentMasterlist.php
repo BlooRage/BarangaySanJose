@@ -400,8 +400,20 @@ function toPublicPath($path): ?string {
     }
 
     // If stored as a full web path, keep it.
-    if (strpos($normalized, '/BarangaySanJose/') === 0) {
+    $baseFromScript = '';
+    $scriptName = str_replace("\\", "/", (string)($_SERVER['SCRIPT_NAME'] ?? ''));
+    $phpPos = strpos($scriptName, '/PhpFiles/');
+    if ($phpPos !== false) {
+        $baseFromScript = rtrim(substr($scriptName, 0, $phpPos), '/');
+    }
+    if ($baseFromScript !== '' && strpos($normalized, $baseFromScript . '/') === 0) {
         return $normalized;
+    }
+    $projectRoot = realpath(__DIR__ . "/../..");
+    $projectBase = $projectRoot ? trim((string)basename($projectRoot)) : '';
+    $projectPrefix = '/' . $projectBase . '/';
+    if ($projectBase !== '' && strpos($normalized, $projectPrefix) === 0) {
+        return ($baseFromScript === '' ? '' : $baseFromScript) . substr($normalized, strlen('/' . $projectBase));
     }
 
     $webRoot = realpath(__DIR__ . "/../..");

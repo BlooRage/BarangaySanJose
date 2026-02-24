@@ -45,7 +45,7 @@ initializeSecureSession();
 
 // Build a stable app-root URL prefix so redirects work whether the app is hosted at:
 // - domain root (e.g. "/Admin-End/..."), or
-// - a subfolder (e.g. "/BarangaySanJose/Admin-End/...").
+// - a subfolder (e.g. "/your-app/Admin-End/...").
 function appRootPath(): string
 {
     $script = (string)($_SERVER['SCRIPT_NAME'] ?? '');

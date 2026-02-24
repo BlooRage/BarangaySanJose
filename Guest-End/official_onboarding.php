@@ -1259,11 +1259,11 @@ if ($mode === 'password') {
                 <ul id="navbarLinks" class="navbar-nav ms-auto">
                     <?php if (!empty($_SESSION['user_id'])): ?>
                         <li class="nav-item">
-                            <a class="nav-link logout-link" href="/BarangaySanJose/PhpFiles/Login/logout.php">Logout</a>
+                            <a class="nav-link logout-link" href="<?= htmlspecialchars(appUrl('/PhpFiles/Login/logout.php')) ?>">Logout</a>
                         </li>
                     <?php else: ?>
                         <li class="nav-item">
-                            <a class="nav-link" href="/BarangaySanJose/Guest-End/login.php">Login</a>
+                            <a class="nav-link" href="<?= htmlspecialchars(appUrl('/Guest-End/login.php')) ?>">Login</a>
                         </li>
                     <?php endif; ?>
                 </ul>

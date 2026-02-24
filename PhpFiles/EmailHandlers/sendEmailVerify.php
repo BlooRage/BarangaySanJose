@@ -79,14 +79,13 @@ $ins->execute();
 // 4) Build verification link
 $scheme = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
 $host = $_SERVER['HTTP_HOST'] ?? '';
-$rootPath = dirname(dirname(dirname($_SERVER['SCRIPT_NAME'] ?? '/BarangaySanJose/PhpFiles/EmailHandlers/sendEmailVerify.php')));
+$rootPath = dirname(dirname(dirname($_SERVER['SCRIPT_NAME'] ?? '/PhpFiles/EmailHandlers/sendEmailVerify.php')));
 
-// Force production domain when running on localhost.
-if ($host === '' || stripos($host, 'localhost') !== false || strpos($host, '127.0.0.1') === 0) {
-  $baseUrl = 'https://barangaysanjose-montalban.com';
-} else {
-  $baseUrl = rtrim($scheme . "://" . $host . $rootPath, '/');
+$baseHost = trim((string)$host);
+if ($baseHost === '') {
+  $baseHost = 'localhost';
 }
+$baseUrl = rtrim($scheme . "://" . $baseHost . $rootPath, '/');
 $verifyUrl = $baseUrl . "/Guest-End/verifyEmail.php?uid=" . urlencode($userId) . "&token=" . urlencode($rawToken);
 
 // 5) Load SMTP config + send

@@ -66,6 +66,17 @@ if ($residentId === '' || $sourceId !== $residentId) {
     exit;
 }
 
+function currentAppBasePath(): string {
+    $scriptName = str_replace("\\", "/", (string)($_SERVER['SCRIPT_NAME'] ?? ''));
+    $pos = strpos($scriptName, '/PhpFiles/');
+    $base = $pos !== false ? substr($scriptName, 0, $pos) : dirname($scriptName);
+    $base = rtrim((string)$base, '/');
+    if ($base === '.' || $base === '/') {
+        return '';
+    }
+    return $base;
+}
+
 function toPublicPath(string $path): string {
     $normalized = str_replace("\\", "/", trim($path));
     if ($normalized === '') {
@@ -78,8 +89,15 @@ function toPublicPath(string $path): string {
         return '..' . substr($normalized, $markerPos);
     }
 
-    if (strpos($normalized, '/BarangaySanJose/') === 0) {
+    $appBase = currentAppBasePath();
+    if ($appBase !== '' && strpos($normalized, $appBase . '/') === 0) {
         return $normalized;
+    }
+    $projectRoot = realpath(__DIR__ . '/../../');
+    $projectBase = $projectRoot ? trim((string)basename($projectRoot)) : '';
+    $projectPrefix = '/' . $projectBase . '/';
+    if ($projectBase !== '' && strpos($normalized, $projectPrefix) === 0) {
+        return ($appBase === '' ? '' : $appBase) . substr($normalized, strlen('/' . $projectBase));
     }
 
     return '../' . ltrim($normalized, '/');

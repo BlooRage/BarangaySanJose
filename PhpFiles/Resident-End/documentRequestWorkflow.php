@@ -23,6 +23,31 @@ if ($residentId === '') {
     dr_respond_json(422, ['success' => false, 'message' => 'Resident profile is incomplete.']);
 }
 
+function dr_app_base_path(): string {
+    $scriptName = str_replace("\\", "/", (string)($_SERVER['SCRIPT_NAME'] ?? ''));
+    $pos = strpos($scriptName, '/PhpFiles/');
+    $base = $pos !== false ? substr($scriptName, 0, $pos) : dirname($scriptName);
+    $base = rtrim((string)$base, '/');
+    if ($base === '.' || $base === '/') {
+        return '';
+    }
+    return $base;
+}
+
+function dr_strip_legacy_base(string $publicPath): string {
+    $publicPath = trim($publicPath);
+    $base = dr_app_base_path();
+    if ($base !== '' && strpos($publicPath, $base) === 0) {
+        return substr($publicPath, strlen($base));
+    }
+    $projectRoot = realpath(__DIR__ . '/../../');
+    $projectBase = $projectRoot ? trim((string)basename($projectRoot)) : '';
+    if ($projectBase !== '' && strpos($publicPath, '/' . $projectBase) === 0) {
+        return substr($publicPath, strlen('/' . $projectBase));
+    }
+    return $publicPath;
+}
+
 function dr_allowed_extension(string $name): bool {
     $ext = strtolower(pathinfo($name, PATHINFO_EXTENSION));
     return in_array($ext, ['jpg', 'jpeg', 'png', 'webp', 'pdf'], true);
@@ -310,7 +335,7 @@ if ($action === 'submit_request') {
     }
 
     if ((isset($_POST['redirect']) && $_POST['redirect'] === '1') || strpos((string)($_SERVER['HTTP_ACCEPT'] ?? ''), 'text/html') !== false) {
-        header('Location: /BarangaySanJose/Resident-End/document_requests.php?created=' . urlencode($requestId));
+        header('Location: ' . dr_app_base_path() . '/Resident-End/document_requests.php?created=' . urlencode($requestId));
         exit;
     }
 
@@ -403,7 +428,7 @@ if ($action === 'download_issued') {
         exit('Path resolution failed.');
     }
 
-    $relative = '/' . ltrim(preg_replace('#^/BarangaySanJose#', '', $publicPath), '/');
+    $relative = '/' . ltrim(dr_strip_legacy_base($publicPath), '/');
     $absolute = realpath($baseDir . $relative);
 
     if ($absolute === false || !is_file($absolute) || strpos($absolute, $baseDir . '/UnifiedFileAttachment/') !== 0) {
@@ -444,7 +469,7 @@ if ($action === 'view_payment_proof') {
         exit('Path resolution failed.');
     }
 
-    $relative = '/' . ltrim(preg_replace('#^/BarangaySanJose#', '', $publicPath), '/');
+    $relative = '/' . ltrim(dr_strip_legacy_base($publicPath), '/');
     $absolute = realpath($baseDir . $relative);
     if ($absolute === false || !is_file($absolute) || strpos($absolute, $baseDir . '/UnifiedFileAttachment/') !== 0) {
         http_response_code(404);

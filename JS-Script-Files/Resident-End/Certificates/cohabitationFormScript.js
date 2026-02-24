@@ -1,4 +1,10 @@
 document.addEventListener("DOMContentLoaded", () => {
+    const appBase = (() => {
+        const marker = "/Resident-End/";
+        const idx = window.location.pathname.indexOf(marker);
+        if (idx === -1) return "";
+        return window.location.pathname.slice(0, idx);
+    })();
     const form = document.getElementById("cohabitationForm");
     const agree = document.getElementById("cohabitationAgree");
     const submitBtn = document.getElementById("cohabitationSubmit");
@@ -404,7 +410,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     const initAddressData = async () => {
         try {
-            const res = await fetch("/BarangaySanJose/JS-Script-Files/Resident-End/Certificates/data/cluster.json", {
+            const res = await fetch(`${appBase}/JS-Script-Files/Resident-End/Certificates/data/cluster.json`, {
                 cache: "no-store"
             });
             if (!res.ok) return;
