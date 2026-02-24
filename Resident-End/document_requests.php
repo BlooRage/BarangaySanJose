@@ -1,4 +1,20 @@
 <?php
+if (!isset($baseUrl)) {
+    $scriptName = str_replace("\\", "/", (string)($_SERVER['SCRIPT_NAME'] ?? ''));
+    $residentSegmentPos = strpos($scriptName, '/Resident-End/');
+    $baseUrl = '';
+    if ($residentSegmentPos !== false) {
+        $baseUrl = substr($scriptName, 0, $residentSegmentPos);
+    } else {
+        $baseUrl = dirname($scriptName);
+    }
+    $baseUrl = rtrim((string)$baseUrl, '/');
+    if ($baseUrl === '.' || $baseUrl === '/') {
+        $baseUrl = '';
+    }
+}
+?>
+<?php
 $allowUnregistered = false;
 require_once __DIR__ . '/includes/resident_access_guard.php';
 ?>
@@ -10,8 +26,8 @@ require_once __DIR__ . '/includes/resident_access_guard.php';
   <title>Document Requests</title>
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
-  <link rel="stylesheet" href="/BarangaySanJose/CSS-Styles/Resident-End-CSS/residentDashboard.css">
-  <link rel="stylesheet" href="/BarangaySanJose/CSS-Styles/Guest-End-CSS/GeneralStyle.css">
+  <link rel="stylesheet" href="<?= htmlspecialchars($baseUrl) ?>/CSS-Styles/Resident-End-CSS/residentDashboard.css">
+  <link rel="stylesheet" href="<?= htmlspecialchars($baseUrl) ?>/CSS-Styles/Guest-End-CSS/GeneralStyle.css">
 </head>
 <body>
 <div class="d-flex min-vh-100">
@@ -120,7 +136,7 @@ require_once __DIR__ . '/includes/resident_access_guard.php';
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 <script>
 (() => {
-  const endpoint = '/BarangaySanJose/PhpFiles/Resident-End/documentRequestWorkflow.php';
+  const endpoint = '<?= htmlspecialchars($baseUrl) ?>/PhpFiles/Resident-End/documentRequestWorkflow.php';
   const tbody = document.getElementById('requestRows');
   const btnRefresh = document.getElementById('btnRefresh');
   const paymentModal = new bootstrap.Modal(document.getElementById('paymentModal'));

@@ -1,4 +1,20 @@
 <?php
+if (!isset($baseUrl)) {
+    $scriptName = str_replace("\\", "/", (string)($_SERVER['SCRIPT_NAME'] ?? ''));
+    $residentSegmentPos = strpos($scriptName, '/Resident-End/');
+    $baseUrl = '';
+    if ($residentSegmentPos !== false) {
+        $baseUrl = substr($scriptName, 0, $residentSegmentPos);
+    } else {
+        $baseUrl = dirname($scriptName);
+    }
+    $baseUrl = rtrim((string)$baseUrl, '/');
+    if ($baseUrl === '.' || $baseUrl === '/') {
+        $baseUrl = '';
+    }
+}
+?>
+<?php
 $allowUnregistered = true;
 require_once __DIR__ . "/includes/resident_access_guard.php";
 ?>
@@ -77,7 +93,7 @@ require_once __DIR__ . "/includes/resident_access_guard.php";
 
         <div class="collapse navbar-collapse" id="navbarNav">
           <ul id="navbarLinks" class="navbar-nav ms-auto">
-            <li class="nav-item"><a class="nav-link logout-link" href="/BarangaySanJose/PhpFiles/Login/logout.php" data-logout-message="Are you sure you want to logout? Changes won't be saved.">Logout</a></li>
+            <li class="nav-item"><a class="nav-link logout-link" href="<?= htmlspecialchars($baseUrl) ?>/PhpFiles/Login/logout.php" data-logout-message="Are you sure you want to logout? Changes won't be saved.">Logout</a></li>
           </ul>
         </div>
 

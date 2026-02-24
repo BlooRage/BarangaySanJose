@@ -1,3 +1,19 @@
+<?php
+if (!isset($baseUrl)) {
+    $scriptName = str_replace("\\", "/", (string)($_SERVER['SCRIPT_NAME'] ?? ''));
+    $residentSegmentPos = strpos($scriptName, '/Resident-End/');
+    $baseUrl = '';
+    if ($residentSegmentPos !== false) {
+        $baseUrl = substr($scriptName, 0, $residentSegmentPos);
+    } else {
+        $baseUrl = dirname($scriptName);
+    }
+    $baseUrl = rtrim((string)$baseUrl, '/');
+    if ($baseUrl === '.' || $baseUrl === '/') {
+        $baseUrl = '';
+    }
+}
+?>
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -17,7 +33,7 @@
     <main id="div-mainDisplay" class="flex-grow-1 px-4 pb-4 pt-0 px-md-5 pb-md-5 pt-md-0 bg-light">
         <div class="main-head application-card orange-card py-3 my-5 rounded">
             <div class="main-head-content">
-            <a href="/BarangaySanJose/Resident-End/Clearances/ClearancesLandingPage.php" class="back-link">< Go Back</a>
+            <a href="<?= htmlspecialchars($baseUrl) ?>/Resident-End/Clearances/ClearancesLandingPage.php" class="back-link">< Go Back</a>
             <h1 class="form-title">Application for Barangay Business Clearance</h1>
             <p class="form-subtitle">First Time Job Seeker</p>
             <p class="form-subtitle tight-subtitle">All fields marked with <span class="required-asterisk">*</span> are required</p>

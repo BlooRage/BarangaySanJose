@@ -1,3 +1,19 @@
+<?php
+if (!isset($baseUrl)) {
+    $scriptName = str_replace("\\", "/", (string)($_SERVER['SCRIPT_NAME'] ?? ''));
+    $residentSegmentPos = strpos($scriptName, '/Resident-End/');
+    $baseUrl = '';
+    if ($residentSegmentPos !== false) {
+        $baseUrl = substr($scriptName, 0, $residentSegmentPos);
+    } else {
+        $baseUrl = dirname($scriptName);
+    }
+    $baseUrl = rtrim((string)$baseUrl, '/');
+    if ($baseUrl === '.' || $baseUrl === '/') {
+        $baseUrl = '';
+    }
+}
+?>
 ﻿<?php
 $residentinformationtbl = [
     'firstname' => 'Juan',
@@ -46,7 +62,7 @@ $useraccountstbl = [
             <div class="main-head application-card orange-card py-3 my-5 rounded">
                 <div class="main-head-content">
 
-                    <a href="/BarangaySanJose/Resident-End/ApplicationsLandingPage.php" class="back-link">&lt; Go Back</a>
+                    <a href="<?= htmlspecialchars($baseUrl) ?>/Resident-End/ApplicationsLandingPage.php" class="back-link">&lt; Go Back</a>
 
                     <h1 class="form-title">Application for Barangay Certification</h1>
                     <p class="form-subtitle">First Time Job Seeker</p>

@@ -1,4 +1,20 @@
 <?php
+if (!isset($baseUrl)) {
+    $scriptName = str_replace("\\", "/", (string)($_SERVER['SCRIPT_NAME'] ?? ''));
+    $residentSegmentPos = strpos($scriptName, '/Resident-End/');
+    $baseUrl = '';
+    if ($residentSegmentPos !== false) {
+        $baseUrl = substr($scriptName, 0, $residentSegmentPos);
+    } else {
+        $baseUrl = dirname($scriptName);
+    }
+    $baseUrl = rtrim((string)$baseUrl, '/');
+    if ($baseUrl === '.' || $baseUrl === '/') {
+        $baseUrl = '';
+    }
+}
+?>
+<?php
 $allowUnregistered = false;
 require_once __DIR__ . "/../includes/resident_access_guard.php";
 
@@ -96,7 +112,7 @@ $fullAddress = htmlspecialchars(implode(', ', $fullAddressParts), ENT_QUOTES, 'U
         <main id="div-mainDisplay" class="flex-grow-1 px-4 pb-4  pt-0 px-md-5 pb-md-5 pt-md-0 bg-light">
             <div class="main-head application-card orange-card py-3 my-5 rounded application-card--muted">
                 <div class="main-head-content">
-                    <a href="/BarangaySanJose/Resident-End/Certificates/CertificatesLandingPage.php" class="back-link">&lt; Go Back</a>
+                    <a href="<?= htmlspecialchars($baseUrl) ?>/Resident-End/Certificates/CertificatesLandingPage.php" class="back-link">&lt; Go Back</a>
                     <h1 class="form-title">Residency</h1>
                     <p class="form-subtitle">All fields marked with <span class="required-asterisk">*</span> are required</p>
 
