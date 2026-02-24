@@ -11,6 +11,27 @@ if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 
+$scriptName = str_replace("\\", "/", (string)($_SERVER['SCRIPT_NAME'] ?? ''));
+$adminSegmentPos = strpos($scriptName, '/Admin-End/');
+$baseUrl = '';
+if ($adminSegmentPos !== false) {
+    $baseUrl = substr($scriptName, 0, $adminSegmentPos);
+} else {
+    $baseUrl = dirname($scriptName);
+}
+$baseUrl = rtrim((string)$baseUrl, '/');
+if ($baseUrl === '.' || $baseUrl === '/') {
+    $baseUrl = '';
+}
+
+if (!function_exists('appUrl')) {
+    function appUrl(string $path): string
+    {
+        global $baseUrl;
+        return ($baseUrl === '' ? '' : $baseUrl) . '/' . ltrim($path, '/');
+    }
+}
+
 $isResidentMgmtActive = in_array($current, $residentMgmtPages);
 $isCertActive = in_array($current, $certPages);
 $isUserMgmtActive = in_array($current, $userMgmtPages);
@@ -107,8 +128,8 @@ if (!empty($_SESSION['user_id']) && isset($conn) && $conn instanceof mysqli) {
      id="dashboard-sidebar">
 
   <!-- LOGO -->
-  <a href="AdminDashboard.php" class="d-flex align-items-center pb-3 mb-3 link-dark text-decoration-none border-bottom">
-    <img src="../Images/San_Jose_LOGO.jpg" class="me-2" style="width: 32px; height: 32px;">
+  <a href="<?= htmlspecialchars(appUrl('Admin-End/AdminDashboard.php')) ?>" class="d-flex align-items-center pb-3 mb-3 link-dark text-decoration-none border-bottom">
+    <img src="<?= htmlspecialchars(appUrl('Images/San_Jose_LOGO.jpg')) ?>" class="me-2" style="width: 32px; height: 32px;">
     <span class="fs-5 fw-semibold logo-name">Barangay San Jose</span>
   </a>
 
@@ -119,7 +140,7 @@ if (!empty($_SESSION['user_id']) && isset($conn) && $conn instanceof mysqli) {
 
       <!-- DASHBOARD -->
       <li class="mb-2">
-        <a href="AdminDashboard.php"
+        <a href="<?= htmlspecialchars(appUrl('Admin-End/AdminDashboard.php')) ?>"
            class="btn btn-toggle d-flex align-items-center gap-2 rounded <?= $current == 'AdminDashboard.php' ? 'active' : '' ?>"
            style="<?= $current == 'AdminDashboard.php' ? 'outline: none; box-shadow: none;' : '' ?>">
           <i class="fas fa-chart-area"></i> Dashboard
@@ -141,31 +162,31 @@ if (!empty($_SESSION['user_id']) && isset($conn) && $conn instanceof mysqli) {
         <div class="collapse <?= $isResidentMgmtActive ? 'show' : '' ?>" id="resident-mgmt-collapse">
           <ul class="btn-toggle-nav list-unstyled fw-normal pb-1 small">
             <li>
-              <a href="ResidentMasterlist.php"
+              <a href="<?= htmlspecialchars(appUrl('Admin-End/ResidentMasterlist.php')) ?>"
                  class="link-dark rounded <?= $current == 'ResidentMasterlist.php' ? 'active' : '' ?>">
                 Masterlist
               </a>
             </li>
             <li>
-              <a href="EditRequests.php"
+              <a href="<?= htmlspecialchars(appUrl('Admin-End/EditRequests.php')) ?>"
                  class="link-dark rounded <?= $current == 'EditRequests.php' ? 'active' : '' ?>">
                 Edit Requests
               </a>
             </li>
             <li>
-              <a href="ResidentArchive.php"
+              <a href="<?= htmlspecialchars(appUrl('Admin-End/ResidentArchive.php')) ?>"
                  class="link-dark rounded <?= $current == 'ResidentArchive.php' ? 'active' : '' ?>">
                 Resident Archive
               </a>
             </li>
             <li>
-              <a href="SectorMembershipVerification.php"
+              <a href="<?= htmlspecialchars(appUrl('Admin-End/SectorMembershipVerification.php')) ?>"
                  class="link-dark rounded <?= $current == 'SectorMembershipVerification.php' ? 'active' : '' ?>">
                 Sector Membership Verification
               </a>
             </li>
             <li>
-              <a href="HouseholdProfiling.php"
+              <a href="<?= htmlspecialchars(appUrl('Admin-End/HouseholdProfiling.php')) ?>"
                  class="link-dark rounded <?= $current == 'HouseholdProfiling.php' ? 'active' : '' ?>">
                 Household Profiling
               </a>
@@ -185,8 +206,8 @@ if (!empty($_SESSION['user_id']) && isset($conn) && $conn instanceof mysqli) {
 
         <div class="collapse <?= $isCertActive ? 'show' : '' ?>" id="cert-collapse">
           <ul class="btn-toggle-nav list-unstyled fw-normal pb-1 small">
-            <li><a href="/BarangaySanJose/Admin-End/Certificates/CertificateTracker.php" class="link-dark rounded <?= $current == 'CertificateTracker.php' ? 'active' : '' ?>">Tracker</a></li>
-            <li><a href="/BarangaySanJose/Admin-End/Certificates/FinancePayments.php" class="link-dark rounded <?= $current == 'FinancePayments.php' ? 'active' : '' ?>">Finance Payments</a></li>
+            <li><a href="<?= htmlspecialchars(appUrl('Admin-End/Certificates/CertificateTracker.php')) ?>" class="link-dark rounded <?= $current == 'CertificateTracker.php' ? 'active' : '' ?>">Tracker</a></li>
+            <li><a href="<?= htmlspecialchars(appUrl('Admin-End/Certificates/FinancePayments.php')) ?>" class="link-dark rounded <?= $current == 'FinancePayments.php' ? 'active' : '' ?>">Finance Payments</a></li>
           </ul>
         </div>
       </li>
@@ -205,13 +226,13 @@ if (!empty($_SESSION['user_id']) && isset($conn) && $conn instanceof mysqli) {
         <div class="collapse <?= $isAdminMgmtActive ? 'show' : '' ?>" id="adminmgmt-collapse">
           <ul class="btn-toggle-nav list-unstyled fw-normal pb-1 small">
             <li>
-              <a href="OfficialsManagement.php"
+              <a href="<?= htmlspecialchars(appUrl('Admin-End/OfficialsManagement.php')) ?>"
                  class="link-dark rounded <?= $current == 'OfficialsManagement.php' ? 'active' : '' ?>">
                 Officials Management
               </a>
             </li>
             <li>
-              <a href="OfficialInvites.php"
+              <a href="<?= htmlspecialchars(appUrl('Admin-End/OfficialInvites.php')) ?>"
                  class="link-dark rounded <?= $current == 'OfficialInvites.php' ? 'active' : '' ?>">
                 Personnel Invite
               </a>
@@ -240,7 +261,7 @@ if (!empty($_SESSION['user_id']) && isset($conn) && $conn instanceof mysqli) {
         <div class="collapse <?= $isUserMgmtActive ? 'show' : '' ?>" id="usermgmt-collapse">
           <ul class="btn-toggle-nav list-unstyled fw-normal pb-1 small">
             <li>
-              <a href="UserMasterlist.php"
+              <a href="<?= htmlspecialchars(appUrl('Admin-End/UserMasterlist.php')) ?>"
                  class="link-dark rounded <?= $current == 'UserMasterlist.php' ? 'active' : '' ?>">
                 User Masterlist
               </a>
@@ -250,7 +271,7 @@ if (!empty($_SESSION['user_id']) && isset($conn) && $conn instanceof mysqli) {
       </li>
 
       <li class="mb-1">
-        <a href="AuditLogs.php"
+        <a href="<?= htmlspecialchars(appUrl('Admin-End/AuditLogs.php')) ?>"
            class="btn btn-toggle d-flex align-items-center gap-2 rounded <?= $current == 'AuditLogs.php' ? 'active' : '' ?>"
            style="<?= $current == 'AuditLogs.php' ? 'outline: none; box-shadow: none;' : '' ?>">
           <i class="fas fa-clipboard-list"></i> Audit Logs
@@ -266,15 +287,15 @@ if (!empty($_SESSION['user_id']) && isset($conn) && $conn instanceof mysqli) {
       <div class="dropdown mb-2 w-100">
         <a href="#" class="d-flex align-items-center link-dark text-decoration-none dropdown-toggle w-100"
            data-bs-toggle="dropdown">
-          <img src="../Images/Profile-Placeholder.png" width="40" height="40" class="rounded-circle me-2">
+          <img src="<?= htmlspecialchars(appUrl('Images/Profile-Placeholder.png')) ?>" width="40" height="40" class="rounded-circle me-2">
           <div class="flex-grow-1" style="min-width: 0;">
             <span class="d-block fw-bold text-truncate mb-0"><?= htmlspecialchars($adminDisplayName) ?></span>
             <small class="d-block text-muted text-truncate"><?= htmlspecialchars($adminPosition) ?></small>
           </div>
         </a>
         <ul class="dropdown-menu text-small shadow">
-          <li><a class="dropdown-item" href="admin_profile.php">Profile</a></li>
-          <li><a class="dropdown-item" href="../PhpFiles/Login/logout.php">Sign out</a></li>
+          <li><a class="dropdown-item" href="<?= htmlspecialchars(appUrl('Admin-End/admin_profile.php')) ?>">Profile</a></li>
+          <li><a class="dropdown-item" href="<?= htmlspecialchars(appUrl('PhpFiles/Login/logout.php')) ?>">Sign out</a></li>
         </ul>
       </div>
     </div>
