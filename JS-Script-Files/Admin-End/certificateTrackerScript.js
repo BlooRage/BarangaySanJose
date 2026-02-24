@@ -93,6 +93,38 @@
     `;
   }
 
+  async function fetchJson(url, options = {}) {
+    const headers = new Headers(options.headers || {});
+    if (!headers.has('Accept')) {
+      headers.set('Accept', 'application/json');
+    }
+    headers.set('X-Requested-With', 'XMLHttpRequest');
+
+    const res = await fetch(url, { ...options, headers, credentials: 'same-origin' });
+    const contentType = (res.headers.get('content-type') || '').toLowerCase();
+    const text = await res.text();
+    const looksHtml = text.trim().startsWith('<!DOCTYPE') || text.trim().startsWith('<html');
+
+    if (!contentType.includes('application/json')) {
+      if (looksHtml) {
+        throw new Error('Session expired or server returned HTML. Please reload and login again.');
+      }
+      throw new Error('Unexpected response format from server.');
+    }
+
+    let data;
+    try {
+      data = JSON.parse(text);
+    } catch (_) {
+      throw new Error('Invalid JSON response from server.');
+    }
+
+    if (!res.ok) {
+      throw new Error(data?.message || `Request failed (${res.status}).`);
+    }
+    return data;
+  }
+
   async function load() {
     tableBody.innerHTML = '<tr><td colspan="7" class="text-center text-muted py-4">Loading...</td></tr>';
     try {
@@ -101,8 +133,7 @@
       const q = (searchInput.value || '').trim();
       if (q) params.set('q', q);
 
-      const res = await fetch(`${endpoint}?${params.toString()}`, { credentials: 'same-origin' });
-      const data = await res.json();
+      const data = await fetchJson(`${endpoint}?${params.toString()}`);
       if (!data.success) throw new Error(data.message || 'Failed to load requests.');
 
       const items = Array.isArray(data.items) ? data.items : [];
@@ -258,12 +289,10 @@
     }
 
     try {
-      const res = await fetch(endpoint, {
+      const data = await fetchJson(endpoint, {
         method: 'POST',
-        body: fd,
-        credentials: 'same-origin'
+        body: fd
       });
-      const data = await res.json();
       if (!data.success) throw new Error(data.message || 'Action failed');
 
       actionModal.hide();

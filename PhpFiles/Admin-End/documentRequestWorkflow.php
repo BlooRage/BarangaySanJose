@@ -4,7 +4,6 @@ declare(strict_types=1);
 require_once __DIR__ . '/../General/security.php';
 require_once __DIR__ . '/../General/connection.php';
 require_once __DIR__ . '/../General/documentRequestWorkflow.php';
-require_once __DIR__ . '/../../composer-email-handler/vendor/autoload.php';
 
 requireRoleSession(['SuperAdmin', 'Official', 'Officials', 'Personnel', 'Personnels', 'Admin', 'Employee'], true);
 
@@ -62,6 +61,24 @@ function dra_public_base_url(): string {
 }
 
 function dra_generate_issued_document(array $requestRow): ?string {
+    if (!class_exists('FPDF')) {
+        $fpdfPaths = [
+            __DIR__ . '/../../composer-email-handler/vendor/autoload.php',
+            __DIR__ . '/../../vendor/autoload.php',
+        ];
+        foreach ($fpdfPaths as $autoloadPath) {
+            if (is_file($autoloadPath)) {
+                require_once $autoloadPath;
+                if (class_exists('FPDF')) {
+                    break;
+                }
+            }
+        }
+    }
+    if (!class_exists('FPDF')) {
+        return null;
+    }
+
     $baseDir = realpath(__DIR__ . '/../../');
     if ($baseDir === false) {
         return null;
