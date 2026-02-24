@@ -148,6 +148,11 @@ body {
     border-radius: 6px;
     font-size: 14px;
 }
+
+.form-row select {
+    padding-right: 2.5rem;
+}
+
 .form-row textarea {
     resize: none;
 }

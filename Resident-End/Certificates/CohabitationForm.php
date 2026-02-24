@@ -160,32 +160,13 @@ $applicantArea = htmlspecialchars($areaNumber, ENT_QUOTES, 'UTF-8');
                         <div class="form-row">
                             <div class="full-width">
                                 <label class="top-label">Complete Address <span class="required-asterisk">*</span></label>
-                                <div class="row g-3">
-                                    <div class="col-md-4">
-                                        <label class="top-label">Unit / Apartment Number</label>
-                                        <input type="text" class="form-control" name="full_unit_number" readonly value="<?php echo $applicantUnit; ?>">
-                                    </div>
-                                    <div class="col-md-4">
-                                        <label class="top-label">House / Lot Number</label>
-                                        <input type="text" class="form-control" name="full_house_lot_number" readonly value="<?php echo $applicantHouseOrLot; ?>">
-                                    </div>
-                                    <div class="col-md-4">
-                                        <label class="top-label">Street / Block Name</label>
-                                        <input type="text" class="form-control" name="full_street_block_name" readonly value="<?php echo $applicantStreetOrBlock; ?>">
-                                    </div>
-                                    <div class="col-md-4">
-                                        <label class="top-label">Subdivision</label>
-                                        <input type="text" class="form-control" name="full_subdivision" readonly value="<?php echo $applicantSubdivision; ?>">
-                                    </div>
-                                    <div class="col-md-4">
-                                        <label class="top-label">Barangay</label>
-                                        <input type="text" class="form-control" name="full_barangay" readonly value="<?php echo $applicantBarangay; ?>">
-                                    </div>
-                                    <div class="col-md-4">
-                                        <label class="top-label">Area</label>
-                                        <input type="text" class="form-control" name="full_area_number" readonly value="<?php echo $applicantArea; ?>">
-                                    </div>
-                                </div>
+                                <input type="text" class="form-control" name="full_address_display" readonly value="<?php echo $fullAddress; ?>">
+                                <input type="hidden" name="full_unit_number" value="<?php echo $applicantUnit; ?>">
+                                <input type="hidden" name="full_house_lot_number" value="<?php echo $applicantHouseOrLot; ?>">
+                                <input type="hidden" name="full_street_block_name" value="<?php echo $applicantStreetOrBlock; ?>">
+                                <input type="hidden" name="full_subdivision" value="<?php echo $applicantSubdivision; ?>">
+                                <input type="hidden" name="full_barangay" value="<?php echo $applicantBarangay; ?>">
+                                <input type="hidden" name="full_area_number" value="<?php echo $applicantArea; ?>">
                                 <input type="hidden" name="full_address" value="<?php echo $fullAddress; ?>">
                             </div>
                         </div>
@@ -256,32 +237,13 @@ $applicantArea = htmlspecialchars($areaNumber, ENT_QUOTES, 'UTF-8');
                             <div id="cohabitantFullAddressWrapper" class="form-row d-none">
                                 <div class="full-width">
                                     <label class="top-label">Address Details (Same as Applicant) <span class="required-asterisk">*</span></label>
-                                    <div class="row g-3">
-                                        <div class="col-md-4">
-                                            <label class="top-label">Unit / Apartment Number</label>
-                                            <input type="text" class="form-control" name="cohabitant_full_unit_number" readonly value="<?php echo $applicantUnit; ?>">
-                                        </div>
-                                        <div class="col-md-4">
-                                            <label class="top-label">House / Lot Number</label>
-                                            <input type="text" class="form-control" name="cohabitant_full_house_lot_number" readonly value="<?php echo $applicantHouseOrLot; ?>">
-                                        </div>
-                                        <div class="col-md-4">
-                                            <label class="top-label">Street / Block Name</label>
-                                            <input type="text" class="form-control" name="cohabitant_full_street_block_name" readonly value="<?php echo $applicantStreetOrBlock; ?>">
-                                        </div>
-                                        <div class="col-md-4">
-                                            <label class="top-label">Subdivision</label>
-                                            <input type="text" class="form-control" name="cohabitant_full_subdivision" readonly value="<?php echo $applicantSubdivision; ?>">
-                                        </div>
-                                        <div class="col-md-4">
-                                            <label class="top-label">Barangay</label>
-                                            <input type="text" class="form-control" name="cohabitant_full_barangay" readonly value="<?php echo $applicantBarangay; ?>">
-                                        </div>
-                                        <div class="col-md-4">
-                                            <label class="top-label">Area</label>
-                                            <input type="text" class="form-control" name="cohabitant_full_area_number" readonly value="<?php echo $applicantArea; ?>">
-                                        </div>
-                                    </div>
+                                    <input type="text" class="form-control" name="cohabitant_full_address_display" readonly value="<?php echo $fullAddress; ?>">
+                                    <input type="hidden" name="cohabitant_full_unit_number" value="<?php echo $applicantUnit; ?>">
+                                    <input type="hidden" name="cohabitant_full_house_lot_number" value="<?php echo $applicantHouseOrLot; ?>">
+                                    <input type="hidden" name="cohabitant_full_street_block_name" value="<?php echo $applicantStreetOrBlock; ?>">
+                                    <input type="hidden" name="cohabitant_full_subdivision" value="<?php echo $applicantSubdivision; ?>">
+                                    <input type="hidden" name="cohabitant_full_barangay" value="<?php echo $applicantBarangay; ?>">
+                                    <input type="hidden" name="cohabitant_full_area_number" value="<?php echo $applicantArea; ?>">
                                     <input type="hidden" id="cohabitantFullAddress" name="cohabitant_full_address" value="<?php echo $fullAddress; ?>">
                                 </div>
                             </div>
@@ -437,32 +399,13 @@ $applicantArea = htmlspecialchars($areaNumber, ENT_QUOTES, 'UTF-8');
                             <div id="cohabitationFullAddressWrapper" class="form-row d-none">
                                 <div class="full-width">
                                     <label class="top-label">Address Details (Same as Applicant) <span class="required-asterisk">*</span></label>
-                                    <div class="row g-3">
-                                        <div class="col-md-4">
-                                            <label class="top-label">Unit / Apartment Number</label>
-                                            <input type="text" class="form-control" name="cohabitation_full_unit_number" readonly value="<?php echo $applicantUnit; ?>">
-                                        </div>
-                                        <div class="col-md-4">
-                                            <label class="top-label">House / Lot Number</label>
-                                            <input type="text" class="form-control" name="cohabitation_full_house_lot_number" readonly value="<?php echo $applicantHouseOrLot; ?>">
-                                        </div>
-                                        <div class="col-md-4">
-                                            <label class="top-label">Street / Block Name</label>
-                                            <input type="text" class="form-control" name="cohabitation_full_street_block_name" readonly value="<?php echo $applicantStreetOrBlock; ?>">
-                                        </div>
-                                        <div class="col-md-4">
-                                            <label class="top-label">Subdivision</label>
-                                            <input type="text" class="form-control" name="cohabitation_full_subdivision" readonly value="<?php echo $applicantSubdivision; ?>">
-                                        </div>
-                                        <div class="col-md-4">
-                                            <label class="top-label">Barangay</label>
-                                            <input type="text" class="form-control" name="cohabitation_full_barangay" readonly value="<?php echo $applicantBarangay; ?>">
-                                        </div>
-                                        <div class="col-md-4">
-                                            <label class="top-label">Area</label>
-                                            <input type="text" class="form-control" name="cohabitation_full_area_number" readonly value="<?php echo $applicantArea; ?>">
-                                        </div>
-                                    </div>
+                                    <input type="text" class="form-control" name="cohabitation_full_address_display" readonly value="<?php echo $fullAddress; ?>">
+                                    <input type="hidden" name="cohabitation_full_unit_number" value="<?php echo $applicantUnit; ?>">
+                                    <input type="hidden" name="cohabitation_full_house_lot_number" value="<?php echo $applicantHouseOrLot; ?>">
+                                    <input type="hidden" name="cohabitation_full_street_block_name" value="<?php echo $applicantStreetOrBlock; ?>">
+                                    <input type="hidden" name="cohabitation_full_subdivision" value="<?php echo $applicantSubdivision; ?>">
+                                    <input type="hidden" name="cohabitation_full_barangay" value="<?php echo $applicantBarangay; ?>">
+                                    <input type="hidden" name="cohabitation_full_area_number" value="<?php echo $applicantArea; ?>">
                                     <input type="hidden" id="cohabitationFullAddress" name="cohabitation_full_address" value="<?php echo $fullAddress; ?>">
                                 </div>
                             </div>

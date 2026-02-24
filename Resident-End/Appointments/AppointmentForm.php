@@ -130,22 +130,13 @@ $fullAddress = implode(", ", $addressParts);
                             </div>
                         </div>
 
-                        <div id="houseSystemWrapper" class="form-row">
+                        <div class="form-row">
                             <div class="full-width">
-                                <div class="row mb-3">
-                                    <div class="col-md-4">
-                                        <label class="top-label" for="unitNumber">Unit / Apartment Number</label>
-                                        <input type="text" class="form-control" id="unitNumber" name="unitNumber" readonly value="<?php echo htmlspecialchars($residentaddresstbl["unit_number"]); ?>">
-                                    </div>
-                                    <div class="col-md-4">
-                                        <label class="top-label" for="houseNumber">House Number <span class="required-asterisk">*</span></label>
-                                        <input type="text" class="form-control" id="houseNumber" name="houseNumber" readonly value="<?php echo htmlspecialchars($residentaddresstbl["street_number"]); ?>">
-                                    </div>
-                                    <div class="col-md-4">
-                                        <label class="top-label" for="streetName">Street Name <span class="required-asterisk">*</span></label>
-                                        <input type="text" class="form-control" id="streetName" name="streetName" readonly value="<?php echo htmlspecialchars($residentaddresstbl["street_name"]); ?>">
-                                    </div>
-                                </div>
+                                <label class="top-label">Complete Address <span class="required-asterisk">*</span></label>
+                                <input type="text" name="full_address_display" readonly value="<?php echo htmlspecialchars($fullAddress); ?>">
+                                <input type="hidden" name="unitNumber" value="<?php echo htmlspecialchars($residentaddresstbl["unit_number"]); ?>">
+                                <input type="hidden" name="houseNumber" value="<?php echo htmlspecialchars($residentaddresstbl["street_number"]); ?>">
+                                <input type="hidden" name="streetName" value="<?php echo htmlspecialchars($residentaddresstbl["street_name"]); ?>">
                             </div>
                         </div>
 
