@@ -132,12 +132,12 @@ $applicantArea = htmlspecialchars($areaNumber, ENT_QUOTES, 'UTF-8');
                         <h2 class="section-title text-center text-dark">Personal Information</h2>
                         <div class="form-row pt-0">
                             <div>
-                                <label class="top-label">First Name <span class="required-asterisk">*</span> </label>
-                                <input type="text" name="first_name" readonly value="<?php echo htmlspecialchars($residentinformationtbl['firstname'] ?? ''); ?>">
-                            </div>
-                            <div>
                                 <label class="top-label">Last Name <span class="required-asterisk">*</span> </label>
                                 <input type="text" name="last_name" readonly value="<?php echo htmlspecialchars($residentinformationtbl['lastname'] ?? ''); ?>">
+                            </div>
+                            <div>
+                                <label class="top-label">First Name <span class="required-asterisk">*</span> </label>
+                                <input type="text" name="first_name" readonly value="<?php echo htmlspecialchars($residentinformationtbl['firstname'] ?? ''); ?>">
                             </div>
                             <div>
                                 <label class="top-label">Middle Name</label>

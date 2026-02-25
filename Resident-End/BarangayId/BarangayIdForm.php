@@ -147,7 +147,7 @@ $fullAddress = implode(', ', array_filter([
                                 <label class="top-label">Birthplace <span class="required-asterisk">*</span></label>
                                 <input type="text">
                             </div>
-                            <div class="phonenum">
+                            <div class="phone">
                                 <label class="top-label">Contact Number <span class="required-asterisk">*</span></label>
                                 <input type="tel" name="phone_number" required>
                             </div>
@@ -174,13 +174,13 @@ $fullAddress = implode(', ', array_filter([
 
                         <div class="form-row">
                             <div>
-                                <label class="top-label">First Name <span class="required-asterisk">*</span> </label>
-                                <input type="text" name="emergency_first" required>
+                                <label class="top-label">Last Name <span class="required-asterisk">*</span> </label>
+                                <input type="text" name="emergency_last" required>
                             </div>
 
                             <div>
-                                <label class="top-label">Last Name <span class="required-asterisk">*</span> </label>
-                                <input type="text" name="emergency_last" required>
+                                <label class="top-label">First Name <span class="required-asterisk">*</span> </label>
+                                <input type="text" name="emergency_first" required>
                             </div>
 
                             <div>
@@ -225,6 +225,21 @@ $fullAddress = implode(', ', array_filter([
 
     </div>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        document.addEventListener("DOMContentLoaded", () => {
+            const form = document.querySelector("form");
+            const submitBtn = form?.querySelector(".submit-btn");
+            if (!form || !submitBtn) return;
+
+            const updateState = () => {
+                submitBtn.disabled = !form.checkValidity();
+            };
+
+            form.addEventListener("input", updateState);
+            form.addEventListener("change", updateState);
+            updateState();
+        });
+    </script>
 </body>
 
 </html>

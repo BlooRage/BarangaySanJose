@@ -99,12 +99,12 @@ $fullAddress = implode(", ", $addressParts);
 
                         <div class="form-row pt-0">
                             <div>
-                                <label class="top-label">First Name <span class="required-asterisk">*</span></label>
-                                <input type="text" name="first_name" value="<?php echo htmlspecialchars($residentinformationtbl["firstname"]); ?>" readonly>
-                            </div>
-                            <div>
                                 <label class="top-label">Last Name <span class="required-asterisk">*</span></label>
                                 <input type="text" name="last_name" value="<?php echo htmlspecialchars($residentinformationtbl["lastname"]); ?>" readonly>
+                            </div>
+                            <div>
+                                <label class="top-label">First Name <span class="required-asterisk">*</span></label>
+                                <input type="text" name="first_name" value="<?php echo htmlspecialchars($residentinformationtbl["firstname"]); ?>" readonly>
                             </div>
                             <div>
                                 <label class="top-label">Middle Name</label>
@@ -167,7 +167,7 @@ $fullAddress = implode(", ", $addressParts);
                         <div class="form-row">
                             <div class="full-width">
                                 <label class="top-label">Purpose <span class="required-asterisk">*</span></label>
-                                <textarea name="purpose" rows="5" required></textarea>
+                                <input type="text" name="purpose" required>
                             </div>
                         </div>
 
@@ -185,6 +185,21 @@ $fullAddress = implode(", ", $addressParts);
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        document.addEventListener("DOMContentLoaded", () => {
+            const form = document.querySelector("form");
+            const submitBtn = form?.querySelector(".submit-btn");
+            if (!form || !submitBtn) return;
+
+            const updateState = () => {
+                submitBtn.disabled = !form.checkValidity();
+            };
+
+            form.addEventListener("input", updateState);
+            form.addEventListener("change", updateState);
+            updateState();
+        });
+    </script>
 </body>
 </html>
 

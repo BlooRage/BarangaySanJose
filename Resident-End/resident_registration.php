@@ -352,7 +352,7 @@ require_once __DIR__ . "/includes/resident_access_guard.php";
           <div class="row mb-3">
             <div class="col-md-2">
               <label class="form-label" for="dateOfBirth">Date of Birth <span class="text-danger">*</span></label>
-              <input type="date" class="form-control" id="dateOfBirth" name="dateOfBirth" required>
+              <input type="date" class="form-control" id="dateOfBirth" name="dateOfBirth" min="1916-01-01" max="2026-12-31" required>
             </div>
 
             <div class="col-md-2">

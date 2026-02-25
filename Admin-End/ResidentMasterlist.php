@@ -594,7 +594,7 @@ if (isset($conn) && $conn instanceof mysqli) {
 
           <div class="col-md-3">
             <label class="small fw-bold">Date of Birth</label>
-            <input type="date" id="edit-birthdate" name="dateOfBirth" class="form-control" required>
+            <input type="date" id="edit-birthdate" name="dateOfBirth" class="form-control" min="1916-01-01" max="2026-12-31" required>
           </div>
           <div class="col-md-3">
             <label class="small fw-bold">Sex</label>

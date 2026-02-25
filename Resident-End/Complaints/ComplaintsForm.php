@@ -49,12 +49,12 @@ require_once __DIR__ . "/../includes/resident_access_guard.php";
 
                     <div class="form-row">
                         <div>
-                            <label class="top-label">First Name <span class="required-asterisk">*</span></label>
-                            <input type="text" name="complainant_first_name" required>
-                        </div>
-                        <div>
                             <label class="top-label">Last Name <span class="required-asterisk">*</span></label>
                             <input type="text" name="complainant_last_name" required>
+                        </div>
+                        <div>
+                            <label class="top-label">First Name <span class="required-asterisk">*</span></label>
+                            <input type="text" name="complainant_first_name" required>
                         </div>
                         <div>
                             <label class="top-label">Middle Name</label>
@@ -62,7 +62,13 @@ require_once __DIR__ . "/../includes/resident_access_guard.php";
                         </div>
                         <div>
                             <label class="top-label">Suffix</label>
-                            <input type="text" name="complainant_suffix">
+                            <select name="complainant_suffix">
+                                <option value="">None</option>
+                                <option value="Jr.">Jr.</option>
+                                <option value="Sr.">Sr.</option>
+                                <option value="III">III</option>
+                                <option value="IV">IV</option>
+                            </select>
                         </div>
                     </div>
 
@@ -92,8 +98,8 @@ require_once __DIR__ . "/../includes/resident_access_guard.php";
 
                     <div class="form-row two-col-row">
                         <div>
-                            <label class="top-label">Name <span class="required-asterisk">*</span></label>
-                            <input type="text" name="subject_name" required>
+                            <label class="top-label">Name (Last Name, First Name Middle Name) <span class="required-asterisk">*</span></label>
+                            <input type="text" name="subject_name" placeholder="Dela Cruz, Juan Miguel" pattern="^[A-Za-z][A-Za-z'\\s-]*,\\s*[A-Za-z][A-Za-z'\\s-]*\\s+[A-Za-z][A-Za-z'\\s-]*$" title="Use format: Last Name, First Name Middle Name" required>
                         </div>
                         <div>
                             <label class="top-label">Contact Number</label>
@@ -148,8 +154,8 @@ require_once __DIR__ . "/../includes/resident_access_guard.php";
 
                     <div class="form-row two-col-row">
                         <div>
-                            <label class="top-label">Name of Witness</label>
-                            <input type="text" name="witness_name">
+                            <label class="top-label">Name of Witness (Last Name, First Name Middle Name)</label>
+                            <input type="text" name="witness_name" placeholder="Dela Cruz, Juan Miguel" pattern="^[A-Za-z][A-Za-z'\\s-]*,\\s*[A-Za-z][A-Za-z'\\s-]*\\s+[A-Za-z][A-Za-z'\\s-]*$" title="Use format: Last Name, First Name Middle Name">
                         </div>
                         <div>
                             <label class="top-label">Witness Contact Number</label>
@@ -177,5 +183,20 @@ require_once __DIR__ . "/../includes/resident_access_guard.php";
     </main>
 </div>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+    document.addEventListener("DOMContentLoaded", () => {
+        const form = document.querySelector("form");
+        const submitBtn = form?.querySelector(".submit-btn");
+        if (!form || !submitBtn) return;
+
+        const updateState = () => {
+            submitBtn.disabled = !form.checkValidity();
+        };
+
+        form.addEventListener("input", updateState);
+        form.addEventListener("change", updateState);
+        updateState();
+    });
+</script>
 </body>
 </html>

@@ -144,6 +144,21 @@ document.querySelectorAll('input[name="owner_type"]').forEach(function (box) {
 });
 </script>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        document.addEventListener("DOMContentLoaded", () => {
+            const form = document.querySelector("form");
+            const submitBtn = form?.querySelector(".submit-btn");
+            if (!form || !submitBtn) return;
+
+            const updateState = () => {
+                submitBtn.disabled = !form.checkValidity();
+            };
+
+            form.addEventListener("input", updateState);
+            form.addEventListener("change", updateState);
+            updateState();
+        });
+    </script>
 </body>
 </html>
 
