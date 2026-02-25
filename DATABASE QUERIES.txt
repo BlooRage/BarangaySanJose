@@ -1,6 +1,6 @@
 CREATE TABLE `documentrequesttbl` (
   `request_id` int(11) NOT NULL AUTO_INCREMENT,
-  `resident_user_id` varchar(10) DEFAULT NULL,
+  `resident_user_id` varchar(12) DEFAULT NULL,
   `last_name` varchar(255) NOT NULL,
   `first_name` varchar(255) NOT NULL,
   `middle_name` varchar(255) DEFAULT NULL,
@@ -24,7 +24,7 @@ CREATE TABLE `documentrequesttbl` (
   CONSTRAINT `fk_docreq_attachment_id` FOREIGN KEY (`attachment_id`) REFERENCES `unifiedfileattachmenttbl` (`attachment_id`),
   CONSTRAINT `fk_docreq_official_released_by` FOREIGN KEY (`user_id_official_released_by`) REFERENCES `useraccountstbl` (`user_id`),
   CONSTRAINT `fk_docreq_official_reviewed_by` FOREIGN KEY (`user_id_official_reviewed_by`) REFERENCES `useraccountstbl` (`user_id`),
-  CONSTRAINT `fk_docreq_resident_user` FOREIGN KEY (`resident_user_id`) REFERENCES `residentinformationtbl` (`resident_id`),
+  CONSTRAINT `fk_docreq_resident_user` FOREIGN KEY (`resident_user_id`) REFERENCES `useraccountstbl` (`user_id`) ON DELETE CASCADE ON UPDATE CASCADE,
   CONSTRAINT `fk_docreq_status_id` FOREIGN KEY (`status_id_request`) REFERENCES `statuslookuptbl` (`status_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 

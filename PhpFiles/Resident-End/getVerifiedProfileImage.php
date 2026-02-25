@@ -34,6 +34,7 @@ $residentId = '';
 
 if (!function_exists('toPublicPath')) {
 function toPublicPath($path): ?string {
+    global $baseUrl;
     $path = trim((string)$path);
     if ($path === '') {
         return null;
@@ -95,6 +96,7 @@ function toPublicPath($path): ?string {
 
 if (!function_exists('publicPathExists')) {
 function publicPathExists(?string $publicPath): bool {
+    global $baseUrl;
     $publicPath = trim((string)$publicPath);
     if ($publicPath === '') {
         return false;
@@ -146,18 +148,34 @@ if ($residentId !== '' && isset($conn) && $conn instanceof mysqli) {
         FROM unifiedfileattachmenttbl uf
         INNER JOIN documenttypelookuptbl dt
             ON uf.document_type_id = dt.document_type_id
-        INNER JOIN statuslookuptbl s
+        LEFT JOIN statuslookuptbl s
             ON uf.status_id_verify = s.status_id
-        WHERE uf.source_type IN ('ResidentProfiling', 'RESIDENT_PROFILE')
-          AND uf.source_id = ?
-          AND LOWER(dt.document_type_name) = LOWER('2x2 Picture')
+        LEFT JOIN resident_edit_requesttbl rer
+            ON uf.source_type = 'ResidentEditRequest'
+           AND rer.request_id = uf.source_id
+        LEFT JOIN statuslookuptbl rs
+            ON rer.status_id = rs.status_id
+        WHERE LOWER(dt.document_type_name) = LOWER('2x2 Picture')
           AND (dt.document_category = 'ResidentProfiling' OR dt.document_category = 'EditRequest' OR dt.document_category IS NULL)
-          AND (s.status_name = 'Verified' OR s.status_name = 'Approved')
+          AND (
+                (
+                    uf.source_type IN ('ResidentProfiling', 'RESIDENT_PROFILE')
+                    AND uf.source_id = ?
+                    AND (s.status_name = 'Verified' OR s.status_name = 'Approved')
+                )
+                OR
+                (
+                    uf.source_type = 'ResidentEditRequest'
+                    AND rer.resident_id = ?
+                    AND rer.request_type = 'profile'
+                    AND rs.status_name = 'ApprovedRequest'
+                )
+          )
         ORDER BY uf.upload_timestamp DESC, uf.attachment_id DESC
         LIMIT 1
     ");
     if ($stmtPic) {
-        $stmtPic->bind_param("s", $residentId);
+        $stmtPic->bind_param("ss", $residentId, $residentId);
         $stmtPic->execute();
         $stmtPic->bind_result($verifiedPicPath);
         if ($stmtPic->fetch() && !empty($verifiedPicPath)) {

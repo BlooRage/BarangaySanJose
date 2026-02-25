@@ -1,4 +1,27 @@
-﻿<?php
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    
+  <link rel="icon" href="/Images/favicon_sanjose.png?v=20260211">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Resident Dashboard - Barangay San Jose</title>
+
+
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+
+
+    <!-- Bootstrap Icons (for logout icon) -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons/font/bootstrap-icons.css" rel="stylesheet" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <link rel="stylesheet" href="/BarangaySanJose/CSS-Styles/Guest-End-CSS/GeneralStyle.css">
+    <link rel="stylesheet" href="/BarangaySanJose/CSS-Styles/Resident-End-CSS/residentDashboard.css">
+    <link rel="stylesheet" href="/BarangaySanJose/CSS-Styles/NavbarFooterStyle.css">
+</head>
+
+
+<body>
+<?php
 if (session_status() === PHP_SESSION_NONE) {
   session_start();
 }
@@ -11,28 +34,10 @@ function activeLink($page, $current) {
 }
 
 $displayName = "Resident";
-$scriptName = str_replace("\\", "/", (string)($_SERVER['SCRIPT_NAME'] ?? ''));
-$residentSegmentPos = strpos($scriptName, '/Resident-End/');
-$baseUrl = '';
-if ($residentSegmentPos !== false) {
-  $baseUrl = substr($scriptName, 0, $residentSegmentPos);
-} else {
-  $baseUrl = dirname($scriptName);
-}
-$baseUrl = rtrim((string)$baseUrl, '/');
-if ($baseUrl === '.' || $baseUrl === '/') {
-  $baseUrl = '';
-}
-$profileImage = ($baseUrl === '' ? '' : $baseUrl) . '/Images/Profile-Placeholder.png';
+$baseUrl = '/BarangaySanJose';
+$profileImage = $baseUrl . '/Images/Profile-Placeholder.png';
 $residentId = '';
 $isHeadOfFamily = false;
-
-if (!function_exists('appUrl')) {
-function appUrl(string $path): string {
-  global $baseUrl;
-  return ($baseUrl === '' ? '' : $baseUrl) . '/' . ltrim($path, '/');
-}
-}
 
 if (!function_exists('toPublicPath')) {
 function toPublicPath($path): ?string {
@@ -88,7 +93,6 @@ function toPublicPath($path): ?string {
 
 if (!function_exists('publicPathExists')) {
 function publicPathExists(?string $publicPath): bool {
-  global $baseUrl;
   $publicPath = trim((string)$publicPath);
   if ($publicPath === '') {
     return false;
@@ -96,11 +100,7 @@ function publicPathExists(?string $publicPath): bool {
   if (preg_match('#^https?://#i', $publicPath)) {
     return true;
   }
-  if ($baseUrl !== '' && strpos($publicPath, $baseUrl) === 0) {
-    $relative = substr($publicPath, strlen($baseUrl));
-  } else {
-    $relative = $publicPath;
-  }
+  $relative = preg_replace('#^/BarangaySanJose#', '', $publicPath);
   $relative = '/' . ltrim((string)$relative, '/');
   $absolute = realpath(__DIR__ . "/../.." . $relative);
   if ($absolute === false) {
@@ -176,9 +176,9 @@ if ($residentId !== '' && isset($conn) && $conn instanceof mysqli) {
        class="d-flex flex-column flex-shrink-0 p-3 bg-white border-end shadow-sm">
 
   <!-- LOGO HEADER (ADMIN-STYLE) -->
-  <a href="<?= htmlspecialchars(appUrl('Resident-End/resident_dashboard.php')) ?>" class="sidebar-brand-link pb-3 mb-3 link-dark text-decoration-none border-bottom">
-    <img src="<?= htmlspecialchars(appUrl('Images/San_Jose_LOGO.jpg')) ?>" class="sidebar-brand-logo" alt="Barangay San Jose Logo">
-    <span class="sidebar-brand-title">Barangay San Jose</span>
+  <a href="/BarangaySanJose/Resident-End/AdminDashboard.php" class="d-flex align-items-center pb-3 mb-3 link-dark text-decoration-none border-bottom">
+    <img src="/BarangaySanJose/Images/San_Jose_LOGO.jpg" class="me-2" style="width: 32px; height: 32px;">
+    <span class="fs-5 fw-semibold logo-name">Barangay San Jose</span>
   </a>
 
   <!-- RESIDENT PROFILE -->
@@ -187,7 +187,7 @@ if ($residentId !== '' && isset($conn) && $conn instanceof mysqli) {
       src="<?= htmlspecialchars($profileImage) ?>"
       alt="Avatar"
       id="img-sidebarAvatar"
-      onerror="this.onerror=null;this.src='<?= htmlspecialchars(appUrl('Images/Profile-Placeholder.png')) ?>';"
+      onerror="this.onerror=null;this.src='/BarangaySanJose/Images/Profile-Placeholder.png';"
       class="rounded-circle mb-2 border shadow-sm"
       width="90"
       height="90"
@@ -201,7 +201,7 @@ if ($residentId !== '' && isset($conn) && $conn instanceof mysqli) {
 
       <div id="group-navHome" class="mb-3">
         <p class="text-muted small fw-bold mb-1">Home</p>
-        <a href="<?= htmlspecialchars(appUrl('Resident-End/resident_dashboard.php')) ?>"
+        <a href="/BarangaySanJose/Resident-End/resident_dashboard.php"
            class="a-sidebarLink <?= activeLink('resident_dashboard.php', $current) ?>">
           <i class="fa-solid fa-newspaper"></i>Dashboard
         </a>
@@ -209,23 +209,23 @@ if ($residentId !== '' && isset($conn) && $conn instanceof mysqli) {
 
       <div id="group-navServices" class="mb-3">
         <p class="text-muted small fw-bold mb-1">Services</p>
-        <a href="<?= htmlspecialchars(appUrl('Resident-End/Certificates/CertificatesLandingPage.php')) ?>"
+        <a href="/BarangaySanJose/Resident-End/Certificates/CertificatesLandingPage.php"
            class="a-sidebarLink <?= activeLink('resident_certificates.php', $current) ?>">
           <i class="fa-solid fa-certificate"></i>Certificates
         </a>
-        <a href="<?= htmlspecialchars(appUrl('Resident-End/Clearances/ClearancesLandingPage.php')) ?>"
+        <a href="/BarangaySanJose/Resident-End/Clearances/ClearancesLandingPage.php"
            class="a-sidebarLink <?= activeLink('resident_clearances.php', $current) ?>">
           <i class="fa-solid fa-file-circle-check fa-sm"></i>Clearances
         </a>
-        <a href="<?= htmlspecialchars(appUrl('Resident-End/BarangayId/BarangayIdForm.php')) ?>"
+        <a href="/BarangaySanJose/Resident-End/BarangayId/BarangayIdForm.php"
            class="a-sidebarLink <?= (in_array($current, ['BarangayIdForm.php'], true) ? 'active' : '') ?>">
           <i class="fa-solid fa-id-badge fa-lg"></i>Barangay ID
         </a>
-        <a href="<?= htmlspecialchars(appUrl('Resident-End/Complaints/ComplaintsForm.php')) ?>"
+        <a href="/BarangaySanJose/Resident-End/Complaints/ComplaintsForm.php"
            class="a-sidebarLink <?= (in_array($current, ['ComplaintsForm.php'], true) ? 'active' : '') ?>">
           <i class="fa-solid fa-comment-dots"></i>Complaints
         </a>
-        <a href="<?= htmlspecialchars(appUrl('Resident-End/Appointments/AppointmentForm.php')) ?>"
+        <a href="/BarangaySanJose/Resident-End/Appointments/AppointmentForm.php"
            class="a-sidebarLink <?= (in_array($current, ['AppointmentForm.php'], true) ? 'active' : '') ?>">
           <i class="fa-regular fa-calendar-days"></i>Appointments
         </a>
@@ -233,15 +233,15 @@ if ($residentId !== '' && isset($conn) && $conn instanceof mysqli) {
 
       <div id="group-navInfo" class="mb-3">
         <p class="text-muted small fw-bold mb-1">Info</p>
-        <a href="<?= htmlspecialchars(appUrl('Resident-End/resident_certificates.php')) ?>"
+        <a href="/BarangaySanJose/Resident-End/resident_certificates.php"
            class="a-sidebarLink <?= activeLink('resident_certificates.php', $current) ?>">
           <i class="fa-solid fa-bullhorn"></i>Announcements
         </a>
-        <a href="<?= htmlspecialchars(appUrl('Resident-End/resident_transactions.php')) ?>"
+        <a href="/BarangaySanJose/Resident-End/resident_transactions.php"
            class="a-sidebarLink <?= activeLink('resident_transactions.php', $current) ?>">
           <i class="fa-solid fa-clock-rotate-left"></i>Transactions
         </a>
-        <a href="<?= htmlspecialchars(appUrl('Resident-End/document_requests.php')) ?>"
+        <a href="/BarangaySanJose/Resident-End/document_requests.php"
            class="a-sidebarLink <?= activeLink('document_requests.php', $current) ?>">
           <i class="fa-solid fa-file-lines"></i>Document Requests
         </a>
@@ -252,11 +252,11 @@ if ($residentId !== '' && isset($conn) && $conn instanceof mysqli) {
 
     <div class="sidebar-actions">
       <a class="account-button btn btn-sm w-100 mb-2"
-         href="<?= htmlspecialchars(appUrl('Resident-End/resident_profile.php')) ?>">
+         href="/BarangaySanJose/Resident-End/resident_profile.php">
         <i class="fa-solid fa-circle-user"></i> Account
       </a>
       <a class="btn btn-danger btn-sm w-100 logout-link"
-         href="<?= htmlspecialchars(appUrl('PhpFiles/Login/logout.php')) ?>"
+         href="/BarangaySanJose/PhpFiles/Login/logout.php"
          data-logout-message="Are you sure you want to logout?">
         <i class="bi bi-box-arrow-right me-1"></i> Logout
       </a>
@@ -319,9 +319,8 @@ if ($residentId !== '' && isset($conn) && $conn instanceof mysqli) {
 
     let lastBaseUrl = "";
     const getBaseUrl = (url) => (url || "").split("?")[0];
-    const PLACEHOLDER_PATH = "Images/Profile-Placeholder.png";
+    const PLACEHOLDER_PATH = "/BarangaySanJose/Images/Profile-Placeholder.png";
     const isPlaceholder = (url) => getBaseUrl(url).includes(PLACEHOLDER_PATH);
-    const profileImageEndpoint = "<?= htmlspecialchars(appUrl('Resident-End/getVerifiedProfileImage.php')) ?>";
 
     const updateImages = (url) => {
       if (!url) return;
@@ -344,7 +343,7 @@ if ($residentId !== '' && isset($conn) && $conn instanceof mysqli) {
 
     const poll = async () => {
       try {
-        const res = await fetch(profileImageEndpoint, {
+        const res = await fetch("/BarangaySanJose/PhpFiles/Resident-End/getVerifiedProfileImage.php", {
           headers: { "Accept": "application/json" }
         });
         if (!res.ok) return;
@@ -361,3 +360,6 @@ if ($residentId !== '' && isset($conn) && $conn instanceof mysqli) {
     setInterval(poll, 15000);
   });
 </script>
+
+</body>
+</html>

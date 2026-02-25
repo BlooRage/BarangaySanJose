@@ -1,5 +1,8 @@
 (() => {
   const el = (id) => document.getElementById(id);
+  const viewerModalEl = el("modal-sectorDocViewer");
+  const getViewerModal = () =>
+    viewerModalEl ? bootstrap.Modal.getOrCreateInstance(viewerModalEl) : null;
 
   const state = {
     apps: [],
@@ -431,12 +434,21 @@
 	  const showApproveConfirm = () => {
     const modalEl = el("modal-sectorApproveConfirm");
     if (!modalEl) return;
+    const viewerModal = getViewerModal();
+    if (viewerModal) {
+      viewerModal.hide();
+    }
 
     const cancel = el("btn-sectorApproveCancel");
     const confirm = el("btn-sectorApproveConfirm");
     const modal = bootstrap.Modal.getOrCreateInstance(modalEl);
 
-    const onCancel = () => modal.hide();
+    const onCancel = () => {
+      modal.hide();
+      if (state.active) {
+        openViewer(state.active);
+      }
+    };
 	    const onConfirm = async () => {
 	      if (!state.active) return;
 	      try {
@@ -466,6 +478,10 @@
 	  const showDenyConfirm = () => {
     const modalEl = el("modal-sectorDenyConfirm");
     if (!modalEl) return;
+    const viewerModal = getViewerModal();
+    if (viewerModal) {
+      viewerModal.hide();
+    }
 
     const reason = el("txt-sectorDenyReason");
     const err = el("txt-sectorDenyReasonError");
@@ -481,6 +497,9 @@
       modal.hide();
       if (reason) reason.value = "";
       resetValidation();
+      if (state.active) {
+        openViewer(state.active);
+      }
     };
 
 	    const onConfirm = async () => {

@@ -127,10 +127,11 @@ $fullAddress = htmlspecialchars(implode(', ', $fullAddressParts), ENT_QUOTES, 'U
                     <h1 class="form-title">First Time Job Seeker</h1>
                     <p class="form-subtitle">All fields marked with <span class="required-asterisk">*</span> are required</p>
 
-                    <form method="POST" action="../../PhpFiles/Resident-End/documentRequestWorkflow.php">
+                    <form method="POST" action="<?= htmlspecialchars($baseUrl) ?>/PhpFiles/Resident-End/documentRequestWorkflow.php">
                         <input type="hidden" name="action" value="submit_request">
                         <input type="hidden" name="document_type" value="firsttimejobseeker">
                         <input type="hidden" name="purpose" value="First Time Job Seeker Application">
+                        <input type="hidden" name="redirect" value="1">
 
                         <h2 class="section-title text-center text-dark">Personal Information</h2>
 

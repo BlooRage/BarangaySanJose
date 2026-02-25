@@ -17,7 +17,7 @@ if ($action === '') {
 
 $userId = (string)($_SESSION['user_id'] ?? '');
 $residentId = dr_get_resident_id($conn, $userId) ?? '';
-$residentForeignId = $residentId !== '' ? $residentId : $userId;
+$residentForeignId = $userId;
 
 if ($residentId === '') {
     dr_respond_json(422, ['success' => false, 'message' => 'Resident profile is incomplete.']);
@@ -94,6 +94,50 @@ function dr_has_column(mysqli $conn, string $table, string $column): bool {
     $colEsc = $conn->real_escape_string($column);
     $res = $conn->query("SHOW COLUMNS FROM {$tableEsc} LIKE '{$colEsc}'");
     return $res instanceof mysqli_result && $res->num_rows > 0;
+}
+
+function dr_column_type(mysqli $conn, string $table, string $column): string {
+    $tableEsc = preg_replace('/[^a-zA-Z0-9_]/', '', $table);
+    $colEsc = $conn->real_escape_string($column);
+    $res = $conn->query("SHOW COLUMNS FROM {$tableEsc} LIKE '{$colEsc}'");
+    if ($res instanceof mysqli_result) {
+        $row = $res->fetch_assoc();
+        if ($row && isset($row['Type'])) {
+            return strtolower((string)$row['Type']);
+        }
+    }
+    return '';
+}
+
+function dr_request_details_token(string $documentTypeRaw, string $documentTypeNormalized): string {
+    $raw = strtolower(trim($documentTypeRaw));
+    if ($raw !== '') {
+        return preg_replace('/[^a-z0-9]+/', '', $raw);
+    }
+
+    $map = [
+        'certificate of cohabitation' => 'cohabitation',
+        'certificate of indigency' => 'indigency',
+        'first time job seeker certificate' => 'firsttimejobseeker',
+        'certificate of identity' => 'identity',
+        'certificate of residency' => 'residency',
+        'certificate of good moral' => 'goodmoral',
+    ];
+    $key = strtolower(trim($documentTypeNormalized));
+    if (isset($map[$key])) {
+        return $map[$key];
+    }
+    return preg_replace('/[^a-z0-9]+/', '', $key);
+}
+
+function dr_request_id_is_numeric(mysqli $conn): bool {
+    $res = $conn->query("SHOW COLUMNS FROM documentrequesttbl LIKE 'request_id'");
+    if (!($res instanceof mysqli_result)) {
+        return false;
+    }
+    $row = $res->fetch_assoc();
+    $type = strtolower((string)($row['Type'] ?? ''));
+    return strpos($type, 'int') !== false;
 }
 
 function dr_pick_any_status_id(mysqli $conn, array $preferred = []): ?int {
@@ -233,6 +277,7 @@ if ($action === 'submit_request') {
 
     $now = dr_now();
     $stage = DR_STAGE_SUBMITTED;
+    $requestId = dr_generate_request_id($conn);
 
     $payloadJson = dr_safe_json($payload);
     $attachmentId = dr_create_request_attachment($conn, $residentId, $userId, $documentType, $payloadJson);
@@ -244,6 +289,19 @@ if ($action === 'submit_request') {
     $residentNames = dr_get_resident_name_parts($conn, $userId);
     $pendingStatusId = dr_pick_any_status_id($conn, ['PendingReview', 'Pending']);
     $requestDetails = trim($documentType . ($purpose !== '' ? ' - ' . $purpose : ''));
+    if ($requestDetails === '') {
+        $requestDetails = 'Document request submitted';
+    }
+    $requestDetailsToken = dr_request_details_token($documentTypeRaw, $documentType);
+    $requestDetailsColType = dr_column_type($conn, 'documentrequesttbl', 'request_details');
+    $requestDetailsValue = $requestDetails;
+    if (strpos($requestDetailsColType, 'json') !== false) {
+        $requestDetailsValue = dr_safe_json([
+            'summary' => $requestDetails,
+            'document_type' => $documentType,
+            'purpose' => $purpose,
+        ]);
+    }
     $defaultValidity = date('Y-m-d H:i:s', strtotime('+1 year'));
 
     $setIfColumn = function (string $column, string $type, $value) use (&$values, &$types, &$params, $conn) {
@@ -255,8 +313,12 @@ if ($action === 'submit_request') {
         $params[] = $value;
     };
 
+    if (dr_has_column($conn, 'documentrequesttbl', 'request_id') && !dr_request_id_is_numeric($conn)) {
+        $setIfColumn('request_id', 's', $requestId);
+    }
     $setIfColumn('resident_user_id', 's', $residentForeignId);
     $setIfColumn('resident_id', 's', $residentId);
+    $setIfColumn('resident_name', 's', trim($residentNames['firstname'] . ' ' . $residentNames['middlename'] . ' ' . $residentNames['lastname']));
     $setIfColumn('document_type', 's', $documentType);
     $setIfColumn('purpose', 's', $purpose);
     $setIfColumn('payload_json', 's', $payloadJson);
@@ -278,7 +340,7 @@ if ($action === 'submit_request') {
         $types .= 'i';
         $params[] = $attachmentId;
     }
-    $setIfColumn('request_details', 's', $requestDetails);
+    $setIfColumn('request_details', 's', $requestDetailsValue);
     if (dr_has_column($conn, 'documentrequesttbl', 'status_id_request')) {
         if ($pendingStatusId === null) {
             dr_respond_json(500, ['success' => false, 'message' => 'Pending status is not configured.']);
@@ -288,8 +350,8 @@ if ($action === 'submit_request') {
         $params[] = $pendingStatusId;
     }
     $setIfColumn('request_timestamp', 's', $now);
-    $setIfColumn('review_timestamp', 's', $now);
-    $setIfColumn('release_timestamp', 's', $now);
+    $setIfColumn('review_timestamp', 's', null);
+    $setIfColumn('release_timestamp', 's', null);
     $setIfColumn('document_validity', 's', $defaultValidity);
     $setIfColumn('qr_code_path', 's', '');
 
@@ -312,14 +374,78 @@ if ($action === 'submit_request') {
     array_unshift($refs, $types);
     call_user_func_array([$stmt, 'bind_param'], $refs);
 
+    $stmtClosed = false;
     if (!$stmt->execute()) {
         $err = $stmt->error;
         $stmt->close();
-        dr_respond_json(500, ['success' => false, 'message' => 'Failed to save request. ' . $err]);
+        $stmtClosed = true;
+
+        // Compatibility retry for legacy CHECK constraints on request_details.
+        if (stripos($err, 'request_details') !== false && isset($values['request_details'])) {
+            $fallbackCandidates = array_values(array_unique(array_filter([
+                $requestDetailsToken,
+                strtolower(trim((string)$documentTypeRaw)),
+                trim((string)$documentType),
+                trim((string)$purpose),
+                $requestDetails,
+                dr_safe_json(['document_type' => $documentType, 'purpose' => $purpose]),
+                '{}',
+                'certificate',
+            ], static fn($v) => trim((string)$v) !== '')));
+
+            $saved = false;
+            $lastRetryErr = $err;
+            foreach ($fallbackCandidates as $fallbackDetails) {
+                $values['request_details'] = $fallbackDetails;
+                $params = array_values($values);
+                $columns = array_keys($values);
+                $types = '';
+                foreach ($columns as $c) {
+                    $types .= ($c === 'attachment_id' || $c === 'status_id_request') ? 'i' : 's';
+                }
+
+                $retrySql = "INSERT INTO documentrequesttbl (" . implode(',', $columns) . ") VALUES (" . implode(',', array_fill(0, count($columns), '?')) . ")";
+                $retry = $conn->prepare($retrySql);
+                if (!$retry) {
+                    continue;
+                }
+
+                $retryRefs = [];
+                foreach ($params as $k => $v) {
+                    $retryRefs[$k] = &$params[$k];
+                }
+                array_unshift($retryRefs, $types);
+                call_user_func_array([$retry, 'bind_param'], $retryRefs);
+                if (!$retry->execute()) {
+                    $lastRetryErr = $retry->error;
+                    $retry->close();
+                    continue;
+                }
+
+                $requestInsertId = (int)$retry->insert_id;
+                if (dr_request_id_is_numeric($conn)) {
+                    $requestId = $requestInsertId > 0 ? (string)$requestInsertId : (string)$residentForeignId . '-' . date('YmdHis');
+                }
+                $saved = true;
+                $retry->close();
+                break;
+            }
+
+            if (!$saved) {
+                dr_respond_json(500, ['success' => false, 'message' => 'Failed to save request. ' . $lastRetryErr]);
+            }
+        } else {
+            dr_respond_json(500, ['success' => false, 'message' => 'Failed to save request. ' . $err]);
+        }
+    } else {
+        $requestInsertId = (int)$stmt->insert_id;
+        if (dr_request_id_is_numeric($conn)) {
+            $requestId = $requestInsertId > 0 ? (string)$requestInsertId : (string)$residentForeignId . '-' . date('YmdHis');
+        }
     }
-    $requestInsertId = (int)$stmt->insert_id;
-    $requestId = $requestInsertId > 0 ? (string)$requestInsertId : (string)$residentForeignId . '-' . date('YmdHis');
-    $stmt->close();
+    if (!$stmtClosed) {
+        $stmt->close();
+    }
 
     $certificateDetails = dr_safe_json([
         'purpose' => $purpose,

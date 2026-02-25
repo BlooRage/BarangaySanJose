@@ -346,23 +346,40 @@ if (!function_exists('oi_generate_invite_code')) {
         $areaCode = oi_normalize_area_code($areaNumber);
         $prefix = date('ym') . $areaCode;
         $like = $prefix . '%';
+        $seqKey = 'OID:' . $prefix;
+
+        $conn->query("
+            CREATE TABLE IF NOT EXISTS idsequencetbl (
+                seq_key VARCHAR(64) NOT NULL PRIMARY KEY,
+                last_seq INT NOT NULL
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
+        ");
+        $conn->query("ALTER TABLE idsequencetbl MODIFY seq_key VARCHAR(64) NOT NULL");
 
         $stmt = $conn->prepare("
-            SELECT MAX(CAST(RIGHT(invite_code, 3) AS UNSIGNED)) AS max_seq
+            INSERT INTO idsequencetbl (seq_key, last_seq)
+            SELECT ?, LAST_INSERT_ID(COALESCE(MAX(CAST(RIGHT(invite_code, 3) AS UNSIGNED)), 0) + 1)
             FROM officialinvitetbl
             WHERE invite_code LIKE ?
+            ON DUPLICATE KEY UPDATE
+                last_seq = LAST_INSERT_ID(last_seq + 1)
         ");
         if (!$stmt) {
             throw new RuntimeException('Unable to generate invite code.');
         }
-        $stmt->bind_param("s", $like);
-        $stmt->execute();
-        $row = $stmt->get_result()->fetch_assoc();
+        $stmt->bind_param("ss", $seqKey, $like);
+        if (!$stmt->execute()) {
+            $stmt->close();
+            throw new RuntimeException('Unable to generate invite code.');
+        }
         $stmt->close();
 
-        $nextSeq = (int)($row['max_seq'] ?? 0) + 1;
+        $nextSeq = (int)$conn->insert_id;
         if ($nextSeq > 999) {
             throw new RuntimeException("Invite code limit reached for {$prefix}.");
+        }
+        if ($nextSeq <= 0) {
+            throw new RuntimeException('Unable to generate invite code.');
         }
 
         return $prefix . str_pad((string)$nextSeq, 3, '0', STR_PAD_LEFT);

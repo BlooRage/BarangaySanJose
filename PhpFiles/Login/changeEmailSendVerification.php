@@ -1,5 +1,6 @@
 <?php
 require_once __DIR__ . '/changeEmailCommon.php';
+require_once __DIR__ . '/../General/security.php';
 require_once __DIR__ . '/../General/connection.php';
 require_once __DIR__ . '/../General/audit.php';
 require_once __DIR__ . '/../EmailHandlers/emailSender.php';
@@ -86,16 +87,8 @@ try {
 
     $conn->commit();
 
-    // Build verification link (same as sendEmailVerify.php)
-    $scheme = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
-    $host = $_SERVER['HTTP_HOST'] ?? '';
-    $rootPath = dirname(dirname(dirname($_SERVER['SCRIPT_NAME'] ?? '/PhpFiles/Login/changeEmailSendVerification.php')));
-    $baseHost = trim((string)$host);
-    if ($baseHost === '') {
-        $baseHost = 'localhost';
-    }
-    $baseUrl = rtrim($scheme . "://" . $baseHost . $rootPath, '/');
-    $verifyUrl = $baseUrl . "/Guest-End/verifyEmail.php?uid=" . urlencode($userId) . "&token=" . urlencode($rawToken);
+    // Build verification link (domain-safe, supports subfolder deployments).
+    $verifyUrl = appBaseUrl() . appUrl("/Guest-End/verifyEmail.php?uid=" . urlencode($userId) . "&token=" . urlencode($rawToken));
 
     // Send verification email (verify template)
     $smtpConfig = require __DIR__ . '/../General/mailConfigurations.php';

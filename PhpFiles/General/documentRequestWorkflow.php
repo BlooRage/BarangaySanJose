@@ -31,6 +31,169 @@ function dr_respond_json(int $statusCode, array $payload): void {
     exit;
 }
 
+function dr_column_exists(mysqli $conn, string $table, string $column): bool {
+    $tableSafe = preg_replace('/[^a-zA-Z0-9_]/', '', $table);
+    if ($tableSafe === '') {
+        return false;
+    }
+    $colEsc = $conn->real_escape_string($column);
+    $res = $conn->query("SHOW COLUMNS FROM {$tableSafe} LIKE '{$colEsc}'");
+    return $res instanceof mysqli_result && $res->num_rows > 0;
+}
+
+function dr_table_exists(mysqli $conn, string $table): bool {
+    $tableEsc = $conn->real_escape_string($table);
+    $res = $conn->query("SHOW TABLES LIKE '{$tableEsc}'");
+    return $res instanceof mysqli_result && $res->num_rows > 0;
+}
+
+function dr_get_column_type(mysqli $conn, string $table, string $column, string $fallback): string {
+    $tableSafe = preg_replace('/[^a-zA-Z0-9_]/', '', $table);
+    if ($tableSafe === '') {
+        return $fallback;
+    }
+    $colEsc = $conn->real_escape_string($column);
+    $res = $conn->query("SHOW COLUMNS FROM {$tableSafe} LIKE '{$colEsc}'");
+    if ($res instanceof mysqli_result) {
+        $row = $res->fetch_assoc();
+        if ($row && !empty($row['Type'])) {
+            return (string)$row['Type'];
+        }
+    }
+    return $fallback;
+}
+
+function dr_ensure_document_request_extensions(mysqli $conn): void {
+    $columnsToEnsure = [
+        "resident_name VARCHAR(191) DEFAULT NULL AFTER resident_id",
+        "attachment_id BIGINT(20) UNSIGNED DEFAULT NULL AFTER resident_name",
+        "request_details LONGTEXT DEFAULT NULL AFTER purpose",
+        "status_id_request INT(11) DEFAULT NULL AFTER stage",
+        "user_id_official_reviewed_by VARCHAR(12) DEFAULT NULL AFTER status_id_request",
+        "user_id_official_released_by VARCHAR(12) DEFAULT NULL AFTER user_id_official_reviewed_by",
+        "request_timestamp DATETIME DEFAULT NULL AFTER user_id_official_released_by",
+        "review_timestamp DATETIME DEFAULT NULL AFTER request_timestamp",
+        "release_timestamp DATETIME DEFAULT NULL AFTER review_timestamp",
+        "document_validity DATETIME DEFAULT NULL AFTER release_timestamp",
+        "qr_code_path VARCHAR(255) DEFAULT NULL AFTER document_validity",
+    ];
+
+    foreach ($columnsToEnsure as $definition) {
+        if (!preg_match('/^([a-zA-Z0-9_]+)/', $definition, $m)) {
+            continue;
+        }
+        $col = $m[1];
+        if (!dr_column_exists($conn, 'documentrequesttbl', $col)) {
+            $conn->query("ALTER TABLE documentrequesttbl ADD COLUMN $definition");
+        }
+    }
+}
+
+function dr_ensure_request_child_tables(mysqli $conn): void {
+    static $done = false;
+    if ($done) {
+        return;
+    }
+
+    $requestIdType = dr_get_column_type($conn, 'documentrequesttbl', 'request_id', 'VARCHAR(16)');
+    $residentUserType = dr_get_column_type($conn, 'documentrequesttbl', 'resident_user_id', 'VARCHAR(12)');
+
+    $conn->query("
+        CREATE TABLE IF NOT EXISTS barangayidrequesttbl (
+            barangay_id BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT,
+            request_id {$requestIdType} NOT NULL,
+            id_details LONGTEXT DEFAULT NULL,
+            created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            PRIMARY KEY (barangay_id),
+            UNIQUE KEY uq_barangayid_request (request_id)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
+    ");
+
+    $conn->query("
+        CREATE TABLE IF NOT EXISTS certificaterequesttbl (
+            certificate_id BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT,
+            request_id {$requestIdType} NOT NULL,
+            certificate_type VARCHAR(120) NOT NULL,
+            certificate_details LONGTEXT DEFAULT NULL,
+            created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            PRIMARY KEY (certificate_id),
+            UNIQUE KEY uq_certreq_request (request_id),
+            KEY idx_certreq_type (certificate_type)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
+    ");
+
+    $conn->query("
+        CREATE TABLE IF NOT EXISTS clearancerequesttbl (
+            clearance_id BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT,
+            request_id {$requestIdType} NOT NULL,
+            clearance_type VARCHAR(120) DEFAULT NULL,
+            application_type VARCHAR(120) DEFAULT NULL,
+            clearance_details LONGTEXT DEFAULT NULL,
+            created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            PRIMARY KEY (clearance_id),
+            UNIQUE KEY uq_clearancereq_request (request_id)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
+    ");
+
+    $conn->query("
+        CREATE TABLE IF NOT EXISTS clearanceinspectiontbl (
+            inspection_id BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT,
+            clearance_id BIGINT(20) UNSIGNED NOT NULL,
+            inspector_name VARCHAR(191) DEFAULT NULL,
+            date_inspected DATETIME DEFAULT NULL,
+            remarks TEXT DEFAULT NULL,
+            inspector_signature_path VARCHAR(255) DEFAULT NULL,
+            created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            PRIMARY KEY (inspection_id),
+            KEY idx_inspection_clearance (clearance_id)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
+    ");
+
+    $conn->query("
+        CREATE TABLE IF NOT EXISTS clearancefeestbl (
+            clearance_fee_id BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT,
+            clearance_id BIGINT(20) UNSIGNED NOT NULL,
+            fee_type VARCHAR(120) NOT NULL,
+            amount DECIMAL(12,2) NOT NULL DEFAULT 0.00,
+            created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            PRIMARY KEY (clearance_fee_id),
+            KEY idx_clearancefee_clearance (clearance_id)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
+    ");
+
+    $conn->query("
+        CREATE TABLE IF NOT EXISTS transactiontbl (
+            transaction_id VARCHAR(10) NOT NULL,
+            request_id {$requestIdType} NOT NULL,
+            transaction_amount DECIMAL(12,2) DEFAULT NULL,
+            applicant_lastname VARCHAR(120) DEFAULT NULL,
+            applicant_firstname VARCHAR(120) DEFAULT NULL,
+            applicant_middleInitial VARCHAR(10) DEFAULT NULL,
+            payment_method VARCHAR(40) DEFAULT NULL,
+            transaction_details LONGTEXT DEFAULT NULL,
+            or_number VARCHAR(80) DEFAULT NULL,
+            transaction_status_id INT(11) DEFAULT NULL,
+            payment_deadline DATETIME DEFAULT NULL,
+            payment_timestamp DATETIME DEFAULT NULL,
+            user_id_employee_process {$residentUserType} DEFAULT NULL,
+            created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            PRIMARY KEY (transaction_id),
+            UNIQUE KEY uq_transaction_request (request_id),
+            UNIQUE KEY uq_transaction_or_number (or_number),
+            KEY idx_transaction_status (transaction_status_id),
+            KEY idx_transaction_employee (user_id_employee_process)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
+    ");
+
+    $done = true;
+}
+
 function dr_ensure_table(mysqli $conn): void {
     static $done = false;
     if ($done) {
@@ -135,32 +298,95 @@ function dr_ensure_table(mysqli $conn): void {
         $conn->query("ALTER TABLE documentrequesttbl ADD INDEX idx_docreq_doc_type (document_type)");
     }
 
+    dr_ensure_document_request_extensions($conn);
+
+    $fkName = 'fk_docreq_resident_user';
+    $fkRefTable = null;
+    $fkCheck = $conn->prepare("
+        SELECT REFERENCED_TABLE_NAME
+        FROM information_schema.KEY_COLUMN_USAGE
+        WHERE TABLE_SCHEMA = DATABASE()
+          AND TABLE_NAME = 'documentrequesttbl'
+          AND COLUMN_NAME = 'resident_user_id'
+          AND CONSTRAINT_NAME = ?
+        LIMIT 1
+    ");
+    if ($fkCheck) {
+        $fkCheck->bind_param('s', $fkName);
+        $fkCheck->execute();
+        $fkCheck->bind_result($fkRefTable);
+        $fkCheck->fetch();
+        $fkCheck->close();
+    }
+
+    if ($fkRefTable !== 'useraccountstbl') {
+        // Convert legacy values where resident_user_id previously stored resident_id.
+        $conn->query("
+            UPDATE documentrequesttbl dr
+            INNER JOIN residentinformationtbl r ON r.resident_id = dr.resident_user_id
+            SET
+                dr.resident_id = COALESCE(NULLIF(dr.resident_id, ''), r.resident_id),
+                dr.resident_user_id = r.user_id
+        ");
+        $conn->query("
+            UPDATE documentrequesttbl dr
+            INNER JOIN residentinformationtbl r ON r.resident_id = dr.resident_id
+            LEFT JOIN useraccountstbl u ON u.user_id = dr.resident_user_id
+            SET dr.resident_user_id = r.user_id
+            WHERE u.user_id IS NULL
+        ");
+        $conn->query("ALTER TABLE documentrequesttbl DROP FOREIGN KEY {$fkName}");
+        $conn->query("
+            ALTER TABLE documentrequesttbl
+            ADD CONSTRAINT {$fkName}
+            FOREIGN KEY (resident_user_id)
+            REFERENCES useraccountstbl(user_id)
+            ON DELETE CASCADE
+            ON UPDATE CASCADE
+        ");
+    }
+
+    dr_ensure_request_child_tables($conn);
+
     $done = true;
 }
 
 function dr_generate_request_id(mysqli $conn): string {
     $prefix = 'DR' . date('ym');
     $like = $prefix . '%';
+    $seqKey = 'DRID:' . $prefix;
 
-    $stmt = $conn->prepare("SELECT request_id FROM documentrequesttbl WHERE request_id LIKE ? ORDER BY request_id DESC LIMIT 1");
+    $conn->query("
+        CREATE TABLE IF NOT EXISTS idsequencetbl (
+            seq_key VARCHAR(64) NOT NULL PRIMARY KEY,
+            last_seq INT NOT NULL
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
+    ");
+    $conn->query("ALTER TABLE idsequencetbl MODIFY seq_key VARCHAR(64) NOT NULL");
+
+    $stmt = $conn->prepare("
+        INSERT INTO idsequencetbl (seq_key, last_seq)
+        SELECT ?, LAST_INSERT_ID(COALESCE(MAX(CAST(RIGHT(request_id, 4) AS UNSIGNED)), 0) + 1)
+        FROM documentrequesttbl
+        WHERE request_id LIKE ?
+        ON DUPLICATE KEY UPDATE
+            last_seq = LAST_INSERT_ID(last_seq + 1)
+    ");
     if (!$stmt) {
         return $prefix . str_pad((string) random_int(1, 9999), 4, '0', STR_PAD_LEFT);
     }
 
-    $stmt->bind_param('s', $like);
-    $stmt->execute();
-    $stmt->bind_result($lastId);
-    $has = $stmt->fetch();
+    $stmt->bind_param('ss', $seqKey, $like);
+    if (!$stmt->execute()) {
+        $stmt->close();
+        return $prefix . str_pad((string) random_int(1, 9999), 4, '0', STR_PAD_LEFT);
+    }
     $stmt->close();
 
-    $next = 1;
-    if ($has && is_string($lastId) && strlen($lastId) >= 4) {
-        $tail = substr($lastId, -4);
-        if (ctype_digit($tail)) {
-            $next = ((int) $tail) + 1;
-        }
+    $next = (int)$conn->insert_id;
+    if ($next <= 0 || $next > 9999) {
+        return $prefix . str_pad((string) random_int(1, 9999), 4, '0', STR_PAD_LEFT);
     }
-
     return $prefix . str_pad((string) $next, 4, '0', STR_PAD_LEFT);
 }
 
@@ -257,12 +483,8 @@ function dr_map_stage_to_transaction_status_id(mysqli $conn, string $stage): int
 
 function dr_sync_transaction(mysqli $conn, array $request): void {
     $requestId = (string)($request['request_id'] ?? '');
-    $residentForeignId = (string)($request['resident_user_id'] ?? '');
-    if ($requestId === '' || $residentForeignId === '') {
-        return;
-    }
-    $accountUserId = dr_get_user_id_from_resident_id($conn, $residentForeignId);
-    if ($accountUserId === null || $accountUserId === '') {
+    $accountUserId = (string)($request['resident_user_id'] ?? '');
+    if ($requestId === '' || $accountUserId === '') {
         return;
     }
 
@@ -306,6 +528,100 @@ function dr_sync_transaction(mysqli $conn, array $request): void {
         null,
         null
     );
+
+    dr_ensure_request_child_tables($conn);
+    if (!dr_table_exists($conn, 'transactiontbl')) {
+        return;
+    }
+
+    $existingId = '';
+    $sel = $conn->prepare("SELECT transaction_id FROM transactiontbl WHERE request_id = ? LIMIT 1");
+    if ($sel) {
+        $sel->bind_param('s', $requestId);
+        $sel->execute();
+        $sel->bind_result($existingId);
+        $sel->fetch();
+        $sel->close();
+    }
+    $transactionId = trim($existingId);
+    if ($transactionId === '') {
+        $transactionId = GenerateTransactionID($conn, 'transactiontbl', 'transaction_id');
+    }
+
+    $payload = json_decode((string)($request['payload_json'] ?? '{}'), true);
+    if (!is_array($payload)) {
+        $payload = [];
+    }
+    $lastName = trim((string)($payload['last_name'] ?? $payload['lastname'] ?? ''));
+    $firstName = trim((string)($payload['first_name'] ?? $payload['firstname'] ?? ''));
+    $middle = trim((string)($payload['middle_name'] ?? $payload['middlename'] ?? ''));
+    $middleInitial = $middle !== '' ? strtoupper(substr($middle, 0, 1)) : '';
+    $employee = trim((string)($request['finance_user_id'] ?? $request['personnel_user_id'] ?? ''));
+    if ($employee === '') {
+        $employee = null;
+    }
+
+    $txAmount = isset($request['amount']) ? (float)$request['amount'] : null;
+    $txOr = trim((string)($request['or_number'] ?? ''));
+    if ($txOr === '') {
+        $txOr = null;
+    }
+    $txPaymentMethod = trim((string)($request['payment_method'] ?? ''));
+    if ($txPaymentMethod === '') {
+        $txPaymentMethod = null;
+    }
+    $txPaymentAt = trim((string)($request['payment_submitted_at'] ?? ''));
+    if ($txPaymentAt === '') {
+        $txPaymentAt = null;
+    }
+
+    $transactionDetails = $docType;
+    if ($purpose !== '') {
+        $transactionDetails .= ' | Purpose: ' . $purpose;
+    }
+    if ($reason !== '') {
+        $transactionDetails .= ' | Reason: ' . $reason;
+    }
+
+    $statusId = dr_map_stage_to_transaction_status_id($conn, $stage);
+    $sql = "
+        INSERT INTO transactiontbl (
+            transaction_id, request_id, transaction_amount, applicant_lastname, applicant_firstname, applicant_middleInitial,
+            payment_method, transaction_details, or_number, transaction_status_id, payment_deadline, payment_timestamp, user_id_employee_process
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, ?)
+        ON DUPLICATE KEY UPDATE
+            transaction_amount = VALUES(transaction_amount),
+            applicant_lastname = VALUES(applicant_lastname),
+            applicant_firstname = VALUES(applicant_firstname),
+            applicant_middleInitial = VALUES(applicant_middleInitial),
+            payment_method = VALUES(payment_method),
+            transaction_details = VALUES(transaction_details),
+            or_number = VALUES(or_number),
+            transaction_status_id = VALUES(transaction_status_id),
+            payment_timestamp = VALUES(payment_timestamp),
+            user_id_employee_process = VALUES(user_id_employee_process),
+            updated_at = CURRENT_TIMESTAMP
+    ";
+    $stmt = $conn->prepare($sql);
+    if ($stmt) {
+        $stmt->bind_param(
+            'ssdsssssisss',
+            $transactionId,
+            $requestId,
+            $txAmount,
+            $lastName,
+            $firstName,
+            $middleInitial,
+            $txPaymentMethod,
+            $transactionDetails,
+            $txOr,
+            $statusId,
+            $txPaymentAt,
+            $employee
+        );
+        $stmt->execute();
+        $stmt->close();
+    }
 }
 
 function dr_fetch_request(mysqli $conn, string $requestId): ?array {
@@ -358,6 +674,45 @@ function dr_update_stage(mysqli $conn, string $requestId, string $stage, array $
         }
     }
 
+    $requestStatusId = dr_map_stage_to_transaction_status_id($conn, $stage);
+    if (dr_column_exists($conn, 'documentrequesttbl', 'status_id_request')) {
+        $sets[] = 'status_id_request = ?';
+        $types .= 'i';
+        $vals[] = $requestStatusId;
+    }
+
+    $actorUserId = null;
+    if (!empty($patch['finance_user_id'])) {
+        $actorUserId = (string)$patch['finance_user_id'];
+    } elseif (!empty($patch['personnel_user_id'])) {
+        $actorUserId = (string)$patch['personnel_user_id'];
+    }
+
+    if (dr_column_exists($conn, 'documentrequesttbl', 'review_timestamp')
+        && in_array($stage, [DR_STAGE_REJECTED, DR_STAGE_FOR_PAYMENT, DR_STAGE_PAYMENT_REJECTED, DR_STAGE_READY_FOR_CLAIM, DR_STAGE_COMPLETED], true)) {
+        $sets[] = 'review_timestamp = ?';
+        $types .= 's';
+        $vals[] = dr_now();
+    }
+    if (dr_column_exists($conn, 'documentrequesttbl', 'release_timestamp')
+        && in_array($stage, [DR_STAGE_READY_FOR_CLAIM, DR_STAGE_COMPLETED], true)) {
+        $sets[] = 'release_timestamp = ?';
+        $types .= 's';
+        $vals[] = dr_now();
+    }
+    if ($actorUserId !== null && dr_column_exists($conn, 'documentrequesttbl', 'user_id_official_reviewed_by')) {
+        $sets[] = 'user_id_official_reviewed_by = ?';
+        $types .= 's';
+        $vals[] = $actorUserId;
+    }
+    if ($actorUserId !== null
+        && dr_column_exists($conn, 'documentrequesttbl', 'user_id_official_released_by')
+        && in_array($stage, [DR_STAGE_READY_FOR_CLAIM, DR_STAGE_COMPLETED], true)) {
+        $sets[] = 'user_id_official_released_by = ?';
+        $types .= 's';
+        $vals[] = $actorUserId;
+    }
+
     $types .= 's';
     $vals[] = $requestId;
 
@@ -392,12 +747,8 @@ function dr_make_certificate_number(string $orNumber): string {
 }
 
 function dr_send_notification(mysqli $conn, array $request, string $subject, string $message): void {
-    $residentForeignId = (string)($request['resident_user_id'] ?? '');
-    if ($residentForeignId === '') {
-        return;
-    }
-    $residentUserId = dr_get_user_id_from_resident_id($conn, $residentForeignId);
-    if ($residentUserId === null || $residentUserId === '') {
+    $residentUserId = (string)($request['resident_user_id'] ?? '');
+    if ($residentUserId === '') {
         return;
     }
 

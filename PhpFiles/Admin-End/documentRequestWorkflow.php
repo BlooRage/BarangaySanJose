@@ -46,18 +46,7 @@ function dra_format_full_name_from_payload(array $payload): string {
 }
 
 function dra_public_base_url(): string {
-    $configured = trim((string)(getenv('APP_BASE_URL') ?: ''));
-    if ($configured !== '') {
-        return rtrim($configured, '/');
-    }
-
-    $scheme = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
-    $host = trim((string)($_SERVER['HTTP_HOST'] ?? ''));
-    if ($host === '') {
-        $host = 'localhost';
-    }
-
-    return rtrim($scheme . '://' . $host . appRootPath(), '/');
+    return appBaseUrl();
 }
 
 function dra_generate_issued_document(array $requestRow): ?string {

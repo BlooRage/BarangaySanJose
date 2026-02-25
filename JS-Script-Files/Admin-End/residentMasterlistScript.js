@@ -29,6 +29,15 @@ document.addEventListener("DOMContentLoaded", () => {
   let currentPage = 1;
   let entriesPerPage = Math.max(1, Number.parseInt(entriesPerPageInput?.value || "20", 10) || 20);
   let currentViewedResident = null;
+  const urlParams = new URLSearchParams(window.location.search);
+  const initialResidentSearch = (urlParams.get("resident_id") || urlParams.get("search") || "").trim();
+  const autoOpenResidentId = urlParams.get("open_view") === "1"
+    ? (urlParams.get("resident_id") || "").trim()
+    : "";
+  let hasAutoOpenedResident = false;
+  if (searchInput && initialResidentSearch) {
+    searchInput.value = initialResidentSearch;
+  }
 
   const viewModalEl = document.getElementById("modal-viewEntry");
   const verifyResidentModalEl = document.getElementById("modal-verifyResidentConfirm");
@@ -301,6 +310,15 @@ document.addEventListener("DOMContentLoaded", () => {
 
         allResidents = data;
         applyFilterAndRender();
+        if (!hasAutoOpenedResident && autoOpenResidentId) {
+          const exact = allResidents.find(
+            (r) => String(r.resident_id || "") === String(autoOpenResidentId)
+          );
+          if (exact) {
+            hasAutoOpenedResident = true;
+            openViewEntry(exact);
+          }
+        }
         return allResidents;
       })
       .catch((err) => {

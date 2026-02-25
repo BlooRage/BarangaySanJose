@@ -43,10 +43,11 @@ require_once __DIR__ . "/../includes/resident_access_guard.php";
             <h1 class="form-title">Identity</h1>
             <p class="form-subtitle">All fields marked with <span class="required-asterisk">*</span> are required</p>
 
-           <form action="../../PhpFiles/Resident-End/documentRequestWorkflow.php" method="POST">
+           <form action="<?= htmlspecialchars($baseUrl) ?>/PhpFiles/Resident-End/documentRequestWorkflow.php" method="POST">
                 <input type="hidden" name="action" value="submit_request">
                 <input type="hidden" name="document_type" value="identity">
                 <input type="hidden" name="purpose" value="Certificate of Identity Application">
+                <input type="hidden" name="redirect" value="1">
 
                 <h2 class="section-title text-center text-dark">Child’s Information</h2>
                 <div class="form-row">
@@ -201,7 +202,6 @@ require_once __DIR__ . "/../includes/resident_access_guard.php";
     </script>
 </body>
 </html>
-
 
 
 

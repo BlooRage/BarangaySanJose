@@ -1,7 +1,6 @@
 <?php
 // PhpFiles/EmailHandlers/sendEmailVerify.php
-session_start();
-
+require_once __DIR__ . "/../General/security.php";
 require_once __DIR__ . "/../General/connection.php";
 require_once __DIR__ . "/../General/mailConfigurations.php";
 require_once __DIR__ . "/emailSender.php";
@@ -77,16 +76,7 @@ $ins->bind_param("sss", $userId, $tokenHash, $expiresAt);
 $ins->execute();
 
 // 4) Build verification link
-$scheme = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
-$host = $_SERVER['HTTP_HOST'] ?? '';
-$rootPath = dirname(dirname(dirname($_SERVER['SCRIPT_NAME'] ?? '/PhpFiles/EmailHandlers/sendEmailVerify.php')));
-
-$baseHost = trim((string)$host);
-if ($baseHost === '') {
-  $baseHost = 'localhost';
-}
-$baseUrl = rtrim($scheme . "://" . $baseHost . $rootPath, '/');
-$verifyUrl = $baseUrl . "/Guest-End/verifyEmail.php?uid=" . urlencode($userId) . "&token=" . urlencode($rawToken);
+$verifyUrl = appBaseUrl() . appUrl("/Guest-End/verifyEmail.php?uid=" . urlencode($userId) . "&token=" . urlencode($rawToken));
 
 // 5) Load SMTP config + send
 $smtpConfig = require __DIR__ . "/../General/mailConfigurations.php";

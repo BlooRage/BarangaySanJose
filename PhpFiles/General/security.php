@@ -48,37 +48,60 @@ initializeSecureSession();
 // - a subfolder (e.g. "/your-app/Admin-End/...").
 function appRootPath(): string
 {
-    $script = (string)($_SERVER['SCRIPT_NAME'] ?? '');
-    $script = '/' . ltrim($script, '/');
-    $parts = array_values(array_filter(explode('/', trim($script, '/')), fn($p) => $p !== ''));
-    if (!$parts) return '';
+    $host = strtolower(trim((string)($_SERVER['HTTP_HOST'] ?? $_SERVER['SERVER_NAME'] ?? '')));
+    $isLocalHost = $host === 'localhost'
+        || $host === '127.0.0.1'
+        || str_starts_with($host, 'localhost:')
+        || str_starts_with($host, '127.0.0.1:');
 
-    $first = $parts[0];
-    $knownTopDirs = [
-        'Admin-End',
-        'Resident-End',
-        'Guest-End',
-        'PhpFiles',
-        'CSS-Styles',
-        'JS-Script-Files',
-        'Images',
-        'UnifiedFileAttachment',
-        'Fonts',
-    ];
-
-    // If the first path segment is already a known app directory, app is at domain root.
-    if (in_array($first, $knownTopDirs, true)) {
-        return '';
+    // Requested behavior:
+    // - localhost => include project folder
+    // - domain => no project folder prefix
+    if ($isLocalHost) {
+        return '/BarangaySanJose';
     }
 
-    // Otherwise, treat the first segment as the app's folder name.
-    return '/' . $first;
+    return '';
 }
 
 function appUrl(string $path): string
 {
     $p = '/' . ltrim($path, '/');
     return appRootPath() . $p;
+}
+
+function appBaseUrl(): string
+{
+    $configured = trim((string)(getenv('APP_BASE_URL') ?: ''));
+    if ($configured !== '') {
+        return rtrim($configured, '/');
+    }
+
+    $scheme = (
+        (!empty($_SERVER['HTTPS']) && strtolower((string)$_SERVER['HTTPS']) !== 'off')
+        || ((string)($_SERVER['SERVER_PORT'] ?? '') === '443')
+    ) ? 'https' : 'http';
+
+    $host = trim((string)($_SERVER['HTTP_HOST'] ?? ''));
+    if ($host === '') {
+        $host = trim((string)($_SERVER['SERVER_NAME'] ?? ''));
+    }
+
+    $hostLower = strtolower($host);
+    $isLocalHost = $hostLower === ''
+        || $hostLower === 'localhost'
+        || $hostLower === '127.0.0.1'
+        || str_starts_with($hostLower, 'localhost:')
+        || str_starts_with($hostLower, '127.0.0.1:');
+
+    if ($isLocalHost) {
+        // Production-safe default for hosted deployment when server host headers are local.
+        $host = 'barangaysanjose-montalban.com';
+        $scheme = 'https';
+    }
+
+    // Base domain only; path prefixing is handled by appUrl().
+    return rtrim($scheme . '://' . $host, '/');
 }
 
 function ensureCsrfToken(): string

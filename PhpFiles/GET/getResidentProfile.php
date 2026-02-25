@@ -6,6 +6,7 @@ requireAuthenticatedSession(true);
 
 function getResidentProfileData(mysqli $conn, string $userId): array {
     $residentinformationtbl = [
+        'resident_id' => '',
         'firstname' => '',
         'middlename' => '',
         'lastname' => '',
@@ -124,6 +125,7 @@ function getResidentProfileData(mysqli $conn, string $userId): array {
             );
 
             $residentinformationtbl = [
+                'resident_id' => $row['resident_id'] ?? '',
                 'firstname' => $row['firstname'] ?? '',
                 'middlename' => $row['middlename'] ?? '',
                 'lastname' => $row['lastname'] ?? '',

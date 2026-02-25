@@ -1,4 +1,21 @@
 <?php
+function ensureIdSequenceTable(mysqli $conn): bool {
+    $createSql = "
+        CREATE TABLE IF NOT EXISTS idsequencetbl (
+            seq_key VARCHAR(64) NOT NULL PRIMARY KEY,
+            last_seq INT NOT NULL
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
+    ";
+    if (!$conn->query($createSql)) {
+        error_log("ensureIdSequenceTable create failed: " . $conn->error);
+        return false;
+    }
+
+    // Upgrade older installs where seq_key may still be VARCHAR(16).
+    $conn->query("ALTER TABLE idsequencetbl MODIFY seq_key VARCHAR(64) NOT NULL");
+    return true;
+}
+
 function GenerateUserID($conn, $roleAccess) {
     // Only 3 roles
     $roleLetters = [
@@ -16,67 +33,86 @@ function GenerateUserID($conn, $roleAccess) {
         return false;
     }
 
-    $roleLetter = $roleLetters[$roleAccess]; // Assign letter automatically
+    $roleLetter = $roleLetters[$roleAccess];
     $yearMonth  = date("Ym");
-    $like       = $yearMonth . $roleLetter . "%"; // e.g., 202601R%
+    $prefix     = $yearMonth . $roleLetter; // e.g., 202601R
+    $like       = $prefix . "%";
 
-    // Get the last user_id for this role this month
-    $stmt = $conn->prepare("
-        SELECT user_id 
-        FROM useraccountstbl
-        WHERE user_id LIKE ?
-        ORDER BY user_id DESC
-        LIMIT 1
-    ");
-
-    if (!$stmt) {
-        error_log("GenerateUserID Prepare Failed: " . $conn->error);
+    if (!ensureIdSequenceTable($conn)) {
+        error_log("GenerateUserID sequence table unavailable.");
         return false;
     }
 
-    $stmt->bind_param("s", $like);
-    $stmt->execute();
-    $stmt->bind_result($lastID);
-    $stmt->fetch();
+    $stmt = $conn->prepare("
+        INSERT INTO idsequencetbl (seq_key, last_seq)
+        SELECT ?, LAST_INSERT_ID(COALESCE(MAX(CAST(RIGHT(user_id, 5) AS UNSIGNED)), 0) + 1)
+        FROM useraccountstbl
+        WHERE user_id LIKE ?
+        ON DUPLICATE KEY UPDATE
+            last_seq = LAST_INSERT_ID(last_seq + 1)
+    ");
+    if (!$stmt) {
+        error_log("GenerateUserID sequence prepare failed: " . $conn->error);
+        return false;
+    }
+
+    $stmt->bind_param("ss", $prefix, $like);
+    if (!$stmt->execute()) {
+        error_log("GenerateUserID sequence execute failed: " . $stmt->error);
+        $stmt->close();
+        return false;
+    }
     $stmt->close();
 
-    // Generate the next sequence number
-    $newSeq = $lastID
-        ? str_pad(((int)substr($lastID, -5)) + 1, 5, "0", STR_PAD_LEFT)
-        : "00001";
+    $nextSeq = (int)$conn->insert_id;
+    if ($nextSeq <= 0 || $nextSeq > 99999) {
+        error_log("GenerateUserID sequence out of range for prefix {$prefix}: {$nextSeq}");
+        return false;
+    }
 
-    return $yearMonth . $roleLetter . $newSeq; // e.g., 202601R00001
+    return $prefix . str_pad((string)$nextSeq, 5, "0", STR_PAD_LEFT); // e.g., 202601R00001
 }
 
 function GenerateResidentID($conn) {
-    // Format: YYMMXXXXXX (monthly sequence)
+    // Format: YYMMXXXXXX (monthly sequence, monotonic per prefix)
     $yearMonth = date("ym");
-    $like = $yearMonth . "%"; // e.g., 2602%
+    $prefix = $yearMonth;
+    $like = $prefix . "%"; // e.g., 2602%
+    $seqKey = 'RID:' . $prefix;
 
-    $stmt = $conn->prepare("
-        SELECT resident_id
-        FROM residentinformationtbl
-        WHERE resident_id LIKE ?
-        ORDER BY resident_id DESC
-        LIMIT 1
-    ");
-
-    if (!$stmt) {
-        error_log("GenerateResidentID Prepare Failed: " . $conn->error);
+    if (!ensureIdSequenceTable($conn)) {
+        error_log("GenerateResidentID sequence table unavailable.");
         return false;
     }
 
-    $stmt->bind_param("s", $like);
-    $stmt->execute();
-    $stmt->bind_result($lastID);
-    $stmt->fetch();
+    $stmt = $conn->prepare("
+        INSERT INTO idsequencetbl (seq_key, last_seq)
+        SELECT ?, LAST_INSERT_ID(COALESCE(MAX(CAST(RIGHT(resident_id, 6) AS UNSIGNED)), 0) + 1)
+        FROM residentinformationtbl
+        WHERE resident_id LIKE ?
+        ON DUPLICATE KEY UPDATE
+            last_seq = LAST_INSERT_ID(last_seq + 1)
+    ");
+    if (!$stmt) {
+        error_log("GenerateResidentID sequence prepare failed: " . $conn->error);
+        return false;
+    }
+
+    $stmt->bind_param("ss", $seqKey, $like);
+    if (!$stmt->execute()) {
+        error_log("GenerateResidentID sequence execute failed: " . $stmt->error);
+        $stmt->close();
+        return false;
+    }
     $stmt->close();
 
-    $newSeq = $lastID
-        ? str_pad(((int)substr($lastID, -6)) + 1, 6, "0", STR_PAD_LEFT)
-        : "000001";
+    $nextSeq = (int)$conn->insert_id;
+    if ($nextSeq <= 0 || $nextSeq > 999999) {
+        error_log("GenerateResidentID sequence out of range for prefix {$prefix}: {$nextSeq}");
+        return false;
+    }
 
-    return $yearMonth . $newSeq; // e.g., 2602000001
+    return $prefix . str_pad((string)$nextSeq, 6, "0", STR_PAD_LEFT); // e.g., 2602000001
 }
 
 function GenerateAddressID(mysqli $conn, string $areaNumber): string {
@@ -89,31 +125,44 @@ function GenerateAddressID(mysqli $conn, string $areaNumber): string {
     $prefix = $areaCode . $year;
     $like = $prefix . "%";
 
-    $stmt = $conn->prepare("
-        SELECT address_id
-        FROM residentaddresstbl
-        WHERE address_id LIKE ?
-        ORDER BY address_id DESC
-        LIMIT 1
-    ");
+    $seqKey = 'AID:' . $prefix;
 
-    if (!$stmt) {
-        error_log("GenerateAddressID prepare failed: " . $conn->error);
+    if (!ensureIdSequenceTable($conn)) {
+        error_log("GenerateAddressID sequence table unavailable.");
         $fallbackSeq = str_pad((string)random_int(1, 99999), 5, "0", STR_PAD_LEFT);
         return $prefix . $fallbackSeq;
     }
 
-    $stmt->bind_param("s", $like);
-    $stmt->execute();
-    $stmt->bind_result($lastId);
-    $stmt->fetch();
+    $stmt = $conn->prepare("
+        INSERT INTO idsequencetbl (seq_key, last_seq)
+        SELECT ?, LAST_INSERT_ID(COALESCE(MAX(CAST(RIGHT(address_id, 5) AS UNSIGNED)), 0) + 1)
+        FROM residentaddresstbl
+        WHERE address_id LIKE ?
+        ON DUPLICATE KEY UPDATE
+            last_seq = LAST_INSERT_ID(last_seq + 1)
+    ");
+    if (!$stmt) {
+        error_log("GenerateAddressID sequence prepare failed: " . $conn->error);
+        $fallbackSeq = str_pad((string)random_int(1, 99999), 5, "0", STR_PAD_LEFT);
+        return $prefix . $fallbackSeq;
+    }
+
+    $stmt->bind_param("ss", $seqKey, $like);
+    if (!$stmt->execute()) {
+        error_log("GenerateAddressID sequence execute failed: " . $stmt->error);
+        $stmt->close();
+        $fallbackSeq = str_pad((string)random_int(1, 99999), 5, "0", STR_PAD_LEFT);
+        return $prefix . $fallbackSeq;
+    }
     $stmt->close();
 
-    $nextSeq = $lastId
-        ? str_pad(((int)substr($lastId, -5)) + 1, 5, "0", STR_PAD_LEFT)
-        : "00001";
+    $nextSeq = (int)$conn->insert_id;
+    if ($nextSeq <= 0 || $nextSeq > 99999) {
+        $fallbackSeq = str_pad((string)random_int(1, 99999), 5, "0", STR_PAD_LEFT);
+        return $prefix . $fallbackSeq;
+    }
 
-    return $prefix . $nextSeq;
+    return $prefix . str_pad((string)$nextSeq, 5, "0", STR_PAD_LEFT);
 }
 
 function GenerateTransactionID(
@@ -121,9 +170,8 @@ function GenerateTransactionID(
     string $tableName = 'unifiedtransactiontbl',
     string $columnName = 'transaction_id'
 ): string {
-    // Format: MMYYYYXXXX (monthly sequence)
+    // Format: MMYYYYXXXX (non-sequential random suffix).
     $prefix = date("mY"); // e.g., 022026
-    $like = $prefix . "%";
 
     // Validate dynamic identifiers to avoid SQL injection.
     if (!preg_match('/^[A-Za-z0-9_]+$/', $tableName) || !preg_match('/^[A-Za-z0-9_]+$/', $columnName)) {
@@ -131,30 +179,33 @@ function GenerateTransactionID(
         return $prefix . str_pad((string)random_int(1, 9999), 4, "0", STR_PAD_LEFT);
     }
 
-    $sql = "
-        SELECT {$columnName}
+    $existsStmt = $conn->prepare("
+        SELECT 1
         FROM {$tableName}
-        WHERE {$columnName} LIKE ?
-        ORDER BY {$columnName} DESC
+        WHERE {$columnName} = ?
         LIMIT 1
-    ";
-
-    $stmt = $conn->prepare($sql);
-    if (!$stmt) {
+    ");
+    if (!$existsStmt) {
         // Table may not exist yet; allow generation anyway.
-        error_log("GenerateTransactionID Prepare Failed: " . $conn->error);
-        return $prefix . str_pad((string)random_int(1, 9999), 4, "0", STR_PAD_LEFT);
+        error_log("GenerateTransactionID existence-check prepare failed: " . $conn->error);
+        return $prefix . str_pad((string)random_int(0, 9999), 4, "0", STR_PAD_LEFT);
     }
 
-    $stmt->bind_param("s", $like);
-    $stmt->execute();
-    $stmt->bind_result($lastId);
-    $stmt->fetch();
-    $stmt->close();
+    // Try multiple random candidates and return first unused ID.
+    for ($i = 0; $i < 64; $i++) {
+        $suffix = str_pad((string)random_int(0, 9999), 4, "0", STR_PAD_LEFT);
+        $candidate = $prefix . $suffix;
+        $existsStmt->bind_param("s", $candidate);
+        $existsStmt->execute();
+        $res = $existsStmt->get_result();
+        $taken = $res && $res->num_rows > 0;
+        if (!$taken) {
+            $existsStmt->close();
+            return $candidate;
+        }
+    }
 
-    $nextSeq = $lastId
-        ? str_pad(((int)substr((string)$lastId, -4)) + 1, 4, "0", STR_PAD_LEFT)
-        : "0001";
-
-    return $prefix . $nextSeq; // e.g., 0220260001
+    // Fallback if random-space is saturated for this month.
+    $existsStmt->close();
+    return $prefix . str_pad((string)random_int(0, 9999), 4, "0", STR_PAD_LEFT);
 }

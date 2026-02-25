@@ -186,17 +186,17 @@ function upsertSectorMembershipStatus(
 	    foreach ($parts as $p) {
 	        if (stripos($p, 'reason=') === 0) {
 	            return trim(substr($p, strlen('reason=')));
-		}
+	        }
+	    }
+	    return '';
+	}
 
 		function extractActionFromRemarks(string $remarks): string {
-		    $parts = array_values(array_filter(array_map('trim', explode(';', (string)$remarks))));
-		    foreach ($parts as $p) {
-		        if (stripos($p, 'action=') === 0) {
-		            return strtolower(trim(substr($p, strlen('action='))));
-		        }
-		    }
-		    return '';
-		}
+	    $parts = array_values(array_filter(array_map('trim', explode(';', (string)$remarks))));
+	    foreach ($parts as $p) {
+	        if (stripos($p, 'action=') === 0) {
+	            return strtolower(trim(substr($p, strlen('action='))));
+	        }
 	    }
 	    return '';
 	}
@@ -1235,7 +1235,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_document_statu
     }
 
 	    try {
-	        $statusId = getStatusId($conn, $statusMap[$uiStatus], "ResidentDocumentProfiling");
+	        $resolvedDocStatus = getFirstStatusMatchByTypes(
+	            $conn,
+	            [$statusMap[$uiStatus]],
+	            ['ResidentDocumentProfiling', 'DocumentVerification', 'VerificationStatus', 'Resident']
+	        );
+	        if (!$resolvedDocStatus) {
+	            throw new Exception("Status not found: {$statusMap[$uiStatus]}");
+	        }
+	        $statusId = (int)$resolvedDocStatus['status_id'];
 
 	        $attachmentResidentId = null;
 	        $attachmentRemarks = '';
@@ -1266,6 +1274,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_document_statu
 	        $requestedStatusName = $statusMap[$uiStatus]; // Verified | Rejected | PendingReview
 	        $currentLower = strtolower(trim((string)$currentStatusName));
 	        $isTerminal = in_array($currentLower, ['verified', 'rejected', 'denied'], true);
+	        $skipAttachmentUpdate = false;
 	        if ($isTerminal) {
 	            $currentTerminal = $currentLower === 'verified' ? 'Verified' : 'Rejected';
 	            if (strcasecmp($requestedStatusName, $currentTerminal) !== 0) {
@@ -1289,15 +1298,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_document_statu
 	                    exit;
 	                }
 	            }
-
-	            echo json_encode([
-	                'success' => true,
-	                'status' => $currentTerminal,
-	                'resident_id' => $attachmentResidentId,
-	                'profile_image_url' => null,
-	                'sector_membership' => null
-	            ]);
-	            exit;
+	            // Same terminal status: keep the attachment untouched, but continue
+	            // to run sector/profile side-effects so stale states can self-heal.
+	            $skipAttachmentUpdate = true;
 	        }
 
 	        // Preserve technical markers in remarks (e.g. idFront/idBack, sector:KEY).
@@ -1314,16 +1317,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_document_statu
 	            $remarks = implode('; ', $chunks);
 	        }
 
-	        $stmt = $conn->prepare("
-	            UPDATE unifiedfileattachmenttbl
-	            SET status_id_verify = ?, remarks = ?
-	            WHERE attachment_id = ?
-	            LIMIT 1
-	        ");
-	        if (!$stmt) throw new Exception("Prepare failed (update document status): " . $conn->error);
-	        $stmt->bind_param("isi", $statusId, $remarks, $attachmentId);
-	        $stmt->execute();
-	        $stmt->close();
+	        if (!$skipAttachmentUpdate) {
+	            $stmt = $conn->prepare("
+	                UPDATE unifiedfileattachmenttbl
+	                SET status_id_verify = ?, remarks = ?
+	                WHERE attachment_id = ?
+	                LIMIT 1
+	            ");
+	            if (!$stmt) throw new Exception("Prepare failed (update document status): " . $conn->error);
+	            $stmt->bind_param("isi", $statusId, $remarks, $attachmentId);
+	            $stmt->execute();
+	            $stmt->close();
+	        }
 
 	        // Audit: document status change (best-effort).
 	        $actorUserId = isset($_SESSION['user_id']) ? (string)$_SESSION['user_id'] : null;
@@ -1392,7 +1397,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_document_statu
 	                    $backStatus = strtolower(trim((string)$getLatestSideStatus($conn, (string)$residentId, (string)$sectorKey, 'back')));
 	                    $bothVerified = ($frontStatus === 'verified' && $backStatus === 'verified');
 	                    if (!$bothVerified) {
-	                        $statusIdForSectorMembership = getStatusId($conn, "PendingReview", "ResidentDocumentProfiling");
+	                        $pendingSectorStatus = getFirstStatusMatchByTypes(
+	                            $conn,
+	                            ['PendingReview', 'Pending'],
+	                            ['ResidentDocumentProfiling', 'DocumentVerification', 'VerificationStatus', 'Resident']
+	                        );
+	                        if (!$pendingSectorStatus) {
+	                            throw new Exception("Status not found: PendingReview");
+	                        }
+	                        $statusIdForSectorMembership = (int)$pendingSectorStatus['status_id'];
 	                    } elseif ($sectorLabel) {
 	                        // Capture old/new for audit trail.
 	                        $oldSectorMembership = null;
