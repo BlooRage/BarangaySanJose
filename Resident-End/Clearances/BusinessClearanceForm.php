@@ -45,7 +45,7 @@ if (!isset($baseUrl)) {
                     <div class="input-stack"><label class="top-label">Last Name<span class="required-asterisk">*</span></label><input type="text" name="o_ln" required></div>
                     <div class="input-stack"><label class="top-label">First Name<span class="required-asterisk">*</span></label><input type="text" name="o_fn" required></div>
                     <div class="input-stack"><label class="top-label">Middle Name</label><input type="text" name="o_mn"></div>
-                    <div class="input-stack"><label class="top-label">Suffix</label><input type="text" name="o_sfx"></div>
+                    <div class="input-stack"><label class="top-label">Suffix</label><select name="o_sfx"><option value=\"\">None</option><option value=\"Jr.\">Jr.</option><option value=\"Sr.\">Sr.</option><option value=\"III\">III</option><option value=\"IV\">IV</option></select></div>
                 </div>
                 <div class="form-row"><div class="full-width"><div class="input-stack"><label class="top-label">Contact Number</label><input type="text" name="o_phone"></div></div></div>
                 <div id="ownerAddressWrapper" class="form-row">
@@ -90,32 +90,45 @@ if (!isset($baseUrl)) {
                 <div class="form-row"><div class="full-width"><div class="input-stack"><label class="top-label">Date of Initial Operation<span class="required-asterisk">*</span></label><input type="date" name="b_date" required></div></div></div>
                 
                 <div class="form-row">
-                    <div class="phone"><div class="input-stack"><label class="top-label">NEW APPLICATION:</label><input type="text" name="new_app"></div></div>
-                    <div class="phone"><div class="input-stack"><label class="top-label">RENEWAL:</label><input type="text" name="renewal_app"></div></div>
-                </div>
-
-                <div class="form-row">
-                    <div class="phone"><div class="input-stack"><label class="top-label">Contact Number</label><input type="text" name="b_contact_1"></div></div>
-                    <div class="phone"><div class="input-stack"><label class="top-label">Contact Number</label><input type="text" name="b_contact_2"></div></div>
-                </div>
-
-                <div class="form-row align-items-center ownership-row">
-                    <div class="full-width d-flex justify-content-between align-items-center">
-                        <label class="bold-header ownership-label">OWNERSHIP:</label>
-                        <div class="d-flex gap-4">
-                            <div class="check-item ownership-check"><input type="checkbox" name="owner_type" value="Owner" id="own_owner"><label for="own_owner">Owner</label></div>
-                            <div class="check-item ownership-check"><input type="checkbox" name="owner_type" value="Renter" id="own_renter"><label for="own_renter">Renter</label></div>
-                            <div class="check-item ownership-check"><input type="checkbox" name="owner_type" value="Occupant" id="own_occupant"><label for="own_occupant">Occupant</label></div>
+                    <div class="full-width">
+                        <div class="d-flex align-items-center justify-content-start gap-3 app-type-row">
+                            <p class="if-building-note mb-0">CHOOSE ONE:</p>
+                            <div class="check-item">
+                                <input type="radio" id="app_new" name="application_type" value="New" class="clearance-radio" required>
+                                <label class="app-type-label" for="app_new">New Application</label>
+                            </div>
+                            <div class="check-item">
+                                <input type="radio" id="app_renewal" name="application_type" value="Renewal" class="clearance-radio" required>
+                                <label class="app-type-label" for="app_renewal">Renewal</label>
+                            </div>
                         </div>
                     </div>
                 </div>
 
-                <h2 class="section-title text-center text-dark">If Renter Occupant, Name of the Owner</h2>
                 <div class="form-row">
-                    <div class="input-stack"><label class="top-label">Last Name<span class="required-asterisk">*</span></label><input type="text" name="ro_ln"></div>
-                    <div class="input-stack"><label class="top-label">First Name<span class="required-asterisk">*</span></label><input type="text" name="ro_fn"></div>
-                    <div class="input-stack"><label class="top-label">Middle Name</label><input type="text" name="ro_mn"></div>
-                    <div class="input-stack"><label class="top-label">Suffix</label><input type="text" name="ro_sfx"></div>
+                    <div class="full-width"><div class="input-stack"><label class="top-label">Contact Number</label><input type="text" name="b_contact_1"></div></div>
+                </div>
+
+                <div class="form-row">
+                    <div class="full-width">
+                        <label class="top-label">Ownership <span class="required-asterisk">*</span></label>
+                        <select name="owner_type" id="ownerTypeSelect" required>
+                            <option value="">Select</option>
+                            <option value="Owner">Owner</option>
+                            <option value="Renter">Renter</option>
+                            <option value="Occupant">Occupant</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div id="renterOwnerDetails" class="d-none">
+                    <h2 class="section-title text-center text-dark">If Renter Occupant, Name of the Owner</h2>
+                    <div class="form-row">
+                        <div class="input-stack"><label class="top-label">Last Name<span class="required-asterisk">*</span></label><input type="text" name="ro_ln"></div>
+                        <div class="input-stack"><label class="top-label">First Name<span class="required-asterisk">*</span></label><input type="text" name="ro_fn"></div>
+                        <div class="input-stack"><label class="top-label">Middle Name</label><input type="text" name="ro_mn"></div>
+                        <div class="input-stack"><label class="top-label">Suffix</label><select name="ro_sfx"><option value=\"\">None</option><option value=\"Jr.\">Jr.</option><option value=\"Sr.\">Sr.</option><option value=\"III\">III</option><option value=\"IV\">IV</option></select></div>
+                    </div>
                 </div>
 
                 <div class="agreement-row">
@@ -130,27 +143,26 @@ if (!isset($baseUrl)) {
         </div>
     </main>
 </div>
-<script>
-document.querySelectorAll('input[name="owner_type"]').forEach(function (box) {
-    box.addEventListener('change', function () {
-        if (this.checked) {
-            document.querySelectorAll('input[name="owner_type"]').forEach(function (other) {
-                if (other !== box) {
-                    other.checked = false;
-                }
-            });
-        }
-    });
-});
-</script>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script>
         document.addEventListener("DOMContentLoaded", () => {
             const form = document.querySelector("form");
             const submitBtn = form?.querySelector(".submit-btn");
+            const ownerTypeSelect = document.getElementById("ownerTypeSelect");
+            const renterOwnerDetails = document.getElementById("renterOwnerDetails");
+            const renterOwnerRequired = renterOwnerDetails
+                ? Array.from(renterOwnerDetails.querySelectorAll("input[name='ro_ln'], input[name='ro_fn']"))
+                : [];
             if (!form || !submitBtn) return;
 
             const updateState = () => {
+                if (ownerTypeSelect && renterOwnerDetails) {
+                    const isRenterOrOccupant = ownerTypeSelect.value === "Renter" || ownerTypeSelect.value === "Occupant";
+                    renterOwnerDetails.classList.toggle("d-none", !isRenterOrOccupant);
+                    renterOwnerRequired.forEach((input) => {
+                        input.required = isRenterOrOccupant;
+                    });
+                }
                 submitBtn.disabled = !form.checkValidity();
             };
 

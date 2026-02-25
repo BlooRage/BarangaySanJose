@@ -149,8 +149,18 @@ body {
     font-size: 14px;
 }
 
-.form-row select {
+.form-row select,
+.input-stack select,
+.application-card select,
+.application-card--muted select {
     padding-right: 2.5rem;
+    appearance: none;
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3e%3cpath fill='none' stroke='%23343a40' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='m2 5 6 6 6-6'/%3e%3c/svg%3e");
+    background-repeat: no-repeat;
+    background-position: right 0.75rem center;
+    background-size: 16px 12px;
 }
 
 .form-row textarea {
@@ -245,6 +255,78 @@ body {
     margin: 0;
     color: #333;
     font-size: 14px;
+}
+
+.app-type-label {
+    display: inline-block;
+    white-space: nowrap;
+}
+
+.app-type-row .if-building-note {
+    line-height: 1;
+}
+
+.app-type-row .check-item {
+    align-items: center;
+    margin-bottom: 0;
+}
+
+.app-type-row input[type="radio"] {
+    margin: 0;
+    width: 18px;
+    height: 18px;
+}
+
+.app-type-row {
+    gap: 12px;
+}
+
+.clearance-radio {
+    width: 18px;
+    height: 18px;
+    margin: 0;
+    accent-color: #FE993C;
+}
+
+.permits-columns {
+    width: 100%;
+    padding-left: 200px;
+    padding-right: 200px;
+}
+
+.permits-right-col {
+    padding-left: 100px;
+}
+
+.others-spec-input {
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
+.permits-columns input[type="checkbox"] {
+    width: 18px;
+    height: 18px;
+}
+
+.others-row {
+    width: 100%;
+    align-items: center;
+    margin-top: 10px;
+}
+
+.others-label {
+    min-width: 60px;
+}
+
+.others-spec-input {
+    width: 100%;
+}
+
+.permits-columns-row {
+    display: flex;
+    gap: 3rem;
+    align-items: flex-start;
+    justify-content: space-between;
 }
 
 .beneficiary-option input[type="radio"] {

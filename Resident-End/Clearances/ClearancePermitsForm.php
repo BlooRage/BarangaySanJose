@@ -126,119 +126,132 @@ if (!isset($baseUrl)) {
                 </div>
 
                 <div class="form-row">
-                    <div class="full-width d-flex justify-content-center gap-5">
-                        <div class="check-item"><input type="checkbox" name="app_type" id="new"><label for="new">New Application</label></div>
-                        <div class="check-item"><input type="checkbox" name="app_type" id="ren"><label for="ren">Renewal</label></div>
-                    </div>
-                </div>
-
-                <div class="form-row">
-                    <div class="phone">
-                        <div class="check-item"><input type="checkbox" id="t1"><label for="t1">Tricycle</label></div>
-                        <div class="check-item"><input type="checkbox" id="t2"><label for="t2">Electrical</label></div>
-                        <div class="check-item"><input type="checkbox" id="t3"><label for="t3">Water</label></div>
-                        <div class="check-item">
-                            <input type="checkbox" id="t4">
-                            <label for="t4" style="min-width: 50px;">Others:</label>
-                            <input type="text" name="others_spec" placeholder="Please specify" class="flex-input">
-                        </div>
-                    </div>
-                    <div class="phone">
-                        <p style="font-size: 14px; font-weight: bold; color: #FE993C; margin-bottom: 10px;">IF BUILDING/ELECTRICAL/WATER:</p>
-                        <div class="check-item"><input type="checkbox" id="c1"><label for="c1">Residential</label></div>
-                        <div class="check-item"><input type="checkbox" id="c2"><label for="c2">Commercial</label></div>
-                    </div>
-                </div>
-
-                <h2 class="section-title text-center text-dark">For Tricycles</h2>
-                <h2 class="section-title text-center text-dark" style="font-size: 16px; margin-top: 0;">Driver's Information</h2>
-                
-                <div class="form-row">
-                    <div class="input-stack">
-                        <label class="top-label">Last Name<span class="required-asterisk">*</span></label>
-                        <input type="text" name="d_ln">
-                    </div>
-                    <div class="input-stack">
-                        <label class="top-label">First Name<span class="required-asterisk">*</span></label>
-                        <input type="text" name="d_fn">
-                    </div>
-                    <div class="input-stack">
-                        <label class="top-label">Middle Name</label>
-                        <input type="text" name="d_mn">
-                    </div>
-                    <div class="input-stack">
-                        <label class="top-label">Suffix</label>
-                        <input type="text" name="d_sfx">
-                    </div>
-                </div>
-
-                <div class="form-row">
-                    <div class="contact">
-                        <div class="input-stack">
-                            <label class="top-label">Contact Number</label>
-                            <input type="text" name="d_phone">
+                    <div class="full-width">
+                        <div class="d-flex align-items-center justify-content-start gap-3 app-type-row">
+                            <p class="if-building-note mb-0">CHOOSE ONE:</p>
+                            <div class="check-item"><input type="radio" name="app_type" id="new" value="New" class="clearance-radio" required><label class="app-type-label" for="new">New Application</label></div>
+                            <div class="check-item"><input type="radio" name="app_type" id="ren" value="Renewal" class="clearance-radio" required><label class="app-type-label" for="ren">Renewal</label></div>
                         </div>
                     </div>
                 </div>
 
                 <div class="form-row">
                     <div class="full-width">
-                        <div class="row mb-3">
-                            <div class="col-md-4">
-                                <label class="top-label" for="driver_unit_number">Unit / Apartment Number</label>
-                                <input type="text" id="driver_unit_number" name="driver_unit_number">
+                        <p class="if-building-note mb-2">IF BUILDING/ELECTRICAL/WATER:</p>
+                        <div class="permits-columns">
+                            <div class="permits-columns-row">
+                                <div class="flex-grow-1">
+                                    <div class="check-item"><input type="checkbox" id="t1"><label for="t1">Tricycle</label></div>
+                                    <div class="check-item"><input type="checkbox" id="t2"><label for="t2">Electrical</label></div>
+                                    <div class="check-item"><input type="checkbox" id="t3"><label for="t3">Water</label></div>
+                                </div>
+                                <div class="flex-grow-1 permits-right-col">
+                                    <div class="check-item"><input type="checkbox" id="c1"><label for="c1">Residential</label></div>
+                                    <div class="check-item"><input type="checkbox" id="c2"><label for="c2">Commercial</label></div>
+                                </div>
                             </div>
-                            <div class="col-md-4">
-                                <label class="top-label" for="driver_house_number">House Number <span class="required-asterisk">*</span></label>
-                                <input type="text" id="driver_house_number" name="driver_house_number" required>
-                            </div>
-                            <div class="col-md-4">
-                                <label class="top-label" for="driver_street_name">Street Name <span class="required-asterisk">*</span></label>
-                                <input type="text" id="driver_street_name" name="driver_street_name" required>
+                            <div class="check-item others-row">
+                                <input type="checkbox" id="t4">
+                                <label for="t4" class="others-label">Others:</label>
+                                <input type="text" name="others_spec" id="othersSpecInput" placeholder="Please specify" class="others-spec-input" disabled>
                             </div>
                         </div>
                     </div>
                 </div>
 
-                <div class="form-row">
-                    <div class="phone">
-                        <div class="check-item">
-                            <input type="checkbox" id="pri"><label for="pri">Private</label>
-                        </div>
-                        
+                <div id="tricycleSection" class="d-none">
+                    <h2 class="section-title text-center text-dark">For Tricycles</h2>
+                    <h2 class="section-title text-center text-dark" style="font-size: 16px; margin-top: 0;">Driver's Information</h2>
+                    
+                    <div class="form-row">
                         <div class="input-stack">
-                            <label class="top-label">OR/CR Number:</label>
-                            <input type="text" name="or_cr" class="flex-input">
+                            <label class="top-label">Last Name<span class="required-asterisk">*</span></label>
+                            <input type="text" name="d_ln">
                         </div>
-
                         <div class="input-stack">
-                            <label class="top-label">Plate Number:</label>
-                            <input type="text" name="plate" class="flex-input">
+                            <label class="top-label">First Name<span class="required-asterisk">*</span></label>
+                            <input type="text" name="d_fn">
                         </div>
-
                         <div class="input-stack">
-                            <label class="top-label">Body Number:</label>
-                            <input type="text" name="body" class="flex-input">
+                            <label class="top-label">Middle Name</label>
+                            <input type="text" name="d_mn">
+                        </div>
+                        <div class="input-stack">
+                            <label class="top-label">Suffix</label>
+                            <input type="text" name="d_sfx">
                         </div>
                     </div>
 
-                    <div class="phone">
-                        <div class="check-item">
-                            <input type="checkbox" id="toda"><label for="toda">TODA</label>
+                    <div class="form-row">
+                        <div class="contact">
+                            <div class="input-stack">
+                                <label class="top-label">Contact Number</label>
+                                <input type="text" name="d_phone">
+                            </div>
                         </div>
+                    </div>
 
-                        <div class="input-stack">
-                            <label class="top-label">Specify:</label>
-                            <input type="text" name="spec_toda" class="flex-input">
+                    <div class="form-row">
+                        <div class="full-width">
+                            <div class="row mb-3">
+                                <div class="col-md-4">
+                                    <label class="top-label" for="driver_unit_number">Unit / Apartment Number</label>
+                                    <input type="text" id="driver_unit_number" name="driver_unit_number">
+                                </div>
+                                <div class="col-md-4">
+                                    <label class="top-label" for="driver_house_number">House Number <span class="required-asterisk">*</span></label>
+                                    <input type="text" id="driver_house_number" name="driver_house_number" required>
+                                </div>
+                                <div class="col-md-4">
+                                    <label class="top-label" for="driver_street_name">Street Name <span class="required-asterisk">*</span></label>
+                                    <input type="text" id="driver_street_name" name="driver_street_name" required>
+                                </div>
+                            </div>
                         </div>
+                    </div>
 
-                        <div class="check-item" style="margin-top: 5px;">
-                            <input type="checkbox" id="poda"><label for="poda">PODA</label>
-                        </div>
+                    <div class="form-row">
+                        <div class="full-width">
+                            <div class="input-stack">
+                                <label class="top-label">Tricycle Type</label>
+                                <select id="tricycleTypeSelect" name="tricycle_type">
+                                    <option value="">Select</option>
+                                    <option value="Private">Private</option>
+                                    <option value="TODA">TODA</option>
+                                    <option value="PODA">PODA</option>
+                                </select>
+                            </div>
 
-                        <div class="input-stack">
-                            <label class="top-label">Specify:</label>
-                            <input type="text" name="spec_poda" class="flex-input">
+                            <div id="privateDetails" class="d-none">
+                                <div class="input-stack">
+                                    <label class="top-label">OR/CR Number:</label>
+                                    <input type="text" name="or_cr">
+                                </div>
+
+                                <div class="input-stack">
+                                    <label class="top-label">Plate Number:</label>
+                                    <input type="text" name="plate">
+                                </div>
+
+                                <div class="input-stack">
+                                    <label class="top-label">Body Number:</label>
+                                    <input type="text" name="body">
+                                </div>
+                            </div>
+
+                            <div id="todaDetails" class="d-none">
+                                <div class="input-stack">
+                                    <label class="top-label">Specify TODA:</label>
+                                    <input type="text" name="spec_toda">
+                                </div>
+                            </div>
+
+                            <div id="podaDetails" class="d-none">
+                                <div class="input-stack">
+                                    <label class="top-label">Specify PODA:</label>
+                                    <input type="text" name="spec_poda">
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -262,9 +275,43 @@ if (!isset($baseUrl)) {
         document.addEventListener("DOMContentLoaded", () => {
             const form = document.querySelector("form");
             const submitBtn = form?.querySelector(".submit-btn");
+            const othersToggle = document.getElementById("t4");
+            const othersInput = document.getElementById("othersSpecInput");
+            const tricycleToggle = document.getElementById("t1");
+            const tricycleSection = document.getElementById("tricycleSection");
+            const tricycleRequired = tricycleSection
+                ? Array.from(tricycleSection.querySelectorAll("[required]"))
+                : [];
+            const tricycleTypeSelect = document.getElementById("tricycleTypeSelect");
+            const privateDetails = document.getElementById("privateDetails");
+            const todaDetails = document.getElementById("todaDetails");
+            const podaDetails = document.getElementById("podaDetails");
             if (!form || !submitBtn) return;
 
             const updateState = () => {
+                if (othersToggle && othersInput) {
+                    const enabled = othersToggle.checked;
+                    othersInput.disabled = !enabled;
+                    if (!enabled) {
+                        othersInput.value = "";
+                    }
+                }
+                if (tricycleToggle && tricycleSection) {
+                    const showTricycle = tricycleToggle.checked;
+                    tricycleSection.classList.toggle("d-none", !showTricycle);
+                    tricycleSection.querySelectorAll("input, select, textarea").forEach((el) => {
+                        el.disabled = !showTricycle;
+                    });
+                    tricycleRequired.forEach((el) => {
+                        el.required = showTricycle;
+                    });
+                }
+                if (tricycleTypeSelect && privateDetails && todaDetails && podaDetails) {
+                    const type = tricycleTypeSelect.value;
+                    privateDetails.classList.toggle("d-none", type !== "Private");
+                    todaDetails.classList.toggle("d-none", type !== "TODA");
+                    podaDetails.classList.toggle("d-none", type !== "PODA");
+                }
                 submitBtn.disabled = !form.checkValidity();
             };
 
