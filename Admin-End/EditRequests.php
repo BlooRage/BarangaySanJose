@@ -31,12 +31,12 @@ include "includes/sidebar.php";
 	            <div class="admin-list-toolbar mb-3 pt-2">
 	                <div class="admin-list-tabs pt-2">
 	                    <button class="btn btn-outline-primary btn-sm status-filter-btn active fw-bold" data-filter="ALL">&nbsp;&nbsp;All&nbsp;&nbsp;</button>
-	                    <button class="btn btn-outline-secondary btn-sm status-filter-btn text-center has-notif fw-bold " data-filter="Pending">
-	                        &nbsp;&nbsp;Pending
-	                        <span id="pendingRequestBadge" class="pending-count-badge d-none text-center fw-bold">0</span>
-	                    </button>
 	                    <button class="btn btn-outline-secondary btn-sm status-filter-btn fw-bold" data-filter="Approved">&nbsp;&nbsp;Approved&nbsp;&nbsp;</button>
 	                    <button class="btn btn-outline-secondary btn-sm status-filter-btn fw-bold" data-filter="Denied">&nbsp;&nbsp;Denied&nbsp;&nbsp;</button>
+                        <button class="btn btn-outline-secondary btn-sm status-filter-btn text-center has-notif fw-bold " data-filter="Pending">
+	                        &nbsp;&nbsp;Pending&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+	                        <span id="pendingRequestBadge" class="pending-count-badge d-none text-center fw-bold">0</span>
+	                    </button>
 	                </div>
 	
 	                <div class="admin-list-actions admin-list-actions--linear">

@@ -13,19 +13,19 @@
 .status-pill.pending {
     color: #664d03;
     background: #fff3cd;
-    border: 1px solid #ffecb5;
+    border: 1px solid #614a05;
 }
 
 .status-pill.approved {
     color: #0f5132;
     background: #d1e7dd;
-    border: 1px solid #badbcc;
+    border: 1px solid #125b3a;
 }
 
 .status-pill.denied {
     color: #842029;
     background: #f8d7da;
-    border: 1px solid #f5c2c7;
+    border: 1px solid #6a0c15;
 }
 
 .request-card {
