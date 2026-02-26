@@ -17,6 +17,80 @@ if (!isset($baseUrl)) {
 <?php
 $allowUnregistered = false;
 require_once __DIR__ . "/../includes/resident_access_guard.php";
+
+require_once __DIR__ . "/../../PhpFiles/GET/getResidentProfile.php";
+
+$userId = $_SESSION['user_id'] ?? '';
+$data = getResidentProfileData($conn, $userId);
+$residentinformationtbl = $data['residentinformationtbl'] ?? [];
+$residentaddresstbl = $data['residentaddresstbl'] ?? [];
+$useraccountstbl = $data['useraccountstbl'] ?? [];
+
+$firstName = htmlspecialchars($residentinformationtbl['firstname'] ?? '', ENT_QUOTES, 'UTF-8');
+$lastName = htmlspecialchars($residentinformationtbl['lastname'] ?? '', ENT_QUOTES, 'UTF-8');
+$middleName = htmlspecialchars($residentinformationtbl['middlename'] ?? '', ENT_QUOTES, 'UTF-8');
+$suffix = $residentinformationtbl['suffix'] ?? '';
+$unitNumber = trim((string)($residentaddresstbl['unit_number'] ?? ''));
+$streetNumber = trim((string)($residentaddresstbl['street_number'] ?? ''));
+$streetName = trim((string)($residentaddresstbl['street_name'] ?? ''));
+$phaseNumber = trim((string)($residentaddresstbl['phase_number'] ?? ''));
+$subdivision = trim((string)($residentaddresstbl['subdivision'] ?? ''));
+$areaNumber = trim((string)($residentaddresstbl['area_number'] ?? ''));
+$phoneNumber = htmlspecialchars($useraccountstbl['phone_number'] ?? '', ENT_QUOTES, 'UTF-8');
+
+$streetNameHasBlock = $streetName !== '' && stripos($streetName, 'block') !== false;
+$streetNumberHasLot = $streetNumber !== '' && stripos($streetNumber, 'lot') !== false;
+$isLotBlockSystem = $streetNameHasBlock || $streetNumberHasLot;
+
+$streetLabel = $streetName;
+if ($streetLabel !== '' && stripos($streetLabel, 'street') === false && !$streetNameHasBlock) {
+    $streetLabel .= ' Street';
+}
+
+$subdivisionLabel = $subdivision !== '' ? $subdivision . ' Subdivision' : '';
+
+$fullAddressParts = [];
+if ($isLotBlockSystem) {
+    $lotNumber = trim((string)preg_replace('/^lot\\s*/i', '', $streetNumber));
+    $blockNumber = trim((string)preg_replace('/^(block|blk)\\s*/i', '', $streetName));
+    $phaseValue = trim((string)preg_replace('/^phase\\s*/i', '', $phaseNumber));
+
+    $lotLabel = $lotNumber !== '' ? 'Lot ' . $lotNumber : $streetNumber;
+    $blockLabel = $blockNumber !== '' ? 'Blk ' . $blockNumber : $streetName;
+    $phaseLabel = $phaseValue !== '' ? 'Phase ' . $phaseValue : ($phaseNumber !== '' ? $phaseNumber : '');
+
+    $fullAddressParts = array_filter([
+        $lotLabel,
+        $blockLabel,
+        $phaseLabel,
+        $subdivisionLabel,
+        'San Jose',
+        'Rodriguez',
+        'Rizal'
+    ], fn($part) => $part !== '');
+} else {
+    if ($unitNumber !== '') {
+        $fullAddressParts = array_filter([
+            'Unit ' . $unitNumber,
+            $streetLabel,
+            $subdivisionLabel,
+            'San Jose',
+            'Rodriguez',
+            'Rizal'
+        ], fn($part) => $part !== '');
+    } else {
+        $streetLine = trim(implode(' ', array_filter([$streetNumber, $streetLabel], fn($part) => $part !== '')));
+        $fullAddressParts = array_filter([
+            $streetLine,
+            $subdivisionLabel,
+            'San Jose',
+            'Rodriguez',
+            'Rizal'
+        ], fn($part) => $part !== '');
+    }
+}
+
+$fullAddress = htmlspecialchars(implode(', ', $fullAddressParts), ENT_QUOTES, 'UTF-8');
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -49,23 +123,48 @@ require_once __DIR__ . "/../includes/resident_access_guard.php";
                 <input type="hidden" name="purpose" value="Certificate of Identity Application">
                 <input type="hidden" name="redirect" value="1">
 
-                <h2 class="section-title text-center text-dark">Child’s Information</h2>
+                <h2 class="section-title text-center text-dark">Applicant Information</h2>
                 <div class="form-row">
                     <div class="input-stack">
                         <label class="top-label">Last Name<span class="required-asterisk">*</span></label>
-                        <input type="text" name="child_last_name" required>
+                        <input type="text" name="last_name" readonly value="<?php echo $lastName; ?>">
                     </div>
                     <div class="input-stack">
                         <label class="top-label">First Name<span class="required-asterisk">*</span></label>
-                        <input type="text" name="child_first_name" required>
+                        <input type="text" name="first_name" readonly value="<?php echo $firstName; ?>">
                     </div>
                     <div class="input-stack">
                         <label class="top-label">Middle Name</label>
-                        <input type="text" name="child_middle_name">
+                        <input type="text" name="middle_name" readonly value="<?php echo $middleName; ?>">
                     </div>
                     <div class="input-stack">
                         <label class="top-label">Suffix</label>
-                        <input type="text" name="child_suffix">
+                        <select name="suffix_name_display" class="text-bg-light" disabled>
+                            <option value="" <?php echo ($suffix === '') ? 'selected' : ''; ?>>None</option>
+                            <option value="Jr." <?php echo ($suffix === 'Jr.') ? 'selected' : ''; ?>>Jr.</option>
+                            <option value="Sr." <?php echo ($suffix === 'Sr.') ? 'selected' : ''; ?>>Sr.</option>
+                            <option value="III" <?php echo ($suffix === 'III') ? 'selected' : ''; ?>>III</option>
+                            <option value="IV" <?php echo ($suffix === 'IV') ? 'selected' : ''; ?>>IV</option>
+                        </select>
+                        <input type="hidden" name="suffix_name" value="<?php echo htmlspecialchars($suffix, ENT_QUOTES, 'UTF-8'); ?>">
+                    </div>
+                </div>
+
+                <div class="form-row">
+                    <div class="full-width">
+                        <div class="input-stack">
+                            <label class="top-label">Contact Number<span class="required-asterisk">*</span></label>
+                            <input type="text" name="contact_number" readonly value="<?php echo $phoneNumber; ?>">
+                        </div>
+                    </div>
+                </div>
+
+                <div class="form-row">
+                    <div class="full-width">
+                        <div class="input-stack">
+                            <label class="top-label">Full Address <span class="required-asterisk">*</span></label>
+                            <input type="text" name="full_address" readonly value="<?php echo $fullAddress; ?>">
+                        </div>
                     </div>
                 </div>
 
@@ -99,25 +198,6 @@ require_once __DIR__ . "/../includes/resident_access_guard.php";
                         <div class="input-stack">
                             <label class="top-label">Nationality<span class="required-asterisk">*</span></label>
                             <input type="text" name="child_nationality" required>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="form-row">
-                    <div class="full-width">
-                        <div class="row mb-3">
-                            <div class="col-md-4">
-                                <label class="top-label" for="child_unit_number">Unit / Apartment Number</label>
-                                <input type="text" id="child_unit_number" name="child_unit_number">
-                            </div>
-                            <div class="col-md-4">
-                                <label class="top-label" for="child_house_number">House Number <span class="required-asterisk">*</span></label>
-                                <input type="text" id="child_house_number" name="child_house_number" required>
-                            </div>
-                            <div class="col-md-4">
-                                <label class="top-label" for="child_street_name">Street Name <span class="required-asterisk">*</span></label>
-                                <input type="text" id="child_street_name" name="child_street_name" required>
-                            </div>
                         </div>
                     </div>
                 </div>
@@ -159,15 +239,6 @@ require_once __DIR__ . "/../includes/resident_access_guard.php";
                     <div class="input-stack">
                         <label class="top-label">Suffix</label>
                         <input type="text" name="mother_suffix">
-                    </div>
-                </div>
-
-                <div class="form-row">
-                    <div class="full-width">
-                        <div class="input-stack">
-                            <label class="top-label">Contact Number<span class="required-asterisk">*</span></label>
-                            <input type="text" name="contact_number" required>
-                        </div>
                     </div>
                 </div>
 
