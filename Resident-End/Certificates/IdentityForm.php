@@ -49,6 +49,23 @@ if ($streetLabel !== '' && stripos($streetLabel, 'street') === false && !$street
 
 $subdivisionLabel = $subdivision !== '' ? $subdivision . ' Subdivision' : '';
 
+$birthdateValue = '';
+$birthdateDisplay = $residentinformationtbl['birthdate'] ?? '';
+if ($birthdateDisplay !== '') {
+    $dt = DateTime::createFromFormat('F j, Y', $birthdateDisplay);
+    if (!$dt) {
+        try {
+            $dt = new DateTime($birthdateDisplay);
+        } catch (Exception $e) {
+            $dt = null;
+        }
+    }
+    if ($dt instanceof DateTime) {
+        $birthdateValue = $dt->format('Y-m-d');
+    }
+}
+$sexValue = (string)($residentinformationtbl['sex'] ?? '');
+
 $fullAddressParts = [];
 if ($isLotBlockSystem) {
     $lotNumber = trim((string)preg_replace('/^lot\\s*/i', '', $streetNumber));
@@ -172,17 +189,18 @@ $fullAddress = htmlspecialchars(implode(', ', $fullAddressParts), ENT_QUOTES, 'U
                     <div class="phone">
                         <div class="input-stack">
                             <label class="top-label">Date of Birth<span class="required-asterisk">*</span></label>
-                            <input type="date" name="child_dob" required>
+                            <input type="date" name="child_dob" value="<?php echo htmlspecialchars($birthdateValue, ENT_QUOTES, 'UTF-8'); ?>" readonly required>
                         </div>
                     </div>
                     <div class="phone">
                         <div class="input-stack">
                             <label class="top-label">Kasarian / Sex<span class="required-asterisk">*</span></label>
-                            <select name="child_sex" required>
-                                <option value="" disabled selected>Select</option>
-                                <option value="Male">Male</option>
-                                <option value="Female">Female</option>
+                            <select name="child_sex_display" class="text-bg-light" disabled required>
+                                <option value="" <?php echo ($sexValue === '') ? 'selected' : ''; ?> disabled>Select</option>
+                                <option value="Male" <?php echo ($sexValue === 'Male') ? 'selected' : ''; ?>>Male</option>
+                                <option value="Female" <?php echo ($sexValue === 'Female') ? 'selected' : ''; ?>>Female</option>
                             </select>
+                            <input type="hidden" name="child_sex" value="<?php echo htmlspecialchars($sexValue, ENT_QUOTES, 'UTF-8'); ?>">
                         </div>
                     </div>
                 </div>
@@ -197,7 +215,12 @@ $fullAddress = htmlspecialchars(implode(', ', $fullAddressParts), ENT_QUOTES, 'U
                     <div class="phone">
                         <div class="input-stack">
                             <label class="top-label">Nationality<span class="required-asterisk">*</span></label>
-                            <input type="text" name="child_nationality" required>
+                            <select id="child_nationality_choice" class="form-select" required>
+                                <option value="Filipino" selected>Filipino</option>
+                                <option value="Other">Other</option>
+                            </select>
+                            <input type="hidden" id="child_nationality" name="child_nationality" value="Filipino">
+                            <input type="text" id="child_nationality_other" class="form-control mt-2" placeholder="Please specify" style="display: none;">
                         </div>
                     </div>
                 </div>
@@ -262,12 +285,40 @@ $fullAddress = htmlspecialchars(implode(', ', $fullAddressParts), ENT_QUOTES, 'U
             const submitBtn = form?.querySelector(".submit-btn");
             if (!form || !submitBtn) return;
 
+            const nationalitySelect = form.querySelector("#child_nationality_choice");
+            const nationalityHidden = form.querySelector("#child_nationality");
+            const nationalityOther = form.querySelector("#child_nationality_other");
+
+            const syncNationality = () => {
+                if (!nationalitySelect || !nationalityHidden || !nationalityOther) return;
+                if (nationalitySelect.value === "Other") {
+                    nationalityOther.style.display = "";
+                    nationalityOther.required = true;
+                    nationalityHidden.value = nationalityOther.value.trim();
+                } else {
+                    nationalityOther.style.display = "none";
+                    nationalityOther.required = false;
+                    nationalityOther.value = "";
+                    nationalityHidden.value = nationalitySelect.value;
+                }
+            };
+
             const updateState = () => {
                 submitBtn.disabled = !form.checkValidity();
             };
 
+            nationalitySelect?.addEventListener("change", () => {
+                syncNationality();
+                updateState();
+            });
+            nationalityOther?.addEventListener("input", () => {
+                syncNationality();
+                updateState();
+            });
+
             form.addEventListener("input", updateState);
             form.addEventListener("change", updateState);
+            syncNationality();
             updateState();
         });
     </script>
