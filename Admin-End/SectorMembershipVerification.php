@@ -35,11 +35,12 @@ include 'includes/sidebar.php';
 	            <div class="admin-list-toolbar mb-3">
 	                <div class="admin-list-tabs">
 	                    <button class="btn btn-outline-primary btn-sm filter-btn fw-bold active" data-filter="ALL">&nbsp;&nbsp;All&nbsp;&nbsp;</button>
-	                    <button class="btn btn-outline-secondary btn-sm filter-btn has-notif fw-bold" data-filter="PendingReview">
-                        &nbsp;&nbsp;Pending<span id="pendingSectorBadge" class="pending-count-badge d-none text-center fw-bold">0</span>
-                      </button>
+	                    
 	                    <button class="btn btn-outline-secondary btn-sm filter-btn fw-bold" data-filter="Verified">&nbsp;&nbsp;Verified&nbsp;&nbsp;</button>
 	                    <button class="btn btn-outline-secondary btn-sm filter-btn fw-bold" data-filter="Rejected">&nbsp;&nbsp;Rejected&nbsp;&nbsp;</button>
+                      <button class="btn btn-outline-secondary btn-sm filter-btn has-notif fw-bold" data-filter="PendingReview">
+                        &nbsp;&nbsp;Pending<span id="pendingSectorBadge" class="pending-count-badge d-none text-center fw-bold">0</span>
+                      </button>
 	                </div>
 	
 	                <div class="admin-list-actions">

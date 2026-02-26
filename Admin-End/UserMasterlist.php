@@ -30,7 +30,7 @@
       display: inline-flex;
       align-items: center;
       gap: 6px;
-      padding: 4px 10px;
+      padding: 6px 1px;
       border-radius: 8px;
       font-size: 12px;
       font-weight: 600;
@@ -40,17 +40,17 @@
     .status-pill.pending {
       color: #664d03;
       background: #fff3cd;
-      border: 1px solid #ffecb5;
+      border: 1px solid #654f0d;
     }
     .status-pill.approved {
       color: #0f5132;
       background: #d1e7dd;
-      border: 1px solid #badbcc;
+      border: 1px solid #0e5837;
     }
     .status-pill.denied {
       color: #842029;
       background: #f8d7da;
-      border: 1px solid #f5c2c7;
+      border: 1px solid #940f1c;
     }
   </style>
 </head>
