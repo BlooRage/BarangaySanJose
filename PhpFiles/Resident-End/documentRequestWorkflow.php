@@ -109,6 +109,35 @@ function dr_column_type(mysqli $conn, string $table, string $column): string {
     return '';
 }
 
+function dr_request_details_requires_json(mysqli $conn): bool {
+    $colType = dr_column_type($conn, 'documentrequesttbl', 'request_details');
+    if (strpos($colType, 'json') !== false) {
+        return true;
+    }
+
+    $res = $conn->query("
+        SELECT cc.CHECK_CLAUSE
+        FROM information_schema.CHECK_CONSTRAINTS cc
+        JOIN information_schema.TABLE_CONSTRAINTS tc
+          ON cc.CONSTRAINT_SCHEMA = tc.CONSTRAINT_SCHEMA
+         AND cc.CONSTRAINT_NAME = tc.CONSTRAINT_NAME
+        WHERE tc.TABLE_SCHEMA = DATABASE()
+          AND tc.TABLE_NAME = 'documentrequesttbl'
+          AND tc.CONSTRAINT_TYPE = 'CHECK'
+          AND cc.CHECK_CLAUSE LIKE '%request_details%'
+    ");
+    if (!($res instanceof mysqli_result)) {
+        return false;
+    }
+    while ($row = $res->fetch_assoc()) {
+        $clause = strtolower((string)($row['CHECK_CLAUSE'] ?? ''));
+        if (strpos($clause, 'json_valid') !== false) {
+            return true;
+        }
+    }
+    return false;
+}
+
 function dr_request_details_token(string $documentTypeRaw, string $documentTypeNormalized): string {
     $raw = strtolower(trim($documentTypeRaw));
     if ($raw !== '') {
@@ -293,9 +322,9 @@ if ($action === 'submit_request') {
         $requestDetails = 'Document request submitted';
     }
     $requestDetailsToken = dr_request_details_token($documentTypeRaw, $documentType);
-    $requestDetailsColType = dr_column_type($conn, 'documentrequesttbl', 'request_details');
+    $requestDetailsJsonRequired = dr_request_details_requires_json($conn);
     $requestDetailsValue = $requestDetails;
-    if (strpos($requestDetailsColType, 'json') !== false) {
+    if ($requestDetailsJsonRequired) {
         $requestDetailsValue = dr_safe_json([
             'summary' => $requestDetails,
             'document_type' => $documentType,
@@ -382,16 +411,27 @@ if ($action === 'submit_request') {
 
         // Compatibility retry for legacy CHECK constraints on request_details.
         if (stripos($err, 'request_details') !== false && isset($values['request_details'])) {
-            $fallbackCandidates = array_values(array_unique(array_filter([
-                $requestDetailsToken,
-                strtolower(trim((string)$documentTypeRaw)),
-                trim((string)$documentType),
-                trim((string)$purpose),
-                $requestDetails,
-                dr_safe_json(['document_type' => $documentType, 'purpose' => $purpose]),
-                '{}',
-                'certificate',
-            ], static fn($v) => trim((string)$v) !== '')));
+            if ($requestDetailsJsonRequired) {
+                $fallbackCandidates = array_values(array_unique(array_filter([
+                    dr_safe_json([
+                        'summary' => $requestDetails,
+                        'document_type' => $documentType,
+                        'purpose' => $purpose,
+                    ]),
+                    '{}',
+                ], static fn($v) => trim((string)$v) !== '')));
+            } else {
+                $fallbackCandidates = array_values(array_unique(array_filter([
+                    $requestDetailsToken,
+                    strtolower(trim((string)$documentTypeRaw)),
+                    trim((string)$documentType),
+                    trim((string)$purpose),
+                    $requestDetails,
+                    dr_safe_json(['document_type' => $documentType, 'purpose' => $purpose]),
+                    '{}',
+                    'certificate',
+                ], static fn($v) => trim((string)$v) !== '')));
+            }
 
             $saved = false;
             $lastRetryErr = $err;
