@@ -226,8 +226,8 @@ $applicantArea = htmlspecialchars($areaNumber, ENT_QUOTES, 'UTF-8');
                         </div>
 
                         <h2 class="section-title text-center text-dark">Cohabitant Address</h2>
-                            <div class="full-width">
-                                <div class="beneficiary-block">
+                            <div class="full-width p-3 ">
+                                <div class="beneficiary-block p-2 mt-3 mb-2 pt-3">
                                     <label class="top-label check-item">
                                         <input type="checkbox" id="cohabitantSameAddress" name="cohabitantSameAddress">
                                         Same address as applicant
@@ -387,8 +387,8 @@ $applicantArea = htmlspecialchars($areaNumber, ENT_QUOTES, 'UTF-8');
                         </div>
 
                         <h2 class="section-title text-center text-dark">Cohabitation Address</h2>
-                            <div class="full-width">
-                                <div class="beneficiary-block">
+                            <div class="full-width p-3">
+                                <div class="beneficiary-block mt-3 mb-2 p-2 pt-3">
                                     <label class="top-label check-item">
                                         <input type="checkbox" id="cohabitationSameAddress" name="cohabitationSameAddress">
                                         Cohabitation address is same as applicant address
