@@ -127,14 +127,27 @@ function dr_request_details_requires_json(mysqli $conn): bool {
           AND cc.CHECK_CLAUSE LIKE '%request_details%'
     ");
     if (!($res instanceof mysqli_result)) {
-        return false;
+        $res = null;
     }
-    while ($row = $res->fetch_assoc()) {
-        $clause = strtolower((string)($row['CHECK_CLAUSE'] ?? ''));
-        if (strpos($clause, 'json_valid') !== false) {
+    if ($res instanceof mysqli_result) {
+        while ($row = $res->fetch_assoc()) {
+            $clause = strtolower((string)($row['CHECK_CLAUSE'] ?? ''));
+            if (strpos($clause, 'json_valid') !== false) {
+                return true;
+            }
+        }
+    }
+
+    // Fallback for servers that don't expose CHECK_CONSTRAINTS reliably.
+    $res = $conn->query("SHOW CREATE TABLE documentrequesttbl");
+    if ($res instanceof mysqli_result) {
+        $row = $res->fetch_assoc();
+        $createSql = strtolower((string)($row['Create Table'] ?? $row['Create Table'] ?? ''));
+        if (strpos($createSql, 'request_details') !== false && strpos($createSql, 'json_valid') !== false) {
             return true;
         }
     }
+
     return false;
 }
 
