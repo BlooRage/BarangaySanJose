@@ -31,7 +31,7 @@ if (!isset($baseUrl)) {
 <div class="d-flex min-vh-100">
     <?php include __DIR__ . '/../includes/resident_sidebar.php'; ?>
     <main id="div-mainDisplay" class="flex-grow-1 px-4 pb-4 pt-0 px-md-5 pb-md-5 pt-md-0 bg-light">
-        <div class="main-head application-card orange-card py-3 my-5 rounded">
+        <div class="main-head application-card orange-card application-card--muted py-3 my-5 rounded">
             <div class="main-head-content">
             <a href="<?= htmlspecialchars($baseUrl) ?>/Resident-End/Clearances/ClearancesLandingPage.php" class="back-link">< Go Back</a>
             <h1 class="form-title">Application for Barangay Business Clearance</h1>
@@ -173,6 +173,7 @@ if (!isset($baseUrl)) {
     </script>
 </body>
 </html>
+
 
 
 

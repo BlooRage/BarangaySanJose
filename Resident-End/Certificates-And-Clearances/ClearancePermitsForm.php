@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
@@ -51,7 +51,7 @@
     <?php include 'includes/resident_sidebar.php'; ?>
 
     <main id="div-mainDisplay" class="flex-grow-1 px-4 pb-4 pt-0 px-md-5 pb-md-5 pt-md-0 bg-light">
-        <div class="main-head application-card orange-card my-5 py-3 rounded">
+        <div class="main-head application-card orange-card application-card--muted my-5 py-3 rounded">
             <div class="main-head-content">
             <a href="/BarangaySanJose/Resident-End/ApplicationsLandingPage.php" class="back-link">< Go Back</a>
             
@@ -61,7 +61,7 @@
             <form action="#" method="POST">
                 
 
-                <h2 class="section-title text-center text-dark">Ownerâ€™s Information</h2>
+                <h2 class="section-title text-center text-dark">Owner’s Information</h2>
                 <div class="form-row">
                     <div class="input-stack">
                         <label class="top-label">Last Name<span class="required-asterisk">*</span></label>
@@ -244,6 +244,7 @@
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 </body>
 </html>
+
 
 
 
