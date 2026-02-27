@@ -36,7 +36,7 @@ require_once __DIR__ . "/../includes/resident_access_guard.php";
     <?php include __DIR__ . '/../includes/resident_sidebar.php'; ?>
 
     <main id="div-mainDisplay" class="flex-grow-1 px-4 pb-4 pt-0 px-md-5 pb-md-5 pt-md-0 bg-light">
-        <div class="main-head application-card orange-card py-3 rounded">
+        <div class="main-head application-card orange-card application-card--muted py-3 rounded">
             <div class="main-head-content">
                 <a href="<?= htmlspecialchars($baseUrl) ?>/Resident-End/resident_dashboard.php" class="back-link">&lt; Go Back</a>
 
@@ -200,3 +200,4 @@ require_once __DIR__ . "/../includes/resident_access_guard.php";
 </script>
 </body>
 </html>
+

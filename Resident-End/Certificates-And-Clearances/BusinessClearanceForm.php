@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
@@ -15,7 +15,7 @@
 <div class="d-flex min-vh-100">
     <?php include 'includes/resident_sidebar.php'; ?>
     <main id="div-mainDisplay" class="flex-grow-1 px-4 pb-4 pt-0 px-md-5 pb-md-5 pt-md-0 bg-light">
-        <div class="main-head application-card orange-card py-3 my-5 rounded">
+        <div class="main-head application-card orange-card application-card--muted py-3 my-5 rounded">
             <div class="main-head-content">
             <a href="/BarangaySanJose/Resident-End/ApplicationsLandingPage.php" class="back-link">< Go Back</a>
             <h1 class="form-title">Application for Barangay Business Clearance</h1>
@@ -24,7 +24,7 @@
 
             <form action="#" method="POST">
                 
-                <h2 class="section-title text-center text-dark">Ownerâ€™s Information</h2>
+                <h2 class="section-title text-center text-dark">Owner’s Information</h2>
                 <div class="form-row">
                     <div class="input-stack"><label class="top-label">Last Name<span class="required-asterisk">*</span></label><input type="text" name="o_ln" required></div>
                     <div class="input-stack"><label class="top-label">First Name<span class="required-asterisk">*</span></label><input type="text" name="o_fn" required></div>
@@ -130,6 +130,7 @@ document.querySelectorAll('input[name="owner_type"]').forEach(function (box) {
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 </body>
 </html>
+
 
 
 
