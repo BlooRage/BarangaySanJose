@@ -13,19 +13,19 @@ require_once __DIR__ . "/includes/admin_guard.php";
     <script src="https://kit.fontawesome.com/3482e00999.js" crossorigin="anonymous"></script>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="../CSS-Styles/Admin-End-CSS/AdminDashboardStyle.css">
-    <link rel="stylesheet" href="../CSS-Styles/Admin-End-CSS/ResidentMasterlistStyle.css?v=20260219-2">
+    <link rel="stylesheet" href="../CSS-Styles/Admin-End-CSS/ResidentMasterlistStyle.css?v=20260227-2">
 </head>
 
 <body>
-<div class="d-flex" style="min-height: 100vh;">
+<div class="d-flex flex-column flex-md-row" style="min-height: 100vh;">
 
     <!-- SIDEBAR -->
     <?php include 'includes/sidebar.php'; ?>
 
     <!-- MAIN CONTENT -->
-    <main id="main-display" class="flex-grow-1 p-4 p-md-5 bg-light">
+    <main id="main-display" class="flex-grow-1 p-3 p-md-4 p-xl-5 bg-light">
 
-        <h2 class="mb-4" style="font-family: 'Charis SIL Bold'; color: #DE710C; font-size: 48px;">
+        <h2 class="mb-4" style="font-family: 'Charis SIL Bold'; color: #DE710C; ">
             Archived Residents
         </h2>
 
@@ -34,7 +34,7 @@ require_once __DIR__ . "/includes/admin_guard.php";
         <div class="bg-white p-4 rounded-4 shadow-sm border archive-shell">
 
 	            <!-- SEARCH -->
-	            <div class="admin-list-toolbar mb-3">
+	            <div class="admin-list-toolbar mb-3 flex-wrap">
 	                <div class="admin-list-tabs"></div>
 
 	                <div class="admin-list-actions">

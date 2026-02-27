@@ -559,11 +559,11 @@ if ($q) {
     </style>
 </head>
 <body class="bg-light">
-<div class="d-flex" style="min-height: 100vh;">
+<div class="d-flex flex-column flex-md-row" style="min-height: 100vh;">
     <?php include 'includes/sidebar.php'; ?>
 
-    <main id="main-display" class="flex-grow-1 p-4 p-md-5 bg-light">
-        <h2 class="mb-4" style="font-family: 'Charis SIL Bold'; color: #DE710C; font-size: 48px;">
+    <main id="main-display" class="flex-grow-1 p-3 p-md-4 p-xl-5 bg-light">
+        <h2 class="mb-4" style="font-family: 'Charis SIL Bold'; color: #DE710C; ">
             Official Invites
         </h2>
         <hr>

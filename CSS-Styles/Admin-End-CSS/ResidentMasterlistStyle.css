@@ -110,6 +110,38 @@ html, body {
     max-width: 420px;
 }
 
+@media (max-width: 768px) {
+    .admin-list-toolbar {
+        flex-wrap: wrap;
+        overflow-x: visible;
+    }
+
+    .admin-list-tabs,
+    .admin-list-actions {
+        white-space: normal;
+    }
+
+    .admin-list-tabs {
+        width: 100%;
+        flex-wrap: wrap;
+        row-gap: 8px;
+    }
+
+    .admin-list-actions {
+        width: 100%;
+        margin-left: 0;
+        flex-wrap: wrap;
+        gap: 8px;
+    }
+
+    .admin-search {
+        min-width: 0;
+        max-width: 100%;
+        width: 100%;
+        flex: 1 1 100%;
+    }
+}
+
 /* "Columns" (blue) + "Refresh" (orange) button styling shared across admin list pages. */
 .admin-columns {
     border-color: rgba(13, 110, 253, 0.25);

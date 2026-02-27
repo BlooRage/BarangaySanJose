@@ -524,10 +524,10 @@ $positionDisplayLabel = ap_format_position_label(
     </style>
 </head>
 <body class="bg-light">
-<div class="d-flex" style="min-height: 100vh;">
+<div class="d-flex flex-column flex-md-row" style="min-height: 100vh;">
     <?php include 'includes/sidebar.php'; ?>
 
-    <main id="main-display" class="flex-grow-1 p-4 p-md-5 bg-light">
+    <main id="main-display" class="flex-grow-1 p-3 p-md-4 p-xl-5 bg-light">
         <div class="d-flex justify-content-between align-items-end flex-wrap gap-2 mb-3">
             <h2 class="profile-page-title">My Profile</h2>
         </div>
