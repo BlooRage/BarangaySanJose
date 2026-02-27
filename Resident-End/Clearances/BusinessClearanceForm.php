@@ -35,7 +35,6 @@ if (!isset($baseUrl)) {
             <div class="main-head-content">
             <a href="<?= htmlspecialchars($baseUrl) ?>/Resident-End/Clearances/ClearancesLandingPage.php" class="back-link">< Go Back</a>
             <h1 class="form-title">Application for Barangay Business Clearance</h1>
-            <p class="form-subtitle">First Time Job Seeker</p>
             <p class="form-subtitle tight-subtitle">All fields marked with <span class="required-asterisk">*</span> are required</p>
 
             <form action="#" method="POST">

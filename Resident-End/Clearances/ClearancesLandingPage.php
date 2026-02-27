@@ -33,26 +33,69 @@ require_once __DIR__ . "/../includes/resident_access_guard.php";
 
             <p class="section-label">List of clearances:</p>
 
-            <div class="row row-cols-1 row-cols-md-2 g-4 certificate-grid justify-content-center">
+            <div class="row row-cols-1 row-cols-md-2 row-cols-lg-3 g-4 certificate-grid justify-content-center">
                 <div class="col d-flex">
                     <div class="certificate-card card-action w-100">
-                        <img src="../../icons/dashboard/clearancepermits.png" class="certificate-icon" alt="Barangay Clearance for Permits">
-                        <h3>BARANGAY CLEARANCE FOR PERMITS</h3>
+                        <img src="../../icons/dashboard/businessclearance.png" class="certificate-icon" alt="For Business Clearance">
+                        <h3>FOR BUSINESS CLEARANCE</h3>
                         <p class="certificate-text">
-                            Apply for barangay clearance required for permit processing and related approvals.
+                            Apply for barangay business clearance for new applications, renewals, and compliance checks.
                         </p>
-                        <button class="btn apply-btn" onclick="location.href='ClearancePermitsForm.php'">Apply Now</button>
+                        <button class="btn apply-btn" onclick="location.href='BusinessClearanceForm.php'">Apply Now</button>
                     </div>
                 </div>
 
                 <div class="col d-flex">
                     <div class="certificate-card card-action w-100">
-                        <img src="../../icons/dashboard/businessclearance.png" class="certificate-icon" alt="Barangay Business Clearance">
-                        <h3>BARANGAY BUSINESS CLEARANCE</h3>
-                        <p class="certificate-text">
-                            Apply for barangay business clearance for new applications, renewals, and compliance checks.
-                        </p>
-                        <button class="btn apply-btn" onclick="location.href='BusinessClearanceForm.php'">Apply Now</button>
+                        <img src="../../icons/dashboard/clearancepermits.png" class="certificate-icon" alt="For Tricycle Permit">
+                        <h3>FOR TRICYCLE PERMIT</h3>
+                        <p class="certificate-text">Apply for barangay clearance required for tricycle permit processing.</p>
+                        <button class="btn apply-btn" onclick="location.href='TricycleForm.php'">Apply Now</button>
+                    </div>
+                </div>
+
+                <div class="col d-flex">
+                    <div class="certificate-card card-action w-100">
+                        <img src="../../icons/dashboard/clearancepermits.png" class="certificate-icon" alt="For Electrical Permit">
+                        <h3>FOR ELECTRICAL PERMIT</h3>
+                        <p class="certificate-text">Apply for barangay clearance required for electrical permit processing.</p>
+                        <button class="btn apply-btn" onclick="location.href='ElectricalForm.php'">Apply Now</button>
+                    </div>
+                </div>
+
+                <div class="col d-flex">
+                    <div class="certificate-card card-action w-100">
+                        <img src="../../icons/dashboard/clearancepermits.png" class="certificate-icon" alt="For Water Permit">
+                        <h3>FOR WATER PERMIT</h3>
+                        <p class="certificate-text">Apply for barangay clearance required for water permit processing.</p>
+                        <button class="btn apply-btn" onclick="location.href='WaterForm.php'">Apply Now</button>
+                    </div>
+                </div>
+
+                <div class="col d-flex">
+                    <div class="certificate-card card-action w-100">
+                        <img src="../../icons/dashboard/clearancepermits.png" class="certificate-icon" alt="For Residential Permit">
+                        <h3>FOR RESIDENTIAL PERMIT</h3>
+                        <p class="certificate-text">Apply for barangay clearance required for residential permit processing.</p>
+                        <button class="btn apply-btn" onclick="location.href='ResidentialForm.php'">Apply Now</button>
+                    </div>
+                </div>
+
+                <div class="col d-flex">
+                    <div class="certificate-card card-action w-100">
+                        <img src="../../icons/dashboard/clearancepermits.png" class="certificate-icon" alt="For Commercial Permit">
+                        <h3>FOR COMMERCIAL PERMIT</h3>
+                        <p class="certificate-text">Apply for barangay clearance required for commercial permit processing.</p>
+                        <button class="btn apply-btn" onclick="location.href='CommercialForm.php'">Apply Now</button>
+                    </div>
+                </div>
+
+                <div class="col d-flex">
+                    <div class="certificate-card card-action w-100">
+                        <img src="../../icons/dashboard/clearancepermits.png" class="certificate-icon" alt="For Other Permits">
+                        <h3>FOR OTHER PERMITS</h3>
+                        <p class="certificate-text">Apply for barangay clearance required for other permit processing.</p>
+                        <button class="btn apply-btn" onclick="location.href='OtherPermitsForm.php'">Apply Now</button>
                     </div>
                 </div>
             </div>

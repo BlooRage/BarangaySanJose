@@ -1,4 +1,19 @@
 <?php
+if (!isset($permitFormType)) {
+    $permitFormType = '';
+}
+$isTricycleForm = $permitFormType === 'tricycle';
+$isOtherPermitsForm = $permitFormType === 'other_permits';
+$permitFormTitleMap = [
+    'tricycle' => 'Application for Barangay Clearance for Tricycle Permit',
+    'electrical' => 'Application for Barangay Clearance for Electrical Permit',
+    'water' => 'Application for Barangay Clearance for Water Permit',
+    'residential' => 'Application for Barangay Clearance for Residential Permit',
+    'commercial' => 'Application for Barangay Clearance for Commercial Permit',
+    'other_permits' => 'Application for Barangay Clearance for Other Permits',
+];
+$permitFormHeading = $permitFormTitleMap[$permitFormType] ?? 'Application for Barangay Clearance for Permits';
+
 if (!isset($baseUrl)) {
     $scriptName = str_replace("\\", "/", (string)($_SERVER['SCRIPT_NAME'] ?? ''));
     $residentSegmentPos = strpos($scriptName, '/Resident-End/');
@@ -18,7 +33,7 @@ if (!isset($baseUrl)) {
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Permit Clearance - Barangay San Jose</title>
+    <title><?= htmlspecialchars($permitFormHeading) ?> - Barangay San Jose</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons/font/bootstrap-icons.css" rel="stylesheet" />
@@ -71,7 +86,7 @@ if (!isset($baseUrl)) {
             <div class="main-head-content">
             <a href="<?= htmlspecialchars($baseUrl) ?>/Resident-End/Clearances/ClearancesLandingPage.php" class="back-link">< Go Back</a>
             
-            <h1 class="form-title">Application for Barangay Clearance for Permits</h1>
+            <h1 class="form-title"><?= htmlspecialchars($permitFormHeading) ?></h1>
             <p class="form-subtitle">All fields marked with <span class="required-asterisk">*</span> are required</p>
 
             <form action="#" method="POST">
@@ -135,32 +150,19 @@ if (!isset($baseUrl)) {
                     </div>
                 </div>
 
+                <?php if ($isOtherPermitsForm): ?>
                 <div class="form-row">
                     <div class="full-width">
-                        <p class="if-building-note mb-2">IF BUILDING/ELECTRICAL/WATER:</p>
-                        <div class="permits-columns">
-                            <div class="permits-columns-row">
-                                <div class="flex-grow-1">
-                                    <div class="check-item"><input type="checkbox" id="t1"><label for="t1">Tricycle</label></div>
-                                    <div class="check-item"><input type="checkbox" id="t2"><label for="t2">Electrical</label></div>
-                                    <div class="check-item"><input type="checkbox" id="t3"><label for="t3">Water</label></div>
-                                </div>
-                                <div class="flex-grow-1 permits-right-col">
-                                    <div class="check-item"><input type="checkbox" id="c1"><label for="c1">Residential</label></div>
-                                    <div class="check-item"><input type="checkbox" id="c2"><label for="c2">Commercial</label></div>
-                                </div>
-                            </div>
-                            <div class="check-item others-row">
-                                <input type="checkbox" id="t4">
-                                <label for="t4" class="others-label">Others:</label>
-                                <input type="text" name="others_spec" id="othersSpecInput" placeholder="Please specify" class="others-spec-input" disabled>
-                            </div>
+                        <div class="input-stack">
+                            <label class="top-label" for="specified_permit">Specify the permit for application:<span class="required-asterisk">*</span></label>
+                            <input type="text" id="specified_permit" name="specified_permit" required>
                         </div>
                     </div>
                 </div>
+                <?php endif; ?>
 
-                <div id="tricycleSection" class="d-none">
-                    <h2 class="section-title text-center text-dark">For Tricycles</h2>
+                <?php if ($isTricycleForm): ?>
+                <div id="tricycleSection">
                     <h2 class="section-title text-center text-dark" style="font-size: 16px; margin-top: 0;">Driver's Information</h2>
                     
                     <div class="form-row">
@@ -255,6 +257,7 @@ if (!isset($baseUrl)) {
                         </div>
                     </div>
                 </div>
+                <?php endif; ?>
 
                 <div class="agreement-row">
                     <div class="agreement-text check-item">
@@ -275,36 +278,19 @@ if (!isset($baseUrl)) {
         document.addEventListener("DOMContentLoaded", () => {
             const form = document.querySelector("form");
             const submitBtn = form?.querySelector(".submit-btn");
-            const othersToggle = document.getElementById("t4");
-            const othersInput = document.getElementById("othersSpecInput");
-            const tricycleToggle = document.getElementById("t1");
-            const tricycleSection = document.getElementById("tricycleSection");
-            const tricycleRequired = tricycleSection
-                ? Array.from(tricycleSection.querySelectorAll("[required]"))
-                : [];
             const tricycleTypeSelect = document.getElementById("tricycleTypeSelect");
             const privateDetails = document.getElementById("privateDetails");
             const todaDetails = document.getElementById("todaDetails");
             const podaDetails = document.getElementById("podaDetails");
+            const specifiedPermitInput = document.getElementById("specified_permit");
             if (!form || !submitBtn) return;
 
             const updateState = () => {
-                if (othersToggle && othersInput) {
-                    const enabled = othersToggle.checked;
-                    othersInput.disabled = !enabled;
-                    if (!enabled) {
-                        othersInput.value = "";
+                if (specifiedPermitInput) {
+                    const words = specifiedPermitInput.value.trim().split(/\s+/).filter(Boolean);
+                    if (words.length > 50) {
+                        specifiedPermitInput.value = words.slice(0, 50).join(" ");
                     }
-                }
-                if (tricycleToggle && tricycleSection) {
-                    const showTricycle = tricycleToggle.checked;
-                    tricycleSection.classList.toggle("d-none", !showTricycle);
-                    tricycleSection.querySelectorAll("input, select, textarea").forEach((el) => {
-                        el.disabled = !showTricycle;
-                    });
-                    tricycleRequired.forEach((el) => {
-                        el.required = showTricycle;
-                    });
                 }
                 if (tricycleTypeSelect && privateDetails && todaDetails && podaDetails) {
                     const type = tricycleTypeSelect.value;
