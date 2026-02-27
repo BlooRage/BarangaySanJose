@@ -510,6 +510,7 @@ function dra_resident_profile_snapshot(mysqli $conn, string $residentUserId, str
         'religion' => (string)($row['religion'] ?? ''),
         'occupation' => $occupation,
         'contact_number' => (string)($row['phone_number'] ?? ''),
+        'area_number' => $area,
         'full_address' => $fullAddress,
     ];
 

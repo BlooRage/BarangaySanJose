@@ -12,6 +12,73 @@ require_once __DIR__ . '/../includes/admin_guard.php';
   <link rel="stylesheet" href="../../CSS-Styles/Admin-End-CSS/AdminDashboardStyle.css">
   <link rel="stylesheet" href="../../CSS-Styles/Admin-End-CSS/ResidentMasterlistStyle.css">
   <style>
+    .certificate-tracker-shell .admin-list-toolbar {
+      overflow-x: visible;
+      overflow-y: visible;
+      flex-wrap: wrap;
+      row-gap: 12px;
+    }
+    .certificate-tracker-shell .admin-list-tabs {
+      gap: 12px;
+      overflow: visible;
+    }
+    .certificate-tracker-shell .stage-filter-btn {
+      border-radius: 10px;
+      border-width: 1px;
+      min-width: 104px;
+    }
+    .certificate-tracker-shell .admin-list-actions .form-select,
+    .certificate-tracker-shell .admin-list-actions .input-group-text,
+    .certificate-tracker-shell .admin-list-actions .form-control {
+      height: 38px;
+    }
+    .certificate-tracker-shell .tracker-doc-filter {
+      min-width: 220px;
+      max-width: 240px;
+    }
+    .certificate-tracker-shell .admin-search {
+      min-width: 300px;
+      max-width: 360px;
+    }
+    .certificate-tracker-shell .table-responsive {
+      overflow-x: auto;
+      overflow-y: visible;
+      -webkit-overflow-scrolling: touch;
+    }
+    #table-certificateTracker {
+      table-layout: auto;
+      width: 100%;
+      min-width: 1100px;
+    }
+    #table-certificateTracker th,
+    #table-certificateTracker td {
+      vertical-align: middle;
+    }
+    #table-certificateTracker .col-request-id { width: 11%; }
+    #table-certificateTracker .col-resident-id { width: 11%; }
+    #table-certificateTracker .col-full-name { width: 18%; }
+    #table-certificateTracker .col-document { width: 15%; }
+    #table-certificateTracker .col-purpose { width: 17%; }
+    #table-certificateTracker .col-status { width: 13%; }
+    #table-certificateTracker .col-submitted { width: 10%; }
+    #table-certificateTracker .col-action { width: 15%; }
+    #table-certificateTracker .cell-truncate {
+      display: block;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      max-width: 100%;
+    }
+    #table-certificateTracker td.col-purpose-cell {
+      white-space: normal;
+      vertical-align: top;
+    }
+    #table-certificateTracker .cell-purpose {
+      display: block;
+      white-space: normal;
+      word-break: break-word;
+      line-height: 1.35;
+    }
     #viewModal .modal-dialog {
       width: min(92vw, 1180px);
       max-width: 1180px;
@@ -445,6 +512,14 @@ require_once __DIR__ . '/../includes/admin_guard.php';
       background: #fff;
     }
     @media (max-width: 768px) {
+      .certificate-tracker-shell .stage-filter-btn {
+        min-width: 0;
+      }
+      .certificate-tracker-shell .admin-search,
+      .certificate-tracker-shell .tracker-doc-filter {
+        min-width: 100%;
+        max-width: 100%;
+      }
       #viewModal .tracker-profile-grid {
         grid-template-columns: 1fr;
       }
@@ -471,52 +546,47 @@ require_once __DIR__ . '/../includes/admin_guard.php';
     <h2 class="mb-4" style="font-family: 'Charis SIL Bold'; color: #DE710C; ">Certificate Issuance</h2>
     <hr class="mb-4">
 
-    <div class="bg-white p-4 rounded-4 shadow-sm border">
-      <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
-        <div class="btn-group" role="group" aria-label="Stage filter">
-          <button type="button" class="btn btn-outline-secondary active" data-stage-filter="">All</button>
-          <button type="button" class="btn btn-outline-secondary" data-stage-filter="submitted">Submitted</button>
-          <button type="button" class="btn btn-outline-secondary" data-stage-filter="for_payment">For Payment</button>
-          <button type="button" class="btn btn-outline-secondary" data-stage-filter="payment_submitted">Pending Payment</button>
-          <button type="button" class="btn btn-outline-secondary" data-stage-filter="finance">Finance</button>
-          <button type="button" class="btn btn-outline-secondary" data-stage-filter="ready_for_claim">Ready</button>
-          <button type="button" class="btn btn-outline-secondary" data-stage-filter="completed">Completed</button>
-          <button type="button" class="btn btn-outline-secondary" data-stage-filter="rejected">Rejected</button>
+    <div class="bg-white p-4 rounded-4 shadow-sm border resident-masterlist-shell certificate-tracker-shell">
+      <div class="admin-list-toolbar mb-3">
+        <div class="admin-list-tabs">
+          <button type="button" class="btn btn-outline-primary btn-sm status-filter-btn stage-filter-btn active" data-stage-filter="">All</button>
+          <button type="button" class="btn btn-outline-secondary btn-sm status-filter-btn stage-filter-btn fw-semibold" data-stage-filter="pending">Pending</button>
+          <button type="button" class="btn btn-outline-secondary btn-sm status-filter-btn stage-filter-btn fw-semibold" data-stage-filter="release">Release</button>
+          <button type="button" class="btn btn-outline-secondary btn-sm status-filter-btn stage-filter-btn fw-semibold" data-stage-filter="completed">Completed</button>
         </div>
 
-        <div class="d-flex flex-wrap align-items-center gap-2">
-          <button type="button" id="btnRefreshList" class="btn btn-outline-secondary">
-            <i class="fa-solid fa-arrows-rotate me-1"></i>Refresh
-          </button>
-          <select id="documentTypeFilter" class="form-select" style="max-width: 240px;">
-            <option value="">Filter: All Documents</option>
-          </select>
-          <div class="input-group" style="max-width: 360px;">
-            <input type="text" id="searchInput" class="form-control" placeholder="Request ID, resident ID, document">
+        <div class="admin-list-actions">
+          <div class="input-group admin-search">
+            <input type="text" id="searchInput" class="form-control" placeholder="Request ID, resident ID, name, address">
             <span class="input-group-text bg-white"><i class="fas fa-search"></i></span>
           </div>
+          <button class="btn btn-outline-secondary btn-icon" type="button" id="filterButton" title="Filter" aria-label="Filter">
+            <i class="fas fa-filter"></i>
+            <span class="visually-hidden">Filter</span>
+          </button>
+          <button class="btn btn-outline-secondary btn-icon admin-columns" type="button" data-bs-toggle="modal" data-bs-target="#modalTableColumns" id="btnCertificateColumns" title="Columns" aria-label="Columns">
+            <i class="fa-solid fa-sliders"></i>
+            <span class="visually-hidden">Columns</span>
+          </button>
+          <button class="btn btn-outline-secondary btn-icon admin-refresh" type="button" id="btnRefreshList" title="Refresh table" aria-label="Refresh table">
+            <i class="fa-solid fa-arrows-rotate"></i>
+            <span class="visually-hidden">Refresh</span>
+          </button>
         </div>
-      </div>
-
-      <div class="btn-group mb-3" role="group" aria-label="Status tabs">
-        <button type="button" class="btn btn-outline-secondary active" data-status-filter="all">All</button>
-        <button type="button" class="btn btn-outline-secondary" data-status-filter="verified">Verified</button>
-        <button type="button" class="btn btn-outline-secondary" data-status-filter="denied">Denied</button>
-        <button type="button" class="btn btn-outline-secondary" data-status-filter="pending">Pending</button>
       </div>
 
       <div class="table-responsive">
-        <table class="table align-middle">
+        <table id="table-certificateTracker" class="table align-middle">
           <thead>
             <tr class="table-light">
-              <th>Request ID</th>
-              <th>Resident ID</th>
-              <th>Full Name</th>
-              <th>Information</th>
-              <th>Purpose</th>
-              <th>Status</th>
-              <th>Submitted Date</th>
-              <th>Action</th>
+              <th class="col-request-id">Request ID</th>
+              <th class="col-resident-id">Resident ID</th>
+              <th class="col-full-name">Full Name</th>
+              <th class="col-document">Document Requested</th>
+              <th class="col-purpose">Purpose</th>
+              <th class="col-status">Status</th>
+              <th class="col-submitted">Submitted Date</th>
+              <th class="col-action">Action</th>
             </tr>
           </thead>
           <tbody id="tableBody">
@@ -568,6 +638,50 @@ require_once __DIR__ . '/../includes/admin_guard.php';
         <button type="submit" class="btn btn-primary">Submit</button>
       </div>
     </form>
+  </div>
+</div>
+
+<div class="modal fade" id="modalFilter" tabindex="-1" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content p-4">
+      <div class="modal-header border-0">
+        <h5 class="modal-title fw-bold">Filter Requests</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <hr>
+      <div class="modal-body">
+        <div class="mb-3">
+          <label class="fw-bold small mb-2">Status</label>
+          <div id="filterStatusList"></div>
+        </div>
+        <div class="mb-1">
+          <label class="fw-bold small mb-2">Area</label>
+          <div id="filterAreaList"></div>
+        </div>
+      </div>
+      <div class="modal-footer border-0">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+        <button type="button" class="btn btn-primary" id="btnApplyFilter">Apply Filter</button>
+        <button type="button" class="btn btn-warning" id="btnResetModalFilters"><i class="fas fa-undo"></i>&nbsp;Reset</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="modalTableColumns" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered modal-lg">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Columns</h5>
+      </div>
+      <div class="modal-body">
+        <div class="row g-2" id="tableColumnsList"></div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline-secondary" id="btnTableColumnsReset">Reset</button>
+        <button type="button" class="btn btn-primary" data-bs-dismiss="modal">Done</button>
+      </div>
+    </div>
   </div>
 </div>
 
@@ -709,6 +823,17 @@ require_once __DIR__ . '/../includes/admin_guard.php';
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+  window.ADMIN_TABLE_COLUMNS_CONFIG = {
+    tableSelector: "#table-certificateTracker",
+    modalId: "modalTableColumns",
+    listId: "tableColumnsList",
+    resetBtnId: "btnTableColumnsReset",
+    storageKey: "admin_cols_certificate_tracker_v1",
+    defaultHiddenIdxs: [1, 4]
+  };
+</script>
+<script src="../../JS-Script-Files/Admin-End/tableColumnsGeneric.js?v=20260215-1"></script>
 <script src="../../JS-Script-Files/Admin-End/certificateTrackerScript.js"></script>
 </body>
 </html>

@@ -8,10 +8,15 @@
   const endpoint = `${appBase}/PhpFiles/Admin-End/documentRequestWorkflow.php`;
   const tableBody = document.getElementById('tableBody');
   const searchInput = document.getElementById('searchInput');
+  const filterButton = document.getElementById('filterButton');
   const stageTabs = Array.from(document.querySelectorAll('[data-stage-filter]'));
-  const statusTabs = Array.from(document.querySelectorAll('[data-status-filter]'));
   const btnRefreshList = document.getElementById('btnRefreshList');
-  const documentTypeFilter = document.getElementById('documentTypeFilter');
+  const modalFilterEl = document.getElementById('modalFilter');
+  const modalFilter = modalFilterEl ? new bootstrap.Modal(modalFilterEl) : null;
+  const filterStatusList = document.getElementById('filterStatusList');
+  const filterAreaList = document.getElementById('filterAreaList');
+  const btnApplyFilter = document.getElementById('btnApplyFilter');
+  const btnResetModalFilters = document.getElementById('btnResetModalFilters');
 
   const actionModalEl = document.getElementById('actionModal');
   const actionModal = actionModalEl ? new bootstrap.Modal(actionModalEl) : null;
@@ -44,13 +49,12 @@
   const residentProfileEndpoint = `${appBase}/PhpFiles/Admin-End/residentMasterlist.php`;
 
   let currentStage = String(window.CERT_TRACKER_DEFAULT_STAGE || '');
-  let currentStatusFilter = 'all';
-  let currentDocumentTypeFilter = '';
   let itemById = new Map();
   let viewMode = 'details';
   let viewDetailsHtml = '';
   let viewPreviewState = null;
-  const financeStages = new Set(['for_payment', 'payment_submitted']);
+  let selectedStatusFilters = new Set();
+  let selectedAreaFilters = new Set();
 
   function esc(v) {
     return String(v ?? '').replace(/[&<>\"']/g, (m) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '\"': '&quot;', "'": '&#39;' }[m]));
@@ -168,7 +172,7 @@
 
   function documentTypePill(row) {
     const doc = firstNonEmpty([row.document_type, '-']);
-    return `<span class="badge rounded-pill" style="background:#f7d9df;color:#8f2b35;font-weight:700;">${esc(doc)}</span>`;
+    return `<span style="display:inline-block;background:#e7f1ff;color:#1f4e8c;font-weight:700;padding:4px 10px;border-radius:8px;">${esc(doc)}</span>`;
   }
 
   function profileItem(label, value) {
@@ -735,20 +739,28 @@
   function rowHtml(row) {
     const reason = row.status_reason ? `<div class="text-danger small mt-1">Reason: ${esc(row.status_reason)}</div>` : '';
     const fullName = fullNameFromRow(row);
+    const residentAddress = firstNonEmpty([
+      row?.payload?.full_address,
+      row?.payload?.full_address_display,
+      row?.payload?.address,
+      row?.payload?.complete_address,
+      '-'
+    ]) || '-';
     const residentInfo = residentInfoFromRow(row);
     const purpose = firstNonEmpty([row.purpose, '-']);
+    const documentRequested = firstNonEmpty([row.document_type, '-']);
     return `
-      <tr>
-        <td class="fw-semibold">${esc(row.request_id)}</td>
-        <td>${esc(row.resident_id || '-')}</td>
-        <td>${esc(fullName)}</td>
-        <td class="small text-muted">${esc(residentInfo)}</td>
-        <td>
-          <div>${esc(purpose)}</div>
-          <div class="mt-1">${documentTypePill(row)}</div>
+      <tr data-resident-info="${esc(residentInfo)}" data-resident-address="${esc(residentAddress)}">
+        <td class="fw-semibold"><span class="cell-truncate" title="${esc(row.request_id)}">${esc(row.request_id)}</span></td>
+        <td><span class="cell-truncate" title="${esc(row.resident_id || '-')}">${esc(row.resident_id || '-')}</span></td>
+        <td><span class="cell-truncate" title="${esc(fullName)}">${esc(fullName)}</span></td>
+        <td>${documentTypePill({ document_type: documentRequested })}</td>
+        <td class="col-purpose-cell">
+          <div class="cell-purpose" title="${esc(purpose)}">${esc(purpose)}</div>
+          <div class="mt-1 d-none">${esc(residentAddress)}</div>
         </td>
         <td>${badge(row.stage, esc(row.stage_label || row.stage || ''))}${reason}</td>
-        <td>${esc(row.submitted_at || '-')}</td>
+        <td><span class="cell-truncate" title="${esc(row.submitted_at || '-')}">${esc(row.submitted_at || '-')}</span></td>
         <td>${actionButtons(row)}</td>
       </tr>
     `;
@@ -756,43 +768,89 @@
 
   function statusBucket(row) {
     const stage = String(row?.stage || '').toLowerCase();
-    if (stage.includes('rejected')) return 'denied';
-    if (stage === 'completed' || stage === 'ready_for_claim' || stage === 'payment_verified') return 'verified';
+    if (stage.includes('rejected')) return 'rejected';
+    if (stage === 'submitted') return 'submitted';
+    if (stage === 'for_payment') return 'for_payment';
+    if (stage === 'payment_submitted') return 'pending_payment';
+    if (stage === 'ready_for_claim' || stage === 'payment_verified') return 'release';
+    if (stage === 'completed') return 'completed';
     return 'pending';
   }
 
-  function matchesStatusFilter(row) {
-    if (currentStatusFilter === 'all') return true;
-    return statusBucket(row) === currentStatusFilter;
-  }
-
-  function matchesDocumentTypeFilter(row) {
-    if (!currentDocumentTypeFilter) return true;
-    return String(row?.document_type || '') === currentDocumentTypeFilter;
-  }
-
-  function syncDocumentTypeFilterOptions(items) {
-    if (!documentTypeFilter) return;
-    const selected = currentDocumentTypeFilter;
-    const unique = Array.from(new Set(
-      (items || [])
-        .map((it) => String(it?.document_type || '').trim())
-        .filter((v) => v !== '')
-    )).sort((a, b) => a.localeCompare(b));
-
-    documentTypeFilter.innerHTML = '<option value="">Filter: All Documents</option>';
-    unique.forEach((docType) => {
-      const opt = document.createElement('option');
-      opt.value = docType;
-      opt.textContent = docType;
-      documentTypeFilter.appendChild(opt);
-    });
-    if (selected && unique.includes(selected)) {
-      documentTypeFilter.value = selected;
-    } else {
-      currentDocumentTypeFilter = '';
-      documentTypeFilter.value = '';
+  function extractArea(row) {
+    const payload = row?.payload && typeof row.payload === 'object' ? row.payload : {};
+    const residentProfile = row?.resident_profile && typeof row.resident_profile === 'object' ? row.resident_profile : {};
+    const raw = firstNonEmpty([
+      payload.full_area_number,
+      payload.area_number,
+      payload.area,
+      payload.full_area,
+      residentProfile.area_number
+    ]);
+    if (!raw) {
+      const addressProbe = firstNonEmpty([
+        payload.full_address,
+        payload.full_address_display,
+        payload.address,
+        payload.complete_address,
+        residentProfile.full_address
+      ]);
+      if (addressProbe) {
+        const m = String(addressProbe).match(/\bArea\s*([A-Za-z0-9-]+)\b/i);
+        if (m && m[1]) {
+          return `Area ${String(m[1]).trim()}`;
+        }
+      }
+      return 'N/A';
     }
+    const compact = raw.replace(/\s+/g, ' ').trim();
+    return /^area\s+/i.test(compact) ? compact : `Area ${compact}`;
+  }
+
+  function matchesModalFilters(row) {
+    if (selectedStatusFilters.size > 0 && !selectedStatusFilters.has(statusBucket(row))) return false;
+    if (selectedAreaFilters.size > 0 && !selectedAreaFilters.has(extractArea(row))) return false;
+    return true;
+  }
+
+  function stageBucket(row) {
+    const stage = String(row?.stage || '').toLowerCase();
+    if (stage === 'completed') return 'completed';
+    if (stage === 'ready_for_claim') return 'release';
+    return 'pending';
+  }
+
+  function matchesStageFilter(row) {
+    if (!currentStage) return true;
+    return stageBucket(row) === currentStage;
+  }
+
+  function renderFilterChecklistOptions(items) {
+    if (!filterStatusList || !filterAreaList) return;
+
+    const statusOptions = [
+      { key: 'submitted', label: 'Pending Review' },
+      { key: 'for_payment', label: 'For Payment' },
+      { key: 'pending_payment', label: 'Pending Payment' },
+      { key: 'release', label: 'Release' },
+      { key: 'completed', label: 'Completed' },
+      { key: 'rejected', label: 'Rejected' }
+    ];
+
+    filterStatusList.innerHTML = statusOptions.map((opt) => `
+      <div class="form-check">
+        <input class="form-check-input tracker-filter-status" type="checkbox" value="${esc(opt.key)}" id="filterStatus_${esc(opt.key)}" ${selectedStatusFilters.has(opt.key) ? 'checked' : ''}>
+        <label class="form-check-label small" for="filterStatus_${esc(opt.key)}">${esc(opt.label)}</label>
+      </div>
+    `).join('');
+
+    const areas = Array.from(new Set((items || []).map(extractArea))).sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
+    filterAreaList.innerHTML = areas.map((area, idx) => `
+      <div class="form-check">
+        <input class="form-check-input tracker-filter-area" type="checkbox" value="${esc(area)}" id="filterArea_${idx}" ${selectedAreaFilters.has(area) ? 'checked' : ''}>
+        <label class="form-check-label small" for="filterArea_${idx}">${esc(area)}</label>
+      </div>
+    `).join('') || '<div class="small text-muted">No area values found.</div>';
   }
 
   async function fetchJson(url, options = {}) {
@@ -831,7 +889,6 @@
     tableBody.innerHTML = '<tr><td colspan="8" class="text-center text-muted py-4">Loading...</td></tr>';
     try {
       const params = new URLSearchParams({ action: 'list' });
-      if (currentStage && currentStage !== 'finance') params.set('stage', currentStage);
       const q = (searchInput.value || '').trim();
       if (q) params.set('q', q);
 
@@ -839,13 +896,10 @@
       if (!data.success) throw new Error(data.message || 'Failed to load requests.');
 
       const allItems = Array.isArray(data.items) ? data.items : [];
-      const stageItems = currentStage === 'finance'
-        ? allItems.filter((it) => financeStages.has(String(it.stage || '').toLowerCase()))
-        : allItems;
-      syncDocumentTypeFilterOptions(stageItems);
+      const stageItems = allItems.filter(matchesStageFilter);
+      renderFilterChecklistOptions(stageItems);
       const items = stageItems
-        .filter(matchesStatusFilter)
-        .filter(matchesDocumentTypeFilter);
+        .filter(matchesModalFilters);
       itemById = new Map(items.map((it) => [String(it.request_id), it]));
       if (!items.length) {
         tableBody.innerHTML = '<tr><td colspan="8" class="text-center text-muted py-4">No requests found.</td></tr>';
@@ -987,10 +1041,11 @@
         if (purposeText) {
           requestFields.push(formField('Purpose', purposeText));
         }
+        const purposeKeys = new Set(['purpose', 'request_purpose']);
 
         Object.keys(payload).forEach((key) => {
           const normalized = String(key);
-          if (consumedKeys.has(normalized) || technicalKeys.has(normalized)) return;
+          if (consumedKeys.has(normalized) || technicalKeys.has(normalized) || purposeKeys.has(normalized)) return;
           const value = payload[key];
           if (value === null || value === undefined) return;
           const text = String(value).trim();
@@ -1259,21 +1314,37 @@
     });
   });
 
-  statusTabs.forEach((tab) => {
-    tab.addEventListener('click', () => {
-      statusTabs.forEach((x) => x.classList.remove('active'));
-      tab.classList.add('active');
-      currentStatusFilter = String(tab.getAttribute('data-status-filter') || 'all').toLowerCase();
-      load();
-    });
+  btnRefreshList?.addEventListener('click', () => {
+    btnRefreshList.classList.add('is-loading');
+    load();
+    setTimeout(() => btnRefreshList.classList.remove('is-loading'), 450);
   });
 
-  documentTypeFilter?.addEventListener('change', () => {
-    currentDocumentTypeFilter = String(documentTypeFilter.value || '');
+  filterButton?.addEventListener('click', () => {
+    modalFilter?.show();
+  });
+
+  btnApplyFilter?.addEventListener('click', () => {
+    selectedStatusFilters = new Set(
+      Array.from(document.querySelectorAll('.tracker-filter-status:checked'))
+        .map((el) => String(el.value || '').trim())
+        .filter((v) => v !== '')
+    );
+    selectedAreaFilters = new Set(
+      Array.from(document.querySelectorAll('.tracker-filter-area:checked'))
+        .map((el) => String(el.value || '').trim())
+        .filter((v) => v !== '')
+    );
+    modalFilter?.hide();
     load();
   });
 
-  btnRefreshList?.addEventListener('click', () => {
+  btnResetModalFilters?.addEventListener('click', () => {
+    selectedStatusFilters.clear();
+    selectedAreaFilters.clear();
+    document.querySelectorAll('.tracker-filter-status, .tracker-filter-area').forEach((el) => {
+      el.checked = false;
+    });
     load();
   });
 

@@ -3,7 +3,8 @@ $current = basename($_SERVER['PHP_SELF']);
 
 // Group pages by section
 $residentMgmtPages = ['ResidentMasterlist.php', 'ResidentArchive.php', 'EditRequests.php', 'SectorMembershipVerification.php', 'HouseholdProfiling.php'];
-$certPages = ['CertificateTracker.php', 'FinancePayments.php'];
+$certPages = ['CertificateTracker.php'];
+$financePages = ['FinancePayments.php'];
 $userMgmtPages = ['UserMasterlist.php'];
 $adminMgmtPages = ['OfficialsManagement.php', 'OfficialInvites.php'];
 
@@ -34,6 +35,7 @@ if (!function_exists('appUrl')) {
 
 $isResidentMgmtActive = in_array($current, $residentMgmtPages);
 $isCertActive = in_array($current, $certPages);
+$isFinanceActive = in_array($current, $financePages);
 $isUserMgmtActive = in_array($current, $userMgmtPages);
 $isAdminMgmtActive = in_array($current, $adminMgmtPages);
 $isSuperAdminSidebar = ((string)($_SESSION['role'] ?? '') === 'SuperAdmin');
@@ -257,9 +259,17 @@ if (!empty($_SESSION['user_id']) && isset($conn) && $conn instanceof mysqli) {
         <div class="collapse <?= $isCertActive ? 'show' : '' ?>" id="cert-collapse">
           <ul class="btn-toggle-nav list-unstyled fw-normal pb-1 small">
             <li><a href="<?= htmlspecialchars(appUrl('Admin-End/Certificates/CertificateTracker.php')) ?>" class="link-dark rounded <?= $current == 'CertificateTracker.php' ? 'active' : '' ?>">Tracker</a></li>
-            <li><a href="<?= htmlspecialchars(appUrl('Admin-End/Certificates/FinancePayments.php')) ?>" class="link-dark rounded <?= $current == 'FinancePayments.php' ? 'active' : '' ?>">Finance Payments</a></li>
           </ul>
         </div>
+      </li>
+
+      <li class="mb-1 mt-2 text-muted small fw-semibold px-2">Finance Department</li>
+      <li class="mb-2">
+        <a href="<?= htmlspecialchars(appUrl('Admin-End/Certificates/FinancePayments.php')) ?>"
+           class="btn btn-toggle d-flex align-items-center gap-2 rounded <?= $isFinanceActive ? 'active' : '' ?>"
+           style="<?= $isFinanceActive ? 'outline: none; box-shadow: none;' : '' ?>">
+          <i class="fas fa-money-check-alt"></i> Finance Payments
+        </a>
       </li>
 
       <?php if ($isSuperAdminSidebar): ?>

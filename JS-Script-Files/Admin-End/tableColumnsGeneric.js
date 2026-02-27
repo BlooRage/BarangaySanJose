@@ -22,7 +22,7 @@
   const loadHiddenIdx = () => {
     try {
       const raw = window.localStorage.getItem(storageKey);
-      const parsed = raw ? JSON.parse(raw) : [];
+      const parsed = raw ? JSON.parse(raw) : (Array.isArray(cfg.defaultHiddenIdxs) ? cfg.defaultHiddenIdxs : []);
       if (!Array.isArray(parsed)) return [];
       return parsed
         .map((n) => Number(n))
