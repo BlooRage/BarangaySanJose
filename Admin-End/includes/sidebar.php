@@ -123,6 +123,56 @@ if (!empty($_SESSION['user_id']) && isset($conn) && $conn instanceof mysqli) {
 }
 ?>
 
+<style>
+  #admin-mobile-header {
+    display: none;
+  }
+
+  @media screen and (orientation: portrait) and (max-width: 1024px) {
+    #admin-mobile-header {
+      display: block;
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      z-index: 1200;
+    }
+
+    #dashboard-sidebar {
+      position: fixed !important;
+      top: 0;
+      left: 0;
+      width: 100% !important;
+      min-width: 0;
+      height: 100vh;
+      transform: translateX(-100%);
+      transition: transform 0.3s ease;
+      z-index: 1100;
+      overflow-y: auto;
+    }
+
+    #dashboard-sidebar.show {
+      transform: translateX(0);
+    }
+
+    body {
+      padding-top: 60px;
+    }
+  }
+</style>
+
+<header id="admin-mobile-header">
+  <div class="d-flex align-items-center px-3 py-2 shadow-sm bg-white">
+    <div class="d-flex align-items-center gap-2">
+      <button class="btn" id="btn-admin-burger" type="button" aria-label="Toggle sidebar">
+        <i class="fa-solid fa-bars fa-lg"></i>
+      </button>
+      <img src="<?= htmlspecialchars(appUrl('Images/San_Jose_LOGO.jpg')) ?>" alt="Logo" style="width:32px;height:32px">
+      <span class="logo-name">Barangay San Jose</span>
+    </div>
+  </div>
+</header>
+
 <div class="d-flex flex-column flex-shrink-0 p-3 bg-white shadow-sm"
      style="width: 280px;"
      id="dashboard-sidebar">
@@ -301,3 +351,38 @@ if (!empty($_SESSION['user_id']) && isset($conn) && $conn instanceof mysqli) {
     </div>
   </div>
 </div>
+
+<script>
+  (function () {
+    const burgerBtn = document.getElementById("btn-admin-burger");
+    const sidebar = document.getElementById("dashboard-sidebar");
+    if (!burgerBtn || !sidebar) return;
+
+    const portraitMq = window.matchMedia("(orientation: portrait) and (max-width: 1024px)");
+
+    const syncMode = () => {
+      if (!portraitMq.matches) {
+        sidebar.classList.remove("show");
+      }
+    };
+
+    burgerBtn.addEventListener("click", () => {
+      if (!portraitMq.matches) return;
+      sidebar.classList.toggle("show");
+    });
+
+    sidebar.querySelectorAll("a").forEach((link) => {
+      link.addEventListener("click", () => {
+        if (portraitMq.matches) sidebar.classList.remove("show");
+      });
+    });
+
+    if (typeof portraitMq.addEventListener === "function") {
+      portraitMq.addEventListener("change", syncMode);
+    } else if (typeof portraitMq.addListener === "function") {
+      portraitMq.addListener(syncMode);
+    }
+
+    syncMode();
+  })();
+</script>

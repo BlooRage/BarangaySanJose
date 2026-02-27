@@ -45,15 +45,15 @@ if ($result = $conn->query($statsQuery)) {
 
 <body>
 
-<div class="d-flex" style="min-height: 100vh;">
+<div class="d-flex flex-column flex-md-row" style="min-height: 100vh;">
 
   <!-- SIDEBAR INCLUDE -->
   <?php include 'includes/sidebar.php'; ?>
 
   <!-- MAIN CONTENT -->
-  <main class="flex-grow-1 p-4 p-md-5 bg-light" id="main-display">
+  <main class="flex-grow-1 p-3 p-md-4 p-xl-5 bg-light" id="main-display">
 
-    <h1 class="mb-4" style="font-family: 'Charis SIL Bold'; color: #DE710C; font-size: 48px;">Admin Dashboard</h1>
+    <h1 class="mb-4" style="font-family: 'Charis SIL Bold'; color: #DE710C; ">Admin Dashboard</h1>
     <hr><br>
 
     <section id="dashboard-stats" class="mb-4">

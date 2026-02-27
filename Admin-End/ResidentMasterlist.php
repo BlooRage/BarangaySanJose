@@ -10,7 +10,7 @@
     <script src="https://kit.fontawesome.com/3482e00999.js" crossorigin="anonymous"></script>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="../CSS-Styles/Admin-End-CSS/AdminDashboardStyle.css">
-    <link rel="stylesheet" href="../CSS-Styles/Admin-End-CSS/ResidentMasterlistStyle.css?v=20260227-1">
+    <link rel="stylesheet" href="../CSS-Styles/Admin-End-CSS/ResidentMasterlistStyle.css?v=20260227-2">
     <style>
         .resident-masterlist-shell .table-responsive {
             overflow-x: auto;
@@ -30,7 +30,7 @@
 </head>
 
 <body>
-<div class="d-flex" style="min-height: 100vh;">
+<div class="d-flex flex-column flex-md-row" style="min-height: 100vh;">
 
     <!-- SIDEBAR INCLUDE -->
 <?php
@@ -77,8 +77,8 @@ if (isset($conn) && $conn instanceof mysqli) {
 ?>
 
     <!-- MAIN CONTENT -->
-    <main id="main-display" class="flex-grow-1 p-4 p-md-5 bg-light">
-        <h2 class="mb-4" style="font-family: 'Charis SIL Bold'; color: #DE710C; font-size: 48px;">
+    <main id="main-display" class="flex-grow-1 p-3 p-md-4 p-xl-5 bg-light">
+        <h2 class="mb-4" style="font-family: 'Charis SIL Bold'; color: #DE710C; ">
             Resident Masterlist
         </h2>
         <hr><br>
@@ -86,7 +86,7 @@ if (isset($conn) && $conn instanceof mysqli) {
         <div id="div-tableContainer" class="bg-white p-4 rounded-4 shadow-sm border resident-masterlist-shell">
 
 	            <!-- FILTER BUTTONS + SEARCH -->
-	            <div class="admin-list-toolbar mb-3 pt-2">
+	            <div class="admin-list-toolbar mb-3 pt-2 flex-wrap">
 	                <!-- Status Filter Buttons -->
 	                <div class="admin-list-tabs">
 	                    <button class="btn btn-outline-primary btn-sm status-filter-btn" data-filter="ALL">&nbsp;&nbsp;All&nbsp;&nbsp;</button>

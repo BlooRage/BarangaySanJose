@@ -9,7 +9,7 @@
   <script src="https://kit.fontawesome.com/3482e00999.js" crossorigin="anonymous"></script>
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
   <link rel="stylesheet" href="../CSS-Styles/Admin-End-CSS/AdminDashboardStyle.css">
-  <link rel="stylesheet" href="../CSS-Styles/Admin-End-CSS/ResidentMasterlistStyle.css?v=20260222-1">
+  <link rel="stylesheet" href="../CSS-Styles/Admin-End-CSS/ResidentMasterlistStyle.css?v=20260227-2">
   <style>
     .user-masterlist-shell {
       width: 100%;
@@ -55,7 +55,7 @@
   </style>
 </head>
 <body>
-  <div class="d-flex" style="min-height: 100vh;">
+  <div class="d-flex flex-column flex-md-row" style="min-height: 100vh;">
     <?php
       require_once "../PhpFiles/General/connection.php";
       require_once "includes/admin_guard.php";
@@ -63,14 +63,14 @@
       include "includes/sidebar.php";
     ?>
 
-    <main class="flex-grow-1 p-4 p-md-5 bg-light" id="main-display">
-      <h2 class="mb-4" style="font-family: 'Charis SIL Bold'; color: #DE710C; font-size: 48px;">
+    <main class="flex-grow-1 p-3 p-md-4 p-xl-5 bg-light" id="main-display">
+      <h2 class="mb-4" style="font-family: 'Charis SIL Bold'; color: #DE710C; ">
         User Masterlist
       </h2>
       <hr><br>
 
       <div class="bg-white p-4 rounded-4 shadow-sm border resident-masterlist-shell user-masterlist-shell">
-        <div class="admin-list-toolbar mb-3">
+        <div class="admin-list-toolbar mb-3 flex-wrap">
           <div class="admin-list-tabs">
             <button class="btn btn-outline-primary btn-sm status-filter-btn active" data-filter="ALL">All</button>
             <button class="btn btn-outline-secondary btn-sm status-filter-btn has-notif" data-filter="Pending">

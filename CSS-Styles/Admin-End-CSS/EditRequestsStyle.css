@@ -270,3 +270,25 @@
 .edit-requests-shell #btnEditRequestsRefresh.is-loading i {
     animation: adminSpin 900ms linear infinite;
 }
+
+@media (max-width: 768px) {
+    .edit-requests-shell .admin-list-tabs {
+        width: 100%;
+        flex-wrap: wrap;
+        row-gap: 8px;
+    }
+
+    .edit-requests-shell .admin-list-actions--linear {
+        width: 100%;
+        margin-left: 0;
+        flex-wrap: wrap;
+        gap: 8px;
+    }
+
+    .edit-requests-shell .admin-list-actions--linear .admin-search {
+        min-width: 0;
+        max-width: 100%;
+        width: 100%;
+        flex: 1 1 100%;
+    }
+}
