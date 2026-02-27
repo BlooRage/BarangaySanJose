@@ -22,11 +22,14 @@ require_once __DIR__ . "/../includes/resident_access_guard.php";
 <<<<<<< Updated upstream
 <<<<<<< Updated upstream
 <<<<<<< Updated upstream
+<<<<<<< Updated upstream
 
 require_once __DIR__ . "/../../PhpFiles/GET/getResidentProfile.php";
 
 $data = getResidentProfileData($conn, $_SESSION['user_id']);
 =======
+=======
+>>>>>>> Stashed changes
 =======
 >>>>>>> Stashed changes
 =======
@@ -43,6 +46,9 @@ $data = getResidentProfileData($conn, $userId);
 <<<<<<< Updated upstream
 <<<<<<< Updated upstream
 <<<<<<< Updated upstream
+<<<<<<< Updated upstream
+>>>>>>> Stashed changes
+=======
 >>>>>>> Stashed changes
 =======
 >>>>>>> Stashed changes
@@ -56,6 +62,7 @@ $residentinformationtbl = $data['residentinformationtbl'] ?? [];
 $residentaddresstbl = $data['residentaddresstbl'] ?? [];
 $useraccountstbl = $data['useraccountstbl'] ?? [];
 
+<<<<<<< Updated upstream
 <<<<<<< Updated upstream
 <<<<<<< Updated upstream
 <<<<<<< Updated upstream
@@ -135,6 +142,8 @@ $fullAddress = htmlspecialchars(implode(', ', $fullAddressParts), ENT_QUOTES, 'U
 >>>>>>> Stashed changes
 =======
 >>>>>>> Stashed changes
+=======
+>>>>>>> Stashed changes
 $ownerLastName = htmlspecialchars((string)($residentinformationtbl['lastname'] ?? ''), ENT_QUOTES, 'UTF-8');
 $ownerFirstName = htmlspecialchars((string)($residentinformationtbl['firstname'] ?? ''), ENT_QUOTES, 'UTF-8');
 $ownerMiddleName = htmlspecialchars((string)($residentinformationtbl['middlename'] ?? ''), ENT_QUOTES, 'UTF-8');
@@ -147,6 +156,9 @@ $ownerStreetName = htmlspecialchars((string)($residentaddresstbl['street_name'] 
 <<<<<<< Updated upstream
 <<<<<<< Updated upstream
 <<<<<<< Updated upstream
+<<<<<<< Updated upstream
+>>>>>>> Stashed changes
+=======
 >>>>>>> Stashed changes
 =======
 >>>>>>> Stashed changes
@@ -189,6 +201,7 @@ $ownerStreetName = htmlspecialchars((string)($residentaddresstbl['street_name'] 
 <<<<<<< Updated upstream
 <<<<<<< Updated upstream
 <<<<<<< Updated upstream
+<<<<<<< Updated upstream
                     <div class="input-stack"><label class="top-label">Last Name<span class="required-asterisk">*</span></label><input type="text" name="o_ln" required readonly value="<?php echo $lastName; ?>"></div>
                     <div class="input-stack"><label class="top-label">First Name<span class="required-asterisk">*</span></label><input type="text" name="o_fn" required readonly value="<?php echo $firstName; ?>"></div>
                     <div class="input-stack"><label class="top-label">Middle Name</label><input type="text" name="o_mn" readonly value="<?php echo $middleName; ?>"></div>
@@ -216,6 +229,13 @@ $ownerStreetName = htmlspecialchars((string)($residentaddresstbl['street_name'] 
                     <div class="input-stack"><label class="top-label">Middle Name</label><input type="text" name="o_mn" value="<?php echo $ownerMiddleName; ?>"></div>
                     <div class="input-stack"><label class="top-label">Suffix</label><select name="o_sfx"><option value="" <?php echo ($ownerSuffix === '') ? 'selected' : ''; ?>>None</option><option value="Jr." <?php echo ($ownerSuffix === 'Jr.') ? 'selected' : ''; ?>>Jr.</option><option value="Sr." <?php echo ($ownerSuffix === 'Sr.') ? 'selected' : ''; ?>>Sr.</option><option value="III" <?php echo ($ownerSuffix === 'III') ? 'selected' : ''; ?>>III</option><option value="IV" <?php echo ($ownerSuffix === 'IV') ? 'selected' : ''; ?>>IV</option></select></div>
                 </div>
+=======
+                    <div class="input-stack"><label class="top-label">Last Name<span class="required-asterisk">*</span></label><input type="text" name="o_ln" required value="<?php echo $ownerLastName; ?>"></div>
+                    <div class="input-stack"><label class="top-label">First Name<span class="required-asterisk">*</span></label><input type="text" name="o_fn" required value="<?php echo $ownerFirstName; ?>"></div>
+                    <div class="input-stack"><label class="top-label">Middle Name</label><input type="text" name="o_mn" value="<?php echo $ownerMiddleName; ?>"></div>
+                    <div class="input-stack"><label class="top-label">Suffix</label><select name="o_sfx"><option value="" <?php echo ($ownerSuffix === '') ? 'selected' : ''; ?>>None</option><option value="Jr." <?php echo ($ownerSuffix === 'Jr.') ? 'selected' : ''; ?>>Jr.</option><option value="Sr." <?php echo ($ownerSuffix === 'Sr.') ? 'selected' : ''; ?>>Sr.</option><option value="III" <?php echo ($ownerSuffix === 'III') ? 'selected' : ''; ?>>III</option><option value="IV" <?php echo ($ownerSuffix === 'IV') ? 'selected' : ''; ?>>IV</option></select></div>
+                </div>
+>>>>>>> Stashed changes
 =======
                     <div class="input-stack"><label class="top-label">Last Name<span class="required-asterisk">*</span></label><input type="text" name="o_ln" required value="<?php echo $ownerLastName; ?>"></div>
                     <div class="input-stack"><label class="top-label">First Name<span class="required-asterisk">*</span></label><input type="text" name="o_fn" required value="<?php echo $ownerFirstName; ?>"></div>
@@ -308,6 +328,9 @@ $ownerStreetName = htmlspecialchars((string)($residentaddresstbl['street_name'] 
 <<<<<<< Updated upstream
 <<<<<<< Updated upstream
 <<<<<<< Updated upstream
+<<<<<<< Updated upstream
+>>>>>>> Stashed changes
+=======
 >>>>>>> Stashed changes
 =======
 >>>>>>> Stashed changes
