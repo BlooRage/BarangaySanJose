@@ -130,7 +130,6 @@ $fullAddress = htmlspecialchars(implode(', ', $fullAddressParts), ENT_QUOTES, 'U
                     <form method="POST" action="<?= htmlspecialchars($baseUrl) ?>/PhpFiles/Resident-End/documentRequestWorkflow.php">
                         <input type="hidden" name="action" value="submit_request">
                         <input type="hidden" name="document_type" value="firsttimejobseeker">
-                        <input type="hidden" name="purpose" value="First Time Job Seeker Application">
                         <input type="hidden" name="redirect" value="1">
 
                         <h2 class="section-title text-center text-dark">Personal Information</h2>
@@ -223,6 +222,13 @@ $fullAddress = htmlspecialchars(implode(', ', $fullAddressParts), ENT_QUOTES, 'U
                                         <span>No</span>
                                     </label>
                                 </div>
+                            </div>
+                        </div>
+
+                        <div class="form-row">
+                            <div class="full-width">
+                                <label class="top-label">Purpose <span class="required-asterisk">*</span></label>
+                                <textarea name="purpose" rows="4" required>First Time Job Seeker Application</textarea>
                             </div>
                         </div>
 

@@ -30,8 +30,11 @@
   const modalError = document.getElementById('actionModalError');
   const viewModalEl = document.getElementById('viewModal');
   const viewModal = viewModalEl ? new bootstrap.Modal(viewModalEl) : null;
+  const viewModalTitle = document.getElementById('viewModalTitle');
   const viewDetailsBody = document.getElementById('viewDetailsBody');
   const viewModalActions = document.getElementById('viewModalActions');
+  const viewModalBackBtn = document.getElementById('viewModalBackBtn');
+  const viewModalNextBtn = document.getElementById('viewModalNextBtn');
   const paymentProofModalEl = document.getElementById('paymentProofModal');
   const paymentProofModal = paymentProofModalEl ? new bootstrap.Modal(paymentProofModalEl) : null;
   const paymentProofWrap = document.getElementById('paymentProofWrap');
@@ -44,6 +47,9 @@
   let currentStatusFilter = 'all';
   let currentDocumentTypeFilter = '';
   let itemById = new Map();
+  let viewMode = 'details';
+  let viewDetailsHtml = '';
+  let viewPreviewState = null;
   const financeStages = new Set(['for_payment', 'payment_submitted']);
 
   function esc(v) {
@@ -171,6 +177,362 @@
         <div class="tracker-profile-grid">${content}</div>
       </section>
     `;
+  }
+
+  function formField(label, value) {
+    return `
+      <div class="tracker-form-field">
+        <p class="tracker-form-label">${esc(label)}</p>
+        <div class="tracker-form-value">${esc(value ?? '-')}</div>
+      </div>
+    `;
+  }
+
+  function formSection(title, content) {
+    return `
+      <section class="tracker-form-section">
+        <h6 class="tracker-form-section-title">${esc(title)}</h6>
+        ${content}
+      </section>
+    `;
+  }
+
+  function extractSubmittedDocuments(row, payload) {
+    const docs = [];
+    const seen = new Set();
+
+    const addDoc = (label, rawPath) => {
+      const pathText = String(rawPath || '').trim();
+      if (!pathText) return;
+      const match = pathText.match(/\/UnifiedFileAttachment\/[^\s"'<>]+/i);
+      const normalized = match ? match[0] : (pathText.startsWith('/UnifiedFileAttachment/') ? pathText : '');
+      if (!normalized) return;
+      const url = `${appBase}${normalized}`;
+      if (seen.has(url)) return;
+      seen.add(url);
+      docs.push({ label: String(label || 'Document'), url, path: normalized });
+    };
+
+    addDoc('Payment Proof', row?.payment_proof_path);
+
+    if (payload && typeof payload === 'object') {
+      Object.keys(payload).forEach((key) => {
+        const value = payload[key];
+        if (Array.isArray(value)) {
+          value.forEach((entry, idx) => addDoc(`${friendlyLabel(key)} ${idx + 1}`, entry));
+          return;
+        }
+        if (typeof value === 'string') {
+          addDoc(friendlyLabel(key), value);
+        }
+      });
+    }
+
+    return docs;
+  }
+
+  function previewDateText(value) {
+    const raw = String(value || '').trim();
+    if (!raw) return dr_now_text();
+    const d = new Date(raw);
+    if (Number.isNaN(d.getTime())) return raw;
+    return d.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+  }
+
+  function dr_now_text() {
+    return new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+  }
+
+  function previewEditable(key, value, fallback = 'Type here') {
+    const text = String(value || '').trim() || fallback;
+    return `<span class="doc-editable" contenteditable="true" data-edit-key="${esc(key)}">${esc(text)}</span>`;
+  }
+
+  function normalizePreviewDocKey(docType) {
+    const text = String(docType || '').toLowerCase();
+    if (text.includes('cohabitation')) return 'cohabitation';
+    if (text.includes('indigency')) return 'indigency';
+    if (text.includes('first time') || text.includes('job seeker')) return 'firsttimejobseeker';
+    if (text.includes('identity')) return 'identity';
+    if (text.includes('residency')) return 'residency';
+    if (text.includes('good moral')) return 'goodmoral';
+    return 'generic';
+  }
+
+  function additionalDetailRows(entries) {
+    const rows = Array.isArray(entries) ? entries.filter((it) => it && it.label && it.value) : [];
+    if (!rows.length) return '';
+    const html = rows.map((it) => `
+      <p><strong>${esc(it.label)}:</strong> ${esc(it.value)}</p>
+    `).join('');
+    return `
+      <p><strong>Additional Submitted Details:</strong></p>
+      ${html}
+    `;
+  }
+
+  function renderDocumentPreview(state) {
+    if (!state || typeof state !== 'object') {
+      return '<div class="text-muted">No document preview available.</div>';
+    }
+    const docType = String(state.docType || 'Certificate').trim() || 'Certificate';
+    const docKey = normalizePreviewDocKey(docType);
+    const fullName = String(state.fullName || '-').trim() || '-';
+    const fullAddress = String(state.fullAddress || '-').trim() || '-';
+    const purpose = String(state.purpose || '-').trim() || '-';
+    const issuedDate = previewDateText(state.issuedDate || '');
+    const requestOfficer = String(state.requestOfficer || '').trim();
+    const requestFor = String(state.requestFor || '').trim();
+    const yearsResidency = String(state.yearsResidency || '').trim();
+    const monthsResidency = String(state.monthsResidency || '').trim();
+    const childBirthplace = String(state.childBirthplace || '').trim();
+    const childBirthdate = String(state.childBirthdate || '').trim();
+    const childNationality = String(state.childNationality || '').trim();
+    const fatherName = String(state.fatherName || '').trim();
+    const motherName = String(state.motherName || '').trim();
+    const cohabitantName = String(state.cohabitantName || '').trim();
+    const cohabitantRelationship = String(state.cohabitantRelationship || '').trim();
+    const cohabitationDuration = String(state.cohabitationDuration || '').trim();
+    const cohabitationStartDate = String(state.cohabitationStartDate || '').trim();
+    const education = String(state.educationalAttainment || '').trim();
+    const jobStart = String(state.jobstartBeneficiary || '').trim();
+    const businessName = String(state.businessName || '').trim();
+    const additionalHtml = additionalDetailRows(state.additionalDetails);
+    const leftLogoUrl = `${appBase}/Images/San_Jose_LOGO.jpg`;
+    const rightLogoUrl = `${appBase}/Images/Montalban_Logo.png`;
+    const fallbackRightLogoUrl = `${appBase}/Images/San_Jose_LOGO.jpg`;
+    const qrUrl = String(state.qrUrl || '').trim();
+
+    let contentHtml = '';
+    if (docKey === 'residency') {
+      const residencyText = [yearsResidency ? `${yearsResidency} year(s)` : '', monthsResidency ? `${monthsResidency} month(s)` : '']
+        .filter(Boolean).join(' and ') || 'a stated period';
+      contentHtml = `
+        <p>
+          This is to certify that <strong>${esc(fullName)}</strong> is a bona fide resident of
+          <strong>${esc(fullAddress)}</strong> and has been residing in this barangay for <strong>${esc(residencyText)}</strong>.
+        </p>
+        <p>
+          This certificate is issued upon request for <strong>${previewEditable('purpose', purpose, 'State purpose')}</strong>.
+        </p>
+        <p>
+          This certification is valid for legal and administrative use, subject to verification by concerned offices and institutions.
+        </p>
+      `;
+    } else if (docKey === 'indigency') {
+      contentHtml = `
+        <p>
+          This is to certify that <strong>${esc(fullName)}</strong>, a resident of
+          <strong>${esc(fullAddress)}</strong>, belongs to an indigent family in this barangay.
+        </p>
+        <p>
+          This certification is being requested for <strong>${previewEditable('purpose', purpose || requestFor, 'State purpose')}</strong>
+          ${requestOfficer !== '' ? `and will be submitted to <strong>${previewEditable('requestOfficer', requestOfficer, 'Receiving office')}</strong>.` : '.'}
+        </p>
+        <p>
+          This document is issued upon the request of the above-named resident and may be presented to lawful authorities as supporting proof.
+        </p>
+      `;
+    } else if (docKey === 'goodmoral') {
+      contentHtml = `
+        <p>
+          This is to certify that <strong>${esc(fullName)}</strong> of
+          <strong>${esc(fullAddress)}</strong> is known in this community as a person of good moral character.
+        </p>
+        <p>
+          This certification is issued upon request for <strong>${previewEditable('purpose', purpose, 'State purpose')}</strong>.
+        </p>
+        <p>
+          Issued for whatever legal purpose it may serve, without prejudice to existing laws, ordinances, and regulations.
+        </p>
+      `;
+    } else if (docKey === 'identity') {
+      contentHtml = `
+        <p>
+          This is to certify that <strong>${esc(fullName)}</strong> is personally known to this barangay and is a resident of
+          <strong>${esc(fullAddress)}</strong>.
+        </p>
+        <p>
+          The following information is presented for identity reference: Birthdate <strong>${esc(childBirthdate || '-')}</strong>,
+          Place of Birth <strong>${esc(childBirthplace || '-')}</strong>, Nationality <strong>${esc(childNationality || '-')}</strong>,
+          Father <strong>${esc(fatherName || '-')}</strong>, Mother <strong>${esc(motherName || '-')}</strong>.
+        </p>
+        <p>
+          This certification is issued upon request for <strong>${previewEditable('purpose', purpose, 'State purpose')}</strong>.
+        </p>
+        <p>
+          This document may be used as reference for identity confirmation subject to the acceptance of the receiving office.
+        </p>
+      `;
+    } else if (docKey === 'firsttimejobseeker') {
+      contentHtml = `
+        <p>
+          This is to certify that <strong>${esc(fullName)}</strong> is a bona fide resident of
+          <strong>${esc(fullAddress)}</strong> and is applying as a first time job seeker.
+        </p>
+        <p>
+          Educational Attainment: <strong>${esc(education || '-')}</strong>.
+          Beneficiary of JobStart Program under RA 10869: <strong>${esc(jobStart || '-')}</strong>.
+        </p>
+        <p>
+          This certificate is issued upon request for <strong>${previewEditable('purpose', purpose, 'State purpose')}</strong>.
+        </p>
+        <p>
+          Issued in accordance with applicable barangay procedures for first time job seeker documentary assistance.
+        </p>
+      `;
+    } else if (docKey === 'cohabitation') {
+      contentHtml = `
+        <p>
+          This is to certify that <strong>${esc(fullName)}</strong> and
+          <strong>${esc(cohabitantName || 'cohabitant/partner')}</strong> are known residents of this barangay.
+        </p>
+        <p>
+          Based on records and sworn declaration, they have been living together as partners
+          ${cohabitationDuration !== '' ? `for <strong>${esc(cohabitationDuration)}</strong>` : ''}
+          ${cohabitationStartDate !== '' ? ` since <strong>${esc(previewDateText(cohabitationStartDate))}</strong>` : ''}
+          at <strong>${esc(fullAddress)}</strong>
+          ${cohabitantRelationship !== '' ? `, with relationship stated as <strong>${esc(cohabitantRelationship)}</strong>` : ''}.
+        </p>
+        <p>
+          This certification is issued upon request for <strong>${previewEditable('purpose', purpose, 'State purpose')}</strong>.
+        </p>
+        <p>
+          This is issued for proper documentation and lawful use where proof of cohabitation is required.
+        </p>
+      `;
+    } else {
+      contentHtml = `
+        <p>
+          This is to certify that <strong>${esc(fullName)}</strong> is a bona fide resident of
+          <strong>${esc(fullAddress)}</strong>.
+        </p>
+        <p>
+          ${businessName !== '' ? `Business Name: <strong>${previewEditable('businessName', businessName, 'Business name')}</strong>.<br>` : ''}
+          This certification is issued upon request for <strong>${previewEditable('purpose', purpose, 'State purpose')}</strong>.
+        </p>
+        <p>
+          This document is issued for lawful purposes and may be subject to validation by receiving agencies.
+        </p>
+      `;
+    }
+    if (additionalHtml !== '') {
+      contentHtml += additionalHtml;
+    }
+    if (businessName !== '' && docKey !== 'generic') {
+      contentHtml += `
+        <p>
+          Business Name: <strong>${previewEditable('businessName', businessName, 'Business name')}</strong>.
+        </p>
+      `;
+    }
+
+    return `
+      <div class="doc-preview-stage">
+        <span class="doc-preview-label">Document Display</span>
+        <div class="doc-preview-shell">
+          <div class="doc-preview-paper">
+            <p class="doc-preview-hint">Highlighted fields are editable in this preview.</p>
+            <div class="doc-preview-head">
+              <img class="doc-preview-logo" src="${leftLogoUrl}" alt="Barangay San Jose Logo">
+              <div class="doc-preview-head-center">
+                <p class="rep">REPUBLIC OF THE PHILIPPINES</p>
+                <p>PROVINCE OF RIZAL</p>
+                <p>MUNICIPALITY OF RODRIGUEZ</p>
+                <p class="barangay">BARANGAY SAN JOSE</p>
+                <p class="office">OFFICE OF THE PUNONG BARANGAY</p>
+                <div class="doc-preview-head-line"></div>
+              </div>
+              <img class="doc-preview-logo" src="${rightLogoUrl}" alt="Montalban Logo" onerror="this.onerror=null;this.src='${fallbackRightLogoUrl}'">
+            </div>
+            <div class="doc-preview-title">${esc(docType)}</div>
+            <div class="doc-preview-body">
+              <p><strong>TO WHOM IT MAY CONCERN:</strong></p>
+              ${contentHtml}
+              <p>
+                Issued this <strong>${esc(issuedDate)}</strong> at Barangay San Jose, Rodriguez, Rizal.
+              </p>
+            </div>
+            <div class="doc-preview-signature">
+              <div class="name">HON. GLENN S. EVANGELISTA</div>
+              <div>Punong Barangay</div>
+            </div>
+            <div class="doc-preview-qr">
+              <div class="doc-preview-qr-box">
+                ${qrUrl !== '' ? `<img src="${esc(qrUrl)}" alt="QR Code">` : '<span>QR</span>'}
+              </div>
+              QR PLACEMENT
+            </div>
+          </div>
+        </div>
+      </div>
+    `;
+  }
+
+  function bindPreviewEditHandlers() {
+    if (!viewDetailsBody) return;
+    viewDetailsBody.querySelectorAll('.doc-editable[data-edit-key]').forEach((editable) => {
+      editable.addEventListener('input', () => {
+        if (!viewPreviewState) return;
+        const key = String(editable.getAttribute('data-edit-key') || '').trim();
+        if (!key) return;
+        viewPreviewState[key] = String(editable.textContent || '').trim();
+      });
+    });
+  }
+
+  function switchViewMode(mode) {
+    viewMode = mode === 'preview' ? 'preview' : 'details';
+    if (!viewDetailsBody) return;
+
+    if (viewMode === 'preview') {
+      viewDetailsBody.innerHTML = renderDocumentPreview(viewPreviewState);
+      bindPreviewEditHandlers();
+      viewModalBackBtn?.classList.remove('d-none');
+      viewModalNextBtn?.classList.add('d-none');
+      return;
+    }
+
+    viewDetailsBody.innerHTML = viewDetailsHtml || '<div class="text-muted">No details.</div>';
+    viewModalBackBtn?.classList.add('d-none');
+    viewModalNextBtn?.classList.remove('d-none');
+  }
+
+  function friendlyLabel(key) {
+    const raw = String(key || '').trim();
+    if (!raw) return '';
+    const map = {
+      last_name: 'Last Name',
+      first_name: 'First Name',
+      middle_name: 'Middle Name',
+      suffix_name: 'Suffix',
+      suffix: 'Suffix',
+      contact_number: 'Contact Number',
+      phone_number: 'Contact Number',
+      full_address: 'Full Address',
+      full_address_display: 'Full Address',
+      birthdate: 'Birthdate',
+      child_dob: 'Date of Birth',
+      age: 'Age',
+      sex: 'Sex',
+      gender: 'Gender',
+      child_sex: 'Sex',
+      civil_status: 'Civil Status',
+      religion: 'Religion',
+      occupation: 'Occupation',
+      years_of_residency: 'Years of Residency',
+      months_of_residency: 'Months of Residency',
+      request_purpose: 'Request For',
+      request_officer: 'To Be Submitted To',
+      educational_attainment: 'Educational Attainment',
+      jobstart_beneficiary: 'JobStart Beneficiary',
+      residency_arrangement: 'Living Arrangement',
+      supporting_document_type: 'Supporting Document Type',
+      child_birthplace: 'Place of Birth',
+      child_nationality: 'Nationality'
+    };
+    if (map[raw]) return map[raw];
+    return raw.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
   }
 
   function computeAgeFromBirthdate(birthdate) {
@@ -495,42 +857,210 @@
         if (!row || !viewDetailsBody || !viewModal) return;
 
         const payload = row.payload && typeof row.payload === 'object' ? row.payload : {};
-        const fullName = fullNameFromRow(row);
-        const residentInfo = residentInfoFromRow(row);
-        let html = '';
-        html += profileSection('Request Summary', [
-          profileItem('Request ID', esc(row.request_id || '-')),
-          profileItem('Resident ID', esc(row.resident_id || '-')),
-          profileItem('Full Name', esc(fullName || '-')),
-          profileItem('Document Requested', documentTypePill(row)),
-          profileItem('Purpose', esc(row.purpose || '-')),
-          profileItem('Information', esc(residentInfo || '-')),
-          profileItem('Stage', esc(row.stage_label || row.stage || '-')),
-          profileItem('Status Reason', esc(row.status_reason || '-')),
-          profileItem('Submitted At', esc(row.submitted_at || '-'))
-        ].join(''));
+        const consumedKeys = new Set();
+        const collectFirst = (...keys) => {
+          for (const key of keys) {
+            if (!key) continue;
+            const value = payload[key];
+            if (value === null || value === undefined) continue;
+            const text = String(value).trim();
+            if (text === '') continue;
+            consumedKeys.add(String(key));
+            return text;
+          }
+          return '';
+        };
 
-        html += profileSection('Payment and Release', [
-          profileItem('Payment Method', esc(row.payment_method || '-')),
-          profileItem('Amount', esc(row.amount || '-')),
-          profileItem('OR Number', esc(row.or_number || '-')),
-          profileItem('Certificate Number', esc(row.certificate_number || '-'))
-        ].join(''));
+        const personalFields = [
+          ['Last Name', collectFirst('last_name', 'lastname')],
+          ['First Name', collectFirst('first_name', 'firstname')],
+          ['Middle Name', collectFirst('middle_name', 'middlename')],
+          ['Suffix', collectFirst('suffix_name', 'suffix')],
+          ['Contact Number', collectFirst('contact_number', 'phone_number')],
+          ['Full Address', collectFirst('full_address', 'full_address_display', 'address', 'complete_address')],
+          ['Birthdate', collectFirst('birthdate', 'date_of_birth', 'child_dob')],
+          ['Age', collectFirst('age')],
+          ['Sex', collectFirst('sex', 'gender', 'child_sex')],
+          ['Civil Status', collectFirst('civil_status')],
+          ['Religion', collectFirst('religion')],
+          ['Occupation', collectFirst('occupation')]
+        ].filter(([, value]) => String(value || '').trim() !== '');
 
-        const hiddenPayloadKeys = new Set([
-          'first_name', 'firstname', 'middle_name', 'middlename', 'last_name', 'lastname', 'suffix', 'suffix_name',
-          'sex', 'gender', 'birthdate', 'date_of_birth', 'age', 'full_address', 'address', 'complete_address'
+        const technicalKeys = new Set([
+          'action', 'csrf_token', 'redirect', 'document_type', 'suffix_name_display', 'suffix_display',
+          'child_sex_display', 'cohabitant_region_select', 'cohabitant_province_select',
+          'cohabitant_city_select', 'cohabitant_barangay_select', 'cohabitantSameAddress',
+          'full_unit_number', 'full_house_lot_number', 'full_street_block_name', 'full_subdivision',
+          'full_barangay', 'full_area_number', 'cohabitant_full_unit_number',
+          'cohabitant_full_house_lot_number', 'cohabitant_full_street_block_name',
+          'cohabitant_full_subdivision', 'cohabitant_full_barangay', 'cohabitant_full_area_number'
         ]);
-        const payloadItems = [];
-        Object.keys(payload).forEach((key) => {
-          if (hiddenPayloadKeys.has(String(key))) return;
-          payloadItems.push(profileItem(key, esc(payload[key])));
-        });
-        if (payloadItems.length) {
-          html += profileSection('Other Submitted Fields', payloadItems.join(''));
+
+        const requestFields = [];
+        const purposeText = firstNonEmpty([row.purpose, payload.purpose]);
+        if (purposeText) {
+          requestFields.push(formField('Purpose', purposeText));
         }
 
-        viewDetailsBody.innerHTML = html || '<div class="text-muted">No details.</div>';
+        Object.keys(payload).forEach((key) => {
+          const normalized = String(key);
+          if (consumedKeys.has(normalized) || technicalKeys.has(normalized)) return;
+          const value = payload[key];
+          if (value === null || value === undefined) return;
+          const text = String(value).trim();
+          if (text === '') return;
+          requestFields.push(formField(friendlyLabel(normalized), text));
+        });
+
+        let html = '';
+        html += `<div class="tracker-doc-highlight">Document Requested: ${esc(row.document_type || '-')}</div>`;
+        const personalMap = new Map(personalFields);
+        if (personalFields.length) {
+          const nameRow = [
+            formField('Last Name', personalMap.get('Last Name') || '-'),
+            formField('First Name', personalMap.get('First Name') || '-'),
+            formField('Middle Name', personalMap.get('Middle Name') || '-'),
+            formField('Suffix', personalMap.get('Suffix') || '-')
+          ].join('');
+          const personalRow = [
+            formField('Birthdate', personalMap.get('Birthdate') || '-'),
+            formField('Age', personalMap.get('Age') || '-'),
+            formField('Sex', personalMap.get('Sex') || '-'),
+            formField('Civil Status', personalMap.get('Civil Status') || '-')
+          ].join('');
+          const contactAddressRow = [
+            formField('Contact Number', personalMap.get('Contact Number') || '-'),
+            formField('Full Address', personalMap.get('Full Address') || '-')
+          ].join('');
+          const extraInfo = [];
+          if ((personalMap.get('Religion') || '').trim()) extraInfo.push(formField('Religion', personalMap.get('Religion')));
+          if ((personalMap.get('Occupation') || '').trim()) extraInfo.push(formField('Occupation', personalMap.get('Occupation')));
+
+          let personalHtml = '';
+          personalHtml += `<div class="tracker-form-grid cols-4">${nameRow}</div>`;
+          personalHtml += `<div class="tracker-form-grid cols-4">${personalRow}</div>`;
+          personalHtml += `<div class="tracker-form-grid">${contactAddressRow}</div>`;
+          if (extraInfo.length) {
+            personalHtml += `<div class="tracker-form-grid">${extraInfo.join('')}</div>`;
+          }
+          html += formSection('Personal Information', personalHtml);
+        }
+        if (requestFields.length) {
+          html += formSection('Request Details', `<div class="tracker-form-grid">${requestFields.join('')}</div>`);
+        }
+
+        const submittedDocs = extractSubmittedDocuments(row, payload);
+        if (submittedDocs.length) {
+          const docsHtml = submittedDocs.map((doc, idx) => `
+            <div class="tracker-form-field">
+              <p class="tracker-form-label">${esc(doc.label || `Document ${idx + 1}`)}</p>
+              <div class="tracker-form-value d-flex justify-content-between align-items-center gap-2">
+                <span class="text-truncate">${esc(doc.path || '')}</span>
+                <button type="button" class="btn btn-sm btn-outline-primary" data-view-doc-url="${esc(doc.url)}">View</button>
+              </div>
+            </div>
+          `).join('');
+          html += formSection('Submitted Documents', `<div class="tracker-form-grid cols-1">${docsHtml}</div>`);
+        }
+
+        html += formSection(
+          'Request Status',
+          `<div class="tracker-form-grid">${[
+            formField('Status', row.stage_label || row.stage || '-'),
+            formField('Status Reason', row.status_reason || '-'),
+            formField('Submitted At', row.submitted_at || '-')
+          ].join('')}</div>`
+        );
+
+        viewDetailsHtml = html || '<div class="text-muted">No details.</div>';
+        const businessName = firstNonEmpty([
+          payload.business_name,
+          payload.businessName,
+          payload.business_trade_name,
+          payload.trade_name,
+          payload.establishment_name,
+          payload.business_establishment
+        ]);
+        const fatherName = [
+          firstNonEmpty([payload.father_first_name]),
+          firstNonEmpty([payload.father_middle_name]),
+          firstNonEmpty([payload.father_last_name]),
+          firstNonEmpty([payload.father_suffix])
+        ].filter(Boolean).join(' ').replace(/\s+/g, ' ').trim();
+        const motherName = [
+          firstNonEmpty([payload.mother_first_name]),
+          firstNonEmpty([payload.mother_middle_name]),
+          firstNonEmpty([payload.mother_last_name]),
+          firstNonEmpty([payload.mother_suffix])
+        ].filter(Boolean).join(' ').replace(/\s+/g, ' ').trim();
+        const cohabitantName = [
+          firstNonEmpty([payload.cohabitant_first]),
+          firstNonEmpty([payload.cohabitant_middle]),
+          firstNonEmpty([payload.cohabitant_last]),
+          firstNonEmpty([payload.cohabitant_suffix])
+        ].filter(Boolean).join(' ').replace(/\s+/g, ' ').trim();
+        const durationValue = firstNonEmpty([payload.cohabitation_duration_value]);
+        const durationUnit = firstNonEmpty([payload.cohabitation_duration_unit]);
+        const cohabitationDuration = [durationValue, durationUnit].filter(Boolean).join(' ').trim();
+        const knownPayloadKeys = new Set([
+          'action', 'csrf_token', 'redirect', 'document_type',
+          'last_name', 'lastname', 'first_name', 'firstname', 'middle_name', 'middlename', 'suffix', 'suffix_name',
+          'contact_number', 'phone_number', 'full_address', 'full_address_display', 'address', 'complete_address',
+          'birthdate', 'date_of_birth', 'child_dob', 'age', 'sex', 'gender', 'child_sex',
+          'civil_status', 'religion', 'occupation',
+          'purpose', 'request_purpose', 'request_officer',
+          'business_name', 'businessName', 'business_trade_name', 'trade_name', 'establishment_name', 'business_establishment',
+          'years_of_residency', 'months_of_residency',
+          'child_birthplace', 'child_nationality',
+          'father_first_name', 'father_middle_name', 'father_last_name', 'father_suffix',
+          'mother_first_name', 'mother_middle_name', 'mother_last_name', 'mother_suffix',
+          'cohabitant_first', 'cohabitant_middle', 'cohabitant_last', 'cohabitant_suffix',
+          'cohabitant_relationship', 'cohabitation_duration_value', 'cohabitation_duration_unit', 'cohabitation_start_date',
+          'educational_attainment', 'jobstart_beneficiary'
+        ]);
+        const additionalDetails = [];
+        Object.keys(payload).forEach((key) => {
+          const k = String(key || '');
+          if (!k || knownPayloadKeys.has(k)) return;
+          const value = String(payload[key] ?? '').trim();
+          if (!value) return;
+          additionalDetails.push({ label: friendlyLabel(k), value });
+        });
+        viewPreviewState = {
+          docType: row.document_type || 'Certificate',
+          fullName: [
+            personalMap.get('First Name') || '',
+            personalMap.get('Middle Name') || '',
+            personalMap.get('Last Name') || '',
+            personalMap.get('Suffix') || ''
+          ].join(' ').replace(/\s+/g, ' ').trim() || fullNameFromRow(row),
+          fullAddress: personalMap.get('Full Address') || '-',
+          purpose: firstNonEmpty([row.purpose, payload.purpose, payload.request_purpose, '-']) || '-',
+          businessName: businessName || '',
+          issuedDate: row.submitted_at || dr_now_text(),
+          requestOfficer: firstNonEmpty([payload.request_officer]),
+          requestFor: firstNonEmpty([payload.request_purpose]),
+          yearsResidency: firstNonEmpty([payload.years_of_residency]),
+          monthsResidency: firstNonEmpty([payload.months_of_residency]),
+          childBirthplace: firstNonEmpty([payload.child_birthplace]),
+          childBirthdate: firstNonEmpty([payload.child_dob, payload.birthdate, payload.date_of_birth]),
+          childNationality: firstNonEmpty([payload.child_nationality]),
+          fatherName: fatherName,
+          motherName: motherName,
+          cohabitantName: cohabitantName,
+          cohabitantRelationship: firstNonEmpty([payload.cohabitant_relationship]),
+          cohabitationDuration: cohabitationDuration,
+          cohabitationStartDate: firstNonEmpty([payload.cohabitation_start_date]),
+          educationalAttainment: firstNonEmpty([payload.educational_attainment]),
+          jobstartBeneficiary: firstNonEmpty([payload.jobstart_beneficiary]),
+          additionalDetails: additionalDetails,
+          qrUrl: firstNonEmpty([row.qr_code_path]) ? `${appBase}${String(row.qr_code_path || '')}` : ''
+        };
+        switchViewMode('details');
+        if (viewModalTitle) {
+          const requestId = String(row.request_id || '').trim();
+          viewModalTitle.textContent = requestId ? `Certificate Request (#${requestId})` : 'Certificate Request';
+        }
         if (viewModalActions) {
           viewModalActions.innerHTML = viewModalActionButtons(row);
           viewModalActions.querySelectorAll('button[data-view-action][data-id]').forEach((actionBtn) => {
@@ -560,6 +1090,20 @@
             });
           });
         }
+        viewDetailsBody.querySelectorAll('button[data-view-doc-url]').forEach((docBtn) => {
+          docBtn.addEventListener('click', () => {
+            const docUrl = String(docBtn.getAttribute('data-view-doc-url') || '').trim();
+            if (!docUrl || !paymentProofModal || !paymentProofWrap || !paymentProofOpenNew) return;
+            paymentProofOpenNew.href = docUrl;
+            const lower = docUrl.toLowerCase();
+            if (lower.endsWith('.pdf')) {
+              paymentProofWrap.innerHTML = `<iframe src="${docUrl}" style="width:100%;height:70vh;border:1px solid #ddd;border-radius:8px;"></iframe>`;
+            } else {
+              paymentProofWrap.innerHTML = `<img src="${docUrl}" alt="Submitted Document" style="max-width:100%;max-height:70vh;border:1px solid #ddd;border-radius:8px;">`;
+            }
+            paymentProofModal.show();
+          });
+        });
         viewModal.show();
       });
     });
@@ -652,6 +1196,20 @@
   searchInput?.addEventListener('input', () => {
     clearTimeout(searchTimer);
     searchTimer = setTimeout(load, 250);
+  });
+
+  viewModalNextBtn?.addEventListener('click', () => {
+    switchViewMode('preview');
+  });
+
+  viewModalBackBtn?.addEventListener('click', () => {
+    switchViewMode('details');
+  });
+
+  viewModalEl?.addEventListener('hidden.bs.modal', () => {
+    viewDetailsHtml = '';
+    viewPreviewState = null;
+    switchViewMode('details');
   });
 
   load();

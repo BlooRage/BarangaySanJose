@@ -382,7 +382,7 @@ $applicantArea = htmlspecialchars($areaNumber, ENT_QUOTES, 'UTF-8');
                             </div>
                             <div>
                                 <label class="top-label">Purpose of Certificate <span class="required-asterisk">*</span></label>
-                                <input type="text" name="cohabitation_purpose" required placeholder="e.g., Legal requirement">
+                                <input type="text" name="purpose" required placeholder="e.g., Legal requirement">
                             </div>
                         </div>
 
@@ -525,5 +525,4 @@ $applicantArea = htmlspecialchars($areaNumber, ENT_QUOTES, 'UTF-8');
 </body>
 
 </html>
-
 

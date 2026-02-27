@@ -137,7 +137,6 @@ $fullAddress = htmlspecialchars(implode(', ', $fullAddressParts), ENT_QUOTES, 'U
            <form action="<?= htmlspecialchars($baseUrl) ?>/PhpFiles/Resident-End/documentRequestWorkflow.php" method="POST">
                 <input type="hidden" name="action" value="submit_request">
                 <input type="hidden" name="document_type" value="identity">
-                <input type="hidden" name="purpose" value="Certificate of Identity Application">
                 <input type="hidden" name="redirect" value="1">
 
                 <h2 class="section-title text-center text-dark">Applicant Information</h2>
@@ -265,6 +264,15 @@ $fullAddress = htmlspecialchars(implode(', ', $fullAddressParts), ENT_QUOTES, 'U
                     </div>
                 </div>
 
+                <div class="form-row">
+                    <div class="full-width">
+                        <div class="input-stack">
+                            <label class="top-label">Purpose <span class="required-asterisk">*</span></label>
+                            <textarea name="purpose" rows="4" required>Certificate of Identity Application</textarea>
+                        </div>
+                    </div>
+                </div>
+
                 <div class="agreement-row">
                     <div class="agreement-text check-item">
                         <input type="checkbox" id="agreement" required>
@@ -324,6 +332,5 @@ $fullAddress = htmlspecialchars(implode(', ', $fullAddressParts), ENT_QUOTES, 'U
     </script>
 </body>
 </html>
-
 
 

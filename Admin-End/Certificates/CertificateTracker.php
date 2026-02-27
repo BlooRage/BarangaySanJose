@@ -13,12 +13,15 @@ require_once __DIR__ . '/../includes/admin_guard.php';
   <link rel="stylesheet" href="../../CSS-Styles/Admin-End-CSS/ResidentMasterlistStyle.css">
   <style>
     #viewModal .modal-dialog {
-      max-width: 980px;
+      width: min(92vw, 1180px);
+      max-width: 1180px;
+      height: 82vh;
     }
     #viewModal .modal-content {
       border: 1px solid #e5e7eb;
       border-radius: 12px;
       overflow: hidden;
+      height: 100%;
     }
     #viewModal .modal-header {
       border-bottom: 1px solid #e5e7eb;
@@ -28,14 +31,229 @@ require_once __DIR__ . '/../includes/admin_guard.php';
       display: grid;
       gap: 12px;
     }
-    #viewModal .tracker-profile-section {
-      border: 1px solid #edf2f7;
+    #viewModal .modal-body {
+      overflow-y: auto;
+      overflow-x: hidden;
+      min-height: 0;
+    }
+    #viewModal .tracker-doc-highlight {
+      border: 1px solid #fde68a;
+      background: #fffbeb;
+      color: #92400e;
       border-radius: 10px;
-      background: #fff;
+      padding: 10px 12px;
+      font-weight: 700;
+    }
+    #viewModal .tracker-form-section {
+      border-top: 1px solid #e5e7eb;
+      padding-top: 10px;
+      margin-top: 4px;
+    }
+    #viewModal .tracker-form-section-title {
+      margin: 2px 0 10px;
+      font-size: 1rem;
+      font-weight: 700;
+      color: #1f2937;
+    }
+    #viewModal .tracker-form-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 10px 12px;
+    }
+    #viewModal .tracker-form-grid.cols-4 {
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+    }
+    #viewModal .tracker-form-grid.cols-1 {
+      grid-template-columns: 1fr;
+    }
+    #viewModal .tracker-form-field {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    #viewModal .tracker-form-label {
+      margin: 0;
+      font-size: .76rem;
+      color: #6b7280;
+      font-weight: 700;
+      text-transform: none;
+      letter-spacing: 0;
+    }
+    #viewModal .tracker-form-value {
+      min-height: 38px;
+      border: 1px solid #dbe0e6;
+      border-radius: 8px;
+      background: #f8fafc;
+      padding: 8px 10px;
+      font-size: .92rem;
+      color: #111827;
+      font-weight: 500;
+      word-break: break-word;
+    }
+    #viewModal .doc-preview-shell {
+      display: grid;
+      place-items: center;
+      padding: 4px 0 14px;
+    }
+    #viewModal .doc-preview-stage {
+      border: 1px solid #d9dee6;
+      border-radius: 10px;
+      background:
+        linear-gradient(135deg, #f8fafc 0%, #eef2f7 100%);
       padding: 12px;
     }
-    #viewModal .tracker-profile-section h6 {
+    #viewModal .doc-preview-label {
+      display: inline-block;
+      margin-bottom: 10px;
+      padding: 4px 10px;
+      border-radius: 999px;
+      background: #111827;
+      color: #fff;
+      font-size: .72rem;
+      font-weight: 700;
+      letter-spacing: .02em;
+    }
+    #viewModal .doc-preview-paper {
+      width: min(100%, 794px);
+      min-height: 1123px;
+      border: 1px solid #cfd8e3;
+      border-radius: 6px;
+      background: #fff;
+      box-shadow: 0 14px 30px rgba(15, 23, 42, .12);
+      padding: 32px 42px;
+      position: relative;
+    }
+    #viewModal .doc-preview-head {
+      display: grid;
+      grid-template-columns: 100px 1fr 100px;
+      align-items: center;
+      gap: 14px;
+      margin-bottom: 16px;
+    }
+    #viewModal .doc-preview-logo {
+      width: 92px;
+      height: 92px;
+      object-fit: contain;
+      border-radius: 50%;
+      justify-self: center;
+    }
+    #viewModal .doc-preview-head-center {
+      text-align: center;
+      color: #111827;
+      line-height: 1.18;
+    }
+    #viewModal .doc-preview-head-center p {
+      margin: 0;
+      font-size: .78rem;
+    }
+    #viewModal .doc-preview-head-center .rep {
+      font-size: .94rem;
+      font-weight: 800;
+      letter-spacing: .02em;
+    }
+    #viewModal .doc-preview-head-center .barangay {
+      font-size: 1rem;
+      font-weight: 800;
+      letter-spacing: .02em;
+      margin-top: 2px;
+    }
+    #viewModal .doc-preview-head-center .office {
+      font-size: .96rem;
+      font-weight: 800;
+      margin-top: 2px;
+    }
+    #viewModal .doc-preview-head-line {
+      border-bottom: 2px solid #9ca3af;
+      margin-top: 10px;
+    }
+    #viewModal .doc-preview-title {
+      text-align: center;
+      font-size: 1.1rem;
+      font-weight: 800;
+      letter-spacing: .03em;
+      margin: 10px 0 14px;
+      text-transform: uppercase;
+    }
+    #viewModal .doc-preview-body {
+      font-size: .95rem;
+      color: #111827;
+      line-height: 1.55;
+    }
+    #viewModal .doc-preview-body p {
+      margin: 0 0 12px;
+      text-align: justify;
+    }
+    #viewModal .doc-preview-hint {
       margin: 0 0 10px;
+      font-size: .78rem;
+      color: #92400e;
+      background: #fff7d6;
+      border: 1px solid #fde68a;
+      border-radius: 7px;
+      padding: 6px 8px;
+    }
+    #viewModal .doc-editable {
+      background: #fff6bf;
+      border: 1px dashed #d97706;
+      border-radius: 4px;
+      padding: 0 4px;
+      min-width: 24px;
+      display: inline-block;
+      outline: none;
+    }
+    #viewModal .doc-editable:focus {
+      border-style: solid;
+      box-shadow: 0 0 0 2px rgba(245, 158, 11, .2);
+    }
+    #viewModal .doc-preview-signature {
+      margin-top: 22px;
+      display: grid;
+      justify-items: end;
+      color: #111827;
+    }
+    #viewModal .doc-preview-signature .name {
+      margin-top: 28px;
+      font-weight: 700;
+      border-top: 1px solid #1f2937;
+      padding-top: 4px;
+      min-width: 220px;
+      text-align: center;
+    }
+    #viewModal .doc-preview-qr {
+      position: absolute;
+      right: 30px;
+      bottom: 34px;
+      width: 118px;
+      text-align: center;
+      color: #374151;
+      font-size: .68rem;
+      font-weight: 700;
+      letter-spacing: .02em;
+    }
+    #viewModal .doc-preview-qr-box {
+      width: 108px;
+      height: 108px;
+      border: 1px dashed #6b7280;
+      border-radius: 6px;
+      margin: 0 auto 6px;
+      display: grid;
+      place-items: center;
+      background: #f9fafb;
+      overflow: hidden;
+    }
+    #viewModal .doc-preview-qr-box img {
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+    }
+    #viewModal .tracker-profile-section {
+      border: 0;
+      border-radius: 0;
+      background: transparent;
+      padding: 0;
+    }
+    #viewModal .tracker-profile-section h6 {
+      margin: 2px 0 8px;
       font-size: .9rem;
       color: #374151;
       font-weight: 700;
@@ -46,10 +264,10 @@ require_once __DIR__ . '/../includes/admin_guard.php';
       gap: 10px;
     }
     #viewModal .tracker-profile-item {
-      background: #f9fafb;
-      border: 1px solid #eef2f7;
-      border-radius: 10px;
-      padding: 10px 12px;
+      background: transparent;
+      border: 0;
+      border-radius: 0;
+      padding: 2px 0;
     }
     #viewModal .tracker-profile-label {
       margin: 0 0 4px;
@@ -79,6 +297,12 @@ require_once __DIR__ . '/../includes/admin_guard.php';
     }
     @media (max-width: 768px) {
       #viewModal .tracker-profile-grid {
+        grid-template-columns: 1fr;
+      }
+      #viewModal .tracker-form-grid {
+        grid-template-columns: 1fr;
+      }
+      #viewModal .tracker-form-grid.cols-4 {
         grid-template-columns: 1fr;
       }
       #residentProfileModal #div-modalSizing {
@@ -195,11 +419,11 @@ require_once __DIR__ . '/../includes/admin_guard.php';
   </div>
 </div>
 
-<div class="modal fade tracker-profile-modal" id="viewModal" tabindex="-1" aria-hidden="true">
+<div class="modal fade tracker-profile-modal" id="viewModal" tabindex="-1" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
   <div class="modal-dialog modal-xl modal-dialog-centered">
     <div class="modal-content">
       <div class="modal-header">
-        <h5 class="modal-title">Request Details</h5>
+        <h5 class="modal-title" id="viewModalTitle">Certificate Request</h5>
         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
       </div>
       <div class="modal-body">
@@ -207,7 +431,11 @@ require_once __DIR__ . '/../includes/admin_guard.php';
       </div>
       <div class="modal-footer d-flex justify-content-between flex-wrap gap-2">
         <div id="viewModalActions" class="d-flex flex-wrap gap-2"></div>
-        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+        <div class="d-flex flex-wrap gap-2">
+          <button type="button" id="viewModalBackBtn" class="btn btn-outline-secondary d-none">Back</button>
+          <button type="button" id="viewModalNextBtn" class="btn btn-primary">Next</button>
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+        </div>
       </div>
     </div>
   </div>

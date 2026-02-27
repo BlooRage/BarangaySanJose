@@ -165,7 +165,7 @@ $fullAddress = htmlspecialchars(implode(', ', $fullAddressParts), ENT_QUOTES, 'U
                         <div class="form-row">
                             <div class="full-width">
                                 <label class="top-label">Request for <span class="required-asterisk">*</span></label>
-                                <select name="request_purpose" required>
+                                <select name="purpose" required>
                                     <option value="">Select Purpose</option>
                                     <option value="Scholarship">Scholarship</option>
                                     <option value="Employment">Employment</option>

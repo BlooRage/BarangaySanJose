@@ -98,7 +98,7 @@ require_once __DIR__ . '/includes/resident_access_guard.php';
   <div class="modal-dialog modal-lg modal-dialog-centered">
     <div class="modal-content">
       <div class="modal-header">
-        <h5 class="modal-title">Request Details</h5>
+        <h5 class="modal-title" id="viewModalTitle">Certificate Request</h5>
         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
       </div>
       <div class="modal-body">
@@ -146,6 +146,7 @@ require_once __DIR__ . '/includes/resident_access_guard.php';
   const proofWrap = document.getElementById('proofWrap');
   const payError = document.getElementById('payError');
   const viewModal = new bootstrap.Modal(document.getElementById('viewModal'));
+  const viewModalTitle = document.getElementById('viewModalTitle');
   const viewDetailsBody = document.getElementById('viewDetailsBody');
   const paymentProofModal = new bootstrap.Modal(document.getElementById('paymentProofModal'));
   const paymentProofWrap = document.getElementById('paymentProofWrap');
@@ -277,6 +278,10 @@ require_once __DIR__ . '/includes/resident_access_guard.php';
             html += `<tr><th>${escapeHtml(key)}</th><td>${escapeHtml(payload[key])}</td></tr>`;
           });
           viewDetailsBody.innerHTML = html || '<tr><td class="text-muted">No details.</td></tr>';
+          if (viewModalTitle) {
+            const requestId = String(row.request_id || '').trim();
+            viewModalTitle.textContent = requestId ? `Certificate Request (#${requestId})` : 'Certificate Request';
+          }
           viewModal.show();
         });
       });
