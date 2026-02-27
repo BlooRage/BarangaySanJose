@@ -63,6 +63,9 @@ require_once __DIR__ . '/../includes/admin_guard.php';
     #viewModal .tracker-form-grid.cols-4 {
       grid-template-columns: repeat(4, minmax(0, 1fr));
     }
+    #viewModal .tracker-form-grid.cols-3 {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
     #viewModal .tracker-form-grid.cols-1 {
       grid-template-columns: 1fr;
     }
@@ -449,6 +452,9 @@ require_once __DIR__ . '/../includes/admin_guard.php';
         grid-template-columns: 1fr;
       }
       #viewModal .tracker-form-grid.cols-4 {
+        grid-template-columns: 1fr;
+      }
+      #viewModal .tracker-form-grid.cols-3 {
         grid-template-columns: 1fr;
       }
       #residentProfileModal #div-modalSizing {
