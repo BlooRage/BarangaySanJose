@@ -111,7 +111,7 @@ $fullAddress = htmlspecialchars(implode(', ', $fullAddressParts), ENT_QUOTES, 'U
         <div class="main-head application-card orange-card application-card--muted py-3 my-5 rounded">
             <div class="main-head-content">
             <a href="<?= htmlspecialchars($baseUrl) ?>/Resident-End/Clearances/ClearancesLandingPage.php" class="back-link">< Go Back</a>
-            <h1 class="form-title">Application for Barangay Business Clearance</h1>
+            <h1 class="form-title">Barangay Business Clearance</h1>
             <p class="form-subtitle">All fields marked with <span class="required-asterisk">*</span> are required</p>
 
             <form action="#" method="POST">
