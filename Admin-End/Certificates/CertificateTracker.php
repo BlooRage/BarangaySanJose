@@ -123,6 +123,137 @@ require_once __DIR__ . '/../includes/admin_guard.php';
       padding: 32px 42px;
       position: relative;
     }
+    #viewModal .doc-preview-paper.doc-preview-paper--indigency {
+      font-family: "Times New Roman", Times, serif;
+      padding: 28px 46px 36px;
+    }
+    #viewModal .doc-preview-paper.doc-preview-paper--indigency .doc-preview-head-center p {
+      font-size: .88rem;
+      line-height: 1.08;
+    }
+    #viewModal .doc-preview-paper.doc-preview-paper--indigency .doc-preview-head-center .rep {
+      font-size: 1.02rem;
+      letter-spacing: .01em;
+    }
+    #viewModal .doc-preview-paper.doc-preview-paper--indigency .doc-preview-head-center .barangay {
+      font-size: 1.18rem;
+      letter-spacing: .01em;
+    }
+    #viewModal .doc-preview-paper.doc-preview-paper--indigency .doc-preview-head-center .doc-head-office {
+      font-size: 1.06rem;
+      font-weight: 700;
+      letter-spacing: .01em;
+      line-height: 1.1;
+      border: 0 !important;
+      border-left: 0 !important;
+      box-shadow: none !important;
+      padding: 0 !important;
+      margin-left: 0 !important;
+      text-indent: 0 !important;
+      background: transparent !important;
+    }
+    #viewModal .doc-preview-paper.doc-preview-paper--indigency .doc-preview-head-center .doc-head-office::before,
+    #viewModal .doc-preview-paper.doc-preview-paper--indigency .doc-preview-head-center .doc-head-office::after {
+      content: none !important;
+      display: none !important;
+    }
+    #viewModal .doc-preview-paper.doc-preview-paper--indigency .doc-preview-title {
+      font-size: 1.9rem;
+      margin: 8px 0 16px;
+      letter-spacing: 0;
+    }
+    #viewModal .doc-preview-paper.doc-preview-paper--indigency .doc-preview-title--indigency {
+      margin: 14px 0 20px;
+      text-align: center;
+      font-family: Arial, Helvetica, sans-serif;
+      text-transform: uppercase;
+      line-height: 1.2;
+    }
+    #viewModal .doc-preview-paper.doc-preview-paper--indigency .doc-preview-title--indigency .office {
+      font-size: 17px;
+      font-weight: 800;
+      letter-spacing: .01em;
+    }
+    #viewModal .doc-preview-paper.doc-preview-paper--indigency .doc-preview-title--indigency .certificate {
+      margin-top: 8px;
+      font-size: 12px;
+      font-weight: 800;
+      letter-spacing: .01em;
+    }
+    #viewModal .doc-preview-paper.doc-preview-paper--indigency .doc-preview-body {
+      font-size: 1.08rem;
+      line-height: 1.75;
+    }
+    #viewModal .doc-preview-paper.doc-preview-paper--indigency .doc-preview-body p {
+      margin: 0 0 16px;
+    }
+    #viewModal .doc-preview-paper.doc-preview-paper--indigency .doc-preview-body {
+      font-size: 1.02rem;
+      line-height: 1.72;
+      text-align: justify;
+      margin-top: 4px;
+    }
+    #viewModal .doc-preview-paper.doc-preview-paper--indigency .doc-preview-signature {
+      position: absolute;
+      right: 66px;
+      bottom: 300px;
+      margin-top: 0;
+      justify-items: center;
+      text-align: center;
+    }
+    #viewModal .doc-preview-paper.doc-preview-paper--indigency .doc-preview-signature .name {
+      min-width: 260px;
+      margin-top: 0;
+      padding-top: 6px;
+    }
+    #viewModal .doc-preview-paper.doc-preview-paper--indigency .doc-preview-issuedby {
+      position: absolute;
+      left: 48px;
+      bottom: 292px;
+      font-size: .95rem;
+      line-height: 1.35;
+      text-align: left;
+    }
+    #viewModal .doc-preview-paper.doc-preview-paper--indigency .doc-preview-footer {
+      position: absolute;
+      width: 68%;
+      left: 16%;
+      bottom: 64px;
+      font-family: Arial, Helvetica, sans-serif;
+      font-size: .78rem;
+      text-align: center;
+      font-style: italic;
+      color: #111827;
+    }
+    #viewModal .doc-preview-paper.doc-preview-paper--indigency .doc-preview-qr {
+      right: 34px;
+      bottom: 56px;
+      width: 92px;
+      font-size: 0;
+    }
+    #viewModal .doc-preview-paper.doc-preview-paper--indigency .doc-preview-qr-box {
+      width: 84px;
+      height: 84px;
+      border-style: solid;
+    }
+    #viewModal .doc-preview-paper.doc-preview-paper--indigency .doc-to-block {
+      display: grid;
+      grid-template-columns: 56px 18px 1fr;
+      align-items: start;
+      margin: 10px 0 18px;
+      column-gap: 4px;
+    }
+    #viewModal .doc-preview-paper.doc-preview-paper--indigency .doc-to-lines {
+      padding-top: 2px;
+    }
+    #viewModal .doc-preview-paper.doc-preview-paper--indigency .doc-to-lines .line {
+      display: block;
+      width: 320px;
+      max-width: 100%;
+      border-bottom: 2px solid #1f2937;
+      margin: 0 0 10px;
+      height: 0;
+    }
     #viewModal .doc-preview-head {
       display: grid;
       grid-template-columns: 100px 1fr 100px;
@@ -157,10 +288,21 @@ require_once __DIR__ . '/../includes/admin_guard.php';
       letter-spacing: .02em;
       margin-top: 2px;
     }
-    #viewModal .doc-preview-head-center .office {
+    #viewModal .doc-preview-head-center .doc-head-office {
       font-size: .96rem;
       font-weight: 800;
       margin-top: 2px;
+      border: 0 !important;
+      border-left: 0 !important;
+      box-shadow: none !important;
+      padding: 0 !important;
+      text-indent: 0 !important;
+      background: transparent !important;
+    }
+    #viewModal .doc-preview-head-center .doc-head-office::before,
+    #viewModal .doc-preview-head-center .doc-head-office::after {
+      content: none !important;
+      display: none !important;
     }
     #viewModal .doc-preview-head-line {
       border-bottom: 2px solid #9ca3af;
@@ -204,6 +346,10 @@ require_once __DIR__ . '/../includes/admin_guard.php';
     #viewModal .doc-editable:focus {
       border-style: solid;
       box-shadow: 0 0 0 2px rgba(245, 158, 11, .2);
+    }
+    #viewModal .doc-editable-multiline {
+      white-space: pre-line;
+      min-width: 280px;
     }
     #viewModal .doc-preview-signature {
       margin-top: 22px;

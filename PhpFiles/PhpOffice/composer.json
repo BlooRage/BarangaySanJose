@@ -1,0 +1,8 @@
+{
+  "name": "barangay/office-docs",
+  "description": "PhpOffice packages for document templating and conversion pipeline",
+  "type": "project",
+  "require": {
+    "phpoffice/phpword": "^1.1"
+  }
+}

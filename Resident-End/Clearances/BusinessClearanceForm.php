@@ -17,14 +17,22 @@ if (!isset($baseUrl)) {
 <?php
 $allowUnregistered = false;
 require_once __DIR__ . "/../includes/resident_access_guard.php";
+<<<<<<< Updated upstream
 
 require_once __DIR__ . "/../../PhpFiles/GET/getResidentProfile.php";
 
 $data = getResidentProfileData($conn, $_SESSION['user_id']);
+=======
+require_once __DIR__ . "/../../PhpFiles/GET/getResidentProfile.php";
+
+$userId = (string)($_SESSION['user_id'] ?? '');
+$data = getResidentProfileData($conn, $userId);
+>>>>>>> Stashed changes
 $residentinformationtbl = $data['residentinformationtbl'] ?? [];
 $residentaddresstbl = $data['residentaddresstbl'] ?? [];
 $useraccountstbl = $data['useraccountstbl'] ?? [];
 
+<<<<<<< Updated upstream
 $firstName = htmlspecialchars($residentinformationtbl['firstname'] ?? '', ENT_QUOTES, 'UTF-8');
 $lastName = htmlspecialchars($residentinformationtbl['lastname'] ?? '', ENT_QUOTES, 'UTF-8');
 $middleName = htmlspecialchars($residentinformationtbl['middlename'] ?? '', ENT_QUOTES, 'UTF-8');
@@ -90,6 +98,16 @@ if ($isLotBlockSystem) {
 }
 
 $fullAddress = htmlspecialchars(implode(', ', $fullAddressParts), ENT_QUOTES, 'UTF-8');
+=======
+$ownerLastName = htmlspecialchars((string)($residentinformationtbl['lastname'] ?? ''), ENT_QUOTES, 'UTF-8');
+$ownerFirstName = htmlspecialchars((string)($residentinformationtbl['firstname'] ?? ''), ENT_QUOTES, 'UTF-8');
+$ownerMiddleName = htmlspecialchars((string)($residentinformationtbl['middlename'] ?? ''), ENT_QUOTES, 'UTF-8');
+$ownerSuffix = (string)($residentinformationtbl['suffix'] ?? '');
+$ownerPhone = htmlspecialchars((string)($useraccountstbl['phone_number'] ?? ''), ENT_QUOTES, 'UTF-8');
+$ownerUnitNumber = htmlspecialchars((string)($residentaddresstbl['unit_number'] ?? ''), ENT_QUOTES, 'UTF-8');
+$ownerHouseNumber = htmlspecialchars((string)($residentaddresstbl['street_number'] ?? ''), ENT_QUOTES, 'UTF-8');
+$ownerStreetName = htmlspecialchars((string)($residentaddresstbl['street_name'] ?? ''), ENT_QUOTES, 'UTF-8');
+>>>>>>> Stashed changes
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -118,6 +136,7 @@ $fullAddress = htmlspecialchars(implode(', ', $fullAddressParts), ENT_QUOTES, 'U
                 
                 <h2 class="section-title text-center text-dark">Owner's Information</h2>
                 <div class="form-row">
+<<<<<<< Updated upstream
                     <div class="input-stack"><label class="top-label">Last Name<span class="required-asterisk">*</span></label><input type="text" name="o_ln" required readonly value="<?php echo $lastName; ?>"></div>
                     <div class="input-stack"><label class="top-label">First Name<span class="required-asterisk">*</span></label><input type="text" name="o_fn" required readonly value="<?php echo $firstName; ?>"></div>
                     <div class="input-stack"><label class="top-label">Middle Name</label><input type="text" name="o_mn" readonly value="<?php echo $middleName; ?>"></div>
@@ -139,6 +158,29 @@ $fullAddress = htmlspecialchars(implode(', ', $fullAddressParts), ENT_QUOTES, 'U
                         <div class="input-stack">
                             <label class="top-label">Full Address <span class="required-asterisk">*</span></label>
                             <input type="text" name="owner_full_address" readonly value="<?php echo $fullAddress; ?>">
+=======
+                    <div class="input-stack"><label class="top-label">Last Name<span class="required-asterisk">*</span></label><input type="text" name="o_ln" required value="<?php echo $ownerLastName; ?>"></div>
+                    <div class="input-stack"><label class="top-label">First Name<span class="required-asterisk">*</span></label><input type="text" name="o_fn" required value="<?php echo $ownerFirstName; ?>"></div>
+                    <div class="input-stack"><label class="top-label">Middle Name</label><input type="text" name="o_mn" value="<?php echo $ownerMiddleName; ?>"></div>
+                    <div class="input-stack"><label class="top-label">Suffix</label><select name="o_sfx"><option value="" <?php echo ($ownerSuffix === '') ? 'selected' : ''; ?>>None</option><option value="Jr." <?php echo ($ownerSuffix === 'Jr.') ? 'selected' : ''; ?>>Jr.</option><option value="Sr." <?php echo ($ownerSuffix === 'Sr.') ? 'selected' : ''; ?>>Sr.</option><option value="III" <?php echo ($ownerSuffix === 'III') ? 'selected' : ''; ?>>III</option><option value="IV" <?php echo ($ownerSuffix === 'IV') ? 'selected' : ''; ?>>IV</option></select></div>
+                </div>
+                <div class="form-row"><div class="full-width"><div class="input-stack"><label class="top-label">Contact Number</label><input type="text" name="o_phone" value="<?php echo $ownerPhone; ?>"></div></div></div>
+                <div id="ownerAddressWrapper" class="form-row">
+                    <div class="full-width">
+                        <div class="row mb-3">
+                            <div class="col-md-4">
+                                <label class="top-label" for="owner_unit_number">Unit / Apartment Number</label>
+                                <input type="text" id="owner_unit_number" name="owner_unit_number" value="<?php echo $ownerUnitNumber; ?>">
+                            </div>
+                            <div class="col-md-4">
+                                <label class="top-label" for="owner_house_number">House Number <span class="required-asterisk">*</span></label>
+                                <input type="text" id="owner_house_number" name="owner_house_number" required value="<?php echo $ownerHouseNumber; ?>">
+                            </div>
+                            <div class="col-md-4">
+                                <label class="top-label" for="owner_street_name">Street Name <span class="required-asterisk">*</span></label>
+                                <input type="text" id="owner_street_name" name="owner_street_name" required value="<?php echo $ownerStreetName; ?>">
+                            </div>
+>>>>>>> Stashed changes
                         </div>
                     </div>
                 </div>
@@ -160,6 +202,7 @@ $fullAddress = htmlspecialchars(implode(', ', $fullAddressParts), ENT_QUOTES, 'U
                     </div>
                 </div>
 
+<<<<<<< Updated upstream
                 <div class="form-row"><div class="full-width"><div class="input-stack"><label class="top-label">Name of Business<span class="required-asterisk">*</span></label><input type="text" name="b_name" required></div></div></div>
                 <div id="businessLocationWrapper" class="form-row">
                     <div class="full-width">
@@ -178,6 +221,10 @@ $fullAddress = htmlspecialchars(implode(', ', $fullAddressParts), ENT_QUOTES, 'U
                             </div>
                         </div>
                     </div>
+=======
+                <div class="form-row">
+                    <div class="full-width"><div class="input-stack"><label class="top-label">Contact Number</label><input type="text" name="b_contact_1" value="<?php echo $ownerPhone; ?>"></div></div>
+>>>>>>> Stashed changes
                 </div>
                 <div class="form-row">
                     <div class="full-width">
@@ -319,7 +366,7 @@ $fullAddress = htmlspecialchars(implode(', ', $fullAddressParts), ENT_QUOTES, 'U
                         <div class="input-stack"><label class="top-label">Last Name<span class="required-asterisk">*</span></label><input type="text" name="ro_ln"></div>
                         <div class="input-stack"><label class="top-label">First Name<span class="required-asterisk">*</span></label><input type="text" name="ro_fn"></div>
                         <div class="input-stack"><label class="top-label">Middle Name</label><input type="text" name="ro_mn"></div>
-                        <div class="input-stack"><label class="top-label">Suffix</label><select name="ro_sfx"><option value=\"\">None</option><option value=\"Jr.\">Jr.</option><option value=\"Sr.\">Sr.</option><option value=\"III\">III</option><option value=\"IV\">IV</option></select></div>
+                        <div class="input-stack"><label class="top-label">Suffix</label><select name="ro_sfx"><option value="">None</option><option value="Jr.">Jr.</option><option value="Sr.">Sr.</option><option value="III">III</option><option value="IV">IV</option></select></div>
                     </div>
                 </div>
 
@@ -339,7 +386,6 @@ $fullAddress = htmlspecialchars(implode(', ', $fullAddressParts), ENT_QUOTES, 'U
     <script src="../../JS-Script-Files/Resident-End/Clearances/businessClearanceScript.js"></script>
 </body>
 </html>
-
 
 
 

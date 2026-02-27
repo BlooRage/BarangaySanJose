@@ -1031,6 +1031,7 @@ if (isset($_GET['fetch'])) {
             (s.status_name <> 'Archived' OR s.status_name IS NULL)
             AND (
               r.resident_id LIKE ?
+              OR r.user_id LIKE ?
               OR r.firstname LIKE ?
               OR r.lastname LIKE ?
               OR r.middlename LIKE ?
@@ -1053,7 +1054,8 @@ if (isset($_GET['fetch'])) {
     if ($search !== '') {
         $like = "%$search%";
         $stmt->bind_param(
-            "ssssssssss",
+            "sssssssssss",
+            $like,
             $like,
             $like,
             $like,
