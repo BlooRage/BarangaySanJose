@@ -499,32 +499,23 @@ body {
 }
 
 .password-reqs {
-    width: min(320px, calc(100% - 8px));
+    width: 100%;
+    max-width: 100%;
     font-size: 0.8rem;
     color: #6c757d;
     background: #ffffff;
     border: 1px solid #d7dce1;
     border-radius: 14px;
     padding: 10px 12px;
-    position: absolute;
-    top: 0;
-    left: calc(100% + 10px);
-    z-index: 50;
-    box-shadow: 0 10px 24px rgba(15, 23, 42, 0.16);
+    position: static;
+    margin-top: 8px;
+    z-index: auto;
+    box-shadow: none;
     animation: reqBubbleIn 140ms ease-out;
 }
 
 .password-reqs::before {
-    content: "";
-    position: absolute;
-    top: 14px;
-    left: -8px;
-    width: 14px;
-    height: 14px;
-    background: #ffffff;
-    border-left: 1px solid #d7dce1;
-    border-top: 1px solid #d7dce1;
-    transform: rotate(-45deg);
+    display: none;
 }
 
 .password-reqs-title {
@@ -563,12 +554,12 @@ body {
 }
 
 .password-reqs-list li.req-invalid {
-    color: #dc3545;
+    color: #0d6efd;
 }
 
 .password-reqs-list li.req-invalid::before {
     content: "✗";
-    color: #dc3545;
+    color: #0d6efd;
 }
 
 .password-reqs.is-hidden {
@@ -588,14 +579,7 @@ body {
 
 @media (max-width: 1200px) {
     .password-reqs {
-        left: 0;
-        top: calc(100% + 8px);
-    }
-
-    .password-reqs::before {
-        top: -8px;
-        left: 16px;
-        transform: rotate(45deg);
+        margin-top: 8px;
     }
 }
 
