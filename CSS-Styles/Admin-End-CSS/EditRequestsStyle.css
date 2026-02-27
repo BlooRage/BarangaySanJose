@@ -1,31 +1,38 @@
 .status-pill {
     display: inline-flex;
     align-items: center;
+    justify-content: center;
     gap: 6px;
-    padding: 4px 10px;
-    border-radius: 8px;
-    font-size: 12px;
-    font-weight: 600;
-    letter-spacing: 0.2px;
+    padding: 6px 15px;
+    border-radius: 15px;
+    font-size: 0.82rem;
+    font-weight: 700;
+    letter-spacing: 0;
     width: fit-content;
+    line-height: 1;
 }
 
 .status-pill.pending {
-    color: #664d03;
-    background: #fff3cd;
-    border: 1px solid #614a05;
+    color: #6c5a06;
+    background: #f4e8b7;
+    border: 2px solid #e9db9f;
 }
 
 .status-pill.approved {
-    color: #0f5132;
-    background: #d1e7dd;
-    border: 1px solid #125b3a;
+    color: #18613f;
+    background: #d4e8db;
+    border: 2px solid #c0dac9;
 }
 
 .status-pill.denied {
-    color: #842029;
-    background: #f8d7da;
-    border: 1px solid #6a0c15;
+    color: #8f2932;
+    background: #e8cfd3;
+    border: 2px solid #e0bcc2;
+}
+
+#table-editRequests th:nth-child(5),
+#table-editRequests td:nth-child(5) {
+    text-align: center;
 }
 
 .request-card {
@@ -181,14 +188,13 @@
 .status-filter-btn.has-notif {
     position: relative;
     overflow: visible;
-    padding-right: 0;
 }
 
 .status-filter-btn.has-notif .pending-count-badge {
     position: absolute;
-    top: 0;
-    right: 0;
-    transform: translate(45%, -45%);
+    top: -6px;
+    right: -8px;
+    transform: none;
 }
 
 .admin-list-actions--linear {
@@ -227,6 +233,8 @@
 
 .edit-requests-shell .status-filter-btn {
     border-radius: 10px;
+    border-width: 1px;
+    overflow: visible;
 }
 
 .edit-requests-shell .status-filter-btn[data-filter="ALL"] {

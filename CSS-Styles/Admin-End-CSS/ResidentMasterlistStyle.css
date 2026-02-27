@@ -284,6 +284,43 @@ html, body {
 .bg-statusDeactivated { background-color: #dc3545 !important; }
 .bg-statusDeleted { background-color: #343a40 !important; }
 
+.status-pill {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    padding: 6px 15px;
+    border-radius: 15px;
+    font-size: 0.85rem;
+    font-weight: 700;
+    letter-spacing: 0;
+    width: fit-content;
+    line-height: 1;
+}
+
+.status-pill.pending {
+    color: #6c5a06;
+    background: #f4e8b7;
+    border: 2px solid #e9db9f;
+}
+
+.status-pill.approved {
+    color: #18613f;
+    background: #d4e8db;
+    border: 2px solid #c0dac9;
+}
+
+.status-pill.denied {
+    color: #8f2932;
+    background: #e8cfd3;
+    border: 2px solid #e0bcc2;
+}
+
+#table-appData th:nth-child(3),
+#table-appData td:nth-child(3) {
+    text-align: center;
+}
+
 .div-hide { display: none; }
 
 /* ===== Documents Modal UI ===== */

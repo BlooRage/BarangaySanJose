@@ -12,6 +12,12 @@ document.addEventListener("DOMContentLoaded", () => {
     "NotVerified": "Not Verified"
   };
 
+  const statusPillClassMap = {
+    "VerifiedResident": "approved",
+    "PendingVerification": "pending",
+    "NotVerified": "denied"
+  };
+
   const AUTO_REFRESH_SECONDS = 60;
   let autoRefreshSecondsLeft = AUTO_REFRESH_SECONDS;
   let autoRefreshInterval = null;
@@ -450,18 +456,14 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     pageRows.forEach(row => {
-      const badge =
-        row.status === "VerifiedResident" ? "success" :
-        row.status === "PendingVerification" ? "warning text-dark" :
-        row.status === "NotVerified" ? "danger" : "secondary";
-
       const tr = document.createElement("tr");
       const canArchive = row.status !== "NotVerified" && row.status !== "PendingVerification";
       const canViewDocs = row.status === "PendingVerification";
+      const statusPillClass = statusPillClassMap[row.status] || "";
       tr.innerHTML = `
         <td class="fw-bold">${row.resident_id}</td>
         <td>${row.full_name}</td>
-        <td><span class="badge bg-${badge}">${statusDisplayMap[row.status] ?? "UNSET"}</span></td>
+        <td><span class="status-pill ${statusPillClass}">${statusDisplayMap[row.status] ?? "UNSET"}</span></td>
         <td class="d-flex gap-1">
           <button type="button" class="btn btn-primary btn-sm text-white viewEntryBtn">View</button>
           ${canViewDocs ? `<button type="button" class="btn btn-info btn-sm text-white viewDocsBtn">Documents</button>` : ""}

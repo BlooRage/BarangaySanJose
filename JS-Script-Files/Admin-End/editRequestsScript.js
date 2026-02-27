@@ -37,11 +37,18 @@ document.addEventListener("DOMContentLoaded", () => {
     return statusName;
   };
 
-  const statusBadgeClass = (statusText) => {
+  const modalStatusBadgeClass = (statusText) => {
     if (statusText === "Approved") return "bg-success text-white";
     if (statusText === "Pending") return "bg-warning text-white";
     if (statusText === "Denied") return "bg-danger text-white";
     return "bg-secondary text-white";
+  };
+
+  const statusPillClass = (statusText) => {
+    if (statusText === "Approved") return "approved";
+    if (statusText === "Pending") return "pending";
+    if (statusText === "Denied") return "denied";
+    return "";
   };
 
   const formatDate = (value) => {
@@ -101,7 +108,7 @@ document.addEventListener("DOMContentLoaded", () => {
             <td class="text-capitalize">${row.request_type || "—"}</td>
             <td>${formatDate(row.created_at)}</td>
             <td>
-              <span class="badge ${statusBadgeClass(statusText)}">${statusText}</span>
+              <span class="status-pill ${statusPillClass(statusText)}">${statusText}</span>
             </td>
             <td>
               <div class="d-flex gap-2">
@@ -407,7 +414,7 @@ document.addEventListener("DOMContentLoaded", () => {
             const statusText = statusLabel(req.status_name);
             if (badgeRequestStatus) {
               badgeRequestStatus.textContent = statusText;
-              badgeRequestStatus.className = `badge ${statusBadgeClass(statusText)}`;
+              badgeRequestStatus.className = `badge ${modalStatusBadgeClass(statusText)}`;
             }
 
             const currentItems = [];

@@ -10,7 +10,7 @@
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="../CSS-Styles/Admin-End-CSS/AdminDashboardStyle.css">
     <link rel="stylesheet" href="../CSS-Styles/Admin-End-CSS/ResidentMasterlistStyle.css?v=20260219-2">
-    <link rel="stylesheet" href="../CSS-Styles/Admin-End-CSS/EditRequestsStyle.css?v=20260222-1">
+    <link rel="stylesheet" href="../CSS-Styles/Admin-End-CSS/EditRequestsStyle.css?v=20260227-3">
 </head>
 <body>
 <div class="d-flex" style="min-height: 100vh;">
@@ -28,14 +28,14 @@ include "includes/sidebar.php";
         <hr><br>
 
         <div id="div-tableContainer" class="bg-white p-4 pt-3 rounded-4 shadow-sm border edit-requests-shell">
-	            <div class="admin-list-toolbar mb-3 pt-2">
-	                <div class="admin-list-tabs pt-2">
-	                    <button class="btn btn-outline-primary btn-sm status-filter-btn active fw-bold" data-filter="ALL">&nbsp;&nbsp;All&nbsp;&nbsp;</button>
-	                    <button class="btn btn-outline-secondary btn-sm status-filter-btn fw-bold" data-filter="Approved">&nbsp;&nbsp;Approved&nbsp;&nbsp;</button>
-	                    <button class="btn btn-outline-secondary btn-sm status-filter-btn fw-bold" data-filter="Denied">&nbsp;&nbsp;Denied&nbsp;&nbsp;</button>
-                        <button class="btn btn-outline-secondary btn-sm status-filter-btn text-center has-notif fw-bold " data-filter="Pending">
-	                        &nbsp;&nbsp;Pending&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
-	                        <span id="pendingRequestBadge" class="pending-count-badge d-none text-center fw-bold">0</span>
+	            <div class="admin-list-toolbar mb-3">
+	                <div class="admin-list-tabs">
+	                    <button class="btn btn-outline-primary btn-sm status-filter-btn active fw-bold" data-filter="ALL">All</button>
+	                    <button class="btn btn-outline-secondary btn-sm status-filter-btn fw-bold" data-filter="Approved">Approved</button>
+	                    <button class="btn btn-outline-secondary btn-sm status-filter-btn fw-bold" data-filter="Denied">Denied</button>
+                        <button class="btn btn-outline-secondary btn-sm status-filter-btn has-notif fw-bold" data-filter="Pending">
+	                        Pending
+	                        <span id="pendingRequestBadge" class="pending-count-badge d-none">0</span>
 	                    </button>
 	                </div>
 	
@@ -279,6 +279,6 @@ include "includes/sidebar.php";
   };
 </script>
 <script src="../JS-Script-Files/Admin-End/tableColumnsGeneric.js?v=20260215-1"></script>
-<script src="../JS-Script-Files/Admin-End/editRequestsScript.js?v=20260219-1"></script>
+<script src="../JS-Script-Files/Admin-End/editRequestsScript.js?v=20260227-1"></script>
 </body>
 </html>
