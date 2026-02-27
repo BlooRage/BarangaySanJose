@@ -112,7 +112,7 @@ $fullAddress = htmlspecialchars(implode(', ', $fullAddressParts), ENT_QUOTES, 'U
             <div class="main-head-content">
             <a href="<?= htmlspecialchars($baseUrl) ?>/Resident-End/Clearances/ClearancesLandingPage.php" class="back-link">< Go Back</a>
             <h1 class="form-title">Application for Barangay Business Clearance</h1>
-            <p class="form-subtitle tight-subtitle">All fields marked with <span class="required-asterisk">*</span> are required</p>
+            <p class="form-subtitle">All fields marked with <span class="required-asterisk">*</span> are required</p>
 
             <form action="#" method="POST">
                 
@@ -204,7 +204,8 @@ $fullAddress = htmlspecialchars(implode(', ', $fullAddressParts), ENT_QUOTES, 'U
                     </div>
                     <div>
                         <label class="top-label">Contact Number</label>
-                        <input type="text" name="b_contact_1">
+                        <input type="text" id="business_contact_number" name="b_contact_1" inputmode="numeric" maxlength="11">
+                        <div id="business_contact_number_error" class="text-danger small d-none">Invalid contact number</div>
                     </div>
                 </div><div class="form-row">
                     <div class="full-width">
@@ -249,6 +250,7 @@ $fullAddress = htmlspecialchars(implode(', ', $fullAddressParts), ENT_QUOTES, 'U
                             <div class="input-stack">
                                 <label class="top-label" for="validIdNumber">Valid ID Number <span class="required-asterisk">*</span></label>
                                 <input type="text" id="validIdNumber" name="valid_id_number" placeholder="Enter ID number">
+                                <div id="validIdNumberError" class="text-danger small d-none">Invalid ID number</div>
                             </div>
                         </div>
                     </div>
@@ -295,6 +297,7 @@ $fullAddress = htmlspecialchars(implode(', ', $fullAddressParts), ENT_QUOTES, 'U
                             <div class="input-stack">
                                 <label class="top-label" for="proofAddressNumber">Document Number <span class="required-asterisk">*</span></label>
                                 <input type="text" id="proofAddressNumber" name="proof_address_number" placeholder="Enter document number">
+                                <div id="proofAddressNumberError" class="text-danger small d-none">Invalid document number</div>
                             </div>
                         </div>
                     </div>
@@ -339,7 +342,6 @@ $fullAddress = htmlspecialchars(implode(', ', $fullAddressParts), ENT_QUOTES, 'U
     <script src="../../JS-Script-Files/Resident-End/Clearances/businessClearanceScript.js"></script>
 </body>
 </html>
-
 
 
 

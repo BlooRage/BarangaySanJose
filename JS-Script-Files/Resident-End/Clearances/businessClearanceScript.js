@@ -10,15 +10,19 @@
   const validIdFile = document.getElementById("validIdFile");
   const validIdNumberRow = document.getElementById("validIdNumberRow");
   const validIdNumber = document.getElementById("validIdNumber");
+  const validIdNumberError = document.getElementById("validIdNumberError");
   const businessRegType = document.getElementById("businessRegType");
   const businessRegFile = document.getElementById("businessRegFile");
   const proofAddressType = document.getElementById("proofAddressType");
   const proofAddressFile = document.getElementById("proofAddressFile");
   const proofAddressNumberRow = document.getElementById("proofAddressNumberRow");
   const proofAddressNumber = document.getElementById("proofAddressNumber");
+  const proofAddressNumberError = document.getElementById("proofAddressNumberError");
   const businessPhotoFile = document.getElementById("businessPhotoFile");
   const businessPhotoDropzone = document.getElementById("businessPhotoDropzone");
   const businessPhotoSelectedFile = document.getElementById("businessPhotoSelectedFile");
+  const businessContactNumber = document.getElementById("business_contact_number");
+  const businessContactNumberError = document.getElementById("business_contact_number_error");
   const renterOwnerRequired = renterOwnerDetails
     ? Array.from(renterOwnerDetails.querySelectorAll("input[name='ro_ln'], input[name='ro_fn']"))
     : [];
@@ -46,6 +50,7 @@
     tct: /^(?:TCT|T)?\d{5,10}$/,
     tax_declaration: /^(?:TD)?\d{3,15}$/
   };
+  const contactNumberRegex = /^09\d{9}$/;
 
   const updateNumberRow = (selectEl, rowEl, inputEl) => {
     if (!selectEl || !rowEl || !inputEl) return;
@@ -62,19 +67,29 @@
     inputEl.dataset.regexGroup = selectEl.id;
   };
 
-  const validateNumberInput = (inputEl, regexMap) => {
+  const validateNumberInput = (inputEl, regexMap, errorEl) => {
     if (!inputEl || !inputEl.required) return;
+    const rawValue = inputEl.value.trim();
+    if (rawValue === '') {
+      inputEl.setCustomValidity('');
+      if (errorEl) errorEl.classList.add("d-none");
+      return;
+    }
     const key = inputEl.dataset.regexKey || '';
     const regex = regexMap[key];
     if (!regex) {
       inputEl.setCustomValidity('Please select a valid option.');
+      if (errorEl) errorEl.classList.remove("d-none");
       return;
     }
-    const normalized = normalizeValue(inputEl.value);
-    if (!regex.test(normalized)) {
+    const normalized = normalizeValue(rawValue);
+    const isInvalid = !regex.test(normalized);
+    if (isInvalid) {
       inputEl.setCustomValidity('Please enter a valid number format.');
+      if (errorEl) errorEl.classList.remove("d-none");
     } else {
       inputEl.setCustomValidity('');
+      if (errorEl) errorEl.classList.add("d-none");
     }
   };
 
@@ -126,6 +141,16 @@
     updateNumberRow(validIdType, validIdNumberRow, validIdNumber);
     updateNumberRow(proofAddressType, proofAddressNumberRow, proofAddressNumber);
 
+    if (businessContactNumber) {
+      const rawValue = businessContactNumber.value.trim();
+      const hasValue = rawValue !== "";
+      const isInvalid = hasValue && !contactNumberRegex.test(rawValue);
+      businessContactNumber.setCustomValidity(isInvalid ? "Invalid contact number" : "");
+      if (businessContactNumberError) {
+        businessContactNumberError.classList.toggle("d-none", !isInvalid);
+      }
+    }
+
     if (!isNewApp) {
       [validIdType, businessRegType, proofAddressType].forEach((el) => {
         if (el) el.value = '';
@@ -143,6 +168,8 @@
           el.setCustomValidity('');
         }
       });
+      if (validIdNumberError) validIdNumberError.classList.add("d-none");
+      if (proofAddressNumberError) proofAddressNumberError.classList.add("d-none");
       [validIdNumberRow, proofAddressNumberRow].forEach((row) => {
         if (row) row.classList.add("d-none");
       });
@@ -162,22 +189,23 @@
   form.addEventListener("change", updateState);
   validIdType?.addEventListener("change", () => {
     updateNumberRow(validIdType, validIdNumberRow, validIdNumber);
-    validateNumberInput(validIdNumber, validIdRegexMap);
+    validateNumberInput(validIdNumber, validIdRegexMap, validIdNumberError);
     updateState();
   });
   proofAddressType?.addEventListener("change", () => {
     updateNumberRow(proofAddressType, proofAddressNumberRow, proofAddressNumber);
-    validateNumberInput(proofAddressNumber, proofAddressRegexMap);
+    validateNumberInput(proofAddressNumber, proofAddressRegexMap, proofAddressNumberError);
     updateState();
   });
   validIdNumber?.addEventListener("input", () => {
-    validateNumberInput(validIdNumber, validIdRegexMap);
+    validateNumberInput(validIdNumber, validIdRegexMap, validIdNumberError);
     updateState();
   });
   proofAddressNumber?.addEventListener("input", () => {
-    validateNumberInput(proofAddressNumber, proofAddressRegexMap);
+    validateNumberInput(proofAddressNumber, proofAddressRegexMap, proofAddressNumberError);
     updateState();
   });
+  businessContactNumber?.addEventListener("input", updateState);
   businessPhotoFile?.addEventListener("change", () => {
     renderFile(businessPhotoFile, businessPhotoSelectedFile);
     updateState();
