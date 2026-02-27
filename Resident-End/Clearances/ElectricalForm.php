@@ -300,7 +300,7 @@ $fullAddress = htmlspecialchars(implode(', ', $fullAddressParts), ENT_QUOTES, 'U
                 const hasValue = rawValue !== "";
                 const isInvalid = hasValue && !tctRegex.test(normalized);
                 tctNumberInput.setCustomValidity(isInvalid ? "Invalid TCT number" : "");
-                if (tctError) {
+                if (tctError) { 
                     tctError.classList.toggle("d-none", !isInvalid);
                 }
             }
