@@ -145,17 +145,13 @@ $applicantArea = htmlspecialchars($areaNumber, ENT_QUOTES, 'UTF-8');
                                 <input type="text" name="middle_name" readonly value="<?php echo htmlspecialchars($residentinformationtbl['middlename'] ?? ''); ?>">
                             </div>
 
+                            <?php if (trim((string)($residentinformationtbl['suffix'] ?? '')) !== ''): ?>
                             <div>
                                 <label class="top-label">Suffix</label>
-                                <select name="suffix_name_display" class="text-bg-light" disabled>
-                                    <option value="" <?php echo (($residentinformationtbl['suffix'] ?? '') === '') ? 'selected' : ''; ?>>None</option>
-                                    <option value="Jr." <?php echo (($residentinformationtbl['suffix'] ?? '') === 'Jr.') ? 'selected' : ''; ?>>Jr.</option>
-                                    <option value="Sr." <?php echo (($residentinformationtbl['suffix'] ?? '') === 'Sr.') ? 'selected' : ''; ?>>Sr.</option>
-                                    <option value="III" <?php echo (($residentinformationtbl['suffix'] ?? '') === 'III') ? 'selected' : ''; ?>>III</option>
-                                    <option value="IV" <?php echo (($residentinformationtbl['suffix'] ?? '') === 'IV') ? 'selected' : ''; ?>>IV</option>
-                                </select>
-                                <input type="hidden" name="suffix_name" value="<?php echo htmlspecialchars($residentinformationtbl['suffix'] ?? '', ENT_QUOTES, 'UTF-8'); ?>">
+                                <input type="text" class="text-bg-light" readonly value="<?php echo htmlspecialchars($residentinformationtbl['suffix'] ?? '', ENT_QUOTES, 'UTF-8'); ?>">
                             </div>
+                            <?php endif; ?>
+                            <input type="hidden" name="suffix_name" value="<?php echo htmlspecialchars($residentinformationtbl['suffix'] ?? '', ENT_QUOTES, 'UTF-8'); ?>">
                         </div>
 
                         <div class="form-row">
@@ -529,4 +525,3 @@ $applicantArea = htmlspecialchars($areaNumber, ENT_QUOTES, 'UTF-8');
 </body>
 
 </html>
-

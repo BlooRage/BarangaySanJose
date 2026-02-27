@@ -29,6 +29,26 @@ if (!isset($baseUrl)) {
     }
 }
 ?>
+<?php
+$allowUnregistered = false;
+require_once __DIR__ . "/../includes/resident_access_guard.php";
+require_once __DIR__ . "/../../PhpFiles/GET/getResidentProfile.php";
+
+$userId = (string)($_SESSION['user_id'] ?? '');
+$data = getResidentProfileData($conn, $userId);
+$residentinformationtbl = $data['residentinformationtbl'] ?? [];
+$residentaddresstbl = $data['residentaddresstbl'] ?? [];
+$useraccountstbl = $data['useraccountstbl'] ?? [];
+
+$ownerLastName = htmlspecialchars((string)($residentinformationtbl['lastname'] ?? ''), ENT_QUOTES, 'UTF-8');
+$ownerFirstName = htmlspecialchars((string)($residentinformationtbl['firstname'] ?? ''), ENT_QUOTES, 'UTF-8');
+$ownerMiddleName = htmlspecialchars((string)($residentinformationtbl['middlename'] ?? ''), ENT_QUOTES, 'UTF-8');
+$ownerSuffix = htmlspecialchars((string)($residentinformationtbl['suffix'] ?? ''), ENT_QUOTES, 'UTF-8');
+$ownerPhone = htmlspecialchars((string)($useraccountstbl['phone_number'] ?? ''), ENT_QUOTES, 'UTF-8');
+$ownerUnitNumber = htmlspecialchars((string)($residentaddresstbl['unit_number'] ?? ''), ENT_QUOTES, 'UTF-8');
+$ownerHouseNumber = htmlspecialchars((string)($residentaddresstbl['street_number'] ?? ''), ENT_QUOTES, 'UTF-8');
+$ownerStreetName = htmlspecialchars((string)($residentaddresstbl['street_name'] ?? ''), ENT_QUOTES, 'UTF-8');
+?>
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -62,19 +82,19 @@ if (!isset($baseUrl)) {
                 <div class="form-row">
                     <div class="input-stack">
                         <label class="top-label">Last Name<span class="required-asterisk">*</span></label>
-                        <input type="text" name="owner_last_name" required>
+                        <input type="text" name="owner_last_name" required value="<?php echo $ownerLastName; ?>">
                     </div>
                     <div class="input-stack">
                         <label class="top-label">First Name<span class="required-asterisk">*</span></label>
-                        <input type="text" name="owner_first_name" required>
+                        <input type="text" name="owner_first_name" required value="<?php echo $ownerFirstName; ?>">
                     </div>
                     <div class="input-stack">
                         <label class="top-label">Middle Name</label>
-                        <input type="text" name="owner_middle_name">
+                        <input type="text" name="owner_middle_name" value="<?php echo $ownerMiddleName; ?>">
                     </div>
                     <div class="input-stack">
                         <label class="top-label">Suffix</label>
-                        <input type="text" name="owner_suffix">
+                        <input type="text" name="owner_suffix" value="<?php echo $ownerSuffix; ?>">
                     </div>
                 </div>
 
@@ -82,7 +102,7 @@ if (!isset($baseUrl)) {
                     <div class="contact">
                         <div class="input-stack">
                             <label class="top-label">Contact Number</label>
-                            <input type="text" name="owner_phone">
+                            <input type="text" name="owner_phone" value="<?php echo $ownerPhone; ?>">
                         </div>
                     </div>
                 </div>
@@ -90,20 +110,20 @@ if (!isset($baseUrl)) {
                 <div class="form-row">
                     <div class="full-width">
                         <div class="row mb-3">
-                            <div class="col-md-4">
-                                <label class="top-label" for="owner_unit_number">Unit / Apartment Number</label>
-                                <input type="text" id="owner_unit_number" name="owner_unit_number">
-                            </div>
-                            <div class="col-md-4">
-                                <label class="top-label" for="owner_house_number">House Number <span class="required-asterisk">*</span></label>
-                                <input type="text" id="owner_house_number" name="owner_house_number" required>
-                            </div>
-                            <div class="col-md-4">
-                                <label class="top-label" for="owner_street_name">Street Name <span class="required-asterisk">*</span></label>
-                                <input type="text" id="owner_street_name" name="owner_street_name" required>
+                                <div class="col-md-4">
+                                    <label class="top-label" for="owner_unit_number">Unit / Apartment Number</label>
+                                    <input type="text" id="owner_unit_number" name="owner_unit_number" value="<?php echo $ownerUnitNumber; ?>">
+                                </div>
+                                <div class="col-md-4">
+                                    <label class="top-label" for="owner_house_number">House Number <span class="required-asterisk">*</span></label>
+                                    <input type="text" id="owner_house_number" name="owner_house_number" required value="<?php echo $ownerHouseNumber; ?>">
+                                </div>
+                                <div class="col-md-4">
+                                    <label class="top-label" for="owner_street_name">Street Name <span class="required-asterisk">*</span></label>
+                                    <input type="text" id="owner_street_name" name="owner_street_name" required value="<?php echo $ownerStreetName; ?>">
+                                </div>
                             </div>
                         </div>
-                    </div>
                 </div>
 
                 <div class="form-row">
@@ -134,19 +154,19 @@ if (!isset($baseUrl)) {
                     <div class="form-row">
                         <div class="input-stack">
                             <label class="top-label">Last Name<span class="required-asterisk">*</span></label>
-                            <input type="text" name="d_ln">
+                            <input type="text" name="d_ln" value="<?php echo $ownerLastName; ?>">
                         </div>
                         <div class="input-stack">
                             <label class="top-label">First Name<span class="required-asterisk">*</span></label>
-                            <input type="text" name="d_fn">
+                            <input type="text" name="d_fn" value="<?php echo $ownerFirstName; ?>">
                         </div>
                         <div class="input-stack">
                             <label class="top-label">Middle Name</label>
-                            <input type="text" name="d_mn">
+                            <input type="text" name="d_mn" value="<?php echo $ownerMiddleName; ?>">
                         </div>
                         <div class="input-stack">
                             <label class="top-label">Suffix</label>
-                            <input type="text" name="d_sfx">
+                            <input type="text" name="d_sfx" value="<?php echo $ownerSuffix; ?>">
                         </div>
                     </div>
 
@@ -154,7 +174,7 @@ if (!isset($baseUrl)) {
                         <div class="contact">
                             <div class="input-stack">
                                 <label class="top-label">Contact Number</label>
-                                <input type="text" name="d_phone">
+                                <input type="text" name="d_phone" value="<?php echo $ownerPhone; ?>">
                             </div>
                         </div>
                     </div>
@@ -164,15 +184,15 @@ if (!isset($baseUrl)) {
                             <div class="row mb-3">
                                 <div class="col-md-4">
                                     <label class="top-label" for="driver_unit_number">Unit / Apartment Number</label>
-                                    <input type="text" id="driver_unit_number" name="driver_unit_number">
+                                    <input type="text" id="driver_unit_number" name="driver_unit_number" value="<?php echo $ownerUnitNumber; ?>">
                                 </div>
                                 <div class="col-md-4">
                                     <label class="top-label" for="driver_house_number">House Number <span class="required-asterisk">*</span></label>
-                                    <input type="text" id="driver_house_number" name="driver_house_number" required>
+                                    <input type="text" id="driver_house_number" name="driver_house_number" required value="<?php echo $ownerHouseNumber; ?>">
                                 </div>
                                 <div class="col-md-4">
                                     <label class="top-label" for="driver_street_name">Street Name <span class="required-asterisk">*</span></label>
-                                    <input type="text" id="driver_street_name" name="driver_street_name" required>
+                                    <input type="text" id="driver_street_name" name="driver_street_name" required value="<?php echo $ownerStreetName; ?>">
                                 </div>
                             </div>
                         </div>
@@ -274,7 +294,6 @@ if (!isset($baseUrl)) {
     </script>
 </body>
 </html>
-
 
 
 

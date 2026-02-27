@@ -1,4 +1,18 @@
 <?php
+if (!isset($baseUrl)) {
+    $scriptName = str_replace("\\", "/", (string)($_SERVER['SCRIPT_NAME'] ?? ''));
+    $residentSegmentPos = strpos($scriptName, '/Resident-End/');
+    $baseUrl = '';
+    if ($residentSegmentPos !== false) {
+        $baseUrl = substr($scriptName, 0, $residentSegmentPos);
+    } else {
+        $baseUrl = dirname($scriptName);
+    }
+    $baseUrl = rtrim((string)$baseUrl, '/');
+    if ($baseUrl === '.' || $baseUrl === '/') {
+        $baseUrl = '';
+    }
+}
 $allowUnregistered = false;
 require_once __DIR__ . "/../includes/resident_access_guard.php";
 ?>
@@ -7,7 +21,7 @@ require_once __DIR__ . "/../includes/resident_access_guard.php";
 
 <head>
     <meta charset="UTF-8">
-    <link rel="icon" href="/Images/favicon_sanjose.png?v=20260211">
+    <link rel="icon" href="<?= htmlspecialchars($baseUrl) ?>/Images/favicon_sanjose.png?v=20260211">
     <title>Document Application</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
 
@@ -36,7 +50,7 @@ require_once __DIR__ . "/../includes/resident_access_guard.php";
             <div class="row certificate-grid text-center justify-content-center">
                 <div class="col-md-6 col-lg-4 d-flex">
                     <div class="certificate-card card-action w-100">
-                        <img src="../../icons/dashboard/cohab.png" class="certificate-icon" alt="">
+                        <img src="<?= htmlspecialchars($baseUrl) ?>/Icons/Dashboard/cohab.png" class="certificate-icon" alt="Cohabitation Certificate">
                         <h3>COHABITATION</h3>
                         <p class="certificate-text">
                             Official proof of common-law partnership for legal or insurance claims.
@@ -47,7 +61,7 @@ require_once __DIR__ . "/../includes/resident_access_guard.php";
 
                 <div class="col-md-6 col-lg-4 d-flex">
                     <div class="certificate-card card-action w-100">
-                        <img src="../../icons/dashboard/indigency.png" class="certificate-icon" alt="">
+                        <img src="<?= htmlspecialchars($baseUrl) ?>/Icons/Dashboard/indigency.png" class="certificate-icon" alt="Certificate of Indigency">
                         <h3>INDIGENCY</h3>
                         <p class="certificate-text">
                             Required for residents seeking financial, medical, or legal assistance.
@@ -58,7 +72,7 @@ require_once __DIR__ . "/../includes/resident_access_guard.php";
 
                 <div class="col-md-6 col-lg-4 d-flex">
                     <div class="certificate-card card-action w-100">
-                        <img src="../../icons/dashboard/jobseekers.png" class="certificate-icon" alt="">
+                        <img src="<?= htmlspecialchars($baseUrl) ?>/Icons/Dashboard/jobseekers.png" class="certificate-icon" alt="First Time Job Seeker Certificate">
                         <h3>FIRST TIME JOB-SEEKERS</h3>
                         <p class="certificate-text">
                             Avail fee waivers for government documents under Republic Act 11261.
@@ -69,7 +83,7 @@ require_once __DIR__ . "/../includes/resident_access_guard.php";
 
                 <div class="col-md-6 col-lg-4 d-flex">
                     <div class="certificate-card card-action w-100">
-                        <img src="../../icons/dashboard/goodmoral.png" class="certificate-icon" alt="">
+                        <img src="<?= htmlspecialchars($baseUrl) ?>/Icons/Dashboard/goodmoral.png" class="certificate-icon" alt="Certificate of Good Moral">
                         <h3>GOOD MORAL</h3>
                         <p class="certificate-text">
                             Request a good moral certificate for school, employment, or other requirements.
@@ -80,7 +94,7 @@ require_once __DIR__ . "/../includes/resident_access_guard.php";
 
                 <div class="col-md-6 col-lg-4 d-flex">
                     <div class="certificate-card card-action w-100">
-                        <img src="../../icons/dashboard/residency.png" class="certificate-icon" alt="">
+                        <img src="<?= htmlspecialchars($baseUrl) ?>/Icons/Dashboard/residency.png" class="certificate-icon" alt="Certificate of Residency">
                         <h3>RESIDENCY</h3>
                         <p class="certificate-text">
                             Request a residency certificate as proof of address and community residence.
@@ -91,7 +105,7 @@ require_once __DIR__ . "/../includes/resident_access_guard.php";
 
                 <div class="col-md-6 col-lg-4 d-flex">
                     <div class="certificate-card card-action w-100">
-                        <img src="../../icons/dashboard/identity.png" class="certificate-icon" alt="">
+                        <img src="<?= htmlspecialchars($baseUrl) ?>/Icons/Dashboard/identity.png" class="certificate-icon" alt="Certificate of Identity">
                         <h3>IDENTITY</h3>
                         <p class="certificate-text">
                             Request an identity certificate for official identification and verification purposes.

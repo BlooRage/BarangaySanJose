@@ -56,6 +56,15 @@
     return String(v ?? '').replace(/[&<>\"']/g, (m) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '\"': '&quot;', "'": '&#39;' }[m]));
   }
 
+  function resolvePublicUrl(path) {
+    const raw = String(path || '').trim();
+    if (!raw) return '';
+    if (/^https?:\/\//i.test(raw)) return raw;
+    if (appBase && raw.startsWith(`${appBase}/`)) return raw;
+    if (raw.startsWith('/')) return `${appBase}${raw}`;
+    return `${appBase}/${raw.replace(/^\/+/, '')}`;
+  }
+
   function badge(stage, label) {
     const k = String(stage || '').toLowerCase();
     if (k.includes('rejected')) return `<span class="badge bg-danger">${label}</span>`;
@@ -78,8 +87,9 @@
     const id = esc(row.request_id || '');
     const stage = String(row.stage || '');
     const residentId = firstNonEmpty([row.resident_id]);
-    const profileBtn = residentId
-      ? `<button class="btn btn-sm btn-outline-primary" data-view-profile-id="${esc(residentId)}">View Profile</button>`
+    const residentUserId = firstNonEmpty([row.resident_user_id, row.user_id]);
+    const profileBtn = (residentId || residentUserId)
+      ? `<button class="btn btn-sm btn-outline-primary" data-view-profile-id="${esc(residentId)}" data-view-profile-user-id="${esc(residentUserId)}">View Profile</button>`
       : '';
     const proofBtn = row.payment_proof_path
       ? `<button class="btn btn-sm btn-outline-dark" data-proof-id="${id}">View Payment</button>`
@@ -197,6 +207,18 @@
     `;
   }
 
+  function renderFormGrid(fields, preferredCols = 0) {
+    const items = Array.isArray(fields) ? fields.filter((v) => String(v || '').trim() !== '') : [];
+    if (!items.length) return '';
+    const count = items.length;
+    const cols = Math.max(1, Math.min(preferredCols > 0 ? preferredCols : count, count, 4));
+    const className = cols === 4 ? 'tracker-form-grid cols-4'
+      : cols === 3 ? 'tracker-form-grid cols-3'
+      : cols === 1 ? 'tracker-form-grid cols-1'
+      : 'tracker-form-grid';
+    return `<div class="${className}">${items.join('')}</div>`;
+  }
+
   function extractSubmittedDocuments(row, payload) {
     const docs = [];
     const seen = new Set();
@@ -243,9 +265,22 @@
     return new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
   }
 
-  function previewEditable(key, value, fallback = 'Type here') {
+  function previewIndigencyIssuedText(value) {
+    const raw = String(value || '').trim();
+    const d = raw ? new Date(raw) : new Date();
+    if (Number.isNaN(d.getTime())) return raw || dr_now_text();
+    const day = d.getDate();
+    const month = d.toLocaleDateString('en-US', { month: 'long' }).toUpperCase();
+    const year = d.getFullYear();
+    const v = day % 100;
+    const suffix = (v >= 11 && v <= 13) ? 'th' : ({ 1: 'st', 2: 'nd', 3: 'rd' }[day % 10] || 'th');
+    return `${day}${suffix} day of ${month} ${year}`;
+  }
+
+  function previewEditable(key, value, fallback = 'Type here', extraClass = '') {
     const text = String(value || '').trim() || fallback;
-    return `<span class="doc-editable" contenteditable="true" data-edit-key="${esc(key)}">${esc(text)}</span>`;
+    const cls = ['doc-editable', extraClass].filter(Boolean).join(' ');
+    return `<span class="${cls}" contenteditable="true" data-edit-key="${esc(key)}">${esc(text)}</span>`;
   }
 
   function normalizePreviewDocKey(docType) {
@@ -320,17 +355,21 @@
         </p>
       `;
     } else if (docKey === 'indigency') {
+      const requestOffice = requestOfficer || '';
+      const indigencyPurpose = purpose || requestFor || 'PURPOSE';
+      const toBlock = requestOffice.trim() !== ''
+        ? `<div class="doc-to-block"><strong>TO</strong><strong>:</strong><strong>${previewEditable('requestOfficer', requestOffice, 'Receiving office', 'doc-editable-multiline')}</strong></div>`
+        : `<div class="doc-to-block"><strong>TO</strong><strong>:</strong><div class="doc-to-lines"><span class="line"></span><span class="line"></span><span class="line"></span></div></div>`;
       contentHtml = `
+        ${toBlock}
         <p>
-          This is to certify that <strong>${esc(fullName)}</strong>, a resident of
-          <strong>${esc(fullAddress)}</strong>, belongs to an indigent family in this barangay.
+          This is to certify that <strong>${esc(fullName)}</strong>, resident of
+          <strong>${esc(fullAddress)}</strong> belongs to the one of the indigent families of this Barangay.
+          The Income of this family is barely enough to meet their day-to-day needs.
         </p>
         <p>
-          This certification is being requested for <strong>${previewEditable('purpose', purpose || requestFor, 'State purpose')}</strong>
-          ${requestOfficer !== '' ? `and will be submitted to <strong>${previewEditable('requestOfficer', requestOfficer, 'Receiving office')}</strong>.` : '.'}
-        </p>
-        <p>
-          This document is issued upon the request of the above-named resident and may be presented to lawful authorities as supporting proof.
+          This certification is being issued upon the request of the above subject in person in connection
+          with his/her application for <strong>${previewEditable('purpose', indigencyPurpose, 'PURPOSE')}</strong> purposes only.
         </p>
       `;
     } else if (docKey === 'goodmoral') {
@@ -427,32 +466,39 @@
       `;
     }
 
+    const isIndigency = docKey === 'indigency';
+    const titleText = isIndigency ? 'CERTIFICATE OF INDIGENCY' : docType;
+    const issuedLine = isIndigency
+      ? `Issued this <strong>${esc(previewIndigencyIssuedText(state.issuedDate || ''))}</strong>, at the office of the punong Barangay, Barangay San Jose, Rodriguez (Montalban), Rizal.`
+      : `Issued this <strong>${esc(issuedDate)}</strong> at Barangay San Jose, Rodriguez, Rizal.`;
+    const paperClass = isIndigency ? 'doc-preview-paper doc-preview-paper--indigency' : 'doc-preview-paper';
     return `
       <div class="doc-preview-stage">
         <span class="doc-preview-label">Document Display</span>
         <div class="doc-preview-shell">
-          <div class="doc-preview-paper">
-            <p class="doc-preview-hint">Highlighted fields are editable in this preview.</p>
+          <div class="${paperClass}">
+            ${isIndigency ? '' : '<p class="doc-preview-hint">Highlighted fields are editable in this preview.</p>'}
             <div class="doc-preview-head">
               <img class="doc-preview-logo" src="${leftLogoUrl}" alt="Barangay San Jose Logo">
               <div class="doc-preview-head-center">
-                <p class="rep">REPUBLIC OF THE PHILIPPINES</p>
-                <p>PROVINCE OF RIZAL</p>
-                <p>MUNICIPALITY OF RODRIGUEZ</p>
+                <p class="rep">REPUBLIKA NG PILIPINAS</p>
+                <p>LALAWIGAN NG RIZAL</p>
+                <p>BAYAN NG RODRIGUEZ</p>
                 <p class="barangay">BARANGAY SAN JOSE</p>
-                <p class="office">OFFICE OF THE PUNONG BARANGAY</p>
+                ${isIndigency ? '' : '<p class="doc-head-office">TANGGAPAN NG PUNONG BARANGAY</p>'}
                 <div class="doc-preview-head-line"></div>
               </div>
               <img class="doc-preview-logo" src="${rightLogoUrl}" alt="Montalban Logo" onerror="this.onerror=null;this.src='${fallbackRightLogoUrl}'">
             </div>
-            <div class="doc-preview-title">${esc(docType)}</div>
+            ${isIndigency
+              ? '<div class="doc-preview-title doc-preview-title--indigency"><div class="office">TANGGAPAN NG PUNONG BARANGAY</div><div class="certificate">CERTIFICATE OF INDIGENCY</div></div>'
+              : `<div class="doc-preview-title">${esc(titleText)}</div>`}
             <div class="doc-preview-body">
-              <p><strong>TO WHOM IT MAY CONCERN:</strong></p>
+              ${isIndigency ? '' : '<p><strong>TO WHOM IT MAY CONCERN:</strong></p>'}
               ${contentHtml}
-              <p>
-                Issued this <strong>${esc(issuedDate)}</strong> at Barangay San Jose, Rodriguez, Rizal.
-              </p>
+              <p>${issuedLine}</p>
             </div>
+            ${isIndigency ? '<div class="doc-preview-issuedby">Issued by: <strong>MINERVA D. QUITA</strong><br><em>Barangay Secretary</em></div>' : ''}
             <div class="doc-preview-signature">
               <div class="name">HON. GLENN S. EVANGELISTA</div>
               <div>Punong Barangay</div>
@@ -461,8 +507,9 @@
               <div class="doc-preview-qr-box">
                 ${qrUrl !== '' ? `<img src="${esc(qrUrl)}" alt="QR Code">` : '<span>QR</span>'}
               </div>
-              QR PLACEMENT
+              ${isIndigency ? 'QR' : 'QR PLACEMENT'}
             </div>
+            ${isIndigency ? '<div class="doc-preview-footer">This certificate is valid for Forty-five (45) days from the date of issue, check the<br>QR code to verify the authenticity of this document.</div>' : ''}
           </div>
         </div>
       </div>
@@ -635,8 +682,29 @@
     renderResidentStatusBanner(data?.status);
   }
 
-  async function openResidentProfileModal(residentId) {
-    if (!residentId || !residentProfileModal) return;
+  function isSameToken(a, b) {
+    return String(a || '').trim().toLowerCase() === String(b || '').trim().toLowerCase();
+  }
+
+  function findResidentRow(rows, residentId, residentUserId) {
+    if (!Array.isArray(rows) || !rows.length) return null;
+    const rid = String(residentId || '').trim();
+    const uid = String(residentUserId || '').trim();
+    return rows.find((r) => {
+      const rowResidentId = String(r?.resident_id || '').trim();
+      const rowUserId = String(r?.user_id || '').trim();
+      return (
+        (rid !== '' && (isSameToken(rowResidentId, rid) || isSameToken(rowUserId, rid))) ||
+        (uid !== '' && (isSameToken(rowResidentId, uid) || isSameToken(rowUserId, uid)))
+      );
+    }) || null;
+  }
+
+  async function openResidentProfileModal(residentId, residentUserId = '') {
+    const rid = String(residentId || '').trim();
+    const uid = String(residentUserId || '').trim();
+    const searchToken = rid || uid;
+    if (!searchToken || !residentProfileModal) return;
     if (viewModalEl && viewModalEl.classList.contains('show') && viewModal) {
       viewModal.hide();
     }
@@ -645,12 +713,18 @@
     try {
       const q = new URLSearchParams({
         fetch: 'true',
-        search: String(residentId)
+        search: searchToken
       });
       const rows = await fetchJson(`${residentProfileEndpoint}?${q.toString()}`);
-      const match = Array.isArray(rows)
-        ? rows.find((r) => String(r.resident_id || '') === String(residentId))
-        : null;
+      let match = findResidentRow(rows, rid, uid);
+      if (!match && rid && uid && !isSameToken(rid, uid)) {
+        const retryQ = new URLSearchParams({
+          fetch: 'true',
+          search: uid
+        });
+        const retryRows = await fetchJson(`${residentProfileEndpoint}?${retryQ.toString()}`);
+        match = findResidentRow(retryRows, rid, uid);
+      }
       if (!match) return;
       fillResidentProfileModal(match);
     } catch (_) {
@@ -857,6 +931,9 @@
         if (!row || !viewDetailsBody || !viewModal) return;
 
         const payload = row.payload && typeof row.payload === 'object' ? row.payload : {};
+        const residentProfile = row.resident_profile && typeof row.resident_profile === 'object'
+          ? row.resident_profile
+          : {};
         const consumedKeys = new Set();
         const collectFirst = (...keys) => {
           for (const key of keys) {
@@ -870,21 +947,30 @@
           }
           return '';
         };
+        const collectResidentFirst = (...keys) => {
+          for (const key of keys) {
+            if (!key) continue;
+            const value = residentProfile[key];
+            if (value === null || value === undefined) continue;
+            const text = String(value).trim();
+            if (text === '') continue;
+            return text;
+          }
+          return '';
+        };
 
         const personalFields = [
-          ['Last Name', collectFirst('last_name', 'lastname')],
-          ['First Name', collectFirst('first_name', 'firstname')],
-          ['Middle Name', collectFirst('middle_name', 'middlename')],
-          ['Suffix', collectFirst('suffix_name', 'suffix')],
-          ['Contact Number', collectFirst('contact_number', 'phone_number')],
-          ['Full Address', collectFirst('full_address', 'full_address_display', 'address', 'complete_address')],
-          ['Birthdate', collectFirst('birthdate', 'date_of_birth', 'child_dob')],
-          ['Age', collectFirst('age')],
-          ['Sex', collectFirst('sex', 'gender', 'child_sex')],
-          ['Civil Status', collectFirst('civil_status')],
-          ['Religion', collectFirst('religion')],
-          ['Occupation', collectFirst('occupation')]
-        ].filter(([, value]) => String(value || '').trim() !== '');
+          ['Last Name', firstNonEmpty([collectFirst('last_name', 'lastname'), collectResidentFirst('last_name')])],
+          ['First Name', firstNonEmpty([collectFirst('first_name', 'firstname'), collectResidentFirst('first_name')])],
+          ['Middle Name', firstNonEmpty([collectFirst('middle_name', 'middlename'), collectResidentFirst('middle_name')])],
+          ['Suffix', firstNonEmpty([collectFirst('suffix_name', 'suffix'), collectResidentFirst('suffix')])],
+          ['Contact Number', firstNonEmpty([collectFirst('contact_number', 'phone_number'), collectResidentFirst('contact_number')])],
+          ['Full Address', firstNonEmpty([collectFirst('full_address', 'full_address_display', 'address', 'complete_address'), collectResidentFirst('full_address')])],
+          ['Birthdate', firstNonEmpty([collectFirst('birthdate', 'date_of_birth', 'child_dob'), collectResidentFirst('birthdate')])],
+          ['Age', firstNonEmpty([collectFirst('age'), collectResidentFirst('age')])],
+          ['Sex', firstNonEmpty([collectFirst('sex', 'gender', 'child_sex'), collectResidentFirst('sex')])],
+          ['Civil Status', firstNonEmpty([collectFirst('civil_status'), collectResidentFirst('civil_status')])]
+        ];
 
         const technicalKeys = new Set([
           'action', 'csrf_token', 'redirect', 'document_type', 'suffix_name_display', 'suffix_display',
@@ -916,37 +1002,33 @@
         html += `<div class="tracker-doc-highlight">Document Requested: ${esc(row.document_type || '-')}</div>`;
         const personalMap = new Map(personalFields);
         if (personalFields.length) {
-          const nameRow = [
+          const nameFields = [
             formField('Last Name', personalMap.get('Last Name') || '-'),
             formField('First Name', personalMap.get('First Name') || '-'),
             formField('Middle Name', personalMap.get('Middle Name') || '-'),
-            formField('Suffix', personalMap.get('Suffix') || '-')
-          ].join('');
-          const personalRow = [
+            (personalMap.get('Suffix') || '').trim() ? formField('Suffix', personalMap.get('Suffix')) : ''
+          ];
+          const personalFieldsRow = [
             formField('Birthdate', personalMap.get('Birthdate') || '-'),
             formField('Age', personalMap.get('Age') || '-'),
             formField('Sex', personalMap.get('Sex') || '-'),
             formField('Civil Status', personalMap.get('Civil Status') || '-')
-          ].join('');
-          const contactAddressRow = [
+          ];
+          const contactAddressFields = [
             formField('Contact Number', personalMap.get('Contact Number') || '-'),
             formField('Full Address', personalMap.get('Full Address') || '-')
-          ].join('');
+          ];
           const extraInfo = [];
-          if ((personalMap.get('Religion') || '').trim()) extraInfo.push(formField('Religion', personalMap.get('Religion')));
-          if ((personalMap.get('Occupation') || '').trim()) extraInfo.push(formField('Occupation', personalMap.get('Occupation')));
 
           let personalHtml = '';
-          personalHtml += `<div class="tracker-form-grid cols-4">${nameRow}</div>`;
-          personalHtml += `<div class="tracker-form-grid cols-4">${personalRow}</div>`;
-          personalHtml += `<div class="tracker-form-grid">${contactAddressRow}</div>`;
-          if (extraInfo.length) {
-            personalHtml += `<div class="tracker-form-grid">${extraInfo.join('')}</div>`;
-          }
+          personalHtml += renderFormGrid(nameFields, 4);
+          personalHtml += renderFormGrid(personalFieldsRow, 4);
+          personalHtml += renderFormGrid(contactAddressFields, 2);
+          personalHtml += renderFormGrid(extraInfo, 2);
           html += formSection('Personal Information', personalHtml);
         }
         if (requestFields.length) {
-          html += formSection('Request Details', `<div class="tracker-form-grid">${requestFields.join('')}</div>`);
+          html += formSection('Request Details', renderFormGrid(requestFields, 2));
         }
 
         const submittedDocs = extractSubmittedDocuments(row, payload);
@@ -965,11 +1047,11 @@
 
         html += formSection(
           'Request Status',
-          `<div class="tracker-form-grid">${[
+          renderFormGrid([
             formField('Status', row.stage_label || row.stage || '-'),
             formField('Status Reason', row.status_reason || '-'),
             formField('Submitted At', row.submitted_at || '-')
-          ].join('')}</div>`
+          ], 3)
         );
 
         viewDetailsHtml = html || '<div class="text-muted">No details.</div>';
@@ -1054,7 +1136,7 @@
           educationalAttainment: firstNonEmpty([payload.educational_attainment]),
           jobstartBeneficiary: firstNonEmpty([payload.jobstart_beneficiary]),
           additionalDetails: additionalDetails,
-          qrUrl: firstNonEmpty([row.qr_code_path]) ? `${appBase}${String(row.qr_code_path || '')}` : ''
+          qrUrl: resolvePublicUrl(firstNonEmpty([row.qr_code_path]))
         };
         switchViewMode('details');
         if (viewModalTitle) {
@@ -1070,7 +1152,10 @@
           });
           viewModalActions.querySelectorAll('button[data-view-profile-id]').forEach((profileBtn) => {
             profileBtn.addEventListener('click', () => {
-              openResidentProfileModal(String(profileBtn.getAttribute('data-view-profile-id') || ''));
+              openResidentProfileModal(
+                String(profileBtn.getAttribute('data-view-profile-id') || ''),
+                String(profileBtn.getAttribute('data-view-profile-user-id') || '')
+              );
             });
           });
           viewModalActions.querySelectorAll('button[data-proof-id]').forEach((proofBtn) => {

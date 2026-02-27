@@ -142,17 +142,13 @@ $fullAddress = htmlspecialchars(implode(', ', $fullAddressParts), ENT_QUOTES, 'U
                                 <label class="top-label">Middle Name</label>
                                 <input type="text" name="middle_name" readonly value="<?php echo $middleName; ?>">
                             </div>
+                            <?php if (trim((string)$suffix) !== ''): ?>
                             <div>
                                 <label class="top-label">Suffix</label>
-                                <select name="suffix_name_display" class="text-bg-light" disabled>
-                                    <option value="" <?php echo ($suffix === '') ? 'selected' : ''; ?>>None</option>
-                                    <option value="Jr." <?php echo ($suffix === 'Jr.') ? 'selected' : ''; ?>>Jr.</option>
-                                    <option value="Sr." <?php echo ($suffix === 'Sr.') ? 'selected' : ''; ?>>Sr.</option>
-                                    <option value="III" <?php echo ($suffix === 'III') ? 'selected' : ''; ?>>III</option>
-                                    <option value="IV" <?php echo ($suffix === 'IV') ? 'selected' : ''; ?>>IV</option>
-                                </select>
-                                <input type="hidden" name="suffix_name" value="<?php echo htmlspecialchars($suffix, ENT_QUOTES, 'UTF-8'); ?>">
+                                <input type="text" class="text-bg-light" readonly value="<?php echo htmlspecialchars($suffix, ENT_QUOTES, 'UTF-8'); ?>">
                             </div>
+                            <?php endif; ?>
+                            <input type="hidden" name="suffix_name" value="<?php echo htmlspecialchars($suffix, ENT_QUOTES, 'UTF-8'); ?>">
                         </div>
 
                         <div class="form-row">
@@ -211,4 +207,3 @@ $fullAddress = htmlspecialchars(implode(', ', $fullAddressParts), ENT_QUOTES, 'U
 </body>
 
 </html>
-

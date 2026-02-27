@@ -14,58 +14,60 @@ if (!isset($baseUrl)) {
     }
 }
 ?>
-﻿<?php
+<?php
 $allowUnregistered = false;
 require_once __DIR__ . "/../includes/resident_access_guard.php";
+require_once __DIR__ . "/../../PhpFiles/GET/getResidentProfile.php";
 
-$residentinformationtbl = [
-    'firstname' => 'Juan',
-    'middlename' => '',
-    'lastname' => 'Dela Cruz',
-    'suffix' => '',
-    'sex' => 'Male',
-    'birthdate' => 'January 1, 1999',
-    'age' => 18,
-    'civil_status' => 'Single',
-    'head_of_family' => 'No',
-    'voter_status' => 'Registered Voter',
-    'occupation' => 'Barista',
-    'employment_status' => 'Employed',
-    'occupation_detail' => '',
-    'religion' => 'Roman Catholic',
-    'sector_membership' => 'Student, PWD',
-    'emergency_name' => 'Maria Dela Cruz',
-    'emergency_contact' => '09123456789',
-    'profile_pic' => 'profile_pic_juan.png'
-];
+$userId = (string)($_SESSION['user_id'] ?? '');
+$data = getResidentProfileData($conn, $userId);
+$residentinformationtbl = $data['residentinformationtbl'] ?? [];
+$residentaddresstbl = $data['residentaddresstbl'] ?? [];
+$useraccountstbl = $data['useraccountstbl'] ?? [];
 
-$residentaddresstbl = [
-    'address_id' => 1,
-    'resident_id' => 101,
-    'street_number' => '14A',
-    'street_name' => 'Chico St',
-    'subdivision' => '',
-    'area_number' => 'Area 01',
-    'unit_number' => 'Unit 5B',
-    'barangay' => 'San Jose',
-];
+$firstName = htmlspecialchars((string)($residentinformationtbl['firstname'] ?? ''), ENT_QUOTES, 'UTF-8');
+$lastName = htmlspecialchars((string)($residentinformationtbl['lastname'] ?? ''), ENT_QUOTES, 'UTF-8');
+$middleName = htmlspecialchars((string)($residentinformationtbl['middlename'] ?? ''), ENT_QUOTES, 'UTF-8');
+$suffix = (string)($residentinformationtbl['suffix'] ?? '');
 
-$useraccountstbl = [
-    'type' => 'Resident',
-    'created' => 'March 12, 2024',
-    'last_password_change' => 'August 3, 2025',
-    'email' => 'juan.delacruz@email.com',
-    'phone_number' => '09123456789'
-];
+$birthdateValue = '';
+$birthdateDisplay = (string)($residentinformationtbl['birthdate'] ?? '');
+if ($birthdateDisplay !== '') {
+    $dt = DateTime::createFromFormat('F j, Y', $birthdateDisplay);
+    if (!$dt) {
+        try {
+            $dt = new DateTime($birthdateDisplay);
+        } catch (Exception $e) {
+            $dt = null;
+        }
+    }
+    if ($dt instanceof DateTime) {
+        $birthdateValue = $dt->format('Y-m-d');
+    }
+}
+
+$phoneNumber = htmlspecialchars((string)($useraccountstbl['phone_number'] ?? ''), ENT_QUOTES, 'UTF-8');
+$emergencyLast = htmlspecialchars((string)($residentinformationtbl['emergency_last_name'] ?? ''), ENT_QUOTES, 'UTF-8');
+$emergencyFirst = htmlspecialchars((string)($residentinformationtbl['emergency_first_name'] ?? ''), ENT_QUOTES, 'UTF-8');
+$emergencyMiddle = htmlspecialchars((string)($residentinformationtbl['emergency_middle_name'] ?? ''), ENT_QUOTES, 'UTF-8');
+$emergencySuffix = (string)($residentinformationtbl['emergency_suffix'] ?? '');
+$emergencyContact = htmlspecialchars((string)($residentinformationtbl['emergency_contact'] ?? ''), ENT_QUOTES, 'UTF-8');
+
+$unitNumber = trim((string)($residentaddresstbl['unit_number'] ?? ''));
+$houseNumber = trim((string)($residentaddresstbl['street_number'] ?? ''));
+$streetName = trim((string)($residentaddresstbl['street_name'] ?? ''));
+$subdivision = trim((string)($residentaddresstbl['subdivision'] ?? ''));
+$areaNumber = trim((string)($residentaddresstbl['area_number'] ?? ''));
 
 $fullAddress = implode(', ', array_filter([
-    trim((string)($residentaddresstbl['unit_number'] ?? '')),
-    trim((string)($residentaddresstbl['street_number'] ?? '')),
-    trim((string)($residentaddresstbl['street_name'] ?? '')),
-    trim((string)($residentaddresstbl['subdivision'] ?? '')),
-    trim((string)($residentaddresstbl['area_number'] ?? '')),
-    trim((string)($residentaddresstbl['barangay'] ?? '')),
-], fn($part) => $part !== ''));
+    $unitNumber !== '' ? 'Unit ' . $unitNumber : '',
+    trim($houseNumber . ' ' . $streetName),
+    $subdivision !== '' ? $subdivision . ' Subdivision' : '',
+    $areaNumber !== '' ? 'Area ' . $areaNumber : '',
+    'San Jose',
+    'Rodriguez',
+    'Rizal'
+], fn($part) => trim((string)$part) !== ''));
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -111,27 +113,27 @@ $fullAddress = implode(', ', array_filter([
                         <div class="form-row">
                             <div>
                                 <label class="top-label">Last Name <span class="required-asterisk">*</span></label>
-                                <input type="text" name="last_name" required>
+                                <input type="text" name="last_name" required readonly value="<?php echo $lastName; ?>">
                             </div>
 
                             <div>
                                 <label class="top-label">First Name <span class="required-asterisk">*</span></label>
-                                <input type="text" name="first_name" required>
+                                <input type="text" name="first_name" required readonly value="<?php echo $firstName; ?>">
                             </div>
 
                             <div>
                                 <label class="top-label">Middle Name</label>
-                                <input type="text" name="middle_name">
+                                <input type="text" name="middle_name" readonly value="<?php echo $middleName; ?>">
                             </div>
 
                             <div>
                                 <label class="top-label">Suffix</label>
                                 <select name="suffix">
-                                    <option value="">None</option>
-                                    <option value="Jr.">Jr.</option>
-                                    <option value="Sr.">Sr.</option>
-                                    <option value="III">III</option>
-                                    <option value="IV">IV</option>
+                                    <option value="" <?php echo ($suffix === '') ? 'selected' : ''; ?>>None</option>
+                                    <option value="Jr." <?php echo ($suffix === 'Jr.') ? 'selected' : ''; ?>>Jr.</option>
+                                    <option value="Sr." <?php echo ($suffix === 'Sr.') ? 'selected' : ''; ?>>Sr.</option>
+                                    <option value="III" <?php echo ($suffix === 'III') ? 'selected' : ''; ?>>III</option>
+                                    <option value="IV" <?php echo ($suffix === 'IV') ? 'selected' : ''; ?>>IV</option>
                                     <option value="V">Others</option>
                                 </select>
                             </div>
@@ -140,7 +142,7 @@ $fullAddress = implode(', ', array_filter([
                         <div class="form-row">
                             <div>
                                 <label class="top-label">Date of Birth <span class="required-asterisk">*</span></label>
-                                <input type="date">
+                                <input type="date" name="birthdate" required readonly value="<?php echo htmlspecialchars($birthdateValue, ENT_QUOTES, 'UTF-8'); ?>">
                             </div>
 
                             <div>
@@ -149,7 +151,7 @@ $fullAddress = implode(', ', array_filter([
                             </div>
                             <div class="phone">
                                 <label class="top-label">Contact Number <span class="required-asterisk">*</span></label>
-                                <input type="tel" name="phone_number" required>
+                                <input type="tel" name="phone_number" required readonly value="<?php echo $phoneNumber; ?>">
                             </div>
 
 
@@ -160,9 +162,9 @@ $fullAddress = implode(', ', array_filter([
                             <div class="full-width">
                                 <label class="top-label">Complete Address <span class="required-asterisk">*</span></label>
                                 <input type="text" name="full_address_display" readonly value="<?php echo htmlspecialchars($fullAddress, ENT_QUOTES, 'UTF-8'); ?>">
-                                <input type="hidden" name="unitNumber" value="<?php echo htmlspecialchars($residentaddresstbl['unit_number'] ?? '', ENT_QUOTES, 'UTF-8'); ?>">
-                                <input type="hidden" name="houseNumber" value="<?php echo htmlspecialchars($residentaddresstbl['street_number'] ?? '', ENT_QUOTES, 'UTF-8'); ?>">
-                                <input type="hidden" name="streetName" value="<?php echo htmlspecialchars($residentaddresstbl['street_name'] ?? '', ENT_QUOTES, 'UTF-8'); ?>">
+                                <input type="hidden" name="unitNumber" value="<?php echo htmlspecialchars($unitNumber, ENT_QUOTES, 'UTF-8'); ?>">
+                                <input type="hidden" name="houseNumber" value="<?php echo htmlspecialchars($houseNumber, ENT_QUOTES, 'UTF-8'); ?>">
+                                <input type="hidden" name="streetName" value="<?php echo htmlspecialchars($streetName, ENT_QUOTES, 'UTF-8'); ?>">
                             </div>
                         </div>
                         <br>
@@ -175,28 +177,28 @@ $fullAddress = implode(', ', array_filter([
                         <div class="form-row">
                             <div>
                                 <label class="top-label">Last Name <span class="required-asterisk">*</span> </label>
-                                <input type="text" name="emergency_last" required>
+                                <input type="text" name="emergency_last" required value="<?php echo $emergencyLast; ?>">
                             </div>
 
                             <div>
                                 <label class="top-label">First Name <span class="required-asterisk">*</span> </label>
-                                <input type="text" name="emergency_first" required>
+                                <input type="text" name="emergency_first" required value="<?php echo $emergencyFirst; ?>">
                             </div>
 
                             <div>
                                 <label class="top-label">Middle Name</label>
-                                <input type="text" name="emergency_middle">
+                                <input type="text" name="emergency_middle" value="<?php echo $emergencyMiddle; ?>">
                             </div>
 
                             <div>
                                 <!-- suffix is select drop down-->
                                 <label class="top-label">Suffix</label>
                                 <select name="emergency_suffix">
-                                    <option value="">None</option>
-                                    <option value="Jr.">Jr.</option>
-                                    <option value="Sr.">Sr.</option>
-                                    <option value="III">III</option>
-                                    <option value="IV">IV</option>
+                                    <option value="" <?php echo ($emergencySuffix === '') ? 'selected' : ''; ?>>None</option>
+                                    <option value="Jr." <?php echo ($emergencySuffix === 'Jr.') ? 'selected' : ''; ?>>Jr.</option>
+                                    <option value="Sr." <?php echo ($emergencySuffix === 'Sr.') ? 'selected' : ''; ?>>Sr.</option>
+                                    <option value="III" <?php echo ($emergencySuffix === 'III') ? 'selected' : ''; ?>>III</option>
+                                    <option value="IV" <?php echo ($emergencySuffix === 'IV') ? 'selected' : ''; ?>>IV</option>
                                 </select>
                             </div>
                         </div>
@@ -204,7 +206,7 @@ $fullAddress = implode(', ', array_filter([
                         <div class="form-row">
                             <div class="full-width">
                                 <label class="top-label">Contact Number <span class="required-asterisk">*</span> </label>
-                                <input type="tel" name="emergency_contact" required>
+                                <input type="tel" name="emergency_contact" required value="<?php echo $emergencyContact; ?>">
                             </div>
                         </div>
 
@@ -243,7 +245,6 @@ $fullAddress = implode(', ', array_filter([
 </body>
 
 </html>
-
 
 
 
