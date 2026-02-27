@@ -61,6 +61,7 @@ let tempSignupData = null;
 let otpFrom = ""; // 'signup' | 'forgot' | 'inactive'
 let otpRecipient = ""; // 11-digit recipient used for SMS sending: 0XXXXXXXXXX
 let otpVerifying = false;
+const signupEscalatedFields = new Set();
 
 const tryAutoVerifyOtp = () => {
   if (otpVerifying) return;
@@ -144,16 +145,22 @@ const showPasswordRequirements = (show, target = null) => {
   el.classList.toggle("is-hidden", !show);
 };
 
-const setErrorBox = (div, message) => {
+const setMessageBox = (div, message, variant = "danger") => {
   if (!div) return;
+  const isInfo = variant === "info";
   div.textContent = message;
   div.style.display = "block";
-  div.style.background = "#f8d7da";
-  div.style.border = "1px solid #f5c2c7";
-  div.style.color = "#000";
+  div.classList.remove("text-danger", "text-primary");
+  div.style.background = isInfo ? "#cfe2ff" : "#f8d7da";
+  div.style.border = isInfo ? "1px solid #9ec5fe" : "1px solid #f5c2c7";
+  div.style.setProperty("color", isInfo ? "#084298" : "#842029", "important");
   div.style.padding = "10px 12px";
   div.style.borderRadius = "6px";
   div.style.marginBottom = "10px";
+};
+
+const setErrorBox = (div, message) => {
+  setMessageBox(div, message, "danger");
 };
 
 const hideErrorBox = (div) => {
@@ -179,7 +186,7 @@ const resetErrors = (formType = "signup") => {
 
 const showError = (message, formType = "signup", field = null, clearBothPasswords = false) => {
   const errorsDiv = formType === "signup" ? signupErrors : loginErrors;
-  setErrorBox(errorsDiv, message);
+  setMessageBox(errorsDiv, message, "danger");
 
   if (formType === "login") {
     if (loginPasswordField) loginPasswordField.value = "";
@@ -191,6 +198,9 @@ const showError = (message, formType = "signup", field = null, clearBothPassword
   if (field) {
     field.style.border = "2px solid red";
     field.focus();
+    if (formType === "signup") {
+      signupEscalatedFields.add(field.id || field.name || "signup_field");
+    }
 
     if (formType === "signup") {
       if (clearBothPasswords) {
@@ -204,8 +214,18 @@ const showError = (message, formType = "signup", field = null, clearBothPassword
   }
 };
 
+const showSignupLiveMessage = (message, field = null, variant = "info") => {
+  const escalated = !!(field && signupEscalatedFields.has(field.id || field.name || "signup_field"));
+  const effectiveVariant = variant === "danger" ? "danger" : (escalated ? "danger" : "info");
+  setMessageBox(signupErrors, message, effectiveVariant);
+  if (field) field.style.border = effectiveVariant === "danger" ? "2px solid red" : "2px solid #0d6efd";
+};
+
 const clearSignupFieldError = (field) => {
   if (!signupErrors) return;
+  if (field) {
+    signupEscalatedFields.delete(field.id || field.name || "signup_field");
+  }
   hideErrorBox(signupErrors);
   if (field) field.style.border = "";
 };
@@ -312,7 +332,7 @@ if (passwordInput) {
   });
 
   passwordInput.addEventListener("blur", (e) => {
-    if (!e.target.value) showPasswordRequirements(false);
+    showPasswordRequirements(false);
   });
 }
 
@@ -342,11 +362,14 @@ const validateSignupField = (field) => {
 
   if (field === phoneInput) {
     if (!phone) return clearSignupFieldError(phoneInput);
+    if (!/^9/.test(phone)) {
+      return showSignupLiveMessage("Phone number must start with 9.", phoneInput, "danger");
+    }
     if (!/^9\d{9}$/.test(phone)) {
-      return showError("Phone number must start with 9 and be exactly 10 digits.", "signup", phoneInput);
+      return showSignupLiveMessage("Phone number must be exactly 10 digits.", phoneInput, "info");
     }
     if (/^9(\d)\1{8}$/.test(phone) || isSequentialPhone(phone)) {
-      return showError("Invalid phone number.", "signup", phoneInput);
+      return showSignupLiveMessage("Invalid phone number.", phoneInput, "danger");
     }
     return clearSignupFieldError(phoneInput);
   }
@@ -354,7 +377,7 @@ const validateSignupField = (field) => {
   if (field === emailInput) {
     if (!email) return clearSignupFieldError(emailInput);
     if (!/^[A-Za-z0-9._%+-]{2,}@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$/.test(email)) {
-      return showError("Please enter a valid email address (at least 2 characters before @).", "signup", emailInput);
+      return showSignupLiveMessage("Please enter a valid email address (at least 2 characters before @).", emailInput);
     }
     return clearSignupFieldError(emailInput);
   }

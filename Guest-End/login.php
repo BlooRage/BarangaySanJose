@@ -118,22 +118,24 @@ if (!empty($_SESSION['user_id']) && empty($_SESSION['role'])) {
 
             <input type="email" id="REmail" name="REmail" class="form-control mb-2" placeholder="Email" required />
 
-            <div class="input-group mb-2">
-              <input type="password" id="RPassword" name="RPassword" class="form-control" placeholder="Password" required />
-              <span class="input-group-text" style="cursor: pointer" onclick="togglePassword('RPassword','eye1')">
-                <i id="eye1" class="bi bi-eye"></i>
-              </span>
-            </div>
+            <div class="password-reqs-anchor mb-2">
+              <div class="input-group mb-0">
+                <input type="password" id="RPassword" name="RPassword" class="form-control" placeholder="Password" required />
+                <span class="input-group-text" style="cursor: pointer" onclick="togglePassword('RPassword','eye1')">
+                  <i id="eye1" class="bi bi-eye"></i>
+                </span>
+              </div>
 
-            <div id="passwordRequirements" class="password-reqs mb-2 is-hidden" aria-live="polite">
-              <div class="password-reqs-title">Password must contain:</div>
-              <ul class="password-reqs-list">
-                <li data-req="uppercase">1 uppercase letter</li>
-                <li data-req="lowercase">1 lowercase letter</li>
-                <li data-req="number">1 number</li>
-                <li data-req="special">1 special character</li>
-                <li data-req="length">At least 8 characters</li>
-              </ul>
+              <div id="passwordRequirements" class="password-reqs is-hidden" aria-live="polite">
+                <div class="password-reqs-title">Password must contain:</div>
+                <ul class="password-reqs-list">
+                  <li data-req="uppercase">1 uppercase letter</li>
+                  <li data-req="lowercase">1 lowercase letter</li>
+                  <li data-req="number">1 number</li>
+                  <li data-req="special">1 special character</li>
+                  <li data-req="length">At least 8 characters</li>
+                </ul>
+              </div>
             </div>
 
             <div class="input-group mb-2">
@@ -315,5 +317,3 @@ if (!empty($_SESSION['user_id']) && empty($_SESSION['role'])) {
         });
     </script></body>
 </html>
-
-
