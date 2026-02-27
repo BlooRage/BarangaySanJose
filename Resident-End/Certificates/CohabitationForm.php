@@ -145,12 +145,10 @@ $applicantArea = htmlspecialchars($areaNumber, ENT_QUOTES, 'UTF-8');
                                 <input type="text" name="middle_name" readonly value="<?php echo htmlspecialchars($residentinformationtbl['middlename'] ?? ''); ?>">
                             </div>
 
-                            <?php if (trim((string)($residentinformationtbl['suffix'] ?? '')) !== ''): ?>
                             <div>
                                 <label class="top-label">Suffix</label>
                                 <input type="text" class="text-bg-light" readonly value="<?php echo htmlspecialchars($residentinformationtbl['suffix'] ?? '', ENT_QUOTES, 'UTF-8'); ?>">
                             </div>
-                            <?php endif; ?>
                             <input type="hidden" name="suffix_name" value="<?php echo htmlspecialchars($residentinformationtbl['suffix'] ?? '', ENT_QUOTES, 'UTF-8'); ?>">
                         </div>
 

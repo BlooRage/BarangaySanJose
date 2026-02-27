@@ -150,12 +150,10 @@ $fullAddress = htmlspecialchars(implode(', ', $fullAddressParts), ENT_QUOTES, 'U
                                 <input type="text" name="middle_name" value="<?php echo $middleName; ?>" readonly>
                             </div>
 
-                            <?php if (trim((string)$suffix) !== ''): ?>
                             <div>
                                 <label class="top-label">Suffix</label>
                                 <input type="text" class="text-bg-light" readonly value="<?php echo htmlspecialchars($suffix, ENT_QUOTES, 'UTF-8'); ?>">
                             </div>
-                            <?php endif; ?>
                             <input type="hidden" name="suffix" value="<?php echo htmlspecialchars($suffix, ENT_QUOTES, 'UTF-8'); ?>">
                         </div>
 
