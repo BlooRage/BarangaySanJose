@@ -207,6 +207,18 @@
     `;
   }
 
+  function renderFormGrid(fields, preferredCols = 0) {
+    const items = Array.isArray(fields) ? fields.filter((v) => String(v || '').trim() !== '') : [];
+    if (!items.length) return '';
+    const count = items.length;
+    const cols = Math.max(1, Math.min(preferredCols > 0 ? preferredCols : count, count, 4));
+    const className = cols === 4 ? 'tracker-form-grid cols-4'
+      : cols === 3 ? 'tracker-form-grid cols-3'
+      : cols === 1 ? 'tracker-form-grid cols-1'
+      : 'tracker-form-grid';
+    return `<div class="${className}">${items.join('')}</div>`;
+  }
+
   function extractSubmittedDocuments(row, payload) {
     const docs = [];
     const seen = new Set();
@@ -957,9 +969,7 @@
           ['Birthdate', firstNonEmpty([collectFirst('birthdate', 'date_of_birth', 'child_dob'), collectResidentFirst('birthdate')])],
           ['Age', firstNonEmpty([collectFirst('age'), collectResidentFirst('age')])],
           ['Sex', firstNonEmpty([collectFirst('sex', 'gender', 'child_sex'), collectResidentFirst('sex')])],
-          ['Civil Status', firstNonEmpty([collectFirst('civil_status'), collectResidentFirst('civil_status')])],
-          ['Religion', firstNonEmpty([collectFirst('religion'), collectResidentFirst('religion')])],
-          ['Occupation', firstNonEmpty([collectFirst('occupation'), collectResidentFirst('occupation')])]
+          ['Civil Status', firstNonEmpty([collectFirst('civil_status'), collectResidentFirst('civil_status')])]
         ];
 
         const technicalKeys = new Set([
@@ -992,37 +1002,33 @@
         html += `<div class="tracker-doc-highlight">Document Requested: ${esc(row.document_type || '-')}</div>`;
         const personalMap = new Map(personalFields);
         if (personalFields.length) {
-          const nameRow = [
+          const nameFields = [
             formField('Last Name', personalMap.get('Last Name') || '-'),
             formField('First Name', personalMap.get('First Name') || '-'),
             formField('Middle Name', personalMap.get('Middle Name') || '-'),
-            formField('Suffix', personalMap.get('Suffix') || '-')
-          ].join('');
-          const personalRow = [
+            (personalMap.get('Suffix') || '').trim() ? formField('Suffix', personalMap.get('Suffix')) : ''
+          ];
+          const personalFieldsRow = [
             formField('Birthdate', personalMap.get('Birthdate') || '-'),
             formField('Age', personalMap.get('Age') || '-'),
             formField('Sex', personalMap.get('Sex') || '-'),
             formField('Civil Status', personalMap.get('Civil Status') || '-')
-          ].join('');
-          const contactAddressRow = [
+          ];
+          const contactAddressFields = [
             formField('Contact Number', personalMap.get('Contact Number') || '-'),
             formField('Full Address', personalMap.get('Full Address') || '-')
-          ].join('');
+          ];
           const extraInfo = [];
-          if ((personalMap.get('Religion') || '').trim()) extraInfo.push(formField('Religion', personalMap.get('Religion')));
-          if ((personalMap.get('Occupation') || '').trim()) extraInfo.push(formField('Occupation', personalMap.get('Occupation')));
 
           let personalHtml = '';
-          personalHtml += `<div class="tracker-form-grid cols-4">${nameRow}</div>`;
-          personalHtml += `<div class="tracker-form-grid cols-4">${personalRow}</div>`;
-          personalHtml += `<div class="tracker-form-grid">${contactAddressRow}</div>`;
-          if (extraInfo.length) {
-            personalHtml += `<div class="tracker-form-grid">${extraInfo.join('')}</div>`;
-          }
+          personalHtml += renderFormGrid(nameFields, 4);
+          personalHtml += renderFormGrid(personalFieldsRow, 4);
+          personalHtml += renderFormGrid(contactAddressFields, 2);
+          personalHtml += renderFormGrid(extraInfo, 2);
           html += formSection('Personal Information', personalHtml);
         }
         if (requestFields.length) {
-          html += formSection('Request Details', `<div class="tracker-form-grid">${requestFields.join('')}</div>`);
+          html += formSection('Request Details', renderFormGrid(requestFields, 2));
         }
 
         const submittedDocs = extractSubmittedDocuments(row, payload);
@@ -1041,11 +1047,11 @@
 
         html += formSection(
           'Request Status',
-          `<div class="tracker-form-grid">${[
+          renderFormGrid([
             formField('Status', row.stage_label || row.stage || '-'),
             formField('Status Reason', row.status_reason || '-'),
             formField('Submitted At', row.submitted_at || '-')
-          ].join('')}</div>`
+          ], 3)
         );
 
         viewDetailsHtml = html || '<div class="text-muted">No details.</div>';

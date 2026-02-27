@@ -45,8 +45,26 @@ function dra_format_full_name_from_payload(array $payload): string {
     return trim(implode(' ', $parts));
 }
 
-function dra_public_base_url(): string {
-    return appBaseUrl();
+function dra_qr_public_base_url(): string {
+    $configured = trim((string)(getenv('QR_BASE_URL') ?: ''));
+    if ($configured !== '') {
+        return rtrim($configured, '/');
+    }
+
+    $scheme = (
+        (!empty($_SERVER['HTTPS']) && strtolower((string)$_SERVER['HTTPS']) !== 'off')
+        || ((string)($_SERVER['SERVER_PORT'] ?? '') === '443')
+    ) ? 'https' : 'http';
+
+    $host = trim((string)($_SERVER['HTTP_HOST'] ?? ''));
+    if ($host === '') {
+        $host = trim((string)($_SERVER['SERVER_NAME'] ?? ''));
+    }
+    if ($host === '') {
+        $host = 'localhost';
+    }
+
+    return rtrim($scheme . '://' . $host, '/');
 }
 
 function dra_generate_issued_document(array $requestRow): ?string {
@@ -105,7 +123,7 @@ function dra_generate_issued_document(array $requestRow): ?string {
     $orNo = trim((string)($requestRow['or_number'] ?? ''));
 
     $verificationCode = trim((string)($requestRow['verification_code'] ?? ''));
-    $verifyUrl = dra_public_base_url()
+    $verifyUrl = dra_qr_public_base_url()
         . appUrl('/Guest-End/TransactionInformation.html?request_id=')
         . rawurlencode($requestId)
         . '&vc=' . rawurlencode($verificationCode !== '' ? $verificationCode : $requestId);
