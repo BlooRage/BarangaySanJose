@@ -127,7 +127,7 @@ $fullAddress = htmlspecialchars(implode(', ', $fullAddressParts), ENT_QUOTES, 'U
     <?php include __DIR__ . '/../includes/resident_sidebar.php'; ?>
 
     <main id="div-mainDisplay" class="flex-grow-1 px-4 pb-4 pt-0 px-md-5 pb-md-5 pt-md-0 bg-light">
-        <div class="main-head application-card orange-card application-card--muted py-3 my-5 rounded">
+        <div class="main-head application-card orange-card py-3 my-5 rounded">
             <div class="main-head-content">
             <a href="<?= htmlspecialchars($baseUrl) ?>/Resident-End/Certificates/CertificatesLandingPage.php" class="back-link">< Go Back</a>
             
@@ -137,6 +137,7 @@ $fullAddress = htmlspecialchars(implode(', ', $fullAddressParts), ENT_QUOTES, 'U
            <form action="<?= htmlspecialchars($baseUrl) ?>/PhpFiles/Resident-End/documentRequestWorkflow.php" method="POST">
                 <input type="hidden" name="action" value="submit_request">
                 <input type="hidden" name="document_type" value="identity">
+                <input type="hidden" name="purpose" value="Certificate of Identity Application">
                 <input type="hidden" name="redirect" value="1">
 
                 <h2 class="section-title text-center text-dark">Applicant Information</h2>
@@ -261,15 +262,6 @@ $fullAddress = htmlspecialchars(implode(', ', $fullAddressParts), ENT_QUOTES, 'U
                     <div class="input-stack">
                         <label class="top-label">Suffix</label>
                         <input type="text" name="mother_suffix">
-                    </div>
-                </div>
-
-                <div class="form-row">
-                    <div class="full-width">
-                        <div class="input-stack">
-                            <label class="top-label">Purpose <span class="required-asterisk">*</span></label>
-                            <textarea name="purpose" rows="4" required>Certificate of Identity Application</textarea>
-                        </div>
                     </div>
                 </div>
 

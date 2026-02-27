@@ -1,4 +1,4 @@
-<?php
+﻿<?php
 if (!isset($baseUrl)) {
     $scriptName = str_replace("\\", "/", (string)($_SERVER['SCRIPT_NAME'] ?? ''));
     $residentSegmentPos = strpos($scriptName, '/Resident-End/');
@@ -226,14 +226,16 @@ $applicantArea = htmlspecialchars($areaNumber, ENT_QUOTES, 'UTF-8');
                         </div>
 
                         <h2 class="section-title text-center text-dark">Cohabitant Address</h2>
-                            <div class="full-width p-3 ">
-                                <div class="beneficiary-block p-2 mt-3 mb-2 pt-3">
+                        <div class="form-row">
+                            <div class="full-width">
+                                <div class="beneficiary-block">
                                     <label class="top-label check-item">
                                         <input type="checkbox" id="cohabitantSameAddress" name="cohabitantSameAddress">
-                                        Same address as applicant
+                                        <span>Same address as applicant</span>
                                     </label>
                                 </div>
                             </div>
+                        </div>
 
                             <div id="cohabitantFullAddressWrapper" class="form-row d-none">
                                 <div class="full-width">
@@ -387,14 +389,16 @@ $applicantArea = htmlspecialchars($areaNumber, ENT_QUOTES, 'UTF-8');
                         </div>
 
                         <h2 class="section-title text-center text-dark">Cohabitation Address</h2>
-                            <div class="full-width p-3">
-                                <div class="beneficiary-block mt-3 mb-2 p-2 pt-3">
+                        <div class="form-row">
+                            <div class="full-width">
+                                <div class="beneficiary-block">
                                     <label class="top-label check-item">
                                         <input type="checkbox" id="cohabitationSameAddress" name="cohabitationSameAddress">
-                                        Cohabitation address is same as applicant address
+                                        <span>Cohabitation address is same as applicant address</span>
                                     </label>
                                 </div>
                             </div>
+                        </div>
   
 
                             <div id="cohabitationFullAddressWrapper" class="form-row d-none">

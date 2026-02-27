@@ -14,6 +14,83 @@ if (!isset($baseUrl)) {
     }
 }
 ?>
+<?php
+$allowUnregistered = false;
+require_once __DIR__ . "/../includes/resident_access_guard.php";
+
+require_once __DIR__ . "/../../PhpFiles/GET/getResidentProfile.php";
+
+$data = getResidentProfileData($conn, $_SESSION['user_id']);
+$residentinformationtbl = $data['residentinformationtbl'] ?? [];
+$residentaddresstbl = $data['residentaddresstbl'] ?? [];
+$useraccountstbl = $data['useraccountstbl'] ?? [];
+
+$firstName = htmlspecialchars($residentinformationtbl['firstname'] ?? '', ENT_QUOTES, 'UTF-8');
+$lastName = htmlspecialchars($residentinformationtbl['lastname'] ?? '', ENT_QUOTES, 'UTF-8');
+$middleName = htmlspecialchars($residentinformationtbl['middlename'] ?? '', ENT_QUOTES, 'UTF-8');
+$suffix = $residentinformationtbl['suffix'] ?? '';
+$phoneNumber = htmlspecialchars($useraccountstbl['phone_number'] ?? '', ENT_QUOTES, 'UTF-8');
+
+$unitNumber = trim((string)($residentaddresstbl['unit_number'] ?? ''));
+$streetNumber = trim((string)($residentaddresstbl['street_number'] ?? ''));
+$streetName = trim((string)($residentaddresstbl['street_name'] ?? ''));
+$phaseNumber = trim((string)($residentaddresstbl['phase_number'] ?? ''));
+$subdivision = trim((string)($residentaddresstbl['subdivision'] ?? ''));
+
+$streetNameHasBlock = $streetName !== '' && stripos($streetName, 'block') !== false;
+$streetNumberHasLot = $streetNumber !== '' && stripos($streetNumber, 'lot') !== false;
+$isLotBlockSystem = $streetNameHasBlock || $streetNumberHasLot;
+
+$streetLabel = $streetName;
+if ($streetLabel !== '' && stripos($streetLabel, 'street') === false && !$streetNameHasBlock) {
+    $streetLabel .= ' Street';
+}
+
+$subdivisionLabel = $subdivision !== '' ? $subdivision . ' Subdivision' : '';
+
+$fullAddressParts = [];
+if ($isLotBlockSystem) {
+    $lotNumber = trim((string)preg_replace('/^lot\\s*/i', '', $streetNumber));
+    $blockNumber = trim((string)preg_replace('/^(block|blk)\\s*/i', '', $streetName));
+    $phaseValue = trim((string)preg_replace('/^phase\\s*/i', '', $phaseNumber));
+
+    $lotLabel = $lotNumber !== '' ? 'Lot ' . $lotNumber : $streetNumber;
+    $blockLabel = $blockNumber !== '' ? 'Blk ' . $blockNumber : $streetName;
+    $phaseLabel = $phaseValue !== '' ? 'Phase ' . $phaseValue : ($phaseNumber !== '' ? $phaseNumber : '');
+
+    $fullAddressParts = array_filter([
+        $lotLabel,
+        $blockLabel,
+        $phaseLabel,
+        $subdivisionLabel,
+        'San Jose',
+        'Rodriguez',
+        'Rizal'
+    ], fn($part) => $part !== '');
+} else {
+    if ($unitNumber !== '') {
+        $fullAddressParts = array_filter([
+            'Unit ' . $unitNumber,
+            $streetLabel,
+            $subdivisionLabel,
+            'San Jose',
+            'Rodriguez',
+            'Rizal'
+        ], fn($part) => $part !== '');
+    } else {
+        $streetLine = trim(implode(' ', array_filter([$streetNumber, $streetLabel], fn($part) => $part !== '')));
+        $fullAddressParts = array_filter([
+            $streetLine,
+            $subdivisionLabel,
+            'San Jose',
+            'Rodriguez',
+            'Rizal'
+        ], fn($part) => $part !== '');
+    }
+}
+
+$fullAddress = htmlspecialchars(implode(', ', $fullAddressParts), ENT_QUOTES, 'UTF-8');
+?>
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -39,55 +116,34 @@ if (!isset($baseUrl)) {
 
             <form action="#" method="POST">
                 
-                <h2 class="section-title text-center text-dark">Owner’s Information</h2>
+                <h2 class="section-title text-center text-dark">Owner's Information</h2>
                 <div class="form-row">
-                    <div class="input-stack"><label class="top-label">Last Name<span class="required-asterisk">*</span></label><input type="text" name="o_ln" required></div>
-                    <div class="input-stack"><label class="top-label">First Name<span class="required-asterisk">*</span></label><input type="text" name="o_fn" required></div>
-                    <div class="input-stack"><label class="top-label">Middle Name</label><input type="text" name="o_mn"></div>
-                    <div class="input-stack"><label class="top-label">Suffix</label><select name="o_sfx"><option value=\"\">None</option><option value=\"Jr.\">Jr.</option><option value=\"Sr.\">Sr.</option><option value=\"III\">III</option><option value=\"IV\">IV</option></select></div>
+                    <div class="input-stack"><label class="top-label">Last Name<span class="required-asterisk">*</span></label><input type="text" name="o_ln" required readonly value="<?php echo $lastName; ?>"></div>
+                    <div class="input-stack"><label class="top-label">First Name<span class="required-asterisk">*</span></label><input type="text" name="o_fn" required readonly value="<?php echo $firstName; ?>"></div>
+                    <div class="input-stack"><label class="top-label">Middle Name</label><input type="text" name="o_mn" readonly value="<?php echo $middleName; ?>"></div>
+                    <div class="input-stack">
+                        <label class="top-label">Suffix</label>
+                        <select name="o_sfx_display" class="text-bg-light" disabled>
+                            <option value="" <?php echo ($suffix === '') ? 'selected' : ''; ?>>None</option>
+                            <option value="Jr." <?php echo ($suffix === 'Jr.') ? 'selected' : ''; ?>>Jr.</option>
+                            <option value="Sr." <?php echo ($suffix === 'Sr.') ? 'selected' : ''; ?>>Sr.</option>
+                            <option value="III" <?php echo ($suffix === 'III') ? 'selected' : ''; ?>>III</option>
+                            <option value="IV" <?php echo ($suffix === 'IV') ? 'selected' : ''; ?>>IV</option>
+                        </select>
+                        <input type="hidden" name="o_sfx" value="<?php echo htmlspecialchars($suffix, ENT_QUOTES, 'UTF-8'); ?>">
+                    </div>
                 </div>
-                <div class="form-row"><div class="full-width"><div class="input-stack"><label class="top-label">Contact Number</label><input type="text" name="o_phone"></div></div></div>
-                <div id="ownerAddressWrapper" class="form-row">
+                <div class="form-row"><div class="full-width"><div class="input-stack"><label class="top-label">Contact Number</label><input type="text" name="o_phone" readonly value="<?php echo $phoneNumber; ?>"></div></div></div>
+                <div class="form-row">
                     <div class="full-width">
-                        <div class="row mb-3">
-                            <div class="col-md-4">
-                                <label class="top-label" for="owner_unit_number">Unit / Apartment Number</label>
-                                <input type="text" id="owner_unit_number" name="owner_unit_number">
-                            </div>
-                            <div class="col-md-4">
-                                <label class="top-label" for="owner_house_number">House Number <span class="required-asterisk">*</span></label>
-                                <input type="text" id="owner_house_number" name="owner_house_number" required>
-                            </div>
-                            <div class="col-md-4">
-                                <label class="top-label" for="owner_street_name">Street Name <span class="required-asterisk">*</span></label>
-                                <input type="text" id="owner_street_name" name="owner_street_name" required>
-                            </div>
+                        <div class="input-stack">
+                            <label class="top-label">Full Address <span class="required-asterisk">*</span></label>
+                            <input type="text" name="owner_full_address" readonly value="<?php echo $fullAddress; ?>">
                         </div>
                     </div>
                 </div>
 
                 <h2 class="section-title text-center text-dark">Business Details</h2>
-                <div class="form-row"><div class="full-width"><div class="input-stack"><label class="top-label">Name of Business<span class="required-asterisk">*</span></label><input type="text" name="b_name" required></div></div></div>
-                <div id="businessLocationWrapper" class="form-row">
-                    <div class="full-width">
-                        <div class="row mb-3">
-                            <div class="col-md-4">
-                                <label class="top-label" for="business_unit_number">Unit / Apartment Number</label>
-                                <input type="text" id="business_unit_number" name="business_unit_number">
-                            </div>
-                            <div class="col-md-4">
-                                <label class="top-label" for="business_house_number">House Number <span class="required-asterisk">*</span></label>
-                                <input type="text" id="business_house_number" name="business_house_number" required>
-                            </div>
-                            <div class="col-md-4">
-                                <label class="top-label" for="business_street_name">Street Name <span class="required-asterisk">*</span></label>
-                                <input type="text" id="business_street_name" name="business_street_name" required>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                <div class="form-row"><div class="full-width"><div class="input-stack"><label class="top-label">Date of Initial Operation<span class="required-asterisk">*</span></label><input type="date" name="b_date" required></div></div></div>
-                
                 <div class="form-row">
                     <div class="full-width">
                         <div class="d-flex align-items-center justify-content-start gap-3 app-type-row">
@@ -104,11 +160,53 @@ if (!isset($baseUrl)) {
                     </div>
                 </div>
 
-                <div class="form-row">
-                    <div class="full-width"><div class="input-stack"><label class="top-label">Contact Number</label><input type="text" name="b_contact_1"></div></div>
+                <div class="form-row"><div class="full-width"><div class="input-stack"><label class="top-label">Name of Business<span class="required-asterisk">*</span></label><input type="text" name="b_name" required></div></div></div>
+                <div id="businessLocationWrapper" class="form-row">
+                    <div class="full-width">
+                        <div class="row mb-3">
+                            <div class="col-md-4">
+                                <label class="top-label" for="business_street_number">Street Number <span class="required-asterisk">*</span></label>
+                                <input type="text" id="business_street_number" name="business_street_number" required>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="top-label" for="business_street_name">Street Name <span class="required-asterisk">*</span></label>
+                                <input type="text" id="business_street_name" name="business_street_name" required>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="top-label" for="business_subdivision">Subdivision</label>
+                                <input type="text" id="business_subdivision" name="business_subdivision">
+                            </div>
+                        </div>
+                    </div>
                 </div>
-
                 <div class="form-row">
+                    <div class="full-width">
+                        <div class="row mb-3">
+                            <div class="col-md-4">
+                                <label class="top-label" for="business_barangay">Barangay</label>
+                                <input type="text" id="business_barangay" name="business_barangay" readonly value="San Jose">
+                            </div>
+                            <div class="col-md-4">
+                                <label class="top-label" for="business_city">Municipality / City</label>
+                                <input type="text" id="business_city" name="business_city" readonly value="Rodriguez (Montalban)">
+                            </div>
+                            <div class="col-md-4">
+                                <label class="top-label" for="business_province">Province</label>
+                                <input type="text" id="business_province" name="business_province" readonly value="Rizal">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="form-row two-col-row">
+                    <div>
+                        <label class="top-label">Date of Initial Operation<span class="required-asterisk">*</span></label>
+                        <input type="date" name="b_date" required>
+                    </div>
+                    <div>
+                        <label class="top-label">Contact Number</label>
+                        <input type="text" name="b_contact_1">
+                    </div>
+                </div><div class="form-row">
                     <div class="full-width">
                         <label class="top-label">Ownership <span class="required-asterisk">*</span></label>
                         <select name="owner_type" id="ownerTypeSelect" required>
@@ -117,6 +215,101 @@ if (!isset($baseUrl)) {
                             <option value="Renter">Renter</option>
                             <option value="Occupant">Occupant</option>
                         </select>
+                    </div>
+                </div>
+
+                <div id="documentUploadSection" class="d-none">
+                    <h2 class="section-title text-center text-dark">Document Upload</h2>
+
+                    <div class="form-row">
+                        <div class="full-width">
+                            <div class="row mb-3">
+                                <div class="col-md-6">
+                                    <label class="top-label" for="validIdType">Valid ID <span class="required-asterisk">*</span></label>
+                                    <select id="validIdType" name="valid_id_type" class="form-select">
+                                        <option value="">Select</option>
+                                        <option value="philsys">PhilSys ID</option>
+                                        <option value="umid">UMID</option>
+                                        <option value="passport">Passport</option>
+                                        <option value="drivers_license">Driver's License</option>
+                                        <option value="prc">PRC ID</option>
+                                        <option value="postal">Postal ID</option>
+                                        <option value="gsis">GSIS ID</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="top-label" for="validIdFile">Upload Valid ID <span class="required-asterisk">*</span></label>
+                                    <input type="file" id="validIdFile" name="valid_id_file" class="form-control" accept=".pdf,.jpg,.jpeg,.png">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div id="validIdNumberRow" class="form-row d-none">
+                        <div class="full-width">
+                            <div class="input-stack">
+                                <label class="top-label" for="validIdNumber">Valid ID Number <span class="required-asterisk">*</span></label>
+                                <input type="text" id="validIdNumber" name="valid_id_number" placeholder="Enter ID number">
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="full-width">
+                            <div class="row mb-3">
+                                <div class="col-md-6">
+                                    <label class="top-label" for="businessRegType">Business Registration <span class="required-asterisk">*</span></label>
+                                    <select id="businessRegType" name="business_reg_type" class="form-select">
+                                        <option value="">Select</option>
+                                        <option value="dti">DTI Certificate (For sole proprietors)</option>
+                                        <option value="sec">SEC Certificate (For corporations)</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="top-label" for="businessRegFile">Upload Business Registration <span class="required-asterisk">*</span></label>
+                                    <input type="file" id="businessRegFile" name="business_reg_file" class="form-control" accept=".pdf,.jpg,.jpeg,.png">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="full-width">
+                            <div class="row mb-3">
+                                <div class="col-md-6">
+                                    <label class="top-label" for="proofAddressType">Proof of Business Address <span class="required-asterisk">*</span></label>
+                                    <select id="proofAddressType" name="proof_address_type" class="form-select">
+                                        <option value="">Select</option>
+                                        <option value="lease">Contract of Lease</option>
+                                        <option value="tct">Transfer Certificate of Title</option>
+                                        <option value="tax_declaration">Tax Declaration</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="top-label" for="proofAddressFile">Upload Proof of Address <span class="required-asterisk">*</span></label>
+                                    <input type="file" id="proofAddressFile" name="proof_address_file" class="form-control" accept=".pdf,.jpg,.jpeg,.png">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div id="proofAddressNumberRow" class="form-row d-none">
+                        <div class="full-width">
+                            <div class="input-stack">
+                                <label class="top-label" for="proofAddressNumber">Document Number <span class="required-asterisk">*</span></label>
+                                <input type="text" id="proofAddressNumber" name="proof_address_number" placeholder="Enter document number">
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="full-width">
+                            <label class="top-label" for="businessPhotoFile">Picture of Establishment or Business <span class="required-asterisk">*</span></label>
+                            <label class="upload-dropzone" id="businessPhotoDropzone" for="businessPhotoFile">
+                                <i class="fa-solid fa-cloud-arrow-up"></i>
+                                <span>Drag files here or click to upload</span>
+                                <small>Accepted: PDF, JPG, JPEG, PNG</small>
+                            </label>
+                            <input type="file" id="businessPhotoFile" name="business_photo_file" class="visually-hidden" accept=".pdf,.jpg,.jpeg,.png">
+                            <div id="businessPhotoSelectedFile" class="selected-files small text-muted mt-2"></div>
+                        </div>
                     </div>
                 </div>
 
@@ -143,33 +336,7 @@ if (!isset($baseUrl)) {
     </main>
 </div>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-    <script>
-        document.addEventListener("DOMContentLoaded", () => {
-            const form = document.querySelector("form");
-            const submitBtn = form?.querySelector(".submit-btn");
-            const ownerTypeSelect = document.getElementById("ownerTypeSelect");
-            const renterOwnerDetails = document.getElementById("renterOwnerDetails");
-            const renterOwnerRequired = renterOwnerDetails
-                ? Array.from(renterOwnerDetails.querySelectorAll("input[name='ro_ln'], input[name='ro_fn']"))
-                : [];
-            if (!form || !submitBtn) return;
-
-            const updateState = () => {
-                if (ownerTypeSelect && renterOwnerDetails) {
-                    const isRenterOrOccupant = ownerTypeSelect.value === "Renter" || ownerTypeSelect.value === "Occupant";
-                    renterOwnerDetails.classList.toggle("d-none", !isRenterOrOccupant);
-                    renterOwnerRequired.forEach((input) => {
-                        input.required = isRenterOrOccupant;
-                    });
-                }
-                submitBtn.disabled = !form.checkValidity();
-            };
-
-            form.addEventListener("input", updateState);
-            form.addEventListener("change", updateState);
-            updateState();
-        });
-    </script>
+    <script src="../../JS-Script-Files/Resident-End/Clearances/businessClearanceScript.js"></script>
 </body>
 </html>
 

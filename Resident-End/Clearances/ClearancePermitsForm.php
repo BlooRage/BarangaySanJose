@@ -41,40 +41,6 @@ if (!isset($baseUrl)) {
 <link rel="stylesheet" href="../../CSS-Styles/Resident-End-CSS/residentDashboard.css">
 <link rel="stylesheet" href="../../CSS-Styles/Guest-End-CSS/GeneralStyle.css">
     <link rel="stylesheet" href="../../CSS-Styles/Resident-End-CSS/applicationForms.css">
-    <style>
-        .check-item {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            margin-bottom: 10px;
-        }
-        
-        .form-row .check-item input[type="checkbox"] {
-            width: 18px;
-            height: 18px;
-            cursor: pointer;
-        }
-
-        .top-label {
-            display: block;
-            font-size: 14px;
-            font-weight: normal;
-            margin-bottom: 5px;
-            color: #333;
-            text-align: left;
-        }
-
-        .flex-input {
-            width: 100%;
-        }
-
-        .input-stack {
-            display: flex;
-            flex-direction: column;
-            width: 100%;
-            margin-bottom: 15px;
-        }
-    </style>
 </head>
 <body>
 
