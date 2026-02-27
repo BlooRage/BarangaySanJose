@@ -65,10 +65,10 @@ function upsertResidentTransaction(
     ?string $releasedBy = null,
     ?string $releasedAt = null
 ): void {
-    $transactionId = GenerateTransactionID($conn, 'unifiedtransactiontbl', 'transaction_id');
+    $transactionId = GenerateTransactionID($conn, 'residenttransactiontbl', 'transaction_id');
 
     $stmt = $conn->prepare("
-        INSERT INTO unifiedtransactiontbl
+        INSERT INTO residenttransactiontbl
             (transaction_id, user_id, resident_user_id, source_type, source_id, transaction_type, title, details, metadata_json, status_id, reviewed_by, reviewed_at, released_by, released_at)
         VALUES
             (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
@@ -168,7 +168,7 @@ function updateResidentTransactionStatus(
     ?string $releasedBy = null
 ): void {
     $stmt = $conn->prepare("
-        UPDATE unifiedtransactiontbl
+        UPDATE residenttransactiontbl
         SET
             status_id = ?,
             reviewed_by = COALESCE(?, reviewed_by),

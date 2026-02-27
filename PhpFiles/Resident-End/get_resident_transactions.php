@@ -294,7 +294,7 @@ function txnSuppressStaleResubmitUrls(array $items): array {
     return $items;
 }
 
-// Prefer unifiedtransactiontbl (new generalized ledger).
+// Prefer residenttransactiontbl (new generalized ledger).
 $sql = "
     SELECT
         t.transaction_id,
@@ -310,7 +310,7 @@ $sql = "
         t.created_at,
         t.updated_at,
         t.reviewed_at
-    FROM unifiedtransactiontbl t
+    FROM residenttransactiontbl t
     LEFT JOIN statuslookuptbl s ON s.status_id = t.status_id
     WHERE (t.resident_user_id = ? OR t.user_id = ?)
 ";
@@ -336,7 +336,7 @@ $params[] = $offset;
 $stmt = $conn->prepare($sql);
 if (!$stmt) {
     http_response_code(500);
-    echo json_encode(['success' => false, 'message' => 'Failed to load transactions. Ensure unifiedtransactiontbl exists and uses the expected columns.']);
+    echo json_encode(['success' => false, 'message' => 'Failed to load transactions. Ensure residenttransactiontbl exists and uses the expected columns.']);
     exit;
 }
 

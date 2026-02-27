@@ -308,6 +308,7 @@ if ($action === 'submit_request') {
     if ($documentType === '') {
         $documentType = 'Certificate Request';
     }
+    $documentTypeId = dr_get_or_create_document_type_id($conn, $documentType, 'DocumentRequest');
 
     $purpose = trim((string)($_POST['request_purpose'] ?? $_POST['purpose'] ?? ''));
     if ($purpose === '') {
@@ -318,7 +319,6 @@ if ($action === 'submit_request') {
     unset($payload['action'], $payload['csrf_token']);
 
     $now = dr_now();
-    $stage = DR_STAGE_SUBMITTED;
     $requestId = dr_generate_request_id($conn);
 
     $payloadJson = dr_safe_json($payload);
@@ -329,21 +329,14 @@ if ($action === 'submit_request') {
     $params = [];
 
     $residentNames = dr_get_resident_name_parts($conn, $userId);
-    $pendingStatusId = dr_pick_any_status_id($conn, ['PendingReview', 'Pending']);
+    $pendingStatusId = dr_pick_any_status_id($conn, ['PendingVerification', 'PendingReview', 'Pending']);
     $requestDetails = trim($documentType . ($purpose !== '' ? ' - ' . $purpose : ''));
     if ($requestDetails === '') {
         $requestDetails = 'Document request submitted';
     }
     $requestDetailsToken = dr_request_details_token($documentTypeRaw, $documentType);
     $requestDetailsJsonRequired = dr_request_details_requires_json($conn);
-    $requestDetailsValue = $requestDetails;
-    if ($requestDetailsJsonRequired) {
-        $requestDetailsValue = dr_safe_json([
-            'summary' => $requestDetails,
-            'document_type' => $documentType,
-            'purpose' => $purpose,
-        ]);
-    }
+    $requestDetailsValue = $payloadJson;
     $defaultValidity = date('Y-m-d H:i:s', strtotime('+1 year'));
 
     $setIfColumn = function (string $column, string $type, $value) use (&$values, &$types, &$params, $conn) {
@@ -362,9 +355,12 @@ if ($action === 'submit_request') {
     $setIfColumn('resident_id', 's', $residentId);
     $setIfColumn('resident_name', 's', trim($residentNames['firstname'] . ' ' . $residentNames['middlename'] . ' ' . $residentNames['lastname']));
     $setIfColumn('document_type', 's', $documentType);
+    if (dr_has_column($conn, 'documentrequesttbl', 'document_type_id') && $documentTypeId) {
+        $values['document_type_id'] = (int)$documentTypeId;
+        $types .= 'i';
+        $params[] = (int)$documentTypeId;
+    }
     $setIfColumn('purpose', 's', $purpose);
-    $setIfColumn('payload_json', 's', $payloadJson);
-    $setIfColumn('stage', 's', $stage);
     $setIfColumn('submitted_at', 's', $now);
     $setIfColumn('created_at', 's', $now);
     $setIfColumn('updated_at', 's', $now);
@@ -383,11 +379,11 @@ if ($action === 'submit_request') {
         $params[] = $attachmentId;
     }
     $setIfColumn('request_details', 's', $requestDetailsValue);
-    if (dr_has_column($conn, 'documentrequesttbl', 'status_id_request')) {
+    if (dr_has_column($conn, 'documentrequesttbl', 'status_id')) {
         if ($pendingStatusId === null) {
             dr_respond_json(500, ['success' => false, 'message' => 'Pending status is not configured.']);
         }
-        $values['status_id_request'] = $pendingStatusId;
+        $values['status_id'] = $pendingStatusId;
         $types .= 'i';
         $params[] = $pendingStatusId;
     }
@@ -454,7 +450,7 @@ if ($action === 'submit_request') {
                 $columns = array_keys($values);
                 $types = '';
                 foreach ($columns as $c) {
-                    $types .= ($c === 'attachment_id' || $c === 'status_id_request') ? 'i' : 's';
+                    $types .= ($c === 'attachment_id' || $c === 'status_id' || $c === 'document_type_id') ? 'i' : 's';
                 }
 
                 $retrySql = "INSERT INTO documentrequesttbl (" . implode(',', $columns) . ") VALUES (" . implode(',', array_fill(0, count($columns), '?')) . ")";
@@ -500,13 +496,15 @@ if ($action === 'submit_request') {
         $stmt->close();
     }
 
-    $certificateDetails = dr_safe_json([
-        'purpose' => $purpose,
-        'submitted_payload' => $payload,
-        'resident_id' => $residentId,
-        'resident_user_id' => $residentForeignId,
-    ]);
-    dr_upsert_certificate_request($conn, $requestId, $documentType, $certificateDetails);
+    if (dr_is_issuance_document_type($documentType)) {
+        $certificateDetails = dr_safe_json([
+            'purpose' => $purpose,
+            'submitted_payload' => $payload,
+            'resident_id' => $residentId,
+            'resident_user_id' => $residentForeignId,
+        ]);
+        dr_upsert_certificate_request($conn, $requestId, $documentType, $certificateDetails);
+    }
 
     $row = dr_fetch_request($conn, $requestId);
     if ($row) {
@@ -562,7 +560,7 @@ if ($action === 'submit_payment') {
         'payment_method' => $paymentMethod,
         'payment_proof_path' => $proofPath,
         'payment_submitted_at' => dr_now(),
-        'status_reason' => null,
+        'status_remarks' => null,
     ]);
 
     if (!$updated) {
@@ -673,9 +671,10 @@ if ($action === 'list') {
     $items = [];
     $res = $stmt->get_result();
     while ($row = $res->fetch_assoc()) {
+        dr_sync_stage_from_status_lookup($conn, $row);
         $row['stage_label'] = dr_stage_label((string)$row['stage']);
         $row['fee_amount'] = dr_get_fee_amount_for_document_type($conn, (string)($row['document_type'] ?? ''));
-        $payload = json_decode((string)($row['payload_json'] ?? '{}'), true);
+        $payload = json_decode((string)($row['request_details'] ?? $row['payload_json'] ?? '{}'), true);
         $row['payload'] = is_array($payload) ? $payload : [];
         $items[] = $row;
     }

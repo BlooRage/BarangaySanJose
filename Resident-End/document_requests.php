@@ -225,7 +225,7 @@ require_once __DIR__ . '/includes/resident_access_guard.php';
           action = `${viewBtn}${proofBtn}`;
         }
 
-        const reason = r.status_reason ? `<div class="text-danger small mt-1">Reason: ${escapeHtml(r.status_reason)}</div>` : '';
+        const reason = r.status_remarks ? `<div class="text-danger small mt-1">Reason: ${escapeHtml(r.status_remarks)}</div>` : '';
         const feeText = (r.fee_amount !== null && r.fee_amount !== undefined && String(r.fee_amount) !== '')
           ? `₱${Number(r.fee_amount).toFixed(2)}`
           : '-';
@@ -265,7 +265,7 @@ require_once __DIR__ . '/includes/resident_access_guard.php';
             ['Purpose', row.purpose || '-'],
             ['Fee', (row.fee_amount !== null && row.fee_amount !== undefined && String(row.fee_amount) !== '') ? `₱${Number(row.fee_amount).toFixed(2)}` : '-'],
             ['Stage', row.stage_label || row.stage || '-'],
-            ['Status Reason', row.status_reason || '-'],
+            ['Status Remarks', row.status_remarks || '-'],
             ['Submitted At', row.submitted_at || '-'],
             ['Payment Method', row.payment_method || '-'],
             ['Amount', row.amount || '-'],

@@ -71,7 +71,7 @@ function pendingFromTransaction(
 
     $stmt = $conn->prepare("
         SELECT 1
-        FROM unifiedtransactiontbl
+        FROM residenttransactiontbl
         WHERE resident_user_id = ?
           AND source_type = 'EDIT_REQUEST'
           AND transaction_type = ?

@@ -1461,7 +1461,7 @@ try {
             // Keep transactions aligned with current registration submission.
             // If proof upload was skipped (or nothing uploaded), remove profiling proof transactions.
             $cleanupTx = $conn->prepare("
-                DELETE FROM unifiedtransactiontbl
+                DELETE FROM residenttransactiontbl
                 WHERE resident_user_id = ?
                   AND source_type = 'RESIDENT_PROFILE'
                   AND source_id = ?

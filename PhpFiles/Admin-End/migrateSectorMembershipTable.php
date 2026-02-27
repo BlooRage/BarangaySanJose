@@ -20,7 +20,7 @@ try {
     $createSql = "
         CREATE TABLE IF NOT EXISTS residentsectormembershiptbl (
           id INT NOT NULL AUTO_INCREMENT,
-          resident_id VARCHAR(10) NOT NULL,
+          resident_id VARCHAR(10) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci NOT NULL,
           sector_key VARCHAR(64) NOT NULL,
           sector_status_id INT NOT NULL,
           latest_attachment_id INT NULL,
@@ -34,7 +34,10 @@ try {
           KEY idx_resident (resident_id),
           KEY idx_sector (sector_key),
           KEY idx_sector_status (sector_status_id),
-          KEY idx_latest_attachment (latest_attachment_id)
+          KEY idx_latest_attachment (latest_attachment_id),
+          CONSTRAINT fk_rsm_resident_id FOREIGN KEY (resident_id)
+            REFERENCES residentinformationtbl(resident_id)
+            ON DELETE CASCADE ON UPDATE CASCADE
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
     ";
 

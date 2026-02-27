@@ -13,7 +13,10 @@ function ti_json(int $status, array $payload): void {
 
 function ti_stage_label(string $stage): string {
     $map = [
-        'submitted' => 'Submitted',
+        'submitted' => 'Pending Verification',
+        'for_interview' => 'For Interview',
+        'for_inspection' => 'For Inspection',
+        'inspection_failed' => 'Inspection Failed',
         'rejected' => 'Rejected',
         'for_payment' => 'For Payment',
         'payment_submitted' => 'Pending Payment Verification',
@@ -23,6 +26,26 @@ function ti_stage_label(string $stage): string {
         'completed' => 'Completed',
     ];
     return $map[$stage] ?? ucfirst(str_replace('_', ' ', $stage));
+}
+
+function ti_stage_from_status_name(string $statusName): ?string {
+    $k = strtolower(trim($statusName));
+    $map = [
+        'pendingverification' => 'submitted',
+        'pendingreview' => 'submitted',
+        'forinterview' => 'for_interview',
+        'forinspection' => 'for_inspection',
+        'inspectionfailed' => 'inspection_failed',
+        'forpayment' => 'for_payment',
+        'paymentsubmitted' => 'payment_submitted',
+        'paymentrejected' => 'payment_rejected',
+        'paymentverified' => 'payment_verified',
+        'forrelease' => 'ready_for_claim',
+        'readyforclaim' => 'ready_for_claim',
+        'completed' => 'completed',
+        'rejected' => 'rejected',
+    ];
+    return $map[$k] ?? null;
 }
 
 function ti_value(array $arr, array $keys, string $default = ''): string {
@@ -48,9 +71,10 @@ $stmt = $conn->prepare("
         resident_id,
         document_type,
         purpose,
-        payload_json,
-        stage,
-        status_reason,
+        request_details,
+        status_id,
+        (SELECT sl.status_name FROM statuslookuptbl sl WHERE sl.status_id = documentrequesttbl.status_id LIMIT 1) AS status_lookup_name,
+        status_remarks,
         amount,
         or_number,
         certificate_number,
@@ -78,6 +102,11 @@ if (!$row) {
     ti_json(404, ['success' => false, 'message' => 'Transaction not found or invalid verification link.']);
 }
 
+$statusMappedStage = ti_stage_from_status_name((string)($row['status_lookup_name'] ?? ''));
+if ($statusMappedStage !== null) {
+    $row['stage'] = $statusMappedStage;
+}
+
 $expectedCode = trim((string)($row['verification_code'] ?? ''));
 if ($expectedCode === '') {
     $expectedCode = (string)$row['request_id'];
@@ -87,7 +116,7 @@ if ($verificationCode === '' || strcasecmp($verificationCode, $expectedCode) !==
     ti_json(404, ['success' => false, 'message' => 'Transaction not found or invalid verification link.']);
 }
 
-$payload = json_decode((string)($row['payload_json'] ?? '{}'), true);
+$payload = json_decode((string)($row['request_details'] ?? $row['payload_json'] ?? '{}'), true);
 if (!is_array($payload)) {
     $payload = [];
 }
@@ -126,7 +155,7 @@ ti_json(200, [
         'certificate_number' => (string)($row['certificate_number'] ?? ''),
         'status' => ti_stage_label((string)($row['stage'] ?? 'submitted')),
         'status_raw' => (string)($row['stage'] ?? 'submitted'),
-        'reason' => (string)($row['status_reason'] ?? ''),
+        'reason' => (string)($row['status_remarks'] ?? ''),
         'document_type' => (string)($row['document_type'] ?? 'Certificate Request'),
         'full_name' => $fullName,
         'purpose' => $purpose,
@@ -136,4 +165,3 @@ ti_json(200, [
         'submitted_at' => (string)($row['submitted_at'] ?? ''),
     ],
 ]);
-

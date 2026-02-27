@@ -106,7 +106,7 @@ function dra_generate_issued_document(array $requestRow): ?string {
     $docType = trim((string)($requestRow['document_type'] ?? 'Certificate'));
     $purpose = trim((string)($requestRow['purpose'] ?? ''));
     $issuedAt = date('F j, Y');
-    $payload = json_decode((string)($requestRow['payload_json'] ?? '{}'), true);
+    $payload = json_decode((string)($requestRow['request_details'] ?? $requestRow['payload_json'] ?? '{}'), true);
     if (!is_array($payload)) {
         $payload = [];
     }
@@ -314,19 +314,18 @@ function dra_generate_issued_document(array $requestRow): ?string {
 
 function dra_backfill_payment_verified_to_ready(mysqli $conn): void {
     try {
-        $legacyStage = DR_STAGE_PAYMENT_VERIFIED;
-        $stmt = $conn->prepare("SELECT * FROM documentrequesttbl WHERE stage = ? ORDER BY request_id ASC");
-        if (!$stmt) {
+        $res = $conn->query("SELECT * FROM documentrequesttbl ORDER BY request_id ASC");
+        if (!$res instanceof mysqli_result) {
             return;
         }
-        $stmt->bind_param('s', $legacyStage);
-        $stmt->execute();
-        $res = $stmt->get_result();
         $rows = [];
         while ($row = $res->fetch_assoc()) {
+            dr_sync_stage_from_status_lookup($conn, $row);
+            if ((string)($row['stage'] ?? '') !== DR_STAGE_PAYMENT_VERIFIED) {
+                continue;
+            }
             $rows[] = $row;
         }
-        $stmt->close();
 
         foreach ($rows as $row) {
             $requestId = (string)($row['request_id'] ?? '');
@@ -526,11 +525,6 @@ if ($action === 'list') {
     $vals = [];
 
     $stage = trim((string)($_GET['stage'] ?? ''));
-    if ($stage !== '') {
-        $where[] = 'stage = ?';
-        $types .= 's';
-        $vals[] = $stage;
-    }
 
     $search = trim((string)($_GET['q'] ?? ''));
     if ($search !== '') {
@@ -565,16 +559,20 @@ if ($action === 'list') {
     $items = [];
     $rs = $stmt->get_result();
     while ($row = $rs->fetch_assoc()) {
+        dr_sync_stage_from_status_lookup($conn, $row);
         $row['stage_label'] = dr_stage_label((string)$row['stage']);
         $row['fee_amount'] = dr_get_fee_amount_for_document_type($conn, (string)($row['document_type'] ?? ''));
-        $payload = json_decode((string)($row['payload_json'] ?? '{}'), true);
+        $payload = json_decode((string)($row['request_details'] ?? $row['payload_json'] ?? '{}'), true);
         $row['payload'] = is_array($payload) ? $payload : [];
         $row['resident_profile'] = dra_resident_profile_snapshot(
             $conn,
             (string)($row['resident_user_id'] ?? ''),
             (string)($row['resident_id'] ?? '')
         );
-        $items[] = $row;
+      if ($stage !== '' && (string)($row['stage'] ?? '') !== $stage) {
+          continue;
+      }
+      $items[] = $row;
     }
     $stmt->close();
 
@@ -628,8 +626,13 @@ if ($requestId !== '' && !$row) {
 }
 
 if ($action === 'personnel_approve') {
+    $currentStage = (string)($row['stage'] ?? '');
+    if (!in_array($currentStage, [DR_STAGE_SUBMITTED, DR_STAGE_FOR_INTERVIEW, DR_STAGE_FOR_INSPECTION], true)) {
+        dr_respond_json(422, ['success' => false, 'message' => 'Request is not in a reviewable stage.']);
+    }
+
     $updated = dr_update_stage($conn, $requestId, DR_STAGE_FOR_PAYMENT, [
-        'status_reason' => null,
+        'status_remarks' => null,
         'personnel_user_id' => $currentUserId,
         'personnel_decision_at' => dr_now(),
     ]);
@@ -647,14 +650,99 @@ if ($action === 'personnel_approve') {
     dr_respond_json(200, ['success' => true, 'request' => $updated]);
 }
 
+if ($action === 'personnel_interview') {
+    $currentStage = (string)($row['stage'] ?? '');
+    if ($currentStage !== DR_STAGE_SUBMITTED) {
+        dr_respond_json(422, ['success' => false, 'message' => 'Only submitted requests can be moved to interview.']);
+    }
+
+    $updated = dr_update_stage($conn, $requestId, DR_STAGE_FOR_INTERVIEW, [
+        'status_remarks' => null,
+        'personnel_user_id' => $currentUserId,
+        'personnel_decision_at' => dr_now(),
+    ]);
+    if (!$updated) {
+        dr_respond_json(500, ['success' => false, 'message' => 'Unable to set request for interview.']);
+    }
+
+    dr_send_notification(
+        $conn,
+        $updated,
+        'Document Request For Interview',
+        'Your request ' . $requestId . ' is set for interview. Please wait for further instructions.'
+    );
+
+    dr_respond_json(200, ['success' => true, 'request' => $updated]);
+}
+
+if ($action === 'personnel_inspection') {
+    $currentStage = (string)($row['stage'] ?? '');
+    if (!in_array($currentStage, [DR_STAGE_SUBMITTED, DR_STAGE_FOR_INTERVIEW], true)) {
+        dr_respond_json(422, ['success' => false, 'message' => 'Only submitted/interview requests can be moved to inspection.']);
+    }
+
+    $updated = dr_update_stage($conn, $requestId, DR_STAGE_FOR_INSPECTION, [
+        'status_remarks' => null,
+        'personnel_user_id' => $currentUserId,
+        'personnel_decision_at' => dr_now(),
+    ]);
+    if (!$updated) {
+        dr_respond_json(500, ['success' => false, 'message' => 'Unable to set request for inspection.']);
+    }
+
+    dr_send_notification(
+        $conn,
+        $updated,
+        'Document Request For Inspection',
+        'Your request ' . $requestId . ' is set for inspection. Please wait for further instructions.'
+    );
+
+    dr_respond_json(200, ['success' => true, 'request' => $updated]);
+}
+
+if ($action === 'personnel_inspection_failed') {
+    $currentStage = (string)($row['stage'] ?? '');
+    if ($currentStage !== DR_STAGE_FOR_INSPECTION) {
+        dr_respond_json(422, ['success' => false, 'message' => 'Only inspection-stage requests can be marked as inspection failed.']);
+    }
+
+    $reason = trim((string)($_POST['reason'] ?? ''));
+    if ($reason === '') {
+        dr_respond_json(422, ['success' => false, 'message' => 'Inspection failure reason is required.']);
+    }
+
+    $updated = dr_update_stage($conn, $requestId, DR_STAGE_INSPECTION_FAILED, [
+        'status_remarks' => $reason,
+        'personnel_user_id' => $currentUserId,
+        'personnel_decision_at' => dr_now(),
+    ]);
+    if (!$updated) {
+        dr_respond_json(500, ['success' => false, 'message' => 'Unable to set inspection failed status.']);
+    }
+
+    dr_send_notification(
+        $conn,
+        $updated,
+        'Document Request Inspection Failed',
+        'Your request ' . $requestId . ' failed inspection. Reason: ' . $reason
+    );
+
+    dr_respond_json(200, ['success' => true, 'request' => $updated]);
+}
+
 if ($action === 'personnel_reject') {
+    $currentStage = (string)($row['stage'] ?? '');
+    if (!in_array($currentStage, [DR_STAGE_SUBMITTED, DR_STAGE_FOR_INTERVIEW, DR_STAGE_FOR_INSPECTION], true)) {
+        dr_respond_json(422, ['success' => false, 'message' => 'Request is not in a reviewable stage.']);
+    }
+
     $reason = trim((string)($_POST['reason'] ?? ''));
     if ($reason === '') {
         dr_respond_json(422, ['success' => false, 'message' => 'Rejection reason is required.']);
     }
 
     $updated = dr_update_stage($conn, $requestId, DR_STAGE_REJECTED, [
-        'status_reason' => $reason,
+        'status_remarks' => $reason,
         'personnel_user_id' => $currentUserId,
         'personnel_decision_at' => dr_now(),
     ]);
@@ -703,7 +791,7 @@ if ($action === 'finance_verify') {
         'certificate_number' => $certificateNumber,
         'verification_code' => $verificationCode,
         'qr_code_path' => $qrCodePath,
-        'status_reason' => null,
+        'status_remarks' => null,
         'finance_user_id' => $currentUserId,
         'finance_decision_at' => dr_now(),
         'ready_at' => dr_now(),
@@ -736,7 +824,7 @@ if ($action === 'finance_reject') {
     }
 
     $updated = dr_update_stage($conn, $requestId, DR_STAGE_PAYMENT_REJECTED, [
-        'status_reason' => $reason,
+        'status_remarks' => $reason,
         'finance_user_id' => $currentUserId,
         'finance_decision_at' => dr_now(),
     ]);

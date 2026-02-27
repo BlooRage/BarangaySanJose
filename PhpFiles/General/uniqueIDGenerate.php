@@ -167,7 +167,7 @@ function GenerateAddressID(mysqli $conn, string $areaNumber): string {
 
 function GenerateTransactionID(
     mysqli $conn,
-    string $tableName = 'unifiedtransactiontbl',
+    string $tableName = 'residenttransactiontbl',
     string $columnName = 'transaction_id'
 ): string {
     // Format: MMYYYYXXXX (non-sequential random suffix).

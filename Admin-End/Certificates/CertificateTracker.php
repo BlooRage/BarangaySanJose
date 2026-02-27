@@ -12,6 +12,10 @@ require_once __DIR__ . '/../includes/admin_guard.php';
   <link rel="stylesheet" href="../../CSS-Styles/Admin-End-CSS/AdminDashboardStyle.css">
   <link rel="stylesheet" href="../../CSS-Styles/Admin-End-CSS/ResidentMasterlistStyle.css">
   <style>
+    .certificate-tracker-shell {
+      max-width: 1340px;
+      margin: 0 auto;
+    }
     .certificate-tracker-shell .admin-list-toolbar {
       overflow-x: visible;
       overflow-y: visible;

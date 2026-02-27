@@ -7,6 +7,9 @@ require_once __DIR__ . '/sendSMS.php';
 require_once __DIR__ . '/../EmailHandlers/emailSender.php';
 
 const DR_STAGE_SUBMITTED = 'submitted';
+const DR_STAGE_FOR_INTERVIEW = 'for_interview';
+const DR_STAGE_FOR_INSPECTION = 'for_inspection';
+const DR_STAGE_INSPECTION_FAILED = 'inspection_failed';
 const DR_STAGE_REJECTED = 'rejected';
 const DR_STAGE_FOR_PAYMENT = 'for_payment';
 const DR_STAGE_PAYMENT_SUBMITTED = 'payment_submitted';
@@ -67,9 +70,10 @@ function dr_ensure_document_request_extensions(mysqli $conn): void {
     $columnsToEnsure = [
         "resident_name VARCHAR(191) DEFAULT NULL AFTER resident_id",
         "attachment_id BIGINT(20) UNSIGNED DEFAULT NULL AFTER resident_name",
+        "document_type_id INT(11) DEFAULT NULL AFTER document_type",
         "request_details LONGTEXT DEFAULT NULL AFTER purpose",
-        "status_id_request INT(11) DEFAULT NULL AFTER stage",
-        "user_id_official_reviewed_by VARCHAR(12) DEFAULT NULL AFTER status_id_request",
+        "status_id INT(11) DEFAULT NULL AFTER request_details",
+        "user_id_official_reviewed_by VARCHAR(12) DEFAULT NULL AFTER status_id",
         "user_id_official_released_by VARCHAR(12) DEFAULT NULL AFTER user_id_official_reviewed_by",
         "request_timestamp DATETIME DEFAULT NULL AFTER user_id_official_released_by",
         "review_timestamp DATETIME DEFAULT NULL AFTER request_timestamp",
@@ -111,7 +115,7 @@ function dr_ensure_request_child_tables(mysqli $conn): void {
     ");
 
     $conn->query("
-        CREATE TABLE IF NOT EXISTS certificaterequesttbl (
+        CREATE TABLE IF NOT EXISTS issuancerequesttbl (
             certificate_id BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT,
             request_id {$requestIdType} NOT NULL,
             certificate_type VARCHAR(120) NOT NULL,
@@ -119,8 +123,8 @@ function dr_ensure_request_child_tables(mysqli $conn): void {
             created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
             updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
             PRIMARY KEY (certificate_id),
-            UNIQUE KEY uq_certreq_request (request_id),
-            KEY idx_certreq_type (certificate_type)
+            UNIQUE KEY uq_issuancereq_request (request_id),
+            KEY idx_issuancereq_type (certificate_type)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
     ");
 
@@ -167,7 +171,7 @@ function dr_ensure_request_child_tables(mysqli $conn): void {
     ");
 
     $conn->query("
-        CREATE TABLE IF NOT EXISTS transactiontbl (
+        CREATE TABLE IF NOT EXISTS financetransactiontbl (
             transaction_id VARCHAR(10) NOT NULL,
             request_id {$requestIdType} NOT NULL,
             transaction_amount DECIMAL(12,2) DEFAULT NULL,
@@ -206,10 +210,11 @@ function dr_ensure_table(mysqli $conn): void {
             resident_user_id VARCHAR(12) NOT NULL,
             resident_id VARCHAR(12) DEFAULT NULL,
             document_type VARCHAR(80) NOT NULL,
+            document_type_id INT(11) DEFAULT NULL,
             purpose VARCHAR(255) DEFAULT NULL,
-            payload_json LONGTEXT DEFAULT NULL,
-            stage VARCHAR(32) NOT NULL DEFAULT 'submitted',
-            status_reason TEXT DEFAULT NULL,
+            request_details LONGTEXT DEFAULT NULL,
+            status_id INT(11) DEFAULT NULL,
+            status_remarks TEXT DEFAULT NULL,
             payment_method VARCHAR(20) DEFAULT NULL,
             payment_proof_path VARCHAR(255) DEFAULT NULL,
             payment_submitted_at DATETIME DEFAULT NULL,
@@ -228,7 +233,8 @@ function dr_ensure_table(mysqli $conn): void {
             created_at DATETIME NOT NULL,
             updated_at DATETIME NOT NULL,
             INDEX idx_docreq_resident_user (resident_user_id),
-            INDEX idx_docreq_stage (stage),
+            INDEX idx_docreq_status_id (status_id),
+            INDEX idx_docreq_document_type_id (document_type_id),
             INDEX idx_docreq_submitted (submitted_at),
             INDEX idx_docreq_doc_type (document_type)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
@@ -241,11 +247,12 @@ function dr_ensure_table(mysqli $conn): void {
         "resident_user_id VARCHAR(12) NOT NULL AFTER request_id",
         "resident_id VARCHAR(12) DEFAULT NULL AFTER resident_user_id",
         "document_type VARCHAR(80) NOT NULL AFTER resident_id",
+        "document_type_id INT(11) DEFAULT NULL AFTER document_type",
         "purpose VARCHAR(255) DEFAULT NULL AFTER document_type",
-        "payload_json LONGTEXT DEFAULT NULL AFTER purpose",
-        "stage VARCHAR(32) NOT NULL DEFAULT 'submitted' AFTER payload_json",
-        "status_reason TEXT DEFAULT NULL AFTER stage",
-        "payment_method VARCHAR(20) DEFAULT NULL AFTER status_reason",
+        "request_details LONGTEXT DEFAULT NULL AFTER purpose",
+        "status_id INT(11) DEFAULT NULL AFTER request_details",
+        "status_remarks TEXT DEFAULT NULL AFTER status_id",
+        "payment_method VARCHAR(20) DEFAULT NULL AFTER status_remarks",
         "payment_proof_path VARCHAR(255) DEFAULT NULL AFTER payment_method",
         "payment_submitted_at DATETIME DEFAULT NULL AFTER payment_proof_path",
         "amount DECIMAL(12,2) DEFAULT NULL AFTER payment_submitted_at",
@@ -288,14 +295,52 @@ function dr_ensure_table(mysqli $conn): void {
     if (!in_array('idx_docreq_resident_user', $indexNames, true)) {
         $conn->query("ALTER TABLE documentrequesttbl ADD INDEX idx_docreq_resident_user (resident_user_id)");
     }
-    if (!in_array('idx_docreq_stage', $indexNames, true)) {
-        $conn->query("ALTER TABLE documentrequesttbl ADD INDEX idx_docreq_stage (stage)");
+    if (!in_array('idx_docreq_status_id', $indexNames, true)) {
+        $conn->query("ALTER TABLE documentrequesttbl ADD INDEX idx_docreq_status_id (status_id)");
     }
     if (!in_array('idx_docreq_submitted', $indexNames, true)) {
         $conn->query("ALTER TABLE documentrequesttbl ADD INDEX idx_docreq_submitted (submitted_at)");
     }
     if (!in_array('idx_docreq_doc_type', $indexNames, true)) {
         $conn->query("ALTER TABLE documentrequesttbl ADD INDEX idx_docreq_doc_type (document_type)");
+    }
+    if (!in_array('idx_docreq_document_type_id', $indexNames, true)) {
+        $conn->query("ALTER TABLE documentrequesttbl ADD INDEX idx_docreq_document_type_id (document_type_id)");
+    }
+
+    // Backward-compatible rename handling.
+    if (!dr_column_exists($conn, 'documentrequesttbl', 'status_id') && dr_column_exists($conn, 'documentrequesttbl', 'status_id_request')) {
+        $conn->query("ALTER TABLE documentrequesttbl CHANGE COLUMN status_id_request status_id INT(11) DEFAULT NULL");
+    }
+    if (!dr_column_exists($conn, 'documentrequesttbl', 'status_remarks') && dr_column_exists($conn, 'documentrequesttbl', 'status_reason')) {
+        $conn->query("ALTER TABLE documentrequesttbl CHANGE COLUMN status_reason status_remarks TEXT NULL");
+    }
+
+    // Ensure FK for document type link.
+    if (dr_column_exists($conn, 'documentrequesttbl', 'document_type_id') && dr_table_exists($conn, 'documenttypelookuptbl')) {
+        $fkDocType = 'fk_docreq_document_type_id';
+        $fkCheckDocType = $conn->prepare("
+            SELECT COUNT(*)
+            FROM information_schema.KEY_COLUMN_USAGE
+            WHERE TABLE_SCHEMA = DATABASE()
+              AND TABLE_NAME = 'documentrequesttbl'
+              AND CONSTRAINT_NAME = ?
+        ");
+        if ($fkCheckDocType) {
+            $fkCheckDocType->bind_param('s', $fkDocType);
+            $fkCheckDocType->execute();
+            $fkCheckDocType->bind_result($fkDocTypeCount);
+            $fkCheckDocType->fetch();
+            $fkCheckDocType->close();
+            if ((int)$fkDocTypeCount === 0) {
+                $conn->query("
+                    ALTER TABLE documentrequesttbl
+                    ADD CONSTRAINT {$fkDocType}
+                    FOREIGN KEY (document_type_id) REFERENCES documenttypelookuptbl(document_type_id)
+                    ON DELETE SET NULL ON UPDATE CASCADE
+                ");
+            }
+        }
     }
 
     dr_ensure_document_request_extensions($conn);
@@ -403,9 +448,82 @@ function dr_normalize_document_type(string $value): string {
     return $map[$key] ?? trim($value);
 }
 
+function dr_is_issuance_document_type(string $documentType): bool {
+    $doc = strtolower(trim($documentType));
+    if ($doc === '') {
+        return false;
+    }
+    // Issuance department currently handles certificate documents.
+    return strpos($doc, 'certificate') !== false;
+}
+
+function dr_canonical_document_type_key(string $value): string {
+    $raw = strtolower(trim($value));
+    return preg_replace('/[^a-z0-9]+/', '', $raw);
+}
+
+function dr_document_type_name_variants(string $documentType): array {
+    $doc = trim($documentType);
+    if ($doc === '') return [];
+    $canonical = dr_canonical_document_type_key($doc);
+    $variants = [$doc];
+    if ($canonical === 'certificateofindigency') {
+        $variants[] = 'Certificate of Indigency';
+        $variants[] = 'CertificateOfIndigency';
+    }
+    return array_values(array_unique(array_filter(array_map('trim', $variants), static fn($v) => $v !== '')));
+}
+
+function dr_get_or_create_document_type_id(mysqli $conn, string $documentType, string $category = 'DocumentRequest'): ?int {
+    $variants = dr_document_type_name_variants($documentType);
+    if (!$variants) return null;
+
+    foreach ($variants as $name) {
+        $sel = $conn->prepare("SELECT document_type_id FROM documenttypelookuptbl WHERE document_type_name = ? LIMIT 1");
+        if (!$sel) continue;
+        $sel->bind_param('s', $name);
+        $sel->execute();
+        $sel->bind_result($docTypeId);
+        $ok = $sel->fetch();
+        $sel->close();
+        if ($ok && $docTypeId) {
+            return (int)$docTypeId;
+        }
+    }
+
+    $createName = $variants[0];
+    $ins = $conn->prepare("INSERT INTO documenttypelookuptbl (document_type_name, document_category) VALUES (?, ?)");
+    if (!$ins) return null;
+    $ins->bind_param('ss', $createName, $category);
+    $okIns = $ins->execute();
+    $insertId = (int)$ins->insert_id;
+    $ins->close();
+    if ($okIns && $insertId > 0) {
+        return $insertId;
+    }
+
+    // Race-safe retry.
+    foreach ($variants as $name) {
+        $sel = $conn->prepare("SELECT document_type_id FROM documenttypelookuptbl WHERE document_type_name = ? LIMIT 1");
+        if (!$sel) continue;
+        $sel->bind_param('s', $name);
+        $sel->execute();
+        $sel->bind_result($docTypeId);
+        $ok = $sel->fetch();
+        $sel->close();
+        if ($ok && $docTypeId) {
+            return (int)$docTypeId;
+        }
+    }
+    return null;
+}
+
 function dr_stage_label(string $stage): string {
     $labels = [
-        DR_STAGE_SUBMITTED => 'Submitted',
+        DR_STAGE_SUBMITTED => 'Pending Verification',
+        DR_STAGE_FOR_INTERVIEW => 'For Interview',
+        DR_STAGE_FOR_INSPECTION => 'For Inspection',
+        DR_STAGE_INSPECTION_FAILED => 'Inspection Failed',
         DR_STAGE_REJECTED => 'Rejected',
         DR_STAGE_FOR_PAYMENT => 'For Payment',
         DR_STAGE_PAYMENT_SUBMITTED => 'Pending Payment Verification',
@@ -415,6 +533,43 @@ function dr_stage_label(string $stage): string {
         DR_STAGE_COMPLETED => 'Completed',
     ];
     return $labels[$stage] ?? $stage;
+}
+
+function dr_stage_to_request_status_names(string $stage): array {
+    $map = [
+        DR_STAGE_SUBMITTED => ['PendingVerification', 'PendingReview'],
+        DR_STAGE_FOR_INTERVIEW => ['ForInterview'],
+        DR_STAGE_FOR_INSPECTION => ['ForInspection'],
+        DR_STAGE_INSPECTION_FAILED => ['InspectionFailed'],
+        DR_STAGE_REJECTED => ['Rejected'],
+        DR_STAGE_FOR_PAYMENT => ['ForPayment'],
+        DR_STAGE_PAYMENT_SUBMITTED => ['PaymentSubmitted'],
+        DR_STAGE_PAYMENT_REJECTED => ['PaymentRejected'],
+        DR_STAGE_PAYMENT_VERIFIED => ['PaymentVerified'],
+        DR_STAGE_READY_FOR_CLAIM => ['ForRelease', 'ReadyForClaim'],
+        DR_STAGE_COMPLETED => ['Completed'],
+    ];
+    return $map[$stage] ?? [];
+}
+
+function dr_status_name_to_stage(string $statusName): ?string {
+    $key = strtolower(trim($statusName));
+    $map = [
+        'pendingverification' => DR_STAGE_SUBMITTED,
+        'pendingreview' => DR_STAGE_SUBMITTED,
+        'forinterview' => DR_STAGE_FOR_INTERVIEW,
+        'forinspection' => DR_STAGE_FOR_INSPECTION,
+        'inspectionfailed' => DR_STAGE_INSPECTION_FAILED,
+        'rejected' => DR_STAGE_REJECTED,
+        'forpayment' => DR_STAGE_FOR_PAYMENT,
+        'paymentsubmitted' => DR_STAGE_PAYMENT_SUBMITTED,
+        'paymentrejected' => DR_STAGE_PAYMENT_REJECTED,
+        'paymentverified' => DR_STAGE_PAYMENT_VERIFIED,
+        'forrelease' => DR_STAGE_READY_FOR_CLAIM,
+        'readyforclaim' => DR_STAGE_READY_FOR_CLAIM,
+        'completed' => DR_STAGE_COMPLETED,
+    ];
+    return $map[$key] ?? null;
 }
 
 function dr_find_status_id(mysqli $conn, string $statusName, array $preferredTypes = []): ?int {
@@ -472,7 +627,7 @@ function dr_map_stage_to_transaction_status_id(mysqli $conn, string $stage): int
         ?? dr_find_status_id($conn, 'Rejected', [])
         ?? $pending;
 
-    if (in_array($stage, [DR_STAGE_REJECTED, DR_STAGE_PAYMENT_REJECTED], true)) {
+    if (in_array($stage, [DR_STAGE_REJECTED, DR_STAGE_PAYMENT_REJECTED, DR_STAGE_INSPECTION_FAILED], true)) {
         return $rejected;
     }
     if ($stage === DR_STAGE_COMPLETED) {
@@ -481,7 +636,58 @@ function dr_map_stage_to_transaction_status_id(mysqli $conn, string $stage): int
     return $pending;
 }
 
+function dr_find_request_status_id_by_stage(mysqli $conn, string $stage): ?int {
+    $candidates = dr_stage_to_request_status_names($stage);
+    foreach ($candidates as $statusName) {
+        $sid = dr_find_status_id($conn, $statusName, ['DocumentVerification']);
+        if ($sid !== null) return $sid;
+        $sid = dr_find_status_id($conn, $statusName, []);
+        if ($sid !== null) return $sid;
+    }
+    return null;
+}
+
+function dr_status_name_by_id(mysqli $conn, ?int $statusId): string {
+    if (!$statusId || $statusId <= 0) return '';
+    static $cache = [];
+    if (isset($cache[$statusId])) {
+        return $cache[$statusId];
+    }
+    $name = '';
+    $stmt = $conn->prepare("SELECT status_name FROM statuslookuptbl WHERE status_id = ? LIMIT 1");
+    if ($stmt) {
+        $stmt->bind_param('i', $statusId);
+        $stmt->execute();
+        $stmt->bind_result($nameRes);
+        if ($stmt->fetch()) {
+            $name = trim((string)$nameRes);
+        }
+        $stmt->close();
+    }
+    $cache[$statusId] = $name;
+    return $name;
+}
+
+function dr_sync_stage_from_status_lookup(mysqli $conn, array &$row): void {
+    if (!isset($row['status_id'])) {
+        return;
+    }
+    $statusId = (int)$row['status_id'];
+    if ($statusId <= 0) {
+        return;
+    }
+    $statusName = dr_status_name_by_id($conn, $statusId);
+    if ($statusName === '') {
+        return;
+    }
+    $mappedStage = dr_status_name_to_stage($statusName);
+    if ($mappedStage !== null) {
+        $row['stage'] = $mappedStage;
+    }
+}
+
 function dr_sync_transaction(mysqli $conn, array $request): void {
+    dr_sync_stage_from_status_lookup($conn, $request);
     $requestId = (string)($request['request_id'] ?? '');
     $accountUserId = (string)($request['resident_user_id'] ?? '');
     if ($requestId === '' || $accountUserId === '') {
@@ -491,7 +697,7 @@ function dr_sync_transaction(mysqli $conn, array $request): void {
     $docType = (string)($request['document_type'] ?? 'Document Request');
     $purpose = trim((string)($request['purpose'] ?? ''));
     $stage = (string)($request['stage'] ?? DR_STAGE_SUBMITTED);
-    $reason = trim((string)($request['status_reason'] ?? ''));
+    $reason = trim((string)($request['status_remarks'] ?? ''));
 
     $description = 'Stage: ' . dr_stage_label($stage);
     if ($purpose !== '') {
@@ -530,12 +736,12 @@ function dr_sync_transaction(mysqli $conn, array $request): void {
     );
 
     dr_ensure_request_child_tables($conn);
-    if (!dr_table_exists($conn, 'transactiontbl')) {
+    if (!dr_table_exists($conn, 'financetransactiontbl')) {
         return;
     }
 
     $existingId = '';
-    $sel = $conn->prepare("SELECT transaction_id FROM transactiontbl WHERE request_id = ? LIMIT 1");
+    $sel = $conn->prepare("SELECT transaction_id FROM financetransactiontbl WHERE request_id = ? LIMIT 1");
     if ($sel) {
         $sel->bind_param('s', $requestId);
         $sel->execute();
@@ -545,10 +751,10 @@ function dr_sync_transaction(mysqli $conn, array $request): void {
     }
     $transactionId = trim($existingId);
     if ($transactionId === '') {
-        $transactionId = GenerateTransactionID($conn, 'transactiontbl', 'transaction_id');
+        $transactionId = GenerateTransactionID($conn, 'financetransactiontbl', 'transaction_id');
     }
 
-    $payload = json_decode((string)($request['payload_json'] ?? '{}'), true);
+    $payload = json_decode((string)($request['request_details'] ?? $request['payload_json'] ?? '{}'), true);
     if (!is_array($payload)) {
         $payload = [];
     }
@@ -585,7 +791,7 @@ function dr_sync_transaction(mysqli $conn, array $request): void {
 
     $statusId = dr_map_stage_to_transaction_status_id($conn, $stage);
     $sql = "
-        INSERT INTO transactiontbl (
+        INSERT INTO financetransactiontbl (
             transaction_id, request_id, transaction_amount, applicant_lastname, applicant_firstname, applicant_middleInitial,
             payment_method, transaction_details, or_number, transaction_status_id, payment_deadline, payment_timestamp, user_id_employee_process
         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, ?)
@@ -633,12 +839,15 @@ function dr_fetch_request(mysqli $conn, string $requestId): ?array {
     $stmt->execute();
     $row = $stmt->get_result()->fetch_assoc();
     $stmt->close();
+    if (is_array($row)) {
+        dr_sync_stage_from_status_lookup($conn, $row);
+    }
     return $row ?: null;
 }
 
 function dr_update_stage(mysqli $conn, string $requestId, string $stage, array $patch = []): ?array {
     $allowedColumns = [
-        'status_reason',
+        'status_remarks',
         'payment_method',
         'payment_proof_path',
         'payment_submitted_at',
@@ -656,9 +865,9 @@ function dr_update_stage(mysqli $conn, string $requestId, string $stage, array $
         'completed_at',
     ];
 
-    $sets = ['stage = ?', 'updated_at = ?'];
-    $types = 'ss';
-    $vals = [$stage, dr_now()];
+    $sets = ['updated_at = ?'];
+    $types = 's';
+    $vals = [dr_now()];
 
     foreach ($patch as $k => $v) {
         if (!in_array($k, $allowedColumns, true)) {
@@ -674,9 +883,12 @@ function dr_update_stage(mysqli $conn, string $requestId, string $stage, array $
         }
     }
 
-    $requestStatusId = dr_map_stage_to_transaction_status_id($conn, $stage);
-    if (dr_column_exists($conn, 'documentrequesttbl', 'status_id_request')) {
-        $sets[] = 'status_id_request = ?';
+    $requestStatusId = dr_find_request_status_id_by_stage($conn, $stage);
+    if ($requestStatusId === null) {
+        $requestStatusId = dr_map_stage_to_transaction_status_id($conn, $stage);
+    }
+    if (dr_column_exists($conn, 'documentrequesttbl', 'status_id')) {
+        $sets[] = 'status_id = ?';
         $types .= 'i';
         $vals[] = $requestStatusId;
     }
@@ -689,7 +901,7 @@ function dr_update_stage(mysqli $conn, string $requestId, string $stage, array $
     }
 
     if (dr_column_exists($conn, 'documentrequesttbl', 'review_timestamp')
-        && in_array($stage, [DR_STAGE_REJECTED, DR_STAGE_FOR_PAYMENT, DR_STAGE_PAYMENT_REJECTED, DR_STAGE_READY_FOR_CLAIM, DR_STAGE_COMPLETED], true)) {
+        && in_array($stage, [DR_STAGE_FOR_INTERVIEW, DR_STAGE_FOR_INSPECTION, DR_STAGE_INSPECTION_FAILED, DR_STAGE_REJECTED, DR_STAGE_FOR_PAYMENT, DR_STAGE_PAYMENT_REJECTED, DR_STAGE_READY_FOR_CLAIM, DR_STAGE_COMPLETED], true)) {
         $sets[] = 'review_timestamp = ?';
         $types .= 's';
         $vals[] = dr_now();
@@ -838,7 +1050,7 @@ function dr_ensure_certificate_request_table(mysqli $conn): void {
 
     // Build table with request_id type matching documentrequesttbl.request_id.
     $sql = "
-        CREATE TABLE IF NOT EXISTS certificaterequesttbl (
+        CREATE TABLE IF NOT EXISTS issuancerequesttbl (
             certificate_id BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT,
             request_id {$requestIdType} NOT NULL,
             certificate_type VARCHAR(120) NOT NULL,
@@ -846,19 +1058,19 @@ function dr_ensure_certificate_request_table(mysqli $conn): void {
             created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
             updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
             PRIMARY KEY (certificate_id),
-            UNIQUE KEY uq_certreq_request (request_id),
-            KEY idx_certreq_type (certificate_type)
+            UNIQUE KEY uq_issuancereq_request (request_id),
+            KEY idx_issuancereq_type (certificate_type)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
     ";
     $conn->query($sql);
 
     // Add FK if not present and types are compatible (best effort).
-    $fkName = 'fk_certreq_request_id';
+    $fkName = 'fk_issuancereq_request_id';
     $fkCheck = $conn->prepare("
         SELECT COUNT(*) 
         FROM information_schema.KEY_COLUMN_USAGE
         WHERE TABLE_SCHEMA = DATABASE()
-          AND TABLE_NAME = 'certificaterequesttbl'
+          AND TABLE_NAME = 'issuancerequesttbl'
           AND CONSTRAINT_NAME = ?
     ");
     if ($fkCheck) {
@@ -871,7 +1083,7 @@ function dr_ensure_certificate_request_table(mysqli $conn): void {
         if ((int)$fkCount === 0) {
             // Try to add FK; ignore failure on incompatible existing schema.
             $conn->query("
-                ALTER TABLE certificaterequesttbl
+                ALTER TABLE issuancerequesttbl
                 ADD CONSTRAINT {$fkName}
                 FOREIGN KEY (request_id) REFERENCES documentrequesttbl(request_id)
                 ON DELETE CASCADE ON UPDATE CASCADE
@@ -886,7 +1098,7 @@ function dr_upsert_certificate_request(mysqli $conn, $requestId, string $certifi
     dr_ensure_certificate_request_table($conn);
 
     $stmt = $conn->prepare("
-        INSERT INTO certificaterequesttbl (request_id, certificate_type, certificate_details)
+        INSERT INTO issuancerequesttbl (request_id, certificate_type, certificate_details)
         VALUES (?, ?, ?)
         ON DUPLICATE KEY UPDATE
             certificate_type = VALUES(certificate_type),
@@ -927,31 +1139,41 @@ function dr_ensure_general_fees_table(mysqli $conn): void {
     $certificateDocNames = [
         'Certificate of Cohabitation',
         'Certificate of Indigency',
+        'CertificateOfIndigency',
         'First Time Job Seeker Certificate',
         'Certificate of Identity',
         'Certificate of Residency',
         'Certificate of Good Moral',
     ];
-    $sel = $conn->prepare("SELECT document_type_id FROM documenttypelookuptbl WHERE document_type_name = ? LIMIT 1");
     $upsert = $conn->prepare("
         INSERT INTO generalfeestbl (document_type_id, amount)
         VALUES (?, 50.00)
         ON DUPLICATE KEY UPDATE amount = VALUES(amount), updated_at = CURRENT_TIMESTAMP
     ");
-    if ($sel && $upsert) {
+    if ($upsert) {
         foreach ($certificateDocNames as $name) {
-            $sel->bind_param('s', $name);
-            $sel->execute();
-            $sel->bind_result($docTypeId);
-            if ($sel->fetch()) {
-                $docTypeIdParam = (int)$docTypeId;
+            $docTypeIdParam = dr_get_or_create_document_type_id($conn, $name, 'DocumentRequest');
+            if ($docTypeIdParam) {
                 $upsert->bind_param('i', $docTypeIdParam);
                 $upsert->execute();
             }
-            $sel->free_result();
         }
-        $sel->close();
         $upsert->close();
+    }
+
+    // CertificateOfIndigency is free.
+    $indigencyId = dr_get_or_create_document_type_id($conn, 'CertificateOfIndigency', 'DocumentRequest');
+    if ($indigencyId) {
+        $free = $conn->prepare("
+            INSERT INTO generalfeestbl (document_type_id, amount)
+            VALUES (?, 0.00)
+            ON DUPLICATE KEY UPDATE amount = VALUES(amount), updated_at = CURRENT_TIMESTAMP
+        ");
+        if ($free) {
+            $free->bind_param('i', $indigencyId);
+            $free->execute();
+            $free->close();
+        }
     }
 
     $done = true;
@@ -959,18 +1181,13 @@ function dr_ensure_general_fees_table(mysqli $conn): void {
 
 function dr_get_fee_amount_for_document_type(mysqli $conn, string $documentType): ?float {
     dr_ensure_general_fees_table($conn);
-
-    $stmt = $conn->prepare("
-        SELECT gf.amount
-        FROM generalfeestbl gf
-        INNER JOIN documenttypelookuptbl dt ON dt.document_type_id = gf.document_type_id
-        WHERE dt.document_type_name = ?
-        LIMIT 1
-    ");
+    $docTypeId = dr_get_or_create_document_type_id($conn, $documentType, 'DocumentRequest');
+    if (!$docTypeId) return null;
+    $stmt = $conn->prepare("SELECT amount FROM generalfeestbl WHERE document_type_id = ? LIMIT 1");
     if (!$stmt) {
         return null;
     }
-    $stmt->bind_param('s', $documentType);
+    $stmt->bind_param('i', $docTypeId);
     $stmt->execute();
     $stmt->bind_result($amount);
     $ok = $stmt->fetch();

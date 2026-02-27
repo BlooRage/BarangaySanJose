@@ -599,7 +599,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_resident_statu
             }
 
             $txnUpdate = $conn->prepare("
-                UPDATE unifiedtransactiontbl
+                UPDATE residenttransactiontbl
                 SET
                     status_id = ?,
                     details = CASE

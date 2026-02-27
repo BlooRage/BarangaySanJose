@@ -72,8 +72,11 @@
   function badge(stage, label) {
     const k = String(stage || '').toLowerCase();
     if (k.includes('rejected')) return `<span class="badge bg-danger">${label}</span>`;
+    if (k === 'inspection_failed') return `<span class="badge bg-danger">${label}</span>`;
     if (k === 'completed') return `<span class="badge bg-success">${label}</span>`;
     if (k === 'ready_for_claim') return `<span class="badge bg-primary">${label}</span>`;
+    if (k === 'for_interview') return `<span class="badge bg-info text-dark">${label}</span>`;
+    if (k === 'for_inspection') return `<span class="badge bg-info-subtle text-dark">${label}</span>`;
     if (k === 'for_payment' || k === 'payment_submitted') return `<span class="badge bg-warning text-dark">${label}</span>`;
     return `<span class="badge bg-secondary">${label}</span>`;
   }
@@ -103,6 +106,26 @@
       return `
         ${profileBtn}
         ${proofBtn}
+        <button class="btn btn-sm btn-outline-info" data-view-action="personnel_interview" data-id="${id}">For Interview</button>
+        <button class="btn btn-sm btn-outline-info" data-view-action="personnel_inspection" data-id="${id}">For Inspection</button>
+        <button class="btn btn-sm btn-success" data-view-action="personnel_approve" data-id="${id}">Approve</button>
+        <button class="btn btn-sm btn-danger" data-view-action="personnel_reject" data-id="${id}">Reject</button>
+      `;
+    }
+    if (stage === 'for_interview') {
+      return `
+        ${profileBtn}
+        ${proofBtn}
+        <button class="btn btn-sm btn-outline-info" data-view-action="personnel_inspection" data-id="${id}">For Inspection</button>
+        <button class="btn btn-sm btn-success" data-view-action="personnel_approve" data-id="${id}">Approve</button>
+        <button class="btn btn-sm btn-danger" data-view-action="personnel_reject" data-id="${id}">Reject</button>
+      `;
+    }
+    if (stage === 'for_inspection') {
+      return `
+        ${profileBtn}
+        ${proofBtn}
+        <button class="btn btn-sm btn-outline-danger" data-view-action="personnel_inspection_failed" data-id="${id}">Inspection Failed</button>
         <button class="btn btn-sm btn-success" data-view-action="personnel_approve" data-id="${id}">Approve</button>
         <button class="btn btn-sm btn-danger" data-view-action="personnel_reject" data-id="${id}">Reject</button>
       `;
@@ -737,7 +760,7 @@
   }
 
   function rowHtml(row) {
-    const reason = row.status_reason ? `<div class="text-danger small mt-1">Reason: ${esc(row.status_reason)}</div>` : '';
+    const reason = row.status_remarks ? `<div class="text-danger small mt-1">Reason: ${esc(row.status_remarks)}</div>` : '';
     const fullName = fullNameFromRow(row);
     const residentAddress = firstNonEmpty([
       row?.payload?.full_address,
@@ -769,7 +792,10 @@
   function statusBucket(row) {
     const stage = String(row?.stage || '').toLowerCase();
     if (stage.includes('rejected')) return 'rejected';
+    if (stage === 'inspection_failed') return 'inspection_failed';
     if (stage === 'submitted') return 'submitted';
+    if (stage === 'for_interview') return 'for_interview';
+    if (stage === 'for_inspection') return 'for_inspection';
     if (stage === 'for_payment') return 'for_payment';
     if (stage === 'payment_submitted') return 'pending_payment';
     if (stage === 'ready_for_claim' || stage === 'payment_verified') return 'release';
@@ -829,7 +855,10 @@
     if (!filterStatusList || !filterAreaList) return;
 
     const statusOptions = [
-      { key: 'submitted', label: 'Pending Review' },
+      { key: 'submitted', label: 'Pending Verification' },
+      { key: 'for_interview', label: 'For Interview' },
+      { key: 'for_inspection', label: 'For Inspection' },
+      { key: 'inspection_failed', label: 'Inspection Failed' },
       { key: 'for_payment', label: 'For Payment' },
       { key: 'pending_payment', label: 'Pending Payment' },
       { key: 'release', label: 'Release' },
@@ -949,6 +978,9 @@
 
     const labels = {
       personnel_approve: 'Approve Request',
+      personnel_interview: 'Set For Interview',
+      personnel_inspection: 'Set For Inspection',
+      personnel_inspection_failed: 'Mark Inspection Failed',
       personnel_reject: 'Reject Request',
       finance_verify: 'Verify Payment',
       finance_reject: 'Reject Payment',
@@ -957,7 +989,7 @@
     };
     modalTitle.textContent = labels[type] || 'Update Request';
 
-    if (type === 'personnel_reject' || type === 'finance_reject') {
+    if (type === 'personnel_reject' || type === 'finance_reject' || type === 'personnel_inspection_failed') {
       actionReasonWrap.classList.remove('d-none');
       actionReason.required = true;
     }
@@ -1104,7 +1136,7 @@
           'Request Status',
           renderFormGrid([
             formField('Status', row.stage_label || row.stage || '-'),
-            formField('Status Reason', row.status_reason || '-'),
+            formField('Status Remarks', row.status_remarks || '-'),
             formField('Submitted At', row.submitted_at || '-')
           ], 3)
         );

@@ -7,7 +7,7 @@ CREATE TABLE `documentrequesttbl` (
   `suffix` varchar(255) DEFAULT NULL,
   `attachment_id` bigint(20) unsigned NOT NULL,
   `request_details` varchar(255) NOT NULL,
-  `status_id_request` int(11) DEFAULT NULL,
+  `status_id` int(11) DEFAULT NULL,
   `user_id_official_reviewed_by` varchar(12) DEFAULT NULL,
   `user_id_official_released_by` varchar(12) DEFAULT NULL,
   `request_timestamp` datetime NOT NULL,
@@ -18,14 +18,14 @@ CREATE TABLE `documentrequesttbl` (
   PRIMARY KEY (`request_id`),
   KEY `fk_docreq_resident_user` (`resident_user_id`),
   KEY `fk_docreq_attachment_id` (`attachment_id`),
-  KEY `fk_docreq_status_id` (`status_id_request`),
+  KEY `fk_docreq_status_id` (`status_id`),
   KEY `fk_docreq_official_reviewed_by` (`user_id_official_reviewed_by`),
   KEY `fk_docreq_official_released_by` (`user_id_official_released_by`),
   CONSTRAINT `fk_docreq_attachment_id` FOREIGN KEY (`attachment_id`) REFERENCES `unifiedfileattachmenttbl` (`attachment_id`),
   CONSTRAINT `fk_docreq_official_released_by` FOREIGN KEY (`user_id_official_released_by`) REFERENCES `useraccountstbl` (`user_id`),
   CONSTRAINT `fk_docreq_official_reviewed_by` FOREIGN KEY (`user_id_official_reviewed_by`) REFERENCES `useraccountstbl` (`user_id`),
   CONSTRAINT `fk_docreq_resident_user` FOREIGN KEY (`resident_user_id`) REFERENCES `useraccountstbl` (`user_id`) ON DELETE CASCADE ON UPDATE CASCADE,
-  CONSTRAINT `fk_docreq_status_id` FOREIGN KEY (`status_id_request`) REFERENCES `statuslookuptbl` (`status_id`)
+  CONSTRAINT `fk_docreq_status_id` FOREIGN KEY (`status_id`) REFERENCES `statuslookuptbl` (`status_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 CREATE TABLE `documenttypelookuptbl` (

@@ -10,7 +10,7 @@ CREATE TABLE IF NOT EXISTS documentrequesttbl (
   resident_name VARCHAR(191) DEFAULT NULL,
   attachment_id BIGINT(20) UNSIGNED DEFAULT NULL,
   request_details LONGTEXT DEFAULT NULL,
-  status_id_request INT(11) DEFAULT NULL,
+  status_id INT(11) DEFAULT NULL,
   user_id_official_reviewed_by VARCHAR(12) DEFAULT NULL,
   user_id_official_released_by VARCHAR(12) DEFAULT NULL,
   request_timestamp DATETIME DEFAULT NULL,
@@ -20,10 +20,9 @@ CREATE TABLE IF NOT EXISTS documentrequesttbl (
   qr_code_path VARCHAR(255) DEFAULT NULL,
   resident_id VARCHAR(12) DEFAULT NULL,
   document_type VARCHAR(120) DEFAULT NULL,
+  document_type_id INT(11) DEFAULT NULL,
   purpose VARCHAR(255) DEFAULT NULL,
-  payload_json LONGTEXT DEFAULT NULL,
-  stage VARCHAR(32) NOT NULL DEFAULT 'submitted',
-  status_reason TEXT DEFAULT NULL,
+  status_remarks TEXT DEFAULT NULL,
   payment_method VARCHAR(40) DEFAULT NULL,
   payment_proof_path VARCHAR(255) DEFAULT NULL,
   payment_submitted_at DATETIME DEFAULT NULL,
@@ -43,9 +42,10 @@ CREATE TABLE IF NOT EXISTS documentrequesttbl (
   updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (request_id),
   KEY idx_docreq_resident_user (resident_user_id),
-  KEY idx_docreq_stage (stage),
+  KEY idx_docreq_document_type_id (document_type_id),
+  KEY idx_docreq_status_id (status_id),
   KEY idx_docreq_timestamp (request_timestamp),
-  KEY idx_docreq_status (status_id_request)
+  KEY idx_docreq_status (status_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 CREATE TABLE IF NOT EXISTS barangayidrequesttbl (
@@ -61,7 +61,7 @@ CREATE TABLE IF NOT EXISTS barangayidrequesttbl (
     ON DELETE CASCADE ON UPDATE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
-CREATE TABLE IF NOT EXISTS certificaterequesttbl (
+CREATE TABLE IF NOT EXISTS issuancerequesttbl (
   certificate_id BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT,
   request_id VARCHAR(16) NOT NULL,
   certificate_type VARCHAR(120) NOT NULL,
@@ -69,9 +69,9 @@ CREATE TABLE IF NOT EXISTS certificaterequesttbl (
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (certificate_id),
-  UNIQUE KEY uq_certreq_request (request_id),
-  KEY idx_certreq_type (certificate_type),
-  CONSTRAINT fk_certreq_request FOREIGN KEY (request_id)
+  UNIQUE KEY uq_issuancereq_request (request_id),
+  KEY idx_issuancereq_type (certificate_type),
+  CONSTRAINT fk_issuancereq_request FOREIGN KEY (request_id)
     REFERENCES documentrequesttbl(request_id)
     ON DELETE CASCADE ON UPDATE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
@@ -121,7 +121,7 @@ CREATE TABLE IF NOT EXISTS clearancefeestbl (
     ON DELETE CASCADE ON UPDATE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
-CREATE TABLE IF NOT EXISTS transactiontbl (
+CREATE TABLE IF NOT EXISTS financetransactiontbl (
   transaction_id VARCHAR(10) NOT NULL,
   request_id VARCHAR(16) NOT NULL,
   transaction_amount DECIMAL(12,2) DEFAULT NULL,
