@@ -16,7 +16,7 @@ require_once __DIR__ . "/../includes/resident_access_guard.php";
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
     <link rel="stylesheet" href="../../CSS-Styles/Resident-End-CSS/residentDashboard.css">
     <link rel="stylesheet" href="../../CSS-Styles/Guest-End-CSS/GeneralStyle.css">
-    <link rel="stylesheet" href="../../CSS-Styles/Resident-End-CSS/ApplicationLandingPage.css">
+    <link rel="stylesheet" href="../../CSS-Styles/Resident-End-CSS/ApplicationLandingPage.css?v=20260228-3">
 </head>
 
 <body>
@@ -47,7 +47,7 @@ require_once __DIR__ . "/../includes/resident_access_guard.php";
 
                 <div class="col d-flex">
                     <div class="certificate-card card-action w-100">
-                        <img src="../../icons/dashboard/clearancepermits.png" class="certificate-icon" alt="For Tricycle Permit">
+                        <img src="../../icons/dashboard/tricycle.png" class="certificate-icon" alt="For Tricycle Permit">
                         <h3>FOR TRICYCLE PERMIT</h3>
                         <p class="certificate-text">Apply for barangay clearance required for tricycle permit processing.</p>
                         <button class="btn apply-btn" onclick="location.href='TricycleForm.php'">Apply Now</button>
@@ -56,7 +56,7 @@ require_once __DIR__ . "/../includes/resident_access_guard.php";
 
                 <div class="col d-flex">
                     <div class="certificate-card card-action w-100">
-                        <img src="../../icons/dashboard/clearancepermits.png" class="certificate-icon" alt="For Electrical Permit">
+                        <img src="../../icons/dashboard/electricity.png" class="certificate-icon" alt="For Electrical Permit">
                         <h3>FOR ELECTRICAL PERMIT</h3>
                         <p class="certificate-text">Apply for barangay clearance required for electrical permit processing.</p>
                         <button class="btn apply-btn" onclick="location.href='ElectricalForm.php'">Apply Now</button>
@@ -65,7 +65,7 @@ require_once __DIR__ . "/../includes/resident_access_guard.php";
 
                 <div class="col d-flex">
                     <div class="certificate-card card-action w-100">
-                        <img src="../../icons/dashboard/clearancepermits.png" class="certificate-icon" alt="For Water Permit">
+                        <img src="../../icons/dashboard/water.png" class="certificate-icon" alt="For Water Permit">
                         <h3>FOR WATER PERMIT</h3>
                         <p class="certificate-text">Apply for barangay clearance required for water permit processing.</p>
                         <button class="btn apply-btn" onclick="location.href='WaterForm.php'">Apply Now</button>
@@ -74,7 +74,7 @@ require_once __DIR__ . "/../includes/resident_access_guard.php";
 
                 <div class="col d-flex">
                     <div class="certificate-card card-action w-100">
-                        <img src="../../icons/dashboard/clearancepermits.png" class="certificate-icon" alt="For Residential Permit">
+                        <img src="../../icons/dashboard/residential.png" class="certificate-icon" alt="For Residential Permit">
                         <h3>FOR RESIDENTIAL PERMIT</h3>
                         <p class="certificate-text">Apply for barangay clearance required for residential permit processing.</p>
                         <button class="btn apply-btn" onclick="location.href='ResidentialForm.php'">Apply Now</button>
@@ -83,7 +83,7 @@ require_once __DIR__ . "/../includes/resident_access_guard.php";
 
                 <div class="col d-flex">
                     <div class="certificate-card card-action w-100">
-                        <img src="../../icons/dashboard/clearancepermits.png" class="certificate-icon" alt="For Commercial Permit">
+                        <img src="../../icons/dashboard/commercial.png" class="certificate-icon" alt="For Commercial Permit">
                         <h3>FOR COMMERCIAL PERMIT</h3>
                         <p class="certificate-text">Apply for barangay clearance required for commercial permit processing.</p>
                         <button class="btn apply-btn" onclick="location.href='CommercialForm.php'">Apply Now</button>

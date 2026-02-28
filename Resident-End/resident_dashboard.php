@@ -145,7 +145,7 @@ if (isset($_SESSION['show_not_verified_modal'])) {
         <div class="col-12 col-md-4 col-lg-3">
           <div id="card-serviceRequest-brgyId"
                class="card-action h-100 p-4 rounded-4 text-center d-flex flex-column align-items-center justify-content-center border-0 shadow-sm"
-               onclick="location.href='BarangayId/BarangayIdForm.php'">
+               onclick="location.href='BarangayId/BarangayIdLandingPage.php'">
             <i class="fa-solid fa-id-card fa-2xl mb-3"></i><br>
             <span class="fw-bold small">BARANGAY ID</span>
           </div>
@@ -154,7 +154,7 @@ if (isset($_SESSION['show_not_verified_modal'])) {
         <div class="col-12 col-md-4 col-lg-3">
           <div id="card-serviceRequest-appointments"
                class="card-action h-100 p-4 rounded-4 text-center d-flex flex-column align-items-center justify-content-center border-0 shadow-sm"
-               onclick="location.href='Appointments/AppointmentForm.php'">
+               onclick="location.href='Appointments/AppointmentsLandingPage.php'">
             <i class="fa-solid fa-calendar-check fa-2xl mb-3"></i><br>
             <span class="fw-bold small">APPOINTMENTS</span>
           </div>
@@ -181,7 +181,7 @@ if (isset($_SESSION['show_not_verified_modal'])) {
         <div class="col-12 col-md-4 col-lg-3">
           <div id="card-serviceRequest-complaints"
                class="card-action h-100 p-4 rounded-4 text-center d-flex flex-column align-items-center justify-content-center border-0 shadow-sm"
-               onclick="location.href='Complaints/ComplaintsForm.php'">
+               onclick="location.href='Complaints/ComplaintsLandingPage.php'">
             <i class="fa-solid fa-comment-dots fa-2xl mb-3"></i><br>
             <span class="fw-bold small">COMPLAINTS</span>
           </div>
@@ -252,3 +252,4 @@ if (isset($_SESSION['show_not_verified_modal'])) {
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 </body>
 </html>
+
