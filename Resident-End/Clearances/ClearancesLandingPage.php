@@ -33,7 +33,7 @@ require_once __DIR__ . "/../includes/resident_access_guard.php";
 
             <p class="section-label">List of clearances:</p>
 
-            <div class="row row-cols-1 row-cols-md-2 row-cols-lg-3 g-4 certificate-grid justify-content-center">
+            <div class="row row-cols-1 row-cols-md-2 row-cols-lg-3 certificate-grid justify-content-center">
                 <div class="col d-flex">
                     <div class="certificate-card card-action w-100">
                         <img src="../../icons/dashboard/businessclearance.png" class="certificate-icon" alt="For Business Clearance">
@@ -90,14 +90,14 @@ require_once __DIR__ . "/../includes/resident_access_guard.php";
                     </div>
                 </div>
 
-                <div class="col d-flex">
+                <!-- <div class="col d-flex">
                     <div class="certificate-card card-action w-100">
                         <img src="../../icons/dashboard/clearancepermits.png" class="certificate-icon" alt="For Other Permits">
                         <h3>FOR OTHER PERMITS</h3>
                         <p class="certificate-text">Apply for barangay clearance required for other permit processing.</p>
                         <button class="btn apply-btn" onclick="location.href='OtherPermitsForm.php'">Apply Now</button>
                     </div>
-                </div>
+                </div> -->
             </div>
         </main>
     </div>
