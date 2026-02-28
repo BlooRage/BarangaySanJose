@@ -101,6 +101,7 @@
       ? `<button class="btn btn-sm btn-outline-success me-1" data-issued-id="${esc(row.request_id)}">View Document</button>`
       : '';
     const viewDocBtn = String(row.stage || '').toLowerCase() === 'ready_for_claim'
+      ? `<button class="btn btn-sm btn-outline-primary me-1" data-preview-id="${esc(row.request_id)}">View Document</button>`
       : '';
     const proofBtn = row.payment_proof_path
       ? `<button class="btn btn-sm btn-outline-dark me-1" data-proof-id="${esc(row.request_id)}">View Payment</button>`
