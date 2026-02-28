@@ -248,8 +248,11 @@ if ($residentId !== '' && isset($conn) && $conn instanceof mysqli) {
 
       <div id="group-navInfo" class="mb-3">
         <p class="text-muted small fw-bold mb-1">Info</p>
-        <a href="<?= htmlspecialchars($baseUrl, ENT_QUOTES, 'UTF-8') ?>/Resident-End/resident_certificates.php"
-           class="a-sidebarLink <?= activeLink('resident_certificates.php', $current) ?>">
+        <a href="javascript:void(0)"
+           class="a-sidebarLink disabled"
+           aria-disabled="true"
+           title="Currently unavailable"
+           style="pointer-events:none;opacity:.6;cursor:not-allowed;">
           <i class="fa-solid fa-bullhorn"></i>Announcements
         </a>
         <a href="<?= htmlspecialchars($baseUrl, ENT_QUOTES, 'UTF-8') ?>/Resident-End/resident_transactions.php"

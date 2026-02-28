@@ -163,7 +163,8 @@ if (isset($_SESSION['show_not_verified_modal'])) {
         <div class="col-12 col-md-4 col-lg-3">
           <div id="card-serviceRequest-announcements"
                class="card-action h-100 p-4 rounded-4 text-center d-flex flex-column align-items-center justify-content-center border-0 shadow-sm"
-               onclick="location.href='#'">
+               title="Currently unavailable"
+               style="pointer-events:none;opacity:.6;cursor:not-allowed;">
             <i class="fa-solid fa-bullhorn fa-2xl mb-3"></i><br>
             <span class="fw-bold small">ANNOUNCEMENTS</span>
           </div>
@@ -252,4 +253,3 @@ if (isset($_SESSION['show_not_verified_modal'])) {
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 </body>
 </html>
-

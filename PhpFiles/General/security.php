@@ -48,20 +48,29 @@ initializeSecureSession();
 // - a subfolder (e.g. "/your-app/Admin-End/...").
 function appRootPath(): string
 {
-    $host = strtolower(trim((string)($_SERVER['HTTP_HOST'] ?? $_SERVER['SERVER_NAME'] ?? '')));
-    $isLocalHost = $host === 'localhost'
-        || $host === '127.0.0.1'
-        || str_starts_with($host, 'localhost:')
-        || str_starts_with($host, '127.0.0.1:');
-
-    // Requested behavior:
-    // - localhost => include project folder
-    // - domain => no project folder prefix
-    if ($isLocalHost) {
-        return '/BarangaySanJose';
+    static $cached = null;
+    if ($cached !== null) {
+        return $cached;
     }
 
-    return '';
+    $scriptName = str_replace('\\', '/', (string)($_SERVER['SCRIPT_NAME'] ?? ''));
+    $markers = ['/PhpFiles/', '/Resident-End/', '/Admin-End/', '/Guest-End/'];
+    foreach ($markers as $marker) {
+        $pos = strpos($scriptName, $marker);
+        if ($pos !== false) {
+            $prefix = rtrim(substr($scriptName, 0, $pos), '/');
+            if ($prefix === '' || $prefix === '/') {
+                return $cached = '';
+            }
+            return $cached = $prefix;
+        }
+    }
+
+    $dir = rtrim(str_replace('\\', '/', dirname($scriptName)), '/');
+    if ($dir === '' || $dir === '.' || $dir === '/') {
+        return $cached = '';
+    }
+    return $cached = $dir;
 }
 
 function appUrl(string $path): string
