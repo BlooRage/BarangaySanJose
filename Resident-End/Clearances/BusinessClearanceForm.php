@@ -30,9 +30,66 @@ $ownerFirstName = htmlspecialchars((string)($residentinformationtbl['firstname']
 $ownerMiddleName = htmlspecialchars((string)($residentinformationtbl['middlename'] ?? ''), ENT_QUOTES, 'UTF-8');
 $ownerSuffix = (string)($residentinformationtbl['suffix'] ?? '');
 $ownerPhone = htmlspecialchars((string)($useraccountstbl['phone_number'] ?? ''), ENT_QUOTES, 'UTF-8');
-$ownerUnitNumber = htmlspecialchars((string)($residentaddresstbl['unit_number'] ?? ''), ENT_QUOTES, 'UTF-8');
-$ownerHouseNumber = htmlspecialchars((string)($residentaddresstbl['street_number'] ?? ''), ENT_QUOTES, 'UTF-8');
-$ownerStreetName = htmlspecialchars((string)($residentaddresstbl['street_name'] ?? ''), ENT_QUOTES, 'UTF-8');
+$ownerUnitNumberRaw = trim((string)($residentaddresstbl['unit_number'] ?? ''));
+$ownerHouseNumberRaw = trim((string)($residentaddresstbl['street_number'] ?? ''));
+$ownerStreetNameRaw = trim((string)($residentaddresstbl['street_name'] ?? ''));
+$ownerPhaseNumberRaw = trim((string)($residentaddresstbl['phase_number'] ?? ''));
+$ownerSubdivisionRaw = trim((string)($residentaddresstbl['subdivision'] ?? ''));
+$ownerAreaNumberRaw = trim((string)($residentaddresstbl['area_number'] ?? ''));
+
+$ownerStreetNameHasBlock = $ownerStreetNameRaw !== '' && stripos($ownerStreetNameRaw, 'block') !== false;
+$ownerStreetNumberHasLot = $ownerHouseNumberRaw !== '' && stripos($ownerHouseNumberRaw, 'lot') !== false;
+$ownerIsLotBlockSystem = $ownerStreetNameHasBlock || $ownerStreetNumberHasLot;
+
+$ownerStreetLabel = $ownerStreetNameRaw;
+if ($ownerStreetLabel !== '' && stripos($ownerStreetLabel, 'street') === false && !$ownerStreetNameHasBlock) {
+    $ownerStreetLabel .= ' Street';
+}
+
+$ownerSubdivisionLabel = $ownerSubdivisionRaw !== '' ? $ownerSubdivisionRaw . ' Subdivision' : '';
+
+$ownerFullAddressParts = [];
+if ($ownerIsLotBlockSystem) {
+    $ownerLotNumber = trim((string)preg_replace('/^lot\\s*/i', '', $ownerHouseNumberRaw));
+    $ownerBlockNumber = trim((string)preg_replace('/^(block|blk)\\s*/i', '', $ownerStreetNameRaw));
+    $ownerPhaseValue = trim((string)preg_replace('/^phase\\s*/i', '', $ownerPhaseNumberRaw));
+
+    $ownerLotLabel = $ownerLotNumber !== '' ? 'Lot ' . $ownerLotNumber : $ownerHouseNumberRaw;
+    $ownerBlockLabel = $ownerBlockNumber !== '' ? 'Blk ' . $ownerBlockNumber : $ownerStreetNameRaw;
+    $ownerPhaseLabel = $ownerPhaseValue !== '' ? 'Phase ' . $ownerPhaseValue : ($ownerPhaseNumberRaw !== '' ? $ownerPhaseNumberRaw : '');
+
+    $ownerFullAddressParts = array_filter([
+        $ownerLotLabel,
+        $ownerBlockLabel,
+        $ownerPhaseLabel,
+        $ownerSubdivisionLabel,
+        'San Jose',
+        'Rodriguez',
+        'Rizal'
+    ], fn($part) => $part !== '');
+} else {
+    if ($ownerUnitNumberRaw !== '') {
+        $ownerFullAddressParts = array_filter([
+            'Unit ' . $ownerUnitNumberRaw,
+            $ownerStreetLabel,
+            $ownerSubdivisionLabel,
+            'San Jose',
+            'Rodriguez',
+            'Rizal'
+        ], fn($part) => $part !== '');
+    } else {
+        $ownerStreetLine = trim(implode(' ', array_filter([$ownerHouseNumberRaw, $ownerStreetLabel], fn($part) => $part !== '')));
+        $ownerFullAddressParts = array_filter([
+            $ownerStreetLine,
+            $ownerSubdivisionLabel,
+            'San Jose',
+            'Rodriguez',
+            'Rizal'
+        ], fn($part) => $part !== '');
+    }
+}
+
+$ownerFullAddress = htmlspecialchars(implode(', ', $ownerFullAddressParts), ENT_QUOTES, 'UTF-8');
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -59,11 +116,11 @@ $ownerStreetName = htmlspecialchars((string)($residentaddresstbl['street_name'] 
 
             <form action="#" method="POST">
                 
-                <h2 class="section-title text-center text-dark">Owner’s Information</h2>
+                <h2 class="section-title text-center text-dark">Applicant Information</h2>
                 <div class="form-row">
-                    <div class="input-stack"><label class="top-label">Last Name<span class="required-asterisk">*</span></label><input type="text" name="o_ln" required value="<?php echo $ownerLastName; ?>" readonly></div>
-                    <div class="input-stack"><label class="top-label">First Name<span class="required-asterisk">*</span></label><input type="text" name="o_fn" required value="<?php echo $ownerFirstName; ?>" readonly></div>
-                    <div class="input-stack"><label class="top-label">Middle Name</label><input type="text" name="o_mn" value="<?php echo $ownerMiddleName; ?>" readonly></div>
+                    <div class="input-stack"><label class="top-label">Last Name <span class="required-asterisk">*</span></label><input type="text" name="o_ln" required value="<?php echo $ownerLastName; ?>" readonly></div>
+                    <div class="input-stack"><label class="top-label">First Name <span class="required-asterisk">*</span></label><input type="text" name="o_fn" required value="<?php echo $ownerFirstName; ?>" readonly></div>
+                    <div class="input-stack"><label class="top-label">Middle Name </label><input type="text" name="o_mn" value="<?php echo $ownerMiddleName; ?>" readonly></div>
                     <div class="input-stack">
                         <label class="top-label">Suffix</label>
                         <select name="o_sfx" disabled>
@@ -76,28 +133,17 @@ $ownerStreetName = htmlspecialchars((string)($residentaddresstbl['street_name'] 
                         <input type="hidden" name="o_sfx" value="<?php echo htmlspecialchars((string)$ownerSuffix, ENT_QUOTES, 'UTF-8'); ?>">
                     </div>
                 </div>
-                <div class="form-row"><div class="full-width"><div class="input-stack"><label class="top-label">Contact Number</label><input type="text" name="o_phone" value="<?php echo $ownerPhone; ?>" readonly></div></div></div>
+                <div class="form-row"><div class="full-width"><div class="input-stack"><label class="top-label">Contact Number <span class="required-asterisk">*</span></label><input type="text" name="o_phone" value="<?php echo $ownerPhone; ?>" readonly></div></div></div>
                 <div id="ownerAddressWrapper" class="form-row">
                     <div class="full-width">
-                        <div class="row mb-3">
-                            <div class="col-md-4">
-                                <label class="top-label" for="owner_unit_number">Unit / Apartment Number</label>
-                                <input type="text" id="owner_unit_number" name="owner_unit_number" value="<?php echo $ownerUnitNumber; ?>" readonly>
-                            </div>
-                            <div class="col-md-4">
-                                <label class="top-label" for="owner_house_number">House Number <span class="required-asterisk">*</span></label>
-                                <input type="text" id="owner_house_number" name="owner_house_number" required value="<?php echo $ownerHouseNumber; ?>" readonly>
-                            </div>
-                            <div class="col-md-4">
-                                <label class="top-label" for="owner_street_name">Street Name <span class="required-asterisk">*</span></label>
-                                <input type="text" id="owner_street_name" name="owner_street_name" required value="<?php echo $ownerStreetName; ?>" readonly>
-                            </div>
+                        <div class="input-stack mb-3">
+                            <label class="top-label" for="owner_full_address">Complete Address <span class="required-asterisk">*</span></label>
+                            <input type="text" id="owner_full_address" name="owner_full_address" value="<?php echo $ownerFullAddress; ?>" readonly>
                         </div>
                     </div>
                 </div>
-
                 <h2 class="section-title text-center text-dark">Business Details</h2>
-                <div class="form-row"><div class="full-width"><div class="input-stack"><label class="top-label">Name of Business<span class="required-asterisk">*</span></label><input type="text" name="b_name" required></div></div></div>
+                <div class="form-row"><div class="full-width"><div class="input-stack"><label class="top-label">Name of Business <span class="required-asterisk">*</span></label><input type="text" name="b_name" required></div></div></div>
                 <div id="businessLocationWrapper" class="form-row">
                     <div class="full-width">
                         <div class="row mb-3">
@@ -136,7 +182,7 @@ $ownerStreetName = htmlspecialchars((string)($residentaddresstbl['street_name'] 
                 </div>
                 <div class="form-row two-col-row">
                     <div>
-                        <label class="top-label">Date of Initial Operation<span class="required-asterisk">*</span></label>
+                        <label class="top-label">Date of Initial Operation <span class="required-asterisk">*</span></label>
                         <input type="date" name="b_date" required>
                     </div>
                     <div>
@@ -169,7 +215,6 @@ $ownerStreetName = htmlspecialchars((string)($residentaddresstbl['street_name'] 
                             <option value="">Select</option>
                             <option value="Owner">Owner</option>
                             <option value="Renter">Renter</option>
-                            <option value="Occupant">Occupant</option>
                         </select>
                     </div>
                 </div>
@@ -177,11 +222,12 @@ $ownerStreetName = htmlspecialchars((string)($residentaddresstbl['street_name'] 
                 <div id="documentUploadSection" class="d-none">
                     <h2 class="section-title text-center text-dark">Document Upload</h2>
 
+                    <div id="documentUploadNew">
                     <div class="form-row">
                         <div class="full-width">
                             <div class="row mb-3">
                                 <div class="col-md-6">
-                                    <label class="top-label" for="validIdType">Valid ID <span class="required-asterisk">*</span></label>
+                                    <label class="top-label" for="validIdType">Valid Government-Issued ID <span class="required-asterisk">*</span></label>
                                     <select id="validIdType" name="valid_id_type" class="form-select">
                                         <option value="">Select</option>
                                         <option value="philsys">PhilSys ID</option>
@@ -268,6 +314,90 @@ $ownerStreetName = htmlspecialchars((string)($residentaddresstbl['street_name'] 
                             </label>
                             <input type="file" id="businessPhotoFile" name="business_photo_file" class="visually-hidden" accept=".pdf,.jpg,.jpeg,.png">
                             <div id="businessPhotoSelectedFile" class="selected-files small text-muted mt-2"></div>
+                        </div>
+                    </div>
+                    </div>
+
+                    <div id="documentUploadRenewal" class="d-none">
+                        <div class="form-row">
+                            <div class="full-width">
+                                <div class="row mb-3">
+                                    <div class="col-md-6">
+                                        <label class="top-label" for="renewalValidIdType">Valid Government-Issued ID <span class="required-asterisk">*</span></label>
+                                        <select id="renewalValidIdType" name="renewal_valid_id_type" class="form-select">
+                                            <option value="">Select</option>
+                                            <option value="philsys">PhilSys ID</option>
+                                            <option value="umid">UMID</option>
+                                            <option value="passport">Passport</option>
+                                            <option value="drivers_license">Driver's License</option>
+                                            <option value="prc">PRC ID</option>
+                                            <option value="postal">Postal ID</option>
+                                            <option value="gsis">GSIS ID</option>
+                                        </select>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label class="top-label" for="renewalValidIdFile">Upload Valid ID <span class="required-asterisk">*</span></label>
+                                        <input type="file" id="renewalValidIdFile" name="renewal_valid_id_file" class="form-control" accept=".pdf,.jpg,.jpeg,.png">
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div id="renewalValidIdNumberRow" class="form-row d-none">
+                            <div class="full-width">
+                                <div class="input-stack">
+                                    <label class="top-label" for="renewalValidIdNumber">Valid ID Number <span class="required-asterisk">*</span></label>
+                                    <input type="text" id="renewalValidIdNumber" name="renewal_valid_id_number" placeholder="Enter ID number">
+                                    <div id="renewalValidIdNumberError" class="text-danger small d-none">Invalid ID number</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="form-row">
+                            <div class="full-width">
+                                <div class="row mb-3">
+                                    <div class="col-md-6">
+                                        <label class="top-label" for="renewalBusinessRegType">Updated Business Registration <span class="required-asterisk">*</span></label>
+                                        <select id="renewalBusinessRegType" name="renewal_business_reg_type" class="form-select">
+                                            <option value="">Select</option>
+                                            <option value="dti">DTI Certificate (For sole proprietors)</option>
+                                            <option value="sec">SEC Certificate (For corporations)</option>
+                                        </select>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label class="top-label" for="renewalBusinessRegFile">Upload Business Registration <span class="required-asterisk">*</span></label>
+                                        <input type="file" id="renewalBusinessRegFile" name="renewal_business_reg_file" class="form-control" accept=".pdf,.jpg,.jpeg,.png">
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="form-row">
+                            <div class="full-width">
+                                <div class="row mb-3">
+                                    <div class="col-md-6">
+                                        <label class="top-label" for="renewalProofAddressType">Updated Business Address <span class="required-asterisk">*</span></label>
+                                        <select id="renewalProofAddressType" name="renewal_proof_address_type" class="form-select">
+                                            <option value="">Select</option>
+                                            <option value="lease">Contract of Lease</option>
+                                            <option value="tct">Transfer Certificate of Title</option>
+                                            <option value="tax_declaration">Tax Declaration</option>
+                                        </select>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label class="top-label" for="renewalProofAddressFile">Upload Proof of Address <span class="required-asterisk">*</span></label>
+                                        <input type="file" id="renewalProofAddressFile" name="renewal_proof_address_file" class="form-control" accept=".pdf,.jpg,.jpeg,.png">
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div id="renewalProofAddressNumberRow" class="form-row d-none">
+                            <div class="full-width">
+                                <div class="input-stack">
+                                    <label class="top-label" for="renewalProofAddressNumber">Document Number <span class="required-asterisk">*</span></label>
+                                    <input type="text" id="renewalProofAddressNumber" name="renewal_proof_address_number" placeholder="Enter document number">
+                                    <div id="renewalProofAddressNumberError" class="text-danger small d-none">Invalid document number</div>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>

@@ -299,12 +299,6 @@ $applicantArea = htmlspecialchars($areaNumber, ENT_QUOTES, 'UTF-8');
                                         <input type="text" class="form-control" id="cohabPhaseNumber" name="cohabitant_phase_number">
                                     </div>
                                 </div>
-                                <div class="row mb-3">
-                                    <div class="col-md-12">
-                                        <label class="top-label" for="cohabitantSubdivisionLot">Subdivision</label>
-                                        <input type="text" class="form-control" id="cohabitantSubdivisionLot" name="cohabitant_subdivision_lot">
-                                    </div>
-                                </div>
                             </div>
                         </div>
 
@@ -330,6 +324,8 @@ $applicantArea = htmlspecialchars($areaNumber, ENT_QUOTES, 'UTF-8');
                                         </select>
                                     </div>
                                 </div>
+                            </div>
+                            <div class="full-width">
                                 <div class="row mb-3">
                                     <div class="col-md-4">
                                         <label class="top-label" for="cohabitantBarangay">Barangay <span class="required-asterisk">*</span></label>

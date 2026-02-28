@@ -21,6 +21,20 @@
   const businessPhotoFile = document.getElementById("businessPhotoFile");
   const businessPhotoDropzone = document.getElementById("businessPhotoDropzone");
   const businessPhotoSelectedFile = document.getElementById("businessPhotoSelectedFile");
+  const documentUploadNew = document.getElementById("documentUploadNew");
+  const documentUploadRenewal = document.getElementById("documentUploadRenewal");
+  const renewalValidIdType = document.getElementById("renewalValidIdType");
+  const renewalValidIdFile = document.getElementById("renewalValidIdFile");
+  const renewalValidIdNumberRow = document.getElementById("renewalValidIdNumberRow");
+  const renewalValidIdNumber = document.getElementById("renewalValidIdNumber");
+  const renewalValidIdNumberError = document.getElementById("renewalValidIdNumberError");
+  const renewalBusinessRegType = document.getElementById("renewalBusinessRegType");
+  const renewalBusinessRegFile = document.getElementById("renewalBusinessRegFile");
+  const renewalProofAddressType = document.getElementById("renewalProofAddressType");
+  const renewalProofAddressFile = document.getElementById("renewalProofAddressFile");
+  const renewalProofAddressNumberRow = document.getElementById("renewalProofAddressNumberRow");
+  const renewalProofAddressNumber = document.getElementById("renewalProofAddressNumber");
+  const renewalProofAddressNumberError = document.getElementById("renewalProofAddressNumberError");
   const businessContactNumber = document.getElementById("business_contact_number");
   const businessContactNumberError = document.getElementById("business_contact_number_error");
   const renterOwnerRequired = renterOwnerDetails
@@ -55,9 +69,10 @@
   const updateNumberRow = (selectEl, rowEl, inputEl) => {
     if (!selectEl || !rowEl || !inputEl) return;
     const hasValue = selectEl.value !== '';
-    rowEl.classList.toggle("d-none", !hasValue);
-    setRequired(inputEl, hasValue);
-    if (!hasValue) {
+    const needsNumber = hasValue && selectEl.value !== 'lease';
+    rowEl.classList.toggle("d-none", !needsNumber);
+    setRequired(inputEl, needsNumber);
+    if (!needsNumber) {
       inputEl.value = '';
       inputEl.setCustomValidity('');
     } else {
@@ -127,8 +142,15 @@
 
   const updateState = () => {
     const isNewApp = appNew?.checked === true;
+    const isRenewal = appRenewal?.checked === true;
     if (documentUploadSection) {
-      documentUploadSection.classList.toggle("d-none", !isNewApp);
+      documentUploadSection.classList.toggle("d-none", !(isNewApp || isRenewal));
+    }
+    if (documentUploadNew) {
+      documentUploadNew.classList.toggle("d-none", !isNewApp);
+    }
+    if (documentUploadRenewal) {
+      documentUploadRenewal.classList.toggle("d-none", !isRenewal);
     }
     setRequired(validIdType, isNewApp);
     setRequired(validIdFile, isNewApp);
@@ -137,9 +159,17 @@
     setRequired(proofAddressType, isNewApp);
     setRequired(proofAddressFile, isNewApp);
     setRequired(businessPhotoFile, isNewApp);
+    setRequired(renewalValidIdType, isRenewal);
+    setRequired(renewalValidIdFile, isRenewal);
+    setRequired(renewalBusinessRegType, isRenewal);
+    setRequired(renewalBusinessRegFile, isRenewal);
+    setRequired(renewalProofAddressType, isRenewal);
+    setRequired(renewalProofAddressFile, isRenewal);
 
     updateNumberRow(validIdType, validIdNumberRow, validIdNumber);
     updateNumberRow(proofAddressType, proofAddressNumberRow, proofAddressNumber);
+    updateNumberRow(renewalValidIdType, renewalValidIdNumberRow, renewalValidIdNumber);
+    updateNumberRow(renewalProofAddressType, renewalProofAddressNumberRow, renewalProofAddressNumber);
 
     if (businessContactNumber) {
       const rawValue = businessContactNumber.value.trim();
@@ -175,6 +205,26 @@
       });
     }
 
+    if (!isRenewal) {
+      [renewalValidIdType, renewalBusinessRegType, renewalProofAddressType].forEach((el) => {
+        if (el) el.value = '';
+      });
+      [renewalValidIdFile, renewalBusinessRegFile, renewalProofAddressFile].forEach((el) => {
+        if (el) el.value = '';
+      });
+      [renewalValidIdNumber, renewalProofAddressNumber].forEach((el) => {
+        if (el) {
+          el.value = '';
+          el.setCustomValidity('');
+        }
+      });
+      if (renewalValidIdNumberError) renewalValidIdNumberError.classList.add("d-none");
+      if (renewalProofAddressNumberError) renewalProofAddressNumberError.classList.add("d-none");
+      [renewalValidIdNumberRow, renewalProofAddressNumberRow].forEach((row) => {
+        if (row) row.classList.add("d-none");
+      });
+    }
+
     if (ownerTypeSelect && renterOwnerDetails) {
       const isRenterOrOccupant = ownerTypeSelect.value === "Renter" || ownerTypeSelect.value === "Occupant";
       renterOwnerDetails.classList.toggle("d-none", !isRenterOrOccupant);
@@ -197,12 +247,30 @@
     validateNumberInput(proofAddressNumber, proofAddressRegexMap, proofAddressNumberError);
     updateState();
   });
+  renewalValidIdType?.addEventListener("change", () => {
+    updateNumberRow(renewalValidIdType, renewalValidIdNumberRow, renewalValidIdNumber);
+    validateNumberInput(renewalValidIdNumber, validIdRegexMap, renewalValidIdNumberError);
+    updateState();
+  });
+  renewalProofAddressType?.addEventListener("change", () => {
+    updateNumberRow(renewalProofAddressType, renewalProofAddressNumberRow, renewalProofAddressNumber);
+    validateNumberInput(renewalProofAddressNumber, proofAddressRegexMap, renewalProofAddressNumberError);
+    updateState();
+  });
   validIdNumber?.addEventListener("input", () => {
     validateNumberInput(validIdNumber, validIdRegexMap, validIdNumberError);
     updateState();
   });
   proofAddressNumber?.addEventListener("input", () => {
     validateNumberInput(proofAddressNumber, proofAddressRegexMap, proofAddressNumberError);
+    updateState();
+  });
+  renewalValidIdNumber?.addEventListener("input", () => {
+    validateNumberInput(renewalValidIdNumber, validIdRegexMap, renewalValidIdNumberError);
+    updateState();
+  });
+  renewalProofAddressNumber?.addEventListener("input", () => {
+    validateNumberInput(renewalProofAddressNumber, proofAddressRegexMap, renewalProofAddressNumberError);
     updateState();
   });
   businessContactNumber?.addEventListener("input", updateState);
