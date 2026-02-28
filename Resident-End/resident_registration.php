@@ -14,10 +14,6 @@ if (!isset($baseUrl)) {
     }
 }
 ?>
-<?php
-$allowUnregistered = true;
-require_once __DIR__ . "/includes/resident_access_guard.php";
-?>
 
 <!DOCTYPE html>
 <html lang="en">
@@ -752,7 +748,7 @@ require_once __DIR__ . "/includes/resident_access_guard.php";
                 </select>
               </div>
 
-              <div class="col-md-6">
+              <div class="col-md-3">
                 <label class="form-label" for="houseTypeSelect">House Type <span class="text-danger">*</span></label>
                 <select
                   class="form-select toggle-other"
@@ -790,6 +786,9 @@ require_once __DIR__ . "/includes/resident_access_guard.php";
                   <option value="More than 5 years">More than 5 years</option>
                 </select>
               </div>
+              <div class="col-md-3">
+                <label class="form-label" for="residencyDate">Residency Start Date <span class="text-danger">*</span></label>
+                <input type="date" class="form-control" id="residencyDate" name="residencyDate" max="<?= date('Y-m-d'); ?>" required> 
             </div>
           </div>
 
