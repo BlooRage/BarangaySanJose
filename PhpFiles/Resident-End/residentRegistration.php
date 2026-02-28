@@ -146,6 +146,15 @@ function normalizePhaseNumber(string $value): string {
     return 'Phase ' . trim($value);
 }
 
+function normalizeSectorLabel(string $value): string {
+    $normalized = strtolower(trim($value));
+    $normalized = preg_replace('/[^a-z]/', '', $normalized);
+    $map = [
+        'student' => 'Student',
+    ];
+    return $map[$normalized] ?? '';
+}
+
 function getDocumentTypeId(mysqli $conn, string $name): int {
     $q = $conn->prepare("SELECT document_type_id FROM documenttypelookuptbl WHERE LOWER(document_type_name) = LOWER(?) AND document_category = 'ResidentProfiling' LIMIT 1");
     if (!$q) throw new Exception("Prepare failed (getDocumentTypeId): " . $conn->error);
@@ -386,9 +395,13 @@ try {
 
     $selectedSectors = [];
     if (isset($_POST['sectorMembership']) && is_array($_POST['sectorMembership'])) {
-        $selectedSectors = array_values(array_filter(array_map('trim', $_POST['sectorMembership']), static function ($v) {
-            return $v !== '';
-        }));
+        foreach ($_POST['sectorMembership'] as $rawSector) {
+            $normalizedSector = normalizeSectorLabel((string)$rawSector);
+            if ($normalizedSector !== '') {
+                $selectedSectors[] = $normalizedSector;
+            }
+        }
+        $selectedSectors = array_values(array_unique($selectedSectors));
     }
     $sector = implode(",", $selectedSectors);
 

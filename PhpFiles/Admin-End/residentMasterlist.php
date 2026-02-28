@@ -38,12 +38,7 @@ function mapSectorKeyToLabel($sectorKey): ?string {
     $normalized = preg_replace('/[^a-z]/', '', $normalized);
 
     $map = [
-        'pwd' => 'PWD',
-        'seniorcitizen' => 'Senior Citizen',
         'student' => 'Student',
-        'indigenouspeople' => 'Indigenous People',
-        'indigenousperson' => 'Indigenous People',
-        'singleparent' => 'Single Parent'
     ];
     return $map[$normalized] ?? null;
 }
@@ -858,9 +853,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['resident_id'])) {
     // -----------------------
     // Sector membership
     // -----------------------
-    $sectorMembership = isset($_POST['sectorMembership'])
-        ? implode(",", $_POST['sectorMembership'])
-        : '';
+    $sectorMembership = '';
+    if (isset($_POST['sectorMembership']) && is_array($_POST['sectorMembership'])) {
+        $onlyStudent = [];
+        foreach ($_POST['sectorMembership'] as $sectorRaw) {
+            $mapped = mapSectorKeyToLabel((string)$sectorRaw);
+            if ($mapped === 'Student') {
+                $onlyStudent[] = $mapped;
+            }
+        }
+        $sectorMembership = implode(",", array_values(array_unique($onlyStudent)));
+    }
 
     // -----------------------
     // Emergency Contact
@@ -1378,6 +1381,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_document_statu
 	                $sectorAction = extractActionFromRemarks((string)$attachmentRemarks);
 
 	                $statusIdForSectorMembership = (int)$statusId;
+	                if ($sectorAction === 'remove') {
+	                    $inactiveSectorStatus = getFirstStatusMatchByTypes(
+	                        $conn,
+	                        ['Inactive'],
+	                        ['SectorMembership']
+	                    );
+	                    if (!$inactiveSectorStatus) {
+	                        throw new Exception("Status not found: Inactive (SectorMembership)");
+	                    }
+	                    $statusIdForSectorMembership = (int)$inactiveSectorStatus['status_id'];
+	                }
 	                if (($sectorSide === 'front' || $sectorSide === 'back') && $sectorKey !== '') {
 	                    // For ID-like sector proofs saved as front/back, only mark the sector verified
 	                    // once BOTH sides' latest uploads are verified.
@@ -1409,10 +1423,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_document_statu
 	                        $pendingSectorStatus = getFirstStatusMatchByTypes(
 	                            $conn,
 	                            ['PendingReview', 'Pending'],
-	                            ['ResidentDocumentProfiling', 'DocumentVerification', 'VerificationStatus', 'Resident']
+	                            ['SectorMembership']
 	                        );
 	                        if (!$pendingSectorStatus) {
-	                            throw new Exception("Status not found: PendingReview");
+	                            throw new Exception("Status not found: PendingReview (SectorMembership)");
 	                        }
 	                        $statusIdForSectorMembership = (int)$pendingSectorStatus['status_id'];
 	                    } elseif ($sectorLabel) {
@@ -1538,11 +1552,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_document_statu
 	            if ($residentId && strpos($remarksLower, 'sector:') === 0) {
 	                $sectorKeyRaw = trim(substr((string)extractMarkerFromRemarks((string)$attachmentRemarks), strlen('sector:')));
 	                $sectorKey = trim((string)(explode(':', $sectorKeyRaw, 2)[0] ?? ''));
+	                $pendingSectorStatus = getFirstStatusMatchByTypes(
+	                    $conn,
+	                    ['PendingReview', 'Pending'],
+	                    ['SectorMembership']
+	                );
+	                if (!$pendingSectorStatus) {
+	                    throw new Exception("Status not found: PendingReview (SectorMembership)");
+	                }
 	                upsertSectorMembershipStatus(
 	                    $conn,
 	                    (string)$residentId,
 	                    (string)$sectorKey,
-                    (int)$statusId,
+                    (int)$pendingSectorStatus['status_id'],
                     (int)$attachmentId,
                     null,
                     (string)$attachmentUploadTs

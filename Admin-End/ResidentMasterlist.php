@@ -635,24 +635,8 @@ if (isset($conn) && $conn instanceof mysqli) {
             <label class="small fw-bold">Sector Membership</label>
             <div class="d-flex flex-wrap gap-2">
               <div class="form-check">
-                <input class="form-check-input" type="checkbox" id="sectorPWD" name="sectorMembership[]" value="PWD">
-                <label class="form-check-label small" for="sectorPWD">PWD</label>
-              </div>
-              <div class="form-check">
                 <input class="form-check-input" type="checkbox" id="sectorStudent" name="sectorMembership[]" value="Student">
                 <label class="form-check-label small" for="sectorStudent">Student</label>
-              </div>
-              <div class="form-check">
-                <input class="form-check-input" type="checkbox" id="sectorSP" name="sectorMembership[]" value="Single Parent">
-                <label class="form-check-label small" for="sectorSP">Single Parent</label>
-              </div>
-              <div class="form-check">
-                <input class="form-check-input" type="checkbox" id="sectorSenior" name="sectorMembership[]" value="Senior Citizen">
-                <label class="form-check-label small" for="sectorSenior">Senior Citizen</label>
-              </div>
-              <div class="form-check">
-                <input class="form-check-input" type="checkbox" id="sectorIP" name="sectorMembership[]" value="Indigenous People">
-                <label class="form-check-label small" for="sectorIP">Indigenous People</label>
               </div>
             </div>
           </div>

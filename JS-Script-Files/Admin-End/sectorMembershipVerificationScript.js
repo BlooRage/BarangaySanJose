@@ -113,6 +113,7 @@
 	    const url = String(fileUrl || "");
 	    const name = String(fileName || "");
 	    const ext = (name.split(".").pop() || "").toLowerCase();
+	    const imageExts = ["jpg", "jpeg", "png", "webp", "gif", "bmp"];
 
     if (!url) {
       const div = document.createElement("div");
@@ -137,13 +138,30 @@
       return wrapper;
     }
 
-    // images fallback
-    const img = document.createElement("img");
-    img.src = url;
-    img.alt = name || "Document";
-    img.className = "img-fluid rounded border";
-    img.style.maxWidth = "1100px";
-    wrapper.appendChild(img);
+    if (imageExts.includes(ext)) {
+      const img = document.createElement("img");
+      img.src = url;
+      img.alt = name || "Document";
+      img.className = "img-fluid rounded border";
+      img.style.maxWidth = "1100px";
+      wrapper.appendChild(img);
+      return wrapper;
+    }
+
+    const box = document.createElement("div");
+    box.className = "border rounded p-3 text-center w-100";
+    const txt = document.createElement("div");
+    txt.className = "small text-muted mb-2";
+    txt.innerText = "Preview not available for this file type.";
+    const open = document.createElement("a");
+    open.className = "btn btn-outline-primary btn-sm";
+    open.href = url;
+    open.target = "_blank";
+    open.rel = "noopener";
+    open.innerText = "Open File";
+    box.appendChild(txt);
+    box.appendChild(open);
+    wrapper.appendChild(box);
     return wrapper;
   };
 

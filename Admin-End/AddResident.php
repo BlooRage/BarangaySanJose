@@ -224,42 +224,12 @@ require_once __DIR__ . "/includes/admin_guard.php";
                                             <div class="col-md-12">
                                                 <div id="sectorGroupCard">
                                                     <div class="row g-2">
-
-                                                        <div class="col-md-6">
-                                                            <div class="form-check">
-                                                                <input class="form-check-input" type="checkbox" id="sectorPWD" name="sectorMembership[]" value="PWD">
-                                                                <label class="form-check-label" for="sectorPWD">Person with Disability (PWD)</label>
-                                                            </div>
-                                                        </div>
-
-                                                        <div class="col-md-6">
-                                                            <div class="form-check">
-                                                                <input class="form-check-input" type="checkbox" id="sectorSP" name="sectorMembership[]" value="Single Parent">
-                                                                <label class="form-check-label" for="sectorSP">Single Parent</label>
-                                                            </div>
-                                                        </div>
-
                                                         <div class="col-md-6">
                                                             <div class="form-check">
                                                                 <input class="form-check-input" type="checkbox" id="sectorStudent" name="sectorMembership[]" value="Student">
                                                                 <label class="form-check-label" for="sectorStudent">Student</label>
                                                             </div>
                                                         </div>
-
-                                                        <div class="col-md-6">
-                                                            <div class="form-check">
-                                                                <input class="form-check-input" type="checkbox" id="sectorSenior" name="sectorMembership[]" value="Senior Citizen">
-                                                                <label class="form-check-label" for="sectorSenior">Senior Citizen</label>
-                                                            </div>
-                                                        </div>
-
-                                                        <div class="col-md-12">
-                                                            <div class="form-check">
-                                                                <input class="form-check-input" type="checkbox" id="sectorIP" name="sectorMembership[]" value="Indigenous People">
-                                                                <label class="form-check-label" for="sectorIP">Indigenous People</label>
-                                                            </div>
-                                                        </div>
-
                                                     </div>
                                                 </div>
                                             </div>
@@ -492,4 +462,3 @@ require_once __DIR__ . "/includes/admin_guard.php";
     </script>
 </body>
 </html>
-

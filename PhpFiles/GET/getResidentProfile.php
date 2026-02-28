@@ -278,6 +278,7 @@ function getResidentProfileData(mysqli $conn, string $userId): array {
         $pendingLabels = [];
         $pendingCount = 0;
         $usedNewTable = false;
+        $suppressedSectorNormKeys = [];
         $declaredSectors = $parseSectorCsv((string)($residentinformationtbl['sector_membership'] ?? ''));
 
         // Try new normalized table first.
@@ -315,6 +316,10 @@ function getResidentProfileData(mysqli $conn, string $userId): array {
 
                     $statusKey = strtolower(trim((string)$statusName));
                     $statusKey = preg_replace('/[\s_-]+/', '', $statusKey);
+                    $isInactive = (
+                        $statusKey === 'inactive'
+                        || strpos($statusKey, 'inactive') !== false
+                    );
                     $isRejected = (
                         strpos($statusKey, 'reject') !== false
                         || strpos($statusKey, 'cancel') !== false
@@ -341,7 +346,11 @@ function getResidentProfileData(mysqli $conn, string $userId): array {
                         )
                     );
 
-                    if ($isVerified) {
+                    if ($isInactive || $isRejected) {
+                        $suppressedSectorNormKeys[$toSectorNormKey($label)] = true;
+                        $sectorState[$dedupeKey]['has_pending'] = false;
+                        $sectorState[$dedupeKey]['has_verified'] = false;
+                    } elseif ($isVerified) {
                         $sectorState[$dedupeKey]['has_verified'] = true;
                     } elseif ($isPending) {
                         $sectorState[$dedupeKey]['has_pending'] = true;
@@ -461,7 +470,7 @@ function getResidentProfileData(mysqli $conn, string $userId): array {
             foreach ($declaredSectors as $declared) {
                 $label = $mapSectorKeyToLabel($declared);
                 $norm = $toSectorNormKey($label);
-                if ($norm === '' || isset($verifiedKeysNorm[$norm])) {
+                if ($norm === '' || isset($verifiedKeysNorm[$norm]) || isset($suppressedSectorNormKeys[$norm])) {
                     continue;
                 }
                 $pendingLabels[] = $label;

@@ -271,6 +271,29 @@ function moveUploadedFileWithDocName(string $tmpName, string $dir, string $docTy
     ];
 }
 
+function createSystemPlaceholderFile(string $dir, string $docType, string $userId, string $content): array {
+    $safeDoc = sanitizeDocTypeToken($docType);
+    $safeUser = preg_replace('/[^A-Za-z0-9_-]/', '', $userId);
+    $timestamp = date("YmdHis");
+    $index = 0;
+    $fileName = "{$safeDoc}{$timestamp}{$safeUser}.txt";
+    $target = rtrim($dir, "/") . "/" . $fileName;
+    while (file_exists($target)) {
+        $index++;
+        $fileName = "{$safeDoc}{$timestamp}{$safeUser}_{$index}.txt";
+        $target = rtrim($dir, "/") . "/" . $fileName;
+    }
+    if (@file_put_contents($target, $content) === false) {
+        throw new Exception("Failed to create system placeholder file.");
+    }
+    @chmod($target, 0644);
+    return [
+        'file_name' => $fileName,
+        'file_path' => toDbWebPath($target),
+        'disk_path' => $target
+    ];
+}
+
 function getDocumentTypeId(mysqli $conn, string $name): int {
     $q = $conn->prepare("SELECT document_type_id FROM documenttypelookuptbl WHERE LOWER(document_type_name) = LOWER(?) AND document_category = 'EditRequest' LIMIT 1");
     if (!$q) throw new Exception("Prepare failed (getDocumentTypeId): " . $conn->error);
@@ -323,7 +346,7 @@ try {
     $studentStopped = cleanString($_POST['student_stopped'] ?? '0') === '1';
 
     $stmt = $conn->prepare("
-        SELECT firstname, middlename, lastname, suffix, sex, civil_status, religion, occupation, occupation_detail, sector_membership
+        SELECT firstname, middlename, lastname, suffix, sex, civil_status, religion, voter_status, occupation, occupation_detail, sector_membership
         FROM residentinformationtbl
         WHERE resident_id = ?
         LIMIT 1
@@ -561,6 +584,11 @@ try {
     $statusVerifyId = getStatusId($conn, "PendingReview", "ResidentDocumentProfiling");
     if ($statusVerifyId === null) {
         throw new Exception('Document status missing.');
+    }
+    $sectorPendingStatusId = getStatusId($conn, "PendingReview", "SectorMembership");
+    if ($sectorPendingStatusId === null) {
+        // Backward-compatible fallback for environments that have not yet added SectorMembership statuses.
+        $sectorPendingStatusId = $statusVerifyId;
     }
 
     $conn->begin_transaction();
@@ -851,7 +879,8 @@ try {
             $sectorDocType = $sectorDocType !== '' ? $sectorDocType : 'Other Supporting Document';
         }
 
-        if (!$sectorUploadFiles) {
+        $allowNoSectorProof = $removedStudent && $studentStopped && empty($addedSectorKeys);
+        if (!$sectorUploadFiles && !$allowNoSectorProof) {
             throw new Exception('Sector membership request must include a supporting document for verification.');
         }
 
@@ -869,17 +898,75 @@ try {
             throw new Exception('No sector membership changes detected.');
         }
 
-        $docTypeId = getDocumentTypeId($conn, $sectorDocType);
-        foreach ($sectorUploadFiles as $sectorUploadFile) {
-            $ext = strtolower(pathinfo($sectorUploadFile['name'] ?? '', PATHINFO_EXTENSION));
-            if (isHeicExt($ext)) {
-                throw new Exception('HEIC is not supported. Please upload JPG or PNG.');
-            }
-            if (!in_array($ext, $allowedExt, true)) {
-                throw new Exception('Invalid file type for sector membership proof.');
-            }
+        if ($sectorUploadFiles) {
+            $docTypeId = getDocumentTypeId($conn, $sectorDocType);
+            foreach ($sectorUploadFiles as $sectorUploadFile) {
+                $ext = strtolower(pathinfo($sectorUploadFile['name'] ?? '', PATHINFO_EXTENSION));
+                if (isHeicExt($ext)) {
+                    throw new Exception('HEIC is not supported. Please upload JPG or PNG.');
+                }
+                if (!in_array($ext, $allowedExt, true)) {
+                    throw new Exception('Invalid file type for sector membership proof.');
+                }
 
-            $moved = moveUploadedFileWithDocName($sectorUploadFile['tmp_name'], $uploadDir, $sectorDocType, $userId, $ext);
+                $moved = moveUploadedFileWithDocName($sectorUploadFile['tmp_name'], $uploadDir, $sectorDocType, $userId, $ext);
+                foreach ($markers as $marker) {
+                    $ins = $conn->prepare("
+                        INSERT INTO unifiedfileattachmenttbl
+                            (source_type, source_id, document_type_id, file_name, file_path, file_type, user_id_uploaded_by, status_id_verify, remarks, id_number)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    ");
+                    $sourceType = "ResidentProfiling";
+                    $sourceId = (string)$residentId;
+                    $idNumber = null;
+                    $ins->bind_param(
+                        "ssissssiss",
+                        $sourceType,
+                        $sourceId,
+                        $docTypeId,
+                        $moved['file_name'],
+                        $moved['file_path'],
+                        $ext,
+                        $userId,
+                        $statusVerifyId,
+                        $marker,
+                        $idNumber
+                    );
+                    if (!$ins->execute()) {
+                        throw new Exception('Failed to save sector membership attachment.');
+                    }
+                    $newAttachmentId = (int)$ins->insert_id;
+                    $ins->close();
+                    if ($newAttachmentId > 0) {
+                        $attachmentIds[] = $newAttachmentId;
+                        $markerBase = strtolower(trim((string)explode(';', $marker, 2)[0]));
+                        if (strpos($markerBase, 'sector:') === 0) {
+                            $sectorKey = trim((string)substr($markerBase, strlen('sector:')));
+                            if ($sectorKey !== '') {
+                                if (!isset($attachmentIdsBySectorKey[$sectorKey])) {
+                                    $attachmentIdsBySectorKey[$sectorKey] = [];
+                                }
+                                $attachmentIdsBySectorKey[$sectorKey][] = $newAttachmentId;
+                                upsertSectorMembershipStatusFromUpload(
+                                    $conn,
+                                    (string)$residentId,
+                                    (string)$sectorKey,
+                                    (int)$sectorPendingStatusId,
+                                    $newAttachmentId
+                                );
+                            }
+                        }
+                    }
+                }
+            }
+        } elseif ($allowNoSectorProof) {
+            $docTypeId = getDocumentTypeId($conn, 'Diploma');
+            $placeholder = createSystemPlaceholderFile(
+                $uploadDir,
+                'SectorRemovalNotice',
+                (string)$userId,
+                "System-generated note for Student sector removal.\nResident ID: {$residentId}\nUser ID: {$userId}\nTimestamp: " . date('Y-m-d H:i:s')
+            );
             foreach ($markers as $marker) {
                 $ins = $conn->prepare("
                     INSERT INTO unifiedfileattachmenttbl
@@ -889,21 +976,22 @@ try {
                 $sourceType = "ResidentProfiling";
                 $sourceId = (string)$residentId;
                 $idNumber = null;
+                $fileType = 'txt';
                 $ins->bind_param(
                     "ssissssiss",
                     $sourceType,
                     $sourceId,
                     $docTypeId,
-                    $moved['file_name'],
-                    $moved['file_path'],
-                    $ext,
+                    $placeholder['file_name'],
+                    $placeholder['file_path'],
+                    $fileType,
                     $userId,
                     $statusVerifyId,
                     $marker,
                     $idNumber
                 );
                 if (!$ins->execute()) {
-                    throw new Exception('Failed to save sector membership attachment.');
+                    throw new Exception('Failed to save sector membership placeholder attachment.');
                 }
                 $newAttachmentId = (int)$ins->insert_id;
                 $ins->close();
@@ -921,7 +1009,7 @@ try {
                                 $conn,
                                 (string)$residentId,
                                 (string)$sectorKey,
-                                (int)$statusVerifyId,
+                                (int)$sectorPendingStatusId,
                                 $newAttachmentId
                             );
                         }
@@ -960,6 +1048,7 @@ try {
                     'action' => $isRemoval ? 'remove' : 'add',
                     'added_sectors' => $isRemoval ? [] : [$changedSectorKey],
                     'removed_student' => $isRemoval ? 1 : 0,
+                    'student_stopped' => $studentStopped ? 1 : 0,
                     'attachment_ids' => $sectorIds
                 ]
             );
