@@ -10,6 +10,48 @@ requireRoleSession(['Resident'], true);
 dr_ensure_table($conn);
 dr_ensure_general_fees_table($conn);
 
+function dr_ensure_request_support_tables(mysqli $conn): void {
+    $conn->query("
+        CREATE TABLE IF NOT EXISTS documenttypelookuptbl (
+            document_type_id INT(11) NOT NULL AUTO_INCREMENT,
+            document_type_name VARCHAR(100) NOT NULL,
+            document_category VARCHAR(100) NOT NULL,
+            PRIMARY KEY (document_type_id),
+            UNIQUE KEY uq_document_type_name (document_type_name)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
+    ");
+
+    $conn->query("
+        CREATE TABLE IF NOT EXISTS unifiedfileattachmenttbl (
+            attachment_id BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT,
+            source_type VARCHAR(50) NOT NULL,
+            source_id VARCHAR(12) NOT NULL,
+            document_type_id INT(11) NOT NULL,
+            file_name VARCHAR(255) NOT NULL,
+            file_path VARCHAR(500) NOT NULL,
+            file_type VARCHAR(50) NOT NULL,
+            upload_timestamp DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            user_id_uploaded_by VARCHAR(12) NOT NULL,
+            status_id_verify INT(11) NOT NULL,
+            remarks TEXT DEFAULT NULL,
+            id_number VARCHAR(100) DEFAULT NULL,
+            deleted_at DATETIME DEFAULT NULL,
+            delete_reason VARCHAR(100) DEFAULT NULL,
+            updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            PRIMARY KEY (attachment_id),
+            KEY idx_source (source_type, source_id),
+            KEY idx_doc_type (document_type_id),
+            KEY idx_uploaded_by (user_id_uploaded_by),
+            KEY idx_verify_status (status_id_verify),
+            CONSTRAINT fk_ufa_document_type FOREIGN KEY (document_type_id) REFERENCES documenttypelookuptbl (document_type_id),
+            CONSTRAINT fk_ufa_uploaded_by FOREIGN KEY (user_id_uploaded_by) REFERENCES useraccountstbl (user_id),
+            CONSTRAINT fk_ufa_verify_status FOREIGN KEY (status_id_verify) REFERENCES statuslookuptbl (status_id)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
+    ");
+}
+
+dr_ensure_request_support_tables($conn);
+
 $action = strtolower(trim((string)($_REQUEST['action'] ?? '')));
 if ($action === '') {
     dr_respond_json(400, ['success' => false, 'message' => 'Missing action.']);
@@ -160,6 +202,7 @@ function dr_request_details_token(string $documentTypeRaw, string $documentTypeN
     $map = [
         'certificate of cohabitation' => 'cohabitation',
         'certificate of indigency' => 'indigency',
+        'certificateofindigency' => 'indigency',
         'first time job seeker certificate' => 'firsttimejobseeker',
         'certificate of identity' => 'identity',
         'certificate of residency' => 'residency',
@@ -239,10 +282,51 @@ function dr_get_resident_name_parts(mysqli $conn, string $userId): array {
     ];
 }
 
-function dr_create_request_attachment(mysqli $conn, string $residentId, string $userId, string $documentType, string $payloadJson): ?int {
-    $docTypeId = dr_pick_doc_type_id($conn, $documentType);
-    $statusId = dr_pick_any_status_id($conn, ['PendingReview', 'Pending']);
-    if ($docTypeId === null || $statusId === null) {
+function dr_ensure_attachment_status_id(mysqli $conn, ?int $preferredStatusId = null): ?int {
+    if ($preferredStatusId !== null && $preferredStatusId > 0) {
+        return $preferredStatusId;
+    }
+
+    $statusId = dr_pick_any_status_id($conn, ['PendingVerification', 'PendingReview', 'Pending']);
+    if ($statusId !== null) {
+        return $statusId;
+    }
+
+    // Minimal bootstrap fallback when status lookups were cleared.
+    $statusName = 'PendingVerification';
+    $statusType = 'DocumentRequest';
+    $insertId = 0;
+    $sql = "INSERT INTO statuslookuptbl (status_name, status_type) VALUES (?, ?)";
+    $ins = $conn->prepare($sql);
+    if ($ins) {
+        $ins->bind_param('ss', $statusName, $statusType);
+        $ok = $ins->execute();
+        $insertId = $ok ? (int)$ins->insert_id : 0;
+        $ins->close();
+    }
+    if ($insertId > 0) {
+        return $insertId;
+    }
+
+    return dr_find_status_id($conn, $statusName, [$statusType]) ?? dr_find_status_id($conn, $statusName, []);
+}
+
+function dr_create_request_attachment(
+    mysqli $conn,
+    string $residentId,
+    string $userId,
+    string $documentType,
+    string $payloadJson,
+    ?int $documentTypeId = null,
+    ?int $statusId = null
+): ?int {
+    $docTypeId = $documentTypeId;
+    if ($docTypeId === null || $docTypeId <= 0) {
+        $docTypeId = dr_get_or_create_document_type_id($conn, $documentType, 'DocumentRequest')
+            ?? dr_pick_doc_type_id($conn, $documentType);
+    }
+    $statusId = dr_ensure_attachment_status_id($conn, $statusId);
+    if ($docTypeId === null || $docTypeId <= 0 || $statusId === null || $statusId <= 0) {
         return null;
     }
 
@@ -256,12 +340,16 @@ function dr_create_request_attachment(mysqli $conn, string $residentId, string $
     }
     $folder = $baseDir . '/UnifiedFileAttachment/DocumentRequests/' . $safeResident;
     if (!is_dir($folder)) {
-        @mkdir($folder, 0775, true);
+        if (!@mkdir($folder, 0775, true) && !is_dir($folder)) {
+            error_log('[documentRequestWorkflow][attachment] failed to create folder: ' . $folder);
+            return null;
+        }
     }
 
     $fileName = 'request_' . date('YmdHis') . '_' . bin2hex(random_bytes(5)) . '.json';
     $diskPath = $folder . '/' . $fileName;
     if (@file_put_contents($diskPath, $payloadJson) === false) {
+        error_log('[documentRequestWorkflow][attachment] failed to write file: ' . $diskPath);
         return null;
     }
     $webPath = '/UnifiedFileAttachment/DocumentRequests/' . $safeResident . '/' . $fileName;
@@ -277,6 +365,7 @@ function dr_create_request_attachment(mysqli $conn, string $residentId, string $
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     ");
     if (!$stmt) {
+        error_log('[documentRequestWorkflow][attachment] prepare failed: ' . $conn->error);
         return null;
     }
     $stmt->bind_param(
@@ -294,7 +383,14 @@ function dr_create_request_attachment(mysqli $conn, string $residentId, string $
     );
     $ok = $stmt->execute();
     $insertId = $ok ? (int)$stmt->insert_id : 0;
+    if (!$ok) {
+        error_log('[documentRequestWorkflow][attachment] insert failed: ' . $stmt->error);
+    }
     $stmt->close();
+
+    if ($insertId <= 0 && file_exists($diskPath)) {
+        @unlink($diskPath);
+    }
     return $insertId > 0 ? $insertId : null;
 }
 
@@ -321,15 +417,23 @@ if ($action === 'submit_request') {
     $now = dr_now();
     $requestId = dr_generate_request_id($conn);
 
+    $pendingStatusId = dr_pick_any_status_id($conn, ['PendingVerification', 'PendingReview', 'Pending']);
     $payloadJson = dr_safe_json($payload);
-    $attachmentId = dr_create_request_attachment($conn, $residentId, $userId, $documentType, $payloadJson);
+    $attachmentId = dr_create_request_attachment(
+        $conn,
+        $residentId,
+        $userId,
+        $documentType,
+        $payloadJson,
+        $documentTypeId,
+        $pendingStatusId
+    );
 
     $values = [];
     $types = '';
     $params = [];
 
     $residentNames = dr_get_resident_name_parts($conn, $userId);
-    $pendingStatusId = dr_pick_any_status_id($conn, ['PendingVerification', 'PendingReview', 'Pending']);
     $requestDetails = trim($documentType . ($purpose !== '' ? ' - ' . $purpose : ''));
     if ($requestDetails === '') {
         $requestDetails = 'Document request submitted';
@@ -371,19 +475,22 @@ if ($action === 'submit_request') {
     $setIfColumn('middle_name', 's', $residentNames['middlename']);
     $setIfColumn('suffix', 's', $residentNames['suffix']);
     if (dr_has_column($conn, 'documentrequesttbl', 'attachment_id')) {
-        if ($attachmentId === null) {
-            dr_respond_json(500, ['success' => false, 'message' => 'Failed to create request attachment.']);
+        if ($attachmentId !== null) {
+            $values['attachment_id'] = $attachmentId;
+            $types .= 'i';
+            $params[] = $attachmentId;
+        } else {
+            // Short-schema mode allows NULL attachment_id; do not block request creation.
+            error_log('[documentRequestWorkflow] attachment not created, continuing with NULL attachment_id');
         }
-        $values['attachment_id'] = $attachmentId;
-        $types .= 'i';
-        $params[] = $attachmentId;
     }
     $setIfColumn('request_details', 's', $requestDetailsValue);
-    if (dr_has_column($conn, 'documentrequesttbl', 'status_id')) {
+    if (dr_has_column($conn, 'documentrequesttbl', 'status_id_request') || dr_has_column($conn, 'documentrequesttbl', 'status_id')) {
         if ($pendingStatusId === null) {
             dr_respond_json(500, ['success' => false, 'message' => 'Pending status is not configured.']);
         }
-        $values['status_id'] = $pendingStatusId;
+        $statusCol = dr_has_column($conn, 'documentrequesttbl', 'status_id_request') ? 'status_id_request' : 'status_id';
+        $values[$statusCol] = $pendingStatusId;
         $types .= 'i';
         $params[] = $pendingStatusId;
     }
@@ -450,7 +557,7 @@ if ($action === 'submit_request') {
                 $columns = array_keys($values);
                 $types = '';
                 foreach ($columns as $c) {
-                    $types .= ($c === 'attachment_id' || $c === 'status_id' || $c === 'document_type_id') ? 'i' : 's';
+                    $types .= ($c === 'attachment_id' || $c === 'status_id' || $c === 'status_id_request' || $c === 'document_type_id') ? 'i' : 's';
                 }
 
                 $retrySql = "INSERT INTO documentrequesttbl (" . implode(',', $columns) . ") VALUES (" . implode(',', array_fill(0, count($columns), '?')) . ")";
@@ -588,9 +695,9 @@ if ($action === 'download_issued') {
     }
 
     $stage = (string)($row['stage'] ?? '');
-    if (!in_array($stage, [DR_STAGE_READY_FOR_CLAIM, DR_STAGE_COMPLETED], true)) {
+    if (!in_array($stage, [DR_STAGE_COMPLETED], true)) {
         http_response_code(422);
-        exit('Document is not yet available for download.');
+        exit('Document is not yet available for download. Release status is pending final review.');
     }
 
     $publicPath = trim((string)($row['issued_file_path'] ?? ''));
@@ -616,6 +723,53 @@ if ($action === 'download_issued') {
     $filename = basename($absolute);
     header('Content-Type: application/octet-stream');
     header('Content-Disposition: attachment; filename="' . $filename . '"');
+    header('Content-Length: ' . filesize($absolute));
+    readfile($absolute);
+    exit;
+}
+
+if ($action === 'view_issued') {
+    $requestId = trim((string)($_GET['request_id'] ?? ''));
+    if ($requestId === '') {
+        http_response_code(422);
+        exit('Missing request ID.');
+    }
+
+    $row = dr_fetch_request($conn, $requestId);
+    if (!$row || (string)$row['resident_user_id'] !== $residentForeignId) {
+        http_response_code(404);
+        exit('Request not found.');
+    }
+
+    $stage = (string)($row['stage'] ?? '');
+    if (!in_array($stage, [DR_STAGE_COMPLETED], true)) {
+        http_response_code(422);
+        exit('Document is not yet available for viewing.');
+    }
+
+    $publicPath = trim((string)($row['issued_file_path'] ?? ''));
+    if ($publicPath === '') {
+        http_response_code(404);
+        exit('Issued file is not yet uploaded.');
+    }
+
+    $baseDir = realpath(__DIR__ . '/../../');
+    if ($baseDir === false) {
+        http_response_code(500);
+        exit('Path resolution failed.');
+    }
+
+    $relative = '/' . ltrim(dr_strip_legacy_base($publicPath), '/');
+    $absolute = realpath($baseDir . $relative);
+
+    if ($absolute === false || !is_file($absolute) || strpos($absolute, $baseDir . '/UnifiedFileAttachment/') !== 0) {
+        http_response_code(404);
+        exit('File not found.');
+    }
+
+    $mime = (string)(mime_content_type($absolute) ?: 'application/octet-stream');
+    header('Content-Type: ' . $mime);
+    header('Content-Disposition: inline; filename="' . basename($absolute) . '"');
     header('Content-Length: ' . filesize($absolute));
     readfile($absolute);
     exit;
@@ -662,7 +816,8 @@ if ($action === 'view_payment_proof') {
 }
 
 if ($action === 'list') {
-    $stmt = $conn->prepare("SELECT * FROM documentrequesttbl WHERE resident_user_id = ? ORDER BY submitted_at DESC, request_id DESC");
+    $orderCol = dr_has_column($conn, 'documentrequesttbl', 'submitted_at') ? 'submitted_at' : 'request_timestamp';
+    $stmt = $conn->prepare("SELECT * FROM documentrequesttbl WHERE resident_user_id = ? ORDER BY {$orderCol} DESC, request_id DESC");
     if (!$stmt) {
         dr_respond_json(500, ['success' => false, 'message' => 'Failed to prepare list query.']);
     }
@@ -671,6 +826,8 @@ if ($action === 'list') {
     $items = [];
     $res = $stmt->get_result();
     while ($row = $res->fetch_assoc()) {
+        dr_hydrate_request_derived_fields($conn, $row);
+        dr_merge_finance_transaction_into_request($conn, $row);
         dr_sync_stage_from_status_lookup($conn, $row);
         $row['stage_label'] = dr_stage_label((string)$row['stage']);
         $row['fee_amount'] = dr_get_fee_amount_for_document_type($conn, (string)($row['document_type'] ?? ''));

@@ -90,10 +90,7 @@ h2 {
 }
 
 .upload-input {
-    position: absolute;
-    inset: 0;
-    opacity: 0;
-    cursor: pointer;
+    display: none !important;
 }
 
 .upload-box .upload-remove {

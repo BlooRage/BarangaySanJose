@@ -55,7 +55,7 @@ require_once __DIR__ . "/../includes/resident_access_guard.php";
                         <p class="certificate-text">
                             Official proof of common-law partnership for legal or insurance claims.
                         </p>
-                        <button class="btn apply-btn" onclick="location.href='CohabitationForm.php'">Apply Now</button>
+                        <button class="btn apply-btn" type="button" disabled title="Currently unavailable">Apply Now</button>
                     </div>
                 </div>
 
@@ -77,7 +77,7 @@ require_once __DIR__ . "/../includes/resident_access_guard.php";
                         <p class="certificate-text">
                             Avail fee waivers for government documents under Republic Act 11261.
                         </p>
-                        <button class="btn apply-btn" onclick="location.href='FirstTimeJobSeekerForm.php'">Apply Now</button>
+                        <button class="btn apply-btn" type="button" disabled title="Currently unavailable">Apply Now</button>
                     </div>
                 </div>
 
@@ -88,7 +88,7 @@ require_once __DIR__ . "/../includes/resident_access_guard.php";
                         <p class="certificate-text">
                             Request a good moral certificate for school, employment, or other requirements.
                         </p>
-                        <button class="btn apply-btn" onclick="location.href='GoodMoralForm.php'">Apply Now</button>
+                        <button class="btn apply-btn" type="button" disabled title="Currently unavailable">Apply Now</button>
                     </div>
                 </div>
 
@@ -99,7 +99,7 @@ require_once __DIR__ . "/../includes/resident_access_guard.php";
                         <p class="certificate-text">
                             Request a residency certificate as proof of address and community residence.
                         </p>
-                        <button class="btn apply-btn" onclick="location.href='ResidencyForm.php'">Apply Now</button>
+                        <button class="btn apply-btn" type="button" disabled title="Currently unavailable">Apply Now</button>
                     </div>
                 </div>
 
@@ -110,7 +110,7 @@ require_once __DIR__ . "/../includes/resident_access_guard.php";
                         <p class="certificate-text">
                             Request an identity certificate for official identification and verification purposes.
                         </p>
-                        <button class="btn apply-btn" onclick="location.href='IdentityForm.php'">Apply Now</button>
+                        <button class="btn apply-btn" type="button" disabled title="Currently unavailable">Apply Now</button>
                     </div>
                 </div>
             </div>
@@ -121,4 +121,3 @@ require_once __DIR__ . "/../includes/resident_access_guard.php";
 </body>
 
 </html>
-

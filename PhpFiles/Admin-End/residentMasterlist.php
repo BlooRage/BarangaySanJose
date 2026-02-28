@@ -974,17 +974,24 @@ if (isset($_GET['fetch'])) {
             (
                 SELECT uf.file_path
                 FROM unifiedfileattachmenttbl uf
-                INNER JOIN documenttypelookuptbl dt
+                LEFT JOIN documenttypelookuptbl dt
                     ON uf.document_type_id = dt.document_type_id
-                INNER JOIN statuslookuptbl sv
+                LEFT JOIN statuslookuptbl sv
                     ON uf.status_id_verify = sv.status_id
                 WHERE uf.source_type = 'ResidentProfiling'
                   AND uf.source_id = r.resident_id
-                  AND dt.document_type_name = '2x2 Picture'
-                  AND dt.document_category = 'ResidentProfiling'
-                  AND sv.status_name = 'Verified'
-                  AND sv.status_type = 'ResidentDocumentProfiling'
-                ORDER BY uf.upload_timestamp DESC, uf.attachment_id DESC
+                  AND (
+                        LOWER(COALESCE(dt.document_type_name, '')) = '2x2 picture'
+                        OR LOWER(COALESCE(dt.document_type_name, '')) LIKE '%2x2%'
+                      )
+                  AND LOWER(COALESCE(dt.document_category, 'residentprofiling')) = 'residentprofiling'
+                ORDER BY
+                    CASE
+                        WHEN LOWER(COALESCE(sv.status_name, '')) = 'verified' THEN 0
+                        ELSE 1
+                    END,
+                    uf.upload_timestamp DESC,
+                    uf.attachment_id DESC
                 LIMIT 1
             ) AS id_picture_path,
 

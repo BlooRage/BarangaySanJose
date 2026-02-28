@@ -4,6 +4,7 @@ declare(strict_types=1);
 header('Content-Type: application/json; charset=utf-8');
 
 require_once __DIR__ . '/../General/connection.php';
+require_once __DIR__ . '/../General/documentRequestWorkflow.php';
 
 function ti_json(int $status, array $payload): void {
     http_response_code($status);
@@ -22,7 +23,7 @@ function ti_stage_label(string $stage): string {
         'payment_submitted' => 'Pending Payment Verification',
         'payment_rejected' => 'Payment Rejected',
         'payment_verified' => 'Payment Verified',
-        'ready_for_claim' => 'Ready for Claim',
+        'ready_for_claim' => 'For Release',
         'completed' => 'Completed',
     ];
     return $map[$stage] ?? ucfirst(str_replace('_', ' ', $stage));
@@ -57,6 +58,12 @@ function ti_value(array $arr, array $keys, string $default = ''): string {
     return $default;
 }
 
+function ti_table_exists(mysqli $conn, string $table): bool {
+    $tableEsc = $conn->real_escape_string($table);
+    $res = $conn->query("SHOW TABLES LIKE '{$tableEsc}'");
+    return $res instanceof mysqli_result && $res->num_rows > 0;
+}
+
 $requestId = trim((string)($_GET['request_id'] ?? ''));
 $verificationCode = trim((string)($_GET['vc'] ?? ''));
 
@@ -64,26 +71,37 @@ if ($requestId === '') {
     ti_json(422, ['success' => false, 'message' => 'Missing request_id.']);
 }
 
+$statusColumn = dr_request_status_column($conn);
+if ($statusColumn === null) {
+    ti_json(500, ['success' => false, 'message' => 'Missing status column in documentrequesttbl.']);
+}
+
+$selectResidentUserId = dr_column_exists($conn, 'documentrequesttbl', 'resident_user_id')
+    ? 'resident_user_id'
+    : "'' AS resident_user_id";
+$selectRequestDetails = dr_column_exists($conn, 'documentrequesttbl', 'request_details')
+    ? 'request_details'
+    : "'{}' AS request_details";
+$selectRequestTimestamp = dr_column_exists($conn, 'documentrequesttbl', 'request_timestamp')
+    ? 'request_timestamp'
+    : (dr_column_exists($conn, 'documentrequesttbl', 'created_at') ? 'created_at AS request_timestamp' : "'' AS request_timestamp");
+$selectDocumentValidity = dr_column_exists($conn, 'documentrequesttbl', 'document_validity')
+    ? 'document_validity'
+    : "'' AS document_validity";
+$selectReleaseTimestamp = dr_column_exists($conn, 'documentrequesttbl', 'release_timestamp')
+    ? 'release_timestamp'
+    : (dr_column_exists($conn, 'documentrequesttbl', 'ready_at') ? 'ready_at AS release_timestamp' : "'' AS release_timestamp");
+
 $stmt = $conn->prepare("
     SELECT
         request_id,
-        resident_user_id,
-        resident_id,
-        document_type,
-        purpose,
-        request_details,
-        status_id,
-        (SELECT sl.status_name FROM statuslookuptbl sl WHERE sl.status_id = documentrequesttbl.status_id LIMIT 1) AS status_lookup_name,
-        status_remarks,
-        amount,
-        or_number,
-        certificate_number,
-        verification_code,
-        submitted_at,
-        ready_at,
-        completed_at,
-        document_validity,
-        release_timestamp
+        {$selectResidentUserId},
+        {$selectRequestDetails},
+        {$statusColumn} AS status_id_request,
+        (SELECT sl.status_name FROM statuslookuptbl sl WHERE sl.status_id = documentrequesttbl.{$statusColumn} LIMIT 1) AS status_lookup_name,
+        {$selectRequestTimestamp},
+        {$selectDocumentValidity},
+        {$selectReleaseTimestamp}
     FROM documentrequesttbl
     WHERE request_id = ?
     LIMIT 1
@@ -102,6 +120,56 @@ if (!$row) {
     ti_json(404, ['success' => false, 'message' => 'Transaction not found or invalid verification link.']);
 }
 
+$payload = json_decode((string)($row['request_details'] ?? '{}'), true);
+if (!is_array($payload)) {
+    $payload = [];
+}
+
+$row['document_type'] = trim((string)($payload['document_type'] ?? ''));
+if ($row['document_type'] === '') {
+    $q = $conn->prepare("SELECT certificate_type FROM issuancerequesttbl WHERE request_id = ? LIMIT 1");
+    if ($q) {
+        $q->bind_param('s', $requestId);
+        $q->execute();
+        $q->bind_result($certType);
+        if ($q->fetch()) {
+            $row['document_type'] = trim((string)$certType);
+        }
+        $q->close();
+    }
+}
+if ($row['document_type'] === '') {
+    $row['document_type'] = 'Certificate Request';
+}
+$row['purpose'] = trim((string)($payload['request_purpose'] ?? $payload['purpose'] ?? ''));
+$row['status_remarks'] = trim((string)($payload['status_remarks'] ?? ''));
+$row['certificate_number'] = '';
+$row['verification_code'] = '';
+if (function_exists('dr_get_issuance_request_meta')) {
+    $issuanceMeta = dr_get_issuance_request_meta($conn, $requestId);
+    $row['certificate_number'] = trim((string)($issuanceMeta['certificate_number'] ?? ''));
+    $row['verification_code'] = trim((string)($issuanceMeta['verification_code'] ?? ''));
+}
+$row['submitted_at'] = trim((string)($row['request_timestamp'] ?? ''));
+$row['ready_at'] = '';
+$row['completed_at'] = '';
+
+$row['amount'] = null;
+$row['or_number'] = '';
+if (ti_table_exists($conn, 'financetransactiontbl')) {
+    $tx = $conn->prepare("SELECT transaction_amount, or_number FROM financetransactiontbl WHERE request_id = ? LIMIT 1");
+    if ($tx) {
+        $tx->bind_param('s', $requestId);
+        $tx->execute();
+        $txRow = $tx->get_result()->fetch_assoc();
+        $tx->close();
+        if (is_array($txRow)) {
+            $row['amount'] = isset($txRow['transaction_amount']) ? (float)$txRow['transaction_amount'] : null;
+            $row['or_number'] = (string)($txRow['or_number'] ?? '');
+        }
+    }
+}
+
 $statusMappedStage = ti_stage_from_status_name((string)($row['status_lookup_name'] ?? ''));
 if ($statusMappedStage !== null) {
     $row['stage'] = $statusMappedStage;
@@ -114,11 +182,6 @@ if ($expectedCode === '') {
 
 if ($verificationCode === '' || strcasecmp($verificationCode, $expectedCode) !== 0) {
     ti_json(404, ['success' => false, 'message' => 'Transaction not found or invalid verification link.']);
-}
-
-$payload = json_decode((string)($row['request_details'] ?? $row['payload_json'] ?? '{}'), true);
-if (!is_array($payload)) {
-    $payload = [];
 }
 
 $lastName = ti_value($payload, ['last_name', 'lastname']);

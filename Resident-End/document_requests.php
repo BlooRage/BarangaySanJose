@@ -28,6 +28,64 @@ require_once __DIR__ . '/includes/resident_access_guard.php';
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
   <link rel="stylesheet" href="<?= htmlspecialchars($baseUrl) ?>/CSS-Styles/Resident-End-CSS/residentDashboard.css">
   <link rel="stylesheet" href="<?= htmlspecialchars($baseUrl) ?>/CSS-Styles/Guest-End-CSS/GeneralStyle.css">
+  <style>
+    #viewModal .modal-body {
+      background: #f8fafc;
+    }
+    #viewModal .tracker-doc-highlight {
+      background: #dbeafe;
+      color: #1e40af;
+      border-radius: 8px;
+      padding: 10px 12px;
+      font-weight: 700;
+      margin-bottom: 12px;
+    }
+    #viewModal .tracker-form-section {
+      border: 1px solid #e5e7eb;
+      border-radius: 10px;
+      background: #fff;
+      padding: 12px;
+      margin-bottom: 12px;
+    }
+    #viewModal .tracker-form-section-title {
+      font-size: 1rem;
+      font-weight: 700;
+      color: #111827;
+      margin-bottom: 10px;
+    }
+    #viewModal .tracker-form-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 10px;
+    }
+    #viewModal .tracker-form-grid.cols-1 {
+      grid-template-columns: 1fr;
+    }
+    #viewModal .tracker-form-field {
+      background: #f8fafc;
+      border: 1px solid #e5e7eb;
+      border-radius: 8px;
+      padding: 8px 10px;
+    }
+    #viewModal .tracker-form-label {
+      margin: 0 0 3px 0;
+      font-size: .78rem;
+      color: #6b7280;
+      font-weight: 600;
+      text-transform: capitalize;
+    }
+    #viewModal .tracker-form-value {
+      margin: 0;
+      color: #111827;
+      font-weight: 600;
+      word-break: break-word;
+    }
+    @media (max-width: 767px) {
+      #viewModal .tracker-form-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
 </head>
 <body>
 <div class="d-flex min-vh-100">
@@ -102,11 +160,7 @@ require_once __DIR__ . '/includes/resident_access_guard.php';
         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
       </div>
       <div class="modal-body">
-        <div class="table-responsive">
-          <table class="table table-sm align-middle mb-0">
-            <tbody id="viewDetailsBody"></tbody>
-          </table>
-        </div>
+        <div id="viewDetailsBody"></div>
       </div>
       <div class="modal-footer">
         <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
@@ -119,7 +173,7 @@ require_once __DIR__ . '/includes/resident_access_guard.php';
   <div class="modal-dialog modal-xl modal-dialog-centered">
     <div class="modal-content">
       <div class="modal-header">
-        <h5 class="modal-title">Payment Proof</h5>
+        <h5 class="modal-title" id="paymentProofTitle">Payment Proof</h5>
         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
       </div>
       <div class="modal-body">
@@ -149,6 +203,7 @@ require_once __DIR__ . '/includes/resident_access_guard.php';
   const viewModalTitle = document.getElementById('viewModalTitle');
   const viewDetailsBody = document.getElementById('viewDetailsBody');
   const paymentProofModal = new bootstrap.Modal(document.getElementById('paymentProofModal'));
+  const paymentProofTitle = document.getElementById('paymentProofTitle');
   const paymentProofWrap = document.getElementById('paymentProofWrap');
   const paymentProofOpenNew = document.getElementById('paymentProofOpenNew');
   let itemById = new Map();
@@ -164,6 +219,51 @@ require_once __DIR__ . '/includes/resident_access_guard.php';
 
   function escapeHtml(v) {
     return String(v ?? '').replace(/[&<>\"']/g, (m) => ({'&':'&amp;','<':'&lt;','>':'&gt;','\"':'&quot;',"'":'&#39;'}[m]));
+  }
+
+  function friendlyLabel(key) {
+    const raw = String(key || '').trim();
+    if (!raw) return '';
+    return raw.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+  }
+
+  function isEmptyFieldValue(value) {
+    const text = String(value ?? '').trim();
+    if (!text) return true;
+    return ['-', '—', 'n/a', 'na', 'null', 'undefined'].includes(text.toLowerCase());
+  }
+
+  function formField(label, value) {
+    return `
+      <div class="tracker-form-field">
+        <p class="tracker-form-label">${escapeHtml(label)}</p>
+        <p class="tracker-form-value">${escapeHtml(value)}</p>
+      </div>
+    `;
+  }
+
+  function formSection(title, content) {
+    return `
+      <section class="tracker-form-section">
+        <h6 class="tracker-form-section-title">${escapeHtml(title)}</h6>
+        ${content}
+      </section>
+    `;
+  }
+
+  function parsePayload(payloadLike) {
+    if (payloadLike && typeof payloadLike === 'object' && !Array.isArray(payloadLike)) {
+      return payloadLike;
+    }
+    const text = String(payloadLike ?? '').trim();
+    if (!text) return {};
+    try {
+      const parsed = JSON.parse(text);
+      if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+        return parsed;
+      }
+    } catch (_) {}
+    return {};
   }
 
   async function fetchJson(url, options = {}) {
@@ -217,10 +317,11 @@ require_once __DIR__ . '/includes/resident_access_guard.php';
         const proofBtn = r.payment_proof_path
           ? `<button class="btn btn-sm btn-outline-dark me-1" data-proof="${escapeHtml(r.request_id)}">View Payment</button>`
           : '';
+        const issuedBtn = `<button class="btn btn-sm btn-success" data-issued="${escapeHtml(r.request_id)}">View Document</button>`;
         if (r.stage === 'for_payment' || r.stage === 'payment_rejected') {
           action = `${viewBtn}${proofBtn}<button class="btn btn-sm btn-outline-primary" data-pay="${escapeHtml(r.request_id)}">Submit Payment</button>`;
-        } else if (r.stage === 'ready_for_claim' || r.stage === 'completed') {
-          action = `${viewBtn}${proofBtn}<a class="btn btn-sm btn-success" href="${endpoint}?action=download_issued&request_id=${encodeURIComponent(r.request_id)}">Download</a>`;
+        } else if (r.stage === 'completed') {
+          action = `${viewBtn}${proofBtn}${issuedBtn}`;
         } else {
           action = `${viewBtn}${proofBtn}`;
         }
@@ -258,26 +359,47 @@ require_once __DIR__ . '/includes/resident_access_guard.php';
           const id = String(btn.getAttribute('data-view') || '');
           const row = itemById.get(id);
           if (!row) return;
-          const payload = row.payload && typeof row.payload === 'object' ? row.payload : {};
-          const fixedRows = [
-            ['Request ID', row.request_id],
-            ['Document Type', row.document_type],
-            ['Purpose', row.purpose || '-'],
-            ['Fee', (row.fee_amount !== null && row.fee_amount !== undefined && String(row.fee_amount) !== '') ? `₱${Number(row.fee_amount).toFixed(2)}` : '-'],
-            ['Stage', row.stage_label || row.stage || '-'],
-            ['Status Remarks', row.status_remarks || '-'],
-            ['Submitted At', row.submitted_at || '-'],
-            ['Payment Method', row.payment_method || '-'],
-            ['Amount', row.amount || '-'],
-            ['OR Number', row.or_number || '-'],
-            ['Certificate Number', row.certificate_number || '-'],
-          ];
-
-          let html = fixedRows.map(([k, v]) => `<tr><th style="width:220px;">${escapeHtml(k)}</th><td>${escapeHtml(v ?? '-')}</td></tr>`).join('');
+          const payload = parsePayload(row.payload);
+          const technicalKeys = new Set(['action', 'csrf_token', 'redirect']);
+          const submittedFields = [];
           Object.keys(payload).forEach((key) => {
-            html += `<tr><th>${escapeHtml(key)}</th><td>${escapeHtml(payload[key])}</td></tr>`;
+            const k = String(key || '').trim();
+            if (!k || technicalKeys.has(k)) return;
+            const value = payload[key];
+            const text = Array.isArray(value) || (value && typeof value === 'object')
+              ? JSON.stringify(value)
+              : String(value ?? '').trim();
+            if (isEmptyFieldValue(text)) return;
+            submittedFields.push({ label: friendlyLabel(k), value: text });
           });
-          viewDetailsBody.innerHTML = html || '<tr><td class="text-muted">No details.</td></tr>';
+
+          const requestDetailsRaw = String(row.request_details ?? '').trim();
+          if (!submittedFields.length && requestDetailsRaw && requestDetailsRaw !== '{}' && requestDetailsRaw !== '[]') {
+            submittedFields.push({ label: 'Request Details', value: requestDetailsRaw });
+          }
+
+          if (!submittedFields.length) {
+            [
+              ['Purpose', row.purpose],
+              ['Status', row.stage_label || row.stage],
+              ['Submitted At', row.submitted_at],
+              ['Status Remarks', row.status_remarks]
+            ].forEach(([label, value]) => {
+              const text = String(value ?? '').trim();
+              if (!isEmptyFieldValue(text)) {
+                submittedFields.push({ label, value: text });
+              }
+            });
+          }
+
+          const gridClass = submittedFields.length <= 1 ? 'cols-1' : '';
+          const gridHtml = submittedFields.length
+            ? `<div class="tracker-form-grid ${gridClass}">${submittedFields.map((f) => formField(f.label, f.value)).join('')}</div>`
+            : '<div class="text-muted">No submitted details.</div>';
+
+          let html = `<div class="tracker-doc-highlight">Document Requested: ${escapeHtml(row.document_type || '-')}</div>`;
+          html += formSection('Submitted Form Details', gridHtml);
+          viewDetailsBody.innerHTML = html;
           if (viewModalTitle) {
             const requestId = String(row.request_id || '').trim();
             viewModalTitle.textContent = requestId ? `Certificate Request (#${requestId})` : 'Certificate Request';
@@ -291,22 +413,49 @@ require_once __DIR__ . '/includes/resident_access_guard.php';
           const id = String(btn.getAttribute('data-proof') || '');
           const row = itemById.get(id);
           if (!row || !row.payment_proof_path) return;
-
           const proofUrl = `${endpoint}?action=view_payment_proof&request_id=${encodeURIComponent(id)}`;
-          paymentProofOpenNew.href = proofUrl;
+          openFileViewerModal({
+            title: 'Payment Proof',
+            viewUrl: proofUrl,
+            linkText: 'Open in New Tab',
+            linkUrl: proofUrl,
+            isPdf: String(row.payment_proof_path || '').toLowerCase().endsWith('.pdf')
+          });
+        });
+      });
 
-          const path = String(row.payment_proof_path || '').toLowerCase();
-          if (path.endsWith('.pdf')) {
-            paymentProofWrap.innerHTML = `<iframe src="${proofUrl}" style="width:100%;height:70vh;border:1px solid #ddd;border-radius:8px;"></iframe>`;
-          } else {
-            paymentProofWrap.innerHTML = `<img src="${proofUrl}" alt="Payment Proof" style="max-width:100%;max-height:70vh;border:1px solid #ddd;border-radius:8px;">`;
-          }
-          paymentProofModal.show();
+      tbody.querySelectorAll('button[data-issued]').forEach((btn) => {
+        btn.addEventListener('click', () => {
+          const id = String(btn.getAttribute('data-issued') || '');
+          const viewUrl = `${endpoint}?action=view_issued&request_id=${encodeURIComponent(id)}`;
+          const downloadUrl = `${endpoint}?action=download_issued&request_id=${encodeURIComponent(id)}`;
+          openFileViewerModal({
+            title: 'Issued Document (PDF)',
+            viewUrl,
+            linkText: 'Download',
+            linkUrl: downloadUrl,
+            isPdf: true
+          });
         });
       });
     } catch (err) {
       tbody.innerHTML = `<tr><td colspan="7" class="text-center text-danger py-4">${escapeHtml(err.message || err)}</td></tr>`;
     }
+  }
+
+  function openFileViewerModal({ title, viewUrl, linkText, linkUrl, isPdf }) {
+    if (paymentProofTitle) {
+      paymentProofTitle.textContent = String(title || 'Document');
+    }
+    paymentProofOpenNew.textContent = String(linkText || 'Open in New Tab');
+    paymentProofOpenNew.href = String(linkUrl || viewUrl || '#');
+
+    if (isPdf) {
+      paymentProofWrap.innerHTML = `<iframe src="${viewUrl}" style="width:100%;height:70vh;border:1px solid #ddd;border-radius:8px;"></iframe>`;
+    } else {
+      paymentProofWrap.innerHTML = `<img src="${viewUrl}" alt="Document Preview" style="max-width:100%;max-height:70vh;border:1px solid #ddd;border-radius:8px;">`;
+    }
+    paymentProofModal.show();
   }
 
   payMethod.addEventListener('change', () => {

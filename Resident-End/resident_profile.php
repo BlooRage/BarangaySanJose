@@ -494,30 +494,40 @@ if ($residentId !== '' && isset($conn) && $conn instanceof mysqli) {
                                 <div><strong>Occupation:</strong> <?= $residentinformationtbl['occupation'] ?></div>
                                 <?php
                                   $sectorText = trim((string)($residentinformationtbl['sector_membership'] ?? ''));
-                                  $pendingSector = (int)($residentinformationtbl['sector_membership_pending_review'] ?? 0);
                                   $pendingSectorLabels = trim((string)($residentinformationtbl['sector_membership_pending_labels'] ?? ''));
-                                  $hasVerifiedSector = $sectorText !== '' && strcasecmp($sectorText, 'none') !== 0;
-                                  $pendingLabel = $pendingSectorLabels !== ''
-                                      ? ($pendingSectorLabels . ' (Pending Review)')
-                                      : 'Pending Review';
+                                  $verifiedSectors = [];
+                                  if ($sectorText !== '' && strcasecmp($sectorText, 'none') !== 0) {
+                                      $verifiedSectors = array_values(array_filter(array_map('trim', explode(',', $sectorText))));
+                                  }
+                                  $pendingSectors = $pendingSectorLabels !== ''
+                                      ? array_values(array_filter(array_map('trim', explode(',', $pendingSectorLabels))))
+                                      : [];
+
+                                  $verifiedCount = count($verifiedSectors);
+                                  $pendingCount = count($pendingSectors);
+
+                                  $sectorMembershipDisplay = 'N/A';
+                                  if ($verifiedCount > 0) {
+                                      $sectorMembershipDisplay = implode(', ', $verifiedSectors);
+                                  } elseif ($pendingCount === 1) {
+                                      $sectorMembershipDisplay = $pendingSectors[0] . ' - Pending Verification';
+                                  } elseif ($pendingCount > 1) {
+                                      $sectorMembershipDisplay = 'Applied Sectors - Pending Verification';
+                                  }
                                 ?>
-                                <?php if ($hasVerifiedSector): ?>
-                                    <div>
-                                        <strong>Sector Membership:</strong> <?= htmlspecialchars($sectorText, ENT_QUOTES, 'UTF-8') ?>
-                                    </div>
-                                    <?php if ($pendingSector > 0): ?>
+                                <div>
+                                    <strong>Sector Membership:</strong> <?= htmlspecialchars($sectorMembershipDisplay, ENT_QUOTES, 'UTF-8') ?>
+                                </div>
+                                <?php if ($verifiedCount > 0 && $pendingCount > 0): ?>
+                                    <?php if ($pendingCount === 1): ?>
                                         <div class="small text-muted">
-                                            <strong>Other sector membership:</strong> <?= htmlspecialchars($pendingLabel, ENT_QUOTES, 'UTF-8') ?>
+                                            <strong>Other sector membership:</strong> <?= htmlspecialchars($pendingSectors[0] . ' - Pending Verification', ENT_QUOTES, 'UTF-8') ?>
+                                        </div>
+                                    <?php else: ?>
+                                        <div class="small text-muted">
+                                            <strong>Other sector memberships:</strong> Applied Sectors - Pending Verification
                                         </div>
                                     <?php endif; ?>
-                                <?php elseif ($pendingSector > 0): ?>
-                                    <div>
-                                        <strong>Sector Membership:</strong> <?= htmlspecialchars($pendingLabel, ENT_QUOTES, 'UTF-8') ?>
-                                    </div>
-                                <?php else: ?>
-                                    <div>
-                                        <strong>Sector Membership:</strong> N/A
-                                    </div>
                                 <?php endif; ?>
                             </div>
                         </div>
@@ -961,7 +971,9 @@ if ($residentId !== '' && isset($conn) && $conn instanceof mysqli) {
                     <div class="mb-3">
                         <label class="form-label">Sector Membership</label>
                         <?php
-                          $sectorSelected = array_filter(array_map('trim', explode(',', (string)($residentinformationtbl['sector_membership'] ?? ''))));
+                          $sectorVerifiedSelected = array_filter(array_map('trim', explode(',', (string)($residentinformationtbl['sector_membership'] ?? ''))));
+                          $sectorPendingSelected = array_filter(array_map('trim', explode(',', (string)($residentinformationtbl['sector_membership_pending_labels'] ?? ''))));
+                          $sectorSelected = array_values(array_unique(array_merge($sectorVerifiedSelected, $sectorPendingSelected)));
                         ?>
                         <div class="row g-2">
                             <div class="col-12 col-md-6">
@@ -995,6 +1007,11 @@ if ($residentId !== '' && isset($conn) && $conn instanceof mysqli) {
                                 </div>
                             </div>
                         </div>
+                        <?php if (!empty($sectorPendingSelected)): ?>
+                            <div class="small text-muted mt-2">
+                                Pending sector verification: <?= htmlspecialchars(implode(', ', $sectorPendingSelected), ENT_QUOTES, 'UTF-8') ?>
+                            </div>
+                        <?php endif; ?>
                     </div>
                 </div>
 
