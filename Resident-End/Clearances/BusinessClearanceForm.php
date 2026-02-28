@@ -300,5 +300,3 @@ $ownerStreetName = htmlspecialchars((string)($residentaddresstbl['street_name'] 
 </html>
 
 
-
-

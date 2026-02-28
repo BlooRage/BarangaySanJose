@@ -266,6 +266,46 @@ $fullAddress = htmlspecialchars(implode(', ', $fullAddressParts), ENT_QUOTES, 'U
                     <div class="input-stack"><label class="top-label">Suffix</label><input type="text" name="land_owner_suffix"></div>
                 </div>
 
+                <div id="documentUploadSection" class="d-none">
+                    <h2 class="section-title text-center text-dark">Document Upload</h2>
+                    <div class="form-row">
+                        <div class="full-width">
+                            <div class="row mb-3">
+                                <div class="col-md-6">
+                                    <label class="top-label" for="fireSafetyFile">Fire Safety Clearance from BFP <span class="required-asterisk">*</span></label>
+                                    <input type="file" id="fireSafetyFile" name="fire_safety_file" class="form-control" accept=".pdf,.jpg,.jpeg,.png">
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="top-label" for="fireSafetyOrNumber">O.R. Number <span class="required-asterisk">*</span></label>
+                                    <input type="text" id="fireSafetyOrNumber" name="fire_safety_or_number" placeholder="Enter O.R. number">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="form-row two-col-row">
+                        <div>
+                            <label class="top-label" for="meralcoYellowFrontFile">Yellow Card from Meralco (Front) <span class="required-asterisk">*</span></label>
+                            <label class="upload-dropzone" id="meralcoYellowFrontDropzone" for="meralcoYellowFrontFile">
+                                <i class="fa-solid fa-cloud-arrow-up"></i>
+                                <span>Drag files here or click to upload</span>
+                                <small>Accepted: PDF, JPG, JPEG, PNG</small>
+                            </label>
+                            <input type="file" id="meralcoYellowFrontFile" name="meralco_yellow_front_file" class="visually-hidden" accept=".pdf,.jpg,.jpeg,.png">
+                            <div id="meralcoYellowFrontSelected" class="selected-files small text-muted mt-2"></div>
+                        </div>
+                        <div>
+                            <label class="top-label" for="meralcoYellowBackFile">Yellow Card from Meralco (Back) <span class="required-asterisk">*</span></label>
+                            <label class="upload-dropzone" id="meralcoYellowBackDropzone" for="meralcoYellowBackFile">
+                                <i class="fa-solid fa-cloud-arrow-up"></i>
+                                <span>Drag files here or click to upload</span>
+                                <small>Accepted: PDF, JPG, JPEG, PNG</small>
+                            </label>
+                            <input type="file" id="meralcoYellowBackFile" name="meralco_yellow_back_file" class="visually-hidden" accept=".pdf,.jpg,.jpeg,.png">
+                            <div id="meralcoYellowBackSelected" class="selected-files small text-muted mt-2"></div>
+                        </div>
+                    </div>
+                </div>
+
                 <div class="agreement-row">
                     <div class="agreement-text check-item">
                         <input type="checkbox" id="agreement" required>
