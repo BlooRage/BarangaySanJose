@@ -1,4 +1,4 @@
-<?php
+﻿<?php
 if (!isset($baseUrl)) {
     $scriptName = str_replace("\\", "/", (string)($_SERVER['SCRIPT_NAME'] ?? ''));
     $residentSegmentPos = strpos($scriptName, '/Resident-End/');
@@ -30,7 +30,7 @@ require_once __DIR__ . "/../includes/resident_access_guard.php";
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
     <link rel="stylesheet" href="../../CSS-Styles/Resident-End-CSS/residentDashboard.css">
     <link rel="stylesheet" href="../../CSS-Styles/Guest-End-CSS/GeneralStyle.css">
-    <link rel="stylesheet" href="../../CSS-Styles/Resident-End-CSS/ApplicationLandingPage.css">
+    <link rel="stylesheet" href="../../CSS-Styles/Resident-End-CSS/ApplicationLandingPage.css?v=20260228-3">
 </head>
 
 <body>
@@ -121,3 +121,4 @@ require_once __DIR__ . "/../includes/resident_access_guard.php";
 </body>
 
 </html>
+

@@ -1,4 +1,4 @@
-<?php
+﻿<?php
 if (!isset($baseUrl)) {
     $scriptName = str_replace("\\", "/", (string)($_SERVER['SCRIPT_NAME'] ?? ''));
     $residentSegmentPos = strpos($scriptName, '/Resident-End/');
@@ -105,10 +105,6 @@ $fullAddress = implode(', ', array_filter([
                         <!-- PERSONAL INFORMATION -->
                         <h2 class="section-title text-center text-dark">Personal Information</h2>
 
-                        <div class="status-row">
-                            <label><input type="checkbox" name="pwd" class="text-center"> PWD</label>
-                            <label><input type="checkbox" name="senior" class="text-center"> Senior Citizen</label>
-                        </div>
 
                         <div class="form-row">
                             <div>

@@ -217,16 +217,16 @@ if ($residentId !== '' && isset($conn) && $conn instanceof mysqli) {
            class="a-sidebarLink <?= activeLink('resident_clearances.php', $current) ?>">
           <i class="fa-solid fa-file-circle-check fa-sm"></i>Clearances
         </a>
-        <a href="/BarangaySanJose/Resident-End/BarangayId/BarangayIdForm.php"
-           class="a-sidebarLink <?= (in_array($current, ['BarangayIdForm.php'], true) ? 'active' : '') ?>">
+        <a href="/BarangaySanJose/Resident-End/BarangayId/BarangayIdLandingPage.php"
+           class="a-sidebarLink <?= (in_array($current, ['BarangayIdLandingPage.php', 'BarangayIdForm.php'], true) ? 'active' : '') ?>">
           <i class="fa-solid fa-id-badge fa-lg"></i>Barangay ID
         </a>
-        <a href="/BarangaySanJose/Resident-End/Complaints/ComplaintsForm.php"
-           class="a-sidebarLink <?= (in_array($current, ['ComplaintsForm.php'], true) ? 'active' : '') ?>">
+        <a href="/BarangaySanJose/Resident-End/Complaints/ComplaintsLandingPage.php"
+           class="a-sidebarLink <?= (in_array($current, ['ComplaintsLandingPage.php', 'ComplaintsForm.php'], true) ? 'active' : '') ?>">
           <i class="fa-solid fa-comment-dots"></i>Complaints
         </a>
-        <a href="/BarangaySanJose/Resident-End/Appointments/AppointmentForm.php"
-           class="a-sidebarLink <?= (in_array($current, ['AppointmentForm.php'], true) ? 'active' : '') ?>">
+        <a href="/BarangaySanJose/Resident-End/Appointments/AppointmentsLandingPage.php"
+           class="a-sidebarLink <?= (in_array($current, ['AppointmentsLandingPage.php', 'AppointmentForm.php'], true) ? 'active' : '') ?>">
           <i class="fa-regular fa-calendar-days"></i>Appointments
         </a>
       </div>
@@ -363,3 +363,4 @@ if ($residentId !== '' && isset($conn) && $conn instanceof mysqli) {
 
 </body>
 </html>
+
