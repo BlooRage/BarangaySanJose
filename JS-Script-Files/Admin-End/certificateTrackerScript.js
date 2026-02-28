@@ -9,6 +9,8 @@
   const tableBody = document.getElementById('tableBody');
   const searchInput = document.getElementById('searchInput');
   const stageTabs = Array.from(document.querySelectorAll('[data-stage-filter]'));
+  const pendingTabCount = document.getElementById('pendingTabCount');
+  const releaseTabCount = document.getElementById('releaseTabCount');
   const statusTabs = Array.from(document.querySelectorAll('[data-status-filter]'));
   const btnRefreshList = document.getElementById('btnRefreshList');
   const documentTypeFilter = document.getElementById('documentTypeFilter');
@@ -26,6 +28,9 @@
   const actionOr = document.getElementById('actionOr');
   const actionIssuedWrap = document.getElementById('actionIssuedWrap');
   const actionIssued = document.getElementById('actionIssued');
+  const actionPrompt = document.getElementById('actionPrompt');
+  const actionCancelBtn = document.getElementById('actionCancelBtn');
+  const actionSubmitBtn = document.getElementById('actionSubmitBtn');
   const modalTitle = document.getElementById('actionModalTitle');
   const modalError = document.getElementById('actionModalError');
   const viewModalEl = document.getElementById('viewModal');
@@ -39,8 +44,12 @@
   const paymentProofModal = paymentProofModalEl ? new bootstrap.Modal(paymentProofModalEl) : null;
   const paymentProofWrap = document.getElementById('paymentProofWrap');
   const paymentProofOpenNew = document.getElementById('paymentProofOpenNew');
+  const paymentProofTitle = document.getElementById('paymentProofTitle');
+  const paymentProofReturnBtn = document.getElementById('paymentProofReturnBtn');
+  const paymentProofCloseBtn = document.getElementById('paymentProofCloseBtn');
   const residentProfileModalEl = document.getElementById('residentProfileModal');
   const residentProfileModal = residentProfileModalEl ? new bootstrap.Modal(residentProfileModalEl) : null;
+  const residentProfileReturnBtn = document.getElementById('residentProfileReturnBtn');
   const residentProfileEndpoint = `${appBase}/PhpFiles/Admin-End/residentMasterlist.php`;
 
   let currentStage = String(window.CERT_TRACKER_DEFAULT_STAGE || '');
@@ -50,6 +59,12 @@
   let viewMode = 'details';
   let viewDetailsHtml = '';
   let viewPreviewState = null;
+  let currentViewRequestId = '';
+  let actionReturnTarget = '';
+  let suppressActionReturn = false;
+  let openPreviewAfterActionModal = false;
+  let paymentProofReturnTarget = '';
+  let preserveViewStateOnNextHide = false;
   const financeStages = new Set(['for_payment', 'payment_submitted']);
 
   function esc(v) {
@@ -60,6 +75,10 @@
     const raw = String(path || '').trim();
     if (!raw) return '';
     if (/^https?:\/\//i.test(raw)) return raw;
+    if (raw.startsWith('../') || raw.startsWith('./')) {
+      const normalized = raw.replace(/^(\.\.\/)+/, '').replace(/^\.\//, '');
+      return `${appBase}/${normalized.replace(/^\/+/, '')}`;
+    }
     if (appBase && raw.startsWith(`${appBase}/`)) return raw;
     if (raw.startsWith('/')) return `${appBase}${raw}`;
     return `${appBase}/${raw.replace(/^\/+/, '')}`;
@@ -86,26 +105,18 @@
     if (!row) return '';
     const id = esc(row.request_id || '');
     const stage = String(row.stage || '');
-    const residentId = firstNonEmpty([row.resident_id]);
-    const residentUserId = firstNonEmpty([row.resident_user_id, row.user_id]);
-    const profileBtn = (residentId || residentUserId)
-      ? `<button class="btn btn-sm btn-outline-primary" data-view-profile-id="${esc(residentId)}" data-view-profile-user-id="${esc(residentUserId)}">View Profile</button>`
-      : '';
     const proofBtn = row.payment_proof_path
       ? `<button class="btn btn-sm btn-outline-dark" data-proof-id="${id}">View Payment</button>`
       : '';
 
     if (stage === 'submitted') {
       return `
-        ${profileBtn}
-        ${proofBtn}
-        <button class="btn btn-sm btn-success" data-view-action="personnel_approve" data-id="${id}">Approve</button>
         <button class="btn btn-sm btn-danger" data-view-action="personnel_reject" data-id="${id}">Reject</button>
+        <button class="btn btn-sm btn-success" data-view-action="personnel_approve" data-id="${id}">Approve</button>
       `;
     }
     if (stage === 'payment_submitted') {
       return `
-        ${profileBtn}
         ${proofBtn}
         <button class="btn btn-sm btn-success" data-view-action="finance_verify" data-id="${id}">Verify Payment</button>
         <button class="btn btn-sm btn-danger" data-view-action="finance_reject" data-id="${id}">Reject Payment</button>
@@ -113,19 +124,17 @@
     }
     if (stage === 'payment_verified') {
       return `
-        ${profileBtn}
         ${proofBtn}
         <button class="btn btn-sm btn-primary" data-view-action="mark_ready" data-id="${id}">Ready for Claim</button>
       `;
     }
     if (stage === 'ready_for_claim') {
       return `
-        ${profileBtn}
         ${proofBtn}
         <button class="btn btn-sm btn-dark" data-view-action="mark_completed" data-id="${id}">Mark Completed</button>
       `;
     }
-    return profileBtn || proofBtn || '<span class="text-muted small">No actions</span>';
+    return proofBtn || '<span class="text-muted small">No actions</span>';
   }
 
   function firstNonEmpty(values) {
@@ -147,7 +156,28 @@
 
     const ordered = [first, middleInitial, last, suffix].filter(Boolean);
     if (ordered.length) return ordered.join(' ');
-    return firstNonEmpty([row.full_name, row.resident_full_name, row.resident_name, '-']) || '-';
+    const fallbackName = firstNonEmpty([row.full_name, row.resident_full_name, row.resident_name, '']);
+    if (!fallbackName) return '-';
+
+    const parts = fallbackName.split(/\s+/).filter(Boolean);
+    if (parts.length >= 3) {
+      const f = parts[0];
+      const l = parts[parts.length - 1];
+      const m = parts.slice(1, parts.length - 1).join(' ');
+      const mi = m ? `${m.charAt(0).toUpperCase()}.` : '';
+      return [f, mi, l].filter(Boolean).join(' ');
+    }
+    return fallbackName;
+  }
+
+  function stripAreaFromAddress(address) {
+    let value = String(address || '').trim();
+    if (!value) return '';
+    value = value.replace(/\s*,\s*Area\s+[A-Za-z0-9-]+\s*(?=,|$)/gi, '');
+    value = value.replace(/(^|,\s*)Area\s+[A-Za-z0-9-]+\s*,\s*/gi, '$1');
+    value = value.replace(/\s{2,}/g, ' ').trim();
+    value = value.replace(/^[,\s]+|[,\s]+$/g, '');
+    return value;
   }
 
   function residentInfoFromRow(row) {
@@ -166,9 +196,19 @@
     return bits.length ? bits.join(' | ') : '-';
   }
 
-  function documentTypePill(row) {
-    const doc = firstNonEmpty([row.document_type, '-']);
-    return `<span class="badge rounded-pill" style="background:#f7d9df;color:#8f2b35;font-weight:700;">${esc(doc)}</span>`;
+  function documentTypeBadgeBlue(row) {
+    const doc = normalizeDocumentTypeDisplay(firstNonEmpty([row.document_type, '-']));
+    return `<span style="display:inline-block;padding:4px 10px;border-radius:8px;background:#dbeafe;color:#1e40af;font-weight:700;">${esc(doc)}</span>`;
+  }
+
+  function normalizeDocumentTypeDisplay(value) {
+    const raw = String(value || '').trim();
+    if (!raw) return '-';
+    const key = raw.toLowerCase().replace(/[^a-z0-9]+/g, '');
+    if (key === 'indigency' || key === 'certificateofindigency') {
+      return 'CertificateOfIndigency';
+    }
+    return raw;
   }
 
   function profileItem(label, value) {
@@ -189,22 +229,55 @@
     `;
   }
 
-  function formField(label, value) {
+  function formField(label, value, raw = false) {
+    const text = String(value ?? '').trim();
+    const rendered = raw ? (text || '-') : esc(text || '-');
     return `
       <div class="tracker-form-field">
         <p class="tracker-form-label">${esc(label)}</p>
-        <div class="tracker-form-value">${esc(value ?? '-')}</div>
+        <div class="tracker-form-value">${rendered}</div>
       </div>
     `;
   }
 
-  function formSection(title, content) {
+  function formSection(title, content, actionHtml = '') {
+    const hasAction = String(actionHtml || '').trim() !== '';
     return `
       <section class="tracker-form-section">
-        <h6 class="tracker-form-section-title">${esc(title)}</h6>
+        ${hasAction
+          ? `<div class="d-flex align-items-center justify-content-between gap-2 flex-wrap">
+               <h6 class="tracker-form-section-title mb-0">${esc(title)}</h6>
+               ${actionHtml}
+             </div>`
+          : `<h6 class="tracker-form-section-title">${esc(title)}</h6>`}
         ${content}
       </section>
     `;
+  }
+
+  function isEmptyFieldValue(value) {
+    const text = String(value ?? '').trim();
+    if (!text) return true;
+    return ['-', '—', 'n/a', 'na', 'null', 'undefined'].includes(text.toLowerCase());
+  }
+
+  function visibleFields(fields) {
+    return (Array.isArray(fields) ? fields : []).filter((f) => f && !isEmptyFieldValue(f.value));
+  }
+
+  function gridClassByCount(count, maxCols = 4) {
+    const n = Math.max(1, Math.min(maxCols, Number(count) || 1));
+    if (n >= 4) return 'cols-4';
+    if (n === 3) return 'cols-3';
+    if (n === 2) return '';
+    return 'cols-1';
+  }
+
+  function renderFieldGrid(fields, maxCols = 4) {
+    const clean = visibleFields(fields);
+    if (!clean.length) return '';
+    const cls = gridClassByCount(clean.length, maxCols);
+    return `<div class="tracker-form-grid ${cls}">${clean.map((f) => formField(f.label, f.value, !!f.raw)).join('')}</div>`;
   }
 
   function extractSubmittedDocuments(row, payload) {
@@ -524,13 +597,28 @@
       viewDetailsBody.innerHTML = renderDocumentPreview(viewPreviewState);
       bindPreviewEditHandlers();
       viewModalBackBtn?.classList.remove('d-none');
-      viewModalNextBtn?.classList.add('d-none');
+      if (viewModalBackBtn) {
+        viewModalBackBtn.textContent = 'Cancel';
+      }
+      if (viewModalNextBtn) {
+        viewModalNextBtn.textContent = 'Save and Approve';
+        viewModalNextBtn.classList.remove('d-none', 'btn-primary');
+        viewModalNextBtn.classList.add('btn-success');
+        viewModalNextBtn.disabled = false;
+      }
       return;
     }
 
     viewDetailsBody.innerHTML = viewDetailsHtml || '<div class="text-muted">No details.</div>';
-    viewModalBackBtn?.classList.add('d-none');
-    viewModalNextBtn?.classList.remove('d-none');
+    if (viewModalBackBtn) {
+      viewModalBackBtn.textContent = 'Back';
+      viewModalBackBtn.classList.add('d-none');
+    }
+    if (viewModalNextBtn) {
+      viewModalNextBtn.textContent = 'Next';
+      viewModalNextBtn.classList.remove('btn-success');
+      viewModalNextBtn.classList.add('btn-primary', 'd-none');
+    }
   }
 
   function friendlyLabel(key) {
@@ -620,7 +708,12 @@
     const placeholder = `${appBase}/Images/Profile-Placeholder.png`;
     const imgEl = document.getElementById('img-modalIdPicture');
     if (imgEl) {
-      const candidate = String(data?.id_picture_url || '').trim();
+      const candidateRaw = String(data?.id_picture_url || '').trim();
+      const candidate = resolvePublicUrl(candidateRaw);
+      imgEl.onerror = () => {
+        imgEl.onerror = null;
+        imgEl.src = placeholder;
+      };
       imgEl.src = candidate || placeholder;
     }
     setById('span-displayID', `#${String(data?.resident_id || '—')}`);
@@ -688,12 +781,15 @@
     }) || null;
   }
 
-  async function openResidentProfileModal(residentId, residentUserId = '') {
+  async function openResidentProfileModal(residentId, residentUserId = '', fallbackProfile = null) {
     const rid = String(residentId || '').trim();
     const uid = String(residentUserId || '').trim();
-    const searchToken = rid || uid;
+    const fallbackRid = String(fallbackProfile?.resident_id || '').trim();
+    const fallbackUid = String(fallbackProfile?.resident_user_id || fallbackProfile?.user_id || '').trim();
+    const searchToken = rid || uid || fallbackRid || fallbackUid;
     if (!searchToken || !residentProfileModal) return;
     if (viewModalEl && viewModalEl.classList.contains('show') && viewModal) {
+      preserveViewStateOnNextHide = true;
       viewModal.hide();
     }
     residentProfileModal.show();
@@ -713,33 +809,99 @@
         const retryRows = await fetchJson(`${residentProfileEndpoint}?${retryQ.toString()}`);
         match = findResidentRow(retryRows, rid, uid);
       }
+      if (!match && fallbackProfile && typeof fallbackProfile === 'object') {
+        match = fallbackProfile;
+      }
       if (!match) return;
       fillResidentProfileModal(match);
     } catch (_) {
-      // Keep modal open with placeholders if fetch fails.
+      // Keep modal open using fallback profile snapshot when fetch fails.
+      if (fallbackProfile && typeof fallbackProfile === 'object') {
+        fillResidentProfileModal(fallbackProfile);
+      }
     }
   }
 
+  residentProfileReturnBtn?.addEventListener('click', () => {
+    if (residentProfileModal) {
+      residentProfileModal.hide();
+    }
+    if (viewModal) {
+      viewModal.show();
+    }
+  });
+
+  paymentProofReturnBtn?.addEventListener('click', () => {
+    if (paymentProofModal) {
+      paymentProofModal.hide();
+    }
+    if (paymentProofReturnTarget === 'view' && viewModal) {
+      viewModal.show();
+    }
+  });
+
+  paymentProofModalEl?.addEventListener('hidden.bs.modal', () => {
+    paymentProofReturnTarget = '';
+    if (paymentProofReturnBtn) {
+      paymentProofReturnBtn.classList.add('d-none');
+    }
+    if (paymentProofTitle) {
+      paymentProofTitle.textContent = 'Document Viewer';
+    }
+    if (paymentProofOpenNew) {
+      paymentProofOpenNew.classList.remove('d-none');
+    }
+    if (paymentProofCloseBtn) {
+      paymentProofCloseBtn.classList.remove('d-none');
+    }
+  });
+
   function rowHtml(row) {
-    const reason = row.status_reason ? `<div class="text-danger small mt-1">Reason: ${esc(row.status_reason)}</div>` : '';
+    const reasonValue = firstNonEmpty([row.status_remarks, row.status_reason]);
+    const reason = reasonValue ? `<div class="text-danger small mt-1">Reason: ${esc(reasonValue)}</div>` : '';
     const fullName = fullNameFromRow(row);
-    const residentInfo = residentInfoFromRow(row);
     const purpose = firstNonEmpty([row.purpose, '-']);
     return `
       <tr>
         <td class="fw-semibold">${esc(row.request_id)}</td>
         <td>${esc(row.resident_id || '-')}</td>
         <td>${esc(fullName)}</td>
-        <td class="small text-muted">${esc(residentInfo)}</td>
+        <td>${documentTypeBadgeBlue(row)}</td>
         <td>
-          <div>${esc(purpose)}</div>
-          <div class="mt-1">${documentTypePill(row)}</div>
+          <div class="cell-purpose">${esc(purpose)}</div>
         </td>
         <td>${badge(row.stage, esc(row.stage_label || row.stage || ''))}${reason}</td>
         <td>${esc(row.submitted_at || '-')}</td>
         <td>${actionButtons(row)}</td>
       </tr>
     `;
+  }
+
+  function openDocumentModal(docUrl, title = 'Document Viewer', returnTarget = '') {
+    if (!docUrl || !paymentProofModal || !paymentProofWrap || !paymentProofOpenNew) return;
+    paymentProofReturnTarget = String(returnTarget || '').trim();
+    if (paymentProofTitle) {
+      paymentProofTitle.textContent = String(title || 'Document Viewer').trim() || 'Document Viewer';
+    }
+    const proofOnly = String(title || '').toLowerCase().startsWith('proof of residency');
+    if (paymentProofReturnBtn) {
+      paymentProofReturnBtn.classList.toggle('d-none', !proofOnly && paymentProofReturnTarget === '');
+      if (proofOnly) paymentProofReturnBtn.classList.remove('d-none');
+    }
+    if (paymentProofOpenNew) {
+      paymentProofOpenNew.classList.toggle('d-none', proofOnly);
+    }
+    if (paymentProofCloseBtn) {
+      paymentProofCloseBtn.classList.toggle('d-none', proofOnly);
+    }
+    paymentProofOpenNew.href = docUrl;
+    const lower = String(docUrl).toLowerCase();
+    if (lower.endsWith('.pdf')) {
+      paymentProofWrap.innerHTML = `<iframe src="${docUrl}" style="width:100%;height:70vh;border:1px solid #ddd;border-radius:8px;"></iframe>`;
+    } else {
+      paymentProofWrap.innerHTML = `<img src="${docUrl}" alt="Document Preview" style="max-width:100%;max-height:70vh;border:1px solid #ddd;border-radius:8px;">`;
+    }
+    paymentProofModal.show();
   }
 
   function statusBucket(row) {
@@ -757,6 +919,39 @@
   function matchesDocumentTypeFilter(row) {
     if (!currentDocumentTypeFilter) return true;
     return String(row?.document_type || '') === currentDocumentTypeFilter;
+  }
+
+  function matchesStageTabFilter(row, stageFilter) {
+    const stage = String(row?.stage || '').toLowerCase();
+    const key = String(stageFilter || '').toLowerCase();
+    if (!key) return true;
+    if (key === 'pending') {
+      return (
+        stage === 'submitted' ||
+        stage === 'for_interview' ||
+        stage === 'for_inspection' ||
+        stage === 'for_payment' ||
+        stage === 'payment_submitted' ||
+        stage.includes('pending')
+      );
+    }
+    if (key === 'release') {
+      return stage === 'ready_for_claim' || stage.includes('release');
+    }
+    if (key === 'completed') {
+      return stage === 'completed';
+    }
+    return stage === key;
+  }
+
+  function updateStageTabBadges(items) {
+    const rows = Array.isArray(items) ? items : [];
+    if (pendingTabCount) {
+      pendingTabCount.textContent = String(rows.filter((it) => matchesStageTabFilter(it, 'pending')).length);
+    }
+    if (releaseTabCount) {
+      releaseTabCount.textContent = String(rows.filter((it) => matchesStageTabFilter(it, 'release')).length);
+    }
   }
 
   function syncDocumentTypeFilterOptions(items) {
@@ -819,7 +1014,6 @@
     tableBody.innerHTML = '<tr><td colspan="8" class="text-center text-muted py-4">Loading...</td></tr>';
     try {
       const params = new URLSearchParams({ action: 'list' });
-      if (currentStage && currentStage !== 'finance') params.set('stage', currentStage);
       const q = (searchInput.value || '').trim();
       if (q) params.set('q', q);
 
@@ -827,9 +1021,10 @@
       if (!data.success) throw new Error(data.message || 'Failed to load requests.');
 
       const allItems = Array.isArray(data.items) ? data.items : [];
+      updateStageTabBadges(allItems);
       const stageItems = currentStage === 'finance'
         ? allItems.filter((it) => financeStages.has(String(it.stage || '').toLowerCase()))
-        : allItems;
+        : allItems.filter((it) => matchesStageTabFilter(it, currentStage));
       syncDocumentTypeFilterOptions(stageItems);
       const items = stageItems
         .filter(matchesStatusFilter)
@@ -850,6 +1045,10 @@
   function resetModalFields() {
     modalError.classList.add('d-none');
     modalError.textContent = '';
+    if (actionPrompt) {
+      actionPrompt.classList.add('d-none');
+      actionPrompt.textContent = '';
+    }
     actionReasonWrap.classList.add('d-none');
     actionAmountWrap.classList.add('d-none');
     actionOrWrap.classList.add('d-none');
@@ -862,6 +1061,15 @@
     actionAmount.value = '';
     actionOr.value = '';
     actionIssued.value = '';
+    if (actionCancelBtn) {
+      actionCancelBtn.textContent = 'Return';
+    }
+    if (actionSubmitBtn) {
+      actionSubmitBtn.textContent = 'Submit';
+      actionSubmitBtn.classList.remove('btn-danger', 'btn-success');
+      actionSubmitBtn.classList.add('btn-primary');
+    }
+    actionForm?.querySelector('.modal-footer')?.classList.remove('action-split');
   }
 
   function clearModalError() {
@@ -873,8 +1081,13 @@
     if (!actionModal) return;
 
     if (viewModalEl && viewModalEl.classList.contains('show') && viewModal) {
+      preserveViewStateOnNextHide = true;
       viewModal.hide();
+      actionReturnTarget = 'view';
+    } else {
+      actionReturnTarget = '';
     }
+    suppressActionReturn = false;
 
     resetModalFields();
     actionType.value = type;
@@ -882,7 +1095,7 @@
     const row = itemById.get(String(requestId));
 
     const labels = {
-      personnel_approve: 'Approve Request',
+      personnel_approve: 'Before You Approve',
       personnel_reject: 'Reject Request',
       finance_verify: 'Verify Payment',
       finance_reject: 'Reject Payment',
@@ -890,6 +1103,30 @@
       mark_completed: 'Mark Completed'
     };
     modalTitle.textContent = labels[type] || 'Update Request';
+    const docName = normalizeDocumentTypeDisplay(String(row?.document_type || 'document'));
+
+    if (type === 'personnel_approve' && actionPrompt) {
+      actionPrompt.textContent = 'Click the view the document to check the document that will be issued and edit it if there are necessary changes in the details. Once everything is correct, proceed to verify the Certificate Of Indigency.';
+      actionPrompt.classList.remove('d-none');
+    }
+    if ((type === 'personnel_reject' || type === 'finance_reject') && actionPrompt) {
+      actionPrompt.textContent = 'Please provide the reason for rejection.';
+      actionPrompt.classList.remove('d-none');
+    }
+    if (actionSubmitBtn) {
+      if (type === 'personnel_approve') {
+        actionSubmitBtn.textContent = 'View Document (Next)';
+        actionSubmitBtn.classList.remove('btn-danger', 'btn-success');
+        actionSubmitBtn.classList.add('btn-primary');
+      } else if (type === 'personnel_reject') {
+        actionSubmitBtn.textContent = 'Reject';
+        actionSubmitBtn.classList.remove('btn-primary', 'btn-success');
+        actionSubmitBtn.classList.add('btn-danger');
+      }
+    }
+    if (type === 'personnel_approve' || type === 'personnel_reject') {
+      actionForm?.querySelector('.modal-footer')?.classList.add('action-split');
+    }
 
     if (type === 'personnel_reject' || type === 'finance_reject') {
       actionReasonWrap.classList.remove('d-none');
@@ -948,18 +1185,18 @@
         };
 
         const personalFields = [
-          ['Last Name', firstNonEmpty([collectFirst('last_name', 'lastname'), collectResidentFirst('last_name')])],
-          ['First Name', firstNonEmpty([collectFirst('first_name', 'firstname'), collectResidentFirst('first_name')])],
-          ['Middle Name', firstNonEmpty([collectFirst('middle_name', 'middlename'), collectResidentFirst('middle_name')])],
-          ['Suffix', firstNonEmpty([collectFirst('suffix_name', 'suffix'), collectResidentFirst('suffix')])],
-          ['Contact Number', firstNonEmpty([collectFirst('contact_number', 'phone_number'), collectResidentFirst('contact_number')])],
-          ['Full Address', firstNonEmpty([collectFirst('full_address', 'full_address_display', 'address', 'complete_address'), collectResidentFirst('full_address')])],
-          ['Birthdate', firstNonEmpty([collectFirst('birthdate', 'date_of_birth', 'child_dob'), collectResidentFirst('birthdate')])],
-          ['Age', firstNonEmpty([collectFirst('age'), collectResidentFirst('age')])],
-          ['Sex', firstNonEmpty([collectFirst('sex', 'gender', 'child_sex'), collectResidentFirst('sex')])],
-          ['Civil Status', firstNonEmpty([collectFirst('civil_status'), collectResidentFirst('civil_status')])],
-          ['Religion', firstNonEmpty([collectFirst('religion'), collectResidentFirst('religion')])],
-          ['Occupation', firstNonEmpty([collectFirst('occupation'), collectResidentFirst('occupation')])]
+          { label: 'Last Name', value: firstNonEmpty([collectFirst('last_name', 'lastname'), collectResidentFirst('last_name')]) },
+          { label: 'First Name', value: firstNonEmpty([collectFirst('first_name', 'firstname'), collectResidentFirst('first_name')]) },
+          { label: 'Middle Name', value: firstNonEmpty([collectFirst('middle_name', 'middlename'), collectResidentFirst('middle_name')]) },
+          { label: 'Suffix', value: firstNonEmpty([collectFirst('suffix_name', 'suffix'), collectResidentFirst('suffix')]) },
+          { label: 'Contact Number', value: firstNonEmpty([collectFirst('contact_number', 'phone_number'), collectResidentFirst('contact_number')]) },
+          { label: 'Full Address', value: firstNonEmpty([collectFirst('full_address', 'full_address_display', 'address', 'complete_address'), collectResidentFirst('full_address')]) },
+          { label: 'Birthdate', value: firstNonEmpty([collectFirst('birthdate', 'date_of_birth', 'child_dob'), collectResidentFirst('birthdate')]) },
+          { label: 'Age', value: firstNonEmpty([collectFirst('age'), collectResidentFirst('age')]) },
+          { label: 'Sex', value: firstNonEmpty([collectFirst('sex', 'gender', 'child_sex'), collectResidentFirst('sex')]) },
+          { label: 'Civil Status', value: firstNonEmpty([collectFirst('civil_status'), collectResidentFirst('civil_status')]) },
+          { label: 'Religion', value: firstNonEmpty([collectFirst('religion'), collectResidentFirst('religion')]) },
+          { label: 'Occupation', value: firstNonEmpty([collectFirst('occupation'), collectResidentFirst('occupation')]) }
         ];
 
         const technicalKeys = new Set([
@@ -973,9 +1210,16 @@
         ]);
 
         const requestFields = [];
-        const purposeText = firstNonEmpty([row.purpose, payload.purpose]);
+        const purposeText = firstNonEmpty([row.purpose, payload.purpose, payload.request_purpose]);
         if (purposeText) {
-          requestFields.push(formField('Purpose', purposeText));
+          consumedKeys.add('purpose');
+          consumedKeys.add('request_purpose');
+          requestFields.push({ label: 'Purpose', value: purposeText });
+        }
+        const officerText = firstNonEmpty([payload.request_officer]);
+        if (officerText) {
+          consumedKeys.add('request_officer');
+          requestFields.push({ label: 'To Be Submitted To', value: officerText });
         }
 
         Object.keys(payload).forEach((key) => {
@@ -985,44 +1229,50 @@
           if (value === null || value === undefined) return;
           const text = String(value).trim();
           if (text === '') return;
-          requestFields.push(formField(friendlyLabel(normalized), text));
+          requestFields.push({ label: friendlyLabel(normalized), value: text });
         });
 
         let html = '';
-        html += `<div class="tracker-doc-highlight">Document Requested: ${esc(row.document_type || '-')}</div>`;
-        const personalMap = new Map(personalFields);
-        if (personalFields.length) {
-          const nameRow = [
-            formField('Last Name', personalMap.get('Last Name') || '-'),
-            formField('First Name', personalMap.get('First Name') || '-'),
-            formField('Middle Name', personalMap.get('Middle Name') || '-'),
-            formField('Suffix', personalMap.get('Suffix') || '-')
-          ].join('');
-          const personalRow = [
-            formField('Birthdate', personalMap.get('Birthdate') || '-'),
-            formField('Age', personalMap.get('Age') || '-'),
-            formField('Sex', personalMap.get('Sex') || '-'),
-            formField('Civil Status', personalMap.get('Civil Status') || '-')
-          ].join('');
-          const contactAddressRow = [
-            formField('Contact Number', personalMap.get('Contact Number') || '-'),
-            formField('Full Address', personalMap.get('Full Address') || '-')
-          ].join('');
-          const extraInfo = [];
-          if ((personalMap.get('Religion') || '').trim()) extraInfo.push(formField('Religion', personalMap.get('Religion')));
-          if ((personalMap.get('Occupation') || '').trim()) extraInfo.push(formField('Occupation', personalMap.get('Occupation')));
-
-          let personalHtml = '';
-          personalHtml += `<div class="tracker-form-grid cols-4">${nameRow}</div>`;
-          personalHtml += `<div class="tracker-form-grid cols-4">${personalRow}</div>`;
-          personalHtml += `<div class="tracker-form-grid">${contactAddressRow}</div>`;
-          if (extraInfo.length) {
-            personalHtml += `<div class="tracker-form-grid">${extraInfo.join('')}</div>`;
-          }
-          html += formSection('Personal Information', personalHtml);
+        html += `<div class="tracker-doc-highlight">Document Requested: ${esc(normalizeDocumentTypeDisplay(row.document_type || '-'))}</div>`;
+        const personalMap = new Map(personalFields.map((f) => [f.label, f.value]));
+        const nameGrid = renderFieldGrid(personalFields.filter((f) => ['Last Name', 'First Name', 'Middle Name', 'Suffix'].includes(f.label)), 4);
+        const profileGrid = renderFieldGrid(personalFields.filter((f) => ['Birthdate', 'Age', 'Sex', 'Civil Status'].includes(f.label)), 4);
+        const contactGrid = renderFieldGrid(personalFields.filter((f) => ['Contact Number', 'Full Address'].includes(f.label)), 2);
+        const extraGrid = renderFieldGrid(personalFields.filter((f) => ['Religion', 'Occupation'].includes(f.label)), 2);
+        const proofResidencyPath = firstNonEmpty([
+          residentProfile.proof_residency_path
+        ]);
+        const proofResidencyName = firstNonEmpty([
+          residentProfile.proof_residency_name,
+          proofResidencyPath ? String(proofResidencyPath).split('/').pop() : ''
+        ]);
+        const proofResidencyUrl = resolvePublicUrl(proofResidencyPath);
+        const proofResidencyType = firstNonEmpty([residentProfile.proof_residency_type, 'Document']);
+        const proofResidencyIdNo = firstNonEmpty([residentProfile.proof_residency_id_number]);
+        const proofResidencyTitle = `Proof of Residency - ${proofResidencyType}${proofResidencyIdNo ? ` #${proofResidencyIdNo}` : ''}`;
+        const proofResidencyHtml = proofResidencyUrl
+          ? `<div class="tracker-form-grid cols-1">
+               <div class="tracker-form-field">
+                 <p class="tracker-form-label">Proof of Residency File</p>
+                 <div class="tracker-form-value d-flex justify-content-between align-items-center gap-2">
+                   <span class="text-truncate">${esc(proofResidencyName || proofResidencyPath)}</span>
+                   <button type="button" class="btn btn-sm btn-primary" data-view-doc-url="${esc(proofResidencyUrl)}" data-view-doc-title="${esc(proofResidencyTitle)}">View</button>
+                 </div>
+               </div>
+             </div>`
+          : '';
+        const personalHtml = [nameGrid, profileGrid, contactGrid, extraGrid, proofResidencyHtml].filter(Boolean).join('');
+        if (personalHtml) {
+          const residentId = firstNonEmpty([row.resident_id, residentProfile.resident_id]);
+          const residentUserId = firstNonEmpty([row.resident_user_id, row.user_id, residentProfile.resident_user_id, residentProfile.user_id]);
+          const personalAction = (residentId || residentUserId)
+            ? `<button type="button" class="btn btn-sm btn-primary" data-inline-profile-id="${esc(residentId)}" data-inline-profile-user-id="${esc(residentUserId)}">View Profile</button>`
+            : '';
+          html += formSection('Personal Information', personalHtml, personalAction);
         }
-        if (requestFields.length) {
-          html += formSection('Request Details', `<div class="tracker-form-grid">${requestFields.join('')}</div>`);
+        const reqGrid = renderFieldGrid(requestFields, 3);
+        if (reqGrid) {
+          html += formSection('Request Details', reqGrid);
         }
 
         const submittedDocs = extractSubmittedDocuments(row, payload);
@@ -1032,21 +1282,39 @@
               <p class="tracker-form-label">${esc(doc.label || `Document ${idx + 1}`)}</p>
               <div class="tracker-form-value d-flex justify-content-between align-items-center gap-2">
                 <span class="text-truncate">${esc(doc.path || '')}</span>
-                <button type="button" class="btn btn-sm btn-outline-primary" data-view-doc-url="${esc(doc.url)}">View</button>
+                <button type="button" class="btn btn-sm btn-primary" data-view-doc-url="${esc(doc.url)}" data-view-doc-title="${esc(doc.label || 'Submitted Document')}">View</button>
               </div>
             </div>
           `).join('');
           html += formSection('Submitted Documents', `<div class="tracker-form-grid cols-1">${docsHtml}</div>`);
         }
 
-        html += formSection(
-          'Request Status',
-          `<div class="tracker-form-grid">${[
-            formField('Status', row.stage_label || row.stage || '-'),
-            formField('Status Reason', row.status_reason || '-'),
-            formField('Submitted At', row.submitted_at || '-')
-          ].join('')}</div>`
-        );
+        const stageKeyForStatus = String(row.stage || '').toLowerCase();
+        const isRejectedStatus = stageKeyForStatus.includes('rejected') || stageKeyForStatus === 'cancelled';
+        const statusLabelText = String(row.stage_label || row.stage || '-');
+        const statusReasonText = firstNonEmpty([row.status_remarks, row.status_reason]);
+        const statusBadgeHtml = isRejectedStatus
+          ? `<span style="display:inline-block;padding:4px 10px;border-radius:6px;background:#fee2e2;color:#b91c1c;font-weight:700;line-height:1.2;">${esc(statusLabelText)}</span>`
+          : esc(statusLabelText);
+        const statusReasonHtml = statusReasonText
+          ? (isRejectedStatus
+              ? `<span style="color:#b91c1c;font-weight:700;">${esc(statusReasonText)}</span>`
+              : esc(statusReasonText))
+          : (isRejectedStatus ? '<span style="color:#b91c1c;">No reason provided.</span>' : '-');
+
+        const statusGrid = renderFieldGrid([
+          { label: 'Status', value: statusBadgeHtml, raw: true },
+          { label: isRejectedStatus ? 'Rejection Reason' : 'Reason', value: statusReasonHtml, raw: true },
+          { label: 'Submitted At', value: row.submitted_at || '-' }
+        ], 3);
+        if (statusGrid) {
+          const modalActionsHtml = viewModalActionButtons(row);
+          const isPendingStage = String(row.stage || '').toLowerCase() === 'submitted';
+          const statusActions = (modalActionsHtml && !modalActionsHtml.includes('No actions'))
+            ? `<div class="tracker-status-actions${isPendingStage ? ' tracker-status-actions--split' : ''}">${modalActionsHtml}</div>`
+            : '';
+          html += formSection('Request Status', `${statusGrid}${statusActions}`);
+        }
 
         viewDetailsHtml = html || '<div class="text-muted">No details.</div>';
         const businessName = firstNonEmpty([
@@ -1110,7 +1378,7 @@
             personalMap.get('Last Name') || '',
             personalMap.get('Suffix') || ''
           ].join(' ').replace(/\s+/g, ' ').trim() || fullNameFromRow(row),
-          fullAddress: personalMap.get('Full Address') || '-',
+          fullAddress: stripAreaFromAddress(personalMap.get('Full Address') || '-') || '-',
           purpose: firstNonEmpty([row.purpose, payload.purpose, payload.request_purpose, '-']) || '-',
           businessName: businessName || '',
           issuedDate: row.submitted_at || dr_now_text(),
@@ -1133,54 +1401,61 @@
           qrUrl: resolvePublicUrl(firstNonEmpty([row.qr_code_path]))
         };
         switchViewMode('details');
+        const stageKey = String(row.stage || '').toLowerCase();
+        const nextEnabled = !(
+          stageKey === 'submitted' ||
+          stageKey.includes('rejected') ||
+          stageKey === 'cancelled'
+        );
+        if (viewModalNextBtn) {
+          viewModalNextBtn.disabled = !nextEnabled;
+          viewModalNextBtn.classList.add('d-none');
+        }
         if (viewModalTitle) {
           const requestId = String(row.request_id || '').trim();
+          currentViewRequestId = requestId;
           viewModalTitle.textContent = requestId ? `Certificate Request (#${requestId})` : 'Certificate Request';
         }
         if (viewModalActions) {
-          viewModalActions.innerHTML = viewModalActionButtons(row);
-          viewModalActions.querySelectorAll('button[data-view-action][data-id]').forEach((actionBtn) => {
-            actionBtn.addEventListener('click', () => {
-              openActionModal(actionBtn.getAttribute('data-view-action') || '', actionBtn.getAttribute('data-id') || '');
-            });
-          });
-          viewModalActions.querySelectorAll('button[data-view-profile-id]').forEach((profileBtn) => {
-            profileBtn.addEventListener('click', () => {
-              openResidentProfileModal(
-                String(profileBtn.getAttribute('data-view-profile-id') || ''),
-                String(profileBtn.getAttribute('data-view-profile-user-id') || '')
-              );
-            });
-          });
-          viewModalActions.querySelectorAll('button[data-proof-id]').forEach((proofBtn) => {
-            proofBtn.addEventListener('click', () => {
-              const proofId = String(proofBtn.getAttribute('data-proof-id') || '');
-              const proofRow = itemById.get(proofId);
-              if (!proofRow || !proofRow.payment_proof_path || !paymentProofModal || !paymentProofWrap || !paymentProofOpenNew) return;
-              const proofUrl = `${appBase}/PhpFiles/Admin-End/documentRequestWorkflow.php?action=view_payment_proof&request_id=` + encodeURIComponent(proofId);
-              paymentProofOpenNew.href = proofUrl;
-              const path = String(proofRow.payment_proof_path || '').toLowerCase();
-              if (path.endsWith('.pdf')) {
-                paymentProofWrap.innerHTML = `<iframe src="${proofUrl}" style="width:100%;height:70vh;border:1px solid #ddd;border-radius:8px;"></iframe>`;
-              } else {
-                paymentProofWrap.innerHTML = `<img src="${proofUrl}" alt="Payment Proof" style="max-width:100%;max-height:70vh;border:1px solid #ddd;border-radius:8px;">`;
-              }
-              paymentProofModal.show();
-            });
-          });
+          viewModalActions.innerHTML = '';
         }
+        viewDetailsBody.querySelectorAll('.tracker-status-actions button[data-view-action][data-id]').forEach((actionBtn) => {
+          actionBtn.addEventListener('click', () => {
+            openActionModal(actionBtn.getAttribute('data-view-action') || '', actionBtn.getAttribute('data-id') || '');
+          });
+        });
+        viewDetailsBody.querySelectorAll('.tracker-status-actions button[data-proof-id]').forEach((proofBtn) => {
+          proofBtn.addEventListener('click', () => {
+            const proofId = String(proofBtn.getAttribute('data-proof-id') || '');
+            const proofRow = itemById.get(proofId);
+            if (!proofRow || !proofRow.payment_proof_path || !paymentProofModal || !paymentProofWrap || !paymentProofOpenNew) return;
+            const proofUrl = `${appBase}/PhpFiles/Admin-End/documentRequestWorkflow.php?action=view_payment_proof&request_id=` + encodeURIComponent(proofId);
+            if (viewModalEl && viewModalEl.classList.contains('show') && viewModal) {
+              preserveViewStateOnNextHide = true;
+              viewModal.hide();
+            }
+            openDocumentModal(proofUrl, 'Payment Proof', 'view');
+          });
+        });
         viewDetailsBody.querySelectorAll('button[data-view-doc-url]').forEach((docBtn) => {
           docBtn.addEventListener('click', () => {
             const docUrl = String(docBtn.getAttribute('data-view-doc-url') || '').trim();
+            const docTitle = String(docBtn.getAttribute('data-view-doc-title') || 'Document Viewer').trim();
             if (!docUrl || !paymentProofModal || !paymentProofWrap || !paymentProofOpenNew) return;
-            paymentProofOpenNew.href = docUrl;
-            const lower = docUrl.toLowerCase();
-            if (lower.endsWith('.pdf')) {
-              paymentProofWrap.innerHTML = `<iframe src="${docUrl}" style="width:100%;height:70vh;border:1px solid #ddd;border-radius:8px;"></iframe>`;
-            } else {
-              paymentProofWrap.innerHTML = `<img src="${docUrl}" alt="Submitted Document" style="max-width:100%;max-height:70vh;border:1px solid #ddd;border-radius:8px;">`;
+            if (viewModalEl && viewModalEl.classList.contains('show') && viewModal) {
+              preserveViewStateOnNextHide = true;
+              viewModal.hide();
             }
-            paymentProofModal.show();
+            openDocumentModal(docUrl, docTitle, 'view');
+          });
+        });
+        viewDetailsBody.querySelectorAll('button[data-inline-profile-id]').forEach((profileBtn) => {
+          profileBtn.addEventListener('click', () => {
+            openResidentProfileModal(
+              String(profileBtn.getAttribute('data-inline-profile-id') || ''),
+              String(profileBtn.getAttribute('data-inline-profile-user-id') || ''),
+              row?.resident_profile && typeof row.resident_profile === 'object' ? row.resident_profile : null
+            );
           });
         });
         viewModal.show();
@@ -1194,15 +1469,7 @@
         if (!row || !row.payment_proof_path || !paymentProofModal || !paymentProofWrap || !paymentProofOpenNew) return;
 
         const proofUrl = `${appBase}/PhpFiles/Admin-End/documentRequestWorkflow.php?action=view_payment_proof&request_id=` + encodeURIComponent(id);
-        paymentProofOpenNew.href = proofUrl;
-
-        const path = String(row.payment_proof_path || '').toLowerCase();
-        if (path.endsWith('.pdf')) {
-          paymentProofWrap.innerHTML = `<iframe src="${proofUrl}" style="width:100%;height:70vh;border:1px solid #ddd;border-radius:8px;"></iframe>`;
-        } else {
-          paymentProofWrap.innerHTML = `<img src="${proofUrl}" alt="Payment Proof" style="max-width:100%;max-height:70vh;border:1px solid #ddd;border-radius:8px;">`;
-        }
-        paymentProofModal.show();
+        openDocumentModal(proofUrl, 'Payment Proof', '');
       });
     });
 
@@ -1211,6 +1478,14 @@
   actionForm?.addEventListener('submit', async (e) => {
     e.preventDefault();
     clearModalError();
+
+    if ((actionType.value || '') === 'personnel_approve') {
+      // "View Document (Next)" only opens preview; it does not approve yet.
+      suppressActionReturn = true;
+      openPreviewAfterActionModal = true;
+      actionModal.hide();
+      return;
+    }
 
     const fd = new FormData();
     fd.append('action', actionType.value || '');
@@ -1236,12 +1511,35 @@
       });
       if (!data.success) throw new Error(data.message || 'Action failed');
 
+      suppressActionReturn = true;
       actionModal.hide();
       await load();
     } catch (err) {
       modalError.textContent = err.message || String(err);
       modalError.classList.remove('d-none');
     }
+  });
+
+  actionCancelBtn?.addEventListener('click', () => {
+    suppressActionReturn = false;
+  });
+
+  actionModalEl?.addEventListener('hidden.bs.modal', () => {
+    if (openPreviewAfterActionModal) {
+      openPreviewAfterActionModal = false;
+      if (viewModal) {
+        switchViewMode('preview');
+        viewModal.show();
+      }
+      actionReturnTarget = '';
+      suppressActionReturn = false;
+      return;
+    }
+    if (!suppressActionReturn && actionReturnTarget === 'view' && viewModal) {
+      viewModal.show();
+    }
+    actionReturnTarget = '';
+    suppressActionReturn = false;
   });
 
   stageTabs.forEach((tab) => {
@@ -1278,6 +1576,27 @@
   });
 
   viewModalNextBtn?.addEventListener('click', () => {
+    if (viewMode === 'preview') {
+      const rid = String(currentViewRequestId || '').trim();
+      if (!rid) return;
+      const fd = new FormData();
+      fd.append('action', 'personnel_approve');
+      fd.append('request_id', rid);
+      viewModalNextBtn.disabled = true;
+      fetchJson(endpoint, { method: 'POST', body: fd })
+        .then((data) => {
+          if (!data.success) throw new Error(data.message || 'Unable to approve request.');
+          viewModal.hide();
+          return load();
+        })
+        .catch((err) => {
+          alert(err.message || String(err));
+        })
+        .finally(() => {
+          if (viewModalNextBtn) viewModalNextBtn.disabled = false;
+        });
+      return;
+    }
     switchViewMode('preview');
   });
 
@@ -1286,8 +1605,13 @@
   });
 
   viewModalEl?.addEventListener('hidden.bs.modal', () => {
+    if (preserveViewStateOnNextHide) {
+      preserveViewStateOnNextHide = false;
+      return;
+    }
     viewDetailsHtml = '';
     viewPreviewState = null;
+    currentViewRequestId = '';
     switchViewMode('details');
   });
 

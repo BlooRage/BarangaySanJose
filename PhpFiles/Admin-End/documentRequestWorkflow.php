@@ -9,6 +9,7 @@ requireRoleSession(['SuperAdmin', 'Official', 'Officials', 'Personnel', 'Personn
 
 dr_ensure_table($conn);
 dr_ensure_general_fees_table($conn);
+dr_backfill_missing_issuance_requests($conn, 5000);
 
 $action = strtolower(trim((string)($_REQUEST['action'] ?? '')));
 if ($action === '') {
@@ -43,6 +44,21 @@ function dra_format_full_name_from_payload(array $payload): string {
     $mi = $middle !== '' ? strtoupper(substr($middle, 0, 1)) . '.' : '';
     $parts = array_filter([$last !== '' ? $last . ',' : '', $first, $mi, $suffix], fn($x) => trim((string)$x) !== '');
     return trim(implode(' ', $parts));
+}
+
+function dra_strip_area_from_address(string $address): string {
+    $value = trim($address);
+    if ($value === '') {
+        return '';
+    }
+
+    // Remove ", Area X" or "Area X," fragments while keeping the rest intact.
+    $value = preg_replace('/\s*,\s*Area\s+[A-Za-z0-9-]+\s*(?=,|$)/i', '', $value) ?? $value;
+    $value = preg_replace('/(^|,\s*)Area\s+[A-Za-z0-9-]+\s*,\s*/i', '$1', $value) ?? $value;
+    $value = preg_replace('/\s{2,}/', ' ', $value) ?? $value;
+    $value = trim($value, " \t\n\r\0\x0B,");
+
+    return $value;
 }
 
 function dra_public_base_url(): string {
@@ -98,6 +114,7 @@ function dra_generate_issued_document(array $requestRow): ?string {
         $fullName = trim((string)($requestRow['resident_id'] ?? 'Resident'));
     }
     $address = trim((string)($payload['full_address'] ?? 'Barangay San Jose, Rodriguez, Rizal'));
+    $address = dra_strip_area_from_address($address);
     if ($address === '') {
         $address = 'Barangay San Jose, Rodriguez, Rizal';
     }
@@ -389,6 +406,10 @@ function dra_resident_profile_snapshot(mysqli $conn, string $residentUserId, str
         'occupation' => '',
         'contact_number' => '',
         'full_address' => '',
+        'proof_residency_path' => '',
+        'proof_residency_name' => '',
+        'proof_residency_type' => '',
+        'proof_residency_id_number' => '',
     ];
 
     $sql = "
@@ -406,6 +427,54 @@ function dra_resident_profile_snapshot(mysqli $conn, string $residentUserId, str
             r.occupation,
             r.occupation_detail,
             u.phone_number,
+            (
+                SELECT uf.file_path
+                FROM unifiedfileattachmenttbl uf
+                LEFT JOIN documenttypelookuptbl dt
+                    ON dt.document_type_id = uf.document_type_id
+                WHERE uf.source_type = 'ResidentProfiling'
+                  AND uf.source_id = r.resident_id
+                  AND (uf.remarks IS NULL OR uf.remarks NOT LIKE 'sector:%')
+                  AND LOWER(COALESCE(dt.document_type_name, '')) <> '2x2 picture'
+                ORDER BY uf.upload_timestamp DESC, uf.attachment_id DESC
+                LIMIT 1
+            ) AS proof_residency_path,
+            (
+                SELECT uf.file_name
+                FROM unifiedfileattachmenttbl uf
+                LEFT JOIN documenttypelookuptbl dt
+                    ON dt.document_type_id = uf.document_type_id
+                WHERE uf.source_type = 'ResidentProfiling'
+                  AND uf.source_id = r.resident_id
+                  AND (uf.remarks IS NULL OR uf.remarks NOT LIKE 'sector:%')
+                  AND LOWER(COALESCE(dt.document_type_name, '')) <> '2x2 picture'
+                ORDER BY uf.upload_timestamp DESC, uf.attachment_id DESC
+                LIMIT 1
+            ) AS proof_residency_name,
+            (
+                SELECT dt.document_type_name
+                FROM unifiedfileattachmenttbl uf
+                LEFT JOIN documenttypelookuptbl dt
+                    ON dt.document_type_id = uf.document_type_id
+                WHERE uf.source_type = 'ResidentProfiling'
+                  AND uf.source_id = r.resident_id
+                  AND (uf.remarks IS NULL OR uf.remarks NOT LIKE 'sector:%')
+                  AND LOWER(COALESCE(dt.document_type_name, '')) <> '2x2 picture'
+                ORDER BY uf.upload_timestamp DESC, uf.attachment_id DESC
+                LIMIT 1
+            ) AS proof_residency_type,
+            (
+                SELECT uf.id_number
+                FROM unifiedfileattachmenttbl uf
+                LEFT JOIN documenttypelookuptbl dt
+                    ON dt.document_type_id = uf.document_type_id
+                WHERE uf.source_type = 'ResidentProfiling'
+                  AND uf.source_id = r.resident_id
+                  AND (uf.remarks IS NULL OR uf.remarks NOT LIKE 'sector:%')
+                  AND LOWER(COALESCE(dt.document_type_name, '')) <> '2x2 picture'
+                ORDER BY uf.upload_timestamp DESC, uf.attachment_id DESC
+                LIMIT 1
+            ) AS proof_residency_id_number,
             a.unit_number,
             a.street_number,
             a.street_name,
@@ -461,13 +530,14 @@ function dra_resident_profile_snapshot(mysqli $conn, string $residentUserId, str
     $phase = trim((string)($row['phase_number'] ?? ''));
     $subdivision = trim((string)($row['subdivision'] ?? ''));
     $area = trim((string)($row['area_number'] ?? ''));
+    $areaNormalized = trim((string)(preg_replace('/^area\b\.?\s*/i', '', $area) ?? $area));
     $fullAddressParts = [];
     if ($unit !== '') $fullAddressParts[] = 'Unit ' . $unit;
     $streetLine = trim($streetNumber . ' ' . $streetName);
     if ($streetLine !== '') $fullAddressParts[] = $streetLine;
     if ($phase !== '') $fullAddressParts[] = 'Phase ' . $phase;
     if ($subdivision !== '') $fullAddressParts[] = $subdivision . ' Subdivision';
-    if ($area !== '') $fullAddressParts[] = 'Area ' . $area;
+    if ($areaNormalized !== '') $fullAddressParts[] = 'Area ' . $areaNormalized;
     $fullAddressParts[] = 'San Jose';
     $fullAddressParts[] = 'Rodriguez';
     $fullAddressParts[] = 'Rizal';
@@ -493,6 +563,10 @@ function dra_resident_profile_snapshot(mysqli $conn, string $residentUserId, str
         'occupation' => $occupation,
         'contact_number' => (string)($row['phone_number'] ?? ''),
         'full_address' => $fullAddress,
+        'proof_residency_path' => (string)($row['proof_residency_path'] ?? ''),
+        'proof_residency_name' => (string)($row['proof_residency_name'] ?? ''),
+        'proof_residency_type' => (string)($row['proof_residency_type'] ?? ''),
+        'proof_residency_id_number' => (string)($row['proof_residency_id_number'] ?? ''),
     ];
 
     $cache[$cacheKey] = $profile;
@@ -506,27 +580,46 @@ if ($action === 'list') {
     $types = '';
     $vals = [];
 
+    $stageCol = dr_column_exists($conn, 'documentrequesttbl', 'stage') ? 'stage' : null;
     $stage = trim((string)($_GET['stage'] ?? ''));
     if ($stage !== '') {
-        $where[] = 'stage = ?';
-        $types .= 's';
-        $vals[] = $stage;
+        if ($stageCol !== null) {
+            $where[] = $stageCol . ' = ?';
+            $types .= 's';
+            $vals[] = $stage;
+        } else {
+            $statusId = dr_find_request_status_id_by_stage($conn, $stage);
+            $statusCol = dr_request_status_column($conn);
+            if ($statusId !== null && $statusCol !== null) {
+                $where[] = $statusCol . ' = ?';
+                $types .= 'i';
+                $vals[] = $statusId;
+            }
+        }
     }
 
     $search = trim((string)($_GET['q'] ?? ''));
     if ($search !== '') {
-        $where[] = '(request_id LIKE ? OR resident_id LIKE ? OR document_type LIKE ?)';
-        $types .= 'sss';
+        $parts = ['request_id LIKE ?'];
+        $types .= 's';
         $vals[] = '%' . $search . '%';
+        if (dr_column_exists($conn, 'documentrequesttbl', 'resident_id')) {
+            $parts[] = 'resident_id LIKE ?';
+            $types .= 's';
+            $vals[] = '%' . $search . '%';
+        }
+        $parts[] = 'request_details LIKE ?';
+        $types .= 's';
         $vals[] = '%' . $search . '%';
-        $vals[] = '%' . $search . '%';
+        $where[] = '(' . implode(' OR ', $parts) . ')';
     }
 
     $sql = 'SELECT * FROM documentrequesttbl';
     if ($where) {
         $sql .= ' WHERE ' . implode(' AND ', $where);
     }
-    $sql .= ' ORDER BY submitted_at DESC, request_id DESC';
+    $orderCol = dr_column_exists($conn, 'documentrequesttbl', 'submitted_at') ? 'submitted_at' : 'request_timestamp';
+    $sql .= ' ORDER BY ' . $orderCol . ' DESC, request_id DESC';
 
     $stmt = $conn->prepare($sql);
     if (!$stmt) {
@@ -546,9 +639,12 @@ if ($action === 'list') {
     $items = [];
     $rs = $stmt->get_result();
     while ($row = $rs->fetch_assoc()) {
+        dr_hydrate_request_derived_fields($conn, $row);
+        dr_merge_finance_transaction_into_request($conn, $row);
+        dr_sync_stage_from_status_lookup($conn, $row);
         $row['stage_label'] = dr_stage_label((string)$row['stage']);
         $row['fee_amount'] = dr_get_fee_amount_for_document_type($conn, (string)($row['document_type'] ?? ''));
-        $payload = json_decode((string)($row['payload_json'] ?? '{}'), true);
+        $payload = json_decode((string)($row['request_details'] ?? $row['payload_json'] ?? '{}'), true);
         $row['payload'] = is_array($payload) ? $payload : [];
         $row['resident_profile'] = dra_resident_profile_snapshot(
             $conn,
@@ -609,10 +705,15 @@ if ($requestId !== '' && !$row) {
 }
 
 if ($action === 'personnel_approve') {
-    $updated = dr_update_stage($conn, $requestId, DR_STAGE_FOR_PAYMENT, [
+    $defaultFee = dr_get_fee_amount_for_document_type($conn, (string)($row['document_type'] ?? ''));
+    $isFreeDocument = ($defaultFee !== null && (float)$defaultFee <= 0.0);
+    $nextStage = $isFreeDocument ? DR_STAGE_READY_FOR_CLAIM : DR_STAGE_FOR_PAYMENT;
+
+    $updated = dr_update_stage($conn, $requestId, $nextStage, [
         'status_reason' => null,
         'personnel_user_id' => $currentUserId,
         'personnel_decision_at' => dr_now(),
+        'fee_amount' => $defaultFee,
     ]);
     if (!$updated) {
         dr_respond_json(500, ['success' => false, 'message' => 'Unable to approve request.']);
@@ -621,8 +722,10 @@ if ($action === 'personnel_approve') {
     dr_send_notification(
         $conn,
         $updated,
-        'Document Request Approved for Payment',
-        'Your request ' . $requestId . ' has been approved and is now waiting for payment.'
+        $isFreeDocument ? 'Document Request Approved for Release' : 'Document Request Approved for Payment',
+        $isFreeDocument
+            ? ('Your request ' . $requestId . ' has been approved and is now ready for release.')
+            : ('Your request ' . $requestId . ' has been approved and is now waiting for payment.')
     );
 
     dr_respond_json(200, ['success' => true, 'request' => $updated]);

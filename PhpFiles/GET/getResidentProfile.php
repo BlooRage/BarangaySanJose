@@ -315,8 +315,31 @@ function getResidentProfileData(mysqli $conn, string $userId): array {
 
                     $statusKey = strtolower(trim((string)$statusName));
                     $statusKey = preg_replace('/[\s_-]+/', '', $statusKey);
-                    $isVerified = in_array($statusKey, ['verified', 'approved', 'verifiedresident'], true);
-                    $isPending = (strpos($statusKey, 'pending') !== false || strpos($statusKey, 'review') !== false);
+                    $isRejected = (
+                        strpos($statusKey, 'reject') !== false
+                        || strpos($statusKey, 'cancel') !== false
+                        || strpos($statusKey, 'failed') !== false
+                        || strpos($statusKey, 'invalid') !== false
+                    );
+                    $isVerified = (
+                        in_array($statusKey, ['verified', 'approved', 'verifiedresident', 'completed'], true)
+                        || strpos($statusKey, 'verified') !== false
+                        || strpos($statusKey, 'approved') !== false
+                        || strpos($statusKey, 'complete') !== false
+                    );
+                    $isPending = (
+                        !$isVerified
+                        && !$isRejected
+                        && (
+                            strpos($statusKey, 'pending') !== false
+                            || strpos($statusKey, 'review') !== false
+                            || strpos($statusKey, 'verify') !== false
+                            || strpos($statusKey, 'submitted') !== false
+                            || strpos($statusKey, 'inspection') !== false
+                            || strpos($statusKey, 'interview') !== false
+                            || strpos($statusKey, 'for') !== false
+                        )
+                    );
 
                     if ($isVerified) {
                         $sectorState[$dedupeKey]['has_verified'] = true;

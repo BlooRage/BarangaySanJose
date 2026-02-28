@@ -30,6 +30,25 @@ require_once __DIR__ . '/../includes/admin_guard.php';
       border-radius: 10px;
       border-width: 1px;
       min-width: 104px;
+      position: relative;
+    }
+    .certificate-tracker-shell .stage-filter-btn .tab-count {
+      position: absolute;
+      top: -7px;
+      right: -7px;
+      min-width: 20px;
+      height: 20px;
+      padding: 0 6px;
+      border-radius: 999px;
+      background: #dc3545;
+      color: #fff;
+      font-size: .72rem;
+      font-weight: 700;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      line-height: 1;
+      box-shadow: none;
     }
     .certificate-tracker-shell .admin-list-actions .form-select,
     .certificate-tracker-shell .admin-list-actions .input-group-text,
@@ -84,19 +103,20 @@ require_once __DIR__ . '/../includes/admin_guard.php';
       line-height: 1.35;
     }
     #viewModal .modal-dialog {
-      width: min(92vw, 1180px);
-      max-width: 1180px;
-      height: 82vh;
+      width: min(88vw, 920px);
+      max-width: 920px;
+      height: 78vh;
     }
     #viewModal .modal-content {
-      border: 1px solid #e5e7eb;
-      border-radius: 12px;
+      border: 1px solid #e9ecef;
+      border-radius: 16px;
       overflow: hidden;
       height: 100%;
+      background: #ffffff;
     }
     #viewModal .modal-header {
-      border-bottom: 1px solid #e5e7eb;
-      background: #f8fafc;
+      border-bottom: 1px solid #e9ecef;
+      background: #ffffff;
     }
     #viewModal .tracker-profile-view {
       display: grid;
@@ -106,30 +126,36 @@ require_once __DIR__ . '/../includes/admin_guard.php';
       overflow-y: auto;
       overflow-x: hidden;
       min-height: 0;
+      background: #ffffff;
+      padding: 14px;
     }
     #viewModal .tracker-doc-highlight {
-      border: 1px solid #fde68a;
-      background: #fffbeb;
-      color: #92400e;
-      border-radius: 10px;
-      padding: 10px 12px;
+      border: 1px solid #bfdbfe;
+      background: #dbeafe;
+      color: #1e3a8a;
+      border-radius: 12px;
+      padding: 10px 14px;
       font-weight: 700;
     }
     #viewModal .tracker-form-section {
-      border-top: 1px solid #e5e7eb;
-      padding-top: 10px;
-      margin-top: 4px;
+      border: 1px solid #e9ecef;
+      background: #ffffff;
+      border-radius: 12px;
+      padding: 12px;
+      margin-top: 10px;
     }
     #viewModal .tracker-form-section-title {
-      margin: 2px 0 10px;
+      margin: 0 0 10px;
       font-size: 1rem;
       font-weight: 700;
-      color: #1f2937;
+      color: #212529;
+      border-bottom: 1px dashed #e9ecef;
+      padding-bottom: 6px;
     }
     #viewModal .tracker-form-grid {
       display: grid;
       grid-template-columns: repeat(2, minmax(0, 1fr));
-      gap: 10px 12px;
+      gap: 14px 12px;
     }
     #viewModal .tracker-form-grid.cols-4 {
       grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -146,7 +172,7 @@ require_once __DIR__ . '/../includes/admin_guard.php';
       gap: 4px;
     }
     #viewModal .tracker-form-label {
-      margin: 0;
+      margin: 6px 0 0;
       font-size: .76rem;
       color: #6b7280;
       font-weight: 700;
@@ -163,6 +189,70 @@ require_once __DIR__ . '/../includes/admin_guard.php';
       color: #111827;
       font-weight: 500;
       word-break: break-word;
+    }
+    #viewModal #viewModalActions .btn {
+      padding: 0.52rem 1rem;
+      border-radius: 10px;
+      font-weight: 600;
+    }
+    #viewModal .tracker-status-actions {
+      margin-top: 10px;
+      padding-top: 10px;
+      border-top: 1px dashed #e5e7eb;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+      width: 100%;
+    }
+    #viewModal .tracker-status-actions .btn {
+      padding: 0.52rem 1rem;
+      border-radius: 5px;
+      font-weight: 600;
+      min-width: 110px;
+    }
+    #viewModal .tracker-status-actions--split {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+    #viewModal .tracker-status-actions--split .btn {
+      width: 100%;
+      min-width: 0;
+      padding: 0.62rem 1rem;
+    }
+    #actionModal .modal-footer.action-split {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      width: 100%;
+    }
+    #actionModal .modal-footer.action-split .btn {
+      width: 100%;
+      margin: 0;
+      padding: 0.62rem 1rem;
+      font-weight: 600;
+    }
+    #actionModal #actionPrompt {
+      text-align: center;
+      color: #000;
+      font-weight: 500;
+      padding: 0;
+      margin-bottom: 12px;
+      background: transparent;
+      border: 0;
+      box-shadow: none;
+    }
+    #actionModal .modal-body {
+      text-align: center;
+      color: #000;
+    }
+    #actionModal .modal-footer {
+      flex-wrap: nowrap !important;
+    }
+    #actionModal .modal-footer .btn {
+      flex: 1 1 0;
+      white-space: nowrap;
     }
     #viewModal .doc-preview-shell {
       display: grid;
@@ -554,8 +644,8 @@ require_once __DIR__ . '/../includes/admin_guard.php';
       <div class="admin-list-toolbar mb-3">
         <div class="admin-list-tabs">
           <button type="button" class="btn btn-outline-primary btn-sm status-filter-btn stage-filter-btn active" data-stage-filter="">All</button>
-          <button type="button" class="btn btn-outline-secondary btn-sm status-filter-btn stage-filter-btn fw-semibold" data-stage-filter="pending">Pending</button>
-          <button type="button" class="btn btn-outline-secondary btn-sm status-filter-btn stage-filter-btn fw-semibold" data-stage-filter="release">Release</button>
+          <button type="button" class="btn btn-outline-secondary btn-sm status-filter-btn stage-filter-btn fw-semibold" data-stage-filter="pending">Pending <span class="tab-count" id="pendingTabCount">0</span></button>
+          <button type="button" class="btn btn-outline-secondary btn-sm status-filter-btn stage-filter-btn fw-semibold" data-stage-filter="release">Release <span class="tab-count" id="releaseTabCount">0</span></button>
           <button type="button" class="btn btn-outline-secondary btn-sm status-filter-btn stage-filter-btn fw-semibold" data-stage-filter="completed">Completed</button>
         </div>
 
@@ -604,16 +694,18 @@ require_once __DIR__ . '/../includes/admin_guard.php';
   </main>
 </div>
 
-<div class="modal fade" id="actionModal" tabindex="-1" aria-hidden="true">
+<div class="modal fade" id="actionModal" tabindex="-1" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
   <div class="modal-dialog modal-dialog-centered">
-    <form class="modal-content" id="actionForm" enctype="multipart/form-data">
-      <div class="modal-header">
-        <h5 class="modal-title" id="actionModalTitle">Update Request</h5>
+    <form class="modal-content p-3" id="actionForm" enctype="multipart/form-data">
+      <div class="modal-header justify-content-center border-0 pb-0">
+        <h5 class="modal-title fw-bold text-center w-100" id="actionModalTitle">Update Request</h5>
         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
       </div>
+      <hr class="my-2">
       <div class="modal-body">
         <input type="hidden" id="actionType" name="action">
         <input type="hidden" id="actionRequestId" name="request_id">
+        <div id="actionPrompt" class="d-none mb-3"></div>
 
         <div id="actionReasonWrap" class="d-none mb-3">
           <label class="form-label">Reason</label>
@@ -637,9 +729,9 @@ require_once __DIR__ . '/../includes/admin_guard.php';
 
         <div id="actionModalError" class="alert alert-danger d-none mb-0"></div>
       </div>
-      <div class="modal-footer">
-        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-        <button type="submit" class="btn btn-primary">Submit</button>
+      <div class="modal-footer border-0 pt-0 d-flex gap-2 w-100">
+        <button type="button" id="actionCancelBtn" class="btn btn-outline-secondary flex-fill" data-bs-dismiss="modal">Return</button>
+        <button type="submit" id="actionSubmitBtn" class="btn btn-primary flex-fill">Submit</button>
       </div>
     </form>
   </div>
@@ -672,7 +764,7 @@ require_once __DIR__ . '/../includes/admin_guard.php';
   </div>
 </div>
 
-<div class="modal fade" id="modalTableColumns" tabindex="-1" aria-hidden="true">
+<div class="modal fade" id="modalTableColumns" tabindex="-1" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
   <div class="modal-dialog modal-dialog-centered modal-lg">
     <div class="modal-content">
       <div class="modal-header">
@@ -700,9 +792,11 @@ require_once __DIR__ . '/../includes/admin_guard.php';
         <div id="viewDetailsBody" class="tracker-profile-view"></div>
       </div>
       <div class="modal-footer d-flex justify-content-between flex-wrap gap-2">
-        <div id="viewModalActions" class="d-flex flex-wrap gap-2"></div>
         <div class="d-flex flex-wrap gap-2">
           <button type="button" id="viewModalBackBtn" class="btn btn-outline-secondary d-none">Back</button>
+        </div>
+        <div id="viewModalActions" class="d-flex flex-wrap gap-2 justify-content-center flex-grow-1"></div>
+        <div class="d-flex flex-wrap gap-2">
           <button type="button" id="viewModalNextBtn" class="btn btn-primary">Next</button>
           <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
         </div>
@@ -711,25 +805,26 @@ require_once __DIR__ . '/../includes/admin_guard.php';
   </div>
 </div>
 
-<div class="modal fade" id="paymentProofModal" tabindex="-1" aria-hidden="true">
+<div class="modal fade" id="paymentProofModal" tabindex="-1" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
   <div class="modal-dialog modal-xl modal-dialog-centered">
     <div class="modal-content">
       <div class="modal-header">
-        <h5 class="modal-title">Payment Proof</h5>
+        <h5 class="modal-title" id="paymentProofTitle">Document Viewer</h5>
         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
       </div>
       <div class="modal-body">
         <div id="paymentProofWrap" class="w-100 text-center"></div>
       </div>
       <div class="modal-footer">
+        <button type="button" id="paymentProofReturnBtn" class="btn btn-secondary d-none">Return</button>
         <a id="paymentProofOpenNew" class="btn btn-outline-primary" target="_blank" rel="noopener">Open in New Tab</a>
-        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+        <button type="button" id="paymentProofCloseBtn" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
       </div>
     </div>
   </div>
 </div>
 
-<div class="modal fade tracker-profile-modal" id="residentProfileModal" tabindex="-1" aria-hidden="true">
+<div class="modal fade tracker-profile-modal" id="residentProfileModal" tabindex="-1" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
   <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable" id="div-modalSizing">
     <div class="modal-content border-0 rounded-2 p-4">
       <div class="modal-header border-0">
@@ -820,7 +915,7 @@ require_once __DIR__ . '/../includes/admin_guard.php';
         </div>
       </div>
       <div class="modal-footer">
-        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+        <button type="button" class="btn btn-secondary" id="residentProfileReturnBtn">Return</button>
       </div>
     </div>
   </div>
