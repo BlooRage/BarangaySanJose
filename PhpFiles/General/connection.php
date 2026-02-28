@@ -2,7 +2,8 @@
 // Use Asia/Manila (UTC+08:00) for PHP date/time functions.
 date_default_timezone_set('Asia/Manila');
 
-$host = getenv('DB_HOST') ?: "srv1986.hstgr.io";
+$host = getenv('DB_HOST') ?: "localhost";
+//srv1986.hstgr.io
 $user = getenv('DB_USER') ?: "u682055666_thesiscaps";
 $pass = getenv('DB_PASS') ?: "ThesisCaps123.";
 $dbname = getenv('DB_NAME') ?: "u682055666_testingBrgySJ";
@@ -23,3 +24,4 @@ $conn->set_charset('utf8mb4');
 // This affects NOW(), CURRENT_TIMESTAMP, and timestamp defaults for this connection.
 $conn->query("SET time_zone = '+08:00'");
 ?>
+

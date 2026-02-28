@@ -1,9 +1,25 @@
-﻿<!DOCTYPE html>
+﻿<?php
+if (!isset($baseUrl)) {
+  $scriptName = str_replace("\\", "/", (string)($_SERVER['SCRIPT_NAME'] ?? ''));
+  $residentSegmentPos = strpos($scriptName, '/Resident-End/');
+  $baseUrl = '';
+  if ($residentSegmentPos !== false) {
+    $baseUrl = substr($scriptName, 0, $residentSegmentPos);
+  } else {
+    $baseUrl = dirname($scriptName);
+  }
+  $baseUrl = rtrim((string)$baseUrl, '/');
+  if ($baseUrl === '.' || $baseUrl === '/') {
+    $baseUrl = '';
+  }
+}
+?>
+<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     
-  <link rel="icon" href="/Images/favicon_sanjose.png?v=20260211">
+  <link rel="icon" href="<?= htmlspecialchars((string)$baseUrl, ENT_QUOTES, 'UTF-8') ?>/Images/favicon_sanjose.png?v=20260211">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Resident Dashboard - Barangay San Jose</title>
 
@@ -34,18 +50,6 @@ function activeLink($page, $current) {
 }
 
 $displayName = "Resident";
-$scriptName = str_replace("\\", "/", (string)($_SERVER['SCRIPT_NAME'] ?? ''));
-$residentSegmentPos = strpos($scriptName, '/Resident-End/');
-$baseUrl = '';
-if ($residentSegmentPos !== false) {
-  $baseUrl = substr($scriptName, 0, $residentSegmentPos);
-} else {
-  $baseUrl = dirname($scriptName);
-}
-$baseUrl = rtrim((string)$baseUrl, '/');
-if ($baseUrl === '.' || $baseUrl === '/') {
-  $baseUrl = '';
-}
 $profileImage = $baseUrl . '/Images/Profile-Placeholder.png';
 $residentId = '';
 $isHeadOfFamily = false;

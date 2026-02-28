@@ -7,7 +7,7 @@ require_once __DIR__ . "/../includes/resident_access_guard.php";
 
 <head>
     <meta charset="UTF-8">
-    <link rel="icon" href="/Images/favicon_sanjose.png?v=20260211">
+    <link rel="icon" href="../../Images/favicon_sanjose.png?v=20260211">
     <title>Appointment Application</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
 
@@ -25,7 +25,7 @@ require_once __DIR__ . "/../includes/resident_access_guard.php";
 
         <main id="div-mainDisplay" class="main-content single-service-page flex-grow-1 p-4 p-md-5 bg-light">
             <div class="d-flex align-items-center gap-2 mb-2">
-                <img src="../../icons/dashboard/appointmentsicon.png" class="certificate-icon" alt="Appointment Service" style="height: 52px; margin-bottom: 0;">
+                <img src="../../Icons/Dashboard/appointmentsicon.png" class="certificate-icon" alt="Appointment Service" style="height: 52px; margin-bottom: 0;">
                 <h1 class="page-title mb-0">Barangay Appointments</h1>
             </div>
             <hr>

@@ -325,7 +325,7 @@ if ($residentId !== '' && isset($conn) && $conn instanceof mysqli) {
 <head>
     <meta charset="UTF-8">
     
-  <link rel="icon" href="/Images/favicon_sanjose.png?v=20260211">
+  <link rel="icon" href="../Images/favicon_sanjose.png?v=20260211">
 	<title>Resident Profile</title>
 
     <script>

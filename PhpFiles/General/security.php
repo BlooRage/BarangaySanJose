@@ -96,17 +96,9 @@ function appBaseUrl(): string
         $host = trim((string)($_SERVER['SERVER_NAME'] ?? ''));
     }
 
-    $hostLower = strtolower($host);
-    $isLocalHost = $hostLower === ''
-        || $hostLower === 'localhost'
-        || $hostLower === '127.0.0.1'
-        || str_starts_with($hostLower, 'localhost:')
-        || str_starts_with($hostLower, '127.0.0.1:');
-
-    if ($isLocalHost) {
-        // Production-safe default for hosted deployment when server host headers are local.
-        $host = 'barangaysanjose-montalban.com';
-        $scheme = 'https';
+    if ($host === '') {
+        // Safe fallback when host headers are unavailable.
+        $host = 'localhost';
     }
 
     // Base domain only; path prefixing is handled by appUrl().

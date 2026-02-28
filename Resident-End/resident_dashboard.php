@@ -40,7 +40,7 @@ if (isset($_SESSION['show_not_verified_modal'])) {
 <head>
   <meta charset="UTF-8">
   
-  <link rel="icon" href="/Images/favicon_sanjose.png?v=20260211">
+  <link rel="icon" href="../Images/favicon_sanjose.png?v=20260211">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Resident Dashboard - Barangay San Jose</title>
 
