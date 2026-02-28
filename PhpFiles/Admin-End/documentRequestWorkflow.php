@@ -65,6 +65,87 @@ function dra_public_base_url(): string {
     return appBaseUrl();
 }
 
+function dra_qr_verify_url(string $requestId, string $verificationCode): string {
+    $vc = $verificationCode !== '' ? $verificationCode : $requestId;
+    return rtrim(dra_public_base_url(), '/')
+        . '/Guest-End/TransactionInformation.html?request_id='
+        . rawurlencode($requestId)
+        . '&vc=' . rawurlencode($vc);
+}
+
+function dra_humanize_document_type(string $docType): string {
+    $text = trim($docType);
+    if ($text === '') {
+        return 'Document';
+    }
+    $text = preg_replace('/([a-z])([A-Z])/', '$1 $2', $text) ?? $text;
+    $text = str_replace(['_', '-'], ' ', $text);
+    $text = preg_replace('/\s+/', ' ', $text) ?? $text;
+    return trim($text);
+}
+
+function dra_request_notice(array $requestRow, string $requestId, string $suffix): string {
+    $docType = dra_humanize_document_type((string)($requestRow['document_type'] ?? ''));
+    $rid = trim($requestId) !== '' ? trim($requestId) : trim((string)($requestRow['request_id'] ?? ''));
+    if ($rid === '') {
+        return 'Your ' . $docType . ' Request has been ' . $suffix;
+    }
+    return 'Your ' . $docType . ' Request #' . $rid . ' has been ' . $suffix;
+}
+
+function dra_decode_request_payload(array $requestRow): array {
+    $raw = (string)($requestRow['request_details'] ?? $requestRow['payload_json'] ?? '{}');
+    $payload = json_decode($raw, true);
+    return is_array($payload) ? $payload : [];
+}
+
+function dra_apply_preview_edits(mysqli $conn, string $requestId, array &$requestRow, array $edited): void {
+    if ($requestId === '' || empty($edited)) {
+        return;
+    }
+
+    $payload = dra_decode_request_payload($requestRow);
+
+    $purpose = trim((string)($edited['purpose'] ?? ''));
+    $requestOfficer = trim((string)($edited['requestOfficer'] ?? ''));
+    $businessName = trim((string)($edited['businessName'] ?? ''));
+    $fullAddress = trim((string)($edited['fullAddress'] ?? ''));
+
+    if ($purpose !== '') {
+        $payload['request_purpose'] = $purpose;
+        $payload['purpose'] = $purpose;
+        if (dr_column_exists($conn, 'documentrequesttbl', 'purpose')) {
+            $stmtPurpose = $conn->prepare("UPDATE documentrequesttbl SET purpose = ? WHERE request_id = ? LIMIT 1");
+            if ($stmtPurpose) {
+                $stmtPurpose->bind_param('ss', $purpose, $requestId);
+                $stmtPurpose->execute();
+                $stmtPurpose->close();
+            }
+        }
+        $requestRow['purpose'] = $purpose;
+    }
+    if ($requestOfficer !== '') {
+        $payload['request_officer'] = $requestOfficer;
+    }
+    if ($businessName !== '') {
+        $payload['business_name'] = $businessName;
+    }
+    if ($fullAddress !== '') {
+        $payload['full_address'] = $fullAddress;
+    }
+
+    $encoded = dr_safe_json($payload);
+    if (dr_column_exists($conn, 'documentrequesttbl', 'request_details')) {
+        $stmt = $conn->prepare("UPDATE documentrequesttbl SET request_details = ? WHERE request_id = ? LIMIT 1");
+        if ($stmt) {
+            $stmt->bind_param('ss', $encoded, $requestId);
+            $stmt->execute();
+            $stmt->close();
+            $requestRow['request_details'] = $encoded;
+        }
+    }
+}
+
 function dra_generate_issued_document(array $requestRow): ?string {
     if (!class_exists('FPDF')) {
         $fpdfPaths = [
@@ -104,10 +185,7 @@ function dra_generate_issued_document(array $requestRow): ?string {
     $docType = trim((string)($requestRow['document_type'] ?? 'Certificate'));
     $purpose = trim((string)($requestRow['purpose'] ?? ''));
     $issuedAt = date('F j, Y');
-    $payload = json_decode((string)($requestRow['payload_json'] ?? '{}'), true);
-    if (!is_array($payload)) {
-        $payload = [];
-    }
+    $payload = dra_decode_request_payload($requestRow);
 
     $fullName = dra_format_full_name_from_payload($payload);
     if ($fullName === '') {
@@ -122,10 +200,7 @@ function dra_generate_issued_document(array $requestRow): ?string {
     $orNo = trim((string)($requestRow['or_number'] ?? ''));
 
     $verificationCode = trim((string)($requestRow['verification_code'] ?? ''));
-    $verifyUrl = dra_public_base_url()
-        . appUrl('/Guest-End/TransactionInformation.html?request_id=')
-        . rawurlencode($requestId)
-        . '&vc=' . rawurlencode($verificationCode !== '' ? $verificationCode : $requestId);
+    $verifyUrl = dra_qr_verify_url($requestId, $verificationCode);
 
     $qrFile = 'qr_' . preg_replace('/[^A-Za-z0-9_-]/', '', $requestId) . '.png';
     $qrDiskPath = $qrDir . '/' . $qrFile;
@@ -309,6 +384,22 @@ function dra_generate_issued_document(array $requestRow): ?string {
     $pdf->Output('F', $diskPath);
 
     return '/UnifiedFileAttachment/IssuedDocuments/Generated/' . $fileName;
+}
+
+function dra_generate_issued_document_safe(array $requestRow): ?string {
+    $bufferLevel = ob_get_level();
+    ob_start();
+    try {
+        $path = dra_generate_issued_document($requestRow);
+    } catch (Throwable $e) {
+        error_log('[dra_generate_issued_document_safe] ' . $e->getMessage());
+        $path = null;
+    } finally {
+        while (ob_get_level() > $bufferLevel) {
+            ob_end_clean();
+        }
+    }
+    return $path;
 }
 
 function dra_backfill_payment_verified_to_ready(mysqli $conn): void {
@@ -695,6 +786,47 @@ if ($action === 'view_payment_proof') {
     exit;
 }
 
+if ($action === 'view_issued') {
+    if ($requestId === '') {
+        http_response_code(422);
+        exit('Missing request ID.');
+    }
+    $row = dr_fetch_request($conn, $requestId);
+    if (!$row) {
+        http_response_code(404);
+        exit('Request not found.');
+    }
+    $stage = strtolower(trim((string)($row['stage'] ?? '')));
+    if ($stage !== DR_STAGE_COMPLETED) {
+        http_response_code(422);
+        exit('Issued document can only be viewed after completion.');
+    }
+    $publicPath = trim((string)($row['issued_file_path'] ?? ''));
+    if ($publicPath === '') {
+        http_response_code(404);
+        exit('Issued document not found.');
+    }
+
+    $baseDir = realpath(__DIR__ . '/../../');
+    if ($baseDir === false) {
+        http_response_code(500);
+        exit('Path resolution failed.');
+    }
+    $relative = '/' . ltrim(dra_strip_legacy_base($publicPath), '/');
+    $absolute = realpath($baseDir . $relative);
+    if ($absolute === false || !is_file($absolute) || strpos($absolute, $baseDir . '/UnifiedFileAttachment/') !== 0) {
+        http_response_code(404);
+        exit('File not found.');
+    }
+
+    $mime = (string)(mime_content_type($absolute) ?: 'application/octet-stream');
+    header('Content-Type: ' . $mime);
+    header('Content-Disposition: inline; filename="' . basename($absolute) . '"');
+    header('Content-Length: ' . filesize($absolute));
+    readfile($absolute);
+    exit;
+}
+
 if ($requestId === '' && $action !== 'list') {
     dr_respond_json(422, ['success' => false, 'message' => 'Missing request ID.']);
 }
@@ -705,16 +837,50 @@ if ($requestId !== '' && !$row) {
 }
 
 if ($action === 'personnel_approve') {
+    $editedPreview = [];
+    $editedPreviewRaw = trim((string)($_POST['edited_preview'] ?? ''));
+    if ($editedPreviewRaw !== '') {
+        $decoded = json_decode($editedPreviewRaw, true);
+        if (is_array($decoded)) {
+            $editedPreview = $decoded;
+        }
+    }
+    if (!empty($editedPreview)) {
+        dra_apply_preview_edits($conn, $requestId, $row, $editedPreview);
+        $row = dr_fetch_request($conn, $requestId) ?? $row;
+    }
+
     $defaultFee = dr_get_fee_amount_for_document_type($conn, (string)($row['document_type'] ?? ''));
     $isFreeDocument = ($defaultFee !== null && (float)$defaultFee <= 0.0);
     $nextStage = $isFreeDocument ? DR_STAGE_READY_FOR_CLAIM : DR_STAGE_FOR_PAYMENT;
-
-    $updated = dr_update_stage($conn, $requestId, $nextStage, [
+    $patch = [
         'status_reason' => null,
         'personnel_user_id' => $currentUserId,
         'personnel_decision_at' => dr_now(),
         'fee_amount' => $defaultFee,
-    ]);
+    ];
+
+    if ($isFreeDocument) {
+        $verificationCode = trim((string)($row['verification_code'] ?? ''));
+        if ($verificationCode === '') {
+            $verificationCode = strtoupper(bin2hex(random_bytes(8)));
+        }
+        $qrCodePath = '/UnifiedFileAttachment/IssuedDocuments/QR/qr_' . preg_replace('/[^A-Za-z0-9_-]/', '', $requestId) . '.png';
+        $issuedPath = trim((string)($row['issued_file_path'] ?? ''));
+        if ($issuedPath === '') {
+            $issuedPath = (string)(dra_generate_issued_document_safe(array_merge((array)$row, [
+                'verification_code' => $verificationCode,
+            ])) ?? '');
+        }
+        $patch['verification_code'] = $verificationCode;
+        $patch['qr_code_path'] = $qrCodePath;
+        $patch['ready_at'] = dr_now();
+        if ($issuedPath !== '') {
+            $patch['issued_file_path'] = $issuedPath;
+        }
+    }
+
+    $updated = dr_update_stage($conn, $requestId, $nextStage, $patch);
     if (!$updated) {
         dr_respond_json(500, ['success' => false, 'message' => 'Unable to approve request.']);
     }
@@ -724,8 +890,8 @@ if ($action === 'personnel_approve') {
         $updated,
         $isFreeDocument ? 'Document Request Approved for Release' : 'Document Request Approved for Payment',
         $isFreeDocument
-            ? ('Your request ' . $requestId . ' has been approved and is now ready for release.')
-            : ('Your request ' . $requestId . ' has been approved and is now waiting for payment.')
+            ? dra_request_notice($updated, $requestId, 'approved and is now for release.')
+            : dra_request_notice($updated, $requestId, 'approved and is now waiting for payment.')
     );
 
     dr_respond_json(200, ['success' => true, 'request' => $updated]);
@@ -751,7 +917,7 @@ if ($action === 'personnel_reject') {
         $conn,
         $updated,
         'Document Request Rejected',
-        'Your request ' . $requestId . ' was rejected. Reason: ' . $reason
+        dra_request_notice($updated, $requestId, 'rejected. Reason: ' . $reason)
     );
 
     dr_respond_json(200, ['success' => true, 'request' => $updated]);
@@ -807,7 +973,7 @@ if ($action === 'finance_verify') {
         $conn,
         $updated,
         'Payment Verified - Document Ready',
-        'Payment for request ' . $requestId . ' is verified. OR: ' . $orNumber . '. Certificate no: ' . $certificateNumber . '. Your document is now ready for claim/download.'
+        dra_request_notice($updated, $requestId, 'payment verified. OR: ' . $orNumber . '. Certificate no: ' . $certificateNumber . '. The document is now for release.')
     );
 
     dr_respond_json(200, ['success' => true, 'request' => $updated]);
@@ -833,7 +999,7 @@ if ($action === 'finance_reject') {
         $conn,
         $updated,
         'Payment Rejected',
-        'Payment for request ' . $requestId . ' was rejected. Reason: ' . $reason
+        dra_request_notice($updated, $requestId, 'payment rejected. Reason: ' . $reason)
     );
 
     dr_respond_json(200, ['success' => true, 'request' => $updated]);
@@ -870,16 +1036,33 @@ if ($action === 'mark_ready') {
         $conn,
         $updated,
         'Document Ready for Claim',
-        'Your document request ' . $requestId . ' is ready for claiming/printing.'
+        dra_request_notice($updated, $requestId, 'prepared and is now for release.')
     );
 
     dr_respond_json(200, ['success' => true, 'request' => $updated]);
 }
 
 if ($action === 'mark_completed') {
-    $updated = dr_update_stage($conn, $requestId, DR_STAGE_COMPLETED, [
+    $patch = [
         'completed_at' => dr_now(),
-    ]);
+    ];
+    $issuedPath = trim((string)($row['issued_file_path'] ?? ''));
+    if ($issuedPath === '') {
+        $verificationCode = trim((string)($row['verification_code'] ?? ''));
+        if ($verificationCode === '') {
+            $verificationCode = strtoupper(bin2hex(random_bytes(8)));
+        }
+        $generated = dra_generate_issued_document_safe(array_merge((array)$row, [
+            'verification_code' => $verificationCode,
+        ]));
+        if (!empty($generated)) {
+            $patch['issued_file_path'] = $generated;
+            $patch['verification_code'] = $verificationCode;
+            $patch['qr_code_path'] = '/UnifiedFileAttachment/IssuedDocuments/QR/qr_' . preg_replace('/[^A-Za-z0-9_-]/', '', $requestId) . '.png';
+        }
+    }
+
+    $updated = dr_update_stage($conn, $requestId, DR_STAGE_COMPLETED, $patch);
 
     if (!$updated) {
         dr_respond_json(500, ['success' => false, 'message' => 'Unable to complete request.']);
@@ -889,7 +1072,7 @@ if ($action === 'mark_completed') {
         $conn,
         $updated,
         'Document Request Completed',
-        'Your document request ' . $requestId . ' has been completed.'
+        dra_request_notice($updated, $requestId, 'completed and released.')
     );
 
     dr_respond_json(200, ['success' => true, 'request' => $updated]);

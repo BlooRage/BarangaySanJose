@@ -173,7 +173,7 @@ require_once __DIR__ . '/includes/resident_access_guard.php';
   <div class="modal-dialog modal-xl modal-dialog-centered">
     <div class="modal-content">
       <div class="modal-header">
-        <h5 class="modal-title">Payment Proof</h5>
+        <h5 class="modal-title" id="paymentProofTitle">Payment Proof</h5>
         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
       </div>
       <div class="modal-body">
@@ -203,6 +203,7 @@ require_once __DIR__ . '/includes/resident_access_guard.php';
   const viewModalTitle = document.getElementById('viewModalTitle');
   const viewDetailsBody = document.getElementById('viewDetailsBody');
   const paymentProofModal = new bootstrap.Modal(document.getElementById('paymentProofModal'));
+  const paymentProofTitle = document.getElementById('paymentProofTitle');
   const paymentProofWrap = document.getElementById('paymentProofWrap');
   const paymentProofOpenNew = document.getElementById('paymentProofOpenNew');
   let itemById = new Map();
@@ -316,10 +317,11 @@ require_once __DIR__ . '/includes/resident_access_guard.php';
         const proofBtn = r.payment_proof_path
           ? `<button class="btn btn-sm btn-outline-dark me-1" data-proof="${escapeHtml(r.request_id)}">View Payment</button>`
           : '';
+        const issuedBtn = `<button class="btn btn-sm btn-success" data-issued="${escapeHtml(r.request_id)}">View Document</button>`;
         if (r.stage === 'for_payment' || r.stage === 'payment_rejected') {
           action = `${viewBtn}${proofBtn}<button class="btn btn-sm btn-outline-primary" data-pay="${escapeHtml(r.request_id)}">Submit Payment</button>`;
-        } else if (r.stage === 'ready_for_claim' || r.stage === 'completed') {
-          action = `${viewBtn}${proofBtn}<a class="btn btn-sm btn-success" href="${endpoint}?action=download_issued&request_id=${encodeURIComponent(r.request_id)}">Download</a>`;
+        } else if (r.stage === 'completed') {
+          action = `${viewBtn}${proofBtn}${issuedBtn}`;
         } else {
           action = `${viewBtn}${proofBtn}`;
         }
@@ -411,22 +413,49 @@ require_once __DIR__ . '/includes/resident_access_guard.php';
           const id = String(btn.getAttribute('data-proof') || '');
           const row = itemById.get(id);
           if (!row || !row.payment_proof_path) return;
-
           const proofUrl = `${endpoint}?action=view_payment_proof&request_id=${encodeURIComponent(id)}`;
-          paymentProofOpenNew.href = proofUrl;
+          openFileViewerModal({
+            title: 'Payment Proof',
+            viewUrl: proofUrl,
+            linkText: 'Open in New Tab',
+            linkUrl: proofUrl,
+            isPdf: String(row.payment_proof_path || '').toLowerCase().endsWith('.pdf')
+          });
+        });
+      });
 
-          const path = String(row.payment_proof_path || '').toLowerCase();
-          if (path.endsWith('.pdf')) {
-            paymentProofWrap.innerHTML = `<iframe src="${proofUrl}" style="width:100%;height:70vh;border:1px solid #ddd;border-radius:8px;"></iframe>`;
-          } else {
-            paymentProofWrap.innerHTML = `<img src="${proofUrl}" alt="Payment Proof" style="max-width:100%;max-height:70vh;border:1px solid #ddd;border-radius:8px;">`;
-          }
-          paymentProofModal.show();
+      tbody.querySelectorAll('button[data-issued]').forEach((btn) => {
+        btn.addEventListener('click', () => {
+          const id = String(btn.getAttribute('data-issued') || '');
+          const viewUrl = `${endpoint}?action=view_issued&request_id=${encodeURIComponent(id)}`;
+          const downloadUrl = `${endpoint}?action=download_issued&request_id=${encodeURIComponent(id)}`;
+          openFileViewerModal({
+            title: 'Issued Document (PDF)',
+            viewUrl,
+            linkText: 'Download',
+            linkUrl: downloadUrl,
+            isPdf: true
+          });
         });
       });
     } catch (err) {
       tbody.innerHTML = `<tr><td colspan="7" class="text-center text-danger py-4">${escapeHtml(err.message || err)}</td></tr>`;
     }
+  }
+
+  function openFileViewerModal({ title, viewUrl, linkText, linkUrl, isPdf }) {
+    if (paymentProofTitle) {
+      paymentProofTitle.textContent = String(title || 'Document');
+    }
+    paymentProofOpenNew.textContent = String(linkText || 'Open in New Tab');
+    paymentProofOpenNew.href = String(linkUrl || viewUrl || '#');
+
+    if (isPdf) {
+      paymentProofWrap.innerHTML = `<iframe src="${viewUrl}" style="width:100%;height:70vh;border:1px solid #ddd;border-radius:8px;"></iframe>`;
+    } else {
+      paymentProofWrap.innerHTML = `<img src="${viewUrl}" alt="Document Preview" style="max-width:100%;max-height:70vh;border:1px solid #ddd;border-radius:8px;">`;
+    }
+    paymentProofModal.show();
   }
 
   payMethod.addEventListener('change', () => {

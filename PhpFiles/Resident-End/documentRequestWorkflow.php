@@ -695,9 +695,9 @@ if ($action === 'download_issued') {
     }
 
     $stage = (string)($row['stage'] ?? '');
-    if (!in_array($stage, [DR_STAGE_READY_FOR_CLAIM, DR_STAGE_COMPLETED], true)) {
+    if (!in_array($stage, [DR_STAGE_COMPLETED], true)) {
         http_response_code(422);
-        exit('Document is not yet available for download.');
+        exit('Document is not yet available for download. Release status is pending final review.');
     }
 
     $publicPath = trim((string)($row['issued_file_path'] ?? ''));
@@ -723,6 +723,53 @@ if ($action === 'download_issued') {
     $filename = basename($absolute);
     header('Content-Type: application/octet-stream');
     header('Content-Disposition: attachment; filename="' . $filename . '"');
+    header('Content-Length: ' . filesize($absolute));
+    readfile($absolute);
+    exit;
+}
+
+if ($action === 'view_issued') {
+    $requestId = trim((string)($_GET['request_id'] ?? ''));
+    if ($requestId === '') {
+        http_response_code(422);
+        exit('Missing request ID.');
+    }
+
+    $row = dr_fetch_request($conn, $requestId);
+    if (!$row || (string)$row['resident_user_id'] !== $residentForeignId) {
+        http_response_code(404);
+        exit('Request not found.');
+    }
+
+    $stage = (string)($row['stage'] ?? '');
+    if (!in_array($stage, [DR_STAGE_COMPLETED], true)) {
+        http_response_code(422);
+        exit('Document is not yet available for viewing.');
+    }
+
+    $publicPath = trim((string)($row['issued_file_path'] ?? ''));
+    if ($publicPath === '') {
+        http_response_code(404);
+        exit('Issued file is not yet uploaded.');
+    }
+
+    $baseDir = realpath(__DIR__ . '/../../');
+    if ($baseDir === false) {
+        http_response_code(500);
+        exit('Path resolution failed.');
+    }
+
+    $relative = '/' . ltrim(dr_strip_legacy_base($publicPath), '/');
+    $absolute = realpath($baseDir . $relative);
+
+    if ($absolute === false || !is_file($absolute) || strpos($absolute, $baseDir . '/UnifiedFileAttachment/') !== 0) {
+        http_response_code(404);
+        exit('File not found.');
+    }
+
+    $mime = (string)(mime_content_type($absolute) ?: 'application/octet-stream');
+    header('Content-Type: ' . $mime);
+    header('Content-Disposition: inline; filename="' . basename($absolute) . '"');
     header('Content-Length: ' . filesize($absolute));
     readfile($absolute);
     exit;

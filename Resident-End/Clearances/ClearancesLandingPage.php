@@ -41,7 +41,7 @@ require_once __DIR__ . "/../includes/resident_access_guard.php";
                         <p class="certificate-text">
                             Apply for barangay business clearance for new applications, renewals, and compliance checks.
                         </p>
-                        <button class="btn apply-btn" onclick="location.href='BusinessClearanceForm.php'">Apply Now</button>
+                        <button class="btn apply-btn" type="button" disabled title="Currently unavailable">Apply Now</button>
                     </div>
                 </div>
 
@@ -50,7 +50,7 @@ require_once __DIR__ . "/../includes/resident_access_guard.php";
                         <img src="../../icons/dashboard/tricycle.png" class="certificate-icon" alt="For Tricycle Permit">
                         <h3>FOR TRICYCLE PERMIT</h3>
                         <p class="certificate-text">Apply for barangay clearance required for tricycle permit processing.</p>
-                        <button class="btn apply-btn" onclick="location.href='TricycleForm.php'">Apply Now</button>
+                        <button class="btn apply-btn" type="button" disabled title="Currently unavailable">Apply Now</button>
                     </div>
                 </div>
 
@@ -59,7 +59,7 @@ require_once __DIR__ . "/../includes/resident_access_guard.php";
                         <img src="../../icons/dashboard/electricity.png" class="certificate-icon" alt="For Electrical Permit">
                         <h3>FOR ELECTRICAL PERMIT</h3>
                         <p class="certificate-text">Apply for barangay clearance required for electrical permit processing.</p>
-                        <button class="btn apply-btn" onclick="location.href='ElectricalForm.php'">Apply Now</button>
+                        <button class="btn apply-btn" type="button" disabled title="Currently unavailable">Apply Now</button>
                     </div>
                 </div>
 
@@ -77,7 +77,7 @@ require_once __DIR__ . "/../includes/resident_access_guard.php";
                         <img src="../../icons/dashboard/residential.png" class="certificate-icon" alt="For Residential Permit">
                         <h3>FOR RESIDENTIAL PERMIT</h3>
                         <p class="certificate-text">Apply for barangay clearance required for residential permit processing.</p>
-                        <button class="btn apply-btn" onclick="location.href='ResidentialForm.php'">Apply Now</button>
+                        <button class="btn apply-btn" type="button" disabled title="Currently unavailable">Apply Now</button>
                     </div>
                 </div>
 
@@ -86,7 +86,7 @@ require_once __DIR__ . "/../includes/resident_access_guard.php";
                         <img src="../../icons/dashboard/commercial.png" class="certificate-icon" alt="For Commercial Permit">
                         <h3>FOR COMMERCIAL PERMIT</h3>
                         <p class="certificate-text">Apply for barangay clearance required for commercial permit processing.</p>
-                        <button class="btn apply-btn" onclick="location.href='CommercialForm.php'">Apply Now</button>
+                        <button class="btn apply-btn" type="button" disabled title="Currently unavailable">Apply Now</button>
                     </div>
                 </div>
 

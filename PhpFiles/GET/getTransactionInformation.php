@@ -71,16 +71,37 @@ if ($requestId === '') {
     ti_json(422, ['success' => false, 'message' => 'Missing request_id.']);
 }
 
+$statusColumn = dr_request_status_column($conn);
+if ($statusColumn === null) {
+    ti_json(500, ['success' => false, 'message' => 'Missing status column in documentrequesttbl.']);
+}
+
+$selectResidentUserId = dr_column_exists($conn, 'documentrequesttbl', 'resident_user_id')
+    ? 'resident_user_id'
+    : "'' AS resident_user_id";
+$selectRequestDetails = dr_column_exists($conn, 'documentrequesttbl', 'request_details')
+    ? 'request_details'
+    : "'{}' AS request_details";
+$selectRequestTimestamp = dr_column_exists($conn, 'documentrequesttbl', 'request_timestamp')
+    ? 'request_timestamp'
+    : (dr_column_exists($conn, 'documentrequesttbl', 'created_at') ? 'created_at AS request_timestamp' : "'' AS request_timestamp");
+$selectDocumentValidity = dr_column_exists($conn, 'documentrequesttbl', 'document_validity')
+    ? 'document_validity'
+    : "'' AS document_validity";
+$selectReleaseTimestamp = dr_column_exists($conn, 'documentrequesttbl', 'release_timestamp')
+    ? 'release_timestamp'
+    : (dr_column_exists($conn, 'documentrequesttbl', 'ready_at') ? 'ready_at AS release_timestamp' : "'' AS release_timestamp");
+
 $stmt = $conn->prepare("
     SELECT
         request_id,
-        resident_user_id,
-        request_details,
-        status_id_request,
-        (SELECT sl.status_name FROM statuslookuptbl sl WHERE sl.status_id = documentrequesttbl.status_id_request LIMIT 1) AS status_lookup_name,
-        request_timestamp,
-        document_validity,
-        release_timestamp
+        {$selectResidentUserId},
+        {$selectRequestDetails},
+        {$statusColumn} AS status_id_request,
+        (SELECT sl.status_name FROM statuslookuptbl sl WHERE sl.status_id = documentrequesttbl.{$statusColumn} LIMIT 1) AS status_lookup_name,
+        {$selectRequestTimestamp},
+        {$selectDocumentValidity},
+        {$selectReleaseTimestamp}
     FROM documentrequesttbl
     WHERE request_id = ?
     LIMIT 1

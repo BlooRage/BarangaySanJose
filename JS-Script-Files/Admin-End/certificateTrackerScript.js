@@ -60,9 +60,11 @@
   let viewDetailsHtml = '';
   let viewPreviewState = null;
   let currentViewRequestId = '';
+  let currentViewStage = '';
   let actionReturnTarget = '';
   let suppressActionReturn = false;
   let openPreviewAfterActionModal = false;
+  let openViewDirectPreview = false;
   let paymentProofReturnTarget = '';
   let preserveViewStateOnNextHide = false;
   const financeStages = new Set(['for_payment', 'payment_submitted']);
@@ -95,10 +97,15 @@
 
   function actionButtons(row) {
     const viewBtn = `<button class="btn btn-sm btn-outline-secondary me-1" data-view-id="${esc(row.request_id)}">View</button>`;
+    const viewIssuedBtn = String(row.stage || '').toLowerCase() === 'completed'
+      ? `<button class="btn btn-sm btn-outline-success me-1" data-issued-id="${esc(row.request_id)}">View Document</button>`
+      : '';
+    const viewDocBtn = String(row.stage || '').toLowerCase() === 'ready_for_claim'
+      : '';
     const proofBtn = row.payment_proof_path
       ? `<button class="btn btn-sm btn-outline-dark me-1" data-proof-id="${esc(row.request_id)}">View Payment</button>`
       : '';
-    return `${viewBtn}${proofBtn}`;
+    return `${viewBtn}${viewDocBtn}${viewIssuedBtn}${proofBtn}`;
   }
 
   function viewModalActionButtons(row) {
@@ -131,7 +138,7 @@
     if (stage === 'ready_for_claim') {
       return `
         ${proofBtn}
-        <button class="btn btn-sm btn-dark" data-view-action="mark_completed" data-id="${id}">Mark Completed</button>
+        <button class="btn btn-sm btn-dark w-100" data-view-action="mark_completed" data-id="${id}">Release Document (Mark as Complete)</button>
       `;
     }
     return proofBtn || '<span class="text-muted small">No actions</span>';
@@ -596,15 +603,30 @@
     if (viewMode === 'preview') {
       viewDetailsBody.innerHTML = renderDocumentPreview(viewPreviewState);
       bindPreviewEditHandlers();
+      const stageKey = String(currentViewStage || '').toLowerCase();
+      const submittedFlow = stageKey === 'submitted';
+      const releaseFlow = stageKey === 'ready_for_claim';
       viewModalBackBtn?.classList.remove('d-none');
       if (viewModalBackBtn) {
-        viewModalBackBtn.textContent = 'Cancel';
+        viewModalBackBtn.textContent = submittedFlow ? 'Cancel' : 'Back';
       }
       if (viewModalNextBtn) {
-        viewModalNextBtn.textContent = 'Save and Approve';
-        viewModalNextBtn.classList.remove('d-none', 'btn-primary');
-        viewModalNextBtn.classList.add('btn-success');
-        viewModalNextBtn.disabled = false;
+        if (submittedFlow) {
+          viewModalNextBtn.textContent = 'Save and Approve';
+          viewModalNextBtn.classList.remove('d-none', 'btn-primary');
+          viewModalNextBtn.classList.add('btn-success');
+          viewModalNextBtn.disabled = false;
+        } else if (releaseFlow) {
+          viewModalNextBtn.textContent = 'Mark as Complete / Release';
+          viewModalNextBtn.classList.remove('d-none', 'btn-primary');
+          viewModalNextBtn.classList.add('btn-success');
+          viewModalNextBtn.disabled = false;
+        } else {
+          viewModalNextBtn.textContent = 'Next';
+          viewModalNextBtn.classList.remove('btn-success');
+          viewModalNextBtn.classList.add('btn-primary', 'd-none');
+          viewModalNextBtn.disabled = true;
+        }
       }
       return;
     }
@@ -896,7 +918,18 @@
     }
     paymentProofOpenNew.href = docUrl;
     const lower = String(docUrl).toLowerCase();
-    if (lower.endsWith('.pdf')) {
+    let forcePdf = lower.endsWith('.pdf');
+    try {
+      const u = new URL(docUrl, window.location.origin);
+      const action = String(u.searchParams.get('action') || '').toLowerCase();
+      if (action === 'view_issued') {
+        forcePdf = true;
+      }
+    } catch (_) {
+      // keep extension-based fallback
+    }
+
+    if (forcePdf) {
       paymentProofWrap.innerHTML = `<iframe src="${docUrl}" style="width:100%;height:70vh;border:1px solid #ddd;border-radius:8px;"></iframe>`;
     } else {
       paymentProofWrap.innerHTML = `<img src="${docUrl}" alt="Document Preview" style="max-width:100%;max-height:70vh;border:1px solid #ddd;border-radius:8px;">`;
@@ -1063,11 +1096,13 @@
     actionIssued.value = '';
     if (actionCancelBtn) {
       actionCancelBtn.textContent = 'Return';
+      actionCancelBtn.disabled = false;
     }
     if (actionSubmitBtn) {
       actionSubmitBtn.textContent = 'Submit';
       actionSubmitBtn.classList.remove('btn-danger', 'btn-success');
       actionSubmitBtn.classList.add('btn-primary');
+      actionSubmitBtn.disabled = false;
     }
     actionForm?.querySelector('.modal-footer')?.classList.remove('action-split');
   }
@@ -1096,10 +1131,12 @@
 
     const labels = {
       personnel_approve: 'Before You Approve',
+      personnel_approve_confirm: 'Confirm Approval',
       personnel_reject: 'Reject Request',
       finance_verify: 'Verify Payment',
       finance_reject: 'Reject Payment',
       mark_ready: 'Mark Ready for Claim',
+      mark_completed_confirm: 'Confirm Release',
       mark_completed: 'Mark Completed'
     };
     modalTitle.textContent = labels[type] || 'Update Request';
@@ -1107,6 +1144,14 @@
 
     if (type === 'personnel_approve' && actionPrompt) {
       actionPrompt.textContent = 'Click the view the document to check the document that will be issued and edit it if there are necessary changes in the details. Once everything is correct, proceed to verify the Certificate Of Indigency.';
+      actionPrompt.classList.remove('d-none');
+    }
+    if (type === 'personnel_approve_confirm' && actionPrompt) {
+      actionPrompt.textContent = `Please confirm that you thoroughly checked the resident's data to issue a ${docName}.`;
+      actionPrompt.classList.remove('d-none');
+    }
+    if (type === 'mark_completed_confirm' && actionPrompt) {
+      actionPrompt.textContent = 'Are you sure you want to release this document and mark this request as completed?';
       actionPrompt.classList.remove('d-none');
     }
     if ((type === 'personnel_reject' || type === 'finance_reject') && actionPrompt) {
@@ -1118,13 +1163,26 @@
         actionSubmitBtn.textContent = 'View Document (Next)';
         actionSubmitBtn.classList.remove('btn-danger', 'btn-success');
         actionSubmitBtn.classList.add('btn-primary');
+      } else if (type === 'personnel_approve_confirm') {
+        actionSubmitBtn.textContent = 'Approve';
+        actionSubmitBtn.classList.remove('btn-danger', 'btn-primary');
+        actionSubmitBtn.classList.add('btn-success');
+      } else if (type === 'mark_completed_confirm') {
+        actionSubmitBtn.textContent = 'Release';
+        actionSubmitBtn.classList.remove('btn-danger', 'btn-primary');
+        actionSubmitBtn.classList.add('btn-success');
       } else if (type === 'personnel_reject') {
         actionSubmitBtn.textContent = 'Reject';
         actionSubmitBtn.classList.remove('btn-primary', 'btn-success');
         actionSubmitBtn.classList.add('btn-danger');
       }
     }
-    if (type === 'personnel_approve' || type === 'personnel_reject') {
+    if (
+      type === 'personnel_approve' ||
+      type === 'personnel_approve_confirm' ||
+      type === 'personnel_reject' ||
+      type === 'mark_completed_confirm'
+    ) {
       actionForm?.querySelector('.modal-footer')?.classList.add('action-split');
     }
 
@@ -1414,6 +1472,7 @@
         if (viewModalTitle) {
           const requestId = String(row.request_id || '').trim();
           currentViewRequestId = requestId;
+          currentViewStage = String(row.stage || '').toLowerCase();
           viewModalTitle.textContent = requestId ? `Certificate Request (#${requestId})` : 'Certificate Request';
         }
         if (viewModalActions) {
@@ -1421,7 +1480,13 @@
         }
         viewDetailsBody.querySelectorAll('.tracker-status-actions button[data-view-action][data-id]').forEach((actionBtn) => {
           actionBtn.addEventListener('click', () => {
-            openActionModal(actionBtn.getAttribute('data-view-action') || '', actionBtn.getAttribute('data-id') || '');
+            const action = String(actionBtn.getAttribute('data-view-action') || '').trim();
+            const actionId = String(actionBtn.getAttribute('data-id') || '').trim();
+            if (action === 'mark_completed') {
+              openActionModal('mark_completed_confirm', actionId);
+              return;
+            }
+            openActionModal(action, actionId);
           });
         });
         viewDetailsBody.querySelectorAll('.tracker-status-actions button[data-proof-id]').forEach((proofBtn) => {
@@ -1458,7 +1523,32 @@
             );
           });
         });
+        if (openViewDirectPreview) {
+          switchViewMode('preview');
+          openViewDirectPreview = false;
+        }
         viewModal.show();
+      });
+    });
+
+    tableBody.querySelectorAll('button[data-preview-id]').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const id = String(btn.getAttribute('data-preview-id') || '');
+        if (!id) return;
+        const viewBtn = Array.from(tableBody.querySelectorAll('button[data-view-id]'))
+          .find((candidate) => String(candidate.getAttribute('data-view-id') || '') === id);
+        if (!viewBtn) return;
+        openViewDirectPreview = true;
+        viewBtn.click();
+      });
+    });
+
+    tableBody.querySelectorAll('button[data-issued-id]').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const id = String(btn.getAttribute('data-issued-id') || '');
+        if (!id) return;
+        const issuedUrl = `${appBase}/PhpFiles/Admin-End/documentRequestWorkflow.php?action=view_issued&request_id=${encodeURIComponent(id)}`;
+        openDocumentModal(issuedUrl, 'Issued Document (PDF)', '');
       });
     });
 
@@ -1481,14 +1571,26 @@
 
     if ((actionType.value || '') === 'personnel_approve') {
       // "View Document (Next)" only opens preview; it does not approve yet.
+      if (actionSubmitBtn) {
+        actionSubmitBtn.disabled = true;
+        actionSubmitBtn.textContent = 'Opening Document...';
+      }
+      if (actionCancelBtn) {
+        actionCancelBtn.disabled = true;
+      }
       suppressActionReturn = true;
       openPreviewAfterActionModal = true;
       actionModal.hide();
       return;
     }
 
+    const currentAction = String(actionType.value || '');
+    const apiAction = currentAction === 'personnel_approve_confirm'
+      ? 'personnel_approve'
+      : (currentAction === 'mark_completed_confirm' ? 'mark_completed' : currentAction);
+
     const fd = new FormData();
-    fd.append('action', actionType.value || '');
+    fd.append('action', apiAction);
     fd.append('request_id', actionRequestId.value || '');
 
     if (actionReasonWrap && !actionReasonWrap.classList.contains('d-none')) {
@@ -1503,6 +1605,18 @@
     if (actionIssuedWrap && !actionIssuedWrap.classList.contains('d-none') && actionIssued.files?.[0]) {
       fd.append('issued_file', actionIssued.files[0]);
     }
+    if (currentAction === 'personnel_approve_confirm' && viewPreviewState && typeof viewPreviewState === 'object') {
+      fd.append('edited_preview', JSON.stringify(viewPreviewState));
+    }
+
+    const prevSubmitLabel = actionSubmitBtn ? actionSubmitBtn.textContent : '';
+    if (actionSubmitBtn) {
+      actionSubmitBtn.disabled = true;
+      actionSubmitBtn.textContent = 'Processing...';
+    }
+    if (actionCancelBtn) {
+      actionCancelBtn.disabled = true;
+    }
 
     try {
       const data = await fetchJson(endpoint, {
@@ -1515,6 +1629,13 @@
       actionModal.hide();
       await load();
     } catch (err) {
+      if (actionSubmitBtn) {
+        actionSubmitBtn.disabled = false;
+        actionSubmitBtn.textContent = prevSubmitLabel || 'Submit';
+      }
+      if (actionCancelBtn) {
+        actionCancelBtn.disabled = false;
+      }
       modalError.textContent = err.message || String(err);
       modalError.classList.remove('d-none');
     }
@@ -1579,22 +1700,15 @@
     if (viewMode === 'preview') {
       const rid = String(currentViewRequestId || '').trim();
       if (!rid) return;
-      const fd = new FormData();
-      fd.append('action', 'personnel_approve');
-      fd.append('request_id', rid);
-      viewModalNextBtn.disabled = true;
-      fetchJson(endpoint, { method: 'POST', body: fd })
-        .then((data) => {
-          if (!data.success) throw new Error(data.message || 'Unable to approve request.');
-          viewModal.hide();
-          return load();
-        })
-        .catch((err) => {
-          alert(err.message || String(err));
-        })
-        .finally(() => {
-          if (viewModalNextBtn) viewModalNextBtn.disabled = false;
-        });
+      const stageKey = String(currentViewStage || '').toLowerCase();
+      if (stageKey === 'ready_for_claim') {
+        openActionModal('mark_completed_confirm', rid);
+        return;
+      }
+      if (stageKey !== 'submitted') {
+        return;
+      }
+      openActionModal('personnel_approve_confirm', rid);
       return;
     }
     switchViewMode('preview');
@@ -1612,6 +1726,8 @@
     viewDetailsHtml = '';
     viewPreviewState = null;
     currentViewRequestId = '';
+    currentViewStage = '';
+    openViewDirectPreview = false;
     switchViewMode('details');
   });
 
