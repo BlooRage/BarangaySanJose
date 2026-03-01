@@ -94,7 +94,7 @@ $fullAddress = htmlspecialchars(implode(', ', $fullAddressParts), ENT_QUOTES, 'U
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Application for Barangay Clearance for Electrical Permit - Barangay San Jose</title>
+    <title>Barangay Clearance for Electrical Permit - Barangay San Jose</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons/font/bootstrap-icons.css" rel="stylesheet" />
@@ -115,21 +115,6 @@ $fullAddress = htmlspecialchars(implode(', ', $fullAddressParts), ENT_QUOTES, 'U
 
             <form action="#" method="POST">
                 <h2 class="section-title text-center text-dark">Applicant Information</h2>
-                 <div class="form-row">
-                    <div class="full-width">
-                        <div class="d-flex align-items-center justify-content-start gap-3 app-type-row">
-                            <p class="if-building-note mb-0">APPLICATION TYPE:</p>
-                            <div class="check-item">
-                                <input type="radio" id="app_new" name="application_type" value="New" class="clearance-radio" required>
-                                <label class="app-type-label" for="app_new">New Application</label>
-                            </div>
-                            <div class="check-item">
-                                <input type="radio" id="app_renewal" name="application_type" value="Renewal" class="clearance-radio" required>
-                                <label class="app-type-label" for="app_renewal">Renewal</label>
-                            </div>
-                        </div>
-                    </div>
-                </div>
                 <div class="form-row">
                     <div class="input-stack"><label class="top-label">Last Name <span class="required-asterisk">*</span></label><input type="text" name="applicant_last_name" required readonly value="<?php echo $lastName; ?>"></div>
                     <div class="input-stack"><label class="top-label">First Name <span class="required-asterisk">*</span></label><input type="text" name="applicant_first_name" required readonly value="<?php echo $firstName; ?>"></div>
@@ -149,43 +134,80 @@ $fullAddress = htmlspecialchars(implode(', ', $fullAddressParts), ENT_QUOTES, 'U
                 <div class="form-row">
                     <div class="full-width">
                         <div class="input-stack">
-                            <label class="top-label">Full Address <span class="required-asterisk">*</span></label>
+                            <label class="top-label">Address <span class="required-asterisk">*</span></label>
                             <input type="text" name="applicant_full_address" readonly value="<?php echo $fullAddress; ?>">
+                            <input type="hidden" id="applicantUnitNumber" value="<?php echo htmlspecialchars($unitNumber, ENT_QUOTES, 'UTF-8'); ?>">
+                            <input type="hidden" id="applicantStreetNumber" value="<?php echo htmlspecialchars($streetNumber, ENT_QUOTES, 'UTF-8'); ?>">
+                            <input type="hidden" id="applicantStreetName" value="<?php echo htmlspecialchars($streetName, ENT_QUOTES, 'UTF-8'); ?>">
+                            <input type="hidden" id="applicantSubdivision" value="<?php echo htmlspecialchars($subdivision, ENT_QUOTES, 'UTF-8'); ?>">
+                            <input type="hidden" id="applicantFullAddress" value="<?php echo $fullAddress; ?>">
                         </div>
                     </div>
                 </div>
 
                 <h2 class="section-title text-center text-dark">Lot Location</h2>
-                <div class="form-row">
-                    <div class="input-stack"><label class="top-label">Lot Number </label><input type="text" name="lot_number"></div>
-                    <div class="input-stack"><label class="top-label">Block Number </label><input type="text" name="block_number"></div>
-                    <div class="input-stack">
-                        <label class="top-label">TCT Number <span class="required-asterisk">*</span></label>
-                        <input type="text" name="tct_number" id="tct_number" required title="Format: TCT/T + 5-10 digits (e.g., TCT-12345)">
-                        <div id="tct_number_error" class="text-danger small d-none">Invalid TCT number</div>
-                    </div>
-                    <div class="input-stack">
-                        <label class="top-label">Tax Declaration Number <span class="required-asterisk">*</span></label>
-                        <input type="text" name="tax_declaration_number" id="tax_declaration_number" required title="Format: TD + 3-10 digits, optional -digits suffix (e.g., TD-123456-01)">
-                        <div id="tax_declaration_number_error" class="text-danger small d-none">Invalid Tax Declaration number</div>
+                <div id="lotAddressSystemRow" class="form-row">
+                    <div class="full-width">
+                        <div class="input-stack">
+                            <label class="top-label" for="lotAddressSystem">Address System <span class="required-asterisk">*</span></label>
+                            <select id="lotAddressSystem" name="lot_address_system" class="form-select w-100" required>
+                                <option value="">Select</option>
+                                <option value="house">House Numbering System</option>
+                                <option value="lot_block">Lot/Block System</option>
+                            </select>
+                        </div>
                     </div>
                 </div>
                 <div class="form-row">
                     <div class="full-width">
-                        <div class="row mb-3">
-                            <div class="col-md-4">
-                                <label class="top-label" for="lot_street_number">Street Number <span class="required-asterisk">*</span></label>
-                                <input type="text" id="lot_street_number" name="lot_street_number" required>
-                            </div>
-                            <div class="col-md-4">
-                                <label class="top-label" for="lot_street_name">Street Name <span class="required-asterisk">*</span></label>
-                                <input type="text" id="lot_street_name" name="lot_street_name" required>
-                            </div>
-                            <div class="col-md-4">
-                                <label class="top-label" for="lot_subdivision">Subdivision <span class="required-asterisk">*</span></label>
-                                <input type="text" id="lot_subdivision" name="lot_subdivision" required>
-                            </div>
+                        <div class="beneficiary-block">
+                            <label class="top-label check-item">
+                                <input type="checkbox" id="lotSameAddress" name="lot_same_address">
+                                <span>Same address as applicant</span>
+                            </label>
                         </div>
+                    </div>
+                </div>
+                <div id="lotFullAddressWrapper" class="form-row d-none">
+                    <div class="full-width">
+                        <label class="top-label">Address Details (Same as Applicant) <span class="required-asterisk">*</span></label>
+                        <input type="text" class="form-control" id="lotFullAddress" readonly value="<?php echo $fullAddress; ?>">
+                    </div>
+                </div>
+                <div id="lotHouseSystemWrapper" class="form-row pt-0 d-none">
+                    <div class="input-stack">
+                        <label class="top-label" for="lot_unit_number">Unit / Apartment Number</label>
+                        <input type="text" id="lot_unit_number" name="lot_unit_number">
+                    </div>
+                    <div class="input-stack">
+                        <label class="top-label" for="lot_street_number">Street Number <span class="required-asterisk">*</span></label>
+                        <input type="text" id="lot_street_number" name="lot_street_number">
+                    </div>
+                    <div class="input-stack">
+                        <label class="top-label" for="lot_street_name">Street Name <span class="required-asterisk">*</span></label>
+                        <input type="text" id="lot_street_name" name="lot_street_name">
+                    </div>
+                    <div class="input-stack">
+                        <label class="top-label" for="lot_subdivision">Subdivision</label>
+                        <input type="text" id="lot_subdivision" name="lot_subdivision">
+                    </div>
+                </div>
+                <div id="lotBlockSystemWrapper" class="form-row pt-0 d-none">
+                    <div class="input-stack">
+                        <label class="top-label" for="lot_number">Lot Number <span class="required-asterisk">*</span></label>
+                        <input type="text" id="lot_number" name="lot_number">
+                    </div>
+                    <div class="input-stack">
+                        <label class="top-label" for="block_number">Block Number <span class="required-asterisk">*</span></label>
+                        <input type="text" id="block_number" name="block_number">
+                    </div>
+                    <div class="input-stack">
+                        <label class="top-label" for="lot_phase_number">Phase <span class="required-asterisk">*</span></label>
+                        <input type="text" id="lot_phase_number" name="lot_phase_number">
+                    </div>
+                    <div class="input-stack">
+                        <label class="top-label" for="lot_subdivision_block">Subdivision</label>
+                        <input type="text" id="lot_subdivision_block" name="lot_subdivision">
                     </div>
                 </div>
                 <div class="form-row">
@@ -202,27 +224,6 @@ $fullAddress = htmlspecialchars(implode(', ', $fullAddressParts), ENT_QUOTES, 'U
                             <div class="col-md-4">
                                 <label class="top-label" for="lot_province">Province</label>
                                 <input type="text" id="lot_province" name="lot_province" readonly value="Rizal">
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <h2 class="section-title text-center text-dark">Meralco Details</h2>
-                <div class="form-row">
-                    <div class="full-width">
-                        <div class="row mb-3">
-                            <div class="col-md-6">
-                                <label class="top-label" for="meralco_business_center">Meralco Business Center<span class="required-asterisk">*</span></label>
-                                <select id="meralco_business_center" name="meralco_business_center" required>
-                                    <option value="">Select</option>
-                                    <option value="Rodriguez Extension Office">Rodriguez Extension Office</option>
-                                    <option value="Marikina Branch">Marikina Branch</option>
-                                    <option value="Commonwealth Branch">Commonwealth Branch</option>
-                                </select>
-                            </div>
-                            <div class="col-md-6">
-                                <label class="top-label" for="meralco_case_number">Meralco Case Number<span class="required-asterisk">*</span></label>
-                                <input type="text" id="meralco_case_number" name="meralco_case_number" required>
                             </div>
                         </div>
                     </div>
@@ -266,42 +267,11 @@ $fullAddress = htmlspecialchars(implode(', ', $fullAddressParts), ENT_QUOTES, 'U
                     <div class="input-stack"><label class="top-label">Suffix</label><input type="text" name="land_owner_suffix"></div>
                 </div>
 
-                <div id="documentUploadSection" class="d-none">
+                <div id="documentUploadSection">
                     <h2 class="section-title text-center text-dark">Document Upload</h2>
                     <div class="form-row">
                         <div class="full-width">
-                            <div class="row mb-3">
-                                <div class="col-md-6">
-                                    <label class="top-label" for="fireSafetyFile">Fire Safety Clearance from BFP <span class="required-asterisk">*</span></label>
-                                    <input type="file" id="fireSafetyFile" name="fire_safety_file" class="form-control" accept=".pdf,.jpg,.jpeg,.png">
-                                </div>
-                                <div class="col-md-6">
-                                    <label class="top-label" for="fireSafetyOrNumber">O.R. Number <span class="required-asterisk">*</span></label>
-                                    <input type="text" id="fireSafetyOrNumber" name="fire_safety_or_number" placeholder="Enter O.R. number">
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="form-row two-col-row">
-                        <div>
-                            <label class="top-label" for="meralcoYellowFrontFile">Yellow Card from Meralco (Front) <span class="required-asterisk">*</span></label>
-                            <label class="upload-dropzone" id="meralcoYellowFrontDropzone" for="meralcoYellowFrontFile">
-                                <i class="fa-solid fa-cloud-arrow-up"></i>
-                                <span>Drag files here or click to upload</span>
-                                <small>Accepted: PDF, JPG, JPEG, PNG</small>
-                            </label>
-                            <input type="file" id="meralcoYellowFrontFile" name="meralco_yellow_front_file" class="visually-hidden" accept=".pdf,.jpg,.jpeg,.png">
-                            <div id="meralcoYellowFrontSelected" class="selected-files small text-muted mt-2"></div>
-                        </div>
-                        <div>
-                            <label class="top-label" for="meralcoYellowBackFile">Yellow Card from Meralco (Back) <span class="required-asterisk">*</span></label>
-                            <label class="upload-dropzone" id="meralcoYellowBackDropzone" for="meralcoYellowBackFile">
-                                <i class="fa-solid fa-cloud-arrow-up"></i>
-                                <span>Drag files here or click to upload</span>
-                                <small>Accepted: PDF, JPG, JPEG, PNG</small>
-                            </label>
-                            <input type="file" id="meralcoYellowBackFile" name="meralco_yellow_back_file" class="visually-hidden" accept=".pdf,.jpg,.jpeg,.png">
-                            <div id="meralcoYellowBackSelected" class="selected-files small text-muted mt-2"></div>
+                            <p class="text-muted mb-0">Document upload requirements will appear here.</p>
                         </div>
                     </div>
                 </div>

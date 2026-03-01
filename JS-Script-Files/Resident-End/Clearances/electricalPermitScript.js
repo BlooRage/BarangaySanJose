@@ -2,95 +2,116 @@ document.addEventListener("DOMContentLoaded", () => {
     const form = document.querySelector("form");
     const submitBtn = form?.querySelector(".submit-btn");
     const landOwnerDetails = document.getElementById("landOwnerDetails");
-    const appNew = document.getElementById("app_new");
     const documentUploadSection = document.getElementById("documentUploadSection");
-    const fireSafetyFile = document.getElementById("fireSafetyFile");
-    const fireSafetyOrNumber = document.getElementById("fireSafetyOrNumber");
-    const meralcoYellowFrontFile = document.getElementById("meralcoYellowFrontFile");
-    const meralcoYellowBackFile = document.getElementById("meralcoYellowBackFile");
-    const meralcoYellowFrontDropzone = document.getElementById("meralcoYellowFrontDropzone");
-    const meralcoYellowBackDropzone = document.getElementById("meralcoYellowBackDropzone");
-    const meralcoYellowFrontSelected = document.getElementById("meralcoYellowFrontSelected");
-    const meralcoYellowBackSelected = document.getElementById("meralcoYellowBackSelected");
-    const tctNumberInput = document.getElementById("tct_number");
-    const taxDeclarationInput = document.getElementById("tax_declaration_number");
-    const tctError = document.getElementById("tct_number_error");
-    const taxError = document.getElementById("tax_declaration_number_error");
-    const tctRegex = /^(TCT|T)?\d{5,10}$/i;
-    const taxRegex = /^(TD)?\d{3,10}\d{0,5}$/i;
-    const normalizeId = (value) => value.replace(/[\s-]+/g, "");
+    const lotAddressSystemRow = document.getElementById("lotAddressSystemRow");
+    const lotAddressSystem = document.getElementById("lotAddressSystem");
+    const lotSameAddress = document.getElementById("lotSameAddress");
+    const lotFullAddressWrapper = document.getElementById("lotFullAddressWrapper");
+    const lotFullAddress = document.getElementById("lotFullAddress");
+    const lotHouseWrapper = document.getElementById("lotHouseSystemWrapper");
+    const lotBlockWrapper = document.getElementById("lotBlockSystemWrapper");
+    const lotUnitNumber = document.getElementById("lot_unit_number");
+    const lotStreetNumber = document.getElementById("lot_street_number");
+    const lotStreetName = document.getElementById("lot_street_name");
+    const lotSubdivisionHouse = document.getElementById("lot_subdivision");
+    const lotNumber = document.getElementById("lot_number");
+    const blockNumber = document.getElementById("block_number");
+    const lotPhaseNumber = document.getElementById("lot_phase_number");
+    const lotSubdivisionBlock = document.getElementById("lot_subdivision_block");
+    const applicantUnitNumber = document.getElementById("applicantUnitNumber");
+    const applicantStreetNumber = document.getElementById("applicantStreetNumber");
+    const applicantStreetName = document.getElementById("applicantStreetName");
+    const applicantSubdivision = document.getElementById("applicantSubdivision");
+    const applicantFullAddress = document.getElementById("applicantFullAddress");
     if (!form || !submitBtn) return;
 
-    const renderFile = (inputEl, outputEl) => {
-        if (!inputEl || !outputEl) return;
-        const names = Array.from(inputEl.files || []).map((file) => file.name);
-        outputEl.textContent = names.length ? `Selected: ${names.join(", ")}` : "No file selected";
-    };
-
-    const bindDropzone = (dropzone, inputEl, outputEl) => {
-        if (!dropzone || !inputEl || !outputEl) return;
-        ["dragenter", "dragover"].forEach((eventName) => {
-            dropzone.addEventListener(eventName, (e) => {
-                e.preventDefault();
-                dropzone.classList.add("is-dragging");
-            });
-        });
-
-        ["dragleave", "drop"].forEach((eventName) => {
-            dropzone.addEventListener(eventName, (e) => {
-                e.preventDefault();
-                dropzone.classList.remove("is-dragging");
-            });
-        });
-
-        dropzone.addEventListener("drop", (e) => {
-            const dt = e.dataTransfer;
-            if (dt && dt.files && dt.files.length) {
-                inputEl.files = dt.files;
-                renderFile(inputEl, outputEl);
-                updateState();
+    const setWrapperState = (wrapper, enabled) => {
+        if (!wrapper) return;
+        wrapper.classList.toggle("d-none", !enabled);
+        wrapper.querySelectorAll("input, select").forEach((el) => {
+            el.disabled = !enabled;
+            if (!enabled) {
+                el.value = "";
+                if (el.type === "checkbox" || el.type === "radio") el.checked = false;
             }
         });
+    };
+
+    const setRequired = (el, required) => {
+        if (!el) return;
+        if (required) el.setAttribute("required", "required");
+        else el.removeAttribute("required");
+    };
+
+    const setReadOnly = (el, isReadOnly) => {
+        if (!el) return;
+        el.readOnly = isReadOnly;
+        if (isReadOnly) {
+            el.classList.add("text-bg-light");
+        } else {
+            el.classList.remove("text-bg-light");
+        }
+    };
+
+    const applyLotAddressSystem = () => {
+        const val = lotAddressSystem ? lotAddressSystem.value : "";
+        setWrapperState(lotHouseWrapper, val === "house");
+        setWrapperState(lotBlockWrapper, val === "lot_block");
+
+        setRequired(lotStreetNumber, val === "house");
+        setRequired(lotStreetName, val === "house");
+        setRequired(lotSubdivisionHouse, false);
+        setRequired(lotNumber, val === "lot_block");
+        setRequired(blockNumber, val === "lot_block");
+        setRequired(lotPhaseNumber, val === "lot_block");
+        setRequired(lotSubdivisionBlock, false);
+    };
+
+    const syncLotAddress = () => {
+        if (!lotSameAddress || !lotAddressSystem) return;
+        const useApplicant = lotSameAddress.checked;
+
+        if (useApplicant) {
+            if (lotAddressSystemRow) {
+                lotAddressSystemRow.classList.add("d-none");
+            }
+            if (lotFullAddressWrapper) {
+                lotFullAddressWrapper.classList.remove("d-none");
+            }
+            lotAddressSystem.value = "house";
+            if (lotFullAddress && applicantFullAddress) {
+                lotFullAddress.value = applicantFullAddress.value || lotFullAddress.value || "";
+            }
+            if (lotUnitNumber && applicantUnitNumber) {
+                lotUnitNumber.value = applicantUnitNumber.value || "";
+            }
+            if (lotStreetNumber && applicantStreetNumber) {
+                lotStreetNumber.value = applicantStreetNumber.value || "";
+            }
+            if (lotStreetName && applicantStreetName) {
+                lotStreetName.value = applicantStreetName.value || "";
+            }
+            if (lotSubdivisionHouse && applicantSubdivision) {
+                lotSubdivisionHouse.value = applicantSubdivision.value || "";
+            }
+        } else {
+            if (lotAddressSystemRow) {
+                lotAddressSystemRow.classList.remove("d-none");
+            }
+            if (lotFullAddressWrapper) {
+                lotFullAddressWrapper.classList.add("d-none");
+            }
+            lotAddressSystem.value = "";
+        }
+
+        [lotUnitNumber, lotStreetNumber, lotStreetName, lotSubdivisionHouse].forEach((el) =>
+            setReadOnly(el, useApplicant)
+        );
     };
 
     const updateState = () => {
-        const isNewApp = appNew?.checked === true;
         if (documentUploadSection) {
-            documentUploadSection.classList.toggle("d-none", !isNewApp);
-        }
-        if (fireSafetyFile) fireSafetyFile.required = isNewApp;
-        if (fireSafetyOrNumber) fireSafetyOrNumber.required = isNewApp;
-        if (meralcoYellowFrontFile) meralcoYellowFrontFile.required = isNewApp;
-        if (meralcoYellowBackFile) meralcoYellowBackFile.required = isNewApp;
-
-        if (!isNewApp) {
-            if (fireSafetyFile) fireSafetyFile.value = '';
-            if (fireSafetyOrNumber) fireSafetyOrNumber.value = '';
-            if (meralcoYellowFrontFile) meralcoYellowFrontFile.value = '';
-            if (meralcoYellowBackFile) meralcoYellowBackFile.value = '';
-            renderFile(meralcoYellowFrontFile, meralcoYellowFrontSelected);
-            renderFile(meralcoYellowBackFile, meralcoYellowBackSelected);
-        }
-
-        if (tctNumberInput) {
-            const rawValue = tctNumberInput.value.trim();
-            const normalized = normalizeId(rawValue);
-            const hasValue = rawValue !== "";
-            const isInvalid = hasValue && !tctRegex.test(normalized);
-            tctNumberInput.setCustomValidity(isInvalid ? "Invalid TCT number" : "");
-            if (tctError) {
-                tctError.classList.toggle("d-none", !isInvalid);
-            }
-        }
-        if (taxDeclarationInput) {
-            const rawValue = taxDeclarationInput.value.trim();
-            const normalized = normalizeId(rawValue);
-            const hasValue = rawValue !== "";
-            const isInvalid = hasValue && !taxRegex.test(normalized);
-            taxDeclarationInput.setCustomValidity(isInvalid ? "Invalid Tax Declaration number" : "");
-            if (taxError) {
-                taxError.classList.toggle("d-none", !isInvalid);
-            }
+            documentUploadSection.classList.remove("d-none");
         }
         const selected = document.querySelector('input[name="is_land_owner"]:checked');
         const needsOwner = selected?.value === "No";
@@ -100,22 +121,14 @@ document.addEventListener("DOMContentLoaded", () => {
                 input.required = needsOwner && input.name !== "land_owner_middle_name" && input.name !== "land_owner_suffix";
             });
         }
+        syncLotAddress();
+        applyLotAddressSystem();
         submitBtn.disabled = !form.checkValidity();
     };
 
     form.addEventListener("input", updateState);
     form.addEventListener("change", updateState);
-    meralcoYellowFrontFile?.addEventListener("change", () => {
-        renderFile(meralcoYellowFrontFile, meralcoYellowFrontSelected);
-        updateState();
-    });
-    meralcoYellowBackFile?.addEventListener("change", () => {
-        renderFile(meralcoYellowBackFile, meralcoYellowBackSelected);
-        updateState();
-    });
-    bindDropzone(meralcoYellowFrontDropzone, meralcoYellowFrontFile, meralcoYellowFrontSelected);
-    bindDropzone(meralcoYellowBackDropzone, meralcoYellowBackFile, meralcoYellowBackSelected);
+    lotAddressSystem?.addEventListener("change", updateState);
+    lotSameAddress?.addEventListener("change", updateState);
     updateState();
-    renderFile(meralcoYellowFrontFile, meralcoYellowFrontSelected);
-    renderFile(meralcoYellowBackFile, meralcoYellowBackSelected);
 });

@@ -17,6 +17,28 @@ require_once __DIR__ . "/../includes/resident_access_guard.php";
     <link rel="stylesheet" href="../../CSS-Styles/Resident-End-CSS/residentDashboard.css">
     <link rel="stylesheet" href="../../CSS-Styles/Guest-End-CSS/GeneralStyle.css">
     <link rel="stylesheet" href="../../CSS-Styles/Resident-End-CSS/ApplicationLandingPage.css?v=20260228-3">
+    <style>
+        .requirements-top {
+            list-style-type: disc;
+        }
+
+        .requirements-top > li::marker {
+            color: #000;
+            font-size: 1.1em;
+        }
+
+        .requirements-numeric {
+            list-style-type: decimal;
+        }
+
+        .requirements-alpha {
+            list-style-type: lower-alpha;
+        }
+
+        .requirements-square {
+            list-style-type: square;
+        }
+    </style>
 </head>
 
 <body>
@@ -41,7 +63,75 @@ require_once __DIR__ . "/../includes/resident_access_guard.php";
                         <p class="certificate-text">
                             Apply for barangay business clearance for new applications, renewals, and compliance checks.
                         </p>
-                        <button class="btn apply-btn" type="button" disabled title="Currently unavailable">Apply Now</button>
+                        <button
+                            class="btn apply-btn"
+                            type="button"
+                            data-bs-toggle="modal"
+                            data-bs-target="#requirementsModal"
+                            data-title="Business Clearance Requirements"
+                            data-apply-href="BusinessClearanceForm.php"
+                            data-body="
+                                <p class='mb-2'><span class='fw-semibold'>Filing a renewal application is required one (1) year from the issuance date of your permit.</span></p>
+                                <ul class='mb-0 ps-3 requirements-top'>
+                                    <li class='mb-2'>
+                                        New Application
+                                        <ol class='mt-1 ps-3 requirements-numeric'>
+                                            <li>Valid Government-Issued ID</li>
+                                            <li>
+                                                Business Registration
+                                                <ol class='mt-1 ps-3 requirements-alpha'>
+                                                    <li>DTI Certificate for sole proprietorship</li>
+                                                    <li>SEC Certificate for company or partnership</li>
+                                                </ol>
+                                            </li>
+                                            <li>
+                                                Proof of Business Address
+                                                <ol class='mt-1 ps-3 requirements-alpha'>
+                                                    <li>
+                                                        Renter
+                                                        <ul class='mt-1 ps-3 requirements-square'>
+                                                            <li>Contract of Lease</li>
+                                                        </ul>
+                                                    </li>
+                                                    <li>
+                                                        Owner
+                                                        <ul class='mt-1 ps-3 requirements-square'>
+                                                            <li>Transfer Certificate of Title or Tax Declaration</li>
+                                                        </ul>
+                                                    </li>
+                                                </ol>
+                                            </li>
+                                        </ol>
+                                    </li>
+                                    <li class='mb-2'>
+                                        Renewal
+                                        <ol class='mt-1 ps-3 requirements-numeric'>
+                                            <li>Valid Government-Issued ID</li>
+                                            <li>Business Clearance from the previous year</li>
+                                            <li>Updated Community Tax Certificate (Cedula or CTC)</li>
+                                            <li>
+                                                Updated Business Registration
+                                                <ol class='mt-1 ps-3 requirements-alpha'>
+                                                    <li>DTI Certificate for sole proprietorship</li>
+                                                    <li>SEC Certificate for company or partnership</li>
+                                                </ol>
+                                            </li>
+                                        </ol>
+                                    </li>
+                                    <li>
+                                        For Ownership Change
+                                        <ol class='mt-1 ps-3 requirements-numeric'>
+                                            <li>Original Copy of Business Clearance</li>
+                                            <li>Affidavit of Change of Ownership</li>
+                                            <li>Valid ID of Old and New Owner</li>
+                                            <li>Authorization Letter</li>
+                                        </ol>
+                                    </li>
+                                </ul>
+                            "
+                        >
+                            Apply Now
+                        </button>
                     </div>
                 </div>
 
@@ -59,7 +149,45 @@ require_once __DIR__ . "/../includes/resident_access_guard.php";
                         <img src="../../Icons/Dashboard/electricity.png" class="certificate-icon" alt="For Electrical Permit">
                         <h3>FOR ELECTRICAL PERMIT</h3>
                         <p class="certificate-text">Apply for barangay clearance required for electrical permit processing.</p>
-                        <button class="btn apply-btn" type="button" disabled title="Currently unavailable">Apply Now</button>
+                        <button
+                            class="btn apply-btn"
+                            type="button"
+                            data-bs-toggle="modal"
+                            data-bs-target="#requirementsModal"
+                            data-title="Barangay Clearance for Electrical Permit Requirements"
+                            data-apply-href="ElectricalForm.php"
+                            data-body="
+                                <ul class='mb-0 ps-3 requirements-top'>
+                                    <li>
+                                        New Application
+                                        <ol class='mt-1 ps-3 requirements-numeric'>
+                                            <li>Valid Government-Issued ID</li>
+                                            <li>
+                                                Proof of Address, one of the following:
+                                                <ol class='mt-1 ps-3 requirements-alpha'>
+                                                    <li>
+                                                        If the lot title is named to Applicant:
+                                                        <ul class='mt-1 ps-3 requirements-square'>
+                                                            <li>Transfer Certificate of Title</li>
+                                                            <li>Tax Declaration</li>
+                                                        </ul>
+                                                    </li>
+                                                    <li>
+                                                        If the lot title is not named to Applicant:
+                                                        <ul class='mt-1 ps-3 requirements-square'>
+                                                            <li>Transfer Certificate of Title from the title owner with Notarized Deed of Sale</li>
+                                                            <li>Tax Declaration from the title owner with Notarized Deed of Sale</li>
+                                                        </ul>
+                                                    </li>
+                                                </ol>
+                                            </li>
+                                        </ol>
+                                    </li>
+                                </ul>
+                            "
+                        >
+                            Apply Now
+                        </button>
                     </div>
                 </div>
 
@@ -68,7 +196,45 @@ require_once __DIR__ . "/../includes/resident_access_guard.php";
                         <img src="../../Icons/Dashboard/water.png" class="certificate-icon" alt="For Water Permit">
                         <h3>FOR WATER PERMIT</h3>
                         <p class="certificate-text">Apply for barangay clearance required for water permit processing.</p>
-                        <button class="btn apply-btn" onclick="location.href='WaterForm.php'">Apply Now</button>
+                        <button
+                            class="btn apply-btn"
+                            type="button"
+                            data-bs-toggle="modal"
+                            data-bs-target="#requirementsModal"
+                            data-title="Barangay Clearance for Water Permit Requirements"
+                            data-apply-href="WaterForm.php"
+                            data-body="
+                                <ul class='mb-0 ps-3 requirements-top'>
+                                    <li>
+                                        New Application
+                                        <ol class='mt-1 ps-3 requirements-numeric'>
+                                            <li>Valid Government-Issued ID</li>
+                                            <li>
+                                                Proof of Address, one of the following:
+                                                <ol class='mt-1 ps-3 requirements-alpha'>
+                                                    <li>
+                                                        If the lot title is named to Applicant:
+                                                        <ul class='mt-1 ps-3 requirements-square'>
+                                                            <li>Transfer Certificate of Title</li>
+                                                            <li>Tax Declaration</li>
+                                                        </ul>
+                                                    </li>
+                                                    <li>
+                                                        If the lot title is not named to Applicant:
+                                                        <ul class='mt-1 ps-3 requirements-square'>
+                                                            <li>Transfer Certificate of Title from the title owner with Notarized Deed of Sale</li>
+                                                            <li>Tax Declaration from the title owner with Notarized Deed of Sale</li>
+                                                        </ul>
+                                                    </li>
+                                                </ol>
+                                            </li>
+                                        </ol>
+                                    </li>
+                                </ul>
+                            "
+                        >
+                            Apply Now
+                        </button>
                     </div>
                 </div>
 
@@ -102,7 +268,40 @@ require_once __DIR__ . "/../includes/resident_access_guard.php";
         </main>
     </div>
 
+    <div class="modal fade" id="requirementsModal" tabindex="-1" aria-labelledby="requirementsModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-lg modal-dialog-scrollable modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="requirementsModalLabel">Requirements</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body" id="requirementsModalBody"></div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                    <a class="btn btn-primary" id="requirementsProceedBtn" href="#">Proceed to Application</a>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        const requirementsModal = document.getElementById('requirementsModal');
+
+        requirementsModal.addEventListener('show.bs.modal', (event) => {
+            const button = event.relatedTarget;
+            const title = button?.getAttribute('data-title') || 'Requirements';
+            const body = button?.getAttribute('data-body') || '';
+            const applyHref = button?.getAttribute('data-apply-href') || '#';
+            const modalTitle = requirementsModal.querySelector('.modal-title');
+            const modalBody = requirementsModal.querySelector('#requirementsModalBody');
+            const proceedBtn = requirementsModal.querySelector('#requirementsProceedBtn');
+
+            modalTitle.textContent = title;
+            modalBody.innerHTML = body;
+            proceedBtn.setAttribute('href', applyHref);
+        });
+    </script>
 </body>
 
 </html>
