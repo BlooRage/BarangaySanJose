@@ -57,19 +57,33 @@ function dr_respond_json(int $statusCode, array $payload): void {
 }
 
 function dr_column_exists(mysqli $conn, string $table, string $column): bool {
+    static $cache = [];
     $tableSafe = preg_replace('/[^a-zA-Z0-9_]/', '', $table);
     if ($tableSafe === '') {
         return false;
     }
+    $cacheKey = strtolower($tableSafe . '|' . $column);
+    if (array_key_exists($cacheKey, $cache)) {
+        return $cache[$cacheKey];
+    }
     $colEsc = $conn->real_escape_string($column);
     $res = $conn->query("SHOW COLUMNS FROM {$tableSafe} LIKE '{$colEsc}'");
-    return $res instanceof mysqli_result && $res->num_rows > 0;
+    $exists = $res instanceof mysqli_result && $res->num_rows > 0;
+    $cache[$cacheKey] = $exists;
+    return $exists;
 }
 
 function dr_table_exists(mysqli $conn, string $table): bool {
+    static $cache = [];
+    $cacheKey = strtolower($table);
+    if (array_key_exists($cacheKey, $cache)) {
+        return $cache[$cacheKey];
+    }
     $tableEsc = $conn->real_escape_string($table);
     $res = $conn->query("SHOW TABLES LIKE '{$tableEsc}'");
-    return $res instanceof mysqli_result && $res->num_rows > 0;
+    $exists = $res instanceof mysqli_result && $res->num_rows > 0;
+    $cache[$cacheKey] = $exists;
+    return $exists;
 }
 
 function dr_get_column_type(mysqli $conn, string $table, string $column, string $fallback): string {
@@ -364,6 +378,18 @@ function dr_ensure_table(mysqli $conn): void {
     if (!in_array('idx_docreq_attachment_id', $indexNames, true)) {
         $conn->query("ALTER TABLE documentrequesttbl ADD INDEX idx_docreq_attachment_id (attachment_id)");
     }
+    if (dr_column_exists($conn, 'documentrequesttbl', 'request_timestamp') && !in_array('idx_docreq_request_timestamp', $indexNames, true)) {
+        $conn->query("ALTER TABLE documentrequesttbl ADD INDEX idx_docreq_request_timestamp (request_timestamp)");
+    }
+    if (dr_column_exists($conn, 'documentrequesttbl', 'stage') && !in_array('idx_docreq_stage_request_timestamp', $indexNames, true)) {
+        $conn->query("ALTER TABLE documentrequesttbl ADD INDEX idx_docreq_stage_request_timestamp (stage, request_timestamp)");
+    }
+    if (dr_column_exists($conn, 'documentrequesttbl', 'submitted_at') && !in_array('idx_docreq_submitted_at', $indexNames, true)) {
+        $conn->query("ALTER TABLE documentrequesttbl ADD INDEX idx_docreq_submitted_at (submitted_at)");
+    }
+    if (dr_column_exists($conn, 'documentrequesttbl', 'stage') && dr_column_exists($conn, 'documentrequesttbl', 'submitted_at') && !in_array('idx_docreq_stage_submitted_at', $indexNames, true)) {
+        $conn->query("ALTER TABLE documentrequesttbl ADD INDEX idx_docreq_stage_submitted_at (stage, submitted_at)");
+    }
 
     // Backward-compatible rename handling.
     if (!dr_column_exists($conn, 'documentrequesttbl', 'status_id_request') && dr_column_exists($conn, 'documentrequesttbl', 'status_id')) {
@@ -507,8 +533,13 @@ function dr_document_type_name_variants(string $documentType): array {
 }
 
 function dr_get_or_create_document_type_id(mysqli $conn, string $documentType, string $category = 'DocumentRequest'): ?int {
+    static $cache = [];
     $variants = dr_document_type_name_variants($documentType);
     if (!$variants) return null;
+    $cacheKey = strtolower(trim($category)) . '|' . dr_canonical_document_type_key((string)$variants[0]);
+    if (array_key_exists($cacheKey, $cache)) {
+        return $cache[$cacheKey];
+    }
 
     foreach ($variants as $name) {
         $sel = $conn->prepare("SELECT document_type_id FROM documenttypelookuptbl WHERE document_type_name = ? LIMIT 1");
@@ -519,7 +550,8 @@ function dr_get_or_create_document_type_id(mysqli $conn, string $documentType, s
         $ok = $sel->fetch();
         $sel->close();
         if ($ok && $docTypeId) {
-            return (int)$docTypeId;
+            $cache[$cacheKey] = (int)$docTypeId;
+            return $cache[$cacheKey];
         }
     }
 
@@ -531,7 +563,8 @@ function dr_get_or_create_document_type_id(mysqli $conn, string $documentType, s
     $insertId = (int)$ins->insert_id;
     $ins->close();
     if ($okIns && $insertId > 0) {
-        return $insertId;
+        $cache[$cacheKey] = $insertId;
+        return $cache[$cacheKey];
     }
 
     // Race-safe retry.
@@ -544,9 +577,11 @@ function dr_get_or_create_document_type_id(mysqli $conn, string $documentType, s
         $ok = $sel->fetch();
         $sel->close();
         if ($ok && $docTypeId) {
-            return (int)$docTypeId;
+            $cache[$cacheKey] = (int)$docTypeId;
+            return $cache[$cacheKey];
         }
     }
+    $cache[$cacheKey] = null;
     return null;
 }
 
@@ -873,7 +908,7 @@ function dr_request_status_column(mysqli $conn): ?string {
     return null;
 }
 
-function dr_hydrate_request_derived_fields(mysqli $conn, array &$row): void {
+function dr_hydrate_request_derived_fields(mysqli $conn, array &$row, bool $includeIssuanceMeta = true): void {
     $payload = json_decode((string)($row['request_details'] ?? '{}'), true);
     if (!is_array($payload)) {
         $payload = [];
@@ -881,12 +916,19 @@ function dr_hydrate_request_derived_fields(mysqli $conn, array &$row): void {
 
     $requestId = trim((string)($row['request_id'] ?? ''));
     $issuanceMeta = ['certificate_type' => '', 'certificate_number' => '', 'verification_code' => ''];
-    if ($requestId !== '' && dr_table_exists($conn, 'issuancerequesttbl')) {
+    $currentDocType = trim((string)($row['document_type'] ?? ''));
+    $payloadDocType = trim((string)($payload['document_type'] ?? ''));
+    $needsIssuanceMeta = (
+        (trim((string)($row['certificate_number'] ?? '')) === '')
+        || (trim((string)($row['verification_code'] ?? '')) === '')
+        || ($currentDocType === '' && $payloadDocType === '')
+    );
+    if ($includeIssuanceMeta && $needsIssuanceMeta && $requestId !== '' && dr_table_exists($conn, 'issuancerequesttbl')) {
         $issuanceMeta = dr_get_issuance_request_meta($conn, $requestId);
     }
 
-    if (trim((string)($row['document_type'] ?? '')) === '') {
-        $docType = trim((string)($payload['document_type'] ?? ''));
+    if ($currentDocType === '') {
+        $docType = $payloadDocType;
         if ($docType === '') {
             $docType = $issuanceMeta['certificate_type'];
         }
@@ -1926,7 +1968,19 @@ function dr_backfill_missing_issuance_requests(mysqli $conn, int $limit = 1000):
 }
 
 function dr_get_issuance_request_meta(mysqli $conn, string $requestId): array {
+    static $cache = [];
     dr_ensure_certificate_request_table($conn);
+    $rid = trim($requestId);
+    if ($rid === '') {
+        return [
+            'certificate_type' => '',
+            'certificate_number' => '',
+            'verification_code' => '',
+        ];
+    }
+    if (array_key_exists($rid, $cache)) {
+        return $cache[$rid];
+    }
     $meta = [
         'certificate_type' => '',
         'certificate_number' => '',
@@ -1952,7 +2006,7 @@ function dr_get_issuance_request_meta(mysqli $conn, string $requestId): array {
         if (!$stmt) {
             continue;
         }
-        $stmt->bind_param('s', $requestId);
+        $stmt->bind_param('s', $rid);
         $stmt->execute();
         $row = $stmt->get_result()->fetch_assoc();
         $stmt->close();
@@ -1962,10 +2016,12 @@ function dr_get_issuance_request_meta(mysqli $conn, string $requestId): array {
         $meta['certificate_type'] = trim((string)($row['certificate_type'] ?? ''));
         $meta['certificate_number'] = trim((string)($row['certificate_number'] ?? ''));
         $meta['verification_code'] = trim((string)($row['verification_code'] ?? ''));
-        return $meta;
+        $cache[$rid] = $meta;
+        return $cache[$rid];
     }
 
-    return $meta;
+    $cache[$rid] = $meta;
+    return $cache[$rid];
 }
 
 function dr_upsert_issuance_identifiers(mysqli $conn, string $requestId, ?string $certificateNumber, ?string $verificationCode): void {
@@ -2060,6 +2116,15 @@ function dr_ensure_general_fees_table(mysqli $conn): void {
     ";
     $conn->query($sql);
 
+    $existingCount = 0;
+    $countRes = $conn->query("SELECT COUNT(*) AS c FROM generalfeestbl");
+    if ($countRes instanceof mysqli_result) {
+        $countRow = $countRes->fetch_assoc();
+        $existingCount = (int)($countRow['c'] ?? 0);
+    }
+
+    // Seed defaults only when table is empty to keep runtime requests fast.
+    if ($existingCount <= 0) {
     // Seed default certificate fees to 50.00 (idempotent via unique index).
     $certificateDocNames = [
         'Certificate of Cohabitation',
@@ -2100,18 +2165,27 @@ function dr_ensure_general_fees_table(mysqli $conn): void {
             $free->close();
         }
     }
+    }
 
     $done = true;
 }
 
 function dr_get_fee_amount_for_document_type(mysqli $conn, string $documentType): ?float {
+    static $cache = [];
     // Rule: certificate requests use generalfeestbl as the fee source.
     if (!dr_is_issuance_document_type($documentType)) {
         return null;
     }
+    $cacheKey = dr_canonical_document_type_key($documentType);
+    if (array_key_exists($cacheKey, $cache)) {
+        return $cache[$cacheKey];
+    }
     dr_ensure_general_fees_table($conn);
     $docTypeId = dr_get_or_create_document_type_id($conn, $documentType, 'DocumentRequest');
-    if (!$docTypeId) return null;
+    if (!$docTypeId) {
+        $cache[$cacheKey] = null;
+        return null;
+    }
     $stmt = $conn->prepare("SELECT amount FROM generalfeestbl WHERE document_type_id = ? LIMIT 1");
     if (!$stmt) {
         return null;
@@ -2121,5 +2195,6 @@ function dr_get_fee_amount_for_document_type(mysqli $conn, string $documentType)
     $stmt->bind_result($amount);
     $ok = $stmt->fetch();
     $stmt->close();
-    return $ok ? (float)$amount : null;
+    $cache[$cacheKey] = $ok ? (float)$amount : null;
+    return $cache[$cacheKey];
 }

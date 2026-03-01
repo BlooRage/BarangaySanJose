@@ -12,13 +12,23 @@ if ($action === '') {
     dr_respond_json(400, ['success' => false, 'message' => 'Missing action.']);
 }
 
-dr_ensure_table($conn);
-dr_ensure_general_fees_table($conn);
-// Expensive maintenance should not run on every list refresh.
-if ($action !== 'list') {
-    dr_backfill_missing_finance_transactions($conn, 2000);
-    dr_prune_free_document_finance_transactions($conn, 5000);
-    dr_backfill_missing_issuance_requests($conn, 5000);
+// NOTE: avoid expensive schema/backfill maintenance on hot request paths.
+// Run maintenance manually when needed:
+//   /PhpFiles/Admin-End/documentRequestWorkflow.php?action=maintenance_run
+if ($action === 'maintenance_run') {
+    dr_ensure_table($conn);
+    dr_ensure_general_fees_table($conn);
+    $syncedFinance = dr_backfill_missing_finance_transactions($conn, 2000);
+    $prunedFree = dr_prune_free_document_finance_transactions($conn, 5000);
+    $syncedIssuance = dr_backfill_missing_issuance_requests($conn, 5000);
+    dr_respond_json(200, [
+        'success' => true,
+        'maintenance' => [
+            'finance_backfilled' => $syncedFinance,
+            'free_pruned' => $prunedFree,
+            'issuance_backfilled' => $syncedIssuance,
+        ],
+    ]);
 }
 
 $currentUserId = (string)($_SESSION['user_id'] ?? '');
@@ -957,7 +967,9 @@ function dra_resident_profile_snapshot(mysqli $conn, string $residentUserId, str
     return $profile;
 }
 
-dra_backfill_payment_verified_to_ready($conn);
+if ($action !== 'list') {
+    dra_backfill_payment_verified_to_ready($conn);
+}
 
 if ($action === 'list') {
     $where = [];
@@ -984,7 +996,6 @@ if ($action === 'list') {
             }
         }
     }
-
     $search = trim((string)($_GET['q'] ?? ''));
     if ($search !== '') {
         $parts = ['d.request_id LIKE ?'];
@@ -1001,6 +1012,23 @@ if ($action === 'list') {
         $where[] = '(' . implode(' OR ', $parts) . ')';
     }
 
+    $extraSelects = [];
+    $extraJoins = [];
+    $hasIssuanceTable = dr_table_exists($conn, 'issuancerequesttbl');
+    $hasResidentInfoTable = dr_table_exists($conn, 'residentinformationtbl');
+    if ($hasIssuanceTable) {
+        $extraSelects[] = "i.certificate_type AS _issuance_certificate_type";
+        $extraSelects[] = "i.certificate_number AS _issuance_certificate_number";
+        $extraSelects[] = "i.verification_code AS _issuance_verification_code";
+        $extraJoins[] = "LEFT JOIN issuancerequesttbl i ON i.request_id = d.request_id";
+    }
+    if ($hasResidentInfoTable) {
+        $extraSelects[] = "TRIM(CONCAT_WS(' ', NULLIF(riu.firstname, ''), NULLIF(riu.middlename, ''), NULLIF(riu.lastname, ''), NULLIF(riu.suffix, ''))) AS _resident_name_by_user";
+        $extraSelects[] = "TRIM(CONCAT_WS(' ', NULLIF(rir.firstname, ''), NULLIF(rir.middlename, ''), NULLIF(rir.lastname, ''), NULLIF(rir.suffix, ''))) AS _resident_name_by_resident";
+        $extraJoins[] = "LEFT JOIN residentinformationtbl riu ON riu.user_id = d.resident_user_id";
+        $extraJoins[] = "LEFT JOIN residentinformationtbl rir ON rir.resident_id = d.resident_id";
+    }
+
     $sql = "
         SELECT
             d.*,
@@ -1015,9 +1043,11 @@ if ($action === 'list') {
             f.payment_timestamp AS _tx_payment_timestamp,
             f.finance_decision_at AS _tx_finance_decision_at,
             f.user_id_employee_process AS _tx_finance_user_id
+            " . ($extraSelects ? ",\n            " . implode(",\n            ", $extraSelects) : "") . "
         FROM documentrequesttbl d
         LEFT JOIN financetransactiontbl f ON f.request_id = d.request_id
         LEFT JOIN statuslookuptbl s ON s.status_id = f.transaction_status_id
+        " . ($extraJoins ? "\n        " . implode("\n        ", $extraJoins) : "") . "
     ";
     if ($where) {
         $sql .= ' WHERE ' . implode(' AND ', $where);
@@ -1041,9 +1071,30 @@ if ($action === 'list') {
 
     $stmt->execute();
     $items = [];
+    $feeByDocType = [];
     $rs = $stmt->get_result();
     while ($row = $rs->fetch_assoc()) {
-        dr_hydrate_request_derived_fields($conn, $row);
+        dr_hydrate_request_derived_fields($conn, $row, false);
+
+        if (trim((string)($row['document_type'] ?? '')) === '') {
+            $issuedType = trim((string)($row['_issuance_certificate_type'] ?? ''));
+            if ($issuedType !== '') {
+                $row['document_type'] = $issuedType;
+            }
+        }
+        if (trim((string)($row['certificate_number'] ?? '')) === '') {
+            $issuedCertNo = trim((string)($row['_issuance_certificate_number'] ?? ''));
+            if ($issuedCertNo !== '') {
+                $row['certificate_number'] = $issuedCertNo;
+            }
+        }
+        if (trim((string)($row['verification_code'] ?? '')) === '') {
+            $issuedVc = trim((string)($row['_issuance_verification_code'] ?? ''));
+            if ($issuedVc !== '') {
+                $row['verification_code'] = $issuedVc;
+            }
+        }
+
         // Populate finance data from joined columns (avoids per-row finance query).
         $row['amount'] = isset($row['_tx_amount']) ? (float)$row['_tx_amount'] : null;
         $row['payment_method'] = (string)($row['_tx_payment_method'] ?? '');
@@ -1063,13 +1114,39 @@ if ($action === 'list') {
                 if ($ref !== '') {
                     $row['payment_reference'] = $ref;
                 }
+                if (trim((string)($row['purpose'] ?? '')) === '') {
+                    $purposeFromTx = trim((string)($decoded['purpose'] ?? ''));
+                    if ($purposeFromTx !== '') {
+                        $row['purpose'] = $purposeFromTx;
+                    }
+                }
             } elseif (preg_match('/\bReference:\s*(.+)$/mi', $txDetails, $m)) {
                 $row['payment_reference'] = trim((string)($m[1] ?? ''));
             }
         }
+
+        if (trim((string)($row['resident_name'] ?? '')) === '') {
+            $resolvedResidentName = trim((string)($row['_resident_name_by_user'] ?? ''));
+            if ($resolvedResidentName === '') {
+                $resolvedResidentName = trim((string)($row['_resident_name_by_resident'] ?? ''));
+            }
+            if ($resolvedResidentName !== '') {
+                $row['resident_name'] = $resolvedResidentName;
+                $row['full_name'] = $resolvedResidentName;
+            }
+        }
+
         dr_sync_stage_from_status_lookup($conn, $row);
         $row['stage_label'] = dr_stage_label((string)$row['stage']);
-        $row['fee_amount'] = dr_get_fee_amount_for_document_type($conn, (string)($row['document_type'] ?? ''));
+        $docTypeForFee = trim((string)($row['document_type'] ?? ''));
+        if ($docTypeForFee !== '') {
+            if (!array_key_exists($docTypeForFee, $feeByDocType)) {
+                $feeByDocType[$docTypeForFee] = dr_get_fee_amount_for_document_type($conn, $docTypeForFee);
+            }
+            $row['fee_amount'] = $feeByDocType[$docTypeForFee];
+        } else {
+            $row['fee_amount'] = null;
+        }
         $payload = json_decode((string)($row['request_details'] ?? $row['payload_json'] ?? '{}'), true);
         $row['payload'] = is_array($payload) ? $payload : [];
         if ($isFinanceList) {
@@ -1093,7 +1170,12 @@ if ($action === 'list') {
             $row['_tx_payment_deadline'],
             $row['_tx_payment_timestamp'],
             $row['_tx_finance_decision_at'],
-            $row['_tx_finance_user_id']
+            $row['_tx_finance_user_id'],
+            $row['_issuance_certificate_type'],
+            $row['_issuance_certificate_number'],
+            $row['_issuance_verification_code'],
+            $row['_resident_name_by_user'],
+            $row['_resident_name_by_resident']
         );
         $items[] = $row;
     }
@@ -1318,7 +1400,10 @@ if ($action === 'finance_verify') {
 
     $amountRaw = trim((string)($_POST['amount'] ?? ''));
     $orNumber = trim((string)($_POST['or_number'] ?? ''));
-    $defaultFee = dr_get_fee_amount_for_document_type($conn, (string)($row['document_type'] ?? ''));
+    $defaultFee = null;
+    if ($amountRaw === '') {
+        $defaultFee = dr_get_fee_amount_for_document_type($conn, (string)($row['document_type'] ?? ''));
+    }
 
     if ($amountRaw === '' && $defaultFee !== null) {
         $amountRaw = (string)$defaultFee;

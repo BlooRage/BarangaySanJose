@@ -2,17 +2,26 @@
 // Use Asia/Manila (UTC+08:00) for PHP date/time functions.
 date_default_timezone_set('Asia/Manila');
 
-$host = getenv('DB_HOST') ?: "srv1986.hstgr.io ";
+$host = getenv('DB_HOST') ?: "srv1986.hstgr.io";
 //srv1986.hstgr.io
 $user = getenv('DB_USER') ?: "u682055666_thesiscaps";
 $pass = getenv('DB_PASS') ?: "ThesisCaps123.";
 $dbname = getenv('DB_NAME') ?: "u682055666_testingBrgySJ";
 
 mysqli_report(MYSQLI_REPORT_OFF);
-$conn = @new mysqli($host, $user, $pass, $dbname);
+$conn = mysqli_init();
+if ($conn instanceof mysqli) {
+    // Fail fast when DB host is slow/unreachable to avoid long page stalls.
+    $conn->options(MYSQLI_OPT_CONNECT_TIMEOUT, 5);
+    if (defined('MYSQLI_OPT_READ_TIMEOUT')) {
+        $conn->options(MYSQLI_OPT_READ_TIMEOUT, 10);
+    }
+    @mysqli_real_connect($conn, $host, $user, $pass, $dbname);
+}
 
-if ($conn->connect_error) {
-    error_log('Database connection failed: ' . $conn->connect_error);
+if (!($conn instanceof mysqli) || $conn->connect_error) {
+    $connectError = ($conn instanceof mysqli) ? (string)$conn->connect_error : 'mysqli_init failed';
+    error_log('Database connection failed: ' . $connectError);
     http_response_code(500);
     exit('Service temporarily unavailable.');
 }
