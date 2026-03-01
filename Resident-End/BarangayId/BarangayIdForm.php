@@ -124,7 +124,7 @@ $fullAddress = implode(', ', array_filter([
 
                             <div>
                                 <label class="top-label">Suffix</label>
-                                <select name="suffix">
+                                <select name="suffix" disabled>
                                     <option value="" <?php echo ($suffix === '') ? 'selected' : ''; ?>>None</option>
                                     <option value="Jr." <?php echo ($suffix === 'Jr.') ? 'selected' : ''; ?>>Jr.</option>
                                     <option value="Sr." <?php echo ($suffix === 'Sr.') ? 'selected' : ''; ?>>Sr.</option>

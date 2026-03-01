@@ -39,7 +39,7 @@ require_once __DIR__ . "/../includes/resident_access_guard.php";
                 <p class="page-description mb-4">
                     Apply for a Barangay ID for local identification and barangay-related transactions.
                 </p>
-                <button class="btn apply-btn" type="button" disabled title="Currently unavailable">Apply Now</button>
+                <button class="btn apply-btn" type="button" onclick="location.href='BarangayIdForm.php'">Apply Now</button>
             </div>
         </main>
     </div>

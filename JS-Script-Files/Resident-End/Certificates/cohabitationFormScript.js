@@ -60,6 +60,11 @@ document.addEventListener("DOMContentLoaded", () => {
     const cohabitationPhase = document.getElementById("cohabitationPhaseNumber");
     const cohabitationSubdivisionLot = document.getElementById("cohabitationSubdivisionLot");
     const cohabitationAreaLot = document.getElementById("cohabitationAreaNumberLot");
+    const cohabitantLastName = document.getElementById("cohabitantLastName") || form.querySelector('input[name="cohabitant_last"]');
+    const cohabitantFirstName = document.getElementById("cohabitantFirstName") || form.querySelector('input[name="cohabitant_first"]');
+    const cohabitantMiddleName = document.getElementById("cohabitantMiddleName") || form.querySelector('input[name="cohabitant_middle"]');
+    const cohabitantDob = form.querySelector('input[name="cohabitant_dob"]');
+    const cohabitationStartDate = form.querySelector('input[name="cohabitation_start_date"]');
 
     const setReadOnly = (el, isReadOnly) => {
         if (!el) return;
@@ -147,6 +152,111 @@ document.addEventListener("DOMContentLoaded", () => {
         if (targets.street) targets.street.value = street;
         if (targets.subdivision) targets.subdivision.value = subdivision;
         if (targets.area) targets.area.value = area;
+    };
+
+    const getOrCreateInlineError = (inputEl) => {
+        if (!inputEl) return null;
+        if (inputEl.id) {
+            const staticErr = document.getElementById(`${inputEl.id}Error`);
+            if (staticErr) return staticErr;
+        }
+        let err = inputEl.parentElement?.querySelector(".inline-name-error");
+        if (!err) {
+            err = document.createElement("div");
+            err.className = "inline-name-error text-danger small mt-1 d-none";
+            err.setAttribute("aria-live", "polite");
+            inputEl.insertAdjacentElement("afterend", err);
+        }
+        return err;
+    };
+
+    const isLikelyGarbageName = (text) => {
+        const value = String(text || "").trim().toLowerCase();
+        if (!value) return false;
+        if (/^(test|testing|dummy|unknown|null|none|n\/a|na|xxx|asdf|qwerty|zxcv)$/i.test(value)) return true;
+        if (/(.)\1{3,}/i.test(value)) return true;
+
+        const lettersOnly = value.replace(/[^a-z]/g, "");
+        if (lettersOnly.length >= 5 && /^[bcdfghjklmnpqrstvwxyz]+$/i.test(lettersOnly)) return true;
+        if (/(asdf|qwer|zxcv|poiuy|lkjh)/i.test(lettersOnly)) return true;
+
+        return false;
+    };
+
+    const validateNameField = (inputEl, label, { required = true, allowSingleChar = false } = {}) => {
+        if (!inputEl) return true;
+        const raw = String(inputEl.value || "").trim();
+        const errorEl = getOrCreateInlineError(inputEl);
+        let message = "";
+
+        if (!raw) {
+            if (required) message = `${label} is required.`;
+        } else if (!/^[A-Za-z][A-Za-z\s-]*$/.test(raw)) {
+            message = `${label} must contain letters only. Allowed symbol: dash (-).`;
+        } else if (/--|\s{2,}/.test(raw)) {
+            message = `${label} contains invalid punctuation or spacing.`;
+        } else {
+            const lettersOnlyLength = raw.replace(/[^A-Za-z]/g, "").length;
+            if (!allowSingleChar && lettersOnlyLength < 2) {
+                message = `${label} must be at least 2 letters.`;
+            } else if (isLikelyGarbageName(raw)) {
+                message = `${label} appears invalid. Please enter a valid name.`;
+            }
+        }
+
+        inputEl.setCustomValidity(message);
+        if (errorEl) {
+            if (message) {
+                errorEl.textContent = message;
+                errorEl.classList.remove("d-none");
+            } else {
+                errorEl.textContent = "";
+                errorEl.classList.add("d-none");
+            }
+        }
+        return message === "";
+    };
+
+    const validateCohabitantNames = () => {
+        const okLast = validateNameField(cohabitantLastName, "Last name", { required: true, allowSingleChar: false });
+        const okFirst = validateNameField(cohabitantFirstName, "First name", { required: true, allowSingleChar: false });
+        const okMiddle = validateNameField(cohabitantMiddleName, "Middle name", { required: false, allowSingleChar: true });
+        return okLast && okFirst && okMiddle;
+    };
+
+    const validateDateNotFuture = (inputEl, label) => {
+        if (!inputEl) return true;
+        const value = String(inputEl.value || "").trim();
+        const errorEl = getOrCreateInlineError(inputEl);
+        const todayIso = new Date().toISOString().split("T")[0];
+        const todayDisplay = new Date().toLocaleDateString(undefined, {
+            year: "numeric",
+            month: "long",
+            day: "numeric",
+        });
+
+        let message = "";
+        if (value && value > todayIso) {
+            message = `Incorrect Input. ${label} must be on or before ${todayDisplay}`;
+        }
+
+        inputEl.setCustomValidity(message);
+        if (errorEl) {
+            if (message) {
+                errorEl.textContent = message;
+                errorEl.classList.remove("d-none");
+            } else {
+                errorEl.textContent = "";
+                errorEl.classList.add("d-none");
+            }
+        }
+        return message === "";
+    };
+
+    const validateCohabitationDates = () => {
+        const okDob = validateDateNotFuture(cohabitantDob, "Date of birth");
+        const okStart = validateDateNotFuture(cohabitationStartDate, "Started cohabitation date");
+        return okDob && okStart;
     };
 
     let regionIndex = null;
@@ -392,6 +502,8 @@ document.addEventListener("DOMContentLoaded", () => {
     };
 
     const updateSubmitState = () => {
+        validateCohabitantNames();
+        validateCohabitationDates();
         const isValid = form.checkValidity();
         submitBtn.disabled = !(agree.checked && isValid);
     };
@@ -507,6 +619,36 @@ document.addEventListener("DOMContentLoaded", () => {
     syncCohabitantAddress();
     syncCohabitationAddress();
     initAddressData();
+    [cohabitantLastName, cohabitantFirstName, cohabitantMiddleName].forEach((el) => {
+        if (!el) return;
+        el.addEventListener("input", () => {
+            validateCohabitantNames();
+            updateSubmitState();
+        });
+        el.addEventListener("blur", () => {
+            validateCohabitantNames();
+            updateSubmitState();
+        });
+    });
+    [cohabitantDob, cohabitationStartDate].forEach((el) => {
+        if (!el) return;
+        el.addEventListener("input", () => {
+            validateCohabitationDates();
+            updateSubmitState();
+        });
+        el.addEventListener("change", () => {
+            validateCohabitationDates();
+            updateSubmitState();
+        });
+        el.addEventListener("blur", () => {
+            validateCohabitationDates();
+            updateSubmitState();
+        });
+        el.addEventListener("invalid", () => {
+            validateCohabitationDates();
+            updateSubmitState();
+        });
+    });
     agree.addEventListener("change", updateSubmitState);
         form.addEventListener("input", updateSubmitState);
     form.addEventListener("change", updateSubmitState);

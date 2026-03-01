@@ -214,7 +214,7 @@ $applicantArea = htmlspecialchars($areaNumber, ENT_QUOTES, 'UTF-8');
                                 <input type="date" name="cohabitant_dob" required>
                             </div>
                             <div>
-                                <label class="top-label">Occupation</label>
+                                <label class="top-label">Occupation <i>(leave blank if NA)</i></label>
                                 <input type="text" name="cohabitant_occupation">
                             </div>
                         </div>
@@ -222,7 +222,7 @@ $applicantArea = htmlspecialchars($areaNumber, ENT_QUOTES, 'UTF-8');
                         <h2 class="section-title text-center text-dark">Cohabitant Address</h2>
                         <div class="form-row">
                             <div class="full-width">
-                                <div class="beneficiary-block">
+                                <div class="beneficiary-block pt-3 pb-2">
                                     <label class="top-label check-item">
                                         <input type="checkbox" id="cohabitantSameAddress" name="cohabitantSameAddress">
                                         <span>Same address as applicant</span>
@@ -381,7 +381,7 @@ $applicantArea = htmlspecialchars($areaNumber, ENT_QUOTES, 'UTF-8');
                         <h2 class="section-title text-center text-dark">Cohabitation Address</h2>
                         <div class="form-row">
                             <div class="full-width">
-                                <div class="beneficiary-block">
+                                <div class="beneficiary-block pt-3 pb-2">
                                     <label class="top-label check-item">
                                         <input type="checkbox" id="cohabitationSameAddress" name="cohabitationSameAddress">
                                         <span>Cohabitation address is same as applicant address</span>
