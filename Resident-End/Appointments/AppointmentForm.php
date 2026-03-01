@@ -156,11 +156,13 @@ $fullAddress = implode(", ", $addressParts);
                         <div class="form-row two-col-row">
                             <div>
                                 <label class="top-label">Date of Appointment <span class="required-asterisk">*</span></label>
-                                <input type="date" name="appointment_date" required>
+                                <input type="date" id="appointmentDate" name="appointment_date" required>
+                                <div id="appointmentDateError" class="text-danger small mt-1 d-none" aria-live="polite"></div>
                             </div>
                             <div>
                                 <label class="top-label">Time of Appointment <span class="required-asterisk">*</span></label>
-                                <input type="time" name="appointment_time" required>
+                                <input type="time" id="appointmentTime" name="appointment_time" required>
+                                <div id="appointmentTimeError" class="text-danger small mt-1 d-none" aria-live="polite"></div>
                             </div>
                         </div>
 
@@ -189,14 +191,98 @@ $fullAddress = implode(", ", $addressParts);
         document.addEventListener("DOMContentLoaded", () => {
             const form = document.querySelector("form");
             const submitBtn = form?.querySelector(".submit-btn");
+            const appointmentDateInput = document.getElementById("appointmentDate");
+            const appointmentDateError = document.getElementById("appointmentDateError");
+            const appointmentTimeInput = document.getElementById("appointmentTime");
+            const appointmentTimeError = document.getElementById("appointmentTimeError");
             if (!form || !submitBtn) return;
 
+            const today = new Date();
+            const todayIso = today.toISOString().split("T")[0];
+            const todayDisplay = today.toLocaleDateString(undefined, {
+                year: "numeric",
+                month: "long",
+                day: "numeric",
+            });
+
+            const validateAppointmentDate = () => {
+                if (!appointmentDateInput) return true;
+
+                const value = String(appointmentDateInput.value || "").trim();
+                const isTodayOrPast = value !== "" && value <= todayIso;
+
+                if (isTodayOrPast) {
+                    const msg = `Incorrect Input. Date must be after ${todayDisplay}`;
+                    appointmentDateInput.setCustomValidity(msg);
+                    if (appointmentDateError) {
+                        appointmentDateError.textContent = msg;
+                        appointmentDateError.classList.remove("d-none");
+                    }
+                    return false;
+                }
+
+                appointmentDateInput.setCustomValidity("");
+                if (appointmentDateError) {
+                    appointmentDateError.textContent = "";
+                    appointmentDateError.classList.add("d-none");
+                }
+                return true;
+            };
+
+            const validateAppointmentTime = () => {
+                if (!appointmentTimeInput) return true;
+
+                const value = String(appointmentTimeInput.value || "").trim();
+                const hasValue = value !== "";
+                const minAllowed = "09:01";
+                const maxAllowed = "16:59";
+                const isOutOfRange = hasValue && (value < minAllowed || value > maxAllowed);
+
+                if (isOutOfRange) {
+                    const msg = "Incorrect Input. Time must be between 9:01 AM and 4:59 PM";
+                    appointmentTimeInput.setCustomValidity(msg);
+                    if (appointmentTimeError) {
+                        appointmentTimeError.textContent = msg;
+                        appointmentTimeError.classList.remove("d-none");
+                    }
+                    return false;
+                }
+
+                appointmentTimeInput.setCustomValidity("");
+                if (appointmentTimeError) {
+                    appointmentTimeError.textContent = "";
+                    appointmentTimeError.classList.add("d-none");
+                }
+                return true;
+            };
+
             const updateState = () => {
+                validateAppointmentDate();
+                validateAppointmentTime();
                 submitBtn.disabled = !form.checkValidity();
             };
 
             form.addEventListener("input", updateState);
             form.addEventListener("change", updateState);
+            appointmentDateInput?.addEventListener("input", updateState);
+            appointmentDateInput?.addEventListener("change", updateState);
+            appointmentDateInput?.addEventListener("keyup", validateAppointmentDate);
+            appointmentDateInput?.addEventListener("blur", validateAppointmentDate);
+            appointmentDateInput?.addEventListener("invalid", validateAppointmentDate);
+            appointmentTimeInput?.addEventListener("input", updateState);
+            appointmentTimeInput?.addEventListener("change", updateState);
+            appointmentTimeInput?.addEventListener("keyup", validateAppointmentTime);
+            appointmentTimeInput?.addEventListener("blur", validateAppointmentTime);
+            appointmentTimeInput?.addEventListener("invalid", validateAppointmentTime);
+            form.addEventListener("submit", (e) => {
+                const okDate = validateAppointmentDate();
+                const okTime = validateAppointmentTime();
+                if (!okDate || !okTime) {
+                    e.preventDefault();
+                    if (!okDate) appointmentDateInput?.focus();
+                    else appointmentTimeInput?.focus();
+                }
+            });
             updateState();
         });
     </script>

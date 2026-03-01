@@ -1264,6 +1264,14 @@
     const looksHtml = text.trim().startsWith('<!DOCTYPE') || text.trim().startsWith('<html');
 
     if (!contentType.includes('application/json')) {
+      const bodyText = String(text || '').trim();
+      const lowerBody = bodyText.toLowerCase();
+      if (lowerBody.includes('service temporarily unavailable')) {
+        throw new Error('Database is temporarily unavailable. Please try again in a moment.');
+      }
+      if (lowerBody.includes('maximum execution time')) {
+        throw new Error('Request timed out while loading data. Please refresh and try again.');
+      }
       if (looksHtml) {
         throw new Error('Session expired or server returned HTML. Please reload and login again.');
       }
@@ -1322,9 +1330,9 @@
       const params = new URLSearchParams({ action: 'list' });
       if (isFinancePaymentsPage) {
         params.set('list_context', 'finance');
-        params.set('limit', '250');
+        params.set('limit', '120');
       } else {
-        params.set('limit', '250');
+        params.set('limit', '150');
       }
       const data = await fetchJson(`${endpoint}?${params.toString()}`);
       if (!data.success) throw new Error(data.message || 'Failed to load requests.');

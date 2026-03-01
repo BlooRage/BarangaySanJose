@@ -135,16 +135,24 @@ require_once __DIR__ . "/../includes/resident_access_guard.php";
                     </div>
 
                     <div class="form-row two-col-row">
-                        <div>
+                        <div class="">
                             <label class="top-label">Date of the Incident <span class="required-asterisk">*</span></label>
-                            <input type="date" name="incident_date" required>
+                            <input type="date" id="incidentDate" name="incident_date" required>
+                            <div id="incidentDateError" class="text-danger small mt-1 d-none" aria-live="polite"></div>
                         </div>
                         <div>
+                            <label class="top-label">Time of the Incident <i>
+                                (recommended)
+                            </i></label>
+                            <input type="time" name="incident_time">
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="full-width">
+                    <div class="mb-3">
                             <label class="top-label">Location of the Incident <span class="required-asterisk">*</span></label>
                             <input type="text" name="incident_location" required>
                         </div>
-                    </div>
-
                     <div class="form-row">
                         <div class="full-width">
                             <label class="top-label">Short narration of the incident <span class="required-asterisk">*</span></label>
@@ -187,14 +195,60 @@ require_once __DIR__ . "/../includes/resident_access_guard.php";
     document.addEventListener("DOMContentLoaded", () => {
         const form = document.querySelector("form");
         const submitBtn = form?.querySelector(".submit-btn");
+        const incidentDateInput = document.getElementById("incidentDate");
+        const incidentDateError = document.getElementById("incidentDateError");
         if (!form || !submitBtn) return;
 
+        const today = new Date();
+        const todayIso = today.toISOString().split("T")[0];
+        const todayDisplay = today.toLocaleDateString(undefined, {
+            year: "numeric",
+            month: "long",
+            day: "numeric",
+        });
+
+        const validateIncidentDate = () => {
+            if (!incidentDateInput) return true;
+
+            const value = String(incidentDateInput.value || "").trim();
+            const isFuture = value !== "" && value > todayIso;
+
+            if (isFuture) {
+                const msg = `Incorrect Input. Date must be on or before ${todayDisplay}`;
+                incidentDateInput.setCustomValidity(msg);
+                if (incidentDateError) {
+                    incidentDateError.textContent = msg;
+                    incidentDateError.classList.remove("d-none");
+                }
+                return false;
+            }
+
+            incidentDateInput.setCustomValidity("");
+            if (incidentDateError) {
+                incidentDateError.textContent = "";
+                incidentDateError.classList.add("d-none");
+            }
+            return true;
+        };
+
         const updateState = () => {
+            validateIncidentDate();
             submitBtn.disabled = !form.checkValidity();
         };
 
         form.addEventListener("input", updateState);
         form.addEventListener("change", updateState);
+        incidentDateInput?.addEventListener("input", updateState);
+        incidentDateInput?.addEventListener("change", updateState);
+        incidentDateInput?.addEventListener("keyup", validateIncidentDate);
+        incidentDateInput?.addEventListener("blur", validateIncidentDate);
+        incidentDateInput?.addEventListener("invalid", validateIncidentDate);
+        form.addEventListener("submit", (e) => {
+            if (!validateIncidentDate()) {
+                e.preventDefault();
+                incidentDateInput?.focus();
+            }
+        });
         updateState();
     });
 </script>

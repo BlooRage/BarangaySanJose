@@ -39,7 +39,7 @@ require_once __DIR__ . "/../includes/resident_access_guard.php";
                 <p class="page-description mb-4">
                     Set an appointment with the barangay office for your selected service and preferred schedule.
                 </p>
-                <button class="btn apply-btn" type="button" disabled title="Currently unavailable">Open Form</button>
+                <button class="btn apply-btn" type="button" onclick="location.href='AppointmentForm.php'">Open Form</button>
             </div>
         </main>
     </div>
