@@ -1276,6 +1276,11 @@ function dr_update_stage(mysqli $conn, string $requestId, string $stage, array $
         $types .= 's';
         $vals[] = dr_now();
     }
+    if (dr_column_exists($conn, 'documentrequesttbl', 'stage')) {
+        $sets[] = 'stage = ?';
+        $types .= 's';
+        $vals[] = $stage;
+    }
     $paymentPatchKeys = [
         'payment_method',
         'payment_proof_path',

@@ -2,7 +2,7 @@
 // Use Asia/Manila (UTC+08:00) for PHP date/time functions.
 date_default_timezone_set('Asia/Manila');
 
-$host = getenv('DB_HOST') ?: "srv1986.hstgr.io";
+$host = getenv('DB_HOST') ?: "srv1986.hstgr.io ";
 //srv1986.hstgr.io
 $user = getenv('DB_USER') ?: "u682055666_thesiscaps";
 $pass = getenv('DB_PASS') ?: "ThesisCaps123.";

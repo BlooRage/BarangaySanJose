@@ -7,15 +7,18 @@ require_once __DIR__ . '/../General/documentRequestWorkflow.php';
 
 requireRoleSession(['SuperAdmin', 'Official', 'Officials', 'Personnel', 'Personnels', 'Admin', 'Employee'], true);
 
-dr_ensure_table($conn);
-dr_ensure_general_fees_table($conn);
-dr_backfill_missing_finance_transactions($conn, 2000);
-dr_prune_free_document_finance_transactions($conn, 5000);
-dr_backfill_missing_issuance_requests($conn, 5000);
-
 $action = strtolower(trim((string)($_REQUEST['action'] ?? '')));
 if ($action === '') {
     dr_respond_json(400, ['success' => false, 'message' => 'Missing action.']);
+}
+
+dr_ensure_table($conn);
+dr_ensure_general_fees_table($conn);
+// Expensive maintenance should not run on every list refresh.
+if ($action !== 'list') {
+    dr_backfill_missing_finance_transactions($conn, 2000);
+    dr_prune_free_document_finance_transactions($conn, 5000);
+    dr_backfill_missing_issuance_requests($conn, 5000);
 }
 
 $currentUserId = (string)($_SESSION['user_id'] ?? '');
@@ -957,24 +960,25 @@ function dra_resident_profile_snapshot(mysqli $conn, string $residentUserId, str
 dra_backfill_payment_verified_to_ready($conn);
 
 if ($action === 'list') {
-    dr_cancel_overdue_payment_requests($conn);
-
     $where = [];
     $types = '';
     $vals = [];
+    $listContext = strtolower(trim((string)($_GET['list_context'] ?? '')));
+    $isFinanceList = ($listContext === 'finance');
+    $limit = max(1, min(500, (int)($_GET['limit'] ?? 250)));
 
     $stageCol = dr_column_exists($conn, 'documentrequesttbl', 'stage') ? 'stage' : null;
     $stage = trim((string)($_GET['stage'] ?? ''));
     if ($stage !== '') {
         if ($stageCol !== null) {
-            $where[] = $stageCol . ' = ?';
+            $where[] = 'd.' . $stageCol . ' = ?';
             $types .= 's';
             $vals[] = $stage;
         } else {
             $statusId = dr_find_request_status_id_by_stage($conn, $stage);
             $statusCol = dr_request_status_column($conn);
             if ($statusId !== null && $statusCol !== null) {
-                $where[] = $statusCol . ' = ?';
+                $where[] = 'd.' . $statusCol . ' = ?';
                 $types .= 'i';
                 $vals[] = $statusId;
             }
@@ -983,26 +987,43 @@ if ($action === 'list') {
 
     $search = trim((string)($_GET['q'] ?? ''));
     if ($search !== '') {
-        $parts = ['request_id LIKE ?'];
+        $parts = ['d.request_id LIKE ?'];
         $types .= 's';
         $vals[] = '%' . $search . '%';
         if (dr_column_exists($conn, 'documentrequesttbl', 'resident_id')) {
-            $parts[] = 'resident_id LIKE ?';
+            $parts[] = 'd.resident_id LIKE ?';
             $types .= 's';
             $vals[] = '%' . $search . '%';
         }
-        $parts[] = 'request_details LIKE ?';
+        $parts[] = 'd.request_details LIKE ?';
         $types .= 's';
         $vals[] = '%' . $search . '%';
         $where[] = '(' . implode(' OR ', $parts) . ')';
     }
 
-    $sql = 'SELECT * FROM documentrequesttbl';
+    $sql = "
+        SELECT
+            d.*,
+            f.transaction_amount AS _tx_amount,
+            f.payment_method AS _tx_payment_method,
+            f.payment_proof_path AS _tx_payment_proof_path,
+            f.transaction_details AS _tx_transaction_details,
+            f.or_number AS _tx_or_number,
+            f.transaction_status_id AS _tx_status_id,
+            s.status_name AS _tx_status_name,
+            f.payment_deadline AS _tx_payment_deadline,
+            f.payment_timestamp AS _tx_payment_timestamp,
+            f.finance_decision_at AS _tx_finance_decision_at,
+            f.user_id_employee_process AS _tx_finance_user_id
+        FROM documentrequesttbl d
+        LEFT JOIN financetransactiontbl f ON f.request_id = d.request_id
+        LEFT JOIN statuslookuptbl s ON s.status_id = f.transaction_status_id
+    ";
     if ($where) {
         $sql .= ' WHERE ' . implode(' AND ', $where);
     }
     $orderCol = dr_column_exists($conn, 'documentrequesttbl', 'submitted_at') ? 'submitted_at' : 'request_timestamp';
-    $sql .= ' ORDER BY ' . $orderCol . ' DESC, request_id DESC';
+    $sql .= ' ORDER BY d.' . $orderCol . ' DESC, d.request_id DESC LIMIT ' . $limit;
 
     $stmt = $conn->prepare($sql);
     if (!$stmt) {
@@ -1023,16 +1044,56 @@ if ($action === 'list') {
     $rs = $stmt->get_result();
     while ($row = $rs->fetch_assoc()) {
         dr_hydrate_request_derived_fields($conn, $row);
-        dr_merge_finance_transaction_into_request($conn, $row);
+        // Populate finance data from joined columns (avoids per-row finance query).
+        $row['amount'] = isset($row['_tx_amount']) ? (float)$row['_tx_amount'] : null;
+        $row['payment_method'] = (string)($row['_tx_payment_method'] ?? '');
+        $row['payment_proof_path'] = (string)($row['_tx_payment_proof_path'] ?? '');
+        $row['or_number'] = (string)($row['_tx_or_number'] ?? '');
+        $row['payment_status_id'] = isset($row['_tx_status_id']) ? (int)$row['_tx_status_id'] : 0;
+        $row['payment_status_name'] = (string)($row['_tx_status_name'] ?? '');
+        $row['payment_deadline'] = (string)($row['_tx_payment_deadline'] ?? '');
+        $row['payment_submitted_at'] = (string)($row['_tx_payment_timestamp'] ?? '');
+        $row['finance_decision_at'] = (string)($row['_tx_finance_decision_at'] ?? '');
+        $row['finance_user_id'] = (string)($row['_tx_finance_user_id'] ?? '');
+        $txDetails = (string)($row['_tx_transaction_details'] ?? '');
+        if ($txDetails !== '') {
+            $decoded = json_decode($txDetails, true);
+            if (is_array($decoded)) {
+                $ref = trim((string)($decoded['reference'] ?? ''));
+                if ($ref !== '') {
+                    $row['payment_reference'] = $ref;
+                }
+            } elseif (preg_match('/\bReference:\s*(.+)$/mi', $txDetails, $m)) {
+                $row['payment_reference'] = trim((string)($m[1] ?? ''));
+            }
+        }
         dr_sync_stage_from_status_lookup($conn, $row);
         $row['stage_label'] = dr_stage_label((string)$row['stage']);
         $row['fee_amount'] = dr_get_fee_amount_for_document_type($conn, (string)($row['document_type'] ?? ''));
         $payload = json_decode((string)($row['request_details'] ?? $row['payload_json'] ?? '{}'), true);
         $row['payload'] = is_array($payload) ? $payload : [];
-        $row['resident_profile'] = dra_resident_profile_snapshot(
-            $conn,
-            (string)($row['resident_user_id'] ?? ''),
-            (string)($row['resident_id'] ?? '')
+        if ($isFinanceList) {
+            // Keep finance list light; resident profile is not needed for table rendering.
+            $row['resident_profile'] = [];
+        } else {
+            $row['resident_profile'] = dra_resident_profile_snapshot(
+                $conn,
+                (string)($row['resident_user_id'] ?? ''),
+                (string)($row['resident_id'] ?? '')
+            );
+        }
+        unset(
+            $row['_tx_amount'],
+            $row['_tx_payment_method'],
+            $row['_tx_payment_proof_path'],
+            $row['_tx_transaction_details'],
+            $row['_tx_or_number'],
+            $row['_tx_status_id'],
+            $row['_tx_status_name'],
+            $row['_tx_payment_deadline'],
+            $row['_tx_payment_timestamp'],
+            $row['_tx_finance_decision_at'],
+            $row['_tx_finance_user_id']
         );
         $items[] = $row;
     }

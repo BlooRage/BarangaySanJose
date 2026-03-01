@@ -1082,6 +1082,18 @@
     return true;
   }
 
+  function hasFinanceTransaction(row) {
+    const statusId = Number(row?.payment_status_id || 0);
+    if (Number.isFinite(statusId) && statusId > 0) return true;
+    if (String(row?.payment_status_name || '').trim() !== '') return true;
+    if (String(row?.payment_method || '').trim() !== '') return true;
+    if (String(row?.payment_deadline || '').trim() !== '') return true;
+    if (String(row?.payment_submitted_at || '').trim() !== '') return true;
+    if (String(row?.or_number || '').trim() !== '') return true;
+    if (row?.amount !== null && row?.amount !== undefined && String(row.amount).trim() !== '') return true;
+    return false;
+  }
+
   function matchesStageTabFilter(row, stageFilter) {
     const stage = String(row?.stage || '').toLowerCase();
     const key = String(stageFilter || '').toLowerCase();
@@ -1275,7 +1287,7 @@
     const allItems = Array.isArray(cachedAllItems) ? cachedAllItems : [];
     updateStageTabBadges(allItems);
     const stageItems = currentStage === 'finance'
-      ? allItems.filter((it) => financeStages.has(String(it.stage || '').toLowerCase()))
+      ? allItems.filter((it) => financeStages.has(String(it.stage || '').toLowerCase()) && hasFinanceTransaction(it))
       : allItems.filter((it) => matchesStageTabFilter(it, currentStage));
     updateFinanceStatusTabBadges(stageItems);
     syncDocumentTypeFilterOptions(stageItems);
@@ -1308,6 +1320,12 @@
     tableBody.innerHTML = '<tr><td colspan="8" class="text-center text-muted py-4">Loading...</td></tr>';
     try {
       const params = new URLSearchParams({ action: 'list' });
+      if (isFinancePaymentsPage) {
+        params.set('list_context', 'finance');
+        params.set('limit', '250');
+      } else {
+        params.set('limit', '250');
+      }
       const data = await fetchJson(`${endpoint}?${params.toString()}`);
       if (!data.success) throw new Error(data.message || 'Failed to load requests.');
       cachedAllItems = Array.isArray(data.items) ? data.items : [];
