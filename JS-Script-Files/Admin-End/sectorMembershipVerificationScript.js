@@ -87,15 +87,15 @@
     return raw;
   };
 
-  const statusBadge = (status) => {
+  const statusPill = (status) => {
     const s = fmtStatus(status);
     const map = {
-      PendingReview: { cls: "badge bg-warning text-dark", label: "Pending Review" },
-      Verified: { cls: "badge bg-success", label: "Verified" },
-      Rejected: { cls: "badge bg-danger", label: "Rejected" },
-      Archived: { cls: "badge bg-secondary", label: "Archived" },
+      PendingReview: { cls: "status-pill pending", label: "Pending Review" },
+      Verified: { cls: "status-pill approved", label: "Verified" },
+      Rejected: { cls: "status-pill denied", label: "Rejected" },
+      Archived: { cls: "status-pill archived", label: "Archived" },
     };
-    const meta = map[s] || { cls: "badge bg-secondary", label: s };
+    const meta = map[s] || { cls: "status-pill archived", label: s };
     const span = document.createElement("span");
     span.className = meta.cls;
     span.innerText = meta.label;
@@ -219,7 +219,7 @@
       const wrap = document.createElement("div");
       wrap.className = "d-flex flex-column gap-1";
       const statusLine = document.createElement("div");
-      statusLine.appendChild(statusBadge(a.verify_status));
+      statusLine.appendChild(statusPill(a.verify_status));
 	      if (fmtStatus(a.verify_status) === "Rejected") {
 	        const reason = extractRejectedReasonFromApp(a);
 	        if (reason) {

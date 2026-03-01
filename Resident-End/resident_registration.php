@@ -58,6 +58,10 @@ if (!isset($baseUrl)) {
 </head>
 
 <body>
+  <?php
+$allowUnregistered = true;
+require_once __DIR__ . "/includes/resident_access_guard.php";
+?>
 
   <!-- ================= NAVBAR ================= -->
   <div class="navbarWrapper">
