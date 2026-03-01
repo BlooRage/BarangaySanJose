@@ -385,17 +385,24 @@ try {
         } elseif (in_array($voterNorm, ['not registered', 'no', '0'], true)) {
             $voterValue = 0;
         }
+        if ($voterValue === 0 && (int)($current['voter_status'] ?? 0) === 1) {
+            throw new Exception('Voter status is already registered and cannot be changed.');
+        }
         if ($voterValue !== null && (int)($current['voter_status'] ?? 0) !== $voterValue) {
             $changes['voter_status'] = $voterValue;
         }
     }
     if ($employmentStatus !== '') {
         $currentEmployment = ((int)($current['occupation'] ?? 0)) === 1 ? 'Employed' : 'Unemployed';
-        $employmentChanged = $employmentStatus !== $currentEmployment;
+        $employmentNormalized = $employmentStatus === 'Self-Employed' ? 'Employed' : $employmentStatus;
+        $employmentChanged = $employmentNormalized !== $currentEmployment;
         if ($employmentChanged) {
-            $changes['occupation'] = $employmentStatus === 'Employed' ? 1 : 0;
+            $changes['occupation'] = $employmentNormalized === 'Employed' ? 1 : 0;
         }
-        if ($employmentStatus === 'Employed' && $occupation !== '' && $occupation !== (string)($current['occupation_detail'] ?? '')) {
+        if (in_array($employmentStatus, ['Employed', 'Self-Employed'], true)
+            && $occupation !== ''
+            && $occupation !== (string)($current['occupation_detail'] ?? '')
+        ) {
             $changes['occupation_detail'] = $occupation;
         }
     }
@@ -490,6 +497,7 @@ try {
     $voterDocType = cleanString($_POST['supporting_voter_type'] ?? '');
     $employmentDocType = cleanString($_POST['supporting_employment_type'] ?? '');
     $sectorDocType = cleanString($_POST['supporting_sector_type'] ?? '');
+    $civilDocType = cleanString($_POST['civil_status_doc_type'] ?? '');
     $nameIdFiles = normalizeFilesArray($_FILES['name_id_file'] ?? null);
     $religionFiles = normalizeFilesArray($_FILES['supporting_religion_file'] ?? null);
     $voterFiles = normalizeFilesArray($_FILES['supporting_voter_file'] ?? null);
@@ -499,22 +507,56 @@ try {
     $studentStatusFiles = normalizeFilesArray($_FILES['student_status_file'] ?? null);
 
     $allowedIdTypes = [
-        "Passport",
+        "Philippine Passport",
+        "Unified Multi-Purpose ID (UMID)",
         "Driver's License",
-        "PhilHealth ID",
-        "Voter's ID",
-        "National ID",
-        "Barangay ID",
-        "PRC ID"
+        "Professional Regulation Commission (PRC) ID",
+        "Postal ID",
+        "National ID / PhilSys ID",
+        "Social Security System (SSS) ID",
+        "Government Service Insurance System (GSIS) ID",
+        "PSA Birth Certificate"
     ];
-    $allowedSupportDocTypes = [
+    $allowedReligionDocTypes = [
+        "Baptismal Certificate",
+        "Certification from Religious Organization",
+        "Affidavit of Declaration"
+    ];
+    $allowedVoterDocTypes = [
+        "Voter's ID",
+        "Voter's Certification from COMELEC",
+        "Precinct Number Slip"
+    ];
+    $allowedEmploymentDocTypes = [
         "Certificate of Employment",
-        "Proof of Income",
-        "Voter Certification",
-        "Proof of Residency",
-        "Barangay Clearance",
-        "Affidavit",
-        "Other Supporting Document"
+        "Company ID",
+        "Latest Payslip",
+        "Affidavit of Unemployment",
+        "Business Permit",
+        "DTI or SEC Registration",
+        "Barangay Business Clearance"
+    ];
+    $allowedSectorDocTypes = [
+        "OSCA ID",
+        "Senior Citizen ID",
+        "PWD ID",
+        "Medical Certificate",
+        "Solo Parent ID",
+        "DSWD Certification",
+        "Birth Certificate of child",
+        "Barangay Certification as Solo Parent",
+        "Valid School ID",
+        "Certificate of Enrollment for current school year",
+        "Registration Form with school seal",
+        "Official Receipt of Tuition for current term",
+        "Certificate of Tribal Membership",
+        "NCIP Certification"
+    ];
+    $allowedCivilDocTypesByStatus = [
+        "Single" => ["Certificate of No Marriage (CENOMAR)"],
+        "Married" => ["PSA Marriage Certificate"],
+        "Widowed" => ["PSA Marriage Certificate", "PSA Death Certificate of spouse"],
+        "Annulled" => ["Court Decision on Annulment", "PSA Marriage Certificate with annotation"]
     ];
 
     if ($nameChanged) {
@@ -526,15 +568,19 @@ try {
         }
     }
 
-    if (!$nameChanged && $civilChanged && in_array($civilStatus, ['Married', 'Widowed'], true)) {
+    if ($civilChanged && in_array($civilStatus, ['Single', 'Married', 'Widowed', 'Annulled'], true)) {
         if (!hasValidUpload($civilFiles)) {
             throw new Exception('Supporting document is required for civil status change.');
+        }
+        $allowedCivilTypes = $allowedCivilDocTypesByStatus[$civilStatus] ?? [];
+        if ($civilDocType === '' || !in_array($civilDocType, $allowedCivilTypes, true)) {
+            throw new Exception('Please select a valid supporting document type for civil status change.');
         }
     }
 
     $changeKeys = array_keys($profileChanges);
     $requiresStudentUntickProof = !$nameChanged
-        && !($civilChanged && in_array($civilStatus, ['Married', 'Widowed'], true))
+        && !($civilChanged && in_array($civilStatus, ['Single', 'Married', 'Widowed', 'Annulled'], true))
         && $removedStudent;
     if ($requiresStudentUntickProof) {
         $hasStudentFile = hasValidUpload($studentStatusFiles);
@@ -545,17 +591,11 @@ try {
     $requiresReligionDoc = isset($profileChanges['religion']);
     $requiresVoterDoc = isset($profileChanges['voter_status']);
     $requiresEmploymentDoc = isset($profileChanges['occupation']) || isset($profileChanges['occupation_detail']);
-    if (isset($profileChanges['occupation'])) {
-        $employmentToUnemployed = (int)$profileChanges['occupation'] === 0;
-        if ($employmentToUnemployed && !isset($profileChanges['occupation_detail'])) {
-            $requiresEmploymentDoc = false;
-        }
-    }
     if ($requiresReligionDoc) {
         if (!hasValidUpload($religionFiles)) {
             throw new Exception('Supporting document is required for religion change.');
         }
-        if ($religionDocType === '' || !in_array($religionDocType, $allowedSupportDocTypes, true)) {
+        if ($religionDocType === '' || !in_array($religionDocType, $allowedReligionDocTypes, true)) {
             throw new Exception('Please select a valid supporting document type for religion change.');
         }
     }
@@ -563,7 +603,7 @@ try {
         if (!hasValidUpload($voterFiles)) {
             throw new Exception('Supporting document is required for voter status change.');
         }
-        if ($voterDocType === '' || !in_array($voterDocType, $allowedSupportDocTypes, true)) {
+        if ($voterDocType === '' || !in_array($voterDocType, $allowedVoterDocTypes, true)) {
             throw new Exception('Please select a valid supporting document type for voter status change.');
         }
     }
@@ -571,12 +611,12 @@ try {
         if (!hasValidUpload($employmentFiles)) {
             throw new Exception('Supporting document is required for employment status change.');
         }
-        if ($employmentDocType === '' || !in_array($employmentDocType, $allowedSupportDocTypes, true)) {
+        if ($employmentDocType === '' || !in_array($employmentDocType, $allowedEmploymentDocTypes, true)) {
             throw new Exception('Please select a valid supporting document type for employment status change.');
         }
     }
     if (hasValidUpload($sectorSupportFiles)) {
-        if ($sectorDocType === '' || !in_array($sectorDocType, $allowedSupportDocTypes, true)) {
+        if ($sectorDocType === '' || !in_array($sectorDocType, $allowedSectorDocTypes, true)) {
             throw new Exception('Please select a valid supporting document type for sector membership change.');
         }
     }
@@ -662,8 +702,8 @@ try {
         }
     }
 
-    if ($requestId > 0 && $civilChanged && $civilFiles && in_array($civilStatus, ['Married', 'Widowed'], true)) {
-        $docTypeName = $civilStatus === 'Married' ? 'Marriage Certificate' : 'Death Certificate of Spouse';
+    if ($requestId > 0 && $civilChanged && $civilFiles && in_array($civilStatus, ['Single', 'Married', 'Widowed', 'Annulled'], true)) {
+        $docTypeName = $civilDocType !== '' ? $civilDocType : 'Civil Status Document';
         $docTypeId = getDocumentTypeId($conn, $docTypeName);
         $remarks = "edit_request_civil_status";
         foreach (filterValidUploads($civilFiles) as $civilFile) {

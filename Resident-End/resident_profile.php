@@ -407,9 +407,9 @@ if ($residentId !== '' && isset($conn) && $conn instanceof mysqli) {
             </div>
         </header>
 
-        <main id="div-mainDisplay" class="flex-grow-1 p-4 p-md-5 bg-light">
+        <main id="div-mainDisplay" class="flex-grow-1 p-4 p-md-4 bg-light">
 
-            <div class="main-head text-center py-1 rounded my-2">
+            <div class="main-head text-center rounded mb-2">
                 <h3 class="mb-0 text-black">ACCOUNT</h3>
             </div>
             <?php if (!empty($profileImageFlash['message'])): ?>
@@ -887,10 +887,6 @@ if ($residentId !== '' && isset($conn) && $conn instanceof mysqli) {
                             <option value="Sr." <?= ($residentinformationtbl['suffix'] ?? '') === 'Sr.' ? 'selected' : '' ?>>Sr.</option>
                         </select>
                     </div>
-                    <div class="alert alert-warning small mb-3 d-none" id="nameDocNoticeInline">
-                        Changing your name requires a valid ID photo. Select an ID type in the upload step.
-                    </div>
-
                     <div class="row mb-3">
                         <div class="col-md-6">
                             <label class="form-label">Sex</label>
@@ -910,6 +906,7 @@ if ($residentId !== '' && isset($conn) && $conn instanceof mysqli) {
                                 <option value="Married" <?= ($residentinformationtbl['civil_status'] ?? '') === 'Married' ? 'selected' : '' ?>>Married</option>
                                 <option value="Widowed" <?= ($residentinformationtbl['civil_status'] ?? '') === 'Widowed' ? 'selected' : '' ?>>Widowed</option>
                                 <option value="Divorced" <?= ($residentinformationtbl['civil_status'] ?? '') === 'Divorced' ? 'selected' : '' ?>>Divorced</option>
+                                <option value="Annulled" <?= ($residentinformationtbl['civil_status'] ?? '') === 'Annulled' ? 'selected' : '' ?>>Annulled</option>
                             </select>
                         </div>
                         <div class="col-md-6">
@@ -921,9 +918,6 @@ if ($residentId !== '' && isset($conn) && $conn instanceof mysqli) {
                                 <option value="Others" <?= ($residentinformationtbl['religion'] ?? '') === 'Others' ? 'selected' : '' ?>>Others</option>
                             </select>
                         </div>
-                    </div>
-                    <div class="alert alert-warning small mb-3 d-none" id="civilStatusDocNoticeInline">
-                        Civil status updates need proof: marriage certificate (Married) or spouse's death certificate (Widowed).
                     </div>
                     <div class="row mb-3 d-none" id="newSurnameRow">
                         <div class="col-md-6">
@@ -944,12 +938,14 @@ if ($residentId !== '' && isset($conn) && $conn instanceof mysqli) {
                                 <option value="Registered" <?= $isRegisteredVoter ? 'selected' : '' ?>>Registered</option>
                                 <option value="Not Registered" <?= !$isRegisteredVoter ? 'selected' : '' ?>>Not Registered</option>
                             </select>
+                            <div class="form-text" id="voterStatusHelp"></div>
                         </div>
 
                          <div class="col-md-6">
                             <label class="form-label">Employment Status</label>
                         <select class="form-select" name="employment_status" id="employmentStatus" onchange="toggleOccupation()">
                             <option value="Employed" <?= ($residentinformationtbl['employment_status'] == 'Employed') ? 'selected' : '' ?>>Employed</option>
+                            <option value="Self-Employed" <?= ($residentinformationtbl['employment_status'] == 'Self-Employed') ? 'selected' : '' ?>>Self-Employed</option>
                             <option value="Unemployed" <?= ($residentinformationtbl['employment_status'] == 'Unemployed') ? 'selected' : '' ?>>Unemployed</option>
                         </select>
                         </div>
@@ -958,7 +954,7 @@ if ($residentId !== '' && isset($conn) && $conn instanceof mysqli) {
 
                      <div class="row mb-3" id="occupationRow" style="display: none;">
                         <div class="col-md-12">
-                            <label class="form-label">Occupation</label>
+                            <label class="form-label">Occupation / Business</label>
                             <input type="text"
                                 class="form-control"
                                 id="editOccupation"
@@ -1034,77 +1030,46 @@ if ($residentId !== '' && isset($conn) && $conn instanceof mysqli) {
                     <button class="btn-close" data-bs-dismiss="modal"></button>
                 </div>
                 <div class="modal-body">
-                    <div class="doc-required-box mb-3 d-none" id="supportReligionSection">
-                        <div class="small fw-semibold text-muted mb-2">For Religion Change</div>
-                        <label class="form-label">Supporting Document Type</label>
-                        <select class="form-select mb-2" id="supportReligionType">
-                            <option value="">Select document type</option>
-                            <option value="Certificate of Employment">Certificate of Employment</option>
-                            <option value="Proof of Income">Proof of Income</option>
-                            <option value="Voter Certification">Voter Certification</option>
-                            <option value="Proof of Residency">Proof of Residency</option>
-                            <option value="Barangay Clearance">Barangay Clearance</option>
-                            <option value="Affidavit">Affidavit</option>
-                            <option value="Other Supporting Document">Other Supporting Document</option>
-                        </select>
-                        <label class="form-label">Supporting Document</label>
-                        <input type="file" class="form-control" id="supportReligionFile" name="supporting_religion_file[]" accept=".jpg,.jpeg,.png,.webp,.pdf" multiple>
-                        <div class="form-text">Upload at least one supporting document for this change. You can select multiple files.</div>
-                    </div>
-                    <div class="doc-required-box mb-3 d-none" id="supportVoterSection">
-                        <div class="small fw-semibold text-muted mb-2">For Voter Status Change</div>
-                        <label class="form-label">Supporting Document Type</label>
-                        <select class="form-select mb-2" id="supportVoterType">
-                            <option value="">Select document type</option>
-                            <option value="Certificate of Employment">Certificate of Employment</option>
-                            <option value="Proof of Income">Proof of Income</option>
-                            <option value="Voter Certification">Voter Certification</option>
-                            <option value="Proof of Residency">Proof of Residency</option>
-                            <option value="Barangay Clearance">Barangay Clearance</option>
-                            <option value="Affidavit">Affidavit</option>
-                            <option value="Other Supporting Document">Other Supporting Document</option>
-                        </select>
-                        <label class="form-label">Supporting Document</label>
-                        <input type="file" class="form-control" id="supportVoterFile" name="supporting_voter_file[]" accept=".jpg,.jpeg,.png,.webp,.pdf" multiple>
-                        <div class="form-text">Upload at least one supporting document for this change. You can select multiple files.</div>
-                    </div>
-                    <div class="doc-required-box mb-3 d-none" id="supportEmploymentSection">
-                        <div class="small fw-semibold text-muted mb-2">For Employment Status Change</div>
-                        <label class="form-label">Supporting Document Type</label>
-                        <select class="form-select mb-2" id="supportEmploymentType">
-                            <option value="">Select document type</option>
-                            <option value="Certificate of Employment">Certificate of Employment</option>
-                            <option value="Proof of Income">Proof of Income</option>
-                            <option value="Voter Certification">Voter Certification</option>
-                            <option value="Proof of Residency">Proof of Residency</option>
-                            <option value="Barangay Clearance">Barangay Clearance</option>
-                            <option value="Affidavit">Affidavit</option>
-                            <option value="Other Supporting Document">Other Supporting Document</option>
-                        </select>
-                        <label class="form-label">Supporting Document</label>
-                        <input type="file" class="form-control" id="supportEmploymentFile" name="supporting_employment_file[]" accept=".jpg,.jpeg,.png,.webp,.pdf" multiple>
-                        <div class="form-text">Upload at least one supporting document for this change. You can select multiple files.</div>
-                    </div>
-                    <div class="doc-required-box mb-3 d-none" id="supportSectorSection">
-                        <div class="small fw-semibold text-muted mb-2">For Sector Membership Change</div>
-                        <label class="form-label">Supporting Document Type</label>
-                        <select class="form-select mb-2" id="supportSectorType">
-                            <option value="">Select document type</option>
-                            <option value="Certificate of Employment">Certificate of Employment</option>
-                            <option value="Proof of Income">Proof of Income</option>
-                            <option value="Voter Certification">Voter Certification</option>
-                            <option value="Proof of Residency">Proof of Residency</option>
-                            <option value="Barangay Clearance">Barangay Clearance</option>
-                            <option value="Affidavit">Affidavit</option>
-                            <option value="Other Supporting Document">Other Supporting Document</option>
-                        </select>
-                        <label class="form-label">Supporting Document</label>
-                        <input type="file" class="form-control" id="supportSectorFile" name="supporting_sector_file[]" accept=".jpg,.jpeg,.png,.webp,.pdf" multiple>
-                        <div class="form-text">Upload at least one supporting document for this change. You can select multiple files.</div>
-                    </div>
-                    <div class="alert alert-warning small mb-3 d-none" id="nameDocNotice">
-                        To change your name, select a valid ID type and upload a photo of your ID.
-                    </div>
+                        <div class="doc-required-box mb-3 d-none" id="supportReligionSection">
+                            <div class="small fw-semibold text-muted mb-2">For Religion Change</div>
+                            <label class="form-label">Supporting Document Type</label>
+                            <select class="form-select mb-2" id="supportReligionType">
+                                <option value="">Select document type</option>
+                            </select>
+                            <label class="form-label">Supporting Document</label>
+                            <input type="file" class="form-control" id="supportReligionFile" name="supporting_religion_file[]" accept=".jpg,.jpeg,.png,.webp,.pdf" multiple>
+                            <div class="form-text">Upload at least one supporting document for this change. You can select multiple files.</div>
+                        </div>
+                        <div class="doc-required-box mb-3 d-none" id="supportVoterSection">
+                            <div class="small fw-semibold text-muted mb-2">For Voter Status Change</div>
+                            <label class="form-label">Supporting Document Type</label>
+                            <select class="form-select mb-2" id="supportVoterType">
+                                <option value="">Select document type</option>
+                            </select>
+                            <label class="form-label">Supporting Document</label>
+                            <input type="file" class="form-control" id="supportVoterFile" name="supporting_voter_file[]" accept=".jpg,.jpeg,.png,.webp,.pdf" multiple>
+                            <div class="form-text">Upload at least one supporting document for this change. You can select multiple files.</div>
+                        </div>
+                        <div class="doc-required-box mb-3 d-none" id="supportEmploymentSection">
+                            <div class="small fw-semibold text-muted mb-2">For Employment Status Change</div>
+                            <label class="form-label">Supporting Document Type</label>
+                            <select class="form-select mb-2" id="supportEmploymentType">
+                                <option value="">Select document type</option>
+                            </select>
+                            <label class="form-label">Supporting Document</label>
+                            <input type="file" class="form-control" id="supportEmploymentFile" name="supporting_employment_file[]" accept=".jpg,.jpeg,.png,.webp,.pdf" multiple>
+                            <div class="form-text">Upload at least one supporting document for this change. You can select multiple files.</div>
+                        </div>
+                        <div class="doc-required-box mb-3 d-none" id="supportSectorSection">
+                            <div class="small fw-semibold text-muted mb-2">For Sector Membership Change</div>
+                            <label class="form-label">Supporting Document Type</label>
+                            <select class="form-select mb-2" id="supportSectorType">
+                                <option value="">Select document type</option>
+                            </select>
+                            <label class="form-label">Supporting Document</label>
+                            <input type="file" class="form-control" id="supportSectorFile" name="supporting_sector_file[]" accept=".jpg,.jpeg,.png,.webp,.pdf" multiple>
+                            <div class="form-text">Upload at least one supporting document for this change. You can select multiple files.</div>
+                        </div>
                     <div class="doc-required-box d-none mb-3" id="nameDocSection">
                         <div class="small fw-semibold text-muted mb-2">For Name Change</div>
                         <div class="row g-2">
@@ -1112,13 +1077,15 @@ if ($residentId !== '' && isset($conn) && $conn instanceof mysqli) {
                                 <label class="form-label">Valid ID Type</label>
                                 <select class="form-select" id="nameIdType">
                                     <option value="">Select ID</option>
-                                    <option value="Passport">Passport</option>
+                                    <option value="Philippine Passport">Philippine Passport</option>
+                                    <option value="Unified Multi-Purpose ID (UMID)">Unified Multi-Purpose ID (UMID)</option>
                                     <option value="Driver's License">Driver's License</option>
-                                    <option value="PhilHealth ID">PhilHealth ID</option>
-                                    <option value="Voter's ID">Voter's ID</option>
-                                    <option value="National ID">National ID</option>
-                                    <option value="Barangay ID">Barangay ID</option>
-                                    <option value="PRC ID">PRC ID</option>
+                                    <option value="Professional Regulation Commission (PRC) ID">Professional Regulation Commission (PRC) ID</option>
+                                    <option value="Postal ID">Postal ID</option>
+                                    <option value="National ID / PhilSys ID">National ID / PhilSys ID</option>
+                                    <option value="Social Security System (SSS) ID">Social Security System (SSS) ID</option>
+                                    <option value="Government Service Insurance System (GSIS) ID">Government Service Insurance System (GSIS) ID</option>
+                                    <option value="PSA Birth Certificate">PSA Birth Certificate</option>
                                 </select>
                             </div>
                             <div class="col-md-6">
@@ -1132,7 +1099,11 @@ if ($residentId !== '' && isset($conn) && $conn instanceof mysqli) {
                         <div class="small fw-semibold text-muted mb-2">For Civil Status Change</div>
                         <div class="row g-2">
                             <div class="col-md-6">
-                                <label class="form-label" id="civilStatusDocLabel">Document</label>
+                                <label class="form-label" id="civilStatusDocLabel">Supporting Document Type</label>
+                                <select class="form-select mb-2" id="civilStatusType">
+                                    <option value="">Select document type</option>
+                                </select>
+                                <label class="form-label">Supporting Document</label>
                                 <input type="file" class="form-control" id="civilStatusFile" name="civil_status_file[]" accept=".jpg,.jpeg,.png,.webp,.pdf" multiple>
                             </div>
                             <div class="col-md-6">

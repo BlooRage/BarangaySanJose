@@ -31,6 +31,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const civilNoticeInline = document.getElementById("civilStatusDocNoticeInline");
     const civilSection = document.getElementById("civilStatusDocSection");
     const civilFile = document.getElementById("civilStatusFile");
+    const civilStatusType = document.getElementById("civilStatusType");
     const civilLabel = document.getElementById("civilStatusDocLabel");
     const civilHelp = document.getElementById("civilStatusDocHelp");
     const btnReview = document.getElementById("btnProfileReview");
@@ -49,6 +50,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const employmentStatus = document.getElementById("employmentStatus");
     const occupation = document.getElementById("editOccupation");
     const voterStatus = document.getElementById("editVoterStatus");
+    const voterStatusHelp = document.getElementById("voterStatusHelp");
     const modalTrigger =
         document.getElementById("btnOpenEditProfile") ||
         document.querySelector('[data-bs-target="#editProfileModal"]');
@@ -102,6 +104,102 @@ document.addEventListener("DOMContentLoaded", () => {
         sectorMembership: getSectorValues(),
     };
 
+    const docOptions = {
+        name: [
+            "Philippine Passport",
+            "Unified Multi-Purpose ID (UMID)",
+            "Driver's License",
+            "Professional Regulation Commission (PRC) ID",
+            "Postal ID",
+            "National ID / PhilSys ID",
+            "Social Security System (SSS) ID",
+            "Government Service Insurance System (GSIS) ID",
+            "PSA Birth Certificate",
+        ],
+        religion: [
+            "Baptismal Certificate",
+            "Certification from Religious Organization",
+            "Affidavit of Declaration",
+        ],
+        voterRegistered: [
+            "Voter's ID",
+            "Voter's Certification from COMELEC",
+            "Precinct Number Slip",
+        ],
+        employment: {
+            Employed: ["Certificate of Employment", "Company ID", "Latest Payslip"],
+            "Self-Employed": ["Business Permit", "DTI or SEC Registration", "Barangay Business Clearance"],
+            Unemployed: ["Affidavit of Unemployment"],
+        },
+        civil: {
+            Single: ["Certificate of No Marriage (CENOMAR)"],
+            Married: ["PSA Marriage Certificate"],
+            Widowed: ["PSA Marriage Certificate", "PSA Death Certificate of spouse"],
+            Annulled: ["Court Decision on Annulment", "PSA Marriage Certificate with annotation"],
+        },
+        sector: {
+            "Senior Citizen": ["OSCA ID", "Senior Citizen ID"],
+            PWD: ["PWD ID", "Medical Certificate"],
+            "Single Parent": [
+                "Solo Parent ID",
+                "DSWD Certification",
+                "Birth Certificate of child",
+                "Barangay Certification as Solo Parent",
+            ],
+            Student: [
+                "Valid School ID",
+                "Certificate of Enrollment for current school year",
+                "Registration Form with school seal",
+                "Official Receipt of Tuition for current term",
+            ],
+            "Indigenous People": ["Certificate of Tribal Membership", "NCIP Certification"],
+        },
+    };
+
+    const uniqueOptions = (options) => Array.from(new Set(options.filter((opt) => opt)));
+
+    const setSelectOptions = (select, options, placeholder = "Select document type") => {
+        if (!select) return;
+        const current = select.value;
+        select.innerHTML = "";
+        const ph = document.createElement("option");
+        ph.value = "";
+        ph.textContent = placeholder;
+        select.appendChild(ph);
+        uniqueOptions(options).forEach((opt) => {
+            const option = document.createElement("option");
+            option.value = opt;
+            option.textContent = opt;
+            select.appendChild(option);
+        });
+        if (current && options.includes(current)) {
+            select.value = current;
+        }
+    };
+
+    const getSectorDocOptions = () => {
+        const selected = Array.from(document.querySelectorAll("input[name='sectorMembership[]']:checked"))
+            .map((el) => el.value.trim())
+            .filter((v) => v !== "");
+        const merged = [];
+        selected.forEach((sector) => {
+            const opts = docOptions.sector[sector] || [];
+            merged.push(...opts);
+        });
+        return uniqueOptions(merged);
+    };
+
+    const updateDocTypeOptions = () => {
+        setSelectOptions(nameIdType, docOptions.name, "Select ID");
+        setSelectOptions(supportReligionType, docOptions.religion);
+        const civilStatusValue = civilStatus ? civilStatus.value.trim() : "";
+        setSelectOptions(civilStatusType, docOptions.civil[civilStatusValue] || []);
+        const employmentValue = employmentStatus ? employmentStatus.value.trim() : "";
+        setSelectOptions(supportEmploymentType, docOptions.employment[employmentValue] || []);
+        setSelectOptions(supportVoterType, docOptions.voterRegistered);
+        setSelectOptions(supportSectorType, getSectorDocOptions());
+    };
+
     const isNameChanged = () => {
         return (
             firstName.value.trim() !== initial.firstName ||
@@ -112,6 +210,8 @@ document.addEventListener("DOMContentLoaded", () => {
     };
 
     const isCivilChanged = () => civilStatus.value.trim() !== initial.civilStatus;
+    const requiresCivilDocStatus = () =>
+        ["Single", "Married", "Widowed", "Annulled"].includes(civilStatus.value.trim());
 
     const requiresNewSurname = () =>
         isFemaleResident &&
@@ -136,7 +236,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const getUploadRequirements = () => {
         const nameChanged = isNameChanged();
         const civilChanged = isCivilChanged();
-        const requiresCivilDoc = civilChanged && ["Married", "Widowed"].includes(civilStatus.value.trim());
+        const requiresCivilDoc = civilChanged && requiresCivilDocStatus();
         const sectorInfo = getSectorChangeInfo();
         const requiresStudentUntickProof = sectorInfo.studentUnticked;
         const sectorChanged = sectorInfo.changed;
@@ -146,8 +246,7 @@ document.addEventListener("DOMContentLoaded", () => {
         const currentEmployment = employmentStatus ? employmentStatus.value.trim() : "";
         const employmentChanged = currentEmployment !== initial.employmentStatus;
         const occupationChanged = occupation ? occupation.value.trim() !== initial.occupation : false;
-        const employmentToUnemployed = employmentChanged && currentEmployment === "Unemployed";
-        const requiresEmploymentDoc = !employmentToUnemployed && (employmentChanged || occupationChanged);
+        const requiresEmploymentDoc = employmentChanged || occupationChanged;
         return {
             nameChanged,
             requiresCivilDoc,
@@ -195,15 +294,18 @@ document.addEventListener("DOMContentLoaded", () => {
 
     const updateCivilDocLabel = () => {
         const status = civilStatus.value.trim();
-        if (status === "Married") {
-            if (civilLabel) civilLabel.textContent = "Marriage Certificate";
-            if (civilHelp) civilHelp.textContent = "Upload a marriage certificate to support the change.";
+        if (civilLabel) civilLabel.textContent = "Supporting Document Type";
+        if (!civilHelp) return;
+        if (status === "Single") {
+            civilHelp.textContent = "Provide proof of no marriage (CENOMAR).";
+        } else if (status === "Married") {
+            civilHelp.textContent = "Provide PSA marriage certificate.";
         } else if (status === "Widowed") {
-            if (civilLabel) civilLabel.textContent = "Death Certificate of Spouse";
-            if (civilHelp) civilHelp.textContent = "Upload the spouse's death certificate to support the change.";
+            civilHelp.textContent = "Provide PSA marriage certificate and/or death certificate of spouse.";
+        } else if (status === "Annulled") {
+            civilHelp.textContent = "Provide court decision on annulment or annotated PSA marriage certificate.";
         } else {
-            if (civilLabel) civilLabel.textContent = "Document";
-            if (civilHelp) civilHelp.textContent = "";
+            civilHelp.textContent = "";
         }
     };
 
@@ -243,9 +345,20 @@ document.addEventListener("DOMContentLoaded", () => {
         const isInitiallyRegistered =
             initialVoter === "registered" || initialVoter === "registered voter";
 
-        notRegisteredOption.disabled = isInitiallyRegistered;
-        if (isInitiallyRegistered && voterStatus.value === "Not Registered") {
-            voterStatus.value = "Registered";
+        if (isInitiallyRegistered) {
+            voterStatus.disabled = true;
+            if (voterStatusHelp) {
+                voterStatusHelp.textContent =
+                    "Voter status is already Registered and cannot be changed.";
+            }
+            if (voterStatus.value === "Not Registered") {
+                voterStatus.value = "Registered";
+            }
+            return;
+        }
+        notRegisteredOption.disabled = false;
+        if (voterStatusHelp) {
+            voterStatusHelp.textContent = "You can only change to Registered once approved.";
         }
     };
 
@@ -311,42 +424,56 @@ document.addEventListener("DOMContentLoaded", () => {
         return true;
     };
 
-    const validate = () => {
+    const validate = (showErrors = true) => {
         const fName = firstName.value.trim();
         const mName = middleName ? middleName.value.trim() : "";
         const lName = lastName.value.trim();
         const occ = occupation ? occupation.value.trim() : "";
 
         if (!isValidPersonName(fName, 2, 30)) {
-            setMessage("First name looks invalid. Please enter a real first name.", true);
+            if (showErrors) {
+                setMessage("First name looks invalid. Please enter a real first name.", true);
+            }
             return false;
         }
         if (mName && !isValidPersonName(mName, 1, 30)) {
-            setMessage("Middle name looks invalid. Please enter a real middle name.", true);
+            if (showErrors) {
+                setMessage("Middle name looks invalid. Please enter a real middle name.", true);
+            }
             return false;
         }
         if (!isValidPersonName(lName, 2, 30)) {
-            setMessage("Last name looks invalid. Please enter a real last name.", true);
+            if (showErrors) {
+                setMessage("Last name looks invalid. Please enter a real last name.", true);
+            }
             return false;
         }
         if (!isValidOccupation(occ)) {
-            setMessage("Occupation looks invalid. Please enter a real occupation.", true);
+            if (showErrors) {
+                setMessage("Occupation looks invalid. Please enter a real occupation.", true);
+            }
             return false;
         }
         const sectorInfo = getSectorChangeInfo();
         if (sectorInfo.removedNonStudent.length > 0) {
-            setMessage("Only Student sector membership can be removed. Other sector memberships cannot be unticked.", true);
+            if (showErrors) {
+                setMessage("Only Student sector membership can be removed. Other sector memberships cannot be unticked.", true);
+            }
             return false;
         }
         if (requiresNewSurname()) {
             const ns = newSurnameInput ? newSurnameInput.value.trim() : "";
             if (!isValidPersonName(ns, 2, 30)) {
-                setMessage("New surname looks invalid. Please enter a real surname.", true);
+                if (showErrors) {
+                    setMessage("New surname looks invalid. Please enter a real surname.", true);
+                }
                 return false;
             }
         }
 
-        setMessage("");
+        if (showErrors) {
+            setMessage("");
+        }
         return true;
     };
 
@@ -361,13 +488,14 @@ document.addEventListener("DOMContentLoaded", () => {
             requiresEmploymentDoc,
         } = getUploadRequirements();
         updateCivilDocLabel();
+        updateDocTypeOptions();
 
         const hasChanges = isNameChanged() || isCivilChanged() || isOtherChanged();
 
         let canProceed = hasChanges;
         let valid = true;
         if (hasChanges) {
-            valid = validate();
+            valid = validate(false);
         } else {
             setMessage("");
         }
@@ -397,7 +525,8 @@ document.addEventListener("DOMContentLoaded", () => {
             }
             if (requiresCivilDoc) {
                 const civilFileOk = civilFile && civilFile.files && civilFile.files.length > 0;
-                canProceed = canProceed && civilFileOk;
+                const civilTypeOk = civilStatusType && civilStatusType.value.trim() !== "";
+                canProceed = canProceed && civilFileOk && civilTypeOk;
             }
             if (requiresReligionDoc) {
                 canProceed = canProceed && isDocReady(supportReligionType, supportReligionFile);
@@ -523,6 +652,7 @@ document.addEventListener("DOMContentLoaded", () => {
     if (studentStatusFile) studentStatusFile.addEventListener("change", updateSections);
     if (studentStoppedSwitch) studentStoppedSwitch.addEventListener("change", updateSections);
     if (civilFile) civilFile.addEventListener("change", updateSections);
+    if (civilStatusType) civilStatusType.addEventListener("change", updateSections);
     if (civilStatus) civilStatus.addEventListener("change", () => {
         enforceMarriedNoSingle();
         updateSections();
@@ -848,17 +978,29 @@ document.addEventListener("DOMContentLoaded", () => {
         appendFiles(form, "student_status_file", studentStatusFile);
         form.append("student_stopped", studentStoppedSwitch && studentStoppedSwitch.checked ? "1" : "0");
         appendFiles(form, "civil_status_file", civilFile);
+        if (civilStatusType && civilStatusType.value.trim() !== "") {
+            form.append("civil_status_doc_type", civilStatusType.value.trim());
+        }
         return form;
     };
 
+    let isSubmitting = false;
+
     const submitProfileRequest = async () => {
+        if (isSubmitting) return;
+        isSubmitting = true;
         btnNext.disabled = true;
+        const originalText = btnNext.textContent;
+        btnNext.textContent = "Submitting...";
         const form = buildProfileFormData();
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 25000);
 
         try {
             const res = await fetch("../PhpFiles/Resident-End/resident_profile_update.php", {
                 method: "POST",
                 body: form,
+                signal: controller.signal,
             });
             const data = await res.json().catch(() => ({}));
             if (!res.ok || !data.success) {
@@ -876,9 +1018,17 @@ document.addEventListener("DOMContentLoaded", () => {
                 window.location.reload();
             }, 1200);
         } catch (err) {
-            alert(err?.message || "Failed to submit profile edit request.");
+            const message =
+                err?.name === "AbortError"
+                    ? "Submission timed out. Please try again."
+                    : err?.message || "Failed to submit profile edit request.";
+            showNotice("Submission Failed", message);
         } finally {
+            clearTimeout(timeoutId);
+            isSubmitting = false;
+            btnNext.textContent = originalText;
             btnNext.disabled = false;
+            updateSections();
         }
     };
 
@@ -1006,7 +1156,7 @@ document.addEventListener("DOMContentLoaded", () => {
             setMessage("No changes detected.", true);
             return;
         }
-        if (!validate()) return;
+        if (!validate(true)) return;
         await openReviewStep();
     });
 

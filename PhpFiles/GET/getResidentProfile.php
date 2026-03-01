@@ -115,7 +115,7 @@ function getResidentProfileData(mysqli $conn, string $userId): array {
             $employmentStatus = ((int)$row['occupation'] === 1) ? 'Employed' : 'Unemployed';
             $occupationText = ((int)$row['occupation'] === 1 && !empty($row['occupation_detail']))
                 ? $row['occupation_detail']
-                : 'Unemployed';
+                : '';
 
             $emergencyName = trim(
                 ($row['emergency_first_name'] ?? '') . ' ' .
