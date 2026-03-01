@@ -9,6 +9,8 @@ requireRoleSession(['SuperAdmin', 'Official', 'Officials', 'Personnel', 'Personn
 
 dr_ensure_table($conn);
 dr_ensure_general_fees_table($conn);
+dr_backfill_missing_finance_transactions($conn, 2000);
+dr_prune_free_document_finance_transactions($conn, 5000);
 dr_backfill_missing_issuance_requests($conn, 5000);
 
 $action = strtolower(trim((string)($_REQUEST['action'] ?? '')));
@@ -17,6 +19,39 @@ if ($action === '') {
 }
 
 $currentUserId = (string)($_SESSION['user_id'] ?? '');
+
+function dra_is_finance_user(mysqli $conn, string $userId): bool {
+    $userId = trim($userId);
+    if ($userId === '' || !dr_table_exists($conn, 'officialinformationtbl')) {
+        return false;
+    }
+    $hasPositionAccess = dr_column_exists($conn, 'officialinformationtbl', 'position_access');
+    $sql = $hasPositionAccess
+        ? "SELECT role_access, position_access, department FROM officialinformationtbl WHERE user_id = ? LIMIT 1"
+        : "SELECT role_access, NULL AS position_access, department FROM officialinformationtbl WHERE user_id = ? LIMIT 1";
+    $stmt = $conn->prepare($sql);
+    if (!$stmt) {
+        return false;
+    }
+    $stmt->bind_param('s', $userId);
+    $stmt->execute();
+    $row = $stmt->get_result()->fetch_assoc();
+    $stmt->close();
+    if (!$row) {
+        return false;
+    }
+
+    $role = strtolower(trim((string)($row['role_access'] ?? '')));
+    $position = strtolower(trim((string)($row['position_access'] ?? '')));
+    $department = strtolower(trim((string)($row['department'] ?? '')));
+
+    return (
+        strpos($department, 'finance') !== false
+        || strpos($position, 'cashier') !== false
+        || strpos($position, 'finance') !== false
+        || ($role === 'employee' && strpos($department, 'finance') !== false)
+    );
+}
 
 function dra_strip_legacy_base(string $publicPath): string {
     $publicPath = trim($publicPath);
@@ -246,24 +281,36 @@ function dra_generate_issued_document(array $requestRow): ?string {
     }
     $docTypeNorm = strtolower(trim($docType));
     $isIndigency = strpos($docTypeNorm, 'indigency') !== false;
-    $fontFace = 'Arial';
+    $isGoodMoral = (strpos($docTypeNorm, 'goodmoral') !== false) || (strpos($docTypeNorm, 'good moral') !== false);
+    $isSpecialCertificate = $isIndigency || $isGoodMoral;
+    $fontFace = 'Times';
+    $indigencyFont = 'Arial';
 
     $pdf->SetFont($fontFace, 'B', 11);
     $pdf->Cell(0, 5, 'REPUBLIKA NG PILIPINAS', 0, 1, 'C');
     $pdf->SetFont($fontFace, '', 10);
     $pdf->Cell(0, 5, 'LALAWIGAN NG RIZAL', 0, 1, 'C');
     $pdf->Cell(0, 5, 'BAYAN NG RODRIGUEZ', 0, 1, 'C');
+    $pdf->Ln(1);
     $pdf->SetFont($fontFace, 'B', 16);
     $pdf->Cell(0, 7, 'BARANGAY SAN JOSE', 0, 1, 'C');
-    if ($isIndigency) {
+    if ($isSpecialCertificate) {
         $pdf->Ln(2);
         $pdf->Line(18, $pdf->GetY(), 192, $pdf->GetY());
         $pdf->Ln(8);
-        $pdf->SetFont('Arial', 'B', 17);
-        $pdf->Cell(0, 8, 'TANGGAPAN NG PUNONG BARANGAY', 0, 1, 'C');
-        $pdf->SetFont('Arial', 'B', 12);
-        $pdf->Cell(0, 7, 'CERTIFICATE OF INDIGENCY', 0, 1, 'C');
-        $pdf->Ln(6);
+        if ($isIndigency) {
+            $pdf->SetFont($indigencyFont, 'B', 17);
+            $pdf->Cell(0, 8, 'TANGGAPAN NG PUNONG BARANGAY', 0, 1, 'C');
+            $pdf->SetFont($indigencyFont, 'B', 12);
+            $pdf->Cell(0, 7, 'CERTIFICATE OF INDIGENCY', 0, 1, 'C');
+            $pdf->Ln(6);
+        } else {
+            $pdf->SetFont($indigencyFont, 'B', 17);
+            $pdf->Cell(0, 8, 'TANGGAPAN NG PUNONG BARANGAY', 0, 1, 'C');
+            $pdf->SetFont($indigencyFont, 'B', 12);
+            $pdf->Cell(0, 7, 'BARANGAY CERTIFICATION', 0, 1, 'C');
+            $pdf->Ln(6);
+        }
     } else {
         $pdf->SetFont($fontFace, 'B', 12);
         $pdf->Cell(0, 6, 'TANGGAPAN NG PUNONG BARANGAY', 0, 1, 'C');
@@ -276,7 +323,116 @@ function dra_generate_issued_document(array $requestRow): ?string {
     }
 
     $pdf->SetFont($fontFace, '', 12);
-    if ($isIndigency) {
+    $writeRichParagraph = function (
+        array $segments,
+        float $lineHeight,
+        float $leftMargin,
+        float $indent,
+        string $fontFamily,
+        float $fontSize,
+        float $restoreLeftMargin = 18.0
+    ) use ($pdf): void {
+        $tokens = [];
+        foreach ($segments as $segment) {
+            $text = (string)($segment['text'] ?? '');
+            if ($text === '') {
+                continue;
+            }
+            $bold = !empty($segment['bold']);
+            $parts = preg_split('/(\s+)/u', $text, -1, PREG_SPLIT_DELIM_CAPTURE | PREG_SPLIT_NO_EMPTY);
+            if (!is_array($parts)) {
+                $parts = [$text];
+            }
+            foreach ($parts as $part) {
+                $tokens[] = ['text' => $part, 'bold' => $bold];
+            }
+        }
+        if (empty($tokens)) {
+            return;
+        }
+
+        $contentWidth = $pdf->GetPageWidth() - $leftMargin - $restoreLeftMargin;
+        $firstLineWidth = max(1.0, $contentWidth - $indent);
+
+        $measureToken = function (array $token) use ($pdf, $fontFamily, $fontSize): float {
+            $pdf->SetFont($fontFamily, !empty($token['bold']) ? 'B' : '', $fontSize);
+            return $pdf->GetStringWidth((string)($token['text'] ?? ''));
+        };
+
+        $lines = [];
+        $line = [];
+        $lineWidth = 0.0;
+        $lineMax = $firstLineWidth;
+
+        foreach ($tokens as $token) {
+            $text = (string)($token['text'] ?? '');
+            if ($text === '') {
+                continue;
+            }
+            $width = $measureToken($token);
+
+            if (!empty($line) && ($lineWidth + $width) > $lineMax) {
+                while (!empty($line) && preg_match('/^\s+$/u', (string)$line[count($line) - 1]['text'])) {
+                    $removed = array_pop($line);
+                    if ($removed !== null) {
+                        $lineWidth -= $measureToken($removed);
+                    }
+                }
+                if (!empty($line)) {
+                    $lines[] = $line;
+                }
+                $line = [];
+                $lineWidth = 0.0;
+                $lineMax = $contentWidth;
+                if (preg_match('/^\s+$/u', $text)) {
+                    continue;
+                }
+            }
+
+            $line[] = $token;
+            $lineWidth += $width;
+        }
+        if (!empty($line)) {
+            $lines[] = $line;
+        }
+
+        $y = $pdf->GetY();
+        foreach ($lines as $lineIndex => $lineTokens) {
+            $x = $leftMargin + ($lineIndex === 0 ? $indent : 0.0);
+            $pdf->SetXY($x, $y);
+            foreach ($lineTokens as $token) {
+                $text = (string)($token['text'] ?? '');
+                $pdf->SetFont($fontFamily, !empty($token['bold']) ? 'B' : '', $fontSize);
+                $w = $pdf->GetStringWidth($text);
+                $pdf->Cell($w, $lineHeight, $text, 0, 0, 'L');
+            }
+            $y += $lineHeight;
+        }
+
+        $pdf->SetLeftMargin($restoreLeftMargin);
+        $pdf->SetX($restoreLeftMargin);
+        $pdf->SetY($y);
+    };
+    $writeIndentedParagraph = function (
+        string $text,
+        float $lineHeight,
+        float $leftMargin,
+        float $indent,
+        string $fontFamily,
+        float $fontSize,
+        float $restoreLeftMargin = 18.0
+    ) use ($writeRichParagraph): void {
+        $writeRichParagraph(
+            [['text' => $text, 'bold' => false]],
+            $lineHeight,
+            $leftMargin,
+            $indent,
+            $fontFamily,
+            $fontSize,
+            $restoreLeftMargin
+        );
+    };
+    if ($isSpecialCertificate) {
         if (is_file($qrDiskPath)) {
             // Place QR beside the bottom disclaimer, in the right-side free space.
             $pdf->Image($qrDiskPath, 166, 254, 20, 20);
@@ -294,60 +450,172 @@ function dra_generate_issued_document(array $requestRow): ?string {
         $suffix = ($v >= 11 && $v <= 13) ? 'th' : (($day % 10 === 1) ? 'st' : (($day % 10 === 2) ? 'nd' : (($day % 10 === 3) ? 'rd' : 'th')));
         $issuedAsDocx = $day . $suffix . ' day of ' . $monthUpper . ' ' . $yearNum;
 
-        $pdf->SetFont($fontFace, 'B', 12);
-        $pdf->SetXY(22, 78);
-        $pdf->Cell(14, 7, 'TO', 0, 0, 'L');
-        $pdf->Cell(4, 7, ':', 0, 0, 'C');
-        if ($requestOfficer === '') {
-            $pdf->Line(39, 84, 106, 84);
-            $pdf->Line(39, 90, 106, 90);
-            $pdf->Line(39, 96, 106, 96);
-            $pdf->SetY(96);
-        } else {
-            $offLines = preg_split("/\r\n|\n|\r/", $requestOfficer);
-            $firstLine = trim((string)($offLines[0] ?? ''));
-            $pdf->SetFont($fontFace, 'B', 11);
-            $pdf->Cell(0, 7, strtoupper($firstLine), 0, 1, 'L');
-            $pdf->SetX(39);
-            for ($i = 1; $i < count($offLines); $i++) {
-                $line = trim((string)$offLines[$i]);
-                if ($line === '') continue;
-                $pdf->Cell(0, 7, strtoupper($line), 0, 1, 'L');
+        if ($isIndigency) {
+            $pdf->SetFont($indigencyFont, 'B', 12);
+            $pdf->SetXY(22, 78);
+            $pdf->Cell(14, 7, 'TO', 0, 0, 'L');
+            $pdf->Cell(4, 7, ':', 0, 0, 'C');
+            if ($requestOfficer === '') {
+                $pdf->Line(39, 84, 106, 84);
+                $pdf->Line(39, 90, 106, 90);
+                $pdf->Line(39, 96, 106, 96);
+                $pdf->SetY(96);
+            } else {
+                $offLines = preg_split("/\r\n|\n|\r/", $requestOfficer);
+                $firstLine = trim((string)($offLines[0] ?? ''));
+                $pdf->SetFont($indigencyFont, 'B', 11);
+                $pdf->Cell(0, 7, strtoupper($firstLine), 0, 1, 'L');
                 $pdf->SetX(39);
+                for ($i = 1; $i < count($offLines); $i++) {
+                    $line = trim((string)$offLines[$i]);
+                    if ($line === '') continue;
+                    $pdf->Cell(0, 7, strtoupper($line), 0, 1, 'L');
+                    $pdf->SetX(39);
+                }
             }
+        } else {
+            $pdf->SetFont($indigencyFont, 'B', 12);
+            $pdf->SetX(18);
+            $pdf->Cell(0, 7, 'TO WHOM IT MAY CONCERN::', 0, 1, 'L');
         }
         $pdf->Ln(7);
-        $pdf->SetFont($fontFace, '', 12);
-        $pdf->SetX(22);
-        $pdf->MultiCell(0, 7, 'This is to certify that ' . $fullName . ', resident of ' . $address . ' belongs to the one of the indigent families of this Barangay. The Income of this family is barely enough to meet their day-to-day needs.', 0, 'J');
+        $pdf->SetFont($indigencyFont, '', 12);
+        if ($isIndigency) {
+            $writeRichParagraph(
+                [
+                    ['text' => 'This is to certify that ', 'bold' => false],
+                    ['text' => $fullName, 'bold' => true],
+                    ['text' => ', resident of ' . $address . ' belongs to the one of the indigent families of this Barangay. The Income of this family is barely enough to meet their day-to-day needs.', 'bold' => false],
+                ],
+                7,
+                18,
+                10,
+                $indigencyFont,
+                12
+            );
+        } else {
+            $writeRichParagraph(
+                [
+                    ['text' => 'This is to certify that ', 'bold' => false],
+                    ['text' => $fullName, 'bold' => true],
+                    ['text' => ', resident of ', 'bold' => false],
+                    ['text' => $address, 'bold' => true],
+                    ['text' => ' is personally known to be as a person of ', 'bold' => false],
+                    ['text' => 'GOOD MORAL CHARACTER, PEACEFUL and LAW-ABIDING CITIZEN of THE COMMUNITY.', 'bold' => true],
+                ],
+                7,
+                18,
+                10,
+                $indigencyFont,
+                12
+            );
+        }
         $pdf->Ln(4);
-        $pdf->SetX(22);
-        $pdf->MultiCell(0, 7, 'This certification is being issued upon the request of the above subject in person in connection with his/her application for ' . $requestPurpose . ' purposes only.', 0, 'J');
+        if ($isIndigency) {
+            $writeRichParagraph(
+                [
+                    ['text' => 'This certification is being issued upon the request of the above subject in person in connection with his/her application for ', 'bold' => false],
+                    ['text' => $requestPurpose, 'bold' => true],
+                    ['text' => ' purposes only.', 'bold' => false],
+                ],
+                7,
+                18,
+                10,
+                $indigencyFont,
+                12
+            );
+        } else {
+            $writeIndentedParagraph(
+                'This further certifies that he/she is not a member, nor has joined a subversive society organization against the government.',
+                7,
+                18,
+                10,
+                $indigencyFont,
+                12
+            );
+            $pdf->Ln(4);
+            $writeRichParagraph(
+                [
+                    ['text' => 'This certification is being issued upon the request of the above-named person to be used for his/her application for ', 'bold' => false],
+                    ['text' => $requestPurpose, 'bold' => true],
+                    ['text' => ' purposes only.', 'bold' => false],
+                ],
+                7,
+                18,
+                10,
+                $indigencyFont,
+                12
+            );
+        }
         $pdf->Ln(4);
-        $pdf->SetX(22);
-        $pdf->MultiCell(0, 7, 'Issued this ' . $issuedAsDocx . ', at the office of the punong Barangay, Barangay San Jose, Rodriguez (Montalban), Rizal.', 0, 'J');
+        $writeRichParagraph(
+            [
+                ['text' => 'Issued this ', 'bold' => false],
+                ['text' => $issuedAsDocx, 'bold' => true],
+                ['text' => ', at the office of the Punong Barangay, Barangay San Jose, Montalban, Rizal', 'bold' => false],
+            ],
+            7,
+            18,
+            10,
+            $indigencyFont,
+            12
+        );
+
+        if ($isGoodMoral) {
+            $metaY = 186.0;
+            $lineX1 = 36.0;
+            $lineX2 = 58.0;
+            $pdf->SetFont($indigencyFont, 'B', 12);
+            $pdf->SetXY(18, $metaY);
+            $pdf->Cell(18, 6, 'CTC No.:', 0, 0, 'L');
+            $pdf->Line($lineX1, $metaY + 5, $lineX2, $metaY + 5);
+            $metaY += 8;
+            $pdf->SetFont($indigencyFont, 'B', 12);
+            $pdf->SetXY(18, $metaY);
+            $pdf->Cell(20, 6, 'Issued at:', 0, 0, 'L');
+            $pdf->Line($lineX1, $metaY + 5, $lineX2, $metaY + 5);
+            $metaY += 8;
+            $pdf->SetXY(18, $metaY);
+            $pdf->Cell(20, 6, 'Issued On:', 0, 0, 'L');
+            $pdf->Line($lineX1, $metaY + 5, $lineX2, $metaY + 5);
+            $metaY += 8;
+            $pdf->SetXY(18, $metaY);
+            $pdf->Cell(18, 6, 'OR No.:', 0, 0, 'L');
+            $pdf->Line($lineX1, $metaY + 5, $lineX2, $metaY + 5);
+            if ($orNo !== '') {
+                $pdf->SetXY($lineX1, $metaY);
+                $pdf->SetFont($indigencyFont, '', 11);
+                $pdf->Cell($lineX2 - $lineX1, 6, $orNo, 0, 0, 'C');
+            }
+
+        }
+
+        // Issued by + signatory blocks aligned to the same baseline.
+        $signBaseY = $isGoodMoral ? 230.0 : 214.0;
 
         // Issued by block (lower-left)
-        $pdf->SetFont($fontFace, '', 11);
-        $pdf->SetXY(22, 178);
-        $pdf->Cell(0, 6, 'Issued by: MINERVA D. QUITA', 0, 1, 'L');
-        $pdf->SetX(39);
-        $pdf->SetFont($fontFace, 'I', 11);
-        $pdf->Cell(0, 6, 'Barangay Secretary', 0, 1, 'L');
+        $pdf->SetFont($indigencyFont, '', 11);
+        $pdf->SetXY(26, $signBaseY + 9);
+        $pdf->Cell(20, 6, 'Issued by:', 0, 0, 'L');
+        $pdf->SetFont($indigencyFont, 'B', 11);
+        $pdf->Cell(54, 6, 'MINERVA D. QUITA', 0, 1, 'L');
+        $pdf->SetFont($indigencyFont, 'I', 11);
+        $pdf->SetXY(46, $signBaseY + 15);
+        $pdf->Cell(44, 6, 'Barangay Secretary', 0, 1, 'C');
 
         // Punong Barangay signature block (lower-right)
-        $pdf->Line(112, 181, 168, 181);
-        $pdf->SetFont($fontFace, 'B', 11);
-        $pdf->SetXY(112, 183);
-        $pdf->Cell(56, 6, 'HON. GLENN S. EVANGELISTA', 0, 1, 'C');
-        $pdf->SetFont($fontFace, 'I', 11);
-        $pdf->SetX(112);
-        $pdf->Cell(56, 6, 'Punong Barangay', 0, 1, 'C');
+        $pdf->Line(124, $signBaseY, 194, $signBaseY);
+        $pdf->SetFont($indigencyFont, 'B', 11);
+        $pdf->SetXY(124, $signBaseY + 2);
+        $pdf->Cell(70, 6, 'HON. GLENN S. EVANGELISTA', 0, 1, 'C');
+        $pdf->SetFont($indigencyFont, 'I', 11);
+        $pdf->SetXY(124, $signBaseY + 8);
+        $pdf->Cell(70, 6, 'Punong Barangay', 0, 1, 'C');
 
         // Footer note in a centered constrained width area.
-        $pdf->SetFont($fontFace, 'I', 8);
+        $pdf->SetFont($indigencyFont, 'I', 8);
         $pdf->SetXY(46, 258);
-        $pdf->SetFont('Arial', 'I', 8);
+        $pdf->SetFont($indigencyFont, 'I', 8);
         $pdf->MultiCell(118, 4, "This certificate is valid for Forty-five (45) days from the date of issue, check the\nQR code to verify the authenticity of this document.", 0, 'C');
 
         $pdf->Output('F', $diskPath);
@@ -356,11 +624,32 @@ function dra_generate_issued_document(array $requestRow): ?string {
         if (is_file($qrDiskPath)) {
             $pdf->Image($qrDiskPath, 166, 238, 26, 26);
         }
-        $pdf->MultiCell(0, 7, 'This is to certify that ' . $fullName . ' is a bona fide resident of ' . $address . '.', 0, 'J');
+        $writeIndentedParagraph(
+            'This is to certify that ' . $fullName . ' is a bona fide resident of ' . $address . '.',
+            7,
+            18,
+            10,
+            $fontFace,
+            12
+        );
         $pdf->Ln(2);
-        $pdf->MultiCell(0, 7, 'This certification is issued upon request for ' . ($purpose !== '' ? $purpose : 'legal purpose') . '.', 0, 'J');
+        $writeIndentedParagraph(
+            'This certification is issued upon request for ' . ($purpose !== '' ? $purpose : 'legal purpose') . '.',
+            7,
+            18,
+            10,
+            $fontFace,
+            12
+        );
         $pdf->Ln(2);
-        $pdf->MultiCell(0, 7, 'Issued this ' . $issuedAt . ' at Barangay San Jose, Rodriguez, Rizal.', 0, 'J');
+        $writeIndentedParagraph(
+            'Issued this ' . $issuedAt . ' at Barangay San Jose, Rodriguez, Rizal.',
+            7,
+            18,
+            10,
+            $fontFace,
+            12
+        );
 
         $pdf->Ln(10);
         $pdf->SetFont($fontFace, '', 10);
@@ -427,12 +716,13 @@ function dra_backfill_payment_verified_to_ready(mysqli $conn): void {
             if ($issuedPath === '') {
                 $issuedPath = dra_generate_issued_document($row) ?? '';
             }
+            if ($issuedPath === '') {
+                continue;
+            }
             $patch = [
                 'ready_at' => dr_now(),
+                'issued_file_path' => $issuedPath,
             ];
-            if ($issuedPath !== '') {
-                $patch['issued_file_path'] = $issuedPath;
-            }
             dr_update_stage($conn, $requestId, DR_STAGE_READY_FOR_CLAIM, $patch);
         }
     } catch (Throwable $e) {
@@ -667,6 +957,8 @@ function dra_resident_profile_snapshot(mysqli $conn, string $residentUserId, str
 dra_backfill_payment_verified_to_ready($conn);
 
 if ($action === 'list') {
+    dr_cancel_overdue_payment_requests($conn);
+
     $where = [];
     $types = '';
     $vals = [];
@@ -787,6 +1079,10 @@ if ($action === 'view_payment_proof') {
 }
 
 if ($action === 'view_issued') {
+    if (dra_is_finance_user($conn, $currentUserId)) {
+        http_response_code(403);
+        exit('Finance users are not allowed to view issued documents.');
+    }
     if ($requestId === '') {
         http_response_code(422);
         exit('Missing request ID.');
@@ -797,11 +1093,36 @@ if ($action === 'view_issued') {
         exit('Request not found.');
     }
     $stage = strtolower(trim((string)($row['stage'] ?? '')));
-    if ($stage !== DR_STAGE_COMPLETED) {
+    if (!in_array($stage, [DR_STAGE_PAYMENT_VERIFIED, DR_STAGE_READY_FOR_CLAIM, DR_STAGE_COMPLETED], true)) {
         http_response_code(422);
-        exit('Issued document can only be viewed after completion.');
+        exit('Issued document is not available for this request stage yet.');
     }
     $publicPath = trim((string)($row['issued_file_path'] ?? ''));
+    $docTypeNorm = strtolower(trim((string)($row['document_type'] ?? '')));
+    $isIndigency = strpos($docTypeNorm, 'indigency') !== false;
+    $isGoodMoral = (strpos($docTypeNorm, 'goodmoral') !== false) || (strpos($docTypeNorm, 'good moral') !== false);
+    $ext = strtolower(pathinfo($publicPath, PATHINFO_EXTENSION));
+    $mustRegenerate = ($publicPath === '') || (($isIndigency || $isGoodMoral) && $ext !== 'pdf');
+    if ($mustRegenerate) {
+        $verificationCode = trim((string)($row['verification_code'] ?? ''));
+        if ($verificationCode === '') {
+            $verificationCode = strtoupper(bin2hex(random_bytes(8)));
+        }
+        $generated = (string)(dra_generate_issued_document_safe(array_merge((array)$row, [
+            'verification_code' => $verificationCode,
+        ])) ?? '');
+        if ($generated !== '') {
+            $patch = [
+                'issued_file_path' => $generated,
+            ];
+            if (trim((string)($row['verification_code'] ?? '')) === '') {
+                $patch['verification_code'] = $verificationCode;
+                $patch['qr_code_path'] = '/UnifiedFileAttachment/IssuedDocuments/QR/qr_' . preg_replace('/[^A-Za-z0-9_-]/', '', $requestId) . '.png';
+            }
+            dr_update_stage($conn, $requestId, (string)($row['stage'] ?? ''), $patch);
+            $publicPath = $generated;
+        }
+    }
     if ($publicPath === '') {
         http_response_code(404);
         exit('Issued document not found.');
@@ -872,12 +1193,13 @@ if ($action === 'personnel_approve') {
                 'verification_code' => $verificationCode,
             ])) ?? '');
         }
+        if ($issuedPath === '') {
+            dr_respond_json(500, ['success' => false, 'message' => 'Unable to generate issued document for release.']);
+        }
         $patch['verification_code'] = $verificationCode;
         $patch['qr_code_path'] = $qrCodePath;
         $patch['ready_at'] = dr_now();
-        if ($issuedPath !== '') {
-            $patch['issued_file_path'] = $issuedPath;
-        }
+        $patch['issued_file_path'] = $issuedPath;
     }
 
     $updated = dr_update_stage($conn, $requestId, $nextStage, $patch);
@@ -924,6 +1246,15 @@ if ($action === 'personnel_reject') {
 }
 
 if ($action === 'finance_verify') {
+    $currentStage = strtolower(trim((string)($row['stage'] ?? '')));
+    if (!in_array($currentStage, [DR_STAGE_FOR_PAYMENT, DR_STAGE_PAYMENT_SUBMITTED, DR_STAGE_PAYMENT_REJECTED], true)) {
+        dr_respond_json(422, ['success' => false, 'message' => 'Request is not eligible for finance verification.']);
+    }
+    $verifyMode = strtolower(trim((string)($_POST['verify_mode'] ?? '')));
+    if (!in_array($verifyMode, ['walkin', 'gcash'], true)) {
+        $verifyMode = '';
+    }
+
     $amountRaw = trim((string)($_POST['amount'] ?? ''));
     $orNumber = trim((string)($_POST['or_number'] ?? ''));
     $defaultFee = dr_get_fee_amount_for_document_type($conn, (string)($row['document_type'] ?? ''));
@@ -946,6 +1277,9 @@ if ($action === 'finance_verify') {
         'certificate_number' => $certificateNumber,
         'verification_code' => $verificationCode,
     ]));
+    if ($issuedPath === null || $issuedPath === '') {
+        dr_respond_json(500, ['success' => false, 'message' => 'Payment verified, but issued document generation failed.']);
+    }
 
     $patch = [
         'amount' => (float)$amountRaw,
@@ -958,9 +1292,16 @@ if ($action === 'finance_verify') {
         'finance_decision_at' => dr_now(),
         'ready_at' => dr_now(),
     ];
-    if ($issuedPath !== null && $issuedPath !== '') {
-        $patch['issued_file_path'] = $issuedPath;
+    // Walk-in verification from for-payment/rejected states is treated as barangay payment.
+    if ($verifyMode === 'walkin' || in_array($currentStage, [DR_STAGE_FOR_PAYMENT, DR_STAGE_PAYMENT_REJECTED], true)) {
+        $patch['payment_method'] = 'barangay';
+        $patch['payment_submitted_at'] = dr_now();
+        $patch['payment_proof_path'] = null;
+        $patch['payment_reference'] = null;
+    } elseif ($verifyMode === 'gcash') {
+        $patch['payment_method'] = 'gcash';
     }
+    $patch['issued_file_path'] = (string)$issuedPath;
 
     // Payment verification immediately makes the document ready for claim/download.
     $updated = dr_update_stage($conn, $requestId, DR_STAGE_READY_FOR_CLAIM, $patch);
@@ -1017,15 +1358,16 @@ if ($action === 'mark_ready') {
             'verification_code' => $verificationCode,
         ]));
     }
+    if ($issuedPath === null || $issuedPath === '') {
+        dr_respond_json(500, ['success' => false, 'message' => 'Unable to mark ready without an issued document.']);
+    }
 
     $patch = [
         'ready_at' => dr_now(),
         'verification_code' => $verificationCode,
         'qr_code_path' => '/UnifiedFileAttachment/IssuedDocuments/QR/qr_' . preg_replace('/[^A-Za-z0-9_-]/', '', $requestId) . '.png',
     ];
-    if ($issuedPath !== null && $issuedPath !== '') {
-        $patch['issued_file_path'] = $issuedPath;
-    }
+    $patch['issued_file_path'] = (string)$issuedPath;
 
     $updated = dr_update_stage($conn, $requestId, DR_STAGE_READY_FOR_CLAIM, $patch);
     if (!$updated) {

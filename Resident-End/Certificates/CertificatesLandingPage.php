@@ -88,7 +88,7 @@ require_once __DIR__ . "/../includes/resident_access_guard.php";
                         <p class="certificate-text">
                             Request a good moral certificate for school, employment, or other requirements.
                         </p>
-                        <button class="btn apply-btn" type="button" disabled title="Currently unavailable">Apply Now</button>
+                        <button class="btn apply-btn" onclick="location.href='GoodMoralForm.php'">Apply Now</button>
                     </div>
                 </div>
 

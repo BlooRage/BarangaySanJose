@@ -9,6 +9,8 @@ requireRoleSession(['Resident'], true);
 
 dr_ensure_table($conn);
 dr_ensure_general_fees_table($conn);
+dr_backfill_missing_finance_transactions($conn, 1000);
+dr_prune_free_document_finance_transactions($conn, 3000);
 
 function dr_ensure_request_support_tables(mysqli $conn): void {
     $conn->query("
@@ -640,6 +642,8 @@ if ($action === 'submit_payment') {
         dr_respond_json(422, ['success' => false, 'message' => 'Missing request ID.']);
     }
 
+    dr_cancel_overdue_payment_requests($conn, $requestId);
+
     $row = dr_fetch_request($conn, $requestId);
     if (!$row || (string)$row['resident_user_id'] !== $residentForeignId) {
         dr_respond_json(404, ['success' => false, 'message' => 'Request not found.']);
@@ -654,9 +658,17 @@ if ($action === 'submit_payment') {
     if (!in_array($paymentMethod, ['gcash', 'barangay'], true)) {
         $paymentMethod = 'gcash';
     }
+    if ($paymentMethod !== 'gcash') {
+        dr_respond_json(422, ['success' => false, 'message' => 'Online submission is only for GCash payments. For barangay payment, pay at the finance window.']);
+    }
 
     $proofPath = null;
+    $paymentReference = null;
     if ($paymentMethod === 'gcash') {
+        $paymentReference = trim((string)($_POST['payment_reference'] ?? ''));
+        if ($paymentReference === '') {
+            dr_respond_json(422, ['success' => false, 'message' => 'GCash transaction number is required.']);
+        }
         $proofPath = dr_save_upload($_FILES['payment_proof'] ?? [], 'DocumentPayments');
         if (!$proofPath) {
             dr_respond_json(422, ['success' => false, 'message' => 'GCash payment proof is required.']);
@@ -667,6 +679,7 @@ if ($action === 'submit_payment') {
         'payment_method' => $paymentMethod,
         'payment_proof_path' => $proofPath,
         'payment_submitted_at' => dr_now(),
+        'payment_reference' => $paymentReference,
         'status_remarks' => null,
     ]);
 
@@ -677,6 +690,51 @@ if ($action === 'submit_payment') {
     dr_respond_json(200, [
         'success' => true,
         'message' => 'Payment submitted. Please wait for finance verification.',
+        'request' => $updated,
+    ]);
+}
+
+if ($action === 'select_payment_mode') {
+    if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+        dr_respond_json(405, ['success' => false, 'message' => 'Method not allowed.']);
+    }
+
+    $requestId = trim((string)($_POST['request_id'] ?? ''));
+    if ($requestId === '') {
+        dr_respond_json(422, ['success' => false, 'message' => 'Missing request ID.']);
+    }
+
+    dr_cancel_overdue_payment_requests($conn, $requestId);
+
+    $row = dr_fetch_request($conn, $requestId);
+    if (!$row || (string)$row['resident_user_id'] !== $residentForeignId) {
+        dr_respond_json(404, ['success' => false, 'message' => 'Request not found.']);
+    }
+
+    $stage = (string)($row['stage'] ?? '');
+    if (!in_array($stage, [DR_STAGE_FOR_PAYMENT, DR_STAGE_PAYMENT_REJECTED], true)) {
+        dr_respond_json(422, ['success' => false, 'message' => 'Payment mode can only be selected while request is for payment.']);
+    }
+
+    $paymentMethod = strtolower(trim((string)($_POST['payment_method'] ?? '')));
+    if (!in_array($paymentMethod, ['gcash', 'barangay'], true)) {
+        dr_respond_json(422, ['success' => false, 'message' => 'Please choose a valid payment method.']);
+    }
+
+    $updated = dr_update_stage($conn, $requestId, DR_STAGE_FOR_PAYMENT, [
+        'payment_method' => $paymentMethod,
+        'payment_proof_path' => null,
+        'payment_submitted_at' => null,
+        'payment_reference' => null,
+        'status_remarks' => null,
+    ]);
+    if (!$updated) {
+        dr_respond_json(500, ['success' => false, 'message' => 'Unable to save payment mode.']);
+    }
+
+    dr_respond_json(200, [
+        'success' => true,
+        'message' => 'Payment mode saved.',
         'request' => $updated,
     ]);
 }
@@ -816,6 +874,8 @@ if ($action === 'view_payment_proof') {
 }
 
 if ($action === 'list') {
+    dr_cancel_overdue_payment_requests($conn);
+
     $orderCol = dr_has_column($conn, 'documentrequesttbl', 'submitted_at') ? 'submitted_at' : 'request_timestamp';
     $stmt = $conn->prepare("SELECT * FROM documentrequesttbl WHERE resident_user_id = ? ORDER BY {$orderCol} DESC, request_id DESC");
     if (!$stmt) {

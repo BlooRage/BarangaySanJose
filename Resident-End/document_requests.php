@@ -120,33 +120,87 @@ require_once __DIR__ . '/includes/resident_access_guard.php';
   </main>
 </div>
 
-<div class="modal fade" id="paymentModal" tabindex="-1" aria-hidden="true">
+<div class="modal fade" id="paymentModeModal" tabindex="-1" aria-hidden="true">
   <div class="modal-dialog modal-dialog-centered">
-    <form class="modal-content" id="paymentForm" enctype="multipart/form-data">
+    <form class="modal-content" id="paymentModeForm">
       <div class="modal-header">
-        <h5 class="modal-title">Submit Payment</h5>
+        <h5 class="modal-title" id="paymentModeTitle">Select Mode of Payment</h5>
         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
       </div>
       <div class="modal-body">
-        <input type="hidden" id="payRequestId" name="request_id">
-
-        <label class="form-label">Payment Method</label>
-        <select class="form-select mb-3" name="payment_method" id="payMethod">
-          <option value="gcash">GCash Upload</option>
-          <option value="barangay">Pay at Barangay</option>
+        <input type="hidden" id="paymentModeRequestId" name="request_id">
+        <label class="form-label">Payment Option</label>
+        <select class="form-select" id="paymentModeSelect" name="payment_method" required>
+          <option value="">Select an option</option>
+          <option value="barangay">Pay in Barangay</option>
+          <option value="gcash">Pay via GCash</option>
         </select>
-
-        <div id="proofWrap">
-          <label class="form-label">Payment Proof</label>
-          <input type="file" class="form-control" name="payment_proof" id="payProof" accept=".jpg,.jpeg,.png,.webp,.pdf">
-          <div class="form-text">Required for GCash payments.</div>
-        </div>
-
-        <div class="alert alert-danger d-none mt-3" id="payError"></div>
+        <div class="alert alert-danger d-none mt-3" id="paymentModeError"></div>
       </div>
       <div class="modal-footer">
         <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
-        <button type="submit" class="btn btn-primary">Submit Payment</button>
+        <button type="submit" class="btn btn-primary">Save</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div class="modal fade" id="barangayPaymentModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Pay in Barangay Instructions</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <p class="mb-2">Follow these steps:</p>
+        <ol class="mb-3">
+          <li>Go to the finance window.</li>
+          <li>Show your request ID.</li>
+          <li>Pay the required amount.</li>
+          <li>Go to the issuance office to claim your requested document.</li>
+        </ol>
+        <p class="text-muted small mb-0" id="barangayDeadlineNote">You have until - to complete the payment before the request is automatically cancelled.</p>
+      </div>
+      <div class="modal-footer">
+        <button type="button" id="barangayChangeModeBtn" class="btn btn-outline-primary">Change Mode of Payment</button>
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="gcashPaymentModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <form class="modal-content" id="gcashPaymentForm" enctype="multipart/form-data">
+      <div class="modal-header">
+        <h5 class="modal-title">Pay via GCash</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" id="gcashRequestId" name="request_id">
+        <input type="hidden" name="payment_method" value="gcash">
+        <div class="mb-3 text-center">
+          <div class="form-text mb-2">Scan this QR for GCash payment.</div>
+          <img
+            id="gcashQrImage"
+            src="<?= htmlspecialchars((string)$baseUrl, ENT_QUOTES, 'UTF-8') ?>/Images/GCASH_QR.jpg"
+            alt="GCash QR Code"
+            style="max-width:220px;width:100%;height:auto;border:1px solid #ddd;border-radius:8px;"
+            onerror="this.style.display='none';document.getElementById('gcashQrMissing')?.classList.remove('d-none');"
+          >
+          <div id="gcashQrMissing" class="form-text text-danger d-none">GCash QR image not found. Please contact the barangay office.</div>
+        </div>
+        <label class="form-label">Reference ID / Transaction Number</label>
+        <input type="text" class="form-control mb-3" name="payment_reference" id="gcashReference" placeholder="Enter GCash transaction number" required>
+        <label class="form-label">Payment Proof</label>
+        <input type="file" class="form-control" name="payment_proof" id="gcashProof" accept=".jpg,.jpeg,.png,.webp,.pdf" required>
+        <div class="form-text">Upload your GCash payment proof.</div>
+        <div class="alert alert-danger d-none mt-3" id="gcashError"></div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" id="gcashChangeModeBtn" class="btn btn-outline-secondary">Change Mode of Payment</button>
+        <button type="submit" class="btn btn-primary">Pay Now</button>
       </div>
     </form>
   </div>
@@ -193,12 +247,22 @@ require_once __DIR__ . '/includes/resident_access_guard.php';
   const endpoint = '<?= htmlspecialchars($baseUrl) ?>/PhpFiles/Resident-End/documentRequestWorkflow.php';
   const tbody = document.getElementById('requestRows');
   const btnRefresh = document.getElementById('btnRefresh');
-  const paymentModal = new bootstrap.Modal(document.getElementById('paymentModal'));
-  const paymentForm = document.getElementById('paymentForm');
-  const payRequestId = document.getElementById('payRequestId');
-  const payMethod = document.getElementById('payMethod');
-  const proofWrap = document.getElementById('proofWrap');
-  const payError = document.getElementById('payError');
+  const paymentModeModal = new bootstrap.Modal(document.getElementById('paymentModeModal'));
+  const paymentModeForm = document.getElementById('paymentModeForm');
+  const paymentModeTitle = document.getElementById('paymentModeTitle');
+  const paymentModeRequestId = document.getElementById('paymentModeRequestId');
+  const paymentModeSelect = document.getElementById('paymentModeSelect');
+  const paymentModeError = document.getElementById('paymentModeError');
+  const barangayPaymentModal = new bootstrap.Modal(document.getElementById('barangayPaymentModal'));
+  const barangayChangeModeBtn = document.getElementById('barangayChangeModeBtn');
+  const barangayDeadlineNote = document.getElementById('barangayDeadlineNote');
+  const gcashPaymentModal = new bootstrap.Modal(document.getElementById('gcashPaymentModal'));
+  const gcashPaymentForm = document.getElementById('gcashPaymentForm');
+  const gcashRequestId = document.getElementById('gcashRequestId');
+  const gcashReference = document.getElementById('gcashReference');
+  const gcashProof = document.getElementById('gcashProof');
+  const gcashError = document.getElementById('gcashError');
+  const gcashChangeModeBtn = document.getElementById('gcashChangeModeBtn');
   const viewModal = new bootstrap.Modal(document.getElementById('viewModal'));
   const viewModalTitle = document.getElementById('viewModalTitle');
   const viewDetailsBody = document.getElementById('viewDetailsBody');
@@ -210,6 +274,7 @@ require_once __DIR__ . '/includes/resident_access_guard.php';
 
   function badge(stage, label) {
     const key = String(stage || '').toLowerCase();
+    if (key === 'cancelled') return `<span class="badge bg-danger">${label}</span>`;
     if (key.includes('rejected')) return `<span class="badge bg-danger">${label}</span>`;
     if (key === 'completed') return `<span class="badge bg-success">${label}</span>`;
     if (key === 'ready_for_claim') return `<span class="badge bg-primary">${label}</span>`;
@@ -266,6 +331,88 @@ require_once __DIR__ . '/includes/resident_access_guard.php';
     return {};
   }
 
+  function formatDateTime(value) {
+    const raw = String(value || '').trim();
+    if (!raw) return '';
+    const normalized = raw.replace(' ', 'T');
+    const date = new Date(normalized);
+    if (Number.isNaN(date.getTime())) return raw;
+    return date.toLocaleString();
+  }
+
+  function paymentActions(row) {
+    const requestId = String(row.request_id || '');
+    const viewBtn = `<button class="btn btn-sm btn-outline-secondary me-1" data-view="${escapeHtml(requestId)}">View</button>`;
+    const method = String(row.payment_method || '').toLowerCase();
+    const hasMode = method === 'gcash' || method === 'barangay';
+    const modeLabel = hasMode ? 'Change Mode of Payment' : 'Select Mode of Payment';
+    const modeButtonClass = hasMode ? 'btn-outline-secondary' : 'btn-outline-primary';
+    const modeBtn = `<button type="button" class="btn btn-sm ${modeButtonClass} me-1" data-open-mode="${escapeHtml(requestId)}">${modeLabel}</button>`;
+    const payNowBtn = `<button class="btn btn-sm btn-primary" data-pay-now="${escapeHtml(requestId)}">Pay Now</button>`;
+
+    if (method === 'gcash') {
+      return `${viewBtn}${payNowBtn}${modeBtn}`;
+    }
+    if (method === 'barangay') {
+      return `${viewBtn}${modeBtn}`;
+    }
+    return `${viewBtn}${modeBtn}`;
+  }
+
+  function openModeModal(requestId) {
+    const row = itemById.get(String(requestId || ''));
+    const method = String(row?.payment_method || '').toLowerCase();
+    paymentModeError.classList.add('d-none');
+    paymentModeError.textContent = '';
+    paymentModeForm.reset();
+    paymentModeRequestId.value = String(requestId || '');
+    paymentModeTitle.textContent = method ? 'Change Mode of Payment' : 'Select Mode of Payment';
+    if (method === 'gcash' || method === 'barangay') {
+      paymentModeSelect.value = method;
+    }
+    paymentModeModal.show();
+  }
+
+  function openGcashModal(requestId) {
+    gcashError.classList.add('d-none');
+    gcashError.textContent = '';
+    gcashPaymentForm.reset();
+    gcashRequestId.value = String(requestId || '');
+    gcashPaymentModal.show();
+  }
+
+  function updateBarangayDeadlineNote(requestId) {
+    if (!barangayDeadlineNote) return;
+    const row = itemById.get(String(requestId || ''));
+    const deadlineRaw = String(row?.payment_deadline || '').trim();
+    if (deadlineRaw) {
+      const normalized = deadlineRaw.replace(' ', 'T');
+      const dt = new Date(normalized);
+      const mmddyyyy = Number.isNaN(dt.getTime())
+        ? deadlineRaw
+        : `${String(dt.getMonth() + 1).padStart(2, '0')}/${String(dt.getDate()).padStart(2, '0')}/${dt.getFullYear()}`;
+      barangayDeadlineNote.textContent = `You have until ${mmddyyyy} to complete the payment before the request is automatically cancelled.`;
+    } else {
+      barangayDeadlineNote.textContent = 'You have until the payment deadline to complete the payment before the request is automatically cancelled.';
+    }
+  }
+
+  async function setPaymentMode(requestId, paymentMethod) {
+    const fd = new FormData();
+    fd.append('action', 'select_payment_mode');
+    fd.append('request_id', String(requestId || ''));
+    fd.append('payment_method', String(paymentMethod || ''));
+
+    const data = await fetchJson(endpoint, {
+      method: 'POST',
+      body: fd
+    });
+    if (!data.success) {
+      throw new Error(data.message || 'Unable to save payment mode.');
+    }
+    return data;
+  }
+
   async function fetchJson(url, options = {}) {
     const headers = new Headers(options.headers || {});
     if (!headers.has('Accept')) {
@@ -319,7 +466,7 @@ require_once __DIR__ . '/includes/resident_access_guard.php';
           : '';
         const issuedBtn = `<button class="btn btn-sm btn-success" data-issued="${escapeHtml(r.request_id)}">View Document</button>`;
         if (r.stage === 'for_payment' || r.stage === 'payment_rejected') {
-          action = `${viewBtn}${proofBtn}<button class="btn btn-sm btn-outline-primary" data-pay="${escapeHtml(r.request_id)}">Submit Payment</button>`;
+          action = paymentActions(r);
         } else if (r.stage === 'completed') {
           action = `${viewBtn}${proofBtn}${issuedBtn}`;
         } else {
@@ -327,6 +474,9 @@ require_once __DIR__ . '/includes/resident_access_guard.php';
         }
 
         const reason = r.status_remarks ? `<div class="text-danger small mt-1">Reason: ${escapeHtml(r.status_remarks)}</div>` : '';
+        const paymentDeadline = (r.stage === 'for_payment' || r.stage === 'payment_rejected') && r.payment_deadline
+          ? `<div class="text-muted small mt-1">Payment deadline: ${escapeHtml(formatDateTime(r.payment_deadline))}</div>`
+          : '';
         const feeText = (r.fee_amount !== null && r.fee_amount !== undefined && String(r.fee_amount) !== '')
           ? `₱${Number(r.fee_amount).toFixed(2)}`
           : '-';
@@ -336,21 +486,25 @@ require_once __DIR__ . '/includes/resident_access_guard.php';
             <td>${escapeHtml(r.document_type)}</td>
             <td>${escapeHtml(r.purpose || '-')}</td>
             <td>${escapeHtml(feeText)}</td>
-            <td>${badge(r.stage, escapeHtml(r.stage_label || r.stage || ''))}${reason}</td>
+            <td>${badge(r.stage, escapeHtml(r.stage_label || r.stage || ''))}${reason}${paymentDeadline}</td>
             <td>${escapeHtml(r.submitted_at || '-')}</td>
             <td>${action}</td>
           </tr>
         `;
       }).join('');
 
-      tbody.querySelectorAll('button[data-pay]').forEach((btn) => {
+      tbody.querySelectorAll('button[data-open-mode]').forEach((btn) => {
         btn.addEventListener('click', () => {
-          payError.classList.add('d-none');
-          payError.textContent = '';
-          paymentForm.reset();
-          payRequestId.value = btn.getAttribute('data-pay') || '';
-          proofWrap.classList.remove('d-none');
-          paymentModal.show();
+          const id = String(btn.getAttribute('data-open-mode') || '');
+          if (!id) return;
+          openModeModal(id);
+        });
+      });
+
+      tbody.querySelectorAll('button[data-pay-now]').forEach((btn) => {
+        btn.addEventListener('click', () => {
+          const id = String(btn.getAttribute('data-pay-now') || '');
+          openGcashModal(id);
         });
       });
 
@@ -458,20 +612,12 @@ require_once __DIR__ . '/includes/resident_access_guard.php';
     paymentProofModal.show();
   }
 
-  payMethod.addEventListener('change', () => {
-    if (payMethod.value === 'barangay') {
-      proofWrap.classList.add('d-none');
-    } else {
-      proofWrap.classList.remove('d-none');
-    }
-  });
-
-  paymentForm.addEventListener('submit', async (e) => {
+  gcashPaymentForm.addEventListener('submit', async (e) => {
     e.preventDefault();
-    payError.classList.add('d-none');
-    payError.textContent = '';
+    gcashError.classList.add('d-none');
+    gcashError.textContent = '';
 
-    const fd = new FormData(paymentForm);
+    const fd = new FormData(gcashPaymentForm);
     fd.append('action', 'submit_payment');
 
     try {
@@ -480,12 +626,52 @@ require_once __DIR__ . '/includes/resident_access_guard.php';
         body: fd
       });
       if (!data.success) throw new Error(data.message || 'Unable to submit payment.');
-      paymentModal.hide();
+      gcashPaymentModal.hide();
       await load();
     } catch (err) {
-      payError.textContent = err.message || String(err);
-      payError.classList.remove('d-none');
+      gcashError.textContent = err.message || String(err);
+      gcashError.classList.remove('d-none');
     }
+  });
+
+  paymentModeForm.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    paymentModeError.classList.add('d-none');
+    paymentModeError.textContent = '';
+
+    const requestId = String(paymentModeRequestId.value || '');
+    const mode = String(paymentModeSelect.value || '').toLowerCase();
+    if (!requestId || (mode !== 'gcash' && mode !== 'barangay')) {
+      paymentModeError.textContent = 'Please select a valid payment option.';
+      paymentModeError.classList.remove('d-none');
+      return;
+    }
+
+    try {
+      await setPaymentMode(requestId, mode);
+      paymentModeModal.hide();
+      paymentModeRequestId.value = requestId;
+      await load();
+      if (mode === 'barangay') {
+        updateBarangayDeadlineNote(requestId);
+        barangayPaymentModal.show();
+      }
+    } catch (err) {
+      paymentModeError.textContent = err.message || String(err);
+      paymentModeError.classList.remove('d-none');
+    }
+  });
+
+  gcashChangeModeBtn.addEventListener('click', () => {
+    const requestId = String(gcashRequestId.value || '');
+    gcashPaymentModal.hide();
+    if (requestId) openModeModal(requestId);
+  });
+
+  barangayChangeModeBtn.addEventListener('click', () => {
+    const requestId = String(paymentModeRequestId.value || gcashRequestId.value || '');
+    barangayPaymentModal.hide();
+    if (requestId) openModeModal(requestId);
   });
 
   btnRefresh.addEventListener('click', load);

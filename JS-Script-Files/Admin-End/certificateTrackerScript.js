@@ -11,9 +11,17 @@
   const stageTabs = Array.from(document.querySelectorAll('[data-stage-filter]'));
   const pendingTabCount = document.getElementById('pendingTabCount');
   const releaseTabCount = document.getElementById('releaseTabCount');
+  const unpaidTabCount = document.getElementById('unpaidTabCount');
+  const pendingVerificationTabCount = document.getElementById('pendingVerificationTabCount');
   const statusTabs = Array.from(document.querySelectorAll('[data-status-filter]'));
   const btnRefreshList = document.getElementById('btnRefreshList');
   const documentTypeFilter = document.getElementById('documentTypeFilter');
+  const financeFilterDocType = document.getElementById('financeFilterDocumentType');
+  const financeFilterPaymentMethod = document.getElementById('financeFilterPaymentMethod');
+  const btnFinanceFilterApply = document.getElementById('btnFinanceFilterApply');
+  const btnFinanceFilterReset = document.getElementById('btnFinanceFilterReset');
+  const financeColChecks = Array.from(document.querySelectorAll('[data-finance-col-index]'));
+  const btnFinanceColumnsReset = document.getElementById('btnFinanceColumnsReset');
 
   const actionModalEl = document.getElementById('actionModal');
   const actionModal = actionModalEl ? new bootstrap.Modal(actionModalEl) : null;
@@ -37,6 +45,7 @@
   const viewModal = viewModalEl ? new bootstrap.Modal(viewModalEl) : null;
   const viewModalTitle = document.getElementById('viewModalTitle');
   const viewDetailsBody = document.getElementById('viewDetailsBody');
+  const viewModalWalkInBtn = document.getElementById('viewModalWalkInBtn');
   const viewModalActions = document.getElementById('viewModalActions');
   const viewModalBackBtn = document.getElementById('viewModalBackBtn');
   const viewModalNextBtn = document.getElementById('viewModalNextBtn');
@@ -55,6 +64,9 @@
   let currentStage = String(window.CERT_TRACKER_DEFAULT_STAGE || '');
   let currentStatusFilter = 'all';
   let currentDocumentTypeFilter = '';
+  let financeFilterDocumentType = '';
+  let financeFilterMethod = '';
+  let cachedAllItems = [];
   let itemById = new Map();
   let viewMode = 'details';
   let viewDetailsHtml = '';
@@ -67,7 +79,17 @@
   let openViewDirectPreview = false;
   let paymentProofReturnTarget = '';
   let preserveViewStateOnNextHide = false;
-  const financeStages = new Set(['for_payment', 'payment_submitted']);
+  const financeStages = new Set([
+    'for_payment',
+    'payment_submitted',
+    'payment_rejected',
+    'payment_verified',
+    'ready_for_claim',
+    'completed'
+  ]);
+  const isFinancePaymentsPage = window.location.pathname.toLowerCase().includes('/admin-end/certificates/financepayments.php');
+  const financeColumnsStorageKey = 'financePaymentsVisibleColumns';
+  const defaultFinanceVisibleColumns = [1, 3, 4, 6, 7, 8];
 
   function esc(v) {
     return String(v ?? '').replace(/[&<>\"']/g, (m) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '\"': '&quot;', "'": '&#39;' }[m]));
@@ -87,6 +109,15 @@
   }
 
   function badge(stage, label) {
+    if (isFinancePaymentsPage) {
+      const bucket = String(stage || '').toLowerCase();
+      if (bucket === 'verified') return `<span class="badge bg-success">${label}</span>`;
+      if (bucket === 'pending_verification') return `<span class="badge bg-warning text-dark">${label}</span>`;
+      if (bucket === 'unpaid') return `<span class="badge bg-secondary">${label}</span>`;
+      if (bucket === 'rejected') return `<span class="badge bg-danger">${label}</span>`;
+      if (bucket === 'cancelled') return `<span class="badge bg-dark">${label}</span>`;
+      return `<span class="badge bg-secondary">${label}</span>`;
+    }
     const k = String(stage || '').toLowerCase();
     if (k.includes('rejected')) return `<span class="badge bg-danger">${label}</span>`;
     if (k === 'completed') return `<span class="badge bg-success">${label}</span>`;
@@ -97,16 +128,24 @@
 
   function actionButtons(row) {
     const viewBtn = `<button class="btn btn-sm btn-outline-secondary me-1" data-view-id="${esc(row.request_id)}">View</button>`;
-    const viewIssuedBtn = String(row.stage || '').toLowerCase() === 'completed'
+    const stageKey = String(row.stage || '').toLowerCase();
+    const hasIssuedFile = String(row.issued_file_path || '').trim() !== '';
+    const canViewIssuedByStage = stageKey === 'completed' || stageKey === 'ready_for_claim' || stageKey === 'payment_verified';
+    const viewIssuedBtn = (!isFinancePaymentsPage && (hasIssuedFile || canViewIssuedByStage))
       ? `<button class="btn btn-sm btn-outline-success me-1" data-issued-id="${esc(row.request_id)}">View Document</button>`
-      : '';
-    const viewDocBtn = String(row.stage || '').toLowerCase() === 'ready_for_claim'
-      ? `<button class="btn btn-sm btn-outline-primary me-1" data-preview-id="${esc(row.request_id)}">View Document</button>`
       : '';
     const proofBtn = row.payment_proof_path
       ? `<button class="btn btn-sm btn-outline-dark me-1" data-proof-id="${esc(row.request_id)}">View Payment</button>`
       : '';
-    return `${viewBtn}${viewDocBtn}${viewIssuedBtn}${proofBtn}`;
+    if (stageKey === 'for_payment' || stageKey === 'payment_submitted' || stageKey === 'payment_rejected') {
+      const hasGcashPayment = String(row.payment_method || '').toLowerCase() === 'gcash'
+        && (!!row.payment_proof_path || !!row.payment_reference || !!row.payment_submitted_at);
+      const gcashBtn = hasGcashPayment
+        ? `<button class="btn btn-sm btn-success" data-inline-action="finance_verify_gcash" data-id="${esc(row.request_id)}">Verify GCash Payment</button>`
+        : '';
+      return `${viewBtn}${gcashBtn}`;
+    }
+    return `${viewBtn}${viewIssuedBtn}${proofBtn}`;
   }
 
   function viewModalActionButtons(row) {
@@ -128,6 +167,12 @@
         ${proofBtn}
         <button class="btn btn-sm btn-success" data-view-action="finance_verify" data-id="${id}">Verify Payment</button>
         <button class="btn btn-sm btn-danger" data-view-action="finance_reject" data-id="${id}">Reject Payment</button>
+      `;
+    }
+    if (stage === 'for_payment' || stage === 'payment_rejected') {
+      return `
+        ${proofBtn}
+        <button class="btn btn-sm btn-success" data-view-action="finance_verify" data-id="${id}">Record Walk-in Payment</button>
       `;
     }
     if (stage === 'payment_verified') {
@@ -381,6 +426,7 @@
     }
     const docType = String(state.docType || 'Certificate').trim() || 'Certificate';
     const docKey = normalizePreviewDocKey(docType);
+    const isGoodMoralDoc = docKey === 'goodmoral';
     const fullName = String(state.fullName || '-').trim() || '-';
     const fullAddress = String(state.fullAddress || '-').trim() || '-';
     const purpose = String(state.purpose || '-').trim() || '-';
@@ -443,15 +489,17 @@
       `;
     } else if (docKey === 'goodmoral') {
       contentHtml = `
+        <p><strong>TO WHOM IT MAY CONCERN::</strong></p>
         <p>
-          This is to certify that <strong>${esc(fullName)}</strong> of
-          <strong>${esc(fullAddress)}</strong> is known in this community as a person of good moral character.
+          This is to certify <strong>${esc(fullName)}</strong>, resident of <strong>${esc(fullAddress)}</strong> is personally known to be as a person of
+          <strong>GOOD MORAL CHARACTER, PEACEFUL and LAW-ABIDING CITIZEN of THE COMMUNITY.</strong>
         </p>
         <p>
-          This certification is issued upon request for <strong>${previewEditable('purpose', purpose, 'State purpose')}</strong>.
+          This further certifies that he/she is not a member, nor has joined a subversive society organization against the government.
         </p>
         <p>
-          Issued for whatever legal purpose it may serve, without prejudice to existing laws, ordinances, and regulations.
+          This certification is being issued upon the request of the above-named person to be used for his/her application for
+          <strong>${previewEditable('purpose', purpose, 'PURPOSE')}</strong> purposes only.
         </p>
       `;
     } else if (docKey === 'identity') {
@@ -524,7 +572,7 @@
         </p>
       `;
     }
-    if (additionalHtml !== '') {
+    if (additionalHtml !== '' && !isGoodMoralDoc) {
       contentHtml += additionalHtml;
     }
     if (businessName !== '' && docKey !== 'generic') {
@@ -536,17 +584,23 @@
     }
 
     const isIndigency = docKey === 'indigency';
-    const titleText = isIndigency ? 'CERTIFICATE OF INDIGENCY' : docType;
+    const isGoodMoral = docKey === 'goodmoral';
+    const isSpecial = isIndigency || isGoodMoral;
+    const titleText = isIndigency ? 'CERTIFICATE OF INDIGENCY' : (isGoodMoral ? '' : docType);
     const issuedLine = isIndigency
       ? `Issued this <strong>${esc(previewIndigencyIssuedText(state.issuedDate || ''))}</strong>, at the office of the punong Barangay, Barangay San Jose, Rodriguez (Montalban), Rizal.`
-      : `Issued this <strong>${esc(issuedDate)}</strong> at Barangay San Jose, Rodriguez, Rizal.`;
-    const paperClass = isIndigency ? 'doc-preview-paper doc-preview-paper--indigency' : 'doc-preview-paper';
+      : (isGoodMoral
+        ? `Issued this <strong>${esc(previewIndigencyIssuedText(state.issuedDate || ''))}</strong> at the office of the Punong Barangay, Barangay San Jose, Montalban, Rizal`
+        : `Issued this <strong>${esc(issuedDate)}</strong> at Barangay San Jose, Rodriguez, Rizal.`);
+    const paperClass = isIndigency
+      ? 'doc-preview-paper doc-preview-paper--indigency'
+      : (isGoodMoral ? 'doc-preview-paper doc-preview-paper--goodmoral' : 'doc-preview-paper');
     return `
       <div class="doc-preview-stage">
         <span class="doc-preview-label">Document Display</span>
         <div class="doc-preview-shell">
           <div class="${paperClass}">
-            ${isIndigency ? '' : '<p class="doc-preview-hint">Highlighted fields are editable in this preview.</p>'}
+            ${(isIndigency || isGoodMoralDoc) ? '' : '<p class="doc-preview-hint">Highlighted fields are editable in this preview.</p>'}
             <div class="doc-preview-head">
               <img class="doc-preview-logo" src="${leftLogoUrl}" alt="Barangay San Jose Logo">
               <div class="doc-preview-head-center">
@@ -554,20 +608,29 @@
                 <p>LALAWIGAN NG RIZAL</p>
                 <p>BAYAN NG RODRIGUEZ</p>
                 <p class="barangay">BARANGAY SAN JOSE</p>
-                ${isIndigency ? '' : '<p class="doc-head-office">TANGGAPAN NG PUNONG BARANGAY</p>'}
+                ${(!isIndigency && !isGoodMoral) ? '<p class="doc-head-office">TANGGAPAN NG PUNONG BARANGAY</p>' : ''}
                 <div class="doc-preview-head-line"></div>
               </div>
               <img class="doc-preview-logo" src="${rightLogoUrl}" alt="Montalban Logo" onerror="this.onerror=null;this.src='${fallbackRightLogoUrl}'">
             </div>
+            ${isGoodMoral ? '<div class="doc-preview-goodmoral-office"><div>TANGGAPAN NG PUNONG BARANGAY</div><div>BARANGAY CERTIFICATION</div></div>' : ''}
             ${isIndigency
               ? '<div class="doc-preview-title doc-preview-title--indigency"><div class="office">TANGGAPAN NG PUNONG BARANGAY</div><div class="certificate">CERTIFICATE OF INDIGENCY</div></div>'
-              : `<div class="doc-preview-title">${esc(titleText)}</div>`}
+              : (isGoodMoral ? '' : `<div class="doc-preview-title">${esc(titleText)}</div>`)}
             <div class="doc-preview-body">
-              ${isIndigency ? '' : '<p><strong>TO WHOM IT MAY CONCERN:</strong></p>'}
+              ${(isIndigency || isGoodMoral) ? '' : '<p><strong>TO WHOM IT MAY CONCERN:</strong></p>'}
               ${contentHtml}
+              ${isGoodMoral ? `
+                <div class="doc-preview-goodmoral-meta">
+                  <p><strong>CTC No.:</strong> ________</p>
+                  <p><strong>Issued at:</strong> ________</p>
+                  <p><strong>Issued On:</strong> ________</p>
+                  <p><strong>OR No.:</strong> ________</p>
+                </div>
+              ` : ''}
               <p>${issuedLine}</p>
             </div>
-            ${isIndigency ? '<div class="doc-preview-issuedby">Issued by: <strong>MINERVA D. QUITA</strong><br><em>Barangay Secretary</em></div>' : ''}
+            ${isSpecial ? '<div class="doc-preview-issuedby">Issued by: <strong>MINERVA D. QUITA</strong><br><em>Barangay Secretary</em></div>' : ''}
             <div class="doc-preview-signature">
               <div class="name">HON. GLENN S. EVANGELISTA</div>
               <div>Punong Barangay</div>
@@ -576,9 +639,9 @@
               <div class="doc-preview-qr-box">
                 ${qrUrl !== '' ? `<img src="${esc(qrUrl)}" alt="QR Code">` : '<span>QR</span>'}
               </div>
-              ${isIndigency ? 'QR' : 'QR PLACEMENT'}
+              ${isSpecial ? 'QR' : 'QR PLACEMENT'}
             </div>
-            ${isIndigency ? '<div class="doc-preview-footer">This certificate is valid for Forty-five (45) days from the date of issue, check the<br>QR code to verify the authenticity of this document.</div>' : ''}
+            ${isSpecial ? '<div class="doc-preview-footer">This certificate is valid for Forty-five (45) days from the date of issue, check the<br>QR code to verify the authenticity of this document.</div>' : ''}
           </div>
         </div>
       </div>
@@ -884,6 +947,14 @@
     const reason = reasonValue ? `<div class="text-danger small mt-1">Reason: ${esc(reasonValue)}</div>` : '';
     const fullName = fullNameFromRow(row);
     const purpose = firstNonEmpty([row.purpose, '-']);
+    const statusKey = statusBucket(row);
+    const financeStatusLabel = {
+      verified: 'Verified',
+      rejected: 'Rejected',
+      pending_verification: 'Pending Verification',
+      cancelled: 'Cancelled',
+      unpaid: 'Unpaid'
+    }[statusKey] || firstNonEmpty([row.payment_status_name, row.payment_status_label, row.stage_label, row.stage, '-']);
     return `
       <tr>
         <td class="fw-semibold">${esc(row.request_id)}</td>
@@ -893,7 +964,7 @@
         <td>
           <div class="cell-purpose">${esc(purpose)}</div>
         </td>
-        <td>${badge(row.stage, esc(row.stage_label || row.stage || ''))}${reason}</td>
+        <td>${badge(isFinancePaymentsPage ? statusKey : row.stage, esc(isFinancePaymentsPage ? financeStatusLabel : (row.stage_label || row.stage || '')))}${reason}</td>
         <td>${esc(row.submitted_at || '-')}</td>
         <td>${actionButtons(row)}</td>
       </tr>
@@ -939,6 +1010,23 @@
   }
 
   function statusBucket(row) {
+    if (isFinancePaymentsPage) {
+      const paymentStatusKey = String(
+        firstNonEmpty([row?.payment_status_name, row?.payment_status_label, ''])
+      ).toLowerCase().replace(/[^a-z0-9]+/g, '');
+      if (paymentStatusKey === 'pendingverification' || paymentStatusKey === 'paymentsubmitted' || paymentStatusKey === 'pendingpaymentverification') return 'pending_verification';
+      if (paymentStatusKey === 'unpaid' || paymentStatusKey === 'pending' || paymentStatusKey === 'pendingreview') return 'unpaid';
+      if (paymentStatusKey === 'rejected' || paymentStatusKey === 'denied' || paymentStatusKey === 'paymentrejected') return 'rejected';
+      if (paymentStatusKey === 'verified' || paymentStatusKey === 'approved') return 'verified';
+      if (paymentStatusKey === 'cancelled' || paymentStatusKey === 'autocancelled' || paymentStatusKey === 'expired') return 'cancelled';
+      const stage = String(row?.stage || '').toLowerCase();
+      if (stage === 'payment_submitted') return 'pending_verification';
+      if (stage === 'for_payment') return 'unpaid';
+      if (stage === 'payment_rejected') return 'rejected';
+      if (stage === 'cancelled') return 'cancelled';
+      if (stage === 'payment_verified' || stage === 'ready_for_claim' || stage === 'completed') return 'verified';
+      return 'unpaid';
+    }
     const stage = String(row?.stage || '').toLowerCase();
     if (stage.includes('rejected')) return 'denied';
     if (stage === 'completed' || stage === 'ready_for_claim' || stage === 'payment_verified') return 'verified';
@@ -953,6 +1041,45 @@
   function matchesDocumentTypeFilter(row) {
     if (!currentDocumentTypeFilter) return true;
     return String(row?.document_type || '') === currentDocumentTypeFilter;
+  }
+
+  function matchesSearchFilter(row) {
+    const q = String(searchInput?.value || '').trim().toLowerCase();
+    if (!q) return true;
+    const payload = row && row.payload && typeof row.payload === 'object' ? row.payload : {};
+    const haystack = [
+      row?.request_id,
+      row?.resident_id,
+      row?.document_type,
+      row?.purpose,
+      row?.stage,
+      row?.stage_label,
+      row?.payment_status_name,
+      row?.payment_status_label,
+      row?.payment_method,
+      row?.payment_reference,
+      row?.resident_name,
+      row?.full_name,
+      payload?.last_name,
+      payload?.first_name,
+      payload?.middle_name,
+      payload?.full_address
+    ].map((v) => String(v || '').toLowerCase()).join(' ');
+    return haystack.includes(q);
+  }
+
+  function matchesFinanceAdvancedFilters(row) {
+    if (!isFinancePaymentsPage) return true;
+    if (financeFilterDocumentType && String(row?.document_type || '') !== financeFilterDocumentType) {
+      return false;
+    }
+    if (financeFilterMethod) {
+      const method = String(row?.payment_method || '').toLowerCase();
+      if (method !== financeFilterMethod) {
+        return false;
+      }
+    }
+    return true;
   }
 
   function matchesStageTabFilter(row, stageFilter) {
@@ -988,6 +1115,17 @@
     }
   }
 
+  function updateFinanceStatusTabBadges(items) {
+    if (!isFinancePaymentsPage) return;
+    const rows = Array.isArray(items) ? items : [];
+    if (unpaidTabCount) {
+      unpaidTabCount.textContent = String(rows.filter((it) => statusBucket(it) === 'unpaid').length);
+    }
+    if (pendingVerificationTabCount) {
+      pendingVerificationTabCount.textContent = String(rows.filter((it) => statusBucket(it) === 'pending_verification').length);
+    }
+  }
+
   function syncDocumentTypeFilterOptions(items) {
     if (!documentTypeFilter) return;
     const selected = currentDocumentTypeFilter;
@@ -1010,6 +1148,95 @@
       currentDocumentTypeFilter = '';
       documentTypeFilter.value = '';
     }
+  }
+
+  function syncFinanceFilterOptions(items) {
+    if (!isFinancePaymentsPage) return;
+    if (!financeFilterDocType || !financeFilterPaymentMethod) return;
+
+    const docs = Array.from(new Set(
+      (items || [])
+        .map((it) => String(it?.document_type || '').trim())
+        .filter((v) => v !== '')
+    )).sort((a, b) => a.localeCompare(b));
+
+    const methods = Array.from(new Set(
+      (items || [])
+        .map((it) => String(it?.payment_method || '').trim().toLowerCase())
+        .filter((v) => v !== '')
+    ));
+
+    financeFilterDocType.innerHTML = '<option value="">All documents</option>';
+    docs.forEach((doc) => {
+      const opt = document.createElement('option');
+      opt.value = doc;
+      opt.textContent = doc;
+      financeFilterDocType.appendChild(opt);
+    });
+
+    const defaultMethodOptions = [
+      { value: '', label: 'All payment methods' },
+      { value: 'gcash', label: 'GCash' },
+      { value: 'barangay', label: 'Pay in Barangay' }
+    ];
+    financeFilterPaymentMethod.innerHTML = '';
+    defaultMethodOptions
+      .filter((it) => it.value === '' || methods.includes(it.value))
+      .forEach((it) => {
+        const opt = document.createElement('option');
+        opt.value = it.value;
+        opt.textContent = it.label;
+        financeFilterPaymentMethod.appendChild(opt);
+      });
+
+    financeFilterDocType.value = docs.includes(financeFilterDocumentType) ? financeFilterDocumentType : '';
+    financeFilterDocumentType = financeFilterDocType.value;
+
+    const methodAllowed = ['gcash', 'barangay'].includes(financeFilterMethod) && methods.includes(financeFilterMethod);
+    financeFilterPaymentMethod.value = methodAllowed ? financeFilterMethod : '';
+    financeFilterMethod = financeFilterPaymentMethod.value;
+  }
+
+  function getFinanceVisibleColumns() {
+    if (!isFinancePaymentsPage) return new Set(defaultFinanceVisibleColumns);
+    try {
+      const raw = localStorage.getItem(financeColumnsStorageKey);
+      if (!raw) return new Set(defaultFinanceVisibleColumns);
+      const parsed = JSON.parse(raw);
+      if (!Array.isArray(parsed) || !parsed.length) return new Set(defaultFinanceVisibleColumns);
+      const normalized = parsed.map((v) => Number(v)).filter((v) => Number.isInteger(v) && v >= 1 && v <= 8);
+      if (!normalized.length) return new Set(defaultFinanceVisibleColumns);
+      return new Set(normalized);
+    } catch (_) {
+      return new Set(defaultFinanceVisibleColumns);
+    }
+  }
+
+  function applyFinanceColumnVisibility() {
+    if (!isFinancePaymentsPage) return;
+    const table = document.getElementById('table-certificateTracker');
+    if (!table) return;
+    const visible = getFinanceVisibleColumns();
+    for (let i = 1; i <= 8; i += 1) {
+      const show = visible.has(i);
+      table.querySelectorAll(`tr > *:nth-child(${i})`).forEach((cell) => {
+        cell.style.display = show ? '' : 'none';
+      });
+    }
+    financeColChecks.forEach((check) => {
+      const idx = Number(check.getAttribute('data-finance-col-index') || '0');
+      check.checked = visible.has(idx);
+    });
+  }
+
+  function saveFinanceVisibleColumnsFromChecks() {
+    if (!isFinancePaymentsPage) return;
+    const checked = financeColChecks
+      .filter((check) => check.checked)
+      .map((check) => Number(check.getAttribute('data-finance-col-index') || '0'))
+      .filter((v) => Number.isInteger(v) && v >= 1 && v <= 8);
+    const value = checked.length ? checked : [1, 2, 3, 4, 5, 6, 7, 8];
+    localStorage.setItem(financeColumnsStorageKey, JSON.stringify(value));
   }
 
   async function fetchJson(url, options = {}) {
@@ -1044,33 +1271,47 @@
     return data;
   }
 
-  async function load() {
+  function renderFromCache() {
+    const allItems = Array.isArray(cachedAllItems) ? cachedAllItems : [];
+    updateStageTabBadges(allItems);
+    const stageItems = currentStage === 'finance'
+      ? allItems.filter((it) => financeStages.has(String(it.stage || '').toLowerCase()))
+      : allItems.filter((it) => matchesStageTabFilter(it, currentStage));
+    updateFinanceStatusTabBadges(stageItems);
+    syncDocumentTypeFilterOptions(stageItems);
+    syncFinanceFilterOptions(stageItems);
+
+    const items = stageItems
+      .filter(matchesStatusFilter)
+      .filter(matchesFinanceAdvancedFilters)
+      .filter(matchesDocumentTypeFilter)
+      .filter(matchesSearchFilter);
+
+    itemById = new Map(items.map((it) => [String(it.request_id), it]));
+    if (!items.length) {
+      tableBody.innerHTML = '<tr><td colspan="8" class="text-center text-muted py-4">No requests found.</td></tr>';
+      return;
+    }
+
+    tableBody.innerHTML = items.map(rowHtml).join('');
+    applyFinanceColumnVisibility();
+    bindActionButtons();
+  }
+
+  async function load(options = {}) {
+    const force = !!options.force;
+    if (!force && Array.isArray(cachedAllItems) && cachedAllItems.length > 0) {
+      renderFromCache();
+      return;
+    }
+
     tableBody.innerHTML = '<tr><td colspan="8" class="text-center text-muted py-4">Loading...</td></tr>';
     try {
       const params = new URLSearchParams({ action: 'list' });
-      const q = (searchInput.value || '').trim();
-      if (q) params.set('q', q);
-
       const data = await fetchJson(`${endpoint}?${params.toString()}`);
       if (!data.success) throw new Error(data.message || 'Failed to load requests.');
-
-      const allItems = Array.isArray(data.items) ? data.items : [];
-      updateStageTabBadges(allItems);
-      const stageItems = currentStage === 'finance'
-        ? allItems.filter((it) => financeStages.has(String(it.stage || '').toLowerCase()))
-        : allItems.filter((it) => matchesStageTabFilter(it, currentStage));
-      syncDocumentTypeFilterOptions(stageItems);
-      const items = stageItems
-        .filter(matchesStatusFilter)
-        .filter(matchesDocumentTypeFilter);
-      itemById = new Map(items.map((it) => [String(it.request_id), it]));
-      if (!items.length) {
-        tableBody.innerHTML = '<tr><td colspan="8" class="text-center text-muted py-4">No requests found.</td></tr>';
-        return;
-      }
-
-      tableBody.innerHTML = items.map(rowHtml).join('');
-      bindActionButtons();
+      cachedAllItems = Array.isArray(data.items) ? data.items : [];
+      renderFromCache();
     } catch (err) {
       tableBody.innerHTML = `<tr><td colspan="8" class="text-center text-danger py-4">${esc(err.message || err)}</td></tr>`;
     }
@@ -1095,6 +1336,15 @@
     actionAmount.value = '';
     actionOr.value = '';
     actionIssued.value = '';
+    if (actionOr) {
+      actionOr.readOnly = false;
+    }
+    if (actionAmount) {
+      actionAmount.readOnly = false;
+    }
+    if (actionForm?.dataset?.confirmStep) {
+      delete actionForm.dataset.confirmStep;
+    }
     if (actionCancelBtn) {
       actionCancelBtn.textContent = 'Return';
       actionCancelBtn.disabled = false;
@@ -1115,6 +1365,9 @@
 
   function openActionModal(type, requestId) {
     if (!actionModal) return;
+    if (actionForm?.dataset?.verifyMode) {
+      delete actionForm.dataset.verifyMode;
+    }
 
     if (viewModalEl && viewModalEl.classList.contains('show') && viewModal) {
       preserveViewStateOnNextHide = true;
@@ -1134,7 +1387,7 @@
       personnel_approve: 'Before You Approve',
       personnel_approve_confirm: 'Confirm Approval',
       personnel_reject: 'Reject Request',
-      finance_verify: 'Verify Payment',
+      finance_verify: 'Verify Payment / Walk-in Payment',
       finance_reject: 'Reject Payment',
       mark_ready: 'Mark Ready for Claim',
       mark_completed_confirm: 'Confirm Release',
@@ -1196,6 +1449,20 @@
       actionOrWrap.classList.remove('d-none');
       actionAmount.required = true;
       actionOr.required = true;
+      if (actionPrompt) {
+        const stage = String(row?.stage || '').toLowerCase();
+        const isPendingVerification = stage === 'payment_submitted';
+        if (isPendingVerification) {
+          actionAmountWrap.classList.add('d-none');
+          actionAmount.required = false;
+          actionPrompt.textContent = 'Enter the official OR number for this submitted payment, then confirm verification.';
+        } else {
+          actionPrompt.textContent = (stage === 'for_payment' || stage === 'payment_rejected')
+            ? 'Record barangay walk-in payment by entering the paid amount and OR number.'
+            : 'Verify the submitted payment by entering the official OR number.';
+        }
+        actionPrompt.classList.remove('d-none');
+      }
       if (row && row.fee_amount !== null && row.fee_amount !== undefined && String(row.fee_amount) !== '') {
         actionAmount.value = String(row.fee_amount);
       }
@@ -1213,6 +1480,143 @@
         const id = String(btn.getAttribute('data-view-id') || '');
         const row = itemById.get(id);
         if (!row || !viewDetailsBody || !viewModal) return;
+
+        if (isFinancePaymentsPage) {
+          const payload = row.payload && typeof row.payload === 'object' ? row.payload : {};
+          const residentProfile = row.resident_profile && typeof row.resident_profile === 'object'
+            ? row.resident_profile
+            : {};
+          const compactFullName = fullNameFromRow(row) || '-';
+          const compactAddress = firstNonEmpty([
+            payload.full_address,
+            payload.full_address_display,
+            payload.address,
+            payload.complete_address,
+            residentProfile.full_address
+          ]) || '-';
+          const compactDocument = normalizeDocumentTypeDisplay(firstNonEmpty([row.document_type, '-']));
+          const financeStatusKey = statusBucket(row);
+          const financeStatusLabel = {
+            verified: 'Verified',
+            rejected: 'Rejected',
+            pending_verification: 'Pending Verification',
+            cancelled: 'Cancelled',
+            unpaid: 'Unpaid'
+          }[financeStatusKey] || firstNonEmpty([row.payment_status_name, row.payment_status_label, row.stage_label, row.stage, '-']);
+
+          const compactGrid = renderFieldGrid([
+            { label: 'Full Name of Customer', value: compactFullName },
+            { label: 'Full Address of Customer', value: compactAddress },
+            { label: 'Requested Document', value: compactDocument },
+            { label: 'Status', value: financeStatusLabel },
+            { label: 'Payment Method', value: firstNonEmpty([row.payment_method, '-']) },
+            { label: 'Submitted Date', value: firstNonEmpty([row.submitted_at, '-']) },
+          ], 1);
+
+          const stageKey = String(row.stage || '').toLowerCase();
+          let financeActionButtons = '';
+          if (stageKey === 'payment_submitted') {
+            financeActionButtons = `
+              <button class="btn btn-sm btn-danger" data-inline-action="finance_reject" data-id="${esc(row.request_id)}">Reject Payment</button>
+              <button class="btn btn-sm btn-success" data-inline-action="finance_verify_gcash" data-id="${esc(row.request_id)}">Verify Payment</button>
+            `;
+          }
+          const financeActionHtml = financeActionButtons
+            ? `<div class="tracker-status-actions">${financeActionButtons}</div>`
+            : '';
+
+          const isVerifiedPayment = statusBucket(row) === 'verified';
+          const verifiedAmount = (row.amount !== null && row.amount !== undefined && String(row.amount).trim() !== '')
+            ? Number(row.amount)
+            : Number(row.fee_amount);
+          const verifiedAmountText = Number.isFinite(verifiedAmount)
+            ? `PHP ${verifiedAmount.toFixed(2)}`
+            : '-';
+          const verifiedAtText = firstNonEmpty([row.finance_decision_at, row.payment_submitted_at, '-']);
+          const verifiedDetailsGrid = isVerifiedPayment
+            ? renderFieldGrid([
+                { label: 'OR Number', value: firstNonEmpty([row.or_number, '-']) },
+                { label: 'Price', value: verifiedAmountText },
+                { label: 'Date Verified', value: verifiedAtText },
+              ], 3)
+            : '';
+          const verifiedProofHtml = (isVerifiedPayment && row.payment_proof_path)
+            ? `<div class="tracker-form-grid cols-1 mt-2">
+                 <div class="tracker-form-field">
+                   <p class="tracker-form-label">Proof of Payment</p>
+                   <div class="tracker-form-value d-flex justify-content-between align-items-center gap-2">
+                     <span class="text-truncate">${esc(String(row.payment_proof_path || '').split('/').pop() || row.payment_proof_path)}</span>
+                     <button type="button" class="btn btn-sm btn-primary" data-proof-id="${esc(row.request_id)}">View</button>
+                   </div>
+                 </div>
+               </div>`
+            : '';
+
+          viewDetailsHtml = `<div class="tracker-doc-highlight">Transaction Details</div>`
+            + formSection('Payment Transaction Information', `${compactGrid}${financeActionHtml}`)
+            + (isVerifiedPayment
+                ? formSection('Verified Payment Details', `${verifiedDetailsGrid || ''}${verifiedProofHtml}`)
+                : '');
+          switchViewMode('details');
+          if (viewModalTitle) {
+            const requestId = String(row.request_id || '').trim();
+            viewModalTitle.textContent = requestId ? `Payment Transaction (#${requestId})` : 'Payment Transaction';
+          }
+          if (viewModalActions) {
+            viewModalActions.innerHTML = '';
+          }
+          if (viewModalNextBtn) {
+            viewModalNextBtn.classList.add('d-none');
+          }
+          if (viewModalBackBtn) {
+            viewModalBackBtn.classList.add('d-none');
+          }
+          if (viewModalWalkInBtn) {
+            const isUnpaidStage = stageKey === 'for_payment' || stageKey === 'payment_rejected';
+            if (isUnpaidStage) {
+              viewModalWalkInBtn.classList.remove('d-none');
+              viewModalWalkInBtn.setAttribute('data-id', String(row.request_id || ''));
+            } else {
+              viewModalWalkInBtn.classList.add('d-none');
+              viewModalWalkInBtn.removeAttribute('data-id');
+            }
+          }
+          viewDetailsBody.querySelectorAll('button[data-inline-action][data-id]').forEach((actionBtn) => {
+            actionBtn.addEventListener('click', () => {
+              const action = String(actionBtn.getAttribute('data-inline-action') || '').trim();
+              const actionId = String(actionBtn.getAttribute('data-id') || '').trim();
+              if (!actionId) return;
+              if (action === 'finance_walkin') {
+                openActionModal('finance_verify', actionId);
+                if (actionForm) actionForm.dataset.verifyMode = 'walkin';
+                return;
+              }
+              if (action === 'finance_verify_gcash') {
+                openActionModal('finance_verify', actionId);
+                if (actionForm) actionForm.dataset.verifyMode = 'gcash';
+                return;
+              }
+              if (action === 'finance_reject') {
+                openActionModal('finance_reject', actionId);
+              }
+            });
+          });
+          viewDetailsBody.querySelectorAll('button[data-proof-id]').forEach((proofBtn) => {
+            proofBtn.addEventListener('click', () => {
+              const proofId = String(proofBtn.getAttribute('data-proof-id') || '');
+              const proofRow = itemById.get(proofId);
+              if (!proofRow || !proofRow.payment_proof_path || !paymentProofModal || !paymentProofWrap || !paymentProofOpenNew) return;
+              const proofUrl = `${appBase}/PhpFiles/Admin-End/documentRequestWorkflow.php?action=view_payment_proof&request_id=` + encodeURIComponent(proofId);
+              if (viewModalEl && viewModalEl.classList.contains('show') && viewModal) {
+                preserveViewStateOnNextHide = true;
+                viewModal.hide();
+              }
+              openDocumentModal(proofUrl, 'Payment Proof', 'view');
+            });
+          });
+          viewModal.show();
+          return;
+        }
 
         const payload = row.payload && typeof row.payload === 'object' ? row.payload : {};
         const residentProfile = row.resident_profile && typeof row.resident_profile === 'object'
@@ -1265,7 +1669,8 @@
           'full_unit_number', 'full_house_lot_number', 'full_street_block_name', 'full_subdivision',
           'full_barangay', 'full_area_number', 'cohabitant_full_unit_number',
           'cohabitant_full_house_lot_number', 'cohabitant_full_street_block_name',
-          'cohabitant_full_subdivision', 'cohabitant_full_barangay', 'cohabitant_full_area_number'
+          'cohabitant_full_subdivision', 'cohabitant_full_barangay', 'cohabitant_full_area_number',
+          'request_purpose', 'requestPurpose', 'purpose_choice', 'purposeChoice'
         ]);
 
         const requestFields = [];
@@ -1273,12 +1678,23 @@
         if (purposeText) {
           consumedKeys.add('purpose');
           consumedKeys.add('request_purpose');
+          consumedKeys.add('requestPurpose');
+          consumedKeys.add('purpose_choice');
+          consumedKeys.add('purposeChoice');
           requestFields.push({ label: 'Purpose', value: purposeText });
         }
         const officerText = firstNonEmpty([payload.request_officer]);
         if (officerText) {
           consumedKeys.add('request_officer');
           requestFields.push({ label: 'To Be Submitted To', value: officerText });
+        }
+        const paymentMethodText = firstNonEmpty([row.payment_method]);
+        if (paymentMethodText) {
+          requestFields.push({ label: 'Payment Method', value: String(paymentMethodText).toUpperCase() });
+        }
+        const paymentReferenceText = firstNonEmpty([row.payment_reference]);
+        if (paymentReferenceText) {
+          requestFields.push({ label: 'GCash Transaction Number', value: paymentReferenceText });
         }
 
         Object.keys(payload).forEach((key) => {
@@ -1476,6 +1892,10 @@
           currentViewStage = String(row.stage || '').toLowerCase();
           viewModalTitle.textContent = requestId ? `Certificate Request (#${requestId})` : 'Certificate Request';
         }
+        if (viewModalWalkInBtn) {
+          viewModalWalkInBtn.classList.add('d-none');
+          viewModalWalkInBtn.removeAttribute('data-id');
+        }
         if (viewModalActions) {
           viewModalActions.innerHTML = '';
         }
@@ -1564,6 +1984,23 @@
       });
     });
 
+    tableBody.querySelectorAll('button[data-inline-action][data-id]').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const id = String(btn.getAttribute('data-id') || '').trim();
+        const action = String(btn.getAttribute('data-inline-action') || '').trim();
+        if (!id) return;
+        if (action === 'finance_walkin') {
+          openActionModal('finance_verify', id);
+          if (actionForm) actionForm.dataset.verifyMode = 'walkin';
+          return;
+        }
+        if (action === 'finance_verify_gcash') {
+          openActionModal('finance_verify', id);
+          if (actionForm) actionForm.dataset.verifyMode = 'gcash';
+        }
+      });
+    });
+
   }
 
   actionForm?.addEventListener('submit', async (e) => {
@@ -1603,11 +2040,37 @@
     if (actionOrWrap && !actionOrWrap.classList.contains('d-none')) {
       fd.append('or_number', actionOr.value || '');
     }
+    if (currentAction === 'finance_verify' && actionForm?.dataset?.verifyMode) {
+      fd.append('verify_mode', String(actionForm.dataset.verifyMode));
+    }
     if (actionIssuedWrap && !actionIssuedWrap.classList.contains('d-none') && actionIssued.files?.[0]) {
       fd.append('issued_file', actionIssued.files[0]);
     }
     if (currentAction === 'personnel_approve_confirm' && viewPreviewState && typeof viewPreviewState === 'object') {
       fd.append('edited_preview', JSON.stringify(viewPreviewState));
+    }
+
+    if (currentAction === 'finance_verify' && actionForm?.dataset?.verifyMode === 'gcash') {
+      const orValue = String(actionOr?.value || '').trim();
+      if (!orValue) {
+        modalError.textContent = 'OR Number is required.';
+        modalError.classList.remove('d-none');
+        return;
+      }
+      if (actionForm?.dataset?.confirmStep !== '1') {
+        actionForm.dataset.confirmStep = '1';
+        if (actionPrompt) {
+          actionPrompt.textContent = `Confirm verification of this GCash payment with OR No. ${orValue}?`;
+          actionPrompt.classList.remove('d-none');
+        }
+        if (actionSubmitBtn) {
+          actionSubmitBtn.textContent = 'Confirm Verify Payment';
+        }
+        if (actionOr) {
+          actionOr.readOnly = true;
+        }
+        return;
+      }
     }
 
     const prevSubmitLabel = actionSubmitBtn ? actionSubmitBtn.textContent : '';
@@ -1628,7 +2091,7 @@
 
       suppressActionReturn = true;
       actionModal.hide();
-      await load();
+      await load({ force: true });
     } catch (err) {
       if (actionSubmitBtn) {
         actionSubmitBtn.disabled = false;
@@ -1639,6 +2102,10 @@
       }
       modalError.textContent = err.message || String(err);
       modalError.classList.remove('d-none');
+    } finally {
+      if (actionForm?.dataset?.verifyMode) {
+        delete actionForm.dataset.verifyMode;
+      }
     }
   });
 
@@ -1687,8 +2154,37 @@
     load();
   });
 
-  btnRefreshList?.addEventListener('click', () => {
+  btnFinanceFilterApply?.addEventListener('click', () => {
+    financeFilterDocumentType = String(financeFilterDocType?.value || '');
+    financeFilterMethod = String(financeFilterPaymentMethod?.value || '').toLowerCase();
+    const modalEl = document.getElementById('modalFinanceFilter');
+    const modalInstance = modalEl ? bootstrap.Modal.getInstance(modalEl) : null;
+    modalInstance?.hide();
     load();
+  });
+
+  btnFinanceFilterReset?.addEventListener('click', () => {
+    financeFilterDocumentType = '';
+    financeFilterMethod = '';
+    if (financeFilterDocType) financeFilterDocType.value = '';
+    if (financeFilterPaymentMethod) financeFilterPaymentMethod.value = '';
+    load();
+  });
+
+  financeColChecks.forEach((check) => {
+    check.addEventListener('change', () => {
+      saveFinanceVisibleColumnsFromChecks();
+      applyFinanceColumnVisibility();
+    });
+  });
+
+  btnFinanceColumnsReset?.addEventListener('click', () => {
+    localStorage.setItem(financeColumnsStorageKey, JSON.stringify(defaultFinanceVisibleColumns));
+    applyFinanceColumnVisibility();
+  });
+
+  btnRefreshList?.addEventListener('click', () => {
+    load({ force: true });
   });
 
   let searchTimer = null;
@@ -1719,10 +2215,21 @@
     switchViewMode('details');
   });
 
+  viewModalWalkInBtn?.addEventListener('click', () => {
+    const id = String(viewModalWalkInBtn.getAttribute('data-id') || '').trim();
+    if (!id) return;
+    openActionModal('finance_verify', id);
+    if (actionForm) actionForm.dataset.verifyMode = 'walkin';
+  });
+
   viewModalEl?.addEventListener('hidden.bs.modal', () => {
     if (preserveViewStateOnNextHide) {
       preserveViewStateOnNextHide = false;
       return;
+    }
+    if (viewModalWalkInBtn) {
+      viewModalWalkInBtn.classList.add('d-none');
+      viewModalWalkInBtn.removeAttribute('data-id');
     }
     viewDetailsHtml = '';
     viewPreviewState = null;

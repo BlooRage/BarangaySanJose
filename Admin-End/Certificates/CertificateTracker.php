@@ -418,6 +418,113 @@ require_once __DIR__ . '/../includes/admin_guard.php';
       margin: 0 0 10px;
       height: 0;
     }
+    #viewModal .doc-preview-paper.doc-preview-paper--goodmoral {
+      font-family: Arial, Helvetica, sans-serif;
+      padding: 28px 46px 36px;
+    }
+    #viewModal .doc-preview-paper.doc-preview-paper--goodmoral .doc-preview-head-center p {
+      font-family: "Times New Roman", Times, serif;
+      font-size: .88rem;
+      line-height: 1.08;
+    }
+    #viewModal .doc-preview-paper.doc-preview-paper--goodmoral .doc-preview-head-center .rep {
+      font-size: 1.02rem;
+      letter-spacing: .01em;
+    }
+    #viewModal .doc-preview-paper.doc-preview-paper--goodmoral .doc-preview-head-center .barangay {
+      font-size: 1.18rem;
+      letter-spacing: .01em;
+    }
+    #viewModal .doc-preview-paper.doc-preview-paper--goodmoral .doc-head-office {
+      font-family: Arial, Helvetica, sans-serif;
+      font-size: 1.06rem;
+      font-weight: 800;
+    }
+    #viewModal .doc-preview-paper.doc-preview-paper--goodmoral .doc-head-office-sub {
+      font-family: Arial, Helvetica, sans-serif;
+      margin-top: 2px;
+      font-size: .98rem;
+      font-weight: 800;
+    }
+    #viewModal .doc-preview-paper.doc-preview-paper--goodmoral .doc-preview-goodmoral-office {
+      margin-top: 10px;
+      margin-bottom: 10px;
+      text-align: center;
+      font-family: Arial, Helvetica, sans-serif;
+      font-weight: 800;
+      line-height: 1.22;
+      text-transform: uppercase;
+    }
+    #viewModal .doc-preview-paper.doc-preview-paper--goodmoral .doc-preview-goodmoral-office div:first-child {
+      font-size: 1.06rem;
+      letter-spacing: .01em;
+    }
+    #viewModal .doc-preview-paper.doc-preview-paper--goodmoral .doc-preview-goodmoral-office div:last-child {
+      margin-top: 4px;
+      font-size: .98rem;
+      letter-spacing: .01em;
+    }
+    #viewModal .doc-preview-paper.doc-preview-paper--goodmoral .doc-preview-title {
+      font-size: 1.02rem;
+      margin: 16px 0 18px;
+      letter-spacing: .01em;
+    }
+    #viewModal .doc-preview-paper.doc-preview-paper--goodmoral .doc-preview-body {
+      font-size: 1.02rem;
+      line-height: 1.68;
+      text-align: justify;
+      margin-top: 6px;
+    }
+    #viewModal .doc-preview-paper.doc-preview-paper--goodmoral .doc-preview-body p {
+      margin: 0 0 14px;
+    }
+    #viewModal .doc-preview-paper.doc-preview-paper--goodmoral .doc-preview-goodmoral-meta p {
+      margin: 0 0 6px;
+      text-align: left;
+    }
+    #viewModal .doc-preview-paper.doc-preview-paper--goodmoral .doc-preview-signature {
+      position: absolute;
+      right: 66px;
+      bottom: 300px;
+      margin-top: 0;
+      justify-items: center;
+      text-align: center;
+    }
+    #viewModal .doc-preview-paper.doc-preview-paper--goodmoral .doc-preview-signature .name {
+      min-width: 260px;
+      margin-top: 0;
+      padding-top: 6px;
+    }
+    #viewModal .doc-preview-paper.doc-preview-paper--goodmoral .doc-preview-issuedby {
+      position: absolute;
+      left: 48px;
+      bottom: 292px;
+      font-size: .95rem;
+      line-height: 1.35;
+      text-align: left;
+    }
+    #viewModal .doc-preview-paper.doc-preview-paper--goodmoral .doc-preview-footer {
+      position: absolute;
+      width: 68%;
+      left: 16%;
+      bottom: 64px;
+      font-family: Arial, Helvetica, sans-serif;
+      font-size: .78rem;
+      text-align: center;
+      font-style: italic;
+      color: #111827;
+    }
+    #viewModal .doc-preview-paper.doc-preview-paper--goodmoral .doc-preview-qr {
+      right: 34px;
+      bottom: 56px;
+      width: 92px;
+      font-size: 0;
+    }
+    #viewModal .doc-preview-paper.doc-preview-paper--goodmoral .doc-preview-qr-box {
+      width: 84px;
+      height: 84px;
+      border-style: solid;
+    }
     #viewModal .doc-preview-head {
       display: grid;
       grid-template-columns: 100px 1fr 100px;

@@ -160,7 +160,21 @@ $fullAddress = htmlspecialchars(implode(', ', $fullAddressParts), ENT_QUOTES, 'U
                         <div class="form-row">
                             <div class="full-width">
                                 <label class="top-label">Purpose <span class="required-asterisk">*</span></label>
-                                <textarea name="purpose" rows="5" required></textarea>
+                                <select id="purposeSelect" required>
+                                    <option value="" selected disabled>Select purpose</option>
+                                    <option value="Employment">Employment</option>
+                                    <option value="Government Aid-Programs">Government Aid-Programs</option>
+                                    <option value="Business Permit Application">Business Permit Application</option>
+                                    <option value="School Requirement">School Requirement</option>
+                                    <option value="Scholarship">Scholarship</option>
+                                    <option value="Board Examination">Board Examination</option>
+                                    <option value="Others">Others</option>
+                                </select>
+                                <div id="purposeOtherWrap" class="mt-2 d-none">
+                                    <label class="top-label" for="purposeOther">Please specify <span class="required-asterisk">*</span></label>
+                                    <input type="text" id="purposeOther" placeholder="Enter your purpose">
+                                </div>
+                                <input type="hidden" name="purpose" id="purposeFinal">
                             </div>
                         </div>
 
@@ -181,12 +195,33 @@ $fullAddress = htmlspecialchars(implode(', ', $fullAddressParts), ENT_QUOTES, 'U
         document.addEventListener("DOMContentLoaded", () => {
             const form = document.querySelector("form");
             const submitBtn = form?.querySelector(".submit-btn");
-            if (!form || !submitBtn) return;
+            const purposeSelect = document.getElementById("purposeSelect");
+            const purposeOtherWrap = document.getElementById("purposeOtherWrap");
+            const purposeOther = document.getElementById("purposeOther");
+            const purposeFinal = document.getElementById("purposeFinal");
+            if (!form || !submitBtn || !purposeSelect || !purposeOtherWrap || !purposeOther || !purposeFinal) return;
+
+            const syncPurposeValue = () => {
+                const choice = String(purposeSelect.value || "").trim();
+                if (choice === "Others") {
+                    purposeOtherWrap.classList.remove("d-none");
+                    purposeOther.required = true;
+                    purposeFinal.value = String(purposeOther.value || "").trim();
+                } else {
+                    purposeOtherWrap.classList.add("d-none");
+                    purposeOther.required = false;
+                    purposeOther.value = "";
+                    purposeFinal.value = choice;
+                }
+            };
 
             const updateState = () => {
+                syncPurposeValue();
                 submitBtn.disabled = !form.checkValidity();
             };
 
+            purposeSelect.addEventListener("change", updateState);
+            purposeOther.addEventListener("input", updateState);
             form.addEventListener("input", updateState);
             form.addEventListener("change", updateState);
             updateState();
