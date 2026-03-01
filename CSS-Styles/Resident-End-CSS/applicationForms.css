@@ -546,6 +546,10 @@ body {
     grid-template-columns: repeat(2, 1fr);
 }
 
+.three-col-row {
+    grid-template-columns: repeat(3, 1fr);
+}
+
 .ownership-row {
     margin-bottom: 28px;
 }

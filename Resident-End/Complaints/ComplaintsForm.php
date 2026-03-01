@@ -135,16 +135,23 @@ require_once __DIR__ . "/../includes/resident_access_guard.php";
                     </div>
 
                     <div class="form-row two-col-row">
-                        <div>
+                        <div class="">
                             <label class="top-label">Date of the Incident <span class="required-asterisk">*</span></label>
                             <input type="date" name="incident_date" required>
                         </div>
                         <div>
+                            <label class="top-label">Time of the Incident <i>
+                                (recommended)
+                            </i></label>
+                            <input type="time" name="incident_time">
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="full-width">
+                    <div class="mb-3">
                             <label class="top-label">Location of the Incident <span class="required-asterisk">*</span></label>
                             <input type="text" name="incident_location" required>
                         </div>
-                    </div>
-
                     <div class="form-row">
                         <div class="full-width">
                             <label class="top-label">Short narration of the incident <span class="required-asterisk">*</span></label>
