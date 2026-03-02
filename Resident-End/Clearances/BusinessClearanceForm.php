@@ -111,7 +111,7 @@ $ownerFullAddress = htmlspecialchars(implode(', ', $ownerFullAddressParts), ENT_
         <div class="main-head application-card orange-card application-card--muted py-3 my-5 rounded">
             <div class="main-head-content">
             <a href="<?= htmlspecialchars($baseUrl) ?>/Resident-End/Clearances/ClearancesLandingPage.php" class="back-link">< Go Back</a>
-            <h1 class="form-title">Application for Barangay Business Clearance</h1>
+            <h1 class="form-title">Barangay Business Clearance</h1>
             <p class="form-subtitle">All fields marked with <span class="required-asterisk">*</span> are required</p>
 
             <form action="#" method="POST">
@@ -237,6 +237,7 @@ $ownerFullAddress = htmlspecialchars(implode(', ', $ownerFullAddressParts), ENT_
                                         <option value="prc">PRC ID</option>
                                         <option value="postal">Postal ID</option>
                                         <option value="gsis">GSIS ID</option>
+                                        <option value="sss">SSS ID</option>
                                     </select>
                                 </div>
                                 <div class="col-md-6">
@@ -333,6 +334,7 @@ $ownerFullAddress = htmlspecialchars(implode(', ', $ownerFullAddressParts), ENT_
                                             <option value="prc">PRC ID</option>
                                             <option value="postal">Postal ID</option>
                                             <option value="gsis">GSIS ID</option>
+                                            <option value="sss">SSS ID</option>
                                         </select>
                                     </div>
                                     <div class="col-md-6">

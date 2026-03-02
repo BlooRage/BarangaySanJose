@@ -146,6 +146,16 @@ $fullAddress = htmlspecialchars(implode(', ', $fullAddressParts), ENT_QUOTES, 'U
                 </div>
 
                 <h2 class="section-title text-center text-dark">Lot Location</h2>
+                <div class="form-row">
+                    <div class="full-width">
+                        <div class="beneficiary-block pt-3 pb-2">
+                            <label class="top-label check-item">
+                                <input type="checkbox" id="lotSameAddress" name="lot_same_address">
+                                <span>Same address as applicant</span>
+                            </label>
+                        </div>
+                    </div>
+                </div>
                 <div id="lotAddressSystemRow" class="form-row">
                     <div class="full-width">
                         <div class="input-stack">
@@ -155,16 +165,6 @@ $fullAddress = htmlspecialchars(implode(', ', $fullAddressParts), ENT_QUOTES, 'U
                                 <option value="house">House Numbering System</option>
                                 <option value="lot_block">Lot/Block System</option>
                             </select>
-                        </div>
-                    </div>
-                </div>
-                <div class="form-row">
-                    <div class="full-width">
-                        <div class="beneficiary-block">
-                            <label class="top-label check-item">
-                                <input type="checkbox" id="lotSameAddress" name="lot_same_address">
-                                <span>Same address as applicant</span>
-                            </label>
                         </div>
                     </div>
                 </div>
@@ -210,7 +210,7 @@ $fullAddress = htmlspecialchars(implode(', ', $fullAddressParts), ENT_QUOTES, 'U
                         <input type="text" id="lot_subdivision_block" name="lot_subdivision">
                     </div>
                 </div>
-                <div class="form-row">
+                <div id="lotBarangayRow" class="form-row">
                     <div class="full-width">
                         <div class="row mb-3">
                             <div class="col-md-4">
@@ -232,46 +232,90 @@ $fullAddress = htmlspecialchars(implode(', ', $fullAddressParts), ENT_QUOTES, 'U
                 <h2 class="section-title text-center text-dark">Owner Details</h2>
                 <div class="form-row">
                     <div class="full-width">
-                        <div class="row mb-3">
-                            <div class="col-md-6">
-                                <label class="top-label" for="ownership_type">Form of Ownership<span class="required-asterisk">*</span></label>
-                                <select id="ownership_type" name="ownership_type" class="form-select w-100" required>
-                                    <option value="">Select</option>
-                                    <option value="Individual">Individual</option>
-                                    <option value="Partnership">Partnership</option>
-                                    <option value="Company">Company</option>
-                                    <option value="Government">Government</option>
-                                </select>
-                            </div>
-                            <div class="col-md-6">
-                                <label class="top-label">Are you the land owner?<span class="required-asterisk">*</span></label>
-                                <div class="d-flex align-items-center gap-3 app-type-row">
-                                    <div class="check-item">
-                                        <input type="radio" id="land_owner_yes" name="is_land_owner" value="Yes" class="clearance-radio" required>
-                                        <label class="app-type-label" for="land_owner_yes">Yes</label>
-                                    </div>
-                                    <div class="check-item">
-                                        <input type="radio" id="land_owner_no" name="is_land_owner" value="No" class="clearance-radio" required>
-                                        <label class="app-type-label" for="land_owner_no">No</label>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
+                        <label class="top-label" for="ownership_type">Form of Ownership<span class="required-asterisk">*</span></label>
+                        <select id="ownership_type" name="ownership_type" class="form-select w-100" required>
+                            <option value="">Select</option>
+                            <option value="Individual">Individual</option>
+                            <option value="Partnership">Partnership</option>
+                            <option value="Company">Company</option>
+                        </select>
                     </div>
-                </div>
-
-                <div id="landOwnerDetails" class="form-row d-none">
-                    <div class="input-stack"><label class="top-label">Last Name<span class="required-asterisk">*</span></label><input type="text" name="land_owner_last_name"></div>
-                    <div class="input-stack"><label class="top-label">First Name<span class="required-asterisk">*</span></label><input type="text" name="land_owner_first_name"></div>
-                    <div class="input-stack"><label class="top-label">Middle Name</label><input type="text" name="land_owner_middle_name"></div>
-                    <div class="input-stack"><label class="top-label">Suffix</label><input type="text" name="land_owner_suffix"></div>
                 </div>
 
                 <div id="documentUploadSection">
                     <h2 class="section-title text-center text-dark">Document Upload</h2>
                     <div class="form-row">
                         <div class="full-width">
-                            <p class="text-muted mb-0">Document upload requirements will appear here.</p>
+                            <div class="row mb-3">
+                                <div class="col-md-6">
+                                    <label class="top-label" for="validIdType">Valid Government-Issued ID <span class="required-asterisk">*</span></label>
+                                    <select id="validIdType" name="valid_id_type" class="form-select">
+                                        <option value="">Select</option>
+                                        <option value="philsys">PhilSys ID</option>
+                                        <option value="umid">UMID</option>
+                                        <option value="passport">Passport</option>
+                                        <option value="drivers_license">Driver's License</option>
+                                        <option value="prc">PRC ID</option>
+                                        <option value="postal">Postal ID</option>
+                                        <option value="gsis">GSIS ID</option>
+                                        <option value="sss">SSS ID</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="top-label" for="validIdFile">Upload Valid ID <span class="required-asterisk">*</span></label>
+                                    <input type="file" id="validIdFile" name="valid_id_file" class="form-control" accept=".pdf,.jpg,.jpeg,.png">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div id="validIdNumberRow" class="form-row d-none">
+                        <div class="full-width">
+                            <div class="input-stack">
+                                <label class="top-label" for="validIdNumber">Valid ID Number <span class="required-asterisk">*</span></label>
+                                <input type="text" id="validIdNumber" name="valid_id_number" placeholder="Enter ID number">
+                                <div id="validIdNumberError" class="text-danger small d-none">Invalid ID number</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="full-width">
+                            <div class="row mb-3">
+                                <div class="col-md-6">
+                                    <label class="top-label" for="proofAddressType">Proof of Address <span class="required-asterisk">*</span></label>
+                                    <select id="proofAddressType" name="proof_address_type" class="form-select">
+                                        <option value="">Select</option>
+                                        <option value="lease">Contract of Lease</option>
+                                        <option value="tct">Transfer Certificate of Title</option>
+                                        <option value="tax_declaration">Tax Declaration</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="top-label" for="proofAddressFile">Upload Proof of Address <span class="required-asterisk">*</span></label>
+                                    <input type="file" id="proofAddressFile" name="proof_address_file" class="form-control" accept=".pdf,.jpg,.jpeg,.png">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div id="proofAddressNumberRow" class="form-row d-none">
+                        <div class="full-width">
+                            <div class="input-stack">
+                                <label class="top-label" for="proofAddressNumber">Document Number <span class="required-asterisk">*</span></label>
+                                <input type="text" id="proofAddressNumber" name="proof_address_number" placeholder="Enter document number">
+                                <div id="proofAddressNumberError" class="text-danger small d-none">Invalid document number</div>
+                            </div>
+                        </div>
+                    </div>
+                    <div id="secCertificateWrapper" class="form-row d-none">
+                        <div class="full-width">
+                            <label class="top-label" for="secCertificateFile">Upload SEC Certificate (for Partnership or Company) <span class="required-asterisk">*</span></label>
+                            <label class="upload-dropzone" id="secCertificateDropzone" for="secCertificateFile">
+                                <i class="fa-solid fa-cloud-arrow-up"></i>
+                                <span>Drag files here or click to upload</span>
+                                <small>Accepted: PDF, JPG, JPEG, PNG</small>
+                            </label>
+                            <input type="file" id="secCertificateFile" name="sec_certificate_file" class="visually-hidden" accept=".pdf,.jpg,.jpeg,.png">
+                            <div id="secCertificateSelectedFile" class="selected-files small text-muted mt-2"></div>
                         </div>
                     </div>
                 </div>

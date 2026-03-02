@@ -56,7 +56,8 @@
     drivers_license: /^\d{10}$/,
     prc: /^\d{7}$/,
     postal: /^\d{12}$/,
-    gsis: /^(?:\d{10}|\d{12})$/
+    gsis: /^(?:\d{10}|\d{12})$/,
+    sss: /^\d{10}$/
   };
 
   const proofAddressRegexMap = {
