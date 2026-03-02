@@ -137,7 +137,7 @@ $ownerFullAddress = htmlspecialchars(implode(', ', $ownerFullAddressParts), ENT_
                 <div id="ownerAddressWrapper" class="form-row">
                     <div class="full-width">
                         <div class="input-stack mb-3">
-                            <label class="top-label" for="owner_full_address">Complete Address <span class="required-asterisk">*</span></label>
+                            <label class="top-label" for="owner_full_address">Address <span class="required-asterisk">*</span></label>
                             <input type="text" id="owner_full_address" name="owner_full_address" value="<?php echo $ownerFullAddress; ?>" readonly>
                         </div>
                     </div>

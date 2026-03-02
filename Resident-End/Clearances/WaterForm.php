@@ -134,6 +134,14 @@ $fullAddress = htmlspecialchars(implode(', ', $fullAddressParts), ENT_QUOTES, 'U
                 <div class="form-row">
                     <div class="full-width">
                         <div class="input-stack">
+                            <label class="top-label">Contact Number <span class="required-asterisk">*</span></label>
+                            <input type="text" name="applicant_contact_number" value="<?php echo $phoneNumber; ?>" readonly required>
+                        </div>
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="full-width">
+                        <div class="input-stack">
                             <label class="top-label">Address <span class="required-asterisk">*</span></label>
                             <input type="text" name="applicant_full_address" readonly value="<?php echo $fullAddress; ?>">
                             <input type="hidden" id="applicantUnitNumber" value="<?php echo htmlspecialchars($unitNumber, ENT_QUOTES, 'UTF-8'); ?>">
