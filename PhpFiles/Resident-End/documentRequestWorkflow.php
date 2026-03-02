@@ -7,10 +7,38 @@ require_once __DIR__ . '/../General/documentRequestWorkflow.php';
 
 requireRoleSession(['Resident'], true);
 
-dr_ensure_table($conn);
-dr_ensure_general_fees_table($conn);
-dr_backfill_missing_finance_transactions($conn, 1000);
-dr_prune_free_document_finance_transactions($conn, 3000);
+$action = strtolower(trim((string)($_REQUEST['action'] ?? '')));
+if ($action === '') {
+    dr_respond_json(400, ['success' => false, 'message' => 'Missing action.']);
+}
+
+$drSubmitTiming = null;
+if ($action === 'submit_request') {
+    $drSubmitTiming = [
+        'started_at' => microtime(true),
+        'request_id' => '',
+        'resident_user_id' => (string)($_SESSION['user_id'] ?? ''),
+        'bootstrap_ran' => false,
+    ];
+    register_shutdown_function(static function () use (&$drSubmitTiming): void {
+        if (!is_array($drSubmitTiming) || !isset($drSubmitTiming['started_at'])) {
+            return;
+        }
+        $elapsedMs = (microtime(true) - (float)$drSubmitTiming['started_at']) * 1000;
+        $status = http_response_code();
+        if (!is_int($status) || $status <= 0) {
+            $status = 200;
+        }
+        error_log(sprintf(
+            '[documentRequestWorkflow][submit_request][timing] status=%d elapsed_ms=%.2f request_id=%s resident_user_id=%s bootstrap=%s',
+            $status,
+            $elapsedMs,
+            trim((string)($drSubmitTiming['request_id'] ?? '')) !== '' ? (string)$drSubmitTiming['request_id'] : '-',
+            trim((string)($drSubmitTiming['resident_user_id'] ?? '')) !== '' ? (string)$drSubmitTiming['resident_user_id'] : '-',
+            !empty($drSubmitTiming['bootstrap_ran']) ? '1' : '0'
+        ));
+    });
+}
 
 function dr_ensure_request_support_tables(mysqli $conn): void {
     $conn->query("
@@ -52,11 +80,55 @@ function dr_ensure_request_support_tables(mysqli $conn): void {
     ");
 }
 
-dr_ensure_request_support_tables($conn);
+function dr_submit_bootstrap_needed(mysqli $conn): bool {
+    static $cached = null;
+    if ($cached !== null) {
+        return $cached;
+    }
 
-$action = strtolower(trim((string)($_REQUEST['action'] ?? '')));
-if ($action === '') {
-    dr_respond_json(400, ['success' => false, 'message' => 'Missing action.']);
+    // Fast guard: only run heavy migration bootstrap when core schema pieces are missing.
+    $requiredTables = [
+        'documentrequesttbl',
+        'documenttypelookuptbl',
+        'unifiedfileattachmenttbl',
+        'generalfeestbl',
+    ];
+    foreach ($requiredTables as $table) {
+        if (!dr_table_exists($conn, $table)) {
+            $cached = true;
+            return true;
+        }
+    }
+
+    $requiredColumns = [
+        'resident_user_id',
+        'resident_id',
+        'request_details',
+        'status_id_request',
+        'request_timestamp',
+    ];
+    foreach ($requiredColumns as $column) {
+        if (!dr_column_exists($conn, 'documentrequesttbl', $column)) {
+            $cached = true;
+            return true;
+        }
+    }
+
+    $cached = false;
+    return false;
+}
+
+$bootstrapActions = ['submit_request'];
+if (in_array($action, $bootstrapActions, true)) {
+    if (dr_submit_bootstrap_needed($conn)) {
+        if (is_array($drSubmitTiming)) {
+            $drSubmitTiming['bootstrap_ran'] = true;
+        }
+        // Run migration/bootstrap only for incomplete installs, not every request submission.
+        dr_ensure_request_support_tables($conn);
+        dr_ensure_table($conn);
+        dr_ensure_general_fees_table($conn);
+    }
 }
 
 $userId = (string)($_SESSION['user_id'] ?? '');
@@ -97,47 +169,99 @@ function dr_allowed_extension(string $name): bool {
     return in_array($ext, ['jpg', 'jpeg', 'png', 'webp', 'pdf'], true);
 }
 
-function dr_save_upload(array $file, string $folder): ?string {
-    if (($file['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_OK) {
-        return null;
+function dr_save_upload(array $file, string $folder, ?array $allowedExtensions = null): array {
+    $errorCode = (int)($file['error'] ?? UPLOAD_ERR_NO_FILE);
+    if ($errorCode !== UPLOAD_ERR_OK) {
+        if ($errorCode === UPLOAD_ERR_NO_FILE) {
+            return ['path' => null, 'error' => 'Please attach your GCash payment proof.'];
+        }
+        if ($errorCode === UPLOAD_ERR_INI_SIZE || $errorCode === UPLOAD_ERR_FORM_SIZE) {
+            return ['path' => null, 'error' => 'Uploaded file is too large. Please choose a smaller file.'];
+        }
+        if ($errorCode === UPLOAD_ERR_PARTIAL) {
+            return ['path' => null, 'error' => 'Upload was interrupted. Please try again.'];
+        }
+        return ['path' => null, 'error' => 'Unable to read uploaded file. Please try again.'];
     }
 
     $orig = (string)($file['name'] ?? '');
-    if ($orig === '' || !dr_allowed_extension($orig)) {
-        return null;
+    if ($orig === '') {
+        return ['path' => null, 'error' => 'Please attach your GCash payment proof.'];
+    }
+    $ext = strtolower(pathinfo($orig, PATHINFO_EXTENSION));
+    if ($allowedExtensions !== null) {
+        $allowed = array_values(array_unique(array_map(static fn($v) => strtolower(trim((string)$v)), $allowedExtensions)));
+        if (!in_array($ext, $allowed, true)) {
+            return ['path' => null, 'error' => 'Unsupported file type. Allowed: JPG, JPEG, PNG, WEBP.'];
+        }
+    } elseif (!dr_allowed_extension($orig)) {
+        return ['path' => null, 'error' => 'Unsupported file type. Allowed: JPG, JPEG, PNG, WEBP, PDF.'];
     }
 
     $tmp = (string)($file['tmp_name'] ?? '');
     if (!is_uploaded_file($tmp)) {
-        return null;
+        return ['path' => null, 'error' => 'Upload validation failed. Please reselect the file and submit again.'];
     }
 
     $baseDir = realpath(__DIR__ . '/../../');
     if ($baseDir === false) {
-        return null;
+        return ['path' => null, 'error' => 'Server path resolution failed. Please try again later.'];
     }
 
     $targetDir = $baseDir . '/UnifiedFileAttachment/' . trim($folder, '/');
-    if (!is_dir($targetDir)) {
-        @mkdir($targetDir, 0775, true);
+    if (!is_dir($targetDir) && !@mkdir($targetDir, 0775, true) && !is_dir($targetDir)) {
+        return ['path' => null, 'error' => 'Server storage is unavailable. Please try again later.'];
     }
+    @chmod($targetDir, 0775);
+    // Probe writeability by creating a tiny temp file; this is more reliable than is_writable() alone.
+    $probe = $targetDir . '/.__w_' . bin2hex(random_bytes(4)) . '.tmp';
+    $probeOk = @file_put_contents($probe, 'ok');
+    if ($probeOk === false) {
+        error_log('[documentRequestWorkflow][upload] target dir not writable: ' . $targetDir);
+        return ['path' => null, 'error' => 'Upload folder is not writable on server. Please contact admin.'];
+    }
+    @unlink($probe);
 
-    $ext = strtolower(pathinfo($orig, PATHINFO_EXTENSION));
     $name = date('YmdHis') . '_' . bin2hex(random_bytes(8)) . '.' . $ext;
     $targetPath = $targetDir . '/' . $name;
 
-    if (!move_uploaded_file($tmp, $targetPath)) {
-        return null;
+    if (!@move_uploaded_file($tmp, $targetPath)) {
+        // Fallbacks for environments where move_uploaded_file intermittently fails.
+        $copied = @copy($tmp, $targetPath);
+        if (!$copied) {
+            $renamed = @rename($tmp, $targetPath);
+            if (!$renamed) {
+                $lastError = error_get_last();
+                error_log('[documentRequestWorkflow][upload] save failed tmp=' . $tmp . ' target=' . $targetPath . ' err=' . ($lastError['message'] ?? 'unknown'));
+                return ['path' => null, 'error' => 'Failed to save uploaded file. Please try again.'];
+            }
+        }
+    }
+    @chmod($targetPath, 0664);
+    if (!is_file($targetPath) || filesize($targetPath) <= 0) {
+        @unlink($targetPath);
+        error_log('[documentRequestWorkflow][upload] saved file invalid/empty: ' . $targetPath);
+        return ['path' => null, 'error' => 'Uploaded file appears empty. Please re-upload a valid proof file.'];
     }
 
-    return '/UnifiedFileAttachment/' . trim($folder, '/') . '/' . $name;
+    return ['path' => '/UnifiedFileAttachment/' . trim($folder, '/') . '/' . $name, 'error' => null];
 }
 
 function dr_has_column(mysqli $conn, string $table, string $column): bool {
+    static $cache = [];
     $tableEsc = preg_replace('/[^a-zA-Z0-9_]/', '', $table);
+    if ($tableEsc === '') {
+        return false;
+    }
+    $key = strtolower($tableEsc . '|' . $column);
+    if (array_key_exists($key, $cache)) {
+        return $cache[$key];
+    }
     $colEsc = $conn->real_escape_string($column);
     $res = $conn->query("SHOW COLUMNS FROM {$tableEsc} LIKE '{$colEsc}'");
-    return $res instanceof mysqli_result && $res->num_rows > 0;
+    $exists = $res instanceof mysqli_result && $res->num_rows > 0;
+    $cache[$key] = $exists;
+    return $exists;
 }
 
 function dr_column_type(mysqli $conn, string $table, string $column): string {
@@ -151,6 +275,55 @@ function dr_column_type(mysqli $conn, string $table, string $column): string {
         }
     }
     return '';
+}
+
+function dr_get_fee_map_for_document_types(mysqli $conn, array $documentTypes): array {
+    $out = [];
+    $clean = [];
+    foreach ($documentTypes as $docType) {
+        $doc = trim((string)$docType);
+        if ($doc === '' || !dr_is_issuance_document_type($doc)) {
+            continue;
+        }
+        $clean[$doc] = true;
+    }
+    if (!$clean) {
+        return $out;
+    }
+    if (!dr_table_exists($conn, 'documenttypelookuptbl') || !dr_table_exists($conn, 'generalfeestbl')) {
+        return $out;
+    }
+
+    $names = array_keys($clean);
+    $placeholders = implode(',', array_fill(0, count($names), '?'));
+    $sql = "
+        SELECT dt.document_type_name, gf.amount
+        FROM documenttypelookuptbl dt
+        LEFT JOIN generalfeestbl gf ON gf.document_type_id = dt.document_type_id
+        WHERE dt.document_type_name IN ($placeholders)
+    ";
+    $stmt = $conn->prepare($sql);
+    if (!$stmt) {
+        return $out;
+    }
+    $types = str_repeat('s', count($names));
+    $bindParams = [$types];
+    foreach ($names as $k => $v) {
+        $bindParams[] = &$names[$k];
+    }
+    call_user_func_array([$stmt, 'bind_param'], $bindParams);
+    $stmt->execute();
+    $res = $stmt->get_result();
+    while ($row = $res->fetch_assoc()) {
+        $name = trim((string)($row['document_type_name'] ?? ''));
+        if ($name === '') {
+            continue;
+        }
+        $amount = $row['amount'];
+        $out[$name] = ($amount === null ? null : (float)$amount);
+    }
+    $stmt->close();
+    return $out;
 }
 
 function dr_request_details_requires_json(mysqli $conn): bool {
@@ -218,13 +391,19 @@ function dr_request_details_token(string $documentTypeRaw, string $documentTypeN
 }
 
 function dr_request_id_is_numeric(mysqli $conn): bool {
+    static $cached = null;
+    if ($cached !== null) {
+        return $cached;
+    }
     $res = $conn->query("SHOW COLUMNS FROM documentrequesttbl LIKE 'request_id'");
     if (!($res instanceof mysqli_result)) {
+        $cached = false;
         return false;
     }
     $row = $res->fetch_assoc();
     $type = strtolower((string)($row['Type'] ?? ''));
-    return strpos($type, 'int') !== false;
+    $cached = strpos($type, 'int') !== false;
+    return $cached;
 }
 
 function dr_pick_any_status_id(mysqli $conn, array $preferred = []): ?int {
@@ -418,6 +597,9 @@ if ($action === 'submit_request') {
 
     $now = dr_now();
     $requestId = dr_generate_request_id($conn);
+    if (is_array($drSubmitTiming)) {
+        $drSubmitTiming['request_id'] = $requestId;
+    }
 
     $pendingStatusId = dr_pick_any_status_id($conn, ['PendingVerification', 'PendingReview', 'Pending']);
     $payloadJson = dr_safe_json($payload);
@@ -642,14 +824,44 @@ if ($action === 'submit_payment') {
         dr_respond_json(422, ['success' => false, 'message' => 'Missing request ID.']);
     }
 
-    dr_cancel_overdue_payment_requests($conn, $requestId);
-
-    $row = dr_fetch_request($conn, $requestId);
-    if (!$row || (string)$row['resident_user_id'] !== $residentForeignId) {
+    $stageCol = dr_has_column($conn, 'documentrequesttbl', 'stage') ? 'stage' : null;
+    $statusCol = dr_request_status_column($conn);
+    $selCols = [
+        'request_id',
+        'resident_user_id',
+        'document_type',
+    ];
+    if ($stageCol !== null) {
+        $selCols[] = 'stage';
+    }
+    if ($statusCol !== null && !in_array($statusCol, $selCols, true)) {
+        $selCols[] = $statusCol;
+    }
+    $selSql = "SELECT " . implode(', ', $selCols) . " FROM documentrequesttbl WHERE request_id = ? LIMIT 1";
+    $sel = $conn->prepare($selSql);
+    if (!$sel) {
+        dr_respond_json(500, ['success' => false, 'message' => 'Failed to prepare request lookup.']);
+    }
+    $sel->bind_param('s', $requestId);
+    $sel->execute();
+    $row = $sel->get_result()->fetch_assoc();
+    $sel->close();
+    if (!$row || (string)($row['resident_user_id'] ?? '') !== $residentForeignId) {
         dr_respond_json(404, ['success' => false, 'message' => 'Request not found.']);
     }
 
-    $stage = (string)($row['stage'] ?? '');
+    if ($stageCol === null && $statusCol !== null) {
+        $statusId = (int)($row[$statusCol] ?? 0);
+        if ($statusId > 0) {
+            $statusName = dr_status_name_by_id($conn, $statusId);
+            $mapped = dr_status_name_to_stage($statusName);
+            if ($mapped !== null) {
+                $row['stage'] = $mapped;
+            }
+        }
+    }
+
+    $stage = trim((string)($row['stage'] ?? ''));
     if (!in_array($stage, [DR_STAGE_FOR_PAYMENT, DR_STAGE_PAYMENT_REJECTED], true)) {
         dr_respond_json(422, ['success' => false, 'message' => 'Request is not ready for payment submission.']);
     }
@@ -669,28 +881,177 @@ if ($action === 'submit_payment') {
         if ($paymentReference === '') {
             dr_respond_json(422, ['success' => false, 'message' => 'GCash transaction number is required.']);
         }
-        $proofPath = dr_save_upload($_FILES['payment_proof'] ?? [], 'DocumentPayments');
-        if (!$proofPath) {
-            dr_respond_json(422, ['success' => false, 'message' => 'GCash payment proof is required.']);
+        $upload = dr_save_upload($_FILES['payment_proof'] ?? [], 'DocumentPayments', ['jpg', 'jpeg', 'png', 'webp']);
+        $proofPath = (string)($upload['path'] ?? '');
+        if ($proofPath === '') {
+            $msg = trim((string)($upload['error'] ?? ''));
+            dr_respond_json(422, ['success' => false, 'message' => $msg !== '' ? $msg : 'GCash payment proof is required.']);
         }
     }
 
-    $updated = dr_update_stage($conn, $requestId, DR_STAGE_PAYMENT_SUBMITTED, [
-        'payment_method' => $paymentMethod,
-        'payment_proof_path' => $proofPath,
-        'payment_submitted_at' => dr_now(),
-        'payment_reference' => $paymentReference,
-        'status_remarks' => null,
-    ]);
+    $now = dr_now();
+    $requestStatusId = dr_find_request_status_id_by_stage($conn, DR_STAGE_PAYMENT_SUBMITTED);
+    $txStatusId = dr_map_stage_to_transaction_status_id($conn, DR_STAGE_PAYMENT_SUBMITTED);
 
-    if (!$updated) {
+    $docSets = [];
+    $docTypes = '';
+    $docVals = [];
+    if (dr_has_column($conn, 'documentrequesttbl', 'updated_at')) {
+        $docSets[] = 'updated_at = ?';
+        $docTypes .= 's';
+        $docVals[] = $now;
+    }
+    if (dr_has_column($conn, 'documentrequesttbl', 'stage')) {
+        $docSets[] = 'stage = ?';
+        $docTypes .= 's';
+        $docVals[] = DR_STAGE_PAYMENT_SUBMITTED;
+    }
+    $statusCol = dr_request_status_column($conn);
+    if ($statusCol !== null && $requestStatusId !== null) {
+        $docSets[] = $statusCol . ' = ?';
+        $docTypes .= 'i';
+        $docVals[] = $requestStatusId;
+    }
+    if (dr_has_column($conn, 'documentrequesttbl', 'review_timestamp')) {
+        $docSets[] = 'review_timestamp = ?';
+        $docTypes .= 's';
+        $docVals[] = $now;
+    }
+    if (dr_has_column($conn, 'documentrequesttbl', 'status_remarks')) {
+        $docSets[] = 'status_remarks = NULL';
+    }
+    if (!$docSets) {
         dr_respond_json(500, ['success' => false, 'message' => 'Unable to update payment state.']);
+    }
+    $docTypes .= 's';
+    $docVals[] = $requestId;
+    $docSql = 'UPDATE documentrequesttbl SET ' . implode(', ', $docSets) . ' WHERE request_id = ? LIMIT 1';
+    $docStmt = $conn->prepare($docSql);
+    if (!$docStmt) {
+        dr_respond_json(500, ['success' => false, 'message' => 'Unable to prepare payment update.']);
+    }
+    $docRefs = [];
+    foreach ($docVals as $i => $v) {
+        $docRefs[$i] = &$docVals[$i];
+    }
+    array_unshift($docRefs, $docTypes);
+    call_user_func_array([$docStmt, 'bind_param'], $docRefs);
+    $docOk = $docStmt->execute();
+    $docStmt->close();
+    if (!$docOk) {
+        dr_respond_json(500, ['success' => false, 'message' => 'Unable to update payment state.']);
+    }
+
+    // Fast finance transaction write using upsert-style insert.
+    if (dr_table_exists($conn, 'financetransactiontbl')) {
+        $txDetails = dr_safe_json([
+            'reference' => $paymentReference,
+            'submitted_at' => $now,
+        ]);
+        $hasProofCol = dr_column_exists($conn, 'financetransactiontbl', 'payment_proof_path');
+        $hasDecisionCol = dr_column_exists($conn, 'financetransactiontbl', 'finance_decision_at');
+        $hasPaymentTs = dr_column_exists($conn, 'financetransactiontbl', 'payment_timestamp');
+        $hasPaymentMethod = dr_column_exists($conn, 'financetransactiontbl', 'payment_method');
+        $hasTxDetails = dr_column_exists($conn, 'financetransactiontbl', 'transaction_details');
+        $hasTxStatus = dr_column_exists($conn, 'financetransactiontbl', 'transaction_status_id');
+        $hasOrNumber = dr_column_exists($conn, 'financetransactiontbl', 'or_number');
+
+        $txId = '';
+        $existingTx = $conn->prepare("SELECT transaction_id FROM financetransactiontbl WHERE request_id = ? LIMIT 1");
+        if ($existingTx) {
+            $existingTx->bind_param('s', $requestId);
+            $existingTx->execute();
+            $existingRow = $existingTx->get_result()->fetch_assoc();
+            $existingTx->close();
+            if (is_array($existingRow)) {
+                $txId = trim((string)($existingRow['transaction_id'] ?? ''));
+            }
+        }
+        if ($txId === '') {
+            if (function_exists('GenerateTransactionID')) {
+                $txId = (string)GenerateTransactionID($conn, 'financetransactiontbl', 'transaction_id');
+            }
+            if ($txId === '') {
+                $txId = strtoupper(substr(bin2hex(random_bytes(8)), 0, 10));
+            }
+        }
+
+        $insertCols = ['transaction_id', 'request_id'];
+        $insertVals = [$txId, $requestId];
+        $insertTypes = 'ss';
+        $updateSets = [];
+
+        if ($hasPaymentMethod) {
+            $insertCols[] = 'payment_method';
+            $insertVals[] = $paymentMethod;
+            $insertTypes .= 's';
+            $updateSets[] = 'payment_method = VALUES(payment_method)';
+        }
+        if ($hasProofCol) {
+            $insertCols[] = 'payment_proof_path';
+            $insertVals[] = $proofPath;
+            $insertTypes .= 's';
+            $updateSets[] = 'payment_proof_path = VALUES(payment_proof_path)';
+        }
+        if ($hasTxDetails) {
+            $insertCols[] = 'transaction_details';
+            $insertVals[] = $txDetails;
+            $insertTypes .= 's';
+            $updateSets[] = 'transaction_details = VALUES(transaction_details)';
+        }
+        if ($hasTxStatus) {
+            $insertCols[] = 'transaction_status_id';
+            $insertVals[] = $txStatusId;
+            $insertTypes .= 'i';
+            $updateSets[] = 'transaction_status_id = VALUES(transaction_status_id)';
+        }
+        if ($hasPaymentTs) {
+            $insertCols[] = 'payment_timestamp';
+            $insertVals[] = $now;
+            $insertTypes .= 's';
+            $updateSets[] = 'payment_timestamp = VALUES(payment_timestamp)';
+        }
+        if ($hasOrNumber) {
+            $updateSets[] = 'or_number = NULL';
+        }
+        if ($hasDecisionCol) {
+            $updateSets[] = 'finance_decision_at = NULL';
+        }
+        if (dr_column_exists($conn, 'financetransactiontbl', 'updated_at')) {
+            $updateSets[] = 'updated_at = CURRENT_TIMESTAMP';
+        }
+
+        if (!$updateSets) {
+            $updateSets[] = 'request_id = request_id';
+        }
+        $insSql = "INSERT INTO financetransactiontbl (" . implode(', ', $insertCols) . ")
+                   VALUES (" . implode(', ', array_fill(0, count($insertCols), '?')) . ")
+                   ON DUPLICATE KEY UPDATE " . implode(', ', $updateSets);
+        $ins = $conn->prepare($insSql);
+        $financeSaved = false;
+        if ($ins) {
+            $insRefs = [];
+            foreach ($insertVals as $i => $v) {
+                $insRefs[$i] = &$insertVals[$i];
+            }
+            array_unshift($insRefs, $insertTypes);
+            call_user_func_array([$ins, 'bind_param'], $insRefs);
+            $financeSaved = (bool)$ins->execute();
+            $ins->close();
+        }
+
+        if (!$financeSaved) {
+            dr_respond_json(500, ['success' => false, 'message' => 'Payment was uploaded but finance queue update failed. Please submit again.']);
+        }
     }
 
     dr_respond_json(200, [
         'success' => true,
         'message' => 'Payment submitted. Please wait for finance verification.',
-        'request' => $updated,
+        'request_id' => $requestId,
+        'stage' => DR_STAGE_PAYMENT_SUBMITTED,
+        'payment_method' => $paymentMethod,
+        'payment_submitted_at' => $now,
     ]);
 }
 
@@ -704,14 +1065,43 @@ if ($action === 'select_payment_mode') {
         dr_respond_json(422, ['success' => false, 'message' => 'Missing request ID.']);
     }
 
-    dr_cancel_overdue_payment_requests($conn, $requestId);
-
-    $row = dr_fetch_request($conn, $requestId);
-    if (!$row || (string)$row['resident_user_id'] !== $residentForeignId) {
+    $stageCol = dr_has_column($conn, 'documentrequesttbl', 'stage') ? 'stage' : null;
+    $statusCol = dr_request_status_column($conn);
+    $selCols = [
+        'request_id',
+        'resident_user_id',
+    ];
+    if ($stageCol !== null) {
+        $selCols[] = 'stage';
+    }
+    if ($statusCol !== null && !in_array($statusCol, $selCols, true)) {
+        $selCols[] = $statusCol;
+    }
+    $selSql = "SELECT " . implode(', ', $selCols) . " FROM documentrequesttbl WHERE request_id = ? LIMIT 1";
+    $sel = $conn->prepare($selSql);
+    if (!$sel) {
+        dr_respond_json(500, ['success' => false, 'message' => 'Failed to prepare request lookup.']);
+    }
+    $sel->bind_param('s', $requestId);
+    $sel->execute();
+    $row = $sel->get_result()->fetch_assoc();
+    $sel->close();
+    if (!$row || (string)($row['resident_user_id'] ?? '') !== $residentForeignId) {
         dr_respond_json(404, ['success' => false, 'message' => 'Request not found.']);
     }
 
-    $stage = (string)($row['stage'] ?? '');
+    if ($stageCol === null && $statusCol !== null) {
+        $statusId = (int)($row[$statusCol] ?? 0);
+        if ($statusId > 0) {
+            $statusName = dr_status_name_by_id($conn, $statusId);
+            $mapped = dr_status_name_to_stage($statusName);
+            if ($mapped !== null) {
+                $row['stage'] = $mapped;
+            }
+        }
+    }
+
+    $stage = trim((string)($row['stage'] ?? ''));
     if (!in_array($stage, [DR_STAGE_FOR_PAYMENT, DR_STAGE_PAYMENT_REJECTED], true)) {
         dr_respond_json(422, ['success' => false, 'message' => 'Payment mode can only be selected while request is for payment.']);
     }
@@ -721,21 +1111,57 @@ if ($action === 'select_payment_mode') {
         dr_respond_json(422, ['success' => false, 'message' => 'Please choose a valid payment method.']);
     }
 
-    $updated = dr_update_stage($conn, $requestId, DR_STAGE_FOR_PAYMENT, [
-        'payment_method' => $paymentMethod,
-        'payment_proof_path' => null,
-        'payment_submitted_at' => null,
-        'payment_reference' => null,
-        'status_remarks' => null,
-    ]);
-    if (!$updated) {
-        dr_respond_json(500, ['success' => false, 'message' => 'Unable to save payment mode.']);
+    // Fast-path update: avoid expensive full workflow recalculation for simple mode selection.
+    if ($stage === DR_STAGE_PAYMENT_REJECTED) {
+        $updated = dr_update_stage($conn, $requestId, DR_STAGE_FOR_PAYMENT, [
+            'payment_method' => $paymentMethod,
+            'payment_proof_path' => null,
+            'payment_submitted_at' => null,
+            'payment_reference' => null,
+            'status_remarks' => null,
+        ]);
+        if (!$updated) {
+            dr_respond_json(500, ['success' => false, 'message' => 'Unable to save payment mode.']);
+        }
+    } else {
+        if (dr_table_exists($conn, 'financetransactiontbl')) {
+            $proofCol = dr_column_exists($conn, 'financetransactiontbl', 'payment_proof_path');
+            $decisionCol = dr_column_exists($conn, 'financetransactiontbl', 'finance_decision_at');
+            $detailsCol = dr_column_exists($conn, 'financetransactiontbl', 'transaction_details');
+            $sql = "UPDATE financetransactiontbl
+                    SET payment_method = ?, payment_timestamp = NULL, or_number = NULL, updated_at = CURRENT_TIMESTAMP";
+            if ($proofCol) {
+                $sql .= ", payment_proof_path = NULL";
+            }
+            if ($decisionCol) {
+                $sql .= ", finance_decision_at = NULL";
+            }
+            if ($detailsCol) {
+                $sql .= ", transaction_details = NULL";
+            }
+            $sql .= " WHERE request_id = ? LIMIT 1";
+            $upd = $conn->prepare($sql);
+            if ($upd) {
+                $upd->bind_param('ss', $paymentMethod, $requestId);
+                $upd->execute();
+                $upd->close();
+            }
+        }
+        if (dr_has_column($conn, 'documentrequesttbl', 'status_remarks')) {
+            $clearRemarks = $conn->prepare("UPDATE documentrequesttbl SET status_remarks = NULL WHERE request_id = ? LIMIT 1");
+            if ($clearRemarks) {
+                $clearRemarks->bind_param('s', $requestId);
+                $clearRemarks->execute();
+                $clearRemarks->close();
+            }
+        }
     }
 
     dr_respond_json(200, [
         'success' => true,
         'message' => 'Payment mode saved.',
-        'request' => $updated,
+        'request_id' => $requestId,
+        'payment_method' => $paymentMethod,
     ]);
 }
 
@@ -874,28 +1300,130 @@ if ($action === 'view_payment_proof') {
 }
 
 if ($action === 'list') {
-    dr_cancel_overdue_payment_requests($conn);
+    if (!dr_table_exists($conn, 'documentrequesttbl')) {
+        dr_respond_json(200, ['success' => true, 'items' => []]);
+    }
 
     $orderCol = dr_has_column($conn, 'documentrequesttbl', 'submitted_at') ? 'submitted_at' : 'request_timestamp';
-    $stmt = $conn->prepare("SELECT * FROM documentrequesttbl WHERE resident_user_id = ? ORDER BY {$orderCol} DESC, request_id DESC");
+    $hasFinanceTable = dr_table_exists($conn, 'financetransactiontbl');
+    $hasStatusLookup = dr_table_exists($conn, 'statuslookuptbl');
+    $limit = max(1, min(300, (int)($_GET['limit'] ?? 120)));
+    if ($hasFinanceTable) {
+        $sql = "
+            SELECT
+                d.*,
+                f.transaction_amount AS _tx_amount,
+                f.payment_method AS _tx_payment_method,
+                f.payment_proof_path AS _tx_payment_proof_path,
+                f.transaction_details AS _tx_transaction_details,
+                f.or_number AS _tx_or_number,
+                f.transaction_status_id AS _tx_status_id,
+                " . ($hasStatusLookup ? "s.status_name" : "''") . " AS _tx_status_name,
+                f.payment_deadline AS _tx_payment_deadline,
+                f.payment_timestamp AS _tx_payment_timestamp,
+                f.finance_decision_at AS _tx_finance_decision_at,
+                f.user_id_employee_process AS _tx_finance_user_id
+            FROM documentrequesttbl d
+            LEFT JOIN financetransactiontbl f ON f.request_id = d.request_id
+            " . ($hasStatusLookup ? "LEFT JOIN statuslookuptbl s ON s.status_id = f.transaction_status_id" : "") . "
+            WHERE d.resident_user_id = ?
+            ORDER BY d.{$orderCol} DESC, d.request_id DESC
+            LIMIT {$limit}
+        ";
+    } else {
+        $sql = "
+            SELECT
+                d.*,
+                NULL AS _tx_amount,
+                '' AS _tx_payment_method,
+                '' AS _tx_payment_proof_path,
+                '' AS _tx_transaction_details,
+                '' AS _tx_or_number,
+                0 AS _tx_status_id,
+                '' AS _tx_status_name,
+                '' AS _tx_payment_deadline,
+                '' AS _tx_payment_timestamp,
+                '' AS _tx_finance_decision_at,
+                '' AS _tx_finance_user_id
+            FROM documentrequesttbl d
+            WHERE d.resident_user_id = ?
+            ORDER BY d.{$orderCol} DESC, d.request_id DESC
+            LIMIT {$limit}
+        ";
+    }
+    $stmt = $conn->prepare($sql);
     if (!$stmt) {
         dr_respond_json(500, ['success' => false, 'message' => 'Failed to prepare list query.']);
     }
     $stmt->bind_param('s', $residentForeignId);
     $stmt->execute();
     $items = [];
+    $docTypesForFee = [];
     $res = $stmt->get_result();
     while ($row = $res->fetch_assoc()) {
-        dr_hydrate_request_derived_fields($conn, $row);
-        dr_merge_finance_transaction_into_request($conn, $row);
-        dr_sync_stage_from_status_lookup($conn, $row);
+        dr_hydrate_request_derived_fields($conn, $row, false);
+
+        // Populate finance data from join (avoid per-row finance query).
+        $row['amount'] = isset($row['_tx_amount']) ? (float)$row['_tx_amount'] : null;
+        $row['payment_method'] = (string)($row['_tx_payment_method'] ?? '');
+        $row['payment_proof_path'] = (string)($row['_tx_payment_proof_path'] ?? '');
+        $row['or_number'] = (string)($row['_tx_or_number'] ?? '');
+        $row['payment_status_id'] = isset($row['_tx_status_id']) ? (int)$row['_tx_status_id'] : 0;
+        $row['payment_status_name'] = (string)($row['_tx_status_name'] ?? '');
+        $row['payment_deadline'] = (string)($row['_tx_payment_deadline'] ?? '');
+        $row['payment_submitted_at'] = (string)($row['_tx_payment_timestamp'] ?? '');
+        $row['finance_decision_at'] = (string)($row['_tx_finance_decision_at'] ?? '');
+        $row['finance_user_id'] = (string)($row['_tx_finance_user_id'] ?? '');
+
+        $txDetails = (string)($row['_tx_transaction_details'] ?? '');
+        if ($txDetails !== '') {
+            $decoded = json_decode($txDetails, true);
+            if (is_array($decoded)) {
+                $ref = trim((string)($decoded['reference'] ?? ''));
+                if ($ref !== '') {
+                    $row['payment_reference'] = $ref;
+                }
+            } elseif (preg_match('/\bReference:\s*(.+)$/mi', $txDetails, $m)) {
+                $row['payment_reference'] = trim((string)($m[1] ?? ''));
+            }
+        }
+
+        if (trim((string)($row['stage'] ?? '')) === '') {
+            dr_sync_stage_from_status_lookup($conn, $row);
+        }
         $row['stage_label'] = dr_stage_label((string)$row['stage']);
-        $row['fee_amount'] = dr_get_fee_amount_for_document_type($conn, (string)($row['document_type'] ?? ''));
+        $docTypeForFee = trim((string)($row['document_type'] ?? ''));
+        $row['fee_amount'] = null;
+        if ($docTypeForFee !== '') $docTypesForFee[$docTypeForFee] = true;
         $payload = json_decode((string)($row['request_details'] ?? $row['payload_json'] ?? '{}'), true);
         $row['payload'] = is_array($payload) ? $payload : [];
+        unset(
+            $row['_tx_amount'],
+            $row['_tx_payment_method'],
+            $row['_tx_payment_proof_path'],
+            $row['_tx_transaction_details'],
+            $row['_tx_or_number'],
+            $row['_tx_status_id'],
+            $row['_tx_status_name'],
+            $row['_tx_payment_deadline'],
+            $row['_tx_payment_timestamp'],
+            $row['_tx_finance_decision_at'],
+            $row['_tx_finance_user_id']
+        );
         $items[] = $row;
     }
     $stmt->close();
+
+    if ($items && $docTypesForFee) {
+        $feeMap = dr_get_fee_map_for_document_types($conn, array_keys($docTypesForFee));
+        foreach ($items as &$it) {
+            $docType = trim((string)($it['document_type'] ?? ''));
+            if ($docType !== '' && array_key_exists($docType, $feeMap)) {
+                $it['fee_amount'] = $feeMap[$docType];
+            }
+        }
+        unset($it);
+    }
 
     dr_respond_json(200, ['success' => true, 'items' => $items]);
 }

@@ -295,16 +295,18 @@ require_once __DIR__ . '/../includes/admin_guard.php';
   </div>
 </div>
 
-<div class="modal fade" id="actionModal" tabindex="-1" aria-hidden="true">
+<div class="modal fade" id="actionModal" tabindex="-1" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
   <div class="modal-dialog modal-dialog-centered">
-    <form class="modal-content" id="actionForm" enctype="multipart/form-data">
-      <div class="modal-header">
-        <h5 class="modal-title" id="actionModalTitle">Update Request</h5>
+    <form class="modal-content p-3" id="actionForm" enctype="multipart/form-data">
+      <div class="modal-header justify-content-center border-0 pb-0">
+        <h5 class="modal-title fw-bold text-center w-100" id="actionModalTitle">Update Request</h5>
         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
       </div>
+      <hr class="my-2">
       <div class="modal-body">
         <input type="hidden" id="actionType" name="action">
         <input type="hidden" id="actionRequestId" name="request_id">
+        <div id="actionPrompt" class="d-none mb-3"></div>
 
         <div id="actionReasonWrap" class="d-none mb-3">
           <label class="form-label">Reason</label>
@@ -328,9 +330,9 @@ require_once __DIR__ . '/../includes/admin_guard.php';
 
         <div id="actionModalError" class="alert alert-danger d-none mb-0"></div>
       </div>
-      <div class="modal-footer">
-        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-        <button type="submit" class="btn btn-primary">Submit</button>
+      <div class="modal-footer border-0 pt-0 d-flex gap-2 w-100">
+        <button type="button" id="actionCancelBtn" class="btn btn-outline-secondary flex-fill" data-bs-dismiss="modal">Return</button>
+        <button type="submit" id="actionSubmitBtn" class="btn btn-primary flex-fill">Submit</button>
       </div>
     </form>
   </div>
@@ -358,15 +360,16 @@ require_once __DIR__ . '/../includes/admin_guard.php';
   <div class="modal-dialog modal-xl modal-dialog-centered">
     <div class="modal-content">
       <div class="modal-header">
-        <h5 class="modal-title">Payment Proof</h5>
+        <h5 class="modal-title" id="paymentProofTitle">Payment Proof</h5>
         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
       </div>
       <div class="modal-body">
         <div id="paymentProofWrap" class="w-100 text-center"></div>
       </div>
       <div class="modal-footer">
+        <button type="button" id="paymentProofReturnBtn" class="btn btn-secondary d-none">Return</button>
         <a id="paymentProofOpenNew" class="btn btn-outline-primary" target="_blank" rel="noopener">Open in New Tab</a>
-        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+        <button type="button" id="paymentProofCloseBtn" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
       </div>
     </div>
   </div>

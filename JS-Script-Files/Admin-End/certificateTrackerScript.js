@@ -68,6 +68,7 @@
   let financeFilterMethod = '';
   let cachedAllItems = [];
   let itemById = new Map();
+  const detailById = new Map();
   let viewMode = 'details';
   let viewDetailsHtml = '';
   let viewPreviewState = null;
@@ -79,6 +80,7 @@
   let openViewDirectPreview = false;
   let paymentProofReturnTarget = '';
   let preserveViewStateOnNextHide = false;
+  let financeViewIntent = 'view';
   const financeStages = new Set([
     'for_payment',
     'payment_submitted',
@@ -108,6 +110,24 @@
     return `${appBase}/${raw.replace(/^\/+/, '')}`;
   }
 
+  function resolvePaymentProofUrl(row, requestId = '') {
+    const raw = String(row?.payment_proof_path || '').trim();
+    if (!raw) return '';
+
+    // Prefer direct file URL for reliable preview rendering.
+    const unifiedMatch = raw.replace(/\\/g, '/').match(/\/UnifiedFileAttachment\/[^\s"'<>]+/i);
+    if (unifiedMatch && unifiedMatch[0]) {
+      return `${appBase}${unifiedMatch[0]}`;
+    }
+
+    const direct = resolvePublicUrl(raw);
+    if (direct) return direct;
+
+    const id = String(requestId || row?.request_id || '').trim();
+    if (!id) return '';
+    return `${appBase}/PhpFiles/Admin-End/documentRequestWorkflow.php?action=view_payment_proof&request_id=${encodeURIComponent(id)}`;
+  }
+
   function badge(stage, label) {
     if (isFinancePaymentsPage) {
       const bucket = String(stage || '').toLowerCase();
@@ -134,25 +154,41 @@
     const viewIssuedBtn = (!isFinancePaymentsPage && (hasIssuedFile || canViewIssuedByStage))
       ? `<button class="btn btn-sm btn-outline-success me-1" data-issued-id="${esc(row.request_id)}">View Document</button>`
       : '';
-    const proofBtn = row.payment_proof_path
-      ? `<button class="btn btn-sm btn-outline-dark me-1" data-proof-id="${esc(row.request_id)}">View Payment</button>`
-      : '';
-    if (stageKey === 'for_payment' || stageKey === 'payment_submitted' || stageKey === 'payment_rejected') {
-      const hasGcashPayment = String(row.payment_method || '').toLowerCase() === 'gcash'
-        && (!!row.payment_proof_path || !!row.payment_reference || !!row.payment_submitted_at);
-      const gcashBtn = hasGcashPayment
-        ? `<button class="btn btn-sm btn-success" data-inline-action="finance_verify_gcash" data-id="${esc(row.request_id)}">Verify GCash Payment</button>`
-        : '';
-      return `${viewBtn}${gcashBtn}`;
+    if (isFinancePaymentsPage) {
+      const financeKey = statusBucket(row);
+      if (financeKey === 'pending_verification') {
+        return `${viewBtn}<button class="btn btn-sm btn-success" data-inline-action="finance_verify_gcash" data-id="${esc(row.request_id)}">Verify Payment</button>`;
+      }
+      if (financeKey === 'unpaid') {
+        return viewBtn;
+      }
+      return viewBtn;
     }
-    return `${viewBtn}${viewIssuedBtn}${proofBtn}`;
+    return `${viewBtn}${viewIssuedBtn}`;
   }
 
   function viewModalActionButtons(row) {
     if (!row) return '';
     const id = esc(row.request_id || '');
-    const stage = String(row.stage || '');
-    const proofBtn = row.payment_proof_path
+    const normalizeStageToken = (value) => String(value || '')
+      .trim()
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '_')
+      .replace(/^_+|_+$/g, '');
+    let stage = normalizeStageToken(firstNonEmpty([row.stage, row.stage_label]));
+    if (!stage) {
+      const paymentToken = normalizeStageToken(firstNonEmpty([row.payment_status_name, row.payment_status_label]));
+      if (['pendingverification', 'paymentsubmitted', 'pending_payment_verification'].includes(paymentToken)) {
+        stage = 'payment_submitted';
+      } else if (['unpaid', 'pending', 'pendingreview'].includes(paymentToken)) {
+        stage = 'for_payment';
+      } else if (['rejected', 'denied', 'paymentrejected'].includes(paymentToken)) {
+        stage = 'payment_rejected';
+      } else if (['verified', 'approved'].includes(paymentToken)) {
+        stage = 'payment_verified';
+      }
+    }
+    const proofBtn = (isFinancePaymentsPage && row.payment_proof_path)
       ? `<button class="btn btn-sm btn-outline-dark" data-proof-id="${id}">View Payment</button>`
       : '';
 
@@ -163,6 +199,9 @@
       `;
     }
     if (stage === 'payment_submitted') {
+      if (!isFinancePaymentsPage) {
+        return `${proofBtn}<span class="text-muted small">Payment verification is handled in Finance Payments.</span>`;
+      }
       return `
         ${proofBtn}
         <button class="btn btn-sm btn-success" data-view-action="finance_verify" data-id="${id}">Verify Payment</button>
@@ -170,6 +209,9 @@
       `;
     }
     if (stage === 'for_payment' || stage === 'payment_rejected') {
+      if (!isFinancePaymentsPage) {
+        return `${proofBtn}<span class="text-muted small">Payment verification is handled in Finance Payments.</span>`;
+      }
       return `
         ${proofBtn}
         <button class="btn btn-sm btn-success" data-view-action="finance_verify" data-id="${id}">Record Walk-in Payment</button>
@@ -1019,6 +1061,12 @@
       if (paymentStatusKey === 'rejected' || paymentStatusKey === 'denied' || paymentStatusKey === 'paymentrejected') return 'rejected';
       if (paymentStatusKey === 'verified' || paymentStatusKey === 'approved') return 'verified';
       if (paymentStatusKey === 'cancelled' || paymentStatusKey === 'autocancelled' || paymentStatusKey === 'expired') return 'cancelled';
+      const hasSubmittedProof = String(row?.payment_submitted_at || '').trim() !== ''
+        && (
+          String(row?.payment_proof_path || '').trim() !== ''
+          || String(row?.payment_reference || '').trim() !== ''
+        );
+      if (hasSubmittedProof) return 'pending_verification';
       const stage = String(row?.stage || '').toLowerCase();
       if (stage === 'payment_submitted') return 'pending_verification';
       if (stage === 'for_payment') return 'unpaid';
@@ -1083,6 +1131,8 @@
   }
 
   function hasFinanceTransaction(row) {
+    const stage = String(row?.stage || '').toLowerCase();
+    if (financeStages.has(stage)) return true;
     const statusId = Number(row?.payment_status_id || 0);
     if (Number.isFinite(statusId) && statusId > 0) return true;
     if (String(row?.payment_status_name || '').trim() !== '') return true;
@@ -1291,6 +1341,46 @@
     return data;
   }
 
+  async function fetchRequestDetails(requestId) {
+    const id = String(requestId || '').trim();
+    if (!id) return null;
+    if (detailById.has(id)) {
+      return detailById.get(id);
+    }
+    const q = new URLSearchParams({ action: 'get_request', request_id: id });
+    const data = await fetchJson(`${endpoint}?${q.toString()}`);
+    const item = data && data.item && typeof data.item === 'object' ? data.item : null;
+    if (item) {
+      detailById.set(id, item);
+    }
+    return item;
+  }
+
+  async function ensureRowDetails(row) {
+    if (!row || typeof row !== 'object') return row;
+    const id = String(row.request_id || '').trim();
+    if (!id) return row;
+    const payloadReady = row.payload && typeof row.payload === 'object' && Object.keys(row.payload).length > 0;
+    const profileReady = row.resident_profile && typeof row.resident_profile === 'object' && Object.keys(row.resident_profile).length > 0;
+    if (payloadReady || profileReady) {
+      return row;
+    }
+    try {
+      const full = await fetchRequestDetails(id);
+      if (full) {
+        itemById.set(id, full);
+        if (Array.isArray(cachedAllItems)) {
+          const idx = cachedAllItems.findIndex((it) => String(it?.request_id || '') === id);
+          if (idx >= 0) cachedAllItems[idx] = full;
+        }
+        return full;
+      }
+    } catch (_) {
+      // Keep lightweight row if details fetch fails.
+    }
+    return row;
+  }
+
   function renderFromCache() {
     const allItems = Array.isArray(cachedAllItems) ? cachedAllItems : [];
     updateStageTabBadges(allItems);
@@ -1328,11 +1418,12 @@
     tableBody.innerHTML = '<tr><td colspan="8" class="text-center text-muted py-4">Loading...</td></tr>';
     try {
       const params = new URLSearchParams({ action: 'list' });
+      params.set('lite', '1');
       if (isFinancePaymentsPage) {
         params.set('list_context', 'finance');
-        params.set('limit', '120');
+        params.set('limit', '60');
       } else {
-        params.set('limit', '150');
+        params.set('limit', '70');
       }
       const data = await fetchJson(`${endpoint}?${params.toString()}`);
       if (!data.success) throw new Error(data.message || 'Failed to load requests.');
@@ -1367,6 +1458,7 @@
     }
     if (actionAmount) {
       actionAmount.readOnly = false;
+      actionAmount.classList.remove('bg-light');
     }
     if (actionForm?.dataset?.confirmStep) {
       delete actionForm.dataset.confirmStep;
@@ -1409,11 +1501,13 @@
     actionRequestId.value = requestId;
     const row = itemById.get(String(requestId));
 
+    const rowStage = String(row?.stage || '').toLowerCase();
+    const isWalkInFlow = rowStage === 'for_payment' || rowStage === 'payment_rejected';
     const labels = {
       personnel_approve: 'Before You Approve',
       personnel_approve_confirm: 'Confirm Approval',
       personnel_reject: 'Reject Request',
-      finance_verify: 'Verify Payment / Walk-in Payment',
+      finance_verify: isWalkInFlow ? 'Record Walk-in Payment' : 'Verify Payment / Walk-in Payment',
       finance_reject: 'Reject Payment',
       mark_ready: 'Mark Ready for Claim',
       mark_completed_confirm: 'Confirm Release',
@@ -1455,6 +1549,14 @@
         actionSubmitBtn.textContent = 'Reject';
         actionSubmitBtn.classList.remove('btn-primary', 'btn-success');
         actionSubmitBtn.classList.add('btn-danger');
+      } else if (type === 'finance_verify') {
+        actionSubmitBtn.textContent = isWalkInFlow ? 'Record Payment' : 'Verify Payment';
+        actionSubmitBtn.classList.remove('btn-danger', 'btn-primary');
+        actionSubmitBtn.classList.add('btn-success');
+      } else if (type === 'finance_reject') {
+        actionSubmitBtn.textContent = 'Reject Payment';
+        actionSubmitBtn.classList.remove('btn-primary', 'btn-success');
+        actionSubmitBtn.classList.add('btn-danger');
       }
     }
     if (
@@ -1478,19 +1580,61 @@
       if (actionPrompt) {
         const stage = String(row?.stage || '').toLowerCase();
         const isPendingVerification = stage === 'payment_submitted';
+        const isWalkInStage = stage === 'for_payment' || stage === 'payment_rejected';
+        const payload = row && row.payload && typeof row.payload === 'object' ? row.payload : {};
+        const residentProfile = row && row.resident_profile && typeof row.resident_profile === 'object'
+          ? row.resident_profile
+          : {};
+        const customerName = fullNameFromRow(row) || '-';
+        const customerAddress = firstNonEmpty([
+          payload.full_address,
+          payload.full_address_display,
+          payload.address,
+          payload.complete_address,
+          residentProfile.full_address,
+          row?.full_address,
+          row?.address,
+          '-'
+        ]);
+        const method = firstNonEmpty([row?.payment_method, 'GCash']);
+        const docNameForPrompt = normalizeDocumentTypeDisplay(firstNonEmpty([row?.document_type, '-']));
+        const feeRaw = firstNonEmpty([row?.fee_amount, row?.amount]);
+        const feeNumber = Number(feeRaw);
+        const feeText = Number.isFinite(feeNumber) ? `PHP ${feeNumber.toFixed(2)}` : '-';
         if (isPendingVerification) {
           actionAmountWrap.classList.add('d-none');
           actionAmount.required = false;
-          actionPrompt.textContent = 'Enter the official OR number for this submitted payment, then confirm verification.';
+          if (actionAmount) {
+            actionAmount.readOnly = true;
+            actionAmount.classList.add('bg-light');
+          }
+          actionPrompt.innerHTML = `
+            <div class="small text-muted mb-2">Review transaction before final verification.</div>
+            <div class="border rounded p-2 bg-light">
+              <div><strong>Full Name:</strong> ${esc(customerName)}</div>
+              <div><strong>Full Address:</strong> ${esc(customerAddress)}</div>
+              <div><strong>Payment Method:</strong> ${esc(method)}</div>
+              <div><strong>Requested Document:</strong> ${esc(docNameForPrompt)}</div>
+              <div><strong>Price:</strong> ${esc(feeText)}</div>
+            </div>
+            <div class="mt-2">Enter the OR Number to continue.</div>
+          `;
         } else {
-          actionPrompt.textContent = (stage === 'for_payment' || stage === 'payment_rejected')
+          if (actionAmount) {
+            actionAmount.readOnly = false;
+            actionAmount.classList.remove('bg-light');
+          }
+          actionPrompt.textContent = isWalkInStage
             ? 'Record barangay walk-in payment by entering the paid amount and OR number.'
             : 'Verify the submitted payment by entering the official OR number.';
         }
         actionPrompt.classList.remove('d-none');
       }
-      if (row && row.fee_amount !== null && row.fee_amount !== undefined && String(row.fee_amount) !== '') {
-        actionAmount.value = String(row.fee_amount);
+      if (row) {
+        const fixedAmount = firstNonEmpty([row.fee_amount, row.amount]);
+        if (fixedAmount !== '') {
+          actionAmount.value = String(fixedAmount);
+        }
       }
     }
     if (type === 'mark_ready') {
@@ -1502,10 +1646,37 @@
 
   function bindActionButtons() {
     tableBody.querySelectorAll('button[data-view-id]').forEach((btn) => {
-      btn.addEventListener('click', () => {
+      btn.addEventListener('click', async () => {
         const id = String(btn.getAttribute('data-view-id') || '');
-        const row = itemById.get(id);
+        let row = itemById.get(id);
         if (!row || !viewDetailsBody || !viewModal) return;
+
+        // Open modal immediately, then hydrate heavy details asynchronously.
+        switchViewMode('details');
+        if (viewModalTitle) {
+          const requestId = String(row.request_id || '').trim();
+          viewModalTitle.textContent = requestId
+            ? (isFinancePaymentsPage ? `Payment Transaction (#${requestId})` : `Certificate Request (#${requestId})`)
+            : (isFinancePaymentsPage ? 'Payment Transaction' : 'Certificate Request');
+        }
+        if (viewModalActions) {
+          viewModalActions.innerHTML = '';
+        }
+        if (viewModalNextBtn) {
+          viewModalNextBtn.classList.add('d-none');
+        }
+        if (viewModalBackBtn) {
+          viewModalBackBtn.classList.add('d-none');
+        }
+        if (viewModalWalkInBtn) {
+          viewModalWalkInBtn.classList.add('d-none');
+          viewModalWalkInBtn.removeAttribute('data-id');
+        }
+        viewDetailsBody.innerHTML = '<div class="text-muted py-2">Loading details...</div>';
+        viewModal.show();
+
+        row = await ensureRowDetails(row);
+        if (!row) return;
 
         if (isFinancePaymentsPage) {
           const payload = row.payload && typeof row.payload === 'object' ? row.payload : {};
@@ -1536,22 +1707,24 @@
             { label: 'Requested Document', value: compactDocument },
             { label: 'Status', value: financeStatusLabel },
             { label: 'Payment Method', value: firstNonEmpty([row.payment_method, '-']) },
-            { label: 'Submitted Date', value: firstNonEmpty([row.submitted_at, '-']) },
+            { label: 'Transaction Number', value: firstNonEmpty([row.payment_reference, '-']) },
+            { label: 'Submitted Date', value: firstNonEmpty([row.payment_submitted_at, row.submitted_at, '-']) },
           ], 1);
+          const feeRaw = firstNonEmpty([row.fee_amount, row.amount]);
+          const feeNumber = Number(feeRaw);
+          const feeText = Number.isFinite(feeNumber) ? `PHP ${feeNumber.toFixed(2)}` : '-';
+          const pendingSummaryGrid = renderFieldGrid([
+            { label: 'Requested Document', value: compactDocument },
+            { label: 'Price', value: feeText },
+            { label: 'Payment Method', value: firstNonEmpty([row.payment_method, 'GCash']) },
+            { label: 'Submitted Date', value: firstNonEmpty([row.payment_submitted_at, row.submitted_at, '-']) },
+          ], 3);
 
           const stageKey = String(row.stage || '').toLowerCase();
-          let financeActionButtons = '';
-          if (stageKey === 'payment_submitted') {
-            financeActionButtons = `
-              <button class="btn btn-sm btn-danger" data-inline-action="finance_reject" data-id="${esc(row.request_id)}">Reject Payment</button>
-              <button class="btn btn-sm btn-success" data-inline-action="finance_verify_gcash" data-id="${esc(row.request_id)}">Verify Payment</button>
-            `;
-          }
-          const financeActionHtml = financeActionButtons
-            ? `<div class="tracker-status-actions">${financeActionButtons}</div>`
-            : '';
+          const financeStatusKeyForActions = statusBucket(row);
+          const openVerifyFlow = financeViewIntent === 'verify' && financeStatusKeyForActions === 'pending_verification';
 
-          const isVerifiedPayment = statusBucket(row) === 'verified';
+          const isVerifiedPayment = financeStatusKeyForActions === 'verified';
           const verifiedAmount = (row.amount !== null && row.amount !== undefined && String(row.amount).trim() !== '')
             ? Number(row.amount)
             : Number(row.fee_amount);
@@ -1561,28 +1734,50 @@
           const verifiedAtText = firstNonEmpty([row.finance_decision_at, row.payment_submitted_at, '-']);
           const verifiedDetailsGrid = isVerifiedPayment
             ? renderFieldGrid([
+                { label: 'Requested Document', value: compactDocument },
+                { label: 'Payment Method', value: firstNonEmpty([row.payment_method, '-']) },
                 { label: 'OR Number', value: firstNonEmpty([row.or_number, '-']) },
                 { label: 'Price', value: verifiedAmountText },
+                { label: 'Transaction Number', value: firstNonEmpty([row.payment_reference, '-']) },
+                { label: 'Submitted Date', value: firstNonEmpty([row.payment_submitted_at, row.submitted_at, '-']) },
                 { label: 'Date Verified', value: verifiedAtText },
               ], 3)
             : '';
-          const verifiedProofHtml = (isVerifiedPayment && row.payment_proof_path)
+          const paymentProofUrl = resolvePaymentProofUrl(row, String(row.request_id || ''));
+          const paymentProofHtml = paymentProofUrl
             ? `<div class="tracker-form-grid cols-1 mt-2">
                  <div class="tracker-form-field">
                    <p class="tracker-form-label">Proof of Payment</p>
-                   <div class="tracker-form-value d-flex justify-content-between align-items-center gap-2">
-                     <span class="text-truncate">${esc(String(row.payment_proof_path || '').split('/').pop() || row.payment_proof_path)}</span>
-                     <button type="button" class="btn btn-sm btn-primary" data-proof-id="${esc(row.request_id)}">View</button>
+                   <div class="tracker-form-value">
+                     <iframe
+                       src="${paymentProofUrl}"
+                       style="width:100%;height:420px;border:1px solid #ddd;border-radius:8px;background:#fff;"
+                       loading="lazy"
+                     ></iframe>
                    </div>
                  </div>
                </div>`
             : '';
 
-          viewDetailsHtml = `<div class="tracker-doc-highlight">Transaction Details</div>`
-            + formSection('Payment Transaction Information', `${compactGrid}${financeActionHtml}`)
-            + (isVerifiedPayment
-                ? formSection('Verified Payment Details', `${verifiedDetailsGrid || ''}${verifiedProofHtml}`)
-                : '');
+          const verifyActionButtons = `
+            <div class="tracker-status-actions">
+              <button class="btn btn-sm btn-success" data-inline-action="finance_verify_gcash" data-id="${esc(row.request_id)}">Verify Payment</button>
+              <button class="btn btn-sm btn-danger" data-inline-action="finance_reject" data-id="${esc(row.request_id)}">Reject Payment</button>
+            </div>
+          `;
+
+          if (openVerifyFlow) {
+            viewDetailsHtml = `<div class="tracker-doc-highlight">Transaction Details</div>`
+              + (paymentProofHtml ? formSection('Submitted Proof of Payment', paymentProofHtml) : '')
+              + formSection('Payment Transaction Information', `${pendingSummaryGrid || ''}${verifyActionButtons}`);
+          } else {
+            viewDetailsHtml = `<div class="tracker-doc-highlight">Transaction Details</div>`
+              + formSection('Payment Transaction Information', `${compactGrid}`)
+              + (isVerifiedPayment
+                  ? formSection('Payment Transaction Summary', `${verifiedDetailsGrid || ''}`)
+                  : '');
+          }
+          financeViewIntent = 'view';
           switchViewMode('details');
           if (viewModalTitle) {
             const requestId = String(row.request_id || '').trim();
@@ -1625,19 +1820,6 @@
               if (action === 'finance_reject') {
                 openActionModal('finance_reject', actionId);
               }
-            });
-          });
-          viewDetailsBody.querySelectorAll('button[data-proof-id]').forEach((proofBtn) => {
-            proofBtn.addEventListener('click', () => {
-              const proofId = String(proofBtn.getAttribute('data-proof-id') || '');
-              const proofRow = itemById.get(proofId);
-              if (!proofRow || !proofRow.payment_proof_path || !paymentProofModal || !paymentProofWrap || !paymentProofOpenNew) return;
-              const proofUrl = `${appBase}/PhpFiles/Admin-End/documentRequestWorkflow.php?action=view_payment_proof&request_id=` + encodeURIComponent(proofId);
-              if (viewModalEl && viewModalEl.classList.contains('show') && viewModal) {
-                preserveViewStateOnNextHide = true;
-                viewModal.hide();
-              }
-              openDocumentModal(proofUrl, 'Payment Proof', 'view');
             });
           });
           viewModal.show();
@@ -1806,7 +1988,25 @@
         const statusGrid = renderFieldGrid([
           { label: 'Status', value: statusBadgeHtml, raw: true },
           { label: isRejectedStatus ? 'Rejection Reason' : 'Reason', value: statusReasonHtml, raw: true },
-          { label: 'Submitted At', value: row.submitted_at || '-' }
+          { label: 'Submitted At', value: row.submitted_at || '-' },
+          {
+            label: 'Approved By',
+            value: firstNonEmpty([
+              row.user_id_official_reviewed_by,
+              row.personnel_user_id,
+              row.finance_user_id,
+              row.reviewed_by,
+              '-'
+            ])
+          },
+          {
+            label: 'Released By',
+            value: firstNonEmpty([
+              row.user_id_official_released_by,
+              row.released_by,
+              '-'
+            ])
+          }
         ], 3);
         if (statusGrid) {
           const modalActionsHtml = viewModalActionButtons(row);
@@ -1941,7 +2141,7 @@
             const proofId = String(proofBtn.getAttribute('data-proof-id') || '');
             const proofRow = itemById.get(proofId);
             if (!proofRow || !proofRow.payment_proof_path || !paymentProofModal || !paymentProofWrap || !paymentProofOpenNew) return;
-            const proofUrl = `${appBase}/PhpFiles/Admin-End/documentRequestWorkflow.php?action=view_payment_proof&request_id=` + encodeURIComponent(proofId);
+            const proofUrl = resolvePaymentProofUrl(proofRow, proofId);
             if (viewModalEl && viewModalEl.classList.contains('show') && viewModal) {
               preserveViewStateOnNextHide = true;
               viewModal.hide();
@@ -2005,7 +2205,7 @@
         const row = itemById.get(id);
         if (!row || !row.payment_proof_path || !paymentProofModal || !paymentProofWrap || !paymentProofOpenNew) return;
 
-        const proofUrl = `${appBase}/PhpFiles/Admin-End/documentRequestWorkflow.php?action=view_payment_proof&request_id=` + encodeURIComponent(id);
+        const proofUrl = resolvePaymentProofUrl(row, id);
         openDocumentModal(proofUrl, 'Payment Proof', '');
       });
     });
@@ -2021,8 +2221,19 @@
           return;
         }
         if (action === 'finance_verify_gcash') {
+          const viewBtn = Array.from(tableBody.querySelectorAll('button[data-view-id]'))
+            .find((candidate) => String(candidate.getAttribute('data-view-id') || '') === id);
+          if (viewBtn) {
+            financeViewIntent = 'verify';
+            viewBtn.click();
+            return;
+          }
           openActionModal('finance_verify', id);
           if (actionForm) actionForm.dataset.verifyMode = 'gcash';
+          return;
+        }
+        if (action === 'finance_reject') {
+          openActionModal('finance_reject', id);
         }
       });
     });
@@ -2083,20 +2294,6 @@
         modalError.classList.remove('d-none');
         return;
       }
-      if (actionForm?.dataset?.confirmStep !== '1') {
-        actionForm.dataset.confirmStep = '1';
-        if (actionPrompt) {
-          actionPrompt.textContent = `Confirm verification of this GCash payment with OR No. ${orValue}?`;
-          actionPrompt.classList.remove('d-none');
-        }
-        if (actionSubmitBtn) {
-          actionSubmitBtn.textContent = 'Confirm Verify Payment';
-        }
-        if (actionOr) {
-          actionOr.readOnly = true;
-        }
-        return;
-      }
     }
 
     const prevSubmitLabel = actionSubmitBtn ? actionSubmitBtn.textContent : '';
@@ -2117,7 +2314,8 @@
 
       suppressActionReturn = true;
       actionModal.hide();
-      await load({ force: true });
+      // Keep action submit responsive; refresh table in background.
+      load({ force: true });
     } catch (err) {
       if (actionSubmitBtn) {
         actionSubmitBtn.disabled = false;

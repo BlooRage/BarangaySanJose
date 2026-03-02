@@ -31,6 +31,11 @@ if ($action === 'maintenance_run') {
     ]);
 }
 
+if ($action === 'optimize_indexes') {
+    dra_ensure_list_hotpath_indexes($conn);
+    dr_respond_json(200, ['success' => true, 'message' => 'List indexes checked/applied.']);
+}
+
 $currentUserId = (string)($_SESSION['user_id'] ?? '');
 
 function dra_is_finance_user(mysqli $conn, string $userId): bool {
@@ -66,13 +71,156 @@ function dra_is_finance_user(mysqli $conn, string $userId): bool {
     );
 }
 
+function dra_send_notification_deferred(mysqli $conn, array $request, string $subject, string $message): void {
+    register_shutdown_function(static function () use ($conn, $request, $subject, $message): void {
+        // Flush response first when supported, then send notifications outside request hot path.
+        if (function_exists('session_write_close')) {
+            @session_write_close();
+        }
+        if (function_exists('fastcgi_finish_request')) {
+            @fastcgi_finish_request();
+        }
+        try {
+            dr_send_notification($conn, $request, $subject, $message);
+        } catch (Throwable $e) {
+            error_log('[documentRequestWorkflow][notification] deferred send failed: ' . $e->getMessage());
+        }
+    });
+}
+
+function dra_ensure_list_hotpath_indexes(mysqli $conn): void {
+    static $done = false;
+    if ($done) {
+        return;
+    }
+    $done = true;
+
+    if (dr_table_exists($conn, 'documentrequesttbl')) {
+        $idxNames = [];
+        $res = $conn->query("SHOW INDEX FROM documentrequesttbl");
+        if ($res instanceof mysqli_result) {
+            while ($row = $res->fetch_assoc()) {
+                $idxNames[(string)($row['Key_name'] ?? '')] = true;
+            }
+        }
+        if (dr_column_exists($conn, 'documentrequesttbl', 'submitted_at') && !isset($idxNames['idx_docreq_submitted_at'])) {
+            $conn->query("ALTER TABLE documentrequesttbl ADD INDEX idx_docreq_submitted_at (submitted_at)");
+        }
+        if (dr_column_exists($conn, 'documentrequesttbl', 'stage')
+            && dr_column_exists($conn, 'documentrequesttbl', 'submitted_at')
+            && !isset($idxNames['idx_docreq_stage_submitted_at'])) {
+            $conn->query("ALTER TABLE documentrequesttbl ADD INDEX idx_docreq_stage_submitted_at (stage, submitted_at)");
+        }
+        if (dr_column_exists($conn, 'documentrequesttbl', 'request_timestamp') && !isset($idxNames['idx_docreq_request_timestamp'])) {
+            $conn->query("ALTER TABLE documentrequesttbl ADD INDEX idx_docreq_request_timestamp (request_timestamp)");
+        }
+        if (dr_column_exists($conn, 'documentrequesttbl', 'stage')
+            && dr_column_exists($conn, 'documentrequesttbl', 'request_timestamp')
+            && !isset($idxNames['idx_docreq_stage_request_timestamp'])) {
+            $conn->query("ALTER TABLE documentrequesttbl ADD INDEX idx_docreq_stage_request_timestamp (stage, request_timestamp)");
+        }
+    }
+
+    if (dr_table_exists($conn, 'financetransactiontbl')) {
+        $hasRequestIndex = false;
+        $res = $conn->query("SHOW INDEX FROM financetransactiontbl");
+        if ($res instanceof mysqli_result) {
+            while ($row = $res->fetch_assoc()) {
+                if (strcasecmp((string)($row['Column_name'] ?? ''), 'request_id') === 0) {
+                    $hasRequestIndex = true;
+                    break;
+                }
+            }
+        }
+        if (!$hasRequestIndex && dr_column_exists($conn, 'financetransactiontbl', 'request_id')) {
+            $conn->query("ALTER TABLE financetransactiontbl ADD INDEX idx_transaction_request_id (request_id)");
+        }
+    }
+}
+
+function dra_get_fee_map_for_document_types(mysqli $conn, array $documentTypes): array {
+    $out = [];
+    $names = [];
+    foreach ($documentTypes as $docType) {
+        $doc = trim((string)$docType);
+        if ($doc === '' || !dr_is_issuance_document_type($doc)) {
+            continue;
+        }
+        $names[$doc] = true;
+    }
+    if (!$names || !dr_table_exists($conn, 'documenttypelookuptbl') || !dr_table_exists($conn, 'generalfeestbl')) {
+        return $out;
+    }
+
+    $nameList = array_keys($names);
+    $placeholders = implode(',', array_fill(0, count($nameList), '?'));
+    $sql = "
+        SELECT dt.document_type_name, gf.amount
+        FROM documenttypelookuptbl dt
+        LEFT JOIN generalfeestbl gf ON gf.document_type_id = dt.document_type_id
+        WHERE dt.document_type_name IN ($placeholders)
+    ";
+    $stmt = $conn->prepare($sql);
+    if (!$stmt) {
+        return $out;
+    }
+    $types = str_repeat('s', count($nameList));
+    $bindArgs = [$types];
+    foreach ($nameList as $i => $value) {
+        $bindArgs[] = &$nameList[$i];
+    }
+    call_user_func_array([$stmt, 'bind_param'], $bindArgs);
+    $stmt->execute();
+    $rs = $stmt->get_result();
+    while ($row = $rs->fetch_assoc()) {
+        $name = trim((string)($row['document_type_name'] ?? ''));
+        if ($name === '') {
+            continue;
+        }
+        $amount = $row['amount'];
+        $out[$name] = ($amount === null) ? null : (float)$amount;
+    }
+    $stmt->close();
+    return $out;
+}
+
+function dra_select_or_null(mysqli $conn, string $table, string $column, string $alias): string {
+    if (dr_column_exists($conn, $table, $column)) {
+        return "d.{$column} AS {$alias}";
+    }
+    return "NULL AS {$alias}";
+}
+
 function dra_strip_legacy_base(string $publicPath): string {
     $publicPath = trim($publicPath);
+    if ($publicPath === '') {
+        return '';
+    }
+
+    // Normalize slashes to support Windows-style stored paths.
+    $publicPath = str_replace('\\', '/', $publicPath);
+
+    // If a full URL is stored, keep only its path portion.
+    if (preg_match('/^https?:\/\//i', $publicPath)) {
+        $urlPath = parse_url($publicPath, PHP_URL_PATH);
+        if (is_string($urlPath) && $urlPath !== '') {
+            $publicPath = $urlPath;
+        }
+    }
+
+    // If an absolute filesystem path is stored, strip project root prefix.
+    $projectRoot = realpath(__DIR__ . '/../../');
+    if ($projectRoot !== false) {
+        $projectRootNorm = str_replace('\\', '/', rtrim($projectRoot, '/'));
+        if (strpos($publicPath, $projectRootNorm) === 0) {
+            return substr($publicPath, strlen($projectRootNorm));
+        }
+    }
+
     $base = rtrim((string)appRootPath(), '/');
     if ($base !== '' && strpos($publicPath, $base) === 0) {
         return substr($publicPath, strlen($base));
     }
-    $projectRoot = realpath(__DIR__ . '/../../');
     $projectBase = $projectRoot ? trim((string)basename($projectRoot)) : '';
     if ($projectBase !== '' && strpos($publicPath, '/' . $projectBase) === 0) {
         return substr($publicPath, strlen('/' . $projectBase));
@@ -977,6 +1125,7 @@ if ($action === 'list') {
     $vals = [];
     $listContext = strtolower(trim((string)($_GET['list_context'] ?? '')));
     $isFinanceList = ($listContext === 'finance');
+    $liteList = ((string)($_GET['lite'] ?? '0') === '1');
     $limit = max(1, min(500, (int)($_GET['limit'] ?? 250)));
 
     $stageCol = dr_column_exists($conn, 'documentrequesttbl', 'stage') ? 'stage' : null;
@@ -996,6 +1145,11 @@ if ($action === 'list') {
             }
         }
     }
+    if ($isFinanceList) {
+        // Do not hard-filter finance list by stage in SQL.
+        // Some legacy rows rely on status_id_request/transaction status and may have stale/empty stage.
+        // Filtering is handled client-side by status bucket to keep rows visible for finance action.
+    }
     $search = trim((string)($_GET['q'] ?? ''));
     if ($search !== '') {
         $parts = ['d.request_id LIKE ?'];
@@ -1014,24 +1168,59 @@ if ($action === 'list') {
 
     $extraSelects = [];
     $extraJoins = [];
-    $hasIssuanceTable = dr_table_exists($conn, 'issuancerequesttbl');
-    $hasResidentInfoTable = dr_table_exists($conn, 'residentinformationtbl');
+    $hasIssuanceTable = (!$liteList) && dr_table_exists($conn, 'issuancerequesttbl');
+    $hasResidentInfoTable = (!$liteList) && dr_table_exists($conn, 'residentinformationtbl');
     if ($hasIssuanceTable) {
         $extraSelects[] = "i.certificate_type AS _issuance_certificate_type";
         $extraSelects[] = "i.certificate_number AS _issuance_certificate_number";
         $extraSelects[] = "i.verification_code AS _issuance_verification_code";
         $extraJoins[] = "LEFT JOIN issuancerequesttbl i ON i.request_id = d.request_id";
     }
-    if ($hasResidentInfoTable) {
+    if ($hasResidentInfoTable && !$isFinanceList) {
         $extraSelects[] = "TRIM(CONCAT_WS(' ', NULLIF(riu.firstname, ''), NULLIF(riu.middlename, ''), NULLIF(riu.lastname, ''), NULLIF(riu.suffix, ''))) AS _resident_name_by_user";
         $extraSelects[] = "TRIM(CONCAT_WS(' ', NULLIF(rir.firstname, ''), NULLIF(rir.middlename, ''), NULLIF(rir.lastname, ''), NULLIF(rir.suffix, ''))) AS _resident_name_by_resident";
         $extraJoins[] = "LEFT JOIN residentinformationtbl riu ON riu.user_id = d.resident_user_id";
         $extraJoins[] = "LEFT JOIN residentinformationtbl rir ON rir.resident_id = d.resident_id";
     }
 
+    $baseSelects = [
+        "d.request_id AS request_id",
+        dra_select_or_null($conn, 'documentrequesttbl', 'resident_user_id', 'resident_user_id'),
+        dra_select_or_null($conn, 'documentrequesttbl', 'resident_id', 'resident_id'),
+        dra_select_or_null($conn, 'documentrequesttbl', 'resident_name', 'resident_name'),
+        dra_select_or_null($conn, 'documentrequesttbl', 'document_type', 'document_type'),
+        dra_select_or_null($conn, 'documentrequesttbl', 'purpose', 'purpose'),
+        dra_select_or_null($conn, 'documentrequesttbl', 'status_remarks', 'status_remarks'),
+        dra_select_or_null($conn, 'documentrequesttbl', 'status_reason', 'status_reason'),
+        dra_select_or_null($conn, 'documentrequesttbl', 'stage', 'stage'),
+        dra_select_or_null($conn, 'documentrequesttbl', 'submitted_at', 'submitted_at'),
+        dra_select_or_null($conn, 'documentrequesttbl', 'request_timestamp', 'request_timestamp'),
+        dra_select_or_null($conn, 'documentrequesttbl', 'certificate_number', 'certificate_number'),
+        dra_select_or_null($conn, 'documentrequesttbl', 'verification_code', 'verification_code'),
+        dra_select_or_null($conn, 'documentrequesttbl', 'user_id_official_reviewed_by', 'user_id_official_reviewed_by'),
+        dra_select_or_null($conn, 'documentrequesttbl', 'user_id_official_released_by', 'user_id_official_released_by'),
+        dra_select_or_null($conn, 'documentrequesttbl', 'review_timestamp', 'review_timestamp'),
+        dra_select_or_null($conn, 'documentrequesttbl', 'release_timestamp', 'release_timestamp'),
+    ];
+    if (dr_column_exists($conn, 'documentrequesttbl', 'status_id_request')) {
+        $baseSelects[] = "d.status_id_request AS status_id_request";
+    }
+    if (dr_column_exists($conn, 'documentrequesttbl', 'status_id')) {
+        $baseSelects[] = "d.status_id AS status_id";
+    }
+    if (!$isFinanceList && !$liteList) {
+        if (dr_column_exists($conn, 'documentrequesttbl', 'request_details')) {
+            $baseSelects[] = "d.request_details AS request_details";
+        } else {
+            $baseSelects[] = "NULL AS request_details";
+        }
+    } else {
+        $baseSelects[] = "NULL AS request_details";
+    }
+
     $sql = "
         SELECT
-            d.*,
+            " . implode(",\n            ", $baseSelects) . ",
             f.transaction_amount AS _tx_amount,
             f.payment_method AS _tx_payment_method,
             f.payment_proof_path AS _tx_payment_proof_path,
@@ -1074,12 +1263,11 @@ if ($action === 'list') {
     $feeByDocType = [];
     $rs = $stmt->get_result();
     while ($row = $rs->fetch_assoc()) {
-        dr_hydrate_request_derived_fields($conn, $row, false);
-
-        if (trim((string)($row['document_type'] ?? '')) === '') {
-            $issuedType = trim((string)($row['_issuance_certificate_type'] ?? ''));
-            if ($issuedType !== '') {
-                $row['document_type'] = $issuedType;
+        $docType = trim((string)($row['document_type'] ?? ''));
+        if ($docType === '') {
+            $docType = trim((string)($row['_issuance_certificate_type'] ?? ''));
+            if ($docType !== '') {
+                $row['document_type'] = $docType;
             }
         }
         if (trim((string)($row['certificate_number'] ?? '')) === '') {
@@ -1094,6 +1282,9 @@ if ($action === 'list') {
                 $row['verification_code'] = $issuedVc;
             }
         }
+        if (trim((string)($row['submitted_at'] ?? '')) === '' && trim((string)($row['request_timestamp'] ?? '')) !== '') {
+            $row['submitted_at'] = (string)$row['request_timestamp'];
+        }
 
         // Populate finance data from joined columns (avoids per-row finance query).
         $row['amount'] = isset($row['_tx_amount']) ? (float)$row['_tx_amount'] : null;
@@ -1107,7 +1298,7 @@ if ($action === 'list') {
         $row['finance_decision_at'] = (string)($row['_tx_finance_decision_at'] ?? '');
         $row['finance_user_id'] = (string)($row['_tx_finance_user_id'] ?? '');
         $txDetails = (string)($row['_tx_transaction_details'] ?? '');
-        if ($txDetails !== '') {
+        if (!$liteList && $txDetails !== '') {
             $decoded = json_decode($txDetails, true);
             if (is_array($decoded)) {
                 $ref = trim((string)($decoded['reference'] ?? ''));
@@ -1125,7 +1316,7 @@ if ($action === 'list') {
             }
         }
 
-        if (trim((string)($row['resident_name'] ?? '')) === '') {
+        if (!$isFinanceList && trim((string)($row['resident_name'] ?? '')) === '') {
             $resolvedResidentName = trim((string)($row['_resident_name_by_user'] ?? ''));
             if ($resolvedResidentName === '') {
                 $resolvedResidentName = trim((string)($row['_resident_name_by_resident'] ?? ''));
@@ -1136,29 +1327,40 @@ if ($action === 'list') {
             }
         }
 
-        dr_sync_stage_from_status_lookup($conn, $row);
+        if (trim((string)($row['stage'] ?? '')) === '') {
+            dr_sync_stage_from_status_lookup($conn, $row);
+        }
         $row['stage_label'] = dr_stage_label((string)$row['stage']);
-        $docTypeForFee = trim((string)($row['document_type'] ?? ''));
-        if ($docTypeForFee !== '') {
-            if (!array_key_exists($docTypeForFee, $feeByDocType)) {
-                $feeByDocType[$docTypeForFee] = dr_get_fee_amount_for_document_type($conn, $docTypeForFee);
+        $row['fee_amount'] = null;
+        $row['_doc_type_for_fee'] = trim((string)($row['document_type'] ?? ''));
+        if ($isFinanceList || $liteList) {
+            // Keep finance list response lean; detailed request payload is not needed on initial list render.
+            $row['payload'] = [];
+        } else {
+            $payload = json_decode((string)($row['request_details'] ?? $row['payload_json'] ?? '{}'), true);
+            $row['payload'] = is_array($payload) ? $payload : [];
+            if (trim((string)($row['document_type'] ?? '')) === '') {
+                $payloadDocType = trim((string)($row['payload']['document_type'] ?? ''));
+                if ($payloadDocType !== '') {
+                    $row['document_type'] = $payloadDocType;
+                }
             }
-            $row['fee_amount'] = $feeByDocType[$docTypeForFee];
-        } else {
-            $row['fee_amount'] = null;
+            if (trim((string)($row['purpose'] ?? '')) === '') {
+                $payloadPurpose = trim((string)($row['payload']['request_purpose'] ?? $row['payload']['purpose'] ?? ''));
+                if ($payloadPurpose !== '') {
+                    $row['purpose'] = $payloadPurpose;
+                }
+            }
+            if (trim((string)($row['resident_name'] ?? '')) === '') {
+                $payloadResidentName = trim((string)($row['payload']['resident_name'] ?? ''));
+                if ($payloadResidentName !== '') {
+                    $row['resident_name'] = $payloadResidentName;
+                }
+            }
         }
-        $payload = json_decode((string)($row['request_details'] ?? $row['payload_json'] ?? '{}'), true);
-        $row['payload'] = is_array($payload) ? $payload : [];
-        if ($isFinanceList) {
-            // Keep finance list light; resident profile is not needed for table rendering.
-            $row['resident_profile'] = [];
-        } else {
-            $row['resident_profile'] = dra_resident_profile_snapshot(
-                $conn,
-                (string)($row['resident_user_id'] ?? ''),
-                (string)($row['resident_id'] ?? '')
-            );
-        }
+        // Keep list payload light to avoid per-row profile queries (major latency source).
+        // Full resident profile is loaded on-demand from resident masterlist endpoint when needed.
+        $row['resident_profile'] = [];
         unset(
             $row['_tx_amount'],
             $row['_tx_payment_method'],
@@ -1181,10 +1383,54 @@ if ($action === 'list') {
     }
     $stmt->close();
 
+    if ($items && !$liteList) {
+        $docTypesForFee = [];
+        foreach ($items as $row) {
+            $docTypeForFee = trim((string)($row['_doc_type_for_fee'] ?? ''));
+            if ($docTypeForFee !== '') {
+                $docTypesForFee[$docTypeForFee] = true;
+            }
+        }
+        $feeByDocType = dra_get_fee_map_for_document_types($conn, array_keys($docTypesForFee));
+        foreach ($items as &$row) {
+            $docTypeForFee = trim((string)($row['_doc_type_for_fee'] ?? ''));
+            if ($docTypeForFee !== '') {
+                if (!array_key_exists($docTypeForFee, $feeByDocType)) {
+                    $feeByDocType[$docTypeForFee] = dr_get_fee_amount_for_document_type($conn, $docTypeForFee);
+                }
+                $row['fee_amount'] = $feeByDocType[$docTypeForFee];
+            } else {
+                $row['fee_amount'] = null;
+            }
+            unset($row['_doc_type_for_fee']);
+        }
+        unset($row);
+    }
+
     dr_respond_json(200, ['success' => true, 'items' => $items]);
 }
 
 $requestId = trim((string)($_POST['request_id'] ?? $_GET['request_id'] ?? ''));
+if ($action === 'get_request') {
+    if ($requestId === '') {
+        dr_respond_json(422, ['success' => false, 'message' => 'Missing request ID.']);
+    }
+    $row = dr_fetch_request($conn, $requestId);
+    if (!$row) {
+        dr_respond_json(404, ['success' => false, 'message' => 'Request not found.']);
+    }
+
+    $payload = json_decode((string)($row['request_details'] ?? $row['payload_json'] ?? '{}'), true);
+    $row['payload'] = is_array($payload) ? $payload : [];
+
+    $residentUserId = trim((string)($row['resident_user_id'] ?? ''));
+    $residentId = trim((string)($row['resident_id'] ?? ''));
+    $row['resident_profile'] = dra_resident_profile_snapshot($conn, $residentUserId, $residentId);
+    $row['stage_label'] = dr_stage_label((string)($row['stage'] ?? ''));
+    $row['fee_amount'] = dr_get_fee_amount_for_document_type($conn, (string)($row['document_type'] ?? ''));
+
+    dr_respond_json(200, ['success' => true, 'item' => $row]);
+}
 if ($action === 'view_payment_proof') {
     if ($requestId === '') {
         http_response_code(422);
@@ -1330,19 +1576,10 @@ if ($action === 'personnel_approve') {
             $verificationCode = strtoupper(bin2hex(random_bytes(8)));
         }
         $qrCodePath = '/UnifiedFileAttachment/IssuedDocuments/QR/qr_' . preg_replace('/[^A-Za-z0-9_-]/', '', $requestId) . '.png';
-        $issuedPath = trim((string)($row['issued_file_path'] ?? ''));
-        if ($issuedPath === '') {
-            $issuedPath = (string)(dra_generate_issued_document_safe(array_merge((array)$row, [
-                'verification_code' => $verificationCode,
-            ])) ?? '');
-        }
-        if ($issuedPath === '') {
-            dr_respond_json(500, ['success' => false, 'message' => 'Unable to generate issued document for release.']);
-        }
+        // Keep approval fast: defer heavy PDF/QR generation until view/release time.
         $patch['verification_code'] = $verificationCode;
         $patch['qr_code_path'] = $qrCodePath;
         $patch['ready_at'] = dr_now();
-        $patch['issued_file_path'] = $issuedPath;
     }
 
     $updated = dr_update_stage($conn, $requestId, $nextStage, $patch);
@@ -1350,7 +1587,7 @@ if ($action === 'personnel_approve') {
         dr_respond_json(500, ['success' => false, 'message' => 'Unable to approve request.']);
     }
 
-    dr_send_notification(
+    dra_send_notification_deferred(
         $conn,
         $updated,
         $isFreeDocument ? 'Document Request Approved for Release' : 'Document Request Approved for Payment',
@@ -1378,7 +1615,7 @@ if ($action === 'personnel_reject') {
         dr_respond_json(500, ['success' => false, 'message' => 'Unable to reject request.']);
     }
 
-    dr_send_notification(
+    dra_send_notification_deferred(
         $conn,
         $updated,
         'Document Request Rejected',
@@ -1400,15 +1637,19 @@ if ($action === 'finance_verify') {
 
     $amountRaw = trim((string)($_POST['amount'] ?? ''));
     $orNumber = trim((string)($_POST['or_number'] ?? ''));
-    $defaultFee = null;
-    if ($amountRaw === '') {
-        $defaultFee = dr_get_fee_amount_for_document_type($conn, (string)($row['document_type'] ?? ''));
+    $defaultFee = dr_get_fee_amount_for_document_type($conn, (string)($row['document_type'] ?? ''));
+    $resolvedAmount = null;
+    if ($defaultFee !== null) {
+        // Finance amount is system-controlled from configured fee.
+        $resolvedAmount = (float)$defaultFee;
+    } elseif (isset($row['amount']) && $row['amount'] !== null && is_numeric((string)$row['amount'])) {
+        $resolvedAmount = (float)$row['amount'];
+    } elseif ($amountRaw !== '' && is_numeric($amountRaw)) {
+        // Fallback only when fee is not configured.
+        $resolvedAmount = (float)$amountRaw;
     }
 
-    if ($amountRaw === '' && $defaultFee !== null) {
-        $amountRaw = (string)$defaultFee;
-    }
-    if ($amountRaw === '' || !is_numeric($amountRaw) || (float)$amountRaw < 0) {
+    if ($resolvedAmount === null || $resolvedAmount < 0) {
         dr_respond_json(422, ['success' => false, 'message' => 'Valid amount is required.']);
     }
     if ($orNumber === '') {
@@ -1428,7 +1669,7 @@ if ($action === 'finance_verify') {
     }
 
     $patch = [
-        'amount' => (float)$amountRaw,
+        'amount' => $resolvedAmount,
         'or_number' => $orNumber,
         'certificate_number' => $certificateNumber,
         'verification_code' => $verificationCode,
@@ -1456,7 +1697,7 @@ if ($action === 'finance_verify') {
         dr_respond_json(500, ['success' => false, 'message' => 'Unable to verify payment.']);
     }
 
-    dr_send_notification(
+    dra_send_notification_deferred(
         $conn,
         $updated,
         'Payment Verified - Document Ready',
@@ -1482,7 +1723,7 @@ if ($action === 'finance_reject') {
         dr_respond_json(500, ['success' => false, 'message' => 'Unable to reject payment.']);
     }
 
-    dr_send_notification(
+    dra_send_notification_deferred(
         $conn,
         $updated,
         'Payment Rejected',
@@ -1520,7 +1761,7 @@ if ($action === 'mark_ready') {
         dr_respond_json(500, ['success' => false, 'message' => 'Unable to mark request ready.']);
     }
 
-    dr_send_notification(
+    dra_send_notification_deferred(
         $conn,
         $updated,
         'Document Ready for Claim',
@@ -1556,7 +1797,7 @@ if ($action === 'mark_completed') {
         dr_respond_json(500, ['success' => false, 'message' => 'Unable to complete request.']);
     }
 
-    dr_send_notification(
+    dra_send_notification_deferred(
         $conn,
         $updated,
         'Document Request Completed',

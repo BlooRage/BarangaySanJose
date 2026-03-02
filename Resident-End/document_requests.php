@@ -194,7 +194,7 @@ require_once __DIR__ . '/includes/resident_access_guard.php';
         <label class="form-label">Reference ID / Transaction Number</label>
         <input type="text" class="form-control mb-3" name="payment_reference" id="gcashReference" placeholder="Enter GCash transaction number" required>
         <label class="form-label">Payment Proof</label>
-        <input type="file" class="form-control" name="payment_proof" id="gcashProof" accept=".jpg,.jpeg,.png,.webp,.pdf" required>
+        <input type="file" class="form-control" name="payment_proof" id="gcashProof" accept=".jpg,.jpeg,.png,.webp,image/*" required>
         <div class="form-text">Upload your GCash payment proof.</div>
         <div class="alert alert-danger d-none mt-3" id="gcashError"></div>
       </div>
@@ -258,6 +258,7 @@ require_once __DIR__ . '/includes/resident_access_guard.php';
   const barangayDeadlineNote = document.getElementById('barangayDeadlineNote');
   const gcashPaymentModal = new bootstrap.Modal(document.getElementById('gcashPaymentModal'));
   const gcashPaymentForm = document.getElementById('gcashPaymentForm');
+  const gcashSubmitBtn = gcashPaymentForm ? gcashPaymentForm.querySelector('button[type="submit"]') : null;
   const gcashRequestId = document.getElementById('gcashRequestId');
   const gcashReference = document.getElementById('gcashReference');
   const gcashProof = document.getElementById('gcashProof');
@@ -271,6 +272,23 @@ require_once __DIR__ . '/includes/resident_access_guard.php';
   const paymentProofWrap = document.getElementById('paymentProofWrap');
   const paymentProofOpenNew = document.getElementById('paymentProofOpenNew');
   let itemById = new Map();
+  let gcashSubmitting = false;
+
+  function setGcashSubmittingState(isSubmitting) {
+    gcashSubmitting = !!isSubmitting;
+    if (gcashSubmitBtn) {
+      if (!gcashSubmitBtn.dataset.defaultText) {
+        gcashSubmitBtn.dataset.defaultText = gcashSubmitBtn.textContent || 'Pay Now';
+      }
+      gcashSubmitBtn.disabled = gcashSubmitting;
+      gcashSubmitBtn.textContent = gcashSubmitting
+        ? 'Submitting...'
+        : (gcashSubmitBtn.dataset.defaultText || 'Pay Now');
+    }
+    if (gcashChangeModeBtn) {
+      gcashChangeModeBtn.disabled = gcashSubmitting;
+    }
+  }
 
   function badge(stage, label) {
     const key = String(stage || '').toLowerCase();
@@ -448,7 +466,7 @@ require_once __DIR__ . '/includes/resident_access_guard.php';
   async function load() {
     tbody.innerHTML = '<tr><td colspan="7" class="text-center text-muted py-4">Loading requests...</td></tr>';
     try {
-      const data = await fetchJson(endpoint + '?action=list');
+      const data = await fetchJson(endpoint + '?action=list&limit=80');
       if (!data.success) throw new Error(data.message || 'Unable to load requests');
 
       const items = Array.isArray(data.items) ? data.items : [];
@@ -614,6 +632,8 @@ require_once __DIR__ . '/includes/resident_access_guard.php';
 
   gcashPaymentForm.addEventListener('submit', async (e) => {
     e.preventDefault();
+    if (gcashSubmitting) return;
+    setGcashSubmittingState(true);
     gcashError.classList.add('d-none');
     gcashError.textContent = '';
 
@@ -627,11 +647,16 @@ require_once __DIR__ . '/includes/resident_access_guard.php';
       });
       if (!data.success) throw new Error(data.message || 'Unable to submit payment.');
       gcashPaymentModal.hide();
-      await load();
+      load().catch(() => {});
     } catch (err) {
       gcashError.textContent = err.message || String(err);
       gcashError.classList.remove('d-none');
+      setGcashSubmittingState(false);
     }
+  });
+
+  document.getElementById('gcashPaymentModal')?.addEventListener('hidden.bs.modal', () => {
+    setGcashSubmittingState(false);
   });
 
   paymentModeForm.addEventListener('submit', async (e) => {
@@ -651,11 +676,21 @@ require_once __DIR__ . '/includes/resident_access_guard.php';
       await setPaymentMode(requestId, mode);
       paymentModeModal.hide();
       paymentModeRequestId.value = requestId;
-      await load();
+      const row = itemById.get(requestId);
+      if (row) {
+        row.payment_method = mode;
+        if (String(row.stage || '').toLowerCase() === 'payment_rejected') {
+          row.stage = 'for_payment';
+          row.stage_label = 'For Payment';
+          row.status_remarks = null;
+        }
+        itemById.set(requestId, row);
+      }
       if (mode === 'barangay') {
         updateBarangayDeadlineNote(requestId);
         barangayPaymentModal.show();
       }
+      load().catch(() => {});
     } catch (err) {
       paymentModeError.textContent = err.message || String(err);
       paymentModeError.classList.remove('d-none');
