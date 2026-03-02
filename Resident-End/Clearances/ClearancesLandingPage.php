@@ -88,15 +88,16 @@ require_once __DIR__ . "/../includes/resident_access_guard.php";
                                                 Proof of Business Address
                                                 <ol class='mt-1 ps-3 requirements-alpha'>
                                                     <li>
-                                                        Renter
+                                                        If renter:
                                                         <ul class='mt-1 ps-3 requirements-square'>
                                                             <li>Contract of Lease</li>
                                                         </ul>
                                                     </li>
                                                     <li>
-                                                        Owner
+                                                        If owner, one of the following:
                                                         <ul class='mt-1 ps-3 requirements-square'>
-                                                            <li>Transfer Certificate of Title or Tax Declaration</li>
+                                                            <li>Transfer Certificate of Title</li>
+                                                            <li>Tax Declaration</li>
                                                         </ul>
                                                     </li>
                                                 </ol>
@@ -108,7 +109,6 @@ require_once __DIR__ . "/../includes/resident_access_guard.php";
                                         <ol class='mt-1 ps-3 requirements-numeric'>
                                             <li>Valid Government-Issued ID</li>
                                             <li>Business Clearance from the previous year</li>
-                                            <li>Updated Community Tax Certificate (Cedula or CTC)</li>
                                             <li>
                                                 Updated Business Registration
                                                 <ol class='mt-1 ps-3 requirements-alpha'>
@@ -118,7 +118,7 @@ require_once __DIR__ . "/../includes/resident_access_guard.php";
                                             </li>
                                         </ol>
                                     </li>
-                                    <li>
+                                    <!-- <li>
                                         For Ownership Change
                                         <ol class='mt-1 ps-3 requirements-numeric'>
                                             <li>Original Copy of Business Clearance</li>
@@ -126,7 +126,7 @@ require_once __DIR__ . "/../includes/resident_access_guard.php";
                                             <li>Valid ID of Old and New Owner</li>
                                             <li>Authorization Letter</li>
                                         </ol>
-                                    </li>
+                                    </li> -->
                                 </ul>
                             "
                         >
