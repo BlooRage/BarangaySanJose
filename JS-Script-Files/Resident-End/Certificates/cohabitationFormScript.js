@@ -60,9 +60,6 @@ document.addEventListener("DOMContentLoaded", () => {
     const cohabitationPhase = document.getElementById("cohabitationPhaseNumber");
     const cohabitationSubdivisionLot = document.getElementById("cohabitationSubdivisionLot");
     const cohabitationAreaLot = document.getElementById("cohabitationAreaNumberLot");
-    const cohabitantLastName = document.getElementById("cohabitantLastName") || form.querySelector('input[name="cohabitant_last"]');
-    const cohabitantFirstName = document.getElementById("cohabitantFirstName") || form.querySelector('input[name="cohabitant_first"]');
-    const cohabitantMiddleName = document.getElementById("cohabitantMiddleName") || form.querySelector('input[name="cohabitant_middle"]');
     const cohabitantDob = form.querySelector('input[name="cohabitant_dob"]');
     const cohabitationStartDate = form.querySelector('input[name="cohabitation_start_date"]');
 
@@ -168,60 +165,6 @@ document.addEventListener("DOMContentLoaded", () => {
             inputEl.insertAdjacentElement("afterend", err);
         }
         return err;
-    };
-
-    const isLikelyGarbageName = (text) => {
-        const value = String(text || "").trim().toLowerCase();
-        if (!value) return false;
-        if (/^(test|testing|dummy|unknown|null|none|n\/a|na|xxx|asdf|qwerty|zxcv)$/i.test(value)) return true;
-        if (/(.)\1{3,}/i.test(value)) return true;
-
-        const lettersOnly = value.replace(/[^a-z]/g, "");
-        if (lettersOnly.length >= 5 && /^[bcdfghjklmnpqrstvwxyz]+$/i.test(lettersOnly)) return true;
-        if (/(asdf|qwer|zxcv|poiuy|lkjh)/i.test(lettersOnly)) return true;
-
-        return false;
-    };
-
-    const validateNameField = (inputEl, label, { required = true, allowSingleChar = false } = {}) => {
-        if (!inputEl) return true;
-        const raw = String(inputEl.value || "").trim();
-        const errorEl = getOrCreateInlineError(inputEl);
-        let message = "";
-
-        if (!raw) {
-            if (required) message = `${label} is required.`;
-        } else if (!/^[A-Za-z][A-Za-z\s-]*$/.test(raw)) {
-            message = `${label} must contain letters only. Allowed symbol: dash (-).`;
-        } else if (/--|\s{2,}/.test(raw)) {
-            message = `${label} contains invalid punctuation or spacing.`;
-        } else {
-            const lettersOnlyLength = raw.replace(/[^A-Za-z]/g, "").length;
-            if (!allowSingleChar && lettersOnlyLength < 2) {
-                message = `${label} must be at least 2 letters.`;
-            } else if (isLikelyGarbageName(raw)) {
-                message = `${label} appears invalid. Please enter a valid name.`;
-            }
-        }
-
-        inputEl.setCustomValidity(message);
-        if (errorEl) {
-            if (message) {
-                errorEl.textContent = message;
-                errorEl.classList.remove("d-none");
-            } else {
-                errorEl.textContent = "";
-                errorEl.classList.add("d-none");
-            }
-        }
-        return message === "";
-    };
-
-    const validateCohabitantNames = () => {
-        const okLast = validateNameField(cohabitantLastName, "Last name", { required: true, allowSingleChar: false });
-        const okFirst = validateNameField(cohabitantFirstName, "First name", { required: true, allowSingleChar: false });
-        const okMiddle = validateNameField(cohabitantMiddleName, "Middle name", { required: false, allowSingleChar: true });
-        return okLast && okFirst && okMiddle;
     };
 
     const validateDateNotFuture = (inputEl, label) => {
@@ -502,7 +445,6 @@ document.addEventListener("DOMContentLoaded", () => {
     };
 
     const updateSubmitState = () => {
-        validateCohabitantNames();
         validateCohabitationDates();
         const isValid = form.checkValidity();
         submitBtn.disabled = !(agree.checked && isValid);
@@ -619,17 +561,6 @@ document.addEventListener("DOMContentLoaded", () => {
     syncCohabitantAddress();
     syncCohabitationAddress();
     initAddressData();
-    [cohabitantLastName, cohabitantFirstName, cohabitantMiddleName].forEach((el) => {
-        if (!el) return;
-        el.addEventListener("input", () => {
-            validateCohabitantNames();
-            updateSubmitState();
-        });
-        el.addEventListener("blur", () => {
-            validateCohabitantNames();
-            updateSubmitState();
-        });
-    });
     [cohabitantDob, cohabitationStartDate].forEach((el) => {
         if (!el) return;
         el.addEventListener("input", () => {
@@ -650,6 +581,14 @@ document.addEventListener("DOMContentLoaded", () => {
         });
     });
     agree.addEventListener("change", updateSubmitState);
-        form.addEventListener("input", updateSubmitState);
+    // Avoid heavy whole-form validity checks on every keystroke (causes input lag).
+    // We keep explicit field listeners above and validate on change/submit.
     form.addEventListener("change", updateSubmitState);
+    form.addEventListener("submit", (e) => {
+        updateSubmitState();
+        if (!form.checkValidity()) {
+            e.preventDefault();
+            form.reportValidity();
+        }
+    });
 });
