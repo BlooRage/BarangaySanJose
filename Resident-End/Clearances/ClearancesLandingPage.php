@@ -274,7 +274,45 @@ require_once __DIR__ . "/../includes/resident_access_guard.php";
                         <img src="../../Icons/Dashboard/residential.png" class="certificate-icon" alt="For Residential Permit">
                         <h3>FOR RESIDENTIAL PERMIT</h3>
                         <p class="certificate-text">Apply for barangay clearance required for residential permit processing.</p>
-                        <button class="btn apply-btn" type="button" onclick="location.href='ResidentialForm.php'">Apply Now</button>
+                        <button
+                            class="btn apply-btn"
+                            type="button"
+                            data-bs-toggle="modal"
+                            data-bs-target="#requirementsModal"
+                            data-title="Barangay Clearance for Residential Permit Requirements"
+                            data-apply-href="ResidentialForm.php"
+                            data-body="
+                                <ul class='mb-0 ps-3 requirements-top'>
+                                    <li>
+                                        New Application
+                                        <ol class='mt-1 ps-3 requirements-numeric'>
+                                            <li>Valid Government-Issued ID</li>
+                                            <li>
+                                                Proof of Address, one of the following:
+                                                <ol class='mt-1 ps-3 requirements-alpha'>
+                                                    <li>
+                                                        If the lot title is named to Applicant:
+                                                        <ul class='mt-1 ps-3 requirements-square'>
+                                                            <li>Transfer Certificate of Title</li>
+                                                            <li>Tax Declaration</li>
+                                                        </ul>
+                                                    </li>
+                                                    <li>
+                                                        If the lot title is not named to Applicant:
+                                                        <ul class='mt-1 ps-3 requirements-square'>
+                                                            <li>Transfer Certificate of Title from the title owner with Notarized Deed of Sale</li>
+                                                            <li>Tax Declaration from the title owner with Notarized Deed of Sale</li>
+                                                        </ul>
+                                                    </li>
+                                                </ol>
+                                            </li>
+                                        </ol>
+                                    </li>
+                                </ul>
+                            "
+                        >
+                            Apply Now
+                        </button>
                     </div>
                 </div>
 
@@ -283,7 +321,46 @@ require_once __DIR__ . "/../includes/resident_access_guard.php";
                         <img src="../../Icons/Dashboard/commercial.png" class="certificate-icon" alt="For Commercial Permit">
                         <h3>FOR COMMERCIAL PERMIT</h3>
                         <p class="certificate-text">Apply for barangay clearance required for commercial permit processing.</p>
-                        <button class="btn apply-btn" type="button" onclick="location.href='CommercialForm.php'">Apply Now</button>
+                        <button
+                            class="btn apply-btn"
+                            type="button"
+                            data-bs-toggle="modal"
+                            data-bs-target="#requirementsModal"
+                            data-title="Barangay Clearance for Commercial Permit Requirements"
+                            data-apply-href="CommercialForm.php"
+                            data-body="
+                                <ul class='mb-0 ps-3 requirements-top'>
+                                    <li>
+                                        New Application
+                                        <ol class='mt-1 ps-3 requirements-numeric'>
+                                            <li>Valid Government-Issued ID</li>
+                                            <li>
+                                                Proof of Address, one of the following:
+                                                <ol class='mt-1 ps-3 requirements-alpha'>
+                                                    <li>
+                                                        If the lot title is named to Applicant:
+                                                        <ul class='mt-1 ps-3 requirements-square'>
+                                                            <li>Transfer Certificate of Title</li>
+                                                            <li>Tax Declaration</li>
+                                                        </ul>
+                                                    </li>
+                                                    <li>
+                                                        If the lot title is not named to Applicant:
+                                                        <ul class='mt-1 ps-3 requirements-square'>
+                                                            <li>Transfer Certificate of Title from the title owner with Notarized Deed of Sale</li>
+                                                            <li>Tax Declaration from the title owner with Notarized Deed of Sale</li>
+                                                        </ul>
+                                                    </li>
+                                                </ol>
+                                            </li>
+                                            <li>SEC Certificate</li>
+                                        </ol>
+                                    </li>
+                                </ul>
+                            "
+                        >
+                            Apply Now
+                        </button>
                     </div>
                 </div>
 
