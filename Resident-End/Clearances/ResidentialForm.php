@@ -114,12 +114,12 @@ $ownerFullAddress = htmlspecialchars(implode(', ', $ownerFullAddressParts), ENT_
             <div class="main-head-content">
             <a href="<?= htmlspecialchars($baseUrl) ?>/Resident-End/Clearances/ClearancesLandingPage.php" class="back-link">< Go Back</a>
 
-            <h1 class="form-title">Application for Barangay Clearance for Residential Permit</h1>
+            <h1 class="form-title">Barangay Clearance for Residential Permit</h1>
             <p class="form-subtitle">All fields marked with <span class="required-asterisk">*</span> are required</p>
 
             <form action="#" method="POST">
 
-                <h2 class="section-title text-center text-dark">Owner's Information</h2>
+                <h2 class="section-title text-center text-dark">Applicant Information</h2>
                 <div class="form-row">
                     <div class="input-stack">
                         <label class="top-label">Last Name<span class="required-asterisk">*</span></label>
@@ -151,10 +151,152 @@ $ownerFullAddress = htmlspecialchars(implode(', ', $ownerFullAddressParts), ENT_
                 <div class="form-row">
                     <div class="full-width">
                         <div class="input-stack mb-3">
-                            <label class="top-label" for="owner_full_address">Complete Address <span class="required-asterisk">*</span></label>
+                            <label class="top-label" for="owner_full_address">Address <span class="required-asterisk">*</span></label>
                             <input type="text" id="owner_full_address" name="owner_full_address" value="<?php echo $ownerFullAddress; ?>" readonly>
                         </div>
                         </div>
+                </div>
+                <div class="form-row">
+                    <div class="full-width">
+                        <div class="input-stack">
+                            <label class="top-label" for="purpose">Purpose <span class="required-asterisk">*</span></label>
+                            <textarea id="purpose" name="purpose" rows="4" required style="resize: none;"></textarea>
+                        </div>
+                    </div>
+                </div>
+
+                <h2 class="section-title text-center text-dark">Lot Information</h2>
+                <div id="lotAddressSystemRow" class="form-row">
+                    <div class="full-width">
+                        <div class="input-stack">
+                            <label class="top-label" for="lotAddressSystem">Address System <span class="required-asterisk">*</span></label>
+                            <select id="lotAddressSystem" name="lot_address_system" class="form-select w-100" required>
+                                <option value="">Select</option>
+                                <option value="house">House Numbering System</option>
+                                <option value="lot_block">Lot/Block System</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+                <div id="lotHouseSystemWrapper" class="form-row pt-0 d-none">
+                    <div class="input-stack">
+                        <label class="top-label" for="lot_unit_number">Unit / Apartment Number</label>
+                        <input type="text" id="lot_unit_number" name="lot_unit_number">
+                    </div>
+                    <div class="input-stack">
+                        <label class="top-label" for="lot_street_number">Street Number <span class="required-asterisk">*</span></label>
+                        <input type="text" id="lot_street_number" name="lot_street_number">
+                    </div>
+                    <div class="input-stack">
+                        <label class="top-label" for="lot_street_name">Street Name <span class="required-asterisk">*</span></label>
+                        <input type="text" id="lot_street_name" name="lot_street_name">
+                    </div>
+                    <div class="input-stack">
+                        <label class="top-label" for="lot_subdivision">Subdivision</label>
+                        <input type="text" id="lot_subdivision" name="lot_subdivision">
+                    </div>
+                </div>
+                <div id="lotBlockSystemWrapper" class="form-row pt-0 d-none">
+                    <div class="input-stack">
+                        <label class="top-label" for="lot_number">Lot Number <span class="required-asterisk">*</span></label>
+                        <input type="text" id="lot_number" name="lot_number">
+                    </div>
+                    <div class="input-stack">
+                        <label class="top-label" for="block_number">Block Number <span class="required-asterisk">*</span></label>
+                        <input type="text" id="block_number" name="block_number">
+                    </div>
+                    <div class="input-stack">
+                        <label class="top-label" for="lot_phase_number">Phase <span class="required-asterisk">*</span></label>
+                        <input type="text" id="lot_phase_number" name="lot_phase_number">
+                    </div>
+                    <div class="input-stack">
+                        <label class="top-label" for="lot_subdivision_block">Subdivision</label>
+                        <input type="text" id="lot_subdivision_block" name="lot_subdivision">
+                    </div>
+                </div>
+                <div id="lotBarangayRow" class="form-row">
+                    <div class="full-width">
+                        <div class="row mb-3">
+                            <div class="col-md-4">
+                                <label class="top-label" for="lot_barangay">Barangay</label>
+                                <input type="text" id="lot_barangay" name="lot_barangay" readonly value="San Jose">
+                            </div>
+                            <div class="col-md-4">
+                                <label class="top-label" for="lot_city">Municipality / City</label>
+                                <input type="text" id="lot_city" name="lot_city" readonly value="Rodriguez (Montalban)">
+                            </div>
+                            <div class="col-md-4">
+                                <label class="top-label" for="lot_province">Province</label>
+                                <input type="text" id="lot_province" name="lot_province" readonly value="Rizal">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="documentUploadSection">
+                    <h2 class="section-title text-center text-dark">Document Upload</h2>
+                    <p class="form-subtitle">Accepted: PDF, JPG, JPEG, PNG</p>
+                    <div class="form-row">
+                        <div class="full-width">
+                            <div class="row mb-3">
+                                <div class="col-md-6">
+                                    <label class="top-label" for="validIdType">Valid Government-Issued ID <span class="required-asterisk">*</span></label>
+                                    <select id="validIdType" name="valid_id_type" class="form-select">
+                                        <option value="">Select</option>
+                                        <option value="philsys">PhilSys ID</option>
+                                        <option value="umid">UMID</option>
+                                        <option value="passport">Passport</option>
+                                        <option value="drivers_license">Driver's License</option>
+                                        <option value="prc">PRC ID</option>
+                                        <option value="postal">Postal ID</option>
+                                        <option value="gsis">GSIS ID</option>
+                                        <option value="sss">SSS ID</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="top-label" for="validIdFile">Upload Valid ID <span class="required-asterisk">*</span></label>
+                                    <input type="file" id="validIdFile" name="valid_id_file" class="form-control" accept=".pdf,.jpg,.jpeg,.png">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div id="validIdNumberRow" class="form-row d-none">
+                        <div class="full-width">
+                            <div class="input-stack">
+                                <label class="top-label" for="validIdNumber">Valid ID Number <span class="required-asterisk">*</span></label>
+                                <input type="text" id="validIdNumber" name="valid_id_number" placeholder="Enter ID number">
+                                <div id="validIdNumberError" class="text-danger small d-none">Invalid ID number</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="full-width">
+                            <div class="row mb-3">
+                                <div class="col-md-6">
+                                    <label class="top-label" for="proofAddressType">Proof of Address <span class="required-asterisk">*</span></label>
+                                    <select id="proofAddressType" name="proof_address_type" class="form-select">
+                                        <option value="">Select</option>
+                                        <option value="tct">Transfer Certificate of Title</option>
+                                        <option value="tax_declaration">Tax Declaration</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="top-label" for="proofAddressFile">Upload Proof of Address <span class="required-asterisk">*</span></label>
+                                    <input type="file" id="proofAddressFile" name="proof_address_file" class="form-control" accept=".pdf,.jpg,.jpeg,.png">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div id="proofAddressNumberRow" class="form-row d-none">
+                        <div class="full-width">
+                            <div class="input-stack">
+                                <label class="top-label" for="proofAddressNumber">Document Number <span class="required-asterisk">*</span></label>
+                                <input type="text" id="proofAddressNumber" name="proof_address_number" placeholder="Enter document number">
+                                <div id="proofAddressNumberError" class="text-danger small d-none">Invalid document number</div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
 
                 <div class="agreement-row">
@@ -172,20 +314,6 @@ $ownerFullAddress = htmlspecialchars(implode(', ', $ownerFullAddressParts), ENT_
 </div>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-    <script>
-        document.addEventListener("DOMContentLoaded", () => {
-            const form = document.querySelector("form");
-            const submitBtn = form?.querySelector(".submit-btn");
-            if (!form || !submitBtn) return;
-
-            const updateState = () => {
-                submitBtn.disabled = !form.checkValidity();
-            };
-
-            form.addEventListener("input", updateState);
-            form.addEventListener("change", updateState);
-            updateState();
-        });
-    </script>
+    <script src="../../JS-Script-Files/Resident-End/Clearances/residentialPermitScript.js"></script>
 </body>
 </html>
