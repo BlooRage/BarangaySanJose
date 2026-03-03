@@ -117,7 +117,7 @@ $ownerFullAddress = htmlspecialchars(implode(', ', $ownerFullAddressParts), ENT_
             <h1 class="form-title">Application for Barangay Clearance for Tricycle Permit</h1>
             <p class="form-subtitle">All fields marked with <span class="required-asterisk">*</span> are required</p>
 
-            <form action="#" method="POST">
+            <form action="#" method="POST" enctype="multipart/form-data">
 
                 <h2 class="section-title text-center text-dark">Applicant Information</h2>
                 <div class="form-row">
@@ -158,89 +158,79 @@ $ownerFullAddress = htmlspecialchars(implode(', ', $ownerFullAddressParts), ENT_
                     </div>
                 </div>
 
-                <div id="tricycleSection">
-                    <h2 class="section-title text-center text-dark" style="font-size: 16px; margin-top: 0;">Driver's Information</h2>
-
-                    <div class="form-row">
-                        <div class="input-stack">
-                            <label class="top-label">Last Name<span class="required-asterisk">*</span></label>
-                            <input type="text" name="d_ln" value="<?php echo $ownerLastName; ?>" readonly>
-                        </div>
-                        <div class="input-stack">
-                            <label class="top-label">First Name<span class="required-asterisk">*</span></label>
-                            <input type="text" name="d_fn" value="<?php echo $ownerFirstName; ?>" readonly>
-                        </div>
-                        <div class="input-stack">
-                            <label class="top-label">Middle Name</label>
-                            <input type="text" name="d_mn" value="<?php echo $ownerMiddleName; ?>" readonly>
-                        </div>
-                        <div class="input-stack">
-                            <label class="top-label">Suffix</label>
-                            <input type="text" name="d_sfx" value="<?php echo $ownerSuffix; ?>" readonly>
-                        </div>
+                <h2 class="section-title text-center text-dark">Vehicle Information</h2>
+                <div class="form-row two-col-row">
+                    <div class="input-stack">
+                        <label class="top-label">Franchise <span class="required-asterisk">*</span></label>
+                        <input type="text" name="vehicle_franchise" required>
                     </div>
-
-                    <div class="form-row">
-                        <div class="contact">
-                            <div class="input-stack">
-                                <label class="top-label">Contact Number</label>
-                            <input type="text" name="d_phone" value="<?php echo $ownerPhone; ?>" readonly>
-                            </div>
-                        </div>
+                    <div class="input-stack">
+                        <label class="top-label">Make <span class="required-asterisk">*</span></label>
+                        <input type="text" name="vehicle_make" required>
                     </div>
-
-                    <div class="form-row">
-                        <div class="full-width">
-                            <div class="input-stack mb-3">
-                                <label class="top-label" for="driver_full_address">Complete Address <span class="required-asterisk">*</span></label>
-                                <input type="text" id="driver_full_address" name="driver_full_address" value="<?php echo $ownerFullAddress; ?>" readonly>
-                            </div>
-                        </div>
+                </div>
+                <div class="form-row two-col-row">
+                    <div class="input-stack">
+                        <label class="top-label">Plate Number <span class="required-asterisk">*</span></label>
+                        <input type="text" id="plateNumber" name="plate_number" required>
                     </div>
+                    <div class="input-stack">
+                        <label class="top-label">Body Number <span class="required-asterisk">*</span></label>
+                        <input type="text" id="bodyNumber" name="body_number" inputmode="numeric" pattern="\d+" title="Numbers only" placeholder="Numbers only" required>
+                        <div id="bodyNumberError" class="text-danger small d-none">Numbers only.</div>
+                    </div>
+                </div>
+                <div class="form-row two-col-row">
+                    <div class="input-stack">
+                        <label class="top-label">Chassis Number <span class="required-asterisk">*</span></label>
+                        <input type="text" id="chassisNumber" name="chassis_number" pattern="[A-Za-z0-9]{6}-[A-Za-z0-9]{6}" title="Format like AB1234-CD5678" placeholder="XXXXXX-XXXXXX" required>
+                        <div id="chassisNumberError" class="text-danger small d-none">Invalid chassis number.</div>
+                    </div>
+                    <div class="input-stack">
+                        <label class="top-label">Motor Number <span class="required-asterisk">*</span></label>
+                        <input type="text" id="motorNumber" name="motor_number" inputmode="numeric" pattern="\d+" title="Numbers only" placeholder="Numbers only" required>
+                        <div id="motorNumberError" class="text-danger small d-none">Numbers only.</div>
+                    </div>
+                </div>
+                <div class="form-row two-col-row">
+                    <div class="input-stack">
+                        <label class="top-label">O.R. Number <span class="required-asterisk">*</span></label>
+                        <input type="text" id="orNumber" name="or_number" inputmode="numeric" pattern="\d{7,12}" title="7 to 12 digits" placeholder="7 to 12 digits" required>
+                        <div id="orNumberError" class="text-danger small d-none">O.R. number must be 7 to 12 digits.</div>
+                    </div>
+                    <div class="input-stack">
+                        <label class="top-label">C.R. Number <span class="required-asterisk">*</span></label>
+                        <input type="text" id="crNumber" name="cr_number" inputmode="numeric" pattern="\d{7,12}" title="7 to 12 digits" placeholder="7 to 12 digits" required>
+                        <div id="crNumberError" class="text-danger small d-none">C.R. number must be 7 to 12 digits.</div>
+                    </div>
+                </div>
 
-                    <div class="form-row">
-                        <div class="full-width">
-                            <div class="input-stack">
-                                <label class="top-label">Tricycle Type</label>
-                                <select id="tricycleTypeSelect" name="tricycle_type">
-                                    <option value="">Select</option>
-                                    <option value="Private">Private</option>
-                                    <option value="TODA">TODA</option>
-                                    <option value="PODA">PODA</option>
-                                </select>
-                            </div>
-
-                            <div id="privateDetails" class="d-none">
-                                <div class="input-stack">
-                                    <label class="top-label">OR/CR Number:</label>
-                                    <input type="text" name="or_cr">
-                                </div>
-
-                                <div class="input-stack">
-                                    <label class="top-label">Plate Number:</label>
-                                    <input type="text" name="plate">
-                                </div>
-
-                                <div class="input-stack">
-                                    <label class="top-label">Body Number:</label>
-                                    <input type="text" name="body">
-                                </div>
-                            </div>
-
-                            <div id="todaDetails" class="d-none">
-                                <div class="input-stack">
-                                    <label class="top-label">Specify TODA:</label>
-                                    <input type="text" name="spec_toda">
-                                </div>
-                            </div>
-
-                            <div id="podaDetails" class="d-none">
-                                <div class="input-stack">
-                                    <label class="top-label">Specify PODA:</label>
-                                    <input type="text" name="spec_poda">
-                                </div>
-                            </div>
-                        </div>
+                <h2 class="section-title text-center text-dark">Document Upload</h2>
+                <div class="form-row two-col-row">
+                    <div class="input-stack">
+                        <label class="top-label" for="tricycleTypeSelect">Tricycle Type <span class="required-asterisk">*</span></label>
+                        <select id="tricycleTypeSelect" name="tricycle_type" class="form-select" required>
+                            <option value="">Select</option>
+                            <option value="PODA">PODA</option>
+                            <option value="TODA">TODA</option>
+                        </select>
+                    </div>
+                    <div class="input-stack">
+                        <label class="top-label" id="tricycleCertLabel" for="tricycleCertFile">Upload Certification <span class="required-asterisk">*</span></label>
+                        <input type="file" id="tricycleCertFile" name="tricycle_cert_file" class="form-control" accept=".pdf,.jpg,.jpeg,.png" required disabled>
+                        <div class="form-text">Accepted: PDF, JPG, JPEG, PNG</div>
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="full-width">
+                        <label class="top-label" for="ltoRegFiles">LTO Registration Documents (O.R. and C.R.) <span class="required-asterisk">*</span></label>
+                        <label class="upload-dropzone" id="ltoRegDropzone" for="ltoRegFiles">
+                            <i class="fa-solid fa-cloud-arrow-up"></i>
+                            <span>Drag files here or click to upload</span>
+                            <small>Accepted: PDF, JPG, JPEG, PNG</small>
+                        </label>
+                        <input type="file" id="ltoRegFiles" name="lto_registration_files[]" class="visually-hidden" accept=".pdf,.jpg,.jpeg,.png" multiple required>
+                        <div id="ltoRegSelectedFile" class="selected-files small text-muted mt-2"></div>
                     </div>
                 </div>
 
@@ -259,30 +249,6 @@ $ownerFullAddress = htmlspecialchars(implode(', ', $ownerFullAddressParts), ENT_
 </div>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-    <script>
-        document.addEventListener("DOMContentLoaded", () => {
-            const form = document.querySelector("form");
-            const submitBtn = form?.querySelector(".submit-btn");
-            const tricycleTypeSelect = document.getElementById("tricycleTypeSelect");
-            const privateDetails = document.getElementById("privateDetails");
-            const todaDetails = document.getElementById("todaDetails");
-            const podaDetails = document.getElementById("podaDetails");
-            if (!form || !submitBtn) return;
-
-            const updateState = () => {
-                if (tricycleTypeSelect && privateDetails && todaDetails && podaDetails) {
-                    const type = tricycleTypeSelect.value;
-                    privateDetails.classList.toggle("d-none", type !== "Private");
-                    todaDetails.classList.toggle("d-none", type !== "TODA");
-                    podaDetails.classList.toggle("d-none", type !== "PODA");
-                }
-                submitBtn.disabled = !form.checkValidity();
-            };
-
-            form.addEventListener("input", updateState);
-            form.addEventListener("change", updateState);
-            updateState();
-        });
-    </script>
+    <script src="../../JS-Script-Files/Resident-End/Clearances/tricycleClearanceScript.js"></script>
 </body>
 </html>
