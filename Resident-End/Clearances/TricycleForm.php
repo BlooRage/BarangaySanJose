@@ -147,7 +147,7 @@ $ownerFullAddress = htmlspecialchars(implode(', ', $ownerFullAddressParts), ENT_
                 <div class="form-row">
                     <div class="full-width">
                         <div class="input-stack mb-3">
-                            <label class="top-label" for="applicant_full_address">Complete Address <span class="required-asterisk">*</span></label>
+                            <label class="top-label" for="applicant_full_address">Address <span class="required-asterisk">*</span></label>
                             <input type="text" id="applicant_full_address" name="applicant_full_address" value="<?php echo $ownerFullAddress; ?>" readonly>
                             <input type="hidden" id="applicantUnitNumber" value="<?php echo htmlspecialchars($ownerUnitNumberRaw, ENT_QUOTES, 'UTF-8'); ?>">
                             <input type="hidden" id="applicantStreetNumber" value="<?php echo htmlspecialchars($ownerHouseNumberRaw, ENT_QUOTES, 'UTF-8'); ?>">
@@ -157,7 +157,21 @@ $ownerFullAddress = htmlspecialchars(implode(', ', $ownerFullAddressParts), ENT_
                         </div>
                     </div>
                 </div>
-
+                <div class="form-row">
+                    <div class="full-width">
+                        <div class="d-flex align-items-center justify-content-start gap-3 app-type-row">
+                            <p class="if-building-note mb-0">APPLICATION TYPE:</p>
+                            <div class="check-item">
+                                <input type="radio" id="app_new" name="application_type" value="New" class="clearance-radio" required>
+                                <label class="app-type-label" for="app_new">New Application</label>
+                            </div>
+                            <div class="check-item">
+                                <input type="radio" id="app_renewal" name="application_type" value="Renewal" class="clearance-radio" required>
+                                <label class="app-type-label" for="app_renewal">Renewal</label>
+                            </div>
+                        </div>
+                    </div>
+                </div>
                 <h2 class="section-title text-center text-dark">Vehicle Information</h2>
                 <div class="form-row two-col-row">
                     <div class="input-stack">
@@ -204,33 +218,82 @@ $ownerFullAddress = htmlspecialchars(implode(', ', $ownerFullAddressParts), ENT_
                         <div id="crNumberError" class="text-danger small d-none">C.R. number must be 7 to 12 digits.</div>
                     </div>
                 </div>
-
-                <h2 class="section-title text-center text-dark">Document Upload</h2>
-                <div class="form-row two-col-row">
-                    <div class="input-stack">
-                        <label class="top-label" for="tricycleTypeSelect">Tricycle Type <span class="required-asterisk">*</span></label>
-                        <select id="tricycleTypeSelect" name="tricycle_type" class="form-select" required>
-                            <option value="">Select</option>
-                            <option value="PODA">PODA</option>
-                            <option value="TODA">TODA</option>
-                        </select>
+                <div id="documentUploadSection" class="d-none">
+                    <h2 class="section-title text-center text-dark">Document Upload</h2>
+                    <p class="form-subtitle">Accepted: PDF, JPG, JPEG, PNG</p>
+                    <div class="form-row">
+                        <div class="full-width">
+                            <div class="row mb-3">
+                                <div class="col-md-6">
+                                    <label class="top-label" for="validIdType">Valid Government-Issued ID <span class="required-asterisk">*</span></label>
+                                    <select id="validIdType" name="valid_id_type" class="form-select">
+                                        <option value="">Select</option>
+                                        <option value="philsys">PhilSys ID</option>
+                                        <option value="umid">UMID</option>
+                                        <option value="passport">Passport</option>
+                                        <option value="drivers_license">Driver's License</option>
+                                        <option value="prc">PRC ID</option>
+                                        <option value="postal">Postal ID</option>
+                                        <option value="gsis">GSIS ID</option>
+                                        <option value="sss">SSS ID</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="top-label" for="validIdFile">Upload Valid ID <span class="required-asterisk">*</span></label>
+                                    <input type="file" id="validIdFile" name="valid_id_file" class="form-control" accept=".pdf,.jpg,.jpeg,.png">
+                                </div>
+                            </div>
+                        </div>
                     </div>
-                    <div class="input-stack">
-                        <label class="top-label" id="tricycleCertLabel" for="tricycleCertFile">Upload Certification <span class="required-asterisk">*</span></label>
-                        <input type="file" id="tricycleCertFile" name="tricycle_cert_file" class="form-control" accept=".pdf,.jpg,.jpeg,.png" required disabled>
-                        <div class="form-text">Accepted: PDF, JPG, JPEG, PNG</div>
+                    <div id="validIdNumberRow" class="form-row d-none">
+                        <div class="full-width">
+                            <div class="input-stack">
+                                <label class="top-label" for="validIdNumber">Valid ID Number <span class="required-asterisk">*</span></label>
+                                <input type="text" id="validIdNumber" name="valid_id_number" placeholder="Enter ID number">
+                                <div id="validIdNumberError" class="text-danger small d-none">Invalid ID number</div>
+                            </div>
+                        </div>
                     </div>
-                </div>
-                <div class="form-row">
-                    <div class="full-width">
-                        <label class="top-label" for="ltoRegFiles">LTO Registration Documents (O.R. and C.R.) <span class="required-asterisk">*</span></label>
-                        <label class="upload-dropzone" id="ltoRegDropzone" for="ltoRegFiles">
-                            <i class="fa-solid fa-cloud-arrow-up"></i>
-                            <span>Drag files here or click to upload</span>
-                            <small>Accepted: PDF, JPG, JPEG, PNG</small>
-                        </label>
-                        <input type="file" id="ltoRegFiles" name="lto_registration_files[]" class="visually-hidden" accept=".pdf,.jpg,.jpeg,.png" multiple required>
-                        <div id="ltoRegSelectedFile" class="selected-files small text-muted mt-2"></div>
+                    <div class="form-row two-col-row">
+                        <div class="input-stack">
+                            <label class="top-label" for="tricycleTypeSelect">Tricycle Type <span class="required-asterisk">*</span></label>
+                            <select id="tricycleTypeSelect" name="tricycle_type" class="form-select">
+                                <option value="">Select</option>
+                                <option value="PODA">PODA</option>
+                                <option value="TODA">TODA</option>
+                            </select>
+                        </div>
+                        <div class="input-stack">
+                            <label class="top-label" id="tricycleCertLabel" for="tricycleCertFile">Upload Certification <span class="required-asterisk">*</span></label>
+                            <input type="file" id="tricycleCertFile" name="tricycle_cert_file" class="form-control" accept=".pdf,.jpg,.jpeg,.png" disabled>
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="full-width">
+                            <div class="row mb-3">
+                                <div class="col-md-12" id="ltoRegCol">
+                                    <label class="top-label" for="ltoRegFiles">LTO Registration Documents (O.R. and C.R.) <span class="required-asterisk">*</span></label>
+                                    <label class="upload-dropzone" id="ltoRegDropzone" for="ltoRegFiles">
+                                        <i class="fa-solid fa-cloud-arrow-up"></i>
+                                        <span>Drag files here or click to upload</span>
+                                        <small>Accepted: PDF, JPG, JPEG, PNG</small>
+                                    </label>
+                                    <input type="file" id="ltoRegFiles" name="lto_registration_files[]" class="visually-hidden" accept=".pdf,.jpg,.jpeg,.png" multiple>
+                                    <div id="ltoRegSelectedFile" class="selected-files small text-muted mt-2"></div>
+                                    <p class="text-muted small mt-2 mb-0">If LTO Registration is not named to the owner/operator, please upload a notarized Deed of Sale.</p>
+                                </div>
+                                <div class="col-md-6 d-none" id="lastYearClearanceCol">
+                                    <label class="top-label" for="lastYearClearanceFile">Barangay Clearance from Previous Year <span class="required-asterisk">*</span></label>
+                                    <label class="upload-dropzone" id="lastYearClearanceDropzone" for="lastYearClearanceFile">
+                                        <i class="fa-solid fa-cloud-arrow-up"></i>
+                                        <span>Drag files here or click to upload</span>
+                                        <small>Accepted: PDF, JPG, JPEG, PNG</small>
+                                    </label>
+                                    <input type="file" id="lastYearClearanceFile" name="last_year_clearance_file" class="visually-hidden" accept=".pdf,.jpg,.jpeg,.png" disabled>
+                                    <div id="lastYearClearanceSelectedFile" class="selected-files small text-muted mt-2"></div>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </div>
 

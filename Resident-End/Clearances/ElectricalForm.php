@@ -252,6 +252,7 @@ $fullAddress = htmlspecialchars(implode(', ', $fullAddressParts), ENT_QUOTES, 'U
 
                 <div id="documentUploadSection">
                     <h2 class="section-title text-center text-dark">Document Upload</h2>
+                    <p class="form-subtitle">Accepted: PDF, JPG, JPEG, PNG</p>
                     <div class="form-row">
                         <div class="full-width">
                             <div class="row mb-3">
@@ -320,7 +321,6 @@ $fullAddress = htmlspecialchars(implode(', ', $fullAddressParts), ENT_QUOTES, 'U
                             <label class="upload-dropzone" id="secCertificateDropzone" for="secCertificateFile">
                                 <i class="fa-solid fa-cloud-arrow-up"></i>
                                 <span>Drag files here or click to upload</span>
-                                <small>Accepted: PDF, JPG, JPEG, PNG</small>
                             </label>
                             <input type="file" id="secCertificateFile" name="sec_certificate_file" class="visually-hidden" accept=".pdf,.jpg,.jpeg,.png">
                             <div id="secCertificateSelectedFile" class="selected-files small text-muted mt-2"></div>

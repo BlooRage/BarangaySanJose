@@ -142,6 +142,21 @@ $ownerFullAddress = htmlspecialchars(implode(', ', $ownerFullAddressParts), ENT_
                         </div>
                     </div>
                 </div>
+                <div class="form-row">
+                    <div class="full-width">
+                        <div class="d-flex align-items-center justify-content-start gap-3 app-type-row">
+                            <p class="if-building-note mb-0">APPLICATION TYPE:</p>
+                            <div class="check-item">
+                                <input type="radio" id="app_new" name="application_type" value="New" class="clearance-radio" required>
+                                <label class="app-type-label" for="app_new">New Application</label>
+                            </div>
+                            <div class="check-item">
+                                <input type="radio" id="app_renewal" name="application_type" value="Renewal" class="clearance-radio" required>
+                                <label class="app-type-label" for="app_renewal">Renewal</label>
+                            </div>
+                        </div>
+                    </div>
+                </div>
                 <h2 class="section-title text-center text-dark">Business Details</h2>
                 <div class="form-row"><div class="full-width"><div class="input-stack"><label class="top-label">Name of Business <span class="required-asterisk">*</span></label><input type="text" name="b_name" required></div></div></div>
                 <div id="businessLocationWrapper" class="form-row">
@@ -191,23 +206,6 @@ $ownerFullAddress = htmlspecialchars(implode(', ', $ownerFullAddressParts), ENT_
                         <div id="business_contact_number_error" class="text-danger small d-none">Invalid contact number</div>
                     </div>
                 </div>
-                
-                <div class="form-row">
-                    <div class="full-width">
-                        <div class="d-flex align-items-center justify-content-start gap-3 app-type-row">
-                            <p class="if-building-note mb-0">APPLICATION TYPE:</p>
-                            <div class="check-item">
-                                <input type="radio" id="app_new" name="application_type" value="New" class="clearance-radio" required>
-                                <label class="app-type-label" for="app_new">New Application</label>
-                            </div>
-                            <div class="check-item">
-                                <input type="radio" id="app_renewal" name="application_type" value="Renewal" class="clearance-radio" required>
-                                <label class="app-type-label" for="app_renewal">Renewal</label>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
                 <div class="form-row">
                     <div class="full-width">
                         <label class="top-label">Ownership <span class="required-asterisk">*</span></label>
@@ -221,6 +219,7 @@ $ownerFullAddress = htmlspecialchars(implode(', ', $ownerFullAddressParts), ENT_
 
                 <div id="documentUploadSection" class="d-none">
                     <h2 class="section-title text-center text-dark">Document Upload</h2>
+                    <p class="form-subtitle">Accepted: PDF, JPG, JPEG, PNG</p>
 
                     <div id="documentUploadNew">
                     <div class="form-row">
@@ -311,7 +310,6 @@ $ownerFullAddress = htmlspecialchars(implode(', ', $ownerFullAddressParts), ENT_
                             <label class="upload-dropzone" id="businessPhotoDropzone" for="businessPhotoFile">
                                 <i class="fa-solid fa-cloud-arrow-up"></i>
                                 <span>Drag files here or click to upload</span>
-                                <small>Accepted: PDF, JPG, JPEG, PNG</small>
                             </label>
                             <input type="file" id="businessPhotoFile" name="business_photo_file" class="visually-hidden" accept=".pdf,.jpg,.jpeg,.png">
                             <div id="businessPhotoSelectedFile" class="selected-files small text-muted mt-2"></div>

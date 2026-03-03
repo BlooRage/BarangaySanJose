@@ -140,7 +140,38 @@ require_once __DIR__ . "/../includes/resident_access_guard.php";
                         <img src="../../Icons/Dashboard/tricycle.png" class="certificate-icon" alt="For Tricycle Permit">
                         <h3>FOR TRICYCLE PERMIT</h3>
                         <p class="certificate-text">Apply for barangay clearance required for tricycle permit processing.</p>
-                        <button class="btn apply-btn" type="button" disabled title="Currently unavailable">Apply Now</button>
+                        <button
+                            class="btn apply-btn"
+                            type="button"
+                            data-bs-toggle="modal"
+                            data-bs-target="#requirementsModal"
+                            data-title="Tricycle Permit Requirements"
+                            data-apply-href="TricycleForm.php"
+                            data-body="
+                                <ul class='mb-0 ps-3 requirements-top'>
+                                    <li class='mb-2'>
+                                        New Application
+                                        <ol class='mt-1 ps-3 requirements-numeric'>
+                                            <li>Valid Government-Issued ID</li>
+                                            <li>TODA/PODA Certification</li>
+                                            <li>LTO Registration Documents (O.R. and C.R.)</li>
+                                        </ol>
+                                    </li>
+                                    <li class='mb-2'>
+                                        Renewal
+                                        <ol class='mt-1 ps-3 requirements-numeric'>
+                                            <li>Valid Government-Issued ID</li>
+                                            <li>TODA/PODA Certification</li>
+                                            <li>LTO Registration Documents (O.R. and C.R.)</li>
+                                            <li>Barangay Clearance from the previous year</li>
+                                        </ol>
+                                    </li>
+                                </ul>
+                                <p class='mt-2 mb-0 text-muted small'>If LTO Registration is not named to the owner/operator, please upload a notarized Deed of Sale.</p>
+                            "
+                        >
+                            Apply Now
+                        </button>
                     </div>
                 </div>
 
