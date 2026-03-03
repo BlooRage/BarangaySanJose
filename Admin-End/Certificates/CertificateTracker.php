@@ -924,6 +924,7 @@ require_once __DIR__ . '/../includes/admin_guard.php';
       </div>
       <div class="modal-footer">
         <button type="button" id="paymentProofReturnBtn" class="btn btn-secondary d-none">Return</button>
+        <button type="button" id="paymentProofPrintBtn" class="btn btn-outline-dark d-none">Print</button>
         <a id="paymentProofOpenNew" class="btn btn-outline-primary" target="_blank" rel="noopener">Open in New Tab</a>
         <button type="button" id="paymentProofCloseBtn" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
       </div>

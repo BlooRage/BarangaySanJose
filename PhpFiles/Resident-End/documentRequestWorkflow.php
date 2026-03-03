@@ -591,6 +591,9 @@ if ($action === 'submit_request') {
     if ($purpose === '') {
         $purpose = trim((string)($_POST['request_officer'] ?? ''));
     }
+    if (strtolower(trim($documentType)) === 'certificate of residency') {
+        $purpose = 'Residency Verification';
+    }
 
     $payload = $_POST;
     unset($payload['action'], $payload['csrf_token']);

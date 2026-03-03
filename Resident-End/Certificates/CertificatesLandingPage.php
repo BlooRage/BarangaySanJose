@@ -99,7 +99,7 @@ require_once __DIR__ . "/../includes/resident_access_guard.php";
                         <p class="certificate-text">
                             Request a residency certificate as proof of address and community residence.
                         </p>
-                        <button class="btn apply-btn" type="button" disabled title="Currently unavailable">Apply Now</button>
+                        <button class="btn apply-btn" type="button" onclick="location.href='ResidencyForm.php'">Apply Now</button>
                     </div>
                 </div>
 

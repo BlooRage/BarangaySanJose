@@ -53,6 +53,7 @@
   const paymentProofModal = paymentProofModalEl ? new bootstrap.Modal(paymentProofModalEl) : null;
   const paymentProofWrap = document.getElementById('paymentProofWrap');
   const paymentProofOpenNew = document.getElementById('paymentProofOpenNew');
+  const paymentProofPrintBtn = document.getElementById('paymentProofPrintBtn');
   const paymentProofTitle = document.getElementById('paymentProofTitle');
   const paymentProofReturnBtn = document.getElementById('paymentProofReturnBtn');
   const paymentProofCloseBtn = document.getElementById('paymentProofCloseBtn');
@@ -79,6 +80,7 @@
   let openPreviewAfterActionModal = false;
   let openViewDirectPreview = false;
   let paymentProofReturnTarget = '';
+  let paymentProofPrintUrl = '';
   let preserveViewStateOnNextHide = false;
   let financeViewIntent = 'view';
   const financeStages = new Set([
@@ -151,7 +153,7 @@
     const stageKey = String(row.stage || '').toLowerCase();
     const hasIssuedFile = String(row.issued_file_path || '').trim() !== '';
     const canViewIssuedByStage = stageKey === 'completed' || stageKey === 'ready_for_claim' || stageKey === 'payment_verified';
-    const viewIssuedBtn = (!isFinancePaymentsPage && (hasIssuedFile || canViewIssuedByStage))
+    const viewIssuedBtn = (!isFinancePaymentsPage && stageKey !== 'completed' && (hasIssuedFile || canViewIssuedByStage))
       ? `<button class="btn btn-sm btn-outline-success me-1" data-issued-id="${esc(row.request_id)}">View Document</button>`
       : '';
     if (isFinancePaymentsPage) {
@@ -968,8 +970,36 @@
     }
   });
 
+  paymentProofPrintBtn?.addEventListener('click', () => {
+    const url = String(paymentProofPrintUrl || '').trim();
+    if (!url) return;
+    const frame = paymentProofWrap?.querySelector('iframe');
+    if (frame && frame.contentWindow) {
+      try {
+        frame.contentWindow.focus();
+        frame.contentWindow.print();
+        return;
+      } catch (_) {
+        // Fallback to new-tab print below.
+      }
+    }
+    const w = window.open(url, '_blank', 'noopener');
+    if (!w) return;
+    const tryPrint = () => {
+      try {
+        w.focus();
+        w.print();
+      } catch (_) {
+        // Ignore browser print restrictions.
+      }
+    };
+    w.addEventListener('load', () => setTimeout(tryPrint, 250), { once: true });
+    setTimeout(tryPrint, 1200);
+  });
+
   paymentProofModalEl?.addEventListener('hidden.bs.modal', () => {
     paymentProofReturnTarget = '';
+    paymentProofPrintUrl = '';
     if (paymentProofReturnBtn) {
       paymentProofReturnBtn.classList.add('d-none');
     }
@@ -981,6 +1011,9 @@
     }
     if (paymentProofCloseBtn) {
       paymentProofCloseBtn.classList.remove('d-none');
+    }
+    if (paymentProofPrintBtn) {
+      paymentProofPrintBtn.classList.add('d-none');
     }
   });
 
@@ -1013,7 +1046,7 @@
     `;
   }
 
-  function openDocumentModal(docUrl, title = 'Document Viewer', returnTarget = '') {
+  function openDocumentModal(docUrl, title = 'Document Viewer', returnTarget = '', options = {}) {
     if (!docUrl || !paymentProofModal || !paymentProofWrap || !paymentProofOpenNew) return;
     paymentProofReturnTarget = String(returnTarget || '').trim();
     if (paymentProofTitle) {
@@ -1030,6 +1063,7 @@
     if (paymentProofCloseBtn) {
       paymentProofCloseBtn.classList.toggle('d-none', proofOnly);
     }
+    paymentProofPrintUrl = '';
     paymentProofOpenNew.href = docUrl;
     const lower = String(docUrl).toLowerCase();
     let forcePdf = lower.endsWith('.pdf');
@@ -1047,6 +1081,13 @@
       paymentProofWrap.innerHTML = `<iframe src="${docUrl}" style="width:100%;height:70vh;border:1px solid #ddd;border-radius:8px;"></iframe>`;
     } else {
       paymentProofWrap.innerHTML = `<img src="${docUrl}" alt="Document Preview" style="max-width:100%;max-height:70vh;border:1px solid #ddd;border-radius:8px;">`;
+    }
+    if (paymentProofPrintBtn) {
+      const allowPrint = !!(options && options.allowPrint);
+      paymentProofPrintBtn.classList.toggle('d-none', !(allowPrint && forcePdf && !proofOnly));
+      if (allowPrint && forcePdf && !proofOnly) {
+        paymentProofPrintUrl = docUrl;
+      }
     }
     paymentProofModal.show();
   }
@@ -1973,6 +2014,26 @@
         }
 
         const stageKeyForStatus = String(row.stage || '').toLowerCase();
+        if (!isFinancePaymentsPage && stageKeyForStatus === 'completed') {
+          const completedIssuedUrl = `${appBase}/PhpFiles/Admin-End/documentRequestWorkflow.php?action=view_issued&request_id=${encodeURIComponent(String(row.request_id || ''))}`;
+          const issuedViewerHtml = `
+            <div class="tracker-form-grid cols-1">
+              <div class="tracker-form-field">
+                <p class="tracker-form-label">Issued Document</p>
+                <div class="tracker-form-value">
+                  <iframe
+                    src="${completedIssuedUrl}"
+                    style="width:100%;height:70vh;border:1px solid #ddd;border-radius:8px;background:#fff;"
+                    loading="lazy"
+                  ></iframe>
+                </div>
+              </div>
+            </div>
+          `;
+          const issuedActionHtml = `<a class="btn btn-sm btn-outline-primary" href="${completedIssuedUrl}" target="_blank" rel="noopener">Open in New Tab</a>`;
+          html += formSection('Issued Document', issuedViewerHtml, issuedActionHtml);
+        }
+
         const isRejectedStatus = stageKeyForStatus.includes('rejected') || stageKeyForStatus === 'cancelled';
         const statusLabelText = String(row.stage_label || row.stage || '-');
         const statusReasonText = firstNonEmpty([row.status_remarks, row.status_reason]);
@@ -2194,8 +2255,11 @@
       btn.addEventListener('click', () => {
         const id = String(btn.getAttribute('data-issued-id') || '');
         if (!id) return;
+        const row = itemById.get(id);
+        const stageKey = String(row?.stage || '').toLowerCase();
+        const allowPrint = stageKey === 'ready_for_claim';
         const issuedUrl = `${appBase}/PhpFiles/Admin-End/documentRequestWorkflow.php?action=view_issued&request_id=${encodeURIComponent(id)}`;
-        openDocumentModal(issuedUrl, 'Issued Document (PDF)', '');
+        openDocumentModal(issuedUrl, 'Issued Document (PDF)', '', { allowPrint });
       });
     });
 

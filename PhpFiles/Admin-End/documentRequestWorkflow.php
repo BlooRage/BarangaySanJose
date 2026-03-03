@@ -343,24 +343,6 @@ function dra_apply_preview_edits(mysqli $conn, string $requestId, array &$reques
 }
 
 function dra_generate_issued_document(array $requestRow): ?string {
-    if (!class_exists('FPDF')) {
-        $fpdfPaths = [
-            __DIR__ . '/../../composer-email-handler/vendor/autoload.php',
-            __DIR__ . '/../../vendor/autoload.php',
-        ];
-        foreach ($fpdfPaths as $autoloadPath) {
-            if (is_file($autoloadPath)) {
-                require_once $autoloadPath;
-                if (class_exists('FPDF')) {
-                    break;
-                }
-            }
-        }
-    }
-    if (!class_exists('FPDF')) {
-        return null;
-    }
-
     $baseDir = realpath(__DIR__ . '/../../');
     if ($baseDir === false) {
         return null;
@@ -425,10 +407,136 @@ function dra_generate_issued_document(array $requestRow): ?string {
         }
     }
 
+    $docTypeNorm = strtolower(trim($docType));
+    $isIndigency = strpos($docTypeNorm, 'indigency') !== false;
+    $isGoodMoral = (strpos($docTypeNorm, 'goodmoral') !== false) || (strpos($docTypeNorm, 'good moral') !== false);
+    $isResidency = strpos($docTypeNorm, 'residency') !== false;
+
+    // Indigency/Good Moral/Residency: prefer .docx template output when template and PhpWord are available.
+    if ($isIndigency || $isGoodMoral || $isResidency) {
+        if ($isIndigency) {
+            $templateFile = 'Certificate of Indigency.docx';
+        } elseif ($isGoodMoral) {
+            $templateFile = 'Certificate of Good Moral.docx';
+        } else {
+            $residencyTemplates = ['general certification.docx', 'GeneralCertification.docx'];
+            $templateFile = 'GeneralCertification.docx';
+            foreach ($residencyTemplates as $candidateTemplate) {
+                if (is_file($baseDir . '/Resident-End/Certificates/DocumentIssuance/' . $candidateTemplate)) {
+                    $templateFile = $candidateTemplate;
+                    break;
+                }
+            }
+        }
+        $templatePath = $baseDir . '/Resident-End/Certificates/DocumentIssuance/' . $templateFile;
+        if (is_file($templatePath)) {
+            if (!class_exists('\PhpOffice\PhpWord\TemplateProcessor')) {
+                $phpWordAutoloads = [
+                    $baseDir . '/PhpFiles/PhpOffice/vendor/autoload.php',
+                    $baseDir . '/vendor/autoload.php',
+                ];
+                foreach ($phpWordAutoloads as $autoloadPath) {
+                    if (is_file($autoloadPath)) {
+                        require_once $autoloadPath;
+                        if (class_exists('\PhpOffice\PhpWord\TemplateProcessor')) {
+                            break;
+                        }
+                    }
+                }
+            }
+
+            if (class_exists('\PhpOffice\PhpWord\TemplateProcessor')) {
+                try {
+                    $template = new \PhpOffice\PhpWord\TemplateProcessor($templatePath);
+                    $normalizeText = static function (string $value): string {
+                        $v = trim(preg_replace('/\s+/u', ' ', $value));
+                        return $v === '' ? '-' : $v;
+                    };
+
+                    $requestOfficer = trim((string)($payload['request_officer'] ?? ''));
+                    $requestPurpose = trim((string)($payload['request_purpose'] ?? $purpose));
+                    if ($isResidency) {
+                        $requestPurpose = 'Residency Verification';
+                    }
+                    if ($requestPurpose === '') {
+                        $requestPurpose = $purpose !== '' ? $purpose : 'PURPOSE';
+                    }
+                    $yearsResidency = trim((string)($payload['years_of_residency'] ?? ''));
+                    $monthsResidency = trim((string)($payload['months_of_residency'] ?? ''));
+                    $issuedDateObj = new DateTime();
+                    $issuedDateWord = $issuedDateObj->format('F j, Y');
+                    $day = (int)$issuedDateObj->format('j');
+                    $monthUpper = strtoupper($issuedDateObj->format('F'));
+                    $yearNum = $issuedDateObj->format('Y');
+                    $v = $day % 100;
+                    $suffix = ($v >= 11 && $v <= 13) ? 'th' : (($day % 10 === 1) ? 'st' : (($day % 10 === 2) ? 'nd' : (($day % 10 === 3) ? 'rd' : 'th')));
+                    $issuedAsDocx = $day . $suffix . ' day of ' . $monthUpper . ' ' . $yearNum;
+
+                    $template->setValue('REQUEST_ID', $normalizeText($requestId));
+                    $template->setValue('FULL_NAME', $normalizeText($fullName));
+                    $template->setValue('ADDRESS', $normalizeText($address));
+                    $template->setValue('PURPOSE', $normalizeText($requestPurpose));
+                    $template->setValue('REQUEST_OFFICER', $normalizeText($requestOfficer));
+                    $template->setValue('ISSUED_AT', $normalizeText($issuedDateWord));
+                    $template->setValue('ISSUED_DATE_WORD', $normalizeText($issuedAsDocx));
+                    $template->setValue('CERTIFICATE_NUMBER', $normalizeText($certNo));
+                    $template->setValue('OR_NUMBER', $normalizeText($orNo));
+                    $template->setValue('VERIFICATION_CODE', $normalizeText($verificationCode));
+                    $template->setValue('VERIFY_URL', $normalizeText($verifyUrl));
+                    $template->setValue('QR_PUBLIC_PATH', $normalizeText($qrPublicPath));
+                    $template->setValue('YEARS_OF_RESIDENCY', $normalizeText($yearsResidency));
+                    $template->setValue('MONTHS_OF_RESIDENCY', $normalizeText($monthsResidency));
+
+                    if (is_file($qrDiskPath) && method_exists($template, 'setImageValue')) {
+                        $template->setImageValue('QR_IMAGE', [
+                            'path' => $qrDiskPath,
+                            'width' => 120,
+                            'height' => 120,
+                            'ratio' => true,
+                        ]);
+                    }
+
+                    $docxName = 'issued_' . preg_replace('/[^A-Za-z0-9_-]/', '', $requestId) . '_' . date('YmdHis') . '.docx';
+                    $docxDiskPath = $outDir . '/' . $docxName;
+                    $template->saveAs($docxDiskPath);
+
+                    if (is_file($docxDiskPath) && filesize($docxDiskPath) > 0) {
+                        $pdfDiskPath = dra_convert_docx_to_pdf($docxDiskPath, $outDir);
+                        if ($pdfDiskPath !== null) {
+                            return '/UnifiedFileAttachment/IssuedDocuments/Generated/' . basename($pdfDiskPath);
+                        }
+                        error_log('[dra_generate_issued_document][docx_template] docx->pdf conversion unavailable/failed; using PDF fallback renderer');
+                    }
+                } catch (Throwable $e) {
+                    error_log('[dra_generate_issued_document][docx_template] ' . $e->getMessage());
+                }
+            }
+        }
+    }
+
+    if (!class_exists('FPDF')) {
+        $fpdfPaths = [
+            __DIR__ . '/../../composer-email-handler/vendor/autoload.php',
+            __DIR__ . '/../../vendor/autoload.php',
+        ];
+        foreach ($fpdfPaths as $autoloadPath) {
+            if (is_file($autoloadPath)) {
+                require_once $autoloadPath;
+                if (class_exists('FPDF')) {
+                    break;
+                }
+            }
+        }
+    }
+    if (!class_exists('FPDF')) {
+        return null;
+    }
+
     $fileName = 'issued_' . preg_replace('/[^A-Za-z0-9_-]/', '', $requestId) . '_' . date('YmdHis') . '.pdf';
     $diskPath = $outDir . '/' . $fileName;
 
-    $pdf = new FPDF('P', 'mm', 'A4');
+    // Use short bond paper (8.5x11) instead of A4.
+    $pdf = new FPDF('P', 'mm', 'Letter');
     $pdf->SetMargins(18, 16, 18);
     $pdf->AddPage();
 
@@ -440,9 +548,6 @@ function dra_generate_issued_document(array $requestRow): ?string {
     if (is_file($rightLogo)) {
         $pdf->Image($rightLogo, 168, 14, 26, 26);
     }
-    $docTypeNorm = strtolower(trim($docType));
-    $isIndigency = strpos($docTypeNorm, 'indigency') !== false;
-    $isGoodMoral = (strpos($docTypeNorm, 'goodmoral') !== false) || (strpos($docTypeNorm, 'good moral') !== false);
     $isSpecialCertificate = $isIndigency || $isGoodMoral;
     $fontFace = 'Times';
     $indigencyFont = 'Arial';
@@ -834,6 +939,91 @@ function dra_generate_issued_document(array $requestRow): ?string {
     $pdf->Output('F', $diskPath);
 
     return '/UnifiedFileAttachment/IssuedDocuments/Generated/' . $fileName;
+}
+
+function dra_convert_docx_to_pdf(string $docxDiskPath, string $outDir): ?string {
+    $docxReal = realpath($docxDiskPath);
+    $outReal = realpath($outDir);
+    if ($docxReal === false || $outReal === false || !is_file($docxReal)) {
+        return null;
+    }
+
+    $baseName = pathinfo($docxReal, PATHINFO_FILENAME);
+    $expectedPdf = $outReal . '/' . $baseName . '.pdf';
+    @unlink($expectedPdf);
+
+    $envSoffice = trim((string)getenv('SOFFICE_BIN'));
+    $candidates = [
+        $envSoffice,
+        '/Applications/LibreOffice.app/Contents/MacOS/soffice',
+        '/usr/bin/soffice',
+        '/usr/local/bin/soffice',
+        'libreoffice',
+        'soffice',
+    ];
+
+    $attempted = [];
+
+    foreach ($candidates as $bin) {
+        if (trim($bin) === '') {
+            continue;
+        }
+        $attempted[] = $bin;
+        $cmd = escapeshellcmd($bin)
+            . ' --headless --convert-to pdf:writer_pdf_Export '
+            . '--outdir ' . escapeshellarg($outReal) . ' '
+            . escapeshellarg($docxReal);
+
+        $stdout = '';
+        $stderr = '';
+        $exitCode = 1;
+
+        if (function_exists('proc_open')) {
+            $spec = [
+                0 => ['pipe', 'r'],
+                1 => ['pipe', 'w'],
+                2 => ['pipe', 'w'],
+            ];
+            $proc = @proc_open($cmd, $spec, $pipes);
+            if (is_resource($proc)) {
+                if (isset($pipes[0]) && is_resource($pipes[0])) {
+                    fclose($pipes[0]);
+                }
+                $stdout = isset($pipes[1]) && is_resource($pipes[1]) ? (string)stream_get_contents($pipes[1]) : '';
+                $stderr = isset($pipes[2]) && is_resource($pipes[2]) ? (string)stream_get_contents($pipes[2]) : '';
+                if (isset($pipes[1]) && is_resource($pipes[1])) {
+                    fclose($pipes[1]);
+                }
+                if (isset($pipes[2]) && is_resource($pipes[2])) {
+                    fclose($pipes[2]);
+                }
+                $exitCode = (int)proc_close($proc);
+            }
+        }
+
+        if ($exitCode !== 0 && function_exists('exec')) {
+            $outLines = [];
+            @exec($cmd . ' 2>&1', $outLines, $execExitCode);
+            $stdout = trim(implode("\n", $outLines));
+            $exitCode = (int)$execExitCode;
+        }
+
+        if ($exitCode !== 0 && function_exists('shell_exec')) {
+            $shellOut = @shell_exec($cmd . ' 2>&1');
+            $stdout = trim((string)$shellOut);
+            $exitCode = is_file($expectedPdf) && filesize($expectedPdf) > 0 ? 0 : 1;
+        }
+
+        if ($exitCode === 0 && is_file($expectedPdf) && filesize($expectedPdf) > 0) {
+            return $expectedPdf;
+        }
+        if (trim((string)$stdout) !== '' || trim((string)$stderr) !== '') {
+            error_log('[dra_convert_docx_to_pdf] ' . trim((string)$stdout . ' ' . (string)$stderr));
+        }
+    }
+
+    error_log('[dra_convert_docx_to_pdf] no working DOCX->PDF converter found. tried=' . implode(', ', $attempted));
+    return null;
 }
 
 function dra_generate_issued_document_safe(array $requestRow): ?string {
@@ -1490,8 +1680,11 @@ if ($action === 'view_issued') {
     $docTypeNorm = strtolower(trim((string)($row['document_type'] ?? '')));
     $isIndigency = strpos($docTypeNorm, 'indigency') !== false;
     $isGoodMoral = (strpos($docTypeNorm, 'goodmoral') !== false) || (strpos($docTypeNorm, 'good moral') !== false);
+    $isResidency = strpos($docTypeNorm, 'residency') !== false;
     $ext = strtolower(pathinfo($publicPath, PATHINFO_EXTENSION));
-    $mustRegenerate = ($publicPath === '') || (($isIndigency || $isGoodMoral) && $ext !== 'pdf');
+    $mustRegenerate = ($publicPath === '')
+        || $isResidency
+        || (($isIndigency || $isGoodMoral) && $ext !== 'pdf');
     if ($mustRegenerate) {
         $verificationCode = trim((string)($row['verification_code'] ?? ''));
         if ($verificationCode === '') {
