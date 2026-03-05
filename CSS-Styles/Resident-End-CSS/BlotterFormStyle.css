@@ -1,0 +1,81 @@
+.blotter-shell {
+    width: 100%;
+    max-width: 100%;
+    margin: 0;
+    background: #fffdfb;
+    border: 1.5px solid #f2b37a;
+    border-radius: 14px;
+    padding: 28px;
+    font-family: 'Geist', sans-serif;
+}
+
+.back-link {
+    display: inline-block;
+    margin-bottom: 12px;
+    color: #de710c;
+    font-size: 14px;
+    text-decoration: none;
+}
+
+.form-title {
+    font-family: 'Charis SIL Bold', serif;
+    text-align: center;
+    color: #de710c;
+    margin-bottom: 6px;
+    font-weight: 700;
+    font-size: 36px;
+}
+
+.form-subtitle {
+    text-align: center;
+    font-size: 14px;
+    color: #666;
+    margin-bottom: 28px;
+}
+
+.section-title {
+    font-family: 'Charis SIL Bold', serif;
+    font-size: 18px;
+    font-weight: 700;
+    margin: 28px 0 16px;
+    color: #333;
+}
+
+.required-asterisk {
+    color: #dc3545;
+    font-weight: 700;
+}
+
+.blotter-shell .form-label {
+    font-size: 14px;
+    font-weight: 400;
+    color: #333;
+    margin-bottom: 8px;
+}
+
+.blotter-shell .form-control,
+.blotter-shell .form-select,
+.blotter-shell textarea {
+    border: 1px solid #a8a7a7;
+    border-radius: 6px;
+    font-size: 14px;
+    padding: 10px 12px;
+}
+
+.blotter-shell .form-control:focus,
+.blotter-shell .form-select:focus,
+.blotter-shell textarea:focus {
+    outline: none;
+    border-color: #e8872f;
+    box-shadow: none;
+}
+
+@media (max-width: 768px) {
+    .blotter-shell {
+        padding: 18px;
+    }
+
+    .form-title {
+        font-size: 30px;
+    }
+}
