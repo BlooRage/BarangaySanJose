@@ -5,6 +5,7 @@ $current = basename($_SERVER['PHP_SELF']);
 $residentMgmtPages = ['ResidentMasterlist.php', 'ResidentArchive.php', 'EditRequests.php', 'SectorMembershipVerification.php', 'HouseholdProfiling.php'];
 $certPages = ['CertificateTracker.php'];
 $financePages = ['FinancePayments.php'];
+$blotterPages = ['BlotterForm.php', 'BlotterTracker.php'];
 $userMgmtPages = ['UserMasterlist.php'];
 $adminMgmtPages = ['OfficialsManagement.php', 'OfficialInvites.php'];
 
@@ -36,6 +37,7 @@ if (!function_exists('appUrl')) {
 $isResidentMgmtActive = in_array($current, $residentMgmtPages);
 $isCertActive = in_array($current, $certPages);
 $isFinanceActive = in_array($current, $financePages);
+$isBlotterActive = in_array($current, $blotterPages);
 $isUserMgmtActive = in_array($current, $userMgmtPages);
 $isAdminMgmtActive = in_array($current, $adminMgmtPages);
 $isSuperAdminSidebar = ((string)($_SESSION['role'] ?? '') === 'SuperAdmin');
@@ -272,8 +274,36 @@ if (!empty($_SESSION['user_id']) && isset($conn) && $conn instanceof mysqli) {
         </a>
       </li>
 
+      <li class="mb-1 mt-2 text-muted small fw-semibold px-2">e-Blotter Management</li>
+      <li class="mb-2">
+        <a href="<?= htmlspecialchars(appUrl('Admin-End/Blotter/BlotterForm.php')) ?>"
+           class="btn btn-toggle d-flex align-items-center gap-2 rounded <?= $current == 'BlotterForm.php' ? 'active' : '' ?>"
+           style="<?= $current == 'BlotterForm.php' ? 'outline: none; box-shadow: none;' : '' ?>">
+          <i class="fas fa-file-pen"></i> Log New Incident
+        </a>
+      </li>
+      <li class="mb-1">
+        <button class="btn btn-toggle d-flex align-items-center gap-2 rounded <?= $current == 'BlotterTracker.php' ? '' : 'collapsed' ?>"
+                data-bs-toggle="collapse"
+                data-bs-target="#blotter-tools-collapse"
+                aria-expanded="<?= $current == 'BlotterTracker.php' ? 'true' : 'false' ?>">
+          <i class="fas fa-toolbox"></i> e-Blotter Tools
+        </button>
+
+        <div class="collapse <?= $current == 'BlotterTracker.php' ? 'show' : '' ?>" id="blotter-tools-collapse">
+          <ul class="btn-toggle-nav list-unstyled fw-normal pb-1 small">
+            <li>
+              <a href="<?= htmlspecialchars(appUrl('Admin-End/Blotter/BlotterTracker.php')) ?>"
+                 class="link-dark rounded <?= $current == 'BlotterTracker.php' ? 'active' : '' ?>">
+                Tracker
+              </a>
+            </li>
+          </ul>
+        </div>
+      </li>
+
       <?php if ($isSuperAdminSidebar): ?>
-      <li class="mb-1 mt-3 text-muted small fw-semibold px-2">Admin Management</li>
+      <li class="mb-1 mt-2 text-muted small fw-semibold px-2">Admin Management</li>
       <!-- PERSONNEL MANAGEMENT -->
       <li class="mb-1">
         <button class="btn btn-toggle d-flex align-items-center gap-2 rounded <?= $isAdminMgmtActive ? '' : 'collapsed' ?>"

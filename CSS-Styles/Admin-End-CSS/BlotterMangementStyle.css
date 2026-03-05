@@ -1,3 +1,19 @@
+.blotter-tracker-shell .table-responsive {
+    overflow-x: auto;
+    overflow-y: visible;
+    -webkit-overflow-scrolling: touch;
+}
+
+.blotter-tracker-shell #table-appData {
+    min-width: 760px;
+}
+
+.blotter-tracker-shell #table-appData th,
+.blotter-tracker-shell #table-appData td {
+    white-space: nowrap;
+}
+
+
 .blotter-shell {
     width: 100%;
     max-width: 100%;
@@ -68,6 +84,51 @@
     outline: none;
     border-color: #e8872f;
     box-shadow: none;
+}
+
+.upload-box {
+    border: 1.5px dashed #c8c8c8;
+    border-radius: 10px;
+    background: #fff;
+    min-height: 140px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    padding: 16px;
+    cursor: pointer;
+    transition: border-color 0.2s ease, background-color 0.2s ease;
+}
+
+.upload-box:hover,
+.upload-box.drag-over {
+    border-color: #de710c;
+    background: #fff7ef;
+}
+
+.upload-box .upload-icon {
+    font-size: 1.3rem;
+    color: #de710c;
+    margin-bottom: 6px;
+}
+
+.upload-box .upload-text {
+    font-size: 0.95rem;
+    color: #333;
+    margin-bottom: 2px;
+}
+
+.upload-box .upload-subtext {
+    font-size: 0.8rem;
+    color: #6c757d;
+}
+
+.upload-file-name {
+    font-size: 0.85rem;
+    color: #495057;
+    margin-top: 8px;
+    word-break: break-all;
 }
 
 @media (max-width: 768px) {
