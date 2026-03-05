@@ -8,6 +8,23 @@ document.addEventListener("DOMContentLoaded", () => {
     const fileInput = document.getElementById("narrativeFileInput");
     const uploadBox = document.getElementById("narrativeUploadBox");
     const fileNameEl = document.getElementById("narrativeFileName");
+    const complainantAddressSystem = document.getElementById("complainantAddressSystem");
+    const complainantHouseWrapper = document.getElementById("complainantHouseSystemWrapper");
+    const complainantLotWrapper = document.getElementById("complainantLotBlockSystemWrapper");
+    const complainantHouseNumber = document.getElementById("complainantHouseNumber");
+    const complainantStreetName = document.getElementById("complainantStreetName");
+    const complainantLotNumber = document.getElementById("complainantLotNumber");
+    const complainantBlockNumber = document.getElementById("complainantBlockNumber");
+    const complainantPhaseNumber = document.getElementById("complainantPhaseNumber");
+
+    const respondentAddressSystem = document.getElementById("respondentAddressSystem");
+    const respondentHouseWrapper = document.getElementById("respondentHouseSystemWrapper");
+    const respondentLotWrapper = document.getElementById("respondentLotBlockSystemWrapper");
+    const respondentHouseNumber = document.getElementById("respondentHouseNumber");
+    const respondentStreetName = document.getElementById("respondentStreetName");
+    const respondentLotNumber = document.getElementById("respondentLotNumber");
+    const respondentBlockNumber = document.getElementById("respondentBlockNumber");
+    const respondentPhaseNumber = document.getElementById("respondentPhaseNumber");
     if (!form || !submitBtn) return;
 
     const setNarrativeMode = () => {
@@ -41,8 +58,52 @@ document.addEventListener("DOMContentLoaded", () => {
         fileNameEl.classList.remove("d-none");
     };
 
+    const setRequired = (el, on) => {
+        if (!el) return;
+        if (on) el.setAttribute("required", "required");
+        else el.removeAttribute("required");
+    };
+
+    const setWrapperState = (wrapper, show) => {
+        if (!wrapper) return;
+        wrapper.classList.toggle("d-none", !show);
+        wrapper.querySelectorAll("input, select").forEach((el) => {
+            el.disabled = !show;
+            if (!show) {
+                el.value = "";
+                el.setCustomValidity("");
+            }
+        });
+    };
+
+    const applyAddressSystem = (systemSelect, houseWrapper, lotWrapper, houseFields, lotFields) => {
+        const mode = String(systemSelect?.value || "");
+        const isHouse = mode === "house";
+        const isLot = mode === "lot_block";
+
+        setWrapperState(houseWrapper, isHouse);
+        setWrapperState(lotWrapper, isLot);
+
+        houseFields.forEach((f) => setRequired(f, isHouse));
+        lotFields.forEach((f) => setRequired(f, isLot));
+    };
+
     const updateState = () => {
         setNarrativeMode();
+        applyAddressSystem(
+            complainantAddressSystem,
+            complainantHouseWrapper,
+            complainantLotWrapper,
+            [complainantHouseNumber, complainantStreetName],
+            [complainantLotNumber, complainantBlockNumber, complainantPhaseNumber]
+        );
+        applyAddressSystem(
+            respondentAddressSystem,
+            respondentHouseWrapper,
+            respondentLotWrapper,
+            [respondentHouseNumber, respondentStreetName],
+            [respondentLotNumber, respondentBlockNumber, respondentPhaseNumber]
+        );
         submitBtn.disabled = !form.checkValidity();
     };
 
@@ -60,6 +121,9 @@ document.addEventListener("DOMContentLoaded", () => {
         updateFileName();
         updateState();
     });
+
+    complainantAddressSystem?.addEventListener("change", updateState);
+    respondentAddressSystem?.addEventListener("change", updateState);
 
     uploadBox?.addEventListener("dragover", (e) => {
         e.preventDefault();

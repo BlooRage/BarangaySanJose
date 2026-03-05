@@ -89,33 +89,23 @@ require_once __DIR__ . "/../includes/admin_guard.php";
                 </div>
 
                 <div class="row g-3 mb-3">
-                    <div class="col-12 col-lg-4">
+                    <div class="col-12 col-lg-3">
                         <label class="form-label">Address System</label>
-                        <select class="form-select" name="complainant_address_system">
+                        <select class="form-select" id="complainantAddressSystem" name="complainant_address_system">
                             <option value="">Select</option>
                             <option value="house">House Numbering System</option>
                             <option value="lot_block">Lot/Block System</option>
                         </select>
                     </div>
-                    <div class="col-12 col-lg-4">
+                    <div class="col-12 col-lg-3">
                         <label class="form-label">Unit / Apartment Number</label>
                         <input type="text" class="form-control" name="complainant_unit_number">
                     </div>
-                    <div class="col-12 col-lg-4">
+                    <div class="col-12 col-lg-3">
                         <label class="form-label">Subdivision</label>
                         <input type="text" class="form-control" name="complainant_subdivision">
                     </div>
-                </div>
-                <div class="row g-3 mb-3">
-                    <div class="col-12 col-md-4">
-                        <label class="form-label">House Number</label>
-                        <input type="text" class="form-control" name="complainant_house_number">
-                    </div>
-                    <div class="col-12 col-md-4">
-                        <label class="form-label">Street Name</label>
-                        <input type="text" class="form-control" name="complainant_street_name">
-                    </div>
-                    <div class="col-12 col-md-4">
+                    <div class="col-12 col-lg-3">
                         <label class="form-label">Area</label>
                         <select class="form-select" name="complainant_area_number">
                             <option value="">Select</option>
@@ -129,18 +119,29 @@ require_once __DIR__ . "/../includes/admin_guard.php";
                         </select>
                     </div>
                 </div>
-                <div class="row g-3 mb-3">
+                <div id="complainantHouseSystemWrapper" class="row g-3 mb-3 d-none">
+                    <div class="col-12 col-md-6">
+                        <label class="form-label">House Number</label>
+                        <input type="text" class="form-control" id="complainantHouseNumber" name="complainant_house_number">
+                    </div>
+                    <div class="col-12 col-md-6">
+                        <label class="form-label">Street Name</label>
+                        <input type="text" class="form-control" id="complainantStreetName" name="complainant_street_name">
+                    </div>
+                </div>
+
+                <div id="complainantLotBlockSystemWrapper" class="row g-3 mb-3 d-none">
                     <div class="col-12 col-md-4">
                         <label class="form-label">Lot</label>
-                        <input type="text" class="form-control" name="complainant_lot_number">
+                        <input type="text" class="form-control" id="complainantLotNumber" name="complainant_lot_number">
                     </div>
                     <div class="col-12 col-md-4">
                         <label class="form-label">Block</label>
-                        <input type="text" class="form-control" name="complainant_block_number">
+                        <input type="text" class="form-control" id="complainantBlockNumber" name="complainant_block_number">
                     </div>
                     <div class="col-12 col-md-4">
                         <label class="form-label">Phase</label>
-                        <input type="text" class="form-control" name="complainant_phase_number">
+                        <input type="text" class="form-control" id="complainantPhaseNumber" name="complainant_phase_number">
                     </div>
                 </div>
                 <div class="row g-3 mb-4">
@@ -205,33 +206,23 @@ require_once __DIR__ . "/../includes/admin_guard.php";
                 </div>
 
                 <div class="row g-3 mb-3">
-                    <div class="col-12 col-lg-4">
+                    <div class="col-12 col-lg-3">
                         <label class="form-label">Address System</label>
-                        <select class="form-select" name="respondent_address_system">
+                        <select class="form-select" id="respondentAddressSystem" name="respondent_address_system">
                             <option value="">Select</option>
                             <option value="house">House Numbering System</option>
                             <option value="lot_block">Lot/Block System</option>
                         </select>
                     </div>
-                    <div class="col-12 col-lg-4">
+                    <div class="col-12 col-lg-3">
                         <label class="form-label">Unit / Apartment Number</label>
                         <input type="text" class="form-control" name="respondent_unit_number">
                     </div>
-                    <div class="col-12 col-lg-4">
+                    <div class="col-12 col-lg-3">
                         <label class="form-label">Subdivision</label>
                         <input type="text" class="form-control" name="respondent_subdivision">
                     </div>
-                </div>
-                <div class="row g-3 mb-3">
-                    <div class="col-12 col-md-4">
-                        <label class="form-label">House Number</label>
-                        <input type="text" class="form-control" name="respondent_house_number">
-                    </div>
-                    <div class="col-12 col-md-4">
-                        <label class="form-label">Street Name</label>
-                        <input type="text" class="form-control" name="respondent_street_name">
-                    </div>
-                    <div class="col-12 col-md-4">
+                    <div class="col-12 col-lg-3">
                         <label class="form-label">Area</label>
                         <select class="form-select" name="respondent_area_number">
                             <option value="">Select</option>
@@ -245,18 +236,29 @@ require_once __DIR__ . "/../includes/admin_guard.php";
                         </select>
                     </div>
                 </div>
-                <div class="row g-3 mb-3">
+                <div id="respondentHouseSystemWrapper" class="row g-3 mb-3 d-none">
+                    <div class="col-12 col-md-6">
+                        <label class="form-label">House Number</label>
+                        <input type="text" class="form-control" id="respondentHouseNumber" name="respondent_house_number">
+                    </div>
+                    <div class="col-12 col-md-6">
+                        <label class="form-label">Street Name</label>
+                        <input type="text" class="form-control" id="respondentStreetName" name="respondent_street_name">
+                    </div>
+                </div>
+
+                <div id="respondentLotBlockSystemWrapper" class="row g-3 mb-3 d-none">
                     <div class="col-12 col-md-4">
                         <label class="form-label">Lot</label>
-                        <input type="text" class="form-control" name="respondent_lot_number">
+                        <input type="text" class="form-control" id="respondentLotNumber" name="respondent_lot_number">
                     </div>
                     <div class="col-12 col-md-4">
                         <label class="form-label">Block</label>
-                        <input type="text" class="form-control" name="respondent_block_number">
+                        <input type="text" class="form-control" id="respondentBlockNumber" name="respondent_block_number">
                     </div>
                     <div class="col-12 col-md-4">
                         <label class="form-label">Phase</label>
-                        <input type="text" class="form-control" name="respondent_phase_number">
+                        <input type="text" class="form-control" id="respondentPhaseNumber" name="respondent_phase_number">
                     </div>
                 </div>
                 <div class="row g-3 mb-4">
@@ -375,6 +377,6 @@ require_once __DIR__ . "/../includes/admin_guard.php";
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-<script src="../../JS-Script-Files/Admin-End/blotterManagement.js?v=20260305-1" defer></script>
+<script src="../../JS-Script-Files/Admin-End/blotterManagement.js?v=20260305-2" defer></script>
 </body>
 </html>
