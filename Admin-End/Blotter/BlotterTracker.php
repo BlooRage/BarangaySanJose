@@ -15,6 +15,17 @@ require_once __DIR__ . "/../includes/admin_guard.php";
     <link rel="stylesheet" href="../../CSS-Styles/Admin-End-CSS/AdminDashboardStyle.css">
     <link rel="stylesheet" href="../../CSS-Styles/Admin-End-CSS/ResidentMasterlistStyle.css?v=20260227-2">
     <link rel="stylesheet" href="../../CSS-Styles/Admin-End-CSS/BlotterMangementStyle.css?v=20260305-1">
+    <style>
+        #table-appData th,
+        #table-appData td {
+            text-align: left;
+        }
+
+        #table-appData th:nth-child(3),
+        #table-appData td:nth-child(3) {
+            text-align: left !important;
+        }
+    </style>
 </head>
 
 <body>
@@ -36,14 +47,14 @@ require_once __DIR__ . "/../includes/admin_guard.php";
 
                 <div class="admin-list-actions">
                     <div class="input-group admin-search">
-                        <input type="text" id="searchInput" class="form-control" placeholder="Blotter ID or Complainant">
+                        <input type="text" id="searchInput" class="form-control" placeholder="Blotter ID, Number, Complainant, Respondent">
                         <span class="input-group-text bg-white"><i class="fas fa-search"></i></span>
                     </div>
-                    <button class="btn btn-outline-secondary btn-icon" type="button" title="Filter" aria-label="Filter" disabled>
-                        <i class="fas fa-filter"></i>
-                        <span class="visually-hidden">Filter</span>
+                    <button class="btn btn-outline-secondary btn-icon" type="button" data-bs-toggle="modal" data-bs-target="#modalTableColumns" id="btnBlotterColumns" title="Columns" aria-label="Columns">
+                        <i class="fa-solid fa-sliders"></i>
+                        <span class="visually-hidden">Columns</span>
                     </button>
-                    <button class="btn btn-outline-secondary btn-icon" type="button" title="Refresh table" aria-label="Refresh table" disabled>
+                    <button class="btn btn-outline-secondary btn-icon" type="button" id="btnBlotterTableRefresh" title="Refresh table" aria-label="Refresh table">
                         <i class="fa-solid fa-arrows-rotate"></i>
                         <span class="visually-hidden">Refresh</span>
                     </button>
@@ -55,14 +66,20 @@ require_once __DIR__ . "/../includes/admin_guard.php";
                     <thead>
                         <tr class="table-light">
                             <th>Blotter ID</th>
+                            <th>Blotter Number</th>
                             <th>Date Filed</th>
+                            <th>Time Filed</th>
                             <th>Complainant</th>
+                            <th>Respondent</th>
                             <th>Status</th>
+                            <th>Case Level</th>
                             <th>Action</th>
                         </tr>
                     </thead>
                     <tbody id="tableBody">
-                        <!-- Filled dynamically -->
+                        <tr>
+                            <td colspan="9" class="text-start text-muted py-4">Loading blotter records...</td>
+                        </tr>
                     </tbody>
                 </table>
             </div>
@@ -87,6 +104,53 @@ require_once __DIR__ . "/../includes/admin_guard.php";
     </main>
 </div>
 
+<!-- TABLE COLUMNS MODAL -->
+<div class="modal fade" id="modalTableColumns" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Columns</h5>
+            </div>
+            <div class="modal-body">
+                <div class="row g-2" id="tableColumnsList"></div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline-secondary" id="btnTableColumnsReset">Reset</button>
+                <button type="button" class="btn btn-primary" data-bs-dismiss="modal">Done</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade tracker-profile-modal" id="viewModal" tabindex="-1" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
+    <div class="modal-dialog modal-xl modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="viewModalTitle">Blotter Details</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div id="viewDetailsBody" class="tracker-profile-view"></div>
+            </div>
+            <div class="modal-footer d-flex justify-content-end">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+    window.ADMIN_TABLE_COLUMNS_CONFIG = {
+        tableSelector: "#table-appData",
+        modalId: "modalTableColumns",
+        listId: "tableColumnsList",
+        resetBtnId: "btnTableColumnsReset",
+        storageKey: "admin_cols_blotter_tracker_v2",
+        defaultHiddenIdxs: [1, 5]
+    };
+</script>
+<script src="../../JS-Script-Files/Admin-End/tableColumnsGeneric.js?v=20260215-1"></script>
+<script src="../../JS-Script-Files/Admin-End/blotterTracker.js?v=20260306-2"></script>
 </body>
 </html>

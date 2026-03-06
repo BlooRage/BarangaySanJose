@@ -28,6 +28,7 @@ require_once __DIR__ . "/../includes/admin_guard.php";
     <link rel="stylesheet" href="../../CSS-Styles/Admin-End-CSS/AdminDashboardStyle.css">
     <link rel="stylesheet" href="../../CSS-Styles/Admin-End-CSS/ResidentMasterlistStyle.css?v=20260302-2">
     <link rel="stylesheet" href="../../CSS-Styles/Admin-End-CSS/BlotterMangementStyle.css?v=20260305-2">
+    <link rel="stylesheet" href="../../CSS-Styles/Resident-End-CSS/applicationForms.css">
 </head>
 <body>
 <div class="d-flex flex-column flex-md-row" style="min-height: 100vh;">
@@ -45,20 +46,20 @@ require_once __DIR__ . "/../includes/admin_guard.php";
                 <p class="form-subtitle mb-0">All fields marked with <span class="required-asterisk">*</span> are required.</p>
             </div>
 
-            <form method="POST" action="" id="blotterForm" novalidate>
+            <form method="POST" action="../../PhpFiles/Admin-End/blotterManagement.php" id="blotterForm" enctype="multipart/form-data">
                 <h3 class="section-title mb-3 text-center">Blotter Information</h3>
                 <div class="row g-3 mb-3">
                     <div class="col-12 col-md-6">
                         <label class="form-label">Blotter Number (Numero ng Blotter) <span class="required-asterisk">*</span></label>
-                        <input type="text" class="form-control" name="blotter_number" required>
+                        <input type="text" class="form-control" name="blotter_number" required maxlength="50" pattern="^[A-Za-z0-9\\-]+$" title="Use letters, numbers, and hyphens only.">
                     </div>
                     <div class="col-12 col-md-3">
                         <label class="form-label">Date Filed (Petsa ng Paghahain) <span class="required-asterisk">*</span></label>
-                        <input type="date" class="form-control" name="date_filed" required>
+                        <input type="date" class="form-control" name="date_filed" required readonly>
                     </div>
                     <div class="col-12 col-md-3">
                         <label class="form-label">Time Filed (Oras ng Paghahain) <span class="required-asterisk">*</span></label>
-                        <input type="time" class="form-control" name="time_filed" required>
+                        <input type="time" class="form-control" name="time_filed" required readonly>
                     </div>
                 </div>
 
@@ -66,15 +67,15 @@ require_once __DIR__ . "/../includes/admin_guard.php";
                 <div class="row g-3 mb-3">
                     <div class="col-12 col-md-3">
                         <label class="form-label">Last Name <span class="required-asterisk">*</span></label>
-                        <input type="text" class="form-control" name="complainant_last_name" required>
+                        <input type="text" class="form-control" name="complainant_last_name" required minlength="2" maxlength="100" pattern="^[A-Za-z\\s.'-]+$" title="Letters, spaces, apostrophes, and hyphens only.">
                     </div>
                     <div class="col-12 col-md-3">
                         <label class="form-label">First Name <span class="required-asterisk">*</span></label>
-                        <input type="text" class="form-control" name="complainant_first_name" required>
+                        <input type="text" class="form-control" name="complainant_first_name" required minlength="2" maxlength="100" pattern="^[A-Za-z\\s.'-]+$" title="Letters, spaces, apostrophes, and hyphens only.">
                     </div>
                     <div class="col-12 col-md-3">
                         <label class="form-label">Middle Name</label>
-                        <input type="text" class="form-control" name="complainant_middle_name">
+                        <input type="text" class="form-control" name="complainant_middle_name" maxlength="100" pattern="^[A-Za-z\\s.'-]*$" title="Letters, spaces, apostrophes, and hyphens only.">
                     </div>
                     <div class="col-12 col-md-3">
                         <label class="form-label">Suffix</label>
@@ -88,85 +89,97 @@ require_once __DIR__ . "/../includes/admin_guard.php";
                     </div>
                 </div>
 
-                <div class="row g-3 mb-3">
-                    <div class="col-12 col-lg-3">
-                        <label class="form-label">Address System</label>
-                        <select class="form-select" id="complainantAddressSystem" name="complainant_address_system">
-                            <option value="">Select</option>
-                            <option value="house">House Numbering System</option>
-                            <option value="lot_block">Lot/Block System</option>
-                        </select>
-                    </div>
-                    <div class="col-12 col-lg-3">
-                        <label class="form-label">Unit / Apartment Number</label>
-                        <input type="text" class="form-control" name="complainant_unit_number">
-                    </div>
-                    <div class="col-12 col-lg-3">
-                        <label class="form-label">Subdivision</label>
-                        <input type="text" class="form-control" name="complainant_subdivision">
-                    </div>
-                    <div class="col-12 col-lg-3">
-                        <label class="form-label">Area</label>
-                        <select class="form-select" name="complainant_area_number">
-                            <option value="">Select</option>
-                            <option value="Area 01">Area 01</option>
-                            <option value="Area 1A">Area 1A</option>
-                            <option value="Area 02">Area 02</option>
-                            <option value="Area 03">Area 03</option>
-                            <option value="Area 04">Area 04</option>
-                            <option value="Area 05">Area 05</option>
-                            <option value="Area 06">Area 06</option>
-                        </select>
+                <div class="form-row">
+                    <div class="full-width">
+                        <div class="input-stack">
+                            <label class="top-label" for="complainantAddressSystem">Address System <span class="required-asterisk">*</span></label>
+                            <select class="form-select w-100" id="complainantAddressSystem" name="complainant_address_system" required>
+                                <option value="">Select</option>
+                                <option value="house">House Numbering System</option>
+                                <option value="lot_block">Lot/Block System</option>
+                            </select>
+                        </div>
                     </div>
                 </div>
-                <div id="complainantHouseSystemWrapper" class="row g-3 mb-3 d-none">
-                    <div class="col-12 col-md-6">
-                        <label class="form-label">House Number</label>
-                        <input type="text" class="form-control" id="complainantHouseNumber" name="complainant_house_number">
+                <div id="complainantHouseSystemWrapper" class="form-row pt-0 d-none">
+                    <div class="input-stack">
+                        <label class="top-label" for="complainantUnitNumber">Unit / Apartment Number</label>
+                        <input type="text" id="complainantUnitNumber" name="complainant_unit_number">
                     </div>
-                    <div class="col-12 col-md-6">
-                        <label class="form-label">Street Name</label>
-                        <input type="text" class="form-control" id="complainantStreetName" name="complainant_street_name">
+                    <div class="input-stack">
+                        <label class="top-label" for="complainantHouseNumber">House Number <span class="required-asterisk">*</span></label>
+                        <input type="text" id="complainantHouseNumber" name="complainant_house_number">
                     </div>
+                    <div class="input-stack">
+                        <label class="top-label" for="complainantStreetName">Street Name <span class="required-asterisk">*</span></label>
+                        <input type="text" id="complainantStreetName" name="complainant_street_name">
+                    </div>
+                    <div class="input-stack">
+                        <label class="top-label" for="complainantSubdivisionHouse">Subdivision</label>
+                        <input type="text" id="complainantSubdivisionHouse" name="complainant_subdivision">
+                    </div>
+                    <div class="input-stack"></div>
                 </div>
 
-                <div id="complainantLotBlockSystemWrapper" class="row g-3 mb-3 d-none">
-                    <div class="col-12 col-md-4">
-                        <label class="form-label">Lot</label>
-                        <input type="text" class="form-control" id="complainantLotNumber" name="complainant_lot_number">
+                <div id="complainantLotBlockSystemWrapper" class="form-row pt-0 d-none">
+                    <div class="input-stack">
+                        <label class="top-label" for="complainantLotNumber">Lot <span class="required-asterisk">*</span></label>
+                        <input type="text" id="complainantLotNumber" name="complainant_lot_number">
                     </div>
-                    <div class="col-12 col-md-4">
-                        <label class="form-label">Block</label>
-                        <input type="text" class="form-control" id="complainantBlockNumber" name="complainant_block_number">
+                    <div class="input-stack">
+                        <label class="top-label" for="complainantBlockNumber">Block <span class="required-asterisk">*</span></label>
+                        <input type="text" id="complainantBlockNumber" name="complainant_block_number">
                     </div>
-                    <div class="col-12 col-md-4">
-                        <label class="form-label">Phase</label>
-                        <input type="text" class="form-control" id="complainantPhaseNumber" name="complainant_phase_number">
+                    <div class="input-stack">
+                        <label class="top-label" for="complainantPhaseNumber">Phase <span class="required-asterisk">*</span></label>
+                        <input type="text" id="complainantPhaseNumber" name="complainant_phase_number">
                     </div>
+                    <div class="input-stack">
+                        <label class="top-label" for="complainantSubdivisionLot">Subdivision</label>
+                        <input type="text" id="complainantSubdivisionLot" name="complainant_subdivision">
+                    </div>
+                    <div class="input-stack"></div>
                 </div>
-                <div class="row g-3 mb-4">
-                    <div class="col-12 col-md-4">
-                        <label class="form-label">Barangay</label>
-                        <input type="text" class="form-control" name="complainant_barangay" value="Barangay San Jose" muted readonly>
-                    </div>
-                    <div class="col-12 col-md-4">
-                        <label class="form-label">Municipality / City</label>
-                        <input type="text" class="form-control" name="complainant_municipality" value="Rodriguez" muted readonly>
-                    </div>
-                    <div class="col-12 col-md-4">
-                        <label class="form-label">Province</label>
-                        <input type="text" class="form-control" name="complainant_province" value="Rizal" muted readonly>
+                <div class="form-row">
+                    <div class="full-width">
+                        <div class="row mb-3">
+                            <div class="col-12 col-md-3">
+                                <label class="top-label" for="complainantAreaNumber">Area</label>
+                                <select class="form-select w-100" id="complainantAreaNumber" name="complainant_area_number">
+                                    <option value="">Select</option>
+                                    <option value="Area 01">Area 01</option>
+                                    <option value="Area 1A">Area 1A</option>
+                                    <option value="Area 02">Area 02</option>
+                                    <option value="Area 03">Area 03</option>
+                                    <option value="Area 04">Area 04</option>
+                                    <option value="Area 05">Area 05</option>
+                                    <option value="Area 06">Area 06</option>
+                                </select>
+                            </div>
+                            <div class="col-12 col-md-3">
+                                <label class="top-label">Barangay</label>
+                                <input type="text" name="complainant_barangay" value="Barangay San Jose" readonly>
+                            </div>
+                            <div class="col-12 col-md-3">
+                                <label class="top-label">Municipality / City</label>
+                                <input type="text" name="complainant_municipality" value="Rodriguez" readonly>
+                            </div>
+                            <div class="col-12 col-md-3">
+                                <label class="top-label">Province</label>
+                                <input type="text" name="complainant_province" value="Rizal" readonly>
+                            </div>
+                        </div>
                     </div>
                 </div>
 
                 <div class="row g-3 mb-4">
                     <div class="col-12 col-md-4">
                         <label class="form-label">Contact Number (Numero ng Telepono)</label>
-                        <input type="text" class="form-control" name="complainant_contact_number">
+                        <input type="text" class="form-control" name="complainant_contact_number" inputmode="numeric" maxlength="11" pattern="^09\d{9}$" title="Format: 09XXXXXXXXX" placeholder="09XXXXXXXXX">
                     </div>
                     <div class="col-12 col-md-4">
                         <label class="form-label">Age (Edad)</label>
-                        <input type="number" min="1" class="form-control" name="complainant_age">
+                        <input type="number" min="1" max="120" class="form-control" name="complainant_age">
                     </div>
                     <div class="col-12 col-md-4">
                         <label class="form-label">Sex (Kasarian)</label>
@@ -183,15 +196,15 @@ require_once __DIR__ . "/../includes/admin_guard.php";
                 <div class="row g-3 mb-3">
                     <div class="col-12 col-md-3">
                         <label class="form-label">Last Name <span class="required-asterisk">*</span></label>
-                        <input type="text" class="form-control" name="respondent_last_name" required>
+                        <input type="text" class="form-control" name="respondent_last_name" required minlength="2" maxlength="100" pattern="^[A-Za-z\\s.'-]+$" title="Letters, spaces, apostrophes, and hyphens only.">
                     </div>
                     <div class="col-12 col-md-3">
                         <label class="form-label">First Name <span class="required-asterisk">*</span></label>
-                        <input type="text" class="form-control" name="respondent_first_name" required>
+                        <input type="text" class="form-control" name="respondent_first_name" required minlength="2" maxlength="100" pattern="^[A-Za-z\\s.'-]+$" title="Letters, spaces, apostrophes, and hyphens only.">
                     </div>
                     <div class="col-12 col-md-3">
                         <label class="form-label">Middle Name</label>
-                        <input type="text" class="form-control" name="respondent_middle_name">
+                        <input type="text" class="form-control" name="respondent_middle_name" maxlength="100" pattern="^[A-Za-z\\s.'-]*$" title="Letters, spaces, apostrophes, and hyphens only.">
                     </div>
                     <div class="col-12 col-md-3">
                         <label class="form-label">Suffix</label>
@@ -205,85 +218,97 @@ require_once __DIR__ . "/../includes/admin_guard.php";
                     </div>
                 </div>
 
-                <div class="row g-3 mb-3">
-                    <div class="col-12 col-lg-3">
-                        <label class="form-label">Address System</label>
-                        <select class="form-select" id="respondentAddressSystem" name="respondent_address_system">
-                            <option value="">Select</option>
-                            <option value="house">House Numbering System</option>
-                            <option value="lot_block">Lot/Block System</option>
-                        </select>
-                    </div>
-                    <div class="col-12 col-lg-3">
-                        <label class="form-label">Unit / Apartment Number</label>
-                        <input type="text" class="form-control" name="respondent_unit_number">
-                    </div>
-                    <div class="col-12 col-lg-3">
-                        <label class="form-label">Subdivision</label>
-                        <input type="text" class="form-control" name="respondent_subdivision">
-                    </div>
-                    <div class="col-12 col-lg-3">
-                        <label class="form-label">Area</label>
-                        <select class="form-select" name="respondent_area_number">
-                            <option value="">Select</option>
-                            <option value="Area 01">Area 01</option>
-                            <option value="Area 1A">Area 1A</option>
-                            <option value="Area 02">Area 02</option>
-                            <option value="Area 03">Area 03</option>
-                            <option value="Area 04">Area 04</option>
-                            <option value="Area 05">Area 05</option>
-                            <option value="Area 06">Area 06</option>
-                        </select>
+                <div class="form-row">
+                    <div class="full-width">
+                        <div class="input-stack">
+                            <label class="top-label" for="respondentAddressSystem">Address System <span class="required-asterisk">*</span></label>
+                            <select class="form-select w-100" id="respondentAddressSystem" name="respondent_address_system" required>
+                                <option value="">Select</option>
+                                <option value="house">House Numbering System</option>
+                                <option value="lot_block">Lot/Block System</option>
+                            </select>
+                        </div>
                     </div>
                 </div>
-                <div id="respondentHouseSystemWrapper" class="row g-3 mb-3 d-none">
-                    <div class="col-12 col-md-6">
-                        <label class="form-label">House Number</label>
-                        <input type="text" class="form-control" id="respondentHouseNumber" name="respondent_house_number">
+                <div id="respondentHouseSystemWrapper" class="form-row pt-0 d-none">
+                    <div class="input-stack">
+                        <label class="top-label" for="respondentUnitNumber">Unit / Apartment Number</label>
+                        <input type="text" id="respondentUnitNumber" name="respondent_unit_number">
                     </div>
-                    <div class="col-12 col-md-6">
-                        <label class="form-label">Street Name</label>
-                        <input type="text" class="form-control" id="respondentStreetName" name="respondent_street_name">
+                    <div class="input-stack">
+                        <label class="top-label" for="respondentHouseNumber">House Number <span class="required-asterisk">*</span></label>
+                        <input type="text" id="respondentHouseNumber" name="respondent_house_number">
                     </div>
+                    <div class="input-stack">
+                        <label class="top-label" for="respondentStreetName">Street Name <span class="required-asterisk">*</span></label>
+                        <input type="text" id="respondentStreetName" name="respondent_street_name">
+                    </div>
+                    <div class="input-stack">
+                        <label class="top-label" for="respondentSubdivisionHouse">Subdivision</label>
+                        <input type="text" id="respondentSubdivisionHouse" name="respondent_subdivision">
+                    </div>
+                    <div class="input-stack"></div>
                 </div>
 
-                <div id="respondentLotBlockSystemWrapper" class="row g-3 mb-3 d-none">
-                    <div class="col-12 col-md-4">
-                        <label class="form-label">Lot</label>
-                        <input type="text" class="form-control" id="respondentLotNumber" name="respondent_lot_number">
+                <div id="respondentLotBlockSystemWrapper" class="form-row pt-0 d-none">
+                    <div class="input-stack">
+                        <label class="top-label" for="respondentLotNumber">Lot <span class="required-asterisk">*</span></label>
+                        <input type="text" id="respondentLotNumber" name="respondent_lot_number">
                     </div>
-                    <div class="col-12 col-md-4">
-                        <label class="form-label">Block</label>
-                        <input type="text" class="form-control" id="respondentBlockNumber" name="respondent_block_number">
+                    <div class="input-stack">
+                        <label class="top-label" for="respondentBlockNumber">Block <span class="required-asterisk">*</span></label>
+                        <input type="text" id="respondentBlockNumber" name="respondent_block_number">
                     </div>
-                    <div class="col-12 col-md-4">
-                        <label class="form-label">Phase</label>
-                        <input type="text" class="form-control" id="respondentPhaseNumber" name="respondent_phase_number">
+                    <div class="input-stack">
+                        <label class="top-label" for="respondentPhaseNumber">Phase <span class="required-asterisk">*</span></label>
+                        <input type="text" id="respondentPhaseNumber" name="respondent_phase_number">
                     </div>
+                    <div class="input-stack">
+                        <label class="top-label" for="respondentSubdivisionLot">Subdivision</label>
+                        <input type="text" id="respondentSubdivisionLot" name="respondent_subdivision">
+                    </div>
+                    <div class="input-stack"></div>
                 </div>
-                <div class="row g-3 mb-4">
-                    <div class="col-12 col-md-4">
-                        <label class="form-label">Barangay</label>
-                        <input type="text" class="form-control" name="respondent_barangay" value="Barangay San Jose" muted readonly>
-                    </div>
-                    <div class="col-12 col-md-4">
-                        <label class="form-label">Municipality / City</label>
-                        <input type="text" class="form-control" name="respondent_municipality" value="Rodriguez" muted readonly>
-                    </div>
-                    <div class="col-12 col-md-4">
-                        <label class="form-label">Province</label>
-                        <input type="text" class="form-control" name="respondent_province" value="Rizal" muted readonly>
+                <div class="form-row">
+                    <div class="full-width">
+                        <div class="row mb-3">
+                            <div class="col-12 col-md-3">
+                                <label class="top-label" for="respondentAreaNumber">Area</label>
+                                <select class="form-select w-100" id="respondentAreaNumber" name="respondent_area_number">
+                                    <option value="">Select</option>
+                                    <option value="Area 01">Area 01</option>
+                                    <option value="Area 1A">Area 1A</option>
+                                    <option value="Area 02">Area 02</option>
+                                    <option value="Area 03">Area 03</option>
+                                    <option value="Area 04">Area 04</option>
+                                    <option value="Area 05">Area 05</option>
+                                    <option value="Area 06">Area 06</option>
+                                </select>
+                            </div>
+                            <div class="col-12 col-md-3">
+                                <label class="top-label">Barangay</label>
+                                <input type="text" name="respondent_barangay" value="Barangay San Jose" readonly>
+                            </div>
+                            <div class="col-12 col-md-3">
+                                <label class="top-label">Municipality / City</label>
+                                <input type="text" name="respondent_municipality" value="Rodriguez" readonly>
+                            </div>
+                            <div class="col-12 col-md-3">
+                                <label class="top-label">Province</label>
+                                <input type="text" name="respondent_province" value="Rizal" readonly>
+                            </div>
+                        </div>
                     </div>
                 </div>
 
                 <div class="row g-3 mb-4">
                     <div class="col-12 col-md-4">
                         <label class="form-label">Contact Number (Numero ng Telepono)</label>
-                        <input type="text" class="form-control" name="respondent_contact_number">
+                        <input type="text" class="form-control" name="respondent_contact_number" inputmode="numeric" maxlength="11" pattern="^09\d{9}$" title="Format: 09XXXXXXXXX" placeholder="09XXXXXXXXX">
                     </div>
                     <div class="col-12 col-md-4">
                         <label class="form-label">Age (Edad)</label>
-                        <input type="number" min="1" class="form-control" name="respondent_age">
+                        <input type="number" min="1" max="120" class="form-control" name="respondent_age">
                     </div>
                     <div class="col-12 col-md-4">
                         <label class="form-label">Sex (Kasarian)</label>
@@ -308,7 +333,7 @@ require_once __DIR__ . "/../includes/admin_guard.php";
                     </div>
                     <div class="col-12 col-md-3">
                         <label class="form-label">Place of Incident <span class="required-asterisk">*</span></label>
-                        <input type="text" class="form-control" name="incident_place" required>
+                        <input type="text" class="form-control" name="incident_place" required maxlength="255">
                     </div>
                     <div class="col-12 col-md-3">
                         <label class="form-label">Type of Complaint <span class="required-asterisk">*</span></label>
@@ -350,7 +375,7 @@ require_once __DIR__ . "/../includes/admin_guard.php";
                 <div class="row g-3 mb-4" id="narrativeTextWrapper">
                     <div class="col-12">
                         <label class="form-label">Narrative Report (Salaysay ng Pangyayari) <span class="required-asterisk">*</span></label>
-                        <textarea class="form-control" name="narrative_report" rows="8" required></textarea>
+                        <textarea class="form-control" name="narrative_report" rows="8" required minlength="10" maxlength="5000"></textarea>
                     </div>
                 </div>
 
@@ -368,10 +393,45 @@ require_once __DIR__ . "/../includes/admin_guard.php";
                     </div>
                 </div>
 
-                <div class="text-center">
+                <div class="text-end">
                     <button type="submit" id="blotterSubmit" class="btn btn-primary px-5">Submit</button>
                 </div>
             </form>
+        </div>
+
+        <div class="modal fade" id="confirmSubmitModal" tabindex="-1" aria-labelledby="confirmSubmitLabel" aria-hidden="true">
+            <div class="modal-dialog modal-dialog-centered">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title" id="confirmSubmitLabel">Confirm Submission</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body">
+                        Are you sure you want to file this Incident Report?
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                        <button type="button" class="btn btn-primary" id="confirmSubmitBtn">Yes</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="modal fade" id="successSubmitModal" tabindex="-1" aria-labelledby="successSubmitLabel" aria-hidden="true">
+            <div class="modal-dialog modal-dialog-centered">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title" id="successSubmitLabel">Success</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body">
+                        Incident Report Filed.
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-primary" data-bs-dismiss="modal">OK</button>
+                    </div>
+                </div>
+            </div>
         </div>
     </main>
 </div>

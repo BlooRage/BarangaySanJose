@@ -131,6 +131,98 @@
     word-break: break-all;
 }
 
+#viewModal .modal-dialog {
+    width: min(88vw, 920px);
+    max-width: 920px;
+    height: 78vh;
+}
+
+#viewModal .modal-content {
+    border: 1px solid #e9ecef;
+    border-radius: 16px;
+    overflow: hidden;
+    height: 100%;
+    background: #ffffff;
+}
+
+#viewModal .modal-header {
+    border-bottom: 1px solid #e9ecef;
+    background: #ffffff;
+}
+
+#viewModal .modal-body {
+    overflow-y: auto;
+    overflow-x: hidden;
+    min-height: 0;
+    background: #ffffff;
+    padding: 14px;
+}
+
+#viewModal .tracker-profile-view {
+    display: grid;
+    gap: 12px;
+}
+
+#viewModal .tracker-form-section {
+    border: 1px solid #e9ecef;
+    background: #ffffff;
+    border-radius: 12px;
+    padding: 12px;
+    margin-top: 10px;
+}
+
+#viewModal .tracker-form-section-title {
+    margin: 0 0 10px;
+    font-size: 1rem;
+    font-weight: 700;
+    color: #212529;
+    border-bottom: 1px dashed #e9ecef;
+    padding-bottom: 6px;
+}
+
+#viewModal .tracker-form-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 14px 12px;
+}
+
+#viewModal .tracker-form-grid.cols-4 {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+#viewModal .tracker-form-grid.cols-3 {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+#viewModal .tracker-form-grid.cols-1 {
+    grid-template-columns: 1fr;
+}
+
+#viewModal .tracker-form-field {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+#viewModal .tracker-form-label {
+    margin: 6px 0 0;
+    font-size: 0.76rem;
+    color: #6b7280;
+    font-weight: 700;
+}
+
+#viewModal .tracker-form-value {
+    min-height: 38px;
+    border: 1px solid #dbe0e6;
+    border-radius: 8px;
+    background: #f8fafc;
+    padding: 8px 10px;
+    font-size: 0.92rem;
+    color: #111827;
+    font-weight: 500;
+    word-break: break-word;
+}
+
 @media (max-width: 768px) {
     .blotter-shell {
         padding: 18px;
@@ -138,5 +230,14 @@
 
     .form-title {
         font-size: 30px;
+    }
+
+    #viewModal .tracker-form-grid {
+        grid-template-columns: 1fr;
+    }
+
+    #viewModal .tracker-form-grid.cols-4,
+    #viewModal .tracker-form-grid.cols-3 {
+        grid-template-columns: 1fr;
     }
 }
