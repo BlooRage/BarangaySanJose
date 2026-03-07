@@ -6,6 +6,7 @@ $residentMgmtPages = ['ResidentMasterlist.php', 'ResidentArchive.php', 'EditRequ
 $certPages = ['CertificateTracker.php'];
 $financePages = ['FinancePayments.php'];
 $blotterPages = ['BlotterForm.php', 'BlotterTracker.php'];
+$contentMgmtPages = ['Announcements.php', 'CreateAnnouncement.php'];
 $userMgmtPages = ['UserMasterlist.php'];
 $adminMgmtPages = ['OfficialsManagement.php', 'OfficialInvites.php'];
 
@@ -38,6 +39,7 @@ $isResidentMgmtActive = in_array($current, $residentMgmtPages);
 $isCertActive = in_array($current, $certPages);
 $isFinanceActive = in_array($current, $financePages);
 $isBlotterActive = in_array($current, $blotterPages);
+$isContentMgmtActive = in_array($current, $contentMgmtPages);
 $isUserMgmtActive = in_array($current, $userMgmtPages);
 $isAdminMgmtActive = in_array($current, $adminMgmtPages);
 $isSuperAdminSidebar = ((string)($_SESSION['role'] ?? '') === 'SuperAdmin');
@@ -300,6 +302,15 @@ if (!empty($_SESSION['user_id']) && isset($conn) && $conn instanceof mysqli) {
             </li>
           </ul>
         </div>
+      </li>
+
+      <li class="mb-1 mt-2 text-muted small fw-semibold px-2">Content Management</li>
+      <li class="mb-2">
+        <a href="<?= htmlspecialchars(appUrl('Admin-End/Announcements/Announcements.php')) ?>"
+           class="btn btn-toggle d-flex align-items-center gap-2 rounded <?= $isContentMgmtActive ? 'active' : '' ?>"
+           style="<?= $isContentMgmtActive ? 'outline: none; box-shadow: none;' : '' ?>">
+          <i class="fas fa-bullhorn"></i> Announcements
+        </a>
       </li>
 
       <?php if ($isSuperAdminSidebar): ?>

@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 $allowUnregistered = false;
 require_once __DIR__ . "/includes/resident_access_guard.php";
 
@@ -109,7 +109,7 @@ if (isset($_SESSION['show_not_verified_modal'])) {
 
       <?php if ($isResidentNotVerified): ?>
         <div class="verify-cta-card rounded-4 overflow-hidden shadow-sm border-orange-thin bg-white mb-4" id="verifyCtaCard">
-          <button type="button" class="verify-cta-close" id="verifyCtaCloseBtn" aria-label="Close">×</button>
+          <button type="button" class="verify-cta-close" id="verifyCtaCloseBtn" aria-label="Close">�</button>
           <div class="bg-orange text-center py-2">
             <h3 class="text-white fw-bold mb-0">ACCOUNT VERIFICATION</h3>
           </div>
@@ -163,8 +163,7 @@ if (isset($_SESSION['show_not_verified_modal'])) {
         <div class="col-12 col-md-4 col-lg-3">
           <div id="card-serviceRequest-announcements"
                class="card-action h-100 p-4 rounded-4 text-center d-flex flex-column align-items-center justify-content-center border-0 shadow-sm"
-               title="Currently unavailable"
-               style="pointer-events:none;opacity:.6;cursor:not-allowed;">
+               onclick="location.href='Announcements/AnnouncementsLandingPage.php'">
             <i class="fa-solid fa-bullhorn fa-2xl mb-3"></i><br>
             <span class="fw-bold small">ANNOUNCEMENTS</span>
           </div>

@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 if (!isset($baseUrl)) {
   $scriptName = str_replace("\\", "/", (string)($_SERVER['SCRIPT_NAME'] ?? ''));
   $residentSegmentPos = strpos($scriptName, '/Resident-End/');
@@ -252,11 +252,8 @@ if ($residentId !== '' && isset($conn) && $conn instanceof mysqli) {
 
       <div id="group-navInfo" class="mb-3">
         <p class="text-muted small fw-bold mb-1">Info</p>
-        <a href="javascript:void(0)"
-           class="a-sidebarLink disabled"
-           aria-disabled="true"
-           title="Currently unavailable"
-           style="pointer-events:none;opacity:.6;cursor:not-allowed;">
+        <a href="<?= htmlspecialchars($baseUrl, ENT_QUOTES, 'UTF-8') ?>/Resident-End/Announcements/AnnouncementsLandingPage.php"
+           class="a-sidebarLink <?= (in_array($current, ['AnnouncementsLandingPage.php'], true) ? 'active' : '') ?>">
           <i class="fa-solid fa-bullhorn"></i>Announcements
         </a>
         <a href="<?= htmlspecialchars($baseUrl, ENT_QUOTES, 'UTF-8') ?>/Resident-End/resident_transactions.php"
