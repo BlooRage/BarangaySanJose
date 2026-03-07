@@ -82,15 +82,153 @@
     `;
   }
 
+  function formatNameWithMiddleInitial(fullName) {
+    const raw = String(fullName ?? '').trim().replace(/\s+/g, ' ');
+    if (!raw || raw === '-') return '-';
+    const suffixSet = new Set(['jr', 'jr.', 'sr', 'sr.', 'ii', 'iii', 'iv', 'v']);
+    const tokens = raw.split(' ').filter(Boolean);
+    if (tokens.length < 3) return raw;
+
+    let suffix = '';
+    const tail = tokens[tokens.length - 1].toLowerCase();
+    const core = [...tokens];
+    if (suffixSet.has(tail)) {
+      suffix = core.pop() || '';
+    }
+
+    if (core.length < 3) {
+      return [core.join(' '), suffix].filter(Boolean).join(' ');
+    }
+
+    const first = core[0];
+    const last = core[core.length - 1];
+    const middleTokens = core.slice(1, -1);
+    const middleInitials = middleTokens
+      .map((m) => String(m || '').trim())
+      .filter(Boolean)
+      .map((m) => `${m.charAt(0).toUpperCase()}.`);
+
+    return [first, ...middleInitials, last, suffix].filter(Boolean).join(' ');
+  }
+
+  function toneForStatus(statusName) {
+    const s = String(statusName || '').trim().toLowerCase();
+    if (s === 'active') return 'pending';
+    if (s === 'resolved') return 'approved';
+    if (s === 'endorsed') return 'info';
+    if (s === 'dropped') return 'archived';
+    return 'archived';
+  }
+
+  function toneForCaseLevel(levelName) {
+    const l = String(levelName || '').trim().toLowerCase();
+    if (l === 'blotter only') return 'pending';
+    if (l === 'settled') return 'approved';
+    if (l.includes('endorsed')) return 'info';
+    if (l === 'unsettled') return 'denied';
+    return 'archived';
+  }
+
+  function badge(text, toneClass) {
+    return `<span class="status-pill ${esc(toneClass || 'archived')}">${esc(text || '-')}</span>`;
+  }
+
+  function parseAddressParts(addressText) {
+    const raw = String(addressText ?? '').trim();
+    if (!raw) return {};
+
+    const map = {};
+    raw.split(/\s*,\s*/).forEach((part) => {
+      const idx = part.indexOf(':');
+      if (idx <= 0) return;
+      const key = part.slice(0, idx).trim().toLowerCase();
+      const value = part.slice(idx + 1).trim();
+      if (!key || !value) return;
+      map[key] = value;
+    });
+
+    const sysRaw = String(map['address system'] || '').toLowerCase();
+    let addressSystem = map['address system'] || '';
+    if (sysRaw === 'house') addressSystem = 'House Numbering System';
+    if (sysRaw === 'lot_block') addressSystem = 'Lot/Block System';
+
+    return {
+      address_system: addressSystem,
+      unit_number: map.unit || '',
+      house_number: map['house no.'] || map['house no'] || '',
+      street_name: map.street || '',
+      lot_number: map.lot || '',
+      block_number: map.block || '',
+      phase_number: map.phase || '',
+      subdivision: map.subdivision || '',
+      area_number: map.area || '',
+      barangay: map.barangay || '',
+      municipality: map.municipality || map['municipality / city'] || '',
+      province: map.province || ''
+    };
+  }
+
+  function formatCompleteAddress(address, fallbackRaw = '') {
+    const rawSystem = String(address?.address_system || '').toLowerCase();
+    const isLotBlock = rawSystem.includes('lot/block') || rawSystem === 'lot_block';
+    const stripTerm = (value, pattern) => String(value || '').replace(pattern, ' ').replace(/\s+/g, ' ').trim();
+    const cleanStreet = stripTerm(address?.street_name || '', /\b(street|st)\b\.?/gi);
+    const cleanSubdivision = stripTerm(address?.subdivision || '', /\b(subdivision|subd)\b\.?/gi);
+    const cleanPhase = stripTerm(address?.phase_number || '', /\b(phase|ph)\b\.?/gi);
+
+    const mainNumber = isLotBlock
+      ? [address?.lot_number ? `Lot ${address.lot_number}` : '', address?.block_number ? `Block ${address.block_number}` : ''].filter(Boolean).join(', ')
+      : String(address?.house_number || '').trim();
+
+    const streetWithSuffix = cleanStreet ? `${cleanStreet} Street` : '';
+    const subdivisionWithSuffix = cleanSubdivision ? `${cleanSubdivision} Subdivision` : '';
+    const phaseWithPrefix = cleanPhase ? `Phase ${cleanPhase}` : '';
+    const primaryLine = [mainNumber, streetWithSuffix].filter(Boolean).join(' ').trim();
+
+    const parts = [
+      address?.unit_number ? `Unit ${address.unit_number}` : '',
+      primaryLine,
+      phaseWithPrefix,
+      subdivisionWithSuffix,
+      address?.barangay || 'Barangay San Jose',
+      address?.municipality || 'Rodriguez',
+      address?.province || 'Rizal'
+    ].filter((v) => String(v || '').trim() !== '');
+
+    const line = parts.join(', ').trim();
+    return line || String(fallbackRaw || '-');
+  }
+
+  function renderParticipantGrid(participant) {
+    const address = parseAddressParts(participant?.address || '');
+    const hasStructuredAddress = Object.values(address).some((v) => String(v || '').trim() !== '');
+    const fields = [
+      { label: 'Full Name', value: participant?.full_name || '-' },
+      { label: 'Contact Number', value: participant?.contact_number || '-' },
+      { label: 'Age', value: participant?.age || '-' },
+      { label: 'Sex', value: participant?.sex || '-' }
+    ];
+
+    if (hasStructuredAddress) {
+      fields.push({ label: 'Complete Address', value: formatCompleteAddress(address, participant?.address || '-') });
+    } else {
+      fields.push({ label: 'Complete Address', value: participant?.address || '-' });
+    }
+
+    return renderFieldGrid(fields, 2);
+  }
+
   function buildTableRow(row) {
     const idDisplay = row.blotter_id || row.case_id || '-';
     const blotterNumber = row.blotter_number || '-';
     const dateFiled = row.date_filed || '-';
     const timeFiled = row.time_filed || '-';
-    const complainant = row.complainant_name || '-';
-    const respondent = row.respondent_name || '-';
+    const complainant = formatNameWithMiddleInitial(row.complainant_name || '-');
+    const respondent = formatNameWithMiddleInitial(row.respondent_name || '-');
     const status = row.status_name || '-';
     const level = row.level_name || '-';
+    const statusBadge = badge(status, toneForStatus(status));
+    const levelBadge = badge(level, toneForCaseLevel(level));
     const viewBtn = `<button class="btn btn-sm btn-outline-secondary" data-view-id="${esc(row.case_id)}">View</button>`;
     const logsBtn = `<button class="btn btn-sm btn-outline-primary ms-1" data-logs-id="${esc(row.case_id)}">Case Logs</button>`;
     return `
@@ -101,8 +239,8 @@
         <td>${esc(timeFiled)}</td>
         <td>${esc(complainant)}</td>
         <td>${esc(respondent)}</td>
-        <td>${esc(status)}</td>
-        <td>${esc(level)}</td>
+        <td>${statusBadge}</td>
+        <td>${levelBadge}</td>
         <td>${viewBtn}${logsBtn}</td>
       </tr>
     `;
@@ -231,7 +369,9 @@
     try {
       const data = await fetchJson(`${endpoint}?action=case_logs&case_id=${encodeURIComponent(caseId)}`);
       const logs = Array.isArray(data.items) ? data.items : [];
-      const narrativeLogs = logs.filter((item) => String(item?.log_entry || '').toLowerCase().startsWith('narrative report added:'));
+      const narrativeLogs = logs
+        .filter((item) => String(item?.log_entry || '').toLowerCase().startsWith('narrative report added:'))
+        .reverse();
       if (!narrativeLogs.length) {
         host.innerHTML = '<div class="text-muted small">No additional narrative reports yet.</div>';
         return;
@@ -249,30 +389,43 @@
   }
 
   function renderCaseManagementSection(detail) {
+    const isFinalized = String(detail?.status_name || '').trim().toLowerCase() !== 'active';
+    const disabledAttr = isFinalized ? 'disabled' : '';
+    const statusActions = isFinalized
+      ? `
+        <div class="small text-muted">
+          Status is final (${esc(detail?.status_name || '-')}); no further status changes are allowed.
+        </div>
+      `
+      : `
+        <button type="button" class="btn btn-sm btn-danger" id="btnMarkDropped">Mark as Dropped</button>
+        <button type="button" class="btn btn-sm btn-warning" id="btnSubjectEndorsement">Subject to Endorsement</button>
+        <button type="button" class="btn btn-sm btn-success" id="btnMarkResolved">Mark as Resolved</button>
+      `;
+
     return `
       <section class="tracker-form-section">
         <h6 class="tracker-form-section-title">Case Management</h6>
+        ${isFinalized ? '<div class="small text-muted mb-2">Case events remain visible in Case Logs, but adding new updates is disabled.</div>' : ''}
         <div class="mb-3">
           <label class="form-label fw-semibold mb-1" for="narrativeAddInput">Additional Narrative Report</label>
-          <textarea id="narrativeAddInput" class="form-control" rows="4" placeholder="Add a new narrative entry..."></textarea>
+          <textarea id="narrativeAddInput" class="form-control" rows="4" placeholder="Add a new narrative entry..." ${disabledAttr}></textarea>
           <div class="d-flex justify-content-end mt-2">
-            <button type="button" class="btn btn-sm btn-primary" id="btnAddNarrative">Add Narrative</button>
+            <button type="button" class="btn btn-sm btn-primary" id="btnAddNarrative" ${disabledAttr}>Add Narrative</button>
           </div>
         </div>
 
         <div>
           <label class="form-label fw-semibold mb-1" for="caseUpdateInput">Case Updates and Logs</label>
-          <textarea id="caseUpdateInput" class="form-control" rows="4" placeholder="Add case event update..."></textarea>
+          <textarea id="caseUpdateInput" class="form-control" rows="4" placeholder="Add case event update..." ${disabledAttr}></textarea>
           <div class="d-flex justify-content-end mt-2">
-            <button type="button" class="btn btn-sm btn-success" id="btnAddCaseUpdate">Add Update</button>
+            <button type="button" class="btn btn-sm btn-success" id="btnAddCaseUpdate" ${disabledAttr}>Add Update</button>
           </div>
         </div>
 
         <hr class="my-3">
         <div class="d-flex flex-wrap gap-2">
-          <button type="button" class="btn btn-sm btn-danger" id="btnMarkDropped">Mark as Dropped</button>
-          <button type="button" class="btn btn-sm btn-warning" id="btnSubjectEndorsement">Subject to Endorsement</button>
-          <button type="button" class="btn btn-sm btn-success" id="btnMarkResolved">Mark as Resolved</button>
+          ${statusActions}
         </div>
       </section>
     `;
@@ -298,6 +451,10 @@
 
   function openCaseActionModal(type) {
     if (!caseActionModal) return;
+    if (String(currentDetail?.status_name || '').trim().toLowerCase() !== 'active') {
+      alert('Case status is already finalized and cannot be changed again.');
+      return;
+    }
     pendingCaseAction = null;
     if (caseActionModalTitle) caseActionModalTitle.textContent = actionLabel(type);
     if (caseActionRemarks) caseActionRemarks.value = '';
@@ -394,10 +551,15 @@
     const markResolvedBtn = document.getElementById('btnMarkResolved');
     const subjectEndorsementBtn = document.getElementById('btnSubjectEndorsement');
     const markDroppedBtn = document.getElementById('btnMarkDropped');
+    const isFinalized = String(currentDetail?.status_name || '').trim().toLowerCase() !== 'active';
 
     if (!narrativeAddInput || !addNarrativeBtn || !addUpdateBtn) return;
 
     addNarrativeBtn.addEventListener('click', async () => {
+      if (isFinalized) {
+        alert('Case is finalized. New narrative updates are not allowed.');
+        return;
+      }
       const value = String(narrativeAddInput.value || '').trim();
       if (!value) {
         alert('Please enter a narrative report update first.');
@@ -427,6 +589,10 @@
     });
 
     addUpdateBtn.addEventListener('click', async () => {
+      if (isFinalized) {
+        alert('Case is finalized. New case logs are not allowed.');
+        return;
+      }
       const logText = String(caseUpdateInput?.value || '').trim();
       if (!logText) {
         alert('Please enter a case update first.');
@@ -481,21 +647,8 @@
         { label: 'Case Level', value: d.level_name || '-' }
       ], 4);
 
-      const complainantGrid = renderFieldGrid([
-        { label: 'Full Name', value: complainant.full_name || '-' },
-        { label: 'Contact Number', value: complainant.contact_number || '-' },
-        { label: 'Age', value: complainant.age || '-' },
-        { label: 'Sex', value: complainant.sex || '-' },
-        { label: 'Address', value: complainant.address || '-' }
-      ], 2);
-
-      const respondentGrid = renderFieldGrid([
-        { label: 'Full Name', value: respondent.full_name || '-' },
-        { label: 'Contact Number', value: respondent.contact_number || '-' },
-        { label: 'Age', value: respondent.age || '-' },
-        { label: 'Sex', value: respondent.sex || '-' },
-        { label: 'Address', value: respondent.address || '-' }
-      ], 2);
+      const complainantGrid = renderParticipantGrid(complainant);
+      const respondentGrid = renderParticipantGrid(respondent);
 
       const incidentGrid = renderFieldGrid([
         { label: 'Incident Date', value: d.incident_date || '-' },

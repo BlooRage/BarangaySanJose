@@ -25,6 +25,12 @@ require_once __DIR__ . "/../includes/admin_guard.php";
         #table-appData td:nth-child(3) {
             text-align: left !important;
         }
+
+        .status-pill.info {
+            color: #2049b3;
+            background: #d6e2f2;
+            border: 2px solid #c0d1e8;
+        }
     </style>
 </head>
 

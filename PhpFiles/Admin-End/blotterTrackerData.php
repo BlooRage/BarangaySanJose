@@ -65,6 +65,24 @@ function getStatusId(mysqli $conn, string $statusName, string $statusType): int 
     return isset($row['status_id']) ? (int)$row['status_id'] : 0;
 }
 
+function getCurrentBlotterStatusName(mysqli $conn, int $caseId): string {
+    $stmt = $conn->prepare("
+        SELECT s.status_name
+        FROM casereportstbl c
+        LEFT JOIN statuslookuptbl s ON s.status_id = c.case_status_id
+        WHERE c.case_id = ? AND c.report_type = 'Blotter'
+        LIMIT 1
+    ");
+    if (!$stmt) {
+        return '';
+    }
+    $stmt->bind_param("i", $caseId);
+    $stmt->execute();
+    $row = $stmt->get_result()->fetch_assoc();
+    $stmt->close();
+    return trim((string)($row['status_name'] ?? ''));
+}
+
 if ($action === 'list') {
     $sql = "
         SELECT
@@ -274,6 +292,9 @@ if ($action === 'add_narrative_entry') {
     if (!$exists) {
         respond(false, [], "Blotter case not found.");
     }
+    if (strtolower(getCurrentBlotterStatusName($conn, $caseId)) !== 'active') {
+        respond(false, [], "Case is finalized. New narrative updates are not allowed.");
+    }
 
     $logEntry = "Narrative report added: " . $narrative;
     $conn->begin_transaction();
@@ -384,6 +405,9 @@ if ($action === 'update_case_outcome') {
 
     $oldStatusName = trim((string)($oldRow['old_status_name'] ?? 'Unknown'));
     $oldLevelName = trim((string)($oldRow['old_level_name'] ?? 'Unknown'));
+    if (strtolower($oldStatusName) !== 'active') {
+        respond(false, [], "Case status is already finalized and cannot be changed again.");
+    }
     $logEntry = "Case status updated: {$oldStatusName} -> {$newStatusName}; Case level: {$oldLevelName} -> {$newLevelName}; Remarks: {$remarks}";
 
     $conn->begin_transaction();
@@ -453,6 +477,9 @@ if ($action === 'add_case_log') {
     $existsStmt->close();
     if (!$exists) {
         respond(false, [], "Blotter case not found.");
+    }
+    if (strtolower(getCurrentBlotterStatusName($conn, $caseId)) !== 'active') {
+        respond(false, [], "Case is finalized. New case logs are not allowed.");
     }
 
     $conn->begin_transaction();
