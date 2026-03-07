@@ -386,6 +386,45 @@ if ($residentId !== '' && isset($conn) && $conn instanceof mysqli) {
         background: #eff6ff;
         color: #1e3a8a;
       }
+      .upload-dropzone {
+        position: relative;
+        border: 1.5px dashed #cbd5e1;
+        border-radius: 10px;
+        background: #f8fafc;
+        min-height: 92px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 14px;
+        transition: border-color .2s ease, background-color .2s ease, box-shadow .2s ease;
+      }
+      .upload-dropzone:hover {
+        border-color: #f97316;
+        background: #fff7ed;
+      }
+      .upload-dropzone.is-dragover {
+        border-color: #f97316;
+        background: #fff7ed;
+        box-shadow: 0 0 0 3px rgba(249, 115, 22, .12);
+      }
+      .upload-dropzone__content {
+        text-align: center;
+        pointer-events: none;
+      }
+      .upload-dropzone__title {
+        font-weight: 600;
+        color: #1f2937;
+      }
+      .upload-dropzone__meta {
+        font-size: .82rem;
+        color: #6b7280;
+      }
+      .upload-dropzone-input {
+        position: absolute;
+        inset: 0;
+        opacity: 0;
+        cursor: pointer;
+      }
     </style>
 </head>
 
@@ -1037,7 +1076,13 @@ if ($residentId !== '' && isset($conn) && $conn instanceof mysqli) {
                                 <option value="">Select document type</option>
                             </select>
                             <label class="form-label">Supporting Document</label>
-                            <input type="file" class="form-control" id="supportReligionFile" name="supporting_religion_file[]" accept=".jpg,.jpeg,.png,.webp,.pdf" multiple>
+                            <div class="upload-dropzone" data-upload-input="supportReligionFile">
+                                <div class="upload-dropzone__content">
+                                    <div class="upload-dropzone__title"><i class="fa-solid fa-upload me-1"></i>Drag and drop files or click to upload</div>
+                                    <div class="upload-dropzone__meta" id="supportReligionFileMeta">PDF or image, multiple files allowed</div>
+                                </div>
+                                <input type="file" class="form-control upload-dropzone-input" id="supportReligionFile" name="supporting_religion_file[]" accept=".jpg,.jpeg,.png,.webp,.pdf" multiple>
+                            </div>
                             <div class="form-text">Upload at least one supporting document for this change. You can select multiple files.</div>
                         </div>
                         <div class="doc-required-box mb-3 d-none" id="supportVoterSection">
@@ -1047,7 +1092,13 @@ if ($residentId !== '' && isset($conn) && $conn instanceof mysqli) {
                                 <option value="">Select document type</option>
                             </select>
                             <label class="form-label">Supporting Document</label>
-                            <input type="file" class="form-control" id="supportVoterFile" name="supporting_voter_file[]" accept=".jpg,.jpeg,.png,.webp,.pdf" multiple>
+                            <div class="upload-dropzone" data-upload-input="supportVoterFile">
+                                <div class="upload-dropzone__content">
+                                    <div class="upload-dropzone__title"><i class="fa-solid fa-upload me-1"></i>Drag and drop files or click to upload</div>
+                                    <div class="upload-dropzone__meta" id="supportVoterFileMeta">PDF or image, multiple files allowed</div>
+                                </div>
+                                <input type="file" class="form-control upload-dropzone-input" id="supportVoterFile" name="supporting_voter_file[]" accept=".jpg,.jpeg,.png,.webp,.pdf" multiple>
+                            </div>
                             <div class="form-text">Upload at least one supporting document for this change. You can select multiple files.</div>
                         </div>
                         <div class="doc-required-box mb-3 d-none" id="supportEmploymentSection">
@@ -1057,7 +1108,13 @@ if ($residentId !== '' && isset($conn) && $conn instanceof mysqli) {
                                 <option value="">Select document type</option>
                             </select>
                             <label class="form-label">Supporting Document</label>
-                            <input type="file" class="form-control" id="supportEmploymentFile" name="supporting_employment_file[]" accept=".jpg,.jpeg,.png,.webp,.pdf" multiple>
+                            <div class="upload-dropzone" data-upload-input="supportEmploymentFile">
+                                <div class="upload-dropzone__content">
+                                    <div class="upload-dropzone__title"><i class="fa-solid fa-upload me-1"></i>Drag and drop files or click to upload</div>
+                                    <div class="upload-dropzone__meta" id="supportEmploymentFileMeta">PDF or image, multiple files allowed</div>
+                                </div>
+                                <input type="file" class="form-control upload-dropzone-input" id="supportEmploymentFile" name="supporting_employment_file[]" accept=".jpg,.jpeg,.png,.webp,.pdf" multiple>
+                            </div>
                             <div class="form-text">Upload at least one supporting document for this change. You can select multiple files.</div>
                         </div>
                         <div class="doc-required-box mb-3 d-none" id="supportSectorSection">
@@ -1067,13 +1124,19 @@ if ($residentId !== '' && isset($conn) && $conn instanceof mysqli) {
                                 <option value="">Select document type</option>
                             </select>
                             <label class="form-label">Supporting Document</label>
-                            <input type="file" class="form-control" id="supportSectorFile" name="supporting_sector_file[]" accept=".jpg,.jpeg,.png,.webp,.pdf" multiple>
+                            <div class="upload-dropzone" data-upload-input="supportSectorFile">
+                                <div class="upload-dropzone__content">
+                                    <div class="upload-dropzone__title"><i class="fa-solid fa-upload me-1"></i>Drag and drop files or click to upload</div>
+                                    <div class="upload-dropzone__meta" id="supportSectorFileMeta">PDF or image, multiple files allowed</div>
+                                </div>
+                                <input type="file" class="form-control upload-dropzone-input" id="supportSectorFile" name="supporting_sector_file[]" accept=".jpg,.jpeg,.png,.webp,.pdf" multiple>
+                            </div>
                             <div class="form-text">Upload at least one supporting document for this change. You can select multiple files.</div>
                         </div>
                     <div class="doc-required-box d-none mb-3" id="nameDocSection">
                         <div class="small fw-semibold text-muted mb-2">For Name Change</div>
                         <div class="row g-2">
-                            <div class="col-md-6">
+                            <div class="col-12">
                                 <label class="form-label">Valid ID Type</label>
                                 <select class="form-select" id="nameIdType">
                                     <option value="">Select ID</option>
@@ -1088,9 +1151,15 @@ if ($residentId !== '' && isset($conn) && $conn instanceof mysqli) {
                                     <option value="PSA Birth Certificate">PSA Birth Certificate</option>
                                 </select>
                             </div>
-                            <div class="col-md-6">
+                            <div class="col-12">
                                 <label class="form-label">Valid ID Photo</label>
-                                <input type="file" class="form-control" id="nameIdFile" name="name_id_file[]" accept=".jpg,.jpeg,.png,.webp,.pdf" multiple>
+                                <div class="upload-dropzone" data-upload-input="nameIdFile">
+                                    <div class="upload-dropzone__content">
+                                        <div class="upload-dropzone__title"><i class="fa-solid fa-upload me-1"></i>Drag and drop files or click to upload</div>
+                                        <div class="upload-dropzone__meta" id="nameIdFileMeta">PDF or image, multiple files allowed</div>
+                                    </div>
+                                    <input type="file" class="form-control upload-dropzone-input" id="nameIdFile" name="name_id_file[]" accept=".jpg,.jpeg,.png,.webp,.pdf" multiple>
+                                </div>
                                 <div class="form-text">Clear photo of your valid ID. You can select multiple files.</div>
                             </div>
                         </div>
@@ -1098,28 +1167,40 @@ if ($residentId !== '' && isset($conn) && $conn instanceof mysqli) {
                     <div class="doc-required-box d-none" id="civilStatusDocSection">
                         <div class="small fw-semibold text-muted mb-2">For Civil Status Change</div>
                         <div class="row g-2">
-                            <div class="col-md-6">
+                            <div class="col-12">
                                 <label class="form-label" id="civilStatusDocLabel">Supporting Document Type</label>
                                 <select class="form-select mb-2" id="civilStatusType">
                                     <option value="">Select document type</option>
                                 </select>
                                 <label class="form-label">Supporting Document</label>
-                                <input type="file" class="form-control" id="civilStatusFile" name="civil_status_file[]" accept=".jpg,.jpeg,.png,.webp,.pdf" multiple>
+                                <div class="upload-dropzone" data-upload-input="civilStatusFile">
+                                    <div class="upload-dropzone__content">
+                                        <div class="upload-dropzone__title"><i class="fa-solid fa-upload me-1"></i>Drag and drop files or click to upload</div>
+                                        <div class="upload-dropzone__meta" id="civilStatusFileMeta">PDF or image, multiple files allowed</div>
+                                    </div>
+                                    <input type="file" class="form-control upload-dropzone-input" id="civilStatusFile" name="civil_status_file[]" accept=".jpg,.jpeg,.png,.webp,.pdf" multiple>
+                                </div>
                             </div>
-                            <div class="col-md-6">
-                                <div class="form-text mt-4" id="civilStatusDocHelp"></div>
+                            <div class="col-12">
+                                <div class="form-text" id="civilStatusDocHelp"></div>
                             </div>
                         </div>
                     </div>
                     <div class="doc-required-box d-none" id="studentUntickSection">
                         <div class="small fw-semibold text-muted mb-2">For Student Sector Change</div>
-                        <div class="row g-2 align-items-end">
-                            <div class="col-md-7">
+                        <div class="row g-2">
+                            <div class="col-12">
                                 <label class="form-label">Diploma / Proof (Optional if stopped studying)</label>
-                                <input type="file" class="form-control" id="studentStatusFile" name="student_status_file[]" accept=".jpg,.jpeg,.png,.webp,.pdf" multiple>
+                                <div class="upload-dropzone" data-upload-input="studentStatusFile">
+                                    <div class="upload-dropzone__content">
+                                        <div class="upload-dropzone__title"><i class="fa-solid fa-upload me-1"></i>Drag and drop files or click to upload</div>
+                                        <div class="upload-dropzone__meta" id="studentStatusFileMeta">PDF or image, multiple files allowed</div>
+                                    </div>
+                                    <input type="file" class="form-control upload-dropzone-input" id="studentStatusFile" name="student_status_file[]" accept=".jpg,.jpeg,.png,.webp,.pdf" multiple>
+                                </div>
                             </div>
-                            <div class="col-md-5">
-                                <div class="form-check form-switch mt-4">
+                            <div class="col-12">
+                                <div class="form-check form-switch mt-2">
                                     <input class="form-check-input" type="checkbox" id="studentStoppedSwitch">
                                     <label class="form-check-label" for="studentStoppedSwitch">I stopped studying</label>
                                 </div>
@@ -1700,12 +1781,18 @@ if ($residentId !== '' && isset($conn) && $conn instanceof mysqli) {
                                  style="width:120px;height:120px;object-fit:cover;">
                         </div>
                         <label class="form-label">Choose image (JPG, JPEG, PNG, WEBP)</label>
-                        <input type="file"
-                               class="form-control"
-                               id="residentProfileImageInput"
-                               name="profile_image"
-                               accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp"
-                               required>
+                        <div class="upload-dropzone" data-upload-input="residentProfileImageInput">
+                            <div class="upload-dropzone__content">
+                                <div class="upload-dropzone__title"><i class="fa-solid fa-upload me-1"></i>Drag and drop image or click to upload</div>
+                                <div class="upload-dropzone__meta" id="residentProfileImageInputMeta">JPG, JPEG, PNG, WEBP only</div>
+                            </div>
+                            <input type="file"
+                                   class="form-control upload-dropzone-input"
+                                   id="residentProfileImageInput"
+                                   name="profile_image"
+                                   accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp"
+                                   required>
+                        </div>
                     </div>
                     <div class="modal-footer">
                         <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
@@ -1729,6 +1816,55 @@ if ($residentId !== '' && isset($conn) && $conn instanceof mysqli) {
                             const instance = bootstrap.Modal.getInstance(openModalEl);
                             if (instance) instance.hide();
                         });
+                    });
+                });
+            });
+
+            document.addEventListener("DOMContentLoaded", () => {
+                const dropzones = document.querySelectorAll(".upload-dropzone[data-upload-input]");
+                if (!dropzones.length) return;
+
+                const setMeta = (input, metaEl) => {
+                    if (!metaEl || !input) return;
+                    const files = input.files ? Array.from(input.files) : [];
+                    if (!files.length) return;
+                    if (files.length === 1) {
+                        metaEl.textContent = files[0].name;
+                        return;
+                    }
+                    metaEl.textContent = files.length + " files selected";
+                };
+
+                dropzones.forEach((zone) => {
+                    const inputId = zone.getAttribute("data-upload-input");
+                    if (!inputId) return;
+                    const input = document.getElementById(inputId);
+                    const meta = document.getElementById(inputId + "Meta");
+                    if (!input) return;
+
+                    input.addEventListener("change", () => setMeta(input, meta));
+
+                    ["dragenter", "dragover"].forEach((eventName) => {
+                        zone.addEventListener(eventName, (event) => {
+                            event.preventDefault();
+                            zone.classList.add("is-dragover");
+                        });
+                    });
+                    ["dragleave", "dragend"].forEach((eventName) => {
+                        zone.addEventListener(eventName, (event) => {
+                            event.preventDefault();
+                            zone.classList.remove("is-dragover");
+                        });
+                    });
+                    zone.addEventListener("drop", (event) => {
+                        event.preventDefault();
+                        zone.classList.remove("is-dragover");
+                        const droppedFiles = event.dataTransfer ? event.dataTransfer.files : null;
+                        if (!droppedFiles || !droppedFiles.length) return;
+                        const dt = new DataTransfer();
+                        Array.from(droppedFiles).forEach((file) => dt.items.add(file));
+                        input.files = dt.files;
+                        input.dispatchEvent(new Event("change", { bubbles: true }));
                     });
                 });
             });
