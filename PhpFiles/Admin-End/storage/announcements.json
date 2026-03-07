@@ -1,0 +1,37 @@
+[
+    {
+        "id": "ann_20260307201355_a94f13d2",
+        "title": "GRADE POSTED",
+        "audience": "All Residents",
+        "channels": [
+            "website"
+        ],
+        "status": "approved",
+        "publish_date": "2026-03-07 20:31",
+        "created_by": "Aquino, M.D. - Dept. OIC",
+        "created_by_user_id": "202602P00001",
+        "created_by_role": "Personnel",
+        "content_html": "<p><b style=\"background-color: rgb(255, 255, 0);\"><font color=\"#0000ff\"><span style=\"font-family: &quot;Arial Black&quot;; font-size: 32px;\">NET 3 GRADE POSTED!!!!</span></font></b></p>",
+        "created_at": "2026-03-07 20:13:55",
+        "updated_at": "2026-03-07 20:29:35",
+        "updated_by": "202602P00001",
+        "reviewed_at": "2026-03-07 20:31:45",
+        "reviewed_by": "202602S00001"
+    },
+    {
+        "id": "ann_20260307181413_d7b64875",
+        "title": "ANNOUNCEMENT TEST",
+        "audience": "All Residents",
+        "channels": [
+            "website"
+        ],
+        "status": "approved",
+        "publish_date": "2026-03-07 18:26",
+        "created_by": "202602P00001",
+        "created_by_role": "Personnel",
+        "content_html": "<p><strong style=\"font-size: 32px; color: rgb(255, 153, 0);\" class=\"ql-font-impact\">TESTING LANG GUMAGANA KUNG KAYA TOH HEHE</strong></p>",
+        "created_at": "2026-03-07 18:14:13",
+        "reviewed_at": "2026-03-07 18:26:31",
+        "reviewed_by": "202602S00001"
+    }
+]

@@ -29,19 +29,25 @@ foreach ($items as $item) {
   if (!in_array('website', $channels, true)) {
     continue;
   }
-  // Resident feed only receives announcements intended for web posting.
-  // Draft stays hidden; pending/approved are visible for testing and review transparency.
-  if ($status === 'draft') {
+  // Resident feed only receives approved website announcements.
+  if ($status !== 'approved') {
     continue;
+  }
+
+  $rawPosted = (string)($item['publish_date'] ?? '');
+  if ($rawPosted === '' || $rawPosted === '-') {
+    $rawPosted = (string)($item['created_at'] ?? '');
+  }
+  $postedDate = '-';
+  $ts = strtotime($rawPosted);
+  if ($ts !== false) {
+    $postedDate = date('M d, Y h:i A', $ts);
   }
 
   $websiteAnnouncements[] = [
     'title' => (string)($item['title'] ?? ''),
     'content_html' => (string)($item['content_html'] ?? ''),
-    'audience' => (string)($item['audience'] ?? 'All Residents'),
-    'status' => $status,
-    'publish_date' => (string)($item['publish_date'] ?? '-'),
-    'created_at' => (string)($item['created_at'] ?? '')
+    'posted_date' => $postedDate
   ];
 }
 ?>
@@ -93,6 +99,13 @@ foreach ($items as $item) {
       font-size: 0.9rem;
     }
 
+    .announcement-posted {
+      color: #6c757d;
+      font-size: 0.85rem;
+      white-space: nowrap;
+      margin-top: 0.2rem;
+    }
+
     .announcement-body {
       margin-top: 0.75rem;
       color: #212529;
@@ -136,20 +149,12 @@ foreach ($items as $item) {
           <div class="announcement-entry text-center text-muted py-4">No announcements available yet.</div>
         <?php else: ?>
           <?php foreach ($websiteAnnouncements as $ann): ?>
-            <?php $statusText = $ann['status'] === 'approved' ? 'Published' : 'Pending Review'; ?>
-            <?php $statusClass = $ann['status'] === 'approved' ? 'bg-success-subtle text-success' : 'bg-warning-subtle text-warning-emphasis'; ?>
             <article class="announcement-entry">
               <div class="d-flex flex-wrap justify-content-between align-items-start gap-2">
                 <div>
                   <h2 class="announcement-title"><?= htmlspecialchars($ann['title']) ?></h2>
-                  <div class="announcement-meta">
-                    Audience: <?= htmlspecialchars($ann['audience']) ?>
-                    <?php if ($ann['publish_date'] !== '-'): ?>
-                      <span class="mx-1">|</span> Schedule: <?= htmlspecialchars($ann['publish_date']) ?>
-                    <?php endif; ?>
-                  </div>
                 </div>
-                <span class="badge rounded-pill <?= $statusClass ?>"><?= htmlspecialchars($statusText) ?></span>
+                <div class="announcement-posted">Posted: <?= htmlspecialchars($ann['posted_date']) ?></div>
               </div>
               <div class="announcement-body">
                 <?= $ann['content_html'] !== '' ? $ann['content_html'] : '<span class="text-muted">No content.</span>' ?>

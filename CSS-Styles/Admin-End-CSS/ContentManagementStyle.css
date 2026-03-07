@@ -28,159 +28,71 @@
   background: #fff;
 }
 
-.announcement-editor .ql-editor {
-  min-height: 180px;
+.announcement-create-shell .note-editor.note-frame {
+  border: 1px solid #ced4da;
+  border-radius: 0.375rem;
+}
+
+.announcement-create-shell .note-editor .note-toolbar {
+  border-bottom: 1px solid #dee2e6;
+  background: #f8f9fa;
+}
+
+.announcement-create-shell .note-editor .note-toolbar,
+.announcement-shell .note-editor .note-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.announcement-create-shell .note-editor .note-toolbar .note-btn-group,
+.announcement-shell .note-editor .note-toolbar .note-btn-group {
+  display: inline-flex;
+  align-items: center;
+}
+
+.announcement-create-shell .note-editor .note-editing-area .note-editable {
+  min-height: 220px;
   font-size: 0.95rem;
 }
 
-.announcement-editor .ql-editor img {
+.announcement-create-shell .note-editor .note-editing-area .note-editable img {
   max-width: 100%;
   height: auto;
 }
 
-.announcement-create-shell .ql-toolbar.ql-snow {
+.note-editor.note-frame.fullscreen,
+.note-editor.note-airframe.fullscreen {
+  position: fixed !important;
+  inset: 0 !important;
+  width: 100vw !important;
+  height: 100vh !important;
+  z-index: 2000 !important;
+  background: #fff;
   display: flex;
-  flex-wrap: wrap;
-  row-gap: 8px;
+  flex-direction: column;
 }
 
-.announcement-create-shell .ql-toolbar.ql-snow .ql-formats {
-  margin-right: 8px;
+.note-editor.note-frame.fullscreen .note-editing-area,
+.note-editor.note-airframe.fullscreen .note-editing-area {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
 }
 
-.announcement-editor .ql-font-arial {
-  font-family: Arial, Helvetica, sans-serif;
+.note-editor.note-frame.fullscreen .note-editing-area .note-editable,
+.note-editor.note-airframe.fullscreen .note-editing-area .note-editable,
+.note-editor.note-frame.fullscreen .note-editing-area .note-codable,
+.note-editor.note-airframe.fullscreen .note-editing-area .note-codable {
+  min-height: calc(100vh - 140px) !important;
+  height: calc(100vh - 140px) !important;
 }
 
-.announcement-editor .ql-font-times-new-roman {
-  font-family: "Times New Roman", Times, serif;
+.note-editor.note-frame.fullscreen .note-statusbar,
+.note-editor.note-airframe.fullscreen .note-statusbar {
+  flex: 0 0 auto;
 }
 
-.announcement-editor .ql-font-georgia {
-  font-family: Georgia, serif;
-}
-
-.announcement-editor .ql-font-trebuchet-ms {
-  font-family: "Trebuchet MS", sans-serif;
-}
-
-.announcement-editor .ql-font-tahoma {
-  font-family: Tahoma, sans-serif;
-}
-
-.announcement-editor .ql-font-verdana {
-  font-family: Verdana, sans-serif;
-}
-
-.announcement-editor .ql-font-courier-new {
-  font-family: "Courier New", Courier, monospace;
-}
-
-.announcement-editor .ql-font-lucida-sans {
-  font-family: "Lucida Sans Unicode", "Lucida Sans", sans-serif;
-}
-
-.announcement-editor .ql-font-impact {
-  font-family: Impact, "Arial Black", sans-serif;
-}
-
-.ql-snow .ql-picker.ql-font .ql-picker-item[data-value="arial"]::before,
-.ql-snow .ql-picker.ql-font .ql-picker-label[data-value="arial"]::before {
-  content: "Arial";
-  font-family: Arial, Helvetica, sans-serif;
-}
-
-.ql-snow .ql-picker.ql-font .ql-picker-item[data-value="times-new-roman"]::before,
-.ql-snow .ql-picker.ql-font .ql-picker-label[data-value="times-new-roman"]::before {
-  content: "Times New Roman";
-  font-family: "Times New Roman", Times, serif;
-}
-
-.ql-snow .ql-picker.ql-font .ql-picker-item[data-value="georgia"]::before,
-.ql-snow .ql-picker.ql-font .ql-picker-label[data-value="georgia"]::before {
-  content: "Georgia";
-  font-family: Georgia, serif;
-}
-
-.ql-snow .ql-picker.ql-font .ql-picker-item[data-value="trebuchet-ms"]::before,
-.ql-snow .ql-picker.ql-font .ql-picker-label[data-value="trebuchet-ms"]::before {
-  content: "Trebuchet MS";
-  font-family: "Trebuchet MS", sans-serif;
-}
-
-.ql-snow .ql-picker.ql-font .ql-picker-item[data-value="tahoma"]::before,
-.ql-snow .ql-picker.ql-font .ql-picker-label[data-value="tahoma"]::before {
-  content: "Tahoma";
-  font-family: Tahoma, sans-serif;
-}
-
-.ql-snow .ql-picker.ql-font .ql-picker-item[data-value="verdana"]::before,
-.ql-snow .ql-picker.ql-font .ql-picker-label[data-value="verdana"]::before {
-  content: "Verdana";
-  font-family: Verdana, sans-serif;
-}
-
-.ql-snow .ql-picker.ql-font .ql-picker-item[data-value="courier-new"]::before,
-.ql-snow .ql-picker.ql-font .ql-picker-label[data-value="courier-new"]::before {
-  content: "Courier New";
-  font-family: "Courier New", Courier, monospace;
-}
-
-.ql-snow .ql-picker.ql-font .ql-picker-item[data-value="lucida-sans"]::before,
-.ql-snow .ql-picker.ql-font .ql-picker-label[data-value="lucida-sans"]::before {
-  content: "Lucida Sans";
-  font-family: "Lucida Sans Unicode", "Lucida Sans", sans-serif;
-}
-
-.ql-snow .ql-picker.ql-font .ql-picker-item[data-value="impact"]::before,
-.ql-snow .ql-picker.ql-font .ql-picker-label[data-value="impact"]::before {
-  content: "Impact";
-  font-family: Impact, "Arial Black", sans-serif;
-}
-
-.ql-snow .ql-picker.ql-size {
-  width: 64px;
-}
-
-.ql-snow .ql-picker.ql-size .ql-picker-item[data-value="12px"]::before,
-.ql-snow .ql-picker.ql-size .ql-picker-label[data-value="12px"]::before {
-  content: "12";
-}
-
-.ql-snow .ql-picker.ql-size .ql-picker-item[data-value="14px"]::before,
-.ql-snow .ql-picker.ql-size .ql-picker-label[data-value="14px"]::before {
-  content: "14";
-}
-
-.ql-snow .ql-picker.ql-size .ql-picker-item[data-value="16px"]::before,
-.ql-snow .ql-picker.ql-size .ql-picker-label[data-value="16px"]::before {
-  content: "16";
-}
-
-.ql-snow .ql-picker.ql-size .ql-picker-item[data-value="18px"]::before,
-.ql-snow .ql-picker.ql-size .ql-picker-label[data-value="18px"]::before {
-  content: "18";
-}
-
-.ql-snow .ql-picker.ql-size .ql-picker-item[data-value="20px"]::before,
-.ql-snow .ql-picker.ql-size .ql-picker-label[data-value="20px"]::before {
-  content: "20";
-}
-
-.ql-snow .ql-picker.ql-size .ql-picker-item[data-value="24px"]::before,
-.ql-snow .ql-picker.ql-size .ql-picker-label[data-value="24px"]::before {
-  content: "24";
-}
-
-.ql-snow .ql-picker.ql-size .ql-picker-item[data-value="28px"]::before,
-.ql-snow .ql-picker.ql-size .ql-picker-label[data-value="28px"]::before {
-  content: "28";
-}
-
-.ql-snow .ql-picker.ql-size .ql-picker-item[data-value="32px"]::before,
-.ql-snow .ql-picker.ql-size .ql-picker-label[data-value="32px"]::before {
-  content: "32";
-}
 
 .channel-field {
   border-top: 1px dashed #dee2e6;
@@ -188,8 +100,7 @@
 }
 
 .announcement-sticky-actions {
-  position: sticky;
-  bottom: 0;
+  position: static;
   background: #fff;
   border-top: 1px solid #e9ecef;
   padding-top: 0.9rem;
@@ -252,6 +163,25 @@
 
 .admin-list-actions {
   margin-left: auto;
+}
+
+.review-queue-toolbar {
+  margin-top: 0;
+}
+
+.review-queue-toolbar .admin-list-actions {
+  margin-left: 0;
+  width: 100%;
+}
+
+.review-queue-title-wrap {
+  flex: 1 1 320px;
+  min-width: 260px;
+}
+
+.review-queue-actions {
+  margin-left: auto !important;
+  flex: 0 1 auto;
 }
 
 .admin-search {
@@ -337,6 +267,51 @@
 .announcement-primary-actions .btn,
 .announcement-review-actions .btn {
   min-width: 74px;
+}
+
+.announcement-details-dialog {
+  max-width: 1500px;
+  width: 75vw;
+}
+
+.announcement-details-content {
+  border: 0;
+  border-radius: 10px;
+  padding: 1rem;
+}
+
+.announcement-details-title {
+  font-weight: 700;
+  color: #111;
+}
+
+.announcement-details-id {
+  color: #e0a800;
+}
+
+.announcement-details-container {
+  border: 1px solid #e78924;
+  border-radius: 10px;
+  padding: 1.25rem;
+  margin-bottom: 1rem;
+  background: #fff;
+}
+
+.announcement-detail-label {
+  color: #6c757d;
+  font-size: 0.9rem;
+  margin-bottom: 0.15rem;
+}
+
+.announcement-detail-value {
+  font-weight: 700;
+  color: #111;
+  margin-bottom: 0;
+}
+
+.announcement-details-content .modal-body {
+  max-height: 74vh;
+  overflow-y: auto;
 }
 
 .announcement-shell #table-appData th:nth-child(4),
@@ -440,6 +415,92 @@
   border-color: #0d6efd;
 }
 
+/* Modal actions: make buttons fill footer space consistently. */
+#modalViewAnnouncement .modal-footer,
+#modalDeleteAnnouncement .modal-footer,
+#modalEditAnnouncement .modal-footer,
+#modalFilter .modal-footer,
+#modalReviewQueueFilter .modal-footer,
+#modalTableColumns .modal-footer,
+#modalReviewQueueColumns .modal-footer,
+#modalAnnouncementFlash .modal-footer {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  justify-content: flex-start;
+  align-items: stretch;
+}
+
+#modalViewAnnouncement .modal-footer > form,
+#modalDeleteAnnouncement .modal-footer > form,
+#modalEditAnnouncement .modal-footer > form,
+#modalFilter .modal-footer > form,
+#modalReviewQueueFilter .modal-footer > form,
+#modalTableColumns .modal-footer > form,
+#modalReviewQueueColumns .modal-footer > form,
+#modalAnnouncementFlash .modal-footer > form {
+  display: flex !important;
+  flex: 1 1 180px;
+  margin: 0;
+}
+
+#modalViewAnnouncement .modal-footer > .btn,
+#modalDeleteAnnouncement .modal-footer > .btn,
+#modalEditAnnouncement .modal-footer > .btn,
+#modalFilter .modal-footer > .btn,
+#modalReviewQueueFilter .modal-footer > .btn,
+#modalTableColumns .modal-footer > .btn,
+#modalReviewQueueColumns .modal-footer > .btn,
+#modalAnnouncementFlash .modal-footer > .btn,
+#modalViewAnnouncement .modal-footer > form .btn,
+#modalDeleteAnnouncement .modal-footer > form .btn,
+#modalEditAnnouncement .modal-footer > form .btn,
+#modalFilter .modal-footer > form .btn,
+#modalReviewQueueFilter .modal-footer > form .btn,
+#modalTableColumns .modal-footer > form .btn,
+#modalReviewQueueColumns .modal-footer > form .btn,
+#modalAnnouncementFlash .modal-footer > form .btn {
+  flex: 1 1 180px;
+  width: 100%;
+}
+
+/* Modal action layout:
+   first visible action spans full row, remaining actions share next row. */
+.modal-footer .modal-action-primary {
+  flex: 1 1 100% !important;
+  max-width: 100%;
+}
+
+.modal-footer .modal-action-secondary {
+  flex: 1 1 0 !important;
+  min-width: 0;
+  max-width: none;
+}
+
+.modal-footer .modal-action-primary.btn,
+.modal-footer .modal-action-secondary.btn,
+.modal-footer .modal-action-primary .btn,
+.modal-footer .modal-action-secondary .btn {
+  width: 100%;
+}
+
+/* View modal deterministic layout:
+   Row 1: primary action full width
+   Row 2: secondary actions in same row (2 columns) */
+#modalViewAnnouncement .modal-footer.modal-grid-actions {
+  display: grid !important;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+}
+
+#modalViewAnnouncement .modal-footer.modal-grid-actions .modal-action-primary {
+  grid-column: 1 / -1;
+}
+
+#modalViewAnnouncement .modal-footer.modal-grid-actions .modal-action-secondary {
+  grid-column: span 1;
+}
+
 @media (max-width: 768px) {
   .admin-list-toolbar {
     flex-wrap: wrap;
@@ -475,6 +536,33 @@
     padding: 1rem !important;
   }
 
+  .review-queue-top {
+    align-items: stretch !important;
+  }
+
+  .review-queue-title-wrap {
+    min-width: 0;
+    width: 100%;
+  }
+
+  .review-queue-actions {
+    width: 100%;
+    margin-left: 0 !important;
+  }
+
+  .review-queue-actions .btn-icon {
+    flex: 0 0 38px;
+  }
+
+  .announcement-shell .table-responsive {
+    margin: 0 -0.25rem;
+    padding-bottom: 2px;
+  }
+
+  .announcement-shell #table-appData {
+    min-width: 700px;
+  }
+
   .announcement-shell .btn {
     white-space: nowrap;
   }
@@ -485,22 +573,6 @@
 
   .announcement-section-card {
     padding: 0.85rem;
-  }
-
-  .announcement-create-shell .ql-toolbar.ql-snow {
-    padding: 8px 6px;
-  }
-
-  .announcement-create-shell .ql-toolbar.ql-snow .ql-formats {
-    margin-right: 4px;
-  }
-
-  .announcement-create-shell .ql-toolbar .ql-picker.ql-font {
-    width: 120px;
-  }
-
-  .announcement-create-shell .ql-toolbar .ql-picker.ql-size {
-    width: 56px;
   }
 
   .announcement-sticky-actions {
@@ -524,6 +596,34 @@
     min-width: 68px;
   }
 
+  .announcement-details-dialog {
+    width: 96vw;
+    max-width: 96vw;
+    margin: 0.75rem auto;
+  }
+
+  .announcement-details-container {
+    padding: 0.9rem;
+  }
+
+  .announcement-create-shell .note-editor .note-toolbar,
+  .announcement-shell .note-editor .note-toolbar {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    white-space: nowrap;
+  }
+
+  .announcement-create-shell .note-editor .note-toolbar::-webkit-scrollbar,
+  .announcement-shell .note-editor .note-toolbar::-webkit-scrollbar {
+    height: 6px;
+  }
+
+  .announcement-create-shell .note-editor .note-toolbar .note-btn-group,
+  .announcement-shell .note-editor .note-toolbar .note-btn-group {
+    flex: 0 0 auto;
+  }
+
   .resident-table-footer {
     flex-direction: column;
     align-items: stretch !important;
@@ -531,5 +631,30 @@
 
   .resident-table-footer nav {
     align-self: flex-start;
+  }
+
+  .modal-footer .modal-action-secondary {
+    flex: 1 1 100% !important;
+    max-width: 100%;
+  }
+
+  #modalViewAnnouncement .modal-footer.modal-grid-actions {
+    grid-template-columns: 1fr;
+  }
+
+  #modalViewAnnouncement .modal-footer.modal-grid-actions .modal-action-secondary {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (max-width: 576px) {
+  .announcement-sticky-actions .btn {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .announcement-primary-actions,
+  .announcement-review-actions {
+    flex-wrap: wrap;
   }
 }

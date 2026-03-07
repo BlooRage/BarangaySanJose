@@ -17,9 +17,9 @@ if (!in_array($deliveryChannel, ['all', 'website', 'sms', 'email'], true)) {
 
   <script src="https://kit.fontawesome.com/3482e00999.js" crossorigin="anonymous"></script>
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-  <link href="https://cdn.jsdelivr.net/npm/quill@1.3.7/dist/quill.snow.css" rel="stylesheet">
+  <link href="../../summernote-0.9.0-dist/summernote-lite.min.css?v=20260307-2" rel="stylesheet">
   <link rel="stylesheet" href="../../CSS-Styles/Admin-End-CSS/AdminDashboardStyle.css">
-  <link rel="stylesheet" href="../../CSS-Styles/Admin-End-CSS/ContentManagementStyle.css?v=20260307-6">
+  <link rel="stylesheet" href="../../CSS-Styles/Admin-End-CSS/ContentManagementStyle.css?v=20260307-16">
 </head>
 <body>
   <div class="d-flex flex-column flex-md-row" style="min-height: 100vh;">
@@ -47,62 +47,7 @@ if (!in_array($deliveryChannel, ['all', 'website', 'sms', 'email'], true)) {
 
               <div class="mb-2">
                 <label class="form-label fw-semibold">Announcement Body</label>
-                <div id="editorToolbar" class="ql-toolbar ql-snow">
-                  <span class="ql-formats">
-                    <select class="ql-font">
-                      <option selected></option>
-                      <option value="arial"></option>
-                      <option value="times-new-roman"></option>
-                      <option value="georgia"></option>
-                      <option value="trebuchet-ms"></option>
-                      <option value="tahoma"></option>
-                      <option value="verdana"></option>
-                      <option value="courier-new"></option>
-                      <option value="lucida-sans"></option>
-                      <option value="impact"></option>
-                    </select>
-                    <select class="ql-size">
-                      <option value="12px">12</option>
-                      <option value="14px" selected>14</option>
-                      <option value="16px">16</option>
-                      <option value="18px">18</option>
-                      <option value="20px">20</option>
-                      <option value="24px">24</option>
-                      <option value="28px">28</option>
-                      <option value="32px">32</option>
-                    </select>
-                  </span>
-                  <span class="ql-formats">
-                    <select class="ql-header">
-                      <option value="1"></option>
-                      <option value="2"></option>
-                      <option selected></option>
-                    </select>
-                  </span>
-                  <span class="ql-formats">
-                    <button class="ql-bold"></button>
-                    <button class="ql-italic"></button>
-                    <button class="ql-underline"></button>
-                  </span>
-                  <span class="ql-formats">
-                    <button class="ql-list" value="ordered"></button>
-                    <button class="ql-list" value="bullet"></button>
-                    <button class="ql-align" value=""></button>
-                    <button class="ql-align" value="center"></button>
-                    <button class="ql-align" value="right"></button>
-                    <button class="ql-align" value="justify"></button>
-                  </span>
-                  <span class="ql-formats">
-                    <select class="ql-color"></select>
-                    <select class="ql-background"></select>
-                  </span>
-                  <span class="ql-formats">
-                    <button class="ql-link"></button>
-                    <button class="ql-image"></button>
-                    <button class="ql-clean"></button>
-                  </span>
-                </div>
-                <div id="announcementEditor" class="announcement-editor"></div>
+                <div id="announcementEditor"></div>
                 <input type="hidden" id="announcementContent" name="content_html">
               </div>
               <small class="text-muted">Use bullets, numbering, and formatting for clearer notices.</small>
@@ -204,33 +149,11 @@ if (!in_array($deliveryChannel, ['all', 'website', 'sms', 'email'], true)) {
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/quill@1.3.7/dist/quill.min.js"></script>
+  <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+  <script src="../../summernote-0.9.0-dist/summernote-lite.min.js?v=20260307-2"></script>
   <script>
     (function () {
-      const Font = Quill.import("formats/font");
-      Font.whitelist = [
-        "arial",
-        "times-new-roman",
-        "georgia",
-        "trebuchet-ms",
-        "tahoma",
-        "verdana",
-        "courier-new",
-        "lucida-sans",
-        "impact"
-      ];
-      Quill.register(Font, true);
-      const Size = Quill.import("attributors/style/size");
-      Size.whitelist = ["12px", "14px", "16px", "18px", "20px", "24px", "28px", "32px"];
-      Quill.register(Size, true);
-
-      const quill = new Quill("#announcementEditor", {
-        modules: { toolbar: "#editorToolbar" },
-        theme: "snow",
-        placeholder: "Write your announcement here..."
-      });
       const MAX_IMAGE_SIZE_BYTES = 5 * 1024 * 1024;
-      const toolbar = quill.getModule("toolbar");
 
       const contentInput = document.getElementById("announcementContent");
       const smsPreview = document.getElementById("smsPreview");
@@ -241,10 +164,24 @@ if (!in_array($deliveryChannel, ['all', 'website', 'sms', 'email'], true)) {
       const emailField = document.getElementById("emailField");
       const audienceAll = document.getElementById("audienceAll");
       const customAudienceFields = document.getElementById("customAudienceFields");
+      const editorEl = $("#announcementEditor");
+      const fullToolbar = [
+        ["style", ["style"]],
+        ["font", ["bold", "italic", "underline", "clear"]],
+        ["fontname", ["fontname"]],
+        ["fontsize", ["fontsize"]],
+        ["color", ["color"]],
+        ["para", ["ul", "ol", "paragraph"]],
+        ["table", ["table"]],
+        ["insert", ["link", "picture", "video"]],
+        ["view", ["fullscreen", "codeview", "help"]]
+      ];
 
       function updateEditorOutputs() {
-        const html = quill.root.innerHTML;
-        const plain = (quill.getText() || "").trim();
+        const html = editorEl.summernote("code");
+        const temp = document.createElement("div");
+        temp.innerHTML = html;
+        const plain = (temp.textContent || temp.innerText || "").trim();
         contentInput.value = html;
         smsPreview.value = plain;
         smsCounter.textContent = plain.length + " / 160 characters";
@@ -261,27 +198,26 @@ if (!in_array($deliveryChannel, ['all', 'website', 'sms', 'email'], true)) {
 
       function applyToolbarTooltips() {
         const tooltips = [
-          [".ql-font", "Font Style"],
-          [".ql-size", "Font Size"],
-          [".ql-header", "Heading Level"],
-          [".ql-bold", "Bold"],
-          [".ql-italic", "Italic"],
-          [".ql-underline", "Underline"],
-          [".ql-list[value='ordered']", "Numbered List"],
-          [".ql-list[value='bullet']", "Bullet List"],
-          [".ql-align[value='']", "Align Left"],
-          [".ql-align[value='center']", "Align Center"],
-          [".ql-align[value='right']", "Align Right"],
-          [".ql-align[value='justify']", "Justify"],
-          [".ql-color", "Text Color"],
-          [".ql-background", "Highlight Color"],
-          [".ql-link", "Insert Link"],
-          [".ql-image", "Insert Image"],
-          [".ql-clean", "Clear Formatting"]
+          [".note-btn[data-event='fontname']", "Font Style"],
+          [".note-btn[data-event='fontsize']", "Font Size"],
+          [".note-btn[data-event='color']", "Text Color"],
+          [".note-btn[data-event='bold']", "Bold"],
+          [".note-btn[data-event='italic']", "Italic"],
+          [".note-btn[data-event='underline']", "Underline"],
+          [".note-btn[data-event='strikethrough']", "Strikethrough"],
+          [".note-btn[data-event='ul']", "Bullet List"],
+          [".note-btn[data-event='ol']", "Numbered List"],
+          [".note-btn[data-event='justifyLeft']", "Align Left"],
+          [".note-btn[data-event='justifyCenter']", "Align Center"],
+          [".note-btn[data-event='justifyRight']", "Align Right"],
+          [".note-btn[data-event='justifyFull']", "Justify"],
+          [".note-btn[data-event='link']", "Insert Link"],
+          [".note-btn[data-event='picture']", "Insert Image"],
+          [".note-btn[data-event='removeFormat']", "Clear Formatting"]
         ];
 
         tooltips.forEach(([selector, label]) => {
-          document.querySelectorAll("#editorToolbar " + selector).forEach((el) => {
+          document.querySelectorAll(".note-toolbar " + selector).forEach((el) => {
             el.setAttribute("title", label);
             el.setAttribute("aria-label", label);
           });
@@ -298,45 +234,93 @@ if (!in_array($deliveryChannel, ['all', 'website', 'sms', 'email'], true)) {
         });
 
         const payload = await response.json();
-        if (!response.ok || !payload.success || !payload.url) {
+        const imageUrl = payload.url || payload.location || "";
+        if (!response.ok || (!payload.success && !imageUrl) || !imageUrl) {
           throw new Error(payload.message || "Image upload failed.");
         }
 
-        return payload.url;
+        return imageUrl;
       }
 
-      function handleImageInsert() {
-        const input = document.createElement("input");
-        input.setAttribute("type", "file");
-        input.setAttribute("accept", "image/png,image/jpeg,image/jpg,image/webp,image/gif");
-        input.click();
-
-        input.onchange = async () => {
-          const file = input.files && input.files[0];
-          if (!file) return;
-          if (file.size > MAX_IMAGE_SIZE_BYTES) {
-            alert("Image must be 5MB or less.");
-            return;
-          }
-
-          try {
-            const imageUrl = await uploadEditorImage(file);
-            const range = quill.getSelection(true) || { index: quill.getLength(), length: 0 };
-            quill.insertEmbed(range.index, "image", imageUrl, "user");
-            quill.setSelection(range.index + 1, 0, "silent");
+      editorEl.summernote({
+        placeholder: "Write your announcement here...",
+        height: 260,
+        minHeight: 220,
+        dialogsInBody: true,
+        fontNames: [
+          "Arial", "Arial Black", "Comic Sans MS", "Courier New", "Helvetica", "Impact",
+          "Lucida Grande", "Tahoma", "Times New Roman", "Trebuchet MS", "Verdana", "Georgia"
+        ],
+        fontSizes: ["8", "9", "10", "11", "12", "14", "16", "18", "20", "24", "28", "32", "36", "48", "64", "82", "150"],
+        toolbar: fullToolbar,
+        callbacks: {
+          onChange: function () {
             updateEditorOutputs();
-          } catch (err) {
-            alert(err.message || "Unable to upload image.");
+          },
+          onImageUpload: async function (files) {
+            for (const file of files) {
+              if (!file) continue;
+              if (file.size > MAX_IMAGE_SIZE_BYTES) {
+                alert("Image must be 5MB or less.");
+                continue;
+              }
+              try {
+                const imageUrl = await uploadEditorImage(file);
+                editorEl.summernote("insertImage", imageUrl);
+              } catch (err) {
+                alert(err.message || "Unable to upload image.");
+              }
+            }
+            updateEditorOutputs();
           }
-        };
-      }
-
-      quill.on("text-change", updateEditorOutputs);
-      if (toolbar) {
-        toolbar.addHandler("image", handleImageInsert);
+        }
+      });
+      const toolbarGroups = editorEl.next(".note-editor").find(".note-toolbar .note-btn-group").length;
+      if (toolbarGroups <= 1) {
+        editorEl.summernote("destroy");
+        editorEl.summernote({
+          placeholder: "Write your announcement here...",
+          height: 260,
+          minHeight: 220,
+          dialogsInBody: true,
+          fontNames: [
+            "Arial", "Arial Black", "Comic Sans MS", "Courier New", "Helvetica", "Impact",
+            "Lucida Grande", "Tahoma", "Times New Roman", "Trebuchet MS", "Verdana", "Georgia"
+          ],
+          fontSizes: ["8", "9", "10", "11", "12", "14", "16", "18", "20", "24", "28", "32", "36", "48", "64", "82", "150"],
+          toolbar: fullToolbar,
+          callbacks: {
+            onChange: function () {
+              updateEditorOutputs();
+            },
+            onImageUpload: async function (files) {
+              for (const file of files) {
+                if (!file) continue;
+                if (file.size > MAX_IMAGE_SIZE_BYTES) {
+                  alert("Image must be 5MB or less.");
+                  continue;
+                }
+                try {
+                  const imageUrl = await uploadEditorImage(file);
+                  editorEl.summernote("insertImage", imageUrl);
+                } catch (err) {
+                  alert(err.message || "Unable to upload image.");
+                }
+              }
+              updateEditorOutputs();
+            }
+          }
+        });
       }
       applyToolbarTooltips();
       updateEditorOutputs();
+
+      const createForm = document.querySelector("form.announcement-create-shell");
+      if (createForm) {
+        createForm.addEventListener("submit", function () {
+          updateEditorOutputs();
+        });
+      }
 
       document.querySelectorAll(".channel-checkbox").forEach((el) => {
         el.addEventListener("change", toggleChannelFields);
