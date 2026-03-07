@@ -343,7 +343,7 @@ function buildReviewQueueUrl(string $channel, string $status, string $searchTerm
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
   <link href="../../summernote-0.9.0-dist/summernote-lite.min.css?v=20260307-2" rel="stylesheet">
   <link rel="stylesheet" href="../../CSS-Styles/Admin-End-CSS/AdminDashboardStyle.css">
-  <link rel="stylesheet" href="../../CSS-Styles/Admin-End-CSS/ContentManagementStyle.css?v=20260307-24">
+  <link rel="stylesheet" href="../../CSS-Styles/Admin-End-CSS/ContentManagementStyle.css?v=20260307-26">
 </head>
 <body>
   <div class="d-flex flex-column flex-md-row" style="min-height: 100vh;">
@@ -1241,6 +1241,26 @@ function buildReviewQueueUrl(string $channel, string $status, string $searchTerm
             footer.classList.add("modal-grid-actions");
             return;
           }
+        }
+
+        if (modalEl.id === "modalDeleteAnnouncement" && candidates.length === 2) {
+          const deleteEl = candidates.find((el) => el.id === "deleteAnnouncementForm") || null;
+          const closeEl = candidates.find((el) => el.tagName === "BUTTON" && el.getAttribute("data-bs-dismiss") === "modal") || null;
+          const ordered = [];
+          if (closeEl) ordered.push(closeEl);
+          if (deleteEl) ordered.push(deleteEl);
+          candidates.forEach((el) => {
+            if (!ordered.includes(el)) ordered.push(el);
+          });
+
+          ordered.forEach((el, idx) => {
+            el.classList.add("modal-action-secondary");
+            if (el.style) {
+              el.style.order = String(idx + 1);
+            }
+          });
+          footer.classList.add("modal-grid-actions");
+          return;
         }
 
         const primary = candidates[0];

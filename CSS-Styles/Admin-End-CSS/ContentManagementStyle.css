@@ -434,7 +434,9 @@
 #modalReviewQueueFilter .modal-footer,
 #modalTableColumns .modal-footer,
 #modalReviewQueueColumns .modal-footer,
-#modalAnnouncementFlash .modal-footer {
+#modalAnnouncementFlash .modal-footer,
+#modalSuperAdminRepostConfirm .modal-footer,
+#modalSuperAdminPostConfirm .modal-footer {
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
@@ -449,7 +451,9 @@
 #modalReviewQueueFilter .modal-footer > form:not(.d-none),
 #modalTableColumns .modal-footer > form:not(.d-none),
 #modalReviewQueueColumns .modal-footer > form:not(.d-none),
-#modalAnnouncementFlash .modal-footer > form:not(.d-none) {
+#modalAnnouncementFlash .modal-footer > form:not(.d-none),
+#modalSuperAdminRepostConfirm .modal-footer > form:not(.d-none),
+#modalSuperAdminPostConfirm .modal-footer > form:not(.d-none) {
   display: flex !important;
   flex: 1 1 180px;
   margin: 0;
@@ -462,7 +466,9 @@
 #modalReviewQueueFilter .modal-footer > form.d-none,
 #modalTableColumns .modal-footer > form.d-none,
 #modalReviewQueueColumns .modal-footer > form.d-none,
-#modalAnnouncementFlash .modal-footer > form.d-none {
+#modalAnnouncementFlash .modal-footer > form.d-none,
+#modalSuperAdminRepostConfirm .modal-footer > form.d-none,
+#modalSuperAdminPostConfirm .modal-footer > form.d-none {
   display: none !important;
 }
 
@@ -474,6 +480,8 @@
 #modalTableColumns .modal-footer > .btn,
 #modalReviewQueueColumns .modal-footer > .btn,
 #modalAnnouncementFlash .modal-footer > .btn,
+#modalSuperAdminRepostConfirm .modal-footer > .btn,
+#modalSuperAdminPostConfirm .modal-footer > .btn,
 #modalViewAnnouncement .modal-footer > form .btn,
 #modalDeleteAnnouncement .modal-footer > form .btn,
 #modalEditAnnouncement .modal-footer > form .btn,
@@ -481,9 +489,24 @@
 #modalReviewQueueFilter .modal-footer > form .btn,
 #modalTableColumns .modal-footer > form .btn,
 #modalReviewQueueColumns .modal-footer > form .btn,
-#modalAnnouncementFlash .modal-footer > form .btn {
+#modalAnnouncementFlash .modal-footer > form .btn,
+#modalSuperAdminRepostConfirm .modal-footer > form .btn,
+#modalSuperAdminPostConfirm .modal-footer > form .btn {
   flex: 1 1 180px;
   width: 100%;
+}
+
+#modalViewAnnouncement .modal-content,
+#modalDeleteAnnouncement .modal-content,
+#modalEditAnnouncement .modal-content,
+#modalFilter .modal-content,
+#modalReviewQueueFilter .modal-content,
+#modalTableColumns .modal-content,
+#modalReviewQueueColumns .modal-content,
+#modalAnnouncementFlash .modal-content,
+#modalSuperAdminRepostConfirm .modal-content,
+#modalSuperAdminPostConfirm .modal-content {
+  border-radius: 10px;
 }
 
 /* Modal action layout:
@@ -509,18 +532,21 @@
 /* View modal deterministic layout:
    Row 1: primary action full width
    Row 2: secondary actions in same row (2 columns) */
-#modalViewAnnouncement .modal-footer.modal-grid-actions {
+#modalViewAnnouncement .modal-footer.modal-grid-actions,
+#modalDeleteAnnouncement .modal-footer.modal-grid-actions {
   display: grid !important;
   grid-template-columns: 1fr 1fr;
   gap: 6px;
   align-items: stretch;
 }
 
-#modalViewAnnouncement .modal-footer.modal-grid-actions .modal-action-primary {
+#modalViewAnnouncement .modal-footer.modal-grid-actions .modal-action-primary,
+#modalDeleteAnnouncement .modal-footer.modal-grid-actions .modal-action-primary {
   grid-column: 1 / -1;
 }
 
-#modalViewAnnouncement .modal-footer.modal-grid-actions .modal-action-secondary {
+#modalViewAnnouncement .modal-footer.modal-grid-actions .modal-action-secondary,
+#modalDeleteAnnouncement .modal-footer.modal-grid-actions .modal-action-secondary {
   grid-column: span 1;
   width: 100%;
 }
@@ -664,11 +690,19 @@
     max-width: 100%;
   }
 
-  #modalViewAnnouncement .modal-footer.modal-grid-actions {
+  #modalSuperAdminRepostConfirm .modal-footer > .btn,
+  #modalSuperAdminPostConfirm .modal-footer > .btn {
+    flex: 1 1 100%;
+    width: 100%;
+  }
+
+  #modalViewAnnouncement .modal-footer.modal-grid-actions,
+  #modalDeleteAnnouncement .modal-footer.modal-grid-actions {
     grid-template-columns: 1fr;
   }
 
-  #modalViewAnnouncement .modal-footer.modal-grid-actions .modal-action-secondary {
+  #modalViewAnnouncement .modal-footer.modal-grid-actions .modal-action-secondary,
+  #modalDeleteAnnouncement .modal-footer.modal-grid-actions .modal-action-secondary {
     grid-column: 1 / -1;
   }
 }

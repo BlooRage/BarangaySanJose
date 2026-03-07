@@ -136,7 +136,15 @@ if (!$channels) {
   ann_redirect_with_flash($redirectUrl, "warning", "Select at least one delivery channel.");
 }
 
-$status = $submitAction === "pending" ? "pending" : "draft";
+$sessionRole = strtolower(trim((string)($_SESSION["role"] ?? "")));
+$isSuperAdmin = $sessionRole === "superadmin";
+$status = "draft";
+if ($submitAction === "pending" && !$isSuperAdmin) {
+  $status = "pending";
+}
+if ($submitAction === "approved" && $isSuperAdmin) {
+  $status = "approved";
+}
 $audience = "All Residents";
 if ($audienceScope === "custom") {
   $parts = [];
@@ -181,7 +189,11 @@ if (!announcements_save_all($all)) {
   ann_redirect_with_flash($redirectUrl, "danger", "Unable to save announcement.");
 }
 
-$msg = $status === "pending"
-  ? "Announcement submitted for review."
-  : "Announcement saved as draft.";
+$msg = "Announcement saved as draft.";
+if ($status === "pending") {
+  $msg = "Announcement submitted for review.";
+}
+if ($status === "approved") {
+  $msg = "Announcement posted successfully.";
+}
 ann_redirect_with_flash($redirectUrl, "success", $msg);

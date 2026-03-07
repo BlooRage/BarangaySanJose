@@ -6,6 +6,8 @@ $deliveryChannel = strtolower(trim((string)($_GET['channel'] ?? 'all')));
 if (!in_array($deliveryChannel, ['all', 'website', 'sms', 'email'], true)) {
   $deliveryChannel = 'all';
 }
+$sessionRole = strtolower(trim((string)($_SESSION['role'] ?? '')));
+$isSuperAdmin = $sessionRole === 'superadmin';
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -19,7 +21,7 @@ if (!in_array($deliveryChannel, ['all', 'website', 'sms', 'email'], true)) {
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
   <link href="../../summernote-0.9.0-dist/summernote-lite.min.css?v=20260307-2" rel="stylesheet">
   <link rel="stylesheet" href="../../CSS-Styles/Admin-End-CSS/AdminDashboardStyle.css">
-  <link rel="stylesheet" href="../../CSS-Styles/Admin-End-CSS/ContentManagementStyle.css?v=20260307-24">
+  <link rel="stylesheet" href="../../CSS-Styles/Admin-End-CSS/ContentManagementStyle.css?v=20260307-26">
 </head>
 <body>
   <div class="d-flex flex-column flex-md-row" style="min-height: 100vh;">
@@ -142,9 +144,33 @@ if (!in_array($deliveryChannel, ['all', 'website', 'sms', 'email'], true)) {
         <div class="announcement-sticky-actions d-flex flex-wrap justify-content-end gap-2 mt-4">
           <a href="Announcements.php<?= $deliveryChannel !== 'all' ? '?channel=' . urlencode($deliveryChannel) : '' ?>" class="btn btn-outline-secondary">Cancel</a>
           <button type="submit" name="submit_action" value="draft" class="btn btn-warning text-dark">Save Draft</button>
-          <button type="submit" name="submit_action" value="pending" class="btn btn-primary text-white">Submit for Review</button>
+          <?php if ($isSuperAdmin): ?>
+            <button type="submit" id="btnPostAnnouncement" name="submit_action" value="approved" class="btn btn-primary text-white">Post Announcement</button>
+          <?php else: ?>
+            <button type="submit" name="submit_action" value="pending" class="btn btn-primary text-white">Submit for Review</button>
+          <?php endif; ?>
         </div>
       </form>
+
+      <?php if ($isSuperAdmin): ?>
+        <div class="modal fade" id="modalSuperAdminPostConfirm" tabindex="-1" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
+          <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+              <div class="modal-header">
+                <h5 class="modal-title">Confirm Post Announcement</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+              </div>
+              <div class="modal-body">
+                <p class="mb-0">Are you sure this announcement is ready to post?</p>
+              </div>
+              <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                <button type="button" class="btn btn-primary text-white" id="btnConfirmPostAnnouncement">Yes, Post Announcement</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      <?php endif; ?>
     </main>
   </div>
 
@@ -321,6 +347,43 @@ if (!in_array($deliveryChannel, ['all', 'website', 'sms', 'email'], true)) {
           updateEditorOutputs();
         });
       }
+
+      <?php if ($isSuperAdmin): ?>
+        const postBtn = document.getElementById("btnPostAnnouncement");
+        const postConfirmModalEl = document.getElementById("modalSuperAdminPostConfirm");
+        const postConfirmBtn = document.getElementById("btnConfirmPostAnnouncement");
+        let superAdminPostConfirmed = false;
+
+        if (createForm && postBtn && postConfirmModalEl && postConfirmBtn) {
+          const postConfirmModal = bootstrap.Modal.getOrCreateInstance(postConfirmModalEl, {
+            backdrop: "static",
+            keyboard: false
+          });
+
+          createForm.addEventListener("submit", function (event) {
+            const submitter = event.submitter || null;
+            const isPostAction = submitter === postBtn || (submitter && submitter.value === "approved");
+            if (isPostAction && !superAdminPostConfirmed) {
+              event.preventDefault();
+              postConfirmModal.show();
+            }
+          });
+
+          postConfirmBtn.addEventListener("click", function () {
+            superAdminPostConfirmed = true;
+            postConfirmModal.hide();
+            if (typeof createForm.requestSubmit === "function") {
+              createForm.requestSubmit(postBtn);
+              return;
+            }
+            createForm.submit();
+          });
+
+          postConfirmModalEl.addEventListener("hidden.bs.modal", function () {
+            superAdminPostConfirmed = false;
+          });
+        }
+      <?php endif; ?>
 
       document.querySelectorAll(".channel-checkbox").forEach((el) => {
         el.addEventListener("change", toggleChannelFields);
