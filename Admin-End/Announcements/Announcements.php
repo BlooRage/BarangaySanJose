@@ -646,8 +646,8 @@ function buildReviewQueueUrl(string $channel, string $status, string $searchTerm
 
               <div class="modal-footer border-0">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
-                <a href="<?= htmlspecialchars(buildAnnouncementsUrl('all', 'all')) ?>" class="btn btn-warning"><i class="fas fa-undo"></i>&nbsp;Reset</a>
                 <button type="submit" class="btn btn-primary">Apply Filter</button>
+                <a href="<?= htmlspecialchars(buildAnnouncementsUrl('all', 'all')) ?>" class="btn btn-warning"><i class="fas fa-undo"></i>&nbsp;Reset</a>
               </div>
             </form>
           </div>
@@ -667,7 +667,7 @@ function buildReviewQueueUrl(string $channel, string $status, string $searchTerm
         </div>
         <div class="modal-footer">
           <button type="button" class="btn btn-outline-secondary" id="btnTableColumnsReset">Reset</button>
-          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Done</button>
+          <button type="button" class="btn btn-primary" data-bs-dismiss="modal">Done</button>
         </div>
       </div>
     </div>
@@ -742,8 +742,8 @@ function buildReviewQueueUrl(string $channel, string $status, string $searchTerm
 
         <div class="modal-footer border-0">
           <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
-          <a href="<?= htmlspecialchars(buildReviewQueueUrl($deliveryChannel, $statusFilter, $searchTerm, 'all', '')) ?>" class="btn btn-warning"><i class="fas fa-undo"></i>&nbsp;Reset</a>
           <button type="submit" class="btn btn-primary">Apply Filter</button>
+          <a href="<?= htmlspecialchars(buildReviewQueueUrl($deliveryChannel, $statusFilter, $searchTerm, 'all', '')) ?>" class="btn btn-warning"><i class="fas fa-undo"></i>&nbsp;Reset</a>
         </div>
       </form>
     </div>
@@ -760,7 +760,7 @@ function buildReviewQueueUrl(string $channel, string $status, string $searchTerm
         </div>
         <div class="modal-footer">
           <button type="button" class="btn btn-outline-secondary" id="btnReviewQueueColumnsReset">Reset</button>
-          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Done</button>
+          <button type="button" class="btn btn-primary" data-bs-dismiss="modal">Done</button>
         </div>
       </div>
     </div>
@@ -922,6 +922,26 @@ function buildReviewQueueUrl(string $channel, string $status, string $searchTerm
     </div>
   </div>
 
+  <?php if ($isSuperAdmin): ?>
+    <div class="modal fade" id="modalSuperAdminRepostConfirm" tabindex="-1" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
+      <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title">Confirm Repost</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+          </div>
+          <div class="modal-body">
+            <p class="mb-0">This announcement was edited. Are you sure it is ready to post again?</p>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+            <button type="button" class="btn btn-primary" id="btnConfirmSuperAdminRepost">Yes, Post Again</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  <?php endif; ?>
+
   <?php if (is_array($flash) && isset($flash['message'])): ?>
     <?php
       $flashType = strtolower((string)($flash['type'] ?? 'info'));
@@ -1011,6 +1031,8 @@ function buildReviewQueueUrl(string $channel, string $status, string $searchTerm
       const viewModal = document.getElementById("modalViewAnnouncement");
       const editModal = document.getElementById("modalEditAnnouncement");
       const editForm = document.getElementById("editAnnouncementForm");
+      const superAdminRepostModalEl = document.getElementById("modalSuperAdminRepostConfirm");
+      const confirmSuperAdminRepostBtn = document.getElementById("btnConfirmSuperAdminRepost");
       const submitReviewBtn = document.getElementById("btnViewSubmitReviewAnnouncement");
       const approveBtn = document.getElementById("btnViewApproveAnnouncement");
       const denyBtn = document.getElementById("btnViewDenyAnnouncement");
@@ -1023,8 +1045,10 @@ function buildReviewQueueUrl(string $channel, string $status, string $searchTerm
       const approveIdInput = document.getElementById("viewApproveAnnouncementId");
       const denyIdInput = document.getElementById("viewDenyAnnouncementId");
       if (!viewModal || !editModal) return;
+      const isSuperAdminSession = <?= $isSuperAdmin ? 'true' : 'false' ?>;
       const editEditorEl = $("#editAnnouncementEditor");
       let editEditorReady = false;
+      let superAdminEditConfirmed = false;
       const fullToolbar = [
         ["style", ["style"]],
         ["font", ["bold", "italic", "underline", "clear"]],
@@ -1138,6 +1162,9 @@ function buildReviewQueueUrl(string $channel, string $status, string $searchTerm
 
       function applyModalFooterLayout(modalEl) {
         if (!modalEl) return;
+        if (["modalFilter", "modalReviewQueueFilter", "modalTableColumns", "modalReviewQueueColumns"].includes(modalEl.id)) {
+          return;
+        }
         const footer = modalEl.querySelector(".modal-footer");
         if (!footer) return;
         footer.classList.remove("modal-grid-actions");
@@ -1244,10 +1271,34 @@ function buildReviewQueueUrl(string $channel, string $status, string $searchTerm
       });
 
       if (editForm) {
-        editForm.addEventListener("submit", function () {
+        editForm.addEventListener("submit", function (event) {
           if (editEditorReady) {
             document.getElementById("editAnnouncementContentInput").value = editEditorEl.summernote("code");
           }
+          if (isSuperAdminSession && !superAdminEditConfirmed) {
+            event.preventDefault();
+            if (superAdminRepostModalEl) {
+              const modalInstance = bootstrap.Modal.getOrCreateInstance(superAdminRepostModalEl);
+              modalInstance.show();
+            }
+          }
+        });
+      }
+
+      if (confirmSuperAdminRepostBtn && editForm) {
+        confirmSuperAdminRepostBtn.addEventListener("click", function () {
+          superAdminEditConfirmed = true;
+          if (superAdminRepostModalEl) {
+            const modalInstance = bootstrap.Modal.getOrCreateInstance(superAdminRepostModalEl);
+            modalInstance.hide();
+          }
+          editForm.submit();
+        });
+      }
+
+      if (editModal) {
+        editModal.addEventListener("show.bs.modal", function () {
+          superAdminEditConfirmed = false;
         });
       }
 
@@ -1312,6 +1363,7 @@ function buildReviewQueueUrl(string $channel, string $status, string $searchTerm
         "modalViewAnnouncement",
         "modalDeleteAnnouncement",
         "modalEditAnnouncement",
+        "modalSuperAdminRepostConfirm",
         "modalFilter",
         "modalReviewQueueFilter",
         "modalTableColumns",
