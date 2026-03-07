@@ -21,12 +21,27 @@
   const caseLogsModal = caseLogsModalEl ? new bootstrap.Modal(caseLogsModalEl) : null;
   const caseLogsModalTitle = document.getElementById('caseLogsModalTitle');
   const caseLogsBody = document.getElementById('caseLogsBody');
+  const caseActionModalEl = document.getElementById('caseActionModal');
+  const caseActionModal = caseActionModalEl ? new bootstrap.Modal(caseActionModalEl) : null;
+  const caseActionModalTitle = document.getElementById('caseActionModalTitle');
+  const endorsementTargetGroup = document.getElementById('endorsementTargetGroup');
+  const endorsementTargetSelect = document.getElementById('endorsementTargetSelect');
+  const caseActionRemarks = document.getElementById('caseActionRemarks');
+  const btnCaseActionProceed = document.getElementById('btnCaseActionProceed');
+  const btnCaseActionReturn = document.getElementById('btnCaseActionReturn');
+  const caseActionConfirmModalEl = document.getElementById('caseActionConfirmModal');
+  const caseActionConfirmModal = caseActionConfirmModalEl ? new bootstrap.Modal(caseActionConfirmModalEl) : null;
+  const caseActionConfirmText = document.getElementById('caseActionConfirmText');
+  const btnCaseActionConfirmReturn = document.getElementById('btnCaseActionConfirmReturn');
+  const btnCaseActionConfirm = document.getElementById('btnCaseActionConfirm');
 
   let allRows = [];
   let filteredRows = [];
   let currentPage = 1;
   let currentViewCaseId = null;
   let currentDetail = null;
+  let pendingCaseAction = null;
+  let caseActionHandlersBound = false;
 
   function esc(v) {
     return String(v ?? '').replace(/[&<>\"']/g, (m) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '\"': '&quot;', "'": '&#39;' }[m]));
@@ -191,34 +206,57 @@
     }
   }
 
-  function renderNarrative(detail) {
-    if (!detail) return formField('Narrative', '-');
-    if (detail.narrative_type === 'file' && detail.narrative_value) {
+  function renderNarrativeReportsSection(detail) {
+    const initialStamp = String(detail?.report_timestamp || detail?.date_filed || '-');
+    let initialValueHtml = esc(detail?.narrative_value || '-');
+    if (detail?.narrative_type === 'file' && detail?.narrative_value) {
       const fileUrl = `${appBase}/${String(detail.narrative_value).replace(/^\/+/, '')}`;
-      const link = `<a class="btn btn-sm btn-outline-primary" href="${esc(fileUrl)}" target="_blank" rel="noopener">Open Narrative File</a>`;
-      return formField('Narrative File', link, true);
+      initialValueHtml = `<a class="btn btn-sm btn-outline-primary" href="${esc(fileUrl)}" target="_blank" rel="noopener">Open Narrative File</a>`;
     }
-    return formField('Narrative Report', detail.narrative_value || '-');
+
+    return `
+      <section class="tracker-form-section">
+        <h6 class="tracker-form-section-title">Narrative Reports</h6>
+        ${formField(`Narrative Report (${initialStamp})`, initialValueHtml, true)}
+        <div id="narrativeUpdatesList" class="mt-2">
+          <div class="text-muted small">Loading narrative updates...</div>
+        </div>
+      </section>
+    `;
+  }
+
+  async function loadNarrativeUpdates(caseId) {
+    const host = document.getElementById('narrativeUpdatesList');
+    if (!host) return;
+    try {
+      const data = await fetchJson(`${endpoint}?action=case_logs&case_id=${encodeURIComponent(caseId)}`);
+      const logs = Array.isArray(data.items) ? data.items : [];
+      const narrativeLogs = logs.filter((item) => String(item?.log_entry || '').toLowerCase().startsWith('narrative report added:'));
+      if (!narrativeLogs.length) {
+        host.innerHTML = '<div class="text-muted small">No additional narrative reports yet.</div>';
+        return;
+      }
+
+      host.innerHTML = narrativeLogs.map((item) => {
+        const raw = String(item.log_entry || '');
+        const text = raw.replace(/^Narrative report added:\s*/i, '').trim() || raw;
+        const stamp = String(item.logged_at || '-');
+        return formField(`Narrative Report (${stamp})`, text);
+      }).join('');
+    } catch (err) {
+      host.innerHTML = `<div class="text-danger small">${esc(err.message || err)}</div>`;
+    }
   }
 
   function renderCaseManagementSection(detail) {
-    const narrativeValue = String(detail?.narrative_value || '');
-    const narrativeType = String(detail?.narrative_type || 'text');
-    const hint = narrativeType === 'file'
-      ? '<div class="form-text">This case currently uses a narrative file. Saving text below will replace it with a narrative report.</div>'
-      : '';
-
     return `
       <section class="tracker-form-section">
         <h6 class="tracker-form-section-title">Case Management</h6>
         <div class="mb-3">
-          <label class="form-label fw-semibold mb-1" for="narrativeEditInput">Narrative Report</label>
-          <textarea id="narrativeEditInput" class="form-control" rows="6" disabled>${esc(narrativeValue)}</textarea>
-          ${hint}
-          <div class="d-flex gap-2 mt-2">
-            <button type="button" class="btn btn-sm btn-outline-secondary" id="btnEditNarrative">Edit Narrative</button>
-            <button type="button" class="btn btn-sm btn-primary d-none" id="btnSaveNarrative">Save Narrative</button>
-            <button type="button" class="btn btn-sm btn-light border d-none" id="btnCancelNarrative">Cancel</button>
+          <label class="form-label fw-semibold mb-1" for="narrativeAddInput">Additional Narrative Report</label>
+          <textarea id="narrativeAddInput" class="form-control" rows="4" placeholder="Add a new narrative entry..."></textarea>
+          <div class="d-flex justify-content-end mt-2">
+            <button type="button" class="btn btn-sm btn-primary" id="btnAddNarrative">Add Narrative</button>
           </div>
         </div>
 
@@ -229,69 +267,162 @@
             <button type="button" class="btn btn-sm btn-success" id="btnAddCaseUpdate">Add Update</button>
           </div>
         </div>
+
+        <hr class="my-3">
+        <div class="d-flex flex-wrap gap-2">
+          <button type="button" class="btn btn-sm btn-danger" id="btnMarkDropped">Mark as Dropped</button>
+          <button type="button" class="btn btn-sm btn-warning" id="btnSubjectEndorsement">Subject to Endorsement</button>
+          <button type="button" class="btn btn-sm btn-success" id="btnMarkResolved">Mark as Resolved</button>
+        </div>
       </section>
     `;
   }
 
+  function actionLabel(type) {
+    if (type === 'resolved') return 'Mark as Resolved';
+    if (type === 'endorsement') return 'Subject to Endorsement';
+    if (type === 'dropped') return 'Mark as Dropped';
+    return 'Update Case';
+  }
+
+  function transitionModal(fromEl, fromModal, toModal) {
+    if (fromEl && fromEl.classList.contains('show') && fromModal) {
+      fromEl.addEventListener('hidden.bs.modal', () => {
+        toModal?.show();
+      }, { once: true });
+      fromModal.hide();
+      return;
+    }
+    toModal?.show();
+  }
+
+  function openCaseActionModal(type) {
+    if (!caseActionModal) return;
+    pendingCaseAction = null;
+    if (caseActionModalTitle) caseActionModalTitle.textContent = actionLabel(type);
+    if (caseActionRemarks) caseActionRemarks.value = '';
+    if (endorsementTargetSelect) endorsementTargetSelect.value = '';
+    if (endorsementTargetGroup) endorsementTargetGroup.classList.toggle('d-none', type !== 'endorsement');
+    if (btnCaseActionProceed) btnCaseActionProceed.setAttribute('data-action-type', type);
+    transitionModal(viewModalEl, viewModal, caseActionModal);
+  }
+
+  function initCaseActionFlow() {
+    if (caseActionHandlersBound) return;
+    caseActionHandlersBound = true;
+    if (!btnCaseActionProceed || !btnCaseActionConfirm) return;
+
+    btnCaseActionProceed.addEventListener('click', () => {
+      const type = String(btnCaseActionProceed.getAttribute('data-action-type') || '').trim();
+      const remarks = String(caseActionRemarks?.value || '').trim();
+      const endorsementTarget = String(endorsementTargetSelect?.value || '').trim();
+      if (!type || !currentViewCaseId) return;
+      if (!remarks) {
+        alert('Remarks are required.');
+        caseActionRemarks?.focus();
+        return;
+      }
+      if (type === 'endorsement' && !endorsementTarget) {
+        alert('Please select endorsement target.');
+        endorsementTargetSelect?.focus();
+        return;
+      }
+
+      pendingCaseAction = {
+        case_id: currentViewCaseId,
+        action_type: type,
+        endorsement_target: endorsementTarget,
+        remarks
+      };
+
+      const targetText = type === 'endorsement'
+        ? ` to ${endorsementTarget === 'lupon' ? 'Lupon' : 'PNP'}`
+        : '';
+      if (caseActionConfirmText) {
+        caseActionConfirmText.textContent = `Are you sure you want to ${actionLabel(type).toLowerCase()}${targetText}?`;
+      }
+      transitionModal(caseActionModalEl, caseActionModal, caseActionConfirmModal);
+    });
+
+    btnCaseActionReturn?.addEventListener('click', () => {
+      transitionModal(caseActionModalEl, caseActionModal, viewModal);
+    });
+
+    btnCaseActionConfirmReturn?.addEventListener('click', () => {
+      transitionModal(caseActionConfirmModalEl, caseActionConfirmModal, caseActionModal);
+    });
+
+    btnCaseActionConfirm.addEventListener('click', async () => {
+      if (!pendingCaseAction) return;
+      try {
+        btnCaseActionConfirm.disabled = true;
+        await fetchJson(endpoint, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            action: 'update_case_outcome',
+            ...pendingCaseAction
+          })
+        });
+        const targetCaseId = currentViewCaseId;
+        if (caseActionConfirmModalEl && caseActionConfirmModal) {
+          caseActionConfirmModalEl.addEventListener('hidden.bs.modal', async () => {
+            alert('Case updated successfully.');
+            await loadList();
+            if (targetCaseId) openViewModal(targetCaseId);
+          }, { once: true });
+          caseActionConfirmModal.hide();
+        } else {
+          alert('Case updated successfully.');
+          await loadList();
+          if (targetCaseId) openViewModal(targetCaseId);
+        }
+      } catch (err) {
+        alert(String(err?.message || err || 'Failed to update case.'));
+      } finally {
+        btnCaseActionConfirm.disabled = false;
+        pendingCaseAction = null;
+      }
+    });
+  }
+
   function bindViewActions() {
-    const narrativeInput = document.getElementById('narrativeEditInput');
+    const narrativeAddInput = document.getElementById('narrativeAddInput');
     const caseUpdateInput = document.getElementById('caseUpdateInput');
-    const editBtn = document.getElementById('btnEditNarrative');
-    const saveBtn = document.getElementById('btnSaveNarrative');
-    const cancelBtn = document.getElementById('btnCancelNarrative');
+    const addNarrativeBtn = document.getElementById('btnAddNarrative');
     const addUpdateBtn = document.getElementById('btnAddCaseUpdate');
+    const markResolvedBtn = document.getElementById('btnMarkResolved');
+    const subjectEndorsementBtn = document.getElementById('btnSubjectEndorsement');
+    const markDroppedBtn = document.getElementById('btnMarkDropped');
 
-    if (!narrativeInput || !editBtn || !saveBtn || !cancelBtn || !addUpdateBtn) return;
+    if (!narrativeAddInput || !addNarrativeBtn || !addUpdateBtn) return;
 
-    const initialValue = narrativeInput.value;
-
-    editBtn.addEventListener('click', () => {
-      narrativeInput.disabled = false;
-      narrativeInput.focus();
-      editBtn.classList.add('d-none');
-      saveBtn.classList.remove('d-none');
-      cancelBtn.classList.remove('d-none');
-    });
-
-    cancelBtn.addEventListener('click', () => {
-      narrativeInput.value = initialValue;
-      narrativeInput.disabled = true;
-      editBtn.classList.remove('d-none');
-      saveBtn.classList.add('d-none');
-      cancelBtn.classList.add('d-none');
-    });
-
-    saveBtn.addEventListener('click', async () => {
-      const value = String(narrativeInput.value || '').trim();
+    addNarrativeBtn.addEventListener('click', async () => {
+      const value = String(narrativeAddInput.value || '').trim();
       if (!value) {
-        alert('Narrative report is required.');
-        narrativeInput.focus();
+        alert('Please enter a narrative report update first.');
+        narrativeAddInput.focus();
         return;
       }
       if (!currentViewCaseId) return;
 
       try {
-        saveBtn.disabled = true;
+        addNarrativeBtn.disabled = true;
         await fetchJson(endpoint, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            action: 'update_narrative',
+            action: 'add_narrative_entry',
             case_id: currentViewCaseId,
             narrative_report: value
           })
         });
-        currentDetail = { ...(currentDetail || {}), narrative_type: 'text', narrative_value: value };
-        narrativeInput.disabled = true;
-        editBtn.classList.remove('d-none');
-        saveBtn.classList.add('d-none');
-        cancelBtn.classList.add('d-none');
-        loadList();
-        alert('Narrative report updated.');
+        narrativeAddInput.value = '';
+        alert('Narrative entry added to case logs.');
       } catch (err) {
-        alert(String(err?.message || err || 'Failed to update narrative.'));
+        alert(String(err?.message || err || 'Failed to add narrative entry.'));
       } finally {
-        saveBtn.disabled = false;
+        addNarrativeBtn.disabled = false;
       }
     });
 
@@ -322,6 +453,10 @@
         addUpdateBtn.disabled = false;
       }
     });
+
+    markResolvedBtn?.addEventListener('click', () => openCaseActionModal('resolved'));
+    subjectEndorsementBtn?.addEventListener('click', () => openCaseActionModal('endorsement'));
+    markDroppedBtn?.addEventListener('click', () => openCaseActionModal('dropped'));
   }
 
   async function openViewModal(caseId) {
@@ -369,19 +504,19 @@
         { label: 'Complaint Type', value: d.complaint_type || '-' }
       ], 2);
 
-      const narrativeField = renderNarrative(d);
-
       const html = [
         formSection('Blotter Information', blotterGrid),
         formSection('Complainant Information', complainantGrid),
         formSection('Respondent Information', respondentGrid),
-        formSection('Incident Details', incidentGrid + narrativeField),
+        formSection('Incident Details', incidentGrid),
+        renderNarrativeReportsSection(d),
         renderCaseManagementSection(d)
       ].join('');
 
       viewDetailsBody.innerHTML = html || '<div class="text-muted">No details available.</div>';
       currentDetail = d;
       bindViewActions();
+      loadNarrativeUpdates(caseId);
     } catch (err) {
       viewDetailsBody.innerHTML = `<div class="text-danger">${esc(err.message || err)}</div>`;
     }
@@ -399,12 +534,20 @@
         caseLogsBody.innerHTML = '<div class="text-muted">No case logs yet.</div>';
         return;
       }
-      const html = logs.map((item) => `
-        <div class="border rounded-3 p-3 mb-2">
-          <div class="small text-muted mb-1">${esc(item.logged_at || '-')} | ${esc(item.logged_by_display || item.logged_by_name || item.logged_by_user_id || 'Unknown User')}</div>
-          <div>${esc(item.log_entry || '')}</div>
-        </div>
-      `).join('');
+      const html = logs.map((item) => {
+        const text = String(item.log_entry || '');
+        const isNarrative = text.toLowerCase().startsWith('narrative report added:');
+        const badge = isNarrative
+          ? '<span class="badge text-bg-primary me-2">Narrative</span>'
+          : '<span class="badge text-bg-secondary me-2">Case Update</span>';
+        return `
+          <div class="border rounded-3 p-3 mb-2">
+            <div class="small text-muted mb-1">${esc(item.logged_at || '-')} | ${esc(item.logged_by_display || item.logged_by_name || item.logged_by_user_id || 'Unknown User')}</div>
+            <div class="mb-1">${badge}</div>
+            <div>${esc(text)}</div>
+          </div>
+        `;
+      }).join('');
       caseLogsBody.innerHTML = html;
     } catch (err) {
       caseLogsBody.innerHTML = `<div class="text-danger">${esc(err.message || err)}</div>`;
@@ -426,5 +569,6 @@
     loadList();
   });
 
+  initCaseActionFlow();
   loadList();
 })();

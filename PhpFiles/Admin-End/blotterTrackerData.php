@@ -48,6 +48,23 @@ function tableExists(mysqli $conn, string $tableName): bool {
     return !empty($row);
 }
 
+function getStatusId(mysqli $conn, string $statusName, string $statusType): int {
+    $stmt = $conn->prepare("
+        SELECT status_id
+        FROM statuslookuptbl
+        WHERE status_name = ? AND status_type = ?
+        LIMIT 1
+    ");
+    if (!$stmt) {
+        return 0;
+    }
+    $stmt->bind_param("ss", $statusName, $statusType);
+    $stmt->execute();
+    $row = $stmt->get_result()->fetch_assoc();
+    $stmt->close();
+    return isset($row['status_id']) ? (int)$row['status_id'] : 0;
+}
+
 if ($action === 'list') {
     $sql = "
         SELECT
@@ -129,6 +146,7 @@ if ($action === 'detail') {
             b.blotter_number,
             b.date_filed,
             b.time_filed,
+            DATE_FORMAT(c.report_timestamp, '%Y-%m-%d %h:%i %p') AS report_timestamp,
             c.incident_date,
             c.incident_time,
             c.incident_place,
@@ -206,6 +224,7 @@ if ($action === 'detail') {
         'blotter_number' => $detail['blotter_number'],
         'date_filed' => $detail['date_filed'],
         'time_filed' => $detail['time_filed'],
+        'report_timestamp' => $detail['report_timestamp'],
         'status_name' => $detail['status_name'],
         'level_name' => $detail['level_name'],
         'incident_date' => $detail['incident_date'],
@@ -221,9 +240,13 @@ if ($action === 'detail') {
     respond(true, ['detail' => $payload]);
 }
 
-if ($action === 'update_narrative') {
+if ($action === 'add_narrative_entry') {
     if ($requestMethod !== 'POST') {
         respond(false, [], "Method not allowed.");
+    }
+
+    if (!tableExists($conn, 'caseupdateslogtbl')) {
+        respond(false, [], "Missing table caseupdateslogtbl. Run the migration first.");
     }
 
     $caseId = isset($jsonInput['case_id']) ? (int)$jsonInput['case_id'] : (isset($_POST['case_id']) ? (int)$_POST['case_id'] : 0);
@@ -240,14 +263,116 @@ if ($action === 'update_narrative') {
         respond(false, [], "User session not found.");
     }
 
+    $existsStmt = $conn->prepare("SELECT 1 FROM casereportstbl WHERE case_id = ? AND report_type = 'Blotter' LIMIT 1");
+    if (!$existsStmt) {
+        respond(false, [], "Failed to validate case.");
+    }
+    $existsStmt->bind_param("i", $caseId);
+    $existsStmt->execute();
+    $exists = $existsStmt->get_result()->fetch_row();
+    $existsStmt->close();
+    if (!$exists) {
+        respond(false, [], "Blotter case not found.");
+    }
+
+    $logEntry = "Narrative report added: " . $narrative;
+    $conn->begin_transaction();
+    try {
+        $logStmt = $conn->prepare("
+            INSERT INTO caseupdateslogtbl (case_id, log_entry, logged_by_user_id)
+            VALUES (?, ?, ?)
+        ");
+        if (!$logStmt) {
+            throw new Exception("Failed to prepare narrative log insert.");
+        }
+        $logStmt->bind_param("iss", $caseId, $logEntry, $actorUserId);
+        $logStmt->execute();
+        $logStmt->close();
+
+        $updStmt = $conn->prepare("
+            UPDATE casereportstbl
+            SET user_id_official_update_by = ?
+            WHERE case_id = ? AND report_type = 'Blotter'
+            LIMIT 1
+        ");
+        if (!$updStmt) {
+            throw new Exception("Failed to prepare case updater.");
+        }
+        $updStmt->bind_param("si", $actorUserId, $caseId);
+        $updStmt->execute();
+        $updStmt->close();
+
+        $conn->commit();
+        respond(true, [], "Narrative entry added.");
+    } catch (Exception $e) {
+        $conn->rollback();
+        respond(false, [], "Failed to add narrative entry.");
+    }
+}
+
+if ($action === 'update_case_outcome') {
+    if ($requestMethod !== 'POST') {
+        respond(false, [], "Method not allowed.");
+    }
+
+    if (!tableExists($conn, 'caseupdateslogtbl')) {
+        respond(false, [], "Missing table caseupdateslogtbl. Run the migration first.");
+    }
+
+    $caseId = isset($jsonInput['case_id']) ? (int)$jsonInput['case_id'] : 0;
+    $actionType = strtolower(trim((string)($jsonInput['action_type'] ?? '')));
+    $endorsementTarget = strtolower(trim((string)($jsonInput['endorsement_target'] ?? '')));
+    $remarks = trim((string)($jsonInput['remarks'] ?? ''));
+
+    if ($caseId <= 0) {
+        respond(false, [], "Invalid case ID.");
+    }
+    if ($remarks === '') {
+        respond(false, [], "Remarks are required.");
+    }
+    if (!in_array($actionType, ['resolved', 'endorsement', 'dropped'], true)) {
+        respond(false, [], "Invalid action type.");
+    }
+    if ($actionType === 'endorsement' && !in_array($endorsementTarget, ['lupon', 'pnp'], true)) {
+        respond(false, [], "Invalid endorsement target.");
+    }
+
+    $actorUserId = isset($_SESSION['user_id']) ? trim((string)$_SESSION['user_id']) : '';
+    if ($actorUserId === '') {
+        respond(false, [], "User session not found.");
+    }
+
+    $newStatusName = '';
+    $newLevelName = '';
+    if ($actionType === 'resolved') {
+        $newStatusName = 'Resolved';
+        $newLevelName = 'Settled';
+    } elseif ($actionType === 'dropped') {
+        $newStatusName = 'Dropped';
+        $newLevelName = 'Unsettled';
+    } elseif ($actionType === 'endorsement') {
+        $newStatusName = 'Endorsed';
+        $newLevelName = ($endorsementTarget === 'lupon') ? 'Endorsed to Lupon' : 'Endorsed to PNP';
+    }
+
+    $newStatusId = getStatusId($conn, $newStatusName, 'Blotter');
+    $newLevelId = getStatusId($conn, $newLevelName, 'BlotterLevel');
+    if ($newStatusId <= 0 || $newLevelId <= 0) {
+        respond(false, [], "Status or case level mapping not found in statuslookuptbl.");
+    }
+
     $oldStmt = $conn->prepare("
-        SELECT case_details, case_remarks
-        FROM casereportstbl
-        WHERE case_id = ? AND report_type = 'Blotter'
+        SELECT
+            s.status_name AS old_status_name,
+            l.status_name AS old_level_name
+        FROM casereportstbl c
+        LEFT JOIN statuslookuptbl s ON s.status_id = c.case_status_id
+        LEFT JOIN statuslookuptbl l ON l.status_id = c.case_level_id
+        WHERE c.case_id = ? AND c.report_type = 'Blotter'
         LIMIT 1
     ");
     if (!$oldStmt) {
-        respond(false, [], "Failed to prepare narrative fetch.");
+        respond(false, [], "Failed to load current case state.");
     }
     $oldStmt->bind_param("i", $caseId);
     $oldStmt->execute();
@@ -257,52 +382,42 @@ if ($action === 'update_narrative') {
         respond(false, [], "Blotter case not found.");
     }
 
-    $stmt = $conn->prepare("
-        UPDATE casereportstbl
-        SET case_details = ?, case_remarks = NULL, user_id_official_update_by = ?
-        WHERE case_id = ? AND report_type = 'Blotter'
-        LIMIT 1
-    ");
-    if (!$stmt) {
-        respond(false, [], "Failed to prepare narrative update.");
-    }
+    $oldStatusName = trim((string)($oldRow['old_status_name'] ?? 'Unknown'));
+    $oldLevelName = trim((string)($oldRow['old_level_name'] ?? 'Unknown'));
+    $logEntry = "Case status updated: {$oldStatusName} -> {$newStatusName}; Case level: {$oldLevelName} -> {$newLevelName}; Remarks: {$remarks}";
+
     $conn->begin_transaction();
     try {
-        $stmt->bind_param("ssi", $narrative, $actorUserId, $caseId);
-        $stmt->execute();
-        $stmt->close();
-
-        if (tableExists($conn, 'caseupdateslogtbl')) {
-            $oldNarrative = trim((string)($oldRow['case_details'] ?? ''));
-            $oldRemarks = strtolower(trim((string)($oldRow['case_remarks'] ?? '')));
-            $fromFile = ($oldRemarks === 'narrative file uploaded');
-            $changed = ($oldNarrative !== $narrative) || $fromFile;
-            if ($changed) {
-                $logEntry = $fromFile
-                    ? "Narrative report updated (replaced previous narrative file)."
-                    : "Narrative report updated.";
-                $logStmt = $conn->prepare("
-                    INSERT INTO caseupdateslogtbl (case_id, log_entry, logged_by_user_id)
-                    VALUES (?, ?, ?)
-                ");
-                if ($logStmt) {
-                    $logStmt->bind_param("iss", $caseId, $logEntry, $actorUserId);
-                    $logStmt->execute();
-                    $logStmt->close();
-                }
-            }
+        $updateStmt = $conn->prepare("
+            UPDATE casereportstbl
+            SET case_status_id = ?, case_level_id = ?, user_id_official_update_by = ?, resolution_remarks = ?
+            WHERE case_id = ? AND report_type = 'Blotter'
+            LIMIT 1
+        ");
+        if (!$updateStmt) {
+            throw new Exception("Failed to prepare case update.");
         }
+        $updateStmt->bind_param("iissi", $newStatusId, $newLevelId, $actorUserId, $remarks, $caseId);
+        $updateStmt->execute();
+        $updateStmt->close();
+
+        $logStmt = $conn->prepare("
+            INSERT INTO caseupdateslogtbl (case_id, log_entry, logged_by_user_id)
+            VALUES (?, ?, ?)
+        ");
+        if (!$logStmt) {
+            throw new Exception("Failed to prepare case log.");
+        }
+        $logStmt->bind_param("iss", $caseId, $logEntry, $actorUserId);
+        $logStmt->execute();
+        $logStmt->close();
 
         $conn->commit();
+        respond(true, [], "Case updated.");
     } catch (Exception $e) {
         $conn->rollback();
-        if (isset($stmt) && $stmt instanceof mysqli_stmt) {
-            $stmt->close();
-        }
-        respond(false, [], "Failed to update narrative report.");
+        respond(false, [], "Failed to update case.");
     }
-
-    respond(true, [], "Narrative updated.");
 }
 
 if ($action === 'add_case_log') {

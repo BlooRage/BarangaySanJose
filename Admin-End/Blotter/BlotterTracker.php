@@ -156,6 +156,53 @@ require_once __DIR__ . "/../includes/admin_guard.php";
     </div>
 </div>
 
+<div class="modal fade" id="caseActionModal" tabindex="-1" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="caseActionModalTitle">Update Case</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3 d-none" id="endorsementTargetGroup">
+                    <label for="endorsementTargetSelect" class="form-label">Endorsement Target</label>
+                    <select id="endorsementTargetSelect" class="form-select">
+                        <option value="">Select target</option>
+                        <option value="lupon">Endorsed to Lupon</option>
+                        <option value="pnp">Endorsed to PNP</option>
+                    </select>
+                </div>
+                <div class="mb-0">
+                    <label for="caseActionRemarks" class="form-label">Remarks</label>
+                    <textarea id="caseActionRemarks" class="form-control" rows="4" placeholder="Add remarks..."></textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline-secondary" id="btnCaseActionReturn">Return</button>
+                <button type="button" class="btn btn-primary" id="btnCaseActionProceed">Update</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="caseActionConfirmModal" tabindex="-1" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Confirm Update</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body" id="caseActionConfirmText">
+                Are you sure you want to update this case?
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline-secondary" id="btnCaseActionConfirmReturn">Return</button>
+                <button type="button" class="btn btn-danger" id="btnCaseActionConfirm">Confirm</button>
+            </div>
+        </div>
+    </div>
+</div>
+
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 <script>
     window.ADMIN_TABLE_COLUMNS_CONFIG = {
@@ -168,6 +215,6 @@ require_once __DIR__ . "/../includes/admin_guard.php";
     };
 </script>
 <script src="../../JS-Script-Files/Admin-End/tableColumnsGeneric.js?v=20260215-1"></script>
-<script src="../../JS-Script-Files/Admin-End/blotterTracker.js?v=20260307-3"></script>
+<script src="../../JS-Script-Files/Admin-End/blotterTracker.js?v=20260307-4"></script>
 </body>
 </html>
