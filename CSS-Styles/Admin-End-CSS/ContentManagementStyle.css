@@ -189,18 +189,18 @@
   max-width: 420px;
 }
 
+.announcement-shell .admin-search .input-group {
+  width: 100%;
+}
+
 .announcement-shell .admin-search .form-control {
-  border-top-left-radius: 0.375rem;
-  border-bottom-left-radius: 0.375rem;
-  border-top-right-radius: 0;
-  border-bottom-right-radius: 0;
+  height: 38px;
 }
 
 .announcement-shell .admin-search .input-group-text {
-  border-top-right-radius: 0.375rem;
-  border-bottom-right-radius: 0.375rem;
-  border-top-left-radius: 0;
-  border-bottom-left-radius: 0;
+  height: 38px;
+  min-width: 48px;
+  justify-content: center;
 }
 
 .status-pill {
@@ -262,6 +262,7 @@
   display: inline-flex;
   flex-wrap: nowrap;
   gap: 8px;
+  align-items: center;
 }
 
 .announcement-primary-actions .btn,
@@ -400,6 +401,16 @@
   background-color: #f8f9fa;
 }
 
+.announcement-shell #btnAnnouncementsTableRefresh.is-loading i,
+.announcement-shell #btnReviewQueueRefresh.is-loading i {
+  animation: announcementRefreshSpin 900ms linear infinite;
+}
+
+@keyframes announcementRefreshSpin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
 .resident-entries-input {
   width: 88px;
 }
@@ -431,17 +442,28 @@
   align-items: stretch;
 }
 
-#modalViewAnnouncement .modal-footer > form,
-#modalDeleteAnnouncement .modal-footer > form,
-#modalEditAnnouncement .modal-footer > form,
-#modalFilter .modal-footer > form,
-#modalReviewQueueFilter .modal-footer > form,
-#modalTableColumns .modal-footer > form,
-#modalReviewQueueColumns .modal-footer > form,
-#modalAnnouncementFlash .modal-footer > form {
+#modalViewAnnouncement .modal-footer > form:not(.d-none),
+#modalDeleteAnnouncement .modal-footer > form:not(.d-none),
+#modalEditAnnouncement .modal-footer > form:not(.d-none),
+#modalFilter .modal-footer > form:not(.d-none),
+#modalReviewQueueFilter .modal-footer > form:not(.d-none),
+#modalTableColumns .modal-footer > form:not(.d-none),
+#modalReviewQueueColumns .modal-footer > form:not(.d-none),
+#modalAnnouncementFlash .modal-footer > form:not(.d-none) {
   display: flex !important;
   flex: 1 1 180px;
   margin: 0;
+}
+
+#modalViewAnnouncement .modal-footer > form.d-none,
+#modalDeleteAnnouncement .modal-footer > form.d-none,
+#modalEditAnnouncement .modal-footer > form.d-none,
+#modalFilter .modal-footer > form.d-none,
+#modalReviewQueueFilter .modal-footer > form.d-none,
+#modalTableColumns .modal-footer > form.d-none,
+#modalReviewQueueColumns .modal-footer > form.d-none,
+#modalAnnouncementFlash .modal-footer > form.d-none {
+  display: none !important;
 }
 
 #modalViewAnnouncement .modal-footer > .btn,
@@ -491,6 +513,7 @@
   display: grid !important;
   grid-template-columns: 1fr 1fr;
   gap: 6px;
+  align-items: stretch;
 }
 
 #modalViewAnnouncement .modal-footer.modal-grid-actions .modal-action-primary {
@@ -499,6 +522,7 @@
 
 #modalViewAnnouncement .modal-footer.modal-grid-actions .modal-action-secondary {
   grid-column: span 1;
+  width: 100%;
 }
 
 @media (max-width: 768px) {
@@ -588,12 +612,13 @@
 
   .announcement-row-actions {
     justify-content: flex-start !important;
-    align-items: flex-start;
+    align-items: stretch;
   }
 
   .announcement-primary-actions .btn,
   .announcement-review-actions .btn {
     min-width: 68px;
+    flex: 1 1 auto;
   }
 
   .announcement-details-dialog {
@@ -627,10 +652,11 @@
   .resident-table-footer {
     flex-direction: column;
     align-items: stretch !important;
+    gap: 10px !important;
   }
 
   .resident-table-footer nav {
-    align-self: flex-start;
+    align-self: flex-end;
   }
 
   .modal-footer .modal-action-secondary {

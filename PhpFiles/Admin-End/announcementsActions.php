@@ -277,13 +277,13 @@ foreach ($rows as $idx => $item) {
   }
 
   if ($action === 'delete') {
-    if ($currentStatus === 'draft' && !$isOwnedByCurrentUser) {
+    if (!$isSuperAdmin && $currentStatus === 'draft' && !$isOwnedByCurrentUser) {
       ann_action_redirect($channel, $status, $q, $queueQ, $queueChannel, 'danger', 'Only the announcement creator can delete an unsubmitted draft.');
     }
     if (!$isSuperAdmin && !$isOwnedByCurrentUser) {
       ann_action_redirect($channel, $status, $q, $queueQ, $queueChannel, 'danger', 'Only the announcement creator can delete this announcement.');
     }
-    if ($currentStatus !== 'draft') {
+    if (!$isSuperAdmin && $currentStatus !== 'draft') {
       ann_action_redirect($channel, $status, $q, $queueQ, $queueChannel, 'danger', 'Only draft announcements can be deleted.');
     }
     array_splice($rows, $idx, 1);

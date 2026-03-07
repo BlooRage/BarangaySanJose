@@ -343,7 +343,7 @@ function buildReviewQueueUrl(string $channel, string $status, string $searchTerm
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
   <link href="../../summernote-0.9.0-dist/summernote-lite.min.css?v=20260307-2" rel="stylesheet">
   <link rel="stylesheet" href="../../CSS-Styles/Admin-End-CSS/AdminDashboardStyle.css">
-  <link rel="stylesheet" href="../../CSS-Styles/Admin-End-CSS/ContentManagementStyle.css?v=20260307-16">
+  <link rel="stylesheet" href="../../CSS-Styles/Admin-End-CSS/ContentManagementStyle.css?v=20260307-24">
 </head>
 <body>
   <div class="d-flex flex-column flex-md-row" style="min-height: 100vh;">
@@ -367,20 +367,17 @@ function buildReviewQueueUrl(string $channel, string $status, string $searchTerm
             <div class="review-queue-title-wrap">
               <div class="d-flex flex-wrap align-items-center gap-2 mb-1">
                 <h5 class="mb-0 fw-bold review-queue-heading">Review Queue</h5>
-                <span class="badge rounded-pill bg-warning-subtle text-warning-emphasis">
-                  Showing <?= (int)count($reviewQueueRows) ?> of <?= (int)count($reviewQueueBaseRows) ?> pending
-                </span>
               </div>
               <p class="small text-muted mb-0 review-queue-description">Shows pending announcements submitted by admin/official/personnel accounts.</p>
             </div>
 
             <div class="admin-list-actions review-queue-actions">
-              <form class="admin-search" method="get" action="Announcements.php">
+              <form class="announcement-search-form" method="get" action="Announcements.php">
                 <input type="hidden" name="channel" value="<?= htmlspecialchars($deliveryChannel) ?>">
                 <input type="hidden" name="status" value="<?= htmlspecialchars($statusFilter) ?>">
                 <input type="hidden" name="q" value="<?= htmlspecialchars($searchTerm) ?>">
                 <input type="hidden" name="queue_channel" value="<?= htmlspecialchars($queueChannelFilter) ?>">
-                <div class="input-group">
+                <div class="input-group admin-search">
                   <input type="text" name="queue_q" class="form-control" placeholder="Search title, audience, creator" value="<?= htmlspecialchars($queueSearchTerm) ?>">
                   <span class="input-group-text bg-white"><i class="fas fa-search"></i></span>
                 </div>
@@ -394,7 +391,7 @@ function buildReviewQueueUrl(string $channel, string $status, string $searchTerm
                 <i class="fa-solid fa-sliders"></i>
                 <span class="visually-hidden">Review queue columns</span>
               </button>
-              <a class="btn btn-outline-secondary btn-icon" href="<?= htmlspecialchars(buildReviewQueueUrl($deliveryChannel, $statusFilter, $searchTerm, $queueChannelFilter, $queueSearchTerm)) ?>" title="Refresh review queue" aria-label="Refresh review queue">
+              <a class="btn btn-outline-secondary btn-icon" id="btnReviewQueueRefresh" href="<?= htmlspecialchars(buildReviewQueueUrl($deliveryChannel, $statusFilter, $searchTerm, $queueChannelFilter, $queueSearchTerm)) ?>" title="Refresh review queue" aria-label="Refresh review queue">
                 <i class="fa-solid fa-arrows-rotate"></i>
                 <span class="visually-hidden">Refresh review queue</span>
               </a>
@@ -447,10 +444,26 @@ function buildReviewQueueUrl(string $channel, string $status, string $searchTerm
               </tbody>
             </table>
           </div>
+
+          <div class="resident-table-footer mt-3 d-flex flex-wrap justify-content-between align-items-center gap-3">
+            <div class="d-flex align-items-center gap-2">
+              <label class="small text-muted mb-0">Entries</label>
+              <span class="small fw-semibold"><?= (int)count($reviewQueueRows) ?></span>
+              <span class="badge rounded-pill bg-warning-subtle text-warning-emphasis">
+                Showing <?= (int)count($reviewQueueRows) ?> of <?= (int)count($reviewQueueBaseRows) ?> pending
+              </span>
+            </div>
+          </div>
         </div>
       <?php endif; ?>
 
       <div class="announcement-shell resident-masterlist-shell p-3 p-md-4 shadow-sm">
+        <?php if ($isSuperAdmin): ?>
+          <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-1">
+            <h5 class="mb-0 fw-bold review-queue-heading">All Announcements</h5>
+          </div>
+        <?php endif; ?>
+
         <div class="admin-list-toolbar mb-3 pt-2 flex-wrap">
           <div class="admin-list-tabs">
             <a href="<?= htmlspecialchars(buildAnnouncementsUrl($deliveryChannel, 'all', $searchTerm)) ?>" data-filter="ALL" class="btn btn-outline-primary btn-sm status-filter-btn fw-semibold <?= $statusFilter === 'all' ? 'active' : '' ?>">
@@ -471,10 +484,10 @@ function buildReviewQueueUrl(string $channel, string $status, string $searchTerm
           </div>
 
           <div class="admin-list-actions">
-            <form class="admin-search" method="get" action="Announcements.php">
+            <form class="announcement-search-form" method="get" action="Announcements.php">
               <input type="hidden" name="channel" value="<?= htmlspecialchars($deliveryChannel) ?>">
               <input type="hidden" name="status" value="<?= htmlspecialchars($statusFilter) ?>">
-              <div class="input-group">
+              <div class="input-group admin-search">
                 <input type="text" id="searchInput" name="q" class="form-control" placeholder="<?= $isSuperAdmin ? 'Search title, audience, creator' : 'Search title, audience' ?>" value="<?= htmlspecialchars($searchTerm) ?>">
                 <span class="input-group-text bg-white"><i class="fas fa-search"></i></span>
               </div>
@@ -580,6 +593,11 @@ function buildReviewQueueUrl(string $channel, string $status, string $searchTerm
               value="20"
               class="form-control form-control-sm resident-entries-input"
             />
+            <?php if ($isSuperAdmin): ?>
+              <span class="badge rounded-pill bg-warning-subtle text-warning-emphasis">
+                Showing <?= (int)count($visibleRows) ?> of <?= (int)count($filteredByChannel) ?>
+              </span>
+            <?php endif; ?>
           </div>
           <nav aria-label="Announcements pagination">
             <ul class="pagination pagination-sm mb-0" id="announcementsPagination"></ul>
@@ -689,7 +707,7 @@ function buildReviewQueueUrl(string $channel, string $status, string $searchTerm
           <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
         </div>
         <div class="modal-body">
-          <p class="mb-2">You are about to delete this announcement:</p>
+          <p class="mb-2">Are you sure you want to delete this announcement?</p>
           <p class="fw-semibold mb-0" id="deleteAnnouncementTitle">-</p>
           <p class="small text-muted mt-2 mb-0">This action cannot be undone.</p>
         </div>
@@ -1169,28 +1187,65 @@ function buildReviewQueueUrl(string $channel, string $status, string $searchTerm
         if (!footer) return;
         footer.classList.remove("modal-grid-actions");
 
-        const candidates = Array.from(footer.children).filter((el) => {
+        const footerChildren = Array.from(footer.children);
+        const candidates = footerChildren.filter((el) => {
           if (!el) return false;
-          if (el.classList.contains("d-none")) return false;
-          if (el.tagName === "FORM") {
+          let isVisible = !el.classList.contains("d-none");
+          if (isVisible && el.tagName === "FORM") {
             const visibleBtn = el.querySelector(".btn:not(.d-none), button:not(.d-none)");
-            return !!visibleBtn;
+            isVisible = !!visibleBtn;
           }
-          return true;
+          // Enforce hidden elements to not occupy grid slots.
+          if (el.style) {
+            el.style.display = isVisible ? "" : "none";
+          }
+          return isVisible;
         });
 
-        candidates.forEach((el) => {
+        footerChildren.forEach((el) => {
           el.classList.remove("modal-action-primary", "modal-action-secondary");
+          if (el.style) {
+            el.style.order = "";
+            el.style.gridColumn = "";
+          }
         });
 
         if (!candidates.length) return;
+
+        if (modalEl.id === "modalViewAnnouncement") {
+          if (candidates.length === 2) {
+            // If only two actions are visible (e.g., Delete + Close), keep them on one row.
+            const deleteEl = candidates.find((el) => el.id === "btnViewDeleteAnnouncement") || null;
+            const closeEl = candidates.find((el) => el.id === "btnViewCloseAnnouncement") || null;
+            const ordered = [];
+            if (deleteEl) ordered.push(deleteEl);
+            if (closeEl) ordered.push(closeEl);
+            candidates.forEach((el) => {
+              if (!ordered.includes(el)) ordered.push(el);
+            });
+
+            ordered.forEach((el, idx) => {
+              el.classList.add("modal-action-secondary");
+              if (el.style) {
+                el.style.order = String(idx + 1);
+              }
+            });
+            footer.classList.add("modal-grid-actions");
+            return;
+          }
+
+          if (candidates.length >= 3) {
+            const primary = candidates[0];
+            primary.classList.add("modal-action-primary");
+            candidates.slice(1).forEach((el) => el.classList.add("modal-action-secondary"));
+            footer.classList.add("modal-grid-actions");
+            return;
+          }
+        }
+
         const primary = candidates[0];
         primary.classList.add("modal-action-primary");
         candidates.slice(1).forEach((el) => el.classList.add("modal-action-secondary"));
-
-        if (modalEl.id === "modalViewAnnouncement" && candidates.length >= 2) {
-          footer.classList.add("modal-grid-actions");
-        }
       }
 
       viewModal.addEventListener("show.bs.modal", function (event) {
@@ -1225,8 +1280,8 @@ function buildReviewQueueUrl(string $channel, string $status, string $searchTerm
         const canReview = <?= $isSuperAdmin ? 'true' : 'false' ?>
           && String(data.status || "").toLowerCase() === "pending"
           && String(data.created_by_role || "").toLowerCase() !== "superadmin";
-        const canDelete = String(data.status || "").toLowerCase() === "draft"
-          && (<?= $isSuperAdmin ? 'true' : 'false' ?> || isOwner);
+        const canDelete = <?= $isSuperAdmin ? 'true' : 'false' ?>
+          || (String(data.status || "").toLowerCase() === "draft" && isOwner);
 
         if (submitReviewForm) submitReviewForm.classList.toggle("d-none", !canSubmitReview);
         if (approveForm) approveForm.classList.toggle("d-none", !canReview);
@@ -1379,6 +1434,80 @@ function buildReviewQueueUrl(string $channel, string $status, string $searchTerm
     })();
 
     (function () {
+      const tableBody = document.getElementById("tableBody");
+      const entriesPerPageInput = document.getElementById("entriesPerPageInput");
+      const paginationEl = document.getElementById("announcementsPagination");
+      if (!tableBody || !entriesPerPageInput || !paginationEl) return;
+
+      function getDataRows() {
+        return Array.from(tableBody.querySelectorAll("tr")).filter((row) => {
+          return !row.querySelector("td[colspan]");
+        });
+      }
+
+      let currentPage = 1;
+      let entriesPerPage = Math.max(1, Number.parseInt(entriesPerPageInput.value || "20", 10) || 20);
+
+      function renderPagination(totalRows) {
+        paginationEl.innerHTML = "";
+        const totalPages = Math.max(1, Math.ceil(totalRows / entriesPerPage));
+        if (currentPage > totalPages) currentPage = totalPages;
+        if (currentPage < 1) currentPage = 1;
+
+        function createPageItem(label, page, disabled, active = false) {
+          const li = document.createElement("li");
+          li.className = `page-item ${disabled ? "disabled" : ""} ${active ? "active" : ""}`.trim();
+
+          const btn = document.createElement("button");
+          btn.type = "button";
+          btn.className = "page-link";
+          btn.textContent = label;
+          btn.disabled = !!disabled;
+          btn.addEventListener("click", () => {
+            if (disabled || page === currentPage) return;
+            currentPage = page;
+            renderPage();
+          });
+          li.appendChild(btn);
+          paginationEl.appendChild(li);
+        }
+
+        createPageItem("<", Math.max(1, currentPage - 1), currentPage <= 1, false);
+        for (let page = 1; page <= totalPages; page++) {
+          createPageItem(String(page), page, false, page === currentPage);
+        }
+        createPageItem(">", Math.min(totalPages, currentPage + 1), currentPage >= totalPages, false);
+      }
+
+      function renderPage() {
+        const rows = getDataRows();
+        const totalRows = rows.length;
+        const totalPages = Math.max(1, Math.ceil(totalRows / entriesPerPage));
+        if (currentPage > totalPages) currentPage = totalPages;
+        if (currentPage < 1) currentPage = 1;
+
+        const start = (currentPage - 1) * entriesPerPage;
+        const end = start + entriesPerPage;
+
+        rows.forEach((row, idx) => {
+          row.style.display = idx >= start && idx < end ? "" : "none";
+        });
+
+        renderPagination(totalRows);
+      }
+
+      entriesPerPageInput.addEventListener("change", () => {
+        const next = Math.max(1, Number.parseInt(entriesPerPageInput.value || "20", 10) || 20);
+        entriesPerPage = next;
+        entriesPerPageInput.value = String(next);
+        currentPage = 1;
+        renderPage();
+      });
+
+      renderPage();
+    })();
+
+    (function () {
       const table = document.getElementById("table-reviewQueueData");
       const modal = document.getElementById("modalReviewQueueColumns");
       const list = document.getElementById("reviewQueueColumnsList");
@@ -1458,6 +1587,20 @@ function buildReviewQueueUrl(string $channel, string $status, string $searchTerm
       if (!flashModalEl) return;
       const flashModal = new bootstrap.Modal(flashModalEl);
       flashModal.show();
+    })();
+
+    (function () {
+      function bindRefreshSpin(buttonId) {
+        const refreshBtn = document.getElementById(buttonId);
+        if (!refreshBtn) return;
+        refreshBtn.addEventListener("click", function () {
+          refreshBtn.classList.add("is-loading");
+          refreshBtn.setAttribute("aria-busy", "true");
+        });
+      }
+
+      bindRefreshSpin("btnAnnouncementsTableRefresh");
+      bindRefreshSpin("btnReviewQueueRefresh");
     })();
   </script>
   <script src="../../JS-Script-Files/Admin-End/tableColumnsGeneric.js?v=20260215-1"></script>
