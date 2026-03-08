@@ -1327,8 +1327,10 @@ function dra_generate_issued_document(array $requestRow): ?string {
                 return '/UnifiedFileAttachment/IssuedDocuments/Generated/' . basename($pdfDiskPath);
             }
 
-            error_log('[dra_generate_issued_document][docx_template] DOCX generated but PDF conversion failed');
-            return null;
+            // Shared hosting often blocks shell converters (soffice/libreoffice).
+            // Keep the generated DOCX as a functional fallback instead of failing issuance.
+            error_log('[dra_generate_issued_document][docx_template] PDF conversion unavailable; falling back to DOCX output');
+            return '/UnifiedFileAttachment/IssuedDocuments/Generated/' . basename($docxDiskPath);
         } catch (Throwable $e) {
             error_log('[dra_generate_issued_document][docx_template] ' . $e->getMessage());
             return null;

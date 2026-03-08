@@ -357,19 +357,19 @@
       if (requestSeq !== templatePreviewRequestSeq) return;
       console.error('generated docx image preview failed', err);
       if (viewDetailsBody) {
-        viewDetailsBody.innerHTML = renderTemplatePreviewShell(requestId);
-        bindTemplateFieldEditors(requestId);
         const message = err && err.message ? String(err.message) : 'Generated .docx preview failed.';
-        setTemplatePreviewStatus(message, true);
-        const placeholder = viewDetailsBody.querySelector('.js-template-preview-placeholder');
-        if (placeholder) {
-          placeholder.classList.remove('d-none');
-          placeholder.innerHTML = `
-            <div class="alert alert-danger py-2 px-3 mb-0" role="alert">
-              ${esc(message)} Use the button above to open the file directly.
-            </div>
-          `;
-        }
+        const docxUrl = issuedTemplateDocxUrl(requestId);
+        const fallbackState = viewPreviewState && typeof viewPreviewState === 'object'
+          ? viewPreviewState
+          : buildPreviewState({}, {}, {});
+        viewDetailsBody.innerHTML = `
+          <div class="alert alert-warning py-2 px-3" role="alert">
+            ${esc(message)}. Showing editable fallback preview.
+            ${docxUrl ? ` <a href="${docxUrl}" target="_blank" rel="noopener">Open generated .docx</a>.` : ''}
+          </div>
+          ${renderDocumentPreview(fallbackState)}
+        `;
+        bindPreviewEditHandlers();
       }
     }
   }
@@ -1542,26 +1542,27 @@
     paymentProofPrintUrl = '';
     paymentProofOpenNew.href = docUrl;
     const lower = String(docUrl).toLowerCase();
-    let forcePdf = lower.endsWith('.pdf');
+    const isImageAsset = /\.(png|jpe?g|gif|webp|bmp|svg)(\?|#|$)/i.test(lower);
+    let isLikelyPdf = lower.endsWith('.pdf');
     try {
       const u = new URL(docUrl, window.location.origin);
-      const action = String(u.searchParams.get('action') || '').toLowerCase();
-      if (action === 'view_issued') {
-        forcePdf = true;
+      const explicitFormat = String(u.searchParams.get('format') || '').toLowerCase();
+      if (explicitFormat === 'pdf') {
+        isLikelyPdf = true;
       }
     } catch (_) {
       // keep extension-based fallback
     }
 
-    if (forcePdf) {
+    if (!isImageAsset) {
       paymentProofWrap.innerHTML = `<iframe src="${docUrl}" style="width:100%;height:70vh;border:1px solid #ddd;border-radius:8px;"></iframe>`;
     } else {
       paymentProofWrap.innerHTML = `<img src="${docUrl}" alt="Document Preview" style="max-width:100%;max-height:70vh;border:1px solid #ddd;border-radius:8px;">`;
     }
     if (paymentProofPrintBtn) {
       const allowPrint = !!(options && options.allowPrint);
-      paymentProofPrintBtn.classList.toggle('d-none', !(allowPrint && forcePdf && !proofOnly));
-      if (allowPrint && forcePdf && !proofOnly) {
+      paymentProofPrintBtn.classList.toggle('d-none', !(allowPrint && isLikelyPdf && !proofOnly));
+      if (allowPrint && isLikelyPdf && !proofOnly) {
         paymentProofPrintUrl = docUrl;
       }
     }
