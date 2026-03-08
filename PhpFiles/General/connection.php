@@ -32,5 +32,3 @@ $conn->set_charset('utf8mb4');
 // Force MySQL session timezone to UTC+08:00.
 // This affects NOW(), CURRENT_TIMESTAMP, and timestamp defaults for this connection.
 $conn->query("SET time_zone = '+08:00'");
-?>
-

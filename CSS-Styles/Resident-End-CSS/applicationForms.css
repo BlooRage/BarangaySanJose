@@ -146,6 +146,10 @@ body {
     margin-bottom: 20px;
 }
 
+.form-row.form-row--triple {
+    grid-template-columns: repeat(3, 1fr);
+}
+
 /* Input Styles */
 .form-row input, .form-row select, .form-row textarea {
     width: 100%;

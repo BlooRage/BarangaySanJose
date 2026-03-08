@@ -83,6 +83,8 @@
   let paymentProofPrintUrl = '';
   let preserveViewStateOnNextHide = false;
   let financeViewIntent = 'view';
+  let templatePreviewRequestSeq = 0;
+  let previewScrollCleanup = null;
   const financeStages = new Set([
     'for_payment',
     'payment_submitted',
@@ -128,6 +130,248 @@
     const id = String(requestId || row?.request_id || '').trim();
     if (!id) return '';
     return `${appBase}/PhpFiles/Admin-End/documentRequestWorkflow.php?action=view_payment_proof&request_id=${encodeURIComponent(id)}`;
+  }
+
+  function issuedTemplateDocxUrl(requestId) {
+    const id = String(requestId || '').trim();
+    if (!id) return '';
+    return `${appBase}/PhpFiles/Admin-End/documentRequestWorkflow.php?action=view_preview_docx&request_id=${encodeURIComponent(id)}&_ts=${Date.now()}`;
+  }
+
+  function issuedTemplateDocxImageUrl(requestId) {
+    const id = String(requestId || '').trim();
+    if (!id) return '';
+    return `${appBase}/PhpFiles/Admin-End/documentRequestWorkflow.php?action=view_preview_docx_image&request_id=${encodeURIComponent(id)}&_ts=${Date.now()}`;
+  }
+
+  function renderTemplatePreviewLoading(message = 'Loading template preview...') {
+    viewDetailsBody.innerHTML = `
+      <div class="tracker-form-section">
+        <div class="tracker-form-label mb-2">Template Preview</div>
+        <div class="text-muted">${esc(message)}</div>
+      </div>
+    `;
+  }
+
+  function templateEditFieldConfig(docType) {
+    const key = normalizePreviewDocKey(docType);
+    if (key === 'indigency') {
+      return [
+        { key: 'requestOfficerLine1', label: 'Official Name' },
+        { key: 'requestOfficerLine2', label: 'Position' },
+        { key: 'requestOfficerLine3', label: 'Jurisdiction', wide: true },
+        { key: 'purpose', label: 'Purpose', multiline: true, wide: true }
+      ];
+    }
+    if (key === 'goodmoral') {
+      return [
+        { key: 'purpose', label: 'Purpose', multiline: true, wide: true }
+      ];
+    }
+    if (key === 'residency') {
+      return [
+        { key: 'remarks', label: 'Remarks', multiline: true, wide: true }
+      ];
+    }
+    if (key === 'cohabitation') {
+      return [
+        { key: 'fullName', label: 'Name', wide: true },
+        { key: 'fullAddress', label: 'Address', multiline: true, wide: true },
+        { key: 'birthdate', label: 'Birthday' },
+        { key: 'birthplace', label: 'Birthplace' },
+        { key: 'remarks', label: 'Remarks', multiline: true, wide: true },
+        { key: 'purpose', label: 'Purpose', multiline: true, wide: true }
+      ];
+    }
+    return [
+      { key: 'birthdate', label: 'Birthdate' },
+      { key: 'birthplace', label: 'Birthplace' },
+      { key: 'location', label: 'Location', multiline: true, wide: true },
+      { key: 'remarks', label: 'Remarks', multiline: true, wide: true },
+      { key: 'purpose', label: 'Purpose', multiline: true, wide: true }
+    ];
+  }
+
+  function renderTemplateEditFields() {
+    if (!viewPreviewState || typeof viewPreviewState !== 'object') return '';
+    const config = templateEditFieldConfig(viewPreviewState.docType || '');
+    if (!config.length) return '';
+    return `
+      <div class="tracker-form-grid" aria-label="Editable template fields">
+        ${config.map((field) => {
+          const value = String(viewPreviewState[field.key] || '').trim();
+          return `
+            <label class="tracker-form-field${field.wide ? ' tracker-form-field--wide' : ''}">
+              <span class="tracker-form-label">${esc(field.label)}</span>
+              ${field.multiline
+                ? `<textarea class="form-control" data-template-edit-key="${esc(field.key)}" rows="2">${esc(value)}</textarea>`
+                : `<input class="form-control" type="text" data-template-edit-key="${esc(field.key)}" value="${esc(value)}">`}
+            </label>
+          `;
+        }).join('')}
+      </div>
+    `;
+  }
+
+  let templateRefreshTimer = null;
+  let templatePreviewObjectUrl = '';
+
+  async function fetchTemplatePreviewAsset(requestId, options = {}) {
+    const previewUrl = issuedTemplateDocxImageUrl(requestId);
+    if (!previewUrl) throw new Error('Preview URL is unavailable.');
+    const headers = { 'X-Requested-With': 'XMLHttpRequest' };
+    let fetchOptions = {
+      credentials: 'same-origin',
+      headers
+    };
+    if (options.editedState && typeof options.editedState === 'object') {
+      const fd = new FormData();
+      fd.append('edited_preview', JSON.stringify(options.editedState));
+      fetchOptions = {
+        ...fetchOptions,
+        method: 'POST',
+        body: fd
+      };
+    }
+    const res = await fetch(previewUrl, fetchOptions);
+    if (!res.ok) {
+      const failureText = String(await res.text().catch(() => '') || '').trim();
+      throw new Error(failureText || `Preview request failed with status ${res.status}`);
+    }
+    const contentType = String(res.headers.get('content-type') || '').toLowerCase();
+    if (!contentType.includes('image/')) {
+      const failureText = String(await res.text().catch(() => '') || '').trim();
+      throw new Error(failureText || `Unsupported preview type: ${contentType || 'unknown'}`);
+    }
+    return {
+      blob: await res.blob(),
+      docxUrl: issuedTemplateDocxUrl(requestId)
+    };
+  }
+
+  function renderTemplatePreviewShell(requestId, docxHref = '') {
+    const docxUrl = issuedTemplateDocxUrl(requestId);
+    const frameName = `templateDocxPreviewFrame_${esc(String(requestId || '').trim() || 'preview')}`;
+    return `
+      <div class="tracker-form-section">
+        <div class="d-flex align-items-center justify-content-between gap-2 flex-wrap mb-2">
+          <div class="tracker-form-label mb-0">Editable Information</div>
+          ${docxUrl ? `<a class="btn btn-sm btn-outline-primary" href="${docxUrl}" target="_blank" rel="noopener">Open .docx Template</a>` : ''}
+        </div>
+        ${renderTemplateEditFields()}
+      </div>
+      <div class="tracker-form-section">
+        <div class="d-flex align-items-center justify-content-between gap-2 flex-wrap mb-2">
+          <div class="tracker-form-label mb-0">Template Preview (.docx)</div>
+          <div class="small text-muted js-template-preview-status">Preparing generated .docx preview...</div>
+        </div>
+        <div class="template-preview-stack">
+          <div class="js-template-preview-placeholder${docxHref ? ' d-none' : ''} text-muted">Preparing generated .docx preview...</div>
+          <div class="js-template-preview-docx${docxHref ? '' : ' d-none'}">
+            <div class="bg-white border rounded-3 p-3 overflow-auto text-center" style="min-height:72vh;max-height:72vh;">
+              <img
+                class="js-template-preview-docx-image img-fluid"
+                alt="Generated .docx preview"
+                style="max-width:100%;height:auto;"
+              />
+            </div>
+          </div>
+        </div>
+      </div>
+    `;
+  }
+
+  function setTemplatePreviewStatus(message, isError = false) {
+    if (!viewDetailsBody) return;
+    const statusEl = viewDetailsBody.querySelector('.js-template-preview-status');
+    if (statusEl) {
+      statusEl.textContent = String(message || '').trim();
+      statusEl.classList.toggle('text-danger', !!isError);
+      statusEl.classList.toggle('text-muted', !isError);
+    }
+  }
+
+  function mountTemplatePreviewImage(objectUrl) {
+    if (!viewDetailsBody) return;
+    const docxWrap = viewDetailsBody.querySelector('.js-template-preview-docx');
+    const docxImage = viewDetailsBody.querySelector('.js-template-preview-docx-image');
+    const placeholder = viewDetailsBody.querySelector('.js-template-preview-placeholder');
+    if (!docxWrap || !docxImage) return;
+    const previousUrl = templatePreviewObjectUrl;
+    templatePreviewObjectUrl = objectUrl;
+    docxImage.src = objectUrl;
+    docxWrap.classList.remove('d-none');
+    if (placeholder) placeholder.classList.add('d-none');
+    if (previousUrl && String(previousUrl).startsWith('blob:')) {
+      setTimeout(() => URL.revokeObjectURL(previousUrl), 1000);
+    }
+  }
+
+  function bindTemplateFieldEditors(requestId) {
+    if (!viewDetailsBody) return;
+    viewDetailsBody.querySelectorAll('[data-template-edit-key]').forEach((input) => {
+      input.addEventListener('input', () => {
+        if (!viewPreviewState) return;
+        const key = String(input.getAttribute('data-template-edit-key') || '').trim();
+        if (!key) return;
+        viewPreviewState[key] = String(input.value || '').trim().toUpperCase();
+        if (templateRefreshTimer) clearTimeout(templateRefreshTimer);
+        setTemplatePreviewStatus('Updating generated .docx preview...');
+        templateRefreshTimer = setTimeout(() => {
+          if (String(currentViewRequestId || '').trim() !== String(requestId || '').trim()) return;
+          loadTemplatePreview(requestId, { preserveExisting: true, editedState: viewPreviewState });
+        }, 180);
+      });
+    });
+  }
+
+  async function loadTemplatePreview(requestId, options = {}) {
+    const previewUrl = issuedTemplateDocxImageUrl(requestId);
+    if (!previewUrl) {
+      renderTemplatePreviewLoading('Preparing generated .docx preview...');
+      return;
+    }
+
+    const requestSeq = ++templatePreviewRequestSeq;
+    const preserveExisting = !!options.preserveExisting;
+    const hasExistingShell = !!viewDetailsBody.querySelector('.js-template-preview-docx');
+    if (!preserveExisting || !hasExistingShell) {
+      viewDetailsBody.innerHTML = renderTemplatePreviewShell(requestId);
+      bindTemplateFieldEditors(requestId);
+    } else {
+      setTemplatePreviewStatus('Updating generated .docx preview...');
+    }
+
+    try {
+      if (requestSeq !== templatePreviewRequestSeq || viewMode !== 'preview' || String(currentViewRequestId || '').trim() !== String(requestId || '').trim()) {
+        return;
+      }
+      const previewAsset = await fetchTemplatePreviewAsset(requestId, options);
+      if (requestSeq !== templatePreviewRequestSeq || viewMode !== 'preview' || String(currentViewRequestId || '').trim() !== String(requestId || '').trim()) {
+        return;
+      }
+      const imageObjectUrl = URL.createObjectURL(previewAsset.blob);
+      mountTemplatePreviewImage(imageObjectUrl);
+      setTemplatePreviewStatus('Generated .docx preview ready.');
+    } catch (err) {
+      if (requestSeq !== templatePreviewRequestSeq) return;
+      console.error('generated docx image preview failed', err);
+      if (viewDetailsBody) {
+        viewDetailsBody.innerHTML = renderTemplatePreviewShell(requestId);
+        bindTemplateFieldEditors(requestId);
+        const message = err && err.message ? String(err.message) : 'Generated .docx preview failed.';
+        setTemplatePreviewStatus(message, true);
+        const placeholder = viewDetailsBody.querySelector('.js-template-preview-placeholder');
+        if (placeholder) {
+          placeholder.classList.remove('d-none');
+          placeholder.innerHTML = `
+            <div class="alert alert-danger py-2 px-3 mb-0" role="alert">
+              ${esc(message)} Use the button above to open the file directly.
+            </div>
+          `;
+        }
+      }
+    }
   }
 
   function badge(stage, label) {
@@ -177,12 +421,33 @@
       .toLowerCase()
       .replace(/[^a-z0-9]+/g, '_')
       .replace(/^_+|_+$/g, '');
-    let stage = normalizeStageToken(firstNonEmpty([row.stage, row.stage_label]));
-    if (!stage) {
-      const paymentToken = normalizeStageToken(firstNonEmpty([row.payment_status_name, row.payment_status_label]));
-      if (['pendingverification', 'paymentsubmitted', 'pending_payment_verification'].includes(paymentToken)) {
+    const stageRaw = normalizeStageToken(row.stage);
+    const stageLabel = normalizeStageToken(row.stage_label);
+    const paymentToken = normalizeStageToken(firstNonEmpty([row.payment_status_name, row.payment_status_label]));
+    const financeLikeStages = new Set([
+      'for_payment',
+      'payment_submitted',
+      'payment_rejected',
+      'payment_verified',
+      'ready_for_claim',
+      'completed'
+    ]);
+    let stage = stageRaw || stageLabel;
+
+    // Guard against stale `row.stage` values (e.g. "submitted") by honoring
+    // explicit finance/payment labels first when present.
+    if (financeLikeStages.has(stageLabel)) {
+      stage = stageLabel;
+    }
+    // Map payment-status tokens conservatively so "Pending Verification"
+    // remains an initial review state (submitted), while payment flow uses
+    // explicit payment tokens (e.g. Pending Payment Verification).
+    // Only let payment token override when stage is absent or already in finance flow.
+    const canDeriveFromPaymentToken = !stageRaw || financeLikeStages.has(stageRaw) || financeLikeStages.has(stageLabel);
+    if (canDeriveFromPaymentToken) {
+      if (['paymentsubmitted', 'pending_payment_verification'].includes(paymentToken)) {
         stage = 'payment_submitted';
-      } else if (['unpaid', 'pending', 'pendingreview'].includes(paymentToken)) {
+      } else if (['unpaid', 'pending'].includes(paymentToken)) {
         stage = 'for_payment';
       } else if (['rejected', 'denied', 'paymentrejected'].includes(paymentToken)) {
         stage = 'payment_rejected';
@@ -202,7 +467,7 @@
     }
     if (stage === 'payment_submitted') {
       if (!isFinancePaymentsPage) {
-        return `${proofBtn}<span class="text-muted small">Payment verification is handled in Finance Payments.</span>`;
+        return proofBtn || '<span class="text-muted small">No actions</span>';
       }
       return `
         ${proofBtn}
@@ -212,7 +477,7 @@
     }
     if (stage === 'for_payment' || stage === 'payment_rejected') {
       if (!isFinancePaymentsPage) {
-        return `${proofBtn}<span class="text-muted small">Payment verification is handled in Finance Payments.</span>`;
+        return proofBtn || '<span class="text-muted small">No actions</span>';
       }
       return `
         ${proofBtn}
@@ -243,16 +508,21 @@
     return '';
   }
 
+  function formatPersonNameFnMiLn(first, middle, last) {
+    const f = String(first || '').trim();
+    const m = String(middle || '').trim();
+    const l = String(last || '').trim();
+    const mi = m ? `${m.charAt(0).toUpperCase()}.` : '';
+    return [f, mi, l].filter(Boolean).join(' ').trim();
+  }
+
   function fullNameFromRow(row) {
     const payload = row && row.payload && typeof row.payload === 'object' ? row.payload : {};
     const first = firstNonEmpty([payload.first_name, payload.firstname]);
     const middle = firstNonEmpty([payload.middle_name, payload.middlename]);
     const last = firstNonEmpty([payload.last_name, payload.lastname]);
-    const suffix = firstNonEmpty([payload.suffix, payload.suffix_name]);
-    const middleInitial = middle ? `${middle.charAt(0).toUpperCase()}.` : '';
-
-    const ordered = [first, middleInitial, last, suffix].filter(Boolean);
-    if (ordered.length) return ordered.join(' ');
+    const ordered = formatPersonNameFnMiLn(first, middle, last);
+    if (ordered.length) return ordered;
     const fallbackName = firstNonEmpty([row.full_name, row.resident_full_name, row.resident_name, '']);
     if (!fallbackName) return '-';
 
@@ -261,8 +531,7 @@
       const f = parts[0];
       const l = parts[parts.length - 1];
       const m = parts.slice(1, parts.length - 1).join(' ');
-      const mi = m ? `${m.charAt(0).toUpperCase()}.` : '';
-      return [f, mi, l].filter(Boolean).join(' ');
+      return formatPersonNameFnMiLn(f, m, l);
     }
     return fallbackName;
   }
@@ -272,6 +541,9 @@
     if (!value) return '';
     value = value.replace(/\s*,\s*Area\s+[A-Za-z0-9-]+\s*(?=,|$)/gi, '');
     value = value.replace(/(^|,\s*)Area\s+[A-Za-z0-9-]+\s*,\s*/gi, '$1');
+    value = value.replace(/\s*,\s*San\s+Jose\s*,\s*Rodriguez\s*,\s*Rizal\s*$/i, '');
+    value = value.replace(/\s*,\s*Barangay\s+San\s+Jose\s*,\s*Rodriguez(?:\s*\(Montalban\))?\s*,\s*Rizal\s*$/i, '');
+    value = value.replace(/\s*,\s*Barangay\s+San\s+Jose\s*,\s*Montalban\s*,\s*Rizal\s*$/i, '');
     value = value.replace(/\s{2,}/g, ' ').trim();
     value = value.replace(/^[,\s]+|[,\s]+$/g, '');
     return value;
@@ -303,7 +575,25 @@
     if (!raw) return '-';
     const key = raw.toLowerCase().replace(/[^a-z0-9]+/g, '');
     if (key === 'indigency' || key === 'certificateofindigency') {
-      return 'CertificateOfIndigency';
+      return 'Certificate of Indigency';
+    }
+    if (key === 'goodmoral' || key === 'certificateofgoodmoral') {
+      return 'Certificate of Good Moral';
+    }
+    if (key === 'residency' || key === 'certificateofresidency' || key === 'certificateofresidence') {
+      return 'Certificate of Residency';
+    }
+    if (key === 'cohabitation' || key === 'certificateofcohabitation') {
+      return 'Certificate of Cohabitation';
+    }
+    if (key === 'identity' || key === 'certificateofidentity') {
+      return 'Certificate of Identity';
+    }
+    if (key === 'firsttimejobseeker' || key === 'firsttimejobseekers' || key === 'firsttimejobseekercertificate') {
+      return 'First Time Job Seeker Certificate';
+    }
+    if (key.includes('barangayclearance') || key.includes('barangaycertification') || key === 'clearance') {
+      return 'Barangay Certification';
     }
     return raw;
   }
@@ -436,19 +726,26 @@
   }
 
   function previewEditable(key, value, fallback = 'Type here', extraClass = '') {
-    const text = String(value || '').trim() || fallback;
+    const text = String(value || '').trim().toUpperCase() || String(fallback || '').toUpperCase();
     const cls = ['doc-editable', extraClass].filter(Boolean).join(' ');
     return `<span class="${cls}" contenteditable="true" data-edit-key="${esc(key)}">${esc(text)}</span>`;
   }
 
+  function upperText(value, fallback = '-') {
+    const text = String(value ?? '').trim();
+    const resolved = text || String(fallback ?? '').trim();
+    return resolved ? resolved.toUpperCase() : '';
+  }
+
   function normalizePreviewDocKey(docType) {
-    const text = String(docType || '').toLowerCase();
+    const text = String(docType || '').toLowerCase().replace(/[^a-z0-9]+/g, '');
     if (text.includes('cohabitation')) return 'cohabitation';
     if (text.includes('indigency')) return 'indigency';
-    if (text.includes('first time') || text.includes('job seeker')) return 'firsttimejobseeker';
+    if (text.includes('firsttime') || text.includes('jobseeker')) return 'firsttimejobseeker';
     if (text.includes('identity')) return 'identity';
-    if (text.includes('residency')) return 'residency';
-    if (text.includes('good moral')) return 'goodmoral';
+    if (text.includes('residency') || text.includes('residence')) return 'residency';
+    if (text.includes('goodmoral')) return 'goodmoral';
+    if (text.includes('barangayclearance') || text.includes('barangaycertification') || text === 'clearance') return 'generic';
     return 'generic';
   }
 
@@ -462,6 +759,141 @@
       <p><strong>Additional Submitted Details:</strong></p>
       ${html}
     `;
+  }
+
+  function buildPreviewState(row, payload = {}, residentProfile = {}, personalMap = null) {
+    const getPersonal = (label, fallback = '-') => {
+      if (personalMap instanceof Map) {
+        const value = String(personalMap.get(label) || '').trim();
+        if (value) return value;
+      }
+      return fallback;
+    };
+    const businessName = firstNonEmpty([
+      payload.business_name,
+      payload.businessName,
+      payload.business_trade_name,
+      payload.trade_name,
+      payload.establishment_name,
+      payload.business_establishment
+    ]);
+    const fatherName = [
+      firstNonEmpty([payload.father_first_name]),
+      firstNonEmpty([payload.father_middle_name]),
+      firstNonEmpty([payload.father_last_name]),
+      firstNonEmpty([payload.father_suffix])
+    ].filter(Boolean).join(' ').replace(/\s+/g, ' ').trim();
+    const motherName = [
+      firstNonEmpty([payload.mother_first_name]),
+      firstNonEmpty([payload.mother_middle_name]),
+      firstNonEmpty([payload.mother_last_name]),
+      firstNonEmpty([payload.mother_suffix])
+    ].filter(Boolean).join(' ').replace(/\s+/g, ' ').trim();
+    const cohabitantName = [
+      firstNonEmpty([payload.cohabitant_first]),
+      firstNonEmpty([payload.cohabitant_middle]),
+      firstNonEmpty([payload.cohabitant_last]),
+      firstNonEmpty([payload.cohabitant_suffix])
+    ].filter(Boolean).join(' ').replace(/\s+/g, ' ').trim();
+    const durationValue = firstNonEmpty([payload.cohabitation_duration_value]);
+    const durationUnit = firstNonEmpty([payload.cohabitation_duration_unit]);
+    const cohabitationDuration = firstNonEmpty([
+      payload.cohabitation_duration,
+      [durationValue, durationUnit].filter(Boolean).join(' ').trim()
+    ]);
+    const knownPayloadKeys = new Set([
+      'action', 'csrf_token', 'redirect', 'document_type',
+      'last_name', 'lastname', 'first_name', 'firstname', 'middle_name', 'middlename', 'suffix', 'suffix_name',
+      'contact_number', 'phone_number', 'full_address', 'full_address_display', 'address', 'complete_address',
+      'birthdate', 'date_of_birth', 'child_dob', 'age', 'sex', 'gender', 'child_sex',
+      'civil_status', 'religion', 'occupation',
+      'purpose', 'request_purpose', 'request_officer',
+      'business_name', 'businessName', 'business_trade_name', 'trade_name', 'establishment_name', 'business_establishment',
+      'years_of_residency', 'months_of_residency',
+      'child_birthplace', 'child_nationality', 'birthplace', 'place_of_birth', 'location', 'remarks',
+      'father_first_name', 'father_middle_name', 'father_last_name', 'father_suffix',
+      'mother_first_name', 'mother_middle_name', 'mother_last_name', 'mother_suffix',
+      'cohabitant_first', 'cohabitant_middle', 'cohabitant_last', 'cohabitant_suffix',
+      'cohabitant_relationship', 'cohabitation_duration_value', 'cohabitation_duration_unit', 'cohabitation_start_date',
+      'educational_attainment', 'jobstart_beneficiary'
+    ]);
+    const additionalDetails = [];
+    Object.keys(payload).forEach((key) => {
+      const k = String(key || '');
+      if (!k || knownPayloadKeys.has(k)) return;
+      const value = String(payload[key] ?? '').trim();
+      if (!value) return;
+      additionalDetails.push({ label: friendlyLabel(k), value });
+    });
+
+    return {
+      docType: normalizeDocumentTypeDisplay(firstNonEmpty([payload.document_type, row.document_type, 'Certificate'])),
+      fullName: upperText(
+        formatPersonNameFnMiLn(
+          getPersonal('First Name', ''),
+          getPersonal('Middle Name', ''),
+          getPersonal('Last Name', '')
+        ),
+        fullNameFromRow(row)
+      ),
+      fullAddress: upperText(stripAreaFromAddress(getPersonal('Full Address', '') || residentProfile.full_address || payload.full_address || payload.full_address_display || payload.address || payload.complete_address || '-'), '-'),
+      purpose: upperText(firstNonEmpty([row.purpose, payload.purpose, payload.request_purpose, '-']), '-'),
+      businessName: upperText(businessName || '', ''),
+      issuedDate: row.submitted_at || dr_now_text(),
+      approvedByName: upperText(firstNonEmpty([
+        row.reviewed_by,
+        row.personnel_name,
+        row.released_by,
+        row.user_id_official_reviewed_by,
+        row.personnel_user_id,
+        row.user_id_official_released_by
+      ]), 'HON. GLENN S. EVANGELISTA'),
+      requestOfficer: upperText(firstNonEmpty([
+        payload.request_officer,
+        [
+          payload.government_official,
+          payload.government_position || payload.government_position_detail,
+          payload.government_office || payload.government_position_group
+        ].filter(Boolean).join(' - ')
+      ]), ''),
+      requestOfficerLine1: upperText(firstNonEmpty([
+        payload.request_officer_line1,
+        payload.government_official,
+        payload.government_official_other
+      ]), ''),
+      requestOfficerLine2: upperText(firstNonEmpty([
+        payload.request_officer_line2,
+        payload.government_position,
+        payload.government_position_detail,
+        payload.institution_position
+      ]), ''),
+      requestOfficerLine3: upperText(firstNonEmpty([
+        payload.request_officer_line3,
+        payload.government_office,
+        payload.government_position_group,
+        payload.institution_name
+      ]), ''),
+      requestFor: upperText(firstNonEmpty([payload.request_purpose]), ''),
+      yearsResidency: upperText(firstNonEmpty([payload.years_of_residency]), ''),
+      monthsResidency: upperText(firstNonEmpty([payload.months_of_residency]), ''),
+      childBirthplace: upperText(firstNonEmpty([payload.child_birthplace, payload.birthplace, payload.place_of_birth]), ''),
+      childBirthdate: upperText(firstNonEmpty([payload.child_dob, payload.birthdate, payload.date_of_birth, residentProfile.birthdate]), ''),
+      childNationality: upperText(firstNonEmpty([payload.child_nationality]), ''),
+      birthdate: upperText(firstNonEmpty([payload.birthdate, payload.date_of_birth, payload.child_dob, residentProfile.birthdate]), ''),
+      birthplace: upperText(firstNonEmpty([payload.birthplace, payload.place_of_birth, payload.child_birthplace]), ''),
+      location: upperText(firstNonEmpty([payload.location, payload.complete_address, payload.address, payload.full_address, residentProfile.full_address]), ''),
+      remarks: upperText(firstNonEmpty([payload.remarks, payload.remark, row.status_remarks, row.status_reason]), ''),
+      fatherName: upperText(fatherName, ''),
+      motherName: upperText(motherName, ''),
+      cohabitantName: upperText(cohabitantName, ''),
+      cohabitantRelationship: upperText(firstNonEmpty([payload.cohabitant_relationship]), ''),
+      cohabitationDuration: upperText(cohabitationDuration, ''),
+      cohabitationStartDate: upperText(firstNonEmpty([payload.cohabitation_start_date]), ''),
+      educationalAttainment: upperText(firstNonEmpty([payload.educational_attainment]), ''),
+      jobstartBeneficiary: upperText(firstNonEmpty([payload.jobstart_beneficiary]), ''),
+      additionalDetails: additionalDetails.map((entry) => ({ ...entry, value: upperText(entry.value, '') })),
+      qrUrl: resolvePublicUrl(firstNonEmpty([row.qr_code_path]))
+    };
   }
 
   function renderDocumentPreview(state) {
@@ -482,6 +914,10 @@
     const childBirthplace = String(state.childBirthplace || '').trim();
     const childBirthdate = String(state.childBirthdate || '').trim();
     const childNationality = String(state.childNationality || '').trim();
+    const birthdate = String(state.birthdate || childBirthdate || '').trim();
+    const birthplace = String(state.birthplace || childBirthplace || '').trim();
+    const location = String(state.location || fullAddress || '').trim();
+    const remarks = String(state.remarks || '').trim();
     const fatherName = String(state.fatherName || '').trim();
     const motherName = String(state.motherName || '').trim();
     const cohabitantName = String(state.cohabitantName || '').trim();
@@ -507,17 +943,21 @@
           <strong>${esc(fullAddress)}</strong> and has been residing in this barangay for <strong>${esc(residencyText)}</strong>.
         </p>
         <p>
-          This certificate is issued upon request for <strong>${previewEditable('purpose', purpose, 'State purpose')}</strong>.
-        </p>
-        <p>
           This certification is valid for legal and administrative use, subject to verification by concerned offices and institutions.
         </p>
       `;
     } else if (docKey === 'indigency') {
-      const requestOffice = requestOfficer || '';
+      const requestOfficerLine1 = String(state.requestOfficerLine1 || '').trim();
+      const requestOfficerLine2 = String(state.requestOfficerLine2 || '').trim();
+      const requestOfficerLine3 = String(state.requestOfficerLine3 || '').trim();
+      const requestLines = [
+        requestOfficerLine1,
+        requestOfficerLine2,
+        requestOfficerLine3
+      ].filter(Boolean);
       const indigencyPurpose = purpose || requestFor || 'PURPOSE';
-      const toBlock = requestOffice.trim() !== ''
-        ? `<div class="doc-to-block"><strong>TO</strong><strong>:</strong><strong>${previewEditable('requestOfficer', requestOffice, 'Receiving office', 'doc-editable-multiline')}</strong></div>`
+      const toBlock = requestLines.length
+        ? `<div class="doc-to-block"><strong>TO</strong><strong>:</strong><div class="doc-to-lines"><strong>${previewEditable('requestOfficerLine1', requestOfficerLine1, 'Official name')}</strong><strong>${previewEditable('requestOfficerLine2', requestOfficerLine2, 'Position')}</strong><strong>${previewEditable('requestOfficerLine3', requestOfficerLine3, 'Jurisdiction')}</strong></div></div>`
         : `<div class="doc-to-block"><strong>TO</strong><strong>:</strong><div class="doc-to-lines"><span class="line"></span><span class="line"></span><span class="line"></span></div></div>`;
       contentHtml = `
         ${toBlock}
@@ -581,32 +1021,23 @@
           Issued in accordance with applicable barangay procedures for first time job seeker documentary assistance.
         </p>
       `;
-    } else if (docKey === 'cohabitation') {
-      contentHtml = `
-        <p>
-          This is to certify that <strong>${esc(fullName)}</strong> and
-          <strong>${esc(cohabitantName || 'cohabitant/partner')}</strong> are known residents of this barangay.
-        </p>
-        <p>
-          Based on records and sworn declaration, they have been living together as partners
-          ${cohabitationDuration !== '' ? `for <strong>${esc(cohabitationDuration)}</strong>` : ''}
-          ${cohabitationStartDate !== '' ? ` since <strong>${esc(previewDateText(cohabitationStartDate))}</strong>` : ''}
-          at <strong>${esc(fullAddress)}</strong>
-          ${cohabitantRelationship !== '' ? `, with relationship stated as <strong>${esc(cohabitantRelationship)}</strong>` : ''}.
-        </p>
-        <p>
-          This certification is issued upon request for <strong>${previewEditable('purpose', purpose, 'State purpose')}</strong>.
-        </p>
-        <p>
-          This is issued for proper documentation and lawful use where proof of cohabitation is required.
-        </p>
-      `;
     } else {
+      const genericDetailRows = [
+        { label: 'Name', value: fullName },
+        { label: 'Address', value: fullAddress },
+        { label: 'Birthdate', value: birthdate || '-' },
+        { label: 'Birthplace', value: birthplace || '-' },
+        { label: 'Location', value: location || '-' },
+        { label: 'Remarks', value: remarks || '-' }
+      ].map((entry) => `
+        <div class="doc-to-block"><strong>${esc(entry.label)}</strong><strong>:</strong><strong>${esc(entry.value)}</strong></div>
+      `).join('');
       contentHtml = `
         <p>
           This is to certify that <strong>${esc(fullName)}</strong> is a bona fide resident of
           <strong>${esc(fullAddress)}</strong>.
         </p>
+        ${genericDetailRows}
         <p>
           ${businessName !== '' ? `Business Name: <strong>${previewEditable('businessName', businessName, 'Business name')}</strong>.<br>` : ''}
           This certification is issued upon request for <strong>${previewEditable('purpose', purpose, 'State purpose')}</strong>.
@@ -676,7 +1107,7 @@
             </div>
             ${isSpecial ? '<div class="doc-preview-issuedby">Issued by: <strong>MINERVA D. QUITA</strong><br><em>Barangay Secretary</em></div>' : ''}
             <div class="doc-preview-signature">
-              <div class="name">HON. GLENN S. EVANGELISTA</div>
+              <div class="name">${esc(String(state.approvedByName || 'HON. GLENN S. EVANGELISTA').trim() || 'HON. GLENN S. EVANGELISTA')}</div>
               <div>Punong Barangay</div>
             </div>
             <div class="doc-preview-qr">
@@ -704,13 +1135,51 @@
     });
   }
 
+  function resetPreviewScrollGate() {
+    if (typeof previewScrollCleanup === 'function') {
+      previewScrollCleanup();
+    }
+    previewScrollCleanup = null;
+  }
+
+  function bindApproveScrollGate() {
+    resetPreviewScrollGate();
+    if (!viewModalNextBtn || String(currentViewStage || '').toLowerCase() !== 'submitted') return;
+    const scrollHost = viewDetailsBody.closest('.modal-body') || viewDetailsBody;
+    if (!scrollHost) return;
+
+    const threshold = 24;
+    const update = () => {
+      if (viewMode !== 'preview' || String(currentViewStage || '').toLowerCase() !== 'submitted') return;
+      const remaining = scrollHost.scrollHeight - scrollHost.scrollTop - scrollHost.clientHeight;
+      const reachedBottom = remaining <= threshold;
+      viewModalNextBtn.disabled = !reachedBottom;
+      viewModalNextBtn.title = reachedBottom ? '' : 'Scroll to the bottom before approving.';
+    };
+
+    scrollHost.scrollTop = 0;
+    viewModalNextBtn.disabled = true;
+    viewModalNextBtn.title = 'Scroll to the bottom before approving.';
+    scrollHost.addEventListener('scroll', update, { passive: true });
+    requestAnimationFrame(update);
+    setTimeout(update, 150);
+
+    previewScrollCleanup = () => {
+      scrollHost.removeEventListener('scroll', update);
+      if (viewModalNextBtn) {
+        viewModalNextBtn.title = '';
+      }
+    };
+  }
+
   function switchViewMode(mode) {
     viewMode = mode === 'preview' ? 'preview' : 'details';
     if (!viewDetailsBody) return;
 
     if (viewMode === 'preview') {
-      viewDetailsBody.innerHTML = renderDocumentPreview(viewPreviewState);
-      bindPreviewEditHandlers();
+      const rid = String(currentViewRequestId || '').trim();
+      renderTemplatePreviewLoading();
+      loadTemplatePreview(rid, { preserveExisting: true });
       const stageKey = String(currentViewStage || '').toLowerCase();
       const submittedFlow = stageKey === 'submitted';
       const releaseFlow = stageKey === 'ready_for_claim';
@@ -723,7 +1192,7 @@
           viewModalNextBtn.textContent = 'Save and Approve';
           viewModalNextBtn.classList.remove('d-none', 'btn-primary');
           viewModalNextBtn.classList.add('btn-success');
-          viewModalNextBtn.disabled = false;
+          viewModalNextBtn.disabled = true;
         } else if (releaseFlow) {
           viewModalNextBtn.textContent = 'Mark as Complete / Release';
           viewModalNextBtn.classList.remove('d-none', 'btn-primary');
@@ -736,9 +1205,16 @@
           viewModalNextBtn.disabled = true;
         }
       }
+      if (submittedFlow) {
+        bindApproveScrollGate();
+      } else {
+        resetPreviewScrollGate();
+      }
       return;
     }
 
+    resetPreviewScrollGate();
+    templatePreviewRequestSeq += 1;
     viewDetailsBody.innerHTML = viewDetailsHtml || '<div class="text-muted">No details.</div>';
     if (viewModalBackBtn) {
       viewModalBackBtn.textContent = 'Back';
@@ -1094,21 +1570,27 @@
 
   function statusBucket(row) {
     if (isFinancePaymentsPage) {
+      const stage = String(row?.stage || '').toLowerCase();
       const paymentStatusKey = String(
         firstNonEmpty([row?.payment_status_name, row?.payment_status_label, ''])
       ).toLowerCase().replace(/[^a-z0-9]+/g, '');
-      if (paymentStatusKey === 'pendingverification' || paymentStatusKey === 'paymentsubmitted' || paymentStatusKey === 'pendingpaymentverification') return 'pending_verification';
-      if (paymentStatusKey === 'unpaid' || paymentStatusKey === 'pending' || paymentStatusKey === 'pendingreview') return 'unpaid';
-      if (paymentStatusKey === 'rejected' || paymentStatusKey === 'denied' || paymentStatusKey === 'paymentrejected') return 'rejected';
-      if (paymentStatusKey === 'verified' || paymentStatusKey === 'approved') return 'verified';
-      if (paymentStatusKey === 'cancelled' || paymentStatusKey === 'autocancelled' || paymentStatusKey === 'expired') return 'cancelled';
       const hasSubmittedProof = String(row?.payment_submitted_at || '').trim() !== ''
         && (
           String(row?.payment_proof_path || '').trim() !== ''
           || String(row?.payment_reference || '').trim() !== ''
         );
+      if (paymentStatusKey === 'paymentsubmitted' || paymentStatusKey === 'pendingpaymentverification') return 'pending_verification';
+      // "PendingVerification" can be a legacy generic status; only treat it as
+      // payment verification once the request is already in payment flow.
+      if (paymentStatusKey === 'pendingverification') {
+        if (stage === 'payment_submitted' || hasSubmittedProof) return 'pending_verification';
+        return 'unpaid';
+      }
+      if (paymentStatusKey === 'unpaid' || paymentStatusKey === 'pending' || paymentStatusKey === 'pendingreview') return 'unpaid';
+      if (paymentStatusKey === 'rejected' || paymentStatusKey === 'denied' || paymentStatusKey === 'paymentrejected') return 'rejected';
+      if (paymentStatusKey === 'verified' || paymentStatusKey === 'approved') return 'verified';
+      if (paymentStatusKey === 'cancelled' || paymentStatusKey === 'autocancelled' || paymentStatusKey === 'expired') return 'cancelled';
       if (hasSubmittedProof) return 'pending_verification';
-      const stage = String(row?.stage || '').toLowerCase();
       if (stage === 'payment_submitted') return 'pending_verification';
       if (stage === 'for_payment') return 'unpaid';
       if (stage === 'payment_rejected') return 'rejected';
@@ -1558,7 +2040,7 @@
     const docName = normalizeDocumentTypeDisplay(String(row?.document_type || 'document'));
 
     if (type === 'personnel_approve' && actionPrompt) {
-      actionPrompt.textContent = 'Click the view the document to check the document that will be issued and edit it if there are necessary changes in the details. Once everything is correct, proceed to verify the Certificate Of Indigency.';
+      actionPrompt.textContent = `Click View Document to check the document that will be issued and edit it if there are necessary changes in the details. Once everything is correct, proceed to verify the ${docName}.`;
       actionPrompt.classList.remove('d-none');
     }
     if (type === 'personnel_approve_confirm' && actionPrompt) {
@@ -1575,7 +2057,7 @@
     }
     if (actionSubmitBtn) {
       if (type === 'personnel_approve') {
-        actionSubmitBtn.textContent = 'View Document (Next)';
+        actionSubmitBtn.textContent = 'View Document';
         actionSubmitBtn.classList.remove('btn-danger', 'btn-success');
         actionSubmitBtn.classList.add('btn-primary');
       } else if (type === 'personnel_approve_confirm') {
@@ -1619,9 +2101,14 @@
       actionAmount.required = true;
       actionOr.required = true;
       if (actionPrompt) {
+        const financeKey = isFinancePaymentsPage ? statusBucket(row) : '';
         const stage = String(row?.stage || '').toLowerCase();
-        const isPendingVerification = stage === 'payment_submitted';
-        const isWalkInStage = stage === 'for_payment' || stage === 'payment_rejected';
+        const isPendingVerification = isFinancePaymentsPage
+          ? financeKey === 'pending_verification'
+          : stage === 'payment_submitted';
+        const isWalkInStage = isFinancePaymentsPage
+          ? financeKey === 'unpaid' || financeKey === 'rejected'
+          : stage === 'for_payment' || stage === 'payment_rejected';
         const payload = row && row.payload && typeof row.payload === 'object' ? row.payload : {};
         const residentProfile = row && row.resident_profile && typeof row.resident_profile === 'object'
           ? row.resident_profile
@@ -1761,7 +2248,6 @@
             { label: 'Submitted Date', value: firstNonEmpty([row.payment_submitted_at, row.submitted_at, '-']) },
           ], 3);
 
-          const stageKey = String(row.stage || '').toLowerCase();
           const financeStatusKeyForActions = statusBucket(row);
           const openVerifyFlow = financeViewIntent === 'verify' && financeStatusKeyForActions === 'pending_verification';
 
@@ -1773,10 +2259,21 @@
             ? `PHP ${verifiedAmount.toFixed(2)}`
             : '-';
           const verifiedAtText = firstNonEmpty([row.finance_decision_at, row.payment_submitted_at, '-']);
+          const processedByText = firstNonEmpty([
+            row.finance_user_name,
+            row.personnel_name,
+            row.reviewed_by,
+            row.released_by,
+            row.finance_user_id,
+            row.personnel_user_id,
+            row.user_id_official_reviewed_by,
+            row.user_id_official_released_by,
+            '-'
+          ]);
           const verifiedDetailsGrid = isVerifiedPayment
             ? renderFieldGrid([
                 { label: 'Requested Document', value: compactDocument },
-                { label: 'Payment Method', value: firstNonEmpty([row.payment_method, '-']) },
+                { label: 'Processed By', value: processedByText },
                 { label: 'OR Number', value: firstNonEmpty([row.or_number, '-']) },
                 { label: 'Price', value: verifiedAmountText },
                 { label: 'Transaction Number', value: firstNonEmpty([row.payment_reference, '-']) },
@@ -1834,7 +2331,7 @@
             viewModalBackBtn.classList.add('d-none');
           }
           if (viewModalWalkInBtn) {
-            const isUnpaidStage = stageKey === 'for_payment' || stageKey === 'payment_rejected';
+            const isUnpaidStage = financeStatusKeyForActions === 'unpaid' || financeStatusKeyForActions === 'rejected';
             if (isUnpaidStage) {
               viewModalWalkInBtn.classList.remove('d-none');
               viewModalWalkInBtn.setAttribute('data-id', String(row.request_id || ''));
@@ -1919,7 +2416,10 @@
           'full_barangay', 'full_area_number', 'cohabitant_full_unit_number',
           'cohabitant_full_house_lot_number', 'cohabitant_full_street_block_name',
           'cohabitant_full_subdivision', 'cohabitant_full_barangay', 'cohabitant_full_area_number',
-          'request_purpose', 'requestPurpose', 'purpose_choice', 'purposeChoice'
+          'request_purpose', 'requestPurpose', 'purpose_choice', 'purposeChoice',
+          'submission_target_type', 'government_official_id', 'government_position_group',
+          'government_position_detail', 'government_official', 'government_office',
+          'government_position', 'request_officer_line1', 'request_officer_line2', 'request_officer_line3'
         ]);
 
         const requestFields = [];
@@ -1932,11 +2432,38 @@
           consumedKeys.add('purposeChoice');
           requestFields.push({ label: 'Purpose', value: purposeText });
         }
-        const officerText = firstNonEmpty([payload.request_officer]);
-        if (officerText) {
+
+        const officialNameText = firstNonEmpty([payload.government_official, payload.request_officer_line1]);
+        const positionText = firstNonEmpty([payload.government_position, payload.government_position_detail, payload.request_officer_line2]);
+        const jurisdictionText = firstNonEmpty([payload.government_office, payload.government_position_group, payload.request_officer_line3]);
+        if (officialNameText || positionText || jurisdictionText) {
+          consumedKeys.add('government_official');
+          consumedKeys.add('government_position');
+          consumedKeys.add('government_position_detail');
+          consumedKeys.add('government_office');
+          consumedKeys.add('government_position_group');
+          consumedKeys.add('request_officer_line1');
+          consumedKeys.add('request_officer_line2');
+          consumedKeys.add('request_officer_line3');
           consumedKeys.add('request_officer');
-          requestFields.push({ label: 'To Be Submitted To', value: officerText });
+
+          if (officialNameText) {
+            requestFields.push({ label: 'Official Name', value: officialNameText });
+          }
+          if (positionText) {
+            requestFields.push({ label: 'Position', value: positionText });
+          }
+          if (jurisdictionText) {
+            requestFields.push({ label: 'Jurisdiction', value: jurisdictionText });
+          }
+        } else {
+          const officerText = firstNonEmpty([payload.request_officer]);
+          if (officerText) {
+            consumedKeys.add('request_officer');
+            requestFields.push({ label: 'To Be Submitted To', value: officerText });
+          }
         }
+
         const paymentMethodText = firstNonEmpty([row.payment_method]);
         if (paymentMethodText) {
           requestFields.push({ label: 'Payment Method', value: String(paymentMethodText).toUpperCase() });
@@ -2053,10 +2580,11 @@
           {
             label: 'Approved By',
             value: firstNonEmpty([
+              row.reviewed_by,
+              row.personnel_name,
               row.user_id_official_reviewed_by,
               row.personnel_user_id,
               row.finance_user_id,
-              row.reviewed_by,
               '-'
             ])
           },
@@ -2079,89 +2607,7 @@
         }
 
         viewDetailsHtml = html || '<div class="text-muted">No details.</div>';
-        const businessName = firstNonEmpty([
-          payload.business_name,
-          payload.businessName,
-          payload.business_trade_name,
-          payload.trade_name,
-          payload.establishment_name,
-          payload.business_establishment
-        ]);
-        const fatherName = [
-          firstNonEmpty([payload.father_first_name]),
-          firstNonEmpty([payload.father_middle_name]),
-          firstNonEmpty([payload.father_last_name]),
-          firstNonEmpty([payload.father_suffix])
-        ].filter(Boolean).join(' ').replace(/\s+/g, ' ').trim();
-        const motherName = [
-          firstNonEmpty([payload.mother_first_name]),
-          firstNonEmpty([payload.mother_middle_name]),
-          firstNonEmpty([payload.mother_last_name]),
-          firstNonEmpty([payload.mother_suffix])
-        ].filter(Boolean).join(' ').replace(/\s+/g, ' ').trim();
-        const cohabitantName = [
-          firstNonEmpty([payload.cohabitant_first]),
-          firstNonEmpty([payload.cohabitant_middle]),
-          firstNonEmpty([payload.cohabitant_last]),
-          firstNonEmpty([payload.cohabitant_suffix])
-        ].filter(Boolean).join(' ').replace(/\s+/g, ' ').trim();
-        const durationValue = firstNonEmpty([payload.cohabitation_duration_value]);
-        const durationUnit = firstNonEmpty([payload.cohabitation_duration_unit]);
-        const cohabitationDuration = [durationValue, durationUnit].filter(Boolean).join(' ').trim();
-        const knownPayloadKeys = new Set([
-          'action', 'csrf_token', 'redirect', 'document_type',
-          'last_name', 'lastname', 'first_name', 'firstname', 'middle_name', 'middlename', 'suffix', 'suffix_name',
-          'contact_number', 'phone_number', 'full_address', 'full_address_display', 'address', 'complete_address',
-          'birthdate', 'date_of_birth', 'child_dob', 'age', 'sex', 'gender', 'child_sex',
-          'civil_status', 'religion', 'occupation',
-          'purpose', 'request_purpose', 'request_officer',
-          'business_name', 'businessName', 'business_trade_name', 'trade_name', 'establishment_name', 'business_establishment',
-          'years_of_residency', 'months_of_residency',
-          'child_birthplace', 'child_nationality',
-          'father_first_name', 'father_middle_name', 'father_last_name', 'father_suffix',
-          'mother_first_name', 'mother_middle_name', 'mother_last_name', 'mother_suffix',
-          'cohabitant_first', 'cohabitant_middle', 'cohabitant_last', 'cohabitant_suffix',
-          'cohabitant_relationship', 'cohabitation_duration_value', 'cohabitation_duration_unit', 'cohabitation_start_date',
-          'educational_attainment', 'jobstart_beneficiary'
-        ]);
-        const additionalDetails = [];
-        Object.keys(payload).forEach((key) => {
-          const k = String(key || '');
-          if (!k || knownPayloadKeys.has(k)) return;
-          const value = String(payload[key] ?? '').trim();
-          if (!value) return;
-          additionalDetails.push({ label: friendlyLabel(k), value });
-        });
-        viewPreviewState = {
-          docType: row.document_type || 'Certificate',
-          fullName: [
-            personalMap.get('First Name') || '',
-            personalMap.get('Middle Name') || '',
-            personalMap.get('Last Name') || '',
-            personalMap.get('Suffix') || ''
-          ].join(' ').replace(/\s+/g, ' ').trim() || fullNameFromRow(row),
-          fullAddress: stripAreaFromAddress(personalMap.get('Full Address') || '-') || '-',
-          purpose: firstNonEmpty([row.purpose, payload.purpose, payload.request_purpose, '-']) || '-',
-          businessName: businessName || '',
-          issuedDate: row.submitted_at || dr_now_text(),
-          requestOfficer: firstNonEmpty([payload.request_officer]),
-          requestFor: firstNonEmpty([payload.request_purpose]),
-          yearsResidency: firstNonEmpty([payload.years_of_residency]),
-          monthsResidency: firstNonEmpty([payload.months_of_residency]),
-          childBirthplace: firstNonEmpty([payload.child_birthplace]),
-          childBirthdate: firstNonEmpty([payload.child_dob, payload.birthdate, payload.date_of_birth]),
-          childNationality: firstNonEmpty([payload.child_nationality]),
-          fatherName: fatherName,
-          motherName: motherName,
-          cohabitantName: cohabitantName,
-          cohabitantRelationship: firstNonEmpty([payload.cohabitant_relationship]),
-          cohabitationDuration: cohabitationDuration,
-          cohabitationStartDate: firstNonEmpty([payload.cohabitation_start_date]),
-          educationalAttainment: firstNonEmpty([payload.educational_attainment]),
-          jobstartBeneficiary: firstNonEmpty([payload.jobstart_beneficiary]),
-          additionalDetails: additionalDetails,
-          qrUrl: resolvePublicUrl(firstNonEmpty([row.qr_code_path]))
-        };
+        viewPreviewState = buildPreviewState(row, payload, residentProfile, personalMap);
         switchViewMode('details');
         const stageKey = String(row.stage || '').toLowerCase();
         const nextEnabled = !(
@@ -2259,7 +2705,7 @@
         const stageKey = String(row?.stage || '').toLowerCase();
         const allowPrint = stageKey === 'ready_for_claim';
         const issuedUrl = `${appBase}/PhpFiles/Admin-End/documentRequestWorkflow.php?action=view_issued&request_id=${encodeURIComponent(id)}`;
-        openDocumentModal(issuedUrl, 'Issued Document (PDF)', '', { allowPrint });
+        openDocumentModal(issuedUrl, 'Issued Document', '', { allowPrint });
       });
     });
 
@@ -2309,17 +2755,23 @@
     clearModalError();
 
     if ((actionType.value || '') === 'personnel_approve') {
-      // "View Document (Next)" only opens preview; it does not approve yet.
+      // "View Document" only opens preview; it does not approve yet.
+      const rid = String(actionRequestId.value || '').trim();
       if (actionSubmitBtn) {
         actionSubmitBtn.disabled = true;
-        actionSubmitBtn.textContent = 'Opening Document...';
+        actionSubmitBtn.textContent = 'Loading Document...';
       }
       if (actionCancelBtn) {
         actionCancelBtn.disabled = true;
       }
-      suppressActionReturn = true;
-      openPreviewAfterActionModal = true;
-      actionModal.hide();
+      fetchTemplatePreviewAsset(rid).catch((err) => {
+        console.error('initial template preview preload failed', err);
+      });
+      window.setTimeout(() => {
+        suppressActionReturn = true;
+        openPreviewAfterActionModal = true;
+        actionModal.hide();
+      }, 3000);
       return;
     }
 
@@ -2506,6 +2958,12 @@
   viewModalWalkInBtn?.addEventListener('click', () => {
     const id = String(viewModalWalkInBtn.getAttribute('data-id') || '').trim();
     if (!id) return;
+    const row = itemById.get(id);
+    if (!row) return;
+    const financeKey = statusBucket(row);
+    if (financeKey !== 'unpaid' && financeKey !== 'rejected') {
+      return;
+    }
     openActionModal('finance_verify', id);
     if (actionForm) actionForm.dataset.verifyMode = 'walkin';
   });
@@ -2514,6 +2972,11 @@
     if (preserveViewStateOnNextHide) {
       preserveViewStateOnNextHide = false;
       return;
+    }
+    resetPreviewScrollGate();
+    if (templatePreviewObjectUrl) {
+      URL.revokeObjectURL(templatePreviewObjectUrl);
+      templatePreviewObjectUrl = '';
     }
     if (viewModalWalkInBtn) {
       viewModalWalkInBtn.classList.add('d-none');

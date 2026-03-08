@@ -50,9 +50,29 @@ function dr_safe_json(array $v): string {
 }
 
 function dr_respond_json(int $statusCode, array $payload): void {
+    $body = dr_safe_json($payload);
+    if (PHP_SAPI !== 'cli') {
+        @ignore_user_abort(true);
+        @ini_set('zlib.output_compression', '0');
+        header('Connection: close');
+    }
     http_response_code($statusCode);
     header('Content-Type: application/json; charset=utf-8');
-    echo dr_safe_json($payload);
+    header('Content-Length: ' . strlen($body));
+    echo $body;
+
+    if (function_exists('session_write_close')) {
+        @session_write_close();
+    }
+    if (function_exists('fastcgi_finish_request')) {
+        @fastcgi_finish_request();
+        exit;
+    }
+
+    while (ob_get_level() > 0) {
+        @ob_end_flush();
+    }
+    @flush();
     exit;
 }
 

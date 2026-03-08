@@ -88,6 +88,365 @@ function dra_send_notification_deferred(mysqli $conn, array $request, string $su
     });
 }
 
+function dra_strip_unreplaced_docx_qr_placeholder(string $docxDiskPath): void {
+    if (!is_file($docxDiskPath) || !class_exists('ZipArchive')) {
+        return;
+    }
+
+    $zip = new ZipArchive();
+    if ($zip->open($docxDiskPath) !== true) {
+        return;
+    }
+
+    $xmlParts = [];
+    for ($i = 0; $i < $zip->numFiles; $i++) {
+        $entryName = (string)$zip->getNameIndex($i);
+        if ($entryName !== '' && preg_match('#^word/(document|header\d+|footer\d+)\.xml$#', $entryName)) {
+            $xmlParts[] = $entryName;
+        }
+    }
+
+    foreach ($xmlParts as $xmlPart) {
+        $xml = $zip->getFromName($xmlPart);
+        if (!is_string($xml) || $xml === '') {
+            continue;
+        }
+
+        $updatedXml = str_replace('${QR_IMAGE}', '', $xml);
+        $preserveLetterhead = stripos($xmlPart, 'header') !== false
+            && (
+                stripos($xml, 'REPUBLIKA NG PILIPINAS') !== false
+                || stripos($xml, 'BARANGAY SAN JOSE') !== false
+            );
+        $updatedXml = preg_replace(
+            '/<w:r\b[^>]*>.*?<w:t[^>]*>\$<\/w:t>.*?<\/w:r>\s*<w:r\b[^>]*>.*?<w:t[^>]*>\{QR_IMAGE\}<\/w:t>.*?<\/w:r>/s',
+            '',
+            $updatedXml
+        );
+        $updatedXml = preg_replace(
+            '/<w:p\b[^>]*>\s*(?:<w:pPr\b[^>]*>.*?<\/w:pPr>\s*)?<w:r\b[^>]*>\s*(?:<w:rPr\b[^>]*>.*?<\/w:rPr>\s*)?<w:pict\b[^>]*>\s*<v:rect\b[^>]*\/>\s*<\/w:pict>\s*<\/w:r>\s*<\/w:p>/s',
+            '',
+            $updatedXml
+        );
+        $updatedXml = preg_replace(
+            '/<mc:AlternateContent\b[^>]*>.*?Text Box 1.*?<w:t>\$<\/w:t>.*?<w:t>\{QR_IMAGE\}<\/w:t>.*?<\/mc:AlternateContent>/s',
+            '',
+            $updatedXml
+        );
+        $updatedXml = preg_replace(
+            '/<w:pict\b[^>]*>.*?<v:shape\b[^>]*id="Text Box 1"[^>]*>.*?<w:t>\$<\/w:t>.*?<w:t>\{QR_IMAGE\}<\/w:t>.*?<\/v:shape>.*?<\/w:pict>/s',
+            '',
+            $updatedXml
+        );
+        if (!$preserveLetterhead) {
+            $updatedXml = preg_replace(
+                '/<w:pict\b[^>]*>\s*<v:rect\b[^>]*\bo:hr="t"[^>]*\/>\s*<\/w:pict>/s',
+                '',
+                $updatedXml
+            );
+            $updatedXml = preg_replace(
+                '/<w:r\b[^>]*>\s*(?:<w:rPr\b[^>]*>.*?<\/w:rPr>\s*)?<w:pict\b[^>]*>\s*<v:rect\b[^>]*\bo:hr="t"[^>]*\/>\s*<\/w:pict>\s*<\/w:r>/s',
+                '',
+                $updatedXml
+            );
+            $updatedXml = preg_replace(
+                '/<w:p\b[^>]*>\s*(?:<w:pPr\b[^>]*>.*?<\/w:pPr>\s*)?<w:r\b[^>]*>\s*(?:<w:rPr\b[^>]*>.*?<\/w:rPr>\s*)?<w:pict\b[^>]*>\s*<v:rect\b[^>]*\bo:hr="t"[^>]*\/>\s*<\/w:pict>\s*<\/w:r>\s*<\/w:p>/s',
+                '',
+                $updatedXml
+            );
+        }
+
+        if (is_string($updatedXml) && $updatedXml !== $xml) {
+            $zip->addFromString($xmlPart, $updatedXml);
+        }
+    }
+
+    $zip->close();
+}
+
+function dra_restore_template_headers(string $templatePath, string $docxDiskPath): void {
+    if (!is_file($templatePath) || !is_file($docxDiskPath) || !class_exists('ZipArchive')) {
+        return;
+    }
+
+    $templateZip = new ZipArchive();
+    if ($templateZip->open($templatePath) !== true) {
+        return;
+    }
+
+    $docxZip = new ZipArchive();
+    if ($docxZip->open($docxDiskPath) !== true) {
+        $templateZip->close();
+        return;
+    }
+
+    try {
+        $templateDocumentXml = $templateZip->getFromName('word/document.xml');
+        $templateRelsXml = $templateZip->getFromName('word/_rels/document.xml.rels');
+        $docxDocumentXml = $docxZip->getFromName('word/document.xml');
+        $docxRelsXml = $docxZip->getFromName('word/_rels/document.xml.rels');
+
+        if (!is_string($templateDocumentXml) || !is_string($templateRelsXml) || !is_string($docxDocumentXml) || !is_string($docxRelsXml)) {
+            return;
+        }
+
+        $templateDocument = new DOMDocument();
+        $templateRelationships = new DOMDocument();
+        $docxDocument = new DOMDocument();
+        $docxRelationships = new DOMDocument();
+
+        if (
+            !$templateDocument->loadXML($templateDocumentXml)
+            || !$templateRelationships->loadXML($templateRelsXml)
+            || !$docxDocument->loadXML($docxDocumentXml)
+            || !$docxRelationships->loadXML($docxRelsXml)
+        ) {
+            return;
+        }
+
+        $wordNamespace = 'http://schemas.openxmlformats.org/wordprocessingml/2006/main';
+        $relsNamespace = 'http://schemas.openxmlformats.org/package/2006/relationships';
+
+        $templateDocumentXpath = new DOMXPath($templateDocument);
+        $templateDocumentXpath->registerNamespace('w', $wordNamespace);
+        $templateRelationshipsXpath = new DOMXPath($templateRelationships);
+        $templateRelationshipsXpath->registerNamespace('rels', $relsNamespace);
+        $docxDocumentXpath = new DOMXPath($docxDocument);
+        $docxDocumentXpath->registerNamespace('w', $wordNamespace);
+        $docxRelationshipsXpath = new DOMXPath($docxRelationships);
+        $docxRelationshipsXpath->registerNamespace('rels', $relsNamespace);
+
+        $templateHeaderReferences = [];
+        foreach ($templateDocumentXpath->query('//w:sectPr/w:headerReference') ?: [] as $headerReference) {
+            if (!$headerReference instanceof DOMElement) {
+                continue;
+            }
+            $templateHeaderReferences[] = [
+                'type' => $headerReference->getAttributeNS($wordNamespace, 'type'),
+                'rid' => $headerReference->getAttributeNS('http://schemas.openxmlformats.org/officeDocument/2006/relationships', 'id'),
+            ];
+        }
+        if ($templateHeaderReferences === []) {
+            return;
+        }
+
+        $templateHeaderRelationships = [];
+        $templateHeaderParts = [];
+        $templateHeaderRelsParts = [];
+        $templateHeaderMediaParts = [];
+        foreach ($templateRelationshipsXpath->query('/rels:Relationships/rels:Relationship[contains(@Type, "/header")]') ?: [] as $relationshipNode) {
+            if (!$relationshipNode instanceof DOMElement) {
+                continue;
+            }
+            $id = $relationshipNode->getAttribute('Id');
+            $target = $relationshipNode->getAttribute('Target');
+            if ($id === '' || $target === '') {
+                continue;
+            }
+            $templateHeaderRelationships[$id] = $target;
+            $targetPart = 'word/' . ltrim($target, '/');
+            $templateHeaderParts[] = $targetPart;
+            $targetXml = $templateZip->getFromName($targetPart);
+            if (is_string($targetXml) && $targetXml !== '') {
+                $docxZip->deleteName($targetPart);
+                $docxZip->addFromString($targetPart, $targetXml);
+            }
+
+            $targetRelsPart = 'word/_rels/' . basename($target) . '.rels';
+            $templateHeaderRelsParts[] = $targetRelsPart;
+            $targetRelsXml = $templateZip->getFromName($targetRelsPart);
+            if (is_string($targetRelsXml) && $targetRelsXml !== '') {
+                $docxZip->deleteName($targetRelsPart);
+                $docxZip->addFromString($targetRelsPart, $targetRelsXml);
+
+                $headerRelsDocument = new DOMDocument();
+                if ($headerRelsDocument->loadXML($targetRelsXml)) {
+                    $headerRelsXpath = new DOMXPath($headerRelsDocument);
+                    $headerRelsXpath->registerNamespace('rels', $relsNamespace);
+                    foreach ($headerRelsXpath->query('/rels:Relationships/rels:Relationship') ?: [] as $headerAssetNode) {
+                        if (!$headerAssetNode instanceof DOMElement) {
+                            continue;
+                        }
+                        $assetTarget = $headerAssetNode->getAttribute('Target');
+                        if ($assetTarget === '' || preg_match('#^(?:https?:|/)#i', $assetTarget)) {
+                            continue;
+                        }
+                        $assetPart = 'word/' . ltrim($assetTarget, '/');
+                        $assetContents = $templateZip->getFromName($assetPart);
+                        if (is_string($assetContents) && $assetContents !== '') {
+                            $templateHeaderMediaParts[] = $assetPart;
+                            $docxZip->deleteName($assetPart);
+                            $docxZip->addFromString($assetPart, $assetContents);
+                        }
+                    }
+                }
+            }
+        }
+
+        if ($templateHeaderRelationships === []) {
+            return;
+        }
+
+        foreach (array_unique($templateHeaderParts) as $headerPart) {
+            $headerXml = $templateZip->getFromName($headerPart);
+            if (is_string($headerXml) && $headerXml !== '') {
+                $docxZip->deleteName($headerPart);
+                $docxZip->addFromString($headerPart, $headerXml);
+            }
+        }
+        foreach (array_unique($templateHeaderRelsParts) as $headerRelsPart) {
+            $headerRelsXml = $templateZip->getFromName($headerRelsPart);
+            if (is_string($headerRelsXml) && $headerRelsXml !== '') {
+                $docxZip->deleteName($headerRelsPart);
+                $docxZip->addFromString($headerRelsPart, $headerRelsXml);
+            }
+        }
+        foreach (array_unique($templateHeaderMediaParts) as $mediaPart) {
+            $mediaContents = $templateZip->getFromName($mediaPart);
+            if (is_string($mediaContents) && $mediaContents !== '') {
+                $docxZip->deleteName($mediaPart);
+                $docxZip->addFromString($mediaPart, $mediaContents);
+            }
+        }
+
+        foreach ($docxDocumentXpath->query('//w:sectPr') ?: [] as $sectionProperties) {
+            if (!$sectionProperties instanceof DOMElement) {
+                continue;
+            }
+            foreach (iterator_to_array($sectionProperties->childNodes) as $childNode) {
+                if ($childNode instanceof DOMElement && $childNode->namespaceURI === $wordNamespace && $childNode->localName === 'headerReference') {
+                    $sectionProperties->removeChild($childNode);
+                }
+            }
+
+            $insertBefore = null;
+            foreach ($sectionProperties->childNodes as $childNode) {
+                if ($childNode instanceof DOMElement) {
+                    $insertBefore = $childNode;
+                    break;
+                }
+            }
+
+            foreach ($templateHeaderReferences as $headerReference) {
+                $newHeaderReference = $docxDocument->createElementNS($wordNamespace, 'w:headerReference');
+                if ($headerReference['type'] !== '') {
+                    $newHeaderReference->setAttributeNS($wordNamespace, 'w:type', $headerReference['type']);
+                }
+                $newHeaderReference->setAttributeNS('http://schemas.openxmlformats.org/officeDocument/2006/relationships', 'r:id', $headerReference['rid']);
+                if ($insertBefore instanceof DOMNode) {
+                    $sectionProperties->insertBefore($newHeaderReference, $insertBefore);
+                } else {
+                    $sectionProperties->appendChild($newHeaderReference);
+                }
+            }
+        }
+
+        foreach ($docxRelationshipsXpath->query('/rels:Relationships/rels:Relationship[contains(@Type, "/header")]') ?: [] as $relationshipNode) {
+            if ($relationshipNode instanceof DOMElement && $relationshipNode->parentNode instanceof DOMNode) {
+                $relationshipNode->parentNode->removeChild($relationshipNode);
+            }
+        }
+
+        $relationshipsRoot = $docxRelationships->documentElement;
+        if (!$relationshipsRoot instanceof DOMElement) {
+            return;
+        }
+
+        foreach ($templateRelationshipsXpath->query('/rels:Relationships/rels:Relationship[contains(@Type, "/header")]') ?: [] as $relationshipNode) {
+            if (!$relationshipNode instanceof DOMElement) {
+                continue;
+            }
+            $relationshipsRoot->appendChild($docxRelationships->importNode($relationshipNode, true));
+        }
+
+        $docxZip->addFromString('word/document.xml', $docxDocument->saveXML());
+        $docxZip->addFromString('word/_rels/document.xml.rels', $docxRelationships->saveXML());
+    } finally {
+        $docxZip->close();
+        $templateZip->close();
+    }
+}
+
+function dra_force_docx_placeholder_replacements(string $docxDiskPath, array $replacements): void {
+    if (!is_file($docxDiskPath) || !class_exists('ZipArchive') || empty($replacements)) {
+        return;
+    }
+
+    $zip = new ZipArchive();
+    if ($zip->open($docxDiskPath) !== true) {
+        return;
+    }
+
+    for ($i = 0; $i < $zip->numFiles; $i += 1) {
+        $entryName = (string)$zip->getNameIndex($i);
+        if ($entryName === '' || !preg_match('#^word/(document|header\d+|footer\d+)\.xml$#', $entryName)) {
+            continue;
+        }
+
+        $xml = $zip->getFromName($entryName);
+        if (!is_string($xml) || $xml === '') {
+            continue;
+        }
+
+        $updatedXml = $xml;
+        foreach ($replacements as $key => $value) {
+            $placeholder = '${' . trim((string)$key) . '}';
+            $stringValue = trim((string)$value);
+            $escapedValue = '';
+            if ($stringValue !== '') {
+                $parts = preg_split("/\r\n|\n|\r/", $stringValue) ?: [$stringValue];
+                $escapedParts = array_map(
+                    static fn($part) => htmlspecialchars((string)$part, ENT_XML1 | ENT_COMPAT, 'UTF-8'),
+                    $parts
+                );
+                $escapedValue = implode('</w:t><w:br/><w:t>', $escapedParts);
+            }
+            $updatedXml = str_replace($placeholder, $escapedValue, $updatedXml);
+        }
+
+        if ($updatedXml !== $xml) {
+            $zip->addFromString($entryName, $updatedXml);
+        }
+    }
+
+    $zip->close();
+}
+
+function dra_extract_docx_media_asset(string $templatePath, string $mediaName): ?string {
+    $templateReal = realpath($templatePath);
+    if ($templateReal === false || !is_file($templateReal) || !class_exists('ZipArchive')) {
+        return null;
+    }
+
+    $tmpDir = dirname(__DIR__, 2) . '/UnifiedFileAttachment/IssuedDocuments/Tmp/template_assets';
+    if (!is_dir($tmpDir)) {
+        @mkdir($tmpDir, 0775, true);
+    }
+    if (!is_dir($tmpDir)) {
+        return null;
+    }
+
+    $extension = strtolower(pathinfo($mediaName, PATHINFO_EXTENSION));
+    $cachePath = $tmpDir . '/' . sha1($templateReal . '|' . $mediaName) . ($extension !== '' ? ('.' . $extension) : '');
+    if (is_file($cachePath) && filesize($cachePath) > 0) {
+        return $cachePath;
+    }
+
+    $zip = new ZipArchive();
+    if ($zip->open($templateReal) !== true) {
+        return null;
+    }
+    $assetContents = $zip->getFromName('word/media/' . ltrim($mediaName, '/'));
+    $zip->close();
+    if (!is_string($assetContents) || $assetContents === '') {
+        return null;
+    }
+    if (@file_put_contents($cachePath, $assetContents) === false) {
+        return null;
+    }
+    return is_file($cachePath) ? $cachePath : null;
+}
+
 function dra_ensure_list_hotpath_indexes(mysqli $conn): void {
     static $done = false;
     if ($done) {
@@ -236,9 +595,8 @@ function dra_format_full_name_from_payload(array $payload): string {
     $last = trim((string)($payload['last_name'] ?? $payload['lastname'] ?? ''));
     $first = trim((string)($payload['first_name'] ?? $payload['firstname'] ?? ''));
     $middle = trim((string)($payload['middle_name'] ?? $payload['middlename'] ?? ''));
-    $suffix = trim((string)($payload['suffix'] ?? ''));
     $mi = $middle !== '' ? strtoupper(substr($middle, 0, 1)) . '.' : '';
-    $parts = array_filter([$last !== '' ? $last . ',' : '', $first, $mi, $suffix], fn($x) => trim((string)$x) !== '');
+    $parts = array_filter([$first, $mi, $last], fn($x) => trim((string)$x) !== '');
     return trim(implode(' ', $parts));
 }
 
@@ -251,6 +609,9 @@ function dra_strip_area_from_address(string $address): string {
     // Remove ", Area X" or "Area X," fragments while keeping the rest intact.
     $value = preg_replace('/\s*,\s*Area\s+[A-Za-z0-9-]+\s*(?=,|$)/i', '', $value) ?? $value;
     $value = preg_replace('/(^|,\s*)Area\s+[A-Za-z0-9-]+\s*,\s*/i', '$1', $value) ?? $value;
+    $value = preg_replace('/\s*,\s*San\s+Jose\s*,\s*Rodriguez\s*,\s*Rizal\s*$/i', '', $value) ?? $value;
+    $value = preg_replace('/\s*,\s*Barangay\s+San\s+Jose\s*,\s*Rodriguez(?:\s*\(Montalban\))?\s*,\s*Rizal\s*$/i', '', $value) ?? $value;
+    $value = preg_replace('/\s*,\s*Barangay\s+San\s+Jose\s*,\s*Montalban\s*,\s*Rizal\s*$/i', '', $value) ?? $value;
     $value = preg_replace('/\s{2,}/', ' ', $value) ?? $value;
     $value = trim($value, " \t\n\r\0\x0B,");
 
@@ -303,9 +664,28 @@ function dra_apply_preview_edits(mysqli $conn, string $requestId, array &$reques
     $payload = dra_decode_request_payload($requestRow);
 
     $purpose = trim((string)($edited['purpose'] ?? ''));
+    $requestOfficerLine1 = trim((string)($edited['requestOfficerLine1'] ?? ''));
+    $requestOfficerLine2 = trim((string)($edited['requestOfficerLine2'] ?? ''));
+    $requestOfficerLine3 = trim((string)($edited['requestOfficerLine3'] ?? ''));
     $requestOfficer = trim((string)($edited['requestOfficer'] ?? ''));
     $businessName = trim((string)($edited['businessName'] ?? ''));
     $fullAddress = trim((string)($edited['fullAddress'] ?? ''));
+    $fullName = trim((string)($edited['fullName'] ?? ''));
+    $cohabitantName = trim((string)($edited['cohabitantName'] ?? ''));
+    $cohabitantRelationship = trim((string)($edited['cohabitantRelationship'] ?? ''));
+    $cohabitationDuration = trim((string)($edited['cohabitationDuration'] ?? ''));
+    $cohabitationStartDate = trim((string)($edited['cohabitationStartDate'] ?? ''));
+
+    if ($requestOfficerLine1 !== '' || $requestOfficerLine2 !== '' || $requestOfficerLine3 !== '') {
+        $payload['request_officer_line1'] = $requestOfficerLine1;
+        $payload['request_officer_line2'] = $requestOfficerLine2;
+        $payload['request_officer_line3'] = $requestOfficerLine3;
+        $requestOfficer = implode(' - ', array_values(array_filter([
+            $requestOfficerLine1,
+            $requestOfficerLine2,
+            $requestOfficerLine3,
+        ], static fn($value) => trim((string)$value) !== '')));
+    }
 
     if ($purpose !== '') {
         $payload['request_purpose'] = $purpose;
@@ -329,6 +709,21 @@ function dra_apply_preview_edits(mysqli $conn, string $requestId, array &$reques
     if ($fullAddress !== '') {
         $payload['full_address'] = $fullAddress;
     }
+    if ($fullName !== '') {
+        $payload['_preview_full_name'] = $fullName;
+    }
+    if ($cohabitantName !== '') {
+        $payload['cohabitant_full_name'] = $cohabitantName;
+    }
+    if ($cohabitantRelationship !== '') {
+        $payload['cohabitant_relationship'] = $cohabitantRelationship;
+    }
+    if ($cohabitationDuration !== '') {
+        $payload['cohabitation_duration'] = $cohabitationDuration;
+    }
+    if ($cohabitationStartDate !== '') {
+        $payload['cohabitation_start_date'] = $cohabitationStartDate;
+    }
 
     $encoded = dr_safe_json($payload);
     if (dr_column_exists($conn, 'documentrequesttbl', 'request_details')) {
@@ -342,7 +737,117 @@ function dra_apply_preview_edits(mysqli $conn, string $requestId, array &$reques
     }
 }
 
+function dra_overlay_preview_edits(array &$requestRow, array $edited): void {
+    if (empty($edited)) {
+        return;
+    }
+
+    $payload = dra_decode_request_payload($requestRow);
+
+    $purpose = trim((string)($edited['purpose'] ?? ''));
+    $requestOfficerLine1 = trim((string)($edited['requestOfficerLine1'] ?? ''));
+    $requestOfficerLine2 = trim((string)($edited['requestOfficerLine2'] ?? ''));
+    $requestOfficerLine3 = trim((string)($edited['requestOfficerLine3'] ?? ''));
+    $requestOfficer = trim((string)($edited['requestOfficer'] ?? ''));
+    $businessName = trim((string)($edited['businessName'] ?? ''));
+    $fullAddress = trim((string)($edited['fullAddress'] ?? ''));
+    $fullName = trim((string)($edited['fullName'] ?? ''));
+    $yearsResidency = trim((string)($edited['yearsResidency'] ?? ''));
+    $monthsResidency = trim((string)($edited['monthsResidency'] ?? ''));
+    $birthdate = trim((string)($edited['birthdate'] ?? $edited['childBirthdate'] ?? ''));
+    $birthplace = trim((string)($edited['birthplace'] ?? $edited['childBirthplace'] ?? ''));
+    $location = trim((string)($edited['location'] ?? ''));
+    $remarks = trim((string)($edited['remarks'] ?? ''));
+    $fatherName = trim((string)($edited['fatherName'] ?? ''));
+    $motherName = trim((string)($edited['motherName'] ?? ''));
+    $cohabitantName = trim((string)($edited['cohabitantName'] ?? ''));
+    $cohabitantRelationship = trim((string)($edited['cohabitantRelationship'] ?? ''));
+    $cohabitationDuration = trim((string)($edited['cohabitationDuration'] ?? ''));
+    $cohabitationStartDate = trim((string)($edited['cohabitationStartDate'] ?? ''));
+    $educationalAttainment = trim((string)($edited['educationalAttainment'] ?? ''));
+    $jobstartBeneficiary = trim((string)($edited['jobstartBeneficiary'] ?? ''));
+
+    if ($requestOfficerLine1 !== '' || $requestOfficerLine2 !== '' || $requestOfficerLine3 !== '') {
+        $payload['request_officer_line1'] = $requestOfficerLine1;
+        $payload['request_officer_line2'] = $requestOfficerLine2;
+        $payload['request_officer_line3'] = $requestOfficerLine3;
+        $requestOfficer = implode(' - ', array_values(array_filter([
+            $requestOfficerLine1,
+            $requestOfficerLine2,
+            $requestOfficerLine3,
+        ], static fn($value) => trim((string)$value) !== '')));
+    }
+
+    if ($purpose !== '') {
+        $payload['request_purpose'] = $purpose;
+        $payload['purpose'] = $purpose;
+        $requestRow['purpose'] = $purpose;
+    }
+    if ($requestOfficer !== '') {
+        $payload['request_officer'] = $requestOfficer;
+    }
+    if ($businessName !== '') {
+        $payload['business_name'] = $businessName;
+    }
+    if ($fullAddress !== '') {
+        $payload['full_address'] = $fullAddress;
+    }
+    if ($fullName !== '') {
+        $payload['_preview_full_name'] = $fullName;
+    }
+    if ($yearsResidency !== '') {
+        $payload['years_of_residency'] = $yearsResidency;
+    }
+    if ($monthsResidency !== '') {
+        $payload['months_of_residency'] = $monthsResidency;
+    }
+    if ($birthdate !== '') {
+        $payload['birthdate'] = $birthdate;
+        $payload['date_of_birth'] = $birthdate;
+        $payload['child_dob'] = $birthdate;
+    }
+    if ($birthplace !== '') {
+        $payload['birthplace'] = $birthplace;
+        $payload['place_of_birth'] = $birthplace;
+        $payload['child_birthplace'] = $birthplace;
+    }
+    if ($location !== '') {
+        $payload['location'] = $location;
+    }
+    if ($remarks !== '') {
+        $payload['remarks'] = $remarks;
+    }
+    if ($fatherName !== '') {
+        $payload['father_full_name'] = $fatherName;
+    }
+    if ($motherName !== '') {
+        $payload['mother_full_name'] = $motherName;
+    }
+    if ($cohabitantName !== '') {
+        $payload['cohabitant_full_name'] = $cohabitantName;
+    }
+    if ($cohabitantRelationship !== '') {
+        $payload['cohabitant_relationship'] = $cohabitantRelationship;
+    }
+    if ($cohabitationDuration !== '') {
+        $payload['cohabitation_duration'] = $cohabitationDuration;
+    }
+    if ($cohabitationStartDate !== '') {
+        $payload['cohabitation_start_date'] = $cohabitationStartDate;
+    }
+    if ($educationalAttainment !== '') {
+        $payload['educational_attainment'] = $educationalAttainment;
+    }
+    if ($jobstartBeneficiary !== '') {
+        $payload['jobstart_beneficiary'] = $jobstartBeneficiary;
+    }
+
+    $requestRow['request_details'] = dr_safe_json($payload);
+}
+
 function dra_generate_issued_document(array $requestRow): ?string {
+    global $conn;
+
     $baseDir = realpath(__DIR__ . '/../../');
     if ($baseDir === false) {
         return null;
@@ -360,12 +865,17 @@ function dra_generate_issued_document(array $requestRow): ?string {
     if ($requestId === '') {
         return null;
     }
+    $previewMode = !empty($requestRow['_preview_mode']);
+    $preferDocxOutput = !empty($requestRow['_prefer_docx_output']);
     $docType = trim((string)($requestRow['document_type'] ?? 'Certificate'));
     $purpose = trim((string)($requestRow['purpose'] ?? ''));
     $issuedAt = date('F j, Y');
     $payload = dra_decode_request_payload($requestRow);
 
-    $fullName = dra_format_full_name_from_payload($payload);
+    $fullName = trim((string)($payload['_preview_full_name'] ?? ''));
+    if ($fullName === '') {
+        $fullName = dra_format_full_name_from_payload($payload);
+    }
     if ($fullName === '') {
         $fullName = trim((string)($requestRow['resident_id'] ?? 'Resident'));
     }
@@ -378,32 +888,51 @@ function dra_generate_issued_document(array $requestRow): ?string {
     $orNo = trim((string)($requestRow['or_number'] ?? ''));
 
     $verificationCode = trim((string)($requestRow['verification_code'] ?? ''));
-    $verifyUrl = dra_qr_verify_url($requestId, $verificationCode);
-
+    $currentStage = strtolower(trim((string)($requestRow['stage'] ?? '')));
+    $defaultFee = dr_get_fee_amount_for_document_type($conn, $docType);
+    $isFreeDocument = ($defaultFee !== null && (float)$defaultFee <= 0.0);
+    $qrEligibleStages = $isFreeDocument
+        ? [
+            strtolower((string)DR_STAGE_READY_FOR_CLAIM),
+            strtolower((string)DR_STAGE_COMPLETED),
+        ]
+        : [
+            strtolower((string)DR_STAGE_PAYMENT_VERIFIED),
+            strtolower((string)DR_STAGE_READY_FOR_CLAIM),
+            strtolower((string)DR_STAGE_COMPLETED),
+        ];
+    $allowQr = (
+        !$previewMode
+        && $verificationCode !== ''
+        && in_array($currentStage, $qrEligibleStages, true)
+    );
+    $verifyUrl = $allowQr ? dra_qr_verify_url($requestId, $verificationCode) : '';
     $qrFile = 'qr_' . preg_replace('/[^A-Za-z0-9_-]/', '', $requestId) . '.png';
     $qrDiskPath = $qrDir . '/' . $qrFile;
-    $qrPublicPath = '/UnifiedFileAttachment/IssuedDocuments/QR/' . $qrFile;
+    $qrPublicPath = $allowQr ? ('/UnifiedFileAttachment/IssuedDocuments/QR/' . $qrFile) : '';
 
-    $qrApi = 'https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=' . rawurlencode($verifyUrl);
-    $ctx = stream_context_create([
-        'http' => ['timeout' => 6, 'ignore_errors' => true],
-        'ssl' => ['verify_peer' => false, 'verify_peer_name' => false],
-    ]);
-    $qrContent = @file_get_contents($qrApi, false, $ctx);
-    if ($qrContent !== false && strlen($qrContent) > 500) {
-        @file_put_contents($qrDiskPath, $qrContent);
-    } else {
-        // Fallback QR placeholder if external API is unreachable.
-        if (function_exists('imagecreatetruecolor')) {
-            $img = imagecreatetruecolor(220, 220);
-            $white = imagecolorallocate($img, 255, 255, 255);
-            $black = imagecolorallocate($img, 0, 0, 0);
-            imagefilledrectangle($img, 0, 0, 220, 220, $white);
-            imagerectangle($img, 0, 0, 219, 219, $black);
-            imagestring($img, 4, 78, 90, 'QR', $black);
-            imagestring($img, 2, 12, 198, substr($verificationCode !== '' ? $verificationCode : $requestId, 0, 28), $black);
-            imagepng($img, $qrDiskPath);
-            imagedestroy($img);
+    if ($allowQr) {
+        $qrApi = 'https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=' . rawurlencode($verifyUrl);
+        $ctx = stream_context_create([
+            'http' => ['timeout' => 6, 'ignore_errors' => true],
+            'ssl' => ['verify_peer' => false, 'verify_peer_name' => false],
+        ]);
+        $qrContent = @file_get_contents($qrApi, false, $ctx);
+        if ($qrContent !== false && strlen($qrContent) > 500) {
+            @file_put_contents($qrDiskPath, $qrContent);
+        } else {
+            // Fallback QR placeholder if external API is unreachable.
+            if (function_exists('imagecreatetruecolor')) {
+                $img = imagecreatetruecolor(220, 220);
+                $white = imagecolorallocate($img, 255, 255, 255);
+                $black = imagecolorallocate($img, 0, 0, 0);
+                imagefilledrectangle($img, 0, 0, 220, 220, $white);
+                imagerectangle($img, 0, 0, 219, 219, $black);
+                imagestring($img, 4, 78, 90, 'QR', $black);
+                imagestring($img, 2, 12, 198, substr($verificationCode !== '' ? $verificationCode : $requestId, 0, 28), $black);
+                imagepng($img, $qrDiskPath);
+                imagedestroy($img);
+            }
         }
     }
 
@@ -411,13 +940,21 @@ function dra_generate_issued_document(array $requestRow): ?string {
     $isIndigency = strpos($docTypeNorm, 'indigency') !== false;
     $isGoodMoral = (strpos($docTypeNorm, 'goodmoral') !== false) || (strpos($docTypeNorm, 'good moral') !== false);
     $isResidency = strpos($docTypeNorm, 'residency') !== false;
+    $isCohabitation = strpos($docTypeNorm, 'cohabitation') !== false;
 
-    // Indigency/Good Moral/Residency: prefer .docx template output when template and PhpWord are available.
-    if ($isIndigency || $isGoodMoral || $isResidency) {
+    $isTemplateBasedCertificate = $isIndigency || $isGoodMoral || $isResidency || $isCohabitation;
+
+    // Indigency/Good Moral/Residency: generate from .docx template only.
+    if ($isTemplateBasedCertificate) {
         if ($isIndigency) {
             $templateFile = 'Certificate of Indigency.docx';
         } elseif ($isGoodMoral) {
             $templateFile = 'Certificate of Good Moral.docx';
+        } elseif ($isCohabitation) {
+            $cohabitationChildrenCount = max(0, min(5, (int)trim((string)($payload['cohabitation_children_count'] ?? '0'))));
+            $templateFile = $cohabitationChildrenCount > 0
+                ? 'CertificateOfCohabitationWithChild.docx'
+                : 'CertificateOfCohabitationNoChild.docx';
         } else {
             $residencyTemplates = ['general certification.docx', 'GeneralCertification.docx'];
             $templateFile = 'GeneralCertification.docx';
@@ -429,88 +966,372 @@ function dra_generate_issued_document(array $requestRow): ?string {
             }
         }
         $templatePath = $baseDir . '/Resident-End/Certificates/DocumentIssuance/' . $templateFile;
-        if (is_file($templatePath)) {
-            if (!class_exists('\PhpOffice\PhpWord\TemplateProcessor')) {
-                $phpWordAutoloads = [
-                    $baseDir . '/PhpFiles/PhpOffice/vendor/autoload.php',
-                    $baseDir . '/vendor/autoload.php',
-                ];
-                foreach ($phpWordAutoloads as $autoloadPath) {
-                    if (is_file($autoloadPath)) {
-                        require_once $autoloadPath;
-                        if (class_exists('\PhpOffice\PhpWord\TemplateProcessor')) {
-                            break;
-                        }
+        if (!is_file($templatePath)) {
+            error_log('[dra_generate_issued_document][docx_template] missing template: ' . $templatePath);
+            return null;
+        }
+
+        if (!class_exists('\PhpOffice\PhpWord\TemplateProcessor')) {
+            $phpWordAutoloads = [
+                $baseDir . '/PhpFiles/PhpOffice/vendor/autoload.php',
+                $baseDir . '/vendor/autoload.php',
+            ];
+            foreach ($phpWordAutoloads as $autoloadPath) {
+                if (is_file($autoloadPath)) {
+                    require_once $autoloadPath;
+                    if (class_exists('\PhpOffice\PhpWord\TemplateProcessor')) {
+                        break;
                     }
                 }
             }
+        }
 
-            if (class_exists('\PhpOffice\PhpWord\TemplateProcessor')) {
+        if (!class_exists('\PhpOffice\PhpWord\TemplateProcessor')) {
+            error_log('[dra_generate_issued_document][docx_template] PhpWord TemplateProcessor unavailable');
+            return null;
+        }
+
+        // PhpWord needs a writable temp dir for unpacking .docx templates.
+        $phpWordTempDir = $baseDir . '/UnifiedFileAttachment/IssuedDocuments/Tmp';
+        if (!is_dir($phpWordTempDir)) {
+            @mkdir($phpWordTempDir, 0777, true);
+        }
+        @chmod($phpWordTempDir, 0777);
+        if (is_dir($phpWordTempDir) && is_writable($phpWordTempDir) && class_exists('\PhpOffice\PhpWord\Settings')) {
+            @putenv('TMPDIR=' . $phpWordTempDir);
+            @putenv('TMP=' . $phpWordTempDir);
+            @putenv('TEMP=' . $phpWordTempDir);
+            @ini_set('sys_temp_dir', $phpWordTempDir);
+            \PhpOffice\PhpWord\Settings::setTempDir($phpWordTempDir);
+        }
+
+        try {
+            $template = new \PhpOffice\PhpWord\TemplateProcessor($templatePath);
+            $normalizeText = static function (string $value): string {
+                $v = trim(preg_replace('/\s+/u', ' ', $value));
+                return $v === '' ? '-' : strtoupper($v);
+            };
+            $normalizeOptionalText = static function (string $value): string {
+                $v = trim(preg_replace('/\s+/u', ' ', $value));
+                return strtoupper($v);
+            };
+            $normalizePlainText = static function (string $value, string $fallback = ''): string {
+                $v = trim(preg_replace('/\s+/u', ' ', $value));
+                return $v === '' ? $fallback : $v;
+            };
+            $formatMiddleInitial = static function (string $value): string {
+                $v = trim($value);
+                if ($v === '') {
+                    return '';
+                }
+                $firstChar = mb_substr($v, 0, 1, 'UTF-8');
+                return $firstChar !== '' ? ($firstChar . '.') : '';
+            };
+            $formatDisplayName = static function (string $first, string $middle, string $last, string $suffix = '') use ($normalizePlainText, $formatMiddleInitial): string {
+                $parts = array_filter([
+                    $normalizePlainText($first),
+                    $formatMiddleInitial($middle),
+                    $normalizePlainText($last),
+                    $normalizePlainText($suffix),
+                ], static fn($value) => trim((string)$value) !== '');
+                return implode(' ', $parts);
+            };
+            $formatDisplayDate = static function (string $value): string {
+                $raw = trim($value);
+                if ($raw === '') {
+                    return '';
+                }
                 try {
-                    $template = new \PhpOffice\PhpWord\TemplateProcessor($templatePath);
-                    $normalizeText = static function (string $value): string {
-                        $v = trim(preg_replace('/\s+/u', ' ', $value));
-                        return $v === '' ? '-' : $v;
-                    };
-
-                    $requestOfficer = trim((string)($payload['request_officer'] ?? ''));
-                    $requestPurpose = trim((string)($payload['request_purpose'] ?? $purpose));
-                    if ($isResidency) {
-                        $requestPurpose = 'Residency Verification';
+                    return (new DateTime($raw))->format('F j, Y');
+                } catch (Throwable $ignored) {
+                    return $raw;
+                }
+            };
+            $formatDisplayMonthYear = static function (string $value): string {
+                $raw = trim($value);
+                if ($raw === '') {
+                    return '';
+                }
+                if (preg_match('/^\d{4}-\d{2}$/', $raw)) {
+                    try {
+                        return (new DateTime($raw . '-01'))->format('F Y');
+                    } catch (Throwable $ignored) {
+                        return $raw;
                     }
-                    if ($requestPurpose === '') {
-                        $requestPurpose = $purpose !== '' ? $purpose : 'PURPOSE';
-                    }
-                    $yearsResidency = trim((string)($payload['years_of_residency'] ?? ''));
-                    $monthsResidency = trim((string)($payload['months_of_residency'] ?? ''));
-                    $issuedDateObj = new DateTime();
-                    $issuedDateWord = $issuedDateObj->format('F j, Y');
-                    $day = (int)$issuedDateObj->format('j');
-                    $monthUpper = strtoupper($issuedDateObj->format('F'));
-                    $yearNum = $issuedDateObj->format('Y');
-                    $v = $day % 100;
-                    $suffix = ($v >= 11 && $v <= 13) ? 'th' : (($day % 10 === 1) ? 'st' : (($day % 10 === 2) ? 'nd' : (($day % 10 === 3) ? 'rd' : 'th')));
-                    $issuedAsDocx = $day . $suffix . ' day of ' . $monthUpper . ' ' . $yearNum;
+                }
+                return $raw;
+            };
 
-                    $template->setValue('REQUEST_ID', $normalizeText($requestId));
-                    $template->setValue('FULL_NAME', $normalizeText($fullName));
-                    $template->setValue('ADDRESS', $normalizeText($address));
-                    $template->setValue('PURPOSE', $normalizeText($requestPurpose));
-                    $template->setValue('REQUEST_OFFICER', $normalizeText($requestOfficer));
-                    $template->setValue('ISSUED_AT', $normalizeText($issuedDateWord));
-                    $template->setValue('ISSUED_DATE_WORD', $normalizeText($issuedAsDocx));
-                    $template->setValue('CERTIFICATE_NUMBER', $normalizeText($certNo));
-                    $template->setValue('OR_NUMBER', $normalizeText($orNo));
-                    $template->setValue('VERIFICATION_CODE', $normalizeText($verificationCode));
-                    $template->setValue('VERIFY_URL', $normalizeText($verifyUrl));
-                    $template->setValue('QR_PUBLIC_PATH', $normalizeText($qrPublicPath));
-                    $template->setValue('YEARS_OF_RESIDENCY', $normalizeText($yearsResidency));
-                    $template->setValue('MONTHS_OF_RESIDENCY', $normalizeText($monthsResidency));
+            $requestOfficer = trim((string)($payload['request_officer'] ?? ''));
+            $requestPurpose = trim((string)($payload['request_purpose'] ?? $purpose));
+            if ($requestPurpose === '') {
+                $requestPurpose = $purpose !== '' ? $purpose : 'PURPOSE';
+            }
+            $submissionTargetType = trim((string)($payload['submission_target_type'] ?? ''));
+            $institutionName = trim((string)($payload['institution_name'] ?? ''));
+            $institutionPerson = trim((string)($payload['institution_person'] ?? ''));
+            $institutionPosition = trim((string)($payload['institution_position'] ?? ''));
+            $requestOfficerLine1 = trim((string)($payload['request_officer_line1'] ?? ''));
+            $requestOfficerLine2 = trim((string)($payload['request_officer_line2'] ?? ''));
+            $requestOfficerLine3 = trim((string)($payload['request_officer_line3'] ?? ''));
+            $governmentOffice = trim((string)($payload['government_office'] ?? ''));
+            if ($governmentOffice === '') {
+                $governmentOffice = trim((string)($payload['government_position_group'] ?? ''));
+            }
+            if ($governmentOffice === '__other__') {
+                $governmentOffice = trim((string)($payload['government_position_other'] ?? ''));
+            }
+            $governmentPosition = trim((string)($payload['government_position'] ?? ''));
+            if ($governmentPosition === '') {
+                $governmentPosition = trim((string)($payload['government_position_detail'] ?? ''));
+            }
+            $governmentOfficial = trim((string)($payload['government_official'] ?? ''));
+            if ($governmentOfficial === '') {
+                $governmentOfficial = trim((string)($payload['government_official_other'] ?? ''));
+            }
 
-                    if (is_file($qrDiskPath) && method_exists($template, 'setImageValue')) {
-                        $template->setImageValue('QR_IMAGE', [
-                            'path' => $qrDiskPath,
-                            'width' => 120,
-                            'height' => 120,
-                            'ratio' => true,
-                        ]);
-                    }
-
-                    $docxName = 'issued_' . preg_replace('/[^A-Za-z0-9_-]/', '', $requestId) . '_' . date('YmdHis') . '.docx';
-                    $docxDiskPath = $outDir . '/' . $docxName;
-                    $template->saveAs($docxDiskPath);
-
-                    if (is_file($docxDiskPath) && filesize($docxDiskPath) > 0) {
-                        $pdfDiskPath = dra_convert_docx_to_pdf($docxDiskPath, $outDir);
-                        if ($pdfDiskPath !== null) {
-                            return '/UnifiedFileAttachment/IssuedDocuments/Generated/' . basename($pdfDiskPath);
+            $formattedRequestOfficer = $requestOfficer;
+            if ($requestOfficerLine1 !== '' || $requestOfficerLine2 !== '' || $requestOfficerLine3 !== '') {
+                $formattedRequestOfficer = implode(' - ', array_filter([$requestOfficerLine1, $requestOfficerLine2, $requestOfficerLine3], static fn($value) => trim((string)$value) !== ''));
+            } elseif ($submissionTargetType === 'institution') {
+                $attentionParts = array_values(array_filter([$institutionPerson, $institutionPosition], static fn($value) => trim((string)$value) !== ''));
+                $requestOfficerLine1 = $institutionName;
+                $requestOfficerLine2 = !empty($attentionParts) ? 'ATTN: ' . implode(', ', $attentionParts) : '';
+                $formattedRequestOfficer = implode(' - ', array_filter([$requestOfficerLine1, $requestOfficerLine2], static fn($value) => trim((string)$value) !== ''));
+            } elseif ($submissionTargetType === 'government_official') {
+                if ($governmentOfficial === '' && $requestOfficer !== '') {
+                    $governmentOfficial = $requestOfficer;
+                }
+                $requestOfficerLine1 = $governmentOfficial;
+                $requestOfficerLine2 = $governmentPosition;
+                $requestOfficerLine3 = $governmentOffice;
+                $formattedRequestOfficer = implode(' - ', array_filter([$requestOfficerLine1, $requestOfficerLine2, $requestOfficerLine3], static fn($value) => trim((string)$value) !== ''));
+            }
+            if ($formattedRequestOfficer !== '') {
+                $requestOfficer = $formattedRequestOfficer;
+            }
+            if ($requestOfficerLine1 === '' && $requestOfficer !== '') {
+                $requestOfficerParts = array_values(array_filter(array_map('trim', preg_split('/\s*-\s*/', $requestOfficer) ?: []), static fn($value) => $value !== ''));
+                $requestOfficerLine1 = (string)($requestOfficerParts[0] ?? '');
+                $requestOfficerLine2 = (string)($requestOfficerParts[1] ?? '');
+                $requestOfficerLine3 = (string)($requestOfficerParts[2] ?? '');
+            }
+            $yearsResidency = trim((string)($payload['years_of_residency'] ?? ''));
+            $monthsResidency = trim((string)($payload['months_of_residency'] ?? ''));
+            $birthdateValue = trim((string)($payload['birthdate'] ?? $payload['date_of_birth'] ?? $payload['child_dob'] ?? ''));
+            $birthplaceValue = trim((string)($payload['birthplace'] ?? $payload['place_of_birth'] ?? $payload['child_birthplace'] ?? ''));
+            $remarksValue = trim((string)($payload['remarks'] ?? $requestRow['status_remarks'] ?? $requestRow['status_reason'] ?? ''));
+            $cohabitationDurationValue = trim((string)($payload['cohabitation_duration'] ?? ''));
+            $cohabitationChildrenCount = max(0, min(5, (int)trim((string)($payload['cohabitation_children_count'] ?? '0'))));
+            $cohabitationChildNames = [];
+            $cohabitationChildAges = [];
+            $residentFirstName = trim((string)($payload['first_name'] ?? $payload['firstname'] ?? ''));
+            $residentMiddleName = trim((string)($payload['middle_name'] ?? $payload['middlename'] ?? ''));
+            $residentLastName = trim((string)($payload['last_name'] ?? $payload['lastname'] ?? ''));
+            $residentSuffix = trim((string)($payload['suffix_name'] ?? $payload['suffix'] ?? ''));
+            $cohabitantFirstName = trim((string)($payload['cohabitant_first'] ?? ''));
+            $cohabitantMiddleName = trim((string)($payload['cohabitant_middle'] ?? ''));
+            $cohabitantLastName = trim((string)($payload['cohabitant_last'] ?? ''));
+            $cohabitantSuffix = trim((string)($payload['cohabitant_suffix'] ?? ''));
+            $cohabitantBirthdateValue = trim((string)($payload['cohabitant_dob'] ?? ''));
+            if ($isCohabitation && ($birthdateValue === '' || $residentFirstName === '' || $residentLastName === '')) {
+                $residentUserId = trim((string)($requestRow['resident_user_id'] ?? ''));
+                if ($residentUserId !== '') {
+                    $residentInfoStmt = $conn->prepare("
+                        SELECT firstname, middlename, lastname, suffix, birthdate
+                        FROM residentinformationtbl
+                        WHERE user_id = ?
+                        LIMIT 1
+                    ");
+                    if ($residentInfoStmt) {
+                        $residentInfoStmt->bind_param('s', $residentUserId);
+                        $residentInfoStmt->execute();
+                        $residentInfo = $residentInfoStmt->get_result()->fetch_assoc() ?: [];
+                        $residentInfoStmt->close();
+                        if ($residentFirstName === '') {
+                            $residentFirstName = trim((string)($residentInfo['firstname'] ?? ''));
                         }
-                        error_log('[dra_generate_issued_document][docx_template] docx->pdf conversion unavailable/failed; using PDF fallback renderer');
+                        if ($residentMiddleName === '') {
+                            $residentMiddleName = trim((string)($residentInfo['middlename'] ?? ''));
+                        }
+                        if ($residentLastName === '') {
+                            $residentLastName = trim((string)($residentInfo['lastname'] ?? ''));
+                        }
+                        if ($residentSuffix === '') {
+                            $residentSuffix = trim((string)($residentInfo['suffix'] ?? ''));
+                        }
+                        if ($birthdateValue === '') {
+                            $birthdateValue = trim((string)($residentInfo['birthdate'] ?? ''));
+                        }
                     }
-                } catch (Throwable $e) {
-                    error_log('[dra_generate_issued_document][docx_template] ' . $e->getMessage());
                 }
             }
+            for ($childIndex = 1; $childIndex <= 5; $childIndex += 1) {
+                $cohabitationChildNames[$childIndex] = trim((string)($payload['cohabitation_child_' . $childIndex . '_name'] ?? ''));
+                $cohabitationChildAges[$childIndex] = trim((string)($payload['cohabitation_child_' . $childIndex . '_age'] ?? ''));
+            }
+            $ageValue = trim((string)($payload['age'] ?? ''));
+            if ($ageValue === '' && $birthdateValue !== '') {
+                try {
+                    $birthDateObj = new DateTime($birthdateValue);
+                    $ageValue = (string)$birthDateObj->diff(new DateTime())->y;
+                } catch (Throwable $ignored) {
+                    $ageValue = '';
+                }
+            }
+            $residentNameValue = $formatDisplayName($residentFirstName, $residentMiddleName, $residentLastName, $residentSuffix);
+            if ($residentNameValue === '') {
+                $residentNameValue = $normalizePlainText($fullName);
+            }
+            $cohabitantNameValue = $formatDisplayName($cohabitantFirstName, $cohabitantMiddleName, $cohabitantLastName, $cohabitantSuffix);
+            $cohabitantAgeValue = trim((string)($payload['cohabitant_age'] ?? ''));
+            if ($cohabitantAgeValue === '' && $cohabitantBirthdateValue !== '') {
+                try {
+                    $cohabitantBirthDateObj = new DateTime($cohabitantBirthdateValue);
+                    $cohabitantAgeValue = (string)$cohabitantBirthDateObj->diff(new DateTime())->y;
+                } catch (Throwable $ignored) {
+                    $cohabitantAgeValue = '';
+                }
+            }
+            $birthdateDisplayValue = $formatDisplayDate($birthdateValue);
+            $cohabitantBirthdateDisplayValue = $formatDisplayDate($cohabitantBirthdateValue);
+            $cohabitationSinceValue = $formatDisplayMonthYear((string)($payload['cohabitation_start_date'] ?? ''));
+            $childrenListValue = [];
+            for ($childIndex = 1; $childIndex <= 5; $childIndex += 1) {
+                $childName = $normalizePlainText((string)($cohabitationChildNames[$childIndex] ?? ''));
+                $childAge = $normalizePlainText((string)($cohabitationChildAges[$childIndex] ?? ''));
+                if ($childName === '' && $childAge === '') {
+                    continue;
+                }
+                $childrenListValue[] = trim($childName . ($childAge !== '' ? ', ' . $childAge . ' y/o' : ''));
+            }
+            $issuedDateObj = new DateTime();
+            $issuedDateWord = $issuedDateObj->format('F j, Y');
+            $day = (int)$issuedDateObj->format('j');
+            $monthUpper = strtoupper($issuedDateObj->format('F'));
+            $yearNum = $issuedDateObj->format('Y');
+            $v = $day % 100;
+            $suffix = ($v >= 11 && $v <= 13) ? 'th' : (($day % 10 === 1) ? 'st' : (($day % 10 === 2) ? 'nd' : (($day % 10 === 3) ? 'rd' : 'th')));
+            $issuedAsDocx = $day . $suffix . ' day of ' . $monthUpper . ' ' . $yearNum;
+
+            $cacheSignature = sha1(dr_safe_json([
+                'cache_version' => 25,
+                'preview' => $previewMode ? 1 : 0,
+                'request_id' => $requestId,
+                'document_type' => $docType,
+                'purpose' => $purpose,
+                'payload' => $payload,
+                'full_name' => $fullName,
+                'address' => $address,
+                'request_officer' => $requestOfficer,
+                'request_purpose' => $requestPurpose,
+                'years_of_residency' => $yearsResidency,
+                'months_of_residency' => $monthsResidency,
+                'birthdate' => $birthdateValue,
+                'birthplace' => $birthplaceValue,
+                'remarks' => $remarksValue,
+                'certificate_number' => $certNo,
+                'or_number' => $orNo,
+                'verification_code' => $verificationCode,
+                'updated_at' => (string)($requestRow['updated_at'] ?? ''),
+                'submitted_at' => (string)($requestRow['submitted_at'] ?? ''),
+                'review_timestamp' => (string)($requestRow['review_timestamp'] ?? ''),
+                'release_timestamp' => (string)($requestRow['release_timestamp'] ?? ''),
+                'template_file' => $templateFile,
+                'template_mtime' => @filemtime($templatePath) ?: 0,
+            ]));
+            $fileStem = ($previewMode ? 'preview_' : 'issued_')
+                . preg_replace('/[^A-Za-z0-9_-]/', '', $requestId)
+                . '_' . substr($cacheSignature, 0, 12);
+            $cachedPdfDiskPath = $outDir . '/' . $fileStem . '.pdf';
+            $cachedDocxDiskPath = $outDir . '/' . $fileStem . '.docx';
+            if ($preferDocxOutput && is_file($cachedDocxDiskPath) && filesize($cachedDocxDiskPath) > 0) {
+                return '/UnifiedFileAttachment/IssuedDocuments/Generated/' . basename($cachedDocxDiskPath);
+            }
+            if (is_file($cachedPdfDiskPath) && filesize($cachedPdfDiskPath) > 0) {
+                return '/UnifiedFileAttachment/IssuedDocuments/Generated/' . basename($cachedPdfDiskPath);
+            }
+
+            $template->setValue('REQUEST_ID', $normalizeText($requestId));
+            $template->setValue('FULL_NAME', $normalizeText($fullName));
+            $template->setValue('ADDRESS', $normalizeText($address));
+            $template->setValue('PURPOSE', $normalizeText($requestPurpose));
+            $template->setValue('REQUEST_OFFICER', $normalizeText($requestOfficer));
+            $template->setValue('REQUEST_OFFICER_LINE1', $normalizeOptionalText($requestOfficerLine1));
+            $template->setValue('REQUEST_OFFICER_LINE2', $normalizeOptionalText($requestOfficerLine2));
+            $template->setValue('REQUEST_OFFICER_LINE3', $normalizeOptionalText($requestOfficerLine3));
+            $template->setValue('SUBMISSION_TARGET_TYPE', $normalizeOptionalText($submissionTargetType));
+            $template->setValue('INSTITUTION_NAME', $normalizeOptionalText($institutionName));
+            $template->setValue('INSTITUTION_PERSON', $normalizeOptionalText($institutionPerson));
+            $template->setValue('INSTITUTION_POSITION', $normalizeOptionalText($institutionPosition));
+            $template->setValue('GOVERNMENT_OFFICE', $normalizeOptionalText($governmentOffice));
+            $template->setValue('GOVERNMENT_POSITION', $normalizeOptionalText($governmentPosition));
+            $template->setValue('GOVERNMENT_OFFICIAL', $normalizeOptionalText($governmentOfficial));
+            $template->setValue('ISSUED_AT', $normalizeText($issuedDateWord));
+            $template->setValue('ISSUED_DATE_WORD', $normalizeText($issuedAsDocx));
+            $template->setValue('CERTIFICATE_NUMBER', $normalizeText($certNo));
+            $template->setValue('OR_NUMBER', $normalizeText($orNo));
+            $template->setValue('VERIFICATION_CODE', $normalizeText($verificationCode));
+            $template->setValue('VERIFY_URL', $normalizeText($verifyUrl));
+            $template->setValue('QR_PUBLIC_PATH', $normalizeText($qrPublicPath));
+            $template->setValue('YEARS_OF_RESIDENCY', $normalizeText($yearsResidency));
+            $template->setValue('MONTHS_OF_RESIDENCY', $normalizeText($monthsResidency));
+            $template->setValue('Birthdate', $normalizeOptionalText($birthdateValue));
+            $template->setValue('BIRTHDATE', $normalizePlainText($birthdateDisplayValue));
+            $template->setValue('Birthplace', $normalizeOptionalText($birthplaceValue));
+            $template->setValue('BIRTHPLACE', $normalizeOptionalText($birthplaceValue));
+            $template->setValue('REMARKS', $normalizeOptionalText($remarksValue));
+            $template->setValue('NAME', $normalizePlainText($residentNameValue));
+            $template->setValue('AGE', $normalizePlainText($ageValue));
+            $template->setValue('PARTNER_NAME', $normalizePlainText($cohabitantNameValue));
+            $template->setValue('PARTNER_AGE', $normalizePlainText($cohabitantAgeValue));
+            $template->setValue('PARTNER_BIRTHDATE', $normalizePlainText($cohabitantBirthdateDisplayValue));
+            $template->setValue('COHABITATION_DURATION', $normalizePlainText($cohabitationDurationValue !== '' ? $cohabitationDurationValue : $cohabitationSinceValue));
+            $template->setValue('COHABITATION_SINCE', $normalizePlainText($cohabitationSinceValue));
+            $template->setValue('COHABIRATION_DURATION', $normalizePlainText($cohabitationSinceValue));
+            $template->setValue('ISSUED_ON', $normalizeText($issuedDateWord));
+            $template->setValue('CHILDREN_LIST', implode("\n", $childrenListValue));
+            for ($childIndex = 1; $childIndex <= 5; $childIndex += 1) {
+                $template->setValue('CHILD_' . $childIndex . '_NAME', $normalizePlainText($cohabitationChildNames[$childIndex] ?? ''));
+                $template->setValue('CHILD_' . $childIndex . '_AGE', $normalizePlainText($cohabitationChildAges[$childIndex] ?? ''));
+            }
+
+            $docxName = $fileStem . '.docx';
+            $docxDiskPath = $outDir . '/' . $docxName;
+            $template->saveAs($docxDiskPath);
+            dra_restore_template_headers($templatePath, $docxDiskPath);
+            dra_strip_unreplaced_docx_qr_placeholder($docxDiskPath);
+
+            if (!is_file($docxDiskPath) || filesize($docxDiskPath) <= 0) {
+                error_log('[dra_generate_issued_document][docx_template] generated docx is missing/empty');
+                return null;
+            }
+
+            if ($preferDocxOutput) {
+                return '/UnifiedFileAttachment/IssuedDocuments/Generated/' . basename($docxDiskPath);
+            }
+
+            $pdfDiskPath = dra_convert_docx_to_pdf($docxDiskPath, $outDir);
+            if ($pdfDiskPath !== null) {
+                $finalizeOptions = [];
+                if ($isCohabitation) {
+                    $finalizeOptions['stamp_letterhead'] = true;
+                    $finalizeOptions['letterhead_type'] = 'cohabitation';
+                }
+                dra_finalize_template_pdf(
+                    $pdfDiskPath,
+                    ($allowQr && is_file($qrDiskPath)) ? $qrDiskPath : null,
+                    $finalizeOptions
+                );
+                @unlink($docxDiskPath);
+                return '/UnifiedFileAttachment/IssuedDocuments/Generated/' . basename($pdfDiskPath);
+            }
+
+            error_log('[dra_generate_issued_document][docx_template] DOCX generated but PDF conversion failed');
+            return null;
+        } catch (Throwable $e) {
+            error_log('[dra_generate_issued_document][docx_template] ' . $e->getMessage());
+            return null;
         }
     }
 
@@ -548,7 +1369,7 @@ function dra_generate_issued_document(array $requestRow): ?string {
     if (is_file($rightLogo)) {
         $pdf->Image($rightLogo, 168, 14, 26, 26);
     }
-    $isSpecialCertificate = $isIndigency || $isGoodMoral;
+    $isSpecialCertificate = $isIndigency || $isGoodMoral || $isResidency;
     $fontFace = 'Times';
     $indigencyFont = 'Arial';
 
@@ -569,6 +1390,12 @@ function dra_generate_issued_document(array $requestRow): ?string {
             $pdf->Cell(0, 8, 'TANGGAPAN NG PUNONG BARANGAY', 0, 1, 'C');
             $pdf->SetFont($indigencyFont, 'B', 12);
             $pdf->Cell(0, 7, 'CERTIFICATE OF INDIGENCY', 0, 1, 'C');
+            $pdf->Ln(6);
+        } elseif ($isResidency) {
+            $pdf->SetFont($indigencyFont, 'B', 17);
+            $pdf->Cell(0, 8, 'TANGGAPAN NG PUNONG BARANGAY', 0, 1, 'C');
+            $pdf->SetFont($indigencyFont, 'B', 12);
+            $pdf->Cell(0, 7, 'CERTIFICATE OF RESIDENCY', 0, 1, 'C');
             $pdf->Ln(6);
         } else {
             $pdf->SetFont($indigencyFont, 'B', 17);
@@ -708,6 +1535,48 @@ function dra_generate_issued_document(array $requestRow): ?string {
         if ($requestPurpose === '') {
             $requestPurpose = 'PURPOSE';
         }
+        $submissionTargetType = trim((string)($payload['submission_target_type'] ?? ''));
+        $institutionName = trim((string)($payload['institution_name'] ?? ''));
+        $institutionPerson = trim((string)($payload['institution_person'] ?? ''));
+        $institutionPosition = trim((string)($payload['institution_position'] ?? ''));
+        $governmentOffice = trim((string)($payload['government_office'] ?? ''));
+        if ($governmentOffice === '') {
+            $governmentOffice = trim((string)($payload['government_position_group'] ?? ''));
+        }
+        if ($governmentOffice === '__other__') {
+            $governmentOffice = trim((string)($payload['government_position_other'] ?? ''));
+        }
+        $governmentPosition = trim((string)($payload['government_position'] ?? ''));
+        if ($governmentPosition === '') {
+            $governmentPosition = trim((string)($payload['government_position_detail'] ?? ''));
+        }
+        $governmentOfficial = trim((string)($payload['government_official'] ?? ''));
+        if ($governmentOfficial === '') {
+            $governmentOfficial = trim((string)($payload['government_official_other'] ?? ''));
+        }
+        if ($submissionTargetType === 'institution') {
+            $institutionParts = [$institutionName];
+            $attentionParts = array_values(array_filter([$institutionPerson, $institutionPosition], static fn($value) => trim((string)$value) !== ''));
+            if (!empty($attentionParts)) {
+                $institutionParts[] = implode(', ', $attentionParts);
+            }
+            $requestOfficer = implode(' - ', array_filter($institutionParts, static fn($value) => trim((string)$value) !== ''));
+        } elseif ($submissionTargetType === 'government_official') {
+            if ($governmentOfficial === '' && $requestOfficer !== '') {
+                $governmentOfficial = $requestOfficer;
+            }
+            $requestOfficer = implode(' - ', array_filter([$governmentOfficial, $governmentPosition, $governmentOffice], static fn($value) => trim((string)$value) !== ''));
+        }
+        $yearsResidency = trim((string)($payload['years_of_residency'] ?? ''));
+        $monthsResidency = trim((string)($payload['months_of_residency'] ?? ''));
+        $residencyParts = [];
+        if ($yearsResidency !== '') {
+            $residencyParts[] = $yearsResidency . ' year(s)';
+        }
+        if ($monthsResidency !== '') {
+            $residencyParts[] = $monthsResidency . ' month(s)';
+        }
+        $residencyDurationText = !empty($residencyParts) ? implode(' and ', $residencyParts) : 'a stated period';
         $issuedDateObj = new DateTime();
         $day = (int)$issuedDateObj->format('j');
         $monthUpper = strtoupper($issuedDateObj->format('F'));
@@ -759,6 +1628,23 @@ function dra_generate_issued_document(array $requestRow): ?string {
                 $indigencyFont,
                 12
             );
+        } elseif ($isResidency) {
+            $writeRichParagraph(
+                [
+                    ['text' => 'This is to certify that ', 'bold' => false],
+                    ['text' => $fullName, 'bold' => true],
+                    ['text' => ' is a bona fide resident of ', 'bold' => false],
+                    ['text' => $address, 'bold' => true],
+                    ['text' => ' and has been residing in this barangay for ', 'bold' => false],
+                    ['text' => $residencyDurationText, 'bold' => true],
+                    ['text' => '.', 'bold' => false],
+                ],
+                7,
+                18,
+                10,
+                $indigencyFont,
+                12
+            );
         } else {
             $writeRichParagraph(
                 [
@@ -781,6 +1667,19 @@ function dra_generate_issued_document(array $requestRow): ?string {
             $writeRichParagraph(
                 [
                     ['text' => 'This certification is being issued upon the request of the above subject in person in connection with his/her application for ', 'bold' => false],
+                    ['text' => $requestPurpose, 'bold' => true],
+                    ['text' => ' purposes only.', 'bold' => false],
+                ],
+                7,
+                18,
+                10,
+                $indigencyFont,
+                12
+            );
+        } elseif ($isResidency) {
+            $writeRichParagraph(
+                [
+                    ['text' => 'This certificate is issued upon request for ', 'bold' => false],
                     ['text' => $requestPurpose, 'bold' => true],
                     ['text' => ' purposes only.', 'bold' => false],
                 ],
@@ -963,6 +1862,12 @@ function dra_convert_docx_to_pdf(string $docxDiskPath, string $outDir): ?string 
     ];
 
     $attempted = [];
+    $profileDir = $outReal . '/.soffice-profile';
+    if (!is_dir($profileDir)) {
+        @mkdir($profileDir, 0775, true);
+    }
+    $profileReal = realpath($profileDir) ?: $profileDir;
+    $profileUri = 'file://' . str_replace('%2F', '/', rawurlencode(str_replace(DIRECTORY_SEPARATOR, '/', $profileReal)));
 
     foreach ($candidates as $bin) {
         if (trim($bin) === '') {
@@ -970,7 +1875,9 @@ function dra_convert_docx_to_pdf(string $docxDiskPath, string $outDir): ?string 
         }
         $attempted[] = $bin;
         $cmd = escapeshellcmd($bin)
-            . ' --headless --convert-to pdf:writer_pdf_Export '
+            . ' --headless --nologo --nodefault --nolockcheck --norestore'
+            . ' -env:UserInstallation=' . escapeshellarg($profileUri)
+            . ' --convert-to pdf:writer_pdf_Export '
             . '--outdir ' . escapeshellarg($outReal) . ' '
             . escapeshellarg($docxReal);
 
@@ -996,6 +1903,15 @@ function dra_convert_docx_to_pdf(string $docxDiskPath, string $outDir): ?string 
                 }
                 if (isset($pipes[2]) && is_resource($pipes[2])) {
                     fclose($pipes[2]);
+                }
+                $status = @proc_get_status($proc);
+                $startedAt = time();
+                while ($status && !empty($status['running']) && (time() - $startedAt) < 25) {
+                    usleep(200000);
+                    $status = @proc_get_status($proc);
+                }
+                if ($status && !empty($status['running'])) {
+                    @proc_terminate($proc);
                 }
                 $exitCode = (int)proc_close($proc);
             }
@@ -1024,6 +1940,435 @@ function dra_convert_docx_to_pdf(string $docxDiskPath, string $outDir): ?string 
 
     error_log('[dra_convert_docx_to_pdf] no working DOCX->PDF converter found. tried=' . implode(', ', $attempted));
     return null;
+}
+
+function dra_convert_docx_to_html(string $docxDiskPath, string $outDir): ?string {
+    $docxReal = realpath($docxDiskPath);
+    $outReal = realpath($outDir);
+    if ($docxReal === false || $outReal === false || !is_file($docxReal)) {
+        return null;
+    }
+
+    $baseName = pathinfo($docxReal, PATHINFO_FILENAME);
+    $expectedHtml = $outReal . '/' . $baseName . '.html';
+    @unlink($expectedHtml);
+
+    $envSoffice = trim((string)getenv('SOFFICE_BIN'));
+    $candidates = [
+        $envSoffice,
+        '/Applications/LibreOffice.app/Contents/MacOS/soffice',
+        '/usr/bin/soffice',
+        '/usr/local/bin/soffice',
+        'libreoffice',
+        'soffice',
+    ];
+
+    $attempted = [];
+    $profileDir = $outReal . '/.soffice-profile';
+    if (!is_dir($profileDir)) {
+        @mkdir($profileDir, 0775, true);
+    }
+    $profileReal = realpath($profileDir) ?: $profileDir;
+    $profileUri = 'file://' . str_replace('%2F', '/', rawurlencode(str_replace(DIRECTORY_SEPARATOR, '/', $profileReal)));
+
+    foreach ($candidates as $bin) {
+        if (trim($bin) === '') {
+            continue;
+        }
+        $attempted[] = $bin;
+        $cmd = escapeshellcmd($bin)
+            . ' --headless --nologo --nodefault --nolockcheck --norestore'
+            . ' -env:UserInstallation=' . escapeshellarg($profileUri)
+            . ' --convert-to html:XHTML Writer File:UTF8 '
+            . '--outdir ' . escapeshellarg($outReal) . ' '
+            . escapeshellarg($docxReal);
+
+        $stdout = '';
+        $stderr = '';
+        $exitCode = 1;
+
+        if (function_exists('proc_open')) {
+            $spec = [
+                0 => ['pipe', 'r'],
+                1 => ['pipe', 'w'],
+                2 => ['pipe', 'w'],
+            ];
+            $proc = @proc_open($cmd, $spec, $pipes);
+            if (is_resource($proc)) {
+                if (isset($pipes[0]) && is_resource($pipes[0])) fclose($pipes[0]);
+                $stdout = isset($pipes[1]) && is_resource($pipes[1]) ? (string)stream_get_contents($pipes[1]) : '';
+                $stderr = isset($pipes[2]) && is_resource($pipes[2]) ? (string)stream_get_contents($pipes[2]) : '';
+                if (isset($pipes[1]) && is_resource($pipes[1])) fclose($pipes[1]);
+                if (isset($pipes[2]) && is_resource($pipes[2])) fclose($pipes[2]);
+                $status = @proc_get_status($proc);
+                $startedAt = time();
+                while ($status && !empty($status['running']) && (time() - $startedAt) < 25) {
+                    usleep(200000);
+                    $status = @proc_get_status($proc);
+                }
+                if ($status && !empty($status['running'])) {
+                    @proc_terminate($proc);
+                }
+                $exitCode = (int)proc_close($proc);
+            }
+        }
+
+        if ($exitCode !== 0 && function_exists('exec')) {
+            $outLines = [];
+            @exec($cmd . ' 2>&1', $outLines, $execExitCode);
+            $stdout = trim(implode("\n", $outLines));
+            $exitCode = (int)$execExitCode;
+        }
+
+        if ($exitCode === 0 && is_file($expectedHtml) && filesize($expectedHtml) > 0) {
+            return $expectedHtml;
+        }
+        if (trim((string)$stdout) !== '' || trim((string)$stderr) !== '') {
+            error_log('[dra_convert_docx_to_html] ' . trim((string)$stdout . ' ' . (string)$stderr));
+        }
+    }
+
+    error_log('[dra_convert_docx_to_html] no working DOCX->HTML converter found. tried=' . implode(', ', $attempted));
+    return null;
+}
+
+function dra_convert_docx_to_preview_image(string $docxDiskPath, string $outDir): ?string {
+    $docxReal = realpath($docxDiskPath);
+    $outReal = realpath($outDir);
+    if ($docxReal === false || $outReal === false || !is_file($docxReal)) {
+        return null;
+    }
+
+    $previewPdf = dra_convert_docx_to_pdf($docxReal, $outReal);
+    if ($previewPdf !== null && is_file($previewPdf) && filesize($previewPdf) > 0) {
+        $finalizeOptions = [
+            'stamp_qr' => false,
+            'cover_width' => 52.0,
+            'cover_height' => 30.0,
+            'cover_margin_right' => 0.0,
+            'cover_margin_bottom' => 24.0,
+        ];
+        dra_finalize_template_pdf($previewPdf, null, $finalizeOptions);
+        $expectedPng = $outReal . '/' . basename($previewPdf) . '.png';
+        @unlink($expectedPng);
+
+        $cmd = '/usr/bin/qlmanage -t -s 1600 -o '
+            . escapeshellarg($outReal) . ' '
+            . escapeshellarg($previewPdf) . ' >/dev/null 2>&1';
+
+        $exitCode = 1;
+        if (function_exists('exec')) {
+            @exec($cmd, $outLines, $execExitCode);
+            $exitCode = (int)$execExitCode;
+        } elseif (function_exists('shell_exec')) {
+            @shell_exec($cmd);
+            $exitCode = is_file($expectedPng) && filesize($expectedPng) > 0 ? 0 : 1;
+        }
+
+        if ($exitCode === 0 && is_file($expectedPng) && filesize($expectedPng) > 0) {
+            return $expectedPng;
+        }
+    }
+
+    $beforeFiles = glob($outReal . '/*.png') ?: [];
+    $beforeMap = [];
+    foreach ($beforeFiles as $beforeFile) {
+        $beforeMap[$beforeFile] = @filemtime($beforeFile) ?: 0;
+    }
+
+    $cmd = '/usr/bin/qlmanage -t -s 1600 -o '
+        . escapeshellarg($outReal) . ' '
+        . escapeshellarg($docxReal) . ' >/dev/null 2>&1';
+
+    $exitCode = 1;
+    if (function_exists('exec')) {
+        @exec($cmd, $outLines, $execExitCode);
+        $exitCode = (int)$execExitCode;
+    } elseif (function_exists('shell_exec')) {
+        @shell_exec($cmd);
+        $exitCode = 0;
+    }
+
+    $candidatePng = $outReal . '/' . basename($docxReal) . '.png';
+    if ($exitCode === 0 && is_file($candidatePng) && filesize($candidatePng) > 0) {
+        return $candidatePng;
+    }
+
+    $afterFiles = glob($outReal . '/*.png') ?: [];
+    $newestFile = null;
+    $newestTime = 0;
+    foreach ($afterFiles as $afterFile) {
+        $mtime = @filemtime($afterFile) ?: 0;
+        $wasKnown = array_key_exists($afterFile, $beforeMap);
+        if ((!$wasKnown || $mtime > (int)$beforeMap[$afterFile]) && $mtime >= $newestTime) {
+            $newestTime = $mtime;
+            $newestFile = $afterFile;
+        }
+    }
+    if ($newestFile !== null && is_file($newestFile) && filesize($newestFile) > 0) {
+        return $newestFile;
+    }
+
+    error_log('[dra_convert_docx_to_preview_image] DOCX->PNG preview conversion failed for ' . $docxReal);
+    return null;
+}
+
+function dra_cleanup_docx_preview_html(string $html): string {
+    $clean = $html;
+    $clean = preg_replace(
+        '#<p[^>]*>\s*<table[^>]*>\s*<col[^>]*/?>\s*<tr>\s*<td[^>]*border:\s*1\.00pt solid #000000[^>]*>\s*<p[^>]*>\s*<br/?>\s*</p>\s*</td>\s*</tr>\s*</table>\s*<br/?>\s*</p>#is',
+        '',
+        $clean
+    ) ?? $clean;
+    $clean = preg_replace('#<div title="header"><p[^>]*>\s*<br/?>\s*</p></div>#is', '', $clean) ?? $clean;
+    return $clean;
+}
+
+function dra_stamp_qr_on_pdf(string $pdfDiskPath, string $qrDiskPath): bool {
+    $pdfReal = realpath($pdfDiskPath);
+    $qrReal = realpath($qrDiskPath);
+    if ($pdfReal === false || $qrReal === false || !is_file($pdfReal) || !is_file($qrReal)) {
+        return false;
+    }
+
+    if (!class_exists('\\setasign\\Fpdi\\Fpdi')) {
+        $autoloadPaths = [
+            __DIR__ . '/../../PhpFiles/PhpOffice/vendor/autoload.php',
+            __DIR__ . '/../../composer-email-handler/vendor/autoload.php',
+            __DIR__ . '/../../vendor/autoload.php',
+        ];
+        foreach ($autoloadPaths as $autoloadPath) {
+            if (is_file($autoloadPath)) {
+                require_once $autoloadPath;
+                if (class_exists('\\setasign\\Fpdi\\Fpdi')) {
+                    break;
+                }
+            }
+        }
+    }
+
+    if (!class_exists('\\setasign\\Fpdi\\Fpdi')) {
+        error_log('[dra_stamp_qr_on_pdf] FPDI unavailable');
+        return false;
+    }
+
+    try {
+        $pdf = new \setasign\Fpdi\Fpdi();
+        $pageCount = $pdf->setSourceFile($pdfReal);
+        if ($pageCount <= 0) {
+            return false;
+        }
+
+        for ($pageNo = 1; $pageNo <= $pageCount; $pageNo++) {
+            $tpl = $pdf->importPage($pageNo);
+            $size = $pdf->getTemplateSize($tpl);
+            $pageWidth = (float)($size['width'] ?? 0);
+            $pageHeight = (float)($size['height'] ?? 0);
+            $orientation = $pageWidth > $pageHeight ? 'L' : 'P';
+
+            $pdf->AddPage($orientation, [$pageWidth, $pageHeight]);
+            $pdf->useTemplate($tpl);
+
+            if ($pageNo === $pageCount) {
+                $qrSize = min(24.0, max(16.0, min($pageWidth, $pageHeight) * 0.12));
+                $margin = max(8.0, $qrSize * 0.45);
+                $x = max(4.0, $pageWidth - $qrSize - $margin);
+                $y = max(4.0, $pageHeight - $qrSize - $margin);
+                $pdf->Image($qrReal, $x, $y, $qrSize, $qrSize);
+            }
+        }
+
+        $tmpPath = dirname($pdfReal) . '/tmp_' . basename($pdfReal);
+        $pdf->Output('F', $tmpPath);
+        if (!is_file($tmpPath) || filesize($tmpPath) <= 0) {
+            @unlink($tmpPath);
+            return false;
+        }
+        if (!@rename($tmpPath, $pdfReal)) {
+            @unlink($tmpPath);
+            return false;
+        }
+
+        return true;
+    } catch (Throwable $e) {
+        error_log('[dra_stamp_qr_on_pdf] ' . $e->getMessage());
+        return false;
+    }
+}
+
+function dra_docx_contains_text(string $docxDiskPath, string $needle): bool {
+    $docxReal = realpath($docxDiskPath);
+    if ($docxReal === false || !is_file($docxReal) || $needle === '') {
+        return false;
+    }
+
+    try {
+        $zip = new ZipArchive();
+        if ($zip->open($docxReal) !== true) {
+            return false;
+        }
+
+        $parts = [
+            'word/document.xml',
+            'word/header1.xml',
+            'word/header2.xml',
+            'word/header3.xml',
+        ];
+        $needleUpper = strtoupper($needle);
+        foreach ($parts as $partName) {
+            $xml = $zip->getFromName($partName);
+            if (!is_string($xml) || $xml === '') {
+                continue;
+            }
+            if (strpos(strtoupper($xml), $needleUpper) !== false) {
+                $zip->close();
+                return true;
+            }
+        }
+
+        $zip->close();
+    } catch (Throwable $e) {
+        error_log('[dra_docx_contains_text] ' . $e->getMessage());
+    }
+
+    return false;
+}
+
+function dra_stamp_cohabitation_letterhead($pdf, float $pageWidth, float $pageHeight): void {
+    $templatePath = __DIR__ . '/../../Resident-End/Certificates/DocumentIssuance/CertificateOfCohabitationWithChild.docx';
+    $leftLogo = dra_extract_docx_media_asset($templatePath, 'image1.jpg');
+    $rightLogo = dra_extract_docx_media_asset($templatePath, 'image2.png');
+
+    $pdf->SetFillColor(255, 255, 255);
+    $pdf->Rect(10.0, 5.0, max(0.0, $pageWidth - 20.0), 43.0, 'F');
+
+    if ($leftLogo !== null) {
+        $pdf->Image($leftLogo, 18.0, 8.0, 18.0, 18.0);
+    }
+    if ($rightLogo !== null) {
+        $pdf->Image($rightLogo, max(0.0, $pageWidth - 36.0), 8.0, 18.0, 18.0);
+    }
+
+    $pdf->SetTextColor(128, 128, 128);
+    $pdf->SetFont('Times', 'B', 9);
+    $pdf->SetXY(42.0, 8.0);
+    $pdf->Cell(max(0.0, $pageWidth - 84.0), 4.0, 'REPUBLIKA NG PILIPINAS', 0, 2, 'C');
+    $pdf->Cell(max(0.0, $pageWidth - 84.0), 4.0, 'LALAWIGAN NG RIZAL', 0, 2, 'C');
+    $pdf->Cell(max(0.0, $pageWidth - 84.0), 4.0, 'BAYAN NG RODRIGUEZ', 0, 2, 'C');
+    $pdf->Ln(0.5);
+    $pdf->SetFont('Times', 'B', 17);
+    $pdf->Cell(max(0.0, $pageWidth - 84.0), 6.0, 'BARANGAY SAN JOSE', 0, 1, 'C');
+    $pdf->SetDrawColor(200, 200, 200);
+    $pdf->SetLineWidth(0.30);
+    $pdf->Line(24.0, 46.0, max(24.0, $pageWidth - 24.0), 46.0);
+    $pdf->SetTextColor(0, 0, 0);
+}
+
+function dra_finalize_template_pdf(string $pdfDiskPath, ?string $qrDiskPath = null, array $options = []): bool {
+    $pdfReal = realpath($pdfDiskPath);
+    if ($pdfReal === false || !is_file($pdfReal)) {
+        return false;
+    }
+
+    $stampQr = array_key_exists('stamp_qr', $options) ? (bool)$options['stamp_qr'] : true;
+    $coverWidth = isset($options['cover_width']) ? (float)$options['cover_width'] : 48.0;
+    $coverHeight = isset($options['cover_height']) ? (float)$options['cover_height'] : 28.0;
+    $coverMarginRight = isset($options['cover_margin_right']) ? (float)$options['cover_margin_right'] : 0.0;
+    $coverMarginBottom = isset($options['cover_margin_bottom']) ? (float)$options['cover_margin_bottom'] : 24.0;
+    $qrSize = isset($options['qr_size']) ? (float)$options['qr_size'] : 24.0;
+    $qrMarginRight = isset($options['qr_margin_right']) ? (float)$options['qr_margin_right'] : 10.0;
+    $qrMarginBottom = isset($options['qr_margin_bottom']) ? (float)$options['qr_margin_bottom'] : 12.0;
+    $stampLetterhead = !empty($options['stamp_letterhead']);
+    $letterheadType = strtolower(trim((string)($options['letterhead_type'] ?? '')));
+
+    $qrReal = null;
+    if ($stampQr && $qrDiskPath !== null && trim($qrDiskPath) !== '') {
+        $resolvedQr = realpath($qrDiskPath);
+        if ($resolvedQr !== false && is_file($resolvedQr)) {
+            $qrReal = $resolvedQr;
+        }
+    }
+
+    if (!class_exists('\\setasign\\Fpdi\\Fpdi')) {
+        $autoloadPaths = [
+            __DIR__ . '/../../PhpFiles/PhpOffice/vendor/autoload.php',
+            __DIR__ . '/../../composer-email-handler/vendor/autoload.php',
+            __DIR__ . '/../../vendor/autoload.php',
+        ];
+        foreach ($autoloadPaths as $autoloadPath) {
+            if (is_file($autoloadPath)) {
+                require_once $autoloadPath;
+                if (class_exists('\\setasign\\Fpdi\\Fpdi')) {
+                    break;
+                }
+            }
+        }
+    }
+
+    if (!class_exists('\\setasign\\Fpdi\\Fpdi')) {
+        error_log('[dra_finalize_template_pdf] FPDI unavailable');
+        return false;
+    }
+
+    try {
+        $pdf = new \setasign\Fpdi\Fpdi();
+        $pageCount = $pdf->setSourceFile($pdfReal);
+        if ($pageCount <= 0) {
+            return false;
+        }
+
+        for ($pageNo = 1; $pageNo <= $pageCount; $pageNo++) {
+            $tpl = $pdf->importPage($pageNo);
+            $size = $pdf->getTemplateSize($tpl);
+            $pageWidth = (float)($size['width'] ?? 0);
+            $pageHeight = (float)($size['height'] ?? 0);
+            $orientation = $pageWidth > $pageHeight ? 'L' : 'P';
+
+            $pdf->AddPage($orientation, [$pageWidth, $pageHeight]);
+            if ($pageNo === 1 && $stampLetterhead && $letterheadType === 'cohabitation') {
+                $bodyTopOffset = 38.0;
+                $pdf->useTemplate($tpl, 0.0, $bodyTopOffset, $pageWidth, max(1.0, $pageHeight - $bodyTopOffset));
+            } else {
+                $pdf->useTemplate($tpl);
+            }
+
+            if ($pageNo === 1 && $stampLetterhead && $letterheadType === 'cohabitation') {
+                dra_stamp_cohabitation_letterhead($pdf, $pageWidth, $pageHeight);
+            }
+
+            if ($pageNo === $pageCount) {
+                // LibreOffice keeps painting a stale QR placeholder rectangle in the
+                // lower-right of the converted PDF even after the DOCX object is removed.
+                // Cover that artifact here, then draw the actual QR only when enabled.
+                $coverX = max(0.0, $pageWidth - $coverWidth - $coverMarginRight);
+                $coverY = max(0.0, $pageHeight - $coverHeight - $coverMarginBottom);
+                $pdf->SetFillColor(255, 255, 255);
+                $pdf->Rect($coverX, $coverY, $coverWidth, $coverHeight, 'F');
+
+                if ($qrReal !== null) {
+                    $qrX = max(0.0, $pageWidth - $qrSize - $qrMarginRight);
+                    $qrY = max(0.0, $pageHeight - $qrSize - $qrMarginBottom);
+                    $pdf->Image($qrReal, $qrX, $qrY, $qrSize, $qrSize);
+                }
+            }
+        }
+
+        $tmpPath = dirname($pdfReal) . '/tmp_' . basename($pdfReal);
+        $pdf->Output('F', $tmpPath);
+        if (!is_file($tmpPath) || filesize($tmpPath) <= 0) {
+            @unlink($tmpPath);
+            return false;
+        }
+        if (!@rename($tmpPath, $pdfReal)) {
+            @unlink($tmpPath);
+            return false;
+        }
+
+        return true;
+    } catch (Throwable $e) {
+        error_log('[dra_finalize_template_pdf] ' . $e->getMessage());
+        return false;
+    }
 }
 
 function dra_generate_issued_document_safe(array $requestRow): ?string {
@@ -1372,6 +2717,16 @@ if ($action === 'list') {
         $extraJoins[] = "LEFT JOIN residentinformationtbl riu ON riu.user_id = d.resident_user_id";
         $extraJoins[] = "LEFT JOIN residentinformationtbl rir ON rir.resident_id = d.resident_id";
     }
+    if ((!$liteList) && dr_table_exists($conn, 'officialinformationtbl')) {
+        $extraSelects[] = "TRIM(CONCAT_WS(' ', NULLIF(oir.firstname, ''), NULLIF(oir.middlename, ''), NULLIF(oir.lastname, ''), NULLIF(oir.suffix, ''))) AS _reviewed_by_name";
+        $extraSelects[] = "TRIM(CONCAT_WS(' ', NULLIF(oil.firstname, ''), NULLIF(oil.middlename, ''), NULLIF(oil.lastname, ''), NULLIF(oil.suffix, ''))) AS _released_by_name";
+        $extraSelects[] = "TRIM(CONCAT_WS(' ', NULLIF(oip.firstname, ''), NULLIF(oip.middlename, ''), NULLIF(oip.lastname, ''), NULLIF(oip.suffix, ''))) AS _personnel_name";
+        $extraSelects[] = "TRIM(CONCAT_WS(' ', NULLIF(oif.firstname, ''), NULLIF(oif.middlename, ''), NULLIF(oif.lastname, ''), NULLIF(oif.suffix, ''))) AS _finance_user_name";
+        $extraJoins[] = "LEFT JOIN officialinformationtbl oir ON oir.user_id = d.user_id_official_reviewed_by";
+        $extraJoins[] = "LEFT JOIN officialinformationtbl oil ON oil.user_id = d.user_id_official_released_by";
+        $extraJoins[] = "LEFT JOIN officialinformationtbl oip ON oip.user_id = d.personnel_user_id";
+        $extraJoins[] = "LEFT JOIN officialinformationtbl oif ON oif.user_id = f.user_id_employee_process";
+    }
 
     $baseSelects = [
         "d.request_id AS request_id",
@@ -1475,6 +2830,10 @@ if ($action === 'list') {
         if (trim((string)($row['submitted_at'] ?? '')) === '' && trim((string)($row['request_timestamp'] ?? '')) !== '') {
             $row['submitted_at'] = (string)$row['request_timestamp'];
         }
+        $row['reviewed_by'] = trim((string)($row['_reviewed_by_name'] ?? ''));
+        $row['released_by'] = trim((string)($row['_released_by_name'] ?? ''));
+        $row['personnel_name'] = trim((string)($row['_personnel_name'] ?? ''));
+        $row['finance_user_name'] = trim((string)($row['_finance_user_name'] ?? ''));
 
         // Populate finance data from joined columns (avoids per-row finance query).
         $row['amount'] = isset($row['_tx_amount']) ? (float)$row['_tx_amount'] : null;
@@ -1657,6 +3016,244 @@ if ($action === 'view_payment_proof') {
     exit;
 }
 
+if ($action === 'view_preview_issued') {
+    if (dra_is_finance_user($conn, $currentUserId)) {
+        http_response_code(403);
+        exit('Finance users are not allowed to preview issued documents.');
+    }
+    if ($requestId === '') {
+        http_response_code(422);
+        exit('Missing request ID.');
+    }
+    $row = dr_fetch_request($conn, $requestId);
+    if (!$row) {
+        http_response_code(404);
+        exit('Request not found.');
+    }
+    $editedPreview = [];
+    $editedPreviewRaw = trim((string)($_POST['edited_preview'] ?? ''));
+    if ($editedPreviewRaw !== '') {
+        $decoded = json_decode($editedPreviewRaw, true);
+        if (is_array($decoded)) {
+            $editedPreview = $decoded;
+        }
+    }
+    if (!empty($editedPreview)) {
+        dra_overlay_preview_edits($row, $editedPreview);
+    }
+
+    // Render a template-based preview on demand (without forcing stage transition).
+    $generated = (string)(dra_generate_issued_document_safe(array_merge((array)$row, [
+        '_preview_mode' => 1,
+    ])) ?? '');
+
+    $publicPath = trim($generated);
+    if ($publicPath === '') {
+        $publicPath = trim((string)($row['issued_file_path'] ?? ''));
+    }
+    if ($publicPath === '') {
+        http_response_code(500);
+        exit('Unable to generate preview document.');
+    }
+
+    $baseDir = realpath(__DIR__ . '/../../');
+    if ($baseDir === false) {
+        http_response_code(500);
+        exit('Path resolution failed.');
+    }
+    $relative = '/' . ltrim(dra_strip_legacy_base($publicPath), '/');
+    $absolute = realpath($baseDir . $relative);
+    if ($absolute === false || !is_file($absolute) || strpos($absolute, $baseDir . '/UnifiedFileAttachment/') !== 0) {
+        http_response_code(404);
+        exit('File not found.');
+    }
+
+    $mime = (string)(mime_content_type($absolute) ?: 'application/octet-stream');
+    header('Content-Type: ' . $mime);
+    header('Content-Disposition: inline; filename="' . basename($absolute) . '"');
+    header('Content-Length: ' . filesize($absolute));
+    readfile($absolute);
+    exit;
+}
+
+if ($action === 'view_preview_docx') {
+    if (dra_is_finance_user($conn, $currentUserId)) {
+        http_response_code(403);
+        exit('Finance users are not allowed to preview issued documents.');
+    }
+    if ($requestId === '') {
+        http_response_code(422);
+        exit('Missing request ID.');
+    }
+    $row = dr_fetch_request($conn, $requestId);
+    if (!$row) {
+        http_response_code(404);
+        exit('Request not found.');
+    }
+    $editedPreview = [];
+    $editedPreviewRaw = trim((string)($_POST['edited_preview'] ?? ''));
+    if ($editedPreviewRaw !== '') {
+        $decoded = json_decode($editedPreviewRaw, true);
+        if (is_array($decoded)) {
+            $editedPreview = $decoded;
+        }
+    }
+    if (!empty($editedPreview)) {
+        dra_overlay_preview_edits($row, $editedPreview);
+    }
+
+    $generated = (string)(dra_generate_issued_document_safe(array_merge((array)$row, [
+        '_preview_mode' => 1,
+        '_prefer_docx_output' => 1,
+    ])) ?? '');
+    if ($generated === '') {
+        http_response_code(500);
+        exit('Unable to generate DOCX preview.');
+    }
+
+    $baseDir = realpath(__DIR__ . '/../../');
+    if ($baseDir === false) {
+        http_response_code(500);
+        exit('Path resolution failed.');
+    }
+    $relative = '/' . ltrim(dra_strip_legacy_base($generated), '/');
+    $absolute = realpath($baseDir . $relative);
+    if ($absolute === false || !is_file($absolute) || strpos($absolute, $baseDir . '/UnifiedFileAttachment/') !== 0) {
+        http_response_code(404);
+        exit('File not found.');
+    }
+
+    header('Content-Type: application/vnd.openxmlformats-officedocument.wordprocessingml.document');
+    header('Content-Disposition: inline; filename="' . basename($absolute) . '"');
+    header('Content-Length: ' . filesize($absolute));
+    readfile($absolute);
+    exit;
+}
+
+if ($action === 'view_preview_docx_html') {
+    if (dra_is_finance_user($conn, $currentUserId)) {
+        http_response_code(403);
+        exit('Finance users are not allowed to preview issued documents.');
+    }
+    if ($requestId === '') {
+        http_response_code(422);
+        exit('Missing request ID.');
+    }
+    $row = dr_fetch_request($conn, $requestId);
+    if (!$row) {
+        http_response_code(404);
+        exit('Request not found.');
+    }
+    $editedPreview = [];
+    $editedPreviewRaw = trim((string)($_POST['edited_preview'] ?? ''));
+    if ($editedPreviewRaw !== '') {
+        $decoded = json_decode($editedPreviewRaw, true);
+        if (is_array($decoded)) {
+            $editedPreview = $decoded;
+        }
+    }
+    if (!empty($editedPreview)) {
+        dra_overlay_preview_edits($row, $editedPreview);
+    }
+
+    $generated = (string)(dra_generate_issued_document_safe(array_merge((array)$row, [
+        '_preview_mode' => 1,
+        '_prefer_docx_output' => 1,
+    ])) ?? '');
+    if ($generated === '') {
+        http_response_code(500);
+        exit('Unable to generate DOCX preview.');
+    }
+
+    $baseDir = realpath(__DIR__ . '/../../');
+    if ($baseDir === false) {
+        http_response_code(500);
+        exit('Path resolution failed.');
+    }
+    $relative = '/' . ltrim(dra_strip_legacy_base($generated), '/');
+    $absolute = realpath($baseDir . $relative);
+    if ($absolute === false || !is_file($absolute) || strpos($absolute, $baseDir . '/UnifiedFileAttachment/') !== 0) {
+        http_response_code(404);
+        exit('File not found.');
+    }
+
+    $htmlPath = dra_convert_docx_to_html($absolute, dirname($absolute));
+    if ($htmlPath === null || !is_file($htmlPath)) {
+        http_response_code(500);
+        exit('Unable to generate HTML preview.');
+    }
+
+    $html = (string)@file_get_contents($htmlPath);
+    if ($html === '') {
+        http_response_code(500);
+        exit('HTML preview is empty.');
+    }
+    $html = dra_cleanup_docx_preview_html($html);
+    header('Content-Type: text/html; charset=utf-8');
+    echo $html;
+    exit;
+}
+
+if ($action === 'view_preview_docx_image') {
+    if (dra_is_finance_user($conn, $currentUserId)) {
+        http_response_code(403);
+        exit('Finance users are not allowed to preview issued documents.');
+    }
+    if ($requestId === '') {
+        http_response_code(422);
+        exit('Missing request ID.');
+    }
+    $row = dr_fetch_request($conn, $requestId);
+    if (!$row) {
+        http_response_code(404);
+        exit('Request not found.');
+    }
+    $editedPreview = [];
+    $editedPreviewRaw = trim((string)($_POST['edited_preview'] ?? ''));
+    if ($editedPreviewRaw !== '') {
+        $decoded = json_decode($editedPreviewRaw, true);
+        if (is_array($decoded)) {
+            $editedPreview = $decoded;
+        }
+    }
+    if (!empty($editedPreview)) {
+        dra_overlay_preview_edits($row, $editedPreview);
+    }
+
+    $generated = (string)(dra_generate_issued_document_safe(array_merge((array)$row, [
+        '_preview_mode' => 1,
+        '_prefer_docx_output' => 1,
+    ])) ?? '');
+    if ($generated === '') {
+        http_response_code(500);
+        exit('Unable to generate DOCX preview.');
+    }
+
+    $baseDir = realpath(__DIR__ . '/../../');
+    if ($baseDir === false) {
+        http_response_code(500);
+        exit('Path resolution failed.');
+    }
+    $relative = '/' . ltrim(dra_strip_legacy_base($generated), '/');
+    $absolute = realpath($baseDir . $relative);
+    if ($absolute === false || !is_file($absolute) || strpos($absolute, $baseDir . '/UnifiedFileAttachment/') !== 0) {
+        http_response_code(404);
+        exit('File not found.');
+    }
+
+    $imagePath = dra_convert_docx_to_preview_image($absolute, dirname($absolute));
+    if ($imagePath === null || !is_file($imagePath)) {
+        http_response_code(500);
+        exit('Unable to generate image preview.');
+    }
+
+    header('Content-Type: image/png');
+    header('Content-Disposition: inline; filename="' . basename($imagePath) . '"');
+    header('Content-Length: ' . filesize($imagePath));
+    readfile($imagePath);
+    exit;
+}
+
 if ($action === 'view_issued') {
     if (dra_is_finance_user($conn, $currentUserId)) {
         http_response_code(403);
@@ -1681,12 +3278,22 @@ if ($action === 'view_issued') {
     $isIndigency = strpos($docTypeNorm, 'indigency') !== false;
     $isGoodMoral = (strpos($docTypeNorm, 'goodmoral') !== false) || (strpos($docTypeNorm, 'good moral') !== false);
     $isResidency = strpos($docTypeNorm, 'residency') !== false;
+    $isCohabitation = strpos($docTypeNorm, 'cohabitation') !== false;
+    $isTemplateBasedCertificate = $isIndigency || $isGoodMoral || $isResidency || $isCohabitation;
     $ext = strtolower(pathinfo($publicPath, PATHINFO_EXTENSION));
+    $verificationCode = trim((string)($row['verification_code'] ?? ''));
+    $qrPublicPath = '/UnifiedFileAttachment/IssuedDocuments/QR/qr_' . preg_replace('/[^A-Za-z0-9_-]/', '', $requestId) . '.png';
+    $qrDiskPath = $baseDir . $qrPublicPath;
+    $defaultFee = dr_get_fee_amount_for_document_type($conn, (string)($row['document_type'] ?? ''));
+    $isFreeDocument = ($defaultFee !== null && (float)$defaultFee <= 0.0);
+    $qrEligibleStages = $isFreeDocument
+        ? [DR_STAGE_READY_FOR_CLAIM, DR_STAGE_COMPLETED]
+        : [DR_STAGE_PAYMENT_VERIFIED, DR_STAGE_READY_FOR_CLAIM, DR_STAGE_COMPLETED];
+    $shouldHaveQr = ($verificationCode !== '' && in_array($stage, $qrEligibleStages, true));
     $mustRegenerate = ($publicPath === '')
-        || $isResidency
-        || (($isIndigency || $isGoodMoral) && $ext !== 'pdf');
+        || ($isTemplateBasedCertificate && !in_array($ext, ['pdf', 'docx'], true))
+        || ($isTemplateBasedCertificate && $shouldHaveQr && !is_file($qrDiskPath));
     if ($mustRegenerate) {
-        $verificationCode = trim((string)($row['verification_code'] ?? ''));
         if ($verificationCode === '') {
             $verificationCode = strtoupper(bin2hex(random_bytes(8)));
         }
@@ -1699,7 +3306,7 @@ if ($action === 'view_issued') {
             ];
             if (trim((string)($row['verification_code'] ?? '')) === '') {
                 $patch['verification_code'] = $verificationCode;
-                $patch['qr_code_path'] = '/UnifiedFileAttachment/IssuedDocuments/QR/qr_' . preg_replace('/[^A-Za-z0-9_-]/', '', $requestId) . '.png';
+                $patch['qr_code_path'] = $qrPublicPath;
             }
             dr_update_stage($conn, $requestId, (string)($row['stage'] ?? ''), $patch);
             $publicPath = $generated;
@@ -1778,6 +3385,15 @@ if ($action === 'personnel_approve') {
     $updated = dr_update_stage($conn, $requestId, $nextStage, $patch);
     if (!$updated) {
         dr_respond_json(500, ['success' => false, 'message' => 'Unable to approve request.']);
+    }
+
+    if ($isFreeDocument) {
+        $issuedPath = dra_generate_issued_document($updated);
+        if (is_string($issuedPath) && trim($issuedPath) !== '') {
+            $updated = dr_update_stage($conn, $requestId, (string)($updated['stage'] ?? $nextStage), [
+                'issued_file_path' => (string)$issuedPath,
+            ]) ?? $updated;
+        }
     }
 
     dra_send_notification_deferred(

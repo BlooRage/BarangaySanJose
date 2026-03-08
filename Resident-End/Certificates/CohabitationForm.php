@@ -91,6 +91,8 @@ $applicantHouseOrLot = htmlspecialchars($streetNumber, ENT_QUOTES, 'UTF-8');
 $applicantStreetOrBlock = htmlspecialchars($streetName, ENT_QUOTES, 'UTF-8');
 $applicantSubdivision = htmlspecialchars($subdivision, ENT_QUOTES, 'UTF-8');
 $applicantBarangay = 'San Jose';
+$applicantMunicipality = 'Rodriguez (Montalban)';
+$applicantProvince = 'Rizal';
 $applicantArea = htmlspecialchars($areaNumber, ENT_QUOTES, 'UTF-8');
 ?>
 
@@ -299,6 +301,12 @@ $applicantArea = htmlspecialchars($areaNumber, ENT_QUOTES, 'UTF-8');
                                         <input type="text" class="form-control" id="cohabPhaseNumber" name="cohabitant_phase_number">
                                     </div>
                                 </div>
+                                <div class="row mb-3">
+                                    <div class="col-md-12">
+                                        <label class="top-label" for="cohabitantSubdivisionLot">Subdivision</label>
+                                        <input type="text" class="form-control" id="cohabitantSubdivisionLot" name="cohabitant_subdivision_lot">
+                                    </div>
+                                </div>
                             </div>
                         </div>
 
@@ -347,33 +355,26 @@ $applicantArea = htmlspecialchars($areaNumber, ENT_QUOTES, 'UTF-8');
 
                         <div class="form-row two-col-row">
                             <div>
-                                <label class="top-label">Relationship to Applicant <span class="required-asterisk">*</span></label>
-                                <input type="text" name="cohabitant_relationship" required placeholder="e.g., Partner / Spouse">
+                                <label class="top-label">Started Cohabitation On (Month and Year) <span class="required-asterisk">*</span></label>
+                                <input type="text" class="form-control text-bg-light" id="cohabitationStartDisplay" value="" placeholder="Select month and year" readonly required>
+                                <input type="hidden" id="cohabitationStartDate" name="cohabitation_start_date" value="">
                             </div>
                             <div>
-                                <label class="top-label">Cohabitation Duration <span class="required-asterisk">*</span></label>
-                                <div class="row g-2">
-                                    <div class="col-6">
-                                        <input type="number" min="1" name="cohabitation_duration_value" class="form-control" required placeholder="e.g., 3">
-                                    </div>
-                                    <div class="col-6">
-                                        <select name="cohabitation_duration_unit" class="form-select" required>
-                                            <option value="">Select</option>
-                                            <option value="Years">Years</option>
-                                            <option value="Months">Months</option>
-                                        </select>
-                                    </div>
-                                </div>
+                                <label class="top-label">Cohabitation Duration</label>
+                                <input type="text" name="cohabitation_duration_display" class="form-control text-bg-light" readonly placeholder="Will be computed from the start date">
+                                <input type="hidden" name="cohabitation_duration" value="">
+                                <input type="hidden" name="cohabitation_duration_value" value="">
+                                <input type="hidden" name="cohabitation_duration_unit" value="">
                             </div>
                         </div>
 
                         <div class="form-row two-col-row">
                             <div>
-                                <label class="top-label">Started Cohabitation On <span class="required-asterisk">*</span></label>
-                                <input type="date" name="cohabitation_start_date" required>
+                                <label class="top-label">Relationship to Applicant <span class="required-asterisk">*</span></label>
+                                <input type="text" name="cohabitant_relationship" required placeholder="e.g., Partner / Spouse">
                             </div>
                             <div>
-                                <label class="top-label">Purpose of Certificate <span class="required-asterisk">*</span></label>
+                                <label class="top-label">Purpose of Document Request <span class="required-asterisk">*</span></label>
                                 <input type="text" name="purpose" required placeholder="e.g., Legal requirement">
                             </div>
                         </div>
@@ -413,6 +414,21 @@ $applicantArea = htmlspecialchars($areaNumber, ENT_QUOTES, 'UTF-8');
                                     <option value="house">House Numbering System</option>
                                     <option value="lot_block">Lot/Block System</option>
                                 </select>
+                            </div>
+                        </div>
+
+                        <div id="cohabitationLocalityRow" class="form-row pt-0 d-none">
+                            <div>
+                                <label class="top-label" for="cohabitationBarangayFixed">Barangay</label>
+                                <input type="text" class="form-control text-bg-light" id="cohabitationBarangayFixed" name="cohabitation_barangay" readonly value="<?php echo htmlspecialchars($applicantBarangay, ENT_QUOTES, 'UTF-8'); ?>">
+                            </div>
+                            <div>
+                                <label class="top-label" for="cohabitationMunicipalityFixed">Municipality</label>
+                                <input type="text" class="form-control text-bg-light" id="cohabitationMunicipalityFixed" name="cohabitation_municipality" readonly value="<?php echo htmlspecialchars($applicantMunicipality, ENT_QUOTES, 'UTF-8'); ?>">
+                            </div>
+                            <div>
+                                <label class="top-label" for="cohabitationProvinceFixed">Province</label>
+                                <input type="text" class="form-control text-bg-light" id="cohabitationProvinceFixed" name="cohabitation_province" readonly value="<?php echo htmlspecialchars($applicantProvince, ENT_QUOTES, 'UTF-8'); ?>">
                             </div>
                         </div>
 
@@ -496,6 +512,75 @@ $applicantArea = htmlspecialchars($areaNumber, ENT_QUOTES, 'UTF-8');
                             </div>
                         </div>
 
+                        <h2 class="section-title text-center text-dark">Other Cohabitation Details</h2>
+                        <div class="form-row">
+                            <div class="full-width">
+                                <label class="top-label" for="cohabitationChildrenCount">Do They Have Children? <span class="required-asterisk">*</span></label>
+                                <select class="form-select" id="cohabitationChildrenCount" name="cohabitation_children_count" required>
+                                    <option value="">Select</option>
+                                    <option value="0">None</option>
+                                    <option value="1">1 Child</option>
+                                    <option value="2">2 Children</option>
+                                    <option value="3">3 Children</option>
+                                    <option value="4">4 Children</option>
+                                    <option value="5">5 Children</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div id="cohabitationChildFields">
+                            <div class="form-row two-col-row d-none" data-child-row="1">
+                                <div>
+                                    <label class="top-label" for="cohabitationChild1Name">Child 1 Name <span class="required-asterisk">*</span></label>
+                                    <input type="text" class="form-control" id="cohabitationChild1Name" name="cohabitation_child_1_name">
+                                </div>
+                                <div>
+                                    <label class="top-label" for="cohabitationChild1Age">Child 1 Age <span class="required-asterisk">*</span></label>
+                                    <input type="number" min="0" class="form-control" id="cohabitationChild1Age" name="cohabitation_child_1_age">
+                                </div>
+                            </div>
+                            <div class="form-row two-col-row d-none" data-child-row="2">
+                                <div>
+                                    <label class="top-label" for="cohabitationChild2Name">Child 2 Name <span class="required-asterisk">*</span></label>
+                                    <input type="text" class="form-control" id="cohabitationChild2Name" name="cohabitation_child_2_name">
+                                </div>
+                                <div>
+                                    <label class="top-label" for="cohabitationChild2Age">Child 2 Age <span class="required-asterisk">*</span></label>
+                                    <input type="number" min="0" class="form-control" id="cohabitationChild2Age" name="cohabitation_child_2_age">
+                                </div>
+                            </div>
+                            <div class="form-row two-col-row d-none" data-child-row="3">
+                                <div>
+                                    <label class="top-label" for="cohabitationChild3Name">Child 3 Name <span class="required-asterisk">*</span></label>
+                                    <input type="text" class="form-control" id="cohabitationChild3Name" name="cohabitation_child_3_name">
+                                </div>
+                                <div>
+                                    <label class="top-label" for="cohabitationChild3Age">Child 3 Age <span class="required-asterisk">*</span></label>
+                                    <input type="number" min="0" class="form-control" id="cohabitationChild3Age" name="cohabitation_child_3_age">
+                                </div>
+                            </div>
+                            <div class="form-row two-col-row d-none" data-child-row="4">
+                                <div>
+                                    <label class="top-label" for="cohabitationChild4Name">Child 4 Name <span class="required-asterisk">*</span></label>
+                                    <input type="text" class="form-control" id="cohabitationChild4Name" name="cohabitation_child_4_name">
+                                </div>
+                                <div>
+                                    <label class="top-label" for="cohabitationChild4Age">Child 4 Age <span class="required-asterisk">*</span></label>
+                                    <input type="number" min="0" class="form-control" id="cohabitationChild4Age" name="cohabitation_child_4_age">
+                                </div>
+                            </div>
+                            <div class="form-row two-col-row d-none" data-child-row="5">
+                                <div>
+                                    <label class="top-label" for="cohabitationChild5Name">Child 5 Name <span class="required-asterisk">*</span></label>
+                                    <input type="text" class="form-control" id="cohabitationChild5Name" name="cohabitation_child_5_name">
+                                </div>
+                                <div>
+                                    <label class="top-label" for="cohabitationChild5Age">Child 5 Age <span class="required-asterisk">*</span></label>
+                                    <input type="number" min="0" class="form-control" id="cohabitationChild5Age" name="cohabitation_child_5_age">
+                                </div>
+                            </div>
+                        </div>
+
 
 
 
@@ -514,8 +599,57 @@ $applicantArea = htmlspecialchars($areaNumber, ENT_QUOTES, 'UTF-8');
         </main>
 
     </div>
+
+    <div class="modal fade residency-picker-modal" id="cohabitationStartModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <div>
+                        <div class="residency-picker-panel-title">Started Cohabitation On</div>
+                        <p class="residency-picker-panel-note mb-0">Choose the month and year when cohabitation started.</p>
+                    </div>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="residency-picker-preview" id="cohabitationStartPreview">No month selected yet.</div>
+                    <div class="row g-2">
+                        <div class="col-6">
+                            <label class="form-label small mb-1" for="cohabitationStartMonth">Month</label>
+                            <select class="form-select" id="cohabitationStartMonth">
+                                <option value="">Select month</option>
+                                <option value="01">January</option>
+                                <option value="02">February</option>
+                                <option value="03">March</option>
+                                <option value="04">April</option>
+                                <option value="05">May</option>
+                                <option value="06">June</option>
+                                <option value="07">July</option>
+                                <option value="08">August</option>
+                                <option value="09">September</option>
+                                <option value="10">October</option>
+                                <option value="11">November</option>
+                                <option value="12">December</option>
+                            </select>
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label small mb-1" for="cohabitationStartYear">Year</label>
+                            <select class="form-select" id="cohabitationStartYear">
+                                <option value="">Select year</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-primary" id="cohabitationStartApply">Apply</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-    <script src="<?= htmlspecialchars($baseUrl) ?>/JS-Script-Files/Resident-End/Certificates/cohabitationFormScript.js?v=20260302-2"></script>
+    <script src="<?= htmlspecialchars($baseUrl) ?>/JS-Script-Files/Resident-End/dateFieldModal.js"></script>
+    <script src="<?= htmlspecialchars($baseUrl) ?>/JS-Script-Files/Resident-End/Certificates/cohabitationFormScript.js?v=20260308-9"></script>
 </body>
 
 </html>

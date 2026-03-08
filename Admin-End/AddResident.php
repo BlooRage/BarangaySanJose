@@ -335,8 +335,8 @@ require_once __DIR__ . "/includes/admin_guard.php";
                                             </div>
 
                                             <div class="col-md-3">
-                                                <label class="form-label" for="subdivisionSitio">Subdivision / Sitio <span class="text-danger">*</span></label>
-                                                <input type="text" class="form-control" id="subdivisionSitio" name="subdivisionSitio" required>
+                                                <label class="form-label" for="subdivisionSitio">Subdivision / Sitio</label>
+                                                <input type="text" class="form-control" id="subdivisionSitio" name="subdivisionSitio">
                                             </div>
 
                                             <div class="col-md-3">

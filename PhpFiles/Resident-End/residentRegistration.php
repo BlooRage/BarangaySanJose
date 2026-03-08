@@ -146,11 +146,43 @@ function normalizePhaseNumber(string $value): string {
     return 'Phase ' . trim($value);
 }
 
+function ensureResidentProfilingColumns(mysqli $conn): void {
+    $definitions = [
+        'family_role' => "ALTER TABLE residentinformationtbl ADD COLUMN family_role VARCHAR(80) NULL AFTER civil_status",
+        'birthplace' => "ALTER TABLE residentinformationtbl ADD COLUMN birthplace VARCHAR(255) NULL AFTER birthdate",
+        'baranagayresidency' => "ALTER TABLE residentinformationtbl ADD COLUMN baranagayresidency VARCHAR(7) NULL AFTER birthplace",
+    ];
+    foreach ($definitions as $column => $sql) {
+        $exists = 0;
+        $check = $conn->prepare("
+            SELECT COUNT(*)
+            FROM INFORMATION_SCHEMA.COLUMNS
+            WHERE TABLE_SCHEMA = DATABASE()
+              AND TABLE_NAME = 'residentinformationtbl'
+              AND COLUMN_NAME = ?
+        ");
+        if ($check) {
+            $check->bind_param('s', $column);
+            $check->execute();
+            $check->bind_result($exists);
+            $check->fetch();
+            $check->close();
+        }
+        if (!$exists) {
+            $conn->query($sql);
+        }
+    }
+}
+
 function normalizeSectorLabel(string $value): string {
     $normalized = strtolower(trim($value));
     $normalized = preg_replace('/[^a-z]/', '', $normalized);
     $map = [
+        'pwd' => 'PWD',
+        'seniorcitizen' => 'SeniorCitizen',
         'student' => 'Student',
+        'indigenouspeople' => 'IndigenousPeople',
+        'singleparent' => 'SingleParent',
     ];
     return $map[$normalized] ?? '';
 }
@@ -364,6 +396,12 @@ try {
     $sex   = cleanString($_POST['sex'] ?? '');
     $civil = cleanString($_POST['civilStatus'] ?? '');
     $familyRole = cleanString($_POST['familyRole'] ?? '');
+    $birthInPhilippines = cleanString($_POST['birthInPhilippines'] ?? '');
+    $birthRegion = cleanString($_POST['birthRegion'] ?? '');
+    $birthProvince = cleanString($_POST['birthProvince'] ?? '');
+    $birthCity = cleanString($_POST['birthCity'] ?? '');
+    $birthCountry = cleanString($_POST['birthCountry'] ?? '');
+    $birthState = cleanString($_POST['birthState'] ?? '');
 
     $religionSelect = cleanString($_POST['religion'] ?? '');
     $religion = $religionSelect;
@@ -425,10 +463,33 @@ try {
     }
 
     $ownership = cleanString($_POST['houseOwnership'] ?? '');
-    $duration  = cleanString($_POST['residencyDuration'] ?? '');
+    $barangayResidencyMonthYear = cleanString($_POST['barangayResidencyMonthYear'] ?? '');
+    $residencyDate = cleanString($_POST['residencyDate'] ?? '');
+    $residencyYears = -1;
+    $residencyMonths = -1;
+    $duration = '';
+    if ($residencyDate !== '') {
+        $residencyStart = DateTime::createFromFormat('Y-m', $residencyDate);
+        if ($residencyStart instanceof DateTime) {
+            $residencyStart->setDate((int)$residencyStart->format('Y'), (int)$residencyStart->format('m'), 1);
+            $currentMonth = new DateTime('first day of this month');
+            if ($residencyStart <= $currentMonth) {
+                $diff = $residencyStart->diff($currentMonth);
+                $residencyYears = ($diff->y >= 0) ? (int)$diff->y : -1;
+                $residencyMonths = ($diff->m >= 0) ? (int)$diff->m : -1;
+                $duration = trim($residencyYears . ' year(s) ' . $residencyMonths . ' month(s)');
+            }
+        }
+    }
+    $birthplace = '';
+    if ($birthInPhilippines === 'yes') {
+        $birthplace = implode(', ', array_filter([$birthCity, $birthProvince], static fn($v) => trim((string)$v) !== ''));
+    } elseif ($birthInPhilippines === 'no') {
+        $birthplace = implode(', ', array_filter([$birthState, $birthCountry], static fn($v) => trim((string)$v) !== ''));
+    }
 
     // -------- Basic Validation --------
-    if ($lastName === '' || $firstName === '' || $dob === '' || $sex === '' || $civil === '' || !$privacy) {
+    if ($lastName === '' || $firstName === '' || $dob === '' || $sex === '' || $civil === '' || $birthInPhilippines === '' || !$privacy) {
         http_response_code(400);
         echo json_encode([
             "success" => false,
@@ -443,13 +504,6 @@ try {
     $allowedAddressSystem = ['house', 'lot_block'];
     $allowedReligionSelect = ['Roman Catholic', 'Iglesia ni Cristo', 'Islam', 'Other'];
     $allowedOwnership = ['Owner', 'Tenant'];
-    $allowedDuration = [
-        'Less than 6 months',
-        '6 months - 1 year',
-        '2-3 years',
-        '4-5 years',
-        'More than 5 years'
-    ];
     $allowedAreas = ['Area 01', 'Area 1A', 'Area 02', 'Area 03', 'Area 04', 'Area 05', 'Area 06'];
     $allowedHouseTypeSelect = [
         'Concrete',
@@ -475,6 +529,11 @@ try {
         echo json_encode(["success" => false, "message" => "Invalid family role value."]);
         exit;
     }
+    if (!in_array($birthInPhilippines, ['yes', 'no'], true)) {
+        http_response_code(400);
+        echo json_encode(["success" => false, "message" => "Please select a valid birthplace option."]);
+        exit;
+    }
     if (!in_array($addressSystem, $allowedAddressSystem, true)) {
         http_response_code(400);
         echo json_encode(["success" => false, "message" => "Please select a valid address system."]);
@@ -496,15 +555,33 @@ try {
         echo json_encode(["success" => false, "message" => "Please select a valid house ownership."]);
         exit;
     }
-    if ($duration === '' || !in_array($duration, $allowedDuration, true)) {
-        http_response_code(400);
-        echo json_encode(["success" => false, "message" => "Please select a valid residency duration."]);
-        exit;
-    }
     if ($houseTypeSelect === '' || !in_array($houseTypeSelect, $allowedHouseTypeSelect, true)) {
         http_response_code(400);
         echo json_encode(["success" => false, "message" => "Please select a valid house type."]);
         exit;
+    }
+    if ($barangayResidencyMonthYear === '') {
+        http_response_code(400);
+        echo json_encode(["success" => false, "message" => "Please enter a valid barangay residency month and year."]);
+        exit;
+    }
+    if ($residencyDate === '' || $residencyYears < 0 || $residencyYears > 120 || $residencyMonths < 0 || $residencyMonths > 11) {
+        http_response_code(400);
+        echo json_encode(["success" => false, "message" => "Please enter a valid residency start month and year."]);
+        exit;
+    }
+    if ($birthInPhilippines === 'yes') {
+        if ($birthRegion === '' || $birthProvince === '' || $birthCity === '') {
+            http_response_code(400);
+            echo json_encode(["success" => false, "message" => "Region, province, and municipality/city are required for Philippine birthplaces."]);
+            exit;
+        }
+    } else {
+        if ($birthCountry === '') {
+            http_response_code(400);
+            echo json_encode(["success" => false, "message" => "Country is required for non-Philippine birthplaces."]);
+            exit;
+        }
     }
     if ($houseTypeSelect === 'Other') {
         if ($houseType === '') {
@@ -556,6 +633,11 @@ try {
     $alphaOptionalChecks = [];
     if ($suffix !== '') $alphaOptionalChecks['Suffix'] = $suffix;
     if ($religion !== '') $alphaOptionalChecks['Religion'] = $religion;
+    if ($birthCountry !== '') $alphaOptionalChecks['Birth country'] = $birthCountry;
+    if ($birthState !== '') $alphaOptionalChecks['Birth state'] = $birthState;
+    if ($birthRegion !== '') $alphaOptionalChecks['Birth region'] = $birthRegion;
+    if ($birthProvince !== '') $alphaOptionalChecks['Birth province'] = $birthProvince;
+    if ($birthCity !== '') $alphaOptionalChecks['Birth city'] = $birthCity;
     if ($occupationDetail !== '') $alphaOptionalChecks['Occupation'] = $occupationDetail;
     if (!empty($_POST['schoolName'])) {
         $alphaOptionalChecks['School name'] = cleanString($_POST['schoolName']);
@@ -672,6 +754,7 @@ try {
         }
     }
 
+    ensureResidentProfilingColumns($conn);
     $conn->begin_transaction();
 
     // Default Resident status = NotVerified (Resident)
@@ -691,15 +774,15 @@ try {
 
     $stmt = $conn->prepare("
         INSERT INTO residentinformationtbl 
-        (resident_id, user_id, lastname, firstname, middlename, suffix, sex, birthdate, civil_status,
+        (resident_id, user_id, lastname, firstname, middlename, suffix, sex, birthdate, birthplace, baranagayresidency, civil_status, family_role,
          head_of_family, voter_status, occupation, occupation_detail,
          religion, sector_membership, privacy_consent, status_id_resident)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     ");
     if (!$stmt) throw new Exception("Prepare failed (resident insert): " . $conn->error);
 
     $stmt->bind_param(
-        "sssssssssiiisssii",
+        "ssssssssssssiiisssii",
         $resident_id,
         $user_id,
         $lastName,
@@ -708,7 +791,10 @@ try {
         $suffix,
         $sex,
         $dob,
+        $birthplace,
+        $barangayResidencyMonthYear,
         $civil,
+        $familyRole,
         $isHead,
         $voter,
         $occupation,

@@ -117,6 +117,31 @@ function toDbWebPath(string $absolutePath): string {
 }
 }
 
+if (!function_exists('publicPathExists')) {
+function publicPathExists(?string $publicPath): bool {
+    $publicPath = trim((string)$publicPath);
+    if ($publicPath === '') {
+        return false;
+    }
+    if (preg_match('#^https?://#i', $publicPath)) {
+        return true;
+    }
+
+    $webRoot = realpath(__DIR__ . "/..");
+    if ($webRoot === false) {
+        return false;
+    }
+
+    $relative = '/' . ltrim($publicPath, '. /');
+    $absolute = realpath($webRoot . $relative);
+    if ($absolute === false) {
+        return false;
+    }
+
+    return is_file($absolute);
+}
+}
+
 if (!function_exists('getStatusId')) {
 function getStatusId(mysqli $conn, string $name, string $type): ?int {
     $stmt = $conn->prepare("SELECT status_id FROM statuslookuptbl WHERE status_name = ? AND status_type = ? LIMIT 1");
@@ -310,7 +335,7 @@ if ($residentId !== '' && isset($conn) && $conn instanceof mysqli) {
         $stmtPic->bind_result($verifiedPicPath);
         if ($stmtPic->fetch() && !empty($verifiedPicPath)) {
             $publicPath = toPublicPath($verifiedPicPath);
-            if (!empty($publicPath)) {
+            if (!empty($publicPath) && publicPathExists($publicPath)) {
                 $profileImage = $publicPath;
             }
         }
@@ -1777,6 +1802,7 @@ if ($residentId !== '' && isset($conn) && $conn instanceof mysqli) {
                             <img id="residentProfileImagePreview"
                                  src="<?= htmlspecialchars($profileImage, ENT_QUOTES, 'UTF-8') ?>"
                                  alt="Profile Preview"
+                                 onerror="this.onerror=null;this.src='../Images/Profile-Placeholder.png';"
                                  class="rounded-circle border"
                                  style="width:120px;height:120px;object-fit:cover;">
                         </div>
@@ -1804,6 +1830,7 @@ if ($residentId !== '' && isset($conn) && $conn instanceof mysqli) {
     </div>
 
         <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+        <script src="../JS-Script-Files/Resident-End/dateFieldModal.js"></script>
         <script>
             document.addEventListener("DOMContentLoaded", () => {
                 if (!window.bootstrap?.Modal) return;

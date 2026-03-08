@@ -67,6 +67,7 @@ function getResidentProfileData(mysqli $conn, string $userId): array {
             r.suffix,
             r.sex,
             r.birthdate,
+            r.birthplace,
             r.civil_status,
             r.head_of_family,
             r.voter_status,
@@ -132,6 +133,7 @@ function getResidentProfileData(mysqli $conn, string $userId): array {
                 'suffix' => $row['suffix'] ?? '',
                 'sex' => $row['sex'] ?? '',
                 'birthdate' => $birthdateFormatted,
+                'birthplace' => $row['birthplace'] ?? '',
                 'age' => $age,
                 'civil_status' => $row['civil_status'] ?? '',
                 'head_of_family' => ((int)$row['head_of_family'] === 1) ? 'Yes' : 'No',
@@ -270,7 +272,10 @@ function getResidentProfileData(mysqli $conn, string $userId): array {
         };
         $parseSectorCsv = static function ($csv): array {
             $parts = array_map('trim', explode(',', (string)$csv));
-            $parts = array_filter($parts, static fn($v) => $v !== '');
+            $parts = array_filter($parts, static function ($v) {
+                $value = strtolower(trim((string)$v));
+                return $value !== '' && $value !== 'none' && $value !== 'n/a';
+            });
             return array_values(array_unique($parts));
         };
 

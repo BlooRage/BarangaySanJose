@@ -39,7 +39,7 @@ if (!isset($baseUrl)) {
   <link rel="stylesheet" href="../CSS-Styles/Resident-End-CSS/registrationStyle.css?v=20260213-6" />
   <link rel="stylesheet" href="../CSS-Styles/NavbarFooterStyle.css" />
 
-  <style>
+<style>
 .field-error {
   font-size: 0.85rem;
   color: #dc3545;
@@ -48,12 +48,58 @@ if (!isset($baseUrl)) {
 .is-invalid {
   border-color: #dc3545 !important;
 }
+.residency-picker-wrap {
+  position: relative;
+}
+.residency-picker-trigger {
+  position: relative;
+}
+.residency-picker-display {
+  padding-right: 44px;
+  cursor: pointer;
+}
+.residency-picker-display::placeholder {
+  color: #9ca3af;
+}
+.residency-picker-icon {
+  position: absolute;
+  right: 14px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: #6b7280;
+  pointer-events: none;
+}
+.residency-picker-modal .modal-content {
+  border-radius: 18px;
+}
+.residency-picker-panel-title {
+  font-size: 0.92rem;
+  font-weight: 700;
+  color: #111827;
+}
+.residency-picker-panel-note {
+  margin: 0;
+  font-size: 0.78rem;
+  color: #6b7280;
+}
+.residency-picker-preview {
+  margin: 0 0 12px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: #fff7ed;
+  color: #9a3412;
+  font-size: 0.85rem;
+  font-weight: 600;
+}
 </style>
 
   <!-- Optional: server-side alert handling (if you use it) -->
   <script src="../JS-Script-Files/modalHandler.js"></script>
 
   <!-- Your wizard/validation JS -->
+  <script>
+    window.COUNTRY_STATE_DATA_URL = "../Public-Assets/Data/countries-states.json";
+  </script>
   <script src="../JS-Script-Files/Resident-End/registrationScript.js?v=20260213-24" defer></script>
 </head>
 
@@ -350,12 +396,7 @@ require_once __DIR__ . "/includes/resident_access_guard.php";
           </div>
 
           <div class="row mb-3">
-            <div class="col-md-2">
-              <label class="form-label" for="dateOfBirth">Date of Birth <span class="text-danger">*</span></label>
-              <input type="date" class="form-control" id="dateOfBirth" name="dateOfBirth" min="1916-01-01" max="2026-12-31" required>
-            </div>
-
-            <div class="col-md-2">
+            <div class="col-md-4">
               <label class="form-label" for="sex">Sex <span class="text-danger">*</span></label>
               <select class="form-select" id="sex" name="sex" required>
                 <option value="">Select</option>
@@ -364,7 +405,62 @@ require_once __DIR__ . "/includes/resident_access_guard.php";
               </select>
             </div>
 
-            <div class="col-md-2">
+            <div class="col-md-4">
+              <label class="form-label" for="dateOfBirth">Date of Birth <span class="text-danger">*</span></label>
+              <input type="date" class="form-control" id="dateOfBirth" name="dateOfBirth" min="1916-01-01" max="2026-12-31" required>
+            </div>
+
+            <div class="col-md-4">
+              <label class="form-label" for="birthInPhilippines">Place of Birth <span class="text-danger">*</span></label>
+              <select class="form-select" id="birthInPhilippines" name="birthInPhilippines" required>
+                <option value="">Select</option>
+                <option value="yes">Born in the Philippines</option>
+                <option value="no">Born outside the Philippines</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="row mb-3 d-none" id="birthplacePhilippinesRow">
+            <div class="col-md-4">
+              <label class="form-label" for="birthRegion">Region <span class="text-danger">*</span></label>
+              <select class="form-select" id="birthRegion" name="birthRegion">
+                <option value="">Select region</option>
+              </select>
+            </div>
+
+            <div class="col-md-4">
+              <label class="form-label" for="birthProvince">Province <span class="text-danger">*</span></label>
+              <select class="form-select" id="birthProvince" name="birthProvince" disabled>
+                <option value="">Select province</option>
+              </select>
+            </div>
+
+            <div class="col-md-4">
+              <label class="form-label" for="birthCity">Municipality / City <span class="text-danger">*</span></label>
+              <select class="form-select" id="birthCity" name="birthCity" disabled>
+                <option value="">Select municipality / city</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="row mb-3 d-none" id="birthplaceInternationalRow">
+            <div class="col-md-6">
+              <label class="form-label" for="birthCountry">Country <span class="text-danger">*</span></label>
+              <select class="form-select" id="birthCountry" name="birthCountry">
+                <option value="">Select country</option>
+              </select>
+            </div>
+
+            <div class="col-md-6">
+              <label class="form-label" for="birthState">State / Province</label>
+              <select class="form-select" id="birthState" name="birthState" disabled>
+                <option value="">Select state / province</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="row mb-3">
+            <div class="col-md-3">
               <label class="form-label" for="civilStatus">Civil Status <span class="text-danger">*</span></label>
               <select class="form-select" id="civilStatus" name="civilStatus" required>
                 <option value="">Select</option>
@@ -409,6 +505,17 @@ require_once __DIR__ . "/includes/resident_access_guard.php";
                 <option value="Grandparents">Grandparents</option>
                 <option value="Extended Family">Extended Family</option>
               </select>
+            </div>
+
+            <div class="col-md-3">
+              <label class="form-label" for="barangayResidencyDisplay">Barangay Residency <span class="text-danger">*</span></label>
+              <div class="residency-picker-wrap">
+                <div class="residency-picker-trigger">
+                  <input type="text" class="form-control residency-picker-display" id="barangayResidencyDisplay" placeholder="Select month and year" readonly required>
+                  <i class="fa-regular fa-calendar residency-picker-icon" aria-hidden="true"></i>
+                </div>
+                <input type="hidden" id="barangayResidencyMonthYear" name="barangayResidencyMonthYear">
+              </div>
             </div>
           </div>
 
@@ -495,10 +602,34 @@ require_once __DIR__ . "/includes/resident_access_guard.php";
             <div class="col-md-12">
               <div id="sectorGroupCard">
                 <div class="row g-2">
-                  <div class="col-md-6">
+                  <div class="col-md-6 col-lg-4">
+                    <div class="form-check">
+                      <input class="form-check-input" type="checkbox" id="sectorPWD" name="sectorMembership[]" value="PWD">
+                      <label class="form-check-label" for="sectorPWD">PWD</label>
+                    </div>
+                  </div>
+                  <div class="col-md-6 col-lg-4">
+                    <div class="form-check">
+                      <input class="form-check-input" type="checkbox" id="sectorSenior" name="sectorMembership[]" value="Senior Citizen">
+                      <label class="form-check-label" for="sectorSenior">Senior Citizen</label>
+                    </div>
+                  </div>
+                  <div class="col-md-6 col-lg-4">
                     <div class="form-check">
                       <input class="form-check-input" type="checkbox" id="sectorStudent" name="sectorMembership[]" value="Student">
                       <label class="form-check-label" for="sectorStudent">Student</label>
+                    </div>
+                  </div>
+                  <div class="col-md-6 col-lg-4">
+                    <div class="form-check">
+                      <input class="form-check-input" type="checkbox" id="sectorIP" name="sectorMembership[]" value="Indigenous People">
+                      <label class="form-check-label" for="sectorIP">Indigenous People</label>
+                    </div>
+                  </div>
+                  <div class="col-md-6 col-lg-4">
+                    <div class="form-check">
+                      <input class="form-check-input" type="checkbox" id="sectorSP" name="sectorMembership[]" value="Single Parent">
+                      <label class="form-check-label" for="sectorSP">Single Parent</label>
                     </div>
                   </div>
                 </div>
@@ -741,58 +872,52 @@ require_once __DIR__ . "/includes/resident_access_guard.php";
           <h2 class="section-title mt-4 mb-0">House Information</h2>
           <hr class="section-hr">
 
-          <div class="house-info-center">
-            <div class="row mb-4">
-              <div class="col-md-3">
-                <label class="form-label" for="houseOwnership">House Ownership <span class="text-danger">*</span></label>
-                <select class="form-select" id="houseOwnership" name="houseOwnership" required>
-                  <option value="">Select</option>
-                  <option value="Owner">Owner</option>
-                  <option value="Tenant">Tenant</option>
-                </select>
-              </div>
+          <div class="row mb-4">
+            <div class="col-md-4">
+              <label class="form-label" for="houseOwnership">House Ownership <span class="text-danger">*</span></label>
+              <select class="form-select" id="houseOwnership" name="houseOwnership" required>
+                <option value="">Select</option>
+                <option value="Owner">Owner</option>
+                <option value="Tenant">Tenant</option>
+              </select>
+            </div>
 
-              <div class="col-md-3">
-                <label class="form-label" for="houseTypeSelect">House Type <span class="text-danger">*</span></label>
-                <select
-                  class="form-select toggle-other"
-                  name="houseType"
-                  required
-                  data-target="houseType-other"
-                  id="houseTypeSelect"
-                >
-                  <option value="">Select</option>
-                  <option value="Concrete">Concrete</option>
-                  <option value="Semi-Concrete">Semi-Concrete</option>
-                  <option value="Wood/Light Materials">Wood/Light Materials</option>
-                  <option value="Makeshift/Salvaged Materials">Makeshift/Salvaged Materials</option>
-                  <option value="Shanty/Informal">Shanty/Informal</option>
-                  <option value="Other">Other</option>
-                </select>
+            <div class="col-md-4">
+              <label class="form-label" for="houseTypeSelect">House Type <span class="text-danger">*</span></label>
+              <select
+                class="form-select toggle-other"
+                name="houseType"
+                required
+                data-target="houseType-other"
+                id="houseTypeSelect"
+              >
+                <option value="">Select</option>
+                <option value="Concrete">Concrete</option>
+                <option value="Semi-Concrete">Semi-Concrete</option>
+                <option value="Wood/Light Materials">Wood/Light Materials</option>
+                <option value="Makeshift/Salvaged Materials">Makeshift/Salvaged Materials</option>
+                <option value="Shanty/Informal">Shanty/Informal</option>
+                <option value="Other">Other</option>
+              </select>
 
-                <input
-                  type="text"
-                  class="form-control mt-2 d-none houseType-other"
-                  name="houseTypeOther"
-                  id="houseTypeOther"
-                  placeholder="Specify house type"
-                >
-              </div>
+              <input
+                type="text"
+                class="form-control mt-2 d-none houseType-other"
+                name="houseTypeOther"
+                id="houseTypeOther"
+                placeholder="Specify house type"
+              >
+            </div>
 
-              <div class="col-md-3">
-                <label class="form-label" for="residencyDuration">Residency Duration <span class="text-danger">*</span></label>
-                <select class="form-select" id="residencyDuration" name="residencyDuration" required>
-                  <option value="">Select</option>
-                  <option value="Less than 6 months">Less than 6 months</option>
-                  <option value="6 months - 1 year">6 months - 1 year</option>
-                  <option value="2-3 years">2-3 years</option>
-                  <option value="4-5 years">4-5 years</option>
-                  <option value="More than 5 years">More than 5 years</option>
-                </select>
+            <div class="col-md-4">
+              <label class="form-label" for="residencyStartDisplay">Residency Start Date <span class="text-danger">*</span></label>
+              <div class="residency-picker-wrap">
+                <div class="residency-picker-trigger">
+                  <input type="text" class="form-control residency-picker-display" id="residencyStartDisplay" placeholder="Select month and year" readonly required>
+                  <i class="fa-regular fa-calendar residency-picker-icon" aria-hidden="true"></i>
+                </div>
+                <input type="hidden" id="residencyDate" name="residencyDate">
               </div>
-              <div class="col-md-3">
-                <label class="form-label" for="residencyDate">Residency Start Date <span class="text-danger">*</span></label>
-                <input type="date" class="form-control" id="residencyDate" name="residencyDate" max="<?= date('Y-m-d'); ?>" required> 
             </div>
           </div>
 
@@ -1309,6 +1434,100 @@ require_once __DIR__ . "/includes/resident_access_guard.php";
   </section>
 
   <!-- Logout Confirm Modal -->
+  <div class="modal fade residency-picker-modal" id="barangayResidencyModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content">
+        <div class="modal-header">
+          <div>
+            <div class="residency-picker-panel-title">Select Residency Month</div>
+            <p class="residency-picker-panel-note mb-0">Choose when the resident started living in the barangay.</p>
+          </div>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+          <div class="residency-picker-preview" id="residencyPickerPreview">No month selected yet.</div>
+          <div class="row g-2">
+            <div class="col-6">
+              <label class="form-label small mb-1" for="residencyPickerMonth">Month</label>
+              <select class="form-select" id="residencyPickerMonth">
+                <option value="">Select month</option>
+                <option value="01">January</option>
+                <option value="02">February</option>
+                <option value="03">March</option>
+                <option value="04">April</option>
+                <option value="05">May</option>
+                <option value="06">June</option>
+                <option value="07">July</option>
+                <option value="08">August</option>
+                <option value="09">September</option>
+                <option value="10">October</option>
+                <option value="11">November</option>
+                <option value="12">December</option>
+              </select>
+            </div>
+            <div class="col-6">
+              <label class="form-label small mb-1" for="residencyPickerYear">Year</label>
+              <select class="form-select" id="residencyPickerYear">
+                <option value="">Select year</option>
+              </select>
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline-secondary" id="residencyPickerCancel" data-bs-dismiss="modal">Cancel</button>
+          <button type="button" class="btn btn-primary" id="residencyPickerApply">Apply</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal fade residency-picker-modal" id="residencyStartModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content">
+        <div class="modal-header">
+          <div>
+            <div class="residency-picker-panel-title">Residency Start Date</div>
+            <p class="residency-picker-panel-note mb-0">Choose when the resident started living in the said residence.</p>
+          </div>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+          <div class="residency-picker-preview" id="residencyStartPreview">No month selected yet.</div>
+          <div class="row g-2">
+            <div class="col-6">
+              <label class="form-label small mb-1" for="residencyStartMonth">Month</label>
+              <select class="form-select" id="residencyStartMonth">
+                <option value="">Select month</option>
+                <option value="01">January</option>
+                <option value="02">February</option>
+                <option value="03">March</option>
+                <option value="04">April</option>
+                <option value="05">May</option>
+                <option value="06">June</option>
+                <option value="07">July</option>
+                <option value="08">August</option>
+                <option value="09">September</option>
+                <option value="10">October</option>
+                <option value="11">November</option>
+                <option value="12">December</option>
+              </select>
+            </div>
+            <div class="col-6">
+              <label class="form-label small mb-1" for="residencyStartYear">Year</label>
+              <select class="form-select" id="residencyStartYear">
+                <option value="">Select year</option>
+              </select>
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline-secondary" id="residencyStartCancel" data-bs-dismiss="modal">Cancel</button>
+          <button type="button" class="btn btn-primary" id="residencyStartApply">Apply</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
         <div class="modal fade uniform-modal" id="logoutConfirmModal" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
       <div class="modal-content">
@@ -1801,6 +2020,7 @@ document.addEventListener("DOMContentLoaded", () => {
     crossorigin="anonymous"
   ></script>
 
+  <script src="../JS-Script-Files/Resident-End/dateFieldModal.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/heic2any/dist/heic2any.min.js"></script>
 
 </body>

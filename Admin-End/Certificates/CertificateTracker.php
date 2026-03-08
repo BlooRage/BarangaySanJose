@@ -171,6 +171,9 @@ require_once __DIR__ . '/../includes/admin_guard.php';
       flex-direction: column;
       gap: 4px;
     }
+    #viewModal .tracker-form-field--wide {
+      grid-column: 1 / -1;
+    }
     #viewModal .tracker-form-label {
       margin: 6px 0 0;
       font-size: .76rem;
@@ -220,6 +223,47 @@ require_once __DIR__ . '/../includes/admin_guard.php';
       width: 100%;
       min-width: 0;
       padding: 0.62rem 1rem;
+    }
+    #viewModal .template-preview-stack {
+      position: relative;
+    }
+    #viewModal .template-preview-overlays {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+    }
+    #viewModal .template-preview-overlay-field {
+      position: absolute;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      pointer-events: auto;
+    }
+    #viewModal .template-preview-overlay-field span {
+      display: none;
+    }
+    #viewModal .template-preview-overlay-field input,
+    #viewModal .template-preview-overlay-field textarea {
+      width: 100%;
+      border: 0;
+      border-bottom: 2px solid rgba(37, 99, 235, .45);
+      background: rgba(255,255,255,.28);
+      color: #111827;
+      border-radius: 0;
+      padding: 2px 4px;
+      font-size: .92rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      box-shadow: none;
+    }
+    #viewModal .template-preview-overlay-field textarea {
+      resize: vertical;
+      min-height: 44px;
+    }
+    #viewModal .template-preview-overlay-field input:focus,
+    #viewModal .template-preview-overlay-field textarea:focus {
+      outline: 2px solid rgba(37, 99, 235, .25);
+      border-color: rgba(37, 99, 235, .85);
     }
     #actionModal .modal-footer.action-split {
       display: grid;
@@ -733,6 +777,16 @@ require_once __DIR__ . '/../includes/admin_guard.php';
       #viewModal .tracker-form-grid.cols-3 {
         grid-template-columns: 1fr;
       }
+      #viewModal .template-preview-overlays {
+        position: static;
+        margin-top: 12px;
+        display: grid;
+        gap: 10px;
+        pointer-events: auto;
+      }
+      #viewModal .template-preview-overlay-field {
+        position: static;
+      }
       #residentProfileModal #div-modalSizing {
         width: 96vw;
       }
@@ -1041,6 +1095,6 @@ require_once __DIR__ . '/../includes/admin_guard.php';
   };
 </script>
 <script src="../../JS-Script-Files/Admin-End/tableColumnsGeneric.js?v=20260215-1"></script>
-<script src="../../JS-Script-Files/Admin-End/certificateTrackerScript.js"></script>
+<script src="../../JS-Script-Files/Admin-End/certificateTrackerScript.js?v=20260309-01"></script>
 </body>
 </html>

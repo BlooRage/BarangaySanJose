@@ -803,6 +803,470 @@ function isActuallyVisible(el) {
   });
 
   /* ===============================
+     BIRTHPLACE WORKFLOW
+     =============================== */
+  const birthInPhilippines = document.getElementById("birthInPhilippines");
+  const birthplacePhilippinesRow = document.getElementById("birthplacePhilippinesRow");
+  const birthplaceInternationalRow = document.getElementById("birthplaceInternationalRow");
+  const birthRegion = document.getElementById("birthRegion");
+  const birthProvince = document.getElementById("birthProvince");
+  const birthCity = document.getElementById("birthCity");
+  const birthCountry = document.getElementById("birthCountry");
+  const birthState = document.getElementById("birthState");
+
+  const birthplaceApiBase = "https://psgc.gitlab.io/api";
+  const countryStateDataUrl = String(window.COUNTRY_STATE_DATA_URL || "../Public-Assets/Data/countries-states.json");
+  const birthplaceCache = {
+    regions: null,
+    countries: null,
+    provincesByRegion: new Map(),
+    citiesByRegion: new Map(),
+    citiesByProvince: new Map()
+  };
+
+  async function fetchBirthplaceJson(path) {
+    const res = await fetch(`${birthplaceApiBase}${path}`, { headers: { Accept: "application/json" } });
+    if (!res.ok) throw new Error(`Birthplace lookup failed: ${res.status}`);
+    return res.json();
+  }
+
+  async function fetchCountryStateJson() {
+    if (!birthplaceCache.countries) {
+      const res = await fetch(countryStateDataUrl, { headers: { Accept: "application/json" } });
+      if (!res.ok) throw new Error(`Country/state lookup failed: ${res.status}`);
+      birthplaceCache.countries = await res.json();
+    }
+    return birthplaceCache.countries;
+  }
+
+  function fillSelectOptions(select, items, placeholder, getLabel) {
+    if (!select) return;
+    select.innerHTML = `<option value="">${placeholder}</option>`;
+    (Array.isArray(items) ? items : []).forEach((item) => {
+      const label = String(getLabel(item) || "").trim();
+      const code = String(item?.code || "").trim();
+      if (!label || !code) return;
+      const opt = document.createElement("option");
+      opt.value = label;
+      opt.textContent = label;
+      opt.dataset.code = code;
+      select.appendChild(opt);
+    });
+  }
+
+  function resetBirthplaceSelect(select, placeholder) {
+    if (!select) return;
+    select.innerHTML = `<option value="">${placeholder}</option>`;
+    select.value = "";
+    select.disabled = true;
+    clearError(select);
+  }
+
+  async function loadCountries() {
+    if (!birthCountry) return;
+    const countries = await fetchCountryStateJson();
+    birthCountry.innerHTML = '<option value="">Select country</option>';
+    (Array.isArray(countries) ? countries : []).forEach((country) => {
+      const name = String(country?.name || "").trim();
+      if (!name) return;
+      const option = document.createElement("option");
+      option.value = name;
+      option.textContent = name;
+      birthCountry.appendChild(option);
+    });
+    birthCountry.disabled = false;
+  }
+
+  async function loadStatesForCountry(countryName) {
+    if (!birthState) return;
+    const countries = await fetchCountryStateJson();
+    const country = (Array.isArray(countries) ? countries : []).find((entry) => String(entry?.name || "").trim() === countryName);
+    const states = Array.isArray(country?.states) ? country.states : [];
+    birthState.innerHTML = `<option value="">${states.length ? "Select state / province" : "No state / province list"}</option>`;
+    states.forEach((stateName) => {
+      const name = String(stateName || "").trim();
+      if (!name) return;
+      const option = document.createElement("option");
+      option.value = name;
+      option.textContent = name;
+      birthState.appendChild(option);
+    });
+    birthState.disabled = states.length === 0;
+    birthState.required = false;
+  }
+
+  async function loadBirthRegions() {
+    if (!birthRegion) return;
+    if (!birthplaceCache.regions) {
+      birthplaceCache.regions = await fetchBirthplaceJson("/regions/");
+    }
+    fillSelectOptions(
+      birthRegion,
+      birthplaceCache.regions,
+      "Select region",
+      (item) => item?.regionName || item?.name
+    );
+    birthRegion.disabled = false;
+  }
+
+  async function loadBirthProvinces(regionCode) {
+    if (!birthProvince) return;
+    if (!birthplaceCache.provincesByRegion.has(regionCode)) {
+      birthplaceCache.provincesByRegion.set(regionCode, await fetchBirthplaceJson(`/regions/${encodeURIComponent(regionCode)}/provinces/`));
+    }
+    const provinces = birthplaceCache.provincesByRegion.get(regionCode) || [];
+    fillSelectOptions(
+      birthProvince,
+      provinces,
+      provinces.length ? "Select province" : "No province selection",
+      (item) => item?.name
+    );
+    birthProvince.disabled = provinces.length === 0;
+    return provinces;
+  }
+
+  async function loadBirthCitiesByRegion(regionCode) {
+    if (!birthCity) return;
+    if (!birthplaceCache.citiesByRegion.has(regionCode)) {
+      birthplaceCache.citiesByRegion.set(regionCode, await fetchBirthplaceJson(`/regions/${encodeURIComponent(regionCode)}/cities-municipalities/`));
+    }
+    const cities = birthplaceCache.citiesByRegion.get(regionCode) || [];
+    fillSelectOptions(birthCity, cities, "Select municipality / city", (item) => item?.name);
+    birthCity.disabled = cities.length === 0;
+  }
+
+  async function loadBirthCitiesByProvince(provinceCode) {
+    if (!birthCity) return;
+    if (!birthplaceCache.citiesByProvince.has(provinceCode)) {
+      birthplaceCache.citiesByProvince.set(provinceCode, await fetchBirthplaceJson(`/provinces/${encodeURIComponent(provinceCode)}/cities-municipalities/`));
+    }
+    const cities = birthplaceCache.citiesByProvince.get(provinceCode) || [];
+    fillSelectOptions(birthCity, cities, "Select municipality / city", (item) => item?.name);
+    birthCity.disabled = cities.length === 0;
+  }
+
+  function toggleBirthplaceMode() {
+    const mode = birthInPhilippines ? birthInPhilippines.value : "";
+    const isPhilippines = mode === "yes";
+    const isInternational = mode === "no";
+
+    if (birthplacePhilippinesRow) birthplacePhilippinesRow.classList.toggle("d-none", !isPhilippines);
+    if (birthplaceInternationalRow) birthplaceInternationalRow.classList.toggle("d-none", !isInternational);
+
+    if (birthRegion) {
+      birthRegion.disabled = !isPhilippines;
+      birthRegion.required = isPhilippines;
+      if (!isPhilippines) {
+        birthRegion.value = "";
+        clearError(birthRegion);
+      }
+    }
+
+    if (!isPhilippines) {
+      resetBirthplaceSelect(birthProvince, "Select province");
+      resetBirthplaceSelect(birthCity, "Select municipality / city");
+    }
+
+    if (birthProvince) birthProvince.required = isPhilippines;
+    if (birthCity) birthCity.required = isPhilippines;
+
+    if (birthCountry) {
+      birthCountry.required = isInternational;
+      birthCountry.disabled = !isInternational;
+      if (!isInternational) {
+        birthCountry.value = "";
+        clearError(birthCountry);
+      }
+    }
+    if (birthState) {
+      birthState.required = false;
+      if (!isInternational) {
+        resetBirthplaceSelect(birthState, "Select state / province");
+      }
+    }
+
+    if (isPhilippines) {
+      loadBirthRegions().catch(() => {
+        if (birthRegion) birthRegion.innerHTML = '<option value="">Unable to load regions</option>';
+      });
+    } else if (isInternational) {
+      loadCountries().catch(() => {
+        if (birthCountry) birthCountry.innerHTML = '<option value="">Unable to load countries</option>';
+      });
+    }
+
+    updateNextButtonState();
+  }
+
+  birthInPhilippines?.addEventListener("change", toggleBirthplaceMode);
+  birthRegion?.addEventListener("change", async () => {
+    const code = birthRegion.selectedOptions[0]?.dataset.code || "";
+    resetBirthplaceSelect(birthProvince, "Select province");
+    resetBirthplaceSelect(birthCity, "Select municipality / city");
+    if (!code) {
+      updateNextButtonState();
+      return;
+    }
+    const provinces = await loadBirthProvinces(code).catch(() => []);
+    if (!provinces.length) {
+      await loadBirthCitiesByRegion(code).catch(() => {
+        if (birthCity) birthCity.innerHTML = '<option value="">Unable to load municipalities / cities</option>';
+      });
+    }
+    updateNextButtonState();
+  });
+
+  birthProvince?.addEventListener("change", async () => {
+    const code = birthProvince.selectedOptions[0]?.dataset.code || "";
+    resetBirthplaceSelect(birthCity, "Select municipality / city");
+    if (!code) {
+      updateNextButtonState();
+      return;
+    }
+    await loadBirthCitiesByProvince(code).catch(() => {
+      if (birthCity) birthCity.innerHTML = '<option value="">Unable to load municipalities / cities</option>';
+    });
+    updateNextButtonState();
+  });
+
+  birthCountry?.addEventListener("change", async () => {
+    const selectedCountry = String(birthCountry.value || "").trim();
+    resetBirthplaceSelect(birthState, "Select state / province");
+    if (!selectedCountry) {
+      updateNextButtonState();
+      return;
+    }
+    await loadStatesForCountry(selectedCountry).catch(() => {
+      if (birthState) birthState.innerHTML = '<option value="">Unable to load states / provinces</option>';
+    });
+    updateNextButtonState();
+  });
+
+  toggleBirthplaceMode();
+
+  /* ===============================
+     BARANGAY RESIDENCY MONTH/YEAR PICKER
+     =============================== */
+  const barangayResidencyDisplay = document.getElementById("barangayResidencyDisplay");
+  const barangayResidencyMonthYear = document.getElementById("barangayResidencyMonthYear");
+  const barangayResidencyModalEl = document.getElementById("barangayResidencyModal");
+  const barangayResidencyModal = barangayResidencyModalEl && window.bootstrap ? new bootstrap.Modal(barangayResidencyModalEl) : null;
+  const residencyPickerMonth = document.getElementById("residencyPickerMonth");
+  const residencyPickerYear = document.getElementById("residencyPickerYear");
+  const residencyPickerApply = document.getElementById("residencyPickerApply");
+  const residencyPickerCancel = document.getElementById("residencyPickerCancel");
+  const residencyPickerPreview = document.getElementById("residencyPickerPreview");
+
+  const residencyMonthLabels = {
+    "01": "January",
+    "02": "February",
+    "03": "March",
+    "04": "April",
+    "05": "May",
+    "06": "June",
+    "07": "July",
+    "08": "August",
+    "09": "September",
+    "10": "October",
+    "11": "November",
+    "12": "December"
+  };
+
+  function closeResidencyPicker() {
+    barangayResidencyModal?.hide();
+  }
+
+  function openResidencyPicker() {
+    updateResidencyPickerPreview();
+    barangayResidencyModal?.show();
+  }
+
+  function updateResidencyPickerPreview() {
+    if (!residencyPickerPreview) return;
+    const month = String(residencyPickerMonth?.value || "").trim();
+    const year = String(residencyPickerYear?.value || "").trim();
+    residencyPickerPreview.textContent = (month && year)
+      ? `Selected: ${residencyMonthLabels[month]} ${year}`
+      : "No month selected yet.";
+  }
+
+  function syncResidencyPickerFromValue() {
+    if (!barangayResidencyMonthYear) return;
+    const raw = String(barangayResidencyMonthYear.value || "").trim();
+    const match = raw.match(/^(\d{4})-(\d{2})$/);
+    if (!match) return;
+    if (residencyPickerYear) residencyPickerYear.value = match[1];
+    if (residencyPickerMonth) residencyPickerMonth.value = match[2];
+    updateResidencyPickerPreview();
+  }
+
+  function setResidencyDisplayValue(value) {
+    if (!barangayResidencyDisplay || !barangayResidencyMonthYear) return;
+    const raw = String(value || "").trim();
+    barangayResidencyMonthYear.value = raw;
+    const match = raw.match(/^(\d{4})-(\d{2})$/);
+    barangayResidencyDisplay.value = match ? `${residencyMonthLabels[match[2]]} ${match[1]}` : "";
+    barangayResidencyDisplay.dispatchEvent(new Event("input", { bubbles: true }));
+    barangayResidencyDisplay.dispatchEvent(new Event("change", { bubbles: true }));
+    clearError(barangayResidencyDisplay);
+    updateResidencyPickerPreview();
+  }
+
+  if (residencyPickerYear) {
+    const currentYear = new Date().getFullYear();
+    residencyPickerYear.innerHTML = '<option value="">Select year</option>';
+    for (let year = currentYear; year >= currentYear - 120; year -= 1) {
+      const option = document.createElement("option");
+      option.value = String(year);
+      option.textContent = String(year);
+      residencyPickerYear.appendChild(option);
+    }
+  }
+
+  barangayResidencyDisplay?.addEventListener("click", () => {
+    syncResidencyPickerFromValue();
+    openResidencyPicker();
+  });
+  barangayResidencyDisplay?.addEventListener("focus", () => {
+    syncResidencyPickerFromValue();
+    openResidencyPicker();
+  });
+  barangayResidencyDisplay?.addEventListener("keydown", (event) => {
+    if (event.key === "Enter" || event.key === " ") {
+      event.preventDefault();
+      syncResidencyPickerFromValue();
+      openResidencyPicker();
+    }
+  });
+
+  residencyPickerMonth?.addEventListener("change", updateResidencyPickerPreview);
+  residencyPickerYear?.addEventListener("change", updateResidencyPickerPreview);
+
+  residencyPickerApply?.addEventListener("click", () => {
+    const month = String(residencyPickerMonth?.value || "").trim();
+    const year = String(residencyPickerYear?.value || "").trim();
+    if (!month || !year) {
+      showError(barangayResidencyDisplay, "Please select month and year.");
+      return;
+    }
+    setResidencyDisplayValue(`${year}-${month}`);
+    closeResidencyPicker();
+    updateNextButtonState();
+  });
+
+  residencyPickerCancel?.addEventListener("click", () => {
+    syncResidencyPickerFromValue();
+  });
+
+  document.addEventListener("keydown", (event) => {
+    if (!barangayResidencyModalEl || !barangayResidencyModalEl.classList.contains("show")) return;
+    if (event.key === "Escape") {
+      syncResidencyPickerFromValue();
+    }
+    if (event.key === "Enter" && (document.activeElement === residencyPickerMonth || document.activeElement === residencyPickerYear)) {
+      event.preventDefault();
+      residencyPickerApply?.click();
+    }
+  });
+  barangayResidencyModalEl?.addEventListener("hidden.bs.modal", syncResidencyPickerFromValue);
+
+  /* ===============================
+     HOUSE RESIDENCY START MONTH/YEAR PICKER
+     =============================== */
+  const residencyStartDisplay = document.getElementById("residencyStartDisplay");
+  const residencyStartValue = document.getElementById("residencyDate");
+  const residencyStartModalEl = document.getElementById("residencyStartModal");
+  const residencyStartModal = residencyStartModalEl && window.bootstrap ? new bootstrap.Modal(residencyStartModalEl) : null;
+  const residencyStartMonth = document.getElementById("residencyStartMonth");
+  const residencyStartYear = document.getElementById("residencyStartYear");
+  const residencyStartApply = document.getElementById("residencyStartApply");
+  const residencyStartPreview = document.getElementById("residencyStartPreview");
+
+  function updateResidencyStartPreview() {
+    if (!residencyStartPreview) return;
+    const month = String(residencyStartMonth?.value || "").trim();
+    const year = String(residencyStartYear?.value || "").trim();
+    residencyStartPreview.textContent = (month && year)
+      ? `Selected: ${residencyMonthLabels[month]} ${year}`
+      : "No month selected yet.";
+  }
+
+  function syncResidencyStartFromValue() {
+    if (!residencyStartValue) return;
+    const raw = String(residencyStartValue.value || "").trim();
+    const match = raw.match(/^(\d{4})-(\d{2})$/);
+    if (!match) {
+      if (residencyStartDisplay) residencyStartDisplay.value = "";
+      updateResidencyStartPreview();
+      return;
+    }
+    if (residencyStartYear) residencyStartYear.value = match[1];
+    if (residencyStartMonth) residencyStartMonth.value = match[2];
+    if (residencyStartDisplay) residencyStartDisplay.value = `${residencyMonthLabels[match[2]]} ${match[1]}`;
+    updateResidencyStartPreview();
+  }
+
+  function setResidencyStartValue(value) {
+    if (!residencyStartDisplay || !residencyStartValue) return;
+    const raw = String(value || "").trim();
+    residencyStartValue.value = raw;
+    const match = raw.match(/^(\d{4})-(\d{2})$/);
+    residencyStartDisplay.value = match ? `${residencyMonthLabels[match[2]]} ${match[1]}` : "";
+    residencyStartDisplay.dispatchEvent(new Event("input", { bubbles: true }));
+    residencyStartDisplay.dispatchEvent(new Event("change", { bubbles: true }));
+    clearError(residencyStartDisplay);
+    updateResidencyStartPreview();
+  }
+
+  if (residencyStartYear) {
+    const currentYear = new Date().getFullYear();
+    residencyStartYear.innerHTML = '<option value="">Select year</option>';
+    for (let year = currentYear; year >= currentYear - 120; year -= 1) {
+      const option = document.createElement("option");
+      option.value = String(year);
+      option.textContent = String(year);
+      residencyStartYear.appendChild(option);
+    }
+  }
+
+  residencyStartDisplay?.addEventListener("click", () => {
+    syncResidencyStartFromValue();
+    updateResidencyStartPreview();
+    residencyStartModal?.show();
+  });
+  residencyStartDisplay?.addEventListener("focus", () => {
+    syncResidencyStartFromValue();
+    updateResidencyStartPreview();
+    residencyStartModal?.show();
+  });
+  residencyStartDisplay?.addEventListener("keydown", (event) => {
+    if (event.key === "Enter" || event.key === " ") {
+      event.preventDefault();
+      syncResidencyStartFromValue();
+      updateResidencyStartPreview();
+      residencyStartModal?.show();
+    }
+  });
+
+  residencyStartMonth?.addEventListener("change", updateResidencyStartPreview);
+  residencyStartYear?.addEventListener("change", updateResidencyStartPreview);
+
+  residencyStartApply?.addEventListener("click", () => {
+    const month = String(residencyStartMonth?.value || "").trim();
+    const year = String(residencyStartYear?.value || "").trim();
+    if (!month || !year) {
+      showError(residencyStartDisplay, "Please select month and year.");
+      return;
+    }
+    setResidencyStartValue(`${year}-${month}`);
+    residencyStartModal?.hide();
+    updateNextButtonState();
+  });
+
+  residencyStartModalEl?.addEventListener("hidden.bs.modal", syncResidencyStartFromValue);
+  syncResidencyStartFromValue();
+
+  /* ===============================
      ADDRESS SYSTEM TOGGLE
      =============================== */
   const addressSystemSelect = document.getElementById("addressSystem");

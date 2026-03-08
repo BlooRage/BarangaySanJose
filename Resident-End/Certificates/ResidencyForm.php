@@ -30,6 +30,8 @@ $firstName = htmlspecialchars($residentinformationtbl['firstname'] ?? '', ENT_QU
 $lastName = htmlspecialchars($residentinformationtbl['lastname'] ?? '', ENT_QUOTES, 'UTF-8');
 $middleName = htmlspecialchars($residentinformationtbl['middlename'] ?? '', ENT_QUOTES, 'UTF-8');
 $suffix = $residentinformationtbl['suffix'] ?? '';
+$birthdate = htmlspecialchars($residentinformationtbl['birthdate'] ?? '', ENT_QUOTES, 'UTF-8');
+$birthplace = htmlspecialchars($residentinformationtbl['birthplace'] ?? '', ENT_QUOTES, 'UTF-8');
 $unitNumber = trim((string)($residentaddresstbl['unit_number'] ?? ''));
 $streetNumber = trim((string)($residentaddresstbl['street_number'] ?? ''));
 $streetName = trim((string)($residentaddresstbl['street_name'] ?? ''));
@@ -37,6 +39,41 @@ $phaseNumber = trim((string)($residentaddresstbl['phase_number'] ?? ''));
 $subdivision = trim((string)($residentaddresstbl['subdivision'] ?? ''));
 $areaNumber = trim((string)($residentaddresstbl['area_number'] ?? ''));
 $phoneNumber = htmlspecialchars($useraccountstbl['phone_number'] ?? '', ENT_QUOTES, 'UTF-8');
+$yearsOfResidency = '';
+$monthsOfResidency = '';
+
+$barangayResidencyRaw = trim((string)($residentinformationtbl['baranagayresidency'] ?? ''));
+if ($barangayResidencyRaw !== '') {
+    $residencyStart = DateTime::createFromFormat('Y-m', $barangayResidencyRaw);
+    if ($residencyStart instanceof DateTime) {
+        $residencyStart->setDate((int)$residencyStart->format('Y'), (int)$residencyStart->format('m'), 1);
+        $currentMonth = new DateTime('first day of this month');
+        if ($residencyStart <= $currentMonth) {
+            $diff = $residencyStart->diff($currentMonth);
+            $yearsOfResidency = (string)max(0, (int)$diff->y);
+            $monthsOfResidency = (string)max(0, (int)$diff->m);
+        }
+    }
+}
+
+if ($yearsOfResidency === '' || $monthsOfResidency === '') {
+    $residencyDurationRaw = trim((string)($residentaddresstbl['residency_duration'] ?? ''));
+    if ($residencyDurationRaw !== '') {
+        if (preg_match('/(\d+)\s*year/i', $residencyDurationRaw, $yearMatch)) {
+            $yearsOfResidency = (string)((int)$yearMatch[1]);
+        }
+        if (preg_match('/(\d+)\s*month/i', $residencyDurationRaw, $monthMatch)) {
+            $monthsOfResidency = (string)((int)$monthMatch[1]);
+        }
+    }
+}
+
+if ($yearsOfResidency === '') {
+    $yearsOfResidency = '0';
+}
+if ($monthsOfResidency === '') {
+    $monthsOfResidency = '0';
+}
 
 $streetNameHasBlock = $streetName !== '' && stripos($streetName, 'block') !== false;
 $streetNumberHasLot = $streetNumber !== '' && stripos($streetNumber, 'lot') !== false;
@@ -116,7 +153,7 @@ $fullAddress = htmlspecialchars(implode(', ', $fullAddressParts), ENT_QUOTES, 'U
                     <h1 class="form-title">Residency</h1>
                     <p class="form-subtitle">All fields marked with <span class="required-asterisk">*</span> are required</p>
 
-                    <form method="POST" action="<?= htmlspecialchars($baseUrl) ?>/PhpFiles/Resident-End/documentRequestWorkflow.php" enctype="multipart/form-data">
+                    <form method="POST" action="<?= htmlspecialchars($baseUrl) ?>/PhpFiles/Resident-End/documentRequestWorkflow.php">
                         <input type="hidden" name="action" value="submit_request">
                         <input type="hidden" name="document_type" value="residency">
                         <input type="hidden" name="redirect" value="1">
@@ -159,49 +196,30 @@ $fullAddress = htmlspecialchars(implode(', ', $fullAddressParts), ENT_QUOTES, 'U
 
                         <div class="form-row two-col-row">
                             <div>
-                                <label class="top-label">Years of Residency <span class="required-asterisk">*</span></label>
-                                <input type="number" min="0" name="years_of_residency" required>
+                                <label class="top-label">Birthdate <span class="required-asterisk">*</span></label>
+                                <input type="text" name="birthdate" readonly value="<?php echo $birthdate; ?>">
                             </div>
                             <div>
-                                <label class="top-label">Months of Residency <span class="required-asterisk">*</span></label>
-                                <input type="number" min="0" max="11" name="months_of_residency" required>
+                                <label class="top-label">Birthplace <span class="required-asterisk">*</span></label>
+                                <input type="text" name="birthplace" readonly value="<?php echo $birthplace; ?>">
                             </div>
                         </div>
-
-                        <div class="form-row">
-                            <div class="full-width">
-                                <label class="top-label">Purpose <span class="required-asterisk">*</span></label>
-                                <textarea name="purpose" rows="5" required></textarea>
-                            </div>
-                        </div>
-
-                        <h2 class="section-title text-center text-dark">Document Upload</h2>
 
                         <div class="form-row two-col-row">
                             <div>
-                                <label class="top-label" for="residencyArrangement">Living Arrangement <span class="required-asterisk">*</span></label>
-                                <select id="residencyArrangement" name="residency_arrangement" required>
-                                    <option value="" selected>Select living arrangement</option>
-                                    <option value="renting">Renting</option>
-                                    <option value="relatives">Living with relatives</option>
-                                </select>
+                                <label class="top-label">Years of Residency <span class="required-asterisk">*</span></label>
+                                <input type="number" min="0" name="years_of_residency" required readonly value="<?php echo htmlspecialchars($yearsOfResidency, ENT_QUOTES, 'UTF-8'); ?>">
                             </div>
                             <div>
-                                <label class="top-label" for="residencyDocumentType">Supporting Document Type <span class="required-asterisk">*</span></label>
-                                <select id="residencyDocumentType" name="supporting_document_type" required disabled></select>
+                                <label class="top-label">Months of Residency <span class="required-asterisk">*</span></label>
+                                <input type="number" min="0" max="11" name="months_of_residency" required readonly value="<?php echo htmlspecialchars($monthsOfResidency, ENT_QUOTES, 'UTF-8'); ?>">
                             </div>
                         </div>
 
                         <div class="form-row">
                             <div class="full-width">
-                                <label class="top-label" for="supportingFile">Upload: Supporting Document <span class="required-asterisk">*</span></label>
-                                <label class="upload-dropzone" id="supportingDropzone" for="supportingFile">
-                                    <i class="fa-solid fa-cloud-arrow-up"></i>
-                                    <span>Drag files here or click to upload</span>
-                                    <small>Accepted: PDF, JPG, JPEG, PNG</small>
-                                </label>
-                                <input type="file" id="supportingFile" name="supporting_file" class="visually-hidden" accept=".pdf,.jpg,.jpeg,.png" required>
-                                <div id="supportingSelectedFile" class="selected-files small text-muted mt-2"></div>
+                                <label class="top-label">Purpose for Request <span class="required-asterisk">*</span></label>
+                                <textarea name="purpose" rows="5" required></textarea>
                             </div>
                         </div>
 
