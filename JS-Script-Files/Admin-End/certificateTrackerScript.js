@@ -144,10 +144,10 @@
     return `${appBase}/PhpFiles/Admin-End/documentRequestWorkflow.php?action=view_preview_docx_image&request_id=${encodeURIComponent(id)}&_ts=${Date.now()}`;
   }
 
-  function renderTemplatePreviewLoading(message = 'Loading template preview...') {
+  function renderTemplatePreviewLoading(message = 'Loading certificate preview...') {
     viewDetailsBody.innerHTML = `
       <div class="tracker-form-section">
-        <div class="tracker-form-label mb-2">Template Preview</div>
+        <div class="tracker-form-label mb-2">Certificate Preview</div>
         <div class="text-muted">${esc(message)}</div>
       </div>
     `;
@@ -326,52 +326,13 @@
   }
 
   async function loadTemplatePreview(requestId, options = {}) {
-    const previewUrl = issuedTemplateDocxImageUrl(requestId);
-    if (!previewUrl) {
-      renderTemplatePreviewLoading('Preparing generated .docx preview...');
-      return;
-    }
-
-    const requestSeq = ++templatePreviewRequestSeq;
-    const preserveExisting = !!options.preserveExisting;
-    const hasExistingShell = !!viewDetailsBody.querySelector('.js-template-preview-docx');
-    if (!preserveExisting || !hasExistingShell) {
-      viewDetailsBody.innerHTML = renderTemplatePreviewShell(requestId);
-      bindTemplateFieldEditors(requestId);
-    } else {
-      setTemplatePreviewStatus('Updating generated .docx preview...');
-    }
-
-    try {
-      if (requestSeq !== templatePreviewRequestSeq || viewMode !== 'preview' || String(currentViewRequestId || '').trim() !== String(requestId || '').trim()) {
-        return;
-      }
-      const previewAsset = await fetchTemplatePreviewAsset(requestId, options);
-      if (requestSeq !== templatePreviewRequestSeq || viewMode !== 'preview' || String(currentViewRequestId || '').trim() !== String(requestId || '').trim()) {
-        return;
-      }
-      const imageObjectUrl = URL.createObjectURL(previewAsset.blob);
-      mountTemplatePreviewImage(imageObjectUrl);
-      setTemplatePreviewStatus('Generated .docx preview ready.');
-    } catch (err) {
-      if (requestSeq !== templatePreviewRequestSeq) return;
-      console.error('generated docx image preview failed', err);
-      if (viewDetailsBody) {
-        const message = err && err.message ? String(err.message) : 'Generated .docx preview failed.';
-        const docxUrl = issuedTemplateDocxUrl(requestId);
-        const fallbackState = viewPreviewState && typeof viewPreviewState === 'object'
-          ? viewPreviewState
-          : buildPreviewState({}, {}, {});
-        viewDetailsBody.innerHTML = `
-          <div class="alert alert-warning py-2 px-3" role="alert">
-            ${esc(message)}. Showing editable fallback preview.
-            ${docxUrl ? ` <a href="${docxUrl}" target="_blank" rel="noopener">Open generated .docx</a>.` : ''}
-          </div>
-          ${renderDocumentPreview(fallbackState)}
-        `;
-        bindPreviewEditHandlers();
-      }
-    }
+    if (!viewDetailsBody) return;
+    // DOCX conversion preview removed: render HTML/JS certificate preview directly.
+    const previewState = viewPreviewState && typeof viewPreviewState === 'object'
+      ? viewPreviewState
+      : buildPreviewState({}, {}, {});
+    viewDetailsBody.innerHTML = renderDocumentPreview(previewState);
+    bindPreviewEditHandlers();
   }
 
   function badge(stage, label) {
@@ -506,6 +467,23 @@
       if (s !== '') return s;
     }
     return '';
+  }
+
+  function looksLikeOfficialId(value) {
+    const s = String(value || '').trim();
+    if (!s) return false;
+    return /^[0-9]{6}[A-Z][0-9]{5}$/i.test(s);
+  }
+
+  function firstNonEmptyName(values, fallback = '') {
+    for (const value of values) {
+      if (value === null || value === undefined) continue;
+      const s = String(value).trim();
+      if (!s) continue;
+      if (looksLikeOfficialId(s)) continue;
+      return s;
+    }
+    return String(fallback || '').trim();
   }
 
   function formatPersonNameFnMiLn(first, middle, last) {
@@ -709,6 +687,32 @@
     return d.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
   }
 
+  function parseFlexibleDate(value) {
+    const raw = String(value || '').trim();
+    if (!raw) return null;
+
+    const iso = raw.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    if (iso) {
+      const y = Number.parseInt(iso[1], 10);
+      const m = Number.parseInt(iso[2], 10);
+      const d = Number.parseInt(iso[3], 10);
+      const out = new Date(y, m - 1, d);
+      return Number.isNaN(out.getTime()) ? null : out;
+    }
+
+    const normalized = raw.replace(/\s+/g, ' ').trim();
+    const parsed = new Date(normalized);
+    return Number.isNaN(parsed.getTime()) ? null : parsed;
+  }
+
+  function previewBornOnDate(value) {
+    const raw = String(value || '').trim();
+    if (!raw) return '';
+    const d = parseFlexibleDate(raw);
+    if (!d) return raw;
+    return d.toLocaleDateString('en-US', { month: 'long', day: '2-digit', year: 'numeric' });
+  }
+
   function dr_now_text() {
     return new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
   }
@@ -723,6 +727,40 @@
     const v = day % 100;
     const suffix = (v >= 11 && v <= 13) ? 'th' : ({ 1: 'st', 2: 'nd', 3: 'rd' }[day % 10] || 'th');
     return `${day}${suffix} day of ${month} ${year}`;
+  }
+
+  function deriveAgeFromDate(value) {
+    const raw = String(value || '').trim();
+    if (!raw) return '';
+    const birth = parseFlexibleDate(raw);
+    if (!birth) return '';
+    const now = new Date();
+    let years = now.getFullYear() - birth.getFullYear();
+    const monthDiff = now.getMonth() - birth.getMonth();
+    if (monthDiff < 0 || (monthDiff === 0 && now.getDate() < birth.getDate())) {
+      years -= 1;
+    }
+    return years >= 0 ? String(years) : '';
+  }
+
+  function stripTemplateTokens(value) {
+    const raw = String(value ?? '').trim();
+    if (!raw) return '';
+    const stripped = raw
+      .replace(/\$\{[A-Z0-9_]+\}/gi, ' ')
+      .replace(/\b(PARTNER_AGE|OR_NUMBER)\b/gi, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+    return stripped;
+  }
+
+  function parseAgeText(value) {
+    const cleaned = stripTemplateTokens(value);
+    if (!cleaned) return '';
+    const match = cleaned.match(/(\d{1,3})/);
+    if (!match) return '';
+    const parsed = Number.parseInt(match[1], 10);
+    return Number.isFinite(parsed) && parsed >= 0 ? String(parsed) : '';
   }
 
   function previewEditable(key, value, fallback = 'Type here', extraClass = '') {
@@ -801,6 +839,33 @@
       payload.cohabitation_duration,
       [durationValue, durationUnit].filter(Boolean).join(' ').trim()
     ]);
+    const applicantBirthdateRaw = stripTemplateTokens(firstNonEmpty([
+      payload.birthdate,
+      payload.date_of_birth,
+      payload.child_dob,
+      payload.birthDate,
+      residentProfile.birthdate
+    ]));
+    const cohabitantBirthdateRaw = stripTemplateTokens(firstNonEmpty([
+      payload.cohabitant_birthdate,
+      payload.cohabitant_dob,
+      payload.partner_birthdate,
+      payload.partner_dob,
+      payload.cohabitantBirthdate
+    ]));
+    const applicantAgeRaw = firstNonEmpty([parseAgeText(payload.age), deriveAgeFromDate(applicantBirthdateRaw)]);
+    const cohabitantAgeRaw = firstNonEmpty([
+      parseAgeText(payload.cohabitant_age),
+      parseAgeText(payload.partner_age),
+      deriveAgeFromDate(cohabitantBirthdateRaw)
+    ]);
+    const childLines = [];
+    for (let i = 1; i <= 5; i += 1) {
+      const childName = String(payload[`cohabitation_child_${i}_name`] || '').trim();
+      const childAge = String(payload[`cohabitation_child_${i}_age`] || '').trim();
+      if (!childName && !childAge) continue;
+      childLines.push(`${childName}${childAge ? `, ${childAge} y/o` : ''}`.trim());
+    }
     const knownPayloadKeys = new Set([
       'action', 'csrf_token', 'redirect', 'document_type',
       'last_name', 'lastname', 'first_name', 'firstname', 'middle_name', 'middlename', 'suffix', 'suffix_name',
@@ -814,6 +879,7 @@
       'father_first_name', 'father_middle_name', 'father_last_name', 'father_suffix',
       'mother_first_name', 'mother_middle_name', 'mother_last_name', 'mother_suffix',
       'cohabitant_first', 'cohabitant_middle', 'cohabitant_last', 'cohabitant_suffix',
+      'cohabitant_dob', 'cohabitant_birthdate', 'cohabitant_age', 'partner_age',
       'cohabitant_relationship', 'cohabitation_duration_value', 'cohabitation_duration_unit', 'cohabitation_start_date',
       'educational_attainment', 'jobstart_beneficiary'
     ]);
@@ -840,13 +906,11 @@
       purpose: upperText(firstNonEmpty([row.purpose, payload.purpose, payload.request_purpose, '-']), '-'),
       businessName: upperText(businessName || '', ''),
       issuedDate: row.submitted_at || dr_now_text(),
-      approvedByName: upperText(firstNonEmpty([
+      approvedByName: upperText(firstNonEmptyName([
         row.reviewed_by,
         row.personnel_name,
         row.released_by,
-        row.user_id_official_reviewed_by,
-        row.personnel_user_id,
-        row.user_id_official_released_by
+        row.finance_user_name
       ]), 'HON. GLENN S. EVANGELISTA'),
       requestOfficer: upperText(firstNonEmpty([
         payload.request_officer,
@@ -874,21 +938,27 @@
         payload.institution_name
       ]), ''),
       requestFor: upperText(firstNonEmpty([payload.request_purpose]), ''),
+      orNumber: upperText(stripTemplateTokens(firstNonEmpty([row.or_number])), ''),
       yearsResidency: upperText(firstNonEmpty([payload.years_of_residency]), ''),
       monthsResidency: upperText(firstNonEmpty([payload.months_of_residency]), ''),
       childBirthplace: upperText(firstNonEmpty([payload.child_birthplace, payload.birthplace, payload.place_of_birth]), ''),
-      childBirthdate: upperText(firstNonEmpty([payload.child_dob, payload.birthdate, payload.date_of_birth, residentProfile.birthdate]), ''),
+      childBirthdate: upperText(previewBornOnDate(firstNonEmpty([payload.child_dob, payload.birthdate, payload.date_of_birth, residentProfile.birthdate])), ''),
       childNationality: upperText(firstNonEmpty([payload.child_nationality]), ''),
-      birthdate: upperText(firstNonEmpty([payload.birthdate, payload.date_of_birth, payload.child_dob, residentProfile.birthdate]), ''),
+      birthdate: upperText(previewBornOnDate(applicantBirthdateRaw), ''),
       birthplace: upperText(firstNonEmpty([payload.birthplace, payload.place_of_birth, payload.child_birthplace]), ''),
       location: upperText(firstNonEmpty([payload.location, payload.complete_address, payload.address, payload.full_address, residentProfile.full_address]), ''),
       remarks: upperText(firstNonEmpty([payload.remarks, payload.remark, row.status_remarks, row.status_reason]), ''),
       fatherName: upperText(fatherName, ''),
       motherName: upperText(motherName, ''),
       cohabitantName: upperText(cohabitantName, ''),
+      age: upperText(applicantAgeRaw, ''),
+      cohabitantAge: upperText(cohabitantAgeRaw, ''),
+      cohabitantBirthdate: upperText(previewBornOnDate(cohabitantBirthdateRaw), ''),
       cohabitantRelationship: upperText(firstNonEmpty([payload.cohabitant_relationship]), ''),
       cohabitationDuration: upperText(cohabitationDuration, ''),
       cohabitationStartDate: upperText(firstNonEmpty([payload.cohabitation_start_date]), ''),
+      cohabitationChildrenCount: Number.parseInt(firstNonEmpty([payload.cohabitation_children_count, '0']), 10) || 0,
+      cohabitationChildrenList: upperText(firstNonEmpty([payload.children_list, childLines.join('; ')]), ''),
       educationalAttainment: upperText(firstNonEmpty([payload.educational_attainment]), ''),
       jobstartBeneficiary: upperText(firstNonEmpty([payload.jobstart_beneficiary]), ''),
       additionalDetails: additionalDetails.map((entry) => ({ ...entry, value: upperText(entry.value, '') })),
@@ -902,180 +972,196 @@
     }
     const docType = String(state.docType || 'Certificate').trim() || 'Certificate';
     const docKey = normalizePreviewDocKey(docType);
-    const isGoodMoralDoc = docKey === 'goodmoral';
+    const isIndigency = docKey === 'indigency';
+    const isGoodMoral = docKey === 'goodmoral';
+    const isResidency = docKey === 'residency';
+    const isCohabitation = docKey === 'cohabitation';
     const fullName = String(state.fullName || '-').trim() || '-';
     const fullAddress = String(state.fullAddress || '-').trim() || '-';
     const purpose = String(state.purpose || '-').trim() || '-';
-    const issuedDate = previewDateText(state.issuedDate || '');
-    const requestOfficer = String(state.requestOfficer || '').trim();
-    const requestFor = String(state.requestFor || '').trim();
-    const yearsResidency = String(state.yearsResidency || '').trim();
-    const monthsResidency = String(state.monthsResidency || '').trim();
-    const childBirthplace = String(state.childBirthplace || '').trim();
-    const childBirthdate = String(state.childBirthdate || '').trim();
-    const childNationality = String(state.childNationality || '').trim();
-    const birthdate = String(state.birthdate || childBirthdate || '').trim();
-    const birthplace = String(state.birthplace || childBirthplace || '').trim();
-    const location = String(state.location || fullAddress || '').trim();
+    const issuedDateWord = previewIndigencyIssuedText(state.issuedDate || '');
+    const birthdate = String(state.birthdate || '').trim();
+    const birthplace = String(state.birthplace || '').trim();
     const remarks = String(state.remarks || '').trim();
-    const fatherName = String(state.fatherName || '').trim();
-    const motherName = String(state.motherName || '').trim();
+    const requestFor = String(state.requestFor || '').trim();
+    const age = String(state.age || '').trim();
     const cohabitantName = String(state.cohabitantName || '').trim();
-    const cohabitantRelationship = String(state.cohabitantRelationship || '').trim();
+    const cohabitantAgeRawState = String(state.cohabitantAge || '').trim();
+    const cohabitantBirthdate = String(state.cohabitantBirthdate || '').trim();
+    const cohabitantAge = cohabitantAgeRawState || deriveAgeFromDate(cohabitantBirthdate);
     const cohabitationDuration = String(state.cohabitationDuration || '').trim();
     const cohabitationStartDate = String(state.cohabitationStartDate || '').trim();
-    const education = String(state.educationalAttainment || '').trim();
-    const jobStart = String(state.jobstartBeneficiary || '').trim();
-    const businessName = String(state.businessName || '').trim();
-    const additionalHtml = additionalDetailRows(state.additionalDetails);
+    const cohabitationChildrenCount = Math.max(0, Number.parseInt(String(state.cohabitationChildrenCount || '0'), 10) || 0);
+    const cohabitationChildrenList = String(state.cohabitationChildrenList || '').trim();
     const leftLogoUrl = `${appBase}/Images/San_Jose_LOGO.jpg`;
     const rightLogoUrl = `${appBase}/Images/Montalban_Logo.png`;
     const fallbackRightLogoUrl = `${appBase}/Images/San_Jose_LOGO.jpg`;
     const qrUrl = String(state.qrUrl || '').trim();
+    const requestOfficerLine1 = String(state.requestOfficerLine1 || '').trim();
+    const requestOfficerLine2 = String(state.requestOfficerLine2 || '').trim();
+    const requestOfficerLine3 = String(state.requestOfficerLine3 || '').trim();
+    const safe = (value, fallback = '-') => (String(value || '').trim() || fallback);
+    const cohabitationHasChildren = isCohabitation && cohabitationChildrenCount > 0;
+
+    const residencyRows = `
+      <div class="doc-to-block"><strong>Name</strong><strong>:</strong><strong>${esc(safe(fullName))}</strong></div>
+      <div class="doc-to-block"><strong>Address</strong><strong>:</strong><div><strong>${esc(safe(fullAddress))}</strong><br><strong>BARANGAY SAN JOSE, MONTALBAN, RIZAL</strong></div></div>
+      <div class="doc-to-block"><strong>Birthday</strong><strong>:</strong><strong>${esc(safe(birthdate, '${Birthdate}'))}</strong></div>
+      <div class="doc-to-block"><strong>Birthplace</strong><strong>:</strong><strong>${esc(safe(birthplace, '${Birthplace}'))}</strong></div>
+      <div class="doc-to-block"><strong>Remarks</strong><strong>:</strong><strong>${previewEditable('remarks', safe(remarks, '${REMARKS}'), '${REMARKS}')}</strong></div>
+      <div class="doc-to-block"><strong>Purpose</strong><strong>:</strong><strong>${esc(safe(purpose, '${PURPOSE}'))}</strong></div>
+    `;
 
     let contentHtml = '';
-    if (docKey === 'residency') {
-      const residencyText = [yearsResidency ? `${yearsResidency} year(s)` : '', monthsResidency ? `${monthsResidency} month(s)` : '']
-        .filter(Boolean).join(' and ') || 'a stated period';
-      contentHtml = `
-        <p>
-          This is to certify that <strong>${esc(fullName)}</strong> is a bona fide resident of
-          <strong>${esc(fullAddress)}</strong> and has been residing in this barangay for <strong>${esc(residencyText)}</strong>.
-        </p>
-        <p>
-          This certification is valid for legal and administrative use, subject to verification by concerned offices and institutions.
-        </p>
+    let titleHtml = '<div class="doc-preview-goodmoral-office"><div>TANGGAPAN NG PUNONG BARANGAY</div><div>BARANGAY CERTIFICATION</div></div>';
+    let issuedLine = `Issued this <strong>${esc(issuedDateWord)}</strong> at the office of the Punong Barangay, Barangay San Jose, Montalban, Rizal`;
+    let metaHtml = `
+      <div class="doc-preview-goodmoral-meta">
+        <p><strong>CTC No.:</strong> _____</p>
+        <p><strong>Issued at:</strong> _____</p>
+        <p><strong>Issued On:</strong> _____</p>
+        <p><strong>OR No.:</strong> ${esc(safe(state.orNumber, '_____'))}</p>
+      </div>
+    `;
+
+    if (isIndigency) {
+      const indigencyPurpose = safe(purpose || requestFor, 'PURPOSE');
+      const toBlock = `
+        <div class="doc-to-block">
+          <strong>TO</strong><strong>:</strong>
+          <div class="doc-to-lines">
+            <div><strong>${previewEditable('requestOfficerLine1', safe(requestOfficerLine1, '${REQUEST_OFFICER_LINE1}'), 'Official name')}</strong></div>
+            <div><strong>${previewEditable('requestOfficerLine2', safe(requestOfficerLine2, '${REQUEST_OFFICER_LINE2}'), 'Position')}</strong></div>
+            <div><strong>${previewEditable('requestOfficerLine3', safe(requestOfficerLine3, '${REQUEST_OFFICER_LINE3}'), 'Jurisdiction')}</strong></div>
+          </div>
+        </div>
       `;
-    } else if (docKey === 'indigency') {
-      const requestOfficerLine1 = String(state.requestOfficerLine1 || '').trim();
-      const requestOfficerLine2 = String(state.requestOfficerLine2 || '').trim();
-      const requestOfficerLine3 = String(state.requestOfficerLine3 || '').trim();
-      const requestLines = [
-        requestOfficerLine1,
-        requestOfficerLine2,
-        requestOfficerLine3
-      ].filter(Boolean);
-      const indigencyPurpose = purpose || requestFor || 'PURPOSE';
-      const toBlock = requestLines.length
-        ? `<div class="doc-to-block"><strong>TO</strong><strong>:</strong><div class="doc-to-lines"><strong>${previewEditable('requestOfficerLine1', requestOfficerLine1, 'Official name')}</strong><strong>${previewEditable('requestOfficerLine2', requestOfficerLine2, 'Position')}</strong><strong>${previewEditable('requestOfficerLine3', requestOfficerLine3, 'Jurisdiction')}</strong></div></div>`
-        : `<div class="doc-to-block"><strong>TO</strong><strong>:</strong><div class="doc-to-lines"><span class="line"></span><span class="line"></span><span class="line"></span></div></div>`;
+      titleHtml = '<div class="doc-preview-title doc-preview-title--indigency"><div class="office">TANGGAPAN NG PUNONG BARANGAY</div><div class="certificate">CERTIFICATE OF INDIGENCY</div></div>';
       contentHtml = `
         ${toBlock}
         <p>
-          This is to certify that <strong>${esc(fullName)}</strong>, resident of
-          <strong>${esc(fullAddress)}</strong> belongs to the one of the indigent families of this Barangay.
-          The Income of this family is barely enough to meet their day-to-day needs.
+          This is to certify that <strong>${esc(safe(fullName, '${FULL_NAME}'))}</strong>, resident of
+          <strong>${esc(safe(fullAddress, '${ADDRESS}'))}</strong><br>
+          <strong>BARANGAY SAN JOSE, RODRIGUEZ, RIZAL</strong>
+          belongs to the one of the indigent families of this Barangay. The Income of this family is barely enough to meet their day-to-day needs.
         </p>
         <p>
-          This certification is being issued upon the request of the above subject in person in connection
-          with his/her application for <strong>${previewEditable('purpose', indigencyPurpose, 'PURPOSE')}</strong> purposes only.
+          This certification is being issued upon the request of the above subject in person in connection with his/her application for
+          <strong>${previewEditable('purpose', indigencyPurpose, 'PURPOSE')}</strong> purposes only.
         </p>
       `;
-    } else if (docKey === 'goodmoral') {
+      metaHtml = '';
+      issuedLine = `Issued this <strong>${esc(issuedDateWord)}</strong>, at the office of the punong Barangay, Barangay San Jose, Rodriguez (Montalban), Rizal.`;
+    } else if (isGoodMoral) {
       contentHtml = `
-        <p><strong>TO WHOM IT MAY CONCERN::</strong></p>
+        <p><strong>TO WHOM IT MAY CONCERN:</strong></p>
         <p>
-          This is to certify <strong>${esc(fullName)}</strong>, resident of <strong>${esc(fullAddress)}</strong> is personally known to be as a person of
-          <strong>GOOD MORAL CHARACTER, PEACEFUL and LAW-ABIDING CITIZEN of THE COMMUNITY.</strong>
+          This is to certify <strong>${esc(safe(fullName, '${FULL_NAME}'))}</strong>, resident of
+          <strong>${esc(safe(fullAddress, '${ADDRESS}'))} BARANGAY SAN JOSE, RODRIGUEZ, RIZAL</strong>
+          is personally known to be as a person of <strong>GOOD MORAL CHARACTER, PEACEFUL and LAW-ABIDING CITIZEN of THE COMMUNITY.</strong>
         </p>
         <p>
           This further certifies that he/she is not a member, nor has joined a subversive society organization against the government.
         </p>
         <p>
           This certification is being issued upon the request of the above-named person to be used for his/her application for
-          <strong>${previewEditable('purpose', purpose, 'PURPOSE')}</strong> purposes only.
+          <strong>${previewEditable('purpose', safe(purpose, '${PURPOSE}'), 'PURPOSE')}</strong> purposes only.
         </p>
       `;
-    } else if (docKey === 'identity') {
+    } else if (isCohabitation && !cohabitationHasChildren) {
+      titleHtml = '<div class="doc-preview-goodmoral-office"><div>TANGGAPAN NG PUNONG BARANGAY</div><div>CERTIFICATE OF COHABITATION</div></div>';
       contentHtml = `
+        <p><strong>TO WHOM IT MAY CONCERN:</strong></p>
         <p>
-          This is to certify that <strong>${esc(fullName)}</strong> is personally known to this barangay and is a resident of
-          <strong>${esc(fullAddress)}</strong>.
+          This is to certify that <strong>${previewEditable('fullName', safe(fullName, '${NAME}'), 'Name')}</strong>,
+          <strong>${esc(safe(age, '${AGE}'))} y/o</strong> and <strong>${esc(safe(cohabitantName, '${PARTNER_NAME}'))}</strong>,
+          <strong>${esc(safe(cohabitantAge, '-'))} y/o</strong> are both residents of
+          <strong>${previewEditable('fullAddress', safe(fullAddress, '${ADDRESS}'), 'Address')}</strong><br>
+          <strong>BARANGAY SAN JOSE, RODRIGUEZ, RIZAL.</strong>
         </p>
         <p>
-          The following information is presented for identity reference: Birthdate <strong>${esc(childBirthdate || '-')}</strong>,
-          Place of Birth <strong>${esc(childBirthplace || '-')}</strong>, Nationality <strong>${esc(childNationality || '-')}</strong>,
-          Father <strong>${esc(fatherName || '-')}</strong>, Mother <strong>${esc(motherName || '-')}</strong>.
+          This further certifies that they are both living together since
+          <strong>${esc(safe(cohabitationDuration || cohabitationStartDate, '${COHABITATION_DURATION}'))}</strong>
+          up to present on the above stated address.
         </p>
         <p>
-          This certification is issued upon request for <strong>${previewEditable('purpose', purpose, 'State purpose')}</strong>.
-        </p>
-        <p>
-          This document may be used as reference for identity confirmation subject to the acceptance of the receiving office.
+          This certification is being issued upon the request of both parties for whatever legal purpose it may serve them.
         </p>
       `;
-    } else if (docKey === 'firsttimejobseeker') {
+      metaHtml = `
+        <div class="doc-preview-goodmoral-meta">
+          <p><strong>CTC No.:</strong> _____</p>
+          <p><strong>Issued at:</strong> _____</p>
+          <p><strong>Issued On:</strong> _____</p>
+          <p><strong>OR No.:</strong> ${esc(safe(state.orNumber, '_____'))}</p>
+        </div>
+      `;
+    } else if (isCohabitation && cohabitationHasChildren) {
+      titleHtml = '<div class="doc-preview-goodmoral-office"><div>TANGGAPAN NG PUNONG BARANGAY</div><div>CERTIFICATE OF COHABITATION</div></div>';
       contentHtml = `
+        <p><strong>TO WHOM IT MAY CONCERN:</strong></p>
         <p>
-          This is to certify that <strong>${esc(fullName)}</strong> is a bona fide resident of
-          <strong>${esc(fullAddress)}</strong> and is applying as a first time job seeker.
+          This is to certify that the person whose name and thumb mark appears here on has requested a Barangay Certification from this office and the information are listed below:
         </p>
+        <div class="doc-to-block"><strong>Name</strong><strong>:</strong><div><strong>${previewEditable('fullName', safe(fullName, '-'), 'Name')}</strong>, ${esc(safe(age, '-'))} y/o<br><strong>${esc(safe(cohabitantName, '-'))}</strong>, ${esc(safe(cohabitantAge, '-'))} y/o</div></div>
+        <div class="doc-to-block"><strong>Address</strong><strong>:</strong><div><strong>${previewEditable('fullAddress', safe(fullAddress, '-'), 'Address')}</strong><br><strong>BARANGAY SAN JOSE, MONTALBAN, RIZAL</strong></div></div>
+        <div class="doc-to-block"><strong>Remarks</strong><strong>:</strong><strong>${previewEditable('remarks', safe(remarks, '-'), 'Remarks')}</strong></div>
+        <div class="doc-to-block"><strong>Purpose</strong><strong>:</strong><strong>${previewEditable('purpose', safe(`COHABITATION SINCE ${cohabitationStartDate || cohabitationDuration}`, '-'), 'Purpose')}</strong></div>
+        <div class="doc-to-block"><strong>Name of Children</strong><strong>:</strong><strong>${esc(safe(cohabitationChildrenList, '-'))}</strong></div>
         <p>
-          Educational Attainment: <strong>${esc(education || '-')}</strong>.
-          Beneficiary of JobStart Program under RA 10869: <strong>${esc(jobStart || '-')}</strong>.
+          This clearance is being issued pursuant to Barangay Revenue Code ORDINANCE NO. 11 – 2019
         </p>
+      `;
+      metaHtml = `
+        <div class="doc-preview-goodmoral-meta">
+          <p><strong>CTC No.:</strong> _____</p>
+          <p><strong>Issued at:</strong> _____</p>
+          <p><strong>Issued On:</strong> _____</p>
+          <p><strong>Amount:</strong> ________</p>
+          <p><strong>OR No.:</strong> ${esc(safe(state.orNumber, '_____'))}</p>
+        </div>
+      `;
+    } else if (isResidency) {
+      titleHtml = '<div class="doc-preview-goodmoral-office"><div>TANGGAPAN NG PUNONG BARANGAY</div><div>BARANGAY CERTIFICATION</div></div>';
+      contentHtml = `
+        <p><strong>TO WHOM IT MAY CONCERN:</strong></p>
         <p>
-          This certificate is issued upon request for <strong>${previewEditable('purpose', purpose, 'State purpose')}</strong>.
+          This is to certify that the person whose name and thumb mark appears here on has requested a Barangay Clearance from this office and the information are listed below:
         </p>
+        ${residencyRows}
         <p>
-          Issued in accordance with applicable barangay procedures for first time job seeker documentary assistance.
+          This clearance is being issued pursuant to Barangay Revenue Code ORDINANCE NO. 11 – 2019
         </p>
+      `;
+      metaHtml = `
+        <div class="doc-preview-goodmoral-meta">
+          <p><strong>CTC No.:</strong> _____</p>
+          <p><strong>Issued at:</strong> _____</p>
+          <p><strong>Issued On:</strong> _____</p>
+          <p><strong>Amount:</strong> ________</p>
+          <p><strong>OR No.:</strong> ${esc(safe(state.orNumber, '_____'))}</p>
+        </div>
       `;
     } else {
-      const genericDetailRows = [
-        { label: 'Name', value: fullName },
-        { label: 'Address', value: fullAddress },
-        { label: 'Birthdate', value: birthdate || '-' },
-        { label: 'Birthplace', value: birthplace || '-' },
-        { label: 'Location', value: location || '-' },
-        { label: 'Remarks', value: remarks || '-' }
-      ].map((entry) => `
-        <div class="doc-to-block"><strong>${esc(entry.label)}</strong><strong>:</strong><strong>${esc(entry.value)}</strong></div>
-      `).join('');
       contentHtml = `
+        <p><strong>TO WHOM IT MAY CONCERN:</strong></p>
         <p>
-          This is to certify that <strong>${esc(fullName)}</strong> is a bona fide resident of
-          <strong>${esc(fullAddress)}</strong>.
+          This is to certify that the person whose name and thumb mark appears here on has requested a Barangay Clearance from this office and the information are listed below:
         </p>
-        ${genericDetailRows}
-        <p>
-          ${businessName !== '' ? `Business Name: <strong>${previewEditable('businessName', businessName, 'Business name')}</strong>.<br>` : ''}
-          This certification is issued upon request for <strong>${previewEditable('purpose', purpose, 'State purpose')}</strong>.
-        </p>
-        <p>
-          This document is issued for lawful purposes and may be subject to validation by receiving agencies.
-        </p>
-      `;
-    }
-    if (additionalHtml !== '' && !isGoodMoralDoc) {
-      contentHtml += additionalHtml;
-    }
-    if (businessName !== '' && docKey !== 'generic') {
-      contentHtml += `
-        <p>
-          Business Name: <strong>${previewEditable('businessName', businessName, 'Business name')}</strong>.
-        </p>
+        ${residencyRows}
       `;
     }
 
-    const isIndigency = docKey === 'indigency';
-    const isGoodMoral = docKey === 'goodmoral';
-    const isSpecial = isIndigency || isGoodMoral;
-    const titleText = isIndigency ? 'CERTIFICATE OF INDIGENCY' : (isGoodMoral ? '' : docType);
-    const issuedLine = isIndigency
-      ? `Issued this <strong>${esc(previewIndigencyIssuedText(state.issuedDate || ''))}</strong>, at the office of the punong Barangay, Barangay San Jose, Rodriguez (Montalban), Rizal.`
-      : (isGoodMoral
-        ? `Issued this <strong>${esc(previewIndigencyIssuedText(state.issuedDate || ''))}</strong> at the office of the Punong Barangay, Barangay San Jose, Montalban, Rizal`
-        : `Issued this <strong>${esc(issuedDate)}</strong> at Barangay San Jose, Rodriguez, Rizal.`);
     const paperClass = isIndigency
       ? 'doc-preview-paper doc-preview-paper--indigency'
-      : (isGoodMoral ? 'doc-preview-paper doc-preview-paper--goodmoral' : 'doc-preview-paper');
+      : (isGoodMoral || isResidency || isCohabitation ? 'doc-preview-paper doc-preview-paper--goodmoral' : 'doc-preview-paper');
+
     return `
       <div class="doc-preview-stage">
         <span class="doc-preview-label">Document Display</span>
         <div class="doc-preview-shell">
           <div class="${paperClass}">
-            ${(isIndigency || isGoodMoralDoc) ? '' : '<p class="doc-preview-hint">Highlighted fields are editable in this preview.</p>'}
+            <p class="doc-preview-hint">Highlighted fields are editable in this preview.</p>
             <div class="doc-preview-head">
               <img class="doc-preview-logo" src="${leftLogoUrl}" alt="Barangay San Jose Logo">
               <div class="doc-preview-head-center">
@@ -1083,29 +1169,17 @@
                 <p>LALAWIGAN NG RIZAL</p>
                 <p>BAYAN NG RODRIGUEZ</p>
                 <p class="barangay">BARANGAY SAN JOSE</p>
-                ${(!isIndigency && !isGoodMoral) ? '<p class="doc-head-office">TANGGAPAN NG PUNONG BARANGAY</p>' : ''}
                 <div class="doc-preview-head-line"></div>
               </div>
               <img class="doc-preview-logo" src="${rightLogoUrl}" alt="Montalban Logo" onerror="this.onerror=null;this.src='${fallbackRightLogoUrl}'">
             </div>
-            ${isGoodMoral ? '<div class="doc-preview-goodmoral-office"><div>TANGGAPAN NG PUNONG BARANGAY</div><div>BARANGAY CERTIFICATION</div></div>' : ''}
-            ${isIndigency
-              ? '<div class="doc-preview-title doc-preview-title--indigency"><div class="office">TANGGAPAN NG PUNONG BARANGAY</div><div class="certificate">CERTIFICATE OF INDIGENCY</div></div>'
-              : (isGoodMoral ? '' : `<div class="doc-preview-title">${esc(titleText)}</div>`)}
+            ${titleHtml}
             <div class="doc-preview-body">
-              ${(isIndigency || isGoodMoral) ? '' : '<p><strong>TO WHOM IT MAY CONCERN:</strong></p>'}
               ${contentHtml}
-              ${isGoodMoral ? `
-                <div class="doc-preview-goodmoral-meta">
-                  <p><strong>CTC No.:</strong> ________</p>
-                  <p><strong>Issued at:</strong> ________</p>
-                  <p><strong>Issued On:</strong> ________</p>
-                  <p><strong>OR No.:</strong> ________</p>
-                </div>
-              ` : ''}
-              <p>${issuedLine}</p>
+              <p class="doc-preview-issued-line">${issuedLine}</p>
+              ${metaHtml}
             </div>
-            ${isSpecial ? '<div class="doc-preview-issuedby">Issued by: <strong>MINERVA D. QUITA</strong><br><em>Barangay Secretary</em></div>' : ''}
+            <div class="doc-preview-issuedby">Issued by: <strong>MINERVA D. QUITA</strong><br><em>Barangay Secretary</em></div>
             <div class="doc-preview-signature">
               <div class="name">${esc(String(state.approvedByName || 'HON. GLENN S. EVANGELISTA').trim() || 'HON. GLENN S. EVANGELISTA')}</div>
               <div>Punong Barangay</div>
@@ -1114,9 +1188,9 @@
               <div class="doc-preview-qr-box">
                 ${qrUrl !== '' ? `<img src="${esc(qrUrl)}" alt="QR Code">` : '<span>QR</span>'}
               </div>
-              ${isSpecial ? 'QR' : 'QR PLACEMENT'}
+              QR
             </div>
-            ${isSpecial ? '<div class="doc-preview-footer">This certificate is valid for Forty-five (45) days from the date of issue, check the<br>QR code to verify the authenticity of this document.</div>' : ''}
+            <div class="doc-preview-footer">This certificate is valid for Forty-five (45) days from the date of issue, check the<br>QR code to verify the authenticity of this document.</div>
           </div>
         </div>
       </div>
@@ -1178,7 +1252,6 @@
 
     if (viewMode === 'preview') {
       const rid = String(currentViewRequestId || '').trim();
-      renderTemplatePreviewLoading();
       loadTemplatePreview(rid, { preserveExisting: true });
       const stageKey = String(currentViewStage || '').toLowerCase();
       const submittedFlow = stageKey === 'submitted';
@@ -2260,15 +2333,11 @@
             ? `PHP ${verifiedAmount.toFixed(2)}`
             : '-';
           const verifiedAtText = firstNonEmpty([row.finance_decision_at, row.payment_submitted_at, '-']);
-          const processedByText = firstNonEmpty([
+          const processedByText = firstNonEmptyName([
             row.finance_user_name,
             row.personnel_name,
             row.reviewed_by,
             row.released_by,
-            row.finance_user_id,
-            row.personnel_user_id,
-            row.user_id_official_reviewed_by,
-            row.user_id_official_released_by,
             '-'
           ]);
           const verifiedDetailsGrid = isVerifiedPayment
@@ -2580,20 +2649,18 @@
           { label: 'Submitted At', value: row.submitted_at || '-' },
           {
             label: 'Approved By',
-            value: firstNonEmpty([
+            value: firstNonEmptyName([
               row.reviewed_by,
               row.personnel_name,
-              row.user_id_official_reviewed_by,
-              row.personnel_user_id,
-              row.finance_user_id,
+              row.finance_user_name,
               '-'
             ])
           },
           {
             label: 'Released By',
-            value: firstNonEmpty([
-              row.user_id_official_released_by,
+            value: firstNonEmptyName([
               row.released_by,
+              row.personnel_name,
               '-'
             ])
           }

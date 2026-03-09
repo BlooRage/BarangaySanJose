@@ -641,6 +641,53 @@ function dra_humanize_document_type(string $docType): string {
     return trim($text);
 }
 
+function dra_parse_residency_duration_text(string $raw): ?array {
+    $text = trim($raw);
+    if ($text === '') {
+        return null;
+    }
+    $years = null;
+    $months = null;
+    if (preg_match('/(\d+)\s*year/i', $text, $m)) {
+        $years = max(0, (int)$m[1]);
+    }
+    if (preg_match('/(\d+)\s*month/i', $text, $m)) {
+        $months = max(0, (int)$m[1]);
+    }
+    if ($years === null && $months === null) {
+        return null;
+    }
+    return ['years' => $years ?? 0, 'months' => $months ?? 0];
+}
+
+function dra_parse_residency_start_ym(string $raw): ?array {
+    $value = trim($raw);
+    if ($value === '') {
+        return null;
+    }
+    $start = DateTime::createFromFormat('Y-m', $value);
+    if (!($start instanceof DateTime)) {
+        return null;
+    }
+    $start->setDate((int)$start->format('Y'), (int)$start->format('m'), 1);
+    $currentMonth = new DateTime('first day of this month');
+    if ($start > $currentMonth) {
+        return null;
+    }
+    $diff = $start->diff($currentMonth);
+    return ['years' => max(0, (int)$diff->y), 'months' => max(0, (int)$diff->m)];
+}
+
+function dra_duration_total_months(array $duration): int {
+    $years = max(0, (int)($duration['years'] ?? 0));
+    $months = max(0, (int)($duration['months'] ?? 0));
+    return ($years * 12) + $months;
+}
+
+function dra_pick_longer_residency_duration(array $a, array $b): array {
+    return dra_duration_total_months($a) >= dra_duration_total_months($b) ? $a : $b;
+}
+
 function dra_request_notice(array $requestRow, string $requestId, string $suffix): string {
     $docType = dra_humanize_document_type((string)($requestRow['document_type'] ?? ''));
     $rid = trim($requestId) !== '' ? trim($requestId) : trim((string)($requestRow['request_id'] ?? ''));
@@ -869,6 +916,16 @@ function dra_generate_issued_document(array $requestRow): ?string {
     $preferDocxOutput = !empty($requestRow['_prefer_docx_output']);
     $docType = trim((string)($requestRow['document_type'] ?? 'Certificate'));
     $purpose = trim((string)($requestRow['purpose'] ?? ''));
+    $stripTemplateTokens = static function (string $value): string {
+        $value = trim($value);
+        if ($value === '') {
+            return '';
+        }
+        $value = (string)(preg_replace('/\$\{[A-Z0-9_]+\}/', ' ', $value) ?? $value);
+        $value = (string)(preg_replace('/\s+/u', ' ', $value) ?? $value);
+        return trim($value);
+    };
+    $purpose = $stripTemplateTokens($purpose);
     $issuedAt = date('F j, Y');
     $payload = dra_decode_request_payload($requestRow);
 
@@ -879,13 +936,21 @@ function dra_generate_issued_document(array $requestRow): ?string {
     if ($fullName === '') {
         $fullName = trim((string)($requestRow['resident_id'] ?? 'Resident'));
     }
+    $fullName = $stripTemplateTokens($fullName);
     $address = trim((string)($payload['full_address'] ?? 'Barangay San Jose, Rodriguez, Rizal'));
     $address = dra_strip_area_from_address($address);
     if ($address === '') {
         $address = 'Barangay San Jose, Rodriguez, Rizal';
     }
+    $address = $stripTemplateTokens($address);
     $certNo = trim((string)($requestRow['certificate_number'] ?? ''));
     $orNo = trim((string)($requestRow['or_number'] ?? ''));
+    if ($orNo !== '') {
+        $orNo = trim((string)(preg_replace('/\$\{[A-Z0-9_]+\}/', '', $orNo) ?? $orNo));
+        if (preg_match('/^\s*OR_NUMBER\s*$/i', $orNo)) {
+            $orNo = '';
+        }
+    }
 
     $verificationCode = trim((string)($requestRow['verification_code'] ?? ''));
     $currentStage = strtolower(trim((string)($requestRow['stage'] ?? '')));
@@ -942,7 +1007,8 @@ function dra_generate_issued_document(array $requestRow): ?string {
     $isResidency = strpos($docTypeNorm, 'residency') !== false;
     $isCohabitation = strpos($docTypeNorm, 'cohabitation') !== false;
 
-    $isTemplateBasedCertificate = $isIndigency || $isGoodMoral || $isResidency || $isCohabitation;
+    // DOCX template workflow removed: force all issuance through pure-PHP renderer below.
+    $isTemplateBasedCertificate = false;
 
     // Indigency/Good Moral/Residency: generate from .docx template only.
     if ($isTemplateBasedCertificate) {
@@ -1215,7 +1281,7 @@ function dra_generate_issued_document(array $requestRow): ?string {
             $issuedAsDocx = $day . $suffix . ' day of ' . $monthUpper . ' ' . $yearNum;
 
             $cacheSignature = sha1(dr_safe_json([
-                'cache_version' => 25,
+                'cache_version' => 30,
                 'preview' => $previewMode ? 1 : 0,
                 'request_id' => $requestId,
                 'document_type' => $docType,
@@ -1311,25 +1377,7 @@ function dra_generate_issued_document(array $requestRow): ?string {
                 return '/UnifiedFileAttachment/IssuedDocuments/Generated/' . basename($docxDiskPath);
             }
 
-            $pdfDiskPath = dra_convert_docx_to_pdf($docxDiskPath, $outDir);
-            if ($pdfDiskPath !== null) {
-                $finalizeOptions = [];
-                if ($isCohabitation) {
-                    $finalizeOptions['stamp_letterhead'] = true;
-                    $finalizeOptions['letterhead_type'] = 'cohabitation';
-                }
-                dra_finalize_template_pdf(
-                    $pdfDiskPath,
-                    ($allowQr && is_file($qrDiskPath)) ? $qrDiskPath : null,
-                    $finalizeOptions
-                );
-                @unlink($docxDiskPath);
-                return '/UnifiedFileAttachment/IssuedDocuments/Generated/' . basename($pdfDiskPath);
-            }
-
-            // Shared hosting often blocks shell converters (soffice/libreoffice).
-            // Keep the generated DOCX as a functional fallback instead of failing issuance.
-            error_log('[dra_generate_issued_document][docx_template] PDF conversion unavailable; falling back to DOCX output');
+            // DOCX-only workflow: keep output in DOCX format and do not run any server-side converter.
             return '/UnifiedFileAttachment/IssuedDocuments/Generated/' . basename($docxDiskPath);
         } catch (Throwable $e) {
             error_log('[dra_generate_issued_document][docx_template] ' . $e->getMessage());
@@ -1355,13 +1403,16 @@ function dra_generate_issued_document(array $requestRow): ?string {
         return null;
     }
 
-    $fileName = 'issued_' . preg_replace('/[^A-Za-z0-9_-]/', '', $requestId) . '_' . date('YmdHis') . '.pdf';
+    $renderRevisionTag = 'r20260310a';
+    $fileName = 'issued_' . preg_replace('/[^A-Za-z0-9_-]/', '', $requestId) . '_' . $renderRevisionTag . '_' . date('YmdHis') . '.pdf';
     $diskPath = $outDir . '/' . $fileName;
 
     // Use short bond paper (8.5x11) instead of A4.
     $pdf = new FPDF('P', 'mm', 'Letter');
     $pdf->SetMargins(18, 16, 18);
     $pdf->AddPage();
+    // Keep generated output to a single page.
+    $pdf->SetAutoPageBreak(false);
 
     $leftLogo = $baseDir . '/Images/San_Jose_LOGO.jpg';
     if (is_file($leftLogo)) {
@@ -1371,7 +1422,7 @@ function dra_generate_issued_document(array $requestRow): ?string {
     if (is_file($rightLogo)) {
         $pdf->Image($rightLogo, 168, 14, 26, 26);
     }
-    $isSpecialCertificate = $isIndigency || $isGoodMoral || $isResidency;
+    $isSpecialCertificate = $isIndigency || $isGoodMoral || $isResidency || $isCohabitation;
     $fontFace = 'Times';
     $indigencyFont = 'Arial';
 
@@ -1398,6 +1449,12 @@ function dra_generate_issued_document(array $requestRow): ?string {
             $pdf->Cell(0, 8, 'TANGGAPAN NG PUNONG BARANGAY', 0, 1, 'C');
             $pdf->SetFont($indigencyFont, 'B', 12);
             $pdf->Cell(0, 7, 'CERTIFICATE OF RESIDENCY', 0, 1, 'C');
+            $pdf->Ln(6);
+        } elseif ($isCohabitation) {
+            $pdf->SetFont($indigencyFont, 'B', 17);
+            $pdf->Cell(0, 8, 'TANGGAPAN NG PUNONG BARANGAY', 0, 1, 'C');
+            $pdf->SetFont($indigencyFont, 'B', 12);
+            $pdf->Cell(0, 7, 'CERTIFICATE OF COHABITATION', 0, 1, 'C');
             $pdf->Ln(6);
         } else {
             $pdf->SetFont($indigencyFont, 'B', 17);
@@ -1529,32 +1586,159 @@ function dra_generate_issued_document(array $requestRow): ?string {
     };
     if ($isSpecialCertificate) {
         if (is_file($qrDiskPath)) {
-            // Place QR beside the bottom disclaimer, in the right-side free space.
-            $pdf->Image($qrDiskPath, 166, 254, 20, 20);
+            // Place QR tighter to the bottom-right corner.
+            $pdf->Image($qrDiskPath, 188, 257, 18, 18);
         }
-        $requestOfficer = trim((string)($payload['request_officer'] ?? ''));
-        $requestPurpose = trim((string)($payload['request_purpose'] ?? $purpose));
+        $normalizeTemplateValue = static function (string $value): string {
+            $value = trim($value);
+            if ($value === '') {
+                return '';
+            }
+            $value = (string)(preg_replace('/\$\{[A-Z0-9_]+\}/', '', $value) ?? $value);
+            $collapsed = preg_replace('/\s+/u', ' ', $value);
+            return trim((string)$collapsed);
+        };
+        $formatDisplayMonthYear = static function (string $value): string {
+            $raw = trim($value);
+            if ($raw === '') {
+                return '';
+            }
+            if (preg_match('/^\d{4}-\d{2}$/', $raw)) {
+                try {
+                    return (new DateTime($raw . '-01'))->format('F Y');
+                } catch (Throwable $ignored) {
+                    return $raw;
+                }
+            }
+            return $raw;
+        };
+        $formatDisplayDate = static function (string $value): string {
+            $raw = trim($value);
+            if ($raw === '') {
+                return '';
+            }
+            try {
+                return (new DateTime($raw))->format('F d, Y');
+            } catch (Throwable $ignored) {
+                return $raw;
+            }
+        };
+        $requestOfficer = $normalizeTemplateValue((string)($payload['request_officer'] ?? ''));
+        $requestOfficerLine1 = $normalizeTemplateValue((string)($payload['request_officer_line1'] ?? ''));
+        $requestOfficerLine2 = $normalizeTemplateValue((string)($payload['request_officer_line2'] ?? ''));
+        $requestOfficerLine3 = $normalizeTemplateValue((string)($payload['request_officer_line3'] ?? ''));
+        $requestPurpose = $normalizeTemplateValue((string)($payload['request_purpose'] ?? $purpose));
         if ($requestPurpose === '') {
             $requestPurpose = 'PURPOSE';
         }
-        $submissionTargetType = trim((string)($payload['submission_target_type'] ?? ''));
-        $institutionName = trim((string)($payload['institution_name'] ?? ''));
-        $institutionPerson = trim((string)($payload['institution_person'] ?? ''));
-        $institutionPosition = trim((string)($payload['institution_position'] ?? ''));
-        $governmentOffice = trim((string)($payload['government_office'] ?? ''));
+        $birthdateValue = $normalizeTemplateValue((string)($payload['birthdate'] ?? $payload['date_of_birth'] ?? $payload['child_dob'] ?? ''));
+        $birthplaceValue = $normalizeTemplateValue((string)($payload['birthplace'] ?? $payload['place_of_birth'] ?? ''));
+        $remarksValue = $normalizeTemplateValue((string)($payload['remarks'] ?? ''));
+        $cohabitationChildrenCount = max(0, (int)trim((string)($payload['cohabitation_children_count'] ?? '0')));
+        $cohabitationHasChildren = $cohabitationChildrenCount > 0;
+        $cohabitantBirthdateValue = $normalizeTemplateValue((string)($payload['cohabitant_birthdate'] ?? $payload['cohabitant_dob'] ?? ''));
+        $cohabitantName = $normalizeTemplateValue((string)($payload['cohabitant_full_name'] ?? ''));
+        if ($cohabitantName === '') {
+            $cohabitantFirst = $normalizeTemplateValue((string)($payload['cohabitant_first'] ?? ''));
+            $cohabitantMiddle = $normalizeTemplateValue((string)($payload['cohabitant_middle'] ?? ''));
+            $cohabitantLast = $normalizeTemplateValue((string)($payload['cohabitant_last'] ?? ''));
+            $cohabitantSuffix = $normalizeTemplateValue((string)($payload['cohabitant_suffix'] ?? ''));
+            $cohabitantMi = $cohabitantMiddle !== '' ? strtoupper(substr($cohabitantMiddle, 0, 1)) . '.' : '';
+            $cohabitantName = trim(implode(' ', array_filter([$cohabitantFirst, $cohabitantMi, $cohabitantLast, $cohabitantSuffix], static fn($v) => trim((string)$v) !== '')));
+        }
+        $cohabitationDurationValue = $normalizeTemplateValue((string)($payload['cohabitation_duration'] ?? ''));
+        if ($cohabitationDurationValue === '') {
+            $cohabitationDurationValue = $formatDisplayMonthYear((string)($payload['cohabitation_start_date'] ?? ''));
+        }
+        $cohabitationSinceValue = $formatDisplayMonthYear((string)($payload['cohabitation_start_date'] ?? ''));
+        if ($cohabitationSinceValue === '') {
+            $cohabitationSinceValue = $cohabitationDurationValue;
+        }
+        $birthdateDisplayValue = $formatDisplayDate($birthdateValue);
+        $cohabitantBirthdateDisplayValue = $formatDisplayDate($cohabitantBirthdateValue);
+        $cohabitationDurationFromMonths = static function (int $monthsTotal): string {
+            if ($monthsTotal < 0) {
+                $monthsTotal = 0;
+            }
+            $years = intdiv($monthsTotal, 12);
+            $months = $monthsTotal % 12;
+            $parts = [];
+            if ($years > 0) {
+                $parts[] = $years . ' ' . ($years === 1 ? 'year' : 'years');
+            }
+            if ($months > 0 || empty($parts)) {
+                $parts[] = $months . ' ' . ($months === 1 ? 'month' : 'months');
+            }
+            return implode(' and ', $parts);
+        };
+        $cohabitationSinceDisplayValue = $cohabitationSinceValue;
+        $cohabitationDurationMonths = max(0, (int)trim((string)($payload['cohabitation_duration_value'] ?? '0')));
+        if ($cohabitationDurationMonths <= 0) {
+            $durText = strtolower($cohabitationDurationValue);
+            $durYears = 0;
+            $durMonths = 0;
+            if (preg_match('/(\d+)\s*year/', $durText, $m)) {
+                $durYears = max(0, (int)$m[1]);
+            }
+            if (preg_match('/(\d+)\s*month/', $durText, $m)) {
+                $durMonths = max(0, (int)$m[1]);
+            }
+            $cohabitationDurationMonths = ($durYears * 12) + $durMonths;
+        }
+        $cohabitationDurationPretty = $cohabitationDurationFromMonths($cohabitationDurationMonths);
+        if ($cohabitationSinceValue !== '') {
+            $cohabitationSinceDisplayValue = $cohabitationSinceValue . ' (' . $cohabitationDurationPretty . ')';
+        } elseif ($cohabitationDurationValue !== '') {
+            $cohabitationSinceDisplayValue = $cohabitationDurationValue;
+        }
+        $deriveAge = static function (string $rawDate): string {
+            $rawDate = trim($rawDate);
+            if ($rawDate === '') {
+                return '';
+            }
+            try {
+                $dob = new DateTime($rawDate);
+                return (string)((new DateTime())->diff($dob)->y);
+            } catch (Throwable $ignored) {
+                return '';
+            }
+        };
+        $extractAgeValue = static function (string $raw) use ($normalizeTemplateValue): string {
+            $clean = $normalizeTemplateValue($raw);
+            if ($clean === '') {
+                return '';
+            }
+            if (preg_match('/(\d{1,3})/', $clean, $match)) {
+                return (string)max(0, (int)$match[1]);
+            }
+            return '';
+        };
+        $ageValue = $extractAgeValue((string)($payload['age'] ?? ''));
+        if ($ageValue === '') {
+            $ageValue = $deriveAge($birthdateValue);
+        }
+        $cohabitantAgeValue = $extractAgeValue((string)($payload['cohabitant_age'] ?? $payload['partner_age'] ?? ''));
+        if ($cohabitantAgeValue === '') {
+            $cohabitantAgeValue = $deriveAge($cohabitantBirthdateValue);
+        }
+        $submissionTargetType = $normalizeTemplateValue((string)($payload['submission_target_type'] ?? ''));
+        $institutionName = $normalizeTemplateValue((string)($payload['institution_name'] ?? ''));
+        $institutionPerson = $normalizeTemplateValue((string)($payload['institution_person'] ?? ''));
+        $institutionPosition = $normalizeTemplateValue((string)($payload['institution_position'] ?? ''));
+        $governmentOffice = $normalizeTemplateValue((string)($payload['government_office'] ?? ''));
         if ($governmentOffice === '') {
-            $governmentOffice = trim((string)($payload['government_position_group'] ?? ''));
+            $governmentOffice = $normalizeTemplateValue((string)($payload['government_position_group'] ?? ''));
         }
         if ($governmentOffice === '__other__') {
-            $governmentOffice = trim((string)($payload['government_position_other'] ?? ''));
+            $governmentOffice = $normalizeTemplateValue((string)($payload['government_position_other'] ?? ''));
         }
-        $governmentPosition = trim((string)($payload['government_position'] ?? ''));
+        $governmentPosition = $normalizeTemplateValue((string)($payload['government_position'] ?? ''));
         if ($governmentPosition === '') {
-            $governmentPosition = trim((string)($payload['government_position_detail'] ?? ''));
+            $governmentPosition = $normalizeTemplateValue((string)($payload['government_position_detail'] ?? ''));
         }
-        $governmentOfficial = trim((string)($payload['government_official'] ?? ''));
+        $governmentOfficial = $normalizeTemplateValue((string)($payload['government_official'] ?? ''));
         if ($governmentOfficial === '') {
-            $governmentOfficial = trim((string)($payload['government_official_other'] ?? ''));
+            $governmentOfficial = $normalizeTemplateValue((string)($payload['government_official_other'] ?? ''));
         }
         if ($submissionTargetType === 'institution') {
             $institutionParts = [$institutionName];
@@ -1563,14 +1747,55 @@ function dra_generate_issued_document(array $requestRow): ?string {
                 $institutionParts[] = implode(', ', $attentionParts);
             }
             $requestOfficer = implode(' - ', array_filter($institutionParts, static fn($value) => trim((string)$value) !== ''));
+            if ($requestOfficerLine1 === '') {
+                $requestOfficerLine1 = trim((string)$institutionName);
+            }
+            if ($requestOfficerLine2 === '' && !empty($attentionParts)) {
+                $requestOfficerLine2 = trim((string)implode(', ', $attentionParts));
+            }
         } elseif ($submissionTargetType === 'government_official') {
             if ($governmentOfficial === '' && $requestOfficer !== '') {
                 $governmentOfficial = $requestOfficer;
             }
             $requestOfficer = implode(' - ', array_filter([$governmentOfficial, $governmentPosition, $governmentOffice], static fn($value) => trim((string)$value) !== ''));
+            if ($requestOfficerLine1 === '') {
+                $requestOfficerLine1 = trim((string)$governmentOfficial);
+            }
+            if ($requestOfficerLine2 === '') {
+                $requestOfficerLine2 = trim((string)$governmentPosition);
+            }
+            if ($requestOfficerLine3 === '') {
+                $requestOfficerLine3 = trim((string)$governmentOffice);
+            }
         }
         $yearsResidency = trim((string)($payload['years_of_residency'] ?? ''));
         $monthsResidency = trim((string)($payload['months_of_residency'] ?? ''));
+        if ($isResidency) {
+            $requestResidentId = trim((string)($requestRow['resident_id'] ?? ''));
+            $profile = dra_resident_profile_snapshot($conn, $requestResidentId, $requestResidentId);
+            $fromStartYm = dra_parse_residency_start_ym((string)($profile['barangay_residency'] ?? ''));
+            $fromText = dra_parse_residency_duration_text((string)($profile['residency_duration'] ?? ''));
+
+            $profileDuration = null;
+            if (is_array($fromStartYm) && is_array($fromText)) {
+                $profileDuration = dra_pick_longer_residency_duration($fromStartYm, $fromText);
+            } elseif (is_array($fromStartYm)) {
+                $profileDuration = $fromStartYm;
+            } elseif (is_array($fromText)) {
+                $profileDuration = $fromText;
+            }
+
+            if (is_array($profileDuration)) {
+                $payloadDuration = [
+                    'years' => (int)($yearsResidency !== '' ? $yearsResidency : 0),
+                    'months' => (int)($monthsResidency !== '' ? $monthsResidency : 0),
+                ];
+                $bestDuration = dra_pick_longer_residency_duration($payloadDuration, $profileDuration);
+                $totalMonths = dra_duration_total_months($bestDuration);
+                $yearsResidency = (string)max(0, intdiv($totalMonths, 12));
+                $monthsResidency = (string)max(0, $totalMonths % 12);
+            }
+        }
         $residencyParts = [];
         if ($yearsResidency !== '') {
             $residencyParts[] = $yearsResidency . ' year(s)';
@@ -1592,28 +1817,36 @@ function dra_generate_issued_document(array $requestRow): ?string {
             $pdf->SetXY(22, 78);
             $pdf->Cell(14, 7, 'TO', 0, 0, 'L');
             $pdf->Cell(4, 7, ':', 0, 0, 'C');
-            if ($requestOfficer === '') {
+            $line1 = trim((string)$requestOfficerLine1);
+            $line2 = trim((string)$requestOfficerLine2);
+            $line3 = trim((string)$requestOfficerLine3);
+            if ($line1 === '' && $requestOfficer !== '') {
+                $parts = array_values(array_filter(array_map('trim', preg_split('/\s*-\s*/', $requestOfficer) ?: []), static fn($v) => $v !== ''));
+                $line1 = (string)($parts[0] ?? '');
+                $line2 = (string)($parts[1] ?? '');
+                $line3 = (string)($parts[2] ?? '');
+            }
+            if ($line1 === '' && $line2 === '' && $line3 === '') {
                 $pdf->Line(39, 84, 106, 84);
                 $pdf->Line(39, 90, 106, 90);
                 $pdf->Line(39, 96, 106, 96);
                 $pdf->SetY(96);
             } else {
-                $offLines = preg_split("/\r\n|\n|\r/", $requestOfficer);
-                $firstLine = trim((string)($offLines[0] ?? ''));
                 $pdf->SetFont($indigencyFont, 'B', 11);
-                $pdf->Cell(0, 7, strtoupper($firstLine), 0, 1, 'L');
-                $pdf->SetX(39);
-                for ($i = 1; $i < count($offLines); $i++) {
-                    $line = trim((string)$offLines[$i]);
-                    if ($line === '') continue;
-                    $pdf->Cell(0, 7, strtoupper($line), 0, 1, 'L');
+                $offLines = [$line1, $line2, $line3];
+                foreach ($offLines as $line) {
                     $pdf->SetX(39);
+                    if ($line === '') {
+                        $pdf->Cell(0, 7, '', 0, 1, 'L');
+                    } else {
+                        $pdf->Cell(0, 7, strtoupper($line), 0, 1, 'L');
+                    }
                 }
             }
         } else {
             $pdf->SetFont($indigencyFont, 'B', 12);
             $pdf->SetX(18);
-            $pdf->Cell(0, 7, 'TO WHOM IT MAY CONCERN::', 0, 1, 'L');
+            $pdf->Cell(0, 7, 'TO WHOM IT MAY CONCERN:', 0, 1, 'L');
         }
         $pdf->Ln(7);
         $pdf->SetFont($indigencyFont, '', 12);
@@ -1622,7 +1855,18 @@ function dra_generate_issued_document(array $requestRow): ?string {
                 [
                     ['text' => 'This is to certify that ', 'bold' => false],
                     ['text' => $fullName, 'bold' => true],
-                    ['text' => ', resident of ' . $address . ' belongs to the one of the indigent families of this Barangay. The Income of this family is barely enough to meet their day-to-day needs.', 'bold' => false],
+                    ['text' => ', resident of ' . $address, 'bold' => false],
+                ],
+                7,
+                18,
+                10,
+                $indigencyFont,
+                12
+            );
+            $writeRichParagraph(
+                [
+                    ['text' => 'Barangay San Jose, Rodriguez, Rizal', 'bold' => true],
+                    ['text' => ' belongs to the one of the indigent families of this Barangay. The Income of this family is barely enough to meet their day-to-day needs.', 'bold' => false],
                 ],
                 7,
                 18,
@@ -1631,15 +1875,63 @@ function dra_generate_issued_document(array $requestRow): ?string {
                 12
             );
         } elseif ($isResidency) {
+            $writeIndentedParagraph(
+                'This is to certify that the person whose name and thumb mark appears here on has requested a Barangay Clearance from this office and the information are listed below:',
+                7,
+                18,
+                10,
+                $indigencyFont,
+                12
+            );
+            $pdf->Ln(3);
+
+            $leftX = 34.0;
+            $colonX = 76.0;
+            $valueX = 79.0;
+            $lineH = 6.2;
+
+            $row = static function (string $label, string $value, bool $valueBold = true) use ($pdf, $indigencyFont, $leftX, $colonX, $valueX, $lineH): void {
+                $rawLines = preg_split('/\R/u', (string)$value) ?: [];
+                $normalizedLines = [];
+                foreach ($rawLines as $line) {
+                    $normalizedLines[] = trim((string)(preg_replace('/\s+/u', ' ', (string)$line) ?? (string)$line));
+                }
+                $value = trim(implode("\n", array_filter($normalizedLines, static fn($line) => $line !== '')));
+                if ($value === '') {
+                    $value = '-';
+                }
+                $pageRight = 198.0;
+                $valueWidth = max(40.0, $pageRight - $valueX);
+                $startY = $pdf->GetY();
+                $pdf->SetFont($indigencyFont, 'B', 12);
+                $pdf->SetXY($leftX, $startY);
+                $pdf->Cell($colonX - $leftX - 1.0, $lineH, $label, 0, 0, 'L');
+                $pdf->SetXY($colonX, $startY);
+                $pdf->Cell(3.0, $lineH, ':', 0, 0, 'L');
+                $pdf->SetFont($indigencyFont, $valueBold ? 'B' : '', 12);
+                $pdf->SetXY($valueX, $startY);
+                $pdf->MultiCell($valueWidth, $lineH, $value, 0, 'L');
+                $endY = max($pdf->GetY(), $startY + $lineH);
+                $pdf->SetY($endY);
+            };
+
+            $row('Name', $fullName !== '' ? $fullName : '-');
+            $row('Address', $address !== '' ? $address : '-');
+            $row('', 'BARANGAY SAN JOSE, MONTALBAN, RIZAL');
+            $row('Birthday', $birthdateValue !== '' ? $birthdateValue : '-');
+            $row('Birthplace', $birthplaceValue !== '' ? $birthplaceValue : '-');
+            $row('Remarks', $remarksValue !== '' ? $remarksValue : '-', true);
+            $row('Purpose', $requestPurpose !== '' ? $requestPurpose : '-', true);
+            $pdf->Ln(4);
+        } elseif ($isCohabitation && !$cohabitationHasChildren) {
             $writeRichParagraph(
                 [
                     ['text' => 'This is to certify that ', 'bold' => false],
-                    ['text' => $fullName, 'bold' => true],
-                    ['text' => ' is a bona fide resident of ', 'bold' => false],
-                    ['text' => $address, 'bold' => true],
-                    ['text' => ' and has been residing in this barangay for ', 'bold' => false],
-                    ['text' => $residencyDurationText, 'bold' => true],
-                    ['text' => '.', 'bold' => false],
+                    ['text' => $fullName !== '' ? $fullName : '-', 'bold' => true],
+                    ['text' => ', ' . ($ageValue !== '' ? $ageValue : '-') . ' y/o and ', 'bold' => false],
+                    ['text' => $cohabitantName !== '' ? $cohabitantName : '-', 'bold' => true],
+                    ['text' => ', ' . ($cohabitantAgeValue !== '' ? $cohabitantAgeValue : '-') . ' y/o are both residents of ', 'bold' => false],
+                    ['text' => ($address !== '' ? $address : '-') . ', BARANGAY SAN JOSE, RODRIGUEZ, RIZAL.', 'bold' => true],
                 ],
                 7,
                 18,
@@ -1647,13 +1939,88 @@ function dra_generate_issued_document(array $requestRow): ?string {
                 $indigencyFont,
                 12
             );
+            $writeRichParagraph(
+                [
+                    ['text' => 'This further certifies that they are both living together since ', 'bold' => false],
+                    ['text' => $cohabitationSinceDisplayValue !== '' ? $cohabitationSinceDisplayValue : '-', 'bold' => true],
+                    ['text' => ' up to present on the above stated address.', 'bold' => false],
+                ],
+                7,
+                18,
+                10,
+                $indigencyFont,
+                12
+            );
+        } elseif ($isCohabitation && $cohabitationHasChildren) {
+            $writeIndentedParagraph(
+                'This is to certify that the person whose name and thumb mark appears here on has requested a Barangay Certification from this office and the information are listed below:',
+                7,
+                18,
+                10,
+                $indigencyFont,
+                12
+            );
+            $pdf->Ln(3);
+
+            $leftX = 34.0;
+            $colonX = 76.0;
+            $valueX = 79.0;
+            $lineH = 6.2;
+
+            $row = static function (string $label, string $value, bool $valueBold = true) use ($pdf, $indigencyFont, $leftX, $colonX, $valueX, $lineH): void {
+                $value = trim((string)(preg_replace('/\s+/u', ' ', $value) ?? $value));
+                if ($value === '') {
+                    $value = '-';
+                }
+                $pageRight = 198.0;
+                $valueWidth = max(40.0, $pageRight - $valueX);
+                $startY = $pdf->GetY();
+                $pdf->SetFont($indigencyFont, 'B', 12);
+                $pdf->SetXY($leftX, $startY);
+                $pdf->Cell($colonX - $leftX - 1.0, $lineH, $label, 0, 0, 'L');
+                $pdf->SetXY($colonX, $startY);
+                $pdf->Cell(3.0, $lineH, ':', 0, 0, 'L');
+                $pdf->SetFont($indigencyFont, $valueBold ? 'B' : '', 12);
+                $pdf->SetXY($valueX, $startY);
+                $pdf->MultiCell($valueWidth, $lineH, $value, 0, 'L');
+                $endY = max($pdf->GetY(), $startY + $lineH);
+                $pdf->SetY($endY);
+            };
+
+            $children = [];
+            for ($i = 1; $i <= 5; $i += 1) {
+                $childName = trim((string)($payload['cohabitation_child_' . $i . '_name'] ?? ''));
+                $childAge = trim((string)($payload['cohabitation_child_' . $i . '_age'] ?? ''));
+                if ($childName === '' && $childAge === '') {
+                    continue;
+                }
+                $childName = trim((string)(preg_replace('/\s+/u', ' ', $childName) ?? $childName));
+                $children[] = trim($childName . ($childAge !== '' ? ', ' . $childAge . ' y/o' : ''));
+            }
+
+            $nameValue = ($fullName !== '' ? $fullName : '-')
+                . ', ' . ($ageValue !== '' ? $ageValue : '-') . ' y/o'
+                . "\n"
+                . ($cohabitantName !== '' ? $cohabitantName : '-')
+                . ', ' . ($cohabitantAgeValue !== '' ? $cohabitantAgeValue : '-') . ' y/o';
+            $row('Name', $nameValue, true);
+            $row('Address', ($address !== '' ? $address : '-'), true);
+            $row('', 'BARANGAY SAN JOSE, MONTALBAN, RIZAL', true);
+            $row('Remarks', $remarksValue !== '' ? $remarksValue : '-', true);
+            $purposeLine = $requestPurpose !== '' && strtoupper($requestPurpose) !== 'PURPOSE'
+                ? $requestPurpose
+                : 'COHABITATION SINCE ' . ($cohabitationSinceValue !== '' ? $cohabitationSinceValue : '-');
+            $row('Purpose', $purposeLine, true);
+            $row('Name of Children', !empty($children) ? implode('; ', $children) : '-', true);
+            $pdf->Ln(4);
         } else {
             $writeRichParagraph(
                 [
                     ['text' => 'This is to certify that ', 'bold' => false],
                     ['text' => $fullName, 'bold' => true],
                     ['text' => ', resident of ', 'bold' => false],
-                    ['text' => $address, 'bold' => true],
+                    ['text' => $address . ' ', 'bold' => true],
+                    ['text' => 'Barangay San Jose, Rodriguez, Rizal', 'bold' => true],
                     ['text' => ' is personally known to be as a person of ', 'bold' => false],
                     ['text' => 'GOOD MORAL CHARACTER, PEACEFUL and LAW-ABIDING CITIZEN of THE COMMUNITY.', 'bold' => true],
                 ],
@@ -1681,9 +2048,27 @@ function dra_generate_issued_document(array $requestRow): ?string {
         } elseif ($isResidency) {
             $writeRichParagraph(
                 [
-                    ['text' => 'This certificate is issued upon request for ', 'bold' => false],
-                    ['text' => $requestPurpose, 'bold' => true],
-                    ['text' => ' purposes only.', 'bold' => false],
+                    ['text' => 'This clearance is being issued pursuant to Barangay Revenue Code ORDINANCE NO. 11 - 2019', 'bold' => false],
+                ],
+                7,
+                18,
+                10,
+                $indigencyFont,
+                12
+            );
+        } elseif ($isCohabitation && !$cohabitationHasChildren) {
+            $writeIndentedParagraph(
+                'This certification is being issued upon the request of both parties for whatever legal purpose it may serve them.',
+                7,
+                18,
+                10,
+                $indigencyFont,
+                12
+            );
+        } elseif ($isCohabitation && $cohabitationHasChildren) {
+            $writeRichParagraph(
+                [
+                    ['text' => 'This clearance is being issued pursuant to Barangay Revenue Code ORDINANCE NO. 11 - 2019', 'bold' => false],
                 ],
                 7,
                 18,
@@ -1730,8 +2115,8 @@ function dra_generate_issued_document(array $requestRow): ?string {
 
         if ($isGoodMoral) {
             $metaY = 186.0;
-            $lineX1 = 36.0;
-            $lineX2 = 58.0;
+            $lineX1 = 52.0;
+            $lineX2 = 102.0;
             $pdf->SetFont($indigencyFont, 'B', 12);
             $pdf->SetXY(18, $metaY);
             $pdf->Cell(18, 6, 'CTC No.:', 0, 0, 'L');
@@ -1742,6 +2127,7 @@ function dra_generate_issued_document(array $requestRow): ?string {
             $pdf->Cell(20, 6, 'Issued at:', 0, 0, 'L');
             $pdf->Line($lineX1, $metaY + 5, $lineX2, $metaY + 5);
             $metaY += 8;
+            $pdf->SetFont($indigencyFont, 'B', 12);
             $pdf->SetXY(18, $metaY);
             $pdf->Cell(20, 6, 'Issued On:', 0, 0, 'L');
             $pdf->Line($lineX1, $metaY + 5, $lineX2, $metaY + 5);
@@ -1755,10 +2141,93 @@ function dra_generate_issued_document(array $requestRow): ?string {
                 $pdf->Cell($lineX2 - $lineX1, 6, $orNo, 0, 0, 'C');
             }
 
+        } elseif ($isResidency) {
+            $metaY = 196.0;
+            $lineX1 = 52.0;
+            $lineX2 = 96.0;
+            $pdf->SetFont($indigencyFont, 'B', 12);
+            $pdf->SetXY(18, $metaY);
+            $pdf->Cell(18, 6, 'CTC No.:', 0, 0, 'L');
+            $pdf->Line($lineX1, $metaY + 5, $lineX2, $metaY + 5);
+            $metaY += 7;
+            $pdf->SetXY(18, $metaY);
+            $pdf->Cell(20, 6, 'Issued at:', 0, 0, 'L');
+            $pdf->Line($lineX1, $metaY + 5, $lineX2, $metaY + 5);
+            $metaY += 7;
+            $pdf->SetXY(18, $metaY);
+            $pdf->Cell(20, 6, 'Issued On:', 0, 0, 'L');
+            $pdf->Line($lineX1, $metaY + 5, $lineX2, $metaY + 5);
+            $metaY += 7;
+            $pdf->SetXY(18, $metaY);
+            $pdf->Cell(20, 6, 'Amount:', 0, 0, 'L');
+            $pdf->Line($lineX1, $metaY + 5, $lineX2, $metaY + 5);
+            $metaY += 7;
+            $pdf->SetXY(18, $metaY);
+            $pdf->Cell(18, 6, 'OR No.:', 0, 0, 'L');
+            $pdf->Line($lineX1, $metaY + 5, $lineX2, $metaY + 5);
+            if ($orNo !== '') {
+                $pdf->SetXY($lineX1, $metaY);
+                $pdf->SetFont($indigencyFont, '', 11);
+                $pdf->Cell($lineX2 - $lineX1, 6, $orNo, 0, 0, 'L');
+            }
+        } elseif ($isCohabitation && !$cohabitationHasChildren) {
+            $metaY = 196.0;
+            $lineX1 = 52.0;
+            $lineX2 = 96.0;
+            $pdf->SetFont($indigencyFont, 'B', 12);
+            $pdf->SetXY(18, $metaY);
+            $pdf->Cell(18, 6, 'CTC No.:', 0, 0, 'L');
+            $pdf->Line($lineX1, $metaY + 5, $lineX2, $metaY + 5);
+            $metaY += 7;
+            $pdf->SetXY(18, $metaY);
+            $pdf->Cell(20, 6, 'Issued at:', 0, 0, 'L');
+            $pdf->Line($lineX1, $metaY + 5, $lineX2, $metaY + 5);
+            $metaY += 7;
+            $pdf->SetXY(18, $metaY);
+            $pdf->Cell(20, 6, 'Issued On:', 0, 0, 'L');
+            $pdf->Line($lineX1, $metaY + 5, $lineX2, $metaY + 5);
+            $metaY += 7;
+            $pdf->SetXY(18, $metaY);
+            $pdf->Cell(18, 6, 'OR No.:', 0, 0, 'L');
+            $pdf->Line($lineX1, $metaY + 5, $lineX2, $metaY + 5);
+            if ($orNo !== '') {
+                $pdf->SetXY($lineX1, $metaY);
+                $pdf->SetFont($indigencyFont, '', 11);
+                $pdf->Cell($lineX2 - $lineX1, 6, $orNo, 0, 0, 'L');
+            }
+        } elseif ($isCohabitation && $cohabitationHasChildren) {
+            $metaY = 196.0;
+            $lineX1 = 52.0;
+            $lineX2 = 96.0;
+            $pdf->SetFont($indigencyFont, 'B', 12);
+            $pdf->SetXY(18, $metaY);
+            $pdf->Cell(18, 6, 'CTC No.:', 0, 0, 'L');
+            $pdf->Line($lineX1, $metaY + 5, $lineX2, $metaY + 5);
+            $metaY += 7;
+            $pdf->SetXY(18, $metaY);
+            $pdf->Cell(20, 6, 'Issued at:', 0, 0, 'L');
+            $pdf->Line($lineX1, $metaY + 5, $lineX2, $metaY + 5);
+            $metaY += 7;
+            $pdf->SetXY(18, $metaY);
+            $pdf->Cell(20, 6, 'Issued On:', 0, 0, 'L');
+            $pdf->Line($lineX1, $metaY + 5, $lineX2, $metaY + 5);
+            $metaY += 7;
+            $pdf->SetXY(18, $metaY);
+            $pdf->Cell(20, 6, 'Amount:', 0, 0, 'L');
+            $pdf->Line($lineX1, $metaY + 5, $lineX2, $metaY + 5);
+            $metaY += 7;
+            $pdf->SetXY(18, $metaY);
+            $pdf->Cell(18, 6, 'OR No.:', 0, 0, 'L');
+            $pdf->Line($lineX1, $metaY + 5, $lineX2, $metaY + 5);
+            if ($orNo !== '') {
+                $pdf->SetXY($lineX1, $metaY);
+                $pdf->SetFont($indigencyFont, '', 11);
+                $pdf->Cell($lineX2 - $lineX1, 6, $orNo, 0, 0, 'L');
+            }
         }
 
         // Issued by + signatory blocks aligned to the same baseline.
-        $signBaseY = $isGoodMoral ? 230.0 : 214.0;
+        $signBaseY = ($isGoodMoral || $isResidency || $isCohabitation) ? 230.0 : 214.0;
 
         // Issued by block (lower-left)
         $pdf->SetFont($indigencyFont, '', 11);
@@ -1789,7 +2258,7 @@ function dra_generate_issued_document(array $requestRow): ?string {
         return '/UnifiedFileAttachment/IssuedDocuments/Generated/' . $fileName;
     } else {
         if (is_file($qrDiskPath)) {
-            $pdf->Image($qrDiskPath, 166, 238, 26, 26);
+            $pdf->Image($qrDiskPath, 186, 252, 20, 20);
         }
         $writeIndentedParagraph(
             'This is to certify that ' . $fullName . ' is a bona fide resident of ' . $address . '.',
@@ -1843,275 +2312,17 @@ function dra_generate_issued_document(array $requestRow): ?string {
 }
 
 function dra_convert_docx_to_pdf(string $docxDiskPath, string $outDir): ?string {
-    $docxReal = realpath($docxDiskPath);
-    $outReal = realpath($outDir);
-    if ($docxReal === false || $outReal === false || !is_file($docxReal)) {
-        return null;
-    }
-
-    $baseName = pathinfo($docxReal, PATHINFO_FILENAME);
-    $expectedPdf = $outReal . '/' . $baseName . '.pdf';
-    @unlink($expectedPdf);
-
-    $envSoffice = trim((string)getenv('SOFFICE_BIN'));
-    $candidates = [
-        $envSoffice,
-        '/Applications/LibreOffice.app/Contents/MacOS/soffice',
-        '/usr/bin/soffice',
-        '/usr/local/bin/soffice',
-        'libreoffice',
-        'soffice',
-    ];
-
-    $attempted = [];
-    $profileDir = $outReal . '/.soffice-profile';
-    if (!is_dir($profileDir)) {
-        @mkdir($profileDir, 0775, true);
-    }
-    $profileReal = realpath($profileDir) ?: $profileDir;
-    $profileUri = 'file://' . str_replace('%2F', '/', rawurlencode(str_replace(DIRECTORY_SEPARATOR, '/', $profileReal)));
-
-    foreach ($candidates as $bin) {
-        if (trim($bin) === '') {
-            continue;
-        }
-        $attempted[] = $bin;
-        $cmd = escapeshellcmd($bin)
-            . ' --headless --nologo --nodefault --nolockcheck --norestore'
-            . ' -env:UserInstallation=' . escapeshellarg($profileUri)
-            . ' --convert-to pdf:writer_pdf_Export '
-            . '--outdir ' . escapeshellarg($outReal) . ' '
-            . escapeshellarg($docxReal);
-
-        $stdout = '';
-        $stderr = '';
-        $exitCode = 1;
-
-        if (function_exists('proc_open')) {
-            $spec = [
-                0 => ['pipe', 'r'],
-                1 => ['pipe', 'w'],
-                2 => ['pipe', 'w'],
-            ];
-            $proc = @proc_open($cmd, $spec, $pipes);
-            if (is_resource($proc)) {
-                if (isset($pipes[0]) && is_resource($pipes[0])) {
-                    fclose($pipes[0]);
-                }
-                $stdout = isset($pipes[1]) && is_resource($pipes[1]) ? (string)stream_get_contents($pipes[1]) : '';
-                $stderr = isset($pipes[2]) && is_resource($pipes[2]) ? (string)stream_get_contents($pipes[2]) : '';
-                if (isset($pipes[1]) && is_resource($pipes[1])) {
-                    fclose($pipes[1]);
-                }
-                if (isset($pipes[2]) && is_resource($pipes[2])) {
-                    fclose($pipes[2]);
-                }
-                $status = @proc_get_status($proc);
-                $startedAt = time();
-                while ($status && !empty($status['running']) && (time() - $startedAt) < 25) {
-                    usleep(200000);
-                    $status = @proc_get_status($proc);
-                }
-                if ($status && !empty($status['running'])) {
-                    @proc_terminate($proc);
-                }
-                $exitCode = (int)proc_close($proc);
-            }
-        }
-
-        if ($exitCode !== 0 && function_exists('exec')) {
-            $outLines = [];
-            @exec($cmd . ' 2>&1', $outLines, $execExitCode);
-            $stdout = trim(implode("\n", $outLines));
-            $exitCode = (int)$execExitCode;
-        }
-
-        if ($exitCode !== 0 && function_exists('shell_exec')) {
-            $shellOut = @shell_exec($cmd . ' 2>&1');
-            $stdout = trim((string)$shellOut);
-            $exitCode = is_file($expectedPdf) && filesize($expectedPdf) > 0 ? 0 : 1;
-        }
-
-        if ($exitCode === 0 && is_file($expectedPdf) && filesize($expectedPdf) > 0) {
-            return $expectedPdf;
-        }
-        if (trim((string)$stdout) !== '' || trim((string)$stderr) !== '') {
-            error_log('[dra_convert_docx_to_pdf] ' . trim((string)$stdout . ' ' . (string)$stderr));
-        }
-    }
-
-    error_log('[dra_convert_docx_to_pdf] no working DOCX->PDF converter found. tried=' . implode(', ', $attempted));
+    error_log('[dra_convert_docx_to_pdf] Disabled: LibreOffice workflow removed (DOCX-only mode).');
     return null;
 }
 
 function dra_convert_docx_to_html(string $docxDiskPath, string $outDir): ?string {
-    $docxReal = realpath($docxDiskPath);
-    $outReal = realpath($outDir);
-    if ($docxReal === false || $outReal === false || !is_file($docxReal)) {
-        return null;
-    }
-
-    $baseName = pathinfo($docxReal, PATHINFO_FILENAME);
-    $expectedHtml = $outReal . '/' . $baseName . '.html';
-    @unlink($expectedHtml);
-
-    $envSoffice = trim((string)getenv('SOFFICE_BIN'));
-    $candidates = [
-        $envSoffice,
-        '/Applications/LibreOffice.app/Contents/MacOS/soffice',
-        '/usr/bin/soffice',
-        '/usr/local/bin/soffice',
-        'libreoffice',
-        'soffice',
-    ];
-
-    $attempted = [];
-    $profileDir = $outReal . '/.soffice-profile';
-    if (!is_dir($profileDir)) {
-        @mkdir($profileDir, 0775, true);
-    }
-    $profileReal = realpath($profileDir) ?: $profileDir;
-    $profileUri = 'file://' . str_replace('%2F', '/', rawurlencode(str_replace(DIRECTORY_SEPARATOR, '/', $profileReal)));
-
-    foreach ($candidates as $bin) {
-        if (trim($bin) === '') {
-            continue;
-        }
-        $attempted[] = $bin;
-        $cmd = escapeshellcmd($bin)
-            . ' --headless --nologo --nodefault --nolockcheck --norestore'
-            . ' -env:UserInstallation=' . escapeshellarg($profileUri)
-            . ' --convert-to html:XHTML Writer File:UTF8 '
-            . '--outdir ' . escapeshellarg($outReal) . ' '
-            . escapeshellarg($docxReal);
-
-        $stdout = '';
-        $stderr = '';
-        $exitCode = 1;
-
-        if (function_exists('proc_open')) {
-            $spec = [
-                0 => ['pipe', 'r'],
-                1 => ['pipe', 'w'],
-                2 => ['pipe', 'w'],
-            ];
-            $proc = @proc_open($cmd, $spec, $pipes);
-            if (is_resource($proc)) {
-                if (isset($pipes[0]) && is_resource($pipes[0])) fclose($pipes[0]);
-                $stdout = isset($pipes[1]) && is_resource($pipes[1]) ? (string)stream_get_contents($pipes[1]) : '';
-                $stderr = isset($pipes[2]) && is_resource($pipes[2]) ? (string)stream_get_contents($pipes[2]) : '';
-                if (isset($pipes[1]) && is_resource($pipes[1])) fclose($pipes[1]);
-                if (isset($pipes[2]) && is_resource($pipes[2])) fclose($pipes[2]);
-                $status = @proc_get_status($proc);
-                $startedAt = time();
-                while ($status && !empty($status['running']) && (time() - $startedAt) < 25) {
-                    usleep(200000);
-                    $status = @proc_get_status($proc);
-                }
-                if ($status && !empty($status['running'])) {
-                    @proc_terminate($proc);
-                }
-                $exitCode = (int)proc_close($proc);
-            }
-        }
-
-        if ($exitCode !== 0 && function_exists('exec')) {
-            $outLines = [];
-            @exec($cmd . ' 2>&1', $outLines, $execExitCode);
-            $stdout = trim(implode("\n", $outLines));
-            $exitCode = (int)$execExitCode;
-        }
-
-        if ($exitCode === 0 && is_file($expectedHtml) && filesize($expectedHtml) > 0) {
-            return $expectedHtml;
-        }
-        if (trim((string)$stdout) !== '' || trim((string)$stderr) !== '') {
-            error_log('[dra_convert_docx_to_html] ' . trim((string)$stdout . ' ' . (string)$stderr));
-        }
-    }
-
-    error_log('[dra_convert_docx_to_html] no working DOCX->HTML converter found. tried=' . implode(', ', $attempted));
+    error_log('[dra_convert_docx_to_html] Disabled: LibreOffice workflow removed (DOCX-only mode).');
     return null;
 }
 
 function dra_convert_docx_to_preview_image(string $docxDiskPath, string $outDir): ?string {
-    $docxReal = realpath($docxDiskPath);
-    $outReal = realpath($outDir);
-    if ($docxReal === false || $outReal === false || !is_file($docxReal)) {
-        return null;
-    }
-
-    $previewPdf = dra_convert_docx_to_pdf($docxReal, $outReal);
-    if ($previewPdf !== null && is_file($previewPdf) && filesize($previewPdf) > 0) {
-        $finalizeOptions = [
-            'stamp_qr' => false,
-            'cover_width' => 52.0,
-            'cover_height' => 30.0,
-            'cover_margin_right' => 0.0,
-            'cover_margin_bottom' => 24.0,
-        ];
-        dra_finalize_template_pdf($previewPdf, null, $finalizeOptions);
-        $expectedPng = $outReal . '/' . basename($previewPdf) . '.png';
-        @unlink($expectedPng);
-
-        $cmd = '/usr/bin/qlmanage -t -s 1600 -o '
-            . escapeshellarg($outReal) . ' '
-            . escapeshellarg($previewPdf) . ' >/dev/null 2>&1';
-
-        $exitCode = 1;
-        if (function_exists('exec')) {
-            @exec($cmd, $outLines, $execExitCode);
-            $exitCode = (int)$execExitCode;
-        } elseif (function_exists('shell_exec')) {
-            @shell_exec($cmd);
-            $exitCode = is_file($expectedPng) && filesize($expectedPng) > 0 ? 0 : 1;
-        }
-
-        if ($exitCode === 0 && is_file($expectedPng) && filesize($expectedPng) > 0) {
-            return $expectedPng;
-        }
-    }
-
-    $beforeFiles = glob($outReal . '/*.png') ?: [];
-    $beforeMap = [];
-    foreach ($beforeFiles as $beforeFile) {
-        $beforeMap[$beforeFile] = @filemtime($beforeFile) ?: 0;
-    }
-
-    $cmd = '/usr/bin/qlmanage -t -s 1600 -o '
-        . escapeshellarg($outReal) . ' '
-        . escapeshellarg($docxReal) . ' >/dev/null 2>&1';
-
-    $exitCode = 1;
-    if (function_exists('exec')) {
-        @exec($cmd, $outLines, $execExitCode);
-        $exitCode = (int)$execExitCode;
-    } elseif (function_exists('shell_exec')) {
-        @shell_exec($cmd);
-        $exitCode = 0;
-    }
-
-    $candidatePng = $outReal . '/' . basename($docxReal) . '.png';
-    if ($exitCode === 0 && is_file($candidatePng) && filesize($candidatePng) > 0) {
-        return $candidatePng;
-    }
-
-    $afterFiles = glob($outReal . '/*.png') ?: [];
-    $newestFile = null;
-    $newestTime = 0;
-    foreach ($afterFiles as $afterFile) {
-        $mtime = @filemtime($afterFile) ?: 0;
-        $wasKnown = array_key_exists($afterFile, $beforeMap);
-        if ((!$wasKnown || $mtime > (int)$beforeMap[$afterFile]) && $mtime >= $newestTime) {
-            $newestTime = $mtime;
-            $newestFile = $afterFile;
-        }
-    }
-    if ($newestFile !== null && is_file($newestFile) && filesize($newestFile) > 0) {
-        return $newestFile;
-    }
-
-    error_log('[dra_convert_docx_to_preview_image] DOCX->PNG preview conversion failed for ' . $docxReal);
+    error_log('[dra_convert_docx_to_preview_image] Disabled: LibreOffice workflow removed (DOCX-only mode).');
     return null;
 }
 
@@ -2389,6 +2600,46 @@ function dra_generate_issued_document_safe(array $requestRow): ?string {
     return $path;
 }
 
+function dra_issued_document_diagnostics(string $baseDir, array $row): string
+{
+    $issues = [];
+
+    $generatedDir = $baseDir . '/UnifiedFileAttachment/IssuedDocuments/Generated';
+    if (!is_dir($generatedDir)) {
+        $issues[] = 'Missing generated output directory.';
+    } elseif (!is_writable($generatedDir)) {
+        $issues[] = 'Generated output directory is not writable.';
+    }
+
+    $qrDir = $baseDir . '/UnifiedFileAttachment/IssuedDocuments/QR';
+    if (!is_dir($qrDir)) {
+        $issues[] = 'Missing QR output directory.';
+    } elseif (!is_writable($qrDir)) {
+        $issues[] = 'QR output directory is not writable.';
+    }
+
+    $fpdfAutoloads = [
+        $baseDir . '/composer-email-handler/vendor/autoload.php',
+        $baseDir . '/vendor/autoload.php',
+    ];
+    $hasFpdfAutoload = false;
+    foreach ($fpdfAutoloads as $autoloadPath) {
+        if (is_file($autoloadPath)) {
+            $hasFpdfAutoload = true;
+            break;
+        }
+    }
+    if (!$hasFpdfAutoload) {
+        $issues[] = 'FPDF dependencies are missing. Run deploy_hostinger.sh.';
+    }
+
+    if (empty($issues)) {
+        return 'Issued document generation failed unexpectedly. Check PHP error logs for [dra_generate_issued_document].';
+    }
+
+    return implode(' ', $issues);
+}
+
 function dra_backfill_payment_verified_to_ready(mysqli $conn): void {
     try {
         $legacyStage = DR_STAGE_PAYMENT_VERIFIED;
@@ -2485,6 +2736,8 @@ function dra_resident_profile_snapshot(mysqli $conn, string $residentUserId, str
         'occupation' => '',
         'contact_number' => '',
         'full_address' => '',
+        'barangay_residency' => '',
+        'residency_duration' => '',
         'proof_residency_path' => '',
         'proof_residency_name' => '',
         'proof_residency_type' => '',
@@ -2500,6 +2753,7 @@ function dra_resident_profile_snapshot(mysqli $conn, string $residentUserId, str
             r.middlename,
             r.suffix,
             r.birthdate,
+            r.baranagayresidency,
             r.sex,
             r.civil_status,
             r.religion,
@@ -2560,6 +2814,7 @@ function dra_resident_profile_snapshot(mysqli $conn, string $residentUserId, str
             a.phase_number,
             a.subdivision,
             a.area_number
+            ,a.residency_duration
         FROM residentinformationtbl r
         LEFT JOIN useraccountstbl u ON u.user_id = r.user_id
         LEFT JOIN residentaddresstbl a
@@ -2642,6 +2897,8 @@ function dra_resident_profile_snapshot(mysqli $conn, string $residentUserId, str
         'occupation' => $occupation,
         'contact_number' => (string)($row['phone_number'] ?? ''),
         'full_address' => $fullAddress,
+        'barangay_residency' => (string)($row['baranagayresidency'] ?? ''),
+        'residency_duration' => (string)($row['residency_duration'] ?? ''),
         'proof_residency_path' => (string)($row['proof_residency_path'] ?? ''),
         'proof_residency_name' => (string)($row['proof_residency_name'] ?? ''),
         'proof_residency_type' => (string)($row['proof_residency_type'] ?? ''),
@@ -3079,56 +3336,8 @@ if ($action === 'view_preview_issued') {
 }
 
 if ($action === 'view_preview_docx') {
-    if (dra_is_finance_user($conn, $currentUserId)) {
-        http_response_code(403);
-        exit('Finance users are not allowed to preview issued documents.');
-    }
-    if ($requestId === '') {
-        http_response_code(422);
-        exit('Missing request ID.');
-    }
-    $row = dr_fetch_request($conn, $requestId);
-    if (!$row) {
-        http_response_code(404);
-        exit('Request not found.');
-    }
-    $editedPreview = [];
-    $editedPreviewRaw = trim((string)($_POST['edited_preview'] ?? ''));
-    if ($editedPreviewRaw !== '') {
-        $decoded = json_decode($editedPreviewRaw, true);
-        if (is_array($decoded)) {
-            $editedPreview = $decoded;
-        }
-    }
-    if (!empty($editedPreview)) {
-        dra_overlay_preview_edits($row, $editedPreview);
-    }
-
-    $generated = (string)(dra_generate_issued_document_safe(array_merge((array)$row, [
-        '_preview_mode' => 1,
-        '_prefer_docx_output' => 1,
-    ])) ?? '');
-    if ($generated === '') {
-        http_response_code(500);
-        exit('Unable to generate DOCX preview.');
-    }
-
-    $baseDir = realpath(__DIR__ . '/../../');
-    if ($baseDir === false) {
-        http_response_code(500);
-        exit('Path resolution failed.');
-    }
-    $relative = '/' . ltrim(dra_strip_legacy_base($generated), '/');
-    $absolute = realpath($baseDir . $relative);
-    if ($absolute === false || !is_file($absolute) || strpos($absolute, $baseDir . '/UnifiedFileAttachment/') !== 0) {
-        http_response_code(404);
-        exit('File not found.');
-    }
-
-    header('Content-Type: application/vnd.openxmlformats-officedocument.wordprocessingml.document');
-    header('Content-Disposition: inline; filename="' . basename($absolute) . '"');
-    header('Content-Length: ' . filesize($absolute));
-    readfile($absolute);
+    http_response_code(410);
+    exit('DOCX preview endpoint removed. Use HTML/JS preview.');
     exit;
 }
 
@@ -3146,53 +3355,8 @@ if ($action === 'view_preview_docx_html') {
         http_response_code(404);
         exit('Request not found.');
     }
-    $editedPreview = [];
-    $editedPreviewRaw = trim((string)($_POST['edited_preview'] ?? ''));
-    if ($editedPreviewRaw !== '') {
-        $decoded = json_decode($editedPreviewRaw, true);
-        if (is_array($decoded)) {
-            $editedPreview = $decoded;
-        }
-    }
-    if (!empty($editedPreview)) {
-        dra_overlay_preview_edits($row, $editedPreview);
-    }
-
-    $generated = (string)(dra_generate_issued_document_safe(array_merge((array)$row, [
-        '_preview_mode' => 1,
-        '_prefer_docx_output' => 1,
-    ])) ?? '');
-    if ($generated === '') {
-        http_response_code(500);
-        exit('Unable to generate DOCX preview.');
-    }
-
-    $baseDir = realpath(__DIR__ . '/../../');
-    if ($baseDir === false) {
-        http_response_code(500);
-        exit('Path resolution failed.');
-    }
-    $relative = '/' . ltrim(dra_strip_legacy_base($generated), '/');
-    $absolute = realpath($baseDir . $relative);
-    if ($absolute === false || !is_file($absolute) || strpos($absolute, $baseDir . '/UnifiedFileAttachment/') !== 0) {
-        http_response_code(404);
-        exit('File not found.');
-    }
-
-    $htmlPath = dra_convert_docx_to_html($absolute, dirname($absolute));
-    if ($htmlPath === null || !is_file($htmlPath)) {
-        http_response_code(500);
-        exit('Unable to generate HTML preview.');
-    }
-
-    $html = (string)@file_get_contents($htmlPath);
-    if ($html === '') {
-        http_response_code(500);
-        exit('HTML preview is empty.');
-    }
-    $html = dra_cleanup_docx_preview_html($html);
-    header('Content-Type: text/html; charset=utf-8');
-    echo $html;
+    http_response_code(501);
+    exit('HTML conversion preview is disabled in DOCX-only mode.');
     exit;
 }
 
@@ -3210,49 +3374,8 @@ if ($action === 'view_preview_docx_image') {
         http_response_code(404);
         exit('Request not found.');
     }
-    $editedPreview = [];
-    $editedPreviewRaw = trim((string)($_POST['edited_preview'] ?? ''));
-    if ($editedPreviewRaw !== '') {
-        $decoded = json_decode($editedPreviewRaw, true);
-        if (is_array($decoded)) {
-            $editedPreview = $decoded;
-        }
-    }
-    if (!empty($editedPreview)) {
-        dra_overlay_preview_edits($row, $editedPreview);
-    }
-
-    $generated = (string)(dra_generate_issued_document_safe(array_merge((array)$row, [
-        '_preview_mode' => 1,
-        '_prefer_docx_output' => 1,
-    ])) ?? '');
-    if ($generated === '') {
-        http_response_code(500);
-        exit('Unable to generate DOCX preview.');
-    }
-
-    $baseDir = realpath(__DIR__ . '/../../');
-    if ($baseDir === false) {
-        http_response_code(500);
-        exit('Path resolution failed.');
-    }
-    $relative = '/' . ltrim(dra_strip_legacy_base($generated), '/');
-    $absolute = realpath($baseDir . $relative);
-    if ($absolute === false || !is_file($absolute) || strpos($absolute, $baseDir . '/UnifiedFileAttachment/') !== 0) {
-        http_response_code(404);
-        exit('File not found.');
-    }
-
-    $imagePath = dra_convert_docx_to_preview_image($absolute, dirname($absolute));
-    if ($imagePath === null || !is_file($imagePath)) {
-        http_response_code(500);
-        exit('Unable to generate image preview.');
-    }
-
-    header('Content-Type: image/png');
-    header('Content-Disposition: inline; filename="' . basename($imagePath) . '"');
-    header('Content-Length: ' . filesize($imagePath));
-    readfile($imagePath);
+    http_response_code(501);
+    exit('Image conversion preview is disabled in DOCX-only mode.');
     exit;
 }
 
@@ -3269,6 +3392,11 @@ if ($action === 'view_issued') {
     if (!$row) {
         http_response_code(404);
         exit('Request not found.');
+    }
+    $baseDir = realpath(__DIR__ . '/../../');
+    if ($baseDir === false) {
+        http_response_code(500);
+        exit('Path resolution failed.');
     }
     $stage = strtolower(trim((string)($row['stage'] ?? '')));
     if (!in_array($stage, [DR_STAGE_PAYMENT_VERIFIED, DR_STAGE_READY_FOR_CLAIM, DR_STAGE_COMPLETED], true)) {
@@ -3292,7 +3420,13 @@ if ($action === 'view_issued') {
         ? [DR_STAGE_READY_FOR_CLAIM, DR_STAGE_COMPLETED]
         : [DR_STAGE_PAYMENT_VERIFIED, DR_STAGE_READY_FOR_CLAIM, DR_STAGE_COMPLETED];
     $shouldHaveQr = ($verificationCode !== '' && in_array($stage, $qrEligibleStages, true));
+    $renderRevisionTag = 'r20260310a';
+    $issuedBaseName = strtolower(basename((string)$publicPath));
+    $isGeneratedIssuedPath = strpos((string)$publicPath, '/UnifiedFileAttachment/IssuedDocuments/Generated/') === 0;
+    $isCurrentRenderRevision = ($issuedBaseName !== '' && strpos($issuedBaseName, strtolower($renderRevisionTag)) !== false);
     $mustRegenerate = ($publicPath === '')
+        || ($isTemplateBasedCertificate && !$isGeneratedIssuedPath)
+        || ($isTemplateBasedCertificate && !$isCurrentRenderRevision)
         || ($isTemplateBasedCertificate && !in_array($ext, ['pdf', 'docx'], true))
         || ($isTemplateBasedCertificate && $shouldHaveQr && !is_file($qrDiskPath));
     if ($mustRegenerate) {
@@ -3315,20 +3449,15 @@ if ($action === 'view_issued') {
         }
     }
     if ($publicPath === '') {
-        http_response_code(404);
-        exit('Issued document not found.');
+        http_response_code(500);
+        exit(dra_issued_document_diagnostics($baseDir, (array)$row));
     }
 
-    $baseDir = realpath(__DIR__ . '/../../');
-    if ($baseDir === false) {
-        http_response_code(500);
-        exit('Path resolution failed.');
-    }
     $relative = '/' . ltrim(dra_strip_legacy_base($publicPath), '/');
     $absolute = realpath($baseDir . $relative);
     if ($absolute === false || !is_file($absolute) || strpos($absolute, $baseDir . '/UnifiedFileAttachment/') !== 0) {
         http_response_code(404);
-        exit('File not found.');
+        exit('Issued file path exists but file is missing on disk. Regenerate the issued document from the request.');
     }
 
     $mime = (string)(mime_content_type($absolute) ?: 'application/octet-stream');

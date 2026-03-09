@@ -367,7 +367,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && isset($_GET['view'])) {
             }
         }
         if (!$reviewedByName) {
-            $reviewedByName = $row['reviewed_by'];
+            $reviewedByName = '—';
         }
     }
 

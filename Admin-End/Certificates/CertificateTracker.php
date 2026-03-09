@@ -389,6 +389,7 @@ require_once __DIR__ . '/../includes/admin_guard.php';
       letter-spacing: .01em;
     }
     #viewModal .doc-preview-paper.doc-preview-paper--indigency .doc-preview-body {
+      font-family: Arial, Helvetica, sans-serif;
       font-size: 1.08rem;
       line-height: 1.75;
     }
@@ -396,6 +397,7 @@ require_once __DIR__ . '/../includes/admin_guard.php';
       margin: 0 0 16px;
     }
     #viewModal .doc-preview-paper.doc-preview-paper--indigency .doc-preview-body {
+      font-family: Arial, Helvetica, sans-serif;
       font-size: 1.02rem;
       line-height: 1.72;
       text-align: justify;
@@ -434,8 +436,8 @@ require_once __DIR__ . '/../includes/admin_guard.php';
       color: #111827;
     }
     #viewModal .doc-preview-paper.doc-preview-paper--indigency .doc-preview-qr {
-      right: 34px;
-      bottom: 56px;
+      right: 18px;
+      bottom: 30px;
       width: 92px;
       font-size: 0;
     }
@@ -491,12 +493,12 @@ require_once __DIR__ . '/../includes/admin_guard.php';
       font-weight: 800;
     }
     #viewModal .doc-preview-paper.doc-preview-paper--goodmoral .doc-preview-goodmoral-office {
-      margin-top: 10px;
-      margin-bottom: 10px;
+      margin-top: 16px;
+      margin-bottom: 18px;
       text-align: center;
       font-family: Arial, Helvetica, sans-serif;
       font-weight: 800;
-      line-height: 1.22;
+      line-height: 1.28;
       text-transform: uppercase;
     }
     #viewModal .doc-preview-paper.doc-preview-paper--goodmoral .doc-preview-goodmoral-office div:first-child {
@@ -514,17 +516,47 @@ require_once __DIR__ . '/../includes/admin_guard.php';
       letter-spacing: .01em;
     }
     #viewModal .doc-preview-paper.doc-preview-paper--goodmoral .doc-preview-body {
+      font-family: Arial, Helvetica, sans-serif;
       font-size: 1.02rem;
-      line-height: 1.68;
+      line-height: 1.6;
       text-align: justify;
-      margin-top: 6px;
+      margin-top: 8px;
+      padding: 0 8px 0 2px;
     }
     #viewModal .doc-preview-paper.doc-preview-paper--goodmoral .doc-preview-body p {
-      margin: 0 0 14px;
+      margin: 0 0 12px;
+    }
+    #viewModal .doc-preview-paper.doc-preview-paper--goodmoral .doc-preview-body p + p {
+      text-indent: 42px;
+    }
+    #viewModal .doc-preview-paper.doc-preview-paper--goodmoral .doc-preview-body .doc-preview-issued-line {
+      margin-top: 22px;
+      margin-bottom: 18px;
+      text-indent: 52px;
+    }
+    #viewModal .doc-preview-paper.doc-preview-paper--goodmoral .doc-preview-body .doc-to-block {
+      display: grid;
+      grid-template-columns: 145px 18px 1fr;
+      align-items: start;
+      column-gap: 0;
+      margin: 0 0 4px;
+      text-indent: 0;
+    }
+    #viewModal .doc-preview-paper.doc-preview-paper--goodmoral .doc-preview-body .doc-to-block + .doc-to-block {
+      margin-top: 2px;
+    }
+    #viewModal .doc-preview-paper.doc-preview-paper--goodmoral .doc-preview-body .doc-to-block div,
+    #viewModal .doc-preview-paper.doc-preview-paper--goodmoral .doc-preview-body .doc-to-block strong {
+      line-height: 1.45;
+    }
+    #viewModal .doc-preview-paper.doc-preview-paper--goodmoral .doc-preview-goodmoral-meta {
+      margin-top: 8px;
+      margin-bottom: 14px;
     }
     #viewModal .doc-preview-paper.doc-preview-paper--goodmoral .doc-preview-goodmoral-meta p {
-      margin: 0 0 6px;
+      margin: 0 0 3px;
       text-align: left;
+      text-indent: 0;
     }
     #viewModal .doc-preview-paper.doc-preview-paper--goodmoral .doc-preview-signature {
       position: absolute;
@@ -559,8 +591,8 @@ require_once __DIR__ . '/../includes/admin_guard.php';
       color: #111827;
     }
     #viewModal .doc-preview-paper.doc-preview-paper--goodmoral .doc-preview-qr {
-      right: 34px;
-      bottom: 56px;
+      right: 18px;
+      bottom: 30px;
       width: 92px;
       font-size: 0;
     }
@@ -632,6 +664,7 @@ require_once __DIR__ . '/../includes/admin_guard.php';
       text-transform: uppercase;
     }
     #viewModal .doc-preview-body {
+      font-family: Arial, Helvetica, sans-serif;
       font-size: .95rem;
       color: #111827;
       line-height: 1.55;
@@ -682,8 +715,8 @@ require_once __DIR__ . '/../includes/admin_guard.php';
     }
     #viewModal .doc-preview-qr {
       position: absolute;
-      right: 30px;
-      bottom: 34px;
+      right: 18px;
+      bottom: 24px;
       width: 118px;
       text-align: center;
       color: #374151;
@@ -1095,6 +1128,6 @@ require_once __DIR__ . '/../includes/admin_guard.php';
   };
 </script>
 <script src="../../JS-Script-Files/Admin-End/tableColumnsGeneric.js?v=20260215-1"></script>
-<script src="../../JS-Script-Files/Admin-End/certificateTrackerScript.js?v=20260309-01"></script>
+<script src="../../JS-Script-Files/Admin-End/certificateTrackerScript.js?v=20260310-07"></script>
 </body>
 </html>
