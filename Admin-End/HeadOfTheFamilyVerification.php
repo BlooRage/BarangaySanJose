@@ -76,40 +76,53 @@
       border-color: #fecaca;
     }
 
-    .status-filter-btn {
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
-    }
+    .status-filter-btn { display: inline-flex; align-items: center; gap: 6px; }
 
-    .pending-count-badge {
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      min-width: 20px;
-      height: 20px;
-      padding: 0 6px;
-      border-radius: 999px;
-      background: #dc3545;
-      color: #fff;
-      font-size: 0.75rem;
-      line-height: 1;
-      font-weight: 400;
-    }
-
-    .status-filter-btn.has-notif {
-      position: relative;
+    .hof-shell .status-filter-btn {
+      border-radius: 10px;
+      border-width: 1px;
       overflow: visible;
     }
 
-    .status-filter-btn.has-notif .pending-count-badge {
-      position: absolute;
-      top: -6px;
-      right: -8px;
+    .hof-shell .status-filter-btn[data-filter="ALL"] {
+      color: #0d6efd;
+      border-color: #0d6efd;
+      background: #fff;
     }
 
-    #btnHofRefresh.is-loading i {
-      animation: adminSpin 900ms linear infinite;
+    .hof-shell .status-filter-btn[data-filter="Pending"],
+    .hof-shell .status-filter-btn[data-filter="Approved"],
+    .hof-shell .status-filter-btn[data-filter="Declined"] {
+      color: #495057;
+      border-color: #6c757d;
+      background: #fff;
+    }
+
+    .hof-shell .status-filter-btn[data-filter="ALL"].active {
+      color: #fff !important;
+      background-color: #0d6efd !important;
+      border-color: #0d6efd !important;
+      font-weight: 700;
+    }
+
+    .hof-shell .status-filter-btn[data-filter="Pending"].active,
+    .hof-shell .status-filter-btn[data-filter="Approved"].active,
+    .hof-shell .status-filter-btn[data-filter="Declined"].active {
+      color: #fff !important;
+      background-color: #495057 !important;
+      border-color: #495057 !important;
+      font-weight: 700;
+    }
+
+    .hof-shell .btn-icon {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      height: 38px;
+      padding: 0 12px;
+      border-radius: 10px;
+      white-space: nowrap;
     }
   </style>
 </head>
@@ -138,20 +151,23 @@
             <button type="button" class="btn btn-outline-secondary btn-sm status-filter-btn fw-bold" data-filter="Approved">Approved</button>
             <button type="button" class="btn btn-outline-secondary btn-sm status-filter-btn fw-bold" data-filter="Declined">Declined</button>
           </div>
-          <div class="admin-list-actions d-flex flex-row flex-nowrap align-items-center gap-2 ms-auto">
+          <div class="admin-list-actions d-flex align-items-center gap-2 ms-auto">
             <div class="input-group admin-search me-2">
               <input id="hofSearch" class="form-control" placeholder="Search address/group/status..." />
               <span class="input-group-text bg-white"><i class="fas fa-search"></i></span>
             </div>
-            <button id="btnHofColumns" class="btn btn-outline-secondary btn-icon" type="button" title="Columns" aria-label="Columns" data-bs-toggle="modal" data-bs-target="#modalHofColumns">
+            <button id="btnHofFilter" class="btn btn-outline-secondary btn-icon" type="button" title="Filter" aria-label="Filter" data-bs-toggle="modal" data-bs-target="#modalHofFilter">
+              <i class="fas fa-filter"></i>
+              <span class="visually-hidden">Filter</span>
+            </button>
+            <button id="btnHofColumns" class="btn btn-outline-secondary btn-icon admin-columns" type="button" title="Columns" aria-label="Columns" data-bs-toggle="modal" data-bs-target="#modalHofColumns">
               <i class="fa-solid fa-sliders"></i>
               <span class="visually-hidden">Columns</span>
             </button>
-            <button id="btnHofRefresh" class="btn btn-outline-secondary btn-icon" type="button" title="Refresh table" aria-label="Refresh table">
+            <button id="btnHofRefresh" class="btn btn-outline-secondary btn-icon admin-refresh" type="button" title="Refresh table" aria-label="Refresh table">
               <i class="fa-solid fa-arrows-rotate"></i>
               <span class="visually-hidden">Refresh</span>
             </button>
-            <span id="hofAutoRefreshCountdown" class="small text-muted d-none"></span>
           </div>
         </div>
 
@@ -232,6 +248,29 @@
         <div class="modal-footer">
           <button type="button" class="btn btn-outline-secondary" id="btnHofColumnsReset">Reset</button>
           <button type="button" class="btn btn-primary" data-bs-dismiss="modal">Done</button>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="modal fade" id="modalHofFilter" tabindex="-1" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content p-3">
+        <div class="modal-header border-0">
+          <h5 class="modal-title fw-bold">Filter Verification Status</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+          <label class="form-label small fw-bold mb-1" for="hofStatusFilterSelect">Status</label>
+          <select id="hofStatusFilterSelect" class="form-select">
+            <option value="ALL">All</option>
+            <option value="Pending">Pending</option>
+            <option value="Approved">Approved</option>
+            <option value="Declined">Declined</option>
+          </select>
+        </div>
+        <div class="modal-footer border-0">
+          <button type="button" class="btn btn-outline-secondary" id="btnHofFilterReset">Reset</button>
+          <button type="button" class="btn btn-primary" id="btnHofFilterApply" data-bs-dismiss="modal">Apply</button>
         </div>
       </div>
     </div>

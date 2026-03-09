@@ -2,8 +2,10 @@ document.addEventListener("DOMContentLoaded", () => {
   const tbody = document.getElementById("hofTbody");
   const searchInput = document.getElementById("hofSearch");
   const refreshBtn = document.getElementById("btnHofRefresh");
-  const countdownEl = document.getElementById("hofAutoRefreshCountdown");
   const statusButtons = document.querySelectorAll(".status-filter-btn");
+  const statusFilterSelect = document.getElementById("hofStatusFilterSelect");
+  const btnFilterApply = document.getElementById("btnHofFilterApply");
+  const btnFilterReset = document.getElementById("btnHofFilterReset");
   const pendingBadge = document.getElementById("pendingHofBadge");
   const entriesPerPageInput = document.getElementById("hofEntriesPerPageInput");
   const paginationEl = document.getElementById("hofPagination");
@@ -19,9 +21,6 @@ document.addEventListener("DOMContentLoaded", () => {
   let currentPage = 1;
   let entriesPerPage = Math.max(1, Number.parseInt(entriesPerPageInput?.value || "20", 10) || 20);
 
-  const AUTO_REFRESH_SECONDS = 60;
-  let secondsLeft = AUTO_REFRESH_SECONDS;
-  let autoRefreshInterval = null;
   let inFlight = false;
 
   const setRefreshLoading = (on) => {
@@ -144,6 +143,21 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   };
 
+  const activateStatusButton = (status) => {
+    statusButtons.forEach((b) => {
+      const isActive = (b.dataset.filter || "ALL") === status;
+      b.classList.toggle("active", isActive);
+      if (isActive) {
+        b.classList.add("btn-outline-primary");
+        b.classList.remove("btn-outline-secondary");
+      } else {
+        b.classList.remove("btn-outline-primary");
+        b.classList.add("btn-outline-secondary");
+      }
+    });
+    if (statusFilterSelect) statusFilterSelect.value = status;
+  };
+
   const fetchRows = async () => {
     if (inFlight) return;
     inFlight = true;
@@ -167,33 +181,8 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   };
 
-  const renderCountdown = () => {
-    if (!countdownEl) return;
-    countdownEl.textContent = secondsLeft > 0 ? `Auto refresh in ${secondsLeft}s` : "";
-  };
-
-  const resetCountdown = () => {
-    secondsLeft = AUTO_REFRESH_SECONDS;
-    renderCountdown();
-  };
-
   const triggerRefresh = () => {
-    resetCountdown();
     fetchRows().catch(() => {});
-  };
-
-  const startAutoRefresh = () => {
-    renderCountdown();
-    if (autoRefreshInterval) clearInterval(autoRefreshInterval);
-    autoRefreshInterval = setInterval(() => {
-      if (inFlight) return;
-      secondsLeft -= 1;
-      if (secondsLeft <= 0) {
-        triggerRefresh();
-        return;
-      }
-      renderCountdown();
-    }, 1000);
   };
 
   const openApproveModal = (row) => {
@@ -275,13 +264,24 @@ document.addEventListener("DOMContentLoaded", () => {
 
   refreshBtn?.addEventListener("click", triggerRefresh);
   btnConfirmApprove?.addEventListener("click", approveGroup);
+  btnFilterApply?.addEventListener("click", () => {
+    activeStatus = statusFilterSelect?.value || "ALL";
+    currentPage = 1;
+    activateStatusButton(activeStatus);
+    renderTable();
+  });
+  btnFilterReset?.addEventListener("click", () => {
+    activeStatus = "ALL";
+    currentPage = 1;
+    activateStatusButton(activeStatus);
+    renderTable();
+  });
 
   statusButtons.forEach((btn) => {
     btn.addEventListener("click", () => {
-      statusButtons.forEach((b) => b.classList.remove("active"));
-      btn.classList.add("active");
       activeStatus = btn.dataset.filter || "ALL";
       currentPage = 1;
+      activateStatusButton(activeStatus);
       renderTable();
     });
   });
@@ -310,5 +310,5 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   fetchRows().catch(() => {});
-  startAutoRefresh();
+  activateStatusButton(activeStatus);
 });
