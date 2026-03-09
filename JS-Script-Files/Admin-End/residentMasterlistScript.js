@@ -1,4 +1,21 @@
 document.addEventListener("DOMContentLoaded", () => {
+  if (window.bootstrap?.Modal) {
+    document.addEventListener("show.bs.modal", (event) => {
+      const current = event.target;
+      if (!current || !current.classList?.contains("modal")) return;
+      document.querySelectorAll(".modal.show").forEach((modalEl) => {
+        if (modalEl === current) return;
+        const instance = bootstrap.Modal.getInstance(modalEl);
+        if (instance) {
+          instance.hide();
+        } else {
+          modalEl.classList.remove("show");
+          modalEl.setAttribute("aria-hidden", "true");
+          modalEl.style.display = "none";
+        }
+      });
+    });
+  }
   const tbody = document.getElementById("tableBody");
   const searchInput = document.getElementById("searchInput");
   const btnRefreshTable = document.getElementById("btnResidentTableRefresh");
