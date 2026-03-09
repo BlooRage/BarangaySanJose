@@ -430,7 +430,7 @@ require_once __DIR__ . "/includes/resident_access_guard.php";
 
             <div class="col-md-4">
               <label class="form-label" for="birthProvince">Province <span class="text-danger">*</span></label>
-              <select class="form-select" id="birthProvince" name="birthProvince" disabled>
+              <select class="form-select" id="birthProvince" name="birthProvince">
                 <option value="">Select province</option>
               </select>
             </div>
