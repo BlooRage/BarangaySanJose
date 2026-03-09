@@ -131,6 +131,29 @@
     word-break: break-all;
 }
 
+#narrativeSignatureModal .modal-body {
+    padding: 1rem 1.2rem;
+}
+
+.signature-fullscreen-modal .modal-content {
+    border-radius: 0;
+}
+
+.signature-fullscreen-body {
+    padding: 12px;
+    background: #f8f9fa;
+}
+
+.signature-fullscreen-canvas {
+    display: block;
+    width: 100%;
+    height: calc(100vh - 170px);
+    background: #ffffff;
+    border: 1px solid #ced4da;
+    border-radius: 10px;
+    touch-action: none;
+}
+
 #viewModal .modal-dialog {
     width: min(88vw, 920px);
     max-width: 920px;
@@ -239,5 +262,9 @@
     #viewModal .tracker-form-grid.cols-4,
     #viewModal .tracker-form-grid.cols-3 {
         grid-template-columns: 1fr;
+    }
+
+    .signature-fullscreen-canvas {
+        height: calc(100vh - 185px);
     }
 }

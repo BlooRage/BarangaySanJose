@@ -31,21 +31,51 @@ document.addEventListener("DOMContentLoaded", () => {
     const phoneInputs = form?.querySelectorAll('input[name="complainant_contact_number"], input[name="respondent_contact_number"]') || [];
     const dateFiledInput = form?.querySelector('input[name="date_filed"]');
     const timeFiledInput = form?.querySelector('input[name="time_filed"]');
+    const complainantSignatureCanvas = document.getElementById("complainantSignatureCanvas");
+    const complainantSignatureData = document.getElementById("complainantSignatureData");
+    const complainantSignatureError = document.getElementById("complainantSignatureError");
+    const clearComplainantSignatureBtn = document.getElementById("clearComplainantSignature");
+    const respondentSignatureCanvas = document.getElementById("respondentSignatureCanvas");
+    const respondentSignatureData = document.getElementById("respondentSignatureData");
+    const respondentSignatureError = document.getElementById("respondentSignatureError");
+    const clearRespondentSignatureBtn = document.getElementById("clearRespondentSignature");
+    const signatureSection = document.getElementById("signatureSection");
+    const openComplainantSignatureFullscreenBtn = document.getElementById("openComplainantSignatureFullscreen");
+    const openRespondentSignatureFullscreenBtn = document.getElementById("openRespondentSignatureFullscreen");
+    const signatureFullscreenModalEl = document.getElementById("signatureFullscreenModal");
+    const signatureFullscreenTitle = document.getElementById("signatureFullscreenLabel");
+    const signatureFullscreenCanvas = document.getElementById("signatureFullscreenCanvas");
+    const signatureFullscreenClearBtn = document.getElementById("signatureFullscreenClear");
+    const signatureFullscreenSaveBtn = document.getElementById("signatureFullscreenSave");
+    const narrativeSignatureModalEl = document.getElementById("narrativeSignatureModal");
+    const openNarrativeSignatureModalBtn = document.getElementById("openNarrativeSignatureModal");
     if (!form || !submitBtn) return;
 
     const confirmModal = confirmSubmitModalEl ? new bootstrap.Modal(confirmSubmitModalEl) : null;
     const successModal = successSubmitModalEl ? new bootstrap.Modal(successSubmitModalEl) : null;
+    const signatureFullscreenModal = signatureFullscreenModalEl ? new bootstrap.Modal(signatureFullscreenModalEl) : null;
+    const narrativeSignatureModal = narrativeSignatureModalEl ? new bootstrap.Modal(narrativeSignatureModalEl) : null;
     let submitConfirmed = false;
 
     const setNarrativeMode = () => {
-        const mode = inputMethod?.value || "text";
+        const mode = inputMethod?.value || "";
+        const useText = mode === "text";
         const useFile = mode === "file";
 
-        textWrapper?.classList.toggle("d-none", useFile);
+        textWrapper?.classList.toggle("d-none", !useText);
         fileWrapper?.classList.toggle("d-none", !useFile);
+        signatureSection?.classList.toggle("d-none", !useText);
 
-        if (narrativeText) narrativeText.required = !useFile;
+        if (narrativeText) narrativeText.required = useText;
         if (fileInput) fileInput.required = useFile;
+        setRequired(complainantSignatureData, useText);
+        setRequired(respondentSignatureData, useText);
+        if (!useText) {
+            complainantSignatureData?.setCustomValidity("");
+            respondentSignatureData?.setCustomValidity("");
+            complainantSignatureError?.classList.add("d-none");
+            respondentSignatureError?.classList.add("d-none");
+        }
 
         if (useFile && narrativeText) {
             narrativeText.value = "";
@@ -115,6 +145,267 @@ document.addEventListener("DOMContentLoaded", () => {
     };
 
     const touchedFields = new WeakSet();
+
+    const initSignaturePad = (canvas, hiddenInput, errorEl, clearBtn) => {
+        if (!canvas || !hiddenInput) return null;
+        const ctx = canvas.getContext("2d");
+        if (!ctx) return null;
+        let drawing = false;
+        let hasStroke = false;
+
+        const paintBackground = () => {
+            const rect = canvas.getBoundingClientRect();
+            ctx.fillStyle = "#ffffff";
+            ctx.fillRect(0, 0, rect.width, rect.height);
+        };
+
+        const setDrawingStyle = () => {
+            ctx.lineWidth = 2;
+            ctx.lineCap = "round";
+            ctx.lineJoin = "round";
+            ctx.strokeStyle = "#111827";
+        };
+
+        const drawFromData = (dataUrl) => {
+            paintBackground();
+            if (!dataUrl) {
+                hasStroke = false;
+                hiddenInput.value = "";
+                hiddenInput.setCustomValidity("Signature is required.");
+                if (errorEl) errorEl.classList.remove("d-none");
+                return;
+            }
+            const rect = canvas.getBoundingClientRect();
+            const img = new Image();
+            img.onload = () => {
+                ctx.drawImage(img, 0, 0, rect.width, rect.height);
+                hasStroke = true;
+                hiddenInput.value = canvas.toDataURL("image/png");
+                hiddenInput.setCustomValidity("");
+                if (errorEl) errorEl.classList.add("d-none");
+            };
+            img.src = dataUrl;
+        };
+
+        const resizeCanvas = () => {
+            const ratio = window.devicePixelRatio || 1;
+            const rect = canvas.getBoundingClientRect();
+            const width = Math.max(1, Math.floor(rect.width * ratio));
+            const height = Math.max(1, Math.floor(rect.height * ratio));
+            const snapshot = hiddenInput.value || (hasStroke ? canvas.toDataURL("image/png") : "");
+            canvas.width = width;
+            canvas.height = height;
+            ctx.setTransform(1, 0, 0, 1, 0, 0);
+            ctx.scale(ratio, ratio);
+            setDrawingStyle();
+            drawFromData(snapshot);
+        };
+
+        const point = (event) => {
+            const rect = canvas.getBoundingClientRect();
+            const source = event.touches && event.touches[0] ? event.touches[0] : event;
+            return {
+                x: source.clientX - rect.left,
+                y: source.clientY - rect.top
+            };
+        };
+
+        const start = (event) => {
+            event.preventDefault();
+            drawing = true;
+            const p = point(event);
+            ctx.beginPath();
+            ctx.moveTo(p.x, p.y);
+        };
+
+        const move = (event) => {
+            if (!drawing) return;
+            event.preventDefault();
+            const p = point(event);
+            ctx.lineTo(p.x, p.y);
+            ctx.stroke();
+            hasStroke = true;
+            hiddenInput.value = canvas.toDataURL("image/png");
+            hiddenInput.setCustomValidity("");
+            if (errorEl) errorEl.classList.add("d-none");
+        };
+
+        const end = () => {
+            drawing = false;
+        };
+
+        const clear = () => drawFromData("");
+
+        canvas.addEventListener("mousedown", start);
+        canvas.addEventListener("mousemove", move);
+        window.addEventListener("mouseup", end);
+        canvas.addEventListener("mouseleave", end);
+        canvas.addEventListener("touchstart", start, { passive: false });
+        canvas.addEventListener("touchmove", move, { passive: false });
+        canvas.addEventListener("touchend", end);
+        canvas.addEventListener("touchcancel", end);
+        clearBtn?.addEventListener("click", clear);
+        window.addEventListener("resize", resizeCanvas);
+
+        resizeCanvas();
+        clear();
+
+        return {
+            validate: () => {
+                const ok = !!hiddenInput.value;
+                hiddenInput.setCustomValidity(ok ? "" : "Signature is required.");
+                if (errorEl) errorEl.classList.toggle("d-none", ok);
+                return ok;
+            },
+            resize: resizeCanvas,
+            clear,
+            setData: (dataUrl) => drawFromData(dataUrl || ""),
+            getData: () => hiddenInput.value
+        };
+    };
+
+    const initFullscreenSignaturePad = (canvas) => {
+        if (!canvas) return null;
+        const ctx = canvas.getContext("2d");
+        if (!ctx) return null;
+        let drawing = false;
+        let hasStroke = false;
+
+        const setDrawingStyle = () => {
+            ctx.lineWidth = 2;
+            ctx.lineCap = "round";
+            ctx.lineJoin = "round";
+            ctx.strokeStyle = "#111827";
+        };
+
+        const fillWhite = () => {
+            const rect = canvas.getBoundingClientRect();
+            ctx.fillStyle = "#ffffff";
+            ctx.fillRect(0, 0, rect.width, rect.height);
+        };
+
+        const resize = (dataUrl) => {
+            const ratio = window.devicePixelRatio || 1;
+            const rect = canvas.getBoundingClientRect();
+            canvas.width = Math.max(1, Math.floor(rect.width * ratio));
+            canvas.height = Math.max(1, Math.floor(rect.height * ratio));
+            ctx.setTransform(1, 0, 0, 1, 0, 0);
+            ctx.scale(ratio, ratio);
+            setDrawingStyle();
+            fillWhite();
+            hasStroke = !!dataUrl;
+            if (!dataUrl) return;
+            const img = new Image();
+            img.onload = () => ctx.drawImage(img, 0, 0, rect.width, rect.height);
+            img.src = dataUrl;
+        };
+
+        const point = (event) => {
+            const rect = canvas.getBoundingClientRect();
+            const source = event.touches && event.touches[0] ? event.touches[0] : event;
+            return {
+                x: source.clientX - rect.left,
+                y: source.clientY - rect.top
+            };
+        };
+
+        const start = (event) => {
+            event.preventDefault();
+            drawing = true;
+            const p = point(event);
+            ctx.beginPath();
+            ctx.moveTo(p.x, p.y);
+        };
+
+        const move = (event) => {
+            if (!drawing) return;
+            event.preventDefault();
+            const p = point(event);
+            ctx.lineTo(p.x, p.y);
+            ctx.stroke();
+            hasStroke = true;
+        };
+
+        const end = () => {
+            drawing = false;
+        };
+
+        canvas.addEventListener("mousedown", start);
+        canvas.addEventListener("mousemove", move);
+        window.addEventListener("mouseup", end);
+        canvas.addEventListener("mouseleave", end);
+        canvas.addEventListener("touchstart", start, { passive: false });
+        canvas.addEventListener("touchmove", move, { passive: false });
+        canvas.addEventListener("touchend", end);
+        canvas.addEventListener("touchcancel", end);
+
+        return {
+            resize,
+            clear: () => {
+                hasStroke = false;
+                resize("");
+            },
+            setData: (dataUrl) => resize(dataUrl || ""),
+            getData: () => (hasStroke ? canvas.toDataURL("image/png") : "")
+        };
+    };
+
+    const complainantSignaturePad = initSignaturePad(
+        complainantSignatureCanvas,
+        complainantSignatureData,
+        complainantSignatureError,
+        clearComplainantSignatureBtn
+    );
+    const respondentSignaturePad = initSignaturePad(
+        respondentSignatureCanvas,
+        respondentSignatureData,
+        respondentSignatureError,
+        clearRespondentSignatureBtn
+    );
+    const fullscreenSignaturePad = initFullscreenSignaturePad(signatureFullscreenCanvas);
+    let activeSignaturePad = null;
+
+    const openSignatureFullscreen = (targetPad, label) => {
+        if (!signatureFullscreenModal || !fullscreenSignaturePad || !targetPad) return;
+        activeSignaturePad = targetPad;
+        if (signatureFullscreenTitle) {
+            signatureFullscreenTitle.textContent = `${label} Signature`;
+        }
+        signatureFullscreenModal.show();
+    };
+
+    signatureFullscreenModalEl?.addEventListener("shown.bs.modal", () => {
+        if (!fullscreenSignaturePad || !activeSignaturePad) return;
+        fullscreenSignaturePad.setData(activeSignaturePad.getData());
+    });
+
+    signatureFullscreenSaveBtn?.addEventListener("click", () => {
+        if (!fullscreenSignaturePad || !activeSignaturePad) return;
+        activeSignaturePad.setData(fullscreenSignaturePad.getData());
+        signatureFullscreenModal?.hide();
+    });
+
+    signatureFullscreenClearBtn?.addEventListener("click", () => {
+        fullscreenSignaturePad?.clear();
+    });
+
+    openComplainantSignatureFullscreenBtn?.addEventListener("click", () => {
+        openSignatureFullscreen(complainantSignaturePad, "Complainant");
+    });
+
+    openRespondentSignatureFullscreenBtn?.addEventListener("click", () => {
+        openSignatureFullscreen(respondentSignaturePad, "Respondent");
+    });
+
+    openNarrativeSignatureModalBtn?.addEventListener("click", () => {
+        narrativeSignatureModal?.show();
+    });
+
+    narrativeSignatureModalEl?.addEventListener("shown.bs.modal", () => {
+        complainantSignaturePad?.resize();
+        respondentSignaturePad?.resize();
+        updateState();
+    });
 
     const renderAllValidity = () => {
         form.querySelectorAll("input, select, textarea").forEach((el) => {
@@ -240,7 +531,12 @@ document.addEventListener("DOMContentLoaded", () => {
         }
     };
 
-    inputMethod?.addEventListener("change", updateState);
+    inputMethod?.addEventListener("change", () => {
+        updateState();
+        if ((inputMethod?.value || "") !== "") {
+            narrativeSignatureModal?.show();
+        }
+    });
     form.querySelectorAll("input, select, textarea").forEach((el) => {
         el.addEventListener("input", () => {
             touchedFields.add(el);
@@ -311,10 +607,18 @@ document.addEventListener("DOMContentLoaded", () => {
     form.addEventListener("input", updateState);
     form.addEventListener("change", updateState);
     form.addEventListener("submit", (e) => {
+        const requiresSignature = (inputMethod?.value || "") === "text";
+        const signaturesValid =
+            !requiresSignature ||
+            ((!complainantSignaturePad || complainantSignaturePad.validate()) &&
+            (!respondentSignaturePad || respondentSignaturePad.validate()));
         if (!submitConfirmed) {
             e.preventDefault();
             e.stopPropagation();
             updateState();
+            if (!signaturesValid) {
+                return;
+            }
             if (!form.checkValidity()) {
                 renderAllValidity();
                 return;
@@ -323,6 +627,11 @@ document.addEventListener("DOMContentLoaded", () => {
             return;
         }
         updateState();
+        if (!signaturesValid) {
+            e.preventDefault();
+            e.stopPropagation();
+            return;
+        }
         if (!form.checkValidity()) {
             e.preventDefault();
             e.stopPropagation();
