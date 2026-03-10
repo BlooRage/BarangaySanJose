@@ -47,17 +47,43 @@
           padding-right: 44px;
           cursor: pointer;
           background: #fff;
+          border-color: #cbd5e1;
+          color: #0f172a;
+          box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+          transition: border-color 0.18s ease, box-shadow 0.18s ease, background-color 0.18s ease;
         }
         .resident-date-proxy[readonly] {
+          background: #fff !important;
+          color: #0f172a !important;
+          opacity: 1;
+          -webkit-text-fill-color: #0f172a;
+        }
+        .resident-date-proxy::placeholder {
+          color: #64748b;
+          opacity: 1;
+        }
+        .resident-date-proxy:hover {
+          background: #f8fafc;
+          border-color: #94a3b8;
+        }
+        .resident-date-proxy:focus {
           background: #fff;
+          border-color: #3b82f6;
+          box-shadow: 0 0 0 0.2rem rgba(59, 130, 246, 0.18);
+          outline: none;
         }
         .resident-date-proxy-icon {
           position: absolute;
           top: 50%;
           right: 14px;
           transform: translateY(-50%);
-          color: #6b7280;
+          color: #64748b;
           pointer-events: none;
+          transition: color 0.18s ease;
+        }
+        .resident-date-proxy-wrap:hover .resident-date-proxy-icon,
+        .resident-date-proxy:focus + .resident-date-proxy-icon {
+          color: #2563eb;
         }
         .resident-date-modal .modal-content {
           border-radius: 18px;
@@ -298,6 +324,9 @@
       proxy.placeholder = input.getAttribute("placeholder") || "Select date";
       proxy.readOnly = true;
       proxy.autocomplete = "off";
+      proxy.setAttribute("role", "button");
+      proxy.setAttribute("aria-haspopup", "dialog");
+      proxy.title = "Click to select a date";
 
       const icon = document.createElement("i");
       icon.className = "fa-regular fa-calendar resident-date-proxy-icon";

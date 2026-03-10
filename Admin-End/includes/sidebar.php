@@ -6,6 +6,7 @@ $residentMgmtPages = ['ResidentMasterlist.php', 'ResidentArchive.php', 'EditRequ
 $certPages = ['CertificateTracker.php'];
 $financePages = ['FinancePayments.php'];
 $blotterPages = ['BlotterForm.php', 'BlotterTracker.php'];
+$complaintPages = ['ComplaintTracker.php'];
 $contentMgmtPages = ['Announcements.php', 'CreateAnnouncement.php'];
 $userMgmtPages = ['UserMasterlist.php'];
 $adminMgmtPages = ['OfficialsManagement.php', 'OfficialInvites.php'];
@@ -39,6 +40,7 @@ $isResidentMgmtActive = in_array($current, $residentMgmtPages);
 $isCertActive = in_array($current, $certPages);
 $isFinanceActive = in_array($current, $financePages);
 $isBlotterActive = in_array($current, $blotterPages);
+$isComplaintActive = in_array($current, $complaintPages);
 $isContentMgmtActive = in_array($current, $contentMgmtPages);
 $isUserMgmtActive = in_array($current, $userMgmtPages);
 $isAdminMgmtActive = in_array($current, $adminMgmtPages);
@@ -297,6 +299,27 @@ if (!empty($_SESSION['user_id']) && isset($conn) && $conn instanceof mysqli) {
             <li>
               <a href="<?= htmlspecialchars(appUrl('Admin-End/Blotter/BlotterTracker.php')) ?>"
                  class="link-dark rounded <?= $current == 'BlotterTracker.php' ? 'active' : '' ?>">
+                Tracker
+              </a>
+            </li>
+          </ul>
+        </div>
+      </li>
+
+      <li class="mb-1 mt-2 text-muted small fw-semibold px-2">Complaints and Grievances</li>
+      <li class="mb-1">
+        <button class="btn btn-toggle d-flex align-items-center gap-2 rounded <?= $isComplaintActive ? '' : 'collapsed' ?>"
+                data-bs-toggle="collapse"
+                data-bs-target="#complaint-tools-collapse"
+                aria-expanded="<?= $isComplaintActive ? 'true' : 'false' ?>">
+          <i class="fas fa-comments"></i> Complaint Tools
+        </button>
+
+        <div class="collapse <?= $isComplaintActive ? 'show' : '' ?>" id="complaint-tools-collapse">
+          <ul class="btn-toggle-nav list-unstyled fw-normal pb-1 small">
+            <li>
+              <a href="<?= htmlspecialchars(appUrl('Admin-End/Complaints/ComplaintTracker.php')) ?>"
+                 class="link-dark rounded <?= $current == 'ComplaintTracker.php' ? 'active' : '' ?>">
                 Tracker
               </a>
             </li>
