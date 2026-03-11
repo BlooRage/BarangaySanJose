@@ -124,6 +124,23 @@
       border-radius: 10px;
       white-space: nowrap;
     }
+
+    .hof-view-card {
+      border: 1px solid #f1e1cf;
+      border-radius: 12px;
+      background: #fffaf4;
+      padding: 14px;
+    }
+
+    .hof-view-label {
+      font-size: 0.78rem;
+      color: #6c757d;
+      font-weight: 600;
+    }
+
+    .hof-view-value {
+      font-weight: 600;
+    }
   </style>
 </head>
 <body>
@@ -141,7 +158,7 @@
       <hr><br>
 
       <div id="div-tableContainer" class="bg-white p-4 rounded-4 shadow-sm border hof-shell">
-        <div class="admin-list-toolbar mb-3 flex-wrap">
+        <div class="admin-list-toolbar mb-3 flex-wrap pt-3">
           <div class="admin-list-tabs d-flex gap-2 flex-wrap">
             <button type="button" class="btn btn-outline-primary btn-sm status-filter-btn active fw-bold" data-filter="ALL">All</button>
             <button type="button" class="btn btn-outline-secondary btn-sm status-filter-btn has-notif fw-bold" data-filter="Pending">
@@ -276,6 +293,31 @@
     </div>
   </div>
 
+  <div class="modal fade" id="modalHofView" tabindex="-1" data-bs-backdrop="static" data-bs-keyboard="false">
+    <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable">
+      <div class="modal-content p-4">
+        <div class="modal-header border-0">
+          <div>
+            <h4 class="fw-bold mb-1">Household Profiling</h4>
+            <div class="text-muted small">Resident Registration Details</div>
+          </div>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <div class="mb-3">
+            <div class="hof-view-label">Household Address</div>
+            <div id="hofViewAddress" class="hof-view-value">-</div>
+            <div id="hofViewAddressMeta" class="text-muted small"></div>
+          </div>
+          <div class="row g-3" id="hofViewApplicants"></div>
+        </div>
+        <div class="modal-footer border-0">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
   <script>
     window.ADMIN_TABLE_COLUMNS_CONFIG = {
@@ -287,6 +329,6 @@
     };
   </script>
   <script src="../JS-Script-Files/Admin-End/tableColumnsGeneric.js?v=20260215-1"></script>
-  <script src="../JS-Script-Files/Admin-End/headOfFamilyVerificationScript.js?v=20260309-2"></script>
+  <script src="../JS-Script-Files/Admin-End/headOfFamilyVerificationScript.js?v=20260311-1"></script>
 </body>
 </html>

@@ -58,11 +58,26 @@ function fetch_head_rows(mysqli $conn): array {
             r.middlename,
             r.lastname,
             r.suffix,
+            r.sex,
+            r.birthdate,
+            r.birthplace,
+            r.baranagayresidency,
+            r.civil_status,
+            r.family_role,
+            r.voter_status,
+            r.occupation,
+            r.occupation_detail,
+            r.religion,
+            r.sector_membership,
             a.street_number AS house_number,
+            a.unit_number,
             a.street_name,
             a.phase_number,
             a.subdivision,
             a.area_number,
+            a.house_type,
+            a.house_ownership,
+            a.residency_duration,
             a.address_id
         FROM residentinformationtbl r
         LEFT JOIN statuslookuptbl s ON r.status_id_resident = s.status_id
@@ -298,6 +313,17 @@ if (isset($_GET['fetch'])) {
                 'address_id' => $row['address_id'] ?? ($decision['address_id'] ?? ''),
                 'address_display' => $addressDisplay !== '-' ? $addressDisplay : ($decision['address_display'] ?? '-'),
                 'area_number' => $row['area_number'] ?? ($decision['area_number'] ?? ''),
+                'address_details' => [
+                    'unit_number' => $row['unit_number'] ?? '',
+                    'house_number' => $row['house_number'] ?? '',
+                    'street_name' => $row['street_name'] ?? '',
+                    'phase_number' => $row['phase_number'] ?? '',
+                    'subdivision' => $row['subdivision'] ?? '',
+                    'area_number' => $row['area_number'] ?? '',
+                    'house_type' => $row['house_type'] ?? '',
+                    'house_ownership' => $row['house_ownership'] ?? '',
+                    'residency_duration' => $row['residency_duration'] ?? ''
+                ],
                 'verification_status' => $decision['decision_status'] ?? 'Pending',
                 'selected_resident_id' => $decision['selected_resident_id'] ?? '',
                 'decided_by_user_id' => $decision['decided_by_user_id'] ?? '',
@@ -310,7 +336,18 @@ if (isset($_GET['fetch'])) {
         $groups[$key]['households'][] = [
             'resident_id' => $row['resident_id'],
             'head_full_name' => $fullName,
-            'member_count' => 1
+            'member_count' => 1,
+            'sex' => $row['sex'] ?? '',
+            'birthdate' => $row['birthdate'] ?? '',
+            'birthplace' => $row['birthplace'] ?? '',
+            'barangay_residency' => $row['baranagayresidency'] ?? '',
+            'civil_status' => $row['civil_status'] ?? '',
+            'family_role' => $row['family_role'] ?? '',
+            'voter_status' => $row['voter_status'] ?? '',
+            'occupation' => $row['occupation'] ?? '',
+            'occupation_detail' => $row['occupation_detail'] ?? '',
+            'religion' => $row['religion'] ?? '',
+            'sector_membership' => $row['sector_membership'] ?? ''
         ];
     }
 
@@ -321,6 +358,17 @@ if (isset($_GET['fetch'])) {
             'address_id' => $decision['address_id'] ?? '',
             'address_display' => $decision['address_display'] ?? '-',
             'area_number' => $decision['area_number'] ?? '',
+            'address_details' => [
+                'unit_number' => '',
+                'house_number' => '',
+                'street_name' => '',
+                'phase_number' => '',
+                'subdivision' => '',
+                'area_number' => $decision['area_number'] ?? '',
+                'house_type' => '',
+                'house_ownership' => '',
+                'residency_duration' => ''
+            ],
             'verification_status' => $decision['decision_status'] ?? 'Pending',
             'selected_resident_id' => $decision['selected_resident_id'] ?? '',
             'decided_by_user_id' => $decision['decided_by_user_id'] ?? '',
@@ -346,4 +394,3 @@ if (isset($_GET['fetch'])) {
 
 http_response_code(404);
 echo json_encode(['success' => false, 'message' => 'Not found']);
-

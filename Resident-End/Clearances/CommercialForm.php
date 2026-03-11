@@ -103,21 +103,53 @@ $ownerFullAddress = htmlspecialchars(implode(', ', $ownerFullAddressParts), ENT_
     <link rel="stylesheet" href="../../CSS-Styles/Resident-End-CSS/residentDashboard.css">
     <link rel="stylesheet" href="../../CSS-Styles/Guest-End-CSS/GeneralStyle.css">
     <link rel="stylesheet" href="../../CSS-Styles/Resident-End-CSS/applicationForms.css">
+    <style>
+        body {
+            background: #fffdfb;
+        }
+        #div-mainDisplay {
+            background: #ffffff !important;
+        }
+        #div-mainDisplay .form-title,
+        #div-mainDisplay .form-subtitle,
+        #div-mainDisplay .back-link {
+            max-width: 1300px;
+            margin-left: auto;
+            margin-right: auto;
+        }
+        #div-mainDisplay .page-form {
+            max-width: 1300px;
+            margin: 0 auto;
+            padding-bottom: 48px;
+        }
+        h1 {
+            font-size: 2.8rem !important;
+            font-weight: 700;
+        }
+        h2.section-title,
+        h3.section-title {
+            font-size: 1.4rem;
+            font-weight: 600;
+            margin-top: 32px;
+            margin-bottom: 24px;
+        }
+    </style>
 </head>
 <body>
 
 <div class="d-flex min-vh-100">
     <?php include __DIR__ . '/../includes/resident_sidebar.php'; ?>
 
-    <main id="div-mainDisplay" class="flex-grow-1 px-4 pb-4 pt-0 px-md-5 pb-md-5 pt-md-0 bg-light">
-        <div class="main-head application-card orange-card application-card--muted py-3 my-5 rounded">
-            <div class="main-head-content">
-            <a href="<?= htmlspecialchars($baseUrl) ?>/Resident-End/Clearances/ClearancesLandingPage.php" class="back-link">< Go Back</a>
-
-            <h1 class="form-title">Barangay Clearance for Commercial Permit</h1>
+    <main id="div-mainDisplay" class="flex-grow-1 px-4 pb-4 pt-0 px-md-5 pb-md-5 pt-md-0">
+            <div class="position-relative d-flex align-items-center justify-content-center mb-2 pt-4">
+                <a href="<?= htmlspecialchars($baseUrl) ?>/Resident-End/Clearances/ClearancesLandingPage.php" class="back-link d-inline-flex align-items-center text-decoration-none text-dark m-0 position-absolute start-0">
+                    <i class="bi bi-arrow-left-short fs-3"></i>
+                </a>
+                <h1 class="form-title m-0">Barangay Clearance for Commercial Permit</h1>
+            </div>
             <p class="form-subtitle">All fields marked with <span class="required-asterisk">*</span> are required</p>
 
-            <form action="#" method="POST">
+            <form class="page-form" action="#" method="POST">
 
                 <h2 class="section-title text-center text-dark">Applicant Information</h2>
                 <div class="form-row">
@@ -319,8 +351,6 @@ $ownerFullAddress = htmlspecialchars(implode(', ', $ownerFullAddressParts), ENT_
                 </div>
 
             </form>
-            </div>
-        </div>
     </main>
 </div>
 

@@ -15,6 +15,10 @@ document.addEventListener("DOMContentLoaded", () => {
   const approveGroupKey = document.getElementById("approveGroupKey");
   const approveError = document.getElementById("approveHeadError");
   const btnConfirmApprove = document.getElementById("btnConfirmApproveHead");
+  const viewModalEl = document.getElementById("modalHofView");
+  const viewAddressEl = document.getElementById("hofViewAddress");
+  const viewAddressMetaEl = document.getElementById("hofViewAddressMeta");
+  const viewApplicantsEl = document.getElementById("hofViewApplicants");
 
   let rowsRaw = [];
   let activeStatus = "ALL";
@@ -131,12 +135,14 @@ document.addEventListener("DOMContentLoaded", () => {
         <td>${safe(row.decided_at)}</td>
         <td>
           <div class="d-flex gap-2">
+            <button type="button" class="btn btn-outline-secondary btn-sm btn-view">View</button>
             <button type="button" class="btn btn-success btn-sm btn-approve" ${canAct ? "" : "disabled"}>Approve</button>
             <button type="button" class="btn btn-danger btn-sm btn-decline" ${canAct ? "" : "disabled"}>Decline</button>
           </div>
         </td>
       `;
 
+      tr.querySelector(".btn-view")?.addEventListener("click", () => openViewModal(row));
       tr.querySelector(".btn-approve")?.addEventListener("click", () => openApproveModal(row));
       tr.querySelector(".btn-decline")?.addEventListener("click", () => declineGroup(row));
       tbody.appendChild(tr);
@@ -206,6 +212,95 @@ document.addEventListener("DOMContentLoaded", () => {
     const modalEl = document.getElementById("modalApproveHead");
     if (!modalEl) return;
     new bootstrap.Modal(modalEl, { backdrop: "static", keyboard: false }).show();
+  };
+
+  const openViewModal = (row) => {
+    if (!row) return;
+    if (viewAddressEl) viewAddressEl.textContent = safe(row.address_display);
+    if (viewAddressMetaEl) {
+      const details = row.address_details || {};
+      const parts = [
+        details.unit_number ? `Unit ${details.unit_number}` : "",
+        details.house_number ? `House ${details.house_number}` : "",
+        details.street_name ? details.street_name : "",
+        details.phase_number ? details.phase_number : "",
+        details.subdivision ? details.subdivision : "",
+        details.area_number ? `Area ${details.area_number}` : ""
+      ].filter(Boolean);
+      const meta = [
+        details.house_type ? `House Type: ${details.house_type}` : "",
+        details.house_ownership ? `Ownership: ${details.house_ownership}` : "",
+        details.residency_duration ? `Residency: ${details.residency_duration}` : ""
+      ].filter(Boolean);
+      viewAddressMetaEl.textContent = [...parts, ...meta].join(" • ");
+    }
+
+    if (viewApplicantsEl) {
+      viewApplicantsEl.innerHTML = "";
+      const households = Array.isArray(row.households) ? row.households : [];
+      households.forEach((member) => {
+        const card = document.createElement("div");
+        card.className = "col-12";
+        const voterRaw = String(member.voter_status ?? "").trim();
+        const voterLabel = voterRaw === "" ? "-" : (voterRaw === "1" ? "Registered" : "Not Registered");
+        const occupation = [member.occupation, member.occupation_detail].filter((v) => String(v || "").trim() !== "").join(" - ");
+        card.innerHTML = `
+          <div class="hof-view-card">
+            <div class="d-flex flex-wrap justify-content-between gap-2">
+              <div class="fw-bold">${safe(member.head_full_name)}</div>
+              <div class="text-muted small">Resident ID: ${safe(member.resident_id)}</div>
+            </div>
+            <div class="row g-2 mt-2">
+              <div class="col-md-4">
+                <div class="hof-view-label">Sex</div>
+                <div class="hof-view-value">${safe(member.sex)}</div>
+              </div>
+              <div class="col-md-4">
+                <div class="hof-view-label">Birthdate</div>
+                <div class="hof-view-value">${safe(member.birthdate)}</div>
+              </div>
+              <div class="col-md-4">
+                <div class="hof-view-label">Birthplace</div>
+                <div class="hof-view-value">${safe(member.birthplace)}</div>
+              </div>
+              <div class="col-md-4">
+                <div class="hof-view-label">Barangay Residency</div>
+                <div class="hof-view-value">${safe(member.barangay_residency)}</div>
+              </div>
+              <div class="col-md-4">
+                <div class="hof-view-label">Civil Status</div>
+                <div class="hof-view-value">${safe(member.civil_status)}</div>
+              </div>
+              <div class="col-md-4">
+                <div class="hof-view-label">Family Role</div>
+                <div class="hof-view-value">${safe(member.family_role)}</div>
+              </div>
+              <div class="col-md-4">
+                <div class="hof-view-label">Voter Status</div>
+                <div class="hof-view-value">${safe(voterLabel)}</div>
+              </div>
+              <div class="col-md-4">
+                <div class="hof-view-label">Occupation</div>
+                <div class="hof-view-value">${safe(occupation)}</div>
+              </div>
+              <div class="col-md-4">
+                <div class="hof-view-label">Religion</div>
+                <div class="hof-view-value">${safe(member.religion)}</div>
+              </div>
+              <div class="col-md-4">
+                <div class="hof-view-label">Sector Membership</div>
+                <div class="hof-view-value">${safe(member.sector_membership)}</div>
+              </div>
+            </div>
+          </div>
+        `;
+        viewApplicantsEl.appendChild(card);
+      });
+    }
+
+    if (viewModalEl && window.bootstrap?.Modal) {
+      bootstrap.Modal.getOrCreateInstance(viewModalEl, { backdrop: "static", keyboard: false }).show();
+    }
   };
 
   const approveGroup = async () => {

@@ -104,19 +104,52 @@ $fullAddress = htmlspecialchars(implode(', ', $fullAddressParts), ENT_QUOTES, 'U
     <link rel="stylesheet" href="../../CSS-Styles/Resident-End-CSS/residentDashboard.css">
     <link rel="stylesheet" href="../../CSS-Styles/Guest-End-CSS/GeneralStyle.css">
     <link rel="stylesheet" href="../../CSS-Styles/Resident-End-CSS/applicationForms.css">
-</head>
+    <style>
+        body {
+            background: #fffdfb;
+        }
+        #div-mainDisplay {
+            background: #ffffff !important;
+        }
+        #div-mainDisplay .form-title,
+        #div-mainDisplay .form-subtitle,
+        #div-mainDisplay .back-link {
+            max-width: 1300px;
+            margin-left: auto;
+            margin-right: auto;
+        }
+        #div-mainDisplay .page-form {
+            max-width: 1300px;
+            margin: 0 auto;
+            padding-bottom: 48px;
+        }
+        h1 {
+            font-size: 2.8rem !important;
+            font-weight: 700;
+        }
+        h2.section-title,
+        h3.section-title {
+            font-size: 1.4rem;
+            font-weight: 600;
+            margin-top: 32px;
+            margin-bottom: 24px;
+        }
+    </style></head>
 <body>
     <div class="d-flex min-vh-100">
         <?php include __DIR__ . '/../includes/resident_sidebar.php'; ?>
 
-        <main id="div-mainDisplay" class="flex-grow-1 px-4 pb-4 pt-0 px-md-5 pb-md-5 pt-md-0 bg-light">
-            <div class="main-head application-card orange-card py-3 my-5 rounded application-card--muted">
-                <div class="main-head-content">
-                    <a href="<?= htmlspecialchars($baseUrl) ?>/Resident-End/Certificates/CertificatesLandingPage.php" class="back-link">&lt; Go Back</a>
-                    <h1 class="form-title">Good Moral</h1>
+        <main id="div-mainDisplay" class="flex-grow-1 px-4 pb-4 pt-0 px-md-5 pb-md-5 pt-md-0">
+            
+                    <div class="position-relative d-flex align-items-center justify-content-center mb-2 pt-4">
+                        <a href="<?= htmlspecialchars($baseUrl) ?>/Resident-End/Certificates/CertificatesLandingPage.php" class="back-link d-inline-flex align-items-center text-decoration-none text-dark m-0 position-absolute start-0">
+                            <i class="bi bi-arrow-left-short fs-3"></i>
+                        </a>
+                        <h1 class="form-title m-0">Good Moral</h1>
+                    </div>
                     <p class="form-subtitle">All fields marked with <span class="required-asterisk">*</span> are required</p>
 
-                    <form method="POST" action="<?= htmlspecialchars($baseUrl) ?>/PhpFiles/Resident-End/documentRequestWorkflow.php" enctype="multipart/form-data">
+                    <form class="page-form" method="POST" action="<?= htmlspecialchars($baseUrl) ?>/PhpFiles/Resident-End/documentRequestWorkflow.php" enctype="multipart/form-data">
                         <input type="hidden" name="action" value="submit_request">
                         <input type="hidden" name="document_type" value="goodmoral">
                         <input type="hidden" name="redirect" value="1">
@@ -186,8 +219,6 @@ $fullAddress = htmlspecialchars(implode(', ', $fullAddressParts), ENT_QUOTES, 'U
                             <button type="submit" class="submit-btn">SUBMIT</button>
                         </div>
                     </form>
-                </div>
-            </div>
         </main>
     </div>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
@@ -229,3 +260,4 @@ $fullAddress = htmlspecialchars(implode(', ', $fullAddressParts), ENT_QUOTES, 'U
     </script>
 </body>
 </html>
+

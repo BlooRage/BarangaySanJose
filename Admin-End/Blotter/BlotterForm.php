@@ -24,29 +24,58 @@ require_once __DIR__ . "/../includes/admin_guard.php";
     <title>Blotter Form</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons/font/bootstrap-icons.css" rel="stylesheet" />
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
     <link rel="stylesheet" href="../../CSS-Styles/Admin-End-CSS/AdminDashboardStyle.css">
     <link rel="stylesheet" href="../../CSS-Styles/Admin-End-CSS/ResidentMasterlistStyle.css?v=20260302-2">
     <link rel="stylesheet" href="../../CSS-Styles/Admin-End-CSS/BlotterMangementStyle.css?v=20260309-2">
     <link rel="stylesheet" href="../../CSS-Styles/Resident-End-CSS/applicationForms.css">
+    <style>
+        body {
+            background: #fffdfb;
+        }
+        #main-display {
+            background: #ffffff !important;
+        }
+        #main-display .form-title,
+        #main-display .form-subtitle,
+        #main-display .back-link {
+            max-width: 1300px;
+            margin-left: auto;
+            margin-right: auto;
+        }
+        #main-display .page-form {
+            max-width: 1300px;
+            margin: 0 auto;
+            padding-bottom: 48px;
+        }
+        h1 {
+            font-size: 2.8rem !important;
+            font-weight: 700;
+        }
+        h2.section-title,
+        h3.section-title {
+            font-size: 1.4rem;
+            font-weight: 600;
+            margin-top: 32px;
+            margin-bottom: 24px;
+        }
+    </style>
 </head>
 <body>
 <div class="d-flex flex-column flex-md-row" style="min-height: 100vh;">
     <?php include __DIR__ . '/../includes/sidebar.php'; ?>
 
-    <main id="main-display" class="flex-grow-1 px-4 pb-4 pt-0 px-md-5 pb-md-5 pt-md-5 bg-light">
-        <h2 class="mb-3" style="font-family: 'Charis SIL Bold'; color: #DE710C;">Blotter Form</h2>
-        <hr class="mb-4">
-
-        <div class="blotter-shell py-3 rounded">
-            <a href="<?= htmlspecialchars($baseUrl) ?>/Admin-End/AdminDashboard.php" class="back-link">&lt; Go Back</a>
-
-            <div class="text-center mt-3 mb-4">
-                <h1 class="form-title mb-2">Blotter Form</h1>
-                <p class="form-subtitle mb-0">All fields marked with <span class="required-asterisk">*</span> are required.</p>
+    <main id="main-display" class="flex-grow-1 px-4 pb-4 pt-0 px-md-5 pb-md-5 pt-md-0">
+            <div class="position-relative d-flex align-items-center justify-content-center mb-2 pt-4">
+                <a href="<?= htmlspecialchars($baseUrl) ?>/Admin-End/AdminDashboard.php" class="back-link d-inline-flex align-items-center text-decoration-none text-dark m-0 position-absolute start-0">
+                    <i class="bi bi-arrow-left-short fs-3"></i>
+                </a>
+                <h1 class="form-title m-0">Blotter Form</h1>
             </div>
+            <p class="form-subtitle mb-4 text-center">All fields marked with <span class="required-asterisk">*</span> are required.</p>
 
-            <form method="POST" action="../../PhpFiles/Admin-End/blotterManagement.php" id="blotterForm" enctype="multipart/form-data">
+            <form method="POST" action="../../PhpFiles/Admin-End/blotterManagement.php" id="blotterForm" class="page-form" enctype="multipart/form-data">
                 <h3 class="section-title mb-3 text-center">Blotter Information</h3>
                 <div class="row g-3 mb-3">
                     <div class="col-12 col-md-6">
@@ -443,7 +472,6 @@ require_once __DIR__ . "/../includes/admin_guard.php";
                     <button type="submit" id="blotterSubmit" class="btn btn-primary px-5">Submit</button>
                 </div>
             </form>
-        </div>
 
         <div class="modal fade" id="confirmSubmitModal" tabindex="-1" aria-labelledby="confirmSubmitLabel" aria-hidden="true">
             <div class="modal-dialog modal-dialog-centered">

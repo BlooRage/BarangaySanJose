@@ -17,29 +17,82 @@ require_once __DIR__ . "/../includes/resident_access_guard.php";
     <link rel="stylesheet" href="../../CSS-Styles/Resident-End-CSS/residentDashboard.css">
     <link rel="stylesheet" href="../../CSS-Styles/Guest-End-CSS/GeneralStyle.css">
     <link rel="stylesheet" href="../../CSS-Styles/Resident-End-CSS/ApplicationLandingPage.css?v=20260228-3">
+    <style>
+        body {
+            background: #fffdfb;
+        }
+        #div-mainDisplay {
+            background: #ffffff !important;
+        }
+        .page-shell {
+            max-width: 1100px;
+            margin: 0 auto;
+        }
+        .page-title {
+            font-size: 2.4rem;
+            font-weight: 700;
+        }
+        .page-subtitle {
+            font-size: 1.3rem;
+            font-weight: 600;
+            color: #1f1f1f;
+        }
+        .info-card {
+            background: #fff7ef;
+            border: 1px solid #f2d9c2;
+            border-radius: 16px;
+            padding: 20px 24px;
+        }
+        .info-list {
+            padding-left: 1.2rem;
+            margin-bottom: 0;
+        }
+        .apply-section {
+            padding-top: 12px;
+        }
+        .apply-btn {
+            min-width: 180px;
+        }
+    </style>
 </head>
 
 <body>
     <div class="d-flex min-vh-100">
         <?php include __DIR__ . '/../includes/resident_sidebar.php'; ?>
 
-        <main id="div-mainDisplay" class="main-content single-service-page flex-grow-1 p-4 p-md-5 bg-light">
-            <div class="d-flex align-items-center gap-2 mb-2">
-                <img src="../../Icons/Dashboard/brgyid.png" class="certificate-icon" alt="Barangay ID Service" style="height: 52px; margin-bottom: 0;">
-                <h1 class="page-title mb-0">Barangay ID Application</h1>
-            </div>
-            <hr>
+        <main id="div-mainDisplay" class="main-content single-service-page flex-grow-1 p-4 p-md-5">
+            <div class="page-shell">
+                <div class="d-flex align-items-center gap-3 mb-3">
+                    <img src="../../Icons/Dashboard/brgyid.png" class="certificate-icon" alt="Barangay ID Service" style="height: 52px; margin-bottom: 0;">
+                    <div>
+                        <h1 class="page-title mb-1">Barangay ID Application</h1>
+                    </div>
+                </div>
+                <hr>
 
-            <p class="page-description">
-                Welcome to the Barangay San Jose Online Barangay ID Application. Select the service below to proceed with your Barangay ID request.
-            </p>
-            <hr>
-
-            <div class="text-center mt-4">
                 <p class="page-description mb-4">
-                    Apply for a Barangay ID for local identification and barangay-related transactions.
+                    Welcome to the Barangay San Jose Online Barangay ID Application. Select the service below to proceed with your Barangay ID request.
                 </p>
-                <button class="btn apply-btn" type="button" onclick="location.href='BarangayIdForm.php'">Apply Now</button>
+
+                <div class="info-card">
+                    <h2 class="page-subtitle mb-2">Where You Can Use Your Barangay ID</h2>
+                    <p class="page-description mb-2">Your Barangay ID can be presented for:</p>
+                    <ul class="page-description info-list">
+                        <li>Verification of residence within Barangay San Jose</li>
+                        <li>Transactions and requests at the barangay hall (certificates, clearances, permits)</li>
+                        <li>Access to barangay programs, benefits, and community services</li>
+                        <li>Local identification for school or clinic records and other community requirements</li>
+                        <li>Supporting ID for local businesses and neighborhood associations</li>
+                        <li>Supports Digital ID</li>
+                    </ul>
+                    <p class="page-description mt-3 mb-0">
+                        Note: Acceptance may vary by agency or establishment. Please bring additional valid IDs if required.
+                    </p>
+                </div>
+
+                <div class="text-center apply-section mt-4">
+                    <button class="btn apply-btn" type="button" onclick="location.href='BarangayIdForm.php'">Apply Now</button>
+                </div>
             </div>
         </main>
     </div>
