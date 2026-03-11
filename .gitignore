@@ -1,8 +1,16 @@
-UnifiedFileAttachment/Documents/202602R00003/Passport202602R00003.png
-UnifiedFileAttachment/Documents/202602R00003/RegistrationForm202602R00003.pdf
-UnifiedFileAttachment/IDPictures/202602R00003/2x2Picture202602R00003.png
-UnifiedFileAttachment/Documents/202602R00003/MarriageCertificate202602R00003.jpg
-UnifiedFileAttachment/Documents/202602R00006/Passport202602R00006.png
-UnifiedFileAttachment/Documents/202602R00006/RegistrationForm202602R00006_1.pdf
-UnifiedFileAttachment/IDPictures/202602R00006/2x2Picture202602R00006.png
+# Runtime uploads and generated documents must stay out of Git.
+UnifiedFileAttachment/.DS_Store
+UnifiedFileAttachment/Documents/**
+UnifiedFileAttachment/IDPictures/**
+UnifiedFileAttachment/DocumentRequests/**
+UnifiedFileAttachment/IssuedDocuments/Generated/**
+UnifiedFileAttachment/IssuedDocuments/QR/**
+
+!UnifiedFileAttachment/Documents/.gitkeep
+!UnifiedFileAttachment/IDPictures/.gitkeep
+!UnifiedFileAttachment/DocumentRequests/.gitkeep
+!UnifiedFileAttachment/IssuedDocuments/Generated/.gitkeep
+!UnifiedFileAttachment/IssuedDocuments/QR/.gitkeep
+
+# Existing local ignore retained.
 JS-Script-Files/Resident-End/Clearances/electricalPermitScript.js
