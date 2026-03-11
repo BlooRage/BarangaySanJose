@@ -620,6 +620,236 @@ require_once __DIR__ . '/../includes/admin_guard.php';
       color: #111827;
       margin: 14px auto 0;
     }
+    #viewModal .doc-preview-paper.doc-preview-paper--business {
+      font-family: Arial, Helvetica, sans-serif;
+      display: flex;
+      flex-direction: column;
+      min-height: 1188px;
+      padding: 28px 44px 34px;
+    }
+    #viewModal .doc-preview-paper.doc-preview-paper--business .doc-preview-hint {
+      display: none;
+    }
+    #viewModal .doc-preview-paper.doc-preview-paper--business .doc-preview-head-center p {
+      font-family: "Times New Roman", Times, serif;
+      font-size: .88rem;
+      line-height: 1.08;
+    }
+    #viewModal .doc-preview-paper.doc-preview-paper--business .doc-preview-head-center .rep {
+      font-size: 1.02rem;
+      letter-spacing: .01em;
+    }
+    #viewModal .doc-preview-paper.doc-preview-paper--business .doc-preview-head-center .barangay {
+      font-size: 1.18rem;
+      letter-spacing: .01em;
+    }
+    #viewModal .doc-preview-paper.doc-preview-paper--business .doc-preview-business-office {
+      margin-top: 12px;
+      margin-bottom: 18px;
+      text-align: center;
+      font-weight: 800;
+      text-transform: uppercase;
+      line-height: 1.24;
+    }
+    #viewModal .doc-preview-paper.doc-preview-paper--business .doc-preview-business-office div:first-child {
+      font-size: 1.06rem;
+      letter-spacing: .01em;
+    }
+    #viewModal .doc-preview-paper.doc-preview-paper--business .doc-preview-business-office div:last-child {
+      margin-top: 4px;
+      font-size: .98rem;
+      letter-spacing: .01em;
+    }
+    #viewModal .doc-preview-paper.doc-preview-paper--business .doc-preview-body {
+      font-size: .98rem;
+      line-height: 1.36;
+      text-align: left;
+      padding: 0 8px 0 4px;
+      flex: 1 1 auto;
+    }
+    #viewModal .doc-preview-paper.doc-preview-paper--business .doc-preview-body p {
+      margin: 0 0 14px;
+      text-align: left;
+    }
+    #viewModal .doc-preview-paper.doc-preview-paper--business .doc-preview-business-lead {
+      margin-bottom: 18px;
+      font-size: 1rem;
+    }
+    #viewModal .doc-preview-paper.doc-preview-paper--business .doc-preview-business-intro {
+      text-align: center;
+      margin-bottom: 18px;
+    }
+    #viewModal .doc-preview-paper.doc-preview-paper--business .doc-preview-business-fields {
+      width: 78%;
+      margin: 0 auto 22px;
+      text-align: center;
+    }
+    #viewModal .doc-preview-paper.doc-preview-paper--business .doc-preview-business-field {
+      margin: 18px 0 22px;
+      font-size: 1.02rem;
+      line-height: 1.35;
+      text-transform: uppercase;
+    }
+    #viewModal .doc-preview-paper.doc-preview-paper--business .doc-preview-business-field .doc-editable {
+      min-width: 260px;
+      text-align: center;
+    }
+    #viewModal .doc-preview-paper.doc-preview-paper--business .doc-preview-business-field .doc-editable.doc-editable-multiline {
+      white-space: normal;
+      min-width: 320px;
+    }
+    #viewModal .doc-preview-paper.doc-preview-paper--business .doc-preview-business-paragraph {
+      width: 90%;
+      margin: 0 auto 16px;
+      line-height: 1.32;
+    }
+    #viewModal .doc-preview-paper.doc-preview-paper--business .doc-preview-business-checks {
+      width: 90%;
+      margin: 10px auto 0;
+    }
+    #viewModal .doc-preview-paper.doc-preview-paper--business .doc-preview-business-check-row {
+      display: grid;
+      grid-template-columns: 48px 1fr;
+      column-gap: 10px;
+      align-items: start;
+      margin: 0 0 8px;
+      line-height: 1.28;
+    }
+    #viewModal .doc-preview-paper.doc-preview-paper--business .doc-preview-business-check-mark {
+      display: inline-block;
+      position: relative;
+      min-width: 48px;
+      white-space: nowrap;
+      letter-spacing: .01em;
+    }
+    #viewModal .doc-preview-paper.doc-preview-paper--business .doc-preview-business-check-inline {
+      position: absolute;
+      left: 18px;
+      top: -1px;
+      font-size: .74rem;
+      line-height: 1;
+      font-weight: 800;
+      opacity: 0;
+    }
+    #viewModal .doc-preview-paper.doc-preview-paper--business .doc-preview-business-check-placeholder {
+      display: block;
+    }
+    #viewModal .doc-preview-paper.doc-preview-paper--business .doc-preview-business-check-mark--selected .doc-preview-business-check-inline {
+      opacity: 1;
+    }
+    #viewModal .doc-preview-paper.doc-preview-paper--business .doc-preview-business-check-symbol {
+      position: absolute;
+      left: 15px;
+      top: -2px;
+      font-weight: 800;
+      font-size: 1.02rem;
+      line-height: 1;
+      opacity: 0;
+    }
+    #viewModal .doc-preview-paper.doc-preview-paper--business .doc-preview-business-check-mark--selected .doc-preview-business-check-symbol {
+      opacity: 1;
+    }
+    #viewModal .doc-preview-paper.doc-preview-paper--business .doc-preview-business-check-mark--selected {
+      font-weight: 800;
+    }
+    #viewModal .doc-preview-paper.doc-preview-paper--business .doc-preview-issued-line {
+      width: 86%;
+      margin: 24px auto 0;
+      text-align: center;
+      line-height: 1.3;
+      text-indent: 0;
+    }
+    #viewModal .doc-preview-paper.doc-preview-paper--business .doc-preview-business-footer-area {
+      display: grid;
+      grid-template-columns: 1fr;
+      column-gap: 0;
+      align-items: end;
+      margin-top: auto;
+      padding-top: 22px;
+      padding-right: 108px;
+    }
+    #viewModal .doc-preview-paper.doc-preview-paper--business .doc-preview-business-footer-area.doc-preview-business-footer-area--noqr {
+      grid-template-columns: 1fr;
+      padding-right: 0;
+    }
+    #viewModal .doc-preview-paper.doc-preview-paper--business .doc-preview-business-footer-main {
+      display: grid;
+      grid-template-columns: minmax(220px, 1fr) minmax(270px, 1fr);
+      column-gap: 26px;
+      align-items: end;
+    }
+    #viewModal .doc-preview-paper.doc-preview-paper--business .doc-preview-business-issuedby {
+      font-size: .95rem;
+      line-height: 1.3;
+      text-align: left;
+      align-self: end;
+      padding-bottom: 10px;
+    }
+    #viewModal .doc-preview-paper.doc-preview-paper--business .doc-preview-business-signing {
+      display: grid;
+      justify-items: center;
+      row-gap: 18px;
+      text-align: center;
+    }
+    #viewModal .doc-preview-paper.doc-preview-paper--business .doc-preview-business-signature {
+      justify-items: center;
+      text-align: center;
+      margin-top: 0;
+    }
+    #viewModal .doc-preview-paper.doc-preview-paper--business .doc-preview-business-signature .name {
+      min-width: 252px;
+      margin-top: 0;
+      padding-top: 4px;
+      font-size: 1rem;
+    }
+    #viewModal .doc-preview-paper.doc-preview-paper--business .doc-preview-business-signature div:last-child {
+      font-style: italic;
+    }
+    #viewModal .doc-preview-paper.doc-preview-paper--business .doc-preview-business-meta {
+      width: 280px;
+      margin-top: 18px;
+      margin-left: 8px;
+      font-size: .97rem;
+      line-height: 1.2;
+    }
+    #viewModal .doc-preview-paper.doc-preview-paper--business .doc-preview-business-meta-row {
+      display: grid;
+      grid-template-columns: 96px 14px 1fr;
+      column-gap: 6px;
+      align-items: baseline;
+      margin: 0 0 2px;
+    }
+    #viewModal .doc-preview-paper.doc-preview-paper--business .doc-preview-business-meta-value .doc-editable {
+      min-width: 96px;
+      text-align: left;
+    }
+    #viewModal .doc-preview-paper.doc-preview-paper--business .doc-preview-business-meta-line {
+      display: inline-block;
+      width: 72px;
+      border-bottom: 1px solid #111827;
+      transform: translateY(-2px);
+    }
+    #viewModal .doc-preview-paper.doc-preview-paper--business .doc-preview-footer {
+      width: 60%;
+      margin: 18px auto 0;
+      font-size: .78rem;
+      text-align: center;
+      font-style: italic;
+    }
+    #viewModal .doc-preview-paper.doc-preview-paper--business .doc-preview-qr {
+      position: absolute;
+      right: 34px;
+      bottom: 42px;
+      width: 96px;
+      font-size: 0;
+      justify-self: auto;
+      align-self: auto;
+    }
+    #viewModal .doc-preview-paper.doc-preview-paper--business .doc-preview-qr-box {
+      width: 88px;
+      height: 88px;
+      border-style: solid;
+    }
     #viewModal .doc-preview-paper.doc-preview-paper--goodmoral.doc-preview-paper--cohabitation-children {
       min-height: 1320px;
     }
@@ -1114,6 +1344,21 @@ require_once __DIR__ . '/../includes/admin_guard.php';
         <div id="actionIssuedWrap" class="d-none mb-3">
           <label class="form-label">Issued File (optional)</label>
           <input id="actionIssued" name="issued_file" type="file" class="form-control" accept=".pdf,.jpg,.jpeg,.png,.webp">
+        </div>
+
+        <div id="actionBusinessApprovalWrap" class="d-none mb-3">
+          <label class="form-label">Type of Approval</label>
+          <select id="actionBusinessApproval" name="business_approval_type" class="form-select">
+            <option value="">Select approval type</option>
+            <option value="not_banned">Not among those business or trade activities being banned to be established in this Barangay</option>
+            <option value="no_objection">Interposes no objection for the issuance of the corresponding Business Permit being applied for.</option>
+            <option value="temporary_clearance">Recommendations only the issuance of &quot;Temporary Barangay Clearance&quot; subject for revocation anytime provided that the requirements under existing Barangay Ordinance, Rules and Regulations should be complied with, otherwise this Barangay should take the necessary actions within legal bounds to stop its continued operations.</option>
+          </select>
+        </div>
+
+        <div id="actionPlateWrap" class="d-none mb-3">
+          <label class="form-label">Plate Number</label>
+          <input id="actionPlate" name="plate_number" type="text" class="form-control" placeholder="Enter plate number if applicable">
         </div>
 
         <div id="actionModalError" class="alert alert-danger d-none mb-0"></div>

@@ -979,6 +979,25 @@ function dra_is_first_time_job_seeker(array $requestRow): bool {
     return is_string($normalized) && strpos($normalized, 'firsttimejobseeker') !== false;
 }
 
+function dra_normalize_business_approval_type(string $value): string {
+    $token = strtolower(trim($value));
+    if ($token === '') {
+        return '';
+    }
+    $token = (string)(preg_replace('/[^a-z0-9]+/', '_', $token) ?? $token);
+    $token = trim($token, '_');
+    if ($token === 'not_banned' || strpos($token, 'not_among_those_business') !== false) {
+        return 'not_banned';
+    }
+    if ($token === 'no_objection' || strpos($token, 'interposes_no_objection') !== false) {
+        return 'no_objection';
+    }
+    if ($token === 'temporary_clearance' || strpos($token, 'temporary_barangay_clearance') !== false) {
+        return 'temporary_clearance';
+    }
+    return '';
+}
+
 function dra_decode_request_payload(array $requestRow): array {
     $raw = (string)($requestRow['request_details'] ?? $requestRow['payload_json'] ?? '{}');
     $payload = json_decode($raw, true);
@@ -1003,6 +1022,8 @@ function dra_apply_preview_edits(mysqli $conn, string $requestId, array &$reques
     $cohabitantName = trim((string)($edited['cohabitantName'] ?? ''));
     $cohabitantRelationship = trim((string)($edited['cohabitantRelationship'] ?? ''));
     $detentionFacility = trim((string)($edited['detentionFacility'] ?? ''));
+    $businessApprovalType = dra_normalize_business_approval_type((string)($edited['businessApprovalType'] ?? ''));
+    $plateNumber = trim((string)($edited['plateNumber'] ?? ''));
     $cohabitationDuration = trim((string)($edited['cohabitationDuration'] ?? ''));
     $cohabitationStartDate = trim((string)($edited['cohabitationStartDate'] ?? ''));
 
@@ -1051,6 +1072,12 @@ function dra_apply_preview_edits(mysqli $conn, string $requestId, array &$reques
     if ($detentionFacility !== '') {
         $payload['_preview_detention_facility'] = $detentionFacility;
     }
+    if ($businessApprovalType !== '') {
+        $payload['_preview_business_approval_type'] = $businessApprovalType;
+    }
+    if ($plateNumber !== '') {
+        $payload['_preview_plate_number'] = strtoupper($plateNumber);
+    }
     if ($cohabitationDuration !== '') {
         $payload['cohabitation_duration'] = $cohabitationDuration;
     }
@@ -1096,6 +1123,8 @@ function dra_overlay_preview_edits(array &$requestRow, array $edited): void {
     $cohabitantName = trim((string)($edited['cohabitantName'] ?? ''));
     $cohabitantRelationship = trim((string)($edited['cohabitantRelationship'] ?? ''));
     $detentionFacility = trim((string)($edited['detentionFacility'] ?? ''));
+    $businessApprovalType = dra_normalize_business_approval_type((string)($edited['businessApprovalType'] ?? ''));
+    $plateNumber = trim((string)($edited['plateNumber'] ?? ''));
     $cohabitationDuration = trim((string)($edited['cohabitationDuration'] ?? ''));
     $cohabitationStartDate = trim((string)($edited['cohabitationStartDate'] ?? ''));
     $educationalAttainment = trim((string)($edited['educationalAttainment'] ?? ''));
@@ -1165,6 +1194,12 @@ function dra_overlay_preview_edits(array &$requestRow, array $edited): void {
     }
     if ($detentionFacility !== '') {
         $payload['_preview_detention_facility'] = $detentionFacility;
+    }
+    if ($businessApprovalType !== '') {
+        $payload['_preview_business_approval_type'] = $businessApprovalType;
+    }
+    if ($plateNumber !== '') {
+        $payload['_preview_plate_number'] = strtoupper($plateNumber);
     }
     if ($cohabitationDuration !== '') {
         $payload['cohabitation_duration'] = $cohabitationDuration;
@@ -1302,11 +1337,18 @@ function dra_generate_issued_document(array $requestRow): ?string {
 
     $cohabitationVariant = strtolower(trim((string)($payload['cohabitation_variant'] ?? '')));
     $docTypeNorm = strtolower(trim($docType));
+    $docTypeToken = preg_replace('/[^a-z0-9]+/', '', $docTypeNorm);
     $isIndigency = strpos($docTypeNorm, 'indigency') !== false;
     $isGoodMoral = (strpos($docTypeNorm, 'goodmoral') !== false) || (strpos($docTypeNorm, 'good moral') !== false);
     $isResidency = strpos($docTypeNorm, 'residency') !== false;
     $isCohabitation = strpos($docTypeNorm, 'cohabitation') !== false;
     $isFirstTimeJobSeeker = strpos(preg_replace('/[^a-z0-9]+/', '', $docTypeNorm), 'firsttimejobseeker') !== false;
+    $isBusinessPermitClearance = in_array($docTypeToken, [
+        'barangayclearanceforbusinesspermit',
+        'barangaybusinessclearance',
+        'businessclearance',
+        'clearanceforbusinesspermit',
+    ], true);
     $isRelationshipJailVisit = $isCohabitation && in_array($cohabitationVariant, ['relationship_jail_visit', 'conjugal_visit'], true);
 
     // DOCX template workflow removed: force all issuance through pure-PHP renderer below.
@@ -1707,11 +1749,11 @@ function dra_generate_issued_document(array $requestRow): ?string {
         return null;
     }
 
-    $renderRevisionTag = 'r20260311e';
+    $renderRevisionTag = 'r20260312n';
     $fileName = 'issued_' . preg_replace('/[^A-Za-z0-9_-]/', '', $requestId) . '_' . $renderRevisionTag . '_' . date('YmdHis') . '.pdf';
     $diskPath = $outDir . '/' . $fileName;
 
-    if ($isRelationshipJailVisit) {
+    if ($isBusinessPermitClearance || $isRelationshipJailVisit) {
         if (!class_exists('\\setasign\\Fpdi\\Fpdi')) {
             $autoloadPaths = [
                 __DIR__ . '/../../PhpFiles/PhpOffice/vendor/autoload.php',
@@ -1727,6 +1769,196 @@ function dra_generate_issued_document(array $requestRow): ?string {
                 }
             }
         }
+    }
+
+    if ($isBusinessPermitClearance) {
+        $templatePath = $baseDir . '/Resident-End/Certificates/DocumentIssuance/ClearanceForBusinessPermit.pdf';
+        if (class_exists('\\setasign\\Fpdi\\Fpdi') && is_file($templatePath)) {
+            try {
+                $businessName = $stripTemplateTokens((string)($payload['business_name'] ?? ''));
+                $businessApprovalType = dra_normalize_business_approval_type((string)($payload['_preview_business_approval_type'] ?? $payload['business_approval_type'] ?? ''));
+                $plateNumber = strtoupper($stripTemplateTokens((string)($payload['_preview_plate_number'] ?? $payload['plate_number'] ?? $payload['business_plate_number'] ?? '')));
+                $businessAddress = $stripTemplateTokens((string)($payload['business_full_address'] ?? $payload['location'] ?? ''));
+                if ($businessAddress === '') {
+                    $businessAddress = $applicantResidenceAddress;
+                }
+                $operatorName = $fullName !== '' ? $fullName : 'RESIDENT';
+                $operatorAddress = $applicantAddressWithBarangay !== '' ? $applicantAddressWithBarangay : $applicantResidenceAddress;
+                $amountNumeric = null;
+                if (isset($requestRow['amount']) && $requestRow['amount'] !== null && $requestRow['amount'] !== '') {
+                    $amountNumeric = (float)$requestRow['amount'];
+                } elseif ($defaultFee !== null) {
+                    $amountNumeric = (float)$defaultFee;
+                }
+                $amountText = $amountNumeric === null ? '' : number_format($amountNumeric, 2, '.', ',');
+
+                $pdf = new \setasign\Fpdi\Fpdi();
+                $pageCount = $pdf->setSourceFile($templatePath);
+                if ($pageCount <= 0) {
+                    throw new RuntimeException('Template PDF has no readable pages.');
+                }
+                $tpl = $pdf->importPage(1);
+                $size = $pdf->getTemplateSize($tpl);
+                $pageWidth = (float)($size['width'] ?? 215.9);
+                $pageHeight = (float)($size['height'] ?? 355.6);
+                $orientation = $pageWidth > $pageHeight ? 'L' : 'P';
+                $pdf->AddPage($orientation, [$pageWidth, $pageHeight]);
+                $pdf->useTemplate($tpl);
+                $pdf->SetAutoPageBreak(false);
+                $pdf->SetFillColor(255, 255, 255);
+                $pdf->SetTextColor(0, 0, 0);
+
+                $normalizeTop = static function (float $value) use ($pageHeight): float {
+                    return $value * $pageHeight;
+                };
+                $fillBox = static function (
+                    \setasign\Fpdi\Fpdi $pdfInstance,
+                    float $x,
+                    float $y,
+                    float $w,
+                    float $h,
+                    float $padX = 1.5,
+                    float $padY = 0.9
+                ): void {
+                    $pdfInstance->Rect(
+                        max(0.0, $x - $padX),
+                        max(0.0, $y - $padY),
+                        max(1.0, $w + ($padX * 2)),
+                        max(1.0, $h + ($padY * 2)),
+                        'F'
+                    );
+                };
+                $writeFittedCell = static function (
+                    \setasign\Fpdi\Fpdi $pdfInstance,
+                    float $x,
+                    float $y,
+                    float $w,
+                    float $h,
+                    string $text,
+                    string $style = '',
+                    float $fontSize = 10.0,
+                    float $minFontSize = 7.0,
+                    string $align = 'L'
+                ): void {
+                    $clean = trim((string)(preg_replace('/\s+/u', ' ', $text) ?? $text));
+                    if ($clean === '') {
+                        return;
+                    }
+                    for ($size = $fontSize; $size >= $minFontSize; $size -= 0.2) {
+                        $pdfInstance->SetFont('Arial', $style, $size);
+                        if ($pdfInstance->GetStringWidth($clean) <= $w) {
+                            break;
+                        }
+                    }
+                    $pdfInstance->SetFont('Arial', $style, max($minFontSize, $size));
+                    $pdfInstance->SetXY($x, $y);
+                    $pdfInstance->Cell($w, $h, $clean, 0, 0, $align);
+                };
+
+                $bodyLeft = 32.0;
+                $bodyWidth = $pageWidth - ($bodyLeft * 2);
+                $bodyLineHeight = 5.8;
+                $bodyValues = [
+                    [$normalizeTop(0.2575), strtoupper($businessName !== '' ? $businessName : '-')],
+                    [$normalizeTop(0.2912), strtoupper($businessAddress !== '' ? $businessAddress : '-')],
+                    [$normalizeTop(0.3245), strtoupper($operatorName !== '' ? $operatorName : '-')],
+                    [$normalizeTop(0.3580), strtoupper($operatorAddress !== '' ? $operatorAddress : '-')],
+                ];
+                foreach ($bodyValues as [$topY, $value]) {
+                    $fillBox($pdf, $bodyLeft, $topY, $bodyWidth, 6.4);
+                    $writeFittedCell($pdf, $bodyLeft, $topY, $bodyWidth, $bodyLineHeight, (string)$value, 'B', 10.2, 7.2, 'C');
+                }
+
+                $approvalMarkers = [
+                    ['key' => 'not_banned', 'lineY' => $normalizeTop(0.5030), 'maskX' => 23.6, 'maskY' => $normalizeTop(0.4950), 'maskW' => 9.4, 'maskH' => 7.2],
+                    ['key' => 'no_objection', 'lineY' => $normalizeTop(0.5545), 'maskX' => 23.6, 'maskY' => $normalizeTop(0.5465), 'maskW' => 9.4, 'maskH' => 7.2],
+                    ['key' => 'temporary_clearance', 'lineY' => $normalizeTop(0.6105), 'maskX' => 0.0, 'maskY' => 0.0, 'maskW' => 0.0, 'maskH' => 0.0],
+                ];
+                foreach ($approvalMarkers as $approvalMarker) {
+                    if ($businessApprovalType !== $approvalMarker['key']) {
+                        continue;
+                    }
+                    $lineY = (float)$approvalMarker['lineY'];
+                    if ((float)$approvalMarker['maskW'] > 0.0 && (float)$approvalMarker['maskH'] > 0.0) {
+                        $fillBox(
+                            $pdf,
+                            (float)$approvalMarker['maskX'],
+                            (float)$approvalMarker['maskY'],
+                            (float)$approvalMarker['maskW'],
+                            (float)$approvalMarker['maskH'],
+                            0.25,
+                            0.25
+                        );
+                        $pdf->SetDrawColor(0, 0, 0);
+                        $pdf->SetLineWidth(0.55);
+                        $pdf->Line(24.3, $lineY, 33.5, $lineY);
+                    }
+                    $pdf->SetDrawColor(0, 0, 0);
+                    $pdf->SetLineWidth(0.78);
+                    $pdf->Line(25.6, $lineY - 1.6, 27.9, $lineY + 1.0);
+                    $pdf->Line(27.9, $lineY + 1.0, 32.8, $lineY - 4.0);
+                    $pdf->SetLineWidth(0.2);
+                }
+
+                $issuedBlockX = 26.0;
+                $issuedBlockY = $normalizeTop(0.5865);
+                $issuedBlockW = $pageWidth - 52.0;
+                $issuedBlockH = 12.0;
+                $fillBox($pdf, $issuedBlockX, $issuedBlockY, $issuedBlockW, $issuedBlockH, 1.6, 0.8);
+                $pdf->SetFont('Arial', '', 10.0);
+                $pdf->SetXY($issuedBlockX, $issuedBlockY);
+                $pdf->MultiCell(
+                    $issuedBlockW,
+                    4.6,
+                    'Issued this ' . $issuedAsDocx . ' at the office of the Punong Barangay, Barangay' . "\n" . 'San Jose, Montalban, Rizal',
+                    0,
+                    'C'
+                );
+
+                $metaBlockX = 19.0;
+                $metaBlockY = $normalizeTop(0.8290);
+                $metaBlockW = 92.0;
+                $metaBlockH = 27.5;
+                $fillBox($pdf, $metaBlockX, $metaBlockY, $metaBlockW, $metaBlockH, 2.0, 1.0);
+                $metaRows = [
+                    ['label' => 'O.R No.', 'value' => $orNo],
+                    ['label' => 'Amount', 'value' => $amountText],
+                    ['label' => 'Plate No.', 'value' => $plateNumber],
+                    ['label' => 'Date Issued', 'value' => $issuedAt],
+                    ['label' => 'Place Issued', 'value' => 'Barangay San Jose'],
+                ];
+                $metaY = $metaBlockY + 0.5;
+                foreach ($metaRows as $rowMeta) {
+                    $pdf->SetFont('Arial', '', 9.5);
+                    $pdf->SetXY($metaBlockX + 2.0, $metaY);
+                    $pdf->Cell(28.0, 5.2, $rowMeta['label'], 0, 0, 'L');
+                    $pdf->Cell(4.0, 5.2, ':', 0, 0, 'C');
+                    $writeFittedCell($pdf, $metaBlockX + 34.5, $metaY, 50.0, 5.2, (string)$rowMeta['value'], '', 9.5, 7.2, 'L');
+                    $metaY += 5.0;
+                }
+
+                if (is_file($qrDiskPath)) {
+                    $qrSize = 22.0;
+                    $qrRightMargin = 8.5;
+                    $qrBottomMargin = 12.0;
+                    $pdf->Image(
+                        $qrDiskPath,
+                        $pageWidth - $qrSize - $qrRightMargin,
+                        $pageHeight - $qrSize - $qrBottomMargin,
+                        $qrSize,
+                        $qrSize
+                    );
+                }
+
+                $pdf->Output('F', $diskPath);
+                return '/UnifiedFileAttachment/IssuedDocuments/Generated/' . $fileName;
+            } catch (Throwable $e) {
+                error_log('[dra_generate_issued_document][business_clearance_fpdi] ' . $e->getMessage());
+            }
+        }
+    }
+
+    if ($isRelationshipJailVisit) {
         $templatePath = $baseDir . '/Resident-End/Certificates/DocumentIssuance/CertificateForJailVisitation.pdf';
         if (class_exists('\\setasign\\Fpdi\\Fpdi') && is_file($templatePath)) {
             try {
@@ -4102,12 +4334,19 @@ if ($action === 'view_issued') {
     }
     $publicPath = trim((string)($row['issued_file_path'] ?? ''));
     $docTypeNorm = strtolower(trim((string)($row['document_type'] ?? '')));
+    $docTypeToken = preg_replace('/[^a-z0-9]+/', '', $docTypeNorm);
     $isIndigency = strpos($docTypeNorm, 'indigency') !== false;
     $isGoodMoral = (strpos($docTypeNorm, 'goodmoral') !== false) || (strpos($docTypeNorm, 'good moral') !== false);
     $isResidency = strpos($docTypeNorm, 'residency') !== false;
     $isCohabitation = strpos($docTypeNorm, 'cohabitation') !== false;
     $isFirstTimeJobSeeker = strpos(preg_replace('/[^a-z0-9]+/', '', $docTypeNorm), 'firsttimejobseeker') !== false;
-    $isTemplateBasedCertificate = $isIndigency || $isGoodMoral || $isResidency || $isCohabitation || $isFirstTimeJobSeeker;
+    $isBusinessPermitClearance = in_array($docTypeToken, [
+        'barangayclearanceforbusinesspermit',
+        'barangaybusinessclearance',
+        'businessclearance',
+        'clearanceforbusinesspermit',
+    ], true);
+    $isTemplateBasedCertificate = $isIndigency || $isGoodMoral || $isResidency || $isCohabitation || $isFirstTimeJobSeeker || $isBusinessPermitClearance;
     $ext = strtolower(pathinfo($publicPath, PATHINFO_EXTENSION));
     $verificationCode = trim((string)($row['verification_code'] ?? ''));
     $qrPublicPath = '/UnifiedFileAttachment/IssuedDocuments/QR/qr_' . preg_replace('/[^A-Za-z0-9_-]/', '', $requestId) . '.png';
@@ -4118,7 +4357,7 @@ if ($action === 'view_issued') {
         ? [DR_STAGE_READY_FOR_CLAIM, DR_STAGE_COMPLETED]
         : [DR_STAGE_PAYMENT_VERIFIED, DR_STAGE_READY_FOR_CLAIM, DR_STAGE_COMPLETED];
     $shouldHaveQr = ($verificationCode !== '' && in_array($stage, $qrEligibleStages, true));
-    $renderRevisionTag = 'r20260311e';
+    $renderRevisionTag = 'r20260311f';
     $issuedBaseName = strtolower(basename((string)$publicPath));
     $isGeneratedIssuedPath = strpos((string)$publicPath, '/UnifiedFileAttachment/IssuedDocuments/Generated/') === 0;
     $isCurrentRenderRevision = ($issuedBaseName !== '' && strpos($issuedBaseName, strtolower($renderRevisionTag)) !== false);

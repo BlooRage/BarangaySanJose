@@ -36,6 +36,10 @@
   const actionOr = document.getElementById('actionOr');
   const actionIssuedWrap = document.getElementById('actionIssuedWrap');
   const actionIssued = document.getElementById('actionIssued');
+  const actionBusinessApprovalWrap = document.getElementById('actionBusinessApprovalWrap');
+  const actionBusinessApproval = document.getElementById('actionBusinessApproval');
+  const actionPlateWrap = document.getElementById('actionPlateWrap');
+  const actionPlate = document.getElementById('actionPlate');
   const actionPrompt = document.getElementById('actionPrompt');
   const actionCancelBtn = document.getElementById('actionCancelBtn');
   const actionSubmitBtn = document.getElementById('actionSubmitBtn');
@@ -184,6 +188,17 @@
     if (key === 'cohabitation') {
       return [
         { key: 'remarks', label: 'Remarks', multiline: true, wide: true }
+      ];
+    }
+    if (key === 'businessclearance') {
+      return [
+        { key: 'businessName', label: 'Business Name', wide: true },
+        { key: 'businessAddress', label: 'Business Address', multiline: true, wide: true },
+        { key: 'operatorName', label: 'Operator Name', wide: true },
+        { key: 'operatorAddress', label: 'Operator Address', multiline: true, wide: true },
+        { key: 'orNumber', label: 'OR Number' },
+        { key: 'amount', label: 'Amount' },
+        { key: 'plateNumber', label: 'Plate Number' }
       ];
     }
     return [
@@ -639,6 +654,9 @@
     const raw = String(value || '').trim();
     if (!raw) return '-';
     const key = raw.toLowerCase().replace(/[^a-z0-9]+/g, '');
+    if (key.includes('businesspermit') || key.includes('businessclearance') || key.includes('clearanceforbusinesspermit')) {
+      return 'Barangay Clearance for Business Permit';
+    }
     if (key === 'indigency' || key === 'certificateofindigency') {
       return 'Certificate of Indigency';
     }
@@ -743,7 +761,14 @@
       detention_proof_file_path: 'Proof of Detention',
       detention_proof_file_paths: 'Proof of Detention Attachment',
       relationship_proof_file_path: 'Proof of Relationship',
-      relationship_proof_file_paths: 'Proof of Relationship Attachment'
+      relationship_proof_file_paths: 'Proof of Relationship Attachment',
+      valid_id_file_path: 'Valid ID',
+      business_reg_file_path: 'Business Registration',
+      proof_address_file_path: 'Proof of Business Address',
+      business_photo_file_path: 'Establishment Photo',
+      renewal_valid_id_file_path: 'Renewal Valid ID',
+      renewal_business_reg_file_path: 'Updated Business Registration',
+      renewal_proof_address_file_path: 'Updated Proof of Business Address'
     };
 
     const addDoc = (label, rawPath) => {
@@ -977,8 +1002,22 @@
     if (text.includes('identity')) return 'identity';
     if (text.includes('residency') || text.includes('residence')) return 'residency';
     if (text.includes('goodmoral')) return 'goodmoral';
+    if (text.includes('businesspermit') || text.includes('businessclearance') || text.includes('clearanceforbusinesspermit')) return 'businessclearance';
     if (text.includes('barangayclearance') || text.includes('barangaycertification') || text === 'clearance') return 'generic';
     return 'generic';
+  }
+
+  function normalizeBusinessApprovalType(value) {
+    const token = String(value || '')
+      .trim()
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '_')
+      .replace(/^_+|_+$/g, '');
+    if (!token) return '';
+    if (token === 'not_banned' || token.includes('not_among_those_business')) return 'not_banned';
+    if (token === 'no_objection' || token.includes('interposes_no_objection')) return 'no_objection';
+    if (token === 'temporary_clearance' || token.includes('temporary_barangay_clearance')) return 'temporary_clearance';
+    return '';
   }
 
   function isFirstTimeJobSeekerRow(row) {
@@ -1013,6 +1052,55 @@
       payload.establishment_name,
       payload.business_establishment
     ]);
+    const businessAddressFromFields = [
+      [
+        String(payload.business_house_number || '').trim(),
+        String(payload.business_street_name || '').trim()
+      ].filter(Boolean).join(' '),
+      String(payload.business_subdivision || '').trim(),
+      String(payload.business_barangay || '').trim(),
+      String(payload.business_city || '').trim(),
+      String(payload.business_province || '').trim()
+    ].filter(Boolean).join(', ');
+    const businessAddress = firstNonEmpty([
+      payload.business_full_address,
+      payload.business_address,
+      payload.location,
+      businessAddressFromFields
+    ]);
+    const operatorAddressRaw = firstNonEmpty([
+      payload.owner_full_address,
+      payload.full_address,
+      payload.full_address_display,
+      payload.address,
+      residentProfile.full_address
+    ]);
+    const previewAmount = (() => {
+      const raw = String(firstNonEmpty([
+        row.amount,
+        row.transaction_amount,
+        payload.amount,
+        payload.transaction_amount
+      ]) || '').replace(/,/g, '').trim();
+      if (!raw) return '';
+      const parsed = Number.parseFloat(raw);
+      if (!Number.isFinite(parsed)) return '';
+      return parsed.toLocaleString('en-US', {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2
+      });
+    })();
+    const plateNumber = firstNonEmpty([
+      payload._preview_plate_number,
+      payload.plate_number,
+      payload.business_plate_number,
+      payload.vehicle_plate_number
+    ]);
+    const businessApprovalType = normalizeBusinessApprovalType(firstNonEmpty([
+      payload._preview_business_approval_type,
+      payload.business_approval_type,
+      payload.businessApprovalType
+    ]));
     const fatherName = [
       firstNonEmpty([payload.father_first_name]),
       firstNonEmpty([payload.father_middle_name]),
@@ -1088,6 +1176,8 @@
       'civil_status', 'religion', 'occupation',
       'purpose', 'request_purpose', 'request_officer',
       'business_name', 'businessName', 'business_trade_name', 'trade_name', 'establishment_name', 'business_establishment',
+      '_preview_business_approval_type', 'business_approval_type', 'businessApprovalType',
+      '_preview_plate_number', 'plate_number', 'business_plate_number', 'vehicle_plate_number',
       'years_of_residency', 'months_of_residency',
       'child_birthplace', 'child_nationality', 'birthplace', 'place_of_birth', 'location', 'remarks',
       'father_first_name', 'father_middle_name', 'father_last_name', 'father_suffix',
@@ -1106,8 +1196,14 @@
       additionalDetails.push({ label: friendlyLabel(k), value });
     });
 
+    const requestedDocType = firstNonEmpty([payload.document_type, row.document_type, 'Certificate']);
+    const inferredBusinessClearance = !!businessName
+      || /business\s+permit/i.test(firstNonEmpty([row.purpose, payload.request_purpose, payload.purpose]));
+
     return {
-      docType: normalizeDocumentTypeDisplay(firstNonEmpty([payload.document_type, row.document_type, 'Certificate'])),
+      docType: inferredBusinessClearance
+        ? 'Barangay Clearance for Business Permit'
+        : normalizeDocumentTypeDisplay(requestedDocType),
       fullName: upperText(
         formatPersonNameFnMiLn(
           getPersonal('First Name', ''),
@@ -1119,6 +1215,16 @@
       fullAddress: upperText(stripAreaFromAddress(getPersonal('Full Address', '') || residentProfile.full_address || payload.full_address || payload.full_address_display || payload.address || payload.complete_address || '-'), '-'),
       purpose: upperText(firstNonEmpty([row.purpose, payload.purpose, payload.request_purpose, '-']), '-'),
       businessName: upperText(businessName || '', ''),
+      businessAddress: upperText(businessAddress || '', ''),
+      businessApprovalType,
+      plateNumber: upperText(plateNumber || '', ''),
+      operatorName: upperText(firstNonEmpty([
+        payload.operator_name,
+        payload.business_operator_name,
+        fullNameFromRow(row)
+      ]), ''),
+      operatorAddress: upperText(composeBarangayAddress(operatorAddressRaw || residentProfile.full_address || payload.full_address || ''), ''),
+      amount: upperText(previewAmount, ''),
       issuedDate: row.submitted_at || dr_now_text(),
       approvedByName: upperText(firstNonEmptyName([
         row.reviewed_by,
@@ -1199,6 +1305,7 @@
     const docType = String(state.docType || 'Certificate').trim() || 'Certificate';
     const docKey = normalizePreviewDocKey(docType);
     const isIndigency = docKey === 'indigency';
+    const isBusinessPermitClearance = docKey === 'businessclearance';
     const isGoodMoral = docKey === 'goodmoral';
     const isResidency = docKey === 'residency';
     const isCohabitation = docKey === 'cohabitation';
@@ -1220,6 +1327,13 @@
     const cohabitantAge = cohabitantAgeRawState || deriveAgeFromDate(cohabitantBirthdate);
     const cohabitantRelationship = String(state.cohabitantRelationship || '').trim();
     const detentionFacility = String(state.detentionFacility || '').trim();
+    const businessName = String(state.businessName || '').trim();
+    const businessAddress = String(state.businessAddress || state.location || '').trim();
+    const businessApprovalType = normalizeBusinessApprovalType(state.businessApprovalType || '');
+    const plateNumber = String(state.plateNumber || '').trim();
+    const operatorName = String(state.operatorName || fullName || '').trim();
+    const operatorAddress = String(state.operatorAddress || '').trim();
+    const amount = String(state.amount || '').trim();
     const applicantResidenceAddress = String(state.applicantResidenceAddress || state.fullAddress || '').trim();
     const cohabitantResidenceAddress = String(state.cohabitantResidenceAddress || state.fullAddress || '').trim();
     const cohabitationResidenceAddress = String(state.cohabitationResidenceAddress || state.fullAddress || '').trim();
@@ -1238,6 +1352,20 @@
     const requestOfficerLine2 = String(state.requestOfficerLine2 || '').trim();
     const requestOfficerLine3 = String(state.requestOfficerLine3 || '').trim();
     const safe = (value, fallback = '-') => (String(value || '').trim() || fallback);
+    const businessMetaValue = (key, value) => {
+      const text = String(value || '').trim();
+      if (!text) return '<span class="doc-preview-business-meta-line"></span>';
+      return previewEditable(key, text, '_____');
+    };
+    const businessCheckMark = (type, placeholder) => {
+      const selected = businessApprovalType === type;
+      return `
+        <span class="doc-preview-business-check-mark${selected ? ' doc-preview-business-check-mark--selected' : ''}">
+          <span class="doc-preview-business-check-placeholder">${esc(placeholder)}</span>
+          <span class="doc-preview-business-check-inline">&#10003;</span>
+        </span>
+      `;
+    };
     const fullAddressWithBarangay = composeBarangayAddress(fullAddress);
     const applicantAddressWithBarangay = composeBarangayAddress(applicantResidenceAddress || fullAddress);
     const cohabitationHasChildren = isCohabitation && cohabitationChildrenCount > 0;
@@ -1289,6 +1417,40 @@
       `;
       metaHtml = '';
       issuedLine = `Issued this <strong>${esc(issuedDateWord)}</strong>, at the office of the punong Barangay, Barangay San Jose, Rodriguez (Montalban), Rizal.`;
+    } else if (isBusinessPermitClearance) {
+      titleHtml = '<div class="doc-preview-goodmoral-office doc-preview-business-office"><div>TANGGAPAN NG PUNONG BARANGAY</div><div>BARANGAY CLEARANCE FOR BUSINESS PERMIT</div></div>';
+      contentHtml = `
+        <p class="doc-preview-business-lead"><strong>TO WHOM IT MAY CONCERN::</strong></p>
+        <p class="doc-preview-business-intro">This is to certify that the business or trade activity below</p>
+        <div class="doc-preview-business-fields">
+          <div class="doc-preview-business-field"><strong>${previewEditable('businessName', safe(businessName, '${BUSINESS_NAME}'), '${BUSINESS_NAME}')}</strong></div>
+          <div class="doc-preview-business-field"><strong>${previewEditable('businessAddress', safe(businessAddress, '${BUSINESS_ADDRESS}'), '${BUSINESS_ADDRESS}', 'doc-editable-multiline')}</strong></div>
+          <div class="doc-preview-business-field"><strong>${previewEditable('operatorName', safe(operatorName, '${OPERATOR_NAME}'), '${OPERATOR_NAME}')}</strong></div>
+          <div class="doc-preview-business-field"><strong>${previewEditable('operatorAddress', safe(operatorAddress, '${OPERATOR_ADDRESS}'), '${OPERATOR_ADDRESS}', 'doc-editable-multiline')}</strong></div>
+        </div>
+        <p class="doc-preview-business-paragraph">
+          Proposed to be established or being applied for renewal for a Barangay Clearance to be used in securing corresponding Business Permit has been found to be:
+        </p>
+        <p class="doc-preview-business-paragraph">
+          In conformity with the provisions of existing Barangay Ordinances, Rules and Regulations being enforced in this Barangay.
+        </p>
+        <div class="doc-preview-business-checks">
+          <div class="doc-preview-business-check-row">
+            ${businessCheckMark('not_banned', '__/__')}
+            <span>Not among those business or trade activities being banned to be established in this Barangay</span>
+          </div>
+          <div class="doc-preview-business-check-row">
+            ${businessCheckMark('no_objection', '__/__')}
+            <span>Interposes no objection for the issuance of the corresponding Business Permit being applied for.</span>
+          </div>
+          <div class="doc-preview-business-check-row">
+            ${businessCheckMark('temporary_clearance', '_____')}
+            <span>Recommendations only the issuance of "Temporary Barangay Clearance" subject for revocation anytime provided that the requirements under existing Barangay Ordinance, Rules and Regulations should be complied with, otherwise this Barangay should take the necessary actions within legal bounds to stop its continued operations.</span>
+          </div>
+        </div>
+      `;
+      issuedLine = `Issued this <strong>${esc(issuedDateWord)}</strong> at the office of the Punong Barangay, Barangay<br>San Jose, Montalban, Rizal`;
+      metaHtml = '';
     } else if (isGoodMoral) {
       contentHtml = `
         <p><strong>TO WHOM IT MAY CONCERN:</strong></p>
@@ -1437,9 +1599,11 @@
 
     const paperClass = isIndigency
       ? 'doc-preview-paper doc-preview-paper--indigency'
-      : (isGoodMoral || isResidency || isCohabitation || isFirstTimeJobSeeker
-        ? `doc-preview-paper doc-preview-paper--goodmoral${(isCohabitation && cohabitationHasChildren) ? ' doc-preview-paper--cohabitation-children' : ''}${isFirstTimeJobSeeker ? ' doc-preview-paper--ftjs' : ''}${isRelationshipJailVisit ? ' doc-preview-paper--jail' : ''}`
-        : 'doc-preview-paper');
+      : (isBusinessPermitClearance
+        ? 'doc-preview-paper doc-preview-paper--business'
+        : (isGoodMoral || isResidency || isCohabitation || isFirstTimeJobSeeker
+          ? `doc-preview-paper doc-preview-paper--goodmoral${(isCohabitation && cohabitationHasChildren) ? ' doc-preview-paper--cohabitation-children' : ''}${isFirstTimeJobSeeker ? ' doc-preview-paper--ftjs' : ''}${isRelationshipJailVisit ? ' doc-preview-paper--jail' : ''}`
+          : 'doc-preview-paper'));
 
     const qrBlockHtml = qrUrl !== ''
       ? `
@@ -1451,40 +1615,91 @@
           </div>
         `
       : '';
-    const footerAreaClass = `doc-preview-footer-area${isFirstTimeJobSeeker ? ' doc-preview-footer-area--ftjs' : ''}${qrBlockHtml ? '' : ' doc-preview-footer-area--noqr'}`;
-    const footerAreaHtml = isFirstTimeJobSeeker
-      ? `
-          <div class="${footerAreaClass}">
-            <div></div>
-            <div class="doc-preview-ftjs-signing">
-              <div class="doc-preview-signature doc-preview-signature--ftjs">
+    let footerAreaHtml = '';
+    let footerNoteHtml = '';
+    if (isBusinessPermitClearance) {
+      footerAreaHtml = `
+        <div class="doc-preview-business-footer-area${qrBlockHtml ? '' : ' doc-preview-business-footer-area--noqr'}">
+          <div class="doc-preview-business-footer-main">
+            <div class="doc-preview-business-issuedby">Issued by: <strong>MINERVA D. QUITA</strong><br><em>Barangay Secretary</em></div>
+            <div class="doc-preview-business-signing">
+              <div class="doc-preview-signature doc-preview-business-signature">
+                <div class="name">HON. GLENN S. EVANGELISTA</div>
+                <div>Punong Barangay</div>
+              </div>
+              <div class="doc-preview-signature doc-preview-business-signature">
+                <div class="name">MR. JOSEPH C. PATRICIO</div>
+                <div>Head, Monitoring &amp; Collection Dept.</div>
+              </div>
+            </div>
+          </div>
+          ${qrBlockHtml}
+        </div>
+        <div class="doc-preview-business-meta">
+          <div class="doc-preview-business-meta-row">
+            <div class="doc-preview-business-meta-label"><strong>O.R No.</strong></div>
+            <div class="doc-preview-business-meta-colon">:</div>
+            <div class="doc-preview-business-meta-value">${businessMetaValue('orNumber', state.orNumber)}</div>
+          </div>
+          <div class="doc-preview-business-meta-row">
+            <div class="doc-preview-business-meta-label"><strong>Amount</strong></div>
+            <div class="doc-preview-business-meta-colon">:</div>
+            <div class="doc-preview-business-meta-value">${businessMetaValue('amount', amount)}</div>
+          </div>
+          <div class="doc-preview-business-meta-row">
+            <div class="doc-preview-business-meta-label"><strong>Plate No.</strong></div>
+            <div class="doc-preview-business-meta-colon">:</div>
+            <div class="doc-preview-business-meta-value">${businessMetaValue('plateNumber', plateNumber)}</div>
+          </div>
+          <div class="doc-preview-business-meta-row">
+            <div class="doc-preview-business-meta-label"><strong>Date Issued</strong></div>
+            <div class="doc-preview-business-meta-colon">:</div>
+            <div class="doc-preview-business-meta-value"><span class="doc-preview-business-meta-line"></span></div>
+          </div>
+          <div class="doc-preview-business-meta-row">
+            <div class="doc-preview-business-meta-label"><strong>Place Issued</strong></div>
+            <div class="doc-preview-business-meta-colon">:</div>
+            <div class="doc-preview-business-meta-value"><span class="doc-preview-business-meta-line"></span></div>
+          </div>
+        </div>
+      `;
+      footerNoteHtml = 'This document is valid until the end of the year,<br>Check the qr code to verify the authenticity of this document.';
+    } else {
+      const footerAreaClass = `doc-preview-footer-area${isFirstTimeJobSeeker ? ' doc-preview-footer-area--ftjs' : ''}${qrBlockHtml ? '' : ' doc-preview-footer-area--noqr'}`;
+      footerAreaHtml = isFirstTimeJobSeeker
+        ? `
+            <div class="${footerAreaClass}">
+              <div></div>
+              <div class="doc-preview-ftjs-signing">
+                <div class="doc-preview-signature doc-preview-signature--ftjs">
+                  <div class="name">${esc(String(state.approvedByName || 'HON. GLENN S. EVANGELISTA').trim() || 'HON. GLENN S. EVANGELISTA')}</div>
+                  <div>Punong Barangay</div>
+                </div>
+                <div class="doc-preview-ftjs-date"><span>${esc(signedDateText)}</span></div>
+                <div class="doc-preview-ftjs-witness-label">Witnesses by:</div>
+                <div class="doc-preview-ftjs-witness">
+                  <div class="name">MINERVA D. QUITA</div>
+                  <div>Barangay Secretary</div>
+                </div>
+                <div class="doc-preview-ftjs-date"><span>${esc(signedDateText)}</span></div>
+              </div>
+              ${qrBlockHtml}
+            </div>
+          `
+        : `
+            <div class="${footerAreaClass}">
+              <div class="doc-preview-issuedby">Issued by: <strong>MINERVA D. QUITA</strong><br><em>Barangay Secretary</em></div>
+              <div class="doc-preview-signature">
                 <div class="name">${esc(String(state.approvedByName || 'HON. GLENN S. EVANGELISTA').trim() || 'HON. GLENN S. EVANGELISTA')}</div>
                 <div>Punong Barangay</div>
               </div>
-              <div class="doc-preview-ftjs-date"><span>${esc(signedDateText)}</span></div>
-              <div class="doc-preview-ftjs-witness-label">Witnesses by:</div>
-              <div class="doc-preview-ftjs-witness">
-                <div class="name">MINERVA D. QUITA</div>
-                <div>Barangay Secretary</div>
-              </div>
-              <div class="doc-preview-ftjs-date"><span>${esc(signedDateText)}</span></div>
+              ${qrBlockHtml}
             </div>
-            ${qrBlockHtml}
-          </div>
-        `
-      : `
-          <div class="${footerAreaClass}">
-            <div class="doc-preview-issuedby">Issued by: <strong>MINERVA D. QUITA</strong><br><em>Barangay Secretary</em></div>
-            <div class="doc-preview-signature">
-              <div class="name">${esc(String(state.approvedByName || 'HON. GLENN S. EVANGELISTA').trim() || 'HON. GLENN S. EVANGELISTA')}</div>
-              <div>Punong Barangay</div>
-            </div>
-            ${qrBlockHtml}
-          </div>
-        `;
-    const footerNoteHtml = isFirstTimeJobSeeker
-      ? 'This certification is only valid for 1 year from the issuance.<br>Check the qr code to verify the authenticity of this document.'
-      : 'This certificate is valid for Forty-five (45) days from the date of issue,<br>check the QR code to verify the authenticity of this document.';
+          `;
+      footerNoteHtml = isFirstTimeJobSeeker
+        ? 'This certification is only valid for 1 year from the issuance.<br>Check the qr code to verify the authenticity of this document.'
+        : 'This certificate is valid for Forty-five (45) days from the date of issue,<br>check the QR code to verify the authenticity of this document.';
+    }
 
     return `
       <div class="doc-preview-stage">
@@ -2443,10 +2658,20 @@
     actionAmountWrap.classList.add('d-none');
     actionOrWrap.classList.add('d-none');
     actionIssuedWrap.classList.add('d-none');
+    actionBusinessApprovalWrap?.classList.add('d-none');
+    actionPlateWrap?.classList.add('d-none');
     actionReason.required = false;
     actionAmount.required = false;
     actionOr.required = false;
     actionIssued.required = false;
+    if (actionBusinessApproval) {
+      actionBusinessApproval.required = false;
+      actionBusinessApproval.value = '';
+    }
+    if (actionPlate) {
+      actionPlate.required = false;
+      actionPlate.value = '';
+    }
     actionReason.value = '';
     actionAmount.value = '';
     actionOr.value = '';
@@ -2460,6 +2685,15 @@
     }
     if (actionForm?.dataset?.confirmStep) {
       delete actionForm.dataset.confirmStep;
+    }
+    if (actionForm?.dataset?.businessApprovalStep) {
+      delete actionForm.dataset.businessApprovalStep;
+    }
+    if (actionForm?.dataset?.businessApprovalType) {
+      delete actionForm.dataset.businessApprovalType;
+    }
+    if (actionForm?.dataset?.businessPlateNumber) {
+      delete actionForm.dataset.businessPlateNumber;
     }
     if (actionCancelBtn) {
       actionCancelBtn.textContent = 'Return';
@@ -2477,6 +2711,76 @@
   function clearModalError() {
     modalError.classList.add('d-none');
     modalError.textContent = '';
+  }
+
+  function configureBusinessApprovalSelectionStep(selectedValue = '', plateValue = '') {
+    if (actionForm) {
+      actionForm.dataset.businessApprovalStep = 'select';
+      if (selectedValue) {
+        actionForm.dataset.businessApprovalType = selectedValue;
+      } else if (actionForm.dataset.businessApprovalType) {
+        delete actionForm.dataset.businessApprovalType;
+      }
+      actionForm.dataset.businessPlateNumber = String(plateValue || '').trim().toUpperCase();
+    }
+    if (modalTitle) {
+      modalTitle.textContent = 'Type of Approval';
+    }
+    if (actionPrompt) {
+      actionPrompt.textContent = 'Choose the approval type for this Barangay Clearance for Business Permit.';
+      actionPrompt.classList.remove('d-none');
+    }
+    if (actionBusinessApprovalWrap) {
+      actionBusinessApprovalWrap.classList.remove('d-none');
+    }
+    if (actionBusinessApproval) {
+      actionBusinessApproval.required = true;
+      actionBusinessApproval.value = selectedValue || '';
+    }
+    if (actionPlateWrap) {
+      actionPlateWrap.classList.remove('d-none');
+    }
+    if (actionPlate) {
+      actionPlate.required = false;
+      actionPlate.value = String(plateValue || '').trim().toUpperCase();
+    }
+    if (actionSubmitBtn) {
+      actionSubmitBtn.textContent = 'Next';
+      actionSubmitBtn.classList.remove('btn-danger', 'btn-success');
+      actionSubmitBtn.classList.add('btn-primary');
+      actionSubmitBtn.disabled = false;
+    }
+  }
+
+  function configureBusinessApprovalReviewStep() {
+    if (actionForm) {
+      actionForm.dataset.businessApprovalStep = 'review';
+    }
+    if (modalTitle) {
+      modalTitle.textContent = 'Before You Approve';
+    }
+    if (actionPrompt) {
+      actionPrompt.textContent = 'Click View Document to check the document that will be issued and edit it if there are necessary changes in the details. Once everything is correct, proceed to verify the Barangay Clearance for Business Permit.';
+      actionPrompt.classList.remove('d-none');
+    }
+    if (actionBusinessApprovalWrap) {
+      actionBusinessApprovalWrap.classList.add('d-none');
+    }
+    if (actionBusinessApproval) {
+      actionBusinessApproval.required = false;
+    }
+    if (actionPlateWrap) {
+      actionPlateWrap.classList.add('d-none');
+    }
+    if (actionPlate) {
+      actionPlate.required = false;
+    }
+    if (actionSubmitBtn) {
+      actionSubmitBtn.textContent = 'View Document';
+      actionSubmitBtn.classList.remove('btn-danger', 'btn-success');
+      actionSubmitBtn.classList.add('btn-primary');
+      actionSubmitBtn.disabled = false;
+    }
   }
 
   function openActionModal(type, requestId) {
@@ -2502,6 +2806,20 @@
     if (actionForm) {
       actionForm.dataset.docKey = normalizePreviewDocKey(row?.document_type || '');
     }
+    const docKey = String(actionForm?.dataset?.docKey || '');
+    const isBusinessClearanceApproval = type === 'personnel_approve' && !isFirstTimeJobSeeker && docKey === 'businessclearance';
+    const existingBusinessApprovalType = normalizeBusinessApprovalType(firstNonEmpty([
+      viewPreviewState?.businessApprovalType,
+      row?.payload?._preview_business_approval_type,
+      row?.payload?.business_approval_type
+    ]));
+    const existingPlateNumber = firstNonEmpty([
+      viewPreviewState?.plateNumber,
+      row?.payload?._preview_plate_number,
+      row?.payload?.plate_number,
+      row?.payload?.business_plate_number,
+      row?.payload?.vehicle_plate_number
+    ]).toUpperCase();
 
     const rowStage = String(row?.stage || '').toLowerCase();
     const isWalkInFlow = rowStage === 'for_payment' || rowStage === 'payment_rejected';
@@ -2519,6 +2837,12 @@
     };
     modalTitle.textContent = labels[type] || 'Update Request';
     const docName = normalizeDocumentTypeDisplay(String(row?.document_type || 'document'));
+
+    if (isBusinessClearanceApproval) {
+      configureBusinessApprovalSelectionStep(existingBusinessApprovalType, existingPlateNumber);
+      actionModal.show();
+      return;
+    }
 
     if (type === 'personnel_approve' && actionPrompt) {
       actionPrompt.textContent = isFirstTimeJobSeeker
@@ -2929,7 +3253,10 @@
           'government_position', 'request_officer_line1', 'request_officer_line2', 'request_officer_line3',
           'cohabitation_variant', 'cohabitant_id_front_path', 'cohabitant_id_back_path',
           'detention_proof_file_path', 'detention_proof_file_paths',
-          'relationship_proof_file_path', 'relationship_proof_file_paths'
+          'relationship_proof_file_path', 'relationship_proof_file_paths',
+          'valid_id_file_path', 'business_reg_file_path', 'proof_address_file_path',
+          'business_photo_file_path', 'renewal_valid_id_file_path', 'renewal_business_reg_file_path',
+          'renewal_proof_address_file_path'
         ]);
 
         const requestFields = [];
@@ -3296,9 +3623,53 @@
     e.preventDefault();
     clearModalError();
 
+    const currentActionValue = String(actionType.value || '');
+    const currentDocKey = String(actionForm?.dataset?.docKey || '');
+    const businessApprovalStep = String(actionForm?.dataset?.businessApprovalStep || '');
+    if (currentActionValue === 'personnel_approve' && currentDocKey === 'businessclearance' && businessApprovalStep === 'select') {
+      const selectedApprovalType = normalizeBusinessApprovalType(actionBusinessApproval?.value || '');
+      const selectedPlateNumber = String(actionPlate?.value || '').trim().toUpperCase();
+      if (!selectedApprovalType) {
+        modalError.textContent = 'Please select the type of approval first.';
+        modalError.classList.remove('d-none');
+        return;
+      }
+      if (actionForm) {
+        actionForm.dataset.businessApprovalType = selectedApprovalType;
+        actionForm.dataset.businessPlateNumber = selectedPlateNumber;
+      }
+      configureBusinessApprovalReviewStep();
+      return;
+    }
+
     if ((actionType.value || '') === 'personnel_approve' && String(actionForm?.dataset?.docKey || '') !== 'firsttimejobseeker') {
       // "View Document" only opens preview; it does not approve yet.
       const rid = String(actionRequestId.value || '').trim();
+      if (String(actionForm?.dataset?.docKey || '') === 'businessclearance') {
+        const selectedApprovalType = normalizeBusinessApprovalType(
+          actionForm?.dataset?.businessApprovalType || actionBusinessApproval?.value || ''
+        );
+        const selectedPlateNumber = String(
+          actionForm?.dataset?.businessPlateNumber || actionPlate?.value || ''
+        ).trim().toUpperCase();
+        if (!selectedApprovalType) {
+          modalError.textContent = 'Please select the type of approval first.';
+          modalError.classList.remove('d-none');
+          return;
+        }
+        if (!viewPreviewState || typeof viewPreviewState !== 'object') {
+          const previewRow = itemById.get(rid) || {};
+          const previewPayload = previewRow?.payload && typeof previewRow.payload === 'object' ? previewRow.payload : {};
+          const previewProfile = previewRow?.resident_profile && typeof previewRow.resident_profile === 'object'
+            ? previewRow.resident_profile
+            : {};
+          viewPreviewState = buildPreviewState(previewRow, previewPayload, previewProfile, null);
+        }
+        if (viewPreviewState && typeof viewPreviewState === 'object') {
+          viewPreviewState.businessApprovalType = selectedApprovalType;
+          viewPreviewState.plateNumber = selectedPlateNumber;
+        }
+      }
       if (actionSubmitBtn) {
         actionSubmitBtn.disabled = true;
         actionSubmitBtn.textContent = 'Loading Document...';

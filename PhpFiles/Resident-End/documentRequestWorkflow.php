@@ -443,6 +443,53 @@ function dr_convert_upload_to_pdf(array $file, string $folder, int $index = 1): 
     return ['path' => '/UnifiedFileAttachment/' . trim($folder, '/') . '/' . $targetName, 'error' => null];
 }
 
+function dr_document_type_token(string $value): string {
+    return preg_replace('/[^a-z0-9]+/', '', strtolower(trim($value)));
+}
+
+function dr_build_business_clearance_address(array $source): string {
+    $parts = [];
+    $streetLine = trim(implode(' ', array_filter([
+        trim((string)($source['business_house_number'] ?? '')),
+        trim((string)($source['business_street_name'] ?? ''))
+    ], static fn($v) => $v !== '')));
+    if ($streetLine !== '') {
+        $parts[] = $streetLine;
+    }
+
+    foreach (['business_subdivision', 'business_barangay', 'business_city', 'business_province'] as $key) {
+        $value = trim((string)($source[$key] ?? ''));
+        if ($value !== '') {
+            $parts[] = $value;
+        }
+    }
+
+    return implode(', ', $parts);
+}
+
+function dr_fetch_resident_birth_snapshot(mysqli $conn, string $residentId, string $userId): array {
+    $sql = "
+        SELECT birthdate, birthplace
+        FROM residentinformationtbl
+        WHERE resident_id = ? OR user_id = ?
+        ORDER BY CASE WHEN resident_id = ? THEN 0 ELSE 1 END
+        LIMIT 1
+    ";
+    $stmt = $conn->prepare($sql);
+    if (!$stmt) {
+        return ['birthdate' => '', 'birthplace' => ''];
+    }
+    $stmt->bind_param('sss', $residentId, $userId, $residentId);
+    $stmt->execute();
+    $row = $stmt->get_result()->fetch_assoc();
+    $stmt->close();
+
+    return [
+        'birthdate' => trim((string)($row['birthdate'] ?? '')),
+        'birthplace' => trim((string)($row['birthplace'] ?? '')),
+    ];
+}
+
 function dr_has_column(mysqli $conn, string $table, string $column): bool {
     static $cache = [];
     $tableEsc = preg_replace('/[^a-zA-Z0-9_]/', '', $table);
@@ -791,7 +838,126 @@ if ($action === 'submit_request') {
         $purpose = 'Residency Verification';
     }
 
-    $isCohabitationRequest = (preg_replace('/[^a-z0-9]+/', '', strtolower(trim($documentTypeRaw))) === 'cohabitation');
+    $documentTypeToken = dr_document_type_token($documentTypeRaw !== '' ? $documentTypeRaw : $documentType);
+    $isBusinessPermitClearanceRequest = in_array($documentTypeToken, [
+        'barangayclearanceforbusinesspermit',
+        'barangaybusinessclearance',
+        'businessclearance'
+    ], true);
+    if ($isBusinessPermitClearanceRequest) {
+        $applicationType = trim((string)($_POST['application_type'] ?? ''));
+        if (!in_array($applicationType, ['New', 'Renewal'], true)) {
+            dr_respond_json(422, ['success' => false, 'message' => 'Application type is required.']);
+        }
+
+        $ownerType = trim((string)($_POST['owner_type'] ?? ''));
+        if (!in_array($ownerType, ['Owner', 'Renter'], true)) {
+            dr_respond_json(422, ['success' => false, 'message' => 'Ownership is required.']);
+        }
+        if ($ownerType === 'Renter') {
+            $renterOwnerLastName = trim((string)($_POST['ro_ln'] ?? ''));
+            $renterOwnerFirstName = trim((string)($_POST['ro_fn'] ?? ''));
+            if ($renterOwnerLastName === '' || $renterOwnerFirstName === '') {
+                dr_respond_json(422, ['success' => false, 'message' => 'Owner name is required for renter applications.']);
+            }
+        }
+
+        $businessName = trim((string)($_POST['business_name'] ?? $_POST['b_name'] ?? ''));
+        if ($businessName === '') {
+            dr_respond_json(422, ['success' => false, 'message' => 'Business name is required.']);
+        }
+        $_POST['business_name'] = $businessName;
+
+        $initialOperationDate = trim((string)($_POST['initial_operation_date'] ?? $_POST['b_date'] ?? ''));
+        if ($initialOperationDate === '') {
+            dr_respond_json(422, ['success' => false, 'message' => 'Date of initial operation is required.']);
+        }
+        $_POST['initial_operation_date'] = $initialOperationDate;
+
+        $businessContact = trim((string)($_POST['business_contact_number'] ?? $_POST['b_contact_1'] ?? ''));
+        if ($businessContact !== '') {
+            $_POST['business_contact_number'] = $businessContact;
+        }
+
+        $businessFullAddress = trim((string)($_POST['business_full_address'] ?? ''));
+        if ($businessFullAddress === '') {
+            $businessFullAddress = dr_build_business_clearance_address($_POST);
+        }
+        if ($businessFullAddress !== '') {
+            $_POST['business_full_address'] = $businessFullAddress;
+            $_POST['location'] = $businessFullAddress;
+        }
+
+        $ownerAddress = trim((string)($_POST['owner_full_address'] ?? $_POST['full_address'] ?? ''));
+        if ($ownerAddress !== '') {
+            $_POST['full_address'] = $ownerAddress;
+        }
+
+        $residentBirthSnapshot = dr_fetch_resident_birth_snapshot($conn, $residentId, $residentForeignId);
+        if (trim((string)($_POST['birthdate'] ?? '')) === '' && $residentBirthSnapshot['birthdate'] !== '') {
+            $_POST['birthdate'] = $residentBirthSnapshot['birthdate'];
+        }
+        if (trim((string)($_POST['birthplace'] ?? '')) === '' && $residentBirthSnapshot['birthplace'] !== '') {
+            $_POST['birthplace'] = $residentBirthSnapshot['birthplace'];
+        }
+
+        $purposeText = $applicationType === 'Renewal' ? 'Business Permit - Renewal' : 'Business Permit - New Application';
+        if (trim((string)($_POST['request_purpose'] ?? '')) === '') {
+            $_POST['request_purpose'] = $purposeText;
+        }
+        if (trim((string)($_POST['purpose'] ?? '')) === '') {
+            $_POST['purpose'] = $purposeText;
+        }
+
+        $uploadSets = $applicationType === 'Renewal'
+            ? [
+                ['field' => 'renewal_valid_id_file', 'folder' => 'DocumentRequests/BusinessClearance/ValidIDs', 'message' => 'Renewal valid government-issued ID'],
+                ['field' => 'renewal_business_reg_file', 'folder' => 'DocumentRequests/BusinessClearance/BusinessRegistrations', 'message' => 'Updated business registration'],
+                ['field' => 'renewal_proof_address_file', 'folder' => 'DocumentRequests/BusinessClearance/ProofOfAddress', 'message' => 'Updated proof of business address'],
+            ]
+            : [
+                ['field' => 'valid_id_file', 'folder' => 'DocumentRequests/BusinessClearance/ValidIDs', 'message' => 'Valid government-issued ID'],
+                ['field' => 'business_reg_file', 'folder' => 'DocumentRequests/BusinessClearance/BusinessRegistrations', 'message' => 'Business registration'],
+                ['field' => 'proof_address_file', 'folder' => 'DocumentRequests/BusinessClearance/ProofOfAddress', 'message' => 'Proof of business address'],
+                ['field' => 'business_photo_file', 'folder' => 'DocumentRequests/BusinessClearance/BusinessPhotos', 'message' => 'Picture of establishment or business'],
+            ];
+
+        $requiredFieldMap = $applicationType === 'Renewal'
+            ? [
+                'renewal_valid_id_type' => 'Valid government-issued ID type is required.',
+                'renewal_valid_id_number' => 'Valid ID number is required.',
+                'renewal_business_reg_type' => 'Updated business registration type is required.',
+                'renewal_proof_address_type' => 'Updated proof of business address type is required.',
+            ]
+            : [
+                'valid_id_type' => 'Valid government-issued ID type is required.',
+                'valid_id_number' => 'Valid ID number is required.',
+                'business_reg_type' => 'Business registration type is required.',
+                'proof_address_type' => 'Proof of business address type is required.',
+            ];
+        foreach ($requiredFieldMap as $field => $message) {
+            if (trim((string)($_POST[$field] ?? '')) === '') {
+                dr_respond_json(422, ['success' => false, 'message' => $message]);
+            }
+        }
+
+        $proofAddressTypeField = $applicationType === 'Renewal' ? 'renewal_proof_address_type' : 'proof_address_type';
+        $proofAddressNumberField = $applicationType === 'Renewal' ? 'renewal_proof_address_number' : 'proof_address_number';
+        if (trim((string)($_POST[$proofAddressTypeField] ?? '')) !== 'lease'
+            && trim((string)($_POST[$proofAddressNumberField] ?? '')) === '') {
+            dr_respond_json(422, ['success' => false, 'message' => 'Proof of business address document number is required.']);
+        }
+
+        foreach ($uploadSets as $uploadSet) {
+            $upload = dr_save_upload($_FILES[$uploadSet['field']] ?? [], $uploadSet['folder'], ['jpg', 'jpeg', 'png', 'pdf']);
+            if (!empty($upload['error'])) {
+                dr_respond_json(422, ['success' => false, 'message' => $uploadSet['message'] . ': ' . $upload['error']]);
+            }
+            $_POST[$uploadSet['field'] . '_path'] = (string)($upload['path'] ?? '');
+        }
+    }
+
+    $isCohabitationRequest = ($documentTypeToken === 'cohabitation');
     if ($isCohabitationRequest) {
         $cohabitationVariant = trim((string)($_POST['cohabitation_variant'] ?? ''));
         $isRelationshipJailVisit = ($cohabitationVariant === 'relationship_jail_visit' || $cohabitationVariant === 'conjugal_visit');

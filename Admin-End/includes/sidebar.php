@@ -259,7 +259,7 @@ if (!empty($_SESSION['user_id']) && isset($conn) && $conn instanceof mysqli) {
                 data-bs-toggle="collapse"
                 data-bs-target="#cert-collapse"
                 aria-expanded="<?= $isCertActive ? 'true' : 'false' ?>">
-          <i class="fas fa-file-circle-check"></i> Certificate Issuance
+          <i class="fas fa-file-circle-check"></i> Document Issuance
         </button>
 
         <div class="collapse <?= $isCertActive ? 'show' : '' ?>" id="cert-collapse">

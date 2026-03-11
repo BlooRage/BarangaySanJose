@@ -37,6 +37,14 @@
   const renewalProofAddressNumberError = document.getElementById("renewalProofAddressNumberError");
   const businessContactNumber = document.getElementById("business_contact_number");
   const businessContactNumberError = document.getElementById("business_contact_number_error");
+  const businessRequestPurpose = document.getElementById("businessRequestPurpose");
+  const businessHouseNumber = document.getElementById("business_house_number");
+  const businessStreetName = document.getElementById("business_street_name");
+  const businessSubdivision = document.getElementById("business_subdivision");
+  const businessBarangay = document.getElementById("business_barangay");
+  const businessCity = document.getElementById("business_city");
+  const businessProvince = document.getElementById("business_province");
+  const businessFullAddress = document.getElementById("businessFullAddress");
   const renterOwnerRequired = renterOwnerDetails
     ? Array.from(renterOwnerDetails.querySelectorAll("input[name='ro_ln'], input[name='ro_fn']"))
     : [];
@@ -141,9 +149,26 @@
     });
   };
 
+  const buildBusinessFullAddress = () => {
+    const parts = [
+      [businessHouseNumber?.value || '', businessStreetName?.value || ''].filter(Boolean).join(' ').trim(),
+      (businessSubdivision?.value || '').trim(),
+      (businessBarangay?.value || '').trim(),
+      (businessCity?.value || '').trim(),
+      (businessProvince?.value || '').trim()
+    ].filter(Boolean);
+    return parts.join(', ');
+  };
+
   const updateState = () => {
     const isNewApp = appNew?.checked === true;
     const isRenewal = appRenewal?.checked === true;
+    if (businessRequestPurpose) {
+      businessRequestPurpose.value = isRenewal ? "Business Permit - Renewal" : "Business Permit - New Application";
+    }
+    if (businessFullAddress) {
+      businessFullAddress.value = buildBusinessFullAddress();
+    }
     if (documentUploadSection) {
       documentUploadSection.classList.toggle("d-none", !(isNewApp || isRenewal));
     }

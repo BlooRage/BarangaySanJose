@@ -114,7 +114,11 @@ $ownerFullAddress = htmlspecialchars(implode(', ', $ownerFullAddressParts), ENT_
             <h1 class="form-title">Barangay Business Clearance</h1>
             <p class="form-subtitle">All fields marked with <span class="required-asterisk">*</span> are required</p>
 
-            <form action="#" method="POST">
+            <form action="<?= htmlspecialchars($baseUrl) ?>/PhpFiles/Resident-End/documentRequestWorkflow.php" method="POST" enctype="multipart/form-data">
+                <input type="hidden" name="action" value="submit_request">
+                <input type="hidden" name="document_type" value="Barangay Clearance for Business Permit">
+                <input type="hidden" name="redirect" value="1">
+                <input type="hidden" name="request_purpose" id="businessRequestPurpose" value="Business Permit - New Application">
                 
                 <h2 class="section-title text-center text-dark">Applicant Information</h2>
                 <div class="form-row">
@@ -158,7 +162,7 @@ $ownerFullAddress = htmlspecialchars(implode(', ', $ownerFullAddressParts), ENT_
                     </div>
                 </div>
                 <h2 class="section-title text-center text-dark">Business Details</h2>
-                <div class="form-row"><div class="full-width"><div class="input-stack"><label class="top-label">Name of Business <span class="required-asterisk">*</span></label><input type="text" name="b_name" required></div></div></div>
+                <div class="form-row"><div class="full-width"><div class="input-stack"><label class="top-label">Name of Business <span class="required-asterisk">*</span></label><input type="text" name="business_name" required></div></div></div>
                 <div id="businessLocationWrapper" class="form-row">
                     <div class="full-width">
                         <div class="row mb-3">
@@ -193,16 +197,17 @@ $ownerFullAddress = htmlspecialchars(implode(', ', $ownerFullAddressParts), ENT_
                                 <input type="text" id="business_province" name="business_province" readonly value="Rizal">
                             </div>
                         </div>
+                        <input type="hidden" id="businessFullAddress" name="business_full_address" value="">
                     </div>
                 </div>
                 <div class="form-row two-col-row">
                     <div>
                         <label class="top-label">Date of Initial Operation <span class="required-asterisk">*</span></label>
-                        <input type="date" name="b_date" required>
+                        <input type="date" name="initial_operation_date" required>
                     </div>
                     <div>
                         <label class="top-label">Contact Number</label>
-                        <input type="text" id="business_contact_number" name="b_contact_1" inputmode="numeric" maxlength="11">
+                        <input type="text" id="business_contact_number" name="business_contact_number" inputmode="numeric" maxlength="11">
                         <div id="business_contact_number_error" class="text-danger small d-none">Invalid contact number</div>
                     </div>
                 </div>
@@ -429,4 +434,3 @@ $ownerFullAddress = htmlspecialchars(implode(', ', $ownerFullAddressParts), ENT_
     <script src="../../JS-Script-Files/Resident-End/Clearances/businessClearanceScript.js"></script>
 </body>
 </html>
-
