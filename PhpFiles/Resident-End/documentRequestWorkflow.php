@@ -304,6 +304,64 @@ function dr_append_pdf_pages(\setasign\Fpdi\Fpdi $pdf, string $pdfPath): void {
     }
 }
 
+function dr_move_uploaded_file_to_path(string $tmp, string $targetPath): bool {
+    if (@move_uploaded_file($tmp, $targetPath)) {
+        return true;
+    }
+    if (@copy($tmp, $targetPath)) {
+        return true;
+    }
+    return @rename($tmp, $targetPath);
+}
+
+function dr_normalize_image_for_pdf(string $imagePath, string $ext): array {
+    $ext = strtolower(trim($ext));
+    if (in_array($ext, ['jpg', 'jpeg', 'png'], true)) {
+        return ['path' => $imagePath, 'cleanup' => false, 'error' => null];
+    }
+
+    if (!extension_loaded('gd') || !function_exists('imagecreatefromstring') || !function_exists('imagepng')) {
+        return ['path' => null, 'cleanup' => false, 'error' => 'Image conversion support is unavailable on the server.'];
+    }
+
+    $imageData = @file_get_contents($imagePath);
+    if ($imageData === false || $imageData === '') {
+        return ['path' => null, 'cleanup' => false, 'error' => 'Unable to read uploaded image.'];
+    }
+
+    $image = @imagecreatefromstring($imageData);
+    if ($image === false) {
+        if ($ext === 'webp') {
+            return ['path' => null, 'cleanup' => false, 'error' => 'WEBP images are not supported on this server. Please upload JPG, PNG, or PDF.'];
+        }
+        return ['path' => null, 'cleanup' => false, 'error' => 'Invalid image file.'];
+    }
+
+    if (function_exists('imagealphablending')) {
+        @imagealphablending($image, false);
+    }
+    if (function_exists('imagesavealpha')) {
+        @imagesavealpha($image, true);
+    }
+
+    $tempBase = @tempnam(sys_get_temp_dir(), 'drimg_');
+    if ($tempBase === false) {
+        @imagedestroy($image);
+        return ['path' => null, 'cleanup' => false, 'error' => 'Failed to prepare image conversion on the server.'];
+    }
+
+    $pngPath = $tempBase . '.png';
+    @unlink($tempBase);
+    if (!@imagepng($image, $pngPath)) {
+        @imagedestroy($image);
+        @unlink($pngPath);
+        return ['path' => null, 'cleanup' => false, 'error' => 'Failed to convert uploaded image to PDF format.'];
+    }
+
+    @imagedestroy($image);
+    return ['path' => $pngPath, 'cleanup' => true, 'error' => null];
+}
+
 function dr_convert_upload_to_pdf(array $file, string $folder, int $index = 1): array {
     $errorCode = (int)($file['error'] ?? UPLOAD_ERR_NO_FILE);
     if ($errorCode === UPLOAD_ERR_NO_FILE) {
@@ -336,22 +394,44 @@ function dr_convert_upload_to_pdf(array $file, string $folder, int $index = 1): 
     if (!is_dir($targetDir) && !@mkdir($targetDir, 0775, true) && !is_dir($targetDir)) {
         return ['path' => null, 'error' => 'Server storage is unavailable. Please try again later.'];
     }
+    @chmod($targetDir, 0775);
+    $probe = $targetDir . '/.__w_' . bin2hex(random_bytes(4)) . '.tmp';
+    $probeOk = @file_put_contents($probe, 'ok');
+    if ($probeOk === false) {
+        error_log('[documentRequestWorkflow][convert_upload_to_pdf] target dir not writable: ' . $targetDir);
+        return ['path' => null, 'error' => 'Upload folder is not writable on the server. Please contact admin.'];
+    }
+    @unlink($probe);
 
     $targetName = date('YmdHis') . '_' . $index . '_' . bin2hex(random_bytes(6)) . '.pdf';
     $targetPath = $targetDir . '/' . $targetName;
+    $normalizedImagePath = null;
 
     try {
-        $pdf = new \setasign\Fpdi\Fpdi();
         if ($ext === 'pdf') {
-            dr_append_pdf_pages($pdf, $tmp);
+            if (!dr_move_uploaded_file_to_path($tmp, $targetPath)) {
+                $lastError = error_get_last();
+                error_log('[documentRequestWorkflow][convert_upload_to_pdf] save pdf failed tmp=' . $tmp . ' target=' . $targetPath . ' err=' . ($lastError['message'] ?? 'unknown'));
+                return ['path' => null, 'error' => 'Failed to save uploaded PDF. Please try again.'];
+            }
         } else {
-            dr_append_image_page_to_pdf($pdf, $tmp);
+            $normalized = dr_normalize_image_for_pdf($tmp, $ext);
+            if (!empty($normalized['error'])) {
+                return ['path' => null, 'error' => (string)$normalized['error']];
+            }
+            $normalizedImagePath = (string)($normalized['path'] ?? '');
+            $pdf = new \setasign\Fpdi\Fpdi();
+            dr_append_image_page_to_pdf($pdf, $normalizedImagePath !== '' ? $normalizedImagePath : $tmp);
+            $pdf->Output('F', $targetPath);
         }
-        $pdf->Output('F', $targetPath);
     } catch (Throwable $e) {
         @unlink($targetPath);
         error_log('[documentRequestWorkflow][convert_upload_to_pdf] ' . $e->getMessage());
         return ['path' => null, 'error' => 'Failed to convert uploaded file to PDF.'];
+    } finally {
+        if ($normalizedImagePath !== null && $normalizedImagePath !== '') {
+            @unlink($normalizedImagePath);
+        }
     }
 
     if (!is_file($targetPath) || filesize($targetPath) <= 0) {

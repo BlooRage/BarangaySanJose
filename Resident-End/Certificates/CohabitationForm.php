@@ -264,8 +264,8 @@ $purposeInputClass = $isRelationshipJailVisitVariant ? 'form-control text-bg-lig
                                         <label class="upload-dropzone" data-upload-input="detentionProofFile1" for="detentionProofFile1">
                                             <i class="fa-solid fa-upload"></i>
                                             <div class="detention-proof-prompt" id="detentionProofPrompt1">Drag and drop detention proof or click to upload</div>
-                                            <small id="detentionProofFile1Meta">JPG, JPEG, PNG, WEBP, or PDF. Saved as PDF.</small>
-                                            <input type="file" class="form-control upload-dropzone-input" id="detentionProofFile1" name="detention_proof_files[]" accept=".jpg,.jpeg,.png,.webp,.pdf" required>
+                                            <small id="detentionProofFile1Meta">JPG, JPEG, PNG, or PDF. Saved as PDF.</small>
+                                            <input type="file" class="form-control upload-dropzone-input" id="detentionProofFile1" name="detention_proof_files[]" accept=".jpg,.jpeg,.png,.pdf" required>
                                         </label>
                                     </div>
                                 </div>
@@ -275,8 +275,8 @@ $purposeInputClass = $isRelationshipJailVisitVariant ? 'form-control text-bg-lig
                                         <label class="upload-dropzone" data-upload-input="detentionProofFile2" for="detentionProofFile2">
                                             <i class="fa-solid fa-upload"></i>
                                             <div class="detention-proof-prompt" id="detentionProofPrompt2">Drag and drop additional attachment or click to upload</div>
-                                            <small id="detentionProofFile2Meta">JPG, JPEG, PNG, WEBP, or PDF. Saved as PDF.</small>
-                                            <input type="file" class="form-control upload-dropzone-input" id="detentionProofFile2" name="detention_proof_files[]" accept=".jpg,.jpeg,.png,.webp,.pdf">
+                                            <small id="detentionProofFile2Meta">JPG, JPEG, PNG, or PDF. Saved as PDF.</small>
+                                            <input type="file" class="form-control upload-dropzone-input" id="detentionProofFile2" name="detention_proof_files[]" accept=".jpg,.jpeg,.png,.pdf">
                                         </label>
                                     </div>
                                 </div>
@@ -286,8 +286,8 @@ $purposeInputClass = $isRelationshipJailVisitVariant ? 'form-control text-bg-lig
                                         <label class="upload-dropzone" data-upload-input="detentionProofFile3" for="detentionProofFile3">
                                             <i class="fa-solid fa-upload"></i>
                                             <div class="detention-proof-prompt" id="detentionProofPrompt3">Drag and drop additional attachment or click to upload</div>
-                                            <small id="detentionProofFile3Meta">JPG, JPEG, PNG, WEBP, or PDF. Saved as PDF.</small>
-                                            <input type="file" class="form-control upload-dropzone-input" id="detentionProofFile3" name="detention_proof_files[]" accept=".jpg,.jpeg,.png,.webp,.pdf">
+                                            <small id="detentionProofFile3Meta">JPG, JPEG, PNG, or PDF. Saved as PDF.</small>
+                                            <input type="file" class="form-control upload-dropzone-input" id="detentionProofFile3" name="detention_proof_files[]" accept=".jpg,.jpeg,.png,.pdf">
                                         </label>
                                     </div>
                                 </div>
@@ -552,8 +552,8 @@ $purposeInputClass = $isRelationshipJailVisitVariant ? 'form-control text-bg-lig
                                     <label class="upload-dropzone" data-upload-input="relationshipProofFile1" for="relationshipProofFile1">
                                         <i class="fa-solid fa-upload"></i>
                                         <div class="relationship-proof-prompt" id="relationshipProofPrompt1">Drag and drop proof of relationship or click to upload</div>
-                                        <small id="relationshipProofFile1Meta">JPG, JPEG, PNG, WEBP, or PDF. Saved as PDF.</small>
-                                        <input type="file" class="form-control upload-dropzone-input" id="relationshipProofFile1" name="relationship_proof_files[]" accept=".jpg,.jpeg,.png,.webp,.pdf" required>
+                                        <small id="relationshipProofFile1Meta">JPG, JPEG, PNG, or PDF. Saved as PDF.</small>
+                                        <input type="file" class="form-control upload-dropzone-input" id="relationshipProofFile1" name="relationship_proof_files[]" accept=".jpg,.jpeg,.png,.pdf" required>
                                     </label>
                                 </div>
                             </div>
@@ -563,8 +563,8 @@ $purposeInputClass = $isRelationshipJailVisitVariant ? 'form-control text-bg-lig
                                     <label class="upload-dropzone" data-upload-input="relationshipProofFile2" for="relationshipProofFile2">
                                         <i class="fa-solid fa-upload"></i>
                                         <div class="relationship-proof-prompt" id="relationshipProofPrompt2">Drag and drop additional attachment or click to upload</div>
-                                        <small id="relationshipProofFile2Meta">JPG, JPEG, PNG, WEBP, or PDF. Saved as PDF.</small>
-                                        <input type="file" class="form-control upload-dropzone-input" id="relationshipProofFile2" name="relationship_proof_files[]" accept=".jpg,.jpeg,.png,.webp,.pdf">
+                                        <small id="relationshipProofFile2Meta">JPG, JPEG, PNG, or PDF. Saved as PDF.</small>
+                                        <input type="file" class="form-control upload-dropzone-input" id="relationshipProofFile2" name="relationship_proof_files[]" accept=".jpg,.jpeg,.png,.pdf">
                                     </label>
                                 </div>
                             </div>
@@ -574,8 +574,8 @@ $purposeInputClass = $isRelationshipJailVisitVariant ? 'form-control text-bg-lig
                                     <label class="upload-dropzone" data-upload-input="relationshipProofFile3" for="relationshipProofFile3">
                                         <i class="fa-solid fa-upload"></i>
                                         <div class="relationship-proof-prompt" id="relationshipProofPrompt3">Drag and drop additional attachment or click to upload</div>
-                                        <small id="relationshipProofFile3Meta">JPG, JPEG, PNG, WEBP, or PDF. Saved as PDF.</small>
-                                        <input type="file" class="form-control upload-dropzone-input" id="relationshipProofFile3" name="relationship_proof_files[]" accept=".jpg,.jpeg,.png,.webp,.pdf">
+                                        <small id="relationshipProofFile3Meta">JPG, JPEG, PNG, or PDF. Saved as PDF.</small>
+                                        <input type="file" class="form-control upload-dropzone-input" id="relationshipProofFile3" name="relationship_proof_files[]" accept=".jpg,.jpeg,.png,.pdf">
                                     </label>
                                 </div>
                             </div>
