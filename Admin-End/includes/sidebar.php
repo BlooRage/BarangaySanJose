@@ -243,14 +243,32 @@ if (!empty($_SESSION['user_id']) && isset($conn) && $conn instanceof mysqli) {
                 Sector Membership Verification
               </a>
             </li>
+          </ul>
+        </div>
+      </li>
+      <!-- HOUSEHOLD PROFILING is collapsible button with 2 sub-buttons householdprofiling.php and headofthefamilyverification.php -->
+      <li class="mb-1">
+        <button class="btn btn-toggle d-flex align-items-center gap-2 rounded <?= $isHouseholdProfilingActive ? '' : 'collapsed' ?>"
+                data-bs-toggle="collapse"
+                data-bs-target="#household-profiling-collapse"
+                aria-expanded="<?= $isHouseholdProfilingActive ? 'true' : 'false' ?>">
+          <i class="fas fa-house"></i> Household Profiling
+        </button>
+        <div class="collapse <?= $isHouseholdProfilingActive ? 'show' : '' ?>" id="household-profiling-collapse">
+          <ul class="btn-toggle-nav list-unstyled fw-normal pb-1 small">
             <li>
               <a href="<?= htmlspecialchars(appUrl('Admin-End/HouseholdProfiling.php')) ?>"
                  class="link-dark rounded <?= $current == 'HouseholdProfiling.php' ? 'active' : '' ?>">
                 Household Profiling
               </a>
             </li>
+            <li>
+              <a href="<?= htmlspecialchars(appUrl('Admin-End/HeadofTheFamilyVerification.php')) ?>"
+                 class="link-dark rounded <?= $current == 'HeadofTheFamilyVerification.php' ? 'active' : '' ?>">
+                Head of the Family Verification
+              </a>
+            </li>
           </ul>
-        </div>
       </li>
 
       <!-- CERTIFICATE ISSUANCE (Resident Management) -->
