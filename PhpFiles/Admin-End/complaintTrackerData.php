@@ -8,6 +8,18 @@ requireRoleSession(['SuperAdmin', 'Official', 'Officials', 'Personnel', 'Personn
 
 header('Content-Type: application/json; charset=utf-8');
 
+$requestMethod = $_SERVER['REQUEST_METHOD'] ?? 'GET';
+$jsonInput = [];
+if ($requestMethod === 'POST') {
+    $raw = file_get_contents('php://input');
+    if (is_string($raw) && trim($raw) !== '') {
+        $decoded = json_decode($raw, true);
+        if (is_array($decoded)) {
+            $jsonInput = $decoded;
+        }
+    }
+}
+
 function respond($success, $payload = [], $message = ''): void
 {
     echo json_encode([
@@ -40,13 +52,50 @@ function tableExists(mysqli $conn, string $tableName): bool
     return !empty($row);
 }
 
+function getStatusId(mysqli $conn, string $statusName, string $statusType): int
+{
+    $stmt = $conn->prepare("
+        SELECT status_id
+        FROM statuslookuptbl
+        WHERE status_name = ? AND status_type = ?
+        LIMIT 1
+    ");
+    if (!$stmt) {
+        return 0;
+    }
+    $stmt->bind_param("ss", $statusName, $statusType);
+    $stmt->execute();
+    $row = $stmt->get_result()->fetch_assoc();
+    $stmt->close();
+    return isset($row['status_id']) ? (int)$row['status_id'] : 0;
+}
+
+function appendMultilineNote(?string $existing, string $newNote): string
+{
+    $existing = trim((string)$existing);
+    $newNote = trim($newNote);
+    if ($existing === '') {
+        return $newNote;
+    }
+    if ($newNote === '') {
+        return $existing;
+    }
+    return $existing . "\n" . $newNote;
+}
+
 function participantDisplayName(array $row, string $prefix = ''): string
 {
+    $first = trim((string)($row[$prefix . 'firstname'] ?? ''));
+    $middle = trim((string)($row[$prefix . 'middlename'] ?? ''));
+    $last = trim((string)($row[$prefix . 'lastname'] ?? ''));
+    $suffix = trim((string)($row[$prefix . 'suffix'] ?? ''));
+    $middleInitial = $middle !== '' ? strtoupper(substr($middle, 0, 1)) . '.' : '';
+
     return trim(implode(' ', array_filter([
-        $row[$prefix . 'firstname'] ?? '',
-        $row[$prefix . 'middlename'] ?? '',
-        $row[$prefix . 'lastname'] ?? '',
-        $row[$prefix . 'suffix'] ?? ''
+        $first,
+        $middleInitial,
+        $last,
+        $suffix
     ])));
 }
 
@@ -54,7 +103,13 @@ if (!tableExists($conn, 'complaintstbl')) {
     respond(false, [], 'Missing table complaintstbl. Run the complaint migration first.');
 }
 
-$action = trim((string)($_GET['action'] ?? 'list'));
+$action = '';
+if ($requestMethod === 'POST') {
+    $action = trim((string)($jsonInput['action'] ?? $_POST['action'] ?? ''));
+}
+if ($action === '') {
+    $action = trim((string)($_GET['action'] ?? 'list'));
+}
 
 if ($action === 'list') {
     $sql = "
@@ -64,6 +119,7 @@ if ($action === 'list') {
             DATE_FORMAT(c.report_timestamp, '%Y-%m-%d') AS submitted_date,
             c.complaint_type,
             s.status_name,
+            l.status_name AS level_name,
             ct.subject_display_name,
             ct.subject_kind,
             ct.escalated_to_blotter,
@@ -75,6 +131,7 @@ if ($action === 'list') {
         FROM casereportstbl c
         INNER JOIN complaintstbl ct ON ct.case_id = c.case_id
         LEFT JOIN statuslookuptbl s ON s.status_id = c.case_status_id
+        LEFT JOIN statuslookuptbl l ON l.status_id = c.case_level_id
         LEFT JOIN caseparticipantstbl cp
             ON cp.case_id = c.case_id
             AND cp.participant_role = 'Complainant'
@@ -95,8 +152,12 @@ if ($action === 'list') {
         $statusKey = 'pending';
         if ((int)($row['escalated_to_blotter'] ?? 0) === 1) {
             $statusKey = 'escalated';
-        } elseif (stripos($statusName, 'review') !== false) {
-            $statusKey = 'review';
+        } elseif (stripos($statusName, 'resolved') !== false) {
+            $statusKey = 'resolved';
+        } elseif (stripos($statusName, 'drop') !== false) {
+            $statusKey = 'dropped';
+        } elseif (stripos($statusName, 'endorse') !== false) {
+            $statusKey = 'escalated';
         }
 
         $items[] = [
@@ -106,6 +167,7 @@ if ($action === 'list') {
             'complaint_type' => $row['complaint_type'] ?? '',
             'status_name' => $statusName !== '' ? $statusName : 'Pending',
             'status_key' => $statusKey,
+            'level_name' => $row['level_name'] ?? 'Complaint Only',
             'subject_display_name' => $row['subject_display_name'] ?? '',
             'subject_kind' => $row['subject_kind'] ?? '',
             'escalated_to_blotter' => (int)($row['escalated_to_blotter'] ?? 0),
@@ -135,6 +197,7 @@ if ($action === 'detail') {
             c.case_details,
             c.case_remarks,
             s.status_name,
+            l.status_name AS level_name,
             ct.subject_kind,
             ct.subject_display_name,
             ct.subject_contact_number,
@@ -148,6 +211,7 @@ if ($action === 'detail') {
         FROM casereportstbl c
         INNER JOIN complaintstbl ct ON ct.case_id = c.case_id
         LEFT JOIN statuslookuptbl s ON s.status_id = c.case_status_id
+        LEFT JOIN statuslookuptbl l ON l.status_id = c.case_level_id
         WHERE c.case_id = ?
           AND c.report_type = 'Complaint'
         LIMIT 1
@@ -207,6 +271,7 @@ if ($action === 'detail') {
             'case_details' => $detail['case_details'] ?? '',
             'case_remarks' => $detail['case_remarks'] ?? '',
             'status_name' => $detail['status_name'] ?? 'Pending',
+            'level_name' => $detail['level_name'] ?? 'Complaint Only',
             'subject_kind' => $detail['subject_kind'] ?? '',
             'subject_display_name' => $detail['subject_display_name'] ?? '',
             'subject_contact_number' => $detail['subject_contact_number'] ?? '',
@@ -222,6 +287,222 @@ if ($action === 'detail') {
             'witness' => $participants['Witness'] ?? null,
         ]
     ]);
+}
+
+if ($action === 'update_intake_notes') {
+    if ($requestMethod !== 'POST') {
+        respond(false, [], 'Method not allowed.');
+    }
+
+    $caseId = isset($jsonInput['case_id']) ? (int)$jsonInput['case_id'] : 0;
+    $intakeNotes = trim((string)($jsonInput['intake_notes'] ?? ''));
+
+    if ($caseId <= 0) {
+        respond(false, [], 'Invalid case ID.');
+    }
+
+    $actorUserId = trim((string)($_SESSION['user_id'] ?? ''));
+    if ($actorUserId === '') {
+        respond(false, [], 'User session not found.');
+    }
+
+    $existsStmt = $conn->prepare("
+        SELECT 1
+        FROM casereportstbl c
+        INNER JOIN complaintstbl ct ON ct.case_id = c.case_id
+        WHERE c.case_id = ? AND c.report_type = 'Complaint'
+        LIMIT 1
+    ");
+    if (!$existsStmt) {
+        respond(false, [], 'Failed to validate complaint case.');
+    }
+    $existsStmt->bind_param("i", $caseId);
+    $existsStmt->execute();
+    $exists = $existsStmt->get_result()->fetch_row();
+    $existsStmt->close();
+    if (!$exists) {
+        respond(false, [], 'Complaint case not found.');
+    }
+
+    $conn->begin_transaction();
+    try {
+        $updateComplaintStmt = $conn->prepare("
+            UPDATE complaintstbl
+            SET intake_notes = ?
+            WHERE case_id = ?
+            LIMIT 1
+        ");
+        if (!$updateComplaintStmt) {
+            throw new Exception('Failed to prepare intake notes update.');
+        }
+        $updateComplaintStmt->bind_param("si", $intakeNotes, $caseId);
+        $updateComplaintStmt->execute();
+        $updateComplaintStmt->close();
+
+        $updateCaseStmt = $conn->prepare("
+            UPDATE casereportstbl
+            SET user_id_official_update_by = ?
+            WHERE case_id = ? AND report_type = 'Complaint'
+            LIMIT 1
+        ");
+        if (!$updateCaseStmt) {
+            throw new Exception('Failed to prepare complaint updater.');
+        }
+        $updateCaseStmt->bind_param("si", $actorUserId, $caseId);
+        $updateCaseStmt->execute();
+        $updateCaseStmt->close();
+
+        if (tableExists($conn, 'caseupdateslogtbl')) {
+            $logStmt = $conn->prepare("
+                INSERT INTO caseupdateslogtbl (case_id, log_entry, logged_by_user_id)
+                VALUES (?, ?, ?)
+            ");
+            if (!$logStmt) {
+                throw new Exception('Failed to prepare complaint case log.');
+            }
+            $logEntry = 'Intake notes updated.';
+            $logStmt->bind_param("iss", $caseId, $logEntry, $actorUserId);
+            $logStmt->execute();
+            $logStmt->close();
+        }
+
+        $conn->commit();
+        respond(true, [], 'Intake notes updated.');
+    } catch (Throwable $e) {
+        $conn->rollback();
+        respond(false, [], 'Failed to update intake notes.');
+    }
+}
+
+if ($action === 'update_case_outcome') {
+    if ($requestMethod !== 'POST') {
+        respond(false, [], 'Method not allowed.');
+    }
+
+    $caseId = isset($jsonInput['case_id']) ? (int)$jsonInput['case_id'] : 0;
+    $actionType = strtolower(trim((string)($jsonInput['action_type'] ?? '')));
+    $remarks = trim((string)($jsonInput['remarks'] ?? ''));
+
+    if ($caseId <= 0) {
+        respond(false, [], 'Invalid case ID.');
+    }
+    if ($remarks === '') {
+        respond(false, [], 'Remarks are required.');
+    }
+    if (!in_array($actionType, ['resolved', 'endorsement', 'dropped'], true)) {
+        respond(false, [], 'Invalid action type.');
+    }
+
+    $actorUserId = trim((string)($_SESSION['user_id'] ?? ''));
+    if ($actorUserId === '') {
+        respond(false, [], 'User session not found.');
+    }
+
+    $oldStmt = $conn->prepare("
+        SELECT
+            c.case_id,
+            s.status_name AS old_status_name,
+            l.status_name AS old_level_name,
+            c.case_remarks,
+            ct.screening_notes,
+            ct.escalated_to_blotter,
+            ct.blotter_id
+        FROM casereportstbl c
+        INNER JOIN complaintstbl ct ON ct.case_id = c.case_id
+        LEFT JOIN statuslookuptbl s ON s.status_id = c.case_status_id
+        LEFT JOIN statuslookuptbl l ON l.status_id = c.case_level_id
+        WHERE c.case_id = ? AND c.report_type = 'Complaint'
+        LIMIT 1
+    ");
+    if (!$oldStmt) {
+        respond(false, [], 'Failed to load current complaint state.');
+    }
+    $oldStmt->bind_param("i", $caseId);
+    $oldStmt->execute();
+    $oldRow = $oldStmt->get_result()->fetch_assoc();
+    $oldStmt->close();
+    if (!$oldRow) {
+        respond(false, [], 'Complaint case not found.');
+    }
+
+    $oldStatusName = trim((string)($oldRow['old_status_name'] ?? 'Pending'));
+    $oldLevelName = trim((string)($oldRow['old_level_name'] ?? 'Complaint Only'));
+    if (in_array(strtolower($oldStatusName), ['resolved', 'dropped', 'endorsed'], true)) {
+        respond(false, [], 'Complaint status is already finalized and cannot be changed again.');
+    }
+
+    $newStatusName = '';
+    $newLevelName = 'Complaint Only';
+    $markEscalated = 0;
+    if ($actionType === 'resolved') {
+        $newStatusName = 'Resolved';
+    } elseif ($actionType === 'dropped') {
+        $newStatusName = 'Dropped';
+    } else {
+        $newStatusName = 'Endorsed';
+        $newLevelName = 'Endorsed to Blotter';
+        $markEscalated = 1;
+    }
+
+    $newStatusId = getStatusId($conn, $newStatusName, 'Complaint');
+    $newLevelId = getStatusId($conn, $newLevelName, 'ComplaintLevel');
+    if ($newStatusId <= 0 || $newLevelId <= 0) {
+        respond(false, [], 'Status or complaint level mapping not found in statuslookuptbl.');
+    }
+
+    $updatedScreeningNotes = appendMultilineNote($oldRow['screening_notes'] ?? '', $remarks);
+    $logEntry = "Complaint status updated: {$oldStatusName} -> {$newStatusName}; Complaint level: {$oldLevelName} -> {$newLevelName}; Remarks: {$remarks}";
+
+    $conn->begin_transaction();
+    try {
+        $updateStmt = $conn->prepare("
+            UPDATE casereportstbl
+            SET case_status_id = ?, case_level_id = ?, case_remarks = ?, user_id_official_update_by = ?
+            WHERE case_id = ? AND report_type = 'Complaint'
+            LIMIT 1
+        ");
+        if (!$updateStmt) {
+            throw new Exception('Failed to prepare complaint update.');
+        }
+        $updateStmt->bind_param("iissi", $newStatusId, $newLevelId, $oldRow['case_remarks'], $actorUserId, $caseId);
+        $updateStmt->execute();
+        $updateStmt->close();
+
+        $complaintUpdateStmt = $conn->prepare("
+            UPDATE complaintstbl
+            SET escalated_to_blotter = ?,
+                escalated_to_blotter_at = CASE WHEN ? = 1 THEN NOW() ELSE escalated_to_blotter_at END,
+                escalated_by_user_id = CASE WHEN ? = 1 THEN ? ELSE escalated_by_user_id END,
+                screening_notes = ?
+            WHERE case_id = ?
+            LIMIT 1
+        ");
+        if (!$complaintUpdateStmt) {
+            throw new Exception('Failed to prepare complaint metadata update.');
+        }
+        $complaintUpdateStmt->bind_param("iiissi", $markEscalated, $markEscalated, $markEscalated, $actorUserId, $updatedScreeningNotes, $caseId);
+        $complaintUpdateStmt->execute();
+        $complaintUpdateStmt->close();
+
+        if (tableExists($conn, 'caseupdateslogtbl')) {
+            $logStmt = $conn->prepare("
+                INSERT INTO caseupdateslogtbl (case_id, log_entry, logged_by_user_id)
+                VALUES (?, ?, ?)
+            ");
+            if (!$logStmt) {
+                throw new Exception('Failed to prepare complaint case log.');
+            }
+            $logStmt->bind_param("iss", $caseId, $logEntry, $actorUserId);
+            $logStmt->execute();
+            $logStmt->close();
+        }
+
+        $conn->commit();
+        respond(true, [], 'Complaint updated.');
+    } catch (Throwable $e) {
+        $conn->rollback();
+        respond(false, [], 'Failed to update complaint.');
+    }
 }
 
 respond(false, [], 'Unsupported action.');

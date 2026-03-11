@@ -6,7 +6,7 @@ $residentMgmtPages = ['ResidentMasterlist.php', 'ResidentArchive.php', 'EditRequ
 $certPages = ['CertificateTracker.php'];
 $financePages = ['FinancePayments.php'];
 $blotterPages = ['BlotterForm.php', 'BlotterTracker.php'];
-$complaintPages = ['ComplaintTracker.php'];
+$complaintPages = ['ComplaintForm.php', 'ComplaintTracker.php'];
 $contentMgmtPages = ['Announcements.php', 'CreateAnnouncement.php'];
 $userMgmtPages = ['UserMasterlist.php'];
 $adminMgmtPages = ['OfficialsManagement.php', 'OfficialInvites.php'];
@@ -307,6 +307,13 @@ if (!empty($_SESSION['user_id']) && isset($conn) && $conn instanceof mysqli) {
       </li>
 
       <li class="mb-1 mt-2 text-muted small fw-semibold px-2">Complaints and Grievances</li>
+      <li class="mb-2">
+        <a href="<?= htmlspecialchars(appUrl('Admin-End/Complaints/ComplaintForm.php')) ?>"
+           class="btn btn-toggle d-flex align-items-center gap-2 rounded <?= $current == 'ComplaintForm.php' ? 'active' : '' ?>"
+           style="<?= $current == 'ComplaintForm.php' ? 'outline: none; box-shadow: none;' : '' ?>">
+          <i class="fas fa-file-pen"></i> Log New Incident
+        </a>
+      </li>
       <li class="mb-1">
         <button class="btn btn-toggle d-flex align-items-center gap-2 rounded <?= $isComplaintActive ? '' : 'collapsed' ?>"
                 data-bs-toggle="collapse"

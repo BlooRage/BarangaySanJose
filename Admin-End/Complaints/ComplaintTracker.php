@@ -21,9 +21,16 @@ require_once __DIR__ . "/../includes/admin_guard.php";
             margin: 0 auto;
         }
 
+        #viewModal .modal-content {
+            border: 0;
+            border-radius: .5rem;
+            padding: 1rem;
+            background: #fff;
+        }
+
         #table-appData th,
         #table-appData td {
-            text-align: left;
+            text-align: left !important;
             vertical-align: middle;
         }
 
@@ -31,6 +38,10 @@ require_once __DIR__ . "/../includes/admin_guard.php";
             color: #2049b3;
             background: #d6e2f2;
             border: 2px solid #c0d1e8;
+        }
+
+        #viewModal .tracker-form-section {
+            border-color: #e78924;
         }
     </style>
 </head>
@@ -45,13 +56,16 @@ require_once __DIR__ . "/../includes/admin_guard.php";
         </h2>
         <hr><br>
 
-        <div id="div-tableContainer" class="bg-white p-4 rounded-4 shadow-sm border complaint-tracker-shell">
+        <div id="div-tableContainer" class="bg-white p-4 rounded-4 shadow-sm border complaint-tracker-shell resident-masterlist-shell">
             <div class="admin-list-toolbar mb-3 pt-2 flex-wrap">
                 <div class="admin-list-tabs">
-                    <button class="btn btn-outline-primary btn-sm status-filter-btn active" type="button" data-filter="">All</button>
-                    <button class="btn btn-outline-secondary btn-sm status-filter-btn" type="button" data-filter="pending">Pending</button>
-                    <button class="btn btn-outline-secondary btn-sm status-filter-btn" type="button" data-filter="review">Under Review</button>
-                    <button class="btn btn-outline-secondary btn-sm status-filter-btn" type="button" data-filter="escalated">Escalated</button>
+                    <button class="btn btn-outline-primary btn-sm status-filter-btn active" type="button" data-filter="">&nbsp;&nbsp;All&nbsp;&nbsp;</button>
+                    <button class="btn btn-outline-secondary btn-sm status-filter-btn fw-semibold" type="button" data-filter="resolved">&nbsp;&nbsp;Resolved&nbsp;&nbsp;</button>
+                    <button class="btn btn-outline-secondary btn-sm status-filter-btn fw-semibold" type="button" data-filter="escalated">&nbsp;&nbsp;Escalated&nbsp;&nbsp;</button>
+                    <button class="btn btn-outline-secondary btn-sm status-filter-btn fw-semibold has-notif" type="button" data-filter="pending">
+                        &nbsp;&nbsp;Pending
+                        <span class="pending-count-badge d-none" id="pendingComplaintBadge">0</span>
+                    </button>
                 </div>
 
                 <div class="admin-list-actions">
@@ -80,12 +94,13 @@ require_once __DIR__ . "/../includes/admin_guard.php";
                             <th>Subject</th>
                             <th>Complaint Type</th>
                             <th>Status</th>
+                            <th>Complaint Level</th>
                             <th>Action</th>
                         </tr>
                     </thead>
                     <tbody id="tableBody">
                         <tr>
-                            <td colspan="7" class="text-start text-muted py-4">Complaint tracking will appear here once the admin data endpoint is connected.</td>
+                            <td colspan="8" class="text-start text-muted py-4">Complaint tracking will appear here once the admin data endpoint is connected.</td>
                         </tr>
                     </tbody>
                 </table>
@@ -129,8 +144,8 @@ require_once __DIR__ . "/../includes/admin_guard.php";
 </div>
 
 <div class="modal fade tracker-profile-modal" id="viewModal" tabindex="-1" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
-    <div class="modal-dialog modal-xl modal-dialog-centered">
-        <div class="modal-content">
+    <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable" id="div-modalSizing" style="max-width: 1500px; width: 75vw;">
+        <div class="modal-content border-0 rounded-2 p-4">
             <div class="modal-header">
                 <h5 class="modal-title" id="viewModalTitle">Complaint Details</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
@@ -140,8 +155,52 @@ require_once __DIR__ . "/../includes/admin_guard.php";
                     <div class="text-muted small">Complaint detail preview will be available once the tracker logic is connected.</div>
                 </div>
             </div>
-            <div class="modal-footer d-flex justify-content-end">
+            <div class="modal-footer d-flex justify-content-between flex-wrap gap-2">
+                <div class="d-flex flex-wrap gap-2" id="complaintActionButtons">
+                    <button type="button" class="btn btn-success" id="btnComplaintResolve">Mark Resolved</button>
+                    <button type="button" class="btn btn-primary" id="btnComplaintEndorse">Endorse to Blotter</button>
+                    <button type="button" class="btn btn-danger" id="btnComplaintDrop">Drop Complaint</button>
+                </div>
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="complaintActionModal" tabindex="-1" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="complaintActionModalTitle">Update Complaint</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-0">
+                    <label for="complaintActionRemarks" class="form-label">Screening Notes</label>
+                    <textarea id="complaintActionRemarks" class="form-control" rows="4" placeholder="Add screening notes..."></textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline-secondary" id="btnComplaintActionReturn">Return</button>
+                <button type="button" class="btn btn-primary" id="btnComplaintActionProceed">Update</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="complaintActionConfirmModal" tabindex="-1" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Confirm Update</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body" id="complaintActionConfirmText">
+                Are you sure you want to update this complaint?
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline-secondary" id="btnComplaintActionConfirmReturn">Return</button>
+                <button type="button" class="btn btn-danger" id="btnComplaintActionConfirm">Confirm</button>
             </div>
         </div>
     </div>

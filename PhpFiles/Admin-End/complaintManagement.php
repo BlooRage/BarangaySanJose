@@ -2,6 +2,9 @@
 require_once __DIR__ . "/../General/security.php";
 require_once __DIR__ . "/../General/connection.php";
 
+requireRoleSession(['SuperAdmin', 'Official', 'Officials', 'Personnel', 'Personnels', 'Admin', 'Employee'], false);
+verifyCsrfToken(false);
+
 function str_field($value): ?string
 {
     $value = trim((string)$value);
@@ -20,12 +23,10 @@ function tableExists(mysqli $conn, string $tableName): bool
     if (!$stmt) {
         return false;
     }
-
     $stmt->bind_param("s", $tableName);
     $stmt->execute();
     $row = $stmt->get_result()->fetch_row();
     $stmt->close();
-
     return !empty($row);
 }
 
@@ -41,12 +42,10 @@ function getStatusId(mysqli $conn, string $name, string $type): ?int
     if (!$stmt) {
         return null;
     }
-
     $stmt->bind_param("ss", $name, $type);
     $stmt->execute();
     $row = $stmt->get_result()->fetch_assoc();
     $stmt->close();
-
     return isset($row['status_id']) ? (int)$row['status_id'] : null;
 }
 
@@ -61,12 +60,10 @@ function ensureStatusId(mysqli $conn, string $name, string $type): int
     if (!$stmt) {
         throw new Exception("Failed to create status lookup entry.");
     }
-
     $stmt->bind_param("ss", $name, $type);
     $stmt->execute();
     $statusId = (int)$conn->insert_id;
     $stmt->close();
-
     return $statusId;
 }
 
@@ -85,26 +82,10 @@ function ensureComplaintLookups(mysqli $conn): array
     return ['status' => $statusIds, 'level' => $levelIds];
 }
 
-function appendRemark(?string $existing, string $newNote): string
-{
-    $existing = trim((string)$existing);
-    $newNote = trim($newNote);
-    if ($existing === '') {
-        return $newNote;
-    }
-    if ($newNote === '') {
-        return $existing;
-    }
-    return $existing . "\n" . $newNote;
-}
-
 function classifySubjectKind(?string $subjectName): string
 {
     $value = strtolower(trim((string)$subjectName));
-    if ($value === '') {
-        return 'Unknown';
-    }
-    if (str_contains($value, 'unknown') || $value === 'n/a' || $value === 'na') {
+    if ($value === '' || str_contains($value, 'unknown') || $value === 'n/a' || $value === 'na') {
         return 'Unknown';
     }
     foreach (['store', 'shop', 'enterprise', 'company', 'corp', 'corporation', 'business', 'inc'] as $keyword) {
@@ -139,12 +120,7 @@ function parseParticipantName(?string $rawName): array
         $parts = preg_split('/\s+/', trim($givenNames)) ?: [];
         $firstname = array_shift($parts) ?: null;
         $middlename = !empty($parts) ? implode(' ', $parts) : null;
-        return [
-            str_field($lastname),
-            str_field($firstname),
-            str_field($middlename),
-            str_field($suffix),
-        ];
+        return [str_field($lastname), str_field($firstname), str_field($middlename), str_field($suffix)];
     }
 
     return [str_field($baseName), null, null, str_field($suffix)];
@@ -174,47 +150,15 @@ function insertParticipant(
         throw new Exception("Prepare failed (participant insert): " . $conn->error);
     }
 
-    $stmt->bind_param(
-        "issssssssss",
-        $caseId,
-        $role,
-        $lastname,
-        $firstname,
-        $middlename,
-        $suffix,
-        $contactNumber,
-        $address,
-        $age,
-        $sex,
-        $remarks
-    );
+    $stmt->bind_param("issssssssss", $caseId, $role, $lastname, $firstname, $middlename, $suffix, $contactNumber, $address, $age, $sex, $remarks);
     $stmt->execute();
     $stmt->close();
 }
 
-function logCaseUpdate(mysqli $conn, int $caseId, string $entry, ?string $userId): void
-{
-    if (!tableExists($conn, 'caseupdateslogtbl')) {
-        return;
-    }
-
-    $stmt = $conn->prepare("
-        INSERT INTO caseupdateslogtbl (case_id, log_entry, logged_by_user_id)
-        VALUES (?, ?, ?)
-    ");
-    if (!$stmt) {
-        return;
-    }
-
-    $stmt->bind_param("iss", $caseId, $entry, $userId);
-    $stmt->execute();
-    $stmt->close();
-}
-
-function redirectWithMessage(string $path, string $type, string $message, array $extra = []): void
+function redirectWithMessage(string $type, string $message, array $extra = []): void
 {
     $query = array_merge([$type => $message], $extra);
-    header('Location: ' . appUrl($path) . '?' . http_build_query($query));
+    header('Location: ' . appUrl('/Admin-End/Complaints/ComplaintForm.php') . '?' . http_build_query($query));
     exit;
 }
 
@@ -222,17 +166,6 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') !== 'POST') {
     http_response_code(405);
     exit('Method not allowed.');
 }
-
-$action = trim((string)($_POST['action'] ?? 'submit_complaint'));
-$actorUserId = (string)($_SESSION['user_id'] ?? '');
-
-if ($action !== 'submit_complaint') {
-    http_response_code(400);
-    exit('Unknown complaint action.');
-}
-
-requireRoleSession(['Resident'], false);
-verifyCsrfToken(false);
 
 if (!tableExists($conn, 'complaintstbl')) {
     http_response_code(500);
@@ -258,6 +191,7 @@ $incidentDate = str_field($_POST['incident_date'] ?? '');
 $incidentTime = str_field($_POST['incident_time'] ?? '');
 $incidentLocation = str_field($_POST['incident_location'] ?? '');
 $incidentNarration = str_field($_POST['incident_narration'] ?? '');
+$initialNotes = str_field($_POST['initial_notes'] ?? '');
 
 $witnessName = str_field($_POST['witness_name'] ?? '');
 $witnessContact = str_field($_POST['witness_contact_number'] ?? '');
@@ -267,12 +201,11 @@ $complaintType = $natureOfComplaint === 'Other' ? $natureOther : $natureOfCompla
 $complaintType = str_field($complaintType);
 
 if (!$complainantLast || !$complainantFirst || !$complainantAge || !$complainantSex || !$complainantContact || !$complainantAddress || !$subjectName || !$subjectAddress || !$complaintType || !$incidentDate || !$incidentLocation || !$incidentNarration) {
-    redirectWithMessage('/Resident-End/Complaints/ComplaintsForm.php', 'error', 'Missing required complaint fields.');
+    redirectWithMessage('error', 'Missing required complaint fields.');
 }
 
-$todayIso = date('Y-m-d');
-if ($incidentDate > $todayIso) {
-    redirectWithMessage('/Resident-End/Complaints/ComplaintsForm.php', 'error', 'Incident date cannot be in the future.');
+if ($incidentDate > date('Y-m-d')) {
+    redirectWithMessage('error', 'Incident date cannot be in the future.');
 }
 
 $witnessSummaryParts = array_filter([
@@ -281,12 +214,11 @@ $witnessSummaryParts = array_filter([
     $witnessAddress ? 'Address: ' . $witnessAddress : null,
 ]);
 $witnessSummary = !empty($witnessSummaryParts) ? implode(' | ', $witnessSummaryParts) : null;
-
 $subjectKind = classifySubjectKind($subjectName);
 [$respondentLast, $respondentFirst, $respondentMiddle, $respondentSuffix] = parseParticipantName($subjectName);
 [$witnessLast, $witnessFirst, $witnessMiddle, $witnessSuffix] = parseParticipantName($witnessName);
-
-$residentUserId = $actorUserId !== '' ? $actorUserId : null;
+$actorUserId = (string)($_SESSION['user_id'] ?? '');
+$residentUserId = null;
 
 $conn->begin_transaction();
 try {
@@ -294,7 +226,7 @@ try {
     $statusId = (int)$lookupIds['status']['Pending'];
     $levelId = (int)$lookupIds['level']['Complaint Only'];
 
-    $caseRemarks = 'Complaint submitted via resident portal.';
+    $caseRemarks = 'Complaint encoded by admin.';
     $stmtCase = $conn->prepare("
         INSERT INTO casereportstbl
             (resident_user_id, report_type, incident_date, incident_time, incident_place, complaint_type,
@@ -305,99 +237,33 @@ try {
     if (!$stmtCase) {
         throw new Exception("Prepare failed (case insert): " . $conn->error);
     }
-
-    $stmtCase->bind_param(
-        "sssssssiis",
-        $residentUserId,
-        $incidentDate,
-        $incidentTime,
-        $incidentLocation,
-        $complaintType,
-        $incidentNarration,
-        $caseRemarks,
-        $statusId,
-        $levelId,
-        $actorUserId
-    );
+    $stmtCase->bind_param("sssssssiis", $residentUserId, $incidentDate, $incidentTime, $incidentLocation, $complaintType, $incidentNarration, $caseRemarks, $statusId, $levelId, $actorUserId);
     $stmtCase->execute();
     $caseId = (int)$conn->insert_id;
     $stmtCase->close();
 
     $stmtComplaint = $conn->prepare("
         INSERT INTO complaintstbl
-            (case_id, complaint_origin, subject_kind, subject_display_name, subject_contact_number, subject_address, witness_summary)
+            (case_id, complaint_origin, subject_kind, subject_display_name, subject_contact_number, subject_address, witness_summary, intake_notes)
         VALUES
-            (?, 'ResidentPortal', ?, ?, ?, ?, ?)
+            (?, 'AdminEncoded', ?, ?, ?, ?, ?, ?)
     ");
     if (!$stmtComplaint) {
         throw new Exception("Prepare failed (complaint insert): " . $conn->error);
     }
-
-    $stmtComplaint->bind_param(
-        "isssss",
-        $caseId,
-        $subjectKind,
-        $subjectName,
-        $subjectContact,
-        $subjectAddress,
-        $witnessSummary
-    );
+    $stmtComplaint->bind_param("issssss", $caseId, $subjectKind, $subjectName, $subjectContact, $subjectAddress, $witnessSummary, $initialNotes);
     $stmtComplaint->execute();
     $stmtComplaint->close();
 
-    insertParticipant(
-        $conn,
-        $caseId,
-        'Complainant',
-        $complainantLast,
-        $complainantFirst,
-        $complainantMiddle,
-        $complainantSuffix,
-        $complainantContact,
-        $complainantAddress,
-        $complainantAge,
-        $complainantSex,
-        null
-    );
-
-    insertParticipant(
-        $conn,
-        $caseId,
-        'Respondent',
-        $respondentLast,
-        $respondentFirst,
-        $respondentMiddle,
-        $respondentSuffix,
-        $subjectContact,
-        $subjectAddress,
-        null,
-        null,
-        'Complaint subject recorded from resident portal submission.'
-    );
+    insertParticipant($conn, $caseId, 'Complainant', $complainantLast, $complainantFirst, $complainantMiddle, $complainantSuffix, $complainantContact, $complainantAddress, $complainantAge, $complainantSex, 'Complaint encoded by admin.');
+    insertParticipant($conn, $caseId, 'Respondent', $respondentLast, $respondentFirst, $respondentMiddle, $respondentSuffix, $subjectContact, $subjectAddress, null, null, 'Complaint subject recorded from admin complaint entry.');
 
     if ($witnessName || $witnessContact || $witnessAddress) {
-        insertParticipant(
-            $conn,
-            $caseId,
-            'Witness',
-            $witnessLast,
-            $witnessFirst,
-            $witnessMiddle,
-            $witnessSuffix,
-            $witnessContact,
-            $witnessAddress,
-            null,
-            null,
-            'Witness details recorded from complaint submission.'
-        );
+        insertParticipant($conn, $caseId, 'Witness', $witnessLast, $witnessFirst, $witnessMiddle, $witnessSuffix, $witnessContact, $witnessAddress, null, null, 'Witness details recorded from admin complaint entry.');
     }
 
-    logCaseUpdate($conn, $caseId, 'Complaint submitted through resident portal.', $actorUserId ?: null);
     $conn->commit();
-
-    redirectWithMessage('/Resident-End/Complaints/ComplaintsForm.php', 'success', 'Complaint submitted successfully.', [
-        'case_id' => $caseId,
-    ]);
+    redirectWithMessage('success', 'Complaint submitted successfully.', ['case_id' => $caseId]);
 } catch (Throwable $e) {
     $conn->rollback();
     http_response_code(500);
