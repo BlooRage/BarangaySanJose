@@ -40,7 +40,57 @@ $phaseNumber = trim((string)($residentaddresstbl['phase_number'] ?? ''));
 $subdivision = trim((string)($residentaddresstbl['subdivision'] ?? ''));
 $areaNumber = trim((string)($residentaddresstbl['area_number'] ?? ''));
 $phoneNumber = htmlspecialchars($useraccountstbl['phone_number'] ?? '', ENT_QUOTES, 'UTF-8');
-$yearsOfResidency = htmlspecialchars((string)($residentaddresstbl['address_id'] ?? ''), ENT_QUOTES, 'UTF-8');
+$yearsOfResidency = '';
+$monthsOfResidency = '';
+$barangayResidencyRaw = trim((string)($residentinformationtbl['baranagayresidency'] ?? ''));
+if ($barangayResidencyRaw !== '') {
+    $residencyStart = DateTime::createFromFormat('Y-m', $barangayResidencyRaw);
+    if ($residencyStart instanceof DateTime) {
+        $residencyStart->setDate((int)$residencyStart->format('Y'), (int)$residencyStart->format('m'), 1);
+        $currentMonth = new DateTime('first day of this month');
+        if ($residencyStart <= $currentMonth) {
+            $diff = $residencyStart->diff($currentMonth);
+            $yearsOfResidency = (string)max(0, (int)$diff->y);
+            $monthsOfResidency = (string)max(0, (int)$diff->m);
+        }
+    }
+}
+
+if ($yearsOfResidency === '' || $monthsOfResidency === '') {
+    $residencyDurationRaw = trim((string)($residentaddresstbl['residency_duration'] ?? ''));
+    if ($residencyDurationRaw !== '') {
+        if (preg_match('/(\d+)\s*year/i', $residencyDurationRaw, $yearMatch)) {
+            $yearsOfResidency = (string)((int)$yearMatch[1]);
+        }
+        if (preg_match('/(\d+)\s*month/i', $residencyDurationRaw, $monthMatch)) {
+            $monthsOfResidency = (string)((int)$monthMatch[1]);
+        }
+    }
+}
+
+if ($yearsOfResidency === '') {
+    $yearsOfResidency = '0';
+}
+if ($monthsOfResidency === '') {
+    $monthsOfResidency = '0';
+}
+
+$residencyDurationDisplayRaw = '';
+if ($barangayResidencyRaw !== '') {
+    $residencyDisplayDate = DateTime::createFromFormat('Y-m', $barangayResidencyRaw);
+    if ($residencyDisplayDate instanceof DateTime) {
+        $residencyDurationDisplayRaw = $residencyDisplayDate->format('F Y');
+    }
+}
+if ($residencyDurationDisplayRaw === '') {
+    $residencyDurationRaw = trim((string)($residentaddresstbl['residency_duration'] ?? ''));
+    $residencyDurationDisplayRaw = $residencyDurationRaw !== '' ? $residencyDurationRaw : ($yearsOfResidency . ' years and ' . $monthsOfResidency . ' months');
+}
+$residencyDurationDisplay = htmlspecialchars($residencyDurationDisplayRaw, ENT_QUOTES, 'UTF-8');
+$yearsOfResidencyEsc = htmlspecialchars($yearsOfResidency, ENT_QUOTES, 'UTF-8');
+$monthsOfResidencyEsc = htmlspecialchars($monthsOfResidency, ENT_QUOTES, 'UTF-8');
+$barangayResidencyEsc = htmlspecialchars($barangayResidencyRaw, ENT_QUOTES, 'UTF-8');
+$residencyDurationRawEsc = htmlspecialchars((string)($residentaddresstbl['residency_duration'] ?? ''), ENT_QUOTES, 'UTF-8');
 
 $streetNameHasBlock = $streetName !== '' && stripos($streetName, 'block') !== false;
 $streetNumberHasLot = $streetNumber !== '' && stripos($streetNumber, 'lot') !== false;
@@ -131,6 +181,10 @@ $fullAddress = htmlspecialchars(implode(', ', $fullAddressParts), ENT_QUOTES, 'U
                         <input type="hidden" name="action" value="submit_request">
                         <input type="hidden" name="document_type" value="firsttimejobseeker">
                         <input type="hidden" name="redirect" value="1">
+                        <input type="hidden" name="years_of_residency" value="<?php echo $yearsOfResidencyEsc; ?>">
+                        <input type="hidden" name="months_of_residency" value="<?php echo $monthsOfResidencyEsc; ?>">
+                        <input type="hidden" name="barangay_residency" value="<?php echo $barangayResidencyEsc; ?>">
+                        <input type="hidden" name="residency_duration" value="<?php echo $residencyDurationRawEsc; ?>">
 
                         <h2 class="section-title text-center text-dark">Personal Information</h2>
 
@@ -171,8 +225,8 @@ $fullAddress = htmlspecialchars(implode(', ', $fullAddressParts), ENT_QUOTES, 'U
                                 <input type="text" name="sex" value="<?php echo $sex; ?>" readonly>
                             </div>
                             <div>
-                                <label class="top-label">Years of Residency <span class="required-asterisk">*</span></label>
-                                <input type="text" name="years_of_residency" value="<?php echo $yearsOfResidency; ?> years" readonly>
+                                <label class="top-label">Residency Duration <span class="required-asterisk">*</span></label>
+                                <input type="text" value="<?php echo $residencyDurationDisplay; ?>" readonly>
                             </div>
                         </div>
 

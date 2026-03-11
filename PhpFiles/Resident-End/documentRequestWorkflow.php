@@ -173,7 +173,7 @@ function dr_save_upload(array $file, string $folder, ?array $allowedExtensions =
     $errorCode = (int)($file['error'] ?? UPLOAD_ERR_NO_FILE);
     if ($errorCode !== UPLOAD_ERR_OK) {
         if ($errorCode === UPLOAD_ERR_NO_FILE) {
-            return ['path' => null, 'error' => 'Please attach your GCash payment proof.'];
+            return ['path' => null, 'error' => 'Please attach the required file.'];
         }
         if ($errorCode === UPLOAD_ERR_INI_SIZE || $errorCode === UPLOAD_ERR_FORM_SIZE) {
             return ['path' => null, 'error' => 'Uploaded file is too large. Please choose a smaller file.'];
@@ -186,13 +186,13 @@ function dr_save_upload(array $file, string $folder, ?array $allowedExtensions =
 
     $orig = (string)($file['name'] ?? '');
     if ($orig === '') {
-        return ['path' => null, 'error' => 'Please attach your GCash payment proof.'];
+        return ['path' => null, 'error' => 'Please attach the required file.'];
     }
     $ext = strtolower(pathinfo($orig, PATHINFO_EXTENSION));
     if ($allowedExtensions !== null) {
         $allowed = array_values(array_unique(array_map(static fn($v) => strtolower(trim((string)$v)), $allowedExtensions)));
         if (!in_array($ext, $allowed, true)) {
-            return ['path' => null, 'error' => 'Unsupported file type. Allowed: JPG, JPEG, PNG, WEBP.'];
+            return ['path' => null, 'error' => 'Unsupported file type.'];
         }
     } elseif (!dr_allowed_extension($orig)) {
         return ['path' => null, 'error' => 'Unsupported file type. Allowed: JPG, JPEG, PNG, WEBP, PDF.'];
@@ -245,6 +245,122 @@ function dr_save_upload(array $file, string $folder, ?array $allowedExtensions =
     }
 
     return ['path' => '/UnifiedFileAttachment/' . trim($folder, '/') . '/' . $name, 'error' => null];
+}
+
+function dr_ensure_pdf_tools(): bool {
+    static $ready = null;
+    if ($ready !== null) {
+        return $ready;
+    }
+
+    $autoloadPaths = [
+        __DIR__ . '/../../composer-email-handler/vendor/autoload.php',
+        __DIR__ . '/../../vendor/autoload.php',
+    ];
+    foreach ($autoloadPaths as $autoloadPath) {
+        if (is_file($autoloadPath)) {
+            require_once $autoloadPath;
+        }
+    }
+
+    $ready = class_exists('\\setasign\\Fpdi\\Fpdi');
+    return $ready;
+}
+
+function dr_append_image_page_to_pdf(\setasign\Fpdi\Fpdi $pdf, string $imagePath): void {
+    $imageInfo = @getimagesize($imagePath);
+    if ($imageInfo === false || !isset($imageInfo[0], $imageInfo[1])) {
+        throw new Exception('Invalid image file.');
+    }
+
+    $imgW = (float)$imageInfo[0];
+    $imgH = (float)$imageInfo[1];
+    $orientation = $imgW > $imgH ? 'L' : 'P';
+    $pdf->AddPage($orientation, 'A4');
+
+    $margin = 10.0;
+    $pageW = (float)$pdf->GetPageWidth();
+    $pageH = (float)$pdf->GetPageHeight();
+    $maxW = $pageW - ($margin * 2);
+    $maxH = $pageH - ($margin * 2);
+
+    $scale = min($maxW / $imgW, $maxH / $imgH);
+    $drawW = $imgW * $scale;
+    $drawH = $imgH * $scale;
+    $x = ($pageW - $drawW) / 2;
+    $y = ($pageH - $drawH) / 2;
+
+    $pdf->Image($imagePath, $x, $y, $drawW, $drawH);
+}
+
+function dr_append_pdf_pages(\setasign\Fpdi\Fpdi $pdf, string $pdfPath): void {
+    $pageCount = $pdf->setSourceFile($pdfPath);
+    for ($i = 1; $i <= $pageCount; $i++) {
+        $tpl = $pdf->importPage($i);
+        $size = $pdf->getTemplateSize($tpl);
+        $orientation = $size['width'] > $size['height'] ? 'L' : 'P';
+        $pdf->AddPage($orientation, [$size['width'], $size['height']]);
+        $pdf->useTemplate($tpl);
+    }
+}
+
+function dr_convert_upload_to_pdf(array $file, string $folder, int $index = 1): array {
+    $errorCode = (int)($file['error'] ?? UPLOAD_ERR_NO_FILE);
+    if ($errorCode === UPLOAD_ERR_NO_FILE) {
+        return ['path' => null, 'error' => null];
+    }
+    if ($errorCode !== UPLOAD_ERR_OK) {
+        return ['path' => null, 'error' => 'Unable to read uploaded file. Please try again.'];
+    }
+
+    $orig = (string)($file['name'] ?? '');
+    $tmp = (string)($file['tmp_name'] ?? '');
+    if ($orig === '' || !is_uploaded_file($tmp)) {
+        return ['path' => null, 'error' => 'Upload validation failed. Please reselect the file and submit again.'];
+    }
+
+    $ext = strtolower(pathinfo($orig, PATHINFO_EXTENSION));
+    if (!in_array($ext, ['jpg', 'jpeg', 'png', 'webp', 'pdf'], true)) {
+        return ['path' => null, 'error' => 'Unsupported file type.'];
+    }
+    if (!dr_ensure_pdf_tools()) {
+        return ['path' => null, 'error' => 'PDF tools are unavailable on the server.'];
+    }
+
+    $baseDir = realpath(__DIR__ . '/../../');
+    if ($baseDir === false) {
+        return ['path' => null, 'error' => 'Server path resolution failed. Please try again later.'];
+    }
+
+    $targetDir = $baseDir . '/UnifiedFileAttachment/' . trim($folder, '/');
+    if (!is_dir($targetDir) && !@mkdir($targetDir, 0775, true) && !is_dir($targetDir)) {
+        return ['path' => null, 'error' => 'Server storage is unavailable. Please try again later.'];
+    }
+
+    $targetName = date('YmdHis') . '_' . $index . '_' . bin2hex(random_bytes(6)) . '.pdf';
+    $targetPath = $targetDir . '/' . $targetName;
+
+    try {
+        $pdf = new \setasign\Fpdi\Fpdi();
+        if ($ext === 'pdf') {
+            dr_append_pdf_pages($pdf, $tmp);
+        } else {
+            dr_append_image_page_to_pdf($pdf, $tmp);
+        }
+        $pdf->Output('F', $targetPath);
+    } catch (Throwable $e) {
+        @unlink($targetPath);
+        error_log('[documentRequestWorkflow][convert_upload_to_pdf] ' . $e->getMessage());
+        return ['path' => null, 'error' => 'Failed to convert uploaded file to PDF.'];
+    }
+
+    if (!is_file($targetPath) || filesize($targetPath) <= 0) {
+        @unlink($targetPath);
+        return ['path' => null, 'error' => 'Converted PDF is empty. Please re-upload the file.'];
+    }
+
+    @chmod($targetPath, 0664);
+    return ['path' => '/UnifiedFileAttachment/' . trim($folder, '/') . '/' . $targetName, 'error' => null];
 }
 
 function dr_has_column(mysqli $conn, string $table, string $column): bool {
@@ -593,6 +709,94 @@ if ($action === 'submit_request') {
     }
     if (strtolower(trim($documentType)) === 'certificate of residency') {
         $purpose = 'Residency Verification';
+    }
+
+    $isCohabitationRequest = (preg_replace('/[^a-z0-9]+/', '', strtolower(trim($documentTypeRaw))) === 'cohabitation');
+    if ($isCohabitationRequest) {
+        $cohabitationVariant = trim((string)($_POST['cohabitation_variant'] ?? ''));
+        $isRelationshipJailVisit = ($cohabitationVariant === 'relationship_jail_visit' || $cohabitationVariant === 'conjugal_visit');
+        if ($isRelationshipJailVisit) {
+            $savedRelationshipProofPaths = [];
+            $relationshipFiles = $_FILES['relationship_proof_files'] ?? null;
+            if (is_array($relationshipFiles) && isset($relationshipFiles['name']) && is_array($relationshipFiles['name'])) {
+                $fileCount = min(3, count($relationshipFiles['name']));
+                for ($i = 0; $i < $fileCount; $i++) {
+                    $entry = [
+                        'name' => $relationshipFiles['name'][$i] ?? '',
+                        'type' => $relationshipFiles['type'][$i] ?? '',
+                        'tmp_name' => $relationshipFiles['tmp_name'][$i] ?? '',
+                        'error' => $relationshipFiles['error'][$i] ?? UPLOAD_ERR_NO_FILE,
+                        'size' => $relationshipFiles['size'][$i] ?? 0,
+                    ];
+                    $converted = dr_convert_upload_to_pdf($entry, 'DocumentRequests/RelationshipProofs', $i + 1);
+                    if (!empty($converted['error'])) {
+                        dr_respond_json(422, ['success' => false, 'message' => 'Proof of relationship attachment ' . ($i + 1) . ': ' . $converted['error']]);
+                    }
+                    if (!empty($converted['path'])) {
+                        $savedRelationshipProofPaths[] = (string)$converted['path'];
+                    }
+                }
+            }
+            if (!$savedRelationshipProofPaths) {
+                dr_respond_json(422, ['success' => false, 'message' => 'At least one proof of relationship attachment is required.']);
+            }
+            $_POST['relationship_proof_file_paths'] = $savedRelationshipProofPaths;
+            $_POST['relationship_proof_file_path'] = (string)($savedRelationshipProofPaths[0] ?? '');
+
+            $detentionProofType = trim((string)($_POST['detention_proof_type'] ?? ''));
+            if ($detentionProofType === '') {
+                dr_respond_json(422, ['success' => false, 'message' => 'Proof of detention type is required.']);
+            }
+            $savedProofPaths = [];
+            $detentionFiles = $_FILES['detention_proof_files'] ?? null;
+            if (is_array($detentionFiles) && isset($detentionFiles['name']) && is_array($detentionFiles['name'])) {
+                $fileCount = min(3, count($detentionFiles['name']));
+                for ($i = 0; $i < $fileCount; $i++) {
+                    $entry = [
+                        'name' => $detentionFiles['name'][$i] ?? '',
+                        'type' => $detentionFiles['type'][$i] ?? '',
+                        'tmp_name' => $detentionFiles['tmp_name'][$i] ?? '',
+                        'error' => $detentionFiles['error'][$i] ?? UPLOAD_ERR_NO_FILE,
+                        'size' => $detentionFiles['size'][$i] ?? 0,
+                    ];
+                    $converted = dr_convert_upload_to_pdf($entry, 'DocumentRequests/DetentionProofs', $i + 1);
+                    if (!empty($converted['error'])) {
+                        dr_respond_json(422, ['success' => false, 'message' => 'Proof of detention attachment ' . ($i + 1) . ': ' . $converted['error']]);
+                    }
+                    if (!empty($converted['path'])) {
+                        $savedProofPaths[] = (string)$converted['path'];
+                    }
+                }
+            }
+            if (!$savedProofPaths) {
+                dr_respond_json(422, ['success' => false, 'message' => 'At least one proof of detention attachment is required.']);
+            }
+            $_POST['detention_proof_file_paths'] = $savedProofPaths;
+            $_POST['detention_proof_file_path'] = (string)($savedProofPaths[0] ?? '');
+        } else {
+            $cohabitantIdType = trim((string)($_POST['cohabitant_id_type'] ?? ''));
+            $cohabitantIdNumber = trim((string)($_POST['cohabitant_id_number'] ?? ''));
+            if ($cohabitantIdType === '' || $cohabitantIdNumber === '') {
+                dr_respond_json(422, ['success' => false, 'message' => 'Partner valid ID type and ID number are required.']);
+            }
+
+            $frontUpload = dr_save_upload($_FILES['cohabitant_id_front'] ?? [], 'DocumentRequests/CohabitationPartnerIDs', ['jpg', 'jpeg', 'png', 'webp', 'pdf']);
+            if (!empty($frontUpload['error'])) {
+                dr_respond_json(422, ['success' => false, 'message' => 'Front of partner valid ID: ' . $frontUpload['error']]);
+            }
+
+            $backUploadPath = '';
+            if (strcasecmp($cohabitantIdType, 'Passport') !== 0) {
+                $backUpload = dr_save_upload($_FILES['cohabitant_id_back'] ?? [], 'DocumentRequests/CohabitationPartnerIDs', ['jpg', 'jpeg', 'png', 'webp', 'pdf']);
+                if (!empty($backUpload['error'])) {
+                    dr_respond_json(422, ['success' => false, 'message' => 'Back of partner valid ID: ' . $backUpload['error']]);
+                }
+                $backUploadPath = (string)($backUpload['path'] ?? '');
+            }
+
+            $_POST['cohabitant_id_front_path'] = (string)($frontUpload['path'] ?? '');
+            $_POST['cohabitant_id_back_path'] = $backUploadPath;
+        }
     }
 
     $payload = $_POST;

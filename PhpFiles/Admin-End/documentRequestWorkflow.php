@@ -550,6 +550,190 @@ function dra_select_or_null(mysqli $conn, string $table, string $column, string 
     return "NULL AS {$alias}";
 }
 
+function dra_fetch_request_for_modal_fast(mysqli $conn, string $requestId): ?array {
+    $requestId = trim($requestId);
+    if ($requestId === '') {
+        return null;
+    }
+
+    $baseSelects = [
+        "d.request_id AS request_id",
+        dra_select_or_null($conn, 'documentrequesttbl', 'resident_user_id', 'resident_user_id'),
+        dra_select_or_null($conn, 'documentrequesttbl', 'resident_id', 'resident_id'),
+        dra_select_or_null($conn, 'documentrequesttbl', 'resident_name', 'resident_name'),
+        dra_select_or_null($conn, 'documentrequesttbl', 'document_type', 'document_type'),
+        dra_select_or_null($conn, 'documentrequesttbl', 'purpose', 'purpose'),
+        dra_select_or_null($conn, 'documentrequesttbl', 'status_remarks', 'status_remarks'),
+        dra_select_or_null($conn, 'documentrequesttbl', 'status_reason', 'status_reason'),
+        dra_select_or_null($conn, 'documentrequesttbl', 'stage', 'stage'),
+        dra_select_or_null($conn, 'documentrequesttbl', 'submitted_at', 'submitted_at'),
+        dra_select_or_null($conn, 'documentrequesttbl', 'request_timestamp', 'request_timestamp'),
+        dra_select_or_null($conn, 'documentrequesttbl', 'certificate_number', 'certificate_number'),
+        dra_select_or_null($conn, 'documentrequesttbl', 'verification_code', 'verification_code'),
+        dra_select_or_null($conn, 'documentrequesttbl', 'user_id_official_reviewed_by', 'user_id_official_reviewed_by'),
+        dra_select_or_null($conn, 'documentrequesttbl', 'user_id_official_released_by', 'user_id_official_released_by'),
+        dra_select_or_null($conn, 'documentrequesttbl', 'review_timestamp', 'review_timestamp'),
+        dra_select_or_null($conn, 'documentrequesttbl', 'release_timestamp', 'release_timestamp'),
+        dr_column_exists($conn, 'documentrequesttbl', 'request_details') ? "d.request_details AS request_details" : "NULL AS request_details",
+    ];
+    if (dr_column_exists($conn, 'documentrequesttbl', 'status_id_request')) {
+        $baseSelects[] = "d.status_id_request AS status_id_request";
+    }
+    if (dr_column_exists($conn, 'documentrequesttbl', 'status_id')) {
+        $baseSelects[] = "d.status_id AS status_id";
+    }
+
+    $extraSelects = [];
+    $extraJoins = [];
+    if (dr_table_exists($conn, 'issuancerequesttbl')) {
+        $extraSelects[] = "i.certificate_type AS _issuance_certificate_type";
+        $extraSelects[] = "i.certificate_number AS _issuance_certificate_number";
+        $extraSelects[] = "i.verification_code AS _issuance_verification_code";
+        $extraJoins[] = "LEFT JOIN issuancerequesttbl i ON i.request_id = d.request_id";
+    }
+    if (dr_table_exists($conn, 'officialinformationtbl')) {
+        $extraSelects[] = "TRIM(CONCAT_WS(' ', NULLIF(oir.firstname, ''), NULLIF(oir.middlename, ''), NULLIF(oir.lastname, ''), NULLIF(oir.suffix, ''))) AS _reviewed_by_name";
+        $extraSelects[] = "TRIM(CONCAT_WS(' ', NULLIF(oil.firstname, ''), NULLIF(oil.middlename, ''), NULLIF(oil.lastname, ''), NULLIF(oil.suffix, ''))) AS _released_by_name";
+        $extraSelects[] = "TRIM(CONCAT_WS(' ', NULLIF(oip.firstname, ''), NULLIF(oip.middlename, ''), NULLIF(oip.lastname, ''), NULLIF(oip.suffix, ''))) AS _personnel_name";
+        $extraSelects[] = "TRIM(CONCAT_WS(' ', NULLIF(oif.firstname, ''), NULLIF(oif.middlename, ''), NULLIF(oif.lastname, ''), NULLIF(oif.suffix, ''))) AS _finance_user_name";
+        $extraJoins[] = "LEFT JOIN officialinformationtbl oir ON oir.user_id = d.user_id_official_reviewed_by";
+        $extraJoins[] = "LEFT JOIN officialinformationtbl oil ON oil.user_id = d.user_id_official_released_by";
+        $extraJoins[] = "LEFT JOIN officialinformationtbl oip ON oip.user_id = d.personnel_user_id";
+        $extraJoins[] = "LEFT JOIN officialinformationtbl oif ON oif.user_id = f.user_id_employee_process";
+    }
+
+    $sql = "
+        SELECT
+            " . implode(",\n            ", $baseSelects) . ",
+            f.transaction_amount AS _tx_amount,
+            f.payment_method AS _tx_payment_method,
+            f.payment_proof_path AS _tx_payment_proof_path,
+            f.transaction_details AS _tx_transaction_details,
+            f.or_number AS _tx_or_number,
+            f.transaction_status_id AS _tx_status_id,
+            s.status_name AS _tx_status_name,
+            f.payment_deadline AS _tx_payment_deadline,
+            f.payment_timestamp AS _tx_payment_timestamp,
+            f.finance_decision_at AS _tx_finance_decision_at,
+            f.user_id_employee_process AS _tx_finance_user_id
+            " . ($extraSelects ? ",\n            " . implode(",\n            ", $extraSelects) : "") . "
+        FROM documentrequesttbl d
+        LEFT JOIN financetransactiontbl f ON f.request_id = d.request_id
+        LEFT JOIN statuslookuptbl s ON s.status_id = f.transaction_status_id
+        " . ($extraJoins ? "\n        " . implode("\n        ", $extraJoins) : "") . "
+        WHERE d.request_id = ?
+        LIMIT 1
+    ";
+    $stmt = $conn->prepare($sql);
+    if (!$stmt) {
+        return null;
+    }
+    $stmt->bind_param('s', $requestId);
+    $stmt->execute();
+    $row = $stmt->get_result()->fetch_assoc() ?: null;
+    $stmt->close();
+    if (!is_array($row)) {
+        return null;
+    }
+
+    $docType = trim((string)($row['document_type'] ?? ''));
+    if ($docType === '') {
+        $docType = trim((string)($row['_issuance_certificate_type'] ?? ''));
+        if ($docType !== '') {
+            $row['document_type'] = $docType;
+        }
+    }
+    if (trim((string)($row['certificate_number'] ?? '')) === '') {
+        $issuedCertNo = trim((string)($row['_issuance_certificate_number'] ?? ''));
+        if ($issuedCertNo !== '') {
+            $row['certificate_number'] = $issuedCertNo;
+        }
+    }
+    if (trim((string)($row['verification_code'] ?? '')) === '') {
+        $issuedVc = trim((string)($row['_issuance_verification_code'] ?? ''));
+        if ($issuedVc !== '') {
+            $row['verification_code'] = $issuedVc;
+        }
+    }
+    if (trim((string)($row['submitted_at'] ?? '')) === '' && trim((string)($row['request_timestamp'] ?? '')) !== '') {
+        $row['submitted_at'] = (string)$row['request_timestamp'];
+    }
+
+    $row['reviewed_by'] = trim((string)($row['_reviewed_by_name'] ?? ''));
+    $row['released_by'] = trim((string)($row['_released_by_name'] ?? ''));
+    $row['personnel_name'] = trim((string)($row['_personnel_name'] ?? ''));
+    $row['finance_user_name'] = trim((string)($row['_finance_user_name'] ?? ''));
+    $row['amount'] = isset($row['_tx_amount']) ? (float)$row['_tx_amount'] : null;
+    $row['payment_method'] = (string)($row['_tx_payment_method'] ?? '');
+    $row['payment_proof_path'] = (string)($row['_tx_payment_proof_path'] ?? '');
+    $row['or_number'] = (string)($row['_tx_or_number'] ?? '');
+    $row['payment_status_id'] = isset($row['_tx_status_id']) ? (int)$row['_tx_status_id'] : 0;
+    $row['payment_status_name'] = (string)($row['_tx_status_name'] ?? '');
+    $row['payment_deadline'] = (string)($row['_tx_payment_deadline'] ?? '');
+    $row['payment_submitted_at'] = (string)($row['_tx_payment_timestamp'] ?? '');
+    $row['finance_decision_at'] = (string)($row['_tx_finance_decision_at'] ?? '');
+    $row['finance_user_id'] = (string)($row['_tx_finance_user_id'] ?? '');
+
+    $txDetails = (string)($row['_tx_transaction_details'] ?? '');
+    if ($txDetails !== '') {
+        $decoded = json_decode($txDetails, true);
+        if (is_array($decoded)) {
+            $ref = trim((string)($decoded['reference'] ?? ''));
+            if ($ref !== '') {
+                $row['payment_reference'] = $ref;
+            }
+            if (trim((string)($row['purpose'] ?? '')) === '') {
+                $purposeFromTx = trim((string)($decoded['purpose'] ?? ''));
+                if ($purposeFromTx !== '') {
+                    $row['purpose'] = $purposeFromTx;
+                }
+            }
+        } elseif (preg_match('/\bReference:\s*(.+)$/mi', $txDetails, $m)) {
+            $row['payment_reference'] = trim((string)($m[1] ?? ''));
+        }
+    }
+
+    $payload = json_decode((string)($row['request_details'] ?? '{}'), true);
+    if (!is_array($payload)) {
+        $payload = [];
+    }
+    if (trim((string)($row['purpose'] ?? '')) === '') {
+        $payloadPurpose = trim((string)($payload['request_purpose'] ?? $payload['purpose'] ?? ''));
+        if ($payloadPurpose !== '') {
+            $row['purpose'] = $payloadPurpose;
+        }
+    }
+    if (trim((string)($row['resident_name'] ?? '')) === '') {
+        $payloadResidentName = trim((string)($payload['resident_name'] ?? ''));
+        if ($payloadResidentName !== '') {
+            $row['resident_name'] = $payloadResidentName;
+        }
+    }
+
+    unset(
+        $row['_issuance_certificate_type'],
+        $row['_issuance_certificate_number'],
+        $row['_issuance_verification_code'],
+        $row['_reviewed_by_name'],
+        $row['_released_by_name'],
+        $row['_personnel_name'],
+        $row['_finance_user_name'],
+        $row['_tx_amount'],
+        $row['_tx_payment_method'],
+        $row['_tx_payment_proof_path'],
+        $row['_tx_transaction_details'],
+        $row['_tx_or_number'],
+        $row['_tx_status_id'],
+        $row['_tx_status_name'],
+        $row['_tx_payment_deadline'],
+        $row['_tx_payment_timestamp'],
+        $row['_tx_finance_decision_at'],
+        $row['_tx_finance_user_id']
+    );
+
+    return $row;
+}
+
 function dra_strip_legacy_base(string $publicPath): string {
     $publicPath = trim($publicPath);
     if ($publicPath === '') {
@@ -616,6 +800,85 @@ function dra_strip_area_from_address(string $address): string {
     $value = trim($value, " \t\n\r\0\x0B,");
 
     return $value;
+}
+
+function dra_join_address_parts(array $parts): string {
+    $clean = [];
+    foreach ($parts as $part) {
+        $value = trim((string)$part);
+        if ($value !== '') {
+            $clean[] = $value;
+        }
+    }
+    return trim((string)(preg_replace('/\s+/', ' ', implode(', ', $clean)) ?? implode(', ', $clean)));
+}
+
+function dra_build_cohabitant_address(array $payload, string $fallback = ''): string {
+    $direct = trim((string)($payload['cohabitant_full_address'] ?? $payload['cohabitant_full_address_display'] ?? ''));
+    if ($direct !== '') {
+        return $direct;
+    }
+    $system = strtolower(trim((string)($payload['cohabitant_address_system'] ?? '')));
+    if ($system === 'lot_block') {
+        return dra_join_address_parts([
+            trim((string)($payload['cohabitant_unit_number_lot'] ?? '')) !== '' ? 'Unit ' . trim((string)($payload['cohabitant_unit_number_lot'] ?? '')) : '',
+            trim((string)($payload['cohabitant_lot_number'] ?? '')) !== '' ? 'Lot ' . trim((string)($payload['cohabitant_lot_number'] ?? '')) : '',
+            trim((string)($payload['cohabitant_block_number'] ?? '')) !== '' ? 'Blk ' . trim((string)($payload['cohabitant_block_number'] ?? '')) : '',
+            trim((string)($payload['cohabitant_phase_number'] ?? '')) !== '' ? 'Phase ' . trim((string)($payload['cohabitant_phase_number'] ?? '')) : '',
+            (string)($payload['cohabitant_subdivision_lot'] ?? $payload['cohabitant_subdivision'] ?? ''),
+            (string)($payload['cohabitant_barangay'] ?? ''),
+            (string)($payload['cohabitant_city'] ?? ''),
+            (string)($payload['cohabitant_province'] ?? ''),
+        ]);
+    }
+    if ($system === 'house') {
+        return dra_join_address_parts([
+            trim((string)($payload['cohabitant_unit_number'] ?? '')) !== '' ? 'Unit ' . trim((string)($payload['cohabitant_unit_number'] ?? '')) : '',
+            trim(implode(' ', array_filter([
+                trim((string)($payload['cohabitant_house_number'] ?? '')),
+                trim((string)($payload['cohabitant_street_name'] ?? '')),
+            ], static fn($v) => $v !== ''))),
+            (string)($payload['cohabitant_subdivision'] ?? ''),
+            (string)($payload['cohabitant_barangay'] ?? ''),
+            (string)($payload['cohabitant_city'] ?? ''),
+            (string)($payload['cohabitant_province'] ?? ''),
+        ]);
+    }
+    return $fallback;
+}
+
+function dra_build_cohabitation_address(array $payload, string $fallback = ''): string {
+    $direct = trim((string)($payload['cohabitation_full_address'] ?? $payload['cohabitation_full_address_display'] ?? ''));
+    if ($direct !== '') {
+        return $direct;
+    }
+    $system = strtolower(trim((string)($payload['cohabitation_address_system'] ?? '')));
+    if ($system === 'lot_block') {
+        return dra_join_address_parts([
+            trim((string)($payload['cohabitation_unit_number_lot'] ?? '')) !== '' ? 'Unit ' . trim((string)($payload['cohabitation_unit_number_lot'] ?? '')) : '',
+            trim((string)($payload['cohabitation_lot_number'] ?? '')) !== '' ? 'Lot ' . trim((string)($payload['cohabitation_lot_number'] ?? '')) : '',
+            trim((string)($payload['cohabitation_block_number'] ?? '')) !== '' ? 'Blk ' . trim((string)($payload['cohabitation_block_number'] ?? '')) : '',
+            trim((string)($payload['cohabitation_phase_number'] ?? '')) !== '' ? 'Phase ' . trim((string)($payload['cohabitation_phase_number'] ?? '')) : '',
+            (string)($payload['cohabitation_subdivision_lot'] ?? $payload['cohabitation_subdivision'] ?? ''),
+            (string)($payload['cohabitation_barangay'] ?? ''),
+            (string)($payload['cohabitation_municipality'] ?? $payload['cohabitation_city'] ?? ''),
+            (string)($payload['cohabitation_province'] ?? ''),
+        ]);
+    }
+    if ($system === 'house') {
+        return dra_join_address_parts([
+            trim((string)($payload['cohabitation_unit_number'] ?? '')) !== '' ? 'Unit ' . trim((string)($payload['cohabitation_unit_number'] ?? '')) : '',
+            trim(implode(' ', array_filter([
+                trim((string)($payload['cohabitation_house_number'] ?? '')),
+                trim((string)($payload['cohabitation_street_name'] ?? '')),
+            ], static fn($v) => $v !== ''))),
+            (string)($payload['cohabitation_subdivision'] ?? ''),
+            (string)($payload['cohabitation_barangay'] ?? ''),
+            (string)($payload['cohabitation_municipality'] ?? $payload['cohabitation_city'] ?? ''),
+            (string)($payload['cohabitation_province'] ?? ''),
+        ]);
+    }
+    return $fallback;
 }
 
 function dra_public_base_url(): string {
@@ -695,6 +958,15 @@ function dra_request_notice(array $requestRow, string $requestId, string $suffix
         return 'Your ' . $docType . ' Request has been ' . $suffix;
     }
     return 'Your ' . $docType . ' Request #' . $rid . ' has been ' . $suffix;
+}
+
+function dra_is_first_time_job_seeker(array $requestRow): bool {
+    $docType = strtolower(trim((string)($requestRow['document_type'] ?? '')));
+    if ($docType === '') {
+        return false;
+    }
+    $normalized = preg_replace('/[^a-z0-9]+/', '', $docType);
+    return is_string($normalized) && strpos($normalized, 'firsttimejobseeker') !== false;
 }
 
 function dra_decode_request_payload(array $requestRow): array {
@@ -937,6 +1209,13 @@ function dra_generate_issued_document(array $requestRow): ?string {
         $fullName = trim((string)($requestRow['resident_id'] ?? 'Resident'));
     }
     $fullName = $stripTemplateTokens($fullName);
+    $applicantResidenceAddress = trim((string)($payload['full_address'] ?? $payload['full_address_display'] ?? ''));
+    if ($applicantResidenceAddress === '') {
+        $applicantResidenceAddress = 'Barangay San Jose, Rodriguez, Rizal';
+    }
+    $applicantResidenceAddress = $stripTemplateTokens($applicantResidenceAddress);
+    $cohabitantResidenceAddress = $stripTemplateTokens(dra_build_cohabitant_address($payload, $applicantResidenceAddress));
+    $cohabitationResidenceAddress = $stripTemplateTokens(dra_build_cohabitation_address($payload, $applicantResidenceAddress));
     $address = trim((string)($payload['full_address'] ?? 'Barangay San Jose, Rodriguez, Rizal'));
     $address = dra_strip_area_from_address($address);
     if ($address === '') {
@@ -1001,11 +1280,14 @@ function dra_generate_issued_document(array $requestRow): ?string {
         }
     }
 
+    $cohabitationVariant = strtolower(trim((string)($payload['cohabitation_variant'] ?? '')));
     $docTypeNorm = strtolower(trim($docType));
     $isIndigency = strpos($docTypeNorm, 'indigency') !== false;
     $isGoodMoral = (strpos($docTypeNorm, 'goodmoral') !== false) || (strpos($docTypeNorm, 'good moral') !== false);
     $isResidency = strpos($docTypeNorm, 'residency') !== false;
     $isCohabitation = strpos($docTypeNorm, 'cohabitation') !== false;
+    $isFirstTimeJobSeeker = strpos(preg_replace('/[^a-z0-9]+/', '', $docTypeNorm), 'firsttimejobseeker') !== false;
+    $isRelationshipJailVisit = $isCohabitation && in_array($cohabitationVariant, ['relationship_jail_visit', 'conjugal_visit'], true);
 
     // DOCX template workflow removed: force all issuance through pure-PHP renderer below.
     $isTemplateBasedCertificate = false;
@@ -1184,7 +1466,7 @@ function dra_generate_issued_document(array $requestRow): ?string {
             }
             $yearsResidency = trim((string)($payload['years_of_residency'] ?? ''));
             $monthsResidency = trim((string)($payload['months_of_residency'] ?? ''));
-            $birthdateValue = trim((string)($payload['birthdate'] ?? $payload['date_of_birth'] ?? $payload['child_dob'] ?? ''));
+            $birthdateValue = trim((string)($payload['birthdate'] ?? $payload['date_of_birth'] ?? $payload['child_dob'] ?? $payload['birthDate'] ?? ''));
             $birthplaceValue = trim((string)($payload['birthplace'] ?? $payload['place_of_birth'] ?? $payload['child_birthplace'] ?? ''));
             $remarksValue = trim((string)($payload['remarks'] ?? $requestRow['status_remarks'] ?? $requestRow['status_reason'] ?? ''));
             $cohabitationDurationValue = trim((string)($payload['cohabitation_duration'] ?? ''));
@@ -1199,7 +1481,7 @@ function dra_generate_issued_document(array $requestRow): ?string {
             $cohabitantMiddleName = trim((string)($payload['cohabitant_middle'] ?? ''));
             $cohabitantLastName = trim((string)($payload['cohabitant_last'] ?? ''));
             $cohabitantSuffix = trim((string)($payload['cohabitant_suffix'] ?? ''));
-            $cohabitantBirthdateValue = trim((string)($payload['cohabitant_dob'] ?? ''));
+            $cohabitantBirthdateValue = trim((string)($payload['cohabitant_birthdate'] ?? $payload['cohabitant_dob'] ?? $payload['partner_birthdate'] ?? $payload['partner_dob'] ?? ''));
             if ($isCohabitation && ($birthdateValue === '' || $residentFirstName === '' || $residentLastName === '')) {
                 $residentUserId = trim((string)($requestRow['resident_user_id'] ?? ''));
                 if ($residentUserId !== '') {
@@ -1261,7 +1543,9 @@ function dra_generate_issued_document(array $requestRow): ?string {
             }
             $birthdateDisplayValue = $formatDisplayDate($birthdateValue);
             $cohabitantBirthdateDisplayValue = $formatDisplayDate($cohabitantBirthdateValue);
-            $cohabitationSinceValue = $formatDisplayMonthYear((string)($payload['cohabitation_start_date'] ?? ''));
+            $cohabitationStartRaw = trim((string)($payload['cohabitation_start_date'] ?? ''));
+            $cohabitationStartRaw = trim((string)(preg_replace('/\s*\([^()]*\)\s*$/', '', $cohabitationStartRaw) ?? $cohabitationStartRaw));
+            $cohabitationSinceValue = $formatDisplayMonthYear($cohabitationStartRaw);
             $childrenListValue = [];
             for ($childIndex = 1; $childIndex <= 5; $childIndex += 1) {
                 $childName = $normalizePlainText((string)($cohabitationChildNames[$childIndex] ?? ''));
@@ -1281,7 +1565,7 @@ function dra_generate_issued_document(array $requestRow): ?string {
             $issuedAsDocx = $day . $suffix . ' day of ' . $monthUpper . ' ' . $yearNum;
 
             $cacheSignature = sha1(dr_safe_json([
-                'cache_version' => 30,
+                'cache_version' => 32,
                 'preview' => $previewMode ? 1 : 0,
                 'request_id' => $requestId,
                 'document_type' => $docType,
@@ -1403,9 +1687,107 @@ function dra_generate_issued_document(array $requestRow): ?string {
         return null;
     }
 
-    $renderRevisionTag = 'r20260310a';
+    $renderRevisionTag = 'r20260311a';
     $fileName = 'issued_' . preg_replace('/[^A-Za-z0-9_-]/', '', $requestId) . '_' . $renderRevisionTag . '_' . date('YmdHis') . '.pdf';
     $diskPath = $outDir . '/' . $fileName;
+
+    if ($isRelationshipJailVisit) {
+        if (!class_exists('\\setasign\\Fpdi\\Fpdi')) {
+            $autoloadPaths = [
+                __DIR__ . '/../../PhpFiles/PhpOffice/vendor/autoload.php',
+                __DIR__ . '/../../composer-email-handler/vendor/autoload.php',
+                __DIR__ . '/../../vendor/autoload.php',
+            ];
+            foreach ($autoloadPaths as $autoloadPath) {
+                if (is_file($autoloadPath)) {
+                    require_once $autoloadPath;
+                    if (class_exists('\\setasign\\Fpdi\\Fpdi')) {
+                        break;
+                    }
+                }
+            }
+        }
+        if (!class_exists('\\setasign\\Fpdi\\Fpdi')) {
+            return null;
+        }
+
+        $templatePath = $baseDir . '/Resident-End/Certificates/DocumentIssuance/CertificateForJailVisitation.pdf';
+        if (!is_file($templatePath)) {
+            return null;
+        }
+
+        $detainedRelationship = $stripTemplateTokens((string)($payload['cohabitant_relationship'] ?? ''));
+        $detainedName = $stripTemplateTokens((string)($payload['cohabitant_full_name'] ?? ''));
+        if ($detainedName === '') {
+            $detainedName = trim(implode(' ', array_filter([
+                $stripTemplateTokens((string)($payload['cohabitant_first'] ?? '')),
+                $stripTemplateTokens((string)($payload['cohabitant_middle'] ?? '')) !== ''
+                    ? strtoupper(substr($stripTemplateTokens((string)($payload['cohabitant_middle'] ?? '')), 0, 1)) . '.'
+                    : '',
+                $stripTemplateTokens((string)($payload['cohabitant_last'] ?? '')),
+                $stripTemplateTokens((string)($payload['cohabitant_suffix'] ?? '')),
+            ], static fn($v) => trim((string)$v) !== '')));
+        }
+        $detentionFacility = $stripTemplateTokens((string)($payload['detention_facility'] ?? ''));
+        if (strcasecmp($detentionFacility, 'Other') === 0) {
+            $detentionFacility = $stripTemplateTokens((string)($payload['detention_facility_other'] ?? ''));
+        }
+
+        $pdf = new \setasign\Fpdi\Fpdi();
+        $pageCount = $pdf->setSourceFile($templatePath);
+        if ($pageCount <= 0) {
+            return null;
+        }
+        $tpl = $pdf->importPage(1);
+        $size = $pdf->getTemplateSize($tpl);
+        $pageWidth = (float)($size['width'] ?? 216.0);
+        $pageHeight = (float)($size['height'] ?? 279.0);
+        $orientation = $pageWidth > $pageHeight ? 'L' : 'P';
+        $pdf->AddPage($orientation, [$pageWidth, $pageHeight]);
+        $pdf->useTemplate($tpl);
+        $pdf->SetAutoPageBreak(false);
+
+        $pdf->SetFillColor(255, 255, 255);
+        $pdf->Rect(18.0, 70.0, 180.0, 30.0, 'F');
+        $pdf->Rect(30.0, 101.0, 154.0, 8.0, 'F');
+        $pdf->Rect(18.0, 112.0, 180.0, 14.0, 'F');
+
+        $pdf->SetTextColor(0, 0, 0);
+        $pdf->SetFont('Arial', '', 9.5);
+        $pdf->SetXY(24.0, 73.0);
+        $pdf->MultiCell(
+            168.0,
+            4.8,
+            'This is to certify ' . ($fullName !== '' ? $fullName : '-') . ', resident of ' . ($applicantResidenceAddress !== '' ? $applicantResidenceAddress : '-') . ' is personally known to be as a person of GOOD MORAL CHARACTER, PEACEFUL and LAW-ABIDING CITIZEN of THE COMMUNITY.',
+            0,
+            'C'
+        );
+
+        $pdf->SetXY(30.0, 101.5);
+        $pdf->MultiCell(
+            156.0,
+            4.8,
+            'Moreover, this certifies that the subject person is the ' . ($detainedRelationship !== '' ? strtoupper($detainedRelationship) : '-') . ' of DETAINED ' . ($detainedName !== '' ? strtoupper($detainedName) : '-') . ' and presently at the ' . ($detentionFacility !== '' ? strtoupper($detentionFacility) : '-') . '.',
+            0,
+            'C'
+        );
+
+        $pdf->SetXY(23.0, 114.5);
+        $pdf->MultiCell(
+            170.0,
+            4.8,
+            'Issued this ' . $issuedAsDocx . ' at the office of the Punong Barangay, Barangay San Jose, Montalban, Rizal.',
+            0,
+            'C'
+        );
+
+        if (is_file($qrDiskPath)) {
+            $pdf->Image($qrDiskPath, 186.0, 252.0, 20.0, 20.0);
+        }
+
+        $pdf->Output('F', $diskPath);
+        return '/UnifiedFileAttachment/IssuedDocuments/Generated/' . $fileName;
+    }
 
     // Use short bond paper (8.5x11) instead of A4.
     $pdf = new FPDF('P', 'mm', 'Letter');
@@ -1422,7 +1804,7 @@ function dra_generate_issued_document(array $requestRow): ?string {
     if (is_file($rightLogo)) {
         $pdf->Image($rightLogo, 168, 14, 26, 26);
     }
-    $isSpecialCertificate = $isIndigency || $isGoodMoral || $isResidency || $isCohabitation;
+    $isSpecialCertificate = $isIndigency || $isGoodMoral || $isResidency || $isCohabitation || $isFirstTimeJobSeeker;
     $fontFace = 'Times';
     $indigencyFont = 'Arial';
 
@@ -1435,33 +1817,41 @@ function dra_generate_issued_document(array $requestRow): ?string {
     $pdf->SetFont($fontFace, 'B', 16);
     $pdf->Cell(0, 7, 'BARANGAY SAN JOSE', 0, 1, 'C');
     if ($isSpecialCertificate) {
-        $pdf->Ln(2);
+        $pdf->Ln(1);
         $pdf->Line(18, $pdf->GetY(), 192, $pdf->GetY());
-        $pdf->Ln(8);
+        $pdf->Ln(4);
         if ($isIndigency) {
             $pdf->SetFont($indigencyFont, 'B', 17);
-            $pdf->Cell(0, 8, 'TANGGAPAN NG PUNONG BARANGAY', 0, 1, 'C');
+            $pdf->Cell(0, 7, 'TANGGAPAN NG PUNONG BARANGAY', 0, 1, 'C');
             $pdf->SetFont($indigencyFont, 'B', 12);
-            $pdf->Cell(0, 7, 'CERTIFICATE OF INDIGENCY', 0, 1, 'C');
-            $pdf->Ln(6);
+            $pdf->Cell(0, 6, 'CERTIFICATE OF INDIGENCY', 0, 1, 'C');
+            $pdf->Ln(4);
         } elseif ($isResidency) {
             $pdf->SetFont($indigencyFont, 'B', 17);
-            $pdf->Cell(0, 8, 'TANGGAPAN NG PUNONG BARANGAY', 0, 1, 'C');
+            $pdf->Cell(0, 7, 'TANGGAPAN NG PUNONG BARANGAY', 0, 1, 'C');
             $pdf->SetFont($indigencyFont, 'B', 12);
-            $pdf->Cell(0, 7, 'CERTIFICATE OF RESIDENCY', 0, 1, 'C');
-            $pdf->Ln(6);
+            $pdf->Cell(0, 6, 'CERTIFICATE OF RESIDENCY', 0, 1, 'C');
+            $pdf->Ln(4);
         } elseif ($isCohabitation) {
             $pdf->SetFont($indigencyFont, 'B', 17);
-            $pdf->Cell(0, 8, 'TANGGAPAN NG PUNONG BARANGAY', 0, 1, 'C');
+            $pdf->Cell(0, 7, 'TANGGAPAN NG PUNONG BARANGAY', 0, 1, 'C');
             $pdf->SetFont($indigencyFont, 'B', 12);
-            $pdf->Cell(0, 7, 'CERTIFICATE OF COHABITATION', 0, 1, 'C');
-            $pdf->Ln(6);
+            $pdf->Cell(0, 6, 'CERTIFICATE OF COHABITATION', 0, 1, 'C');
+            $pdf->Ln(4);
+        } elseif ($isFirstTimeJobSeeker) {
+            $pdf->SetFont($indigencyFont, 'B', 17);
+            $pdf->Cell(0, 7, 'TANGGAPAN NG PUNONG BARANGAY', 0, 1, 'C');
+            $pdf->SetFont($indigencyFont, 'B', 12);
+            $pdf->Cell(0, 6, 'BARANGAY CERTIFICATION', 0, 1, 'C');
+            $pdf->SetFont($indigencyFont, 'B', 9);
+            $pdf->Cell(0, 5, '(First Time Jobseekers Act-RA 11261)', 0, 1, 'C');
+            $pdf->Ln(3);
         } else {
             $pdf->SetFont($indigencyFont, 'B', 17);
-            $pdf->Cell(0, 8, 'TANGGAPAN NG PUNONG BARANGAY', 0, 1, 'C');
+            $pdf->Cell(0, 7, 'TANGGAPAN NG PUNONG BARANGAY', 0, 1, 'C');
             $pdf->SetFont($indigencyFont, 'B', 12);
-            $pdf->Cell(0, 7, 'BARANGAY CERTIFICATION', 0, 1, 'C');
-            $pdf->Ln(6);
+            $pdf->Cell(0, 6, 'BARANGAY CERTIFICATION', 0, 1, 'C');
+            $pdf->Ln(4);
         }
     } else {
         $pdf->SetFont($fontFace, 'B', 12);
@@ -1585,9 +1975,12 @@ function dra_generate_issued_document(array $requestRow): ?string {
         );
     };
     if ($isSpecialCertificate) {
-        if (is_file($qrDiskPath)) {
-            // Place QR tighter to the bottom-right corner.
-            $pdf->Image($qrDiskPath, 188, 257, 18, 18);
+        $fixedQrSize = 20.0;
+        $fixedQrX = 186.0;
+        $fixedQrY = 252.0;
+        if (!$isFirstTimeJobSeeker && is_file($qrDiskPath)) {
+            // Keep QR pinned to the same visible bottom-right position across generated special certificates.
+            $pdf->Image($qrDiskPath, $fixedQrX, $fixedQrY, $fixedQrSize, $fixedQrSize);
         }
         $normalizeTemplateValue = static function (string $value): string {
             $value = trim($value);
@@ -1631,12 +2024,30 @@ function dra_generate_issued_document(array $requestRow): ?string {
         if ($requestPurpose === '') {
             $requestPurpose = 'PURPOSE';
         }
-        $birthdateValue = $normalizeTemplateValue((string)($payload['birthdate'] ?? $payload['date_of_birth'] ?? $payload['child_dob'] ?? ''));
+        $birthdateValue = $normalizeTemplateValue((string)($payload['birthdate'] ?? $payload['date_of_birth'] ?? $payload['child_dob'] ?? $payload['birthDate'] ?? ''));
         $birthplaceValue = $normalizeTemplateValue((string)($payload['birthplace'] ?? $payload['place_of_birth'] ?? ''));
         $remarksValue = $normalizeTemplateValue((string)($payload['remarks'] ?? ''));
         $cohabitationChildrenCount = max(0, (int)trim((string)($payload['cohabitation_children_count'] ?? '0')));
         $cohabitationHasChildren = $cohabitationChildrenCount > 0;
-        $cohabitantBirthdateValue = $normalizeTemplateValue((string)($payload['cohabitant_birthdate'] ?? $payload['cohabitant_dob'] ?? ''));
+        $cohabitantBirthdateValue = $normalizeTemplateValue((string)($payload['cohabitant_birthdate'] ?? $payload['cohabitant_dob'] ?? $payload['partner_birthdate'] ?? $payload['partner_dob'] ?? ''));
+        if ($isCohabitation && $birthdateValue === '') {
+            $residentUserId = trim((string)($requestRow['resident_user_id'] ?? ''));
+            if ($residentUserId !== '') {
+                $residentInfoStmt = $conn->prepare("
+                    SELECT birthdate
+                    FROM residentinformationtbl
+                    WHERE user_id = ?
+                    LIMIT 1
+                ");
+                if ($residentInfoStmt) {
+                    $residentInfoStmt->bind_param('s', $residentUserId);
+                    $residentInfoStmt->execute();
+                    $residentInfo = $residentInfoStmt->get_result()->fetch_assoc() ?: [];
+                    $residentInfoStmt->close();
+                    $birthdateValue = $normalizeTemplateValue((string)($residentInfo['birthdate'] ?? $birthdateValue));
+                }
+            }
+        }
         $cohabitantName = $normalizeTemplateValue((string)($payload['cohabitant_full_name'] ?? ''));
         if ($cohabitantName === '') {
             $cohabitantFirst = $normalizeTemplateValue((string)($payload['cohabitant_first'] ?? ''));
@@ -1646,11 +2057,15 @@ function dra_generate_issued_document(array $requestRow): ?string {
             $cohabitantMi = $cohabitantMiddle !== '' ? strtoupper(substr($cohabitantMiddle, 0, 1)) . '.' : '';
             $cohabitantName = trim(implode(' ', array_filter([$cohabitantFirst, $cohabitantMi, $cohabitantLast, $cohabitantSuffix], static fn($v) => trim((string)$v) !== '')));
         }
-        $cohabitationDurationValue = $normalizeTemplateValue((string)($payload['cohabitation_duration'] ?? ''));
+        $stripTrailingParenthetical = static function (string $value): string {
+            return trim((string)preg_replace('/\s*\([^()]*\)\s*$/', '', trim($value)));
+        };
+        $cohabitationDurationValue = $stripTrailingParenthetical($normalizeTemplateValue((string)($payload['cohabitation_duration'] ?? '')));
+        $cohabitationStartRaw = $stripTrailingParenthetical((string)($payload['cohabitation_start_date'] ?? ''));
         if ($cohabitationDurationValue === '') {
-            $cohabitationDurationValue = $formatDisplayMonthYear((string)($payload['cohabitation_start_date'] ?? ''));
+            $cohabitationDurationValue = $formatDisplayMonthYear($cohabitationStartRaw);
         }
-        $cohabitationSinceValue = $formatDisplayMonthYear((string)($payload['cohabitation_start_date'] ?? ''));
+        $cohabitationSinceValue = $formatDisplayMonthYear($cohabitationStartRaw);
         if ($cohabitationSinceValue === '') {
             $cohabitationSinceValue = $cohabitationDurationValue;
         }
@@ -1674,7 +2089,7 @@ function dra_generate_issued_document(array $requestRow): ?string {
         $cohabitationSinceDisplayValue = $cohabitationSinceValue;
         $cohabitationDurationMonths = max(0, (int)trim((string)($payload['cohabitation_duration_value'] ?? '0')));
         if ($cohabitationDurationMonths <= 0) {
-            $durText = strtolower($cohabitationDurationValue);
+            $durText = strtolower($stripTrailingParenthetical($cohabitationDurationValue));
             $durYears = 0;
             $durMonths = 0;
             if (preg_match('/(\d+)\s*year/', $durText, $m)) {
@@ -1689,7 +2104,7 @@ function dra_generate_issued_document(array $requestRow): ?string {
         if ($cohabitationSinceValue !== '') {
             $cohabitationSinceDisplayValue = $cohabitationSinceValue . ' (' . $cohabitationDurationPretty . ')';
         } elseif ($cohabitationDurationValue !== '') {
-            $cohabitationSinceDisplayValue = $cohabitationDurationValue;
+            $cohabitationSinceDisplayValue = $stripTrailingParenthetical($cohabitationDurationValue);
         }
         $deriveAge = static function (string $rawDate): string {
             $rawDate = trim($rawDate);
@@ -1811,6 +2226,69 @@ function dra_generate_issued_document(array $requestRow): ?string {
         $v = $day % 100;
         $suffix = ($v >= 11 && $v <= 13) ? 'th' : (($day % 10 === 1) ? 'st' : (($day % 10 === 2) ? 'nd' : (($day % 10 === 3) ? 'rd' : 'th')));
         $issuedAsDocx = $day . $suffix . ' day of ' . $monthUpper . ' ' . $yearNum;
+        $firstTimeJobSeekerHonorific = 'MR./MS.';
+        $firstTimeJobSeekerResidencySince = '';
+        $firstTimeJobSeekerSignedDate = 'Date';
+        if ($isFirstTimeJobSeeker) {
+            $sexValue = strtolower(trim((string)($payload['sex'] ?? $payload['gender'] ?? '')));
+            if ($sexValue !== '') {
+                $firstTimeJobSeekerHonorific = str_starts_with($sexValue, 'm') ? 'MR.' : (str_starts_with($sexValue, 'f') ? 'MS.' : 'MR./MS.');
+            }
+
+            $residentUserId = trim((string)($requestRow['resident_user_id'] ?? ''));
+            $residentId = trim((string)($requestRow['resident_id'] ?? ''));
+            $residentProfile = dra_resident_profile_snapshot($conn, $residentUserId, $residentId);
+            $residencyStartRaw = trim((string)($payload['barangay_residency'] ?? $residentProfile['barangay_residency'] ?? ''));
+            $residencyDurationRaw = trim((string)($payload['residency_duration'] ?? $residentProfile['residency_duration'] ?? ''));
+            $durationFromPayload = [
+                'years' => max(0, (int)($yearsResidency !== '' ? $yearsResidency : 0)),
+                'months' => max(0, (int)($monthsResidency !== '' ? $monthsResidency : 0)),
+            ];
+            $durationFromStart = dra_parse_residency_start_ym($residencyStartRaw);
+            $durationFromText = dra_parse_residency_duration_text($residencyDurationRaw);
+            $bestDuration = $durationFromPayload;
+            if (is_array($durationFromStart) && is_array($durationFromText)) {
+                $bestDuration = dra_pick_longer_residency_duration(dra_pick_longer_residency_duration($durationFromPayload, $durationFromStart), $durationFromText);
+            } elseif (is_array($durationFromStart)) {
+                $bestDuration = dra_pick_longer_residency_duration($durationFromPayload, $durationFromStart);
+            } elseif (is_array($durationFromText)) {
+                $bestDuration = dra_pick_longer_residency_duration($durationFromPayload, $durationFromText);
+            }
+            $durationYears = max(0, (int)($bestDuration['years'] ?? 0));
+            $durationMonths = max(0, (int)($bestDuration['months'] ?? 0));
+            $durationPrettyParts = [];
+            if ($durationYears > 0) {
+                $durationPrettyParts[] = $durationYears . ' ' . ($durationYears === 1 ? 'year' : 'years');
+            }
+            if ($durationMonths > 0 || empty($durationPrettyParts)) {
+                $durationPrettyParts[] = $durationMonths . ' ' . ($durationMonths === 1 ? 'month' : 'months');
+            }
+            $durationPretty = implode(' and ', $durationPrettyParts);
+            $residencyStartDisplay = $formatDisplayMonthYear($residencyStartRaw);
+            if ($residencyStartDisplay === '') {
+                try {
+                    $inferredStart = new DateTime('first day of this month');
+                    $monthsToSubtract = ($durationYears * 12) + $durationMonths;
+                    if ($monthsToSubtract > 0) {
+                        $inferredStart->modify('-' . $monthsToSubtract . ' months');
+                    }
+                    $residencyStartDisplay = $inferredStart->format('F Y');
+                } catch (Throwable $ignored) {
+                    $residencyStartDisplay = '';
+                }
+            }
+            $firstTimeJobSeekerResidencySince = $residencyStartDisplay !== ''
+                ? $residencyStartDisplay . ' (' . $durationPretty . ')'
+                : $durationPretty;
+            $signedDateRaw = trim((string)($requestRow['completed_at'] ?? $requestRow['release_timestamp'] ?? $requestRow['ready_at'] ?? ''));
+            if ($signedDateRaw !== '') {
+                try {
+                    $firstTimeJobSeekerSignedDate = (new DateTime($signedDateRaw))->format('F j, Y');
+                } catch (Throwable $ignored) {
+                    $firstTimeJobSeekerSignedDate = $signedDateRaw;
+                }
+            }
+        }
 
         if ($isIndigency) {
             $pdf->SetFont($indigencyFont, 'B', 12);
@@ -1876,7 +2354,7 @@ function dra_generate_issued_document(array $requestRow): ?string {
             );
         } elseif ($isResidency) {
             $writeIndentedParagraph(
-                'This is to certify that the person whose name and thumb mark appears here on has requested a Barangay Clearance from this office and the information are listed below:',
+                'This is to certify that the person whose name appears here on has requested a Barangay Clearance from this office and the information are listed below:',
                 7,
                 18,
                 10,
@@ -1928,10 +2406,13 @@ function dra_generate_issued_document(array $requestRow): ?string {
                 [
                     ['text' => 'This is to certify that ', 'bold' => false],
                     ['text' => $fullName !== '' ? $fullName : '-', 'bold' => true],
-                    ['text' => ', ' . ($ageValue !== '' ? $ageValue : '-') . ' y/o and ', 'bold' => false],
+                    ['text' => ', ' . ($ageValue !== '' ? $ageValue : '-') . ' y/o a resident of ', 'bold' => false],
+                    ['text' => $applicantResidenceAddress !== '' ? $applicantResidenceAddress : '-', 'bold' => true],
+                    ['text' => ' and ', 'bold' => false],
                     ['text' => $cohabitantName !== '' ? $cohabitantName : '-', 'bold' => true],
-                    ['text' => ', ' . ($cohabitantAgeValue !== '' ? $cohabitantAgeValue : '-') . ' y/o are both residents of ', 'bold' => false],
-                    ['text' => ($address !== '' ? $address : '-') . ', BARANGAY SAN JOSE, RODRIGUEZ, RIZAL.', 'bold' => true],
+                    ['text' => ', ' . ($cohabitantAgeValue !== '' ? $cohabitantAgeValue : '-') . ' y/o a resident of ', 'bold' => false],
+                    ['text' => $cohabitantResidenceAddress !== '' ? $cohabitantResidenceAddress : '-', 'bold' => true],
+                    ['text' => '.', 'bold' => false],
                 ],
                 7,
                 18,
@@ -1943,7 +2424,9 @@ function dra_generate_issued_document(array $requestRow): ?string {
                 [
                     ['text' => 'This further certifies that they are both living together since ', 'bold' => false],
                     ['text' => $cohabitationSinceDisplayValue !== '' ? $cohabitationSinceDisplayValue : '-', 'bold' => true],
-                    ['text' => ' up to present on the above stated address.', 'bold' => false],
+                    ['text' => ' up to present on ', 'bold' => false],
+                    ['text' => $cohabitationResidenceAddress !== '' ? $cohabitationResidenceAddress : '-', 'bold' => true],
+                    ['text' => '.', 'bold' => false],
                 ],
                 7,
                 18,
@@ -1953,7 +2436,7 @@ function dra_generate_issued_document(array $requestRow): ?string {
             );
         } elseif ($isCohabitation && $cohabitationHasChildren) {
             $writeIndentedParagraph(
-                'This is to certify that the person whose name and thumb mark appears here on has requested a Barangay Certification from this office and the information are listed below:',
+                'This is to certify that the person whose name appears here on has requested a Barangay Certification from this office and the information are listed below:',
                 7,
                 18,
                 10,
@@ -1968,7 +2451,12 @@ function dra_generate_issued_document(array $requestRow): ?string {
             $lineH = 6.2;
 
             $row = static function (string $label, string $value, bool $valueBold = true) use ($pdf, $indigencyFont, $leftX, $colonX, $valueX, $lineH): void {
-                $value = trim((string)(preg_replace('/\s+/u', ' ', $value) ?? $value));
+                $lines = preg_split('/\R/u', (string)$value) ?: [(string)$value];
+                $lines = array_map(static function (string $line): string {
+                    $line = (string)(preg_replace('/\s+/u', ' ', $line) ?? $line);
+                    return trim($line);
+                }, $lines);
+                $value = trim(implode("\n", $lines));
                 if ($value === '') {
                     $value = '-';
                 }
@@ -2007,12 +2495,36 @@ function dra_generate_issued_document(array $requestRow): ?string {
             $row('Address', ($address !== '' ? $address : '-'), true);
             $row('', 'BARANGAY SAN JOSE, MONTALBAN, RIZAL', true);
             $row('Remarks', $remarksValue !== '' ? $remarksValue : '-', true);
-            $purposeLine = $requestPurpose !== '' && strtoupper($requestPurpose) !== 'PURPOSE'
-                ? $requestPurpose
-                : 'COHABITATION SINCE ' . ($cohabitationSinceValue !== '' ? $cohabitationSinceValue : '-');
+            $purposeLine = 'COHABITATION SINCE ' . ($cohabitationSinceValue !== '' ? $cohabitationSinceValue : '-');
             $row('Purpose', $purposeLine, true);
-            $row('Name of Children', !empty($children) ? implode('; ', $children) : '-', true);
+            $row('Name of Children', !empty($children) ? implode('; ', $children) : '-', false);
             $pdf->Ln(4);
+        } elseif ($isFirstTimeJobSeeker) {
+            $writeRichParagraph(
+                [
+                    ['text' => 'This is to certify ', 'bold' => false],
+                    ['text' => $firstTimeJobSeekerHonorific . ' ' . ($fullName !== '' ? $fullName : '-'), 'bold' => true],
+                    ['text' => ', resident of ', 'bold' => false],
+                    ['text' => ($address !== '' ? $address : '-') . ', BARANGAY SAN JOSE, RODRIGUEZ, RIZAL', 'bold' => true],
+                    ['text' => ' since ', 'bold' => false],
+                    ['text' => $firstTimeJobSeekerResidencySince !== '' ? $firstTimeJobSeekerResidencySince : '-', 'bold' => true],
+                    ['text' => ' is a qualified availlee of RA 11261 or the First Time Jobseekers Act 2019.', 'bold' => false],
+                ],
+                6.2,
+                18,
+                10,
+                $indigencyFont,
+                11.5
+            );
+            $pdf->Ln(2);
+            $writeIndentedParagraph(
+                'I further certify that the holder/bearer was informed of his/her rights, including the duties and responsibilities accorded by RA 11261 through the Oath of Undertaking he/she has signed and executed in the presence of our Barangay Official.',
+                6.2,
+                18,
+                10,
+                $indigencyFont,
+                11.5
+            );
         } else {
             $writeRichParagraph(
                 [
@@ -2076,6 +2588,8 @@ function dra_generate_issued_document(array $requestRow): ?string {
                 $indigencyFont,
                 12
             );
+        } elseif ($isFirstTimeJobSeeker) {
+            // No extra paragraph here; FTJS proceeds directly to issued line.
         } else {
             $writeIndentedParagraph(
                 'This further certifies that he/she is not a member, nor has joined a subversive society organization against the government.',
@@ -2115,55 +2629,55 @@ function dra_generate_issued_document(array $requestRow): ?string {
 
         if ($isGoodMoral) {
             $metaY = 186.0;
+            $labelX = 18.0;
+            $labelW = 34.0;
             $lineX1 = 52.0;
-            $lineX2 = 102.0;
+            $lineX2 = 70.0;
             $pdf->SetFont($indigencyFont, 'B', 12);
-            $pdf->SetXY(18, $metaY);
-            $pdf->Cell(18, 6, 'CTC No.:', 0, 0, 'L');
+            $pdf->SetXY($labelX, $metaY);
+            $pdf->Cell($labelW, 6, 'CTC No.:', 0, 0, 'L');
             $pdf->Line($lineX1, $metaY + 5, $lineX2, $metaY + 5);
             $metaY += 8;
             $pdf->SetFont($indigencyFont, 'B', 12);
-            $pdf->SetXY(18, $metaY);
-            $pdf->Cell(20, 6, 'Issued at:', 0, 0, 'L');
+            $pdf->SetXY($labelX, $metaY);
+            $pdf->Cell($labelW, 6, 'Issued at:', 0, 0, 'L');
             $pdf->Line($lineX1, $metaY + 5, $lineX2, $metaY + 5);
             $metaY += 8;
             $pdf->SetFont($indigencyFont, 'B', 12);
-            $pdf->SetXY(18, $metaY);
-            $pdf->Cell(20, 6, 'Issued On:', 0, 0, 'L');
+            $pdf->SetXY($labelX, $metaY);
+            $pdf->Cell($labelW, 6, 'Issued On:', 0, 0, 'L');
             $pdf->Line($lineX1, $metaY + 5, $lineX2, $metaY + 5);
             $metaY += 8;
-            $pdf->SetXY(18, $metaY);
-            $pdf->Cell(18, 6, 'OR No.:', 0, 0, 'L');
+            $pdf->SetXY($labelX, $metaY);
+            $pdf->Cell($labelW, 6, 'OR No.:', 0, 0, 'L');
             $pdf->Line($lineX1, $metaY + 5, $lineX2, $metaY + 5);
             if ($orNo !== '') {
                 $pdf->SetXY($lineX1, $metaY);
                 $pdf->SetFont($indigencyFont, '', 11);
-                $pdf->Cell($lineX2 - $lineX1, 6, $orNo, 0, 0, 'C');
+                $pdf->Cell($lineX2 - $lineX1, 6, $orNo, 0, 0, 'L');
             }
 
         } elseif ($isResidency) {
             $metaY = 196.0;
+            $labelX = 18.0;
+            $labelW = 34.0;
             $lineX1 = 52.0;
-            $lineX2 = 96.0;
+            $lineX2 = 70.0;
             $pdf->SetFont($indigencyFont, 'B', 12);
-            $pdf->SetXY(18, $metaY);
-            $pdf->Cell(18, 6, 'CTC No.:', 0, 0, 'L');
+            $pdf->SetXY($labelX, $metaY);
+            $pdf->Cell($labelW, 6, 'CTC No.:', 0, 0, 'L');
             $pdf->Line($lineX1, $metaY + 5, $lineX2, $metaY + 5);
             $metaY += 7;
-            $pdf->SetXY(18, $metaY);
-            $pdf->Cell(20, 6, 'Issued at:', 0, 0, 'L');
+            $pdf->SetXY($labelX, $metaY);
+            $pdf->Cell($labelW, 6, 'Issued at:', 0, 0, 'L');
             $pdf->Line($lineX1, $metaY + 5, $lineX2, $metaY + 5);
             $metaY += 7;
-            $pdf->SetXY(18, $metaY);
-            $pdf->Cell(20, 6, 'Issued On:', 0, 0, 'L');
+            $pdf->SetXY($labelX, $metaY);
+            $pdf->Cell($labelW, 6, 'Issued On:', 0, 0, 'L');
             $pdf->Line($lineX1, $metaY + 5, $lineX2, $metaY + 5);
             $metaY += 7;
-            $pdf->SetXY(18, $metaY);
-            $pdf->Cell(20, 6, 'Amount:', 0, 0, 'L');
-            $pdf->Line($lineX1, $metaY + 5, $lineX2, $metaY + 5);
-            $metaY += 7;
-            $pdf->SetXY(18, $metaY);
-            $pdf->Cell(18, 6, 'OR No.:', 0, 0, 'L');
+            $pdf->SetXY($labelX, $metaY);
+            $pdf->Cell($labelW, 6, 'OR No.:', 0, 0, 'L');
             $pdf->Line($lineX1, $metaY + 5, $lineX2, $metaY + 5);
             if ($orNo !== '') {
                 $pdf->SetXY($lineX1, $metaY);
@@ -2172,23 +2686,25 @@ function dra_generate_issued_document(array $requestRow): ?string {
             }
         } elseif ($isCohabitation && !$cohabitationHasChildren) {
             $metaY = 196.0;
+            $labelX = 18.0;
+            $labelW = 34.0;
             $lineX1 = 52.0;
-            $lineX2 = 96.0;
+            $lineX2 = 70.0;
             $pdf->SetFont($indigencyFont, 'B', 12);
-            $pdf->SetXY(18, $metaY);
-            $pdf->Cell(18, 6, 'CTC No.:', 0, 0, 'L');
+            $pdf->SetXY($labelX, $metaY);
+            $pdf->Cell($labelW, 6, 'CTC No.:', 0, 0, 'L');
             $pdf->Line($lineX1, $metaY + 5, $lineX2, $metaY + 5);
             $metaY += 7;
-            $pdf->SetXY(18, $metaY);
-            $pdf->Cell(20, 6, 'Issued at:', 0, 0, 'L');
+            $pdf->SetXY($labelX, $metaY);
+            $pdf->Cell($labelW, 6, 'Issued at:', 0, 0, 'L');
             $pdf->Line($lineX1, $metaY + 5, $lineX2, $metaY + 5);
             $metaY += 7;
-            $pdf->SetXY(18, $metaY);
-            $pdf->Cell(20, 6, 'Issued On:', 0, 0, 'L');
+            $pdf->SetXY($labelX, $metaY);
+            $pdf->Cell($labelW, 6, 'Issued On:', 0, 0, 'L');
             $pdf->Line($lineX1, $metaY + 5, $lineX2, $metaY + 5);
             $metaY += 7;
-            $pdf->SetXY(18, $metaY);
-            $pdf->Cell(18, 6, 'OR No.:', 0, 0, 'L');
+            $pdf->SetXY($labelX, $metaY);
+            $pdf->Cell($labelW, 6, 'OR No.:', 0, 0, 'L');
             $pdf->Line($lineX1, $metaY + 5, $lineX2, $metaY + 5);
             if ($orNo !== '') {
                 $pdf->SetXY($lineX1, $metaY);
@@ -2197,27 +2713,25 @@ function dra_generate_issued_document(array $requestRow): ?string {
             }
         } elseif ($isCohabitation && $cohabitationHasChildren) {
             $metaY = 196.0;
+            $labelX = 18.0;
+            $labelW = 34.0;
             $lineX1 = 52.0;
-            $lineX2 = 96.0;
+            $lineX2 = 70.0;
             $pdf->SetFont($indigencyFont, 'B', 12);
-            $pdf->SetXY(18, $metaY);
-            $pdf->Cell(18, 6, 'CTC No.:', 0, 0, 'L');
+            $pdf->SetXY($labelX, $metaY);
+            $pdf->Cell($labelW, 6, 'CTC No.:', 0, 0, 'L');
             $pdf->Line($lineX1, $metaY + 5, $lineX2, $metaY + 5);
             $metaY += 7;
-            $pdf->SetXY(18, $metaY);
-            $pdf->Cell(20, 6, 'Issued at:', 0, 0, 'L');
+            $pdf->SetXY($labelX, $metaY);
+            $pdf->Cell($labelW, 6, 'Issued at:', 0, 0, 'L');
             $pdf->Line($lineX1, $metaY + 5, $lineX2, $metaY + 5);
             $metaY += 7;
-            $pdf->SetXY(18, $metaY);
-            $pdf->Cell(20, 6, 'Issued On:', 0, 0, 'L');
+            $pdf->SetXY($labelX, $metaY);
+            $pdf->Cell($labelW, 6, 'Issued On:', 0, 0, 'L');
             $pdf->Line($lineX1, $metaY + 5, $lineX2, $metaY + 5);
             $metaY += 7;
-            $pdf->SetXY(18, $metaY);
-            $pdf->Cell(20, 6, 'Amount:', 0, 0, 'L');
-            $pdf->Line($lineX1, $metaY + 5, $lineX2, $metaY + 5);
-            $metaY += 7;
-            $pdf->SetXY(18, $metaY);
-            $pdf->Cell(18, 6, 'OR No.:', 0, 0, 'L');
+            $pdf->SetXY($labelX, $metaY);
+            $pdf->Cell($labelW, 6, 'OR No.:', 0, 0, 'L');
             $pdf->Line($lineX1, $metaY + 5, $lineX2, $metaY + 5);
             if ($orNo !== '') {
                 $pdf->SetXY($lineX1, $metaY);
@@ -2226,39 +2740,96 @@ function dra_generate_issued_document(array $requestRow): ?string {
             }
         }
 
-        // Issued by + signatory blocks aligned to the same baseline.
-        $signBaseY = ($isGoodMoral || $isResidency || $isCohabitation) ? 230.0 : 214.0;
+        if ($isFirstTimeJobSeeker) {
+            if (is_file($qrDiskPath)) {
+                $pdf->Image($qrDiskPath, $fixedQrX, $fixedQrY, $fixedQrSize, $fixedQrSize);
+            }
 
-        // Issued by block (lower-left)
-        $pdf->SetFont($indigencyFont, '', 11);
-        $pdf->SetXY(26, $signBaseY + 9);
-        $pdf->Cell(20, 6, 'Issued by:', 0, 0, 'L');
-        $pdf->SetFont($indigencyFont, 'B', 11);
-        $pdf->Cell(54, 6, 'MINERVA D. QUITA', 0, 1, 'L');
-        $pdf->SetFont($indigencyFont, 'I', 11);
-        $pdf->SetXY(46, $signBaseY + 15);
-        $pdf->Cell(44, 6, 'Barangay Secretary', 0, 1, 'C');
+            $signBaseY = 168.0;
+            $signX = 126.0;
+            $signW = 46.0;
+            $pdf->Line($signX, $signBaseY, $signX + $signW, $signBaseY);
+            $pdf->SetFont($indigencyFont, 'B', 10);
+            $pdf->SetXY($signX, $signBaseY + 1.5);
+            $pdf->Cell($signW, 5, 'HON. GLENN S. EVANGELISTA', 0, 1, 'C');
+            $pdf->SetFont($indigencyFont, 'I', 9);
+            $pdf->SetXY($signX, $signBaseY + 6.5);
+            $pdf->Cell($signW, 4.5, 'Punong Barangay', 0, 1, 'C');
+            $pdf->Line($signX + 8, $signBaseY + 17, $signX + $signW - 8, $signBaseY + 17);
+            $pdf->SetFont($indigencyFont, 'B', 9);
+            $pdf->SetXY($signX, $signBaseY + 18.5);
+            $pdf->Cell($signW, 4, $firstTimeJobSeekerSignedDate, 0, 1, 'C');
 
-        // Punong Barangay signature block (lower-right)
-        $pdf->Line(124, $signBaseY, 194, $signBaseY);
-        $pdf->SetFont($indigencyFont, 'B', 11);
-        $pdf->SetXY(124, $signBaseY + 2);
-        $pdf->Cell(70, 6, 'HON. GLENN S. EVANGELISTA', 0, 1, 'C');
-        $pdf->SetFont($indigencyFont, 'I', 11);
-        $pdf->SetXY(124, $signBaseY + 8);
-        $pdf->Cell(70, 6, 'Punong Barangay', 0, 1, 'C');
+            $pdf->SetFont($indigencyFont, 'B', 9);
+            $pdf->SetXY($signX, $signBaseY + 24);
+            $pdf->Cell($signW, 4, 'Witnesses by:', 0, 1, 'C');
 
-        // Footer note in a centered constrained width area.
-        $pdf->SetFont($indigencyFont, 'I', 8);
-        $pdf->SetXY(46, 258);
-        $pdf->SetFont($indigencyFont, 'I', 8);
-        $pdf->MultiCell(118, 4, "This certificate is valid for Forty-five (45) days from the date of issue, check the\nQR code to verify the authenticity of this document.", 0, 'C');
+            $witnessBaseY = $signBaseY + 34;
+            $pdf->Line($signX, $witnessBaseY, $signX + $signW, $witnessBaseY);
+            $pdf->SetFont($indigencyFont, 'B', 10);
+            $pdf->SetXY($signX, $witnessBaseY + 1.5);
+            $pdf->Cell($signW, 5, 'MINERVA D. QUITA', 0, 1, 'C');
+            $pdf->SetFont($indigencyFont, 'I', 9);
+            $pdf->SetXY($signX, $witnessBaseY + 6.5);
+            $pdf->Cell($signW, 4.5, 'Barangay Secretary', 0, 1, 'C');
+            $pdf->Line($signX + 8, $witnessBaseY + 17, $signX + $signW - 8, $witnessBaseY + 17);
+            $pdf->SetFont($indigencyFont, 'B', 9);
+            $pdf->SetXY($signX, $witnessBaseY + 18.5);
+            $pdf->Cell($signW, 4, $firstTimeJobSeekerSignedDate, 0, 1, 'C');
+
+            $pdf->SetFont($indigencyFont, 'I', 8);
+            $pdf->SetXY(46, 249);
+            $pdf->MultiCell(100, 4, "This certification is only valid for 1 year from the issuance.\nCheck the qr code to verify the authenticity of this document.", 0, 'C');
+        } else {
+            // Issued by + signatory blocks aligned to the same baseline.
+            $signBaseY = ($isGoodMoral || $isResidency || $isCohabitation) ? 230.0 : 214.0;
+            $issuedByY = $signBaseY + 9;
+            $issuedByTitleY = $signBaseY + 15;
+            $footerNoteY = 258.0;
+            if ($isCohabitation && !$cohabitationHasChildren) {
+                $signBaseY = 232.0;
+                $issuedByY = 240.0;
+                $issuedByTitleY = 246.0;
+                $footerNoteY = 260.0;
+            } elseif ($isCohabitation && $cohabitationHasChildren) {
+                $signBaseY = 234.0;
+                $issuedByY = 242.0;
+                $issuedByTitleY = 248.0;
+                $footerNoteY = 262.0;
+            }
+
+            // Issued by block (lower-left)
+            $pdf->SetFont($indigencyFont, '', 11);
+            $pdf->SetXY(26, $issuedByY);
+            $pdf->Cell(20, 6, 'Issued by:', 0, 0, 'L');
+            $pdf->SetFont($indigencyFont, 'B', 11);
+            $pdf->Cell(54, 6, 'MINERVA D. QUITA', 0, 1, 'L');
+            $pdf->SetFont($indigencyFont, 'I', 11);
+            $pdf->SetXY(46, $issuedByTitleY);
+            $pdf->Cell(44, 6, 'Barangay Secretary', 0, 1, 'C');
+
+            // Punong Barangay signature block (lower-right)
+            $pdf->Line(124, $signBaseY, 194, $signBaseY);
+            $pdf->SetFont($indigencyFont, 'B', 11);
+            $pdf->SetXY(124, $signBaseY + 2);
+            $pdf->Cell(70, 6, 'HON. GLENN S. EVANGELISTA', 0, 1, 'C');
+            $pdf->SetFont($indigencyFont, 'I', 11);
+            $pdf->SetXY(124, $signBaseY + 8);
+            $pdf->Cell(70, 6, 'Punong Barangay', 0, 1, 'C');
+
+            // Footer note in a centered constrained width area.
+            $pdf->SetFont($indigencyFont, 'I', 8);
+            $pdf->SetXY(46, $footerNoteY);
+            $pdf->SetFont($indigencyFont, 'I', 8);
+            $pdf->MultiCell(118, 4, "This certificate is valid for Forty-five (45) days from the date of issue, check the\nQR code to verify the authenticity of this document.", 0, 'C');
+        }
 
         $pdf->Output('F', $diskPath);
         return '/UnifiedFileAttachment/IssuedDocuments/Generated/' . $fileName;
     } else {
         if (is_file($qrDiskPath)) {
-            $pdf->Image($qrDiskPath, 186, 252, 20, 20);
+            $fixedQrSize = 20.0;
+            $pdf->Image($qrDiskPath, 186.0, 252.0, $fixedQrSize, $fixedQrSize);
         }
         $writeIndentedParagraph(
             'This is to certify that ' . $fullName . ' is a bona fide resident of ' . $address . '.',
@@ -2488,8 +3059,8 @@ function dra_finalize_template_pdf(string $pdfDiskPath, ?string $qrDiskPath = nu
     $coverHeight = isset($options['cover_height']) ? (float)$options['cover_height'] : 28.0;
     $coverMarginRight = isset($options['cover_margin_right']) ? (float)$options['cover_margin_right'] : 0.0;
     $coverMarginBottom = isset($options['cover_margin_bottom']) ? (float)$options['cover_margin_bottom'] : 24.0;
-    $qrSize = isset($options['qr_size']) ? (float)$options['qr_size'] : 24.0;
-    $qrMarginRight = isset($options['qr_margin_right']) ? (float)$options['qr_margin_right'] : 10.0;
+    $qrSize = isset($options['qr_size']) ? (float)$options['qr_size'] : 20.0;
+    $qrMarginRight = isset($options['qr_margin_right']) ? (float)$options['qr_margin_right'] : 12.0;
     $qrMarginBottom = isset($options['qr_margin_bottom']) ? (float)$options['qr_margin_bottom'] : 12.0;
     $stampLetterhead = !empty($options['stamp_letterhead']);
     $letterheadType = strtolower(trim((string)($options['letterhead_type'] ?? '')));
@@ -3223,7 +3794,7 @@ if ($action === 'get_request') {
     if ($requestId === '') {
         dr_respond_json(422, ['success' => false, 'message' => 'Missing request ID.']);
     }
-    $row = dr_fetch_request($conn, $requestId);
+    $row = dra_fetch_request_for_modal_fast($conn, $requestId);
     if (!$row) {
         dr_respond_json(404, ['success' => false, 'message' => 'Request not found.']);
     }
@@ -3231,9 +3802,9 @@ if ($action === 'get_request') {
     $payload = json_decode((string)($row['request_details'] ?? $row['payload_json'] ?? '{}'), true);
     $row['payload'] = is_array($payload) ? $payload : [];
 
-    $residentUserId = trim((string)($row['resident_user_id'] ?? ''));
-    $residentId = trim((string)($row['resident_id'] ?? ''));
-    $row['resident_profile'] = dra_resident_profile_snapshot($conn, $residentUserId, $residentId);
+    // Keep request modal fast. Full resident profile is loaded on demand by the
+    // dedicated resident profile viewer instead of every modal open.
+    $row['resident_profile'] = [];
     $row['stage_label'] = dr_stage_label((string)($row['stage'] ?? ''));
     $row['fee_amount'] = dr_get_fee_amount_for_document_type($conn, (string)($row['document_type'] ?? ''));
 
@@ -3409,7 +3980,8 @@ if ($action === 'view_issued') {
     $isGoodMoral = (strpos($docTypeNorm, 'goodmoral') !== false) || (strpos($docTypeNorm, 'good moral') !== false);
     $isResidency = strpos($docTypeNorm, 'residency') !== false;
     $isCohabitation = strpos($docTypeNorm, 'cohabitation') !== false;
-    $isTemplateBasedCertificate = $isIndigency || $isGoodMoral || $isResidency || $isCohabitation;
+    $isFirstTimeJobSeeker = strpos(preg_replace('/[^a-z0-9]+/', '', $docTypeNorm), 'firsttimejobseeker') !== false;
+    $isTemplateBasedCertificate = $isIndigency || $isGoodMoral || $isResidency || $isCohabitation || $isFirstTimeJobSeeker;
     $ext = strtolower(pathinfo($publicPath, PATHINFO_EXTENSION));
     $verificationCode = trim((string)($row['verification_code'] ?? ''));
     $qrPublicPath = '/UnifiedFileAttachment/IssuedDocuments/QR/qr_' . preg_replace('/[^A-Za-z0-9_-]/', '', $requestId) . '.png';
@@ -3420,7 +3992,7 @@ if ($action === 'view_issued') {
         ? [DR_STAGE_READY_FOR_CLAIM, DR_STAGE_COMPLETED]
         : [DR_STAGE_PAYMENT_VERIFIED, DR_STAGE_READY_FOR_CLAIM, DR_STAGE_COMPLETED];
     $shouldHaveQr = ($verificationCode !== '' && in_array($stage, $qrEligibleStages, true));
-    $renderRevisionTag = 'r20260310a';
+    $renderRevisionTag = 'r20260311a';
     $issuedBaseName = strtolower(basename((string)$publicPath));
     $isGeneratedIssuedPath = strpos((string)$publicPath, '/UnifiedFileAttachment/IssuedDocuments/Generated/') === 0;
     $isCurrentRenderRevision = ($issuedBaseName !== '' && strpos($issuedBaseName, strtolower($renderRevisionTag)) !== false);
@@ -3491,9 +4063,15 @@ if ($action === 'personnel_approve') {
         $row = dr_fetch_request($conn, $requestId) ?? $row;
     }
 
+    $isFirstTimeJobSeeker = dra_is_first_time_job_seeker($row);
     $defaultFee = dr_get_fee_amount_for_document_type($conn, (string)($row['document_type'] ?? ''));
+    if ($isFirstTimeJobSeeker) {
+        $defaultFee = 0.0;
+    }
     $isFreeDocument = ($defaultFee !== null && (float)$defaultFee <= 0.0);
-    $nextStage = $isFreeDocument ? DR_STAGE_READY_FOR_CLAIM : DR_STAGE_FOR_PAYMENT;
+    $nextStage = $isFirstTimeJobSeeker
+        ? DR_STAGE_FOR_INTERVIEW
+        : ($isFreeDocument ? DR_STAGE_READY_FOR_CLAIM : DR_STAGE_FOR_PAYMENT);
     $patch = [
         'status_reason' => null,
         'personnel_user_id' => $currentUserId,
@@ -3501,7 +4079,7 @@ if ($action === 'personnel_approve') {
         'fee_amount' => $defaultFee,
     ];
 
-    if ($isFreeDocument) {
+    if ($isFreeDocument && !$isFirstTimeJobSeeker) {
         $verificationCode = trim((string)($row['verification_code'] ?? ''));
         if ($verificationCode === '') {
             $verificationCode = strtoupper(bin2hex(random_bytes(8)));
@@ -3518,7 +4096,7 @@ if ($action === 'personnel_approve') {
         dr_respond_json(500, ['success' => false, 'message' => 'Unable to approve request.']);
     }
 
-    if ($isFreeDocument) {
+    if ($isFreeDocument && !$isFirstTimeJobSeeker) {
         $issuedPath = dra_generate_issued_document($updated);
         if (is_string($issuedPath) && trim($issuedPath) !== '') {
             $updated = dr_update_stage($conn, $requestId, (string)($updated['stage'] ?? $nextStage), [
@@ -3527,14 +4105,27 @@ if ($action === 'personnel_approve') {
         }
     }
 
-    dra_send_notification_deferred(
-        $conn,
-        $updated,
-        $isFreeDocument ? 'Document Request Approved for Release' : 'Document Request Approved for Payment',
-        $isFreeDocument
-            ? dra_request_notice($updated, $requestId, 'approved and is now for release.')
-            : dra_request_notice($updated, $requestId, 'approved and is now waiting for payment.')
-    );
+    if ($isFirstTimeJobSeeker) {
+        dra_send_notification_deferred(
+            $conn,
+            $updated,
+            'First Time Job Seeker Interview Required',
+            dra_request_notice(
+                $updated,
+                $requestId,
+                'approved for interview. Please proceed to the barangay within 5 working days for the signing of the oath of undertaking and interview.'
+            )
+        );
+    } else {
+        dra_send_notification_deferred(
+            $conn,
+            $updated,
+            $isFreeDocument ? 'Document Request Approved for Release' : 'Document Request Approved for Payment',
+            $isFreeDocument
+                ? dra_request_notice($updated, $requestId, 'approved and is now for release.')
+                : dra_request_notice($updated, $requestId, 'approved and is now waiting for payment.')
+        );
+    }
 
     dr_respond_json(200, ['success' => true, 'request' => $updated]);
 }
@@ -3560,6 +4151,88 @@ if ($action === 'personnel_reject') {
         $updated,
         'Document Request Rejected',
         dra_request_notice($updated, $requestId, 'rejected. Reason: ' . $reason)
+    );
+
+    dr_respond_json(200, ['success' => true, 'request' => $updated]);
+}
+
+if ($action === 'interview_pass') {
+    if (!dra_is_first_time_job_seeker($row)) {
+        dr_respond_json(422, ['success' => false, 'message' => 'Interview approval is only available for First Time Job Seeker requests.']);
+    }
+    $currentStage = strtolower(trim((string)($row['stage'] ?? '')));
+    if ($currentStage !== DR_STAGE_FOR_INTERVIEW) {
+        dr_respond_json(422, ['success' => false, 'message' => 'Request is not currently waiting for interview approval.']);
+    }
+
+    $verificationCode = trim((string)($row['verification_code'] ?? ''));
+    if ($verificationCode === '') {
+        $verificationCode = strtoupper(bin2hex(random_bytes(8)));
+    }
+    $qrCodePath = '/UnifiedFileAttachment/IssuedDocuments/QR/qr_' . preg_replace('/[^A-Za-z0-9_-]/', '', $requestId) . '.png';
+    $issuedPath = dra_generate_issued_document(array_merge((array)$row, [
+        'verification_code' => $verificationCode,
+        'fee_amount' => 0,
+    ]));
+    if ($issuedPath === null || trim((string)$issuedPath) === '') {
+        dr_respond_json(500, ['success' => false, 'message' => 'Interview passed, but issued document generation failed.']);
+    }
+
+    $updated = dr_update_stage($conn, $requestId, DR_STAGE_READY_FOR_CLAIM, [
+        'status_reason' => null,
+        'personnel_user_id' => $currentUserId,
+        'personnel_decision_at' => dr_now(),
+        'fee_amount' => 0,
+        'ready_at' => dr_now(),
+        'verification_code' => $verificationCode,
+        'qr_code_path' => $qrCodePath,
+        'issued_file_path' => (string)$issuedPath,
+    ]);
+
+    if (!$updated) {
+        dr_respond_json(500, ['success' => false, 'message' => 'Unable to mark interview as passed.']);
+    }
+
+    dra_send_notification_deferred(
+        $conn,
+        $updated,
+        'First Time Job Seeker Ready for Release',
+        dra_request_notice($updated, $requestId, 'approved after interview and is now ready for release.')
+    );
+
+    dr_respond_json(200, ['success' => true, 'request' => $updated]);
+}
+
+if ($action === 'interview_fail') {
+    if (!dra_is_first_time_job_seeker($row)) {
+        dr_respond_json(422, ['success' => false, 'message' => 'Interview rejection is only available for First Time Job Seeker requests.']);
+    }
+    $currentStage = strtolower(trim((string)($row['stage'] ?? '')));
+    if ($currentStage !== DR_STAGE_FOR_INTERVIEW) {
+        dr_respond_json(422, ['success' => false, 'message' => 'Request is not currently waiting for interview review.']);
+    }
+
+    $reason = trim((string)($_POST['reason'] ?? ''));
+    if ($reason === '') {
+        dr_respond_json(422, ['success' => false, 'message' => 'Interview failure reason is required.']);
+    }
+
+    $updated = dr_update_stage($conn, $requestId, DR_STAGE_INTERVIEW_FAILED, [
+        'status_reason' => $reason,
+        'personnel_user_id' => $currentUserId,
+        'personnel_decision_at' => dr_now(),
+        'fee_amount' => 0,
+    ]);
+
+    if (!$updated) {
+        dr_respond_json(500, ['success' => false, 'message' => 'Unable to mark interview as failed.']);
+    }
+
+    dra_send_notification_deferred(
+        $conn,
+        $updated,
+        'First Time Job Seeker Interview Failed',
+        dra_request_notice($updated, $requestId, 'did not pass the interview. Reason: ' . $reason)
     );
 
     dr_respond_json(200, ['success' => true, 'request' => $updated]);
@@ -3735,6 +4408,15 @@ if ($action === 'mark_completed') {
 
     if (!$updated) {
         dr_respond_json(500, ['success' => false, 'message' => 'Unable to complete request.']);
+    }
+
+    if (dra_is_first_time_job_seeker($updated)) {
+        $regeneratedIssuedPath = dra_generate_issued_document_safe($updated);
+        if (is_string($regeneratedIssuedPath) && trim($regeneratedIssuedPath) !== '') {
+            $updated = dr_update_stage($conn, $requestId, DR_STAGE_COMPLETED, [
+                'issued_file_path' => $regeneratedIssuedPath,
+            ]) ?? $updated;
+        }
     }
 
     dra_send_notification_deferred(

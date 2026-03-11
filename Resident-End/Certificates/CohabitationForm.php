@@ -94,6 +94,19 @@ $applicantBarangay = 'San Jose';
 $applicantMunicipality = 'Rodriguez (Montalban)';
 $applicantProvince = 'Rizal';
 $applicantArea = htmlspecialchars($areaNumber, ENT_QUOTES, 'UTF-8');
+
+$cohabitationVariant = strtolower(trim((string)($_GET['variant'] ?? '')));
+$isRelationshipJailVisitVariant = in_array($cohabitationVariant, ['relationship_jail_visit', 'conjugal_visit'], true);
+$formTitle = $isRelationshipJailVisitVariant ? 'Certificate of Relationship for Jail Visitation' : 'Cohabitation';
+$pageTitle = $isRelationshipJailVisitVariant ? 'Certificate of Relationship for Jail Visitation Application' : 'Cohabitation Application';
+$defaultPurpose = $isRelationshipJailVisitVariant ? 'Jail Visitation' : '';
+$partnerSectionTitle = $isRelationshipJailVisitVariant ? 'Detained Person Information' : 'Cohabitant / Partner Information';
+$partnerAddressTitle = $isRelationshipJailVisitVariant ? 'Detained Partner Living Address' : 'Cohabitant Address';
+$partnerSameAddressText = $isRelationshipJailVisitVariant ? 'Same living address as applicant' : 'Same address as applicant';
+$partnerAddressSystemLabel = $isRelationshipJailVisitVariant ? 'Living Address System' : 'Address System';
+$cohabitationStartLabel = $isRelationshipJailVisitVariant ? 'Started Living Together On (Month and Year)' : 'Started Cohabitation On (Month and Year)';
+$cohabitationDurationLabel = $isRelationshipJailVisitVariant ? 'Length of Relationship' : 'Cohabitation Duration';
+$purposeInputClass = $isRelationshipJailVisitVariant ? 'form-control text-bg-light' : 'form-control';
 ?>
 
 <!DOCTYPE html>
@@ -101,7 +114,7 @@ $applicantArea = htmlspecialchars($areaNumber, ENT_QUOTES, 'UTF-8');
 
 <head>
     <meta charset="UTF-8">
-    <title>Cohabitation Application</title>
+    <title><?= htmlspecialchars($pageTitle, ENT_QUOTES, 'UTF-8') ?></title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons/font/bootstrap-icons.css" rel="stylesheet" />
@@ -123,12 +136,13 @@ $applicantArea = htmlspecialchars($areaNumber, ENT_QUOTES, 'UTF-8');
                 <div class="main-head-content">
 
                     <a href="<?= htmlspecialchars($baseUrl) ?>/Resident-End/Certificates/CertificatesLandingPage.php" class="back-link">&lt; Go Back</a>
-                    <h1 class="form-title">Cohabitation</h1>
+                    <h1 class="form-title"><?= htmlspecialchars($formTitle, ENT_QUOTES, 'UTF-8') ?></h1>
                     <p class="form-subtitle">All fields marked with <span class="required-asterisk">*</span> are required</p>
 
-                    <form method="POST" action="<?= htmlspecialchars($baseUrl) ?>/PhpFiles/Resident-End/documentRequestWorkflow.php" id="cohabitationForm">
+                    <form method="POST" action="<?= htmlspecialchars($baseUrl) ?>/PhpFiles/Resident-End/documentRequestWorkflow.php" id="cohabitationForm" enctype="multipart/form-data">
                         <input type="hidden" name="action" value="submit_request">
                         <input type="hidden" name="document_type" value="cohabitation">
+                        <input type="hidden" name="cohabitation_variant" value="<?= $isRelationshipJailVisitVariant ? 'relationship_jail_visit' : 'standard' ?>">
                         <input type="hidden" name="redirect" value="1">
 
                         <!-- PERSONAL INFORMATION -->
@@ -168,7 +182,7 @@ $applicantArea = htmlspecialchars($areaNumber, ENT_QUOTES, 'UTF-8');
                             </div>
                         </div>
 
-                        <h2 class="section-title text-center text-dark">Cohabitant / Partner Information</h2>
+                        <h2 class="section-title text-center text-dark"><?= htmlspecialchars($partnerSectionTitle, ENT_QUOTES, 'UTF-8') ?></h2>
                         <div class="form-row pt-0">
                             <div>
                                 <label class="top-label">Last Name <span class="required-asterisk">*</span> </label>
@@ -212,22 +226,143 @@ $applicantArea = htmlspecialchars($areaNumber, ENT_QUOTES, 'UTF-8');
                                 <input type="text" name="cohabitant_nationality" required>
                             </div>
                             <div>
-                                <label class="top-label">Date of Birth <span class="required-asterisk">*</span></label>
+                                <label class="top-label"><?= $isRelationshipJailVisitVariant ? 'Birthday / Date of Birth' : 'Date of Birth' ?> <span class="required-asterisk">*</span></label>
                                 <input type="date" name="cohabitant_dob" required>
                             </div>
-                            <div>
+                            <div class="<?= $isRelationshipJailVisitVariant ? 'd-none' : '' ?>">
                                 <label class="top-label">Occupation <i>(leave blank if NA)</i></label>
                                 <input type="text" name="cohabitant_occupation">
                             </div>
                         </div>
 
-                        <h2 class="section-title text-center text-dark">Cohabitant Address</h2>
+                        <?php if ($isRelationshipJailVisitVariant): ?>
+                        <h2 class="section-title text-center text-dark">Proof of Detention Requirement</h2>
+                        <div class="form-row">
+                            <div class="full-width">
+                                <label class="top-label" for="detentionProofType">Proof of Detention Type <span class="required-asterisk">*</span></label>
+                                <select class="form-select" id="detentionProofType" name="detention_proof_type" required>
+                                    <option value="">Select</option>
+                                    <option value="Certificate of Detention">Certificate of Detention</option>
+                                    <option value="Commitment Order">Commitment Order</option>
+                                    <option value="Arrest Report">Arrest Report</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div id="detentionProofDetails" class="d-none">
+                            <div class="form-row two-col-row">
+                                <div class="full-width">
+                                    <div class="id-guidance-card">
+                                    <div class="id-guidance-card__title">Proof Upload Guide</div>
+                                    <div class="id-guidance-card__meta" id="detentionProofGuideText">Select a detention proof type first to continue.</div>
+                                </div>
+                                </div>
+                            </div>
+                            <div id="detentionProofAttachmentRows">
+                                <div class="form-row" data-detention-attachment-row="1">
+                                    <div class="full-width">
+                                        <label class="top-label" for="detentionProofFile1">Attachment 1 <span class="required-asterisk">*</span></label>
+                                        <label class="upload-dropzone" data-upload-input="detentionProofFile1" for="detentionProofFile1">
+                                            <i class="fa-solid fa-upload"></i>
+                                            <div class="detention-proof-prompt" id="detentionProofPrompt1">Drag and drop detention proof or click to upload</div>
+                                            <small id="detentionProofFile1Meta">JPG, JPEG, PNG, WEBP, or PDF. Saved as PDF.</small>
+                                            <input type="file" class="form-control upload-dropzone-input" id="detentionProofFile1" name="detention_proof_files[]" accept=".jpg,.jpeg,.png,.webp,.pdf" required>
+                                        </label>
+                                    </div>
+                                </div>
+                                <div class="form-row d-none" data-detention-attachment-row="2">
+                                    <div class="full-width">
+                                        <label class="top-label" for="detentionProofFile2">Attachment 2</label>
+                                        <label class="upload-dropzone" data-upload-input="detentionProofFile2" for="detentionProofFile2">
+                                            <i class="fa-solid fa-upload"></i>
+                                            <div class="detention-proof-prompt" id="detentionProofPrompt2">Drag and drop additional attachment or click to upload</div>
+                                            <small id="detentionProofFile2Meta">JPG, JPEG, PNG, WEBP, or PDF. Saved as PDF.</small>
+                                            <input type="file" class="form-control upload-dropzone-input" id="detentionProofFile2" name="detention_proof_files[]" accept=".jpg,.jpeg,.png,.webp,.pdf">
+                                        </label>
+                                    </div>
+                                </div>
+                                <div class="form-row d-none" data-detention-attachment-row="3">
+                                    <div class="full-width">
+                                        <label class="top-label" for="detentionProofFile3">Attachment 3</label>
+                                        <label class="upload-dropzone" data-upload-input="detentionProofFile3" for="detentionProofFile3">
+                                            <i class="fa-solid fa-upload"></i>
+                                            <div class="detention-proof-prompt" id="detentionProofPrompt3">Drag and drop additional attachment or click to upload</div>
+                                            <small id="detentionProofFile3Meta">JPG, JPEG, PNG, WEBP, or PDF. Saved as PDF.</small>
+                                            <input type="file" class="form-control upload-dropzone-input" id="detentionProofFile3" name="detention_proof_files[]" accept=".jpg,.jpeg,.png,.webp,.pdf">
+                                        </label>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="form-row">
+                                <div class="full-width d-flex justify-content-start">
+                                    <button type="button" class="btn btn-outline-secondary" id="addDetentionAttachmentBtn">Add Attachment</button>
+                                </div>
+                            </div>
+                        </div>
+                        <?php else: ?>
+                        <h2 class="section-title text-center text-dark">Partner ID Requirement</h2>
+                        <div class="form-row">
+                            <div class="full-width">
+                                <label class="top-label" for="cohabitantIdType">Valid ID Type <span class="required-asterisk">*</span></label>
+                                <select class="form-select" id="cohabitantIdType" name="cohabitant_id_type" required>
+                                    <option value="">Select</option>
+                                    <option value="Philippine National ID">Philippine National ID</option>
+                                    <option value="Passport">Passport</option>
+                                    <option value="Driver's License">Driver's License</option>
+                                    <option value="UMID">UMID</option>
+                                    <option value="SSS ID">SSS ID</option>
+                                    <option value="PRC ID">PRC ID</option>
+                                    <option value="Postal ID">Postal ID</option>
+                                    <option value="Voter's ID">Voter's ID</option>
+                                    <option value="Senior Citizen ID">Senior Citizen ID</option>
+                                    <option value="PWD ID">PWD ID</option>
+                                    <option value="Barangay ID">Barangay ID</option>
+                                    <option value="Other Government ID">Other Government ID</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div id="cohabitantIdDetails" class="d-none">
+                        <div class="form-row two-col-row">
+                            <div>
+                                <label class="top-label" for="cohabitantIdNumber">ID Number <span class="required-asterisk">*</span></label>
+                                <input type="text" class="form-control" id="cohabitantIdNumber" name="cohabitant_id_number" required>
+                            </div>
+                            <div class="id-guidance-card">
+                                <div class="id-guidance-card__title">ID Upload Guide</div>
+                                <div class="id-guidance-card__meta" id="cohabitantIdGuideText">Select an ID type first to continue.</div>
+                            </div>
+                        </div>
+
+                        <div id="cohabitantIdUploadRow" class="form-row two-col-row">
+                            <div>
+                                <label class="top-label" for="cohabitantIdFront"><span id="cohabitantIdFrontLabel">Front of Valid ID</span> <span class="required-asterisk">*</span></label>
+                                <label class="upload-dropzone" data-upload-input="cohabitantIdFront" for="cohabitantIdFront">
+                                    <i class="fa-solid fa-upload"></i>
+                                    <div id="cohabitantIdFrontPrompt">Drag and drop front ID or click to upload</div>
+                                    <small id="cohabitantIdFrontMeta">JPG, JPEG, PNG, WEBP, or PDF</small>
+                                    <input type="file" class="form-control upload-dropzone-input" id="cohabitantIdFront" name="cohabitant_id_front" accept=".jpg,.jpeg,.png,.webp,.pdf" required>
+                                </label>
+                            </div>
+                            <div id="cohabitantIdBackField">
+                                <label class="top-label" for="cohabitantIdBack">Back of Valid ID <span class="required-asterisk">*</span></label>
+                                <label class="upload-dropzone" data-upload-input="cohabitantIdBack" for="cohabitantIdBack">
+                                    <i class="fa-solid fa-upload"></i>
+                                    <div>Drag and drop back ID or click to upload</div>
+                                    <small id="cohabitantIdBackMeta">JPG, JPEG, PNG, WEBP, or PDF</small>
+                                    <input type="file" class="form-control upload-dropzone-input" id="cohabitantIdBack" name="cohabitant_id_back" accept=".jpg,.jpeg,.png,.webp,.pdf" required>
+                                </label>
+                            </div>
+                        </div>
+                        </div>
+                        <?php endif; ?>
+
+                        <h2 class="section-title text-center text-dark"><?= htmlspecialchars($partnerAddressTitle, ENT_QUOTES, 'UTF-8') ?></h2>
                         <div class="form-row">
                             <div class="full-width">
                                 <div class="beneficiary-block pt-3 pb-2">
                                     <label class="top-label check-item">
                                         <input type="checkbox" id="cohabitantSameAddress" name="cohabitantSameAddress">
-                                        <span>Same address as applicant</span>
+                                        <span><?= htmlspecialchars($partnerSameAddressText, ENT_QUOTES, 'UTF-8') ?></span>
                                     </label>
                                 </div>
                             </div>
@@ -249,7 +384,7 @@ $applicantArea = htmlspecialchars($areaNumber, ENT_QUOTES, 'UTF-8');
 
                         <div id="cohabitantAddressSystemRow" class="form-row">
                             <div class="full-width">
-                                <label class="top-label" for="cohabitantAddressSystem">Address System <span class="required-asterisk">*</span></label>
+                                <label class="top-label" for="cohabitantAddressSystem"><?= htmlspecialchars($partnerAddressSystemLabel, ENT_QUOTES, 'UTF-8') ?> <span class="required-asterisk">*</span></label>
                                 <select id="cohabitantAddressSystem" name="cohabitant_address_system" required>
                                     <option value="">Select</option>
                                     <option value="house">House Numbering System</option>
@@ -335,17 +470,13 @@ $applicantArea = htmlspecialchars($areaNumber, ENT_QUOTES, 'UTF-8');
                             </div>
                             <div class="full-width">
                                 <div class="row mb-3">
-                                    <div class="col-md-4">
+                                    <div class="col-md-6">
                                         <label class="top-label" for="cohabitantBarangay">Barangay <span class="required-asterisk">*</span></label>
                                         <select class="form-select" id="cohabitantBarangay" name="cohabitant_barangay" required>
                                             <option value="">Select city first</option>
                                         </select>
                                     </div>
-                                    <div class="col-md-4">
-                                        <label class="top-label" for="cohabSubdivision">Subdivision</label>
-                                        <input type="text" class="form-control" id="cohabSubdivision" name="cohabitant_subdivision">
-                                    </div>
-                                    <div class="col-md-4">
+                                    <div class="col-md-6">
                                         <label class="top-label" for="cohabitantPostalCode">Postal Code <span class="required-asterisk">*</span></label>
                                         <input type="text" class="form-control" id="cohabitantPostalCode" name="cohabitant_postal_code" inputmode="numeric" maxlength="10" required>
                                     </div>
@@ -353,14 +484,14 @@ $applicantArea = htmlspecialchars($areaNumber, ENT_QUOTES, 'UTF-8');
                             </div>
                         </div>
 
-                        <div class="form-row two-col-row">
+                        <div id="relationshipLengthWrapper" class="form-row two-col-row<?= $isRelationshipJailVisitVariant ? ' d-none' : '' ?>">
                             <div>
-                                <label class="top-label">Started Cohabitation On (Month and Year) <span class="required-asterisk">*</span></label>
+                                <label class="top-label"><?= htmlspecialchars($cohabitationStartLabel, ENT_QUOTES, 'UTF-8') ?> <span class="required-asterisk">*</span></label>
                                 <input type="text" class="form-control text-bg-light" id="cohabitationStartDisplay" value="" placeholder="Select month and year" readonly required>
                                 <input type="hidden" id="cohabitationStartDate" name="cohabitation_start_date" value="">
                             </div>
                             <div>
-                                <label class="top-label">Cohabitation Duration</label>
+                                <label class="top-label"><?= htmlspecialchars($cohabitationDurationLabel, ENT_QUOTES, 'UTF-8') ?></label>
                                 <input type="text" name="cohabitation_duration_display" class="form-control text-bg-light" readonly placeholder="Will be computed from the start date">
                                 <input type="hidden" name="cohabitation_duration" value="">
                                 <input type="hidden" name="cohabitation_duration_value" value="">
@@ -371,14 +502,113 @@ $applicantArea = htmlspecialchars($areaNumber, ENT_QUOTES, 'UTF-8');
                         <div class="form-row two-col-row">
                             <div>
                                 <label class="top-label">Relationship to Applicant <span class="required-asterisk">*</span></label>
-                                <input type="text" name="cohabitant_relationship" required placeholder="e.g., Partner / Spouse">
+                                <?php if ($isRelationshipJailVisitVariant): ?>
+                                    <select class="form-select" id="cohabitantRelationshipSelect" name="cohabitant_relationship" required>
+                                        <option value="">Select</option>
+                                        <option value="Partner">Partner</option>
+                                        <option value="Spouse">Spouse</option>
+                                        <option value="Parent">Parent</option>
+                                        <option value="Child">Child</option>
+                                        <option value="Sibling">Sibling</option>
+                                        <option value="Grandparent">Grandparent</option>
+                                        <option value="Grandchild">Grandchild</option>
+                                        <option value="Relative">Relative</option>
+                                        <option value="Friend">Friend</option>
+                                        <option value="Guardian">Guardian</option>
+                                        <option value="Other">Other</option>
+                                    </select>
+                                <?php else: ?>
+                                    <input type="text" name="cohabitant_relationship" required placeholder="e.g., Partner / Spouse">
+                                <?php endif; ?>
                             </div>
                             <div>
                                 <label class="top-label">Purpose of Document Request <span class="required-asterisk">*</span></label>
-                                <input type="text" name="purpose" required placeholder="e.g., Legal requirement">
+                                <input
+                                    type="text"
+                                    name="purpose"
+                                    required
+                                    placeholder="e.g., Legal requirement"
+                                    value="<?= htmlspecialchars($defaultPurpose, ENT_QUOTES, 'UTF-8') ?>"
+                                    class="<?= $purposeInputClass ?>"
+                                    <?= $isRelationshipJailVisitVariant ? 'readonly' : '' ?>
+                                >
                             </div>
                         </div>
 
+                        <?php if ($isRelationshipJailVisitVariant): ?>
+                        <h2 class="section-title text-center text-dark">Proof of Relationship Requirement</h2>
+                        <div class="form-row">
+                            <div class="full-width">
+                                <div class="id-guidance-card">
+                                    <div class="id-guidance-card__title">Relationship Proof Guide</div>
+                                    <div class="id-guidance-card__meta">Upload a photo of them together or any document/image that helps prove their relationship. Saved as PDF.</div>
+                                </div>
+                            </div>
+                        </div>
+                        <div id="relationshipProofAttachmentRows">
+                            <div class="form-row" data-relationship-attachment-row="1">
+                                <div class="full-width">
+                                    <label class="top-label" for="relationshipProofFile1">Attachment 1 <span class="required-asterisk">*</span></label>
+                                    <label class="upload-dropzone" data-upload-input="relationshipProofFile1" for="relationshipProofFile1">
+                                        <i class="fa-solid fa-upload"></i>
+                                        <div class="relationship-proof-prompt" id="relationshipProofPrompt1">Drag and drop proof of relationship or click to upload</div>
+                                        <small id="relationshipProofFile1Meta">JPG, JPEG, PNG, WEBP, or PDF. Saved as PDF.</small>
+                                        <input type="file" class="form-control upload-dropzone-input" id="relationshipProofFile1" name="relationship_proof_files[]" accept=".jpg,.jpeg,.png,.webp,.pdf" required>
+                                    </label>
+                                </div>
+                            </div>
+                            <div class="form-row d-none" data-relationship-attachment-row="2">
+                                <div class="full-width">
+                                    <label class="top-label" for="relationshipProofFile2">Attachment 2</label>
+                                    <label class="upload-dropzone" data-upload-input="relationshipProofFile2" for="relationshipProofFile2">
+                                        <i class="fa-solid fa-upload"></i>
+                                        <div class="relationship-proof-prompt" id="relationshipProofPrompt2">Drag and drop additional attachment or click to upload</div>
+                                        <small id="relationshipProofFile2Meta">JPG, JPEG, PNG, WEBP, or PDF. Saved as PDF.</small>
+                                        <input type="file" class="form-control upload-dropzone-input" id="relationshipProofFile2" name="relationship_proof_files[]" accept=".jpg,.jpeg,.png,.webp,.pdf">
+                                    </label>
+                                </div>
+                            </div>
+                            <div class="form-row d-none" data-relationship-attachment-row="3">
+                                <div class="full-width">
+                                    <label class="top-label" for="relationshipProofFile3">Attachment 3</label>
+                                    <label class="upload-dropzone" data-upload-input="relationshipProofFile3" for="relationshipProofFile3">
+                                        <i class="fa-solid fa-upload"></i>
+                                        <div class="relationship-proof-prompt" id="relationshipProofPrompt3">Drag and drop additional attachment or click to upload</div>
+                                        <small id="relationshipProofFile3Meta">JPG, JPEG, PNG, WEBP, or PDF. Saved as PDF.</small>
+                                        <input type="file" class="form-control upload-dropzone-input" id="relationshipProofFile3" name="relationship_proof_files[]" accept=".jpg,.jpeg,.png,.webp,.pdf">
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="form-row">
+                            <div class="full-width d-flex justify-content-start">
+                                <button type="button" class="btn btn-outline-secondary" id="addRelationshipAttachmentBtn">Add Attachment</button>
+                            </div>
+                        </div>
+
+                        <h2 class="section-title text-center text-dark">Detention Facility Details</h2>
+                        <div class="form-row two-col-row">
+                            <div>
+                                <label class="top-label" for="detentionFacility">Police Station / BJMP <span class="required-asterisk">*</span></label>
+                                <select class="form-select" id="detentionFacility" name="detention_facility" required>
+                                    <option value="">Select</option>
+                                    <option value="Rodriguez Municipal Police Station">Rodriguez Municipal Police Station</option>
+                                    <option value="San Mateo Municipal Police Station">San Mateo Municipal Police Station</option>
+                                    <option value="Antipolo City Police Station">Antipolo City Police Station</option>
+                                    <option value="BJMP Rodriguez District Jail">BJMP Rodriguez District Jail</option>
+                                    <option value="BJMP Rizal District Jail">BJMP Rizal District Jail</option>
+                                    <option value="Other">Other</option>
+                                </select>
+                            </div>
+                            <div id="detentionFacilityOtherWrapper" class="d-none">
+                                <label class="top-label" for="detentionFacilityOther">Other Facility Name <span class="required-asterisk">*</span></label>
+                                <input type="text" class="form-control" id="detentionFacilityOther" name="detention_facility_other">
+                            </div>
+                        </div>
+                        <input type="hidden" name="cohabitation_children_count" value="0">
+                        <?php endif; ?>
+
+                        <?php if (!$isRelationshipJailVisitVariant): ?>
                         <h2 class="section-title text-center text-dark">Cohabitation Address</h2>
                         <div class="form-row">
                             <div class="full-width">
@@ -390,7 +620,7 @@ $applicantArea = htmlspecialchars($areaNumber, ENT_QUOTES, 'UTF-8');
                                 </div>
                             </div>
                         </div>
-  
+
 
                             <div id="cohabitationFullAddressWrapper" class="form-row d-none">
                                 <div class="full-width">
@@ -414,21 +644,6 @@ $applicantArea = htmlspecialchars($areaNumber, ENT_QUOTES, 'UTF-8');
                                     <option value="house">House Numbering System</option>
                                     <option value="lot_block">Lot/Block System</option>
                                 </select>
-                            </div>
-                        </div>
-
-                        <div id="cohabitationLocalityRow" class="form-row pt-0 d-none">
-                            <div>
-                                <label class="top-label" for="cohabitationBarangayFixed">Barangay</label>
-                                <input type="text" class="form-control text-bg-light" id="cohabitationBarangayFixed" name="cohabitation_barangay" readonly value="<?php echo htmlspecialchars($applicantBarangay, ENT_QUOTES, 'UTF-8'); ?>">
-                            </div>
-                            <div>
-                                <label class="top-label" for="cohabitationMunicipalityFixed">Municipality</label>
-                                <input type="text" class="form-control text-bg-light" id="cohabitationMunicipalityFixed" name="cohabitation_municipality" readonly value="<?php echo htmlspecialchars($applicantMunicipality, ENT_QUOTES, 'UTF-8'); ?>">
-                            </div>
-                            <div>
-                                <label class="top-label" for="cohabitationProvinceFixed">Province</label>
-                                <input type="text" class="form-control text-bg-light" id="cohabitationProvinceFixed" name="cohabitation_province" readonly value="<?php echo htmlspecialchars($applicantProvince, ENT_QUOTES, 'UTF-8'); ?>">
                             </div>
                         </div>
 
@@ -467,6 +682,21 @@ $applicantArea = htmlspecialchars($areaNumber, ENT_QUOTES, 'UTF-8');
                                         </select>
                                     </div>
                                 </div>
+                            </div>
+                        </div>
+
+                        <div id="cohabitationLocalityRow" class="form-row pt-0 d-none">
+                            <div>
+                                <label class="top-label" for="cohabitationBarangayFixed">Barangay</label>
+                                <input type="text" class="form-control text-bg-light" id="cohabitationBarangayFixed" name="cohabitation_barangay" readonly value="<?php echo htmlspecialchars($applicantBarangay, ENT_QUOTES, 'UTF-8'); ?>">
+                            </div>
+                            <div>
+                                <label class="top-label" for="cohabitationMunicipalityFixed">Municipality</label>
+                                <input type="text" class="form-control text-bg-light" id="cohabitationMunicipalityFixed" name="cohabitation_municipality" readonly value="<?php echo htmlspecialchars($applicantMunicipality, ENT_QUOTES, 'UTF-8'); ?>">
+                            </div>
+                            <div>
+                                <label class="top-label" for="cohabitationProvinceFixed">Province</label>
+                                <input type="text" class="form-control text-bg-light" id="cohabitationProvinceFixed" name="cohabitation_province" readonly value="<?php echo htmlspecialchars($applicantProvince, ENT_QUOTES, 'UTF-8'); ?>">
                             </div>
                         </div>
 
@@ -511,75 +741,78 @@ $applicantArea = htmlspecialchars($areaNumber, ENT_QUOTES, 'UTF-8');
                                 </div>
                             </div>
                         </div>
+                        <?php endif; ?>
 
-                        <h2 class="section-title text-center text-dark">Other Cohabitation Details</h2>
-                        <div class="form-row">
-                            <div class="full-width">
-                                <label class="top-label" for="cohabitationChildrenCount">Do They Have Children? <span class="required-asterisk">*</span></label>
-                                <select class="form-select" id="cohabitationChildrenCount" name="cohabitation_children_count" required>
-                                    <option value="">Select</option>
-                                    <option value="0">None</option>
-                                    <option value="1">1 Child</option>
-                                    <option value="2">2 Children</option>
-                                    <option value="3">3 Children</option>
-                                    <option value="4">4 Children</option>
-                                    <option value="5">5 Children</option>
-                                </select>
+                        <?php if (!$isRelationshipJailVisitVariant): ?>
+                            <h2 class="section-title text-center text-dark">Other Cohabitation Details</h2>
+                            <div class="form-row">
+                                <div class="full-width">
+                                    <label class="top-label" for="cohabitationChildrenCount">Do They Have Children? <span class="required-asterisk">*</span></label>
+                                    <select class="form-select" id="cohabitationChildrenCount" name="cohabitation_children_count" required>
+                                        <option value="">Select</option>
+                                        <option value="0">None</option>
+                                        <option value="1">1 Child</option>
+                                        <option value="2">2 Children</option>
+                                        <option value="3">3 Children</option>
+                                        <option value="4">4 Children</option>
+                                        <option value="5">5 Children</option>
+                                    </select>
+                                </div>
                             </div>
-                        </div>
 
-                        <div id="cohabitationChildFields">
-                            <div class="form-row two-col-row d-none" data-child-row="1">
-                                <div>
-                                    <label class="top-label" for="cohabitationChild1Name">Child 1 Name <span class="required-asterisk">*</span></label>
-                                    <input type="text" class="form-control" id="cohabitationChild1Name" name="cohabitation_child_1_name">
+                            <div id="cohabitationChildFields">
+                                <div class="form-row two-col-row d-none" data-child-row="1">
+                                    <div>
+                                        <label class="top-label" for="cohabitationChild1Name">Child 1 Name <span class="required-asterisk">*</span></label>
+                                        <input type="text" class="form-control" id="cohabitationChild1Name" name="cohabitation_child_1_name">
+                                    </div>
+                                    <div>
+                                        <label class="top-label" for="cohabitationChild1Age">Child 1 Age <span class="required-asterisk">*</span></label>
+                                        <input type="number" min="0" class="form-control" id="cohabitationChild1Age" name="cohabitation_child_1_age">
+                                    </div>
                                 </div>
-                                <div>
-                                    <label class="top-label" for="cohabitationChild1Age">Child 1 Age <span class="required-asterisk">*</span></label>
-                                    <input type="number" min="0" class="form-control" id="cohabitationChild1Age" name="cohabitation_child_1_age">
+                                <div class="form-row two-col-row d-none" data-child-row="2">
+                                    <div>
+                                        <label class="top-label" for="cohabitationChild2Name">Child 2 Name <span class="required-asterisk">*</span></label>
+                                        <input type="text" class="form-control" id="cohabitationChild2Name" name="cohabitation_child_2_name">
+                                    </div>
+                                    <div>
+                                        <label class="top-label" for="cohabitationChild2Age">Child 2 Age <span class="required-asterisk">*</span></label>
+                                        <input type="number" min="0" class="form-control" id="cohabitationChild2Age" name="cohabitation_child_2_age">
+                                    </div>
+                                </div>
+                                <div class="form-row two-col-row d-none" data-child-row="3">
+                                    <div>
+                                        <label class="top-label" for="cohabitationChild3Name">Child 3 Name <span class="required-asterisk">*</span></label>
+                                        <input type="text" class="form-control" id="cohabitationChild3Name" name="cohabitation_child_3_name">
+                                    </div>
+                                    <div>
+                                        <label class="top-label" for="cohabitationChild3Age">Child 3 Age <span class="required-asterisk">*</span></label>
+                                        <input type="number" min="0" class="form-control" id="cohabitationChild3Age" name="cohabitation_child_3_age">
+                                    </div>
+                                </div>
+                                <div class="form-row two-col-row d-none" data-child-row="4">
+                                    <div>
+                                        <label class="top-label" for="cohabitationChild4Name">Child 4 Name <span class="required-asterisk">*</span></label>
+                                        <input type="text" class="form-control" id="cohabitationChild4Name" name="cohabitation_child_4_name">
+                                    </div>
+                                    <div>
+                                        <label class="top-label" for="cohabitationChild4Age">Child 4 Age <span class="required-asterisk">*</span></label>
+                                        <input type="number" min="0" class="form-control" id="cohabitationChild4Age" name="cohabitation_child_4_age">
+                                    </div>
+                                </div>
+                                <div class="form-row two-col-row d-none" data-child-row="5">
+                                    <div>
+                                        <label class="top-label" for="cohabitationChild5Name">Child 5 Name <span class="required-asterisk">*</span></label>
+                                        <input type="text" class="form-control" id="cohabitationChild5Name" name="cohabitation_child_5_name">
+                                    </div>
+                                    <div>
+                                        <label class="top-label" for="cohabitationChild5Age">Child 5 Age <span class="required-asterisk">*</span></label>
+                                        <input type="number" min="0" class="form-control" id="cohabitationChild5Age" name="cohabitation_child_5_age">
+                                    </div>
                                 </div>
                             </div>
-                            <div class="form-row two-col-row d-none" data-child-row="2">
-                                <div>
-                                    <label class="top-label" for="cohabitationChild2Name">Child 2 Name <span class="required-asterisk">*</span></label>
-                                    <input type="text" class="form-control" id="cohabitationChild2Name" name="cohabitation_child_2_name">
-                                </div>
-                                <div>
-                                    <label class="top-label" for="cohabitationChild2Age">Child 2 Age <span class="required-asterisk">*</span></label>
-                                    <input type="number" min="0" class="form-control" id="cohabitationChild2Age" name="cohabitation_child_2_age">
-                                </div>
-                            </div>
-                            <div class="form-row two-col-row d-none" data-child-row="3">
-                                <div>
-                                    <label class="top-label" for="cohabitationChild3Name">Child 3 Name <span class="required-asterisk">*</span></label>
-                                    <input type="text" class="form-control" id="cohabitationChild3Name" name="cohabitation_child_3_name">
-                                </div>
-                                <div>
-                                    <label class="top-label" for="cohabitationChild3Age">Child 3 Age <span class="required-asterisk">*</span></label>
-                                    <input type="number" min="0" class="form-control" id="cohabitationChild3Age" name="cohabitation_child_3_age">
-                                </div>
-                            </div>
-                            <div class="form-row two-col-row d-none" data-child-row="4">
-                                <div>
-                                    <label class="top-label" for="cohabitationChild4Name">Child 4 Name <span class="required-asterisk">*</span></label>
-                                    <input type="text" class="form-control" id="cohabitationChild4Name" name="cohabitation_child_4_name">
-                                </div>
-                                <div>
-                                    <label class="top-label" for="cohabitationChild4Age">Child 4 Age <span class="required-asterisk">*</span></label>
-                                    <input type="number" min="0" class="form-control" id="cohabitationChild4Age" name="cohabitation_child_4_age">
-                                </div>
-                            </div>
-                            <div class="form-row two-col-row d-none" data-child-row="5">
-                                <div>
-                                    <label class="top-label" for="cohabitationChild5Name">Child 5 Name <span class="required-asterisk">*</span></label>
-                                    <input type="text" class="form-control" id="cohabitationChild5Name" name="cohabitation_child_5_name">
-                                </div>
-                                <div>
-                                    <label class="top-label" for="cohabitationChild5Age">Child 5 Age <span class="required-asterisk">*</span></label>
-                                    <input type="number" min="0" class="form-control" id="cohabitationChild5Age" name="cohabitation_child_5_age">
-                                </div>
-                            </div>
-                        </div>
+                        <?php endif; ?>
 
 
 
@@ -605,8 +838,8 @@ $applicantArea = htmlspecialchars($areaNumber, ENT_QUOTES, 'UTF-8');
             <div class="modal-content">
                 <div class="modal-header">
                     <div>
-                        <div class="residency-picker-panel-title">Started Cohabitation On</div>
-                        <p class="residency-picker-panel-note mb-0">Choose the month and year when cohabitation started.</p>
+                        <div class="residency-picker-panel-title"><?= htmlspecialchars($isRelationshipJailVisitVariant ? 'Started Living Together On' : 'Started Cohabitation On', ENT_QUOTES, 'UTF-8') ?></div>
+                        <p class="residency-picker-panel-note mb-0"><?= htmlspecialchars($isRelationshipJailVisitVariant ? 'Choose the month and year when they started living together.' : 'Choose the month and year when cohabitation started.', ENT_QUOTES, 'UTF-8') ?></p>
                     </div>
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
@@ -649,7 +882,7 @@ $applicantArea = htmlspecialchars($areaNumber, ENT_QUOTES, 'UTF-8');
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script src="<?= htmlspecialchars($baseUrl) ?>/JS-Script-Files/Resident-End/dateFieldModal.js"></script>
-    <script src="<?= htmlspecialchars($baseUrl) ?>/JS-Script-Files/Resident-End/Certificates/cohabitationFormScript.js?v=20260308-9"></script>
+    <script src="<?= htmlspecialchars($baseUrl) ?>/JS-Script-Files/Resident-End/Certificates/cohabitationFormScript.js?v=20260311-05"></script>
 </body>
 
 </html>

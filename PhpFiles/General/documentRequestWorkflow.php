@@ -8,6 +8,7 @@ require_once __DIR__ . '/../EmailHandlers/emailSender.php';
 
 const DR_STAGE_SUBMITTED = 'submitted';
 const DR_STAGE_FOR_INTERVIEW = 'for_interview';
+const DR_STAGE_INTERVIEW_FAILED = 'interview_failed';
 const DR_STAGE_FOR_INSPECTION = 'for_inspection';
 const DR_STAGE_INSPECTION_FAILED = 'inspection_failed';
 const DR_STAGE_REJECTED = 'rejected';
@@ -609,6 +610,7 @@ function dr_stage_label(string $stage): string {
     $labels = [
         DR_STAGE_SUBMITTED => 'Pending Verification',
         DR_STAGE_FOR_INTERVIEW => 'For Interview',
+        DR_STAGE_INTERVIEW_FAILED => 'Interview Failed',
         DR_STAGE_FOR_INSPECTION => 'For Inspection',
         DR_STAGE_INSPECTION_FAILED => 'Inspection Failed',
         DR_STAGE_REJECTED => 'Rejected',
@@ -627,6 +629,7 @@ function dr_stage_to_request_status_names(string $stage): array {
     $map = [
         DR_STAGE_SUBMITTED => ['PendingVerification', 'PendingReview'],
         DR_STAGE_FOR_INTERVIEW => ['ForInterview'],
+        DR_STAGE_INTERVIEW_FAILED => ['Rejected'],
         DR_STAGE_FOR_INSPECTION => ['ForInspection'],
         DR_STAGE_INSPECTION_FAILED => ['InspectionFailed'],
         DR_STAGE_REJECTED => ['Rejected'],
@@ -647,6 +650,7 @@ function dr_status_name_to_stage(string $statusName): ?string {
         'pendingverification' => DR_STAGE_SUBMITTED,
         'pendingreview' => DR_STAGE_SUBMITTED,
         'forinterview' => DR_STAGE_FOR_INTERVIEW,
+        'interviewfailed' => DR_STAGE_INTERVIEW_FAILED,
         'forinspection' => DR_STAGE_FOR_INSPECTION,
         'inspectionfailed' => DR_STAGE_INSPECTION_FAILED,
         'rejected' => DR_STAGE_REJECTED,
@@ -837,7 +841,7 @@ function dr_map_stage_to_transaction_status_id(mysqli $conn, string $stage): int
         ?? dr_find_status_id($conn, 'Rejected', [])
         ?? $pending;
 
-    if (in_array($stage, [DR_STAGE_REJECTED, DR_STAGE_PAYMENT_REJECTED, DR_STAGE_INSPECTION_FAILED, DR_STAGE_CANCELLED], true)) {
+    if (in_array($stage, [DR_STAGE_REJECTED, DR_STAGE_INTERVIEW_FAILED, DR_STAGE_PAYMENT_REJECTED, DR_STAGE_INSPECTION_FAILED, DR_STAGE_CANCELLED], true)) {
         return $rejected;
     }
     if ($stage === DR_STAGE_COMPLETED) {
@@ -1403,7 +1407,7 @@ function dr_update_stage(mysqli $conn, string $requestId, string $stage, array $
     }
 
     if (dr_column_exists($conn, 'documentrequesttbl', 'review_timestamp')
-        && in_array($stage, [DR_STAGE_FOR_INTERVIEW, DR_STAGE_FOR_INSPECTION, DR_STAGE_INSPECTION_FAILED, DR_STAGE_REJECTED, DR_STAGE_FOR_PAYMENT, DR_STAGE_PAYMENT_REJECTED, DR_STAGE_CANCELLED, DR_STAGE_READY_FOR_CLAIM, DR_STAGE_COMPLETED], true)) {
+        && in_array($stage, [DR_STAGE_FOR_INTERVIEW, DR_STAGE_INTERVIEW_FAILED, DR_STAGE_FOR_INSPECTION, DR_STAGE_INSPECTION_FAILED, DR_STAGE_REJECTED, DR_STAGE_FOR_PAYMENT, DR_STAGE_PAYMENT_REJECTED, DR_STAGE_CANCELLED, DR_STAGE_READY_FOR_CLAIM, DR_STAGE_COMPLETED], true)) {
         $sets[] = 'review_timestamp = ?';
         $types .= 's';
         $vals[] = dr_now();
