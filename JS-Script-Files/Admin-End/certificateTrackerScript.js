@@ -541,6 +541,15 @@
     return parts.map((part) => String(part || '').trim()).filter(Boolean).join(', ').replace(/\s+/g, ' ').trim();
   }
 
+  function composeBarangayAddress(address, locality = 'BARANGAY SAN JOSE, RODRIGUEZ, RIZAL') {
+    const suffix = String(locality || '').trim();
+    const cleaned = stripAreaFromAddress(String(address || '').trim()).replace(/^[,\s]+|[,\s]+$/g, '');
+    if (!cleaned || cleaned === '-') {
+      return suffix || '-';
+    }
+    return suffix ? `${cleaned}, ${suffix}` : cleaned;
+  }
+
   function buildCohabitantAddress(payload, applicantAddress = '') {
     const direct = firstNonEmpty([
       payload.cohabitant_full_address,
@@ -945,7 +954,9 @@
         ${rows.map((row) => `
           <div class="doc-preview-meta-row">
             <div class="doc-preview-meta-label"><strong>${esc(row.label || '')}</strong></div>
-            <div class="doc-preview-meta-value">${String(row.value || '').trim() || '_____'}</div>
+            <div class="doc-preview-meta-value">${/^[\s_]+$/.test(String(row.value || '').trim() || '_____')
+              ? '<span class="doc-preview-meta-line"></span>'
+              : esc(String(row.value || '').trim() || '_____')}</div>
           </div>
         `).join('')}
       </div>
@@ -1163,6 +1174,7 @@
       cohabitantRelationship: upperText(firstNonEmpty([payload.cohabitant_relationship]), ''),
       cohabitationVariant: String(payload.cohabitation_variant || '').trim().toLowerCase(),
       detentionFacility: upperText(firstNonEmpty([
+        payload._preview_detention_facility,
         payload.detention_facility_other,
         payload.detention_facility
       ]), ''),
@@ -1226,6 +1238,8 @@
     const requestOfficerLine2 = String(state.requestOfficerLine2 || '').trim();
     const requestOfficerLine3 = String(state.requestOfficerLine3 || '').trim();
     const safe = (value, fallback = '-') => (String(value || '').trim() || fallback);
+    const fullAddressWithBarangay = composeBarangayAddress(fullAddress);
+    const applicantAddressWithBarangay = composeBarangayAddress(applicantResidenceAddress || fullAddress);
     const cohabitationHasChildren = isCohabitation && cohabitationChildrenCount > 0;
 
     const residencyRows = `
@@ -1280,7 +1294,7 @@
         <p><strong>TO WHOM IT MAY CONCERN:</strong></p>
         <p>
           This is to certify <strong>${esc(safe(fullName, '${FULL_NAME}'))}</strong>, resident of
-          <strong>${esc(safe(fullAddress, '${ADDRESS}'))} BARANGAY SAN JOSE, RODRIGUEZ, RIZAL</strong>
+          <strong>${esc(safe(fullAddressWithBarangay, '${ADDRESS}'))}</strong>
           is personally known to be as a person of <strong>GOOD MORAL CHARACTER, PEACEFUL and LAW-ABIDING CITIZEN of THE COMMUNITY.</strong>
         </p>
         <p>
@@ -1297,13 +1311,13 @@
         <p class="doc-preview-jail-lead"><strong>TO WHOM IT MAY CONCERN:</strong></p>
         <p class="doc-preview-jail-center">
           This is to certify <strong>${esc(safe(fullName, '${NAME}'))}</strong>, resident of
-          <strong>${esc(safe(applicantResidenceAddress, '${ADDRESS}'))}</strong> BARANGAY SAN JOSE, RODRIGUEZ, RIZAL
+          <strong>${esc(safe(applicantAddressWithBarangay, '${ADDRESS}'))}</strong>
           is personally known to be as a person of <strong>GOOD MORAL CHARACTER, PEACEFUL and LAW-ABIDING CITIZEN of THE COMMUNITY.</strong>
         </p>
         <p class="doc-preview-jail-center">
           Moreover, this certifies that the subject person is the <strong>${esc(safe(cohabitantRelationship, '${RELATIONSHIP}'))}</strong>
           of DETAINED <strong>${esc(safe(cohabitantName, '${DETAINEE_NAME}'))}</strong> and presently at the
-          <strong>${esc(safe(detentionFacility, '${PRISON}'))}</strong>.
+          <strong>${previewEditable('detentionFacility', safe(detentionFacility, '${PRISON}'), '${PRISON}')}</strong>.
         </p>
         <p class="doc-preview-jail-center doc-preview-jail-ordinance">
           This certification is being issued pursuant to Barangay Revenue Code ORDINANCE NO. 11 – 2019.
@@ -1393,7 +1407,7 @@
         <p><strong>TO WHOM IT MAY CONCERN:</strong></p>
         <p>
           This is to certify <strong>${esc(safe(applicantHonorificText, 'MR./MS.'))} ${esc(safe(fullName, '${NAME}'))}</strong>,
-          resident of <strong>${esc(safe(fullAddress, '${ADDRESS}'))}, BARANGAY SAN JOSE, RODRIGUEZ, RIZAL</strong>
+          resident of <strong>${esc(safe(fullAddressWithBarangay, '${ADDRESS}'))}</strong>
           since <strong>${esc(safe(residencySinceText, '${RESIDENCY_SINCE}'))}</strong> is a qualified availlee of RA 11261
           or the First Time Jobseekers Act 2019.
         </p>
@@ -1427,9 +1441,20 @@
         ? `doc-preview-paper doc-preview-paper--goodmoral${(isCohabitation && cohabitationHasChildren) ? ' doc-preview-paper--cohabitation-children' : ''}${isFirstTimeJobSeeker ? ' doc-preview-paper--ftjs' : ''}${isRelationshipJailVisit ? ' doc-preview-paper--jail' : ''}`
         : 'doc-preview-paper');
 
+    const qrBlockHtml = qrUrl !== ''
+      ? `
+          <div class="doc-preview-qr">
+            <div class="doc-preview-qr-box">
+              <img src="${esc(qrUrl)}" alt="QR Code">
+            </div>
+            QR
+          </div>
+        `
+      : '';
+    const footerAreaClass = `doc-preview-footer-area${isFirstTimeJobSeeker ? ' doc-preview-footer-area--ftjs' : ''}${qrBlockHtml ? '' : ' doc-preview-footer-area--noqr'}`;
     const footerAreaHtml = isFirstTimeJobSeeker
       ? `
-          <div class="doc-preview-footer-area doc-preview-footer-area--ftjs">
+          <div class="${footerAreaClass}">
             <div></div>
             <div class="doc-preview-ftjs-signing">
               <div class="doc-preview-signature doc-preview-signature--ftjs">
@@ -1444,32 +1469,22 @@
               </div>
               <div class="doc-preview-ftjs-date"><span>${esc(signedDateText)}</span></div>
             </div>
-            <div class="doc-preview-qr">
-              <div class="doc-preview-qr-box">
-                ${qrUrl !== '' ? `<img src="${esc(qrUrl)}" alt="QR Code">` : '<span>QR</span>'}
-              </div>
-              QR
-            </div>
+            ${qrBlockHtml}
           </div>
         `
       : `
-          <div class="doc-preview-footer-area">
+          <div class="${footerAreaClass}">
             <div class="doc-preview-issuedby">Issued by: <strong>MINERVA D. QUITA</strong><br><em>Barangay Secretary</em></div>
             <div class="doc-preview-signature">
               <div class="name">${esc(String(state.approvedByName || 'HON. GLENN S. EVANGELISTA').trim() || 'HON. GLENN S. EVANGELISTA')}</div>
               <div>Punong Barangay</div>
             </div>
-            <div class="doc-preview-qr">
-              <div class="doc-preview-qr-box">
-                ${qrUrl !== '' ? `<img src="${esc(qrUrl)}" alt="QR Code">` : '<span>QR</span>'}
-              </div>
-              QR
-            </div>
+            ${qrBlockHtml}
           </div>
         `;
     const footerNoteHtml = isFirstTimeJobSeeker
       ? 'This certification is only valid for 1 year from the issuance.<br>Check the qr code to verify the authenticity of this document.'
-      : 'This certificate is valid for Forty-five (45) days from the date of issue, check the<br>QR code to verify the authenticity of this document.';
+      : 'This certificate is valid for Forty-five (45) days from the date of issue,<br>check the QR code to verify the authenticity of this document.';
 
     return `
       <div class="doc-preview-stage">
@@ -2314,13 +2329,18 @@
     return item;
   }
 
+  function rowHasModalDetails(row) {
+    if (!row || typeof row !== 'object') return false;
+    const payloadReady = row.payload && typeof row.payload === 'object' && Object.keys(row.payload).length > 0;
+    const profileReady = row.resident_profile && typeof row.resident_profile === 'object' && Object.keys(row.resident_profile).length > 0;
+    return payloadReady || profileReady;
+  }
+
   async function ensureRowDetails(row) {
     if (!row || typeof row !== 'object') return row;
     const id = String(row.request_id || '').trim();
     if (!id) return row;
-    const payloadReady = row.payload && typeof row.payload === 'object' && Object.keys(row.payload).length > 0;
-    const profileReady = row.resident_profile && typeof row.resident_profile === 'object' && Object.keys(row.resident_profile).length > 0;
-    if (payloadReady || profileReady) {
+    if (rowHasModalDetails(row)) {
       return row;
     }
     try {
@@ -2664,35 +2684,38 @@
         const id = String(btn.getAttribute('data-view-id') || '');
         let row = itemById.get(id);
         if (!row || !viewDetailsBody || !viewModal) return;
+        try {
+          // Open modal immediately, then hydrate heavy details asynchronously.
+          switchViewMode('details');
+          if (viewModalTitle) {
+            const requestId = String(row.request_id || '').trim();
+            viewModalTitle.textContent = requestId
+              ? (isFinancePaymentsPage ? `Payment Transaction (#${requestId})` : `Certificate Request (#${requestId})`)
+              : (isFinancePaymentsPage ? 'Payment Transaction' : 'Certificate Request');
+          }
+          if (viewModalActions) {
+            viewModalActions.innerHTML = '';
+          }
+          if (viewModalNextBtn) {
+            viewModalNextBtn.classList.add('d-none');
+          }
+          if (viewModalBackBtn) {
+            viewModalBackBtn.classList.add('d-none');
+          }
+          if (viewModalWalkInBtn) {
+            viewModalWalkInBtn.classList.add('d-none');
+            viewModalWalkInBtn.removeAttribute('data-id');
+          }
+          const openImmediately = isFinancePaymentsPage || !rowHasModalDetails(row);
+          if (openImmediately) {
+            viewDetailsBody.innerHTML = renderQuickRequestSummary(row);
+            viewModal.show();
+          }
 
-        // Open modal immediately, then hydrate heavy details asynchronously.
-        switchViewMode('details');
-        if (viewModalTitle) {
-          const requestId = String(row.request_id || '').trim();
-          viewModalTitle.textContent = requestId
-            ? (isFinancePaymentsPage ? `Payment Transaction (#${requestId})` : `Certificate Request (#${requestId})`)
-            : (isFinancePaymentsPage ? 'Payment Transaction' : 'Certificate Request');
-        }
-        if (viewModalActions) {
-          viewModalActions.innerHTML = '';
-        }
-        if (viewModalNextBtn) {
-          viewModalNextBtn.classList.add('d-none');
-        }
-        if (viewModalBackBtn) {
-          viewModalBackBtn.classList.add('d-none');
-        }
-        if (viewModalWalkInBtn) {
-          viewModalWalkInBtn.classList.add('d-none');
-          viewModalWalkInBtn.removeAttribute('data-id');
-        }
-        viewDetailsBody.innerHTML = renderQuickRequestSummary(row);
-        viewModal.show();
+          row = await ensureRowDetails(row);
+          if (!row) return;
 
-        row = await ensureRowDetails(row);
-        if (!row) return;
-
-        if (isFinancePaymentsPage) {
+          if (isFinancePaymentsPage) {
           const payload = row.payload && typeof row.payload === 'object' ? row.payload : {};
           const residentProfile = row.resident_profile && typeof row.resident_profile === 'object'
             ? row.resident_profile
@@ -2842,38 +2865,40 @@
               }
             });
           });
-          viewModal.show();
-          return;
-        }
+            viewModal.show();
+            return;
+          }
 
-        const payload = row.payload && typeof row.payload === 'object' ? row.payload : {};
-        const residentProfile = row.resident_profile && typeof row.resident_profile === 'object'
-          ? row.resident_profile
-          : {};
-        const consumedKeys = new Set();
-        const collectFirst = (...keys) => {
-          for (const key of keys) {
-            if (!key) continue;
-            const value = payload[key];
-            if (value === null || value === undefined) continue;
-            const text = String(value).trim();
-            if (text === '') continue;
-            consumedKeys.add(String(key));
-            return text;
-          }
-          return '';
-        };
-        const collectResidentFirst = (...keys) => {
-          for (const key of keys) {
-            if (!key) continue;
-            const value = residentProfile[key];
-            if (value === null || value === undefined) continue;
-            const text = String(value).trim();
-            if (text === '') continue;
-            return text;
-          }
-          return '';
-        };
+          const payload = row.payload && typeof row.payload === 'object' ? row.payload : {};
+          const residentProfile = row.resident_profile && typeof row.resident_profile === 'object'
+            ? row.resident_profile
+            : {};
+          const isRelationshipJailVisit = String(payload?.cohabitation_variant || '').trim() === 'relationship_jail_visit'
+            || String(payload?.cohabitation_variant || '').trim() === 'conjugal_visit';
+          const consumedKeys = new Set();
+          const collectFirst = (...keys) => {
+            for (const key of keys) {
+              if (!key) continue;
+              const value = payload[key];
+              if (value === null || value === undefined) continue;
+              const text = String(value).trim();
+              if (text === '') continue;
+              consumedKeys.add(String(key));
+              return text;
+            }
+            return '';
+          };
+          const collectResidentFirst = (...keys) => {
+            for (const key of keys) {
+              if (!key) continue;
+              const value = residentProfile[key];
+              if (value === null || value === undefined) continue;
+              const text = String(value).trim();
+              if (text === '') continue;
+              return text;
+            }
+            return '';
+          };
 
         const personalFields = [
           { label: 'Last Name', value: firstNonEmpty([collectFirst('last_name', 'lastname'), collectResidentFirst('last_name')]) },
@@ -3187,11 +3212,18 @@
             );
           });
         });
-        if (openViewDirectPreview) {
-          switchViewMode('preview');
-          openViewDirectPreview = false;
+          if (openViewDirectPreview) {
+            switchViewMode('preview');
+            openViewDirectPreview = false;
+          }
+          viewModal.show();
+        } catch (err) {
+          const message = String(err?.message || err || 'Failed to load request details.');
+          viewDetailsHtml = `<div class="tracker-form-section"><div class="text-danger">${esc(message)}</div></div>`;
+          switchViewMode('details');
+          viewModal.show();
+          console.error('Failed to open request view modal:', err);
         }
-        viewModal.show();
       });
     });
 

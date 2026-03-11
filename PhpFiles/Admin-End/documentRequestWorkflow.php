@@ -802,6 +802,16 @@ function dra_strip_area_from_address(string $address): string {
     return $value;
 }
 
+function dra_compose_barangay_address(string $address, string $locality = 'Barangay San Jose, Rodriguez, Rizal'): string {
+    $suffix = trim($locality);
+    $clean = dra_strip_area_from_address($address);
+    $clean = trim((string)(preg_replace('/\s+/u', ' ', $clean) ?? $clean), " \t\n\r\0\x0B,");
+    if ($clean === '' || $clean === '-') {
+        return $suffix !== '' ? $suffix : '-';
+    }
+    return $suffix !== '' ? ($clean . ', ' . $suffix) : $clean;
+}
+
 function dra_join_address_parts(array $parts): string {
     $clean = [];
     foreach ($parts as $part) {
@@ -992,6 +1002,7 @@ function dra_apply_preview_edits(mysqli $conn, string $requestId, array &$reques
     $fullName = trim((string)($edited['fullName'] ?? ''));
     $cohabitantName = trim((string)($edited['cohabitantName'] ?? ''));
     $cohabitantRelationship = trim((string)($edited['cohabitantRelationship'] ?? ''));
+    $detentionFacility = trim((string)($edited['detentionFacility'] ?? ''));
     $cohabitationDuration = trim((string)($edited['cohabitationDuration'] ?? ''));
     $cohabitationStartDate = trim((string)($edited['cohabitationStartDate'] ?? ''));
 
@@ -1037,6 +1048,9 @@ function dra_apply_preview_edits(mysqli $conn, string $requestId, array &$reques
     if ($cohabitantRelationship !== '') {
         $payload['cohabitant_relationship'] = $cohabitantRelationship;
     }
+    if ($detentionFacility !== '') {
+        $payload['_preview_detention_facility'] = $detentionFacility;
+    }
     if ($cohabitationDuration !== '') {
         $payload['cohabitation_duration'] = $cohabitationDuration;
     }
@@ -1081,6 +1095,7 @@ function dra_overlay_preview_edits(array &$requestRow, array $edited): void {
     $motherName = trim((string)($edited['motherName'] ?? ''));
     $cohabitantName = trim((string)($edited['cohabitantName'] ?? ''));
     $cohabitantRelationship = trim((string)($edited['cohabitantRelationship'] ?? ''));
+    $detentionFacility = trim((string)($edited['detentionFacility'] ?? ''));
     $cohabitationDuration = trim((string)($edited['cohabitationDuration'] ?? ''));
     $cohabitationStartDate = trim((string)($edited['cohabitationStartDate'] ?? ''));
     $educationalAttainment = trim((string)($edited['educationalAttainment'] ?? ''));
@@ -1148,6 +1163,9 @@ function dra_overlay_preview_edits(array &$requestRow, array $edited): void {
     if ($cohabitantRelationship !== '') {
         $payload['cohabitant_relationship'] = $cohabitantRelationship;
     }
+    if ($detentionFacility !== '') {
+        $payload['_preview_detention_facility'] = $detentionFacility;
+    }
     if ($cohabitationDuration !== '') {
         $payload['cohabitation_duration'] = $cohabitationDuration;
     }
@@ -1214,6 +1232,7 @@ function dra_generate_issued_document(array $requestRow): ?string {
         $applicantResidenceAddress = 'Barangay San Jose, Rodriguez, Rizal';
     }
     $applicantResidenceAddress = $stripTemplateTokens($applicantResidenceAddress);
+    $applicantAddressWithBarangay = dra_compose_barangay_address($applicantResidenceAddress);
     $cohabitantResidenceAddress = $stripTemplateTokens(dra_build_cohabitant_address($payload, $applicantResidenceAddress));
     $cohabitationResidenceAddress = $stripTemplateTokens(dra_build_cohabitation_address($payload, $applicantResidenceAddress));
     $address = trim((string)($payload['full_address'] ?? 'Barangay San Jose, Rodriguez, Rizal'));
@@ -1222,6 +1241,7 @@ function dra_generate_issued_document(array $requestRow): ?string {
         $address = 'Barangay San Jose, Rodriguez, Rizal';
     }
     $address = $stripTemplateTokens($address);
+    $addressWithBarangay = dra_compose_barangay_address($address);
     $certNo = trim((string)($requestRow['certificate_number'] ?? ''));
     $orNo = trim((string)($requestRow['or_number'] ?? ''));
     if ($orNo !== '') {
@@ -1687,7 +1707,7 @@ function dra_generate_issued_document(array $requestRow): ?string {
         return null;
     }
 
-    $renderRevisionTag = 'r20260311a';
+    $renderRevisionTag = 'r20260311e';
     $fileName = 'issued_' . preg_replace('/[^A-Za-z0-9_-]/', '', $requestId) . '_' . $renderRevisionTag . '_' . date('YmdHis') . '.pdf';
     $diskPath = $outDir . '/' . $fileName;
 
@@ -1707,86 +1727,84 @@ function dra_generate_issued_document(array $requestRow): ?string {
                 }
             }
         }
-        if (!class_exists('\\setasign\\Fpdi\\Fpdi')) {
-            return null;
-        }
-
         $templatePath = $baseDir . '/Resident-End/Certificates/DocumentIssuance/CertificateForJailVisitation.pdf';
-        if (!is_file($templatePath)) {
-            return null;
+        if (class_exists('\\setasign\\Fpdi\\Fpdi') && is_file($templatePath)) {
+            try {
+                $detainedRelationship = $stripTemplateTokens((string)($payload['cohabitant_relationship'] ?? ''));
+                $detainedName = $stripTemplateTokens((string)($payload['cohabitant_full_name'] ?? ''));
+                if ($detainedName === '') {
+                    $detainedName = trim(implode(' ', array_filter([
+                        $stripTemplateTokens((string)($payload['cohabitant_first'] ?? '')),
+                        $stripTemplateTokens((string)($payload['cohabitant_middle'] ?? '')) !== ''
+                            ? strtoupper(substr($stripTemplateTokens((string)($payload['cohabitant_middle'] ?? '')), 0, 1)) . '.'
+                            : '',
+                        $stripTemplateTokens((string)($payload['cohabitant_last'] ?? '')),
+                        $stripTemplateTokens((string)($payload['cohabitant_suffix'] ?? '')),
+                    ], static fn($v) => trim((string)$v) !== '')));
+                }
+                $detentionFacility = $stripTemplateTokens((string)($payload['_preview_detention_facility'] ?? $payload['detention_facility'] ?? ''));
+                if (strcasecmp($detentionFacility, 'Other') === 0) {
+                    $detentionFacility = $stripTemplateTokens((string)($payload['detention_facility_other'] ?? ''));
+                }
+
+                $pdf = new \setasign\Fpdi\Fpdi();
+                $pageCount = $pdf->setSourceFile($templatePath);
+                if ($pageCount <= 0) {
+                    throw new RuntimeException('Template PDF has no readable pages.');
+                }
+                $tpl = $pdf->importPage(1);
+                $size = $pdf->getTemplateSize($tpl);
+                $pageWidth = (float)($size['width'] ?? 216.0);
+                $pageHeight = (float)($size['height'] ?? 279.0);
+                $orientation = $pageWidth > $pageHeight ? 'L' : 'P';
+                $pdf->AddPage($orientation, [$pageWidth, $pageHeight]);
+                $pdf->useTemplate($tpl);
+                $pdf->SetAutoPageBreak(false);
+
+                $pdf->SetFillColor(255, 255, 255);
+                $pdf->Rect(18.0, 70.0, 180.0, 30.0, 'F');
+                $pdf->Rect(30.0, 101.0, 154.0, 8.0, 'F');
+                $pdf->Rect(18.0, 112.0, 180.0, 14.0, 'F');
+
+                $pdf->SetTextColor(0, 0, 0);
+                $pdf->SetFont('Arial', '', 9.5);
+                $pdf->SetXY(28.0, 73.0);
+                $pdf->MultiCell(
+                    160.0,
+                    4.8,
+                    '      This is to certify ' . ($fullName !== '' ? $fullName : '-') . ', resident of ' . ($applicantResidenceAddress !== '' ? $applicantResidenceAddress : '-') . ' is personally known to be as a person of GOOD MORAL CHARACTER, PEACEFUL and LAW-ABIDING CITIZEN of THE COMMUNITY.',
+                    0,
+                    'J'
+                );
+
+                $pdf->SetXY(31.0, 101.5);
+                $pdf->MultiCell(
+                    152.0,
+                    4.8,
+                    '      Moreover, this certifies that the subject person is the ' . ($detainedRelationship !== '' ? strtoupper($detainedRelationship) : '-') . ' of DETAINED ' . ($detainedName !== '' ? strtoupper($detainedName) : '-') . ' and presently at the ' . ($detentionFacility !== '' ? strtoupper($detentionFacility) : '-') . '.',
+                    0,
+                    'J'
+                );
+
+                $pdf->SetXY(28.0, 114.5);
+                $pdf->MultiCell(
+                    160.0,
+                    4.8,
+                    '      Issued this ' . $issuedAsDocx . ' at the office of the Punong Barangay, Barangay San Jose, Montalban, Rizal.',
+                    0,
+                    'L'
+                );
+
+                if (is_file($qrDiskPath)) {
+                    $pdf->Image($qrDiskPath, 186.0, 252.0, 20.0, 20.0);
+                }
+
+                $pdf->Output('F', $diskPath);
+                return '/UnifiedFileAttachment/IssuedDocuments/Generated/' . $fileName;
+            } catch (Throwable $e) {
+                error_log('[dra_generate_issued_document][jail_fpdi_fallback] ' . $e->getMessage());
+            }
         }
-
-        $detainedRelationship = $stripTemplateTokens((string)($payload['cohabitant_relationship'] ?? ''));
-        $detainedName = $stripTemplateTokens((string)($payload['cohabitant_full_name'] ?? ''));
-        if ($detainedName === '') {
-            $detainedName = trim(implode(' ', array_filter([
-                $stripTemplateTokens((string)($payload['cohabitant_first'] ?? '')),
-                $stripTemplateTokens((string)($payload['cohabitant_middle'] ?? '')) !== ''
-                    ? strtoupper(substr($stripTemplateTokens((string)($payload['cohabitant_middle'] ?? '')), 0, 1)) . '.'
-                    : '',
-                $stripTemplateTokens((string)($payload['cohabitant_last'] ?? '')),
-                $stripTemplateTokens((string)($payload['cohabitant_suffix'] ?? '')),
-            ], static fn($v) => trim((string)$v) !== '')));
-        }
-        $detentionFacility = $stripTemplateTokens((string)($payload['detention_facility'] ?? ''));
-        if (strcasecmp($detentionFacility, 'Other') === 0) {
-            $detentionFacility = $stripTemplateTokens((string)($payload['detention_facility_other'] ?? ''));
-        }
-
-        $pdf = new \setasign\Fpdi\Fpdi();
-        $pageCount = $pdf->setSourceFile($templatePath);
-        if ($pageCount <= 0) {
-            return null;
-        }
-        $tpl = $pdf->importPage(1);
-        $size = $pdf->getTemplateSize($tpl);
-        $pageWidth = (float)($size['width'] ?? 216.0);
-        $pageHeight = (float)($size['height'] ?? 279.0);
-        $orientation = $pageWidth > $pageHeight ? 'L' : 'P';
-        $pdf->AddPage($orientation, [$pageWidth, $pageHeight]);
-        $pdf->useTemplate($tpl);
-        $pdf->SetAutoPageBreak(false);
-
-        $pdf->SetFillColor(255, 255, 255);
-        $pdf->Rect(18.0, 70.0, 180.0, 30.0, 'F');
-        $pdf->Rect(30.0, 101.0, 154.0, 8.0, 'F');
-        $pdf->Rect(18.0, 112.0, 180.0, 14.0, 'F');
-
-        $pdf->SetTextColor(0, 0, 0);
-        $pdf->SetFont('Arial', '', 9.5);
-        $pdf->SetXY(24.0, 73.0);
-        $pdf->MultiCell(
-            168.0,
-            4.8,
-            'This is to certify ' . ($fullName !== '' ? $fullName : '-') . ', resident of ' . ($applicantResidenceAddress !== '' ? $applicantResidenceAddress : '-') . ' is personally known to be as a person of GOOD MORAL CHARACTER, PEACEFUL and LAW-ABIDING CITIZEN of THE COMMUNITY.',
-            0,
-            'C'
-        );
-
-        $pdf->SetXY(30.0, 101.5);
-        $pdf->MultiCell(
-            156.0,
-            4.8,
-            'Moreover, this certifies that the subject person is the ' . ($detainedRelationship !== '' ? strtoupper($detainedRelationship) : '-') . ' of DETAINED ' . ($detainedName !== '' ? strtoupper($detainedName) : '-') . ' and presently at the ' . ($detentionFacility !== '' ? strtoupper($detentionFacility) : '-') . '.',
-            0,
-            'C'
-        );
-
-        $pdf->SetXY(23.0, 114.5);
-        $pdf->MultiCell(
-            170.0,
-            4.8,
-            'Issued this ' . $issuedAsDocx . ' at the office of the Punong Barangay, Barangay San Jose, Montalban, Rizal.',
-            0,
-            'C'
-        );
-
-        if (is_file($qrDiskPath)) {
-            $pdf->Image($qrDiskPath, 186.0, 252.0, 20.0, 20.0);
-        }
-
-        $pdf->Output('F', $diskPath);
-        return '/UnifiedFileAttachment/IssuedDocuments/Generated/' . $fileName;
     }
 
     // Use short bond paper (8.5x11) instead of A4.
@@ -1832,6 +1850,12 @@ function dra_generate_issued_document(array $requestRow): ?string {
             $pdf->SetFont($indigencyFont, 'B', 12);
             $pdf->Cell(0, 6, 'CERTIFICATE OF RESIDENCY', 0, 1, 'C');
             $pdf->Ln(4);
+        } elseif ($isRelationshipJailVisit) {
+            $pdf->SetFont($indigencyFont, 'B', 17);
+            $pdf->Cell(0, 7, 'TANGGAPAN NG PUNONG BARANGAY', 0, 1, 'C');
+            $pdf->SetFont($indigencyFont, 'B', 12);
+            $pdf->Cell(0, 6, 'BARANGAY CERTIFICATION', 0, 1, 'C');
+            $pdf->Ln(4);
         } elseif ($isCohabitation) {
             $pdf->SetFont($indigencyFont, 'B', 17);
             $pdf->Cell(0, 7, 'TANGGAPAN NG PUNONG BARANGAY', 0, 1, 'C');
@@ -1872,7 +1896,8 @@ function dra_generate_issued_document(array $requestRow): ?string {
         float $indent,
         string $fontFamily,
         float $fontSize,
-        float $restoreLeftMargin = 18.0
+        float $restoreLeftMargin = 18.0,
+        bool $justify = false
     ) use ($pdf): void {
         $tokens = [];
         foreach ($segments as $segment) {
@@ -1942,10 +1967,29 @@ function dra_generate_issued_document(array $requestRow): ?string {
         foreach ($lines as $lineIndex => $lineTokens) {
             $x = $leftMargin + ($lineIndex === 0 ? $indent : 0.0);
             $pdf->SetXY($x, $y);
+            $targetWidth = $lineIndex === 0 ? $firstLineWidth : $contentWidth;
+            $lineWidthActual = 0.0;
+            $spaceTokenIndexes = [];
+            foreach ($lineTokens as $tokenIndex => $token) {
+                $text = (string)($token['text'] ?? '');
+                $width = $measureToken($token);
+                $lineWidthActual += $width;
+                if (preg_match('/^\s+$/u', $text)) {
+                    $spaceTokenIndexes[] = $tokenIndex;
+                }
+            }
+            $shouldJustify = !empty($justify)
+                && $lineIndex < (count($lines) - 1)
+                && count($spaceTokenIndexes) > 0
+                && $lineWidthActual < $targetWidth;
+            $extraPerSpace = $shouldJustify ? (($targetWidth - $lineWidthActual) / count($spaceTokenIndexes)) : 0.0;
             foreach ($lineTokens as $token) {
                 $text = (string)($token['text'] ?? '');
                 $pdf->SetFont($fontFamily, !empty($token['bold']) ? 'B' : '', $fontSize);
                 $w = $pdf->GetStringWidth($text);
+                if ($shouldJustify && preg_match('/^\s+$/u', $text)) {
+                    $w += $extraPerSpace;
+                }
                 $pdf->Cell($w, $lineHeight, $text, 0, 0, 'L');
             }
             $y += $lineHeight;
@@ -1962,7 +2006,8 @@ function dra_generate_issued_document(array $requestRow): ?string {
         float $indent,
         string $fontFamily,
         float $fontSize,
-        float $restoreLeftMargin = 18.0
+        float $restoreLeftMargin = 18.0,
+        bool $justify = false
     ) use ($writeRichParagraph): void {
         $writeRichParagraph(
             [['text' => $text, 'bold' => false]],
@@ -1971,7 +2016,8 @@ function dra_generate_issued_document(array $requestRow): ?string {
             $indent,
             $fontFamily,
             $fontSize,
-            $restoreLeftMargin
+            $restoreLeftMargin,
+            $justify
         );
     };
     if ($isSpecialCertificate) {
@@ -2056,6 +2102,11 @@ function dra_generate_issued_document(array $requestRow): ?string {
             $cohabitantSuffix = $normalizeTemplateValue((string)($payload['cohabitant_suffix'] ?? ''));
             $cohabitantMi = $cohabitantMiddle !== '' ? strtoupper(substr($cohabitantMiddle, 0, 1)) . '.' : '';
             $cohabitantName = trim(implode(' ', array_filter([$cohabitantFirst, $cohabitantMi, $cohabitantLast, $cohabitantSuffix], static fn($v) => trim((string)$v) !== '')));
+        }
+        $cohabitantRelationshipValue = $normalizeTemplateValue((string)($payload['cohabitant_relationship'] ?? ''));
+        $detentionFacilityValue = $normalizeTemplateValue((string)($payload['_preview_detention_facility'] ?? $payload['detention_facility'] ?? ''));
+        if (strcasecmp($detentionFacilityValue, 'Other') === 0) {
+            $detentionFacilityValue = $normalizeTemplateValue((string)($payload['detention_facility_other'] ?? ''));
         }
         $stripTrailingParenthetical = static function (string $value): string {
             return trim((string)preg_replace('/\s*\([^()]*\)\s*$/', '', trim($value)));
@@ -2401,6 +2452,24 @@ function dra_generate_issued_document(array $requestRow): ?string {
             $row('Remarks', $remarksValue !== '' ? $remarksValue : '-', true);
             $row('Purpose', $requestPurpose !== '' ? $requestPurpose : '-', true);
             $pdf->Ln(4);
+        } elseif ($isRelationshipJailVisit) {
+            $writeRichParagraph(
+                [
+                    ['text' => 'This is to certify ', 'bold' => false],
+                    ['text' => $fullName !== '' ? $fullName : '-', 'bold' => true],
+                    ['text' => ', resident of ', 'bold' => false],
+                    ['text' => $applicantAddressWithBarangay !== '' ? $applicantAddressWithBarangay : 'Barangay San Jose, Rodriguez, Rizal', 'bold' => true],
+                    ['text' => ' is personally known to be as a person of ', 'bold' => false],
+                    ['text' => 'GOOD MORAL CHARACTER, PEACEFUL and LAW-ABIDING CITIZEN of THE COMMUNITY.', 'bold' => true],
+                ],
+                7,
+                18,
+                10,
+                $indigencyFont,
+                12,
+                18.0,
+                true
+            );
         } elseif ($isCohabitation && !$cohabitationHasChildren) {
             $writeRichParagraph(
                 [
@@ -2505,7 +2574,7 @@ function dra_generate_issued_document(array $requestRow): ?string {
                     ['text' => 'This is to certify ', 'bold' => false],
                     ['text' => $firstTimeJobSeekerHonorific . ' ' . ($fullName !== '' ? $fullName : '-'), 'bold' => true],
                     ['text' => ', resident of ', 'bold' => false],
-                    ['text' => ($address !== '' ? $address : '-') . ', BARANGAY SAN JOSE, RODRIGUEZ, RIZAL', 'bold' => true],
+                    ['text' => $addressWithBarangay !== '' ? $addressWithBarangay : 'Barangay San Jose, Rodriguez, Rizal', 'bold' => true],
                     ['text' => ' since ', 'bold' => false],
                     ['text' => $firstTimeJobSeekerResidencySince !== '' ? $firstTimeJobSeekerResidencySince : '-', 'bold' => true],
                     ['text' => ' is a qualified availlee of RA 11261 or the First Time Jobseekers Act 2019.', 'bold' => false],
@@ -2531,8 +2600,7 @@ function dra_generate_issued_document(array $requestRow): ?string {
                     ['text' => 'This is to certify that ', 'bold' => false],
                     ['text' => $fullName, 'bold' => true],
                     ['text' => ', resident of ', 'bold' => false],
-                    ['text' => $address . ' ', 'bold' => true],
-                    ['text' => 'Barangay San Jose, Rodriguez, Rizal', 'bold' => true],
+                    ['text' => $addressWithBarangay !== '' ? $addressWithBarangay : 'Barangay San Jose, Rodriguez, Rizal', 'bold' => true],
                     ['text' => ' is personally known to be as a person of ', 'bold' => false],
                     ['text' => 'GOOD MORAL CHARACTER, PEACEFUL and LAW-ABIDING CITIZEN of THE COMMUNITY.', 'bold' => true],
                 ],
@@ -2567,6 +2635,36 @@ function dra_generate_issued_document(array $requestRow): ?string {
                 10,
                 $indigencyFont,
                 12
+            );
+        } elseif ($isRelationshipJailVisit) {
+            $writeRichParagraph(
+                [
+                    ['text' => 'Moreover, this certifies that the subject person is the ', 'bold' => false],
+                    ['text' => $cohabitantRelationshipValue !== '' ? strtoupper($cohabitantRelationshipValue) : '-', 'bold' => true],
+                    ['text' => ' of DETAINED ', 'bold' => false],
+                    ['text' => $cohabitantName !== '' ? strtoupper($cohabitantName) : '-', 'bold' => true],
+                    ['text' => ' and presently at the ', 'bold' => false],
+                    ['text' => $detentionFacilityValue !== '' ? strtoupper($detentionFacilityValue) : '-', 'bold' => true],
+                    ['text' => '.', 'bold' => false],
+                ],
+                7,
+                18,
+                10,
+                $indigencyFont,
+                12,
+                18.0,
+                true
+            );
+            $pdf->Ln(4);
+            $writeIndentedParagraph(
+                'This certification is being issued pursuant to Barangay Revenue Code ORDINANCE NO. 11 - 2019.',
+                7,
+                18,
+                10,
+                $indigencyFont,
+                12,
+                18.0,
+                true
             );
         } elseif ($isCohabitation && !$cohabitationHasChildren) {
             $writeIndentedParagraph(
@@ -2624,7 +2722,9 @@ function dra_generate_issued_document(array $requestRow): ?string {
             18,
             10,
             $indigencyFont,
-            12
+            12,
+            18.0,
+            $isRelationshipJailVisit
         );
 
         if ($isGoodMoral) {
@@ -2659,6 +2759,33 @@ function dra_generate_issued_document(array $requestRow): ?string {
 
         } elseif ($isResidency) {
             $metaY = 196.0;
+            $labelX = 18.0;
+            $labelW = 34.0;
+            $lineX1 = 52.0;
+            $lineX2 = 70.0;
+            $pdf->SetFont($indigencyFont, 'B', 12);
+            $pdf->SetXY($labelX, $metaY);
+            $pdf->Cell($labelW, 6, 'CTC No.:', 0, 0, 'L');
+            $pdf->Line($lineX1, $metaY + 5, $lineX2, $metaY + 5);
+            $metaY += 7;
+            $pdf->SetXY($labelX, $metaY);
+            $pdf->Cell($labelW, 6, 'Issued at:', 0, 0, 'L');
+            $pdf->Line($lineX1, $metaY + 5, $lineX2, $metaY + 5);
+            $metaY += 7;
+            $pdf->SetXY($labelX, $metaY);
+            $pdf->Cell($labelW, 6, 'Issued On:', 0, 0, 'L');
+            $pdf->Line($lineX1, $metaY + 5, $lineX2, $metaY + 5);
+            $metaY += 7;
+            $pdf->SetXY($labelX, $metaY);
+            $pdf->Cell($labelW, 6, 'OR No.:', 0, 0, 'L');
+            $pdf->Line($lineX1, $metaY + 5, $lineX2, $metaY + 5);
+            if ($orNo !== '') {
+                $pdf->SetXY($lineX1, $metaY);
+                $pdf->SetFont($indigencyFont, '', 11);
+                $pdf->Cell($lineX2 - $lineX1, 6, $orNo, 0, 0, 'L');
+            }
+        } elseif ($isRelationshipJailVisit) {
+            $metaY = min(max($pdf->GetY() + 4.0, 170.0), 186.0);
             $labelX = 18.0;
             $labelW = 34.0;
             $lineX1 = 52.0;
@@ -2880,6 +3007,21 @@ function dra_generate_issued_document(array $requestRow): ?string {
     $pdf->Output('F', $diskPath);
 
     return '/UnifiedFileAttachment/IssuedDocuments/Generated/' . $fileName;
+}
+
+function dra_generate_issued_document_safe(array $requestRow): ?string {
+    $bufferLevel = ob_get_level();
+    ob_start();
+    try {
+        return dra_generate_issued_document($requestRow);
+    } catch (Throwable $e) {
+        error_log('[dra_generate_issued_document_safe] ' . $e->getMessage());
+        return null;
+    } finally {
+        while (ob_get_level() > $bufferLevel) {
+            ob_end_clean();
+        }
+    }
 }
 
 function dra_convert_docx_to_pdf(string $docxDiskPath, string $outDir): ?string {
@@ -3155,22 +3297,6 @@ function dra_finalize_template_pdf(string $pdfDiskPath, ?string $qrDiskPath = nu
     }
 }
 
-function dra_generate_issued_document_safe(array $requestRow): ?string {
-    $bufferLevel = ob_get_level();
-    ob_start();
-    try {
-        $path = dra_generate_issued_document($requestRow);
-    } catch (Throwable $e) {
-        error_log('[dra_generate_issued_document_safe] ' . $e->getMessage());
-        $path = null;
-    } finally {
-        while (ob_get_level() > $bufferLevel) {
-            ob_end_clean();
-        }
-    }
-    return $path;
-}
-
 function dra_issued_document_diagnostics(string $baseDir, array $row): string
 {
     $issues = [];
@@ -3234,7 +3360,7 @@ function dra_backfill_payment_verified_to_ready(mysqli $conn): void {
             }
             $issuedPath = trim((string)($row['issued_file_path'] ?? ''));
             if ($issuedPath === '') {
-                $issuedPath = dra_generate_issued_document($row) ?? '';
+                $issuedPath = dra_generate_issued_document_safe($row) ?? '';
             }
             if ($issuedPath === '') {
                 continue;
@@ -3583,7 +3709,7 @@ if ($action === 'list') {
     if (dr_column_exists($conn, 'documentrequesttbl', 'status_id')) {
         $baseSelects[] = "d.status_id AS status_id";
     }
-    if (!$isFinanceList && !$liteList) {
+    if (!$isFinanceList) {
         if (dr_column_exists($conn, 'documentrequesttbl', 'request_details')) {
             $baseSelects[] = "d.request_details AS request_details";
         } else {
@@ -3677,7 +3803,7 @@ if ($action === 'list') {
         $row['finance_decision_at'] = (string)($row['_tx_finance_decision_at'] ?? '');
         $row['finance_user_id'] = (string)($row['_tx_finance_user_id'] ?? '');
         $txDetails = (string)($row['_tx_transaction_details'] ?? '');
-        if (!$liteList && $txDetails !== '') {
+        if ((!$liteList || !$isFinanceList) && $txDetails !== '') {
             $decoded = json_decode($txDetails, true);
             if (is_array($decoded)) {
                 $ref = trim((string)($decoded['reference'] ?? ''));
@@ -3712,7 +3838,7 @@ if ($action === 'list') {
         $row['stage_label'] = dr_stage_label((string)$row['stage']);
         $row['fee_amount'] = null;
         $row['_doc_type_for_fee'] = trim((string)($row['document_type'] ?? ''));
-        if ($isFinanceList || $liteList) {
+        if ($isFinanceList) {
             // Keep finance list response lean; detailed request payload is not needed on initial list render.
             $row['payload'] = [];
         } else {
@@ -3992,7 +4118,7 @@ if ($action === 'view_issued') {
         ? [DR_STAGE_READY_FOR_CLAIM, DR_STAGE_COMPLETED]
         : [DR_STAGE_PAYMENT_VERIFIED, DR_STAGE_READY_FOR_CLAIM, DR_STAGE_COMPLETED];
     $shouldHaveQr = ($verificationCode !== '' && in_array($stage, $qrEligibleStages, true));
-    $renderRevisionTag = 'r20260311a';
+    $renderRevisionTag = 'r20260311e';
     $issuedBaseName = strtolower(basename((string)$publicPath));
     $isGeneratedIssuedPath = strpos((string)$publicPath, '/UnifiedFileAttachment/IssuedDocuments/Generated/') === 0;
     $isCurrentRenderRevision = ($issuedBaseName !== '' && strpos($issuedBaseName, strtolower($renderRevisionTag)) !== false);
@@ -4097,7 +4223,7 @@ if ($action === 'personnel_approve') {
     }
 
     if ($isFreeDocument && !$isFirstTimeJobSeeker) {
-        $issuedPath = dra_generate_issued_document($updated);
+        $issuedPath = dra_generate_issued_document_safe($updated);
         if (is_string($issuedPath) && trim($issuedPath) !== '') {
             $updated = dr_update_stage($conn, $requestId, (string)($updated['stage'] ?? $nextStage), [
                 'issued_file_path' => (string)$issuedPath,
@@ -4170,7 +4296,7 @@ if ($action === 'interview_pass') {
         $verificationCode = strtoupper(bin2hex(random_bytes(8)));
     }
     $qrCodePath = '/UnifiedFileAttachment/IssuedDocuments/QR/qr_' . preg_replace('/[^A-Za-z0-9_-]/', '', $requestId) . '.png';
-    $issuedPath = dra_generate_issued_document(array_merge((array)$row, [
+    $issuedPath = dra_generate_issued_document_safe(array_merge((array)$row, [
         'verification_code' => $verificationCode,
         'fee_amount' => 0,
     ]));
@@ -4272,7 +4398,7 @@ if ($action === 'finance_verify') {
     $certificateNumber = dr_make_certificate_number($orNumber);
     $verificationCode = strtoupper(bin2hex(random_bytes(8)));
     $qrCodePath = '/UnifiedFileAttachment/IssuedDocuments/QR/qr_' . preg_replace('/[^A-Za-z0-9_-]/', '', $requestId) . '.png';
-    $issuedPath = dra_generate_issued_document(array_merge((array)$row, [
+    $issuedPath = dra_generate_issued_document_safe(array_merge((array)$row, [
         'or_number' => $orNumber,
         'certificate_number' => $certificateNumber,
         'verification_code' => $verificationCode,
@@ -4354,7 +4480,7 @@ if ($action === 'mark_ready') {
     $issuedPath = dra_save_upload($_FILES['issued_file'] ?? [], 'IssuedDocuments');
     if ($issuedPath === null) {
         // Auto-generate issued document when manual upload is not provided.
-        $issuedPath = dra_generate_issued_document(array_merge((array)$row, [
+        $issuedPath = dra_generate_issued_document_safe(array_merge((array)$row, [
             'verification_code' => $verificationCode,
         ]));
     }
