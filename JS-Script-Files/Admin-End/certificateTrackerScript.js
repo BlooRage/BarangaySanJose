@@ -57,6 +57,13 @@
   const paymentProofTitle = document.getElementById('paymentProofTitle');
   const paymentProofReturnBtn = document.getElementById('paymentProofReturnBtn');
   const paymentProofCloseBtn = document.getElementById('paymentProofCloseBtn');
+  const submittedFileModalEl = document.getElementById('submittedFileModal');
+  const submittedFileModal = submittedFileModalEl ? new bootstrap.Modal(submittedFileModalEl) : null;
+  const submittedFileWrap = document.getElementById('submittedFileWrap');
+  const submittedFileOpenNew = document.getElementById('submittedFileOpenNew');
+  const submittedFileTitle = document.getElementById('submittedFileTitle');
+  const submittedFileReturnBtn = document.getElementById('submittedFileReturnBtn');
+  const submittedFileCloseBtn = document.getElementById('submittedFileCloseBtn');
   const residentProfileModalEl = document.getElementById('residentProfileModal');
   const residentProfileModal = residentProfileModalEl ? new bootstrap.Modal(residentProfileModalEl) : null;
   const residentProfileReturnBtn = document.getElementById('residentProfileReturnBtn');
@@ -81,6 +88,7 @@
   let openViewDirectPreview = false;
   let paymentProofReturnTarget = '';
   let paymentProofPrintUrl = '';
+  let submittedFileReturnTarget = '';
   let preserveViewStateOnNextHide = false;
   let financeViewIntent = 'view';
   let templatePreviewRequestSeq = 0;
@@ -175,12 +183,7 @@
     }
     if (key === 'cohabitation') {
       return [
-        { key: 'fullName', label: 'Name', wide: true },
-        { key: 'fullAddress', label: 'Address', multiline: true, wide: true },
-        { key: 'birthdate', label: 'Birthday' },
-        { key: 'birthplace', label: 'Birthplace' },
-        { key: 'remarks', label: 'Remarks', multiline: true, wide: true },
-        { key: 'purpose', label: 'Purpose', multiline: true, wide: true }
+        { key: 'remarks', label: 'Remarks', multiline: true, wide: true }
       ];
     }
     return [
@@ -377,6 +380,7 @@
   function viewModalActionButtons(row) {
     if (!row) return '';
     const id = esc(row.request_id || '');
+    const isFirstTimeJobSeeker = isFirstTimeJobSeekerRow(row);
     const normalizeStageToken = (value) => String(value || '')
       .trim()
       .toLowerCase()
@@ -423,7 +427,13 @@
     if (stage === 'submitted') {
       return `
         <button class="btn btn-sm btn-danger" data-view-action="personnel_reject" data-id="${id}">Reject</button>
-        <button class="btn btn-sm btn-success" data-view-action="personnel_approve" data-id="${id}">Approve</button>
+        <button class="btn btn-sm btn-success" data-view-action="personnel_approve" data-id="${id}">${isFirstTimeJobSeeker ? 'Approve for Interview' : 'Approve'}</button>
+      `;
+    }
+    if (stage === 'for_interview' && isFirstTimeJobSeeker) {
+      return `
+        <button class="btn btn-sm btn-danger" data-view-action="interview_fail" data-id="${id}">Fail Interview</button>
+        <button class="btn btn-sm btn-success" data-view-action="interview_pass" data-id="${id}">Pass Interview</button>
       `;
     }
     if (stage === 'payment_submitted') {
@@ -525,6 +535,83 @@
     value = value.replace(/\s{2,}/g, ' ').trim();
     value = value.replace(/^[,\s]+|[,\s]+$/g, '');
     return value;
+  }
+
+  function joinAddressParts(parts) {
+    return parts.map((part) => String(part || '').trim()).filter(Boolean).join(', ').replace(/\s+/g, ' ').trim();
+  }
+
+  function composeBarangayAddress(address, locality = 'BARANGAY SAN JOSE, RODRIGUEZ, RIZAL') {
+    const suffix = String(locality || '').trim();
+    const cleaned = stripAreaFromAddress(String(address || '').trim()).replace(/^[,\s]+|[,\s]+$/g, '');
+    if (!cleaned || cleaned === '-') {
+      return suffix || '-';
+    }
+    return suffix ? `${cleaned}, ${suffix}` : cleaned;
+  }
+
+  function buildCohabitantAddress(payload, applicantAddress = '') {
+    const direct = firstNonEmpty([
+      payload.cohabitant_full_address,
+      payload.cohabitant_full_address_display
+    ]);
+    if (direct) return direct;
+    const system = String(payload.cohabitant_address_system || '').trim().toLowerCase();
+    if (system === 'lot_block') {
+      return joinAddressParts([
+        firstNonEmpty([payload.cohabitant_unit_number_lot]) ? `Unit ${payload.cohabitant_unit_number_lot}` : '',
+        firstNonEmpty([payload.cohabitant_lot_number]) ? `Lot ${payload.cohabitant_lot_number}` : '',
+        firstNonEmpty([payload.cohabitant_block_number]) ? `Blk ${payload.cohabitant_block_number}` : '',
+        firstNonEmpty([payload.cohabitant_phase_number]) ? `Phase ${payload.cohabitant_phase_number}` : '',
+        firstNonEmpty([payload.cohabitant_subdivision_lot, payload.cohabitant_subdivision]),
+        firstNonEmpty([payload.cohabitant_barangay]),
+        firstNonEmpty([payload.cohabitant_city]),
+        firstNonEmpty([payload.cohabitant_province])
+      ]);
+    }
+    if (system === 'house') {
+      return joinAddressParts([
+        firstNonEmpty([payload.cohabitant_unit_number]) ? `Unit ${payload.cohabitant_unit_number}` : '',
+        [firstNonEmpty([payload.cohabitant_house_number]), firstNonEmpty([payload.cohabitant_street_name])].filter(Boolean).join(' ').trim(),
+        firstNonEmpty([payload.cohabitant_subdivision]),
+        firstNonEmpty([payload.cohabitant_barangay]),
+        firstNonEmpty([payload.cohabitant_city]),
+        firstNonEmpty([payload.cohabitant_province])
+      ]);
+    }
+    return applicantAddress;
+  }
+
+  function buildCohabitationAddress(payload, applicantAddress = '') {
+    const direct = firstNonEmpty([
+      payload.cohabitation_full_address,
+      payload.cohabitation_full_address_display
+    ]);
+    if (direct) return direct;
+    const system = String(payload.cohabitation_address_system || '').trim().toLowerCase();
+    if (system === 'lot_block') {
+      return joinAddressParts([
+        firstNonEmpty([payload.cohabitation_unit_number_lot]) ? `Unit ${payload.cohabitation_unit_number_lot}` : '',
+        firstNonEmpty([payload.cohabitation_lot_number]) ? `Lot ${payload.cohabitation_lot_number}` : '',
+        firstNonEmpty([payload.cohabitation_block_number]) ? `Blk ${payload.cohabitation_block_number}` : '',
+        firstNonEmpty([payload.cohabitation_phase_number]) ? `Phase ${payload.cohabitation_phase_number}` : '',
+        firstNonEmpty([payload.cohabitation_subdivision_lot, payload.cohabitation_subdivision]),
+        firstNonEmpty([payload.cohabitation_barangay]),
+        firstNonEmpty([payload.cohabitation_municipality, payload.cohabitation_city]),
+        firstNonEmpty([payload.cohabitation_province])
+      ]);
+    }
+    if (system === 'house') {
+      return joinAddressParts([
+        firstNonEmpty([payload.cohabitation_unit_number]) ? `Unit ${payload.cohabitation_unit_number}` : '',
+        [firstNonEmpty([payload.cohabitation_house_number]), firstNonEmpty([payload.cohabitation_street_name])].filter(Boolean).join(' ').trim(),
+        firstNonEmpty([payload.cohabitation_subdivision]),
+        firstNonEmpty([payload.cohabitation_barangay]),
+        firstNonEmpty([payload.cohabitation_municipality, payload.cohabitation_city]),
+        firstNonEmpty([payload.cohabitation_province])
+      ]);
+    }
+    return applicantAddress;
   }
 
   function residentInfoFromRow(row) {
@@ -648,6 +735,16 @@
   function extractSubmittedDocuments(row, payload) {
     const docs = [];
     const seen = new Set();
+    const isRelationshipJailVisit = String(payload?.cohabitation_variant || '').trim() === 'relationship_jail_visit'
+      || String(payload?.cohabitation_variant || '').trim() === 'conjugal_visit';
+    const customLabels = {
+      cohabitant_id_front_path: 'Partner Valid ID - Front',
+      cohabitant_id_back_path: 'Partner Valid ID - Back',
+      detention_proof_file_path: 'Proof of Detention',
+      detention_proof_file_paths: 'Proof of Detention Attachment',
+      relationship_proof_file_path: 'Proof of Relationship',
+      relationship_proof_file_paths: 'Proof of Relationship Attachment'
+    };
 
     const addDoc = (label, rawPath) => {
       const pathText = String(rawPath || '').trim();
@@ -667,11 +764,14 @@
       Object.keys(payload).forEach((key) => {
         const value = payload[key];
         if (Array.isArray(value)) {
-          value.forEach((entry, idx) => addDoc(`${friendlyLabel(key)} ${idx + 1}`, entry));
+          value.forEach((entry, idx) => {
+            const baseLabel = customLabels[key] || friendlyLabel(key);
+            addDoc(`${baseLabel} ${idx + 1}`, entry);
+          });
           return;
         }
         if (typeof value === 'string') {
-          addDoc(friendlyLabel(key), value);
+          addDoc(customLabels[key] || friendlyLabel(key), value);
         }
       });
     }
@@ -711,6 +811,80 @@
     const d = parseFlexibleDate(raw);
     if (!d) return raw;
     return d.toLocaleDateString('en-US', { month: 'long', day: '2-digit', year: 'numeric' });
+  }
+
+  function previewMonthYear(value) {
+    const raw = String(value || '').trim();
+    if (!raw) return '';
+    const ym = raw.match(/^(\d{4})-(\d{2})$/);
+    if (ym) {
+      const dt = new Date(Number.parseInt(ym[1], 10), Number.parseInt(ym[2], 10) - 1, 1);
+      if (!Number.isNaN(dt.getTime())) {
+        return dt.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+      }
+    }
+    const d = parseFlexibleDate(raw);
+    if (!d) return raw;
+    return d.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+  }
+
+  function parseDurationParts(value) {
+    const raw = String(value || '').trim();
+    if (!raw) return null;
+    const yearsMatch = raw.match(/(\d+)\s*year/i);
+    const monthsMatch = raw.match(/(\d+)\s*month/i);
+    if (!yearsMatch && !monthsMatch) return null;
+    return {
+      years: yearsMatch ? Math.max(0, Number.parseInt(yearsMatch[1], 10) || 0) : 0,
+      months: monthsMatch ? Math.max(0, Number.parseInt(monthsMatch[1], 10) || 0) : 0
+    };
+  }
+
+  function formatDurationParts(years, months) {
+    const y = Math.max(0, Number.parseInt(String(years || '0'), 10) || 0);
+    const m = Math.max(0, Number.parseInt(String(months || '0'), 10) || 0);
+    const parts = [];
+    if (y > 0) parts.push(`${y} ${y === 1 ? 'year' : 'years'}`);
+    if (m > 0 || parts.length === 0) parts.push(`${m} ${m === 1 ? 'month' : 'months'}`);
+    return parts.join(' and ');
+  }
+
+  function buildResidencySinceText(startRaw, yearsRaw, monthsRaw, fallbackDurationRaw = '') {
+    const explicitYears = String(yearsRaw || '').trim();
+    const explicitMonths = String(monthsRaw || '').trim();
+    let years = explicitYears !== '' ? Math.max(0, Number.parseInt(explicitYears, 10) || 0) : null;
+    let months = explicitMonths !== '' ? Math.max(0, Number.parseInt(explicitMonths, 10) || 0) : null;
+
+    if (years === null || months === null) {
+      const parsed = parseDurationParts(fallbackDurationRaw);
+      if (parsed) {
+        if (years === null) years = parsed.years;
+        if (months === null) months = parsed.months;
+      }
+    }
+
+    let startDisplay = previewMonthYear(startRaw);
+    const durationDisplay = formatDurationParts(years ?? 0, months ?? 0);
+    if (!startDisplay && years !== null && months !== null) {
+      const now = new Date();
+      const inferred = new Date(now.getFullYear(), now.getMonth(), 1);
+      inferred.setMonth(inferred.getMonth() - months);
+      inferred.setFullYear(inferred.getFullYear() - years);
+      if (!Number.isNaN(inferred.getTime())) {
+        startDisplay = inferred.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+      }
+    }
+    if (startDisplay) {
+      return `${startDisplay} (${durationDisplay})`;
+    }
+    return durationDisplay;
+  }
+
+  function applicantHonorific(sexValue) {
+    const sex = String(sexValue || '').trim().toLowerCase();
+    if (sex.startsWith('m')) return 'MR.';
+    if (sex.startsWith('f')) return 'MS.';
+    return 'MR./MS.';
   }
 
   function dr_now_text() {
@@ -754,6 +928,10 @@
     return stripped;
   }
 
+  function stripTrailingParenthetical(value) {
+    return String(value || '').replace(/\s*\([^()]*\)\s*$/g, '').trim();
+  }
+
   function parseAgeText(value) {
     const cleaned = stripTemplateTokens(value);
     if (!cleaned) return '';
@@ -767,6 +945,22 @@
     const text = String(value || '').trim().toUpperCase() || String(fallback || '').toUpperCase();
     const cls = ['doc-editable', extraClass].filter(Boolean).join(' ');
     return `<span class="${cls}" contenteditable="true" data-edit-key="${esc(key)}">${esc(text)}</span>`;
+  }
+
+  function renderPreviewMetaRows(rows) {
+    if (!Array.isArray(rows) || rows.length === 0) return '';
+    return `
+      <div class="doc-preview-goodmoral-meta">
+        ${rows.map((row) => `
+          <div class="doc-preview-meta-row">
+            <div class="doc-preview-meta-label"><strong>${esc(row.label || '')}</strong></div>
+            <div class="doc-preview-meta-value">${/^[\s_]+$/.test(String(row.value || '').trim() || '_____')
+              ? '<span class="doc-preview-meta-line"></span>'
+              : esc(String(row.value || '').trim() || '_____')}</div>
+          </div>
+        `).join('')}
+      </div>
+    `;
   }
 
   function upperText(value, fallback = '-') {
@@ -785,6 +979,10 @@
     if (text.includes('goodmoral')) return 'goodmoral';
     if (text.includes('barangayclearance') || text.includes('barangaycertification') || text === 'clearance') return 'generic';
     return 'generic';
+  }
+
+  function isFirstTimeJobSeekerRow(row) {
+    return normalizePreviewDocKey(row?.document_type || '') === 'firsttimejobseeker';
   }
 
   function additionalDetailRows(entries) {
@@ -835,10 +1033,26 @@
     ].filter(Boolean).join(' ').replace(/\s+/g, ' ').trim();
     const durationValue = firstNonEmpty([payload.cohabitation_duration_value]);
     const durationUnit = firstNonEmpty([payload.cohabitation_duration_unit]);
-    const cohabitationDuration = firstNonEmpty([
+    const cohabitationDurationRaw = firstNonEmpty([
       payload.cohabitation_duration,
       [durationValue, durationUnit].filter(Boolean).join(' ').trim()
     ]);
+    const cohabitationDuration = stripTrailingParenthetical(cohabitationDurationRaw);
+    const cohabitationStartRaw = firstNonEmpty([payload.cohabitation_start_date]);
+    const cohabitationStartDateDisplay = (() => {
+      const raw = String(cohabitationStartRaw || '').trim();
+      if (!raw) return '';
+      const base = previewMonthYear(raw) || raw;
+      const dur = stripTrailingParenthetical(cohabitationDuration);
+      return dur ? `${base} (${dur.toLowerCase()})` : base;
+    })();
+    const sexValue = firstNonEmpty([payload.sex, payload.gender, residentProfile.sex]);
+    const residencySinceText = buildResidencySinceText(
+      firstNonEmpty([payload.barangay_residency, residentProfile.barangay_residency]),
+      firstNonEmpty([payload.years_of_residency]),
+      firstNonEmpty([payload.months_of_residency]),
+      firstNonEmpty([payload.residency_duration, residentProfile.residency_duration])
+    );
     const applicantBirthdateRaw = stripTemplateTokens(firstNonEmpty([
       payload.birthdate,
       payload.date_of_birth,
@@ -947,6 +1161,9 @@
       birthdate: upperText(previewBornOnDate(applicantBirthdateRaw), ''),
       birthplace: upperText(firstNonEmpty([payload.birthplace, payload.place_of_birth, payload.child_birthplace]), ''),
       location: upperText(firstNonEmpty([payload.location, payload.complete_address, payload.address, payload.full_address, residentProfile.full_address]), ''),
+      applicantResidenceAddress: upperText(firstNonEmpty([payload.full_address, payload.full_address_display, payload.address, residentProfile.full_address]), ''),
+      cohabitantResidenceAddress: upperText(buildCohabitantAddress(payload, firstNonEmpty([payload.full_address, payload.full_address_display, residentProfile.full_address])), ''),
+      cohabitationResidenceAddress: upperText(buildCohabitationAddress(payload, firstNonEmpty([payload.full_address, payload.full_address_display, residentProfile.full_address])), ''),
       remarks: upperText(firstNonEmpty([payload.remarks, payload.remark, row.status_remarks, row.status_reason]), ''),
       fatherName: upperText(fatherName, ''),
       motherName: upperText(motherName, ''),
@@ -955,12 +1172,21 @@
       cohabitantAge: upperText(cohabitantAgeRaw, ''),
       cohabitantBirthdate: upperText(previewBornOnDate(cohabitantBirthdateRaw), ''),
       cohabitantRelationship: upperText(firstNonEmpty([payload.cohabitant_relationship]), ''),
+      cohabitationVariant: String(payload.cohabitation_variant || '').trim().toLowerCase(),
+      detentionFacility: upperText(firstNonEmpty([
+        payload._preview_detention_facility,
+        payload.detention_facility_other,
+        payload.detention_facility
+      ]), ''),
       cohabitationDuration: upperText(cohabitationDuration, ''),
-      cohabitationStartDate: upperText(firstNonEmpty([payload.cohabitation_start_date]), ''),
+      cohabitationStartDate: upperText(cohabitationStartDateDisplay, ''),
       cohabitationChildrenCount: Number.parseInt(firstNonEmpty([payload.cohabitation_children_count, '0']), 10) || 0,
       cohabitationChildrenList: upperText(firstNonEmpty([payload.children_list, childLines.join('; ')]), ''),
       educationalAttainment: upperText(firstNonEmpty([payload.educational_attainment]), ''),
       jobstartBeneficiary: upperText(firstNonEmpty([payload.jobstart_beneficiary]), ''),
+      applicantHonorific: upperText(applicantHonorific(sexValue), ''),
+      residencySinceText: upperText(residencySinceText, ''),
+      signedDate: upperText(previewDateText(firstNonEmpty([row.completed_at, row.release_timestamp, row.ready_at])), ''),
       additionalDetails: additionalDetails.map((entry) => ({ ...entry, value: upperText(entry.value, '') })),
       qrUrl: resolvePublicUrl(firstNonEmpty([row.qr_code_path]))
     };
@@ -976,6 +1202,9 @@
     const isGoodMoral = docKey === 'goodmoral';
     const isResidency = docKey === 'residency';
     const isCohabitation = docKey === 'cohabitation';
+    const isFirstTimeJobSeeker = docKey === 'firsttimejobseeker';
+    const isRelationshipJailVisit = isCohabitation
+      && ['relationship_jail_visit', 'conjugal_visit'].includes(String(state.cohabitationVariant || '').trim().toLowerCase());
     const fullName = String(state.fullName || '-').trim() || '-';
     const fullAddress = String(state.fullAddress || '-').trim() || '-';
     const purpose = String(state.purpose || '-').trim() || '-';
@@ -989,10 +1218,18 @@
     const cohabitantAgeRawState = String(state.cohabitantAge || '').trim();
     const cohabitantBirthdate = String(state.cohabitantBirthdate || '').trim();
     const cohabitantAge = cohabitantAgeRawState || deriveAgeFromDate(cohabitantBirthdate);
+    const cohabitantRelationship = String(state.cohabitantRelationship || '').trim();
+    const detentionFacility = String(state.detentionFacility || '').trim();
+    const applicantResidenceAddress = String(state.applicantResidenceAddress || state.fullAddress || '').trim();
+    const cohabitantResidenceAddress = String(state.cohabitantResidenceAddress || state.fullAddress || '').trim();
+    const cohabitationResidenceAddress = String(state.cohabitationResidenceAddress || state.fullAddress || '').trim();
     const cohabitationDuration = String(state.cohabitationDuration || '').trim();
     const cohabitationStartDate = String(state.cohabitationStartDate || '').trim();
     const cohabitationChildrenCount = Math.max(0, Number.parseInt(String(state.cohabitationChildrenCount || '0'), 10) || 0);
     const cohabitationChildrenList = String(state.cohabitationChildrenList || '').trim();
+    const applicantHonorificText = String(state.applicantHonorific || 'MR./MS.').trim() || 'MR./MS.';
+    const residencySinceText = String(state.residencySinceText || '').trim();
+    const signedDateText = String(state.signedDate || 'DATE').trim() || 'DATE';
     const leftLogoUrl = `${appBase}/Images/San_Jose_LOGO.jpg`;
     const rightLogoUrl = `${appBase}/Images/Montalban_Logo.png`;
     const fallbackRightLogoUrl = `${appBase}/Images/San_Jose_LOGO.jpg`;
@@ -1001,6 +1238,8 @@
     const requestOfficerLine2 = String(state.requestOfficerLine2 || '').trim();
     const requestOfficerLine3 = String(state.requestOfficerLine3 || '').trim();
     const safe = (value, fallback = '-') => (String(value || '').trim() || fallback);
+    const fullAddressWithBarangay = composeBarangayAddress(fullAddress);
+    const applicantAddressWithBarangay = composeBarangayAddress(applicantResidenceAddress || fullAddress);
     const cohabitationHasChildren = isCohabitation && cohabitationChildrenCount > 0;
 
     const residencyRows = `
@@ -1015,14 +1254,12 @@
     let contentHtml = '';
     let titleHtml = '<div class="doc-preview-goodmoral-office"><div>TANGGAPAN NG PUNONG BARANGAY</div><div>BARANGAY CERTIFICATION</div></div>';
     let issuedLine = `Issued this <strong>${esc(issuedDateWord)}</strong> at the office of the Punong Barangay, Barangay San Jose, Montalban, Rizal`;
-    let metaHtml = `
-      <div class="doc-preview-goodmoral-meta">
-        <p><strong>CTC No.:</strong> _____</p>
-        <p><strong>Issued at:</strong> _____</p>
-        <p><strong>Issued On:</strong> _____</p>
-        <p><strong>OR No.:</strong> ${esc(safe(state.orNumber, '_____'))}</p>
-      </div>
-    `;
+    let metaHtml = renderPreviewMetaRows([
+      { label: 'CTC No.:', value: '_____' },
+      { label: 'Issued at:', value: '_____' },
+      { label: 'Issued On:', value: '_____' },
+      { label: 'OR No.:', value: esc(safe(state.orNumber, '_____')) },
+    ]);
 
     if (isIndigency) {
       const indigencyPurpose = safe(purpose || requestFor, 'PURPOSE');
@@ -1057,7 +1294,7 @@
         <p><strong>TO WHOM IT MAY CONCERN:</strong></p>
         <p>
           This is to certify <strong>${esc(safe(fullName, '${FULL_NAME}'))}</strong>, resident of
-          <strong>${esc(safe(fullAddress, '${ADDRESS}'))} BARANGAY SAN JOSE, RODRIGUEZ, RIZAL</strong>
+          <strong>${esc(safe(fullAddressWithBarangay, '${ADDRESS}'))}</strong>
           is personally known to be as a person of <strong>GOOD MORAL CHARACTER, PEACEFUL and LAW-ABIDING CITIZEN of THE COMMUNITY.</strong>
         </p>
         <p>
@@ -1068,85 +1305,131 @@
           <strong>${previewEditable('purpose', safe(purpose, '${PURPOSE}'), 'PURPOSE')}</strong> purposes only.
         </p>
       `;
+    } else if (isRelationshipJailVisit) {
+      titleHtml = '<div class="doc-preview-goodmoral-office"><div>TANGGAPAN NG PUNONG BARANGAY</div><div>BARANGAY CERTIFICATION</div></div>';
+      contentHtml = `
+        <p class="doc-preview-jail-lead"><strong>TO WHOM IT MAY CONCERN:</strong></p>
+        <p class="doc-preview-jail-center">
+          This is to certify <strong>${esc(safe(fullName, '${NAME}'))}</strong>, resident of
+          <strong>${esc(safe(applicantAddressWithBarangay, '${ADDRESS}'))}</strong>
+          is personally known to be as a person of <strong>GOOD MORAL CHARACTER, PEACEFUL and LAW-ABIDING CITIZEN of THE COMMUNITY.</strong>
+        </p>
+        <p class="doc-preview-jail-center">
+          Moreover, this certifies that the subject person is the <strong>${esc(safe(cohabitantRelationship, '${RELATIONSHIP}'))}</strong>
+          of DETAINED <strong>${esc(safe(cohabitantName, '${DETAINEE_NAME}'))}</strong> and presently at the
+          <strong>${previewEditable('detentionFacility', safe(detentionFacility, '${PRISON}'), '${PRISON}')}</strong>.
+        </p>
+        <p class="doc-preview-jail-center doc-preview-jail-ordinance">
+          This certification is being issued pursuant to Barangay Revenue Code ORDINANCE NO. 11 – 2019.
+        </p>
+      `;
+      issuedLine = `Issued this <strong>${esc(issuedDateWord)}</strong> at the office of the Punong Barangay, Barangay San Jose, Montalban, Rizal.`;
+      metaHtml = renderPreviewMetaRows([
+        { label: 'CTC No.:', value: '_____' },
+        { label: 'Issued at:', value: '_____' },
+        { label: 'Issued On:', value: '_____' },
+        { label: 'OR No.:', value: esc(safe(state.orNumber, '_____')) },
+      ]);
     } else if (isCohabitation && !cohabitationHasChildren) {
       titleHtml = '<div class="doc-preview-goodmoral-office"><div>TANGGAPAN NG PUNONG BARANGAY</div><div>CERTIFICATE OF COHABITATION</div></div>';
       contentHtml = `
         <p><strong>TO WHOM IT MAY CONCERN:</strong></p>
         <p>
-          This is to certify that <strong>${previewEditable('fullName', safe(fullName, '${NAME}'), 'Name')}</strong>,
-          <strong>${esc(safe(age, '${AGE}'))} y/o</strong> and <strong>${esc(safe(cohabitantName, '${PARTNER_NAME}'))}</strong>,
-          <strong>${esc(safe(cohabitantAge, '-'))} y/o</strong> are both residents of
-          <strong>${previewEditable('fullAddress', safe(fullAddress, '${ADDRESS}'), 'Address')}</strong><br>
-          <strong>BARANGAY SAN JOSE, RODRIGUEZ, RIZAL.</strong>
+          This is to certify that <strong>${esc(safe(fullName, '${NAME}'))}</strong>,
+          <strong>${esc(safe(age, '${AGE}'))} y/o</strong> a resident of <strong>${esc(safe(applicantResidenceAddress, '${ADDRESS}'))}</strong>
+          and <strong>${esc(safe(cohabitantName, '${PARTNER_NAME}'))}</strong>,
+          <strong>${esc(safe(cohabitantAge, '-'))} y/o</strong> a resident of <strong>${esc(safe(cohabitantResidenceAddress, '${PARTNER_ADDRESS}'))}</strong>.
         </p>
         <p>
           This further certifies that they are both living together since
-          <strong>${esc(safe(cohabitationDuration || cohabitationStartDate, '${COHABITATION_DURATION}'))}</strong>
-          up to present on the above stated address.
+          <strong>${esc(safe(cohabitationStartDate || cohabitationDuration, '${COHABITATION_DURATION}'))}</strong>
+          up to present on <strong>${esc(safe(cohabitationResidenceAddress, '${COHABITATION_ADDRESS}'))}</strong>.
         </p>
         <p>
           This certification is being issued upon the request of both parties for whatever legal purpose it may serve them.
         </p>
       `;
-      metaHtml = `
-        <div class="doc-preview-goodmoral-meta">
-          <p><strong>CTC No.:</strong> _____</p>
-          <p><strong>Issued at:</strong> _____</p>
-          <p><strong>Issued On:</strong> _____</p>
-          <p><strong>OR No.:</strong> ${esc(safe(state.orNumber, '_____'))}</p>
-        </div>
-      `;
+      metaHtml = renderPreviewMetaRows([
+        { label: 'CTC No.:', value: '_____' },
+        { label: 'Issued at:', value: '_____' },
+        { label: 'Issued On:', value: '_____' },
+        { label: 'OR No.:', value: esc(safe(state.orNumber, '_____')) },
+      ]);
     } else if (isCohabitation && cohabitationHasChildren) {
       titleHtml = '<div class="doc-preview-goodmoral-office"><div>TANGGAPAN NG PUNONG BARANGAY</div><div>CERTIFICATE OF COHABITATION</div></div>';
       contentHtml = `
         <p><strong>TO WHOM IT MAY CONCERN:</strong></p>
         <p>
-          This is to certify that the person whose name and thumb mark appears here on has requested a Barangay Certification from this office and the information are listed below:
+          This is to certify that the person whose name appears here on has requested a Barangay Certification from this office and the information are listed below:
         </p>
-        <div class="doc-to-block"><strong>Name</strong><strong>:</strong><div><strong>${previewEditable('fullName', safe(fullName, '-'), 'Name')}</strong>, ${esc(safe(age, '-'))} y/o<br><strong>${esc(safe(cohabitantName, '-'))}</strong>, ${esc(safe(cohabitantAge, '-'))} y/o</div></div>
-        <div class="doc-to-block"><strong>Address</strong><strong>:</strong><div><strong>${previewEditable('fullAddress', safe(fullAddress, '-'), 'Address')}</strong><br><strong>BARANGAY SAN JOSE, MONTALBAN, RIZAL</strong></div></div>
+        <div class="doc-to-block"><strong>Name</strong><strong>:</strong><div><div><strong>${esc(safe(fullName, '-'))}</strong>, ${esc(safe(age, '-'))} y/o</div><div><strong>${esc(safe(cohabitantName, '-'))}</strong>, ${esc(safe(cohabitantAge, '-'))} y/o</div></div></div>
+        <div class="doc-to-block"><strong>Address</strong><strong>:</strong><div><strong>${esc(safe(fullAddress, '-'))}</strong><br><strong>BARANGAY SAN JOSE, MONTALBAN, RIZAL</strong></div></div>
         <div class="doc-to-block"><strong>Remarks</strong><strong>:</strong><strong>${previewEditable('remarks', safe(remarks, '-'), 'Remarks')}</strong></div>
-        <div class="doc-to-block"><strong>Purpose</strong><strong>:</strong><strong>${previewEditable('purpose', safe(`COHABITATION SINCE ${cohabitationStartDate || cohabitationDuration}`, '-'), 'Purpose')}</strong></div>
-        <div class="doc-to-block"><strong>Name of Children</strong><strong>:</strong><strong>${esc(safe(cohabitationChildrenList, '-'))}</strong></div>
+        <div class="doc-to-block"><strong>Purpose</strong><strong>:</strong><strong>${esc(`COHABITATION SINCE ${safe(cohabitationStartDate || cohabitationDuration, '-')}`)}</strong></div>
+        <div class="doc-to-block"><strong>Name of Children</strong><strong>:</strong><span>${esc(safe(cohabitationChildrenList, '-'))}</span></div>
         <p>
           This clearance is being issued pursuant to Barangay Revenue Code ORDINANCE NO. 11 – 2019
         </p>
       `;
-      metaHtml = `
-        <div class="doc-preview-goodmoral-meta">
-          <p><strong>CTC No.:</strong> _____</p>
-          <p><strong>Issued at:</strong> _____</p>
-          <p><strong>Issued On:</strong> _____</p>
-          <p><strong>Amount:</strong> ________</p>
-          <p><strong>OR No.:</strong> ${esc(safe(state.orNumber, '_____'))}</p>
-        </div>
-      `;
+      metaHtml = renderPreviewMetaRows([
+        { label: 'CTC No.:', value: '_____' },
+        { label: 'Issued at:', value: '_____' },
+        { label: 'Issued On:', value: '_____' },
+        { label: 'OR No.:', value: esc(safe(state.orNumber, '_____')) },
+      ]);
     } else if (isResidency) {
       titleHtml = '<div class="doc-preview-goodmoral-office"><div>TANGGAPAN NG PUNONG BARANGAY</div><div>BARANGAY CERTIFICATION</div></div>';
       contentHtml = `
         <p><strong>TO WHOM IT MAY CONCERN:</strong></p>
         <p>
-          This is to certify that the person whose name and thumb mark appears here on has requested a Barangay Clearance from this office and the information are listed below:
+          This is to certify that the person whose name appears here on has requested a Barangay Clearance from this office and the information are listed below:
         </p>
         ${residencyRows}
         <p>
           This clearance is being issued pursuant to Barangay Revenue Code ORDINANCE NO. 11 – 2019
         </p>
       `;
-      metaHtml = `
-        <div class="doc-preview-goodmoral-meta">
-          <p><strong>CTC No.:</strong> _____</p>
-          <p><strong>Issued at:</strong> _____</p>
-          <p><strong>Issued On:</strong> _____</p>
-          <p><strong>Amount:</strong> ________</p>
-          <p><strong>OR No.:</strong> ${esc(safe(state.orNumber, '_____'))}</p>
+      metaHtml = renderPreviewMetaRows([
+        { label: 'CTC No.:', value: '_____' },
+        { label: 'Issued at:', value: '_____' },
+        { label: 'Issued On:', value: '_____' },
+        { label: 'OR No.:', value: esc(safe(state.orNumber, '_____')) },
+      ]);
+    } else if (isFirstTimeJobSeeker) {
+      titleHtml = `
+        <div class="doc-preview-goodmoral-office doc-preview-ftjs-office">
+          <div>TANGGAPAN NG PUNONG BARANGAY</div>
+          <div>BARANGAY CERTIFICATION</div>
+          <div class="doc-preview-ftjs-subtitle">(First Time Jobseekers Act-RA 11261)</div>
         </div>
+      `;
+      contentHtml = `
+        <p><strong>TO WHOM IT MAY CONCERN:</strong></p>
+        <p>
+          This is to certify <strong>${esc(safe(applicantHonorificText, 'MR./MS.'))} ${esc(safe(fullName, '${NAME}'))}</strong>,
+          resident of <strong>${esc(safe(fullAddressWithBarangay, '${ADDRESS}'))}</strong>
+          since <strong>${esc(safe(residencySinceText, '${RESIDENCY_SINCE}'))}</strong> is a qualified availlee of RA 11261
+          or the First Time Jobseekers Act 2019.
+        </p>
+        <p>
+          I further certify that the holder/bearer was informed of his/her rights, including the duties and responsibilities accorded by RA 11261 through the Oath of Undertaking he/she has signed and executed in the presence of our Barangay Official.
+        </p>
+      `;
+      metaHtml = '';
+    } else if (isResidency) {
+      titleHtml = '<div class="doc-preview-goodmoral-office"><div>TANGGAPAN NG PUNONG BARANGAY</div><div>BARANGAY CERTIFICATION</div></div>';
+      contentHtml = `
+        <p><strong>TO WHOM IT MAY CONCERN:</strong></p>
+        <p>
+          This is to certify that the person whose name appears here on has requested a Barangay Clearance from this office and the information are listed below:
+        </p>
+        ${residencyRows}
       `;
     } else {
       contentHtml = `
         <p><strong>TO WHOM IT MAY CONCERN:</strong></p>
         <p>
-          This is to certify that the person whose name and thumb mark appears here on has requested a Barangay Clearance from this office and the information are listed below:
+          This is to certify that the person whose name appears here on has requested a Barangay Clearance from this office and the information are listed below:
         </p>
         ${residencyRows}
       `;
@@ -1154,7 +1437,54 @@
 
     const paperClass = isIndigency
       ? 'doc-preview-paper doc-preview-paper--indigency'
-      : (isGoodMoral || isResidency || isCohabitation ? 'doc-preview-paper doc-preview-paper--goodmoral' : 'doc-preview-paper');
+      : (isGoodMoral || isResidency || isCohabitation || isFirstTimeJobSeeker
+        ? `doc-preview-paper doc-preview-paper--goodmoral${(isCohabitation && cohabitationHasChildren) ? ' doc-preview-paper--cohabitation-children' : ''}${isFirstTimeJobSeeker ? ' doc-preview-paper--ftjs' : ''}${isRelationshipJailVisit ? ' doc-preview-paper--jail' : ''}`
+        : 'doc-preview-paper');
+
+    const qrBlockHtml = qrUrl !== ''
+      ? `
+          <div class="doc-preview-qr">
+            <div class="doc-preview-qr-box">
+              <img src="${esc(qrUrl)}" alt="QR Code">
+            </div>
+            QR
+          </div>
+        `
+      : '';
+    const footerAreaClass = `doc-preview-footer-area${isFirstTimeJobSeeker ? ' doc-preview-footer-area--ftjs' : ''}${qrBlockHtml ? '' : ' doc-preview-footer-area--noqr'}`;
+    const footerAreaHtml = isFirstTimeJobSeeker
+      ? `
+          <div class="${footerAreaClass}">
+            <div></div>
+            <div class="doc-preview-ftjs-signing">
+              <div class="doc-preview-signature doc-preview-signature--ftjs">
+                <div class="name">${esc(String(state.approvedByName || 'HON. GLENN S. EVANGELISTA').trim() || 'HON. GLENN S. EVANGELISTA')}</div>
+                <div>Punong Barangay</div>
+              </div>
+              <div class="doc-preview-ftjs-date"><span>${esc(signedDateText)}</span></div>
+              <div class="doc-preview-ftjs-witness-label">Witnesses by:</div>
+              <div class="doc-preview-ftjs-witness">
+                <div class="name">MINERVA D. QUITA</div>
+                <div>Barangay Secretary</div>
+              </div>
+              <div class="doc-preview-ftjs-date"><span>${esc(signedDateText)}</span></div>
+            </div>
+            ${qrBlockHtml}
+          </div>
+        `
+      : `
+          <div class="${footerAreaClass}">
+            <div class="doc-preview-issuedby">Issued by: <strong>MINERVA D. QUITA</strong><br><em>Barangay Secretary</em></div>
+            <div class="doc-preview-signature">
+              <div class="name">${esc(String(state.approvedByName || 'HON. GLENN S. EVANGELISTA').trim() || 'HON. GLENN S. EVANGELISTA')}</div>
+              <div>Punong Barangay</div>
+            </div>
+            ${qrBlockHtml}
+          </div>
+        `;
+    const footerNoteHtml = isFirstTimeJobSeeker
+      ? 'This certification is only valid for 1 year from the issuance.<br>Check the qr code to verify the authenticity of this document.'
+      : 'This certificate is valid for Forty-five (45) days from the date of issue,<br>check the QR code to verify the authenticity of this document.';
 
     return `
       <div class="doc-preview-stage">
@@ -1179,18 +1509,8 @@
               <p class="doc-preview-issued-line">${issuedLine}</p>
               ${metaHtml}
             </div>
-            <div class="doc-preview-issuedby">Issued by: <strong>MINERVA D. QUITA</strong><br><em>Barangay Secretary</em></div>
-            <div class="doc-preview-signature">
-              <div class="name">${esc(String(state.approvedByName || 'HON. GLENN S. EVANGELISTA').trim() || 'HON. GLENN S. EVANGELISTA')}</div>
-              <div>Punong Barangay</div>
-            </div>
-            <div class="doc-preview-qr">
-              <div class="doc-preview-qr-box">
-                ${qrUrl !== '' ? `<img src="${esc(qrUrl)}" alt="QR Code">` : '<span>QR</span>'}
-              </div>
-              QR
-            </div>
-            <div class="doc-preview-footer">This certificate is valid for Forty-five (45) days from the date of issue, check the<br>QR code to verify the authenticity of this document.</div>
+            ${footerAreaHtml}
+            <div class="doc-preview-footer">${footerNoteHtml}</div>
           </div>
         </div>
       </div>
@@ -1219,6 +1539,12 @@
   function bindApproveScrollGate() {
     resetPreviewScrollGate();
     if (!viewModalNextBtn || String(currentViewStage || '').toLowerCase() !== 'submitted') return;
+    const currentRow = itemById.get(String(currentViewRequestId || '').trim());
+    if (isFirstTimeJobSeekerRow(currentRow)) {
+      viewModalNextBtn.disabled = false;
+      viewModalNextBtn.title = '';
+      return;
+    }
     const scrollHost = viewDetailsBody.closest('.modal-body') || viewDetailsBody;
     if (!scrollHost) return;
 
@@ -1262,10 +1588,11 @@
       }
       if (viewModalNextBtn) {
         if (submittedFlow) {
-          viewModalNextBtn.textContent = 'Save and Approve';
+          const currentRow = itemById.get(rid);
+          viewModalNextBtn.textContent = isFirstTimeJobSeekerRow(currentRow) ? 'Approve for Interview' : 'Save and Approve';
           viewModalNextBtn.classList.remove('d-none', 'btn-primary');
           viewModalNextBtn.classList.add('btn-success');
-          viewModalNextBtn.disabled = true;
+          viewModalNextBtn.disabled = !isFirstTimeJobSeekerRow(currentRow);
         } else if (releaseFlow) {
           viewModalNextBtn.textContent = 'Mark as Complete / Release';
           viewModalNextBtn.classList.remove('d-none', 'btn-primary');
@@ -1566,6 +1893,35 @@
     }
   });
 
+  submittedFileReturnBtn?.addEventListener('click', () => {
+    if (submittedFileModal) {
+      submittedFileModal.hide();
+    }
+    if (submittedFileReturnTarget === 'view' && viewModal) {
+      viewModal.show();
+    }
+  });
+
+  submittedFileModalEl?.addEventListener('hidden.bs.modal', () => {
+    submittedFileReturnTarget = '';
+    if (submittedFileTitle) {
+      submittedFileTitle.textContent = 'Submitted Attachment Viewer';
+    }
+    if (submittedFileReturnBtn) {
+      submittedFileReturnBtn.classList.add('d-none');
+    }
+    if (submittedFileOpenNew) {
+      submittedFileOpenNew.classList.remove('d-none');
+      submittedFileOpenNew.removeAttribute('href');
+    }
+    if (submittedFileCloseBtn) {
+      submittedFileCloseBtn.classList.remove('d-none');
+    }
+    if (submittedFileWrap) {
+      submittedFileWrap.innerHTML = '';
+    }
+  });
+
   function rowHtml(row) {
     const reasonValue = firstNonEmpty([row.status_remarks, row.status_reason]);
     const reason = reasonValue ? `<div class="text-danger small mt-1">Reason: ${esc(reasonValue)}</div>` : '';
@@ -1642,6 +1998,26 @@
     paymentProofModal.show();
   }
 
+  function openSubmittedFileModal(docUrl, title = 'Submitted Attachment Viewer', returnTarget = '') {
+    if (!docUrl || !submittedFileModal || !submittedFileWrap || !submittedFileOpenNew) return;
+    submittedFileReturnTarget = String(returnTarget || '').trim();
+    if (submittedFileTitle) {
+      submittedFileTitle.textContent = String(title || 'Submitted Attachment Viewer').trim() || 'Submitted Attachment Viewer';
+    }
+    if (submittedFileReturnBtn) {
+      submittedFileReturnBtn.classList.toggle('d-none', submittedFileReturnTarget === '');
+    }
+    submittedFileOpenNew.href = docUrl;
+    const lower = String(docUrl).toLowerCase();
+    const isImageAsset = /\.(png|jpe?g|gif|webp|bmp|svg)(\?|#|$)/i.test(lower);
+    if (!isImageAsset) {
+      submittedFileWrap.innerHTML = `<iframe src="${docUrl}" style="width:100%;height:70vh;border:1px solid #ddd;border-radius:8px;"></iframe>`;
+    } else {
+      submittedFileWrap.innerHTML = `<img src="${docUrl}" alt="Submitted File Preview" style="max-width:100%;max-height:70vh;border:1px solid #ddd;border-radius:8px;">`;
+    }
+    submittedFileModal.show();
+  }
+
   function statusBucket(row) {
     if (isFinancePaymentsPage) {
       const stage = String(row?.stage || '').toLowerCase();
@@ -1673,7 +2049,7 @@
       return 'unpaid';
     }
     const stage = String(row?.stage || '').toLowerCase();
-    if (stage.includes('rejected')) return 'denied';
+    if (stage.includes('rejected') || stage === 'interview_failed') return 'denied';
     if (stage === 'completed' || stage === 'ready_for_claim' || stage === 'payment_verified') return 'verified';
     return 'pending';
   }
@@ -1953,13 +2329,18 @@
     return item;
   }
 
+  function rowHasModalDetails(row) {
+    if (!row || typeof row !== 'object') return false;
+    const payloadReady = row.payload && typeof row.payload === 'object' && Object.keys(row.payload).length > 0;
+    const profileReady = row.resident_profile && typeof row.resident_profile === 'object' && Object.keys(row.resident_profile).length > 0;
+    return payloadReady || profileReady;
+  }
+
   async function ensureRowDetails(row) {
     if (!row || typeof row !== 'object') return row;
     const id = String(row.request_id || '').trim();
     if (!id) return row;
-    const payloadReady = row.payload && typeof row.payload === 'object' && Object.keys(row.payload).length > 0;
-    const profileReady = row.resident_profile && typeof row.resident_profile === 'object' && Object.keys(row.resident_profile).length > 0;
-    if (payloadReady || profileReady) {
+    if (rowHasModalDetails(row)) {
       return row;
     }
     try {
@@ -1976,6 +2357,26 @@
       // Keep lightweight row if details fetch fails.
     }
     return row;
+  }
+
+  function renderQuickRequestSummary(row) {
+    const docName = normalizeDocumentTypeDisplay(String(row?.document_type || '-'));
+    const statusLabel = String(row?.stage_label || row?.stage || '-').trim() || '-';
+    const residentName = fullNameFromRow(row) || String(row?.resident_name || '-').trim() || '-';
+    const submittedAt = firstNonEmpty([row?.submitted_at, row?.request_timestamp, '-']);
+    const purpose = firstNonEmpty([row?.purpose, '-']);
+    return `
+      <div class="tracker-doc-highlight">Document Requested: ${esc(docName)}</div>
+      ${formSection('Request Summary', renderFieldGrid([
+        { label: 'Full Name', value: residentName },
+        { label: 'Status', value: statusLabel },
+        { label: 'Submitted At', value: submittedAt },
+        { label: 'Purpose', value: purpose }
+      ], 2))}
+      <div class="tracker-form-section">
+        <div class="text-muted">Loading full details...</div>
+      </div>
+    `;
   }
 
   function renderFromCache() {
@@ -2097,13 +2498,19 @@
     actionType.value = type;
     actionRequestId.value = requestId;
     const row = itemById.get(String(requestId));
+    const isFirstTimeJobSeeker = isFirstTimeJobSeekerRow(row);
+    if (actionForm) {
+      actionForm.dataset.docKey = normalizePreviewDocKey(row?.document_type || '');
+    }
 
     const rowStage = String(row?.stage || '').toLowerCase();
     const isWalkInFlow = rowStage === 'for_payment' || rowStage === 'payment_rejected';
     const labels = {
-      personnel_approve: 'Before You Approve',
+      personnel_approve: isFirstTimeJobSeeker ? 'Approve for Interview' : 'Before You Approve',
       personnel_approve_confirm: 'Confirm Approval',
       personnel_reject: 'Reject Request',
+      interview_pass: 'Approve Interview',
+      interview_fail: 'Fail Interview',
       finance_verify: isWalkInFlow ? 'Record Walk-in Payment' : 'Verify Payment / Walk-in Payment',
       finance_reject: 'Reject Payment',
       mark_ready: 'Mark Ready for Claim',
@@ -2114,7 +2521,9 @@
     const docName = normalizeDocumentTypeDisplay(String(row?.document_type || 'document'));
 
     if (type === 'personnel_approve' && actionPrompt) {
-      actionPrompt.textContent = `Click View Document to check the document that will be issued and edit it if there are necessary changes in the details. Once everything is correct, proceed to verify the ${docName}.`;
+      actionPrompt.textContent = isFirstTimeJobSeeker
+        ? 'This request will be moved to the interview stage. The resident will be notified to report to the barangay within 5 working days for the oath of undertaking and interview.'
+        : `Click View Document to check the document that will be issued and edit it if there are necessary changes in the details. Once everything is correct, proceed to verify the ${docName}.`;
       actionPrompt.classList.remove('d-none');
     }
     if (type === 'personnel_approve_confirm' && actionPrompt) {
@@ -2129,15 +2538,31 @@
       actionPrompt.textContent = 'Please provide the reason for rejection.';
       actionPrompt.classList.remove('d-none');
     }
+    if (type === 'interview_pass' && actionPrompt) {
+      actionPrompt.textContent = 'Approve the interview result and generate the First Time Job Seeker document for release.';
+      actionPrompt.classList.remove('d-none');
+    }
+    if (type === 'interview_fail' && actionPrompt) {
+      actionPrompt.textContent = 'Please provide the reason why the resident did not pass the interview.';
+      actionPrompt.classList.remove('d-none');
+    }
     if (actionSubmitBtn) {
       if (type === 'personnel_approve') {
-        actionSubmitBtn.textContent = 'View Document';
-        actionSubmitBtn.classList.remove('btn-danger', 'btn-success');
-        actionSubmitBtn.classList.add('btn-primary');
+        actionSubmitBtn.textContent = isFirstTimeJobSeeker ? 'Approve for Interview' : 'View Document';
+        actionSubmitBtn.classList.remove('btn-danger', 'btn-success', 'btn-primary');
+        actionSubmitBtn.classList.add(isFirstTimeJobSeeker ? 'btn-success' : 'btn-primary');
       } else if (type === 'personnel_approve_confirm') {
         actionSubmitBtn.textContent = 'Approve';
         actionSubmitBtn.classList.remove('btn-danger', 'btn-primary');
         actionSubmitBtn.classList.add('btn-success');
+      } else if (type === 'interview_pass') {
+        actionSubmitBtn.textContent = 'Pass Interview';
+        actionSubmitBtn.classList.remove('btn-danger', 'btn-primary');
+        actionSubmitBtn.classList.add('btn-success');
+      } else if (type === 'interview_fail') {
+        actionSubmitBtn.textContent = 'Fail Interview';
+        actionSubmitBtn.classList.remove('btn-primary', 'btn-success');
+        actionSubmitBtn.classList.add('btn-danger');
       } else if (type === 'mark_completed_confirm') {
         actionSubmitBtn.textContent = 'Release';
         actionSubmitBtn.classList.remove('btn-danger', 'btn-primary');
@@ -2160,12 +2585,14 @@
       type === 'personnel_approve' ||
       type === 'personnel_approve_confirm' ||
       type === 'personnel_reject' ||
+      type === 'interview_pass' ||
+      type === 'interview_fail' ||
       type === 'mark_completed_confirm'
     ) {
       actionForm?.querySelector('.modal-footer')?.classList.add('action-split');
     }
 
-    if (type === 'personnel_reject' || type === 'finance_reject') {
+    if (type === 'personnel_reject' || type === 'finance_reject' || type === 'interview_fail') {
       actionReasonWrap.classList.remove('d-none');
       actionReason.required = true;
     }
@@ -2240,7 +2667,12 @@
       }
     }
     if (type === 'mark_ready') {
-      actionIssuedWrap.classList.remove('d-none');
+      actionIssuedWrap.classList.add('d-none');
+      if (actionIssued) {
+        actionIssued.value = '';
+      }
+      actionPrompt.textContent = 'This will generate the issued document and mark the request as ready for claim.';
+      actionPrompt.classList.remove('d-none');
     }
 
     actionModal.show();
@@ -2252,35 +2684,38 @@
         const id = String(btn.getAttribute('data-view-id') || '');
         let row = itemById.get(id);
         if (!row || !viewDetailsBody || !viewModal) return;
+        try {
+          // Open modal immediately, then hydrate heavy details asynchronously.
+          switchViewMode('details');
+          if (viewModalTitle) {
+            const requestId = String(row.request_id || '').trim();
+            viewModalTitle.textContent = requestId
+              ? (isFinancePaymentsPage ? `Payment Transaction (#${requestId})` : `Certificate Request (#${requestId})`)
+              : (isFinancePaymentsPage ? 'Payment Transaction' : 'Certificate Request');
+          }
+          if (viewModalActions) {
+            viewModalActions.innerHTML = '';
+          }
+          if (viewModalNextBtn) {
+            viewModalNextBtn.classList.add('d-none');
+          }
+          if (viewModalBackBtn) {
+            viewModalBackBtn.classList.add('d-none');
+          }
+          if (viewModalWalkInBtn) {
+            viewModalWalkInBtn.classList.add('d-none');
+            viewModalWalkInBtn.removeAttribute('data-id');
+          }
+          const openImmediately = isFinancePaymentsPage || !rowHasModalDetails(row);
+          if (openImmediately) {
+            viewDetailsBody.innerHTML = renderQuickRequestSummary(row);
+            viewModal.show();
+          }
 
-        // Open modal immediately, then hydrate heavy details asynchronously.
-        switchViewMode('details');
-        if (viewModalTitle) {
-          const requestId = String(row.request_id || '').trim();
-          viewModalTitle.textContent = requestId
-            ? (isFinancePaymentsPage ? `Payment Transaction (#${requestId})` : `Certificate Request (#${requestId})`)
-            : (isFinancePaymentsPage ? 'Payment Transaction' : 'Certificate Request');
-        }
-        if (viewModalActions) {
-          viewModalActions.innerHTML = '';
-        }
-        if (viewModalNextBtn) {
-          viewModalNextBtn.classList.add('d-none');
-        }
-        if (viewModalBackBtn) {
-          viewModalBackBtn.classList.add('d-none');
-        }
-        if (viewModalWalkInBtn) {
-          viewModalWalkInBtn.classList.add('d-none');
-          viewModalWalkInBtn.removeAttribute('data-id');
-        }
-        viewDetailsBody.innerHTML = '<div class="text-muted py-2">Loading details...</div>';
-        viewModal.show();
+          row = await ensureRowDetails(row);
+          if (!row) return;
 
-        row = await ensureRowDetails(row);
-        if (!row) return;
-
-        if (isFinancePaymentsPage) {
+          if (isFinancePaymentsPage) {
           const payload = row.payload && typeof row.payload === 'object' ? row.payload : {};
           const residentProfile = row.resident_profile && typeof row.resident_profile === 'object'
             ? row.resident_profile
@@ -2430,38 +2865,40 @@
               }
             });
           });
-          viewModal.show();
-          return;
-        }
+            viewModal.show();
+            return;
+          }
 
-        const payload = row.payload && typeof row.payload === 'object' ? row.payload : {};
-        const residentProfile = row.resident_profile && typeof row.resident_profile === 'object'
-          ? row.resident_profile
-          : {};
-        const consumedKeys = new Set();
-        const collectFirst = (...keys) => {
-          for (const key of keys) {
-            if (!key) continue;
-            const value = payload[key];
-            if (value === null || value === undefined) continue;
-            const text = String(value).trim();
-            if (text === '') continue;
-            consumedKeys.add(String(key));
-            return text;
-          }
-          return '';
-        };
-        const collectResidentFirst = (...keys) => {
-          for (const key of keys) {
-            if (!key) continue;
-            const value = residentProfile[key];
-            if (value === null || value === undefined) continue;
-            const text = String(value).trim();
-            if (text === '') continue;
-            return text;
-          }
-          return '';
-        };
+          const payload = row.payload && typeof row.payload === 'object' ? row.payload : {};
+          const residentProfile = row.resident_profile && typeof row.resident_profile === 'object'
+            ? row.resident_profile
+            : {};
+          const isRelationshipJailVisit = String(payload?.cohabitation_variant || '').trim() === 'relationship_jail_visit'
+            || String(payload?.cohabitation_variant || '').trim() === 'conjugal_visit';
+          const consumedKeys = new Set();
+          const collectFirst = (...keys) => {
+            for (const key of keys) {
+              if (!key) continue;
+              const value = payload[key];
+              if (value === null || value === undefined) continue;
+              const text = String(value).trim();
+              if (text === '') continue;
+              consumedKeys.add(String(key));
+              return text;
+            }
+            return '';
+          };
+          const collectResidentFirst = (...keys) => {
+            for (const key of keys) {
+              if (!key) continue;
+              const value = residentProfile[key];
+              if (value === null || value === undefined) continue;
+              const text = String(value).trim();
+              if (text === '') continue;
+              return text;
+            }
+            return '';
+          };
 
         const personalFields = [
           { label: 'Last Name', value: firstNonEmpty([collectFirst('last_name', 'lastname'), collectResidentFirst('last_name')]) },
@@ -2489,7 +2926,10 @@
           'request_purpose', 'requestPurpose', 'purpose_choice', 'purposeChoice',
           'submission_target_type', 'government_official_id', 'government_position_group',
           'government_position_detail', 'government_official', 'government_office',
-          'government_position', 'request_officer_line1', 'request_officer_line2', 'request_officer_line3'
+          'government_position', 'request_officer_line1', 'request_officer_line2', 'request_officer_line3',
+          'cohabitation_variant', 'cohabitant_id_front_path', 'cohabitant_id_back_path',
+          'detention_proof_file_path', 'detention_proof_file_paths',
+          'relationship_proof_file_path', 'relationship_proof_file_paths'
         ]);
 
         const requestFields = [];
@@ -2542,6 +2982,24 @@
         if (paymentReferenceText) {
           requestFields.push({ label: 'GCash Transaction Number', value: paymentReferenceText });
         }
+        if (isRelationshipJailVisit) {
+          const detentionProofTypeText = firstNonEmpty([payload.detention_proof_type]);
+          if (detentionProofTypeText) {
+            consumedKeys.add('detention_proof_type');
+            requestFields.push({ label: 'Proof of Detention Type', value: detentionProofTypeText });
+          }
+        } else {
+          const cohabitantIdTypeText = firstNonEmpty([payload.cohabitant_id_type]);
+          if (cohabitantIdTypeText) {
+            consumedKeys.add('cohabitant_id_type');
+            requestFields.push({ label: 'Partner ID Type', value: cohabitantIdTypeText });
+          }
+          const cohabitantIdNumberText = firstNonEmpty([payload.cohabitant_id_number]);
+          if (cohabitantIdNumberText) {
+            consumedKeys.add('cohabitant_id_number');
+            requestFields.push({ label: 'Partner ID Number', value: cohabitantIdNumberText });
+          }
+        }
 
         Object.keys(payload).forEach((key) => {
           const normalized = String(key);
@@ -2577,7 +3035,7 @@
                  <p class="tracker-form-label">Proof of Residency File</p>
                  <div class="tracker-form-value d-flex justify-content-between align-items-center gap-2">
                    <span class="text-truncate">${esc(proofResidencyName || proofResidencyPath)}</span>
-                   <button type="button" class="btn btn-sm btn-primary" data-view-doc-url="${esc(proofResidencyUrl)}" data-view-doc-title="${esc(proofResidencyTitle)}">View</button>
+                   <button type="button" class="btn btn-sm btn-primary" data-support-doc-url="${esc(proofResidencyUrl)}" data-support-doc-title="${esc(proofResidencyTitle)}">View</button>
                  </div>
                </div>
              </div>`
@@ -2603,7 +3061,7 @@
               <p class="tracker-form-label">${esc(doc.label || `Document ${idx + 1}`)}</p>
               <div class="tracker-form-value d-flex justify-content-between align-items-center gap-2">
                 <span class="text-truncate">${esc(doc.path || '')}</span>
-                <button type="button" class="btn btn-sm btn-primary" data-view-doc-url="${esc(doc.url)}" data-view-doc-title="${esc(doc.label || 'Submitted Document')}">View</button>
+                <button type="button" class="btn btn-sm btn-primary" data-support-doc-url="${esc(doc.url)}" data-support-doc-title="${esc(doc.label || 'Submitted Document')}">View</button>
               </div>
             </div>
           `).join('');
@@ -2617,12 +3075,9 @@
             <div class="tracker-form-grid cols-1">
               <div class="tracker-form-field">
                 <p class="tracker-form-label">Issued Document</p>
-                <div class="tracker-form-value">
-                  <iframe
-                    src="${completedIssuedUrl}"
-                    style="width:100%;height:70vh;border:1px solid #ddd;border-radius:8px;background:#fff;"
-                    loading="lazy"
-                  ></iframe>
+                <div class="tracker-form-value d-flex justify-content-between align-items-center gap-2">
+                  <span>Open the issued document only when needed.</span>
+                  <button type="button" class="btn btn-sm btn-primary" data-view-doc-url="${esc(completedIssuedUrl)}" data-view-doc-title="Issued Document">View</button>
                 </div>
               </div>
             </div>
@@ -2631,7 +3086,7 @@
           html += formSection('Issued Document', issuedViewerHtml, issuedActionHtml);
         }
 
-        const isRejectedStatus = stageKeyForStatus.includes('rejected') || stageKeyForStatus === 'cancelled';
+        const isRejectedStatus = stageKeyForStatus.includes('rejected') || stageKeyForStatus === 'interview_failed' || stageKeyForStatus === 'cancelled';
         const statusLabelText = String(row.stage_label || row.stage || '-');
         const statusReasonText = firstNonEmpty([row.status_remarks, row.status_reason]);
         const statusBadgeHtml = isRejectedStatus
@@ -2736,6 +3191,18 @@
             openDocumentModal(docUrl, docTitle, 'view');
           });
         });
+        viewDetailsBody.querySelectorAll('button[data-support-doc-url]').forEach((docBtn) => {
+          docBtn.addEventListener('click', () => {
+            const docUrl = String(docBtn.getAttribute('data-support-doc-url') || '').trim();
+            const docTitle = String(docBtn.getAttribute('data-support-doc-title') || 'Submitted Attachment Viewer').trim();
+            if (!docUrl || !submittedFileModal || !submittedFileWrap || !submittedFileOpenNew) return;
+            if (viewModalEl && viewModalEl.classList.contains('show') && viewModal) {
+              preserveViewStateOnNextHide = true;
+              viewModal.hide();
+            }
+            openSubmittedFileModal(docUrl, docTitle, 'view');
+          });
+        });
         viewDetailsBody.querySelectorAll('button[data-inline-profile-id]').forEach((profileBtn) => {
           profileBtn.addEventListener('click', () => {
             openResidentProfileModal(
@@ -2745,11 +3212,18 @@
             );
           });
         });
-        if (openViewDirectPreview) {
-          switchViewMode('preview');
-          openViewDirectPreview = false;
+          if (openViewDirectPreview) {
+            switchViewMode('preview');
+            openViewDirectPreview = false;
+          }
+          viewModal.show();
+        } catch (err) {
+          const message = String(err?.message || err || 'Failed to load request details.');
+          viewDetailsHtml = `<div class="tracker-form-section"><div class="text-danger">${esc(message)}</div></div>`;
+          switchViewMode('details');
+          viewModal.show();
+          console.error('Failed to open request view modal:', err);
         }
-        viewModal.show();
       });
     });
 
@@ -2822,7 +3296,7 @@
     e.preventDefault();
     clearModalError();
 
-    if ((actionType.value || '') === 'personnel_approve') {
+    if ((actionType.value || '') === 'personnel_approve' && String(actionForm?.dataset?.docKey || '') !== 'firsttimejobseeker') {
       // "View Document" only opens preview; it does not approve yet.
       const rid = String(actionRequestId.value || '').trim();
       if (actionSubmitBtn) {
@@ -2914,6 +3388,9 @@
       if (actionForm?.dataset?.verifyMode) {
         delete actionForm.dataset.verifyMode;
       }
+      if (actionForm?.dataset?.docKey) {
+        delete actionForm.dataset.docKey;
+      }
     }
   });
 
@@ -2922,6 +3399,9 @@
   });
 
   actionModalEl?.addEventListener('hidden.bs.modal', () => {
+    if (actionForm?.dataset?.docKey) {
+      delete actionForm.dataset.docKey;
+    }
     if (openPreviewAfterActionModal) {
       openPreviewAfterActionModal = false;
       if (viewModal) {
@@ -3013,7 +3493,8 @@
       if (stageKey !== 'submitted') {
         return;
       }
-      openActionModal('personnel_approve_confirm', rid);
+      const currentRow = itemById.get(rid);
+      openActionModal(isFirstTimeJobSeekerRow(currentRow) ? 'personnel_approve' : 'personnel_approve_confirm', rid);
       return;
     }
     switchViewMode('preview');

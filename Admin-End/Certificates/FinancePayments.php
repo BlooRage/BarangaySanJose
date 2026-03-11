@@ -376,10 +376,29 @@ require_once __DIR__ . '/../includes/admin_guard.php';
   </div>
 </div>
 
+<div class="modal fade" id="submittedFileModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-xl modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="submittedFileTitle">Submitted Attachment Viewer</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <div id="submittedFileWrap" class="w-100 text-center"></div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" id="submittedFileReturnBtn" class="btn btn-secondary d-none">Return</button>
+        <a id="submittedFileOpenNew" class="btn btn-outline-primary" target="_blank" rel="noopener">Open Attachment in New Tab</a>
+        <button type="button" id="submittedFileCloseBtn" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <script>
 window.CERT_TRACKER_DEFAULT_STAGE = 'finance';
 </script>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-<script src="../../JS-Script-Files/Admin-End/certificateTrackerScript.js?v=20260310-07"></script>
+<script src="../../JS-Script-Files/Admin-End/certificateTrackerScript.js?v=20260311-08"></script>
 </body>
 </html>

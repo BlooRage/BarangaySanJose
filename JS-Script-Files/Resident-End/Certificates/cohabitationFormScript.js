@@ -76,8 +76,41 @@ document.addEventListener("DOMContentLoaded", () => {
     const cohabitationDurationHidden = form.querySelector('input[name="cohabitation_duration"]');
     const cohabitationDurationValue = form.querySelector('input[name="cohabitation_duration_value"]');
     const cohabitationDurationUnit = form.querySelector('input[name="cohabitation_duration_unit"]');
+    const relationshipLengthWrapper = document.getElementById("relationshipLengthWrapper");
     const cohabitationChildrenCount = document.getElementById("cohabitationChildrenCount");
     const cohabitationChildRows = Array.from(document.querySelectorAll("[data-child-row]"));
+    const cohabitationVariant = String(form.querySelector('input[name="cohabitation_variant"]')?.value || "").trim();
+    const isConjugalVisitVariant = cohabitationVariant === "conjugal_visit" || cohabitationVariant === "relationship_jail_visit";
+    const cohabitantRelationshipSelect = document.getElementById("cohabitantRelationshipSelect");
+    const cohabitantIdType = document.getElementById("cohabitantIdType");
+    const cohabitantIdDetails = document.getElementById("cohabitantIdDetails");
+    const cohabitantIdNumber = document.getElementById("cohabitantIdNumber");
+    const cohabitantIdFront = document.getElementById("cohabitantIdFront");
+    const cohabitantIdBack = document.getElementById("cohabitantIdBack");
+    const cohabitantIdBackField = document.getElementById("cohabitantIdBackField");
+    const cohabitantIdGuideText = document.getElementById("cohabitantIdGuideText");
+    const cohabitantIdFrontLabel = document.getElementById("cohabitantIdFrontLabel");
+    const cohabitantIdFrontPrompt = document.getElementById("cohabitantIdFrontPrompt");
+    const detentionProofType = document.getElementById("detentionProofType");
+    const detentionProofDetails = document.getElementById("detentionProofDetails");
+    const detentionProofGuideText = document.getElementById("detentionProofGuideText");
+    const detentionProofFiles = [
+        document.getElementById("detentionProofFile1"),
+        document.getElementById("detentionProofFile2"),
+        document.getElementById("detentionProofFile3")
+    ].filter(Boolean);
+    const detentionProofRows = Array.from(document.querySelectorAll("[data-detention-attachment-row]"));
+    const addDetentionAttachmentBtn = document.getElementById("addDetentionAttachmentBtn");
+    const relationshipProofFiles = [
+        document.getElementById("relationshipProofFile1"),
+        document.getElementById("relationshipProofFile2"),
+        document.getElementById("relationshipProofFile3")
+    ].filter(Boolean);
+    const relationshipProofRows = Array.from(document.querySelectorAll("[data-relationship-attachment-row]"));
+    const addRelationshipAttachmentBtn = document.getElementById("addRelationshipAttachmentBtn");
+    const detentionFacility = document.getElementById("detentionFacility");
+    const detentionFacilityOtherWrapper = document.getElementById("detentionFacilityOtherWrapper");
+    const detentionFacilityOther = document.getElementById("detentionFacilityOther");
     const monthLabels = {
         "01": "January",
         "02": "February",
@@ -210,6 +243,86 @@ document.addEventListener("DOMContentLoaded", () => {
         if (targets.street) targets.street.value = street;
         if (targets.subdivision) targets.subdivision.value = subdivision;
         if (targets.area) targets.area.value = area;
+    };
+
+    const joinAddressParts = (parts) =>
+        parts
+            .map((part) => String(part || "").trim())
+            .filter(Boolean)
+            .join(", ")
+            .replace(/\s+/g, " ")
+            .trim();
+
+    const buildCohabitantAddressValue = () => {
+        if (cohabSameAddress?.checked) {
+            return String(cohabitantFullAddress?.value || "").trim();
+        }
+        const system = String(cohabitantAddressSystem?.value || "").trim();
+        if (system === "lot_block") {
+            return joinAddressParts([
+                cohabUnitLot?.value ? `Unit ${cohabUnitLot.value}` : "",
+                cohabLot?.value ? `Lot ${cohabLot.value}` : "",
+                cohabBlock?.value ? `Blk ${cohabBlock.value}` : "",
+                cohabPhase?.value ? `Phase ${cohabPhase.value}` : "",
+                cohabSubdivisionLot?.value || cohabSubdivision?.value || "",
+                cohabitantBarangay?.value || "",
+                cohabitantCity?.value || "",
+                cohabitantProvince?.value || ""
+            ]);
+        }
+        if (system === "house") {
+            return joinAddressParts([
+                cohabUnit?.value ? `Unit ${cohabUnit.value}` : "",
+                [cohabHouse?.value || "", cohabStreet?.value || ""].filter(Boolean).join(" ").trim(),
+                cohabSubdivision?.value || "",
+                cohabitantBarangay?.value || "",
+                cohabitantCity?.value || "",
+                cohabitantProvince?.value || ""
+            ]);
+        }
+        return "";
+    };
+
+    const buildCohabitationAddressValue = () => {
+        if (cohabitationSameAddress?.checked) {
+            return String(cohabitationFullAddress?.value || "").trim();
+        }
+        const system = String(cohabitationAddressSystem?.value || "").trim();
+        const municipalityFixed = form.querySelector('input[name="cohabitation_municipality"]')?.value || "";
+        const provinceFixed = form.querySelector('input[name="cohabitation_province"]')?.value || "";
+        const barangayFixed = form.querySelector('input[name="cohabitation_barangay"]')?.value || "";
+        if (system === "lot_block") {
+            return joinAddressParts([
+                cohabitationUnitLot?.value ? `Unit ${cohabitationUnitLot.value}` : "",
+                cohabitationLot?.value ? `Lot ${cohabitationLot.value}` : "",
+                cohabitationBlock?.value ? `Blk ${cohabitationBlock.value}` : "",
+                cohabitationPhase?.value ? `Phase ${cohabitationPhase.value}` : "",
+                cohabitationSubdivisionLot?.value || cohabitationSubdivision?.value || "",
+                barangayFixed,
+                municipalityFixed,
+                provinceFixed
+            ]);
+        }
+        if (system === "house") {
+            return joinAddressParts([
+                cohabitationUnit?.value ? `Unit ${cohabitationUnit.value}` : "",
+                [cohabitationHouse?.value || "", cohabitationStreet?.value || ""].filter(Boolean).join(" ").trim(),
+                cohabitationSubdivision?.value || "",
+                barangayFixed,
+                municipalityFixed,
+                provinceFixed
+            ]);
+        }
+        return "";
+    };
+
+    const syncDerivedAddresses = () => {
+        if (cohabitantFullAddress && !cohabSameAddress?.checked) {
+            cohabitantFullAddress.value = buildCohabitantAddressValue();
+        }
+        if (cohabitationFullAddress && !cohabitationSameAddress?.checked) {
+            cohabitationFullAddress.value = buildCohabitationAddressValue();
+        }
     };
 
     const getOrCreateInlineError = (inputEl) => {
@@ -382,6 +495,201 @@ document.addEventListener("DOMContentLoaded", () => {
                 }
             });
         });
+    };
+
+    const syncDetentionFacilityOther = () => {
+        if (!detentionFacilityOtherWrapper || !detentionFacilityOther) return;
+        const useOther = String(detentionFacility?.value || "") === "Other";
+        detentionFacilityOtherWrapper.classList.toggle("d-none", !useOther);
+        detentionFacilityOther.disabled = !useOther;
+        setRequired(detentionFacilityOther, useOther);
+        if (!useOther) {
+            detentionFacilityOther.value = "";
+        }
+    };
+
+    const syncCohabitantIdSection = () => {
+        if (!cohabitantIdType || !cohabitantIdDetails) return;
+        const selectedType = String(cohabitantIdType.value || "").trim();
+        const hasType = selectedType !== "";
+        const isPassport = selectedType === "Passport";
+
+        cohabitantIdDetails.classList.toggle("d-none", !hasType);
+
+        if (cohabitantIdNumber) {
+            cohabitantIdNumber.disabled = !hasType;
+            setRequired(cohabitantIdNumber, hasType);
+            if (!hasType) {
+                cohabitantIdNumber.value = "";
+            }
+        }
+
+        if (cohabitantIdFront) {
+            cohabitantIdFront.disabled = !hasType;
+            setRequired(cohabitantIdFront, hasType);
+            if (!hasType) {
+                cohabitantIdFront.value = "";
+            }
+        }
+
+        if (cohabitantIdBackField && cohabitantIdBack) {
+            cohabitantIdBackField.classList.toggle("d-none", !hasType || isPassport);
+            cohabitantIdBack.disabled = !hasType || isPassport;
+            setRequired(cohabitantIdBack, hasType && !isPassport);
+            if (!hasType || isPassport) {
+                cohabitantIdBack.value = "";
+            }
+        }
+
+        if (cohabitantIdGuideText) {
+            if (!hasType) {
+                cohabitantIdGuideText.textContent = "Select an ID type first to continue.";
+            } else if (isPassport) {
+                cohabitantIdGuideText.textContent = "Passport only needs one upload image or file.";
+            } else {
+                cohabitantIdGuideText.textContent = `${selectedType} requires ID number plus front and back uploads.`;
+            }
+        }
+
+        if (cohabitantIdFrontLabel) {
+            cohabitantIdFrontLabel.textContent = isPassport ? "Passport Image / Scan" : "Front of Valid ID";
+        }
+        if (cohabitantIdFrontPrompt) {
+            cohabitantIdFrontPrompt.textContent = isPassport
+                ? "Drag and drop passport image or click to upload"
+                : "Drag and drop front ID or click to upload";
+        }
+    };
+
+    const syncDetentionProofSection = () => {
+        if (!detentionProofType || !detentionProofDetails) return;
+        const selectedType = String(detentionProofType.value || "").trim();
+        const hasType = selectedType !== "";
+        detentionProofDetails.classList.toggle("d-none", !hasType);
+        if (detentionProofGuideText) {
+            detentionProofGuideText.textContent = hasType
+                ? `${selectedType} will be attached as proof of detention.`
+                : "Select a detention proof type first to continue.";
+        }
+        detentionProofRows.forEach((row, index) => {
+            const input = detentionProofFiles[index];
+            const prompt = row.querySelector(".detention-proof-prompt");
+            const isVisible = hasType && index === 0 ? true : hasType && !row.classList.contains("d-none");
+            if (!hasType) {
+                row.classList.toggle("d-none", index !== 0);
+            }
+            if (input) {
+                input.disabled = !hasType || row.classList.contains("d-none");
+                setRequired(input, hasType && index === 0);
+                if (!hasType) {
+                    input.value = "";
+                }
+            }
+            if (prompt) {
+                prompt.textContent = hasType
+                    ? (index === 0
+                        ? `Drag and drop ${selectedType.toLowerCase()} or click to upload`
+                        : "Drag and drop additional attachment or click to upload")
+                    : "Drag and drop detention proof or click to upload";
+            }
+        });
+        if (addDetentionAttachmentBtn) {
+            addDetentionAttachmentBtn.classList.toggle("d-none", !hasType);
+            const visibleRows = detentionProofRows.filter((row) => !row.classList.contains("d-none")).length;
+            addDetentionAttachmentBtn.disabled = visibleRows >= detentionProofRows.length;
+        }
+    };
+
+    const syncRelationshipProofSection = () => {
+        relationshipProofRows.forEach((row, index) => {
+            const input = relationshipProofFiles[index];
+            const isVisible = !row.classList.contains("d-none");
+            if (input) {
+                input.disabled = !isVisible;
+                setRequired(input, index === 0);
+            }
+        });
+        if (addRelationshipAttachmentBtn) {
+            const visibleRows = relationshipProofRows.filter((row) => !row.classList.contains("d-none")).length;
+            addRelationshipAttachmentBtn.disabled = visibleRows >= relationshipProofRows.length;
+        }
+    };
+
+    const syncRelationshipLengthSection = () => {
+        if (!isConjugalVisitVariant || !relationshipLengthWrapper || !cohabitantRelationshipSelect) return;
+        const needsRelationshipLength = String(cohabitantRelationshipSelect.value || '').trim().toLowerCase() === 'partner';
+        relationshipLengthWrapper.classList.toggle('d-none', !needsRelationshipLength);
+        if (cohabitationStartDisplay) {
+            cohabitationStartDisplay.disabled = !needsRelationshipLength;
+        }
+        if (cohabitationStartDate) {
+            cohabitationStartDate.disabled = !needsRelationshipLength;
+            setRequired(cohabitationStartDate, needsRelationshipLength);
+            if (!needsRelationshipLength) {
+                cohabitationStartDate.value = '';
+            }
+        }
+        if (cohabitationStartDisplay && !needsRelationshipLength) {
+            cohabitationStartDisplay.value = '';
+            cohabitationStartDisplay.setCustomValidity('');
+        }
+        if (cohabitationDurationDisplay && !needsRelationshipLength) {
+            cohabitationDurationDisplay.value = '';
+        }
+        if (cohabitationDurationHidden && !needsRelationshipLength) {
+            cohabitationDurationHidden.value = '';
+        }
+        if (cohabitationDurationValue && !needsRelationshipLength) {
+            cohabitationDurationValue.value = '';
+        }
+        if (cohabitationDurationUnit && !needsRelationshipLength) {
+            cohabitationDurationUnit.value = '';
+        }
+    };
+
+    const bindDropzone = (inputEl) => {
+        if (!inputEl) return;
+        const zone = document.querySelector(`.upload-dropzone[data-upload-input="${inputEl.id}"]`);
+        const meta = document.getElementById(inputEl.id + "Meta");
+        if (!zone) return;
+
+        const setMeta = () => {
+            if (!meta) return;
+            const files = inputEl.files ? Array.from(inputEl.files) : [];
+            meta.textContent = files.length === 1
+                ? files[0].name
+                : "JPG, JPEG, PNG, WEBP, or PDF";
+        };
+
+        inputEl.addEventListener("change", () => {
+            setMeta();
+            updateSubmitState();
+        });
+
+        ["dragenter", "dragover"].forEach((eventName) => {
+            zone.addEventListener(eventName, (event) => {
+                event.preventDefault();
+                zone.classList.add("is-dragging");
+            });
+        });
+
+        ["dragleave", "dragend", "drop"].forEach((eventName) => {
+            zone.addEventListener(eventName, (event) => {
+                event.preventDefault();
+                zone.classList.remove("is-dragging");
+            });
+        });
+
+        zone.addEventListener("drop", (event) => {
+            const droppedFiles = event.dataTransfer ? event.dataTransfer.files : null;
+            if (!droppedFiles || !droppedFiles.length) return;
+            const dt = new DataTransfer();
+            dt.items.add(droppedFiles[0]);
+            inputEl.files = dt.files;
+            inputEl.dispatchEvent(new Event("change", { bubbles: true }));
+        });
+
+        setMeta();
     };
 
     let regionIndex = null;
@@ -651,6 +959,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 return;
             }
             applyCohabitantAddressSystem();
+            syncDerivedAddresses();
             updateSubmitState();
         });
         applyCohabitantAddressSystem();
@@ -732,6 +1041,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 return;
             }
             applyCohabitationAddressSystem();
+            syncDerivedAddresses();
             updateSubmitState();
         });
         applyCohabitationAddressSystem();
@@ -743,7 +1053,82 @@ document.addEventListener("DOMContentLoaded", () => {
             updateSubmitState();
         });
         applyCohabitationChildrenCount();
+    } else if (isConjugalVisitVariant) {
+        cohabitationChildRows.forEach((row) => {
+            row.classList.add("d-none");
+            row.querySelectorAll("input").forEach((input) => {
+                input.disabled = true;
+                input.value = "";
+                setRequired(input, false);
+            });
+        });
     }
+
+    if (detentionFacility) {
+        detentionFacility.addEventListener("change", () => {
+            syncDetentionFacilityOther();
+            updateSubmitState();
+        });
+        syncDetentionFacilityOther();
+    }
+
+    if (cohabitantIdType) {
+        cohabitantIdType.addEventListener("change", () => {
+            syncCohabitantIdSection();
+            updateSubmitState();
+        });
+        syncCohabitantIdSection();
+    }
+
+    if (detentionProofType) {
+        detentionProofType.addEventListener("change", () => {
+            syncDetentionProofSection();
+            updateSubmitState();
+        });
+        syncDetentionProofSection();
+    }
+
+    if (cohabitantRelationshipSelect) {
+        cohabitantRelationshipSelect.addEventListener("change", () => {
+            syncRelationshipLengthSection();
+            computeCohabitationDuration();
+            updateSubmitState();
+        });
+        syncRelationshipLengthSection();
+    }
+
+    if (addDetentionAttachmentBtn) {
+        addDetentionAttachmentBtn.addEventListener("click", () => {
+            const nextRow = detentionProofRows.find((row) => row.classList.contains("d-none"));
+            if (!nextRow) return;
+            nextRow.classList.remove("d-none");
+            const idx = detentionProofRows.indexOf(nextRow);
+            const input = detentionProofFiles[idx];
+            if (input) {
+                input.disabled = false;
+            }
+            syncDetentionProofSection();
+            updateSubmitState();
+        });
+    }
+
+    if (addRelationshipAttachmentBtn) {
+        addRelationshipAttachmentBtn.addEventListener("click", () => {
+            const nextRow = relationshipProofRows.find((row) => row.classList.contains("d-none"));
+            if (!nextRow) return;
+            nextRow.classList.remove("d-none");
+            const idx = relationshipProofRows.indexOf(nextRow);
+            const input = relationshipProofFiles[idx];
+            if (input) {
+                input.disabled = false;
+            }
+            syncRelationshipProofSection();
+            updateSubmitState();
+        });
+        syncRelationshipProofSection();
+    }
+
+    [cohabitantIdFront, cohabitantIdBack, ...detentionProofFiles, ...relationshipProofFiles].forEach(bindDropzone);
 
     if (cohabitationStartYear) {
         const currentYear = new Date().getFullYear();
@@ -803,6 +1188,7 @@ document.addEventListener("DOMContentLoaded", () => {
     if (cohabSameAddress) {
         cohabSameAddress.addEventListener("change", () => {
             syncCohabitantAddress();
+            syncDerivedAddresses();
             updateSubmitState();
         });
     }
@@ -810,6 +1196,7 @@ document.addEventListener("DOMContentLoaded", () => {
     if (cohabitationSameAddress) {
         cohabitationSameAddress.addEventListener("change", () => {
             syncCohabitationAddress();
+            syncDerivedAddresses();
             updateSubmitState();
         });
     }
@@ -817,7 +1204,18 @@ document.addEventListener("DOMContentLoaded", () => {
     updateSubmitState();
     syncCohabitantAddress();
     syncCohabitationAddress();
+    syncDerivedAddresses();
     initAddressData();
+    [
+        cohabUnit, cohabHouse, cohabStreet, cohabSubdivision, cohabUnitLot, cohabLot, cohabBlock, cohabPhase, cohabSubdivisionLot,
+        cohabitantProvince, cohabitantCity, cohabitantBarangay, cohabitantPostal, cohabitantRegionSelect,
+        cohabitationUnit, cohabitationHouse, cohabitationStreet, cohabitationSubdivision, cohabitationArea,
+        cohabitationUnitLot, cohabitationLot, cohabitationBlock, cohabitationPhase, cohabitationSubdivisionLot, cohabitationAreaLot
+    ].forEach((el) => {
+        if (!el) return;
+        el.addEventListener("input", syncDerivedAddresses);
+        el.addEventListener("change", syncDerivedAddresses);
+    });
     [cohabitantDob, cohabitationStartDate].forEach((el) => {
         if (!el) return;
         el.addEventListener("input", () => {
@@ -847,6 +1245,7 @@ document.addEventListener("DOMContentLoaded", () => {
     // We keep explicit field listeners above and validate on change/submit.
     form.addEventListener("change", updateSubmitState);
     form.addEventListener("submit", (e) => {
+        syncDerivedAddresses();
         updateSubmitState();
         const invalidField = getVisibleRequiredFields().find((el) => !el.checkValidity() || String(el.value || "").trim() === "");
         if (invalidField || !agree.checked) {

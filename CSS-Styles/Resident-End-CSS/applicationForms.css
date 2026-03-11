@@ -403,6 +403,7 @@ body {
 }
 
 .upload-dropzone {
+    position: relative;
     width: 100%;
     border: 2px dashed #d5b18f;
     border-radius: 10px;
@@ -414,6 +415,13 @@ body {
     align-items: center;
     gap: 6px;
     text-align: center;
+    cursor: pointer;
+}
+
+.upload-dropzone-input {
+    position: absolute;
+    inset: 0;
+    opacity: 0;
     cursor: pointer;
 }
 
@@ -433,6 +441,29 @@ body {
 
 .selected-files {
     word-break: break-word;
+}
+
+.id-guidance-card {
+    min-height: 100%;
+    border: 1px solid #f2d3b8;
+    background: #fffaf6;
+    border-radius: 10px;
+    padding: 14px 16px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 4px;
+}
+
+.id-guidance-card__title {
+    font-weight: 700;
+    color: #7c3f00;
+}
+
+.id-guidance-card__meta {
+    font-size: 0.9rem;
+    color: #6b7280;
+    line-height: 1.4;
 }
 
 /* Footer & Button */

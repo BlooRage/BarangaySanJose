@@ -522,6 +522,13 @@ require_once __DIR__ . '/../includes/admin_guard.php';
       text-align: justify;
       margin-top: 8px;
       padding: 0 8px 0 2px;
+      flex: 1 1 auto;
+    }
+    #viewModal .doc-preview-paper.doc-preview-paper--goodmoral {
+      display: flex;
+      flex-direction: column;
+      min-height: 1188px;
+      padding-bottom: 76px;
     }
     #viewModal .doc-preview-paper.doc-preview-paper--goodmoral .doc-preview-body p {
       margin: 0 0 12px;
@@ -553,15 +560,41 @@ require_once __DIR__ . '/../includes/admin_guard.php';
       margin-top: 8px;
       margin-bottom: 14px;
     }
-    #viewModal .doc-preview-paper.doc-preview-paper--goodmoral .doc-preview-goodmoral-meta p {
-      margin: 0 0 3px;
+    #viewModal .doc-preview-paper.doc-preview-paper--goodmoral .doc-preview-goodmoral-meta .doc-preview-meta-row {
+      display: grid;
+      grid-template-columns: 136px 120px;
+      align-items: baseline;
+      justify-content: start;
+      column-gap: 10px;
+      margin: 0 0 4px;
       text-align: left;
       text-indent: 0;
     }
+    #viewModal .doc-preview-paper.doc-preview-paper--goodmoral .doc-preview-goodmoral-meta .doc-preview-meta-label,
+    #viewModal .doc-preview-paper.doc-preview-paper--goodmoral .doc-preview-goodmoral-meta .doc-preview-meta-value {
+      text-align: left;
+      text-indent: 0;
+      white-space: nowrap;
+    }
+    #viewModal .doc-preview-paper.doc-preview-paper--goodmoral .doc-preview-goodmoral-meta .doc-preview-meta-line {
+      display: inline-block;
+      width: 72px;
+      border-bottom: 1px solid #111827;
+      transform: translateY(-2px);
+    }
+    #viewModal .doc-preview-paper.doc-preview-paper--goodmoral .doc-preview-footer-area {
+      display: grid;
+      grid-template-columns: minmax(220px, 1fr) minmax(260px, 1fr) 96px;
+      align-items: end;
+      column-gap: 18px;
+      margin-top: auto;
+      padding-top: 28px;
+    }
+    #viewModal .doc-preview-paper.doc-preview-paper--goodmoral .doc-preview-footer-area.doc-preview-footer-area--noqr {
+      grid-template-columns: minmax(220px, 1fr) minmax(260px, 1fr);
+      column-gap: 28px;
+    }
     #viewModal .doc-preview-paper.doc-preview-paper--goodmoral .doc-preview-signature {
-      position: absolute;
-      right: 66px;
-      bottom: 300px;
       margin-top: 0;
       justify-items: center;
       text-align: center;
@@ -572,33 +605,195 @@ require_once __DIR__ . '/../includes/admin_guard.php';
       padding-top: 6px;
     }
     #viewModal .doc-preview-paper.doc-preview-paper--goodmoral .doc-preview-issuedby {
-      position: absolute;
-      left: 48px;
-      bottom: 292px;
       font-size: .95rem;
       line-height: 1.35;
       text-align: left;
+      align-self: center;
     }
     #viewModal .doc-preview-paper.doc-preview-paper--goodmoral .doc-preview-footer {
-      position: absolute;
       width: 68%;
       left: 16%;
-      bottom: 64px;
       font-family: Arial, Helvetica, sans-serif;
       font-size: .78rem;
       text-align: center;
       font-style: italic;
       color: #111827;
+      margin: 14px auto 0;
+    }
+    #viewModal .doc-preview-paper.doc-preview-paper--goodmoral.doc-preview-paper--cohabitation-children {
+      min-height: 1320px;
+    }
+    #viewModal .doc-preview-paper.doc-preview-paper--goodmoral.doc-preview-paper--ftjs {
+      min-height: 1220px;
+      padding-bottom: 68px;
+    }
+    #viewModal .doc-preview-paper.doc-preview-paper--goodmoral.doc-preview-paper--ftjs .doc-preview-goodmoral-office {
+      margin-top: 10px;
+      margin-bottom: 14px;
+    }
+    #viewModal .doc-preview-paper.doc-preview-paper--goodmoral.doc-preview-paper--ftjs .doc-preview-ftjs-subtitle {
+      margin-top: 2px;
+      font-size: .74rem;
+      line-height: 1.2;
+      text-transform: none;
+      font-weight: 700;
+    }
+    #viewModal .doc-preview-paper.doc-preview-paper--goodmoral.doc-preview-paper--ftjs .doc-preview-body {
+      font-size: .96rem;
+      line-height: 1.46;
+    }
+    #viewModal .doc-preview-paper.doc-preview-paper--goodmoral.doc-preview-paper--ftjs .doc-preview-body p {
+      margin-bottom: 10px;
+    }
+    #viewModal .doc-preview-paper.doc-preview-paper--goodmoral.doc-preview-paper--ftjs .doc-preview-footer-area--ftjs {
+      grid-template-columns: 1fr minmax(280px, 1fr) 96px;
+      column-gap: 16px;
+      padding-top: 12px;
+    }
+    #viewModal .doc-preview-paper.doc-preview-paper--goodmoral.doc-preview-paper--ftjs .doc-preview-signature--ftjs {
+      margin-bottom: 6px;
+    }
+    #viewModal .doc-preview-paper.doc-preview-paper--goodmoral.doc-preview-paper--ftjs .doc-preview-signature--ftjs .name,
+    #viewModal .doc-preview-paper.doc-preview-paper--goodmoral.doc-preview-paper--ftjs .doc-preview-ftjs-witness .name {
+      min-width: 0;
+      width: 100%;
+      margin-top: 0;
+      padding-top: 6px;
+      border-top: 1px solid #374151;
+      font-size: 1rem;
+      font-weight: 800;
+      text-align: center;
+    }
+    #viewModal .doc-preview-paper.doc-preview-paper--goodmoral.doc-preview-paper--ftjs .doc-preview-ftjs-signing {
+      display: grid;
+      justify-items: center;
+      row-gap: 6px;
+      text-align: center;
+      font-size: .92rem;
+      margin-top: -8px;
+    }
+    #viewModal .doc-preview-paper.doc-preview-paper--goodmoral.doc-preview-paper--ftjs .doc-preview-ftjs-witness-label,
+    #viewModal .doc-preview-paper.doc-preview-paper--goodmoral.doc-preview-paper--ftjs .doc-preview-ftjs-date {
+      font-weight: 700;
+      font-size: .88rem;
+    }
+    #viewModal .doc-preview-paper.doc-preview-paper--goodmoral.doc-preview-paper--ftjs .doc-preview-ftjs-date {
+      width: 96px;
+      padding-top: 6px;
+      border-top: 1px solid #374151;
+      line-height: 1.1;
+    }
+    #viewModal .doc-preview-paper.doc-preview-paper--goodmoral.doc-preview-paper--ftjs .doc-preview-ftjs-date span {
+      display: inline-block;
+      margin-top: 2px;
+    }
+    #viewModal .doc-preview-paper.doc-preview-paper--goodmoral.doc-preview-paper--ftjs .doc-preview-ftjs-witness div:last-child,
+    #viewModal .doc-preview-paper.doc-preview-paper--goodmoral.doc-preview-paper--ftjs .doc-preview-signature--ftjs div:last-child {
+      font-style: italic;
+    }
+    #viewModal .doc-preview-paper.doc-preview-paper--goodmoral.doc-preview-paper--ftjs .doc-preview-footer {
+      width: 58%;
+      margin-top: 10px;
+      font-size: .76rem;
+    }
+    #viewModal .doc-preview-paper.doc-preview-paper--goodmoral.doc-preview-paper--jail {
+      min-height: 1188px;
+      padding-top: 34px;
+      padding-bottom: 54px;
+    }
+    #viewModal .doc-preview-paper.doc-preview-paper--goodmoral.doc-preview-paper--jail .doc-preview-goodmoral-office {
+      margin-top: 6px;
+      margin-bottom: 28px;
+    }
+    #viewModal .doc-preview-paper.doc-preview-paper--goodmoral.doc-preview-paper--jail .doc-preview-hint {
+      display: none;
+    }
+    #viewModal .doc-preview-paper.doc-preview-paper--goodmoral.doc-preview-paper--jail .doc-preview-body {
+      font-size: 1rem;
+      line-height: 1.48;
+      text-align: justify;
+      padding: 0 6px;
+      margin-top: 16px;
+    }
+    #viewModal .doc-preview-paper.doc-preview-paper--goodmoral.doc-preview-paper--jail .doc-preview-body p {
+      margin: 0 0 22px;
+      text-indent: 56px;
+    }
+    #viewModal .doc-preview-paper.doc-preview-paper--goodmoral.doc-preview-paper--jail .doc-preview-body p + p {
+      text-indent: 56px;
+    }
+    #viewModal .doc-preview-paper.doc-preview-paper--goodmoral.doc-preview-paper--jail .doc-preview-jail-lead {
+      text-align: left;
+      margin-bottom: 26px;
+      font-size: 1rem;
+      text-indent: 0 !important;
+    }
+    #viewModal .doc-preview-paper.doc-preview-paper--goodmoral.doc-preview-paper--jail .doc-preview-jail-center {
+      width: 84%;
+      margin-left: auto;
+      margin-right: auto;
+      box-sizing: border-box;
+      text-align: justify;
+      text-align-last: left;
+    }
+    #viewModal .doc-preview-paper.doc-preview-paper--goodmoral.doc-preview-paper--jail .doc-preview-jail-ordinance {
+      width: 84%;
+      margin: 6px auto 26px;
+      box-sizing: border-box;
+      text-align: justify;
+      text-align-last: left;
+    }
+    #viewModal .doc-preview-paper.doc-preview-paper--goodmoral.doc-preview-paper--jail .doc-preview-body .doc-preview-issued-line {
+      width: 84%;
+      margin: 10px auto 6px;
+      box-sizing: border-box;
+      text-indent: 56px;
+      text-align: left;
+      line-height: 1.52;
+    }
+    #viewModal .doc-preview-paper.doc-preview-paper--goodmoral.doc-preview-paper--jail .doc-preview-goodmoral-meta {
+      width: 220px;
+      margin: 0 0 0 8px;
+    }
+    #viewModal .doc-preview-paper.doc-preview-paper--goodmoral.doc-preview-paper--jail .doc-preview-goodmoral-meta .doc-preview-meta-row {
+      grid-template-columns: 88px 84px;
+      column-gap: 10px;
+      margin-bottom: 6px;
+    }
+    #viewModal .doc-preview-paper.doc-preview-paper--goodmoral.doc-preview-paper--jail .doc-preview-footer-area {
+      margin-top: 28px;
+      padding-top: 18px;
+      align-items: start;
+    }
+    #viewModal .doc-preview-paper.doc-preview-paper--goodmoral.doc-preview-paper--jail .doc-preview-issuedby {
+      align-self: start;
+      padding-top: 14px;
+      padding-bottom: 0;
+      font-size: .92rem;
+    }
+    #viewModal .doc-preview-paper.doc-preview-paper--goodmoral.doc-preview-paper--jail .doc-preview-signature {
+      align-self: start;
+    }
+    #viewModal .doc-preview-paper.doc-preview-paper--goodmoral.doc-preview-paper--jail .doc-preview-signature .name {
+      min-width: 320px;
+    }
+    #viewModal .doc-preview-paper.doc-preview-paper--goodmoral.doc-preview-paper--jail .doc-preview-footer {
+      width: 72%;
+      margin-top: 18px;
+      font-size: .8rem;
     }
     #viewModal .doc-preview-paper.doc-preview-paper--goodmoral .doc-preview-qr {
-      right: 18px;
-      bottom: 30px;
-      width: 92px;
+      position: static;
+      right: auto;
+      bottom: auto;
+      width: 96px;
       font-size: 0;
+      justify-self: end;
+      align-self: end;
     }
     #viewModal .doc-preview-paper.doc-preview-paper--goodmoral .doc-preview-qr-box {
-      width: 84px;
-      height: 84px;
+      width: 88px;
+      height: 88px;
       border-style: solid;
     }
     #viewModal .doc-preview-head {
@@ -717,7 +912,7 @@ require_once __DIR__ . '/../includes/admin_guard.php';
       position: absolute;
       right: 18px;
       bottom: 24px;
-      width: 118px;
+      width: 96px;
       text-align: center;
       color: #374151;
       font-size: .68rem;
@@ -725,8 +920,8 @@ require_once __DIR__ . '/../includes/admin_guard.php';
       letter-spacing: .02em;
     }
     #viewModal .doc-preview-qr-box {
-      width: 108px;
-      height: 108px;
+      width: 88px;
+      height: 88px;
       border: 1px dashed #6b7280;
       border-radius: 6px;
       margin: 0 auto 6px;
@@ -1019,6 +1214,25 @@ require_once __DIR__ . '/../includes/admin_guard.php';
   </div>
 </div>
 
+<div class="modal fade" id="submittedFileModal" tabindex="-1" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
+  <div class="modal-dialog modal-xl modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="submittedFileTitle">Submitted Attachment Viewer</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <div id="submittedFileWrap" class="w-100 text-center"></div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" id="submittedFileReturnBtn" class="btn btn-secondary d-none">Return</button>
+        <a id="submittedFileOpenNew" class="btn btn-outline-primary" target="_blank" rel="noopener">Open Attachment in New Tab</a>
+        <button type="button" id="submittedFileCloseBtn" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <div class="modal fade tracker-profile-modal" id="residentProfileModal" tabindex="-1" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
   <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable" id="div-modalSizing">
     <div class="modal-content border-0 rounded-2 p-4">
@@ -1128,6 +1342,6 @@ require_once __DIR__ . '/../includes/admin_guard.php';
   };
 </script>
 <script src="../../JS-Script-Files/Admin-End/tableColumnsGeneric.js?v=20260215-1"></script>
-<script src="../../JS-Script-Files/Admin-End/certificateTrackerScript.js?v=20260310-07"></script>
+<script src="../../JS-Script-Files/Admin-End/certificateTrackerScript.js?v=20260311-08"></script>
 </body>
 </html>

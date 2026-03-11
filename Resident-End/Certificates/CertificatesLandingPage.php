@@ -61,6 +61,17 @@ require_once __DIR__ . "/../includes/resident_access_guard.php";
 
                 <div class="col-md-6 col-lg-4 d-flex">
                     <div class="certificate-card card-action w-100">
+                        <img src="<?= htmlspecialchars($baseUrl) ?>/Icons/Dashboard/cohab.png" class="certificate-icon" alt="Certificate of Relationship for Jail Visitation">
+                        <h3>RELATIONSHIP FOR JAIL VISITATION</h3>
+                        <p class="certificate-text">
+                            Request a certificate of relationship for jail visitation requirements.
+                        </p>
+                        <button class="btn apply-btn" type="button" onclick="location.href='CohabitationForm.php?variant=relationship_jail_visit'">Apply Now</button>
+                    </div>
+                </div>
+
+                <div class="col-md-6 col-lg-4 d-flex">
+                    <div class="certificate-card card-action w-100">
                         <img src="<?= htmlspecialchars($baseUrl) ?>/Icons/Dashboard/indigency.png" class="certificate-icon" alt="Certificate of Indigency">
                         <h3>INDIGENCY</h3>
                         <p class="certificate-text">
@@ -77,7 +88,7 @@ require_once __DIR__ . "/../includes/resident_access_guard.php";
                         <p class="certificate-text">
                             Avail fee waivers for government documents under Republic Act 11261.
                         </p>
-                        <button class="btn apply-btn" type="button" disabled title="Currently unavailable">Apply Now</button>
+                        <button class="btn apply-btn" type="button" onclick="location.href='FirstTimeJobSeekerForm.php'">Apply Now</button>
                     </div>
                 </div>
 
@@ -103,16 +114,7 @@ require_once __DIR__ . "/../includes/resident_access_guard.php";
                     </div>
                 </div>
 
-                <div class="col-md-6 col-lg-4 d-flex">
-                    <div class="certificate-card card-action w-100">
-                        <img src="<?= htmlspecialchars($baseUrl) ?>/Icons/Dashboard/identity.png" class="certificate-icon" alt="Certificate of Identity">
-                        <h3>IDENTITY</h3>
-                        <p class="certificate-text">
-                            Request an identity certificate for official identification and verification purposes.
-                        </p>
-                        <button class="btn apply-btn" type="button" disabled title="Currently unavailable">Apply Now</button>
-                    </div>
-                </div>
+                <!-- Certificate of Identity intentionally hidden for now. -->
             </div>
         </main>
     </div>
