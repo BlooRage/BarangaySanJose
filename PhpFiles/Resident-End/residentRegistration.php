@@ -400,6 +400,7 @@ try {
     $birthRegion = cleanString($_POST['birthRegion'] ?? '');
     $birthProvince = cleanString($_POST['birthProvince'] ?? '');
     $birthCity = cleanString($_POST['birthCity'] ?? '');
+    $birthProvinceApplicable = cleanString($_POST['birthProvinceApplicable'] ?? '');
     $birthCountry = cleanString($_POST['birthCountry'] ?? '');
     $birthState = cleanString($_POST['birthState'] ?? '');
 
@@ -483,7 +484,13 @@ try {
     }
     $birthplace = '';
     if ($birthInPhilippines === 'yes') {
-        $birthplace = implode(', ', array_filter([$birthCity, $birthProvince], static fn($v) => trim((string)$v) !== ''));
+        $birthplaceParts = [$birthCity];
+        if ($birthProvince !== '') {
+            $birthplaceParts[] = $birthProvince;
+        } elseif ($birthRegion !== '') {
+            $birthplaceParts[] = $birthRegion;
+        }
+        $birthplace = implode(', ', array_filter($birthplaceParts, static fn($v) => trim((string)$v) !== ''));
     } elseif ($birthInPhilippines === 'no') {
         $birthplace = implode(', ', array_filter([$birthState, $birthCountry], static fn($v) => trim((string)$v) !== ''));
     }
@@ -571,9 +578,14 @@ try {
         exit;
     }
     if ($birthInPhilippines === 'yes') {
-        if ($birthRegion === '' || $birthProvince === '' || $birthCity === '') {
+        if ($birthRegion === '' || $birthCity === '') {
             http_response_code(400);
-            echo json_encode(["success" => false, "message" => "Region, province, and municipality/city are required for Philippine birthplaces."]);
+            echo json_encode(["success" => false, "message" => "Region and municipality/city are required for Philippine birthplaces."]);
+            exit;
+        }
+        if ($birthProvinceApplicable === 'yes' && $birthProvince === '') {
+            http_response_code(400);
+            echo json_encode(["success" => false, "message" => "Province is required for the selected Philippine region."]);
             exit;
         }
     } else {

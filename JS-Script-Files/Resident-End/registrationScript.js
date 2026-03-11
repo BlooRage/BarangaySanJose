@@ -813,6 +813,9 @@ function isActuallyVisible(el) {
   const birthCity = document.getElementById("birthCity");
   const birthCountry = document.getElementById("birthCountry");
   const birthState = document.getElementById("birthState");
+  const birthProvinceRequiredMark = document.getElementById("birthProvinceRequiredMark");
+  const birthProvinceOptionalNote = document.getElementById("birthProvinceOptionalNote");
+  const birthProvinceApplicable = document.getElementById("birthProvinceApplicable");
 
   const birthplaceApiBase = "https://psgc.gitlab.io/api";
   const countryStateDataUrl = String(window.COUNTRY_STATE_DATA_URL || "../Public-Assets/Data/countries-states.json");
@@ -860,6 +863,25 @@ function isActuallyVisible(el) {
     select.value = "";
     select.disabled = true;
     clearError(select);
+  }
+
+  function setBirthProvinceApplicability(isApplicable) {
+    if (birthProvinceApplicable) {
+      birthProvinceApplicable.value = isApplicable ? "yes" : "no";
+    }
+    if (birthProvince) {
+      birthProvince.required = isApplicable;
+      if (!isApplicable) {
+        birthProvince.value = "";
+        clearError(birthProvince);
+      }
+    }
+    if (birthProvinceRequiredMark) {
+      birthProvinceRequiredMark.classList.toggle("d-none", !isApplicable);
+    }
+    if (birthProvinceOptionalNote) {
+      birthProvinceOptionalNote.classList.toggle("d-none", isApplicable);
+    }
   }
 
   async function loadCountries() {
@@ -967,7 +989,7 @@ function isActuallyVisible(el) {
       resetBirthplaceSelect(birthCity, "Select municipality / city");
     }
 
-    if (birthProvince) birthProvince.required = isPhilippines;
+    setBirthProvinceApplicability(false);
     if (birthCity) birthCity.required = isPhilippines;
 
     if (birthCountry) {
@@ -1003,12 +1025,22 @@ function isActuallyVisible(el) {
     const code = birthRegion.selectedOptions[0]?.dataset.code || "";
     resetBirthplaceSelect(birthProvince, "Select province");
     resetBirthplaceSelect(birthCity, "Select municipality / city");
+    setBirthProvinceApplicability(false);
     if (!code) {
       updateNextButtonState();
       return;
     }
-    const provinces = await loadBirthProvinces(code).catch(() => []);
+    let provinces = [];
+    try {
+      provinces = await loadBirthProvinces(code);
+    } catch (_) {
+      if (birthProvince) birthProvince.innerHTML = '<option value="">Unable to load provinces</option>';
+      updateNextButtonState();
+      return;
+    }
+    setBirthProvinceApplicability(provinces.length > 0);
     if (!provinces.length) {
+      resetBirthplaceSelect(birthProvince, "Province not applicable for selected region");
       await loadBirthCitiesByRegion(code).catch(() => {
         if (birthCity) birthCity.innerHTML = '<option value="">Unable to load municipalities / cities</option>';
       });
