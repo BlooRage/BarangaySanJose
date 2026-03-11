@@ -107,7 +107,7 @@ function ann_creator_display_label(mysqli $conn, string $userId, string $fallbac
 $title = trim((string)($_POST["title"] ?? ""));
 $contentHtml = trim((string)($_POST["content_html"] ?? ""));
 $channels = array_values(array_unique(array_filter((array)($_POST["channels"] ?? []), function ($ch) {
-  return in_array((string)$ch, ["website", "sms", "email"], true);
+  return in_array((string)$ch, ["website", "public", "public_news", "sms", "email"], true);
 })));
 $audienceScope = trim((string)($_POST["audience_scope"] ?? "all"));
 $area = trim((string)($_POST["area"] ?? ""));
@@ -116,7 +116,7 @@ $submitAction = trim((string)($_POST["submit_action"] ?? "draft"));
 $scheduleDate = trim((string)($_POST["schedule_date"] ?? ""));
 $scheduleTime = trim((string)($_POST["schedule_time"] ?? ""));
 $channelContext = strtolower(trim((string)($_POST["channel_context"] ?? "all")));
-if (!in_array($channelContext, ["all", "website", "sms", "email"], true)) {
+if (!in_array($channelContext, ["all", "website", "public", "public_news", "sms", "email"], true)) {
   $channelContext = "all";
 }
 

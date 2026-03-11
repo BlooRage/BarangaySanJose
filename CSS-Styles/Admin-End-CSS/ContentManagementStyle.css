@@ -131,25 +131,28 @@
 .admin-list-toolbar {
   display: flex;
   align-items: center;
+  justify-content: space-between;
   gap: 12px;
-  flex-wrap: nowrap;
-  overflow-x: auto;
-  -webkit-overflow-scrolling: touch;
   padding-bottom: 2px;
   margin-top: 8px;
 }
 
-.admin-list-toolbar::-webkit-scrollbar {
-  height: 6px;
+.admin-list-toolbar-start,
+.admin-list-toolbar-end {
+  min-width: 0;
 }
 
-.admin-list-toolbar::-webkit-scrollbar-thumb {
-  background: rgba(0, 0, 0, 0.15);
-  border-radius: 999px;
+.admin-list-toolbar-start {
+  flex: 1 1 auto;
+  overflow: visible;
+  padding-right: 18px;
 }
 
-.admin-list-toolbar::-webkit-scrollbar-track {
-  background: transparent;
+.admin-list-toolbar-end {
+  display: flex;
+  flex: 0 0 auto;
+  justify-content: flex-end;
+  align-items: center;
 }
 
 .admin-list-tabs,
@@ -157,12 +160,37 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  flex: 0 0 auto;
   white-space: nowrap;
 }
 
+.admin-list-tabs {
+  min-width: 0;
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  scrollbar-width: thin;
+  padding-bottom: 2px;
+}
+
+.admin-list-tabs::-webkit-scrollbar {
+  height: 6px;
+}
+
+.admin-list-tabs::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.15);
+  border-radius: 999px;
+}
+
+.admin-list-tabs::-webkit-scrollbar-track {
+  background: transparent;
+}
+
 .admin-list-actions {
-  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  justify-content: flex-end;
+  flex-wrap: nowrap;
+  min-width: 0;
 }
 
 .review-queue-toolbar {
@@ -185,8 +213,10 @@
 }
 
 .admin-search {
-  min-width: 260px;
-  max-width: 420px;
+  min-width: 220px;
+  max-width: 320px;
+  width: 320px;
+  flex: 0 0 320px;
 }
 
 .announcement-shell .admin-search .input-group {
@@ -233,6 +263,12 @@
   color: #495057;
   background: #e9ecef;
   border: 2px solid #d5dbe1;
+}
+
+.status-pill.denied {
+  color: #9b2c3d;
+  background: #f3d6dc;
+  border: 2px solid #e3bcc5;
 }
 
 .announcement-shell .table-responsive {
@@ -310,14 +346,80 @@
   margin-bottom: 0;
 }
 
+.announcement-detail-status {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 140px;
+  padding: 8px 16px;
+  border-radius: 10px;
+  font-weight: 700;
+  border: 2px solid transparent;
+}
+
+.announcement-detail-status.status-approved {
+  color: #18613f;
+  background: #d4e8db;
+  border-color: #c0dac9;
+}
+
+.announcement-detail-status.status-pending {
+  color: #6c5a06;
+  background: #f4e8b7;
+  border-color: #e9db9f;
+}
+
+.announcement-detail-status.status-denied {
+  color: #9b2c3d;
+  background: #f3d6dc;
+  border-color: #e3bcc5;
+}
+
+.announcement-detail-status.status-draft {
+  color: #495057;
+  background: #e9ecef;
+  border-color: #d5dbe1;
+}
+
+.announcement-status-select.status-approved {
+  color: #18613f;
+  background-color: #d4e8db;
+  border-color: #c0dac9;
+  font-weight: 700;
+}
+
+.announcement-status-select.status-pending {
+  color: #6c5a06;
+  background-color: #f4e8b7;
+  border-color: #e9db9f;
+  font-weight: 700;
+}
+
+.announcement-status-select.status-denied {
+  color: #9b2c3d;
+  background-color: #f3d6dc;
+  border-color: #e3bcc5;
+  font-weight: 700;
+}
+
+.announcement-status-select.status-draft {
+  color: #495057;
+  background-color: #e9ecef;
+  border-color: #d5dbe1;
+  font-weight: 700;
+}
+
 .announcement-details-content .modal-body {
   max-height: 74vh;
   overflow-y: auto;
 }
 
-.announcement-shell #table-appData th:nth-child(4),
-.announcement-shell #table-appData td:nth-child(4) {
+.announcement-shell #table-appData .announcement-status-col {
   text-align: center;
+}
+
+.announcement-shell #table-appData .announcement-action-col {
+  text-align: right;
 }
 
 .pending-count-badge {
@@ -359,7 +461,19 @@
   border-width: 1px;
 }
 
+.announcement-shell .admin-list-tabs {
+  gap: 12px;
+  overflow: visible;
+}
+
+.announcement-shell .status-filter-btn {
+  border-radius: 10px;
+  border-width: 1px;
+  overflow: visible;
+}
+
 .announcement-shell .status-filter-btn[data-filter="Approved"],
+.announcement-shell .status-filter-btn[data-filter="Denied"],
 .announcement-shell .status-filter-btn[data-filter="Pending"],
 .announcement-shell .status-filter-btn[data-filter="Draft"] {
   color: #495057;
@@ -377,6 +491,7 @@
 }
 
 .announcement-shell .status-filter-btn[data-filter="Approved"].active,
+.announcement-shell .status-filter-btn[data-filter="Denied"].active,
 .announcement-shell .status-filter-btn[data-filter="Pending"].active,
 .announcement-shell .status-filter-btn[data-filter="Draft"].active {
   color: #fff !important;
@@ -509,6 +624,29 @@
   border-radius: 10px;
 }
 
+#modalDeleteAnnouncement .modal-header,
+#modalAnnouncementFlash .modal-header,
+#modalSuperAdminRepostConfirm .modal-header,
+#modalSuperAdminPostConfirm .modal-header {
+  justify-content: center;
+  text-align: center;
+}
+
+#modalDeleteAnnouncement .modal-header .modal-title,
+#modalAnnouncementFlash .modal-header .modal-title,
+#modalSuperAdminRepostConfirm .modal-header .modal-title,
+#modalSuperAdminPostConfirm .modal-header .modal-title {
+  width: 100%;
+  text-align: center;
+}
+
+#modalDeleteAnnouncement .modal-body,
+#modalAnnouncementFlash .modal-body,
+#modalSuperAdminRepostConfirm .modal-body,
+#modalSuperAdminPostConfirm .modal-body {
+  text-align: center;
+}
+
 /* Modal action layout:
    first visible action spans full row, remaining actions share next row. */
 .modal-footer .modal-action-primary {
@@ -522,10 +660,17 @@
   max-width: none;
 }
 
+.modal-footer .modal-action-fullrow {
+  flex: 1 1 100% !important;
+  max-width: 100%;
+}
+
 .modal-footer .modal-action-primary.btn,
 .modal-footer .modal-action-secondary.btn,
+.modal-footer .modal-action-fullrow.btn,
 .modal-footer .modal-action-primary .btn,
-.modal-footer .modal-action-secondary .btn {
+.modal-footer .modal-action-secondary .btn,
+.modal-footer .modal-action-fullrow .btn {
   width: 100%;
 }
 
@@ -541,7 +686,9 @@
 }
 
 #modalViewAnnouncement .modal-footer.modal-grid-actions .modal-action-primary,
-#modalDeleteAnnouncement .modal-footer.modal-grid-actions .modal-action-primary {
+#modalDeleteAnnouncement .modal-footer.modal-grid-actions .modal-action-primary,
+#modalViewAnnouncement .modal-footer.modal-grid-actions .modal-action-fullrow,
+#modalDeleteAnnouncement .modal-footer.modal-grid-actions .modal-action-fullrow {
   grid-column: 1 / -1;
 }
 
@@ -551,10 +698,46 @@
   width: 100%;
 }
 
-@media (max-width: 768px) {
+@media (max-width: 992px) {
   .admin-list-toolbar {
+    display: flex;
+    align-items: stretch;
+    flex-wrap: wrap;
+  }
+
+  .admin-list-toolbar-start,
+  .admin-list-toolbar-end {
+    width: 100%;
+  }
+
+  .admin-list-toolbar-end {
+    justify-content: flex-start;
+  }
+
+  .admin-list-tabs {
+    width: 100%;
     flex-wrap: wrap;
     overflow-x: visible;
+    padding-bottom: 0;
+  }
+
+  .admin-list-actions {
+    width: 100%;
+    justify-content: flex-start;
+    flex-wrap: wrap;
+  }
+
+  .admin-search {
+    min-width: 0;
+    max-width: 100%;
+    width: 100%;
+    flex: 1 1 320px;
+  }
+}
+
+@media (max-width: 768px) {
+  .admin-list-toolbar {
+    align-items: stretch;
   }
 
   .admin-list-tabs,
@@ -573,6 +756,7 @@
     margin-left: 0;
     flex-wrap: wrap;
     gap: 8px;
+    justify-content: flex-start;
   }
 
   .admin-search {

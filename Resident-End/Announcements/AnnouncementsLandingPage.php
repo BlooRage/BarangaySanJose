@@ -23,7 +23,7 @@ $websiteAnnouncements = [];
 
 foreach ($items as $item) {
   $channels = array_values(array_filter((array)($item['channels'] ?? []), function ($ch) {
-    return in_array((string)$ch, ['website', 'sms', 'email'], true);
+    return in_array((string)$ch, ['website', 'public', 'public_news', 'sms', 'email'], true);
   }));
   $status = strtolower((string)($item['status'] ?? 'draft'));
   if (!in_array('website', $channels, true)) {
@@ -139,7 +139,7 @@ foreach ($items as $item) {
       <hr>
 
       <p class="page-description">
-        Stay informed with verified barangay updates, advisories, and reminders posted through the official website channel.
+        Stay informed with verified barangay updates, advisories, and reminders posted through the official account page channel.
       </p>
 
       <p class="section-label">Latest announcements:</p>

@@ -3,7 +3,7 @@ require_once __DIR__ . "/../includes/admin_guard.php";
 require_once __DIR__ . "/../../PhpFiles/General/connection.php";
 
 $deliveryChannel = strtolower(trim((string)($_GET['channel'] ?? 'all')));
-if (!in_array($deliveryChannel, ['all', 'website', 'sms', 'email'], true)) {
+if (!in_array($deliveryChannel, ['all', 'website', 'public', 'public_news', 'sms', 'email'], true)) {
   $deliveryChannel = 'all';
 }
 $sessionRole = strtolower(trim((string)($_SESSION['role'] ?? '')));
@@ -21,7 +21,7 @@ $isSuperAdmin = $sessionRole === 'superadmin';
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
   <link href="../../summernote-0.9.0-dist/summernote-lite.min.css?v=20260307-2" rel="stylesheet">
   <link rel="stylesheet" href="../../CSS-Styles/Admin-End-CSS/AdminDashboardStyle.css">
-  <link rel="stylesheet" href="../../CSS-Styles/Admin-End-CSS/ContentManagementStyle.css?v=20260307-26">
+  <link rel="stylesheet" href="../../CSS-Styles/Admin-End-CSS/ContentManagementStyle.css?v=20260311-34">
 </head>
 <body>
   <div class="d-flex flex-column flex-md-row" style="min-height: 100vh;">
@@ -61,8 +61,16 @@ $isSuperAdmin = $sessionRole === 'superadmin';
               <h5 class="announcement-section-title">Delivery Channels</h5>
 
               <div class="form-check">
+                <input class="form-check-input channel-checkbox" type="checkbox" value="public" id="channelPublic" name="channels[]" <?= $deliveryChannel === 'public' || $deliveryChannel === 'all' ? 'checked' : '' ?>>
+                <label class="form-check-label" for="channelPublic">Public Announcement</label>
+              </div>
+              <div class="form-check">
+                <input class="form-check-input channel-checkbox" type="checkbox" value="public_news" id="channelPublicNews" name="channels[]" <?= $deliveryChannel === 'public_news' || $deliveryChannel === 'all' ? 'checked' : '' ?>>
+                <label class="form-check-label" for="channelPublicNews">Public News</label>
+              </div>
+              <div class="form-check">
                 <input class="form-check-input channel-checkbox" type="checkbox" value="website" id="channelWebsite" name="channels[]" <?= $deliveryChannel === 'website' || $deliveryChannel === 'all' ? 'checked' : '' ?>>
-                <label class="form-check-label" for="channelWebsite">Website</label>
+                <label class="form-check-label" for="channelWebsite">Account Page</label>
               </div>
               <div class="form-check">
                 <input class="form-check-input channel-checkbox" type="checkbox" value="sms" id="channelSms" name="channels[]" <?= $deliveryChannel === 'sms' || $deliveryChannel === 'all' ? 'checked' : '' ?>>
@@ -142,10 +150,10 @@ $isSuperAdmin = $sessionRole === 'superadmin';
         </div>
 
         <div class="announcement-sticky-actions d-flex flex-wrap justify-content-end gap-2 mt-4">
-          <a href="Announcements.php<?= $deliveryChannel !== 'all' ? '?channel=' . urlencode($deliveryChannel) : '' ?>" class="btn btn-outline-secondary">Cancel</a>
-          <button type="submit" name="submit_action" value="draft" class="btn btn-warning text-dark">Save Draft</button>
+          <a href="Announcements.php<?= $deliveryChannel !== 'all' ? '?channel=' . urlencode($deliveryChannel) : '' ?>" class="btn btn-outline-secondary">Close</a>
+          <button type="submit" name="submit_action" value="draft" class="btn btn-warning text-dark">Save as Draft</button>
           <?php if ($isSuperAdmin): ?>
-            <button type="submit" id="btnPostAnnouncement" name="submit_action" value="approved" class="btn btn-primary text-white">Post Announcement</button>
+            <button type="submit" id="btnPostAnnouncement" name="submit_action" value="approved" class="btn btn-primary text-white">Post</button>
           <?php else: ?>
             <button type="submit" name="submit_action" value="pending" class="btn btn-primary text-white">Submit for Review</button>
           <?php endif; ?>

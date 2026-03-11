@@ -113,13 +113,13 @@ $q = trim((string)($_POST['q'] ?? ''));
 $queueQ = trim((string)($_POST['queue_q'] ?? ''));
 $queueChannel = strtolower(trim((string)($_POST['queue_channel'] ?? 'all')));
 
-if (!in_array($channel, ['all', 'website', 'sms', 'email'], true)) {
+if (!in_array($channel, ['all', 'website', 'public', 'public_news', 'sms', 'email'], true)) {
   $channel = 'all';
 }
 if (!in_array($status, ['all', 'approved', 'pending', 'draft'], true)) {
   $status = 'all';
 }
-if (!in_array($queueChannel, ['all', 'website', 'sms', 'email'], true)) {
+if (!in_array($queueChannel, ['all', 'website', 'public', 'public_news', 'sms', 'email'], true)) {
   $queueChannel = 'all';
 }
 if ($announcementId === '' || !in_array($action, ['approve', 'deny', 'delete', 'update', 'submit_review'], true)) {
@@ -168,6 +168,8 @@ foreach ($rows as $idx => $item) {
       ann_action_redirect($channel, $status, $q, $queueQ, $queueChannel, 'warning', 'Only pending announcements can be approved.');
     }
     $rows[$idx]['status'] = 'approved';
+    $rows[$idx]['review_result'] = 'approved';
+    $rows[$idx]['review_note'] = '';
     $rows[$idx]['reviewed_at'] = date('Y-m-d H:i:s');
     $rows[$idx]['reviewed_by'] = (string)($_SESSION['user_id'] ?? 'SuperAdmin');
     if (empty((string)($rows[$idx]['publish_date'] ?? '')) || (string)($rows[$idx]['publish_date'] ?? '-') === '-') {
@@ -191,6 +193,8 @@ foreach ($rows as $idx => $item) {
     }
     // Denied announcements are returned to Draft for revision.
     $rows[$idx]['status'] = 'draft';
+    $rows[$idx]['review_result'] = 'denied';
+    $rows[$idx]['review_note'] = 'Your announcement was denied and returned to draft for revision.';
     $rows[$idx]['reviewed_at'] = date('Y-m-d H:i:s');
     $rows[$idx]['reviewed_by'] = (string)($_SESSION['user_id'] ?? 'SuperAdmin');
     if (!announcements_save_all($rows)) {
@@ -213,7 +217,7 @@ foreach ($rows as $idx => $item) {
     $publishDate = trim((string)($_POST['publish_date'] ?? '-'));
     $nextStatus = strtolower(trim((string)($_POST['status_update'] ?? $currentStatus)));
     $channels = array_values(array_unique(array_filter((array)($_POST['channels'] ?? []), function ($ch) {
-      return in_array((string)$ch, ['website', 'sms', 'email'], true);
+      return in_array((string)$ch, ['website', 'public', 'public_news', 'sms', 'email'], true);
     })));
 
     if ($title === '' || $audience === '') {
@@ -232,6 +236,9 @@ foreach ($rows as $idx => $item) {
       if ($currentStatus === 'approved') {
         // Any Admin edit to a published announcement must go through SuperAdmin review again.
         $nextStatus = 'pending';
+      } elseif ($currentStatus === 'pending') {
+        // Editing an already submitted announcement keeps it in the pending review queue.
+        $nextStatus = 'pending';
       } elseif ($nextStatus === 'approved') {
         $nextStatus = 'pending';
       }
@@ -245,13 +252,24 @@ foreach ($rows as $idx => $item) {
     $rows[$idx]['status'] = $nextStatus;
     $rows[$idx]['updated_at'] = date('Y-m-d H:i:s');
     $rows[$idx]['updated_by'] = (string)($_SESSION['user_id'] ?? ($_SESSION['role'] ?? 'Admin'));
+    if ($nextStatus === 'draft') {
+      if (strtolower((string)($item['review_result'] ?? '')) === 'denied') {
+        $rows[$idx]['review_result'] = '';
+        $rows[$idx]['review_note'] = '';
+      }
+    } else {
+      $rows[$idx]['review_result'] = $nextStatus === 'approved' ? 'approved' : '';
+      $rows[$idx]['review_note'] = '';
+    }
 
     if (!announcements_save_all($rows)) {
       ann_action_redirect($channel, $status, $q, $queueQ, $queueChannel, 'danger', 'Unable to update announcement.');
     }
-    $msg = (!$isSuperAdmin && $currentStatus === 'approved')
-      ? 'Announcement updated and resubmitted for review.'
-      : 'Announcement updated successfully.';
+    $msg = (!$isSuperAdmin && $nextStatus === 'pending')
+      ? 'Announcement submitted for review. Please wait for approval.'
+      : ((strtolower((string)($item['review_result'] ?? '')) === 'denied' && $nextStatus === 'draft')
+        ? 'Announcement changes saved as draft.'
+        : 'Announcement updated successfully.');
     ann_action_redirect($channel, $status, $q, $queueQ, $queueChannel, 'success', $msg);
   }
 
@@ -269,6 +287,8 @@ foreach ($rows as $idx => $item) {
     $rows[$idx]['status'] = 'pending';
     $rows[$idx]['updated_at'] = date('Y-m-d H:i:s');
     $rows[$idx]['updated_by'] = (string)($_SESSION['user_id'] ?? ($_SESSION['role'] ?? 'Admin'));
+    $rows[$idx]['review_result'] = '';
+    $rows[$idx]['review_note'] = '';
 
     if (!announcements_save_all($rows)) {
       ann_action_redirect($channel, $status, $q, $queueQ, $queueChannel, 'danger', 'Unable to submit announcement for review.');

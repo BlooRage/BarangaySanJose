@@ -4,19 +4,19 @@ require_once __DIR__ . "/../../PhpFiles/General/connection.php";
 require_once __DIR__ . "/../../PhpFiles/Admin-End/announcementsStore.php";
 
 $deliveryChannel = strtolower(trim((string)($_GET['channel'] ?? 'all')));
-if (!in_array($deliveryChannel, ['all', 'website', 'sms', 'email'], true)) {
+if (!in_array($deliveryChannel, ['all', 'website', 'public', 'public_news', 'sms', 'email'], true)) {
   $deliveryChannel = 'all';
 }
 
 $statusFilter = strtolower(trim((string)($_GET['status'] ?? 'all')));
-if (!in_array($statusFilter, ['all', 'approved', 'pending', 'draft'], true)) {
+if (!in_array($statusFilter, ['all', 'approved', 'denied', 'pending', 'draft'], true)) {
   $statusFilter = 'all';
 }
 
 $searchTerm = trim((string)($_GET['q'] ?? ''));
 $queueSearchTerm = trim((string)($_GET['queue_q'] ?? ''));
 $queueChannelFilter = strtolower(trim((string)($_GET['queue_channel'] ?? 'all')));
-if (!in_array($queueChannelFilter, ['all', 'website', 'sms', 'email'], true)) {
+if (!in_array($queueChannelFilter, ['all', 'website', 'public', 'public_news', 'sms', 'email'], true)) {
   $queueChannelFilter = 'all';
 }
 $sessionRole = strtolower(trim((string)($_SESSION['role'] ?? '')));
@@ -24,7 +24,9 @@ $isSuperAdmin = $sessionRole === 'superadmin';
 $currentUserId = trim((string)($_SESSION['user_id'] ?? ''));
 
 $channelLabels = [
-  'website' => 'Website',
+  'public' => 'Public Announcement',
+  'public_news' => 'Public News',
+  'website' => 'Account Page',
   'sms' => 'SMS',
   'email' => 'Email'
 ];
@@ -32,7 +34,8 @@ $channelLabels = [
 $statusLabels = [
   'approved' => 'Approved',
   'pending' => 'Pending',
-  'draft' => 'Draft'
+  'draft' => 'Draft',
+  'denied' => 'Denied'
 ];
 
 function ann_creator_display_from_user_id(mysqli $conn, string $userId, string $fallback): string
@@ -158,13 +161,23 @@ function ann_is_owned_by_current_user(array $item, string $currentUserId, string
   return false;
 }
 
+function ann_display_status(array $item, string $currentUserId, string $currentUserDisplay): string
+{
+  $status = strtolower((string)($item['status'] ?? 'draft'));
+  $reviewResult = strtolower((string)($item['review_result'] ?? ''));
+  if ($status === 'draft' && $reviewResult === 'denied' && ann_is_owned_by_current_user($item, $currentUserId, $currentUserDisplay)) {
+    return 'denied';
+  }
+  return $status;
+}
+
 $currentUserDisplayLabel = ann_creator_display_from_user_id($conn, $currentUserId, $currentUserId);
 
 $announcementRows = [];
 $storedAnnouncements = announcements_load_all();
 foreach ($storedAnnouncements as $item) {
   $channels = array_values(array_filter((array)($item['channels'] ?? []), function ($ch) {
-    return in_array($ch, ['website', 'sms', 'email'], true);
+    return in_array($ch, ['website', 'public', 'public_news', 'sms', 'email'], true);
   }));
   $status = strtolower((string)($item['status'] ?? 'draft'));
   if (!in_array($status, ['approved', 'pending', 'draft'], true)) {
@@ -193,6 +206,8 @@ foreach ($storedAnnouncements as $item) {
     'created_by_user_id' => $createdByUserId,
     'created_by_role' => $createdByRole,
     'content_html' => (string)($item['content_html'] ?? ''),
+    'review_result' => strtolower((string)($item['review_result'] ?? '')),
+    'review_note' => (string)($item['review_note'] ?? ''),
     'created_at' => (string)($item['created_at'] ?? ''),
     'updated_at' => (string)($item['updated_at'] ?? '')
   ];
@@ -216,17 +231,18 @@ $filteredByChannel = array_values(array_filter($announcementRows, function ($ite
   return in_array($deliveryChannel, $item['channels'], true);
 }));
 
-$statusCounts = ['all' => 0, 'approved' => 0, 'pending' => 0, 'draft' => 0];
+$statusCounts = ['all' => 0, 'approved' => 0, 'denied' => 0, 'pending' => 0, 'draft' => 0];
 foreach ($filteredByChannel as $item) {
-  $status = $item['status'];
+  $status = ann_display_status($item, $currentUserId, $currentUserDisplayLabel);
   $statusCounts['all']++;
   if (isset($statusCounts[$status])) {
     $statusCounts[$status]++;
   }
 }
 
-$visibleRows = array_values(array_filter($filteredByChannel, function ($item) use ($statusFilter, $searchTerm, $channelLabels, $statusLabels, $isSuperAdmin) {
-  if ($statusFilter !== 'all' && $item['status'] !== $statusFilter) {
+$visibleRows = array_values(array_filter($filteredByChannel, function ($item) use ($statusFilter, $searchTerm, $channelLabels, $statusLabels, $currentUserId, $currentUserDisplayLabel) {
+  $displayStatus = ann_display_status($item, $currentUserId, $currentUserDisplayLabel);
+  if ($statusFilter !== 'all' && $displayStatus !== $statusFilter) {
     return false;
   }
   if ($searchTerm === '') {
@@ -238,8 +254,8 @@ $visibleRows = array_values(array_filter($filteredByChannel, function ($item) us
     implode(', ', array_map(function ($ch) use ($channelLabels) {
       return $channelLabels[$ch] ?? strtoupper($ch);
     }, $item['channels'])),
-    $statusLabels[$item['status']] ?? $item['status'],
-    $isSuperAdmin ? $item['created_by'] : ''
+    $statusLabels[$displayStatus] ?? $displayStatus,
+    $item['created_by']
   ]));
   return str_contains($haystack, strtolower($searchTerm));
 }));
@@ -292,6 +308,8 @@ foreach ($announcementRows as $row) {
     'publish_date' => (string)$row['publish_date'],
     'created_by' => (string)$row['created_by'],
     'content_html' => (string)$row['content_html'],
+    'review_result' => (string)($row['review_result'] ?? ''),
+    'review_note' => (string)($row['review_note'] ?? ''),
     'created_at' => (string)$row['created_at'],
     'updated_at' => (string)$row['updated_at']
   ];
@@ -330,6 +348,20 @@ function buildReviewQueueUrl(string $channel, string $status, string $searchTerm
   }
   return 'Announcements.php?' . http_build_query($query);
 }
+
+function announcement_ordered_channels(array $channels): array
+{
+  $order = ['public_news', 'public', 'website', 'sms', 'email'];
+  $normalized = array_values(array_unique(array_filter($channels, function ($ch) use ($order) {
+    return in_array((string)$ch, $order, true);
+  })));
+
+  usort($normalized, function ($a, $b) use ($order) {
+    return array_search((string)$a, $order, true) <=> array_search((string)$b, $order, true);
+  });
+
+  return $normalized;
+}
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -343,7 +375,7 @@ function buildReviewQueueUrl(string $channel, string $status, string $searchTerm
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
   <link href="../../summernote-0.9.0-dist/summernote-lite.min.css?v=20260307-2" rel="stylesheet">
   <link rel="stylesheet" href="../../CSS-Styles/Admin-End-CSS/AdminDashboardStyle.css">
-  <link rel="stylesheet" href="../../CSS-Styles/Admin-End-CSS/ContentManagementStyle.css?v=20260307-26">
+  <link rel="stylesheet" href="../../CSS-Styles/Admin-End-CSS/ContentManagementStyle.css?v=20260311-34">
 </head>
 <body>
   <div class="d-flex flex-column flex-md-row" style="min-height: 100vh;">
@@ -417,9 +449,10 @@ function buildReviewQueueUrl(string $channel, string $status, string $searchTerm
                 <?php else: ?>
                   <?php foreach ($reviewQueueRows as $item): ?>
                     <?php
+                      $orderedQueueChannels = announcement_ordered_channels((array)$item['channels']);
                       $queueChannelsText = implode(', ', array_map(function ($ch) use ($channelLabels) {
                         return $channelLabels[$ch] ?? strtoupper($ch);
-                      }, $item['channels']));
+                      }, $orderedQueueChannels));
                     ?>
                     <tr>
                       <td><?= htmlspecialchars($item['title']) ?></td>
@@ -436,6 +469,28 @@ function buildReviewQueueUrl(string $channel, string $status, string $searchTerm
                             data-id="<?= htmlspecialchars($item['id']) ?>">
                             View
                           </button>
+                          <form method="post" action="../../PhpFiles/Admin-End/announcementsActions.php" class="d-inline">
+                            <?= csrfTokenField() ?>
+                            <input type="hidden" name="action" value="approve">
+                            <input type="hidden" name="announcement_id" value="<?= htmlspecialchars($item['id']) ?>">
+                            <input type="hidden" name="channel" value="<?= htmlspecialchars($deliveryChannel) ?>">
+                            <input type="hidden" name="status" value="<?= htmlspecialchars($statusFilter) ?>">
+                            <input type="hidden" name="q" value="<?= htmlspecialchars($searchTerm) ?>">
+                            <input type="hidden" name="queue_channel" value="<?= htmlspecialchars($queueChannelFilter) ?>">
+                            <input type="hidden" name="queue_q" value="<?= htmlspecialchars($queueSearchTerm) ?>">
+                            <button class="btn btn-success btn-sm" type="submit">Approve</button>
+                          </form>
+                          <form method="post" action="../../PhpFiles/Admin-End/announcementsActions.php" class="d-inline">
+                            <?= csrfTokenField() ?>
+                            <input type="hidden" name="action" value="deny">
+                            <input type="hidden" name="announcement_id" value="<?= htmlspecialchars($item['id']) ?>">
+                            <input type="hidden" name="channel" value="<?= htmlspecialchars($deliveryChannel) ?>">
+                            <input type="hidden" name="status" value="<?= htmlspecialchars($statusFilter) ?>">
+                            <input type="hidden" name="q" value="<?= htmlspecialchars($searchTerm) ?>">
+                            <input type="hidden" name="queue_channel" value="<?= htmlspecialchars($queueChannelFilter) ?>">
+                            <input type="hidden" name="queue_q" value="<?= htmlspecialchars($queueSearchTerm) ?>">
+                            <button class="btn btn-danger btn-sm" type="submit">Deny</button>
+                          </form>
                         </div>
                       </td>
                     </tr>
@@ -464,47 +519,54 @@ function buildReviewQueueUrl(string $channel, string $status, string $searchTerm
           </div>
         <?php endif; ?>
 
-        <div class="admin-list-toolbar mb-3 pt-2 flex-wrap">
-          <div class="admin-list-tabs">
-            <a href="<?= htmlspecialchars(buildAnnouncementsUrl($deliveryChannel, 'all', $searchTerm)) ?>" data-filter="ALL" class="btn btn-outline-primary btn-sm status-filter-btn fw-semibold <?= $statusFilter === 'all' ? 'active' : '' ?>">
-              &nbsp;&nbsp;All&nbsp;&nbsp;
-            </a>
-            <a href="<?= htmlspecialchars(buildAnnouncementsUrl($deliveryChannel, 'approved', $searchTerm)) ?>" data-filter="Approved" class="btn btn-outline-secondary btn-sm status-filter-btn fw-semibold <?= $statusFilter === 'approved' ? 'active' : '' ?>">
-              &nbsp;&nbsp;Approved&nbsp;&nbsp;
-            </a>
-            <a href="<?= htmlspecialchars(buildAnnouncementsUrl($deliveryChannel, 'draft', $searchTerm)) ?>" data-filter="Draft" class="btn btn-outline-secondary btn-sm status-filter-btn fw-semibold <?= $statusFilter === 'draft' ? 'active' : '' ?>">
-              &nbsp;&nbsp;Draft&nbsp;&nbsp;
-            </a>
-            <a href="<?= htmlspecialchars(buildAnnouncementsUrl($deliveryChannel, 'pending', $searchTerm)) ?>" data-filter="Pending" class="btn btn-outline-secondary btn-sm status-filter-btn fw-semibold has-notif <?= $statusFilter === 'pending' ? 'active' : '' ?>">
-              &nbsp;&nbsp;Pending
-              <?php if ($statusCounts['pending'] > 0): ?>
-                <span class="pending-count-badge"><?= (int)$statusCounts['pending'] ?></span>
-              <?php endif; ?>
-            </a>
+        <div class="admin-list-toolbar mb-3 pt-2">
+          <div class="admin-list-toolbar-start">
+            <div class="admin-list-tabs">
+              <a href="<?= htmlspecialchars(buildAnnouncementsUrl($deliveryChannel, 'all', $searchTerm)) ?>" data-filter="ALL" class="btn btn-outline-primary btn-sm status-filter-btn fw-semibold <?= $statusFilter === 'all' ? 'active' : '' ?>">
+                &nbsp;&nbsp;All&nbsp;&nbsp;
+              </a>
+              <a href="<?= htmlspecialchars(buildAnnouncementsUrl($deliveryChannel, 'approved', $searchTerm)) ?>" data-filter="Approved" class="btn btn-outline-secondary btn-sm status-filter-btn fw-semibold <?= $statusFilter === 'approved' ? 'active' : '' ?>">
+                &nbsp;&nbsp;Approved&nbsp;&nbsp;
+              </a>
+              <a href="<?= htmlspecialchars(buildAnnouncementsUrl($deliveryChannel, 'denied', $searchTerm)) ?>" data-filter="Denied" class="btn btn-outline-secondary btn-sm status-filter-btn fw-semibold <?= $statusFilter === 'denied' ? 'active' : '' ?>">
+                &nbsp;&nbsp;Denied&nbsp;&nbsp;
+              </a>
+              <a href="<?= htmlspecialchars(buildAnnouncementsUrl($deliveryChannel, 'draft', $searchTerm)) ?>" data-filter="Draft" class="btn btn-outline-secondary btn-sm status-filter-btn fw-semibold <?= $statusFilter === 'draft' ? 'active' : '' ?>">
+                &nbsp;&nbsp;Draft&nbsp;&nbsp;
+              </a>
+              <a href="<?= htmlspecialchars(buildAnnouncementsUrl($deliveryChannel, 'pending', $searchTerm)) ?>" data-filter="Pending" class="btn btn-outline-secondary btn-sm status-filter-btn fw-semibold has-notif <?= $statusFilter === 'pending' ? 'active' : '' ?>">
+                &nbsp;&nbsp;Pending
+                <?php if ($statusCounts['pending'] > 0): ?>
+                  <span class="pending-count-badge"><?= (int)$statusCounts['pending'] ?></span>
+                <?php endif; ?>
+              </a>
+            </div>
           </div>
 
-          <div class="admin-list-actions">
-            <form class="announcement-search-form" method="get" action="Announcements.php">
-              <input type="hidden" name="channel" value="<?= htmlspecialchars($deliveryChannel) ?>">
-              <input type="hidden" name="status" value="<?= htmlspecialchars($statusFilter) ?>">
-              <div class="input-group admin-search">
-                <input type="text" id="searchInput" name="q" class="form-control" placeholder="<?= $isSuperAdmin ? 'Search title, audience, creator' : 'Search title, audience' ?>" value="<?= htmlspecialchars($searchTerm) ?>">
-                <span class="input-group-text bg-white"><i class="fas fa-search"></i></span>
-              </div>
-            </form>
+          <div class="admin-list-toolbar-end">
+            <div class="admin-list-actions">
+              <form class="announcement-search-form" method="get" action="Announcements.php">
+                <input type="hidden" name="channel" value="<?= htmlspecialchars($deliveryChannel) ?>">
+                <input type="hidden" name="status" value="<?= htmlspecialchars($statusFilter) ?>">
+                <div class="input-group admin-search">
+                  <input type="text" id="searchInput" name="q" class="form-control" placeholder="Search title, audience, creator" value="<?= htmlspecialchars($searchTerm) ?>">
+                  <span class="input-group-text bg-white"><i class="fas fa-search"></i></span>
+                </div>
+              </form>
 
-            <button class="btn btn-outline-secondary btn-icon" type="button" data-bs-toggle="modal" data-bs-target="#modalFilter" id="filterButton" title="Filter" aria-label="Filter">
-              <i class="fas fa-filter"></i>
-              <span class="visually-hidden">Filter</span>
-            </button>
-            <button class="btn btn-outline-secondary btn-icon" type="button" data-bs-toggle="modal" data-bs-target="#modalTableColumns" id="btnAnnouncementsColumns" title="Columns" aria-label="Columns">
-              <i class="fa-solid fa-sliders"></i>
-              <span class="visually-hidden">Columns</span>
-            </button>
-            <a class="btn btn-outline-secondary btn-icon" id="btnAnnouncementsTableRefresh" href="<?= htmlspecialchars(buildAnnouncementsUrl($deliveryChannel, $statusFilter)) ?>" title="Refresh table" aria-label="Refresh table">
-              <i class="fa-solid fa-arrows-rotate"></i>
-              <span class="visually-hidden">Refresh</span>
-            </a>
+              <button class="btn btn-outline-secondary btn-icon" type="button" data-bs-toggle="modal" data-bs-target="#modalFilter" id="filterButton" title="Filter" aria-label="Filter">
+                <i class="fas fa-filter"></i>
+                <span class="visually-hidden">Filter</span>
+              </button>
+              <button class="btn btn-outline-secondary btn-icon" type="button" data-bs-toggle="modal" data-bs-target="#modalTableColumns" id="btnAnnouncementsColumns" title="Columns" aria-label="Columns">
+                <i class="fa-solid fa-sliders"></i>
+                <span class="visually-hidden">Columns</span>
+              </button>
+              <a class="btn btn-outline-secondary btn-icon" id="btnAnnouncementsTableRefresh" href="<?= htmlspecialchars(buildAnnouncementsUrl($deliveryChannel, $statusFilter)) ?>" title="Refresh table" aria-label="Refresh table">
+                <i class="fa-solid fa-arrows-rotate"></i>
+                <span class="visually-hidden">Refresh</span>
+              </a>
+            </div>
           </div>
         </div>
 
@@ -515,18 +577,16 @@ function buildReviewQueueUrl(string $channel, string $status, string $searchTerm
                 <th>Title</th>
                 <th>Audience</th>
                 <th>Channels</th>
-                <th>Status</th>
-                <?php if ($isSuperAdmin): ?>
-                  <th>Created By</th>
-                <?php endif; ?>
+                <th>Created By</th>
                 <th>Publish Date</th>
-                <th class="text-end">Actions</th>
+                <th class="announcement-status-col">Status</th>
+                <th class="text-end announcement-action-col">Actions</th>
               </tr>
             </thead>
             <tbody id="tableBody">
               <?php if (!$visibleRows): ?>
                 <tr>
-                  <td colspan="<?= $isSuperAdmin ? '7' : '6' ?>" class="text-center text-muted py-4">No announcements match the current filters.</td>
+                  <td colspan="7" class="text-center text-muted py-4">No announcements match the current filters.</td>
                 </tr>
               <?php else: ?>
                 <?php foreach ($visibleRows as $item): ?>
@@ -534,21 +594,26 @@ function buildReviewQueueUrl(string $channel, string $status, string $searchTerm
                     $status = $item['status'];
                     $isSuperAdminCreated = ((string)($item['created_by_role'] ?? '') === 'superadmin');
                     $isOwnedByCurrentUser = ann_is_owned_by_current_user($item, $currentUserId, $currentUserDisplayLabel);
-                    $statusClass = $status === 'approved' ? 'approved' : ($status === 'pending' ? 'pending' : 'archived');
+                    $reviewResult = strtolower((string)($item['review_result'] ?? ''));
+                    $displayStatus = ($status === 'draft' && $reviewResult === 'denied' && $isOwnedByCurrentUser) ? 'denied' : $status;
+                    $statusClass = $displayStatus === 'approved'
+                      ? 'approved'
+                      : ($displayStatus === 'pending'
+                        ? 'pending'
+                        : ($displayStatus === 'denied' ? 'denied' : 'archived'));
+                    $orderedChannels = announcement_ordered_channels((array)$item['channels']);
                     $channelsText = implode(', ', array_map(function ($ch) use ($channelLabels) {
                       return $channelLabels[$ch] ?? strtoupper($ch);
-                    }, $item['channels']));
+                    }, $orderedChannels));
                   ?>
                   <tr>
                     <td><?= htmlspecialchars($item['title']) ?></td>
                     <td><?= htmlspecialchars($item['audience']) ?></td>
                     <td><?= htmlspecialchars($channelsText) ?></td>
-                    <td><span class="status-pill <?= htmlspecialchars($statusClass) ?>"><?= htmlspecialchars($statusLabels[$status]) ?></span></td>
-                    <?php if ($isSuperAdmin): ?>
-                      <td><?= htmlspecialchars($item['created_by']) ?></td>
-                    <?php endif; ?>
+                    <td><?= htmlspecialchars($item['created_by']) ?></td>
                     <td><?= htmlspecialchars($item['publish_date']) ?></td>
-                    <td class="text-end">
+                    <td class="announcement-status-col"><span class="status-pill <?= htmlspecialchars($statusClass) ?>"><?= htmlspecialchars($statusLabels[$displayStatus] ?? $displayStatus) ?></span></td>
+                    <td class="text-end announcement-action-col">
                       <div class="announcement-row-actions">
                         <div class="announcement-primary-actions">
                           <button
@@ -629,6 +694,10 @@ function buildReviewQueueUrl(string $channel, string $status, string $searchTerm
                       <span>Approved</span>
                     </label>
                     <label class="d-flex align-items-center gap-2">
+                      <input class="form-check-input m-0" type="radio" name="status" value="denied" <?= $statusFilter === 'denied' ? 'checked' : '' ?>>
+                      <span>Denied</span>
+                    </label>
+                    <label class="d-flex align-items-center gap-2">
                       <input class="form-check-input m-0" type="radio" name="status" value="pending" <?= $statusFilter === 'pending' ? 'checked' : '' ?>>
                       <span>Pending</span>
                     </label>
@@ -648,7 +717,15 @@ function buildReviewQueueUrl(string $channel, string $status, string $searchTerm
                     </label>
                     <label class="d-flex align-items-center gap-2">
                       <input class="form-check-input m-0" type="radio" name="channel" value="website" <?= $deliveryChannel === 'website' ? 'checked' : '' ?>>
-                      <span>Website</span>
+                      <span>Account Page</span>
+                    </label>
+                    <label class="d-flex align-items-center gap-2">
+                      <input class="form-check-input m-0" type="radio" name="channel" value="public" <?= $deliveryChannel === 'public' ? 'checked' : '' ?>>
+                      <span>Public Announcement</span>
+                    </label>
+                    <label class="d-flex align-items-center gap-2">
+                      <input class="form-check-input m-0" type="radio" name="channel" value="public_news" <?= $deliveryChannel === 'public_news' ? 'checked' : '' ?>>
+                      <span>Public News</span>
                     </label>
                     <label class="d-flex align-items-center gap-2">
                       <input class="form-check-input m-0" type="radio" name="channel" value="sms" <?= $deliveryChannel === 'sms' ? 'checked' : '' ?>>
@@ -742,12 +819,20 @@ function buildReviewQueueUrl(string $channel, string $status, string $searchTerm
                 <input class="form-check-input m-0" type="radio" name="queue_channel" value="all" <?= $queueChannelFilter === 'all' ? 'checked' : '' ?>>
                 <span>All Channels</span>
               </label>
-              <label class="d-flex align-items-center gap-2">
-                <input class="form-check-input m-0" type="radio" name="queue_channel" value="website" <?= $queueChannelFilter === 'website' ? 'checked' : '' ?>>
-                <span>Website</span>
-              </label>
-              <label class="d-flex align-items-center gap-2">
-                <input class="form-check-input m-0" type="radio" name="queue_channel" value="sms" <?= $queueChannelFilter === 'sms' ? 'checked' : '' ?>>
+                <label class="d-flex align-items-center gap-2">
+                  <input class="form-check-input m-0" type="radio" name="queue_channel" value="website" <?= $queueChannelFilter === 'website' ? 'checked' : '' ?>>
+                  <span>Account Page</span>
+                </label>
+                <label class="d-flex align-items-center gap-2">
+                  <input class="form-check-input m-0" type="radio" name="queue_channel" value="public" <?= $queueChannelFilter === 'public' ? 'checked' : '' ?>>
+                  <span>Public Announcement</span>
+                </label>
+                <label class="d-flex align-items-center gap-2">
+                  <input class="form-check-input m-0" type="radio" name="queue_channel" value="public_news" <?= $queueChannelFilter === 'public_news' ? 'checked' : '' ?>>
+                  <span>Public News</span>
+                </label>
+                <label class="d-flex align-items-center gap-2">
+                  <input class="form-check-input m-0" type="radio" name="queue_channel" value="sms" <?= $queueChannelFilter === 'sms' ? 'checked' : '' ?>>
                 <span>SMS</span>
               </label>
               <label class="d-flex align-items-center gap-2">
@@ -814,7 +899,7 @@ function buildReviewQueueUrl(string $channel, string $status, string $searchTerm
               </div>
               <div class="col-md-6">
                 <p class="announcement-detail-label">Status</p>
-                <p class="announcement-detail-value" id="viewAnnouncementStatus">-</p>
+                <p class="announcement-detail-value announcement-detail-status status-draft" id="viewAnnouncementStatus">-</p>
               </div>
               <div class="col-md-6">
                 <p class="announcement-detail-label">Publish Date</p>
@@ -823,46 +908,15 @@ function buildReviewQueueUrl(string $channel, string $status, string $searchTerm
             </div>
             <hr>
             <div>
+              <div id="viewAnnouncementReviewNotice" class="alert alert-danger d-none mb-3" role="alert"></div>
               <p class="announcement-detail-label mb-1">Announcement Content</p>
               <div id="viewAnnouncementContent" class="border rounded p-3 bg-white" style="min-height: 160px;"></div>
             </div>
           </div>
         </div>
         <div class="modal-footer border-0">
-          <form id="viewSubmitReviewForm" method="post" action="../../PhpFiles/Admin-End/announcementsActions.php" class="d-inline">
-            <?= csrfTokenField() ?>
-            <input type="hidden" name="action" value="submit_review">
-            <input type="hidden" id="viewSubmitReviewAnnouncementId" name="announcement_id" value="">
-            <input type="hidden" name="channel" value="<?= htmlspecialchars($deliveryChannel) ?>">
-            <input type="hidden" name="status" value="<?= htmlspecialchars($statusFilter) ?>">
-            <input type="hidden" name="q" value="<?= htmlspecialchars($searchTerm) ?>">
-            <input type="hidden" name="queue_channel" value="<?= htmlspecialchars($queueChannelFilter) ?>">
-            <input type="hidden" name="queue_q" value="<?= htmlspecialchars($queueSearchTerm) ?>">
-            <button type="button" class="btn btn-primary text-white d-none" id="btnViewSubmitReviewAnnouncement">Submit for Review</button>
-          </form>
-          <form id="viewApproveForm" method="post" action="../../PhpFiles/Admin-End/announcementsActions.php" class="d-inline">
-            <?= csrfTokenField() ?>
-            <input type="hidden" name="action" value="approve">
-            <input type="hidden" id="viewApproveAnnouncementId" name="announcement_id" value="">
-            <input type="hidden" name="channel" value="<?= htmlspecialchars($deliveryChannel) ?>">
-            <input type="hidden" name="status" value="<?= htmlspecialchars($statusFilter) ?>">
-            <input type="hidden" name="q" value="<?= htmlspecialchars($searchTerm) ?>">
-            <input type="hidden" name="queue_channel" value="<?= htmlspecialchars($queueChannelFilter) ?>">
-            <input type="hidden" name="queue_q" value="<?= htmlspecialchars($queueSearchTerm) ?>">
-            <button type="button" class="btn btn-success text-white d-none" id="btnViewApproveAnnouncement">Approve</button>
-          </form>
-          <form id="viewDenyForm" method="post" action="../../PhpFiles/Admin-End/announcementsActions.php" class="d-inline">
-            <?= csrfTokenField() ?>
-            <input type="hidden" name="action" value="deny">
-            <input type="hidden" id="viewDenyAnnouncementId" name="announcement_id" value="">
-            <input type="hidden" name="channel" value="<?= htmlspecialchars($deliveryChannel) ?>">
-            <input type="hidden" name="status" value="<?= htmlspecialchars($statusFilter) ?>">
-            <input type="hidden" name="q" value="<?= htmlspecialchars($searchTerm) ?>">
-            <input type="hidden" name="queue_channel" value="<?= htmlspecialchars($queueChannelFilter) ?>">
-            <input type="hidden" name="queue_q" value="<?= htmlspecialchars($queueSearchTerm) ?>">
-            <button type="button" class="btn btn-danger text-white d-none" id="btnViewDenyAnnouncement">Deny</button>
-          </form>
-          <button type="button" class="btn btn-danger text-white d-none" id="btnViewDeleteAnnouncement">Delete</button>
+          <button type="button" class="btn btn-warning text-dark d-none" id="btnViewEditAnnouncement">Edit</button>
+          <button type="button" class="btn btn-outline-danger d-none" id="btnViewDeleteAnnouncement">Delete</button>
           <button type="button" class="btn btn-secondary" id="btnViewCloseAnnouncement" data-bs-dismiss="modal">Close</button>
         </div>
       </div>
@@ -897,8 +951,16 @@ function buildReviewQueueUrl(string $channel, string $status, string $searchTerm
             <label class="form-label d-block">Delivery Channels</label>
             <div class="d-flex flex-wrap gap-3">
               <label class="form-check-label d-flex align-items-center gap-2">
+                <input class="form-check-input m-0" type="checkbox" name="channels[]" value="public" id="editChannelPublic">
+                <span>Public Announcement</span>
+              </label>
+              <label class="form-check-label d-flex align-items-center gap-2">
+                <input class="form-check-input m-0" type="checkbox" name="channels[]" value="public_news" id="editChannelPublicNews">
+                <span>Public News</span>
+              </label>
+              <label class="form-check-label d-flex align-items-center gap-2">
                 <input class="form-check-input m-0" type="checkbox" name="channels[]" value="website" id="editChannelWebsite">
-                <span>Website</span>
+                <span>Account Page</span>
               </label>
               <label class="form-check-label d-flex align-items-center gap-2">
                 <input class="form-check-input m-0" type="checkbox" name="channels[]" value="sms" id="editChannelSms">
@@ -911,17 +973,20 @@ function buildReviewQueueUrl(string $channel, string $status, string $searchTerm
             </div>
           </div>
           <div class="row g-3">
-            <div class="col-md-6">
-              <label for="editAnnouncementStatusInput" class="form-label">Status</label>
-              <select class="form-select" id="editAnnouncementStatusInput" name="status_update">
-                <option value="draft">Draft</option>
-                <option value="pending">Pending</option>
-                <?php if ($isSuperAdmin): ?>
+            <?php if ($isSuperAdmin): ?>
+              <div class="col-md-6">
+                <label for="editAnnouncementStatusInput" class="form-label">Status</label>
+                <select class="form-select announcement-status-select status-draft" id="editAnnouncementStatusInput" name="status_update">
+                  <option value="draft">Draft</option>
+                  <option value="pending">Pending</option>
                   <option value="approved">Approved</option>
-                <?php endif; ?>
-              </select>
-            </div>
-            <div class="col-md-6">
+                </select>
+              </div>
+              <div class="col-md-6">
+            <?php else: ?>
+              <input type="hidden" id="editAnnouncementStatusInput" name="status_update" value="draft">
+              <div class="col-12">
+            <?php endif; ?>
               <label for="editAnnouncementPublishDateInput" class="form-label">Publish Date</label>
               <input type="text" class="form-control" id="editAnnouncementPublishDateInput" name="publish_date" placeholder="YYYY-MM-DD HH:MM">
             </div>
@@ -933,10 +998,120 @@ function buildReviewQueueUrl(string $channel, string $status, string $searchTerm
           </div>
         </div>
         <div class="modal-footer">
-          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-          <button type="submit" class="btn btn-primary">Save Changes</button>
+          <button type="button" class="btn btn-outline-danger d-none" id="btnEditDeleteAnnouncement">Delete</button>
+          <button type="button" class="btn btn-secondary" id="btnEditCancel">Close</button>
+          <button type="submit" class="btn btn-warning text-dark" id="btnEditSaveDraft">Save Changes</button>
+          <button type="submit" class="btn btn-primary d-none" id="btnEditSubmitReview">Submit for Review</button>
         </div>
       </form>
+    </div>
+  </div>
+
+  <div class="modal fade" id="modalDeniedAnnouncementDraftNotice" tabindex="-1" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title">Draft Notice</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+          <p class="mb-0">This announcement was denied. If you continue editing, your creation will now be saved as draft.</p>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button type="button" class="btn btn-warning text-dark" id="btnConfirmDeniedAnnouncementDraftNotice">Continue Editing</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal fade" id="modalDeniedAnnouncementSaveConfirm" tabindex="-1" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title">Confirm Save Changes</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+          <p class="mb-0">Are you sure you want to save these changes? This announcement will be moved to draft status.</p>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button type="button" class="btn btn-warning text-dark" id="btnConfirmDeniedAnnouncementSave">Yes, Save Changes</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal fade" id="modalDeniedAnnouncementResubmitConfirm" tabindex="-1" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title">Confirm Resubmission</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+          <p class="mb-0">Are you sure that you are ready to submit again?</p>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button type="button" class="btn btn-primary" id="btnConfirmDeniedAnnouncementResubmit">Yes, Submit Again</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal fade" id="modalApprovedAnnouncementSaveConfirm" tabindex="-1" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title">Confirm Save Changes</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+          <p class="mb-0">Are you sure you want to save these changes? These changes will be submitted for review.</p>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button type="button" class="btn btn-warning text-dark" id="btnConfirmApprovedAnnouncementSave">Yes, Save Changes</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal fade" id="modalPendingAnnouncementSaveConfirm" tabindex="-1" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title">Confirm Save Changes</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+          <p class="mb-0">Are you sure you want to save these changes and update the pending approval for review?</p>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button type="button" class="btn btn-warning text-dark" id="btnConfirmPendingAnnouncementSave">Yes, Save Changes</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal fade" id="modalSuperAdminApprovedCloseConfirm" tabindex="-1" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title">Confirm Close</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+          <p class="mb-0">Are you sure you want to close? Any unsaved changes will be lost.</p>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button type="button" class="btn btn-primary" id="btnConfirmSuperAdminApprovedClose">Yes, Close</button>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -945,15 +1120,15 @@ function buildReviewQueueUrl(string $channel, string $status, string $searchTerm
       <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content">
           <div class="modal-header">
-            <h5 class="modal-title">Confirm Repost</h5>
+            <h5 class="modal-title">Confirm Save Changes</h5>
             <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
           </div>
           <div class="modal-body">
-            <p class="mb-0">This announcement was edited. Are you sure it is ready to post again?</p>
+            <p class="mb-0">Are you ready to save these changes? When you save, this announcement will be posted.</p>
           </div>
           <div class="modal-footer">
             <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-            <button type="button" class="btn btn-primary" id="btnConfirmSuperAdminRepost">Yes, Post Again</button>
+            <button type="button" class="btn btn-primary" id="btnConfirmSuperAdminRepost">Yes, Save Changes</button>
           </div>
         </div>
       </div>
@@ -998,7 +1173,9 @@ function buildReviewQueueUrl(string $channel, string $status, string $searchTerm
     const CURRENT_USER_ID = <?= json_encode($currentUserId, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
     const CURRENT_USER_DISPLAY = <?= json_encode($currentUserDisplayLabel, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
     const ANNOUNCEMENT_CHANNEL_LABELS = {
-      website: "Website",
+      public: "Public Announcement",
+      public_news: "Public News",
+      website: "Account Page",
       sms: "SMS",
       email: "Email"
     };
@@ -1049,24 +1226,43 @@ function buildReviewQueueUrl(string $channel, string $status, string $searchTerm
       const viewModal = document.getElementById("modalViewAnnouncement");
       const editModal = document.getElementById("modalEditAnnouncement");
       const editForm = document.getElementById("editAnnouncementForm");
+      const editCancelBtn = document.getElementById("btnEditCancel");
+      const editDeleteBtn = document.getElementById("btnEditDeleteAnnouncement");
+      const editSaveDraftBtn = document.getElementById("btnEditSaveDraft");
+      const editSubmitReviewBtn = document.getElementById("btnEditSubmitReview");
+      const deniedSaveModalEl = document.getElementById("modalDeniedAnnouncementSaveConfirm");
+      const confirmDeniedSaveBtn = document.getElementById("btnConfirmDeniedAnnouncementSave");
+      const deniedResubmitModalEl = document.getElementById("modalDeniedAnnouncementResubmitConfirm");
+      const confirmDeniedResubmitBtn = document.getElementById("btnConfirmDeniedAnnouncementResubmit");
+      const approvedSaveModalEl = document.getElementById("modalApprovedAnnouncementSaveConfirm");
+      const confirmApprovedSaveBtn = document.getElementById("btnConfirmApprovedAnnouncementSave");
+      const pendingSaveModalEl = document.getElementById("modalPendingAnnouncementSaveConfirm");
+      const confirmPendingSaveBtn = document.getElementById("btnConfirmPendingAnnouncementSave");
+      const superAdminApprovedCloseModalEl = document.getElementById("modalSuperAdminApprovedCloseConfirm");
+      const confirmSuperAdminApprovedCloseBtn = document.getElementById("btnConfirmSuperAdminApprovedClose");
+      const deniedDraftNoticeModalEl = document.getElementById("modalDeniedAnnouncementDraftNotice");
+      const confirmDeniedDraftNoticeBtn = document.getElementById("btnConfirmDeniedAnnouncementDraftNotice");
+      const viewEditBtn = document.getElementById("btnViewEditAnnouncement");
       const superAdminRepostModalEl = document.getElementById("modalSuperAdminRepostConfirm");
       const confirmSuperAdminRepostBtn = document.getElementById("btnConfirmSuperAdminRepost");
-      const submitReviewBtn = document.getElementById("btnViewSubmitReviewAnnouncement");
-      const approveBtn = document.getElementById("btnViewApproveAnnouncement");
-      const denyBtn = document.getElementById("btnViewDenyAnnouncement");
       const deleteBtn = document.getElementById("btnViewDeleteAnnouncement");
-      const closeBtn = document.getElementById("btnViewCloseAnnouncement");
-      const submitReviewForm = document.getElementById("viewSubmitReviewForm");
-      const approveForm = document.getElementById("viewApproveForm");
-      const denyForm = document.getElementById("viewDenyForm");
-      const submitReviewIdInput = document.getElementById("viewSubmitReviewAnnouncementId");
-      const approveIdInput = document.getElementById("viewApproveAnnouncementId");
-      const denyIdInput = document.getElementById("viewDenyAnnouncementId");
       if (!viewModal || !editModal) return;
       const isSuperAdminSession = <?= $isSuperAdmin ? 'true' : 'false' ?>;
       const editEditorEl = $("#editAnnouncementEditor");
       let editEditorReady = false;
       let superAdminEditConfirmed = false;
+      let deniedSaveConfirmed = false;
+      let deniedResubmitConfirmed = false;
+      let approvedSaveConfirmed = false;
+      let pendingSaveConfirmed = false;
+      let isDeniedDraftEdit = false;
+      let isApprovedReviewEdit = false;
+      let isAdminPendingEdit = false;
+      let isSuperAdminApprovedEdit = false;
+      let requiresDeniedResubmitConfirm = false;
+      let canShowPrimarySubmit = false;
+      let pendingDeniedEditId = "";
+      let editSubmitMode = "save";
       const fullToolbar = [
         ["style", ["style"]],
         ["font", ["bold", "italic", "underline", "clear"]],
@@ -1166,8 +1362,10 @@ function buildReviewQueueUrl(string $channel, string $status, string $searchTerm
         editEditorReady = true;
       }
 
-      function statusText(status) {
+      function statusText(status, reviewResult = "", isOwner = false) {
         const v = String(status || "").toLowerCase();
+        const review = String(reviewResult || "").toLowerCase();
+        if (v === "draft" && review === "denied" && isOwner) return "Denied";
         if (v === "approved") return "Approved";
         if (v === "pending") return "Pending";
         return "Draft";
@@ -1176,6 +1374,25 @@ function buildReviewQueueUrl(string $channel, string $status, string $searchTerm
       function channelText(channels) {
         if (!Array.isArray(channels) || channels.length === 0) return "-";
         return channels.map((ch) => ANNOUNCEMENT_CHANNEL_LABELS[ch] || String(ch).toUpperCase()).join(", ");
+      }
+
+      function applyStatusHighlight(el, status, reviewResult = "", isOwner = false) {
+        if (!el) return;
+        const effectiveStatus = statusText(status, reviewResult, isOwner).toLowerCase();
+        el.classList.remove("status-approved", "status-pending", "status-denied", "status-draft");
+        if (effectiveStatus === "approved") {
+          el.classList.add("status-approved");
+          return;
+        }
+        if (effectiveStatus === "pending") {
+          el.classList.add("status-pending");
+          return;
+        }
+        if (effectiveStatus === "denied") {
+          el.classList.add("status-denied");
+          return;
+        }
+        el.classList.add("status-draft");
       }
 
       function applyModalFooterLayout(modalEl) {
@@ -1203,7 +1420,7 @@ function buildReviewQueueUrl(string $channel, string $status, string $searchTerm
         });
 
         footerChildren.forEach((el) => {
-          el.classList.remove("modal-action-primary", "modal-action-secondary");
+          el.classList.remove("modal-action-primary", "modal-action-secondary", "modal-action-fullrow");
           if (el.style) {
             el.style.order = "";
             el.style.gridColumn = "";
@@ -1212,29 +1429,45 @@ function buildReviewQueueUrl(string $channel, string $status, string $searchTerm
 
         if (!candidates.length) return;
 
+        if (candidates.length === 2) {
+          candidates.forEach((el, idx) => {
+            el.classList.add("modal-action-secondary");
+            if (el.style) {
+              el.style.order = String(idx + 1);
+            }
+          });
+          return;
+        }
+
         if (modalEl.id === "modalViewAnnouncement") {
-          if (candidates.length === 2) {
-            // If only two actions are visible (e.g., Delete + Close), keep them on one row.
-            const deleteEl = candidates.find((el) => el.id === "btnViewDeleteAnnouncement") || null;
-            const closeEl = candidates.find((el) => el.id === "btnViewCloseAnnouncement") || null;
-            const ordered = [];
-            if (deleteEl) ordered.push(deleteEl);
-            if (closeEl) ordered.push(closeEl);
-            candidates.forEach((el) => {
-              if (!ordered.includes(el)) ordered.push(el);
-            });
-
-            ordered.forEach((el, idx) => {
-              el.classList.add("modal-action-secondary");
-              if (el.style) {
-                el.style.order = String(idx + 1);
-              }
-            });
-            footer.classList.add("modal-grid-actions");
-            return;
-          }
-
           if (candidates.length >= 3) {
+            if (candidates.length === 4) {
+              const approveEl = candidates.find((el) => el.id === "viewApproveForm") || candidates[0];
+              const denyEl = candidates.find((el) => el.id === "viewDenyForm") || candidates[1];
+              const deleteEl = candidates.find((el) => el.id === "btnViewDeleteAnnouncement") || candidates[2];
+              const closeEl = candidates.find((el) => el.id === "btnViewCloseAnnouncement") || candidates[3];
+              const ordered = [];
+              [approveEl, denyEl, deleteEl, closeEl].forEach((el) => {
+                if (el && !ordered.includes(el)) {
+                  ordered.push(el);
+                }
+              });
+              candidates.forEach((el) => {
+                if (!ordered.includes(el)) {
+                  ordered.push(el);
+                }
+              });
+
+              ordered.forEach((el, idx) => {
+                el.classList.add("modal-action-secondary");
+                if (el.style) {
+                  el.style.order = String(idx + 1);
+                }
+              });
+              footer.classList.add("modal-grid-actions");
+              return;
+            }
+
             const primary = candidates[0];
             primary.classList.add("modal-action-primary");
             candidates.slice(1).forEach((el) => el.classList.add("modal-action-secondary"));
@@ -1243,24 +1476,34 @@ function buildReviewQueueUrl(string $channel, string $status, string $searchTerm
           }
         }
 
-        if (modalEl.id === "modalDeleteAnnouncement" && candidates.length === 2) {
-          const deleteEl = candidates.find((el) => el.id === "deleteAnnouncementForm") || null;
-          const closeEl = candidates.find((el) => el.tagName === "BUTTON" && el.getAttribute("data-bs-dismiss") === "modal") || null;
-          const ordered = [];
-          if (closeEl) ordered.push(closeEl);
-          if (deleteEl) ordered.push(deleteEl);
-          candidates.forEach((el) => {
-            if (!ordered.includes(el)) ordered.push(el);
-          });
+        if (modalEl.id === "modalEditAnnouncement" && candidates.length >= 2) {
+          const cancelEl = candidates.find((el) => el.id === "btnEditCancel") || null;
+          const nonCancel = candidates.filter((el) => el !== cancelEl);
 
-          ordered.forEach((el, idx) => {
-            el.classList.add("modal-action-secondary");
-            if (el.style) {
-              el.style.order = String(idx + 1);
+          if (nonCancel.length === 2 && cancelEl) {
+            nonCancel.forEach((el, idx) => {
+              el.classList.add("modal-action-secondary");
+              if (el.style) {
+                el.style.order = String(idx + 1);
+              }
+            });
+            cancelEl.classList.add("modal-action-fullrow");
+            if (cancelEl.style) {
+              cancelEl.style.order = "3";
             }
-          });
-          footer.classList.add("modal-grid-actions");
-          return;
+            footer.classList.add("modal-grid-actions");
+            return;
+          }
+
+          if (nonCancel.length === 1 && cancelEl) {
+            nonCancel[0].classList.add("modal-action-primary");
+            cancelEl.classList.add("modal-action-fullrow");
+            if (cancelEl.style) {
+              cancelEl.style.order = "2";
+            }
+            footer.classList.add("modal-grid-actions");
+            return;
+          }
         }
 
         const primary = candidates[0];
@@ -1279,36 +1522,40 @@ function buildReviewQueueUrl(string $channel, string $status, string $searchTerm
         document.getElementById("viewAnnouncementTitle").textContent = data.title || "-";
         document.getElementById("viewAnnouncementAudience").textContent = data.audience || "-";
         document.getElementById("viewAnnouncementChannels").textContent = channelText(data.channels);
-        document.getElementById("viewAnnouncementStatus").textContent = statusText(data.status);
         document.getElementById("viewAnnouncementPublishDate").textContent = data.publish_date || "-";
         document.getElementById("viewAnnouncementCreatedBy").textContent = data.created_by || "-";
         document.getElementById("viewAnnouncementContent").innerHTML = data.content_html && String(data.content_html).trim() !== ""
           ? data.content_html
           : '<span class="text-muted">No content.</span>';
 
-        if (submitReviewIdInput) submitReviewIdInput.value = data.id || "";
-        if (approveIdInput) approveIdInput.value = data.id || "";
-        if (denyIdInput) denyIdInput.value = data.id || "";
-
         const ownerId = String(data.created_by_user_id || "");
         const createdByLabel = String(data.created_by || "");
         const isOwner = ownerId === String(CURRENT_USER_ID || "")
           || (ownerId === "" && createdByLabel !== "" && createdByLabel === String(CURRENT_USER_DISPLAY || ""));
-        const canSubmitReview = !<?= $isSuperAdmin ? 'true' : 'false' ?>
-          && isOwner
-          && String(data.status || "").toLowerCase() === "draft";
-        const canReview = <?= $isSuperAdmin ? 'true' : 'false' ?>
-          && String(data.status || "").toLowerCase() === "pending"
-          && String(data.created_by_role || "").toLowerCase() !== "superadmin";
+        const reviewResult = String(data.review_result || "").toLowerCase();
+        const reviewNoticeEl = document.getElementById("viewAnnouncementReviewNotice");
+        const viewStatusEl = document.getElementById("viewAnnouncementStatus");
+        const isDeniedDraft = String(data.status || "").toLowerCase() === "draft" && reviewResult === "denied" && isOwner;
+        const canEditFromView = <?= $isSuperAdmin ? 'true' : 'false' ?> || isOwner;
         const canDelete = <?= $isSuperAdmin ? 'true' : 'false' ?>
           || (String(data.status || "").toLowerCase() === "draft" && isOwner);
 
-        if (submitReviewForm) submitReviewForm.classList.toggle("d-none", !canSubmitReview);
-        if (approveForm) approveForm.classList.toggle("d-none", !canReview);
-        if (denyForm) denyForm.classList.toggle("d-none", !canReview);
-        if (submitReviewBtn) submitReviewBtn.classList.toggle("d-none", !canSubmitReview);
-        if (approveBtn) approveBtn.classList.toggle("d-none", !canReview);
-        if (denyBtn) denyBtn.classList.toggle("d-none", !canReview);
+        if (viewStatusEl) {
+          viewStatusEl.textContent = statusText(data.status, reviewResult, isOwner);
+          applyStatusHighlight(viewStatusEl, data.status, reviewResult, isOwner);
+        }
+        if (reviewNoticeEl) {
+          const showDeniedNotice = isDeniedDraft;
+          reviewNoticeEl.classList.toggle("d-none", !showDeniedNotice);
+          reviewNoticeEl.textContent = showDeniedNotice
+            ? (String(data.review_note || "").trim() || "This announcement is denied. You can edit or delete it.")
+            : "";
+        }
+
+        if (viewEditBtn) {
+          viewEditBtn.classList.toggle("d-none", !(isDeniedDraft && canEditFromView));
+          viewEditBtn.setAttribute("data-id", data.id || "");
+        }
         if (deleteBtn) {
           deleteBtn.classList.toggle("d-none", !canDelete);
           deleteBtn.setAttribute("data-id", data.id || "");
@@ -1319,7 +1566,7 @@ function buildReviewQueueUrl(string $channel, string $status, string $searchTerm
 
       editModal.addEventListener("show.bs.modal", function (event) {
         initEditEditor();
-        const trigger = event.relatedTarget;
+        const trigger = event.relatedTarget || editModal._deniedDraftTrigger || null;
         const id = trigger?.getAttribute("data-id") || "";
         const data = ANNOUNCEMENT_DATA[id];
         if (!data) return;
@@ -1338,11 +1585,50 @@ function buildReviewQueueUrl(string $channel, string $status, string $searchTerm
         if (statusInput.value !== statusVal) {
           statusInput.value = <?= $isSuperAdmin ? '"draft"' : '"pending"' ?>;
         }
+        applyStatusHighlight(statusInput, statusInput.value);
 
         const channels = Array.isArray(data.channels) ? data.channels : [];
+        document.getElementById("editChannelPublic").checked = channels.includes("public");
+        document.getElementById("editChannelPublicNews").checked = channels.includes("public_news");
         document.getElementById("editChannelWebsite").checked = channels.includes("website");
         document.getElementById("editChannelSms").checked = channels.includes("sms");
         document.getElementById("editChannelEmail").checked = channels.includes("email");
+
+        const ownerId = String(data.created_by_user_id || "");
+        const createdByLabel = String(data.created_by || "");
+        const isOwner = ownerId === String(CURRENT_USER_ID || "")
+          || (ownerId === "" && createdByLabel !== "" && createdByLabel === String(CURRENT_USER_DISPLAY || ""));
+        const reviewResult = String(data.review_result || "").toLowerCase();
+        const canUseDeniedFlow = statusVal === "draft" && reviewResult === "denied" && (isOwner || isSuperAdminSession);
+        const canUseApprovedReviewFlow = !isSuperAdminSession && isOwner && statusVal === "approved";
+        const canUsePendingReviewFlow = !isSuperAdminSession && isOwner && statusVal === "pending";
+        isSuperAdminApprovedEdit = isSuperAdminSession && statusVal === "approved";
+        const canEditSubmitReview = canUseDeniedFlow || (!canUsePendingReviewFlow && !isSuperAdminApprovedEdit && (isSuperAdminSession || isOwner));
+        isDeniedDraftEdit = canUseDeniedFlow;
+        isApprovedReviewEdit = canUseApprovedReviewFlow;
+        isAdminPendingEdit = canUsePendingReviewFlow;
+        requiresDeniedResubmitConfirm = canUseDeniedFlow;
+        canShowPrimarySubmit = canEditSubmitReview;
+        deniedSaveConfirmed = false;
+        deniedResubmitConfirmed = false;
+        approvedSaveConfirmed = false;
+        pendingSaveConfirmed = false;
+        if (editSubmitReviewBtn) {
+          editSubmitReviewBtn.classList.toggle("d-none", isApprovedReviewEdit || isAdminPendingEdit || isSuperAdminApprovedEdit || !canEditSubmitReview);
+          editSubmitReviewBtn.textContent = (isSuperAdminSession && !isDeniedDraftEdit)
+            ? "Post"
+            : "Submit for Review";
+        }
+        if (editDeleteBtn) {
+          editDeleteBtn.classList.toggle("d-none", !isSuperAdminApprovedEdit);
+        }
+        if (editCancelBtn) {
+          editCancelBtn.textContent = "Close";
+        }
+        if (editSaveDraftBtn) {
+          editSaveDraftBtn.textContent = isApprovedReviewEdit ? "Save Changes" : "Save Changes";
+        }
+        editSubmitMode = "save";
       });
 
       if (editForm) {
@@ -1350,13 +1636,142 @@ function buildReviewQueueUrl(string $channel, string $status, string $searchTerm
           if (editEditorReady) {
             document.getElementById("editAnnouncementContentInput").value = editEditorEl.summernote("code");
           }
-          if (isSuperAdminSession && !superAdminEditConfirmed) {
+          const statusInput = document.getElementById("editAnnouncementStatusInput");
+          if (statusInput) {
+            if (editSubmitMode === "submit_review") {
+              statusInput.value = (isSuperAdminSession && !isDeniedDraftEdit) ? "approved" : "pending";
+            } else if (isSuperAdminApprovedEdit) {
+              statusInput.value = "approved";
+            } else if (isAdminPendingEdit) {
+              statusInput.value = "pending";
+            } else if (isApprovedReviewEdit) {
+              statusInput.value = "pending";
+            } else if (!isSuperAdminSession || isDeniedDraftEdit) {
+              statusInput.value = "draft";
+            }
+          }
+          if (editSubmitMode === "save" && isAdminPendingEdit && !pendingSaveConfirmed) {
+            event.preventDefault();
+            if (pendingSaveModalEl) {
+              const modalInstance = bootstrap.Modal.getOrCreateInstance(pendingSaveModalEl);
+              modalInstance.show();
+            }
+            return;
+          }
+          if (editSubmitMode === "save" && isSuperAdminSession && !isDeniedDraftEdit && !superAdminEditConfirmed) {
+            event.preventDefault();
+            if (superAdminRepostModalEl) {
+              const modalInstance = bootstrap.Modal.getOrCreateInstance(superAdminRepostModalEl);
+              modalInstance.show();
+            }
+            return;
+          }
+          if (editSubmitMode === "save" && isApprovedReviewEdit && !approvedSaveConfirmed) {
+            event.preventDefault();
+            if (approvedSaveModalEl) {
+              const modalInstance = bootstrap.Modal.getOrCreateInstance(approvedSaveModalEl);
+              modalInstance.show();
+            }
+            return;
+          }
+          if (editSubmitMode === "save" && isDeniedDraftEdit && !deniedSaveConfirmed) {
+            event.preventDefault();
+            if (deniedSaveModalEl) {
+              const modalInstance = bootstrap.Modal.getOrCreateInstance(deniedSaveModalEl);
+              modalInstance.show();
+            }
+            return;
+          }
+          if (editSubmitMode === "submit_review" && requiresDeniedResubmitConfirm && !deniedResubmitConfirmed) {
+            event.preventDefault();
+            if (deniedResubmitModalEl) {
+              const modalInstance = bootstrap.Modal.getOrCreateInstance(deniedResubmitModalEl);
+              modalInstance.show();
+            }
+            return;
+          }
+          if (isSuperAdminSession && canShowPrimarySubmit && editSubmitMode === "submit_review" && !isDeniedDraftEdit && !superAdminEditConfirmed) {
             event.preventDefault();
             if (superAdminRepostModalEl) {
               const modalInstance = bootstrap.Modal.getOrCreateInstance(superAdminRepostModalEl);
               modalInstance.show();
             }
           }
+        });
+      }
+
+      if (confirmApprovedSaveBtn && editForm) {
+        confirmApprovedSaveBtn.addEventListener("click", function () {
+          approvedSaveConfirmed = true;
+          if (approvedSaveModalEl) {
+            const modalInstance = bootstrap.Modal.getOrCreateInstance(approvedSaveModalEl);
+            modalInstance.hide();
+          }
+          editForm.submit();
+        });
+      }
+
+      if (confirmPendingSaveBtn && editForm) {
+        confirmPendingSaveBtn.addEventListener("click", function () {
+          pendingSaveConfirmed = true;
+          if (pendingSaveModalEl) {
+            const modalInstance = bootstrap.Modal.getOrCreateInstance(pendingSaveModalEl);
+            modalInstance.hide();
+          }
+          editForm.submit();
+        });
+      }
+
+      if (confirmDeniedSaveBtn && editForm) {
+        confirmDeniedSaveBtn.addEventListener("click", function () {
+          deniedSaveConfirmed = true;
+          if (deniedSaveModalEl) {
+            const modalInstance = bootstrap.Modal.getOrCreateInstance(deniedSaveModalEl);
+            modalInstance.hide();
+          }
+          editForm.submit();
+        });
+      }
+
+      if (confirmDeniedResubmitBtn && editForm) {
+        confirmDeniedResubmitBtn.addEventListener("click", function () {
+          deniedResubmitConfirmed = true;
+          if (deniedResubmitModalEl) {
+            const modalInstance = bootstrap.Modal.getOrCreateInstance(deniedResubmitModalEl);
+            modalInstance.hide();
+          }
+          editForm.submit();
+        });
+      }
+
+      function openDeniedDraftNotice(id) {
+        pendingDeniedEditId = id || "";
+        if (!pendingDeniedEditId || !deniedDraftNoticeModalEl) {
+          return;
+        }
+        const modalInstance = bootstrap.Modal.getOrCreateInstance(deniedDraftNoticeModalEl);
+        modalInstance.show();
+      }
+
+      if (confirmDeniedDraftNoticeBtn) {
+        confirmDeniedDraftNoticeBtn.addEventListener("click", function () {
+          const id = pendingDeniedEditId;
+          if (deniedDraftNoticeModalEl) {
+            const modalInstance = bootstrap.Modal.getOrCreateInstance(deniedDraftNoticeModalEl);
+            modalInstance.hide();
+          }
+          const data = ANNOUNCEMENT_DATA[id];
+          if (!data || !editModal) {
+            return;
+          }
+          const viewInstance = bootstrap.Modal.getInstance(viewModal);
+          if (viewInstance) {
+            viewInstance.hide();
+          }
+          const editTrigger = document.querySelector('.btn-edit-announcement[data-id="' + CSS.escape(id) + '"]');
+          const editInstance = bootstrap.Modal.getOrCreateInstance(editModal);
+          editModal._deniedDraftTrigger = editTrigger || null;
+          editInstance.show(editTrigger || undefined);
         });
       }
 
@@ -1371,33 +1786,98 @@ function buildReviewQueueUrl(string $channel, string $status, string $searchTerm
         });
       }
 
+      if (confirmSuperAdminApprovedCloseBtn && editModal) {
+        confirmSuperAdminApprovedCloseBtn.addEventListener("click", function () {
+          if (superAdminApprovedCloseModalEl) {
+            const modalInstance = bootstrap.Modal.getOrCreateInstance(superAdminApprovedCloseModalEl);
+            modalInstance.hide();
+          }
+          const editInstance = bootstrap.Modal.getOrCreateInstance(editModal);
+          editInstance.hide();
+        });
+      }
+
       if (editModal) {
         editModal.addEventListener("show.bs.modal", function () {
           superAdminEditConfirmed = false;
+          deniedSaveConfirmed = false;
+          deniedResubmitConfirmed = false;
+          approvedSaveConfirmed = false;
+          pendingSaveConfirmed = false;
+          isDeniedDraftEdit = false;
+          isApprovedReviewEdit = false;
+          isAdminPendingEdit = false;
+          isSuperAdminApprovedEdit = false;
+          requiresDeniedResubmitConfirm = false;
+          canShowPrimarySubmit = false;
+        });
+        editModal.addEventListener("hidden.bs.modal", function () {
+          editModal._deniedDraftTrigger = null;
         });
       }
 
-      if (submitReviewBtn) {
-        submitReviewBtn.addEventListener("click", function () {
-          const formEl = document.getElementById("viewSubmitReviewForm");
-          if (!formEl) return;
-          formEl.submit();
+      if (editSubmitReviewBtn) {
+        editSubmitReviewBtn.addEventListener("click", function () {
+          editSubmitMode = "submit_review";
         });
       }
 
-      if (approveBtn) {
-        approveBtn.addEventListener("click", function () {
-          const formEl = document.getElementById("viewApproveForm");
-          if (!formEl) return;
-          formEl.submit();
+      if (editForm) {
+        const saveDraftBtn = document.getElementById("btnEditSaveDraft");
+        if (saveDraftBtn) {
+          saveDraftBtn.addEventListener("click", function () {
+            editSubmitMode = "save";
+          });
+        }
+      }
+
+      if (editCancelBtn) {
+        editCancelBtn.addEventListener("click", function () {
+          if (isSuperAdminApprovedEdit && superAdminApprovedCloseModalEl) {
+            const modalInstance = bootstrap.Modal.getOrCreateInstance(superAdminApprovedCloseModalEl);
+            modalInstance.show();
+            return;
+          }
+          const editInstance = bootstrap.Modal.getOrCreateInstance(editModal);
+          editInstance.hide();
         });
       }
 
-      if (denyBtn) {
-        denyBtn.addEventListener("click", function () {
-          const formEl = document.getElementById("viewDenyForm");
-          if (!formEl) return;
-          formEl.submit();
+      if (editDeleteBtn) {
+        editDeleteBtn.addEventListener("click", function () {
+          const deleteModalEl = document.getElementById("modalDeleteAnnouncement");
+          const deleteTitleEl = document.getElementById("deleteAnnouncementTitle");
+          const deleteIdEl = document.getElementById("deleteAnnouncementIdInput");
+          const deleteChannelEl = document.getElementById("deleteChannelInput");
+          const deleteStatusEl = document.getElementById("deleteStatusInput");
+          const deleteQueryEl = document.getElementById("deleteQueryInput");
+          const deleteQueueChannelEl = document.getElementById("deleteQueueChannelInput");
+          const deleteQueueQueryEl = document.getElementById("deleteQueueQueryInput");
+          const currentId = document.getElementById("editAnnouncementIdInput")?.value || "";
+          const currentTitle = document.getElementById("editAnnouncementTitleInput")?.value || "-";
+          if (!deleteModalEl || !deleteTitleEl || !deleteIdEl || !deleteChannelEl || !deleteStatusEl || !deleteQueryEl || !deleteQueueChannelEl || !deleteQueueQueryEl || !currentId) {
+            return;
+          }
+
+          deleteIdEl.value = currentId;
+          deleteTitleEl.textContent = currentTitle;
+          deleteChannelEl.value = "<?= htmlspecialchars($deliveryChannel, ENT_QUOTES, 'UTF-8') ?>";
+          deleteStatusEl.value = "<?= htmlspecialchars($statusFilter, ENT_QUOTES, 'UTF-8') ?>";
+          deleteQueryEl.value = "<?= htmlspecialchars($searchTerm, ENT_QUOTES, 'UTF-8') ?>";
+          deleteQueueChannelEl.value = "<?= htmlspecialchars($queueChannelFilter, ENT_QUOTES, 'UTF-8') ?>";
+          deleteQueueQueryEl.value = "<?= htmlspecialchars($queueSearchTerm, ENT_QUOTES, 'UTF-8') ?>";
+
+          const editInstance = bootstrap.Modal.getOrCreateInstance(editModal);
+          editInstance.hide();
+          const deleteInstance = bootstrap.Modal.getOrCreateInstance(deleteModalEl);
+          deleteInstance.show();
+        });
+      }
+
+      const editStatusInputEl = document.getElementById("editAnnouncementStatusInput");
+      if (editStatusInputEl) {
+        editStatusInputEl.addEventListener("change", function () {
+          applyStatusHighlight(editStatusInputEl, editStatusInputEl.value);
         });
       }
 
@@ -1438,6 +1918,12 @@ function buildReviewQueueUrl(string $channel, string $status, string $searchTerm
         "modalViewAnnouncement",
         "modalDeleteAnnouncement",
         "modalEditAnnouncement",
+        "modalDeniedAnnouncementDraftNotice",
+        "modalDeniedAnnouncementSaveConfirm",
+        "modalDeniedAnnouncementResubmitConfirm",
+        "modalApprovedAnnouncementSaveConfirm",
+        "modalPendingAnnouncementSaveConfirm",
+        "modalSuperAdminApprovedCloseConfirm",
         "modalSuperAdminRepostConfirm",
         "modalFilter",
         "modalReviewQueueFilter",
@@ -1618,6 +2104,39 @@ function buildReviewQueueUrl(string $channel, string $status, string $searchTerm
           refreshBtn.setAttribute("aria-busy", "true");
         });
       }
+
+      if (viewEditBtn) {
+        viewEditBtn.addEventListener("click", function () {
+          const id = viewEditBtn.getAttribute("data-id") || "";
+          if (!id) {
+            return;
+          }
+          openDeniedDraftNotice(id);
+        });
+      }
+
+      document.querySelectorAll(".btn-edit-announcement").forEach(function (btn) {
+        btn.addEventListener("click", function (event) {
+          const id = btn.getAttribute("data-id") || "";
+          const data = ANNOUNCEMENT_DATA[id];
+          if (!data) {
+            return;
+          }
+          const ownerId = String(data.created_by_user_id || "");
+          const createdByLabel = String(data.created_by || "");
+          const isOwner = ownerId === String(CURRENT_USER_ID || "")
+            || (ownerId === "" && createdByLabel !== "" && createdByLabel === String(CURRENT_USER_DISPLAY || ""));
+          const isDeniedDraft = String(data.status || "").toLowerCase() === "draft"
+            && String(data.review_result || "").toLowerCase() === "denied"
+            && (isOwner || isSuperAdminSession);
+          if (!isDeniedDraft) {
+            return;
+          }
+          event.preventDefault();
+          event.stopPropagation();
+          openDeniedDraftNotice(id);
+        });
+      });
 
       bindRefreshSpin("btnAnnouncementsTableRefresh");
       bindRefreshSpin("btnReviewQueueRefresh");

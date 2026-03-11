@@ -55,7 +55,7 @@
     <div class="banner">
         <img src="../Images/News_Banner.jpg" alt="Govt Banner" class="bannerImage">
         <div class="bannerText">
-            <h1>Announcements</h1>
+            <h1>News and Announcements</h1>
             <p>Barangay San Jose values an informed and aware community. The barangay ensures residents receive timely updates on matters that affect daily life and safety. </p>
         </div>
     </div>
@@ -67,18 +67,15 @@
             <div class="container newsContentGroup">
                 <div class="row g-5">
                 <div class="col-md-8 newsArticleGroup">
-                    <div class="articleImageWrapper mb-4">
+                    <div class="articleImageWrapper mb-4" id="publicNewsImageWrapper">
                         <div class="placeholderImage"></div>
                     </div>
                     
-                    <h2 class="articleHeadline">HEADLINE OF NEWS 1</h2>
+                    <h2 class="articleHeadline" id="publicNewsHeadline">Latest Barangay News</h2>
+                    <p class="announcementDate mb-3" id="publicNewsDate">-</p>
                     
-                    <div class="articleBody">
-                        <p>Lorem ipsum dolor sit amet consectetur adipiscing elit. Consectetur adipiscing elit quisque faucibus ex sapien vitae. Ex sapien vitae pellentesque sem placerat in id. Placerat in id cursus mi pretium tellus duis. Pretium telus duis convallis tempus leo eu aenean. Lorem ipsum dolor sit amet consectetur adipiscing elit quisque faucibus ex sapien vitae. Ex sapien vitae pellentesque sem placerat in id. Placerat in id cursus mi pretium tellus duis. Pretium telus duis convallis tempus leo eu aenean.</p>
-
-                        <p>Lorem ipsum dolor sit amet consectetur adipiscing elit. Consectetur adipiscing elit quisque faucibus ex sapien vitae. Ex sapien vitae pellentesque sem placerat in id. Placerat in id cursus mi pretium tellus duis. Pretium telus duis convallis tempus leo eu aenean. Lorem ipsum dolor sit amet consectetur adipiscing elit. Consectetur adipiscing elit quisque faucibus ex sapien vitae. Ex sapien vitae pellentesque sem placerat in id. Placerat in id cursus mi pretium tellus duis. Pretium telus duis convallis tempus leo eu aenean.</p>
-                        
-                        <p>Lorem ipsum dolor sit amet consectetur adipiscing elit. Consectetur adipiscing elit quisque faucibus ex sapien vitae. Ex sapien vitae pellentesque sem placerat in id. Placerat in id cursus mi pretium tellus duis.</p>
+                    <div class="articleBody" id="publicNewsBody">
+                        <p>No public news available yet.</p>
                     </div>
                 </div>
                 
@@ -87,22 +84,11 @@
                     
                     <div class="sidebarSection announcementsGroup">
                         <h3 class="sidebarTitle">ANNOUNCEMENTS</h3>
-                        
-                        <div class="announcementItem">
-                            <p class="announcementText">Lorem ipsum dolor sit amet consectetur adipiscing elit.</p>
-                            <span class="announcementDate">September 26, 2025</span>
-                        </div>
-                        <hr class="sidebarDivider">
-                        
-                        <div class="announcementItem">
-                            <p class="announcementText">Lorem ipsum dolor sit amet consectetur adipiscing elit.</p>
-                            <span class="announcementDate">September 26, 2025</span>
-                        </div>
-                        <hr class="sidebarDivider">
-                        
-                        <div class="announcementItem">
-                            <p class="announcementText">Lorem ipsum dolor sit amet consectetur adipiscing elit.</p>
-                            <span class="announcementDate">September 26, 2025</span>
+                        <div id="publicAnnouncementsList">
+                            <div class="announcementItem">
+                                <p class="announcementText">No public announcements available yet.</p>
+                                <span class="announcementDate">-</span>
+                            </div>
                         </div>
                     </div>
                     
@@ -180,6 +166,94 @@
                 collapse.hide();
             }
         });
+
+        function escapeHtml(value) {
+            return String(value == null ? '' : value)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#039;');
+        }
+
+        (function () {
+            const headlineEl = document.getElementById("publicNewsHeadline");
+            const dateEl = document.getElementById("publicNewsDate");
+            const bodyEl = document.getElementById("publicNewsBody");
+            const imageWrapperEl = document.getElementById("publicNewsImageWrapper");
+            if (headlineEl && dateEl && bodyEl && imageWrapperEl) {
+                fetch("../PhpFiles/GET/getPublicNews.php", {
+                    headers: {
+                        "Accept": "application/json"
+                    }
+                })
+                .then(function (response) {
+                    if (!response.ok) {
+                        throw new Error("Unable to load public news.");
+                    }
+                    return response.json();
+                })
+                .then(function (payload) {
+                    const item = payload && payload.item ? payload.item : null;
+                    if (!item) {
+                        return;
+                    }
+
+                    headlineEl.textContent = item.title || "Latest Barangay News";
+                    dateEl.textContent = item.posted_date ? "Posted: " + item.posted_date : "-";
+                    bodyEl.innerHTML = item.content_html && String(item.content_html).trim() !== ""
+                        ? item.content_html
+                        : "<p>No public news content available yet.</p>";
+
+                    if (item.image_url) {
+                        imageWrapperEl.innerHTML = '<img src="' + escapeHtml(item.image_url) + '" alt="' + escapeHtml(item.title || "Public news image") + '" class="img-fluid rounded-4 w-100">';
+                    }
+                })
+                .catch(function () {
+                    headlineEl.textContent = "Latest Barangay News";
+                    dateEl.textContent = "-";
+                });
+            }
+        })();
+
+        (function () {
+            const listEl = document.getElementById("publicAnnouncementsList");
+            if (!listEl) {
+                return;
+            }
+
+            fetch("../PhpFiles/GET/getPublicAnnouncements.php", {
+                headers: {
+                    "Accept": "application/json"
+                }
+            })
+            .then(function (response) {
+                if (!response.ok) {
+                    throw new Error("Unable to load announcements.");
+                }
+                return response.json();
+            })
+            .then(function (payload) {
+                const items = Array.isArray(payload.items) ? payload.items : [];
+                if (!items.length) {
+                    listEl.innerHTML = '<div class="announcementItem"><p class="announcementText">No public announcements available yet.</p><span class="announcementDate">-</span></div>';
+                    return;
+                }
+
+                listEl.innerHTML = items.map(function (item, idx) {
+                    const divider = idx < items.length - 1 ? '<hr class="sidebarDivider">' : '';
+                    return ''
+                        + '<div class="announcementItem">'
+                        + '  <p class="announcementText">' + escapeHtml(item.title || 'Untitled announcement') + '</p>'
+                        + '  <span class="announcementDate">' + escapeHtml(item.posted_date || '-') + '</span>'
+                        + '</div>'
+                        + divider;
+                }).join('');
+            })
+            .catch(function () {
+                listEl.innerHTML = '<div class="announcementItem"><p class="announcementText">Unable to load public announcements right now.</p><span class="announcementDate">-</span></div>';
+            });
+        })();
     </script></body>
 </html>
 
