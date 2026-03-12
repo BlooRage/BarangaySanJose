@@ -1,5 +1,5 @@
 CREATE TABLE IF NOT EXISTS `complaintstbl` (
-  `complaint_id` bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+  `complaint_id` varchar(10) NOT NULL,
   `case_id` bigint(20) unsigned NOT NULL,
   `complaint_origin` enum('ResidentPortal','AdminEncoded','WalkIn','Referral') NOT NULL DEFAULT 'ResidentPortal',
   `subject_kind` enum('Resident','NonResident','Business','Organization','Unknown','GeneralConcern') NOT NULL DEFAULT 'Unknown',
@@ -10,7 +10,7 @@ CREATE TABLE IF NOT EXISTS `complaintstbl` (
   `intake_notes` text DEFAULT NULL,
   `screening_notes` text DEFAULT NULL,
   `escalated_to_blotter` tinyint(1) NOT NULL DEFAULT 0,
-  `blotter_id` bigint(20) unsigned DEFAULT NULL,
+  `blotter_id` varchar(10) DEFAULT NULL,
   `escalated_to_blotter_at` datetime DEFAULT NULL,
   `escalated_by_user_id` varchar(12) DEFAULT NULL,
   `created_at` datetime NOT NULL DEFAULT current_timestamp(),

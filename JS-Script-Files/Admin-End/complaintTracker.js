@@ -91,7 +91,7 @@
         const actionBtn = `<button class="btn btn-sm btn-outline-secondary" data-view-id="${esc(row.case_id)}">View</button>`;
         return `
             <tr>
-                <td>${esc(row.case_id)}</td>
+                <td>${esc(row.complaint_id || "-")}</td>
                 <td>${esc(row.submitted_date || "-")}</td>
                 <td>${esc(row.complainant_name || "-")}</td>
                 <td>${esc(row.subject_display_name || "-")}</td>
@@ -164,6 +164,7 @@
 
             if (!term) return true;
             const haystack = [
+                row.complaint_id,
                 row.case_id,
                 row.complainant_name,
                 row.subject_display_name,
@@ -303,7 +304,7 @@
             if (btnComplaintActionConfirm) btnComplaintActionConfirm.disabled = true;
             await postJson({
                 action: "update_case_outcome",
-                case_id: Number(currentViewCaseId),
+                case_id: currentViewCaseId,
                 action_type: pendingComplaintAction,
                 remarks,
             });
@@ -375,7 +376,7 @@
             const d = data.detail || {};
 
             const summaryGrid = renderFieldGrid([
-                { label: "Case ID", value: d.case_id || "-" },
+                { label: "Complaint ID", value: d.complaint_id || "-" },
                 { label: "Submitted At", value: d.submitted_at || "-" },
                 { label: "Origin", value: d.complaint_origin || "ResidentPortal" },
                 { label: "Status", value: d.status_name || "Pending" },
@@ -421,7 +422,7 @@
             const notesGrid = [
                 renderFieldGrid([
                     { label: "Case Remarks", value: d.case_remarks || "-" },
-                    { label: "Escalated to Blotter", value: Number(d.escalated_to_blotter || 0) === 1 ? `Yes${d.blotter_id ? ` (Blotter #${d.blotter_id})` : ""}` : "No" },
+                    { label: "Escalated to Blotter", value: Number(d.escalated_to_blotter || 0) === 1 ? `Yes${d.blotter_id ? ` (${d.blotter_id})` : ""}` : "No" },
                 ], 2),
                 renderFieldGrid([
                     { label: "Resident Narration", value: d.case_details || "-" },
@@ -456,7 +457,7 @@
                     if (saveIntakeNotesBtn) saveIntakeNotesBtn.disabled = true;
                     await postJson({
                         action: "update_intake_notes",
-                        case_id: Number(currentViewCaseId),
+                        case_id: currentViewCaseId,
                         intake_notes: intakeNotes,
                     });
                     await loadList();

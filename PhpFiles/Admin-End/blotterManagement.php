@@ -3,6 +3,7 @@ session_start();
 
 require_once "../General/connection.php";
 require_once "../General/security.php";
+require_once "../General/uniqueIDGenerate.php";
 
 requireRoleSession(['SuperAdmin', 'Official', 'Officials', 'Personnel', 'Personnels', 'Admin', 'Employee']);
 
@@ -160,19 +161,28 @@ $conn->begin_transaction();
 try {
     $statusId = getStatusId($conn, "Active", "Blotter");
     $levelId = getStatusId($conn, "Blotter Only", "BlotterLevel");
+    $caseId = GenerateCaseID($conn);
+    if (!$caseId) {
+        throw new Exception("Failed to generate case ID.");
+    }
+    $blotterId = GenerateBlotterID($conn);
+    if (!$blotterId) {
+        throw new Exception("Failed to generate blotter ID.");
+    }
 
     $stmtCase = $conn->prepare("
         INSERT INTO casereportstbl
-            (resident_user_id, report_type, incident_date, incident_time, incident_place, complaint_type,
+            (case_id, resident_user_id, report_type, incident_date, incident_time, incident_place, complaint_type,
              case_details, case_remarks, case_status_id, case_level_id, user_id_official_update_by, user_id_official_reviewed_by, user_id_official_record_by)
         VALUES
-            (NULL, 'Blotter', ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?)
+            (?, NULL, 'Blotter', ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?)
     ");
     if (!$stmtCase) {
         throw new Exception("Prepare failed (case insert): " . $conn->error);
     }
     $stmtCase->bind_param(
-        "ssssssiiss",
+        "sssssssiiss",
+        $caseId,
         $incidentDate,
         $incidentTime,
         $incidentPlace,
@@ -185,19 +195,18 @@ try {
         $actorUserId
     );
     $stmtCase->execute();
-    $caseId = (int)$conn->insert_id;
     $stmtCase->close();
 
     $stmtBlotter = $conn->prepare("
         INSERT INTO barangayblottertbl
-            (case_id, blotter_number, logbook_id, date_filed, time_filed)
+            (blotter_id, case_id, blotter_number, logbook_id, date_filed, time_filed)
         VALUES
-            (?, ?, NULL, ?, ?)
+            (?, ?, ?, NULL, ?, ?)
     ");
     if (!$stmtBlotter) {
         throw new Exception("Prepare failed (blotter insert): " . $conn->error);
     }
-    $stmtBlotter->bind_param("isss", $caseId, $blotterNumber, $dateFiled, $timeFiled);
+    $stmtBlotter->bind_param("sssss", $blotterId, $caseId, $blotterNumber, $dateFiled, $timeFiled);
     $stmtBlotter->execute();
     $stmtBlotter->close();
 
@@ -213,7 +222,7 @@ try {
 
     $role = 'Complainant';
     $stmtParticipant->bind_param(
-        "issssssssss",
+        "sssssssssss",
         $caseId,
         $role,
         $complainantLast,
@@ -230,7 +239,7 @@ try {
 
     $role = 'Respondent';
     $stmtParticipant->bind_param(
-        "issssssssss",
+        "sssssssssss",
         $caseId,
         $role,
         $respondentLast,

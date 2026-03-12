@@ -70,7 +70,7 @@ require_once __DIR__ . "/../includes/admin_guard.php";
 
                 <div class="admin-list-actions">
                     <div class="input-group admin-search">
-                        <input type="text" id="searchInput" class="form-control" placeholder="Case ID, complainant, subject, complaint type">
+                        <input type="text" id="searchInput" class="form-control" placeholder="Complaint ID, complainant, subject, complaint type">
                         <span class="input-group-text bg-white"><i class="fas fa-search"></i></span>
                     </div>
                     <button class="btn btn-outline-secondary btn-icon" type="button" data-bs-toggle="modal" data-bs-target="#modalTableColumns" id="btnComplaintColumns" title="Columns" aria-label="Columns">
@@ -88,7 +88,7 @@ require_once __DIR__ . "/../includes/admin_guard.php";
                 <table id="table-appData" class="table align-middle">
                     <thead>
                         <tr class="table-light">
-                            <th>Case ID</th>
+                            <th>Complaint ID</th>
                             <th>Date Submitted</th>
                             <th>Complainant</th>
                             <th>Subject</th>

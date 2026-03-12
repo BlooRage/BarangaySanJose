@@ -219,7 +219,7 @@
   }
 
   function buildTableRow(row) {
-    const idDisplay = row.blotter_id || row.case_id || '-';
+    const blotterIdDisplay = row.blotter_id || '-';
     const blotterNumber = row.blotter_number || '-';
     const dateFiled = row.date_filed || '-';
     const timeFiled = row.time_filed || '-';
@@ -233,7 +233,7 @@
     const logsBtn = `<button class="btn btn-sm btn-outline-primary ms-1" data-logs-id="${esc(row.case_id)}">Case Logs</button>`;
     return `
       <tr>
-        <td>${esc(idDisplay)}</td>
+        <td>${esc(blotterIdDisplay)}</td>
         <td>${esc(blotterNumber)}</td>
         <td>${esc(dateFiled)}</td>
         <td>${esc(timeFiled)}</td>
@@ -309,8 +309,8 @@
     } else {
       filteredRows = allRows.filter((row) => {
         const hay = [
-          row.blotter_number,
           row.blotter_id,
+          row.blotter_number,
           row.case_id,
           row.complainant_name,
           row.respondent_name
@@ -640,6 +640,7 @@
       const respondent = d.respondent || {};
 
       const blotterGrid = renderFieldGrid([
+        { label: 'Blotter ID', value: d.blotter_id || '-' },
         { label: 'Blotter Number', value: d.blotter_number || d.blotter_id || '-' },
         { label: 'Date Filed', value: d.date_filed || '-' },
         { label: 'Time Filed', value: d.time_filed || '-' },

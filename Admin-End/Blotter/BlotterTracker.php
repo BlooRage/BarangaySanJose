@@ -53,7 +53,7 @@ require_once __DIR__ . "/../includes/admin_guard.php";
 
                 <div class="admin-list-actions">
                     <div class="input-group admin-search">
-                        <input type="text" id="searchInput" class="form-control" placeholder="Blotter ID, Number, Complainant, Respondent">
+                        <input type="text" id="searchInput" class="form-control" placeholder="Blotter ID, Blotter Number, Complainant, Respondent">
                         <span class="input-group-text bg-white"><i class="fas fa-search"></i></span>
                     </div>
                     <button class="btn btn-outline-secondary btn-icon" type="button" data-bs-toggle="modal" data-bs-target="#modalTableColumns" id="btnBlotterColumns" title="Columns" aria-label="Columns">

@@ -115,6 +115,7 @@ if ($action === 'list') {
     $sql = "
         SELECT
             c.case_id,
+            ct.complaint_id,
             DATE_FORMAT(c.report_timestamp, '%Y-%m-%d %h:%i %p') AS submitted_at,
             DATE_FORMAT(c.report_timestamp, '%Y-%m-%d') AS submitted_date,
             c.complaint_type,
@@ -161,7 +162,8 @@ if ($action === 'list') {
         }
 
         $items[] = [
-            'case_id' => (int)$row['case_id'],
+            'case_id' => (string)$row['case_id'],
+            'complaint_id' => $row['complaint_id'] ?? '',
             'submitted_at' => $row['submitted_at'] ?? '',
             'submitted_date' => $row['submitted_date'] ?? '',
             'complaint_type' => $row['complaint_type'] ?? '',
@@ -181,14 +183,15 @@ if ($action === 'list') {
 }
 
 if ($action === 'detail') {
-    $caseId = isset($_GET['case_id']) ? (int)$_GET['case_id'] : 0;
-    if ($caseId <= 0) {
+    $caseId = trim((string)($_GET['case_id'] ?? ''));
+    if ($caseId === '') {
         respond(false, [], 'Invalid case ID.');
     }
 
     $stmt = $conn->prepare("
         SELECT
             c.case_id,
+            ct.complaint_id,
             DATE_FORMAT(c.report_timestamp, '%Y-%m-%d %h:%i %p') AS submitted_at,
             c.incident_date,
             c.incident_time,
@@ -207,11 +210,13 @@ if ($action === 'detail') {
             ct.screening_notes,
             ct.escalated_to_blotter,
             ct.blotter_id,
+            b.blotter_number,
             ct.complaint_origin
         FROM casereportstbl c
         INNER JOIN complaintstbl ct ON ct.case_id = c.case_id
         LEFT JOIN statuslookuptbl s ON s.status_id = c.case_status_id
         LEFT JOIN statuslookuptbl l ON l.status_id = c.case_level_id
+        LEFT JOIN barangayblottertbl b ON b.blotter_id = ct.blotter_id
         WHERE c.case_id = ?
           AND c.report_type = 'Complaint'
         LIMIT 1
@@ -220,7 +225,7 @@ if ($action === 'detail') {
         respond(false, [], 'Failed to prepare complaint detail query.');
     }
 
-    $stmt->bind_param("i", $caseId);
+    $stmt->bind_param("s", $caseId);
     $stmt->execute();
     $detail = $stmt->get_result()->fetch_assoc();
     $stmt->close();
@@ -239,7 +244,7 @@ if ($action === 'detail') {
         respond(false, [], 'Failed to prepare participant query.');
     }
 
-    $stmt->bind_param("i", $caseId);
+    $stmt->bind_param("s", $caseId);
     $stmt->execute();
     $res = $stmt->get_result();
     $participants = [
@@ -262,7 +267,8 @@ if ($action === 'detail') {
 
     respond(true, [
         'detail' => [
-            'case_id' => (int)$detail['case_id'],
+            'case_id' => (string)$detail['case_id'],
+            'complaint_id' => $detail['complaint_id'] ?? '',
             'submitted_at' => $detail['submitted_at'] ?? '',
             'incident_date' => $detail['incident_date'] ?? '',
             'incident_time' => $detail['incident_time'] ?? '',
@@ -281,6 +287,7 @@ if ($action === 'detail') {
             'screening_notes' => $detail['screening_notes'] ?? '',
             'escalated_to_blotter' => (int)($detail['escalated_to_blotter'] ?? 0),
             'blotter_id' => $detail['blotter_id'] ?? null,
+            'blotter_number' => $detail['blotter_number'] ?? null,
             'complaint_origin' => $detail['complaint_origin'] ?? '',
             'complainant' => $participants['Complainant'] ?? null,
             'respondent' => $participants['Respondent'] ?? null,
@@ -294,10 +301,10 @@ if ($action === 'update_intake_notes') {
         respond(false, [], 'Method not allowed.');
     }
 
-    $caseId = isset($jsonInput['case_id']) ? (int)$jsonInput['case_id'] : 0;
+    $caseId = trim((string)($jsonInput['case_id'] ?? ''));
     $intakeNotes = trim((string)($jsonInput['intake_notes'] ?? ''));
 
-    if ($caseId <= 0) {
+    if ($caseId === '') {
         respond(false, [], 'Invalid case ID.');
     }
 
@@ -316,7 +323,7 @@ if ($action === 'update_intake_notes') {
     if (!$existsStmt) {
         respond(false, [], 'Failed to validate complaint case.');
     }
-    $existsStmt->bind_param("i", $caseId);
+    $existsStmt->bind_param("s", $caseId);
     $existsStmt->execute();
     $exists = $existsStmt->get_result()->fetch_row();
     $existsStmt->close();
@@ -335,7 +342,7 @@ if ($action === 'update_intake_notes') {
         if (!$updateComplaintStmt) {
             throw new Exception('Failed to prepare intake notes update.');
         }
-        $updateComplaintStmt->bind_param("si", $intakeNotes, $caseId);
+        $updateComplaintStmt->bind_param("ss", $intakeNotes, $caseId);
         $updateComplaintStmt->execute();
         $updateComplaintStmt->close();
 
@@ -348,7 +355,7 @@ if ($action === 'update_intake_notes') {
         if (!$updateCaseStmt) {
             throw new Exception('Failed to prepare complaint updater.');
         }
-        $updateCaseStmt->bind_param("si", $actorUserId, $caseId);
+        $updateCaseStmt->bind_param("ss", $actorUserId, $caseId);
         $updateCaseStmt->execute();
         $updateCaseStmt->close();
 
@@ -361,7 +368,7 @@ if ($action === 'update_intake_notes') {
                 throw new Exception('Failed to prepare complaint case log.');
             }
             $logEntry = 'Intake notes updated.';
-            $logStmt->bind_param("iss", $caseId, $logEntry, $actorUserId);
+            $logStmt->bind_param("sss", $caseId, $logEntry, $actorUserId);
             $logStmt->execute();
             $logStmt->close();
         }
@@ -379,11 +386,11 @@ if ($action === 'update_case_outcome') {
         respond(false, [], 'Method not allowed.');
     }
 
-    $caseId = isset($jsonInput['case_id']) ? (int)$jsonInput['case_id'] : 0;
+    $caseId = trim((string)($jsonInput['case_id'] ?? ''));
     $actionType = strtolower(trim((string)($jsonInput['action_type'] ?? '')));
     $remarks = trim((string)($jsonInput['remarks'] ?? ''));
 
-    if ($caseId <= 0) {
+    if ($caseId === '') {
         respond(false, [], 'Invalid case ID.');
     }
     if ($remarks === '') {
@@ -417,7 +424,7 @@ if ($action === 'update_case_outcome') {
     if (!$oldStmt) {
         respond(false, [], 'Failed to load current complaint state.');
     }
-    $oldStmt->bind_param("i", $caseId);
+    $oldStmt->bind_param("s", $caseId);
     $oldStmt->execute();
     $oldRow = $oldStmt->get_result()->fetch_assoc();
     $oldStmt->close();
@@ -464,7 +471,7 @@ if ($action === 'update_case_outcome') {
         if (!$updateStmt) {
             throw new Exception('Failed to prepare complaint update.');
         }
-        $updateStmt->bind_param("iissi", $newStatusId, $newLevelId, $oldRow['case_remarks'], $actorUserId, $caseId);
+        $updateStmt->bind_param("iisss", $newStatusId, $newLevelId, $oldRow['case_remarks'], $actorUserId, $caseId);
         $updateStmt->execute();
         $updateStmt->close();
 
@@ -480,7 +487,7 @@ if ($action === 'update_case_outcome') {
         if (!$complaintUpdateStmt) {
             throw new Exception('Failed to prepare complaint metadata update.');
         }
-        $complaintUpdateStmt->bind_param("iiissi", $markEscalated, $markEscalated, $markEscalated, $actorUserId, $updatedScreeningNotes, $caseId);
+        $complaintUpdateStmt->bind_param("iiisss", $markEscalated, $markEscalated, $markEscalated, $actorUserId, $updatedScreeningNotes, $caseId);
         $complaintUpdateStmt->execute();
         $complaintUpdateStmt->close();
 
@@ -492,7 +499,7 @@ if ($action === 'update_case_outcome') {
             if (!$logStmt) {
                 throw new Exception('Failed to prepare complaint case log.');
             }
-            $logStmt->bind_param("iss", $caseId, $logEntry, $actorUserId);
+            $logStmt->bind_param("sss", $caseId, $logEntry, $actorUserId);
             $logStmt->execute();
             $logStmt->close();
         }

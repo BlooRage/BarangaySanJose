@@ -1,6 +1,7 @@
 <?php
 require_once __DIR__ . "/../General/security.php";
 require_once __DIR__ . "/../General/connection.php";
+require_once __DIR__ . "/../General/uniqueIDGenerate.php";
 
 function str_field($value): ?string
 {
@@ -152,7 +153,7 @@ function parseParticipantName(?string $rawName): array
 
 function insertParticipant(
     mysqli $conn,
-    int $caseId,
+    string $caseId,
     string $role,
     ?string $lastname,
     ?string $firstname,
@@ -175,7 +176,7 @@ function insertParticipant(
     }
 
     $stmt->bind_param(
-        "issssssssss",
+        "sssssssssss",
         $caseId,
         $role,
         $lastname,
@@ -192,7 +193,7 @@ function insertParticipant(
     $stmt->close();
 }
 
-function logCaseUpdate(mysqli $conn, int $caseId, string $entry, ?string $userId): void
+function logCaseUpdate(mysqli $conn, string $caseId, string $entry, ?string $userId): void
 {
     if (!tableExists($conn, 'caseupdateslogtbl')) {
         return;
@@ -206,7 +207,7 @@ function logCaseUpdate(mysqli $conn, int $caseId, string $entry, ?string $userId
         return;
     }
 
-    $stmt->bind_param("iss", $caseId, $entry, $userId);
+    $stmt->bind_param("sss", $caseId, $entry, $userId);
     $stmt->execute();
     $stmt->close();
 }
@@ -293,21 +294,30 @@ try {
     $lookupIds = ensureComplaintLookups($conn);
     $statusId = (int)$lookupIds['status']['Pending'];
     $levelId = (int)$lookupIds['level']['Complaint Only'];
+    $caseId = GenerateCaseID($conn);
+    if (!$caseId) {
+        throw new Exception("Failed to generate case ID.");
+    }
+    $complaintId = GenerateComplaintID($conn);
+    if (!$complaintId) {
+        throw new Exception("Failed to generate complaint ID.");
+    }
 
     $caseRemarks = 'Complaint submitted via resident portal.';
     $stmtCase = $conn->prepare("
         INSERT INTO casereportstbl
-            (resident_user_id, report_type, incident_date, incident_time, incident_place, complaint_type,
+            (case_id, resident_user_id, report_type, incident_date, incident_time, incident_place, complaint_type,
              case_details, case_remarks, case_status_id, case_level_id, user_id_official_update_by, user_id_official_reviewed_by, user_id_official_record_by)
         VALUES
-            (?, 'Complaint', ?, ?, ?, ?, ?, ?, ?, ?, NULL, NULL, ?)
+            (?, ?, 'Complaint', ?, ?, ?, ?, ?, ?, ?, ?, NULL, NULL, ?)
     ");
     if (!$stmtCase) {
         throw new Exception("Prepare failed (case insert): " . $conn->error);
     }
 
     $stmtCase->bind_param(
-        "sssssssiis",
+        "ssssssssiis",
+        $caseId,
         $residentUserId,
         $incidentDate,
         $incidentTime,
@@ -320,21 +330,21 @@ try {
         $actorUserId
     );
     $stmtCase->execute();
-    $caseId = (int)$conn->insert_id;
     $stmtCase->close();
 
     $stmtComplaint = $conn->prepare("
         INSERT INTO complaintstbl
-            (case_id, complaint_origin, subject_kind, subject_display_name, subject_contact_number, subject_address, witness_summary)
+            (complaint_id, case_id, complaint_origin, subject_kind, subject_display_name, subject_contact_number, subject_address, witness_summary)
         VALUES
-            (?, 'ResidentPortal', ?, ?, ?, ?, ?)
+            (?, ?, 'ResidentPortal', ?, ?, ?, ?, ?)
     ");
     if (!$stmtComplaint) {
         throw new Exception("Prepare failed (complaint insert): " . $conn->error);
     }
 
     $stmtComplaint->bind_param(
-        "isssss",
+        "sssssss",
+        $complaintId,
         $caseId,
         $subjectKind,
         $subjectName,

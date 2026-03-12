@@ -209,3 +209,126 @@ function GenerateTransactionID(
     $existsStmt->close();
     return $prefix . str_pad((string)random_int(0, 9999), 4, "0", STR_PAD_LEFT);
 }
+
+function GenerateCaseID(mysqli $conn) {
+    $yearMonth = date("ym");
+    $prefix = "CS" . $yearMonth;
+    $like = $prefix . "%";
+    $seqKey = 'CASE:' . $yearMonth;
+
+    if (!ensureIdSequenceTable($conn)) {
+        error_log("GenerateCaseID sequence table unavailable.");
+        return false;
+    }
+
+    $stmt = $conn->prepare("
+        INSERT INTO idsequencetbl (seq_key, last_seq)
+        SELECT ?, LAST_INSERT_ID(COALESCE(MAX(CAST(RIGHT(case_id, 6) AS UNSIGNED)), 0) + 1)
+        FROM casereportstbl
+        WHERE case_id LIKE ?
+        ON DUPLICATE KEY UPDATE
+            last_seq = LAST_INSERT_ID(last_seq + 1)
+    ");
+    if (!$stmt) {
+        error_log("GenerateCaseID sequence prepare failed: " . $conn->error);
+        return false;
+    }
+
+    $stmt->bind_param("ss", $seqKey, $like);
+    if (!$stmt->execute()) {
+        error_log("GenerateCaseID sequence execute failed: " . $stmt->error);
+        $stmt->close();
+        return false;
+    }
+    $stmt->close();
+
+    $nextSeq = (int)$conn->insert_id;
+    if ($nextSeq <= 0 || $nextSeq > 999999) {
+        error_log("GenerateCaseID sequence out of range for prefix {$prefix}: {$nextSeq}");
+        return false;
+    }
+
+    return $prefix . str_pad((string)$nextSeq, 6, "0", STR_PAD_LEFT);
+}
+
+function GenerateComplaintID(mysqli $conn) {
+    $year = date("Y");
+    $prefix = "C" . $year;
+    $like = $prefix . "%";
+    $seqKey = 'CID:' . $year;
+
+    if (!ensureIdSequenceTable($conn)) {
+        error_log("GenerateComplaintID sequence table unavailable.");
+        return false;
+    }
+
+    $stmt = $conn->prepare("
+        INSERT INTO idsequencetbl (seq_key, last_seq)
+        SELECT ?, LAST_INSERT_ID(COALESCE(MAX(CAST(RIGHT(complaint_id, 5) AS UNSIGNED)), 0) + 1)
+        FROM complaintstbl
+        WHERE complaint_id LIKE ?
+        ON DUPLICATE KEY UPDATE
+            last_seq = LAST_INSERT_ID(last_seq + 1)
+    ");
+    if (!$stmt) {
+        error_log("GenerateComplaintID sequence prepare failed: " . $conn->error);
+        return false;
+    }
+
+    $stmt->bind_param("ss", $seqKey, $like);
+    if (!$stmt->execute()) {
+        error_log("GenerateComplaintID sequence execute failed: " . $stmt->error);
+        $stmt->close();
+        return false;
+    }
+    $stmt->close();
+
+    $nextSeq = (int)$conn->insert_id;
+    if ($nextSeq <= 0 || $nextSeq > 99999) {
+        error_log("GenerateComplaintID sequence out of range for prefix {$prefix}: {$nextSeq}");
+        return false;
+    }
+
+    return $prefix . str_pad((string)$nextSeq, 5, "0", STR_PAD_LEFT);
+}
+
+function GenerateBlotterID(mysqli $conn) {
+    $year = date("Y");
+    $prefix = "B" . $year;
+    $like = $prefix . "%";
+    $seqKey = 'BID:' . $year;
+
+    if (!ensureIdSequenceTable($conn)) {
+        error_log("GenerateBlotterID sequence table unavailable.");
+        return false;
+    }
+
+    $stmt = $conn->prepare("
+        INSERT INTO idsequencetbl (seq_key, last_seq)
+        SELECT ?, LAST_INSERT_ID(COALESCE(MAX(CAST(RIGHT(blotter_id, 5) AS UNSIGNED)), 0) + 1)
+        FROM barangayblottertbl
+        WHERE blotter_id LIKE ?
+        ON DUPLICATE KEY UPDATE
+            last_seq = LAST_INSERT_ID(last_seq + 1)
+    ");
+    if (!$stmt) {
+        error_log("GenerateBlotterID sequence prepare failed: " . $conn->error);
+        return false;
+    }
+
+    $stmt->bind_param("ss", $seqKey, $like);
+    if (!$stmt->execute()) {
+        error_log("GenerateBlotterID sequence execute failed: " . $stmt->error);
+        $stmt->close();
+        return false;
+    }
+    $stmt->close();
+
+    $nextSeq = (int)$conn->insert_id;
+    if ($nextSeq <= 0 || $nextSeq > 99999) {
+        error_log("GenerateBlotterID sequence out of range for prefix {$prefix}: {$nextSeq}");
+        return false;
+    }
+
+    return $prefix . str_pad((string)$nextSeq, 5, "0", STR_PAD_LEFT);
+}

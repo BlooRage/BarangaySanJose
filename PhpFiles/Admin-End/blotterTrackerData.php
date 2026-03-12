@@ -65,7 +65,7 @@ function getStatusId(mysqli $conn, string $statusName, string $statusType): int 
     return isset($row['status_id']) ? (int)$row['status_id'] : 0;
 }
 
-function getCurrentBlotterStatusName(mysqli $conn, int $caseId): string {
+function getCurrentBlotterStatusName(mysqli $conn, string $caseId): string {
     $stmt = $conn->prepare("
         SELECT s.status_name
         FROM casereportstbl c
@@ -76,7 +76,7 @@ function getCurrentBlotterStatusName(mysqli $conn, int $caseId): string {
     if (!$stmt) {
         return '';
     }
-    $stmt->bind_param("i", $caseId);
+    $stmt->bind_param("s", $caseId);
     $stmt->execute();
     $row = $stmt->get_result()->fetch_assoc();
     $stmt->close();
@@ -152,8 +152,8 @@ if ($action === 'list') {
 }
 
 if ($action === 'detail') {
-    $caseId = isset($_GET['case_id']) ? (int)$_GET['case_id'] : 0;
-    if ($caseId <= 0) {
+    $caseId = trim((string)($_GET['case_id'] ?? ''));
+    if ($caseId === '') {
         respond(false, [], "Invalid case ID.");
     }
 
@@ -184,7 +184,7 @@ if ($action === 'detail') {
     if (!$stmt) {
         respond(false, [], "Failed to prepare detail query.");
     }
-    $stmt->bind_param("i", $caseId);
+    $stmt->bind_param("s", $caseId);
     $stmt->execute();
     $detail = $stmt->get_result()->fetch_assoc();
     $stmt->close();
@@ -200,7 +200,7 @@ if ($action === 'detail') {
     if (!$stmt) {
         respond(false, [], "Failed to prepare participant query.");
     }
-    $stmt->bind_param("i", $caseId);
+    $stmt->bind_param("s", $caseId);
     $stmt->execute();
     $res = $stmt->get_result();
     $participants = [
@@ -267,9 +267,9 @@ if ($action === 'add_narrative_entry') {
         respond(false, [], "Missing table caseupdateslogtbl. Run the migration first.");
     }
 
-    $caseId = isset($jsonInput['case_id']) ? (int)$jsonInput['case_id'] : (isset($_POST['case_id']) ? (int)$_POST['case_id'] : 0);
+    $caseId = trim((string)($jsonInput['case_id'] ?? $_POST['case_id'] ?? ''));
     $narrative = trim((string)($jsonInput['narrative_report'] ?? $_POST['narrative_report'] ?? ''));
-    if ($caseId <= 0) {
+    if ($caseId === '') {
         respond(false, [], "Invalid case ID.");
     }
     if ($narrative === '') {
@@ -285,7 +285,7 @@ if ($action === 'add_narrative_entry') {
     if (!$existsStmt) {
         respond(false, [], "Failed to validate case.");
     }
-    $existsStmt->bind_param("i", $caseId);
+    $existsStmt->bind_param("s", $caseId);
     $existsStmt->execute();
     $exists = $existsStmt->get_result()->fetch_row();
     $existsStmt->close();
@@ -306,7 +306,7 @@ if ($action === 'add_narrative_entry') {
         if (!$logStmt) {
             throw new Exception("Failed to prepare narrative log insert.");
         }
-        $logStmt->bind_param("iss", $caseId, $logEntry, $actorUserId);
+        $logStmt->bind_param("sss", $caseId, $logEntry, $actorUserId);
         $logStmt->execute();
         $logStmt->close();
 
@@ -319,7 +319,7 @@ if ($action === 'add_narrative_entry') {
         if (!$updStmt) {
             throw new Exception("Failed to prepare case updater.");
         }
-        $updStmt->bind_param("si", $actorUserId, $caseId);
+        $updStmt->bind_param("ss", $actorUserId, $caseId);
         $updStmt->execute();
         $updStmt->close();
 
@@ -340,12 +340,12 @@ if ($action === 'update_case_outcome') {
         respond(false, [], "Missing table caseupdateslogtbl. Run the migration first.");
     }
 
-    $caseId = isset($jsonInput['case_id']) ? (int)$jsonInput['case_id'] : 0;
+    $caseId = trim((string)($jsonInput['case_id'] ?? ''));
     $actionType = strtolower(trim((string)($jsonInput['action_type'] ?? '')));
     $endorsementTarget = strtolower(trim((string)($jsonInput['endorsement_target'] ?? '')));
     $remarks = trim((string)($jsonInput['remarks'] ?? ''));
 
-    if ($caseId <= 0) {
+    if ($caseId === '') {
         respond(false, [], "Invalid case ID.");
     }
     if ($remarks === '') {
@@ -395,7 +395,7 @@ if ($action === 'update_case_outcome') {
     if (!$oldStmt) {
         respond(false, [], "Failed to load current case state.");
     }
-    $oldStmt->bind_param("i", $caseId);
+    $oldStmt->bind_param("s", $caseId);
     $oldStmt->execute();
     $oldRow = $oldStmt->get_result()->fetch_assoc();
     $oldStmt->close();
@@ -421,7 +421,7 @@ if ($action === 'update_case_outcome') {
         if (!$updateStmt) {
             throw new Exception("Failed to prepare case update.");
         }
-        $updateStmt->bind_param("iissi", $newStatusId, $newLevelId, $actorUserId, $remarks, $caseId);
+        $updateStmt->bind_param("iisss", $newStatusId, $newLevelId, $actorUserId, $remarks, $caseId);
         $updateStmt->execute();
         $updateStmt->close();
 
@@ -432,7 +432,7 @@ if ($action === 'update_case_outcome') {
         if (!$logStmt) {
             throw new Exception("Failed to prepare case log.");
         }
-        $logStmt->bind_param("iss", $caseId, $logEntry, $actorUserId);
+        $logStmt->bind_param("sss", $caseId, $logEntry, $actorUserId);
         $logStmt->execute();
         $logStmt->close();
 
@@ -453,9 +453,9 @@ if ($action === 'add_case_log') {
         respond(false, [], "Missing table caseupdateslogtbl. Run the migration first.");
     }
 
-    $caseId = isset($jsonInput['case_id']) ? (int)$jsonInput['case_id'] : (isset($_POST['case_id']) ? (int)$_POST['case_id'] : 0);
+    $caseId = trim((string)($jsonInput['case_id'] ?? $_POST['case_id'] ?? ''));
     $logEntry = trim((string)($jsonInput['log_entry'] ?? $_POST['log_entry'] ?? ''));
-    if ($caseId <= 0) {
+    if ($caseId === '') {
         respond(false, [], "Invalid case ID.");
     }
     if ($logEntry === '') {
@@ -471,7 +471,7 @@ if ($action === 'add_case_log') {
     if (!$existsStmt) {
         respond(false, [], "Failed to validate case.");
     }
-    $existsStmt->bind_param("i", $caseId);
+    $existsStmt->bind_param("s", $caseId);
     $existsStmt->execute();
     $exists = $existsStmt->get_result()->fetch_row();
     $existsStmt->close();
@@ -491,7 +491,7 @@ if ($action === 'add_case_log') {
         if (!$logStmt) {
             throw new Exception("Failed to prepare case log insert.");
         }
-        $logStmt->bind_param("iss", $caseId, $logEntry, $actorUserId);
+        $logStmt->bind_param("sss", $caseId, $logEntry, $actorUserId);
         $logStmt->execute();
         $logStmt->close();
 
@@ -504,7 +504,7 @@ if ($action === 'add_case_log') {
         if (!$updStmt) {
             throw new Exception("Failed to prepare case updater.");
         }
-        $updStmt->bind_param("si", $actorUserId, $caseId);
+        $updStmt->bind_param("ss", $actorUserId, $caseId);
         $updStmt->execute();
         $updStmt->close();
 
@@ -517,8 +517,8 @@ if ($action === 'add_case_log') {
 }
 
 if ($action === 'case_logs') {
-    $caseId = isset($_GET['case_id']) ? (int)$_GET['case_id'] : 0;
-    if ($caseId <= 0) {
+    $caseId = trim((string)($_GET['case_id'] ?? ''));
+    if ($caseId === '') {
         respond(false, [], "Invalid case ID.");
     }
 
@@ -542,7 +542,7 @@ if ($action === 'case_logs') {
     if (!$stmt) {
         respond(false, [], "Failed to prepare case logs query.");
     }
-    $stmt->bind_param("i", $caseId);
+    $stmt->bind_param("s", $caseId);
     $stmt->execute();
     $res = $stmt->get_result();
     $items = [];
