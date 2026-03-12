@@ -157,6 +157,64 @@
     font-family: 'Geist', sans-serif;
 }
 
+.dashboard-preload #dashboard-stats .stats-header,
+.dashboard-preload #dashboard-stats .stats-card,
+.dashboard-preload .analytics-header,
+.dashboard-preload .chart-panel {
+    opacity: 0;
+    transform: translateY(22px);
+}
+
+.dashboard-preload.dashboard-loaded #dashboard-stats .stats-header,
+.dashboard-preload.dashboard-loaded #dashboard-stats .stats-card,
+.dashboard-preload.dashboard-loaded .analytics-header,
+.dashboard-preload.dashboard-loaded .chart-panel {
+    opacity: 1;
+    transform: translateY(0);
+}
+
+.dashboard-preload #dashboard-stats .stats-header {
+    transition: opacity 0.45s ease, transform 0.45s ease;
+}
+
+.dashboard-preload #dashboard-stats .stats-card,
+.dashboard-preload .analytics-header,
+.dashboard-preload .chart-panel {
+    transition: opacity 0.55s ease, transform 0.55s ease;
+}
+
+.dashboard-preload #dashboard-stats .stats-grid .col-12:nth-child(1) .stats-card {
+    transition-delay: 0.08s;
+}
+
+.dashboard-preload #dashboard-stats .stats-grid .col-12:nth-child(2) .stats-card {
+    transition-delay: 0.14s;
+}
+
+.dashboard-preload #dashboard-stats .stats-grid .col-12:nth-child(3) .stats-card {
+    transition-delay: 0.2s;
+}
+
+.dashboard-preload #dashboard-stats .stats-grid .col-12:nth-child(4) .stats-card {
+    transition-delay: 0.26s;
+}
+
+.dashboard-preload .analytics-header {
+    transition-delay: 0.3s;
+}
+
+.dashboard-preload .chart-panel:nth-of-type(1) {
+    transition-delay: 0.36s;
+}
+
+.dashboard-preload .chart-panel:nth-of-type(2) {
+    transition-delay: 0.44s;
+}
+
+.dashboard-preload .chart-panel:nth-of-type(3) {
+    transition-delay: 0.52s;
+}
+
 .stats-title {
     font-family: 'Charis SIL Bold', serif;
     font-size: 1.6rem;
@@ -213,6 +271,89 @@
 .bg-emerald { background: #2f9e44; }
 .bg-sky { background: #1c7ed6; }
 .bg-rose { background: #e03131; }
+
+.analytics-section {
+    margin-top: 1.75rem;
+}
+
+.analytics-title {
+    font-family: 'Charis SIL Bold', serif;
+    font-size: 1.6rem;
+    color: #3b3b3b;
+}
+
+.analytics-copy {
+    color: #6b7280;
+    font-size: 0.96rem;
+}
+
+.analytics-range {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.5rem 0.9rem;
+    border-radius: 999px;
+    background: rgba(222, 113, 12, 0.1);
+    color: #b75b09;
+    font-size: 0.88rem;
+    font-weight: 600;
+}
+
+.chart-panel {
+    background:
+        radial-gradient(circle at top right, rgba(254, 153, 60, 0.15), transparent 34%),
+        linear-gradient(180deg, #ffffff 0%, #fffaf5 100%);
+    border: 1px solid rgba(254, 153, 60, 0.28);
+    border-radius: 24px;
+    box-shadow: 0 18px 38px rgba(17, 24, 39, 0.08);
+    padding: 1.05rem 1.1rem 0.95rem;
+}
+
+.chart-panel-head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 1rem;
+    margin-bottom: 0.7rem;
+}
+
+.chart-title {
+    font-family: 'Charis SIL Bold', serif;
+    color: #2d2d2d;
+    font-size: 1.08rem;
+    margin: 0;
+    margin-bottom: 0.35rem;
+}
+
+.chart-copy {
+    color: #6b7280;
+    font-size: 0.84rem;
+    line-height: 1.6;
+}
+
+.chart-total {
+    white-space: nowrap;
+    background: #fff;
+    border: 1px solid rgba(28, 126, 214, 0.16);
+    border-radius: 999px;
+    color: #1f2937;
+    font-size: 0.76rem;
+    font-weight: 700;
+    padding: 0.35rem 0.7rem;
+}
+
+.chart-canvas-wrap {
+    position: relative;
+    min-height: 210px;
+}
+
+.chart-canvas-wrap-wide {
+    min-height: 250px;
+}
+
+.chart-canvas-wrap canvas {
+    width: 100% !important;
+    height: 100% !important;
+}
 
 #requestsSection {
     display: none;
@@ -292,6 +433,31 @@
 
 .card-action:hover span {
     color: #fff;
+}
+
+@media (max-width: 991.98px) {
+    .chart-panel-head {
+        flex-direction: column;
+    }
+
+    .chart-total {
+        white-space: normal;
+    }
+}
+
+@media (max-width: 575.98px) {
+    .chart-panel {
+        border-radius: 20px;
+        padding: 0.95rem;
+    }
+
+    .chart-canvas-wrap {
+        min-height: 200px;
+    }
+
+    .chart-canvas-wrap-wide {
+        min-height: 225px;
+    }
 }
 
 /* Ensure all modal header titles are black across admin pages */
