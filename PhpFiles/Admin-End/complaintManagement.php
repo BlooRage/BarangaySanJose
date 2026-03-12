@@ -12,6 +12,122 @@ function str_field($value): ?string
     return $value === '' ? null : $value;
 }
 
+function normalizeComplaintPhone($value): ?string
+{
+    $digits = preg_replace('/\D+/', '', trim((string)$value));
+    if ($digits === '') {
+        return null;
+    }
+    if (preg_match('/^9\d{9}$/', $digits)) {
+        $digits = '0' . $digits;
+    }
+    return $digits;
+}
+
+function validateComplaintPhoneOrRedirect(?string $value, bool $required, string $label): ?string
+{
+    $phone = normalizeComplaintPhone($value);
+    if ($phone === null) {
+        if ($required) {
+            redirectWithMessage('error', "{$label} is required.");
+        }
+        return null;
+    }
+    if (!preg_match('/^09\d{9}$/', $phone)) {
+        redirectWithMessage('error', "{$label} must be in the format 09XXXXXXXXX.");
+    }
+    return $phone;
+}
+
+function buildComplaintAddressFromPost(string $prefix): ?string
+{
+    $addressSystem = str_field($_POST["{$prefix}_address_system"] ?? '');
+    $unitNumber = str_field($_POST["{$prefix}_unit_number"] ?? '');
+    $houseNumber = str_field($_POST["{$prefix}_house_number"] ?? '');
+    $streetName = str_field($_POST["{$prefix}_street_name"] ?? '');
+    $lotNumber = str_field($_POST["{$prefix}_lot_number"] ?? '');
+    $blockNumber = str_field($_POST["{$prefix}_block_number"] ?? '');
+    $phaseNumber = str_field($_POST["{$prefix}_phase_number"] ?? '');
+    $subdivision = str_field($_POST["{$prefix}_subdivision"] ?? '');
+    $areaNumber = str_field($_POST["{$prefix}_area_number"] ?? '');
+    $barangay = str_field($_POST["{$prefix}_barangay"] ?? '');
+    $municipality = str_field($_POST["{$prefix}_municipality"] ?? '');
+    $province = str_field($_POST["{$prefix}_province"] ?? '');
+
+    if (!in_array($addressSystem, ['house', 'lot_block'], true)) {
+        redirectWithMessage('error', 'Complainant address system is required.');
+    }
+    if ($addressSystem === 'house' && (!$houseNumber || !$streetName)) {
+        redirectWithMessage('error', 'Complainant house number and street name are required.');
+    }
+    if ($addressSystem === 'lot_block' && (!$lotNumber || !$blockNumber || !$phaseNumber)) {
+        redirectWithMessage('error', 'Complainant lot, block, and phase are required.');
+    }
+    if (!$barangay || !$municipality || !$province) {
+        redirectWithMessage('error', 'Complainant address is incomplete.');
+    }
+
+    $parts = [];
+    foreach ([
+        'Address System' => $addressSystem,
+        'Unit' => $unitNumber,
+        'Subdivision' => $subdivision,
+        'House No.' => $houseNumber,
+        'Street' => $streetName,
+        'Area' => $areaNumber,
+        'Lot' => $lotNumber,
+        'Block' => $blockNumber,
+        'Phase' => $phaseNumber,
+        'Barangay' => $barangay,
+        'Municipality' => $municipality,
+        'Province' => $province,
+    ] as $label => $value) {
+        if ($value !== null && $value !== '') {
+            $parts[] = "{$label}: {$value}";
+        }
+    }
+
+    return !empty($parts) ? implode(', ', $parts) : null;
+}
+
+function validateIncidentDateTimeOrRedirect(?string $incidentDate, ?string $incidentTime): void
+{
+    if (!$incidentDate) {
+        return;
+    }
+
+    $timezone = new DateTimeZone(date_default_timezone_get() ?: 'Asia/Manila');
+    $now = new DateTimeImmutable('now', $timezone);
+    $oldestAllowed = $now->sub(new DateInterval('P6M'));
+
+    $dateOnly = DateTimeImmutable::createFromFormat('!Y-m-d', $incidentDate, $timezone);
+    if (!$dateOnly) {
+        redirectWithMessage('error', 'Incident date is invalid.');
+    }
+
+    if ($dateOnly->format('Y-m-d') < $oldestAllowed->format('Y-m-d')) {
+        redirectWithMessage('error', 'Incident date must be within the past 6 months.');
+    }
+
+    if ($incidentTime) {
+        $incidentDateTime = DateTimeImmutable::createFromFormat('Y-m-d H:i', $incidentDate . ' ' . $incidentTime, $timezone);
+        if (!$incidentDateTime) {
+            redirectWithMessage('error', 'Incident time is invalid.');
+        }
+        if ($incidentDateTime > $now) {
+            redirectWithMessage('error', 'Incident date and time cannot be in the future.');
+        }
+        if ($incidentDateTime < $oldestAllowed) {
+            redirectWithMessage('error', 'Incident date and time must be within the past 6 months.');
+        }
+        return;
+    }
+
+    if ($incidentDate > $now->format('Y-m-d')) {
+        redirectWithMessage('error', 'Incident date cannot be in the future.');
+    }
+}
+
 function tableExists(mysqli $conn, string $tableName): bool
 {
     $stmt = $conn->prepare("
@@ -124,7 +240,21 @@ function parseParticipantName(?string $rawName): array
         return [str_field($lastname), str_field($firstname), str_field($middlename), str_field($suffix)];
     }
 
-    return [str_field($baseName), null, null, str_field($suffix)];
+    $parts = preg_split('/\s+/', $baseName) ?: [];
+    $parts = array_values(array_filter($parts, static fn ($part) => $part !== ''));
+    if (empty($parts)) {
+        return [null, null, null, str_field($suffix)];
+    }
+    if (count($parts) === 1) {
+        $single = str_field($parts[0]);
+        return [$single, $single, null, str_field($suffix)];
+    }
+
+    $lastname = str_field(array_pop($parts));
+    $firstname = str_field(array_shift($parts));
+    $middlename = !empty($parts) ? str_field(implode(' ', $parts)) : null;
+
+    return [$lastname, $firstname, $middlename, str_field($suffix)];
 }
 
 function insertParticipant(
@@ -152,7 +282,11 @@ function insertParticipant(
     }
 
     $stmt->bind_param("sssssssssss", $caseId, $role, $lastname, $firstname, $middlename, $suffix, $contactNumber, $address, $age, $sex, $remarks);
-    $stmt->execute();
+    if (!$stmt->execute()) {
+        $error = $stmt->error ?: $conn->error;
+        $stmt->close();
+        throw new Exception("Failed to insert {$role} participant: " . $error);
+    }
     $stmt->close();
 }
 
@@ -177,13 +311,13 @@ $complainantLast = str_field($_POST['complainant_last_name'] ?? '');
 $complainantFirst = str_field($_POST['complainant_first_name'] ?? '');
 $complainantMiddle = str_field($_POST['complainant_middle_name'] ?? '');
 $complainantSuffix = str_field($_POST['complainant_suffix'] ?? '');
-$complainantContact = str_field($_POST['complainant_contact_number'] ?? '');
+$complainantContact = validateComplaintPhoneOrRedirect($_POST['complainant_contact_number'] ?? '', true, 'Complainant contact number');
 $complainantAge = str_field($_POST['complainant_age'] ?? '');
 $complainantSex = str_field($_POST['complainant_sex'] ?? '');
-$complainantAddress = str_field($_POST['complainant_address'] ?? '');
+$complainantAddress = buildComplaintAddressFromPost('complainant');
 
 $subjectName = str_field($_POST['subject_name'] ?? '');
-$subjectContact = str_field($_POST['subject_contact_number'] ?? '');
+$subjectContact = validateComplaintPhoneOrRedirect($_POST['subject_contact_number'] ?? '', false, 'Subject contact number');
 $subjectAddress = str_field($_POST['subject_address'] ?? '');
 
 $natureOfComplaint = str_field($_POST['nature_of_complaint'] ?? '');
@@ -195,7 +329,7 @@ $incidentNarration = str_field($_POST['incident_narration'] ?? '');
 $initialNotes = str_field($_POST['initial_notes'] ?? '');
 
 $witnessName = str_field($_POST['witness_name'] ?? '');
-$witnessContact = str_field($_POST['witness_contact_number'] ?? '');
+$witnessContact = validateComplaintPhoneOrRedirect($_POST['witness_contact_number'] ?? '', false, 'Witness contact number');
 $witnessAddress = str_field($_POST['witness_address'] ?? '');
 
 $complaintType = $natureOfComplaint === 'Other' ? $natureOther : $natureOfComplaint;
@@ -205,9 +339,7 @@ if (!$complainantLast || !$complainantFirst || !$complainantAge || !$complainant
     redirectWithMessage('error', 'Missing required complaint fields.');
 }
 
-if ($incidentDate > date('Y-m-d')) {
-    redirectWithMessage('error', 'Incident date cannot be in the future.');
-}
+validateIncidentDateTimeOrRedirect($incidentDate, $incidentTime);
 
 $witnessSummaryParts = array_filter([
     $witnessName ? 'Name: ' . $witnessName : null,

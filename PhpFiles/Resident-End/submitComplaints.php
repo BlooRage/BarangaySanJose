@@ -9,6 +9,18 @@ function str_field($value): ?string
     return $value === '' ? null : $value;
 }
 
+function normalizeComplaintPhone($value): ?string
+{
+    $digits = preg_replace('/\D+/', '', trim((string)$value));
+    if ($digits === '') {
+        return null;
+    }
+    if (preg_match('/^9\d{9}$/', $digits)) {
+        $digits = '0' . $digits;
+    }
+    return $digits;
+}
+
 function tableExists(mysqli $conn, string $tableName): bool
 {
     $stmt = $conn->prepare("
@@ -148,7 +160,21 @@ function parseParticipantName(?string $rawName): array
         ];
     }
 
-    return [str_field($baseName), null, null, str_field($suffix)];
+    $parts = preg_split('/\s+/', $baseName) ?: [];
+    $parts = array_values(array_filter($parts, static fn ($part) => $part !== ''));
+    if (empty($parts)) {
+        return [null, null, null, str_field($suffix)];
+    }
+    if (count($parts) === 1) {
+        $single = str_field($parts[0]);
+        return [$single, $single, null, str_field($suffix)];
+    }
+
+    $lastname = str_field(array_pop($parts));
+    $firstname = str_field(array_shift($parts));
+    $middlename = !empty($parts) ? str_field(implode(' ', $parts)) : null;
+
+    return [$lastname, $firstname, $middlename, str_field($suffix)];
 }
 
 function insertParticipant(
@@ -189,7 +215,11 @@ function insertParticipant(
         $sex,
         $remarks
     );
-    $stmt->execute();
+    if (!$stmt->execute()) {
+        $error = $stmt->error ?: $conn->error;
+        $stmt->close();
+        throw new Exception("Failed to insert {$role} participant: " . $error);
+    }
     $stmt->close();
 }
 
@@ -219,6 +249,59 @@ function redirectWithMessage(string $path, string $type, string $message, array 
     exit;
 }
 
+function validateComplaintPhoneOrRedirect(string $path, $value, bool $required, string $label): ?string
+{
+    $phone = normalizeComplaintPhone($value);
+    if ($phone === null) {
+        if ($required) {
+            redirectWithMessage($path, 'error', "{$label} is required.");
+        }
+        return null;
+    }
+    if (!preg_match('/^09\d{9}$/', $phone)) {
+        redirectWithMessage($path, 'error', "{$label} must be in the format 09XXXXXXXXX.");
+    }
+    return $phone;
+}
+
+function validateIncidentDateTimeOrRedirect(string $path, ?string $incidentDate, ?string $incidentTime): void
+{
+    if (!$incidentDate) {
+        return;
+    }
+
+    $timezone = new DateTimeZone(date_default_timezone_get() ?: 'Asia/Manila');
+    $now = new DateTimeImmutable('now', $timezone);
+    $oldestAllowed = $now->sub(new DateInterval('P6M'));
+
+    $dateOnly = DateTimeImmutable::createFromFormat('!Y-m-d', $incidentDate, $timezone);
+    if (!$dateOnly) {
+        redirectWithMessage($path, 'error', 'Incident date is invalid.');
+    }
+
+    if ($dateOnly->format('Y-m-d') < $oldestAllowed->format('Y-m-d')) {
+        redirectWithMessage($path, 'error', 'Incident date must be within the past 6 months.');
+    }
+
+    if ($incidentTime) {
+        $incidentDateTime = DateTimeImmutable::createFromFormat('Y-m-d H:i', $incidentDate . ' ' . $incidentTime, $timezone);
+        if (!$incidentDateTime) {
+            redirectWithMessage($path, 'error', 'Incident time is invalid.');
+        }
+        if ($incidentDateTime > $now) {
+            redirectWithMessage($path, 'error', 'Incident date and time cannot be in the future.');
+        }
+        if ($incidentDateTime < $oldestAllowed) {
+            redirectWithMessage($path, 'error', 'Incident date and time must be within the past 6 months.');
+        }
+        return;
+    }
+
+    if ($incidentDate > $now->format('Y-m-d')) {
+        redirectWithMessage($path, 'error', 'Incident date cannot be in the future.');
+    }
+}
+
 if (($_SERVER['REQUEST_METHOD'] ?? 'GET') !== 'POST') {
     http_response_code(405);
     exit('Method not allowed.');
@@ -244,13 +327,14 @@ $complainantLast = str_field($_POST['complainant_last_name'] ?? '');
 $complainantFirst = str_field($_POST['complainant_first_name'] ?? '');
 $complainantMiddle = str_field($_POST['complainant_middle_name'] ?? '');
 $complainantSuffix = str_field($_POST['complainant_suffix'] ?? '');
-$complainantContact = str_field($_POST['complainant_contact_number'] ?? '');
+$complainantPath = '/Resident-End/Complaints/ComplaintsForm.php';
+$complainantContact = validateComplaintPhoneOrRedirect($complainantPath, $_POST['complainant_contact_number'] ?? '', true, 'Complainant contact number');
 $complainantAge = str_field($_POST['complainant_age'] ?? '');
 $complainantSex = str_field($_POST['complainant_sex'] ?? '');
 $complainantAddress = str_field($_POST['complainant_address'] ?? '');
 
 $subjectName = str_field($_POST['subject_name'] ?? '');
-$subjectContact = str_field($_POST['subject_contact_number'] ?? '');
+$subjectContact = validateComplaintPhoneOrRedirect($complainantPath, $_POST['subject_contact_number'] ?? '', false, 'Subject contact number');
 $subjectAddress = str_field($_POST['subject_address'] ?? '');
 
 $natureOfComplaint = str_field($_POST['nature_of_complaint'] ?? '');
@@ -261,20 +345,17 @@ $incidentLocation = str_field($_POST['incident_location'] ?? '');
 $incidentNarration = str_field($_POST['incident_narration'] ?? '');
 
 $witnessName = str_field($_POST['witness_name'] ?? '');
-$witnessContact = str_field($_POST['witness_contact_number'] ?? '');
+$witnessContact = validateComplaintPhoneOrRedirect($complainantPath, $_POST['witness_contact_number'] ?? '', false, 'Witness contact number');
 $witnessAddress = str_field($_POST['witness_address'] ?? '');
 
 $complaintType = $natureOfComplaint === 'Other' ? $natureOther : $natureOfComplaint;
 $complaintType = str_field($complaintType);
 
 if (!$complainantLast || !$complainantFirst || !$complainantAge || !$complainantSex || !$complainantContact || !$complainantAddress || !$subjectName || !$subjectAddress || !$complaintType || !$incidentDate || !$incidentLocation || !$incidentNarration) {
-    redirectWithMessage('/Resident-End/Complaints/ComplaintsForm.php', 'error', 'Missing required complaint fields.');
+    redirectWithMessage($complainantPath, 'error', 'Missing required complaint fields.');
 }
 
-$todayIso = date('Y-m-d');
-if ($incidentDate > $todayIso) {
-    redirectWithMessage('/Resident-End/Complaints/ComplaintsForm.php', 'error', 'Incident date cannot be in the future.');
-}
+validateIncidentDateTimeOrRedirect($complainantPath, $incidentDate, $incidentTime);
 
 $witnessSummaryParts = array_filter([
     $witnessName ? 'Name: ' . $witnessName : null,
@@ -405,7 +486,7 @@ try {
     logCaseUpdate($conn, $caseId, 'Complaint submitted through resident portal.', $actorUserId ?: null);
     $conn->commit();
 
-    redirectWithMessage('/Resident-End/Complaints/ComplaintsForm.php', 'success', 'Complaint submitted successfully.', [
+    redirectWithMessage($complainantPath, 'success', 'Complaint submitted successfully.', [
         'case_id' => $caseId,
     ]);
 } catch (Throwable $e) {

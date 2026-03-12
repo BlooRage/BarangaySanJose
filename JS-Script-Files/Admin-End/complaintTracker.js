@@ -410,12 +410,15 @@
                 ], 1),
             ].join("");
 
-            const witnessGrid = renderFieldGrid([
-                { label: "Witness Name", value: d.witness?.full_name || "-" },
-                { label: "Witness Contact", value: d.witness?.contact_number || "-" },
-                { label: "Witness Address", value: d.witness?.address || "-" },
-                { label: "Witness Summary", value: d.witness_summary || "-" },
-            ], 2);
+            const witnessGrid = [
+                renderFieldGrid([
+                    { label: "Witness Name", value: d.witness?.full_name || "-" },
+                    { label: "Witness Contact", value: d.witness?.contact_number || "-" },
+                ], 2),
+                renderFieldGrid([
+                    { label: "Witness Address", value: d.witness?.address || "-" },
+                ], 1),
+            ].join("");
 
             const intakeNotesSection = formSection("Intake Notes", renderIntakeNotesEditor(d.intake_notes || ""));
 

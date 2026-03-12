@@ -133,9 +133,18 @@ if ($action === 'list') {
         INNER JOIN complaintstbl ct ON ct.case_id = c.case_id
         LEFT JOIN statuslookuptbl s ON s.status_id = c.case_status_id
         LEFT JOIN statuslookuptbl l ON l.status_id = c.case_level_id
-        LEFT JOIN caseparticipantstbl cp
+        LEFT JOIN (
+            SELECT
+                case_id,
+                MAX(firstname) AS firstname,
+                MAX(middlename) AS middlename,
+                MAX(lastname) AS lastname,
+                MAX(suffix) AS suffix
+            FROM caseparticipantstbl
+            WHERE participant_role = 'Complainant'
+            GROUP BY case_id
+        ) cp
             ON cp.case_id = c.case_id
-            AND cp.participant_role = 'Complainant'
         WHERE c.report_type = 'Complaint'
         ORDER BY c.report_timestamp DESC, c.case_id DESC
     ";

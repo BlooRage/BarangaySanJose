@@ -31,6 +31,9 @@ document.addEventListener("DOMContentLoaded", () => {
     const phoneInputs = form?.querySelectorAll('input[name="complainant_contact_number"], input[name="respondent_contact_number"]') || [];
     const dateFiledInput = form?.querySelector('input[name="date_filed"]');
     const timeFiledInput = form?.querySelector('input[name="time_filed"]');
+    const incidentDateInput = document.getElementById("incidentDate");
+    const incidentTimeInput = document.getElementById("incidentTime");
+    const incidentDateError = document.getElementById("incidentDateError");
     const complainantSignatureCanvas = document.getElementById("complainantSignatureCanvas");
     const complainantSignatureData = document.getElementById("complainantSignatureData");
     const complainantSignatureError = document.getElementById("complainantSignatureError");
@@ -145,6 +148,19 @@ document.addEventListener("DOMContentLoaded", () => {
     };
 
     const touchedFields = new WeakSet();
+
+    const toIsoDate = (date) => {
+        const yyyy = date.getFullYear();
+        const mm = String(date.getMonth() + 1).padStart(2, "0");
+        const dd = String(date.getDate()).padStart(2, "0");
+        return `${yyyy}-${mm}-${dd}`;
+    };
+
+    const toTimeValue = (date) => {
+        const hh = String(date.getHours()).padStart(2, "0");
+        const min = String(date.getMinutes()).padStart(2, "0");
+        return `${hh}:${min}`;
+    };
 
     const initSignaturePad = (canvas, hiddenInput, errorEl, clearBtn) => {
         if (!canvas || !hiddenInput) return null;
@@ -459,8 +475,49 @@ document.addEventListener("DOMContentLoaded", () => {
         });
     };
 
+    const validateIncidentDateTime = () => {
+        if (!incidentDateInput) return true;
+        const now = new Date();
+        const todayIso = toIsoDate(now);
+        const currentTime = toTimeValue(now);
+        const dateValue = String(incidentDateInput.value || "").trim();
+        const timeValue = String(incidentTimeInput?.value || "").trim();
+
+        incidentDateInput.max = todayIso;
+        if (incidentTimeInput) {
+            incidentTimeInput.max = dateValue === todayIso ? currentTime : "";
+        }
+
+        if (dateValue !== "" && dateValue > todayIso) {
+            const msg = `Date must be on or before ${todayIso}.`;
+            incidentDateInput.setCustomValidity(msg);
+            if (incidentDateError) {
+                incidentDateError.textContent = msg;
+                incidentDateError.classList.remove("d-none");
+            }
+            return false;
+        }
+
+        incidentDateInput.setCustomValidity("");
+        if (incidentDateError) {
+            incidentDateError.textContent = "";
+            incidentDateError.classList.add("d-none");
+        }
+
+        if (incidentTimeInput) {
+            if (dateValue === todayIso && timeValue !== "" && timeValue > currentTime) {
+                incidentTimeInput.setCustomValidity(`Time must be on or before ${currentTime} for incidents dated today.`);
+                return false;
+            }
+            incidentTimeInput.setCustomValidity("");
+        }
+
+        return true;
+    };
+
     const updateState = () => {
         setNarrativeMode();
+        validateIncidentDateTime();
         applyAddressSystem(
             complainantAddressSystem,
             complainantHouseWrapper,
@@ -572,6 +629,19 @@ document.addEventListener("DOMContentLoaded", () => {
         input.addEventListener("blur", () => syncPhoneValidation(input));
     });
 
+    incidentDateInput?.addEventListener("input", updateState);
+    incidentDateInput?.addEventListener("change", updateState);
+    incidentDateInput?.addEventListener("blur", () => {
+        touchedFields.add(incidentDateInput);
+        renderValidity(incidentDateInput);
+    });
+    incidentTimeInput?.addEventListener("input", updateState);
+    incidentTimeInput?.addEventListener("change", updateState);
+    incidentTimeInput?.addEventListener("blur", () => {
+        touchedFields.add(incidentTimeInput);
+        renderValidity(incidentTimeInput);
+    });
+
     uploadBox?.addEventListener("click", () => fileInput?.click());
     uploadBox?.addEventListener("keydown", (e) => {
         if (e.key === "Enter" || e.key === " ") {
@@ -616,6 +686,10 @@ document.addEventListener("DOMContentLoaded", () => {
             e.preventDefault();
             e.stopPropagation();
             updateState();
+            if (!validateIncidentDateTime()) {
+                renderAllValidity();
+                return;
+            }
             if (!signaturesValid) {
                 return;
             }
@@ -627,6 +701,12 @@ document.addEventListener("DOMContentLoaded", () => {
             return;
         }
         updateState();
+        if (!validateIncidentDateTime()) {
+            e.preventDefault();
+            e.stopPropagation();
+            renderAllValidity();
+            return;
+        }
         if (!signaturesValid) {
             e.preventDefault();
             e.stopPropagation();

@@ -352,11 +352,12 @@ require_once __DIR__ . "/../includes/admin_guard.php";
                 <div class="row g-3 mb-3">
                     <div class="col-12 col-md-3">
                         <label class="form-label">Date of Incident <span class="required-asterisk">*</span></label>
-                        <input type="date" class="form-control" name="incident_date" required>
+                        <input type="date" class="form-control" id="incidentDate" name="incident_date" required>
+                        <div id="incidentDateError" class="invalid-feedback d-block d-none"></div>
                     </div>
                     <div class="col-12 col-md-3">
                         <label class="form-label">Time of Incident <span class="required-asterisk">*</span></label>
-                        <input type="time" class="form-control" name="incident_time" required>
+                        <input type="time" class="form-control" id="incidentTime" name="incident_time" required>
                     </div>
                     <div class="col-12 col-md-3">
                         <label class="form-label">Place of Incident <span class="required-asterisk">*</span></label>

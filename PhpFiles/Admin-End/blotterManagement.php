@@ -38,6 +38,20 @@ function getStatusId(mysqli $conn, string $name, string $type): int {
     return (int)$res['status_id'];
 }
 
+function validateIncidentDateTime(string $incidentDate, string $incidentTime): void {
+    $timezone = new DateTimeZone(date_default_timezone_get() ?: 'Asia/Manila');
+    $now = new DateTimeImmutable('now', $timezone);
+    $incidentDateTime = DateTimeImmutable::createFromFormat('Y-m-d H:i', $incidentDate . ' ' . $incidentTime, $timezone);
+    if (!$incidentDateTime) {
+        http_response_code(400);
+        exit("Incident date or time is invalid.");
+    }
+    if ($incidentDateTime > $now) {
+        http_response_code(400);
+        exit("Incident date and time cannot be in the future.");
+    }
+}
+
 if (($_SERVER['REQUEST_METHOD'] ?? 'GET') !== 'POST') {
     http_response_code(405);
     exit("Method not allowed.");
@@ -74,6 +88,8 @@ if (!$blotterNumber || !$dateFiled || !$timeFiled || !$complainantLast || !$comp
     http_response_code(400);
     exit("Missing required fields.");
 }
+
+validateIncidentDateTime($incidentDate, $incidentTime);
 
 if ($narrativeMethod === 'text' && !$narrativeText) {
     http_response_code(400);
@@ -235,7 +251,9 @@ try {
         $complainantSex,
         $complainantRemarks
     );
-    $stmtParticipant->execute();
+    if (!$stmtParticipant->execute()) {
+        throw new Exception("Failed to insert Complainant participant: " . ($stmtParticipant->error ?: $conn->error));
+    }
 
     $role = 'Respondent';
     $stmtParticipant->bind_param(
@@ -252,7 +270,9 @@ try {
         $respondentSex,
         $respondentRemarks
     );
-    $stmtParticipant->execute();
+    if (!$stmtParticipant->execute()) {
+        throw new Exception("Failed to insert Respondent participant: " . ($stmtParticipant->error ?: $conn->error));
+    }
     $stmtParticipant->close();
 
     $conn->commit();

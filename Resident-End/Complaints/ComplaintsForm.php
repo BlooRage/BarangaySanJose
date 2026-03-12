@@ -30,7 +30,11 @@ $complainantMiddleName = htmlspecialchars((string)($residentinformationtbl['midd
 $complainantSuffix = htmlspecialchars((string)($residentinformationtbl['suffix'] ?? ''), ENT_QUOTES, 'UTF-8');
 $complainantAge = htmlspecialchars((string)($residentinformationtbl['age'] ?? ''), ENT_QUOTES, 'UTF-8');
 $complainantSex = htmlspecialchars((string)($residentinformationtbl['sex'] ?? ''), ENT_QUOTES, 'UTF-8');
-$complainantContactNumber = htmlspecialchars((string)($useraccountstbl['phone_number'] ?? ''), ENT_QUOTES, 'UTF-8');
+$complainantContactNumberRaw = trim((string)($useraccountstbl['phone_number'] ?? ''));
+if (preg_match('/^9\d{9}$/', $complainantContactNumberRaw)) {
+    $complainantContactNumberRaw = '0' . $complainantContactNumberRaw;
+}
+$complainantContactNumber = htmlspecialchars($complainantContactNumberRaw, ENT_QUOTES, 'UTF-8');
 
 $unitNumber = trim((string)($residentaddresstbl['unit_number'] ?? ''));
 $streetNumber = trim((string)($residentaddresstbl['street_number'] ?? ''));
@@ -41,7 +45,6 @@ $subdivision = trim((string)($residentaddresstbl['subdivision'] ?? ''));
 $streetNameHasBlock = $streetName !== '' && stripos($streetName, 'block') !== false;
 $streetNumberHasLot = $streetNumber !== '' && stripos($streetNumber, 'lot') !== false;
 $isLotBlockSystem = $streetNameHasBlock || $streetNumberHasLot;
-
 $streetLabel = $streetName;
 if ($streetLabel !== '' && stripos($streetLabel, 'street') === false && !$streetNameHasBlock) {
     $streetLabel .= ' Street';
@@ -206,7 +209,7 @@ $addressReadonly = $complainantAddress !== '' ? 'readonly' : '';
                         </div>
                         <div class="phone">
                             <label class="top-label">Contact Number <span class="required-asterisk">*</span></label>
-                            <input type="text" name="complainant_contact_number" required value="<?php echo $complainantContactNumber; ?>" <?php echo $contactReadonly; ?>>
+                            <input type="text" name="complainant_contact_number" inputmode="numeric" maxlength="11" pattern="^09\d{9}$" title="Format: 09XXXXXXXXX" placeholder="09XXXXXXXXX" required value="<?php echo $complainantContactNumber; ?>" <?php echo $contactReadonly; ?>>
                         </div>
                     </div>
 
@@ -235,7 +238,7 @@ $addressReadonly = $complainantAddress !== '' ? 'readonly' : '';
                         </div>
                         <div>
                             <label class="top-label">Contact Number</label>
-                            <input type="text" name="subject_contact_number">
+                            <input type="text" name="subject_contact_number" inputmode="numeric" maxlength="11" pattern="^09\d{9}$" title="Format: 09XXXXXXXXX" placeholder="09XXXXXXXXX">
                         </div>
                     </div>
 
@@ -307,7 +310,7 @@ $addressReadonly = $complainantAddress !== '' ? 'readonly' : '';
                         </div>
                         <div>
                             <label class="top-label">Witness Contact Number</label>
-                            <input type="text" name="witness_contact_number">
+                            <input type="text" name="witness_contact_number" inputmode="numeric" maxlength="11" pattern="^09\d{9}$" title="Format: 09XXXXXXXXX" placeholder="09XXXXXXXXX">
                         </div>
                     </div>
 

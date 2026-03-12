@@ -103,14 +103,92 @@ $feedbackMessage = !empty($_GET['success'])
                     </div>
                     <div class="phone">
                         <label class="top-label">Contact Number <span class="required-asterisk">*</span></label>
-                        <input type="text" name="complainant_contact_number" required>
+                        <input type="text" name="complainant_contact_number" inputmode="numeric" maxlength="11" pattern="^09\d{9}$" title="Format: 09XXXXXXXXX" placeholder="09XXXXXXXXX" required>
                     </div>
                 </div>
 
                 <div class="form-row">
                     <div class="full-width">
-                        <label class="top-label">Address <span class="required-asterisk">*</span></label>
-                        <input type="text" name="complainant_address" required>
+                        <div class="input-stack">
+                            <label class="top-label" for="complainantAddressSystem">Address System <span class="required-asterisk">*</span></label>
+                            <select class="form-select w-100" id="complainantAddressSystem" name="complainant_address_system" required>
+                                <option value="">Select</option>
+                                <option value="house">House Numbering System</option>
+                                <option value="lot_block">Lot/Block System</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="complainantHouseSystemWrapper" class="form-row pt-0 d-none">
+                    <div class="input-stack">
+                        <label class="top-label" for="complainantUnitNumber">Unit / Apartment Number</label>
+                        <input type="text" id="complainantUnitNumber" name="complainant_unit_number">
+                    </div>
+                    <div class="input-stack">
+                        <label class="top-label" for="complainantHouseNumber">House Number <span class="required-asterisk">*</span></label>
+                        <input type="text" id="complainantHouseNumber" name="complainant_house_number">
+                    </div>
+                    <div class="input-stack">
+                        <label class="top-label" for="complainantStreetName">Street Name <span class="required-asterisk">*</span></label>
+                        <input type="text" id="complainantStreetName" name="complainant_street_name">
+                    </div>
+                    <div class="input-stack">
+                        <label class="top-label" for="complainantSubdivisionHouse">Subdivision</label>
+                        <input type="text" id="complainantSubdivisionHouse" name="complainant_subdivision">
+                    </div>
+                    <div class="input-stack"></div>
+                </div>
+
+                <div id="complainantLotBlockSystemWrapper" class="form-row pt-0 d-none">
+                    <div class="input-stack">
+                        <label class="top-label" for="complainantLotNumber">Lot <span class="required-asterisk">*</span></label>
+                        <input type="text" id="complainantLotNumber" name="complainant_lot_number">
+                    </div>
+                    <div class="input-stack">
+                        <label class="top-label" for="complainantBlockNumber">Block <span class="required-asterisk">*</span></label>
+                        <input type="text" id="complainantBlockNumber" name="complainant_block_number">
+                    </div>
+                    <div class="input-stack">
+                        <label class="top-label" for="complainantPhaseNumber">Phase <span class="required-asterisk">*</span></label>
+                        <input type="text" id="complainantPhaseNumber" name="complainant_phase_number">
+                    </div>
+                    <div class="input-stack">
+                        <label class="top-label" for="complainantSubdivisionLot">Subdivision</label>
+                        <input type="text" id="complainantSubdivisionLot" name="complainant_subdivision">
+                    </div>
+                    <div class="input-stack"></div>
+                </div>
+
+                <div class="form-row">
+                    <div class="full-width">
+                        <div class="row mb-3">
+                            <div class="col-12 col-md-3">
+                                <label class="top-label" for="complainantAreaNumber">Area</label>
+                                <select class="form-select w-100" id="complainantAreaNumber" name="complainant_area_number">
+                                    <option value="">Select</option>
+                                    <option value="Area 01">Area 01</option>
+                                    <option value="Area 1A">Area 1A</option>
+                                    <option value="Area 02">Area 02</option>
+                                    <option value="Area 03">Area 03</option>
+                                    <option value="Area 04">Area 04</option>
+                                    <option value="Area 05">Area 05</option>
+                                    <option value="Area 06">Area 06</option>
+                                </select>
+                            </div>
+                            <div class="col-12 col-md-3">
+                                <label class="top-label">Barangay</label>
+                                <input type="text" name="complainant_barangay" value="Barangay San Jose" readonly>
+                            </div>
+                            <div class="col-12 col-md-3">
+                                <label class="top-label">Municipality / City</label>
+                                <input type="text" name="complainant_municipality" value="Rodriguez" readonly>
+                            </div>
+                            <div class="col-12 col-md-3">
+                                <label class="top-label">Province</label>
+                                <input type="text" name="complainant_province" value="Rizal" readonly>
+                            </div>
+                        </div>
                     </div>
                 </div>
 
@@ -132,7 +210,7 @@ $feedbackMessage = !empty($_GET['success'])
                     </div>
                     <div>
                         <label class="top-label">Contact Number</label>
-                        <input type="text" name="subject_contact_number">
+                        <input type="text" name="subject_contact_number" inputmode="numeric" maxlength="11" pattern="^09\d{9}$" title="Format: 09XXXXXXXXX" placeholder="09XXXXXXXXX">
                     </div>
                 </div>
 
@@ -210,7 +288,7 @@ $feedbackMessage = !empty($_GET['success'])
                     </div>
                     <div>
                         <label class="top-label">Witness Contact Number</label>
-                        <input type="text" name="witness_contact_number">
+                        <input type="text" name="witness_contact_number" inputmode="numeric" maxlength="11" pattern="^09\d{9}$" title="Format: 09XXXXXXXXX" placeholder="09XXXXXXXXX">
                     </div>
                 </div>
 
