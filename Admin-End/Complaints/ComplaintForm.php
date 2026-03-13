@@ -36,36 +36,64 @@ $feedbackMessage = !empty($_GET['success'])
     <link rel="stylesheet" href="../../CSS-Styles/Admin-End-CSS/ResidentMasterlistStyle.css?v=20260227-2">
     <link rel="stylesheet" href="../../CSS-Styles/Admin-End-CSS/BlotterMangementStyle.css?v=20260305-1">
     <link rel="stylesheet" href="../../CSS-Styles/Resident-End-CSS/applicationForms.css">
+    <style>
+        body {
+            background: #fffdfb;
+        }
+        #main-display {
+            background: #ffffff !important;
+        }
+        #main-display .form-title,
+        #main-display .form-subtitle,
+        #main-display .back-link {
+            max-width: 1300px;
+            margin-left: auto;
+            margin-right: auto;
+        }
+        #main-display .page-form {
+            max-width: 1300px;
+            margin: 0 auto;
+            padding-bottom: 48px;
+        }
+        h1 {
+            font-size: 2.8rem !important;
+            font-weight: 700;
+        }
+        h2.section-title,
+        h3.section-title {
+            font-size: 1.4rem;
+            font-weight: 600;
+            margin-top: 32px;
+            margin-bottom: 24px;
+        }
+    </style>
 </head>
 <body>
 <div class="d-flex flex-column flex-md-row" style="min-height: 100vh;">
     <?php include __DIR__ . '/../includes/sidebar.php'; ?>
 
-    <main id="main-display" class="flex-grow-1 px-4 pb-4 pt-0 px-md-5 pb-md-5 pt-md-5 bg-light">
-        <h2 class="mb-3" style="font-family: 'Charis SIL Bold'; color: #DE710C;">Complaint Form</h2>
-        <hr class="mb-4">
+    <main id="main-display" class="flex-grow-1 px-4 pb-4 pt-0 px-md-5 pb-md-5 pt-md-0">
+        <div class="position-relative d-flex align-items-center justify-content-center mb-2 pt-4">
+            <a href="<?= htmlspecialchars($baseUrl) ?>/Admin-End/Complaints/ComplaintTracker.php" class="back-link d-inline-flex align-items-center text-decoration-none text-dark m-0 position-absolute start-0">
+                <i class="bi bi-arrow-left-short fs-3"></i>
+            </a>
+            <h1 class="form-title m-0">Complaint Form</h1>
+        </div>
+        <p class="form-subtitle mb-2 text-center">Use this form to encode a complaint on behalf of a resident or walk-in complainant.</p>
+        <p class="form-subtitle mb-4 text-center">All fields marked with <span class="required-asterisk">*</span> are required.</p>
 
-        <div class="blotter-shell py-3 rounded">
-            <a href="<?= htmlspecialchars($baseUrl) ?>/Admin-End/Complaints/ComplaintTracker.php" class="back-link">&lt; Go Back</a>
+        <div
+            id="complaintFeedbackData"
+            data-feedback-type="<?= htmlspecialchars($feedbackType, ENT_QUOTES, 'UTF-8') ?>"
+            data-feedback-message="<?= htmlspecialchars($feedbackMessage, ENT_QUOTES, 'UTF-8') ?>"
+            hidden
+        ></div>
 
-            <div class="text-center mt-3 mb-4">
-                <h1 class="form-title mb-2">Complaint Form</h1>
-                <p class="form-subtitle mb-0">Use this form to encode a complaint on behalf of a resident or walk-in complainant.</p>
-                <p class="form-subtitle mb-0">All fields marked with <span class="required-asterisk">*</span> are required.</p>
-            </div>
+        <form method="POST" action="<?= htmlspecialchars($baseUrl) ?>/PhpFiles/Admin-End/complaintManagement.php" class="page-form">
+            <?= csrfTokenField() ?>
+            <input type="hidden" name="action" value="submit_complaint">
 
-            <div
-                id="complaintFeedbackData"
-                data-feedback-type="<?= htmlspecialchars($feedbackType, ENT_QUOTES, 'UTF-8') ?>"
-                data-feedback-message="<?= htmlspecialchars($feedbackMessage, ENT_QUOTES, 'UTF-8') ?>"
-                hidden
-            ></div>
-
-            <form method="POST" action="<?= htmlspecialchars($baseUrl) ?>/PhpFiles/Admin-End/complaintManagement.php">
-                <?= csrfTokenField() ?>
-                <input type="hidden" name="action" value="submit_complaint">
-
-                <h2 class="section-title text-center text-dark">Complainant's Information</h2>
+            <h2 class="section-title text-center text-dark">Complainant's Information</h2>
 
                 <div class="form-row">
                     <div>
@@ -299,15 +327,14 @@ $feedbackMessage = !empty($_GET['success'])
                     </div>
                 </div>
 
-                <div class="agreement-row">
-                    <label class="agreement-text check-item" for="agreementComplaint">
-                        <input type="checkbox" id="agreementComplaint" name="certify" required>
-                        I hereby certify that the above information is true and correct to the best of my knowledge and belief.
-                    </label>
-                    <button type="submit" class="submit-btn">SUBMIT</button>
-                </div>
-            </form>
-        </div>
+            <div class="agreement-row">
+                <label class="agreement-text check-item" for="agreementComplaint">
+                    <input type="checkbox" id="agreementComplaint" name="certify" required>
+                    I hereby certify that the above information is true and correct to the best of my knowledge and belief.
+                </label>
+                <button type="submit" class="submit-btn">SUBMIT</button>
+            </div>
+        </form>
     </main>
 </div>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
