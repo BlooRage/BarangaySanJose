@@ -53,6 +53,9 @@ require_once __DIR__ . "/../includes/resident_access_guard.php";
         .apply-btn {
             min-width: 180px;
         }
+        .id-sample-img {
+            box-shadow: 0 10px 24px rgba(0, 0, 0, 0.18);
+        }
     </style>
 </head>
 
@@ -88,6 +91,24 @@ require_once __DIR__ . "/../includes/resident_access_guard.php";
                     <p class="page-description mt-3 mb-0">
                         Note: Acceptance may vary by agency or establishment. Please bring additional valid IDs if required.
                     </p>
+                </div>
+
+                <div class="mt-4">
+                    <h2 class="page-subtitle mb-3">Barangay ID Sample</h2>
+                    <div class="row g-3">
+                        <div class="col-12 col-md-6">
+                            <div class="h-100">
+                                <img src="../../Images/barangayid/SAMPLE.png" class="img-fluid rounded id-sample-img" alt="Barangay ID Sample - Front">
+                                <p class="page-description mt-2 mb-0 text-center">Front</p>
+                            </div>
+                        </div>
+                        <div class="col-12 col-md-6">
+                            <div class="h-100">
+                                <img src="../../Images/barangayid/BACK.png" class="img-fluid rounded id-sample-img" alt="Barangay ID Sample - Back">
+                                <p class="page-description mt-2 mb-0 text-center">Back</p>
+                            </div>
+                        </div>
+                    </div>
                 </div>
 
                 <div class="text-center apply-section mt-4">
