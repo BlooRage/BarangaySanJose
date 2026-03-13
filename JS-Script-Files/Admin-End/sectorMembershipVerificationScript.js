@@ -302,8 +302,7 @@
 
 	    if (title) title.innerText = "Sector Membership Proof";
 	    if (subtitle) subtitle.innerText = `Purpose: ${sectorLabel} Sector Membership Proof`;
-
-	    if (infoEl) {
+    if (infoEl) {
       const safeText = (v, fallback = "—") => {
         const s = String(v ?? "").trim();
         return s !== "" ? s : fallback;
@@ -324,30 +323,6 @@
 
       const fullAddress = addressParts.join(", ") || "—";
       const ageValue = computeAgeFromBirthdate(app.birthdate);
-
-      const addInfoRow = (gridEl, colClass, label, value) => {
-        const col = document.createElement("div");
-        col.className = colClass;
-        const strong = document.createElement("strong");
-        strong.innerText = `${label}: `;
-        const span = document.createElement("span");
-        span.innerText = safeText(value);
-        col.appendChild(strong);
-        col.appendChild(span);
-        gridEl.appendChild(col);
-      };
-
-      infoEl.innerHTML = "";
-      const heading = document.createElement("div");
-      heading.className = "fw-bold fs-4 mb-1";
-      heading.innerText = "Resident Basic Information";
-      infoEl.appendChild(heading);
-
-	      const grid = document.createElement("div");
-	      grid.className = "row g-2";
-	      addInfoRow(grid, "col-md-6", "Name", app.full_name);
-	      addInfoRow(grid, "col-md-6", "Age", ageValue);
-	      addInfoRow(grid, "col-md-6", "Sex", app.sex);
       const fmtBirthday = (() => {
         const raw = String(app.birthdate ?? "").trim();
         if (!raw) return "—";
@@ -358,27 +333,63 @@
         const yyyy = String(d.getFullYear());
         return `${mm}/${dd}/${yyyy}`;
       })();
-      addInfoRow(grid, "col-md-6", "Birthday", fmtBirthday);
-	      addInfoRow(grid, "col-12", "Address", fullAddress);
-	      addInfoRow(grid, "col-12", "Sector Membership", app.sector_membership);
-	      const docType = docs.length ? (docs[0].document_type_name || docs[0].file_name || "") : "";
-	      const uploaded = (() => {
-	        if (!docs.length) return "";
-	        // show the newest upload timestamp among shown documents
-	        const ts = docs
-	          .map((d) => String(d.upload_timestamp || "").trim())
-	          .filter(Boolean)
-	          .sort()
-	          .pop();
-	        return ts || "";
-	      })();
-	      addInfoRow(grid, "col-12", "Document Type", safeText(docType || "—"));
-	      addInfoRow(grid, "col-12", "Uploaded", safeText(uploaded || "—"));
 
-	      infoEl.appendChild(grid);
-	    }
+      const docType = docs.length ? (docs[0].document_type_name || docs[0].file_name || "") : "";
+      const uploaded = (() => {
+        if (!docs.length) return "";
+        // show the newest upload timestamp among shown documents
+        const ts = docs
+          .map((d) => String(d.upload_timestamp || "").trim())
+          .filter(Boolean)
+          .sort()
+          .pop();
+        return ts || "";
+      })();
 
-	    if (body) {
+      const field = (label, value) => `
+        <div class="tracker-form-field">
+          <div class="tracker-form-label">${label}</div>
+          <div class="tracker-form-value">${safeText(value)}</div>
+        </div>
+      `;
+
+      const requestSummary = `
+        <div class="tracker-form-section">
+          <h5 class="tracker-form-section-title">Request Summary</h5>
+          <div class="tracker-form-grid cols-3">
+            ${field("Status", status)}
+            ${field("Document Type", docType || "—")}
+            ${field("Uploaded", uploaded || "—")}
+          </div>
+        </div>
+      `;
+
+      const residentInfo = `
+        <div class="tracker-form-section highlight">
+          <h5 class="tracker-form-section-title">Resident Information</h5>
+          <div class="tracker-form-grid cols-3">
+            ${field("Resident ID", app.resident_id)}
+            ${field("Name", app.full_name)}
+            ${field("Age", ageValue)}
+            ${field("Sex", app.sex)}
+            ${field("Birthday", fmtBirthday)}
+            ${field("Sector Membership", app.sector_membership)}
+          </div>
+          <div class="tracker-form-grid cols-1">
+            ${field("Address", fullAddress)}
+          </div>
+        </div>
+      `;
+
+      infoEl.innerHTML = `
+        <div class="tracker-profile-view">
+          ${requestSummary}
+          ${residentInfo}
+        </div>
+      `;
+    }
+
+    if (body) {
 	      body.innerHTML = "";
 	      if (!docs.length) {
 	        body.appendChild(makePreview("", ""));
@@ -688,3 +699,4 @@
     startAutoRefresh();
   });
 })();
+

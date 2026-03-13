@@ -95,61 +95,182 @@ require_once __DIR__ . '/../includes/admin_guard.php';
     #table-certificateTracker .col-submitted { width: 10%; }
     #table-certificateTracker .col-action { width: 15%; }
 
-    #viewModal .modal-body { background: #f8fafc; }
+    #viewModal .modal-dialog {
+      width: min(88vw, 920px);
+      max-width: 920px;
+      height: 78vh;
+    }
+    #viewModal .modal-content {
+      border: 0;
+      border-radius: .5rem;
+      padding: 1rem;
+      overflow: hidden;
+      height: 100%;
+      background: #ffffff;
+    }
+    #viewModal .modal-header {
+      border-bottom: 1px solid #e9ecef;
+      background: #ffffff;
+    }
+    #viewModal .modal-body {
+      overflow-y: auto;
+      overflow-x: hidden;
+      min-height: 0;
+      background: #ffffff;
+      padding: 14px;
+    }
+    #viewModal .tracker-profile-view {
+      display: grid;
+      gap: 12px;
+    }
     #viewModal .tracker-doc-highlight {
+      border: 1px solid #bfdbfe;
       background: #dbeafe;
-      color: #1e40af;
-      border-radius: 8px;
-      padding: 10px 12px;
+      color: #1e3a8a;
+      border-radius: 12px;
+      padding: 10px 14px;
       font-weight: 700;
-      margin-bottom: 12px;
     }
     #viewModal .tracker-form-section {
-      border: 1px solid #e5e7eb;
-      border-radius: 10px;
-      background: #fff;
+      border: 1px solid #e78924;
+      background: #ffffff;
+      border-radius: 12px;
       padding: 12px;
-      margin-bottom: 12px;
+      margin-top: 10px;
     }
     #viewModal .tracker-form-section-title {
+      margin: 0 0 10px;
       font-size: 1rem;
       font-weight: 700;
-      color: #111827;
-      margin-bottom: 10px;
+      color: #212529;
+      border-bottom: 1px dashed #e9ecef;
+      padding-bottom: 6px;
     }
     #viewModal .tracker-form-grid {
       display: grid;
       grid-template-columns: repeat(2, minmax(0, 1fr));
-      gap: 10px;
+      gap: 14px 12px;
     }
-    #viewModal .tracker-form-grid.cols-1 { grid-template-columns: 1fr; }
+    #viewModal .tracker-form-grid.cols-4 {
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+    }
+    #viewModal .tracker-form-grid.cols-3 {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+    #viewModal .tracker-form-grid.cols-1 {
+      grid-template-columns: 1fr;
+    }
     #viewModal .tracker-form-field {
-      background: #f8fafc;
-      border: 1px solid #e5e7eb;
-      border-radius: 8px;
-      padding: 8px 10px;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    #viewModal .tracker-form-field--wide {
+      grid-column: 1 / -1;
     }
     #viewModal .tracker-form-label {
-      margin: 0 0 3px 0;
-      font-size: .78rem;
+      margin: 6px 0 0;
+      font-size: .76rem;
       color: #6b7280;
-      font-weight: 600;
-      text-transform: capitalize;
+      font-weight: 700;
+      text-transform: none;
+      letter-spacing: 0;
     }
     #viewModal .tracker-form-value {
-      margin: 0;
+      min-height: 38px;
+      border: 1px solid #dbe0e6;
+      border-radius: 8px;
+      background: #f8fafc;
+      padding: 8px 10px;
+      font-size: .92rem;
       color: #111827;
-      font-weight: 600;
+      font-weight: 500;
       word-break: break-word;
     }
     #viewModal .tracker-status-actions {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 8px;
       margin-top: 10px;
+      padding-top: 10px;
+      border-top: 1px dashed #e5e7eb;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+      width: 100%;
+    }
+    #viewModal .submitted-docs-grid {
+      display: grid;
+      grid-template-columns: minmax(240px, 1fr) minmax(280px, 1.1fr);
+      gap: 16px;
+    }
+    #viewModal .submitted-docs-list {
+      display: grid;
+      gap: 12px;
+    }
+    #viewModal .submitted-docs-item {
+      border: 1px solid #e5e7eb;
+      border-radius: 10px;
+      padding: 10px 12px;
+      background: #ffffff;
+    }
+    #viewModal .submitted-docs-item__label {
+      font-size: .76rem;
+      font-weight: 700;
+      color: #6b7280;
+      margin-bottom: 6px;
+    }
+    #viewModal .submitted-docs-item__meta {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+    }
+    #viewModal .submitted-docs-preview {
+      border: 1px solid #e5e7eb;
+      border-radius: 10px;
+      background: #f8fafc;
+      padding: 12px;
+      display: grid;
+      grid-template-rows: auto 1fr;
+      gap: 10px;
+      min-height: 220px;
+    }
+    #viewModal .submitted-docs-preview__header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+    }
+    #viewModal .submitted-docs-preview__name {
+      font-weight: 600;
+      color: #111827;
+    }
+    #viewModal .submitted-docs-preview__placeholder {
+      color: #6b7280;
+      font-size: .9rem;
+      text-align: center;
+      padding: 24px 8px;
+    }
+    #viewModal .submitted-docs-preview__body iframe {
+      width: 100%;
+      height: 60vh;
+      border: 1px solid #e5e7eb;
+      border-radius: 8px;
+      background: #fff;
+    }
+    #viewModal .submitted-docs-preview__body img {
+      max-width: 100%;
+      max-height: 60vh;
+      border: 1px solid #e5e7eb;
+      border-radius: 8px;
+      background: #fff;
     }
     @media (max-width: 767px) {
       #viewModal .tracker-form-grid { grid-template-columns: 1fr; }
+    }
+    @media (max-width: 992px) {
+      #viewModal .submitted-docs-grid { grid-template-columns: 1fr; }
+      #viewModal .submitted-docs-preview__body iframe,
+      #viewModal .submitted-docs-preview__body img { height: 45vh; }
     }
     @media (max-width: 767px) {
       .certificate-tracker-shell .stage-filter-btn {
@@ -339,18 +460,24 @@ require_once __DIR__ . '/../includes/admin_guard.php';
 </div>
 
 <div class="modal fade" id="viewModal" tabindex="-1" aria-hidden="true">
-  <div class="modal-dialog modal-lg modal-dialog-centered">
+  <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable">
     <div class="modal-content">
       <div class="modal-header">
         <h5 class="modal-title" id="viewModalTitle">Certificate Request</h5>
         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
       </div>
       <div class="modal-body">
-        <div id="viewDetailsBody"></div>
+        <div id="viewDetailsBody" class="tracker-profile-view"></div>
       </div>
-      <div class="modal-footer">
-        <button type="button" class="btn btn-success d-none" id="viewModalWalkInBtn">Record Walk-in Payment</button>
-        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+      <div class="modal-footer d-flex justify-content-between flex-wrap gap-2">
+        <div class="d-flex flex-wrap gap-2" id="viewModalActions">
+          <button type="button" class="btn btn-primary d-none" id="viewModalDocBtn">View Document</button>
+          <button type="button" class="btn btn-outline-secondary d-none" id="viewModalBackBtn">Back</button>
+        </div>
+        <div class="d-flex flex-wrap gap-2">
+          <button type="button" class="btn btn-success d-none" id="viewModalWalkInBtn">Record Walk-in Payment</button>
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+        </div>
       </div>
     </div>
   </div>

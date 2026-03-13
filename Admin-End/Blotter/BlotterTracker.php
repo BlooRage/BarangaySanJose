@@ -31,6 +31,17 @@ require_once __DIR__ . "/../includes/admin_guard.php";
             background: #d6e2f2;
             border: 2px solid #c0d1e8;
         }
+
+        #viewModal .modal-content {
+            border: 0;
+            border-radius: .5rem;
+            padding: 1rem;
+            background: #ffffff;
+        }
+
+        #viewModal .tracker-form-section {
+            border-color: #e78924;
+        }
     </style>
 </head>
 
@@ -138,7 +149,7 @@ require_once __DIR__ . "/../includes/admin_guard.php";
             <div class="modal-body">
                 <div id="viewDetailsBody" class="tracker-profile-view"></div>
             </div>
-            <div class="modal-footer d-flex justify-content-end">
+            <div class="modal-footer d-flex justify-content-between flex-wrap gap-2">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
             </div>
         </div>

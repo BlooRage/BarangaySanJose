@@ -108,8 +108,9 @@ require_once __DIR__ . '/../includes/admin_guard.php';
       height: 78vh;
     }
     #viewModal .modal-content {
-      border: 1px solid #e9ecef;
-      border-radius: 16px;
+      border: 0;
+      border-radius: .5rem;
+      padding: 1rem;
       overflow: hidden;
       height: 100%;
       background: #ffffff;
@@ -138,7 +139,7 @@ require_once __DIR__ . '/../includes/admin_guard.php';
       font-weight: 700;
     }
     #viewModal .tracker-form-section {
-      border: 1px solid #e9ecef;
+      border: 1px solid #e78924;
       background: #ffffff;
       border-radius: 12px;
       padding: 12px;
@@ -609,6 +610,82 @@ require_once __DIR__ . '/../includes/admin_guard.php';
       line-height: 1.35;
       text-align: left;
       align-self: center;
+    }
+    #viewModal .submitted-docs-grid {
+      display: grid;
+      grid-template-columns: minmax(240px, 1fr) minmax(280px, 1.1fr);
+      gap: 16px;
+    }
+    #viewModal .submitted-docs-list {
+      display: grid;
+      gap: 12px;
+    }
+    #viewModal .submitted-docs-item {
+      border: 1px solid #e5e7eb;
+      border-radius: 10px;
+      padding: 10px 12px;
+      background: #ffffff;
+    }
+    #viewModal .submitted-docs-item__label {
+      font-size: .76rem;
+      font-weight: 700;
+      color: #6b7280;
+      margin-bottom: 6px;
+    }
+    #viewModal .submitted-docs-item__meta {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+    }
+    #viewModal .submitted-docs-preview {
+      border: 1px solid #e5e7eb;
+      border-radius: 10px;
+      background: #f8fafc;
+      padding: 12px;
+      display: grid;
+      grid-template-rows: auto 1fr;
+      gap: 10px;
+      min-height: 220px;
+    }
+    #viewModal .submitted-docs-preview__header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+    }
+    #viewModal .submitted-docs-preview__name {
+      font-weight: 600;
+      color: #111827;
+    }
+    #viewModal .submitted-docs-preview__placeholder {
+      color: #6b7280;
+      font-size: .9rem;
+      text-align: center;
+      padding: 24px 8px;
+    }
+    #viewModal .submitted-docs-preview__body iframe {
+      width: 100%;
+      height: 60vh;
+      border: 1px solid #e5e7eb;
+      border-radius: 8px;
+      background: #fff;
+    }
+    #viewModal .submitted-docs-preview__body img {
+      max-width: 100%;
+      max-height: 60vh;
+      border: 1px solid #e5e7eb;
+      border-radius: 8px;
+      background: #fff;
+    }
+    @media (max-width: 992px) {
+      #viewModal .submitted-docs-grid {
+        grid-template-columns: 1fr;
+      }
+      #viewModal .submitted-docs-preview__body iframe,
+      #viewModal .submitted-docs-preview__body img {
+        height: 45vh;
+      }
     }
     #viewModal .doc-preview-paper.doc-preview-paper--goodmoral .doc-preview-footer {
       width: 68%;

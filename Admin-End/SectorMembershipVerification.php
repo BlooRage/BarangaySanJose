@@ -11,6 +11,116 @@
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="../CSS-Styles/Admin-End-CSS/AdminDashboardStyle.css">
     <link rel="stylesheet" href="../CSS-Styles/Admin-End-CSS/ResidentMasterlistStyle.css?v=20260227-3">
+    <style>
+        #modal-sectorDocViewer .modal-dialog {
+            width: min(88vw, 920px);
+            max-width: 920px;
+            height: 78vh;
+        }
+
+        #modal-sectorDocViewer .modal-content {
+            border: 0;
+            border-radius: .5rem;
+            padding: 1rem;
+            background: #ffffff;
+            overflow: hidden;
+            height: 100%;
+        }
+
+        #modal-sectorDocViewer .modal-header {
+            border-bottom: 1px solid #e9ecef;
+            background: #ffffff;
+        }
+
+        #modal-sectorDocViewer .modal-body {
+            overflow-y: auto;
+            overflow-x: hidden;
+            min-height: 0;
+            background: #ffffff;
+            padding: 14px;
+        }
+
+        #modal-sectorDocViewer .modal-title {
+            font-weight: 600;
+        }
+
+        #modal-sectorDocViewer .tracker-profile-view {
+            display: grid;
+            gap: 12px;
+        }
+
+        #modal-sectorDocViewer .tracker-form-section {
+            border: 1px solid #e78924;
+            background: #ffffff;
+            border-radius: 12px;
+            padding: 12px;
+            margin-top: 10px;
+        }
+
+        #modal-sectorDocViewer .tracker-form-section-title {
+            margin: 0 0 10px;
+            font-size: 1rem;
+            font-weight: 700;
+            color: #212529;
+            border-bottom: 1px dashed #e9ecef;
+            padding-bottom: 6px;
+        }
+
+        #modal-sectorDocViewer .tracker-form-grid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 14px 12px;
+        }
+
+        #modal-sectorDocViewer .tracker-form-grid.cols-3 {
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+        }
+
+        #modal-sectorDocViewer .tracker-form-grid.cols-4 {
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+        }
+
+        #modal-sectorDocViewer .tracker-form-grid.cols-1 {
+            grid-template-columns: 1fr;
+        }
+
+        #modal-sectorDocViewer .tracker-form-field {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        #modal-sectorDocViewer .tracker-form-label {
+            margin: 6px 0 0;
+            font-size: 0.76rem;
+            color: #6b7280;
+            font-weight: 700;
+        }
+
+        #modal-sectorDocViewer .tracker-form-value {
+            min-height: 38px;
+            border: 1px solid #dbe0e6;
+            border-radius: 8px;
+            background: #f8fafc;
+            padding: 8px 10px;
+            font-size: 0.92rem;
+            color: #111827;
+            font-weight: 500;
+            word-break: break-word;
+        }
+
+        #modal-sectorDocViewer .tracker-form-section.highlight {
+            border-color: #e78924;
+        }
+
+        @media (max-width: 768px) {
+            #modal-sectorDocViewer .tracker-form-grid,
+            #modal-sectorDocViewer .tracker-form-grid.cols-3,
+            #modal-sectorDocViewer .tracker-form-grid.cols-4 {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
 </head>
 
 <body>
@@ -110,7 +220,7 @@ include 'includes/sidebar.php';
     <div class="modal-content p-3">
       <div class="modal-header border-0">
         <div class="w-100">
-          <h5 class="fw-bold mb-0" id="sector-docViewer-title">Document Preview</h5>
+          <h5 class="modal-title mb-0" id="sector-docViewer-title">Document Preview</h5>
           <div class="small text-muted" id="sector-docViewer-subtitle"></div>
         </div>
         <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
@@ -119,10 +229,10 @@ include 'includes/sidebar.php';
         <div class="mb-3" id="sector-docViewer-info"></div>
 
         <div id="sector-docViewer-body" class="w-100 mb-3"></div>
-        <div id="sector-docViewer-actions" class="d-flex flex-nowrap w-100 gap-2"></div>
       </div>
-      <div class="modal-footer border-0">
-        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Close</button>
+      <div class="modal-footer border-0 d-flex justify-content-between flex-wrap gap-2">
+        <div id="sector-docViewer-actions" class="d-flex flex-wrap gap-2"></div>
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
       </div>
     </div>
   </div>

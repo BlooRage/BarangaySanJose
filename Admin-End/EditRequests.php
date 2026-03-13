@@ -11,6 +11,109 @@
     <link rel="stylesheet" href="../CSS-Styles/Admin-End-CSS/AdminDashboardStyle.css">
     <link rel="stylesheet" href="../CSS-Styles/Admin-End-CSS/ResidentMasterlistStyle.css?v=20260227-2">
     <link rel="stylesheet" href="../CSS-Styles/Admin-End-CSS/EditRequestsStyle.css?v=20260227-5">
+    <style>
+        #modal-viewRequest .modal-dialog {
+            width: min(88vw, 920px);
+            max-width: 920px;
+            height: 78vh;
+        }
+
+        #modal-viewRequest .modal-content {
+            border: 0;
+            border-radius: .5rem;
+            padding: 1rem;
+            background: #ffffff;
+            overflow: hidden;
+            height: 100%;
+        }
+
+        #modal-viewRequest .modal-header {
+            border-bottom: 1px solid #e9ecef;
+            background: #ffffff;
+        }
+
+        #modal-viewRequest .modal-body {
+            overflow-y: auto;
+            overflow-x: hidden;
+            min-height: 0;
+            background: #ffffff;
+            padding: 14px;
+        }
+
+        #modal-viewRequest .tracker-profile-view {
+            display: grid;
+            gap: 12px;
+        }
+
+        #modal-viewRequest .tracker-form-section {
+            border: 1px solid #e78924;
+            background: #ffffff;
+            border-radius: 12px;
+            padding: 12px;
+            margin-top: 10px;
+        }
+
+        #modal-viewRequest .tracker-form-section-title {
+            margin: 0 0 10px;
+            font-size: 1rem;
+            font-weight: 700;
+            color: #212529;
+            border-bottom: 1px dashed #e9ecef;
+            padding-bottom: 6px;
+        }
+
+        #modal-viewRequest .request-meta__label,
+        #modal-viewRequest .request-detail .label {
+            margin: 6px 0 0;
+            font-size: 0.76rem;
+            color: #6b7280;
+            font-weight: 700;
+        }
+
+        #modal-viewRequest .request-meta__value,
+        #modal-viewRequest .request-detail .value,
+        #modal-viewRequest .request-meta__sub {
+            min-height: 38px;
+            border: 1px solid #dbe0e6;
+            border-radius: 8px;
+            background: #f8fafc;
+            padding: 8px 10px;
+            font-size: 0.92rem;
+            color: #111827;
+            font-weight: 500;
+            word-break: break-word;
+        }
+
+        #modal-viewRequest .request-meta__sub {
+            font-size: 0.85rem;
+            font-weight: 500;
+        }
+
+        #modal-viewRequest .request-meta__grid {
+            gap: 14px 12px;
+        }
+
+        #modal-viewRequest .request-card {
+            border: 1px solid #e78924;
+            background: #ffffff;
+        }
+
+        #modal-viewRequest .request-card--highlight {
+            border-color: #e78924;
+            background: #ffffff;
+        }
+
+        #modal-viewRequest .request-detail {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 6px;
+        }
+
+        #modal-viewRequest .request-detail.changed {
+            background: #fff8ef;
+            border: 1px solid #f1d2a6;
+        }
+    </style>
 </head>
 <body>
 <div class="d-flex flex-column flex-md-row" style="min-height: 100vh;">
@@ -156,17 +259,18 @@ include "includes/sidebar.php";
 
 <!-- VIEW REQUEST MODAL -->
 <div class="modal fade" id="modal-viewRequest" tabindex="-1" data-bs-backdrop="static" data-bs-keyboard="false">
-    <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable" style="max-width: 1200px; width: 75vw;">
+    <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable">
         <div class="modal-content border-0 rounded-2 p-4">
             <div class="modal-header border-0">
-                <h3 class="fw-bold mb-0">
+                <h5 class="modal-title">
                     Edit Request - <span id="span-requestTypeHeader"></span>: <span id="span-requestId" class="text-warning"></span>
-                </h3>
+                </h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
 
             <div class="modal-body">
-                <div class="div-infoContainer request-meta">
+                <div class="div-infoContainer request-meta tracker-form-section">
+                    <h5 class="tracker-form-section-title">Request Summary</h5>
                     <div class="request-meta__grid">
                         <div class="request-meta__cell">
                             <div class="request-meta__label">Resident:</div>
@@ -198,21 +302,21 @@ include "includes/sidebar.php";
 
                 <div class="row g-3">
                     <div class="col-lg-6">
-                        <div class="request-card">
-                            <h5 class="fw-bold mb-3">Current Details</h5>
+                        <div class="request-card tracker-form-section">
+                            <h5 class="tracker-form-section-title">Current Details</h5>
                             <div id="currentDetails" class="request-detail-list"></div>
                         </div>
                     </div>
                     <div class="col-lg-6">
-                        <div class="request-card request-card--highlight">
-                            <h5 class="fw-bold mb-3">Requested Changes</h5>
+                        <div class="request-card request-card--highlight tracker-form-section">
+                            <h5 class="tracker-form-section-title">Requested Changes</h5>
                             <div id="requestedDetails" class="request-detail-list"></div>
                         </div>
                     </div>
                 </div>
 
-                <div class="mt-4">
-                    <h6 class="fw-bold mb-2">Submitted Documents</h6>
+                <div class="mt-4 tracker-form-section">
+                    <h6 class="tracker-form-section-title">Submitted Documents</h6>
                     <div id="edit-docs-inline-loading" class="text-muted small mb-2">Loading documents...</div>
                     <div id="edit-docs-inline-empty" class="text-muted small d-none">No submitted documents found.</div>
                     <div id="edit-docs-inline-list" class="d-flex flex-column gap-2"></div>

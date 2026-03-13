@@ -11,6 +11,9 @@
   <link rel="stylesheet" href="../CSS-Styles/Admin-End-CSS/AdminDashboardStyle.css">
   <link rel="stylesheet" href="../CSS-Styles/Admin-End-CSS/ResidentMasterlistStyle.css?v=20260227-2">
   <style>
+    #main-display {
+      min-width: 0;
+    }
     .user-masterlist-shell {
       width: 100%;
       max-width: 100%;
@@ -30,12 +33,17 @@
       display: inline-flex;
       align-items: center;
       gap: 6px;
-      padding: 6px 1px;
+      padding: 6px 12px;
       border-radius: 8px;
       font-size: 12px;
       font-weight: 600;
       letter-spacing: 0.2px;
       width: fit-content;
+      line-height: 1;
+    }
+    .user-masterlist-shell td:nth-child(6),
+    .user-masterlist-shell td:nth-child(7) {
+      white-space: nowrap;
     }
     .status-pill.pending {
       color: #664d03;

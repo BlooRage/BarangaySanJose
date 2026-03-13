@@ -26,6 +26,79 @@
         .resident-masterlist-shell #table-appData td {
             white-space: nowrap;
         }
+
+        #modal-viewEntry .modal-dialog {
+            width: min(88vw, 920px);
+            max-width: 920px;
+            height: 78vh;
+        }
+
+        #modal-viewEntry .modal-content {
+            border: 0;
+            border-radius: .5rem;
+            padding: 1rem;
+            background: #ffffff;
+            overflow: hidden;
+            height: 100%;
+        }
+
+        #modal-viewEntry .modal-header {
+            border-bottom: 1px solid #e9ecef;
+            background: #ffffff;
+        }
+
+        #modal-viewEntry .modal-title {
+            font-weight: 600;
+        }
+
+        #modal-viewEntry .modal-body {
+            overflow-y: auto;
+            overflow-x: hidden;
+            min-height: 0;
+            background: #ffffff;
+            padding: 14px;
+        }
+
+        #modal-viewEntry .tracker-profile-view {
+            display: grid;
+            gap: 12px;
+        }
+
+        #modal-viewEntry .tracker-form-section {
+            border: 1px solid #e78924;
+            background: #ffffff;
+            border-radius: 12px;
+            padding: 12px;
+            margin-top: 10px;
+        }
+
+        #modal-viewEntry .tracker-form-section-title {
+            margin: 0 0 10px;
+            font-size: 1rem;
+            font-weight: 700;
+            color: #212529;
+            border-bottom: 1px dashed #e9ecef;
+            padding-bottom: 6px;
+        }
+
+        #modal-viewEntry .tracker-form-section .text-muted.small.mb-0 {
+            margin: 6px 0 0;
+            font-size: 0.76rem;
+            color: #6b7280 !important;
+            font-weight: 700;
+        }
+
+        #modal-viewEntry .tracker-form-section p.fw-bold.mb-0 {
+            min-height: 38px;
+            border: 1px solid #dbe0e6;
+            border-radius: 8px;
+            background: #f8fafc;
+            padding: 8px 10px;
+            font-size: 0.92rem;
+            color: #111827;
+            font-weight: 500;
+            word-break: break-word;
+        }
     </style>
 </head>
 
@@ -271,21 +344,21 @@ if (isset($conn) && $conn instanceof mysqli) {
 
 <!-- MODAL stays unchanged -->
 <div class="modal fade" id="modal-viewEntry" tabindex="-1" data-bs-backdrop="static" data-bs-keyboard="false">
-    <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable" id="div-modalSizing" style="max-width: 1500px; width: 75vw;">
+    <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable" id="div-modalSizing">
         <div class="modal-content border-0 rounded-2 p-4">
             <div class="modal-header border-0">
-                <h3 class="fw-bold">Resident Details: <span id="span-displayID" class="text-warning"></span></h3>
+                <h5 class="modal-title">Resident Details: <span id="span-displayID" class="text-warning"></span></h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
 
             <div class="modal-body">
                 <input type="hidden" name="input-appId" id="input-appId">
 
-                <div id="div-infoGroup" class="div-infoContainer">
+                <div id="div-infoGroup" class="div-infoContainer tracker-profile-view">
 
-                    <div class="p-3 rounded-3 mb-3 border-0 bg-white">
+                    <div class="p-3 rounded-3 mb-3 border-0 bg-white tracker-form-section">
                         <div class="d-flex align-items-center justify-content-between mb-2">
-                            <h5 class="fw-bold mb-0" style="color: #000;">Personal Information</h5>
+                            <h5 class="fw-bold mb-0 tracker-form-section-title">Personal Information</h5>
                         </div>
 
                         <div class="row g-3 align-items-center">
@@ -350,9 +423,9 @@ if (isset($conn) && $conn instanceof mysqli) {
 
                     <hr class="my-2">
 
-                    <div class="p-3 rounded-3 mb-3 border-0 bg-white" id="view-address-single-wrapper">
+                    <div class="p-3 rounded-3 mb-3 border-0 bg-white tracker-form-section" id="view-address-single-wrapper">
                         <div class="d-flex align-items-center justify-content-between mb-2">
-                            <h5 class="fw-bold mb-0" style="color: #000;">Emergency Contact</h5>
+                            <h5 class="fw-bold mb-0 tracker-form-section-title">Emergency Contact</h5>
                         </div>
 
                         <div class="row g-3">
@@ -377,9 +450,9 @@ if (isset($conn) && $conn instanceof mysqli) {
 
                     <hr class="my-2">
 
-                    <div class="p-3 rounded-3 mb-3 border-0 bg-white">
+                    <div class="p-3 rounded-3 mb-3 border-0 bg-white tracker-form-section">
                         <div class="d-flex align-items-center justify-content-between mb-2">
-                            <h5 class="fw-bold mb-0" style="color: #000;">Address Information</h5>
+                            <h5 class="fw-bold mb-0 tracker-form-section-title">Address Information</h5>
                         </div>
 
                         <div class="row g-3">
@@ -441,18 +514,18 @@ if (isset($conn) && $conn instanceof mysqli) {
                         </a>
                     </div>
 
-                    <div class="p-3 rounded-3 border-0 bg-white d-none mb-2" id="view-address-history-wrapper">
+                    <div class="p-3 rounded-3 border-0 bg-white d-none mb-2 tracker-form-section" id="view-address-history-wrapper">
                         <div class="d-flex align-items-center justify-content-between mb-2">
-                            <h5 class="fw-bold mb-0" style="color: #000;">Address History</h5>
+                            <h5 class="fw-bold mb-0 tracker-form-section-title">Address History</h5>
                         </div>
                         <div id="view-address-history-list" class="d-flex flex-column gap-2"></div>
                     </div>
 
                     <hr class="my-2">
 
-                    <div class="p-3 rounded-3 border-0 bg-white d-none" id="view-verified-docs-wrapper">
+                    <div class="p-3 rounded-3 border-0 bg-white d-none tracker-form-section" id="view-verified-docs-wrapper">
                         <div class="d-flex align-items-center justify-content-between mb-2">
-                            <h5 class="fw-bold mb-0" style="color: #000;">Verified Documents</h5>
+                            <h5 class="fw-bold mb-0 tracker-form-section-title">Verified Documents</h5>
                         </div>
                         <div id="view-verified-docs-section">
                             <div id="view-verified-docs" class="d-flex flex-column gap-2"></div>
@@ -472,7 +545,7 @@ if (isset($conn) && $conn instanceof mysqli) {
 
             </div>
 
-            <div class="modal-footer border-0">
+            <div class="modal-footer border-0 d-flex justify-content-between flex-wrap gap-2">
                 <button type="button" class="btn btn-secondary px-4" data-bs-dismiss="modal">Close</button>
             </div>
         </div>

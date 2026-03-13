@@ -51,6 +51,7 @@
   const viewDetailsBody = document.getElementById('viewDetailsBody');
   const viewModalWalkInBtn = document.getElementById('viewModalWalkInBtn');
   const viewModalActions = document.getElementById('viewModalActions');
+  const viewModalDocBtn = document.getElementById('viewModalDocBtn');
   const viewModalBackBtn = document.getElementById('viewModalBackBtn');
   const viewModalNextBtn = document.getElementById('viewModalNextBtn');
   const paymentProofModalEl = document.getElementById('paymentProofModal');
@@ -750,6 +751,26 @@
     return `<div class="tracker-form-grid ${cls}">${clean.map((f) => formField(f.label, f.value, !!f.raw)).join('')}</div>`;
   }
 
+  function looksLikeFilePath(key, value) {
+    const k = String(key || '').toLowerCase();
+    const v = String(value || '').trim();
+    if (!v) return false;
+    const vLower = v.toLowerCase();
+    if (vLower.includes('/unifiedfileattachment/')) return true;
+    if (/\.(pdf|png|jpe?g|webp|gif|bmp)$/i.test(vLower)) return true;
+    if (
+      k.includes('path') ||
+      k.includes('file') ||
+      k.includes('attachment') ||
+      k.includes('image') ||
+      k.includes('photo') ||
+      k.includes('proof')
+    ) {
+      return v.includes('/') || v.includes('\\');
+    }
+    return false;
+  }
+
   function extractSubmittedDocuments(row, payload) {
     const docs = [];
     const seen = new Set();
@@ -780,7 +801,8 @@
       const url = `${appBase}${normalized}`;
       if (seen.has(url)) return;
       seen.add(url);
-      docs.push({ label: String(label || 'Document'), url, path: normalized });
+      const fileName = normalized.split('/').pop() || pathText.replace(/\\/g, '/').split('/').pop() || '';
+      docs.push({ label: String(label || 'Document'), url, path: normalized, name: fileName });
     };
 
     addDoc('Payment Proof', row?.payment_proof_path);
@@ -2233,6 +2255,41 @@
     submittedFileModal.show();
   }
 
+  function inlineSubmittedPreviewMarkup(docUrl) {
+    const clean = String(docUrl || '').split('?')[0].split('#')[0];
+    const ext = clean.split('.').pop().toLowerCase();
+    const imgExts = ['jpg', 'jpeg', 'png', 'webp', 'gif', 'bmp'];
+    if (ext === 'pdf') {
+      return `<iframe src="${esc(docUrl)}" title="Submitted File Preview"></iframe>`;
+    }
+    if (imgExts.includes(ext)) {
+      return `<img src="${esc(docUrl)}" alt="Submitted File Preview">`;
+    }
+    return `
+      <div class="submitted-docs-preview__placeholder">
+        Preview not available.
+        <div class="mt-2">
+          <a class="btn btn-sm btn-outline-primary" href="${esc(docUrl)}" target="_blank" rel="noopener">Open File</a>
+        </div>
+      </div>
+    `;
+  }
+
+  function openInlineSubmittedPreview(docUrl, docName) {
+    if (!viewDetailsBody) return false;
+    const previewBody = viewDetailsBody.querySelector('#submittedDocsPreviewBody');
+    if (!previewBody) return false;
+    const previewName = viewDetailsBody.querySelector('#submittedDocsPreviewName');
+    const previewOpen = viewDetailsBody.querySelector('#submittedDocsPreviewOpen');
+    previewBody.innerHTML = inlineSubmittedPreviewMarkup(docUrl);
+    if (previewName) previewName.textContent = String(docName || 'Submitted Document');
+    if (previewOpen) {
+      previewOpen.href = docUrl;
+      previewOpen.classList.remove('d-none');
+    }
+    return true;
+  }
+
   function statusBucket(row) {
     if (isFinancePaymentsPage) {
       const stage = String(row?.stage || '').toLowerCase();
@@ -3030,6 +3087,9 @@
             viewModalWalkInBtn.classList.add('d-none');
             viewModalWalkInBtn.removeAttribute('data-id');
           }
+          if (viewModalDocBtn) {
+            viewModalDocBtn.classList.add('d-none');
+          }
           const openImmediately = isFinancePaymentsPage || !rowHasModalDetails(row);
           if (openImmediately) {
             viewDetailsBody.innerHTML = renderQuickRequestSummary(row);
@@ -3150,8 +3210,17 @@
             const requestId = String(row.request_id || '').trim();
             viewModalTitle.textContent = requestId ? `Payment Transaction (#${requestId})` : 'Payment Transaction';
           }
+          currentViewRequestId = String(row.request_id || '').trim();
+          currentViewStage = String(row.stage || '').toLowerCase();
           if (viewModalActions) {
             viewModalActions.innerHTML = '';
+          }
+          if (viewModalDocBtn) {
+            viewModalDocBtn.classList.remove('d-none');
+            viewModalDocBtn.onclick = () => {
+              viewPreviewState = buildPreviewState(row, payload, residentProfile, null);
+              switchViewMode('preview');
+            };
           }
           if (viewModalNextBtn) {
             viewModalNextBtn.classList.add('d-none');
@@ -3334,6 +3403,7 @@
           const value = payload[key];
           if (value === null || value === undefined) return;
           const text = String(value).trim();
+          if (looksLikeFilePath(normalized, text)) return;
           if (text === '') return;
           requestFields.push({ label: friendlyLabel(normalized), value: text });
         });
@@ -3360,8 +3430,7 @@
           ? `<div class="tracker-form-grid cols-1">
                <div class="tracker-form-field">
                  <p class="tracker-form-label">Proof of Residency File</p>
-                 <div class="tracker-form-value d-flex justify-content-between align-items-center gap-2">
-                   <span class="text-truncate">${esc(proofResidencyName || proofResidencyPath)}</span>
+                 <div class="tracker-form-value d-flex justify-content-end">
                    <button type="button" class="btn btn-sm btn-primary" data-support-doc-url="${esc(proofResidencyUrl)}" data-support-doc-title="${esc(proofResidencyTitle)}">View</button>
                  </div>
                </div>
@@ -3384,15 +3453,39 @@
         const submittedDocs = extractSubmittedDocuments(row, payload);
         if (submittedDocs.length) {
           const docsHtml = submittedDocs.map((doc, idx) => `
-            <div class="tracker-form-field">
-              <p class="tracker-form-label">${esc(doc.label || `Document ${idx + 1}`)}</p>
-              <div class="tracker-form-value d-flex justify-content-between align-items-center gap-2">
-                <span class="text-truncate">${esc(doc.path || '')}</span>
-                <button type="button" class="btn btn-sm btn-primary" data-support-doc-url="${esc(doc.url)}" data-support-doc-title="${esc(doc.label || 'Submitted Document')}">View</button>
+            <div class="submitted-docs-item">
+              <div class="submitted-docs-item__label">${esc(doc.label || `Document ${idx + 1}`)}</div>
+              <div class="submitted-docs-item__meta justify-content-end">
+                <button
+                  type="button"
+                  class="btn btn-sm btn-primary"
+                  data-support-doc-url="${esc(doc.url)}"
+                  data-support-doc-title="${esc(doc.label || 'Submitted Document')}"
+                  data-support-doc-name="${esc(doc.name || '')}"
+                >
+                  View
+                </button>
               </div>
             </div>
           `).join('');
-          html += formSection('Submitted Documents', `<div class="tracker-form-grid cols-1">${docsHtml}</div>`);
+          const previewHtml = `
+            <div class="submitted-docs-preview" id="submittedDocsPreview">
+              <div class="submitted-docs-preview__header">
+                <span class="submitted-docs-preview__name text-truncate" id="submittedDocsPreviewName">Select a document</span>
+                <a class="btn btn-sm btn-outline-primary d-none" id="submittedDocsPreviewOpen" target="_blank" rel="noopener">Open</a>
+              </div>
+              <div class="submitted-docs-preview__body" id="submittedDocsPreviewBody">
+                <div class="submitted-docs-preview__placeholder">Select a file to preview.</div>
+              </div>
+            </div>
+          `;
+          html += formSection(
+            'Submitted Documents',
+            `<div class="submitted-docs-grid">
+               <div class="submitted-docs-list">${docsHtml}</div>
+               ${previewHtml}
+             </div>`
+          );
         }
 
         const stageKeyForStatus = String(row.stage || '').toLowerCase();
@@ -3522,7 +3615,12 @@
           docBtn.addEventListener('click', () => {
             const docUrl = String(docBtn.getAttribute('data-support-doc-url') || '').trim();
             const docTitle = String(docBtn.getAttribute('data-support-doc-title') || 'Submitted Attachment Viewer').trim();
-            if (!docUrl || !submittedFileModal || !submittedFileWrap || !submittedFileOpenNew) return;
+            const docName = String(docBtn.getAttribute('data-support-doc-name') || '').trim();
+            if (!docUrl) return;
+            if (openInlineSubmittedPreview(docUrl, docName || docTitle)) {
+              return;
+            }
+            if (!submittedFileModal || !submittedFileWrap || !submittedFileOpenNew) return;
             if (viewModalEl && viewModalEl.classList.contains('show') && viewModal) {
               preserveViewStateOnNextHide = true;
               viewModal.hide();
@@ -3901,6 +3999,10 @@
     if (viewModalWalkInBtn) {
       viewModalWalkInBtn.classList.add('d-none');
       viewModalWalkInBtn.removeAttribute('data-id');
+    }
+    if (viewModalDocBtn) {
+      viewModalDocBtn.classList.add('d-none');
+      viewModalDocBtn.onclick = null;
     }
     viewDetailsHtml = '';
     viewPreviewState = null;

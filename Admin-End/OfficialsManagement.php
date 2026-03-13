@@ -10,6 +10,36 @@
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
   <link rel="stylesheet" href="../CSS-Styles/Admin-End-CSS/AdminDashboardStyle.css">
   <link rel="stylesheet" href="../CSS-Styles/Admin-End-CSS/ResidentMasterlistStyle.css?v=20260227-2">
+  <style>
+    #main-display {
+      min-width: 0;
+    }
+    .officials-masterlist-shell {
+      width: 100%;
+      max-width: 100%;
+      overflow-x: hidden;
+      overflow-y: visible;
+      -webkit-overflow-scrolling: touch;
+    }
+    .officials-masterlist-shell .table-responsive {
+      overflow-x: auto;
+      overflow-y: visible;
+      -webkit-overflow-scrolling: touch;
+    }
+    .officials-masterlist-shell .officials-masterlist-table {
+      min-width: 1200px;
+    }
+    .officials-masterlist-shell .officials-masterlist-table th {
+      white-space: nowrap;
+    }
+    .officials-masterlist-shell .officials-masterlist-table td {
+      vertical-align: middle;
+      max-width: 260px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+  </style>
 </head>
 <body>
   <div class="d-flex flex-column flex-md-row" style="min-height: 100vh;">
@@ -26,7 +56,7 @@
       </h2>
       <hr><br>
 
-      <div class="bg-white p-4 rounded-4 shadow-sm border resident-masterlist-shell">
+      <div class="bg-white p-4 rounded-4 shadow-sm border resident-masterlist-shell officials-masterlist-shell">
         <div class="admin-list-toolbar mb-3 flex-wrap">
           <div class="admin-list-tabs">
             <button class="btn btn-outline-primary btn-sm status-filter-btn active" data-filter="ALL">All</button>
@@ -53,7 +83,7 @@
         </div>
 
         <div class="table-responsive">
-          <table class="table table-hover align-middle mb-0">
+          <table class="table table-hover align-middle mb-0 officials-masterlist-table">
             <thead class="table-light">
               <tr>
                 <th>Official ID</th>
