@@ -365,7 +365,7 @@ require_once __DIR__ . "/../includes/admin_guard.php";
                     </div>
                     <div class="col-12 col-md-3">
                         <label class="form-label">Type of Complaint <span class="required-asterisk">*</span></label>
-                        <select class="form-select" name="complaint_type" required>
+                        <select class="form-select" id="blotterComplaintType" name="complaint_type" required>
                             <option value="">Select</option>
                             <option value="Alarm and Scandal">Alarm and Scandal</option>
                             <option value="Physical Injury">Physical Injury</option>
@@ -386,7 +386,15 @@ require_once __DIR__ . "/../includes/admin_guard.php";
                             <option value="Unjust Vexation">Unjust Vexation</option>
                             <option value="Trespassing">Trespassing</option>
                             <option value="Lost and Found">Lost and Found</option>
+                            <option value="Other">Other</option>
                         </select>
+                    </div>
+                </div>
+
+                <div class="row g-3 mb-3">
+                    <div class="col-12 col-md-6">
+                        <label class="form-label">If Other, please specify</label>
+                        <input type="text" class="form-control" id="blotterComplaintTypeOther" name="complaint_type_other" disabled>
                     </div>
                 </div>
 

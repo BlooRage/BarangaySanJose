@@ -28,6 +28,8 @@ document.addEventListener("DOMContentLoaded", () => {
     const respondentLotNumber = document.getElementById("respondentLotNumber");
     const respondentBlockNumber = document.getElementById("respondentBlockNumber");
     const respondentPhaseNumber = document.getElementById("respondentPhaseNumber");
+    const blotterComplaintType = document.getElementById("blotterComplaintType");
+    const blotterComplaintTypeOther = document.getElementById("blotterComplaintTypeOther");
     const phoneInputs = form?.querySelectorAll('input[name="complainant_contact_number"], input[name="respondent_contact_number"]') || [];
     const dateFiledInput = form?.querySelector('input[name="date_filed"]');
     const timeFiledInput = form?.querySelector('input[name="time_filed"]');
@@ -105,6 +107,20 @@ document.addEventListener("DOMContentLoaded", () => {
         if (!el) return;
         if (on) el.setAttribute("required", "required");
         else el.removeAttribute("required");
+    };
+
+    const syncBlotterComplaintType = () => {
+        if (!blotterComplaintType || !blotterComplaintTypeOther) return;
+        const isOther = String(blotterComplaintType.value || "").trim() === "Other";
+        blotterComplaintTypeOther.disabled = !isOther;
+        setRequired(blotterComplaintTypeOther, isOther);
+        if (!isOther) {
+            blotterComplaintTypeOther.value = "";
+            blotterComplaintTypeOther.setCustomValidity("");
+            blotterComplaintTypeOther.classList.remove("is-invalid");
+            const feedback = ensureFeedbackEl(blotterComplaintTypeOther);
+            if (feedback) feedback.textContent = "";
+        }
     };
 
     const ensureFeedbackEl = (input) => {
@@ -517,6 +533,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     const updateState = () => {
         setNarrativeMode();
+        syncBlotterComplaintType();
         validateIncidentDateTime();
         applyAddressSystem(
             complainantAddressSystem,
@@ -657,6 +674,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     complainantAddressSystem?.addEventListener("change", updateState);
     respondentAddressSystem?.addEventListener("change", updateState);
+    blotterComplaintType?.addEventListener("change", updateState);
 
     uploadBox?.addEventListener("dragover", (e) => {
         e.preventDefault();
@@ -726,6 +744,7 @@ document.addEventListener("DOMContentLoaded", () => {
     });
 
     setNarrativeMode();
+    syncBlotterComplaintType();
     setFiledDateTime();
     if (timeFiledInput) {
         setInterval(setFiledDateTime, 1000);

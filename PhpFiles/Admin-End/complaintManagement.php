@@ -218,6 +218,16 @@ function classifySubjectKind(?string $subjectName): string
     return 'GeneralConcern';
 }
 
+function resolveSubjectKind($value, ?string $subjectName): string
+{
+    $allowed = ['Resident', 'NonResident', 'Business', 'Organization', 'Unknown', 'GeneralConcern'];
+    $value = trim((string)$value);
+    if (in_array($value, $allowed, true)) {
+        return $value;
+    }
+    return classifySubjectKind($subjectName);
+}
+
 function parseParticipantName(?string $rawName): array
 {
     $rawName = trim((string)$rawName);
@@ -317,6 +327,7 @@ $complainantSex = str_field($_POST['complainant_sex'] ?? '');
 $complainantAddress = buildComplaintAddressFromPost('complainant');
 
 $subjectName = str_field($_POST['subject_name'] ?? '');
+$subjectKind = resolveSubjectKind($_POST['subject_kind'] ?? '', $subjectName);
 $subjectContact = validateComplaintPhoneOrRedirect($_POST['subject_contact_number'] ?? '', false, 'Subject contact number');
 $subjectAddress = str_field($_POST['subject_address'] ?? '');
 
@@ -347,7 +358,6 @@ $witnessSummaryParts = array_filter([
     $witnessAddress ? 'Address: ' . $witnessAddress : null,
 ]);
 $witnessSummary = !empty($witnessSummaryParts) ? implode(' | ', $witnessSummaryParts) : null;
-$subjectKind = classifySubjectKind($subjectName);
 [$respondentLast, $respondentFirst, $respondentMiddle, $respondentSuffix] = parseParticipantName($subjectName);
 [$witnessLast, $witnessFirst, $witnessMiddle, $witnessSuffix] = parseParticipantName($witnessName);
 $actorUserId = (string)($_SESSION['user_id'] ?? '');

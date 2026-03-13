@@ -227,6 +227,18 @@ $addressReadonly = $complainantAddress !== '' ? 'readonly' : '';
 
                     <div class="form-row two-col-row">
                         <div>
+                            <label class="top-label">Reported Subject Type <span class="required-asterisk">*</span></label>
+                            <select name="subject_kind" required>
+                                <option value="">Select</option>
+                                <option value="Resident">Resident</option>
+                                <option value="NonResident">Non-Resident</option>
+                                <option value="Business">Business</option>
+                                <option value="Organization">Organization</option>
+                                <option value="Unknown">Unknown Person</option>
+                                <option value="GeneralConcern">General Concern</option>
+                            </select>
+                        </div>
+                        <div>
                             <label class="top-label">Name of Person / Business / Organization / Description <span class="required-asterisk">*</span></label>
                             <input
                                 type="text"
@@ -240,10 +252,7 @@ $addressReadonly = $complainantAddress !== '' ? 'readonly' : '';
                             <label class="top-label">Contact Number</label>
                             <input type="text" name="subject_contact_number" inputmode="numeric" maxlength="11" pattern="^09\d{9}$" title="Format: 09XXXXXXXXX" placeholder="09XXXXXXXXX">
                         </div>
-                    </div>
-
-                    <div class="form-row">
-                        <div class="full-width">
+                        <div>
                             <label class="top-label">Known Address / Location / Area Involved <span class="required-asterisk">*</span></label>
                             <input
                                 type="text"
@@ -259,7 +268,7 @@ $addressReadonly = $complainantAddress !== '' ? 'readonly' : '';
                     <div class="form-row two-col-row">
                         <div>
                             <label class="top-label">Nature of Complaint <span class="required-asterisk">*</span></label>
-                            <select name="nature_of_complaint" required>
+                            <select id="natureOfComplaint" name="nature_of_complaint" required>
                                 <option value="">Select</option>
                                 <option value="Disturbance">Disturbance</option>
                                 <option value="Property Dispute">Property Dispute</option>
@@ -270,7 +279,7 @@ $addressReadonly = $complainantAddress !== '' ? 'readonly' : '';
                         </div>
                         <div>
                             <label class="top-label">If Other, please specify</label>
-                            <input type="text" name="nature_other">
+                            <input type="text" id="natureOther" name="nature_other">
                         </div>
                     </div>
 

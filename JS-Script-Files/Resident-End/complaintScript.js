@@ -13,6 +13,8 @@ document.addEventListener("DOMContentLoaded", () => {
     const complainantLotNumber = document.getElementById("complainantLotNumber");
     const complainantBlockNumber = document.getElementById("complainantBlockNumber");
     const complainantPhaseNumber = document.getElementById("complainantPhaseNumber");
+    const natureOfComplaint = document.getElementById("natureOfComplaint") || form?.querySelector('select[name="nature_of_complaint"]') || null;
+    const natureOther = document.getElementById("natureOther") || form?.querySelector('input[name="nature_other"]') || null;
     const phoneInputs = form?.querySelectorAll('input[name="complainant_contact_number"], input[name="subject_contact_number"], input[name="witness_contact_number"]') || [];
     let isSubmitting = false;
     const touchedFields = new WeakSet();
@@ -146,6 +148,20 @@ document.addEventListener("DOMContentLoaded", () => {
         setRequired(complainantPhaseNumber, useLotBlock);
     };
 
+    const syncNatureOfComplaint = () => {
+        if (!natureOfComplaint || !natureOther) return;
+        const isOther = String(natureOfComplaint.value || "").trim() === "Other";
+        natureOther.disabled = !isOther;
+        setRequired(natureOther, isOther);
+        if (!isOther) {
+            natureOther.value = "";
+            natureOther.setCustomValidity("");
+            natureOther.classList.remove("is-invalid");
+            const feedback = ensureFeedbackEl(natureOther);
+            if (feedback) feedback.textContent = "";
+        }
+    };
+
     const isVisibleField = (field) => {
         if (!field || field.disabled) return false;
         return !field.closest(".d-none");
@@ -271,6 +287,7 @@ document.addEventListener("DOMContentLoaded", () => {
             return;
         }
         applyAddressSystem();
+        syncNatureOfComplaint();
         syncIncidentBounds();
         validateIncidentDate();
         validateIncidentTime();
@@ -290,6 +307,7 @@ document.addEventListener("DOMContentLoaded", () => {
     form.addEventListener("input", updateState);
     form.addEventListener("change", updateState);
     complainantAddressSystem?.addEventListener("change", updateState);
+    natureOfComplaint?.addEventListener("change", updateState);
     incidentDateInput?.addEventListener("input", updateState);
     incidentDateInput?.addEventListener("change", updateState);
     incidentDateInput?.addEventListener("keyup", validateIncidentDate);
@@ -376,6 +394,7 @@ document.addEventListener("DOMContentLoaded", () => {
     });
 
     syncIncidentBounds();
+    syncNatureOfComplaint();
     updateState();
 
     window.addEventListener("pageshow", () => {

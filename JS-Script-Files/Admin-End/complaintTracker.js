@@ -220,6 +220,13 @@
         return `<div class="tracker-form-grid ${cls}">${clean.map((f) => formField(f.label, f.value, !!f.raw)).join("")}</div>`;
     }
 
+    function renderAddressFieldGrid(fields) {
+        const clean = (Array.isArray(fields) ? fields : []).filter((f) => f && String(f.value ?? "").trim() !== "");
+        if (!clean.length) return "";
+        const gridClass = clean.length === 1 ? "cols-1" : "cols-3";
+        return `<div class="tracker-form-grid ${gridClass}">${clean.map((f) => formField(f.label, f.value, !!f.raw)).join("")}</div>`;
+    }
+
     function formSection(title, content) {
         return `
             <section class="tracker-form-section">
@@ -236,6 +243,49 @@
             { label: "Age", value: participant?.age || "-" },
             { label: "Sex", value: participant?.sex || "-" },
         ], 2);
+    }
+
+    function parseStructuredAddress(address) {
+        const text = String(address || "").trim();
+        if (!text) return [];
+
+        const parts = text
+            .split(",")
+            .map((part) => part.trim())
+            .filter(Boolean);
+
+        const parsed = new Map();
+        parts.forEach((part) => {
+            const idx = part.indexOf(":");
+            if (idx === -1) return;
+            const label = part.slice(0, idx).trim();
+            const value = part.slice(idx + 1).trim();
+            if (label && value) {
+                parsed.set(label, value);
+            }
+        });
+
+        if (!parsed.size) {
+            return [{ label: "Address", value: text }];
+        }
+
+        const orderedLabels = [
+            "Unit",
+            "House No.",
+            "Street",
+            "Lot",
+            "Block",
+            "Phase",
+            "Subdivision",
+            "Area",
+            "Barangay",
+            "Municipality",
+            "Province",
+        ];
+
+        return orderedLabels
+            .filter((label) => parsed.has(label))
+            .map((label) => ({ label, value: parsed.get(label) || "" }));
     }
 
     function renderIntakeNotesEditor(value) {
@@ -393,9 +443,7 @@
 
             const complainantGrid = [
                 renderParticipantGrid(d.complainant || {}),
-                renderFieldGrid([
-                    { label: "Address", value: d.complainant?.address || "-" },
-                ], 1),
+                renderAddressFieldGrid(parseStructuredAddress(d.complainant?.address || "")),
             ].join("");
 
             const subjectGrid = [
@@ -403,7 +451,7 @@
                     { label: "Subject", value: d.subject_display_name || "-" },
                     { label: "Subject Kind", value: d.subject_kind || "-" },
                     { label: "Contact Number", value: d.subject_contact_number || "-" },
-                    { label: "Respondent Name", value: d.respondent?.full_name || "-" },
+                    { label: "Complaint Type", value: d.complaint_type || "-" },
                 ], 2),
                 renderFieldGrid([
                     { label: "Known Address / Location", value: d.subject_address || "-" },

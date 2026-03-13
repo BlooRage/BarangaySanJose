@@ -80,7 +80,9 @@ $respondentSex = str_field($_POST['respondent_sex'] ?? '');
 $incidentDate = str_field($_POST['incident_date'] ?? '');
 $incidentTime = str_field($_POST['incident_time'] ?? '');
 $incidentPlace = str_field($_POST['incident_place'] ?? '');
-$complaintType = str_field($_POST['complaint_type'] ?? '');
+$complaintTypeSelected = str_field($_POST['complaint_type'] ?? '');
+$complaintTypeOther = str_field($_POST['complaint_type_other'] ?? '');
+$complaintType = $complaintTypeSelected === 'Other' ? $complaintTypeOther : $complaintTypeSelected;
 $narrativeMethod = str_field($_POST['narrative_input_method'] ?? 'text');
 $narrativeText = str_field($_POST['narrative_report'] ?? '');
 
