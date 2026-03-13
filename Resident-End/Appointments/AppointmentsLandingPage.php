@@ -17,29 +17,87 @@ require_once __DIR__ . "/../includes/resident_access_guard.php";
     <link rel="stylesheet" href="../../CSS-Styles/Resident-End-CSS/residentDashboard.css">
     <link rel="stylesheet" href="../../CSS-Styles/Guest-End-CSS/GeneralStyle.css">
     <link rel="stylesheet" href="../../CSS-Styles/Resident-End-CSS/ApplicationLandingPage.css?v=20260228-3">
+    <style>
+        body {
+            background: #fffdfb;
+        }
+        #div-mainDisplay {
+            background: #ffffff !important;
+        }
+        .page-shell {
+            max-width: 1100px;
+            margin: 0 auto;
+        }
+        .page-title {
+            font-size: 2.4rem;
+            font-weight: 700;
+        }
+        .page-subtitle {
+            font-size: 1.3rem;
+            font-weight: 600;
+            color: #1f1f1f;
+        }
+        .info-card {
+            background: #fff7ef;
+            border: 1px solid #f2d9c2;
+            border-radius: 16px;
+            padding: 20px 24px;
+        }
+        .info-list {
+            padding-left: 1.2rem;
+            margin-bottom: 0;
+        }
+        .apply-section {
+            padding-top: 12px;
+        }
+        .apply-btn {
+            min-width: 180px;
+        }
+    </style>
 </head>
 
 <body>
     <div class="d-flex min-vh-100">
         <?php include __DIR__ . '/../includes/resident_sidebar.php'; ?>
 
-        <main id="div-mainDisplay" class="main-content single-service-page flex-grow-1 p-4 p-md-5 bg-light">
-            <div class="d-flex align-items-center gap-2 mb-2">
-                <img src="../../Icons/Dashboard/appointmentsicon.png" class="certificate-icon" alt="Appointment Service" style="height: 52px; margin-bottom: 0;">
-                <h1 class="page-title mb-0">Barangay Appointments</h1>
-            </div>
-            <hr>
+        <main id="div-mainDisplay" class="main-content single-service-page flex-grow-1 p-4 p-md-5">
+            <div class="page-shell">
+                <div class="d-flex align-items-center gap-3 mb-3">
+                    <img src="../../Icons/Dashboard/appointmentsicon.png" class="certificate-icon" alt="Appointment Service" style="height: 52px; margin-bottom: 0;">
+                    <div>
+                        <h1 class="page-title mb-1">Barangay Appointments</h1>
+                    </div>
+                </div>
+                <hr>
 
-            <p class="page-description">
-                Welcome to the Barangay San Jose Online Appointment Application. Select the appointment service below to schedule your visit and submit the required details in advance.
-            </p>
-            <hr>
-
-            <div class="text-center mt-4">
                 <p class="page-description mb-4">
-                    Set an appointment with the barangay office for your selected service and preferred schedule.
+                    Welcome to the Barangay San Jose Online Appointment Application. Schedule your visit and submit details ahead for a faster transaction.
                 </p>
-                <button class="btn apply-btn" type="button" onclick="location.href='AppointmentForm.php'">Open Form</button>
+
+                <div class="info-card">
+                    <h2 class="page-subtitle mb-2">What You Can Set an Appointment For</h2>
+                    <p class="page-description mb-2">Common appointment purposes include:</p>
+                    <ul class="page-description info-list">
+                        <li>Claiming certificates or clearances</li>
+                        <li>Barangay ID processing or pick-up</li>
+                        <li>Business permit inquiries or follow-ups</li>
+                        <li>Document verification or record requests</li>
+                        <li>Assistance programs and social services consultations</li>
+                        <li>Meetings for mediation or case updates</li>
+                        <li>Community project or event coordination</li>
+                        <li>General consultation with barangay staff</li>
+                    </ul>
+                    <p class="page-description mt-3 mb-0">
+                        Note: Availability depends on office schedules. Please choose a preferred date and time.
+                    </p>
+                </div>
+
+                <div class="text-center apply-section mt-4">
+                    <p class="page-description mb-3">
+                        Set an appointment with the barangay office for your selected service and schedule.
+                    </p>
+                    <button class="btn apply-btn" type="button" onclick="location.href='AppointmentForm.php'">Open Form</button>
+                </div>
             </div>
         </main>
     </div>
