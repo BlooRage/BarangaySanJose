@@ -104,6 +104,53 @@
 
 .announcementItem {
    margin-bottom: 15px;
+   border: 0;
+   outline: 0;
+   box-shadow: none;
+}
+
+.announcementItemInteractive {
+   width: 100%;
+   text-align: left;
+   border: 0;
+   background: transparent;
+   padding: 0;
+   cursor: pointer;
+   outline: none;
+   box-shadow: none;
+}
+
+.announcementItemInteractive:hover .announcementText {
+   color: var(--accent-color);
+}
+
+.announcementItemInteractive:focus,
+.announcementItemInteractive:focus-visible,
+.announcementItemInteractive:active {
+   outline: none !important;
+   border: 0 !important;
+   box-shadow: none !important;
+}
+
+.announcementItemInteractive,
+.announcementItemInteractive .announcementText,
+.announcementItemInteractive .announcementPreviewText,
+.announcementItemInteractive .announcementDate {
+   text-align: left !important;
+}
+
+.announcementItemInteractive,
+.announcementItemInteractive * {
+   border: 0 !important;
+   outline: 0 !important;
+   box-shadow: none !important;
+   background: transparent !important;
+}
+
+.announcementItemInteractive .announcementText,
+.announcementItemInteractive .announcementPreviewText,
+.announcementItemInteractive .announcementDate {
+   display: block;
 }
 
 .announcementText {
@@ -111,6 +158,13 @@
    font-weight: 500;
    color: var(--dark-text-color);
    margin-bottom: 5px;
+}
+
+.announcementPreviewText {
+   font-size: 0.95em;
+   color: #5f6368;
+   line-height: 1.55;
+   margin-bottom: 8px;
 }
 
 .announcementDate {
@@ -123,6 +177,39 @@
    color: #ccc;
    margin-top: 15px;
    margin-bottom: 15px;
+}
+
+.publicAnnouncementModalContent {
+   border-radius: 12px;
+   overflow: hidden;
+}
+
+.publicAnnouncementModalHeader {
+   align-items: flex-start;
+}
+
+.publicAnnouncementModalHeader .modal-title {
+   font-size: 1.6rem;
+   font-family: 'Charis SIL Bold', serif;
+   color: var(--primary-color);
+   font-weight: 700;
+   text-align: left;
+}
+
+.publicAnnouncementModalBody {
+   text-align: left;
+}
+
+.publicAnnouncementModalArticle {
+   word-break: break-word;
+}
+
+.publicAnnouncementModalArticle img,
+.publicAnnouncementModalArticle video,
+.publicAnnouncementModalArticle iframe,
+.publicAnnouncementModalArticle table {
+   max-width: 100%;
+   height: auto;
 }
 
 @media (max-width: 768px) {
@@ -150,5 +237,11 @@
    }
    .announcementText {
       font-size: 16px;
+   }
+   .announcementPreviewText {
+      font-size: 0.92em;
+   }
+   .publicAnnouncementModalHeader .modal-title {
+      font-size: 1.3rem;
    }
 }

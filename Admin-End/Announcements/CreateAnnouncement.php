@@ -198,7 +198,6 @@ $isSuperAdmin = $sessionRole === 'superadmin';
                   <input type="hidden" id="announcementContent" name="content_html">
                   <div id="sharedSidebarWarning" class="announcement-counter-note d-none mt-2">
                     <span id="sharedSidebarCounter" class="announcement-counter-text">0 characters</span>
-                    <span id="sharedSidebarWarningText" class="announcement-counter-warning d-none">Warning: Sidebar announcements should stay concise to avoid crowding the guest page.</span>
                   </div>
                 </div>
               </section>
@@ -247,7 +246,6 @@ $isSuperAdmin = $sessionRole === 'superadmin';
                         <input type="hidden" id="publicAnnouncementContent" name="public_content_html">
                         <div class="announcement-counter-note mt-2">
                           <span id="publicAnnouncementCounter" class="announcement-counter-text">0 characters</span>
-                          <span id="publicAnnouncementWarning" class="announcement-counter-warning d-none">Warning: Sidebar announcements should stay concise to avoid crowding the guest page.</span>
                         </div>
                       </div>
                     </div>
@@ -312,9 +310,7 @@ $isSuperAdmin = $sessionRole === 'superadmin';
       const publicNewsCounter = document.getElementById("publicNewsCounter");
       const sharedSidebarWarning = document.getElementById("sharedSidebarWarning");
       const sharedSidebarCounter = document.getElementById("sharedSidebarCounter");
-      const sharedSidebarWarningText = document.getElementById("sharedSidebarWarningText");
       const publicAnnouncementCounter = document.getElementById("publicAnnouncementCounter");
-      const publicAnnouncementWarning = document.getElementById("publicAnnouncementWarning");
       const smsPreview = document.getElementById("smsPreview");
       const smsCounter = document.getElementById("smsCounter");
       const placementPublicNews = document.getElementById("placementPublicNews");
@@ -376,15 +372,13 @@ $isSuperAdmin = $sessionRole === 'superadmin';
         smsPreview.value = plain;
         smsCounter.textContent = plain.length + " / 160 characters";
 
-        if (sharedSidebarWarning && sharedSidebarCounter && sharedSidebarWarningText) {
+        if (sharedSidebarWarning && sharedSidebarCounter) {
           sharedSidebarWarning.classList.toggle("d-none", !sidebarOnlyMode);
           sharedSidebarCounter.textContent = sharedPlain.length + " characters";
-          sharedSidebarWarningText.classList.toggle("d-none", sharedPlain.length <= 280);
         }
 
-        if (publicAnnouncementCounter && publicAnnouncementWarning) {
+        if (publicAnnouncementCounter) {
           publicAnnouncementCounter.textContent = publicAnnouncementPlain.length + " characters";
-          publicAnnouncementWarning.classList.toggle("d-none", publicAnnouncementPlain.length <= 280);
         }
 
         if (publicNewsCounter) {

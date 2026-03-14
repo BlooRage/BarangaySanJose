@@ -87,6 +87,7 @@
                         <div id="publicAnnouncementsList">
                             <div class="announcementItem">
                                 <p class="announcementText">No public announcements available yet.</p>
+                                <div class="announcementPreviewText">Check back later for new barangay announcements.</div>
                                 <span class="announcementDate">-</span>
                             </div>
                         </div>
@@ -97,6 +98,25 @@
             </div>
         </div>
     </main>
+
+    <div class="modal fade" id="publicAnnouncementModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered modal-lg modal-dialog-scrollable">
+            <div class="modal-content publicAnnouncementModalContent">
+                <div class="modal-header publicAnnouncementModalHeader">
+                    <div>
+                        <h5 class="modal-title" id="publicAnnouncementModalTitle">Announcement</h5>
+                        <div class="announcementDate mt-1" id="publicAnnouncementModalDate">-</div>
+                    </div>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body publicAnnouncementModalBody">
+                    <div id="publicAnnouncementModalBody" class="articleBody publicAnnouncementModalArticle">
+                        <p>No announcement content available.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
     
     <div class="footerWrapper">
         <footer id="footer">
@@ -176,6 +196,28 @@
                 .replace(/'/g, '&#039;');
         }
 
+        function toModalParagraphHtml(html) {
+            const wrapper = document.createElement('div');
+            wrapper.innerHTML = String(html || '');
+            const plain = (wrapper.textContent || wrapper.innerText || '').replace(/\r/g, '').trim();
+            if (!plain) {
+                return '<p>No announcement content available.</p>';
+            }
+
+            const lines = plain
+                .split(/\n+/)
+                .map(function (line) { return line.replace(/\s+/g, ' ').trim(); })
+                .filter(Boolean);
+
+            if (!lines.length) {
+                return '<p>' + escapeHtml(plain.replace(/\s+/g, ' ').trim()) + '</p>';
+            }
+
+            return lines.map(function (line) {
+                return '<p>' + escapeHtml(line) + '</p>';
+            }).join('');
+        }
+
         (function () {
             const headlineEl = document.getElementById("publicNewsHeadline");
             const dateEl = document.getElementById("publicNewsDate");
@@ -224,6 +266,13 @@
 
         (function () {
             const listEl = document.getElementById("publicAnnouncementsList");
+            const modalEl = document.getElementById("publicAnnouncementModal");
+            const modalTitleEl = document.getElementById("publicAnnouncementModalTitle");
+            const modalDateEl = document.getElementById("publicAnnouncementModalDate");
+            const modalBodyEl = document.getElementById("publicAnnouncementModalBody");
+            const modalInstance = modalEl && window.bootstrap?.Modal
+                ? new bootstrap.Modal(modalEl)
+                : null;
             if (!listEl) {
                 return;
             }
@@ -242,22 +291,59 @@
             .then(function (payload) {
                 const items = Array.isArray(payload.items) ? payload.items : [];
                 if (!items.length) {
-                    listEl.innerHTML = '<div class="announcementItem"><p class="announcementText">No public announcements available yet.</p><span class="announcementDate">-</span></div>';
+                    listEl.innerHTML = '<div class="announcementItem"><p class="announcementText">No public announcements available yet.</p><div class="announcementPreviewText">Check back later for new barangay announcements.</div><span class="announcementDate">-</span></div>';
                     return;
+                }
+
+                function toPreviewText(html) {
+                    const wrapper = document.createElement('div');
+                    wrapper.innerHTML = String(html || '');
+                    const plain = (wrapper.textContent || wrapper.innerText || '').replace(/\s+/g, ' ').trim();
+                    if (!plain) {
+                        return 'No announcement details available.';
+                    }
+                    return plain.length > 140 ? plain.slice(0, 140).trimEnd() + '...' : plain;
                 }
 
                 listEl.innerHTML = items.map(function (item, idx) {
                     const divider = idx < items.length - 1 ? '<hr class="sidebarDivider">' : '';
                     return ''
-                        + '<div class="announcementItem">'
+                        + '<div class="announcementItem announcementItemInteractive" tabindex="0" role="button"'
+                        + ' data-announcement-title="' + escapeHtml(item.title || 'Untitled announcement') + '"'
+                        + ' data-announcement-date="' + escapeHtml(item.posted_date || '-') + '"'
+                        + ' data-announcement-content="' + encodeURIComponent(item.content_html || '') + '">'
                         + '  <p class="announcementText">' + escapeHtml(item.title || 'Untitled announcement') + '</p>'
+                        + '  <div class="announcementPreviewText">' + escapeHtml(toPreviewText(item.content_html || '')) + '</div>'
                         + '  <span class="announcementDate">' + escapeHtml(item.posted_date || '-') + '</span>'
                         + '</div>'
                         + divider;
                 }).join('');
+
+                listEl.querySelectorAll(".announcementItemInteractive").forEach(function (itemEl) {
+                    function openAnnouncementModal() {
+                        if (!modalInstance || !modalTitleEl || !modalDateEl || !modalBodyEl) {
+                            return;
+                        }
+                        modalTitleEl.textContent = itemEl.getAttribute("data-announcement-title") || "Announcement";
+                        modalDateEl.textContent = itemEl.getAttribute("data-announcement-date") || "-";
+                        modalBodyEl.innerHTML = decodeURIComponent(itemEl.getAttribute("data-announcement-content") || "")
+                            || "<p>No announcement content available.</p>";
+                        modalInstance.show();
+                    }
+
+                    itemEl.addEventListener("click", function () {
+                        openAnnouncementModal();
+                    });
+                    itemEl.addEventListener("keydown", function (event) {
+                        if (event.key === "Enter" || event.key === " ") {
+                            event.preventDefault();
+                            openAnnouncementModal();
+                        }
+                    });
+                });
             })
             .catch(function () {
-                listEl.innerHTML = '<div class="announcementItem"><p class="announcementText">Unable to load public announcements right now.</p><span class="announcementDate">-</span></div>';
+                listEl.innerHTML = '<div class="announcementItem"><p class="announcementText">Unable to load public announcements right now.</p><div class="announcementPreviewText">Please try again later.</div><span class="announcementDate">-</span></div>';
             });
         })();
     </script></body>

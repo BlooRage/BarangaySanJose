@@ -90,8 +90,9 @@ foreach ($items as $item) {
     .announcement-title {
       font-family: 'Charis SIL Bold', serif;
       color: #de710c;
-      font-size: 1.25rem;
+      font-size: 1.55rem;
       margin-bottom: 0.2rem;
+      line-height: 1.25;
     }
 
     .announcement-meta {
@@ -113,10 +114,16 @@ foreach ($items as $item) {
       word-wrap: break-word;
     }
 
-    .announcement-body img {
+    .announcement-body img,
+    .announcement-body video,
+    .announcement-body iframe,
+    .announcement-body table {
       max-width: 100%;
       height: auto;
-      border-radius: 8px;
+    }
+
+    .announcement-body * {
+      word-break: break-word;
     }
 
     @media (max-width: 767px) {
@@ -125,7 +132,7 @@ foreach ($items as $item) {
         padding: 1rem;
       }
       .announcement-title {
-        font-size: 1.1rem;
+        font-size: 1.3rem;
       }
     }
   </style>

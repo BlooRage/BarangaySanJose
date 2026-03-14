@@ -214,20 +214,79 @@ foreach ($rows as $idx => $item) {
     $title = trim((string)($_POST['title'] ?? ''));
     $audience = trim((string)($_POST['audience'] ?? ''));
     $contentHtml = trim((string)($_POST['content_html'] ?? ''));
+    $publicNewsTitle = trim((string)($_POST['public_news_title'] ?? ''));
+    $publicNewsContentHtml = trim((string)($_POST['public_news_content_html'] ?? ''));
+    $publicTitle = trim((string)($_POST['public_title'] ?? ''));
+    $publicContentHtml = trim((string)($_POST['public_content_html'] ?? ''));
     $publishDate = trim((string)($_POST['publish_date'] ?? '-'));
     $nextStatus = strtolower(trim((string)($_POST['status_update'] ?? $currentStatus)));
+    $placements = array_values(array_unique(array_filter((array)($_POST['placements'] ?? []), function ($placement) {
+      return in_array((string)$placement, ['announcement', 'public_news'], true);
+    })));
     $channels = array_values(array_unique(array_filter((array)($_POST['channels'] ?? []), function ($ch) {
       return in_array((string)$ch, ['website', 'public', 'public_news', 'sms', 'email'], true);
     })));
 
-    if ($title === '' || $audience === '') {
-      ann_action_redirect($channel, $status, $q, $queueQ, $queueChannel, 'warning', 'Title and audience are required.');
+    if ($audience === '') {
+      ann_action_redirect($channel, $status, $q, $queueQ, $queueChannel, 'warning', 'Audience is required.');
     }
-    if (trim(strip_tags($contentHtml)) === '') {
-      ann_action_redirect($channel, $status, $q, $queueQ, $queueChannel, 'warning', 'Announcement content is required.');
+    if (!$placements) {
+      ann_action_redirect($channel, $status, $q, $queueQ, $queueChannel, 'warning', 'Select at least one page placement.');
     }
+    $hasAnnouncementPlacement = in_array('announcement', $placements, true);
+    $hasNewsPlacement = in_array('public_news', $placements, true);
+    if ($hasAnnouncementPlacement && !array_intersect(['public', 'website'], $channels)) {
+      ann_action_redirect($channel, $status, $q, $queueQ, $queueChannel, 'warning', 'Select Guest Page or Account Page when Announcements is selected.');
+    }
+
+    if ($hasAnnouncementPlacement && $hasNewsPlacement) {
+      if ($publicNewsTitle === '' || trim(strip_tags($publicNewsContentHtml)) === '') {
+        ann_action_redirect($channel, $status, $q, $queueQ, $queueChannel, 'warning', 'News Section title and body are required when both placements are selected.');
+      }
+      if ($publicTitle === '' || trim(strip_tags($publicContentHtml)) === '') {
+        ann_action_redirect($channel, $status, $q, $queueQ, $queueChannel, 'warning', 'Announcements title and body are required when both placements are selected.');
+      }
+      $title = $publicNewsTitle;
+      $contentHtml = $publicNewsContentHtml;
+    } elseif ($hasNewsPlacement) {
+      if ($title === '' || trim(strip_tags($contentHtml)) === '') {
+        ann_action_redirect($channel, $status, $q, $queueQ, $queueChannel, 'warning', 'Title and body are required.');
+      }
+      $publicNewsTitle = $title;
+      $publicNewsContentHtml = $contentHtml;
+      $publicTitle = '';
+      $publicContentHtml = '';
+    } elseif ($hasAnnouncementPlacement) {
+      if ($title === '' || trim(strip_tags($contentHtml)) === '') {
+        ann_action_redirect($channel, $status, $q, $queueQ, $queueChannel, 'warning', 'Title and body are required.');
+      }
+      $publicTitle = $title;
+      $publicContentHtml = $contentHtml;
+      $publicNewsTitle = '';
+      $publicNewsContentHtml = '';
+    }
+
+    $resolvedChannels = [];
+    if ($hasNewsPlacement) {
+      $resolvedChannels[] = 'public_news';
+    }
+    if ($hasAnnouncementPlacement) {
+      if (in_array('public', $channels, true)) {
+        $resolvedChannels[] = 'public';
+      }
+      if (in_array('website', $channels, true)) {
+        $resolvedChannels[] = 'website';
+      }
+    }
+    if (in_array('sms', $channels, true)) {
+      $resolvedChannels[] = 'sms';
+    }
+    if (in_array('email', $channels, true)) {
+      $resolvedChannels[] = 'email';
+    }
+    $channels = array_values(array_unique($resolvedChannels));
     if (!$channels) {
-      ann_action_redirect($channel, $status, $q, $queueQ, $queueChannel, 'warning', 'Select at least one delivery channel.');
+      ann_action_redirect($channel, $status, $q, $queueQ, $queueChannel, 'warning', 'Select at least one valid delivery destination.');
     }
     if (!in_array($nextStatus, ['draft', 'pending', 'approved'], true)) {
       $nextStatus = $currentStatus;
@@ -248,6 +307,10 @@ foreach ($rows as $idx => $item) {
     $rows[$idx]['audience'] = $audience;
     $rows[$idx]['channels'] = $channels;
     $rows[$idx]['content_html'] = $contentHtml;
+    $rows[$idx]['public_news_title'] = $publicNewsTitle;
+    $rows[$idx]['public_news_content_html'] = $publicNewsContentHtml;
+    $rows[$idx]['public_title'] = $publicTitle;
+    $rows[$idx]['public_content_html'] = $publicContentHtml;
     $rows[$idx]['publish_date'] = $publishDate === '' ? '-' : $publishDate;
     $rows[$idx]['status'] = $nextStatus;
     $rows[$idx]['updated_at'] = date('Y-m-d H:i:s');

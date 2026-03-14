@@ -66,14 +66,10 @@ foreach ($announcementItems as $item) {
 
   $title = trim((string)(($item['public_title'] ?? '') !== '' ? $item['public_title'] : ($item['title'] ?? '')));
   $contentHtml = (string)(($item['public_content_html'] ?? '') !== '' ? $item['public_content_html'] : ($item['content_html'] ?? ''));
-  $contentPreviewHtml = trim(strip_tags(
-    $contentHtml,
-    '<p><br><b><strong><i><em><u><ul><ol><li><span><div><h1><h2><h3><h4><h5><h6><font><a>'
-  ));
 
   $residentAnnouncements[] = [
     'title' => $title !== '' ? $title : 'Untitled Announcement',
-    'content_html' => $contentPreviewHtml !== '' ? $contentPreviewHtml : '<p>Tap to view the latest account-page announcement.</p>',
+    'content_html' => trim($contentHtml) !== '' ? $contentHtml : '<p>Tap to view the latest account-page announcement.</p>',
     'posted_date' => $postedDate
   ];
 }
@@ -140,13 +136,13 @@ foreach ($announcementItems as $item) {
 
     <main id="div-mainDisplay" class="flex-grow-1 p-4 p-md-5 bg-light">
 
-      <div id="div-welcomeBanner" class="rounded-4 overflow-hidden mb-3 shadow-sm border-orange-thin">
+      <div id="div-welcomeBanner" class="rounded-4 overflow-hidden mb-4 shadow-sm border-orange-thin">
         <div id="div-bannerHeader" class="bg-orange text-center py-3">
           <h3 class="text-white fw-bold mb-0">WELCOME, RESIDENTS OF BARANGAY SAN JOSE!</h3>
         </div>
-        <div id="div-bannerBody" class="bg-white p-5 text-center">
+        <div id="div-bannerBody" class="bg-white p-3 p-md-4 text-center">
           <p id="txt-bannerLorem" class="text-muted mb-0">
-            LOREM IPSUM DOLOR SIT AMET, CONSECTETUR ADIPISCING ELIT. SED DO EIUSMOD TEMPOR INCIDIDUNT UT LABORE ET DOLORE MAGNA ALIQUA.
+            Welcome to your official Barangay San Jose resident dashboard. Stay updated with barangay announcements, receive important community reminders, and quickly access services such as certificates, clearances, barangay ID requests, appointments, complaints, and transactions. Use this page to keep track of your account activity and stay informed about the latest barangay updates.
           </p>
         </div>
       </div>
@@ -159,7 +155,7 @@ foreach ($announcementItems as $item) {
               <div class="bg-orange text-center py-3">
                 <h3 class="text-white fw-bold mb-0"><?= htmlspecialchars($announcement['title']) ?></h3>
               </div>
-              <div class="bg-white p-4 p-md-5">
+              <div class="bg-white p-3 p-md-4 dashboard-announcement-body">
                 <div class="dashboard-announcement-preview"><?= $announcement['content_html'] ?></div>
                 <div class="dashboard-announcement-footer">
                   <div class="dashboard-announcement-posted">Posted: <?= htmlspecialchars($announcement['posted_date']) ?></div>

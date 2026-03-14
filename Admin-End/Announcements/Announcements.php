@@ -171,6 +171,18 @@ function ann_display_status(array $item, string $currentUserId, string $currentU
   return $status;
 }
 
+function ann_placements_from_channels(array $channels): array
+{
+  $placements = [];
+  if (in_array('public_news', $channels, true)) {
+    $placements[] = 'public_news';
+  }
+  if (in_array('public', $channels, true) || in_array('website', $channels, true)) {
+    $placements[] = 'announcement';
+  }
+  return $placements;
+}
+
 $currentUserDisplayLabel = ann_creator_display_from_user_id($conn, $currentUserId, $currentUserId);
 
 $announcementRows = [];
@@ -200,12 +212,17 @@ foreach ($storedAnnouncements as $item) {
     'title' => (string)($item['title'] ?? ''),
     'audience' => (string)($item['audience'] ?? 'All Residents'),
     'channels' => $channels,
+    'placements' => ann_placements_from_channels($channels),
     'status' => $status,
     'publish_date' => (string)($item['publish_date'] ?? '-'),
     'created_by' => $createdByDisplay,
     'created_by_user_id' => $createdByUserId,
     'created_by_role' => $createdByRole,
     'content_html' => (string)($item['content_html'] ?? ''),
+    'public_news_title' => (string)($item['public_news_title'] ?? ''),
+    'public_news_content_html' => (string)($item['public_news_content_html'] ?? ''),
+    'public_title' => (string)($item['public_title'] ?? ''),
+    'public_content_html' => (string)($item['public_content_html'] ?? ''),
     'review_result' => strtolower((string)($item['review_result'] ?? '')),
     'review_note' => (string)($item['review_note'] ?? ''),
     'created_at' => (string)($item['created_at'] ?? ''),
@@ -302,12 +319,17 @@ foreach ($announcementRows as $row) {
     'title' => (string)$row['title'],
     'audience' => (string)$row['audience'],
     'channels' => array_values((array)$row['channels']),
+    'placements' => array_values((array)($row['placements'] ?? [])),
     'status' => (string)$row['status'],
     'created_by_role' => (string)$row['created_by_role'],
     'created_by_user_id' => (string)($row['created_by_user_id'] ?? ''),
     'publish_date' => (string)$row['publish_date'],
     'created_by' => (string)$row['created_by'],
     'content_html' => (string)$row['content_html'],
+    'public_news_title' => (string)($row['public_news_title'] ?? ''),
+    'public_news_content_html' => (string)($row['public_news_content_html'] ?? ''),
+    'public_title' => (string)($row['public_title'] ?? ''),
+    'public_content_html' => (string)($row['public_content_html'] ?? ''),
     'review_result' => (string)($row['review_result'] ?? ''),
     'review_note' => (string)($row['review_note'] ?? ''),
     'created_at' => (string)$row['created_at'],
@@ -590,6 +612,7 @@ function announcement_ordered_channels(array $channels): array
                     $status = $item['status'];
                     $isSuperAdminCreated = ((string)($item['created_by_role'] ?? '') === 'superadmin');
                     $isOwnedByCurrentUser = ann_is_owned_by_current_user($item, $currentUserId, $currentUserDisplayLabel);
+                    $disableSuperAdminEdit = $isSuperAdmin && $status === 'pending';
                     $reviewResult = strtolower((string)($item['review_result'] ?? ''));
                     $displayStatus = ($status === 'draft' && $reviewResult === 'denied' && $isOwnedByCurrentUser) ? 'denied' : $status;
                     $statusClass = $displayStatus === 'approved'
@@ -621,14 +644,25 @@ function announcement_ordered_channels(array $channels): array
                             View
                           </button>
                           <?php if ($isSuperAdmin || $isOwnedByCurrentUser): ?>
-                            <button
-                              class="btn btn-warning btn-sm text-dark btn-edit-announcement"
-                              type="button"
-                              data-bs-toggle="modal"
-                              data-bs-target="#modalEditAnnouncement"
-                              data-id="<?= htmlspecialchars($item['id']) ?>">
-                              Edit
-                            </button>
+                            <?php if ($disableSuperAdminEdit): ?>
+                              <button
+                                class="btn btn-warning btn-sm text-dark btn-edit-announcement disabled"
+                                type="button"
+                                disabled
+                                aria-disabled="true"
+                                title="Pending announcements in the review queue cannot be edited here.">
+                                Edit
+                              </button>
+                            <?php else: ?>
+                              <button
+                                class="btn btn-warning btn-sm text-dark btn-edit-announcement"
+                                type="button"
+                                data-bs-toggle="modal"
+                                data-bs-target="#modalEditAnnouncement"
+                                data-id="<?= htmlspecialchars($item['id']) ?>">
+                                Edit
+                              </button>
+                            <?php endif; ?>
                           <?php endif; ?>
                         </div>
                         <?php if ($status === 'pending' && $isSuperAdmin && !$isSuperAdminCreated): ?>
@@ -892,7 +926,11 @@ function announcement_ordered_channels(array $channels): array
                 <p class="announcement-detail-value" id="viewAnnouncementAudience">-</p>
               </div>
               <div class="col-md-6">
-                <p class="announcement-detail-label">Channels</p>
+                <p class="announcement-detail-label">Page Placement</p>
+                <p class="announcement-detail-value" id="viewAnnouncementPlacements">-</p>
+              </div>
+              <div class="col-md-6">
+                <p class="announcement-detail-label">Additional Delivery</p>
                 <p class="announcement-detail-value" id="viewAnnouncementChannels">-</p>
               </div>
               <div class="col-md-6">
@@ -909,6 +947,16 @@ function announcement_ordered_channels(array $channels): array
             <h5 class="announcement-card-title">Announcement Content</h5>
             <div id="viewAnnouncementReviewNotice" class="alert alert-danger d-none mb-3" role="alert"></div>
             <div id="viewAnnouncementContent" class="announcement-content-surface"></div>
+            <div id="viewAnnouncementDualContent" class="d-none">
+              <div class="announcement-details-card announcement-details-card--content mt-3">
+                <h6 class="announcement-card-title announcement-placement-title">News Section</h6>
+                <div id="viewAnnouncementNewsContent" class="announcement-content-surface"></div>
+              </div>
+              <div class="announcement-details-card announcement-details-card--content mt-3">
+                <h6 class="announcement-card-title announcement-placement-title">Announcements</h6>
+                <div id="viewAnnouncementPublicContent" class="announcement-content-surface"></div>
+              </div>
+            </div>
           </div>
         </div>
         <div class="modal-footer border-0">
@@ -943,23 +991,28 @@ function announcement_ordered_channels(array $channels): array
           <div class="announcement-form-card">
             <h5 class="announcement-card-title">Announcement Details</h5>
             <div class="mb-3">
-            <label for="editAnnouncementTitleInput" class="form-label">Title</label>
-            <input type="text" class="form-control" id="editAnnouncementTitleInput" name="title" required>
-            </div>
-            <div class="mb-3">
               <label for="editAnnouncementAudienceInput" class="form-label">Audience</label>
               <input type="text" class="form-control" id="editAnnouncementAudienceInput" name="audience" required>
             </div>
             <div class="mb-3">
-              <label class="form-label d-block">Delivery Channels</label>
+              <label class="form-label d-block">Page Placement</label>
+              <div class="d-flex flex-wrap gap-3">
+                <label class="form-check-label d-flex align-items-center gap-2">
+                  <input class="form-check-input m-0 edit-placement-checkbox" type="checkbox" name="placements[]" value="public_news" id="editPlacementPublicNews">
+                  <span>News Section</span>
+                </label>
+                <label class="form-check-label d-flex align-items-center gap-2">
+                  <input class="form-check-input m-0 edit-placement-checkbox" type="checkbox" name="placements[]" value="announcement" id="editPlacementAnnouncement">
+                  <span>Announcements</span>
+                </label>
+              </div>
+            </div>
+            <div class="mb-3">
+              <label class="form-label d-block">Additional Delivery</label>
               <div class="d-flex flex-wrap gap-3">
                 <label class="form-check-label d-flex align-items-center gap-2">
                   <input class="form-check-input m-0" type="checkbox" name="channels[]" value="public" id="editChannelPublic">
-                  <span>Public Announcement</span>
-                </label>
-                <label class="form-check-label d-flex align-items-center gap-2">
-                  <input class="form-check-input m-0" type="checkbox" name="channels[]" value="public_news" id="editChannelPublicNews">
-                  <span>Public News</span>
+                  <span>Guest Page</span>
                 </label>
                 <label class="form-check-label d-flex align-items-center gap-2">
                   <input class="form-check-input m-0" type="checkbox" name="channels[]" value="website" id="editChannelWebsite">
@@ -978,12 +1031,9 @@ function announcement_ordered_channels(array $channels): array
             <div class="row g-3">
               <?php if ($isSuperAdmin): ?>
                 <div class="col-md-6">
-                  <label for="editAnnouncementStatusInput" class="form-label">Status</label>
-                  <select class="form-select announcement-status-select status-draft" id="editAnnouncementStatusInput" name="status_update">
-                    <option value="draft">Draft</option>
-                    <option value="pending">Pending</option>
-                    <option value="approved">Approved</option>
-                  </select>
+                  <label class="form-label">Status</label>
+                  <div class="announcement-detail-value announcement-detail-status status-draft" id="editAnnouncementStatusDisplay">-</div>
+                  <input type="hidden" id="editAnnouncementStatusInput" name="status_update" value="draft">
                 </div>
                 <div class="col-md-6">
               <?php else: ?>
@@ -997,9 +1047,33 @@ function announcement_ordered_channels(array $channels): array
           </div>
           <div class="announcement-form-card mt-4">
             <h5 class="announcement-card-title">Announcement Content</h5>
-            <label for="editAnnouncementContentInput" class="form-label">Content</label>
-            <div id="editAnnouncementEditor"></div>
+            <div id="editSharedContentFields">
+              <div class="announcement-primary-title-wrap">
+                <label for="editAnnouncementTitleInput" class="form-label">Title</label>
+                <input type="text" class="form-control announcement-primary-title-input" id="editAnnouncementTitleInput" name="title" required>
+              </div>
+              <label for="editAnnouncementContentInput" class="form-label">Body</label>
+              <div id="editAnnouncementEditor"></div>
+            </div>
             <input type="hidden" id="editAnnouncementContentInput" name="content_html" required>
+            <div id="editDualPlacementFields" class="d-none">
+              <div class="announcement-dual-card mt-2">
+                <h6 class="announcement-card-title announcement-placement-title">News Section</h6>
+                <label for="editPublicNewsTitle" class="form-label fw-semibold">Title</label>
+                <input id="editPublicNewsTitle" name="public_news_title" type="text" class="form-control announcement-secondary-title-input" placeholder="Enter news section title">
+                <label class="form-label mt-3">Body</label>
+                <div id="editPublicNewsEditor"></div>
+                <input type="hidden" id="editPublicNewsContent" name="public_news_content_html">
+              </div>
+              <div class="announcement-dual-card mt-3">
+                <h6 class="announcement-card-title announcement-placement-title">Announcements</h6>
+                <label for="editPublicAnnouncementTitle" class="form-label fw-semibold">Title</label>
+                <input id="editPublicAnnouncementTitle" name="public_title" type="text" class="form-control announcement-secondary-title-input" placeholder="Enter announcements title">
+                <label class="form-label mt-3">Body</label>
+                <div id="editPublicAnnouncementEditor"></div>
+                <input type="hidden" id="editPublicAnnouncementContent" name="public_content_html">
+              </div>
+            </div>
           </div>
         </div>
         <div class="modal-footer border-0">
@@ -1182,11 +1256,15 @@ function announcement_ordered_channels(array $channels): array
     const CURRENT_USER_ID = <?= json_encode($currentUserId, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
     const CURRENT_USER_DISPLAY = <?= json_encode($currentUserDisplayLabel, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
     const ANNOUNCEMENT_CHANNEL_LABELS = {
-      public: "Public Announcement",
-      public_news: "Public News",
+      public: "Guest Page",
+      public_news: "News Section",
       website: "Account Page",
       sms: "SMS",
       email: "Email"
+    };
+    const ANNOUNCEMENT_PLACEMENT_LABELS = {
+      public_news: "News Section",
+      announcement: "Announcements"
     };
 
     window.ADMIN_TABLE_COLUMNS_CONFIG = {
@@ -1258,7 +1336,19 @@ function announcement_ordered_channels(array $channels): array
       if (!viewModal || !editModal) return;
       const isSuperAdminSession = <?= $isSuperAdmin ? 'true' : 'false' ?>;
       const editEditorEl = $("#editAnnouncementEditor");
+      const editPublicNewsEditorEl = $("#editPublicNewsEditor");
+      const editPublicAnnouncementEditorEl = $("#editPublicAnnouncementEditor");
+      const editPlacementPublicNews = document.getElementById("editPlacementPublicNews");
+      const editPlacementAnnouncement = document.getElementById("editPlacementAnnouncement");
+      const editSharedContentFields = document.getElementById("editSharedContentFields");
+      const editDualPlacementFields = document.getElementById("editDualPlacementFields");
+      const editPublicNewsTitleInput = document.getElementById("editPublicNewsTitle");
+      const editPublicAnnouncementTitleInput = document.getElementById("editPublicAnnouncementTitle");
+      const editPublicNewsContentInput = document.getElementById("editPublicNewsContent");
+      const editPublicAnnouncementContentInput = document.getElementById("editPublicAnnouncementContent");
       let editEditorReady = false;
+      let editPublicNewsEditorReady = false;
+      let editPublicAnnouncementEditorReady = false;
       let superAdminEditConfirmed = false;
       let deniedSaveConfirmed = false;
       let deniedResubmitConfirmed = false;
@@ -1284,10 +1374,9 @@ function announcement_ordered_channels(array $channels): array
         ["view", ["fullscreen", "codeview", "help"]]
       ];
 
-      function initEditEditor() {
-        if (editEditorReady || !editEditorEl.length) return;
-        editEditorEl.summernote({
-          placeholder: "Update announcement content...",
+      function buildEditorConfig(placeholderText) {
+        return {
+          placeholder: placeholderText,
           height: 240,
           minHeight: 200,
           dialogsInBody: true,
@@ -1301,8 +1390,8 @@ function announcement_ordered_channels(array $channels): array
             onImageUpload: async function (files) {
               for (const file of files) {
                 if (!file) continue;
-                if (file.size > 5 * 1024 * 1024) {
-                  alert("Image must be 5MB or less.");
+                if (file.size > 25 * 1024 * 1024) {
+                  alert("Image must be 25MB or less.");
                   continue;
                 }
                 try {
@@ -1317,58 +1406,43 @@ function announcement_ordered_channels(array $channels): array
                   if (!response.ok || (!payload.success && !imageUrl) || !imageUrl) {
                     throw new Error(payload.message || "Image upload failed.");
                   }
-                  editEditorEl.summernote("insertImage", imageUrl);
+                  $(this).summernote("insertImage", imageUrl);
                 } catch (err) {
                   alert(err.message || "Unable to upload image.");
                 }
               }
             }
           }
-        });
-        const toolbarGroups = editEditorEl.next(".note-editor").find(".note-toolbar .note-btn-group").length;
+        };
+      }
+
+      function initSpecificEditor(editorEl, placeholderText, onReady) {
+        if (!editorEl.length) return;
+        editorEl.summernote(buildEditorConfig(placeholderText));
+        const toolbarGroups = editorEl.next(".note-editor").find(".note-toolbar .note-btn-group").length;
         if (toolbarGroups <= 1) {
-          editEditorEl.summernote("destroy");
-          editEditorEl.summernote({
-            placeholder: "Update announcement content...",
-            height: 240,
-            minHeight: 200,
-            dialogsInBody: true,
-            fontNames: [
-              "Arial", "Arial Black", "Comic Sans MS", "Courier New", "Helvetica", "Impact",
-              "Lucida Grande", "Tahoma", "Times New Roman", "Trebuchet MS", "Verdana", "Georgia"
-            ],
-            fontSizes: ["8", "9", "10", "11", "12", "14", "16", "18", "20", "24", "28", "32", "36", "48", "64", "82", "150"],
-            toolbar: fullToolbar,
-            callbacks: {
-              onImageUpload: async function (files) {
-                for (const file of files) {
-                  if (!file) continue;
-                  if (file.size > 5 * 1024 * 1024) {
-                    alert("Image must be 5MB or less.");
-                    continue;
-                  }
-                  try {
-                    const formData = new FormData();
-                    formData.append("image", file);
-                    const response = await fetch("../../PhpFiles/Admin-End/uploadAnnouncementEditorImage.php", {
-                      method: "POST",
-                      body: formData
-                    });
-                    const payload = await response.json();
-                    const imageUrl = payload.url || payload.location || "";
-                    if (!response.ok || (!payload.success && !imageUrl) || !imageUrl) {
-                      throw new Error(payload.message || "Image upload failed.");
-                    }
-                    editEditorEl.summernote("insertImage", imageUrl);
-                  } catch (err) {
-                    alert(err.message || "Unable to upload image.");
-                  }
-                }
-              }
-            }
+          editorEl.summernote("destroy");
+          editorEl.summernote(buildEditorConfig(placeholderText));
+        }
+        onReady();
+      }
+
+      function initEditEditor() {
+        if (!editEditorReady && editEditorEl.length) {
+          initSpecificEditor(editEditorEl, "Update announcement content...", function () {
+            editEditorReady = true;
           });
         }
-        editEditorReady = true;
+        if (!editPublicNewsEditorReady && editPublicNewsEditorEl.length) {
+          initSpecificEditor(editPublicNewsEditorEl, "Update the news section content...", function () {
+            editPublicNewsEditorReady = true;
+          });
+        }
+        if (!editPublicAnnouncementEditorReady && editPublicAnnouncementEditorEl.length) {
+          initSpecificEditor(editPublicAnnouncementEditorEl, "Update the announcements content...", function () {
+            editPublicAnnouncementEditorReady = true;
+          });
+        }
       }
 
       function statusText(status, reviewResult = "", isOwner = false) {
@@ -1383,6 +1457,56 @@ function announcement_ordered_channels(array $channels): array
       function channelText(channels) {
         if (!Array.isArray(channels) || channels.length === 0) return "-";
         return channels.map((ch) => ANNOUNCEMENT_CHANNEL_LABELS[ch] || String(ch).toUpperCase()).join(", ");
+      }
+
+      function placementText(placements) {
+        if (!Array.isArray(placements) || placements.length === 0) return "-";
+        return placements.map((placement) => ANNOUNCEMENT_PLACEMENT_LABELS[placement] || String(placement)).join(", ");
+      }
+
+      function syncEditAnnouncementContent() {
+        if (editEditorReady) {
+          document.getElementById("editAnnouncementContentInput").value = editEditorEl.summernote("code");
+        }
+        if (editPublicNewsEditorReady && editPublicNewsContentInput) {
+          editPublicNewsContentInput.value = editPublicNewsEditorEl.summernote("code");
+        }
+        if (editPublicAnnouncementEditorReady && editPublicAnnouncementContentInput) {
+          editPublicAnnouncementContentInput.value = editPublicAnnouncementEditorEl.summernote("code");
+        }
+      }
+
+      function updateEditPlacementState() {
+        const dualPlacement = !!editPlacementPublicNews?.checked && !!editPlacementAnnouncement?.checked;
+        const sharedTitleInput = document.getElementById("editAnnouncementTitleInput");
+        if (sharedTitleInput && !dualPlacement) {
+          if (editPlacementPublicNews?.checked && editPublicNewsTitleInput?.value.trim()) {
+            sharedTitleInput.value = editPublicNewsTitleInput.value;
+          } else if (editPlacementAnnouncement?.checked && editPublicAnnouncementTitleInput?.value.trim()) {
+            sharedTitleInput.value = editPublicAnnouncementTitleInput.value;
+          }
+        }
+        if (editSharedContentFields) {
+          editSharedContentFields.classList.toggle("d-none", dualPlacement);
+        }
+        if (editDualPlacementFields) {
+          editDualPlacementFields.classList.toggle("d-none", !dualPlacement);
+        }
+        if (sharedTitleInput) {
+          sharedTitleInput.required = !dualPlacement;
+        }
+        if (editPublicNewsTitleInput) {
+          editPublicNewsTitleInput.required = dualPlacement;
+        }
+        if (editPublicAnnouncementTitleInput) {
+          editPublicAnnouncementTitleInput.required = dualPlacement;
+        }
+        if (!editPlacementAnnouncement?.checked) {
+          const guestCheckbox = document.getElementById("editChannelPublic");
+          const websiteCheckbox = document.getElementById("editChannelWebsite");
+          if (guestCheckbox) guestCheckbox.checked = false;
+          if (websiteCheckbox) websiteCheckbox.checked = false;
+        }
       }
 
       function applyStatusHighlight(el, status, reviewResult = "", isOwner = false) {
@@ -1530,12 +1654,30 @@ function announcement_ordered_channels(array $channels): array
         if (viewRefEl) viewRefEl.textContent = "#" + (data.id || "-");
         document.getElementById("viewAnnouncementTitle").textContent = data.title || "-";
         document.getElementById("viewAnnouncementAudience").textContent = data.audience || "-";
-        document.getElementById("viewAnnouncementChannels").textContent = channelText(data.channels);
+        document.getElementById("viewAnnouncementPlacements").textContent = placementText(data.placements || []);
+        document.getElementById("viewAnnouncementChannels").textContent = channelText((data.channels || []).filter((channel) => channel !== "public_news"));
         document.getElementById("viewAnnouncementPublishDate").textContent = data.publish_date || "-";
         document.getElementById("viewAnnouncementCreatedBy").textContent = data.created_by || "-";
-        document.getElementById("viewAnnouncementContent").innerHTML = data.content_html && String(data.content_html).trim() !== ""
-          ? data.content_html
-          : '<span class="text-muted">No content.</span>';
+        const hasNewsPlacement = Array.isArray(data.placements) && data.placements.includes("public_news");
+        const hasAnnouncementPlacement = Array.isArray(data.placements) && data.placements.includes("announcement");
+        const isDualPlacement = hasNewsPlacement && hasAnnouncementPlacement;
+        const contentSurface = document.getElementById("viewAnnouncementContent");
+        const dualContentSurface = document.getElementById("viewAnnouncementDualContent");
+        const newsContentSurface = document.getElementById("viewAnnouncementNewsContent");
+        const publicContentSurface = document.getElementById("viewAnnouncementPublicContent");
+        if (contentSurface && dualContentSurface && newsContentSurface && publicContentSurface) {
+          contentSurface.classList.toggle("d-none", isDualPlacement);
+          dualContentSurface.classList.toggle("d-none", !isDualPlacement);
+          contentSurface.innerHTML = data.content_html && String(data.content_html).trim() !== ""
+            ? data.content_html
+            : '<span class="text-muted">No content.</span>';
+          newsContentSurface.innerHTML = data.public_news_content_html && String(data.public_news_content_html).trim() !== ""
+            ? data.public_news_content_html
+            : '<span class="text-muted">No news section content.</span>';
+          publicContentSurface.innerHTML = data.public_content_html && String(data.public_content_html).trim() !== ""
+            ? data.public_content_html
+            : '<span class="text-muted">No announcements content.</span>';
+        }
 
         const ownerId = String(data.created_by_user_id || "");
         const createdByLabel = String(data.created_by || "");
@@ -1581,24 +1723,35 @@ function announcement_ordered_channels(array $channels): array
         if (!data) return;
 
         document.getElementById("editAnnouncementIdInput").value = data.id || "";
-        document.getElementById("editAnnouncementTitleInput").value = data.title || "";
         document.getElementById("editAnnouncementAudienceInput").value = data.audience || "";
         document.getElementById("editAnnouncementPublishDateInput").value = data.publish_date && data.publish_date !== "-" ? data.publish_date : "";
         if (editEditorReady) {
           editEditorEl.summernote("code", data.content_html || "");
         }
+        if (editPublicNewsEditorReady) {
+          editPublicNewsEditorEl.summernote("code", data.public_news_content_html || "");
+        }
+        if (editPublicAnnouncementEditorReady) {
+          editPublicAnnouncementEditorEl.summernote("code", data.public_content_html || "");
+        }
+        document.getElementById("editAnnouncementTitleInput").value = data.title || "";
+        if (editPublicNewsTitleInput) editPublicNewsTitleInput.value = data.public_news_title || "";
+        if (editPublicAnnouncementTitleInput) editPublicAnnouncementTitleInput.value = data.public_title || "";
 
         const statusInput = document.getElementById("editAnnouncementStatusInput");
+        const statusDisplay = document.getElementById("editAnnouncementStatusDisplay");
         const statusVal = String(data.status || "draft").toLowerCase();
         statusInput.value = statusVal;
         if (statusInput.value !== statusVal) {
           statusInput.value = <?= $isSuperAdmin ? '"draft"' : '"pending"' ?>;
         }
-        applyStatusHighlight(statusInput, statusInput.value);
 
         const channels = Array.isArray(data.channels) ? data.channels : [];
+        const placements = Array.isArray(data.placements) ? data.placements : [];
+        if (editPlacementPublicNews) editPlacementPublicNews.checked = placements.includes("public_news");
+        if (editPlacementAnnouncement) editPlacementAnnouncement.checked = placements.includes("announcement");
+        updateEditPlacementState();
         document.getElementById("editChannelPublic").checked = channels.includes("public");
-        document.getElementById("editChannelPublicNews").checked = channels.includes("public_news");
         document.getElementById("editChannelWebsite").checked = channels.includes("website");
         document.getElementById("editChannelSms").checked = channels.includes("sms");
         document.getElementById("editChannelEmail").checked = channels.includes("email");
@@ -1608,6 +1761,11 @@ function announcement_ordered_channels(array $channels): array
         const isOwner = ownerId === String(CURRENT_USER_ID || "")
           || (ownerId === "" && createdByLabel !== "" && createdByLabel === String(CURRENT_USER_DISPLAY || ""));
         const reviewResult = String(data.review_result || "").toLowerCase();
+        if (statusDisplay) {
+          statusDisplay.textContent = statusText(statusInput.value, reviewResult, isOwner);
+          applyStatusHighlight(statusDisplay, statusInput.value, reviewResult, isOwner);
+        }
+        applyStatusHighlight(statusInput, statusInput.value);
         const canUseDeniedFlow = statusVal === "draft" && reviewResult === "denied" && (isOwner || isSuperAdminSession);
         const canUseApprovedReviewFlow = !isSuperAdminSession && isOwner && statusVal === "approved";
         const canUsePendingReviewFlow = !isSuperAdminSession && isOwner && statusVal === "pending";
@@ -1642,9 +1800,7 @@ function announcement_ordered_channels(array $channels): array
 
       if (editForm) {
         editForm.addEventListener("submit", function (event) {
-          if (editEditorReady) {
-            document.getElementById("editAnnouncementContentInput").value = editEditorEl.summernote("code");
-          }
+          syncEditAnnouncementContent();
           const statusInput = document.getElementById("editAnnouncementStatusInput");
           if (statusInput) {
             if (editSubmitMode === "submit_review") {
@@ -1708,6 +1864,11 @@ function announcement_ordered_channels(array $channels): array
           }
         });
       }
+
+      [editPlacementPublicNews, editPlacementAnnouncement].forEach((checkbox) => {
+        if (!checkbox) return;
+        checkbox.addEventListener("change", updateEditPlacementState);
+      });
 
       if (confirmApprovedSaveBtn && editForm) {
         confirmApprovedSaveBtn.addEventListener("click", function () {
@@ -1884,7 +2045,7 @@ function announcement_ordered_channels(array $channels): array
       }
 
       const editStatusInputEl = document.getElementById("editAnnouncementStatusInput");
-      if (editStatusInputEl) {
+      if (editStatusInputEl && editStatusInputEl.tagName === "SELECT") {
         editStatusInputEl.addEventListener("change", function () {
           applyStatusHighlight(editStatusInputEl, editStatusInputEl.value);
         });
