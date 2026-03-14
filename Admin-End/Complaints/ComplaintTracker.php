@@ -260,11 +260,12 @@ require_once __DIR__ . "/../includes/admin_guard.php";
         modalId: "modalTableColumns",
         listId: "tableColumnsList",
         resetBtnId: "btnTableColumnsReset",
-        storageKey: "admin_cols_complaint_tracker_v1",
-        defaultHiddenIdxs: []
+        storageKey: "admin_cols_complaint_tracker_v2",
+        defaultHiddenIdxs: [3]
     };
 </script>
 <script src="../../JS-Script-Files/Admin-End/tableColumnsGeneric.js?v=20260215-1"></script>
 <script src="../../JS-Script-Files/Admin-End/complaintTracker.js?v=20260311-1"></script>
 </body>
 </html>
+

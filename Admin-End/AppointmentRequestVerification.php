@@ -403,7 +403,7 @@ foreach ($appointmentRows as $r) {
               <div class="form-control bg-light" id="viewContactNumber">-</div>
             </div>
             <div class="col-12">
-              <label class="small text-muted">Complete Address</label>
+                                        <label class="small text-muted">Address</label>
               <div class="form-control bg-light" id="viewAddress">-</div>
             </div>
             <div class="col-12 col-md-6">

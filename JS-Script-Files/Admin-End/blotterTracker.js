@@ -210,9 +210,9 @@
     ];
 
     if (hasStructuredAddress) {
-      fields.push({ label: 'Complete Address', value: formatCompleteAddress(address, participant?.address || '-') });
+fields.push({ label: 'Address', value: formatCompleteAddress(address, participant?.address || '-') });
     } else {
-      fields.push({ label: 'Complete Address', value: participant?.address || '-' });
+fields.push({ label: 'Address', value: participant?.address || '-' });
     }
 
     return renderFieldGrid(fields, 2);

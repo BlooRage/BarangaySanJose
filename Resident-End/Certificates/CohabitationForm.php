@@ -203,7 +203,7 @@ $purposeInputClass = $isRelationshipJailVisitVariant ? 'form-control text-bg-lig
 
                         <div class="form-row">
                             <div class="full-width">
-                                <label class="top-label">Complete Address <span class="required-asterisk">*</span></label>
+                            <label class="top-label">Address <span class="required-asterisk">*</span></label>
                                 <input type="text" class="form-control" name="full_address_display" readonly value="<?php echo $fullAddress; ?>">
                                 <input type="hidden" name="full_unit_number" value="<?php echo $applicantUnit; ?>">
                                 <input type="hidden" name="full_house_lot_number" value="<?php echo $applicantHouseOrLot; ?>">

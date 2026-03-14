@@ -107,7 +107,7 @@
 
   if (resetBtn) {
     resetBtn.addEventListener("click", () => {
-      saveHiddenIdx([]);
+      saveHiddenIdx(Array.isArray(cfg.defaultHiddenIdxs) ? cfg.defaultHiddenIdxs : []);
       applyFromStorage();
       renderModal();
     });
@@ -115,3 +115,4 @@
 
   applyFromStorage();
 })();
+

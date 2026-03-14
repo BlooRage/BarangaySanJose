@@ -13,60 +13,58 @@ if (!isset($baseUrl)) {
         $baseUrl = '';
     }
 }
-?>
-﻿<?php
+
 $allowUnregistered = false;
 require_once __DIR__ . "/../includes/resident_access_guard.php";
+require_once __DIR__ . "/../../PhpFiles/GET/getResidentProfile.php";
 
-$residentinformationtbl = [
-    "firstname" => "Juan",
-    "middlename" => "",
-    "lastname" => "Dela Cruz",
-    "suffix" => "",
-    "sex" => "Male",
-    "birthdate" => "January 1, 1999",
-    "age" => 27,
-    "civil_status" => "Single",
-    "head_of_family" => "No",
-    "voter_status" => "Registered Voter",
-    "occupation" => "Barista",
-    "employment_status" => "Employed",
-    "occupation_detail" => "",
-    "religion" => "Roman Catholic",
-    "sector_membership" => "Student, PWD",
-    "emergency_name" => "Maria Dela Cruz",
-    "emergency_contact" => "09123456789",
-    "profile_pic" => "profile_pic_juan.png",
+$userId = (string)($_SESSION['user_id'] ?? '');
+$data = getResidentProfileData($conn, $userId);
+$residentinformationtbl = $data['residentinformationtbl'] ?? [];
+$residentaddresstbl = $data['residentaddresstbl'] ?? [];
+$useraccountstbl = $data['useraccountstbl'] ?? [];
+
+$lastName = htmlspecialchars((string)($residentinformationtbl['lastname'] ?? ''), ENT_QUOTES, 'UTF-8');
+$firstName = htmlspecialchars((string)($residentinformationtbl['firstname'] ?? ''), ENT_QUOTES, 'UTF-8');
+$middleName = htmlspecialchars((string)($residentinformationtbl['middlename'] ?? ''), ENT_QUOTES, 'UTF-8');
+$suffix = (string)($residentinformationtbl['suffix'] ?? '');
+$contactNumber = htmlspecialchars((string)($useraccountstbl['phone_number'] ?? ''), ENT_QUOTES, 'UTF-8');
+
+$unitNumber = trim((string)($residentaddresstbl['unit_number'] ?? ''));
+$houseNumber = trim((string)($residentaddresstbl['street_number'] ?? ''));
+$streetName = trim((string)($residentaddresstbl['street_name'] ?? ''));
+$phaseNumber = trim((string)($residentaddresstbl['phase_number'] ?? ''));
+$subdivision = trim((string)($residentaddresstbl['subdivision'] ?? ''));
+
+$normalizedStreetName = $streetName;
+if ($normalizedStreetName !== '' && !preg_match('/\b(street|st\.?)$/i', $normalizedStreetName)) {
+    $normalizedStreetName .= ' Street';
+}
+
+$fullAddress = implode(', ', array_filter([
+    $unitNumber !== '' ? 'Unit ' . $unitNumber : '',
+    trim($houseNumber . ' ' . $normalizedStreetName),
+    $phaseNumber !== '' ? 'Phase ' . $phaseNumber : '',
+    $subdivision !== '' ? $subdivision . ' Subdivision' : '',
+    'San Jose',
+    'Rodriguez',
+    'Rizal',
+], static fn($part) => trim((string)$part) !== ''));
+
+$formValues = [
+    'subject' => '',
+    'subject_other' => '',
+    'appointment_date' => '',
+    'appointment_time' => '',
+    'purpose' => '',
 ];
-
-$residentaddresstbl = [
-    "address_id" => 1,
-    "resident_id" => 101,
-    "street_number" => "14A",
-    "street_name" => "Chico St",
-    "subdivision" => "",
-    "area_number" => "Area 01",
-    "unit_number" => "Unit 5B",
-    "barangay" => "San Jose",
-];
-
-$useraccountstbl = [
-    "type" => "Resident",
-    "created" => "March 12, 2024",
-    "last_password_change" => "August 3, 2025",
-    "email" => "juan.delacruz@email.com",
-    "phone_number" => "09123456789",
-];
-
-$addressParts = array_filter([
-    $residentaddresstbl["unit_number"] ? "Unit " . $residentaddresstbl["unit_number"] : "",
-    $residentaddresstbl["street_number"],
-    $residentaddresstbl["street_name"],
-    $residentaddresstbl["subdivision"],
-    $residentaddresstbl["area_number"],
-    $residentaddresstbl["barangay"],
-]);
-$fullAddress = implode(", ", $addressParts);
+$feedbackType = !empty($_GET['success']) ? 'success' : (!empty($_GET['error']) ? 'error' : '');
+$feedbackMessage = !empty($_GET['success'])
+    ? (string)$_GET['success']
+    : (!empty($_GET['error']) ? (string)$_GET['error'] : '');
+$currentMonthStartDate = date('Y-m-01');
+$minAppointmentDate = date('Y-m-d', strtotime('+1 day'));
+$maxAppointmentDate = date('Y-m-t');
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -94,74 +92,92 @@ $fullAddress = implode(", ", $addressParts);
                     <h1 class="form-title" style="color: #de710c">Appointment Form</h1>
                     <p class="form-subtitle">All fields marked with <span class="required-asterisk">*</span> are required</p>
 
-                    <form method="POST" action="">
+                    <form method="POST" action="<?= htmlspecialchars(appUrl('/PhpFiles/Resident-End/submitAppointment.php'), ENT_QUOTES, 'UTF-8') ?>">
+                        <?= csrfTokenField() ?>
+                        <input type="hidden" name="action" value="submit_appointment">
+                        <?php if ($feedbackMessage !== '' && $feedbackType !== 'success'): ?>
+                            <div class="alert alert-<?php echo $feedbackType === 'success' ? 'success' : 'danger'; ?>" role="alert">
+                                <?php echo htmlspecialchars($feedbackMessage, ENT_QUOTES, 'UTF-8'); ?>
+                            </div>
+                        <?php endif; ?>
                         <h2 class="section-title text-center text-dark">Information</h2>
 
                         <div class="form-row pt-0">
                             <div>
                                 <label class="top-label">Last Name <span class="required-asterisk">*</span></label>
-                                <input type="text" name="last_name" value="<?php echo htmlspecialchars($residentinformationtbl["lastname"]); ?>" readonly>
+                                <input type="text" name="last_name" value="<?php echo $lastName; ?>" readonly>
                             </div>
                             <div>
                                 <label class="top-label">First Name <span class="required-asterisk">*</span></label>
-                                <input type="text" name="first_name" value="<?php echo htmlspecialchars($residentinformationtbl["firstname"]); ?>" readonly>
+                                <input type="text" name="first_name" value="<?php echo $firstName; ?>" readonly>
                             </div>
                             <div>
                                 <label class="top-label">Middle Name</label>
-                                <input type="text" name="middle_name" value="<?php echo htmlspecialchars($residentinformationtbl["middlename"]); ?>" readonly>
+                                <input type="text" name="middle_name" value="<?php echo $middleName; ?>" readonly>
                             </div>
                             <div>
                                 <label class="top-label">Suffix</label>
-                                <select name="suffix_name" class="text-bg-light" readonly value="<?php echo htmlspecialchars($residentinformationtbl["suffix"]); ?>" disabled>
-                                    <option value="" <?php echo ($residentinformationtbl["suffix"] === "") ? "selected" : ""; ?>>None</option>
-                                    <option value="Jr." <?php echo ($residentinformationtbl["suffix"] === "Jr.") ? "selected" : ""; ?>>Jr.</option>
-                                    <option value="Sr." <?php echo ($residentinformationtbl["suffix"] === "Sr.") ? "selected" : ""; ?>>Sr.</option>
-                                    <option value="III" <?php echo ($residentinformationtbl["suffix"] === "III") ? "selected" : ""; ?>>III</option>
-                                    <option value="IV" <?php echo ($residentinformationtbl["suffix"] === "IV") ? "selected" : ""; ?>>IV</option>
+                                <select name="suffix_name" class="text-bg-light" readonly value="<?php echo htmlspecialchars($suffix, ENT_QUOTES, 'UTF-8'); ?>" disabled>
+                                    <option value="" <?php echo ($suffix === "") ? "selected" : ""; ?>>None</option>
+                                    <option value="Jr." <?php echo ($suffix === "Jr.") ? "selected" : ""; ?>>Jr.</option>
+                                    <option value="Sr." <?php echo ($suffix === "Sr.") ? "selected" : ""; ?>>Sr.</option>
+                                    <option value="III" <?php echo ($suffix === "III") ? "selected" : ""; ?>>III</option>
+                                    <option value="IV" <?php echo ($suffix === "IV") ? "selected" : ""; ?>>IV</option>
                                 </select>
-                                <input type="hidden" name="suffix_name" value="<?php echo htmlspecialchars($residentinformationtbl["suffix"]); ?>">
+                                <input type="hidden" name="suffix_name" value="<?php echo htmlspecialchars($suffix, ENT_QUOTES, 'UTF-8'); ?>">
                             </div>
                         </div>
 
                         <div class="form-row">
                             <div class="full-width">
                                 <label class="top-label">Contact Number <span class="required-asterisk">*</span></label>
-                                <input type="text" name="contact_number" value="<?php echo htmlspecialchars($useraccountstbl["phone_number"]); ?>" readonly>
+                                <input type="text" name="contact_number" value="<?php echo $contactNumber; ?>" readonly>
                             </div>
                         </div>
 
                         <div class="form-row">
                             <div class="full-width">
-                                <label class="top-label">Complete Address <span class="required-asterisk">*</span></label>
-                                <input type="text" name="full_address_display" readonly value="<?php echo htmlspecialchars($fullAddress); ?>">
-                                <input type="hidden" name="unitNumber" value="<?php echo htmlspecialchars($residentaddresstbl["unit_number"]); ?>">
-                                <input type="hidden" name="houseNumber" value="<?php echo htmlspecialchars($residentaddresstbl["street_number"]); ?>">
-                                <input type="hidden" name="streetName" value="<?php echo htmlspecialchars($residentaddresstbl["street_name"]); ?>">
+                            <label class="top-label">Address <span class="required-asterisk">*</span></label>
+                                <input type="text" name="full_address_display" readonly value="<?php echo htmlspecialchars($fullAddress, ENT_QUOTES, 'UTF-8'); ?>">
+                                <input type="hidden" name="unitNumber" value="<?php echo htmlspecialchars($unitNumber, ENT_QUOTES, 'UTF-8'); ?>">
+                                <input type="hidden" name="houseNumber" value="<?php echo htmlspecialchars($houseNumber, ENT_QUOTES, 'UTF-8'); ?>">
+                                <input type="hidden" name="streetName" value="<?php echo htmlspecialchars($streetName, ENT_QUOTES, 'UTF-8'); ?>">
                             </div>
                         </div>
 
-                        <div class="form-row">
-                            <div class="full-width">
+                        <div class="form-row two-col-row">
+                            <div>
                                 <label class="top-label">Subject of Appointment <span class="required-asterisk">*</span></label>
-                                <select name="subject" required>
+                                <select name="subject" id="appointmentSubject" required>
                                     <option value="">Select</option>
-                                    <option value="document_claiming">Document Claiming</option>
-                                    <option value="follow_up">Follow-up Concern</option>
-                                    <option value="consultation">Consultation</option>
-                                    <option value="other">Other</option>
+                                    <option value="follow_up" <?php echo $formValues['subject'] === 'follow_up' ? 'selected' : ''; ?>>Follow-up Concern</option>
+                                    <option value="consultation" <?php echo $formValues['subject'] === 'consultation' ? 'selected' : ''; ?>>Consultation</option>
+                                    <option value="event_coordination" <?php echo $formValues['subject'] === 'event_coordination' ? 'selected' : ''; ?>>Event Coordination</option>
+                                    <option value="other" <?php echo $formValues['subject'] === 'other' ? 'selected' : ''; ?>>Other</option>
                                 </select>
+                            </div>
+                            <div>
+                                <label class="top-label">If Other, please specify</label>
+                                <input
+                                    type="text"
+                                    name="subject_other"
+                                    id="appointmentSubjectOther"
+                                    value="<?php echo htmlspecialchars($formValues['subject_other'], ENT_QUOTES, 'UTF-8'); ?>"
+                                    maxlength="150"
+                                >
+                                <div id="appointmentSubjectOtherError" class="text-danger small mt-1 d-none" aria-live="polite"></div>
                             </div>
                         </div>
 
                         <div class="form-row two-col-row">
                             <div>
                                 <label class="top-label">Date of Appointment <span class="required-asterisk">*</span></label>
-                                <input type="date" id="appointmentDate" name="appointment_date" required>
+                                <input type="date" id="appointmentDate" name="appointment_date" min="<?php echo htmlspecialchars($minAppointmentDate, ENT_QUOTES, 'UTF-8'); ?>" max="<?php echo htmlspecialchars($maxAppointmentDate, ENT_QUOTES, 'UTF-8'); ?>" data-month-start="<?php echo htmlspecialchars($currentMonthStartDate, ENT_QUOTES, 'UTF-8'); ?>" data-month-end="<?php echo htmlspecialchars($maxAppointmentDate, ENT_QUOTES, 'UTF-8'); ?>" value="<?php echo htmlspecialchars($formValues['appointment_date'], ENT_QUOTES, 'UTF-8'); ?>" required>
                                 <div id="appointmentDateError" class="text-danger small mt-1 d-none" aria-live="polite"></div>
                             </div>
                             <div>
                                 <label class="top-label">Time of Appointment <span class="required-asterisk">*</span></label>
-                                <input type="time" id="appointmentTime" name="appointment_time" required>
+                                <input type="time" id="appointmentTime" name="appointment_time" value="<?php echo htmlspecialchars($formValues['appointment_time'], ENT_QUOTES, 'UTF-8'); ?>" required>
                                 <div id="appointmentTimeError" class="text-danger small mt-1 d-none" aria-live="polite"></div>
                             </div>
                         </div>
@@ -169,7 +185,7 @@ $fullAddress = implode(", ", $addressParts);
                         <div class="form-row">
                             <div class="full-width">
                                 <label class="top-label">Purpose <span class="required-asterisk">*</span></label>
-                                <input type="text" name="purpose" required>
+                                <input type="text" name="purpose" value="<?php echo htmlspecialchars($formValues['purpose'], ENT_QUOTES, 'UTF-8'); ?>" required>
                             </div>
                         </div>
 
@@ -186,6 +202,30 @@ $fullAddress = implode(", ", $addressParts);
         </main>
     </div>
 
+    <div
+        id="appointmentFeedbackData"
+        data-feedback-type="<?= htmlspecialchars($feedbackType, ENT_QUOTES, 'UTF-8') ?>"
+        data-feedback-message="<?= htmlspecialchars($feedbackMessage, ENT_QUOTES, 'UTF-8') ?>"
+        hidden
+    ></div>
+
+    <div class="modal fade" id="appointmentSuccessModal" tabindex="-1" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Appointment Submitted</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <p class="mb-0" id="appointmentSuccessMessage">Your appointment request has been submitted successfully.</p>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-success" data-bs-dismiss="modal">OK</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script src="../../JS-Script-Files/Resident-End/dateFieldModal.js"></script>
     <script>
@@ -196,6 +236,12 @@ $fullAddress = implode(", ", $addressParts);
             const appointmentDateError = document.getElementById("appointmentDateError");
             const appointmentTimeInput = document.getElementById("appointmentTime");
             const appointmentTimeError = document.getElementById("appointmentTimeError");
+            const appointmentSubjectInput = document.getElementById("appointmentSubject");
+            const appointmentSubjectOtherInput = document.getElementById("appointmentSubjectOther");
+            const appointmentSubjectOtherError = document.getElementById("appointmentSubjectOtherError");
+            const appointmentFeedbackData = document.getElementById("appointmentFeedbackData");
+            const appointmentSuccessModalEl = document.getElementById("appointmentSuccessModal");
+            const appointmentSuccessMessage = document.getElementById("appointmentSuccessMessage");
             if (!form || !submitBtn) return;
 
             const today = new Date();
@@ -205,15 +251,34 @@ $fullAddress = implode(", ", $addressParts);
                 month: "long",
                 day: "numeric",
             });
+            const currentYear = today.getFullYear();
+            const currentMonth = today.getMonth();
+            const currentMonthStartIso = appointmentDateInput?.dataset.monthStart || `${todayIso.slice(0, 7)}-01`;
+            const endOfMonthIso = appointmentDateInput?.dataset.monthEnd || new Date(currentYear, currentMonth + 1, 0).toISOString().split("T")[0];
+            const currentMonthDisplay = today.toLocaleDateString(undefined, {
+                year: "numeric",
+                month: "long",
+            });
 
             const validateAppointmentDate = () => {
                 if (!appointmentDateInput) return true;
 
                 const value = String(appointmentDateInput.value || "").trim();
                 const isTodayOrPast = value !== "" && value <= todayIso;
+                const isOutsideCurrentMonth = value !== "" && (value < currentMonthStartIso || value > endOfMonthIso);
 
                 if (isTodayOrPast) {
                     const msg = `Incorrect Input. Date must be after ${todayDisplay}`;
+                    appointmentDateInput.setCustomValidity(msg);
+                    if (appointmentDateError) {
+                        appointmentDateError.textContent = msg;
+                        appointmentDateError.classList.remove("d-none");
+                    }
+                    return false;
+                }
+
+                if (isOutsideCurrentMonth) {
+                    const msg = `Incorrect Input. Date must be within ${currentMonthDisplay}`;
                     appointmentDateInput.setCustomValidity(msg);
                     if (appointmentDateError) {
                         appointmentDateError.textContent = msg;
@@ -228,6 +293,17 @@ $fullAddress = implode(", ", $addressParts);
                     appointmentDateError.classList.add("d-none");
                 }
                 return true;
+            };
+
+            const enforceCurrentMonthDate = () => {
+                if (!appointmentDateInput) return;
+
+                const value = String(appointmentDateInput.value || "").trim();
+                if (value === "") return;
+
+                if (value < currentMonthStartIso || value > endOfMonthIso) {
+                    appointmentDateInput.value = "";
+                }
             };
 
             const validateAppointmentTime = () => {
@@ -257,7 +333,35 @@ $fullAddress = implode(", ", $addressParts);
                 return true;
             };
 
+            const validateSubjectOther = () => {
+                if (!appointmentSubjectInput || !appointmentSubjectOtherInput) return true;
+
+                const isOther = appointmentSubjectInput.value === "other";
+                const value = String(appointmentSubjectOtherInput.value || "").trim();
+
+                appointmentSubjectOtherInput.disabled = !isOther;
+                appointmentSubjectOtherInput.required = isOther;
+
+                if (isOther && value === "") {
+                    const msg = "Please specify the subject when Other is selected";
+                    appointmentSubjectOtherInput.setCustomValidity(msg);
+                    if (appointmentSubjectOtherError) {
+                        appointmentSubjectOtherError.textContent = msg;
+                        appointmentSubjectOtherError.classList.remove("d-none");
+                    }
+                    return false;
+                }
+
+                appointmentSubjectOtherInput.setCustomValidity("");
+                if (appointmentSubjectOtherError) {
+                    appointmentSubjectOtherError.textContent = "";
+                    appointmentSubjectOtherError.classList.add("d-none");
+                }
+                return true;
+            };
+
             const updateState = () => {
+                validateSubjectOther();
                 validateAppointmentDate();
                 validateAppointmentTime();
                 submitBtn.disabled = !form.checkValidity();
@@ -266,7 +370,10 @@ $fullAddress = implode(", ", $addressParts);
             form.addEventListener("input", updateState);
             form.addEventListener("change", updateState);
             appointmentDateInput?.addEventListener("input", updateState);
-            appointmentDateInput?.addEventListener("change", updateState);
+            appointmentDateInput?.addEventListener("change", () => {
+                enforceCurrentMonthDate();
+                updateState();
+            });
             appointmentDateInput?.addEventListener("keyup", validateAppointmentDate);
             appointmentDateInput?.addEventListener("blur", validateAppointmentDate);
             appointmentDateInput?.addEventListener("invalid", validateAppointmentDate);
@@ -275,18 +382,39 @@ $fullAddress = implode(", ", $addressParts);
             appointmentTimeInput?.addEventListener("keyup", validateAppointmentTime);
             appointmentTimeInput?.addEventListener("blur", validateAppointmentTime);
             appointmentTimeInput?.addEventListener("invalid", validateAppointmentTime);
+            appointmentSubjectInput?.addEventListener("input", updateState);
+            appointmentSubjectInput?.addEventListener("change", updateState);
+            appointmentSubjectOtherInput?.addEventListener("input", updateState);
+            appointmentSubjectOtherInput?.addEventListener("change", updateState);
+            appointmentSubjectOtherInput?.addEventListener("blur", validateSubjectOther);
+            appointmentSubjectOtherInput?.addEventListener("invalid", validateSubjectOther);
             form.addEventListener("submit", (e) => {
+                const okSubjectOther = validateSubjectOther();
                 const okDate = validateAppointmentDate();
                 const okTime = validateAppointmentTime();
-                if (!okDate || !okTime) {
+                if (!okSubjectOther || !okDate || !okTime) {
                     e.preventDefault();
-                    if (!okDate) appointmentDateInput?.focus();
+                    if (!okSubjectOther) appointmentSubjectOtherInput?.focus();
+                    else if (!okDate) appointmentDateInput?.focus();
                     else appointmentTimeInput?.focus();
                 }
             });
+
+            const feedbackType = String(appointmentFeedbackData?.dataset.feedbackType || "").trim();
+            const feedbackMessage = String(appointmentFeedbackData?.dataset.feedbackMessage || "").trim();
+            if (feedbackType === "success" && feedbackMessage !== "" && appointmentSuccessModalEl && window.bootstrap) {
+                if (appointmentSuccessMessage) {
+                    appointmentSuccessMessage.textContent = feedbackMessage;
+                }
+                const successModal = bootstrap.Modal.getOrCreateInstance(appointmentSuccessModalEl, {
+                    backdrop: "static",
+                    keyboard: false,
+                });
+                successModal.show();
+            }
+
             updateState();
         });
     </script>
 </body>
 </html>
-

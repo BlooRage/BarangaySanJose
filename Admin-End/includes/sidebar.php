@@ -3,6 +3,7 @@ $current = basename($_SERVER['PHP_SELF']);
 
 // Group pages by section
 $residentMgmtPages = ['ResidentMasterlist.php', 'ResidentArchive.php', 'EditRequests.php', 'SectorMembershipVerification.php', 'HouseholdProfiling.php'];
+$appointmentPages = ['AppointmentTracker.php'];
 $certPages = ['CertificateTracker.php'];
 $financePages = ['FinancePayments.php'];
 $blotterPages = ['BlotterForm.php', 'BlotterTracker.php'];
@@ -37,6 +38,7 @@ if (!function_exists('appUrl')) {
 }
 
 $isResidentMgmtActive = in_array($current, $residentMgmtPages);
+$isAppointmentActive = in_array($current, $appointmentPages);
 $isCertActive = in_array($current, $certPages);
 $isFinanceActive = in_array($current, $financePages);
 $isBlotterActive = in_array($current, $blotterPages);
@@ -269,6 +271,25 @@ if (!empty($_SESSION['user_id']) && isset($conn) && $conn instanceof mysqli) {
               </a>
             </li>
           </ul>
+      </li>
+      <li class="mb-1">
+        <button class="btn btn-toggle d-flex align-items-center gap-2 rounded <?= $isAppointmentActive ? '' : 'collapsed' ?>"
+                data-bs-toggle="collapse"
+                data-bs-target="#appointment-collapse"
+                aria-expanded="<?= $isAppointmentActive ? 'true' : 'false' ?>">
+          <i class="fas fa-calendar-check"></i> Appointments
+        </button>
+
+        <div class="collapse <?= $isAppointmentActive ? 'show' : '' ?>" id="appointment-collapse">
+          <ul class="btn-toggle-nav list-unstyled fw-normal pb-1 small">
+            <li>
+              <a href="<?= htmlspecialchars(appUrl('Admin-End/Appointments/AppointmentTracker.php')) ?>"
+                 class="link-dark rounded <?= $current == 'AppointmentTracker.php' ? 'active' : '' ?>">
+                Tracker
+              </a>
+            </li>
+          </ul>
+        </div>
       </li>
 
       <!-- CERTIFICATE ISSUANCE (Resident Management) -->

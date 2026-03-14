@@ -272,6 +272,10 @@ if ($residentId !== '' && isset($conn) && $conn instanceof mysqli) {
            class="a-sidebarLink <?= (in_array($current, ['AnnouncementsLandingPage.php'], true) ? 'active' : '') ?>">
           <i class="fa-solid fa-bullhorn"></i>Announcements
         </a>
+        <a href="<?= htmlspecialchars($baseUrl, ENT_QUOTES, 'UTF-8') ?>/Resident-End/resident_activity.php"
+           class="a-sidebarLink <?= activeLink('resident_activity.php', $current) ?>">
+          <i class="fa-solid fa-list-check"></i>Activity
+        </a>
         <a href="<?= htmlspecialchars($baseUrl, ENT_QUOTES, 'UTF-8') ?>/Resident-End/resident_transactions.php"
            class="a-sidebarLink <?= activeLink('resident_transactions.php', $current) ?>">
           <i class="fa-solid fa-clock-rotate-left"></i>Transactions

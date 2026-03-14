@@ -99,6 +99,19 @@ function participantDisplayName(array $row, string $prefix = ''): string
     ])));
 }
 
+function formatDisplayTimestamp(?string $value): string
+{
+    $value = trim((string)$value);
+    if ($value === '') {
+        return '';
+    }
+    try {
+        $date = new DateTime($value);
+        return $date->format('M d, Y h:iA');
+    } catch (Throwable $e) {
+        return $value;
+    }
+}
 if (!tableExists($conn, 'complaintstbl')) {
     respond(false, [], 'Missing table complaintstbl. Run the complaint migration first.');
 }
@@ -116,8 +129,7 @@ if ($action === 'list') {
         SELECT
             c.case_id,
             ct.complaint_id,
-            DATE_FORMAT(c.report_timestamp, '%Y-%m-%d %h:%i %p') AS submitted_at,
-            DATE_FORMAT(c.report_timestamp, '%Y-%m-%d') AS submitted_date,
+            c.report_timestamp AS submitted_at_raw,
             c.complaint_type,
             s.status_name,
             l.status_name AS level_name,
@@ -173,8 +185,7 @@ if ($action === 'list') {
         $items[] = [
             'case_id' => (string)$row['case_id'],
             'complaint_id' => $row['complaint_id'] ?? '',
-            'submitted_at' => $row['submitted_at'] ?? '',
-            'submitted_date' => $row['submitted_date'] ?? '',
+            'submitted_at' => formatDisplayTimestamp($row['submitted_at_raw'] ?? ''),
             'complaint_type' => $row['complaint_type'] ?? '',
             'status_name' => $statusName !== '' ? $statusName : 'Pending',
             'status_key' => $statusKey,
@@ -201,7 +212,7 @@ if ($action === 'detail') {
         SELECT
             c.case_id,
             ct.complaint_id,
-            DATE_FORMAT(c.report_timestamp, '%Y-%m-%d %h:%i %p') AS submitted_at,
+            c.report_timestamp AS submitted_at_raw,
             c.incident_date,
             c.incident_time,
             c.incident_place,
@@ -242,6 +253,8 @@ if ($action === 'detail') {
     if (!$detail) {
         respond(false, [], 'Complaint record not found.');
     }
+
+    $detail['submitted_at'] = formatDisplayTimestamp($detail['submitted_at_raw'] ?? '');
 
     $stmt = $conn->prepare("
         SELECT participant_role, firstname, middlename, lastname, suffix, contact_number, address, age, sex, remarks
@@ -522,3 +535,5 @@ if ($action === 'update_case_outcome') {
 }
 
 respond(false, [], 'Unsupported action.');
+
+

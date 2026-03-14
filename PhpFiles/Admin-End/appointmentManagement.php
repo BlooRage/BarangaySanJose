@@ -1,0 +1,297 @@
+<?php
+require_once __DIR__ . "/../General/security.php";
+require_once __DIR__ . "/../General/connection.php";
+
+requireRoleSession(['SuperAdmin', 'Official', 'Officials', 'Personnel', 'Personnels', 'Admin', 'Employee'], false);
+verifyCsrfToken(false);
+
+function am_redirect_with_message(string $type, string $message, array $extra = []): void
+{
+    $query = array_merge([$type => $message], $extra);
+    header('Location: ' . appUrl('/Admin-End/Appointments/AppointmentTracker.php') . '?' . http_build_query($query));
+    exit;
+}
+
+function am_table_exists(mysqli $conn, string $tableName): bool
+{
+    $stmt = $conn->prepare("
+        SELECT 1
+        FROM information_schema.TABLES
+        WHERE TABLE_SCHEMA = DATABASE()
+          AND TABLE_NAME = ?
+        LIMIT 1
+    ");
+    if (!$stmt) {
+        return false;
+    }
+
+    $stmt->bind_param("s", $tableName);
+    $stmt->execute();
+    $row = $stmt->get_result()->fetch_row();
+    $stmt->close();
+
+    return !empty($row);
+}
+
+function am_table_columns(mysqli $conn, string $tableName): array
+{
+    $columns = [];
+    $stmt = $conn->prepare("
+        SELECT COLUMN_NAME
+        FROM information_schema.COLUMNS
+        WHERE TABLE_SCHEMA = DATABASE()
+          AND TABLE_NAME = ?
+    ");
+    if (!$stmt) {
+        return $columns;
+    }
+
+    $stmt->bind_param("s", $tableName);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    while ($row = $result->fetch_assoc()) {
+        $column = strtolower(trim((string)($row['COLUMN_NAME'] ?? '')));
+        if ($column !== '') {
+            $columns[$column] = true;
+        }
+    }
+    $stmt->close();
+
+    return $columns;
+}
+
+function am_get_status_id(mysqli $conn, string $name, string $type): ?int
+{
+    $stmt = $conn->prepare("
+        SELECT status_id
+        FROM statuslookuptbl
+        WHERE status_name = ? AND status_type = ?
+        ORDER BY status_id ASC
+        LIMIT 1
+    ");
+    if (!$stmt) {
+        return null;
+    }
+
+    $stmt->bind_param("ss", $name, $type);
+    $stmt->execute();
+    $row = $stmt->get_result()->fetch_assoc();
+    $stmt->close();
+
+    return isset($row['status_id']) ? (int)$row['status_id'] : null;
+}
+
+function am_ensure_status_id(mysqli $conn, string $name, string $type): int
+{
+    $existing = am_get_status_id($conn, $name, $type);
+    if ($existing !== null) {
+        return $existing;
+    }
+
+    $stmt = $conn->prepare("INSERT INTO statuslookuptbl (status_name, status_type) VALUES (?, ?)");
+    if (!$stmt) {
+        throw new Exception('Failed to create appointment status lookup.');
+    }
+
+    $stmt->bind_param("ss", $name, $type);
+    $stmt->execute();
+    $statusId = (int)$conn->insert_id;
+    $stmt->close();
+
+    return $statusId;
+}
+
+function am_validate_schedule(string $date, string $time): string
+{
+    if ($date === '' || $time === '') {
+        throw new Exception('Confirmed date and time are required for this action.');
+    }
+
+    $timezone = new DateTimeZone(date_default_timezone_get() ?: 'Asia/Manila');
+    $now = new DateTimeImmutable('now', $timezone);
+    $minDate = $now->modify('+1 day')->format('Y-m-d');
+    $monthStart = $now->format('Y-m-01');
+    $monthEnd = $now->format('Y-m-t');
+
+    $schedule = DateTimeImmutable::createFromFormat('Y-m-d H:i', $date . ' ' . $time, $timezone);
+    if (!$schedule || $schedule->format('Y-m-d') !== $date || $schedule->format('H:i') !== $time) {
+        throw new Exception('Confirmed appointment date or time is invalid.');
+    }
+
+    if ($date < $minDate || $date < $monthStart || $date > $monthEnd) {
+        throw new Exception('Confirmed appointment date must be within the current month and after today.');
+    }
+
+    if ($time < '09:01' || $time > '16:59') {
+        throw new Exception('Confirmed appointment time must be between 9:01 AM and 4:59 PM.');
+    }
+
+    return $schedule->format('Y-m-d H:i:s');
+}
+
+if (($_SERVER['REQUEST_METHOD'] ?? 'GET') !== 'POST') {
+    http_response_code(405);
+    exit('Method not allowed.');
+}
+
+if (!am_table_exists($conn, 'appointmentstbl')) {
+    http_response_code(500);
+    exit('Appointment table is not available. Run the appointment migration first.');
+}
+
+$action = strtolower(trim((string)($_POST['action'] ?? '')));
+$appointmentId = trim((string)($_POST['appointment_id'] ?? ''));
+$officialUserId = trim((string)($_POST['official_user_id'] ?? ''));
+$confirmedDate = trim((string)($_POST['confirmed_date'] ?? ''));
+$confirmedTime = trim((string)($_POST['confirmed_time'] ?? ''));
+$remarks = trim((string)($_POST['appointment_remarks'] ?? ''));
+$reviewedByUserId = trim((string)($_SESSION['user_id'] ?? ''));
+
+if (!in_array($action, ['approve_appointment', 'reschedule_appointment', 'deny_appointment'], true)) {
+    am_redirect_with_message('error', 'Unknown appointment action.');
+}
+
+if ($appointmentId === '') {
+    am_redirect_with_message('error', 'Appointment ID is required.');
+}
+
+$appointmentColumns = am_table_columns($conn, 'appointmentstbl');
+if (!isset($appointmentColumns['appointment_status_id'])) {
+    am_redirect_with_message('error', 'Appointment status column is missing from appointmentstbl.');
+}
+
+if ($officialUserId !== '' && !isset($appointmentColumns['user_id_official_assigned'])) {
+    am_redirect_with_message('error', 'Assigned official cannot be saved because user_id_official_assigned is missing from appointmentstbl.', [
+        'appointment_id' => $appointmentId,
+    ]);
+}
+
+$needsSchedule = in_array($action, ['approve_appointment', 'reschedule_appointment'], true);
+$confirmedScheduleTimestamp = null;
+if ($needsSchedule) {
+    try {
+        $confirmedScheduleTimestamp = am_validate_schedule($confirmedDate, $confirmedTime);
+    } catch (Throwable $e) {
+        am_redirect_with_message('error', $e->getMessage(), ['appointment_id' => $appointmentId]);
+    }
+}
+
+$statusName = 'Pending';
+if ($action === 'approve_appointment') {
+    $statusName = 'Approved';
+} elseif ($action === 'reschedule_appointment') {
+    $statusName = 'Rescheduled';
+} elseif ($action === 'deny_appointment') {
+    $statusName = 'Denied';
+}
+
+try {
+    $statusId = am_ensure_status_id($conn, $statusName, 'Appointment');
+} catch (Throwable $e) {
+    am_redirect_with_message('error', 'Unable to prepare appointment statuses right now.');
+}
+
+$conn->begin_transaction();
+try {
+    $existsStmt = $conn->prepare("
+        SELECT appointment_id
+             , COALESCE(s.status_name, 'Pending') AS status_name
+        FROM appointmentstbl
+        LEFT JOIN statuslookuptbl s
+            ON s.status_id = appointmentstbl.appointment_status_id
+        WHERE appointment_id = ?
+        LIMIT 1
+    ");
+    if (!$existsStmt) {
+        throw new Exception('Failed to load the appointment record.');
+    }
+    $existsStmt->bind_param("s", $appointmentId);
+    $existsStmt->execute();
+    $existingRow = $existsStmt->get_result()->fetch_assoc();
+    $existsStmt->close();
+
+    if (!$existingRow) {
+        throw new Exception('Appointment record not found.');
+    }
+
+    $currentStatusName = strtolower(trim((string)($existingRow['status_name'] ?? 'pending')));
+    if ($currentStatusName !== '' && !str_contains($currentStatusName, 'pending')) {
+        throw new Exception('This appointment has already been reviewed and can no longer be changed.');
+    }
+
+    $setClauses = ['appointment_status_id = ?'];
+    $bindTypes = 'i';
+    $bindValues = [$statusId];
+
+    if (isset($appointmentColumns['user_id_employee_staff'])) {
+        $setClauses[] = 'user_id_employee_staff = ?';
+        $bindTypes .= 's';
+        $bindValues[] = $reviewedByUserId !== '' ? $reviewedByUserId : null;
+    }
+
+    if (isset($appointmentColumns['user_id_official_assigned'])) {
+        $setClauses[] = 'user_id_official_assigned = ?';
+        $bindTypes .= 's';
+        $bindValues[] = $officialUserId !== '' ? $officialUserId : null;
+    }
+
+    if (isset($appointmentColumns['appointment_remarks'])) {
+        $setClauses[] = 'appointment_remarks = ?';
+        $bindTypes .= 's';
+        $bindValues[] = $remarks !== '' ? $remarks : null;
+    }
+
+    if (isset($appointmentColumns['review_timestamp'])) {
+        $setClauses[] = 'review_timestamp = NOW()';
+    }
+
+    if (isset($appointmentColumns['confirmed_schedule_timestamp'])) {
+        $setClauses[] = 'confirmed_schedule_timestamp = ?';
+        $bindTypes .= 's';
+        $bindValues[] = $needsSchedule ? $confirmedScheduleTimestamp : null;
+    } elseif ($needsSchedule && isset($appointmentColumns['schedule_timestamp'])) {
+        $setClauses[] = 'schedule_timestamp = ?';
+        $bindTypes .= 's';
+        $bindValues[] = $confirmedScheduleTimestamp;
+    }
+
+    $bindTypes .= 's';
+    $bindValues[] = $appointmentId;
+
+    $sql = "
+        UPDATE appointmentstbl
+        SET " . implode(",\n            ", $setClauses) . "
+        WHERE appointment_id = ?
+        LIMIT 1
+    ";
+
+    $stmt = $conn->prepare($sql);
+    if (!$stmt) {
+        throw new Exception('Failed to prepare the appointment update.');
+    }
+
+    $stmt->bind_param($bindTypes, ...$bindValues);
+    if (!$stmt->execute()) {
+        $error = $stmt->error ?: $conn->error;
+        $stmt->close();
+        throw new Exception('Failed to update appointment: ' . $error);
+    }
+    $stmt->close();
+
+    $conn->commit();
+
+    $successMessage = 'Appointment review saved successfully.';
+    if ($action === 'approve_appointment') {
+        $successMessage = 'Appointment approved successfully.';
+    } elseif ($action === 'reschedule_appointment') {
+        $successMessage = 'Appointment rescheduled successfully.';
+    } elseif ($action === 'deny_appointment') {
+        $successMessage = 'Appointment denied successfully.';
+    }
+
+    am_redirect_with_message('success', $successMessage, ['appointment_id' => $appointmentId]);
+} catch (Throwable $e) {
+    $conn->rollback();
+    error_log('appointmentManagement failed: ' . $e->getMessage());
+    am_redirect_with_message('error', 'Unable to update the appointment right now.', ['appointment_id' => $appointmentId]);
+}

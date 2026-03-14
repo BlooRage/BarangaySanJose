@@ -92,7 +92,7 @@
         return `
             <tr>
                 <td>${esc(row.complaint_id || "-")}</td>
-                <td>${esc(row.submitted_date || "-")}</td>
+                <td>${esc(row.submitted_at || "-")}</td>
                 <td>${esc(row.complainant_name || "-")}</td>
                 <td>${esc(row.subject_display_name || "-")}</td>
                 <td>${esc(row.complaint_type || "-")}</td>
@@ -568,3 +568,4 @@
     initComplaintActionFlow();
     loadList();
 })();
+

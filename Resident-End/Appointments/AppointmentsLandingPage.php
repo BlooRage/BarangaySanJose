@@ -78,10 +78,6 @@ require_once __DIR__ . "/../includes/resident_access_guard.php";
                     <h2 class="page-subtitle mb-2">What You Can Set an Appointment For</h2>
                     <p class="page-description mb-2">Common appointment purposes include:</p>
                     <ul class="page-description info-list">
-                        <li>Claiming certificates or clearances</li>
-                        <li>Barangay ID processing or pick-up</li>
-                        <li>Business permit inquiries or follow-ups</li>
-                        <li>Document verification or record requests</li>
                         <li>Assistance programs and social services consultations</li>
                         <li>Meetings for mediation or case updates</li>
                         <li>Community project or event coordination</li>

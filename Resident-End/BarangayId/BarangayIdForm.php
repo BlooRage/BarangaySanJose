@@ -156,7 +156,7 @@ $fullAddress = implode(', ', array_filter([
 
                         <div class="form-row">
                             <div class="full-width">
-                                <label class="top-label">Complete Address <span class="required-asterisk">*</span></label>
+                            <label class="top-label">Address <span class="required-asterisk">*</span></label>
                                 <input type="text" name="full_address_display" readonly value="<?php echo htmlspecialchars($fullAddress, ENT_QUOTES, 'UTF-8'); ?>">
                                 <input type="hidden" name="unitNumber" value="<?php echo htmlspecialchars($unitNumber, ENT_QUOTES, 'UTF-8'); ?>">
                                 <input type="hidden" name="houseNumber" value="<?php echo htmlspecialchars($houseNumber, ENT_QUOTES, 'UTF-8'); ?>">

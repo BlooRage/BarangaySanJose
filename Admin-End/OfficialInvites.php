@@ -144,8 +144,9 @@ function fetch_invite_by_id(mysqli $conn, int $inviteId): ?array {
 }
 
 function verify_actor_password_or_fail(mysqli $conn, string $actorUserId, bool $isSuperAdminActor, string $actorPassword): void {
-    if (!$isSuperAdminActor) {
-        return;
+    if (trim($actorUserId) === '') {
+        set_invite_flash('danger', 'Session expired. Please login again.');
+        redirect_self();
     }
     if (trim($actorPassword) === '') {
         set_invite_flash('danger', 'Please enter your current password to authorize this action.');
@@ -553,6 +554,15 @@ if ($q) {
       .invite-required { color: #dc3545; font-weight: 700; }
       .invite-submit-row { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-top: 14px; flex-wrap: wrap; }
       .invite-submit-note { font-size: 0.82rem; color: #6b7280; }
+      #inviteAuthorizationModal .modal-content,
+      #inviteSendingModal .modal-content,
+      #inviteResultModal .modal-content,
+      #inviteAuthorizationModal .form-control,
+      #inviteAuthorizationModal .btn,
+      #inviteSendingModal .btn,
+      #inviteResultModal .btn {
+        font-family: 'Geist', sans-serif;
+      }
       .invite-modal-title-centered { width: 100%; text-align: center; font-weight: 700; }
       .invite-auth-summary { font-size: 0.95rem; line-height: 1.45; color: #374151; }
       .invite-auth-summary strong { color: #111827; }
@@ -756,22 +766,30 @@ if ($q) {
                                         <form method="post" class="d-inline">
                                             <input type="hidden" name="action" value="resend_invite">
                                             <input type="hidden" name="invite_id" value="<?= (int)$r['invite_id'] ?>">
+                                            <input type="hidden" name="actor_password" value="">
                                             <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($csrfToken, ENT_QUOTES, 'UTF-8') ?>">
-                                            <?php if (in_array((string)($_SESSION['role'] ?? ''), ['SuperAdmin'], true)): ?>
-                                                <input type="password" name="actor_password" class="form-control form-control-sm d-inline-block me-1" style="width: 170px;" placeholder="Your password" autocomplete="current-password" required>
-                                            <?php endif; ?>
-                                            <button type="submit" class="btn btn-outline-primary btn-sm">Resend</button>
+                                            <button
+                                                type="button"
+                                                class="btn btn-outline-primary btn-sm js-invite-action-btn"
+                                                data-action-label="Resend"
+                                                data-action-verb="resend"
+                                                data-invite-name="<?= htmlspecialchars($name, ENT_QUOTES, 'UTF-8') ?>"
+                                            >Resend</button>
                                         </form>
                                     <?php endif; ?>
                                     <?php if (in_array((string)$r['status'], ['Pending', 'InProgress'], true)): ?>
                                         <form method="post" class="d-inline">
                                             <input type="hidden" name="action" value="revoke_invite">
                                             <input type="hidden" name="invite_id" value="<?= (int)$r['invite_id'] ?>">
+                                            <input type="hidden" name="actor_password" value="">
                                             <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($csrfToken, ENT_QUOTES, 'UTF-8') ?>">
-                                            <?php if (in_array((string)($_SESSION['role'] ?? ''), ['SuperAdmin'], true)): ?>
-                                                <input type="password" name="actor_password" class="form-control form-control-sm d-inline-block me-1" style="width: 170px;" placeholder="Your password" autocomplete="current-password" required>
-                                            <?php endif; ?>
-                                            <button type="submit" class="btn btn-outline-danger btn-sm">Revoke</button>
+                                            <button
+                                                type="button"
+                                                class="btn btn-outline-danger btn-sm js-invite-action-btn"
+                                                data-action-label="Revoke"
+                                                data-action-verb="revoke"
+                                                data-invite-name="<?= htmlspecialchars($name, ENT_QUOTES, 'UTF-8') ?>"
+                                            >Revoke</button>
                                         </form>
                                     <?php endif; ?>
                                 </td>
@@ -789,7 +807,7 @@ if ($q) {
   <div class="modal-dialog modal-dialog-centered">
     <div class="modal-content">
       <div class="modal-header">
-        <h5 class="modal-title invite-modal-title-centered">Confirm Invite Authorization</h5>
+        <h5 class="modal-title invite-modal-title-centered" id="inviteAuthorizationModalTitle">Confirm Invite Authorization</h5>
         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
       </div>
       <div class="modal-body">
@@ -802,7 +820,7 @@ if ($q) {
       </div>
       <div class="modal-footer">
         <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
-        <button type="button" class="btn btn-primary" id="confirmInviteSendBtn">Confirm & Send Invite</button>
+        <button type="button" class="btn btn-primary" id="confirmInviteAuthorizationBtn">Confirm</button>
       </div>
     </div>
   </div>
@@ -919,10 +937,11 @@ if ($q) {
   (function () {
     const form = document.getElementById('createInviteForm');
     const openBtn = document.getElementById('openInviteAuthorizationModal');
-    const confirmBtn = document.getElementById('confirmInviteSendBtn');
+    const confirmBtn = document.getElementById('confirmInviteAuthorizationBtn');
     const hiddenPwd = document.getElementById('inviteActorPasswordHidden');
     const modalPwd = document.getElementById('inviteActorPasswordModalInput');
     const summary = document.getElementById('inviteAuthorizationSummary');
+    const title = document.getElementById('inviteAuthorizationModalTitle');
     const precheckError = document.getElementById('invitePrecheckError');
     const firstName = form ? form.querySelector('input[name="first_name"]') : null;
     const middleName = form ? form.querySelector('input[name="middle_name"]') : null;
@@ -937,6 +956,21 @@ if ($q) {
 
     const authModal = new bootstrap.Modal(modalEl);
     const sendingModal = new bootstrap.Modal(sendingModalEl);
+    let pendingSubmit = null;
+
+    const openAuthorizationModal = function (config) {
+      modalPwd.value = '';
+      if (title) {
+        title.textContent = config.title || 'Confirm Invite Authorization';
+      }
+      summary.innerHTML = config.summary || 'You are about to grant account access.';
+      confirmBtn.textContent = config.confirmText || 'Confirm';
+      confirmBtn.classList.toggle('btn-danger', !!config.danger);
+      confirmBtn.classList.toggle('btn-primary', !config.danger);
+      pendingSubmit = typeof config.onConfirm === 'function' ? config.onConfirm : null;
+      authModal.show();
+      setTimeout(function () { modalPwd.focus(); }, 120);
+    };
 
     openBtn.addEventListener('click', function () {
       if (!form.reportValidity()) return;
@@ -979,11 +1013,19 @@ if ($q) {
         const phoneVal = phone ? phone.value.trim() : '';
         const roleVal = role ? role.value.trim() : '';
         const roleText = roleVal === 'SuperAdmin' ? 'superadmin' : (roleVal || 'selected role').toLowerCase();
-        summary.innerHTML =
-          'You are about to give <strong>' + (fullName || 'this user') + '</strong> with email <strong>' + (emailVal || 'N/A') + '</strong> and phone <strong>+63' + (phoneVal || 'N/A') + '</strong> access to become a <strong>' + roleText + '</strong>.';
-
-        authModal.show();
-        setTimeout(function () { modalPwd.focus(); }, 120);
+        openAuthorizationModal({
+          title: 'Confirm Invite Authorization',
+          summary:
+            'You are about to give <strong>' + (fullName || 'this user') + '</strong> with email <strong>' + (emailVal || 'N/A') + '</strong> and phone <strong>+63' + (phoneVal || 'N/A') + '</strong> access to become a <strong>' + roleText + '</strong>.',
+          confirmText: 'Confirm & Send Invite',
+          danger: false,
+          onConfirm: function (pwd) {
+            hiddenPwd.value = pwd;
+            authModal.hide();
+            sendingModal.show();
+            form.submit();
+          }
+        });
       }).catch(function () {
         precheckError.textContent = 'Unable to validate invite details right now.';
         precheckError.style.display = '';
@@ -996,10 +1038,37 @@ if ($q) {
         modalPwd.focus();
         return;
       }
-      hiddenPwd.value = pwd;
-      authModal.hide();
-      sendingModal.show();
-      form.submit();
+      if (pendingSubmit) {
+        pendingSubmit(pwd);
+      }
+    });
+
+    modalEl.addEventListener('hidden.bs.modal', function () {
+      modalPwd.value = '';
+      pendingSubmit = null;
+    });
+
+    document.querySelectorAll('.js-invite-action-btn').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        const ownerForm = btn.closest('form');
+        const passwordField = ownerForm ? ownerForm.querySelector('input[name="actor_password"]') : null;
+        const actionLabel = btn.getAttribute('data-action-label') || 'Confirm';
+        const actionVerb = btn.getAttribute('data-action-verb') || 'process';
+        const inviteName = btn.getAttribute('data-invite-name') || 'this invite';
+        if (!ownerForm || !passwordField) return;
+
+        openAuthorizationModal({
+          title: actionLabel + ' Invite',
+          summary: 'Enter your current password to ' + actionVerb + ' the invite for <strong>' + inviteName + '</strong>.',
+          confirmText: actionLabel,
+          danger: actionLabel.toLowerCase() === 'revoke',
+          onConfirm: function (pwd) {
+            passwordField.value = pwd;
+            authModal.hide();
+            ownerForm.submit();
+          }
+        });
+      });
     });
   })();
 
