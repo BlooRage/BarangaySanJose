@@ -39,60 +39,6 @@ if (!isset($baseUrl)) {
   <link rel="stylesheet" href="../CSS-Styles/Resident-End-CSS/registrationStyle.css?v=20260213-6" />
   <link rel="stylesheet" href="../CSS-Styles/NavbarFooterStyle.css" />
 
-<style>
-.field-error {
-  font-size: 0.85rem;
-  color: #dc3545;
-  margin-top: 4px;
-}
-.is-invalid {
-  border-color: #dc3545 !important;
-}
-.residency-picker-wrap {
-  position: relative;
-}
-.residency-picker-trigger {
-  position: relative;
-}
-.residency-picker-display {
-  padding-right: 44px;
-  cursor: pointer;
-}
-.residency-picker-display::placeholder {
-  color: #9ca3af;
-}
-.residency-picker-icon {
-  position: absolute;
-  right: 14px;
-  top: 50%;
-  transform: translateY(-50%);
-  color: #6b7280;
-  pointer-events: none;
-}
-.residency-picker-modal .modal-content {
-  border-radius: 18px;
-}
-.residency-picker-panel-title {
-  font-size: 0.92rem;
-  font-weight: 700;
-  color: #111827;
-}
-.residency-picker-panel-note {
-  margin: 0;
-  font-size: 0.78rem;
-  color: #6b7280;
-}
-.residency-picker-preview {
-  margin: 0 0 12px;
-  padding: 10px 12px;
-  border-radius: 12px;
-  background: #fff7ed;
-  color: #9a3412;
-  font-size: 0.85rem;
-  font-weight: 600;
-}
-</style>
-
   <!-- Optional: server-side alert handling (if you use it) -->
   <script src="../JS-Script-Files/modalHandler.js"></script>
 
@@ -796,7 +742,19 @@ require_once __DIR__ . "/includes/resident_access_guard.php";
               </div>
 
               <div class="col-md-6">
-                <label class="form-label" for="areaNumber">Area <span class="text-danger">*</span></label>
+                <div class="area-guide-label">
+                  <label class="form-label mb-0" for="areaNumber">Area <span class="text-danger">*</span></label>
+                  <button
+                    type="button"
+                    class="area-guide-trigger"
+                    data-bs-toggle="modal"
+                    data-bs-target="#barangayAreaGuideModal"
+                    title="Click here for the Barangay Area Guide"
+                    aria-label="Open Barangay Area Guide"
+                  >
+                    <i class="fa-solid fa-circle-info area-guide-icon" aria-hidden="true"></i>
+                  </button>
+                </div>
                 <select class="form-select" id="areaNumber" name="areaNumber">
                   <option value="">Select</option>
                   <option value="Area 01">Area 01</option>
@@ -839,7 +797,19 @@ require_once __DIR__ . "/includes/resident_access_guard.php";
               </div>
 
               <div class="col-md-6">
-                <label class="form-label" for="areaNumberLotBlock">Area <span class="text-danger">*</span></label>
+                <div class="area-guide-label">
+                  <label class="form-label mb-0" for="areaNumberLotBlock">Area <span class="text-danger">*</span></label>
+                  <button
+                    type="button"
+                    class="area-guide-trigger"
+                    data-bs-toggle="modal"
+                    data-bs-target="#barangayAreaGuideModal"
+                    title="Click here for the Barangay Area Guide"
+                    aria-label="Open Barangay Area Guide"
+                  >
+                    <i class="fa-solid fa-circle-info area-guide-icon" aria-hidden="true"></i>
+                  </button>
+                </div>
                 <select class="form-select" id="areaNumberLotBlock" name="areaNumber">
                   <option value="">Select</option>
                   <option value="Area 01">Area 01</option>
@@ -1528,6 +1498,35 @@ require_once __DIR__ . "/includes/resident_access_guard.php";
         <div class="modal-footer">
           <button type="button" class="btn btn-outline-secondary" id="residencyStartCancel" data-bs-dismiss="modal">Cancel</button>
           <button type="button" class="btn btn-primary" id="residencyStartApply">Apply</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal fade residency-picker-modal" id="barangayAreaGuideModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content">
+        <div class="modal-header">
+          <div>
+            <div class="residency-picker-panel-title">Barangay Area Guide</div>
+            <p class="residency-picker-panel-note mb-0">Use this guide to identify the correct area for the resident's home address.</p>
+          </div>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+          <div class="residency-picker-preview">Select the area that matches the resident's subdivision, village, or zone.</div>
+          <ul class="area-guide-list">
+            <li><strong>AREA 01</strong><br>SAN JOSE PROPER</li>
+            <li><strong>AREA 1A</strong><br>LITEX Village | ABATEX Christine Creek | MED. HEIGHTS</li>
+            <li><strong>AREA 02</strong><br>VFW | Amychelle | Christine Villa Parnshey | Villa Ana | Zaniga Farm</li>
+            <li><strong>AREA 03</strong><br>RELOCATION</li>
+            <li><strong>AREA 04</strong><br>Kasiglahan: Phase 1-B | Phase 1-C | Phase 1-D | Phase 1-M | Phase 1-A</li>
+            <li><strong>AREA 05</strong><br>Kasiglahan: Phase 1-K | Phase 1K1 | Phase 1K2 | Phase 1-E | Phase 1-G</li>
+            <li><strong>AREA 06</strong><br>Sub-Urban | Metro Manila Hills</li>
+          </ul>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-primary" data-bs-dismiss="modal">Close</button>
         </div>
       </div>
     </div>
