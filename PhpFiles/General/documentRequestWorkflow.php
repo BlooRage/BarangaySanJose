@@ -233,11 +233,29 @@ function dr_ensure_request_child_tables(mysqli $conn): void {
             request_id {$requestIdType} NOT NULL,
             certificate_type VARCHAR(120) NOT NULL,
             certificate_details LONGTEXT DEFAULT NULL,
+            certificate_number VARCHAR(64) DEFAULT NULL,
+            verification_code VARCHAR(80) DEFAULT NULL,
             created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
             updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
             PRIMARY KEY (certificate_id),
             UNIQUE KEY uq_issuancereq_request (request_id),
             KEY idx_issuancereq_type (certificate_type)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
+    ");
+
+    $conn->query("
+        CREATE TABLE IF NOT EXISTS certificatesrequesttbl (
+            certificate_id BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT,
+            request_id {$requestIdType} NOT NULL,
+            certificate_type VARCHAR(120) NOT NULL,
+            certificate_details LONGTEXT DEFAULT NULL,
+            certificate_number VARCHAR(64) DEFAULT NULL,
+            verification_code VARCHAR(80) DEFAULT NULL,
+            created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            PRIMARY KEY (certificate_id),
+            UNIQUE KEY uq_certificatesreq_request (request_id),
+            KEY idx_certificatesreq_type (certificate_type)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
     ");
 
@@ -534,6 +552,54 @@ function dr_is_issuance_document_type(string $documentType): bool {
     }
     // Issuance department currently handles certificate documents.
     return strpos($doc, 'certificate') !== false;
+}
+
+function dr_is_clearance_document_type(string $documentType): bool {
+    $doc = strtolower(trim($documentType));
+    if ($doc === '') {
+        return false;
+    }
+    if (strpos($doc, 'clearance') !== false) {
+        return true;
+    }
+
+    $token = dr_canonical_document_type_key($doc);
+    $clearanceTokens = [
+        'businesspermit',
+        'businessclearance',
+        'barangaybusinessclearance',
+        'electricalpermit',
+        'waterpermit',
+        'residentialpermit',
+        'residentialbuildingpermit',
+        'commercialpermit',
+        'commercialbuildingpermit',
+        'tricyclepermit',
+        'tricycleclearance',
+    ];
+    foreach ($clearanceTokens as $clearanceToken) {
+        if (strpos($token, $clearanceToken) !== false) {
+            return true;
+        }
+    }
+    return false;
+}
+
+function dr_request_application_type(array $requestRow, array $payload): string {
+    $applicationType = trim((string)($requestRow['application_type'] ?? $payload['application_type'] ?? ''));
+    if ($applicationType !== '') {
+        return $applicationType;
+    }
+
+    $purpose = trim((string)($requestRow['purpose'] ?? $payload['request_purpose'] ?? $payload['purpose'] ?? ''));
+    if (stripos($purpose, 'renewal') !== false) {
+        return 'Renewal';
+    }
+    if (stripos($purpose, 'new') !== false) {
+        return 'New';
+    }
+
+    return '';
 }
 
 function dr_canonical_document_type_key(string $value): string {
@@ -947,7 +1013,7 @@ function dr_hydrate_request_derived_fields(mysqli $conn, array &$row, bool $incl
         || (trim((string)($row['verification_code'] ?? '')) === '')
         || ($currentDocType === '' && $payloadDocType === '')
     );
-    if ($includeIssuanceMeta && $needsIssuanceMeta && $requestId !== '' && dr_table_exists($conn, 'issuancerequesttbl')) {
+    if ($includeIssuanceMeta && $needsIssuanceMeta && $requestId !== '' && dr_preferred_issuance_table($conn) !== null) {
         $issuanceMeta = dr_get_issuance_request_meta($conn, $requestId);
     }
 
@@ -1300,7 +1366,7 @@ function dr_fetch_request(mysqli $conn, string $requestId): ?array {
     $row = $stmt->get_result()->fetch_assoc();
     $stmt->close();
     if (is_array($row)) {
-        dr_ensure_issuance_row_for_request($conn, $row);
+        dr_sync_request_child_rows($conn, $row);
         dr_hydrate_request_derived_fields($conn, $row);
         dr_merge_finance_transaction_into_request($conn, $row);
         dr_sync_stage_from_status_lookup($conn, $row);
@@ -1456,7 +1522,7 @@ function dr_update_stage(mysqli $conn, string $requestId, string $stage, array $
 
     $row = dr_fetch_request($conn, $requestId);
     if ($row) {
-        dr_ensure_issuance_row_for_request($conn, $row);
+        dr_sync_request_child_rows($conn, $row);
         foreach ($paymentPatch as $k => $v) {
             $row[$k] = $v;
         }
@@ -1744,9 +1810,23 @@ function dr_ensure_certificate_request_table(mysqli $conn): void {
         }
     }
 
-    // Build table with request_id type matching documentrequesttbl.request_id.
-    $sql = "
-        CREATE TABLE IF NOT EXISTS issuancerequesttbl (
+    dr_ensure_named_certificate_request_table($conn, 'issuancerequesttbl', $requestIdType);
+    dr_ensure_named_certificate_request_table($conn, 'certificatesrequesttbl', $requestIdType);
+    if (dr_table_exists($conn, 'issuancerequeststbl')) {
+        dr_ensure_named_certificate_request_table($conn, 'issuancerequeststbl', $requestIdType);
+    }
+
+    $done = true;
+}
+
+function dr_ensure_named_certificate_request_table(mysqli $conn, string $table, string $requestIdType): void {
+    $tableSafe = preg_replace('/[^a-zA-Z0-9_]/', '', $table);
+    if ($tableSafe === '') {
+        return;
+    }
+
+    $conn->query("
+        CREATE TABLE IF NOT EXISTS {$tableSafe} (
             certificate_id BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT,
             request_id {$requestIdType} NOT NULL,
             certificate_type VARCHAR(120) NOT NULL,
@@ -1756,69 +1836,104 @@ function dr_ensure_certificate_request_table(mysqli $conn): void {
             created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
             updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
             PRIMARY KEY (certificate_id),
-            UNIQUE KEY uq_issuancereq_request (request_id),
-            KEY idx_issuancereq_type (certificate_type)
+            UNIQUE KEY uq_{$tableSafe}_request (request_id),
+            KEY idx_{$tableSafe}_type (certificate_type)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
-    ";
-    $conn->query($sql);
+    ");
 
-    // Align request_id column type with documentrequesttbl when table already exists.
-    $issuanceRequestType = null;
-    $issuanceColRes = $conn->query("SHOW COLUMNS FROM issuancerequesttbl LIKE 'request_id'");
-    if ($issuanceColRes instanceof mysqli_result) {
-        $issuanceCol = $issuanceColRes->fetch_assoc();
-        if ($issuanceCol && !empty($issuanceCol['Type'])) {
-            $issuanceRequestType = (string)$issuanceCol['Type'];
+    $currentRequestType = null;
+    $colRes = $conn->query("SHOW COLUMNS FROM {$tableSafe} LIKE 'request_id'");
+    if ($colRes instanceof mysqli_result) {
+        $col = $colRes->fetch_assoc();
+        if ($col && !empty($col['Type'])) {
+            $currentRequestType = (string)$col['Type'];
         }
     }
-    if ($issuanceRequestType !== null && strtolower($issuanceRequestType) !== strtolower($requestIdType)) {
-        // Best effort only; if conversion cannot be applied, keep current type and continue.
-        $conn->query("ALTER TABLE issuancerequesttbl MODIFY COLUMN request_id {$requestIdType} NOT NULL");
+    if ($currentRequestType !== null && strtolower($currentRequestType) !== strtolower($requestIdType)) {
+        $conn->query("ALTER TABLE {$tableSafe} MODIFY COLUMN request_id {$requestIdType} NOT NULL");
     }
 
-    // Add FK if not present and types are compatible (best effort).
-    $fkName = 'fk_issuancereq_request_id';
+    $columnsToEnsure = [
+        "certificate_type VARCHAR(120) NOT NULL AFTER request_id",
+        "certificate_details LONGTEXT DEFAULT NULL AFTER certificate_type",
+        "certificate_number VARCHAR(64) DEFAULT NULL AFTER certificate_details",
+        "verification_code VARCHAR(80) DEFAULT NULL AFTER certificate_number",
+    ];
+    foreach ($columnsToEnsure as $definition) {
+        if (!preg_match('/^([a-zA-Z0-9_]+)/', $definition, $m)) {
+            continue;
+        }
+        $column = $m[1];
+        if (!dr_column_exists($conn, $tableSafe, $column)) {
+            $conn->query("ALTER TABLE {$tableSafe} ADD COLUMN {$definition}");
+        }
+    }
+
+    $hasUniqueRequest = false;
+    $hasTypeIndex = false;
+    $idxRes = $conn->query("SHOW INDEX FROM {$tableSafe}");
+    if ($idxRes instanceof mysqli_result) {
+        while ($idx = $idxRes->fetch_assoc()) {
+            $columnName = (string)($idx['Column_name'] ?? '');
+            if ($columnName === 'request_id' && (string)($idx['Non_unique'] ?? '1') === '0') {
+                $hasUniqueRequest = true;
+            }
+            if ($columnName === 'certificate_type') {
+                $hasTypeIndex = true;
+            }
+        }
+    }
+    if (!$hasUniqueRequest) {
+        $conn->query("ALTER TABLE {$tableSafe} ADD UNIQUE KEY uq_{$tableSafe}_request (request_id)");
+    }
+    if (!$hasTypeIndex) {
+        $conn->query("ALTER TABLE {$tableSafe} ADD INDEX idx_{$tableSafe}_type (certificate_type)");
+    }
+
+    $fkName = 'fk_' . $tableSafe . '_request_id';
     $fkCheck = $conn->prepare("
-        SELECT COUNT(*) 
+        SELECT COUNT(*)
         FROM information_schema.KEY_COLUMN_USAGE
         WHERE TABLE_SCHEMA = DATABASE()
-          AND TABLE_NAME = 'issuancerequesttbl'
+          AND TABLE_NAME = ?
           AND CONSTRAINT_NAME = ?
     ");
     if ($fkCheck) {
-        $fkCheck->bind_param('s', $fkName);
+        $fkCheck->bind_param('ss', $tableSafe, $fkName);
         $fkCheck->execute();
         $fkCheck->bind_result($fkCount);
         $fkCheck->fetch();
         $fkCheck->close();
 
         if ((int)$fkCount === 0) {
-            // Try to add FK; ignore failure on incompatible existing schema.
             $conn->query("
-                ALTER TABLE issuancerequesttbl
+                ALTER TABLE {$tableSafe}
                 ADD CONSTRAINT {$fkName}
                 FOREIGN KEY (request_id) REFERENCES documentrequesttbl(request_id)
                 ON DELETE CASCADE ON UPDATE CASCADE
             ");
         }
     }
-
-    if (!dr_column_exists($conn, 'issuancerequesttbl', 'verification_code')) {
-        $conn->query("ALTER TABLE issuancerequesttbl ADD COLUMN verification_code VARCHAR(80) DEFAULT NULL AFTER certificate_details");
-    }
-
-    $done = true;
 }
 
 function dr_issuance_table_candidates(mysqli $conn): array {
+    dr_ensure_certificate_request_table($conn);
     $tables = [];
     if (dr_table_exists($conn, 'issuancerequesttbl')) {
         $tables[] = 'issuancerequesttbl';
+    }
+    if (dr_table_exists($conn, 'certificatesrequesttbl')) {
+        $tables[] = 'certificatesrequesttbl';
     }
     if (dr_table_exists($conn, 'issuancerequeststbl')) {
         $tables[] = 'issuancerequeststbl';
     }
     return $tables;
+}
+
+function dr_preferred_issuance_table(mysqli $conn): ?string {
+    $tables = dr_issuance_table_candidates($conn);
+    return $tables[0] ?? null;
 }
 
 function dr_upsert_certificate_request_into_table(mysqli $conn, string $table, string $requestId, string $certificateType, string $certificateDetails): void {
@@ -1864,6 +1979,187 @@ function dr_upsert_certificate_request(mysqli $conn, $requestId, string $certifi
     }
 }
 
+function dr_ensure_clearance_request_table(mysqli $conn): void {
+    static $done = false;
+    if ($done) {
+        return;
+    }
+
+    $requestIdType = dr_get_column_type($conn, 'documentrequesttbl', 'request_id', 'VARCHAR(16)');
+    dr_ensure_named_clearance_request_table($conn, 'clearancerequesttbl', $requestIdType);
+    $done = true;
+}
+
+function dr_ensure_named_clearance_request_table(mysqli $conn, string $table, string $requestIdType): void {
+    $tableSafe = preg_replace('/[^a-zA-Z0-9_]/', '', $table);
+    if ($tableSafe === '') {
+        return;
+    }
+
+    $conn->query("
+        CREATE TABLE IF NOT EXISTS {$tableSafe} (
+            clearance_id BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT,
+            request_id {$requestIdType} NOT NULL,
+            clearance_type VARCHAR(120) DEFAULT NULL,
+            application_type VARCHAR(120) DEFAULT NULL,
+            clearance_details LONGTEXT DEFAULT NULL,
+            created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            PRIMARY KEY (clearance_id),
+            UNIQUE KEY uq_{$tableSafe}_request (request_id)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
+    ");
+
+    $currentRequestType = null;
+    $colRes = $conn->query("SHOW COLUMNS FROM {$tableSafe} LIKE 'request_id'");
+    if ($colRes instanceof mysqli_result) {
+        $col = $colRes->fetch_assoc();
+        if ($col && !empty($col['Type'])) {
+            $currentRequestType = (string)$col['Type'];
+        }
+    }
+    if ($currentRequestType !== null && strtolower($currentRequestType) !== strtolower($requestIdType)) {
+        $conn->query("ALTER TABLE {$tableSafe} MODIFY COLUMN request_id {$requestIdType} NOT NULL");
+    }
+
+    $columnsToEnsure = [
+        "clearance_type VARCHAR(120) DEFAULT NULL AFTER request_id",
+        "application_type VARCHAR(120) DEFAULT NULL AFTER clearance_type",
+        "clearance_details LONGTEXT DEFAULT NULL AFTER application_type",
+    ];
+    foreach ($columnsToEnsure as $definition) {
+        if (!preg_match('/^([a-zA-Z0-9_]+)/', $definition, $m)) {
+            continue;
+        }
+        $column = $m[1];
+        if (!dr_column_exists($conn, $tableSafe, $column)) {
+            $conn->query("ALTER TABLE {$tableSafe} ADD COLUMN {$definition}");
+        }
+    }
+
+    $hasUniqueRequest = false;
+    $idxRes = $conn->query("SHOW INDEX FROM {$tableSafe}");
+    if ($idxRes instanceof mysqli_result) {
+        while ($idx = $idxRes->fetch_assoc()) {
+            if ((string)($idx['Column_name'] ?? '') === 'request_id' && (string)($idx['Non_unique'] ?? '1') === '0') {
+                $hasUniqueRequest = true;
+                break;
+            }
+        }
+    }
+    if (!$hasUniqueRequest) {
+        $conn->query("ALTER TABLE {$tableSafe} ADD UNIQUE KEY uq_{$tableSafe}_request (request_id)");
+    }
+
+    $fkName = 'fk_' . $tableSafe . '_request_id';
+    $fkCheck = $conn->prepare("
+        SELECT COUNT(*)
+        FROM information_schema.KEY_COLUMN_USAGE
+        WHERE TABLE_SCHEMA = DATABASE()
+          AND TABLE_NAME = ?
+          AND CONSTRAINT_NAME = ?
+    ");
+    if ($fkCheck) {
+        $fkCheck->bind_param('ss', $tableSafe, $fkName);
+        $fkCheck->execute();
+        $fkCheck->bind_result($fkCount);
+        $fkCheck->fetch();
+        $fkCheck->close();
+
+        if ((int)$fkCount === 0) {
+            $conn->query("
+                ALTER TABLE {$tableSafe}
+                ADD CONSTRAINT {$fkName}
+                FOREIGN KEY (request_id) REFERENCES documentrequesttbl(request_id)
+                ON DELETE CASCADE ON UPDATE CASCADE
+            ");
+        }
+    }
+}
+
+function dr_clearance_table_candidates(mysqli $conn): array {
+    dr_ensure_clearance_request_table($conn);
+    $tables = [];
+    if (dr_table_exists($conn, 'clearancerequesttbl')) {
+        $tables[] = 'clearancerequesttbl';
+    }
+    return $tables;
+}
+
+function dr_upsert_clearance_request_into_table(
+    mysqli $conn,
+    string $table,
+    string $requestId,
+    string $clearanceType,
+    string $applicationType,
+    string $clearanceDetails
+): void {
+    if (!dr_table_exists($conn, $table) || !dr_column_exists($conn, $table, 'request_id') || !dr_column_exists($conn, $table, 'clearance_type')) {
+        return;
+    }
+
+    $insertCols = ['request_id', 'clearance_type'];
+    $placeholders = ['?', '?'];
+    $types = 'ss';
+    $params = [$requestId, $clearanceType];
+    $duplicateUpdates = ['clearance_type = VALUES(clearance_type)'];
+
+    if (dr_column_exists($conn, $table, 'application_type')) {
+        $insertCols[] = 'application_type';
+        $placeholders[] = '?';
+        $types .= 's';
+        $params[] = $applicationType;
+        $duplicateUpdates[] = 'application_type = VALUES(application_type)';
+    }
+    if (dr_column_exists($conn, $table, 'clearance_details')) {
+        $insertCols[] = 'clearance_details';
+        $placeholders[] = '?';
+        $types .= 's';
+        $params[] = $clearanceDetails;
+        $duplicateUpdates[] = 'clearance_details = VALUES(clearance_details)';
+    }
+    if (dr_column_exists($conn, $table, 'updated_at')) {
+        $duplicateUpdates[] = 'updated_at = CURRENT_TIMESTAMP';
+    }
+
+    $stmt = $conn->prepare("
+        INSERT INTO {$table} (" . implode(', ', $insertCols) . ")
+        VALUES (" . implode(', ', $placeholders) . ")
+        ON DUPLICATE KEY UPDATE
+            " . implode(",\n            ", $duplicateUpdates) . "
+    ");
+    if (!$stmt) {
+        error_log("[documentRequestWorkflow][clearance] prepare failed for {$table}: " . $conn->error);
+        return;
+    }
+
+    $refs = [];
+    foreach ($params as $i => $value) {
+        $refs[$i] = &$params[$i];
+    }
+    array_unshift($refs, $types);
+    call_user_func_array([$stmt, 'bind_param'], $refs);
+
+    if (!$stmt->execute()) {
+        error_log("[documentRequestWorkflow][clearance] upsert failed in {$table}: " . $stmt->error . ' | request_id=' . $requestId);
+    }
+    $stmt->close();
+}
+
+function dr_upsert_clearance_request(
+    mysqli $conn,
+    $requestId,
+    string $clearanceType,
+    string $applicationType,
+    string $clearanceDetails
+): void {
+    dr_ensure_clearance_request_table($conn);
+    $requestIdParam = (string)$requestId;
+    foreach (dr_clearance_table_candidates($conn) as $table) {
+        dr_upsert_clearance_request_into_table($conn, $table, $requestIdParam, $clearanceType, $applicationType, $clearanceDetails);
+    }
+}
+
 function dr_ensure_issuance_row_for_request(mysqli $conn, array $requestRow): void {
     $requestId = trim((string)($requestRow['request_id'] ?? ''));
     if ($requestId === '') {
@@ -1900,12 +2196,55 @@ function dr_ensure_issuance_row_for_request(mysqli $conn, array $requestRow): vo
     dr_upsert_certificate_request($conn, $requestId, $docType, $certificateDetails);
 }
 
+function dr_ensure_clearance_row_for_request(mysqli $conn, array $requestRow): void {
+    $requestId = trim((string)($requestRow['request_id'] ?? ''));
+    if ($requestId === '') {
+        return;
+    }
+
+    $detailsRaw = (string)($requestRow['request_details'] ?? $requestRow['payload_json'] ?? '{}');
+    $payload = json_decode($detailsRaw, true);
+    if (!is_array($payload)) {
+        $payload = [];
+    }
+
+    $docType = trim((string)($requestRow['document_type'] ?? ''));
+    if ($docType === '') {
+        $docType = trim((string)($payload['document_type'] ?? ''));
+    }
+    $docType = dr_normalize_document_type($docType);
+    if (!dr_is_clearance_document_type($docType)) {
+        return;
+    }
+
+    $purpose = trim((string)($requestRow['purpose'] ?? ''));
+    if ($purpose === '') {
+        $purpose = trim((string)($payload['request_purpose'] ?? $payload['purpose'] ?? ''));
+    }
+    $applicationType = dr_request_application_type($requestRow, $payload);
+
+    $clearanceDetails = dr_safe_json([
+        'source' => 'clearance_request_enforcement',
+        'purpose' => $purpose,
+        'application_type' => $applicationType,
+        'submitted_payload' => $payload,
+        'resident_id' => trim((string)($requestRow['resident_id'] ?? '')),
+        'resident_user_id' => trim((string)($requestRow['resident_user_id'] ?? $requestRow['user_id'] ?? '')),
+    ]);
+    dr_upsert_clearance_request($conn, $requestId, $docType, $applicationType, $clearanceDetails);
+}
+
+function dr_sync_request_child_rows(mysqli $conn, array $requestRow): void {
+    dr_ensure_issuance_row_for_request($conn, $requestRow);
+    dr_ensure_clearance_row_for_request($conn, $requestRow);
+}
+
 function dr_backfill_missing_issuance_requests(mysqli $conn, int $limit = 1000): int {
     if (!dr_table_exists($conn, 'documentrequesttbl')) {
         return 0;
     }
     dr_ensure_certificate_request_table($conn);
-    if (!dr_table_exists($conn, 'issuancerequesttbl')) {
+    if (dr_preferred_issuance_table($conn) === null) {
         return 0;
     }
 
@@ -1926,8 +2265,6 @@ function dr_backfill_missing_issuance_requests(mysqli $conn, int $limit = 1000):
     $sql = "
         SELECT " . implode(', ', $selectCols) . "
         FROM documentrequesttbl d
-        LEFT JOIN issuancerequesttbl i ON i.request_id = d.request_id
-        WHERE i.request_id IS NULL
         ORDER BY d.request_id ASC
         LIMIT ?
     ";
@@ -1949,42 +2286,83 @@ function dr_backfill_missing_issuance_requests(mysqli $conn, int $limit = 1000):
 
     $created = 0;
     foreach ($rows as $row) {
-        $requestId = trim((string)($row['request_id'] ?? ''));
-        if ($requestId === '') {
-            continue;
-        }
-
-        $payload = [];
-        if ($hasRequestDetails) {
+        $docType = trim((string)($row['document_type'] ?? ''));
+        if ($docType === '' && $hasRequestDetails) {
             $decoded = json_decode((string)($row['request_details'] ?? '{}'), true);
             if (is_array($decoded)) {
-                $payload = $decoded;
+                $docType = trim((string)($decoded['document_type'] ?? ''));
             }
         }
-
-        $docType = trim((string)($row['document_type'] ?? ''));
-        if ($docType === '') {
-            $docType = trim((string)($payload['document_type'] ?? ''));
-        }
-        $docType = dr_normalize_document_type($docType);
-        if (!dr_is_issuance_document_type($docType)) {
+        if (!dr_is_issuance_document_type(dr_normalize_document_type($docType))) {
             continue;
         }
 
-        $purpose = trim((string)($row['purpose'] ?? ''));
-        if ($purpose === '') {
-            $purpose = trim((string)($payload['request_purpose'] ?? $payload['purpose'] ?? ''));
+        dr_ensure_issuance_row_for_request($conn, $row);
+        $created++;
+    }
+
+    return $created;
+}
+
+function dr_backfill_missing_clearance_requests(mysqli $conn, int $limit = 1000): int {
+    if (!dr_table_exists($conn, 'documentrequesttbl')) {
+        return 0;
+    }
+    dr_ensure_clearance_request_table($conn);
+    if (!dr_table_exists($conn, 'clearancerequesttbl')) {
+        return 0;
+    }
+
+    $limit = max(1, min($limit, 10000));
+    $hasDocType = dr_column_exists($conn, 'documentrequesttbl', 'document_type');
+    $hasPurpose = dr_column_exists($conn, 'documentrequesttbl', 'purpose');
+    $hasRequestDetails = dr_column_exists($conn, 'documentrequesttbl', 'request_details');
+    $hasResidentId = dr_column_exists($conn, 'documentrequesttbl', 'resident_id');
+    $hasResidentUserId = dr_column_exists($conn, 'documentrequesttbl', 'resident_user_id');
+
+    $selectCols = ['d.request_id'];
+    if ($hasDocType) $selectCols[] = 'd.document_type';
+    if ($hasPurpose) $selectCols[] = 'd.purpose';
+    if ($hasRequestDetails) $selectCols[] = 'd.request_details';
+    if ($hasResidentId) $selectCols[] = 'd.resident_id';
+    if ($hasResidentUserId) $selectCols[] = 'd.resident_user_id';
+
+    $sql = "
+        SELECT " . implode(', ', $selectCols) . "
+        FROM documentrequesttbl d
+        ORDER BY d.request_id ASC
+        LIMIT ?
+    ";
+    $stmt = $conn->prepare($sql);
+    if (!$stmt) {
+        return 0;
+    }
+    $stmt->bind_param('i', $limit);
+    if (!$stmt->execute()) {
+        $stmt->close();
+        return 0;
+    }
+    $res = $stmt->get_result();
+    $rows = [];
+    while ($row = $res->fetch_assoc()) {
+        $rows[] = $row;
+    }
+    $stmt->close();
+
+    $created = 0;
+    foreach ($rows as $row) {
+        $docType = trim((string)($row['document_type'] ?? ''));
+        if ($docType === '' && $hasRequestDetails) {
+            $decoded = json_decode((string)($row['request_details'] ?? '{}'), true);
+            if (is_array($decoded)) {
+                $docType = trim((string)($decoded['document_type'] ?? ''));
+            }
+        }
+        if (!dr_is_clearance_document_type(dr_normalize_document_type($docType))) {
+            continue;
         }
 
-        $certificateDetails = dr_safe_json([
-            'source' => 'issuance_backfill',
-            'purpose' => $purpose,
-            'submitted_payload' => $payload,
-            'resident_id' => trim((string)($row['resident_id'] ?? '')),
-            'resident_user_id' => trim((string)($row['resident_user_id'] ?? '')),
-        ]);
-
-        dr_upsert_certificate_request($conn, $requestId, $docType, $certificateDetails);
+        dr_ensure_clearance_row_for_request($conn, $row);
         $created++;
     }
 

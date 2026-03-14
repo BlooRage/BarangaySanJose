@@ -149,15 +149,11 @@ $ownerFullAddress = htmlspecialchars(implode(', ', $ownerFullAddressParts), ENT_
             </div>
             <p class="form-subtitle">All fields marked with <span class="required-asterisk">*</span> are required</p>
 
-<<<<<<< Updated upstream
-            <form class="page-form" action="#" method="POST" enctype="multipart/form-data">
-=======
-            <form action="<?= htmlspecialchars($baseUrl) ?>/PhpFiles/Resident-End/documentRequestWorkflow.php" method="POST" enctype="multipart/form-data">
+            <form class="page-form" action="<?= htmlspecialchars($baseUrl) ?>/PhpFiles/Resident-End/documentRequestWorkflow.php" method="POST" enctype="multipart/form-data">
                 <input type="hidden" name="action" value="submit_request">
                 <input type="hidden" name="document_type" value="Barangay Clearance for Tricycle Permit">
                 <input type="hidden" name="redirect" value="1">
                 <input type="hidden" name="request_purpose" id="tricycleRequestPurpose" value="Tricycle Permit - New Application">
->>>>>>> Stashed changes
 
                 <h2 class="section-title text-center text-dark">Applicant Information</h2>
                 <div class="form-row">
@@ -377,4 +373,3 @@ $ownerFullAddress = htmlspecialchars(implode(', ', $ownerFullAddressParts), ENT_
     <script src="../../JS-Script-Files/Resident-End/Clearances/tricycleClearanceScript.js"></script>
 </body>
 </html>
-

@@ -510,6 +510,75 @@ function dr_build_business_clearance_address(array $source): string {
     return implode(', ', $parts);
 }
 
+function dr_build_general_permit_location(array $source, string $fallback = ''): string {
+    $direct = trim((string)($source['location'] ?? $source['lot_full_address'] ?? $source['project_location'] ?? ''));
+    if ($direct !== '') {
+        return $direct;
+    }
+
+    $sameAddress = strtolower(trim((string)($source['lot_same_address'] ?? '')));
+    $applicantAddress = trim((string)($source['applicant_full_address'] ?? $source['owner_full_address'] ?? $source['full_address'] ?? ''));
+    if (in_array($sameAddress, ['1', 'true', 'yes', 'on'], true)) {
+        return $applicantAddress !== '' ? $applicantAddress : $fallback;
+    }
+
+    $system = strtolower(trim((string)($source['lot_address_system'] ?? '')));
+    $parts = [];
+
+    if ($system === 'lot_block') {
+        $lotNumber = trim((string)($source['lot_number'] ?? ''));
+        $blockNumber = trim((string)($source['block_number'] ?? ''));
+        $phaseNumber = trim((string)($source['lot_phase_number'] ?? ''));
+        $subdivision = trim((string)($source['lot_subdivision'] ?? $source['lot_subdivision_block'] ?? ''));
+
+        if ($lotNumber !== '') {
+            $parts[] = 'Lot ' . $lotNumber;
+        }
+        if ($blockNumber !== '') {
+            $parts[] = 'Blk ' . $blockNumber;
+        }
+        if ($phaseNumber !== '') {
+            $parts[] = 'Phase ' . $phaseNumber;
+        }
+        if ($subdivision !== '') {
+            $parts[] = $subdivision;
+        }
+    } elseif ($system === 'house') {
+        $unitNumber = trim((string)($source['lot_unit_number'] ?? ''));
+        $streetNumber = trim((string)($source['lot_street_number'] ?? ''));
+        $streetName = trim((string)($source['lot_street_name'] ?? ''));
+        $subdivision = trim((string)($source['lot_subdivision'] ?? ''));
+
+        if ($unitNumber !== '') {
+            $parts[] = 'Unit ' . $unitNumber;
+        }
+
+        $streetLine = trim(implode(' ', array_filter([$streetNumber, $streetName], static fn($v) => $v !== '')));
+        if ($streetLine !== '') {
+            $parts[] = $streetLine;
+        }
+        if ($subdivision !== '') {
+            $parts[] = $subdivision;
+        }
+    }
+
+    foreach (['lot_barangay', 'lot_city', 'lot_province'] as $key) {
+        $value = trim((string)($source[$key] ?? ''));
+        if ($value !== '') {
+            $parts[] = $value;
+        }
+    }
+
+    $location = implode(', ', $parts);
+    if ($location !== '') {
+        return $location;
+    }
+    if ($applicantAddress !== '') {
+        return $applicantAddress;
+    }
+    return $fallback;
+}
+
 function dr_fetch_resident_birth_snapshot(mysqli $conn, string $residentId, string $userId): array {
     $sql = "
         SELECT birthdate, birthplace
@@ -1083,6 +1152,172 @@ if ($action === 'submit_request') {
         }
     }
 
+    $generalPermitConfig = null;
+    if (in_array($documentTypeToken, [
+        'barangayclearanceforelectricalpermit',
+        'clearanceforelectricalpermit',
+        'electricalpermit',
+    ], true)) {
+        $generalPermitConfig = [
+            'label' => 'Electrical permit',
+            'folder' => 'ElectricalPermit',
+            'default_purpose' => 'Electrical Permit Application',
+            'allowed_proof_types' => ['lease', 'tct', 'tax_declaration'],
+            'requires_ownership_type' => true,
+            'requires_sec_certificate' => false,
+            'requires_sec_for_ownership' => true,
+        ];
+    } elseif (in_array($documentTypeToken, [
+        'barangayclearanceforwaterpermit',
+        'clearanceforwaterpermit',
+        'waterpermit',
+    ], true)) {
+        $generalPermitConfig = [
+            'label' => 'Water permit',
+            'folder' => 'WaterPermit',
+            'default_purpose' => 'Water Permit Application',
+            'allowed_proof_types' => ['lease', 'tct', 'tax_declaration'],
+            'requires_ownership_type' => true,
+            'requires_sec_certificate' => false,
+            'requires_sec_for_ownership' => true,
+        ];
+    } elseif (in_array($documentTypeToken, [
+        'barangayclearanceforresidentialpermit',
+        'clearanceforresidentialpermit',
+        'residentialpermit',
+        'barangayclearanceforresidentialbuildingpermit',
+        'clearanceforresidentialbuildingpermit',
+        'residentialbuildingpermit',
+    ], true)) {
+        $generalPermitConfig = [
+            'label' => 'Residential permit',
+            'folder' => 'ResidentialPermit',
+            'default_purpose' => '',
+            'allowed_proof_types' => ['tct', 'tax_declaration'],
+            'requires_ownership_type' => false,
+            'requires_sec_certificate' => false,
+            'requires_sec_for_ownership' => false,
+        ];
+    } elseif (in_array($documentTypeToken, [
+        'barangayclearanceforcommercialpermit',
+        'clearanceforcommercialpermit',
+        'commercialpermit',
+        'barangayclearanceforcommercialbuildingpermit',
+        'clearanceforcommercialbuildingpermit',
+        'commercialbuildingpermit',
+    ], true)) {
+        $generalPermitConfig = [
+            'label' => 'Commercial permit',
+            'folder' => 'CommercialPermit',
+            'default_purpose' => '',
+            'allowed_proof_types' => ['tct', 'tax_declaration'],
+            'requires_ownership_type' => false,
+            'requires_sec_certificate' => true,
+            'requires_sec_for_ownership' => false,
+        ];
+    }
+
+    if ($generalPermitConfig !== null) {
+        $sameAddress = strtolower(trim((string)($_POST['lot_same_address'] ?? '')));
+        $usesApplicantAddress = in_array($sameAddress, ['1', 'true', 'yes', 'on'], true);
+        $lotAddressSystem = strtolower(trim((string)($_POST['lot_address_system'] ?? '')));
+
+        if (!$usesApplicantAddress) {
+            if (!in_array($lotAddressSystem, ['house', 'lot_block'], true)) {
+                dr_respond_json(422, ['success' => false, 'message' => 'Lot address system is required.']);
+            }
+
+            if ($lotAddressSystem === 'house') {
+                if (trim((string)($_POST['lot_street_number'] ?? '')) === '' || trim((string)($_POST['lot_street_name'] ?? '')) === '') {
+                    dr_respond_json(422, ['success' => false, 'message' => 'Lot street number and street name are required.']);
+                }
+            } elseif (
+                trim((string)($_POST['lot_number'] ?? '')) === ''
+                || trim((string)($_POST['block_number'] ?? '')) === ''
+                || trim((string)($_POST['lot_phase_number'] ?? '')) === ''
+            ) {
+                dr_respond_json(422, ['success' => false, 'message' => 'Lot number, block number, and phase are required.']);
+            }
+        }
+
+        $applicantAddress = trim((string)($_POST['applicant_full_address'] ?? $_POST['owner_full_address'] ?? $_POST['full_address'] ?? ''));
+        if ($applicantAddress !== '') {
+            $_POST['full_address'] = $applicantAddress;
+        }
+        $location = dr_build_general_permit_location($_POST, $applicantAddress);
+        if ($location !== '') {
+            $_POST['location'] = $location;
+            $_POST['project_location'] = $location;
+            $_POST['lot_full_address'] = $location;
+        }
+
+        if ($generalPermitConfig['default_purpose'] !== '') {
+            if (trim((string)($_POST['request_purpose'] ?? '')) === '') {
+                $_POST['request_purpose'] = $generalPermitConfig['default_purpose'];
+            }
+            if (trim((string)($_POST['purpose'] ?? '')) === '') {
+                $_POST['purpose'] = $generalPermitConfig['default_purpose'];
+            }
+        } elseif (trim((string)($_POST['purpose'] ?? '')) === '') {
+            dr_respond_json(422, ['success' => false, 'message' => 'Purpose is required.']);
+        }
+
+        $ownershipType = trim((string)($_POST['ownership_type'] ?? ''));
+        $needsSecCertificate = (bool)$generalPermitConfig['requires_sec_certificate'];
+        if ($generalPermitConfig['requires_ownership_type']) {
+            if (!in_array($ownershipType, ['Individual', 'Partnership', 'Company'], true)) {
+                dr_respond_json(422, ['success' => false, 'message' => 'Ownership type is required.']);
+            }
+            $needsSecCertificate = $needsSecCertificate || (
+                (bool)$generalPermitConfig['requires_sec_for_ownership']
+                && in_array($ownershipType, ['Partnership', 'Company'], true)
+            );
+        }
+
+        $proofAddressType = trim((string)($_POST['proof_address_type'] ?? ''));
+        if (!in_array($proofAddressType, $generalPermitConfig['allowed_proof_types'], true)) {
+            dr_respond_json(422, ['success' => false, 'message' => 'Valid proof of address type is required.']);
+        }
+        if ($proofAddressType !== 'lease' && trim((string)($_POST['proof_address_number'] ?? '')) === '') {
+            dr_respond_json(422, ['success' => false, 'message' => 'Proof of address document number is required.']);
+        }
+
+        $proofUpload = dr_save_upload(
+            $_FILES['proof_address_file'] ?? [],
+            'DocumentRequests/' . $generalPermitConfig['folder'] . '/ProofOfAddress',
+            ['jpg', 'jpeg', 'png', 'pdf']
+        );
+        if (!empty($proofUpload['error'])) {
+            dr_respond_json(422, ['success' => false, 'message' => 'Proof of address: ' . $proofUpload['error']]);
+        }
+        $_POST['proof_address_file_path'] = (string)($proofUpload['path'] ?? '');
+
+        $secCertificateError = (int)(($_FILES['sec_certificate_file']['error'] ?? UPLOAD_ERR_NO_FILE));
+        if ($needsSecCertificate) {
+            $secCertificateUpload = dr_save_upload(
+                $_FILES['sec_certificate_file'] ?? [],
+                'DocumentRequests/' . $generalPermitConfig['folder'] . '/SECCertificate',
+                ['jpg', 'jpeg', 'png', 'pdf']
+            );
+            if (!empty($secCertificateUpload['error'])) {
+                dr_respond_json(422, ['success' => false, 'message' => 'SEC certificate: ' . $secCertificateUpload['error']]);
+            }
+            $_POST['sec_certificate_file_path'] = (string)($secCertificateUpload['path'] ?? '');
+        } elseif ($secCertificateError !== UPLOAD_ERR_NO_FILE) {
+            $secCertificateUpload = dr_save_upload(
+                $_FILES['sec_certificate_file'] ?? [],
+                'DocumentRequests/' . $generalPermitConfig['folder'] . '/SECCertificate',
+                ['jpg', 'jpeg', 'png', 'pdf']
+            );
+            if (!empty($secCertificateUpload['error'])) {
+                dr_respond_json(422, ['success' => false, 'message' => 'SEC certificate: ' . $secCertificateUpload['error']]);
+            }
+            $_POST['sec_certificate_file_path'] = (string)($secCertificateUpload['path'] ?? '');
+        } else {
+            $_POST['sec_certificate_file_path'] = '';
+        }
+    }
+
     $isCohabitationRequest = ($documentTypeToken === 'cohabitation');
     if ($isCohabitationRequest) {
         $cohabitationVariant = trim((string)($_POST['cohabitation_variant'] ?? ''));
@@ -1364,16 +1599,6 @@ if ($action === 'submit_request') {
     }
     if (!$stmtClosed) {
         $stmt->close();
-    }
-
-    if (dr_is_issuance_document_type($documentType)) {
-        $certificateDetails = dr_safe_json([
-            'purpose' => $purpose,
-            'submitted_payload' => $payload,
-            'resident_id' => $residentId,
-            'resident_user_id' => $residentForeignId,
-        ]);
-        dr_upsert_certificate_request($conn, $requestId, $documentType, $certificateDetails);
     }
 
     $row = dr_fetch_request($conn, $requestId);

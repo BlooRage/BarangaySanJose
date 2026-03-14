@@ -634,7 +634,9 @@
     const token = String(docType || '').toLowerCase().replace(/[^a-z0-9]+/g, '');
     if (token.includes('electricalpermit')) return 'ELECTRICAL PERMIT';
     if (token.includes('waterpermit')) return 'WATER PERMIT';
+    if (token.includes('residentialpermit')) return 'RESIDENTIAL PERMIT';
     if (token.includes('residentialbuildingpermit')) return 'RESIDENTIAL BUILDING PERMIT';
+    if (token.includes('commercialpermit')) return 'COMMERCIAL PERMIT';
     if (token.includes('commercialbuildingpermit')) return 'COMMERCIAL BUILDING PERMIT';
     return '';
   }
@@ -716,8 +718,14 @@
     if (key.includes('waterpermit')) {
       return 'Barangay Clearance for Water Permit';
     }
+    if (key.includes('residentialpermit')) {
+      return 'Barangay Clearance for Residential Permit';
+    }
     if (key.includes('residentialbuildingpermit')) {
       return 'Barangay Clearance for Residential Building Permit';
+    }
+    if (key.includes('commercialpermit')) {
+      return 'Barangay Clearance for Commercial Permit';
     }
     if (key.includes('commercialbuildingpermit')) {
       return 'Barangay Clearance for Commercial Building Permit';
@@ -1106,7 +1114,7 @@
     if (text.includes('identity')) return 'identity';
     if (text.includes('residency') || text.includes('residence')) return 'residency';
     if (text.includes('goodmoral')) return 'goodmoral';
-    if (text.includes('electricalpermit') || text.includes('waterpermit') || text.includes('residentialbuildingpermit') || text.includes('commercialbuildingpermit')) return 'generalpermitclearance';
+    if (text.includes('electricalpermit') || text.includes('waterpermit') || text.includes('residentialpermit') || text.includes('residentialbuildingpermit') || text.includes('commercialpermit') || text.includes('commercialbuildingpermit')) return 'generalpermitclearance';
     if (text.includes('tricycle')) return 'tricycleclearance';
     if (text.includes('businesspermit') || text.includes('businessclearance') || text.includes('clearanceforbusinesspermit')) return 'businessclearance';
     if (text.includes('barangayclearance') || text.includes('barangaycertification') || text === 'clearance') return 'generic';

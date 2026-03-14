@@ -149,7 +149,10 @@ $ownerFullAddress = htmlspecialchars(implode(', ', $ownerFullAddressParts), ENT_
             </div>
             <p class="form-subtitle">All fields marked with <span class="required-asterisk">*</span> are required</p>
 
-            <form class="page-form" action="#" method="POST">
+            <form class="page-form" action="<?= htmlspecialchars($baseUrl) ?>/PhpFiles/Resident-End/documentRequestWorkflow.php" method="POST" enctype="multipart/form-data">
+                <input type="hidden" name="action" value="submit_request">
+                <input type="hidden" name="document_type" value="Barangay Clearance for Commercial Permit">
+                <input type="hidden" name="redirect" value="1">
 
                 <h2 class="section-title text-center text-dark">Applicant Information</h2>
                 <div class="form-row">

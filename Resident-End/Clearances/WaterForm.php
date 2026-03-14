@@ -146,7 +146,11 @@ $fullAddress = htmlspecialchars(implode(', ', $fullAddressParts), ENT_QUOTES, 'U
             </div>
             <p class="form-subtitle">All fields marked with <span class="required-asterisk">*</span> are required</p>
 
-            <form class="page-form" action="#" method="POST">
+            <form class="page-form" action="<?= htmlspecialchars($baseUrl) ?>/PhpFiles/Resident-End/documentRequestWorkflow.php" method="POST" enctype="multipart/form-data">
+                <input type="hidden" name="action" value="submit_request">
+                <input type="hidden" name="document_type" value="Barangay Clearance for Water Permit">
+                <input type="hidden" name="redirect" value="1">
+                <input type="hidden" name="request_purpose" value="Water Permit Application">
                 <h2 class="section-title text-center text-dark">Applicant Information</h2>
                 <div class="form-row">
                     <div class="input-stack"><label class="top-label">Last Name <span class="required-asterisk">*</span></label><input type="text" name="applicant_last_name" required readonly value="<?php echo $lastName; ?>"></div>
@@ -341,4 +345,3 @@ $fullAddress = htmlspecialchars(implode(', ', $fullAddressParts), ENT_QUOTES, 'U
 <script src="../../JS-Script-Files/Resident-End/Clearances/waterPermitScript.js"></script>
 </body>
 </html>
-

@@ -127,15 +127,18 @@ if (!is_array($payload)) {
 
 $row['document_type'] = trim((string)($payload['document_type'] ?? ''));
 if ($row['document_type'] === '') {
-    $q = $conn->prepare("SELECT certificate_type FROM issuancerequesttbl WHERE request_id = ? LIMIT 1");
-    if ($q) {
-        $q->bind_param('s', $requestId);
-        $q->execute();
-        $q->bind_result($certType);
-        if ($q->fetch()) {
-            $row['document_type'] = trim((string)$certType);
+    $issuanceTable = function_exists('dr_preferred_issuance_table') ? dr_preferred_issuance_table($conn) : null;
+    if ($issuanceTable !== null) {
+        $q = $conn->prepare("SELECT certificate_type FROM {$issuanceTable} WHERE request_id = ? LIMIT 1");
+        if ($q) {
+            $q->bind_param('s', $requestId);
+            $q->execute();
+            $q->bind_result($certType);
+            if ($q->fetch()) {
+                $row['document_type'] = trim((string)$certType);
+            }
+            $q->close();
         }
-        $q->close();
     }
 }
 if ($row['document_type'] === '') {

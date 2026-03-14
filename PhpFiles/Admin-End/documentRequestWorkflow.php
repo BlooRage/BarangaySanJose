@@ -21,12 +21,14 @@ if ($action === 'maintenance_run') {
     $syncedFinance = dr_backfill_missing_finance_transactions($conn, 2000);
     $prunedFree = dr_prune_free_document_finance_transactions($conn, 5000);
     $syncedIssuance = dr_backfill_missing_issuance_requests($conn, 5000);
+    $syncedClearance = dr_backfill_missing_clearance_requests($conn, 5000);
     dr_respond_json(200, [
         'success' => true,
         'maintenance' => [
             'finance_backfilled' => $syncedFinance,
             'free_pruned' => $prunedFree,
             'issuance_backfilled' => $syncedIssuance,
+            'clearance_backfilled' => $syncedClearance,
         ],
     ]);
 }
@@ -585,11 +587,12 @@ function dra_fetch_request_for_modal_fast(mysqli $conn, string $requestId): ?arr
 
     $extraSelects = [];
     $extraJoins = [];
-    if (dr_table_exists($conn, 'issuancerequesttbl')) {
+    $issuanceTable = dr_preferred_issuance_table($conn);
+    if ($issuanceTable !== null) {
         $extraSelects[] = "i.certificate_type AS _issuance_certificate_type";
         $extraSelects[] = "i.certificate_number AS _issuance_certificate_number";
         $extraSelects[] = "i.verification_code AS _issuance_verification_code";
-        $extraJoins[] = "LEFT JOIN issuancerequesttbl i ON i.request_id = d.request_id";
+        $extraJoins[] = "LEFT JOIN {$issuanceTable} i ON i.request_id = d.request_id";
     }
     if (dr_table_exists($conn, 'officialinformationtbl')) {
         $extraSelects[] = "TRIM(CONCAT_WS(' ', NULLIF(oir.firstname, ''), NULLIF(oir.middlename, ''), NULLIF(oir.lastname, ''), NULLIF(oir.suffix, ''))) AS _reviewed_by_name";
@@ -899,8 +902,14 @@ function dra_general_clearance_purpose_from_document_type(string $documentType):
     if (strpos($token, 'waterpermit') !== false) {
         return 'WATER PERMIT';
     }
+    if (strpos($token, 'residentialpermit') !== false) {
+        return 'RESIDENTIAL PERMIT';
+    }
     if (strpos($token, 'residentialbuildingpermit') !== false) {
         return 'RESIDENTIAL BUILDING PERMIT';
+    }
+    if (strpos($token, 'commercialpermit') !== false) {
+        return 'COMMERCIAL PERMIT';
     }
     if (strpos($token, 'commercialbuildingpermit') !== false) {
         return 'COMMERCIAL BUILDING PERMIT';
@@ -4287,13 +4296,14 @@ if ($action === 'list') {
 
     $extraSelects = [];
     $extraJoins = [];
-    $hasIssuanceTable = (!$liteList) && dr_table_exists($conn, 'issuancerequesttbl');
+    $issuanceTable = (!$liteList) ? dr_preferred_issuance_table($conn) : null;
+    $hasIssuanceTable = $issuanceTable !== null;
     $hasResidentInfoTable = (!$liteList) && dr_table_exists($conn, 'residentinformationtbl');
     if ($hasIssuanceTable) {
         $extraSelects[] = "i.certificate_type AS _issuance_certificate_type";
         $extraSelects[] = "i.certificate_number AS _issuance_certificate_number";
         $extraSelects[] = "i.verification_code AS _issuance_verification_code";
-        $extraJoins[] = "LEFT JOIN issuancerequesttbl i ON i.request_id = d.request_id";
+        $extraJoins[] = "LEFT JOIN {$issuanceTable} i ON i.request_id = d.request_id";
     }
     if ($hasResidentInfoTable && !$isFinanceList) {
         $extraSelects[] = "TRIM(CONCAT_WS(' ', NULLIF(riu.firstname, ''), NULLIF(riu.middlename, ''), NULLIF(riu.lastname, ''), NULLIF(riu.suffix, ''))) AS _resident_name_by_user";

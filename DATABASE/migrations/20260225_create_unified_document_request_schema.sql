@@ -66,12 +66,31 @@ CREATE TABLE IF NOT EXISTS issuancerequesttbl (
   request_id VARCHAR(16) NOT NULL,
   certificate_type VARCHAR(120) NOT NULL,
   certificate_details LONGTEXT DEFAULT NULL,
+  certificate_number VARCHAR(64) DEFAULT NULL,
+  verification_code VARCHAR(80) DEFAULT NULL,
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (certificate_id),
   UNIQUE KEY uq_issuancereq_request (request_id),
   KEY idx_issuancereq_type (certificate_type),
   CONSTRAINT fk_issuancereq_request FOREIGN KEY (request_id)
+    REFERENCES documentrequesttbl(request_id)
+    ON DELETE CASCADE ON UPDATE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+CREATE TABLE IF NOT EXISTS certificatesrequesttbl (
+  certificate_id BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT,
+  request_id VARCHAR(16) NOT NULL,
+  certificate_type VARCHAR(120) NOT NULL,
+  certificate_details LONGTEXT DEFAULT NULL,
+  certificate_number VARCHAR(64) DEFAULT NULL,
+  verification_code VARCHAR(80) DEFAULT NULL,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (certificate_id),
+  UNIQUE KEY uq_certificatesreq_request (request_id),
+  KEY idx_certificatesreq_type (certificate_type),
+  CONSTRAINT fk_certificatesreq_request FOREIGN KEY (request_id)
     REFERENCES documentrequesttbl(request_id)
     ON DELETE CASCADE ON UPDATE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
