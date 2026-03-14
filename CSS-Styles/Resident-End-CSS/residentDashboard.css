@@ -269,6 +269,70 @@ body {
     color: #000;
 }
 
+.btn-toggle {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 12px;
+    color: #666;
+    border: 0;
+    border-radius: 8px;
+    background: transparent;
+    text-align: left;
+    font-weight: 500;
+    box-shadow: none !important;
+}
+
+.btn-toggle:hover,
+.btn-toggle.active {
+    background-color: #fff3e6;
+    color: #000;
+    font-weight: 700;
+}
+
+.btn-toggle i {
+    color: #000;
+}
+
+.btn-toggle::after {
+    content: "\f078";
+    font-family: "Font Awesome 6 Free";
+    font-weight: 900;
+    margin-left: auto;
+    font-size: 0.75rem;
+    transition: transform 0.2s ease;
+}
+
+.btn-toggle.collapsed::after {
+    transform: rotate(-90deg);
+}
+
+.btn-toggle-nav {
+    padding: 0.3rem 0 0.15rem 1.25rem;
+    margin: 0;
+}
+
+.btn-toggle-nav li {
+    list-style: none;
+}
+
+.btn-toggle-nav .link-dark {
+    display: block;
+    padding: 7px 12px;
+    margin-bottom: 2px;
+    border-radius: 8px;
+    color: #666 !important;
+    text-decoration: none;
+}
+
+.btn-toggle-nav .link-dark:hover,
+.btn-toggle-nav .link-dark.active {
+    background-color: #fff3e6;
+    color: #000 !important;
+    font-weight: 700;
+}
+
 .account-button {
     background: linear-gradient(135deg, #0b2a4a 0%, #123a66 50%, #0a1f3b 100%);
     color: #ffffff;

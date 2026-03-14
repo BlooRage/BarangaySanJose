@@ -49,6 +49,15 @@ function activeLink($page, $current) {
   return $page === $current ? 'active' : '';
 }
 
+$transactionPages = [
+  'resident_activity.php',
+  'resident_transactions.php',
+  'document_requests.php',
+  'AppointmentsLandingPage.php',
+  'ComplaintsLandingPage.php',
+];
+$isTransactionsActive = in_array($current, $transactionPages, true);
+
 $displayName = "Resident";
 $profileImage = $baseUrl . '/Images/Profile-Placeholder.png';
 $residentId = '';
@@ -257,11 +266,11 @@ if ($residentId !== '' && isset($conn) && $conn instanceof mysqli) {
           <i class="fa-solid fa-id-badge fa-lg"></i>Barangay ID
         </a>
         <a href="<?= htmlspecialchars($baseUrl, ENT_QUOTES, 'UTF-8') ?>/Resident-End/Complaints/ComplaintsLandingPage.php"
-           class="a-sidebarLink <?= (in_array($current, ['ComplaintsLandingPage.php', 'ComplaintsForm.php'], true) ? 'active' : '') ?>">
+           class="a-sidebarLink <?= (in_array($current, ['ComplaintsForm.php'], true) ? 'active' : '') ?>">
           <i class="fa-solid fa-comment-dots"></i>Complaints
         </a>
         <a href="<?= htmlspecialchars($baseUrl, ENT_QUOTES, 'UTF-8') ?>/Resident-End/Appointments/AppointmentsLandingPage.php"
-           class="a-sidebarLink <?= (in_array($current, ['AppointmentsLandingPage.php', 'AppointmentForm.php'], true) ? 'active' : '') ?>">
+           class="a-sidebarLink <?= (in_array($current, ['AppointmentForm.php'], true) ? 'active' : '') ?>">
           <i class="fa-regular fa-calendar-days"></i>Appointments
         </a>
       </div>
@@ -272,18 +281,46 @@ if ($residentId !== '' && isset($conn) && $conn instanceof mysqli) {
            class="a-sidebarLink <?= (in_array($current, ['AnnouncementsLandingPage.php'], true) ? 'active' : '') ?>">
           <i class="fa-solid fa-bullhorn"></i>Announcements
         </a>
-        <a href="<?= htmlspecialchars($baseUrl, ENT_QUOTES, 'UTF-8') ?>/Resident-End/resident_activity.php"
-           class="a-sidebarLink <?= activeLink('resident_activity.php', $current) ?>">
-          <i class="fa-solid fa-list-check"></i>Activity
-        </a>
-        <a href="<?= htmlspecialchars($baseUrl, ENT_QUOTES, 'UTF-8') ?>/Resident-End/resident_transactions.php"
-           class="a-sidebarLink <?= activeLink('resident_transactions.php', $current) ?>">
+        <button class="btn btn-toggle d-flex align-items-center gap-2 rounded <?= $isTransactionsActive ? '' : 'collapsed' ?>"
+                data-bs-toggle="collapse"
+                data-bs-target="#resident-transactions-collapse"
+                aria-expanded="<?= $isTransactionsActive ? 'true' : 'false' ?>">
           <i class="fa-solid fa-clock-rotate-left"></i>Transactions
-        </a>
-        <a href="<?= htmlspecialchars($baseUrl, ENT_QUOTES, 'UTF-8') ?>/Resident-End/document_requests.php"
-           class="a-sidebarLink <?= activeLink('document_requests.php', $current) ?>">
-          <i class="fa-solid fa-file-lines"></i>Document Requests
-        </a>
+        </button>
+        <div class="collapse <?= $isTransactionsActive ? 'show' : '' ?>" id="resident-transactions-collapse">
+          <ul class="btn-toggle-nav list-unstyled fw-normal pb-1 small">
+            <li>
+              <a href="<?= htmlspecialchars($baseUrl, ENT_QUOTES, 'UTF-8') ?>/Resident-End/resident_activity.php"
+                 class="link-dark rounded <?= activeLink('resident_activity.php', $current) ?>">
+                Summary
+              </a>
+            </li>
+            <li>
+              <a href="<?= htmlspecialchars($baseUrl, ENT_QUOTES, 'UTF-8') ?>/Resident-End/resident_transactions.php"
+                 class="link-dark rounded <?= activeLink('resident_transactions.php', $current) ?>">
+                All Transactions
+              </a>
+            </li>
+            <li>
+              <a href="<?= htmlspecialchars($baseUrl, ENT_QUOTES, 'UTF-8') ?>/Resident-End/document_requests.php"
+                 class="link-dark rounded <?= activeLink('document_requests.php', $current) ?>">
+                Document Request
+              </a>
+            </li>
+            <li>
+              <a href="<?= htmlspecialchars($baseUrl, ENT_QUOTES, 'UTF-8') ?>/Resident-End/Appointments/AppointmentsLandingPage.php"
+                 class="link-dark rounded <?= activeLink('AppointmentsLandingPage.php', $current) ?>">
+                Appointment Schedules
+              </a>
+            </li>
+            <li>
+              <a href="<?= htmlspecialchars($baseUrl, ENT_QUOTES, 'UTF-8') ?>/Resident-End/Complaints/ComplaintsLandingPage.php"
+                 class="link-dark rounded <?= activeLink('ComplaintsLandingPage.php', $current) ?>">
+                Complaint Tracking
+              </a>
+            </li>
+          </ul>
+        </div>
       </div>
     </nav>
 
