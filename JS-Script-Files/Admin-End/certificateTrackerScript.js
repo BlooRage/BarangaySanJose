@@ -630,6 +630,61 @@
     return applicantAddress;
   }
 
+  function generalClearancePurposeFromDocType(docType) {
+    const token = String(docType || '').toLowerCase().replace(/[^a-z0-9]+/g, '');
+    if (token.includes('electricalpermit')) return 'ELECTRICAL PERMIT';
+    if (token.includes('waterpermit')) return 'WATER PERMIT';
+    if (token.includes('residentialbuildingpermit')) return 'RESIDENTIAL BUILDING PERMIT';
+    if (token.includes('commercialbuildingpermit')) return 'COMMERCIAL BUILDING PERMIT';
+    return '';
+  }
+
+  function buildGeneralPermitLocation(payload, applicantAddress = '') {
+    const direct = firstNonEmpty([
+      payload.location,
+      payload.lot_full_address,
+      payload.project_location
+    ]);
+    if (direct) return direct;
+
+    const sameAddress = String(payload.lot_same_address || '').trim().toLowerCase();
+    const applicant = firstNonEmpty([
+      payload.applicant_full_address,
+      payload.full_address,
+      payload.full_address_display,
+      payload.address,
+      applicantAddress
+    ]);
+    if (['1', 'true', 'yes', 'on'].includes(sameAddress)) {
+      return applicant;
+    }
+
+    const system = String(payload.lot_address_system || '').trim().toLowerCase();
+    if (system === 'lot_block') {
+      return joinAddressParts([
+        firstNonEmpty([payload.lot_number]) ? `Lot ${payload.lot_number}` : '',
+        firstNonEmpty([payload.block_number]) ? `Blk ${payload.block_number}` : '',
+        firstNonEmpty([payload.lot_phase_number]) ? `Phase ${payload.lot_phase_number}` : '',
+        firstNonEmpty([payload.lot_subdivision]),
+        firstNonEmpty([payload.lot_barangay]),
+        firstNonEmpty([payload.lot_city]),
+        firstNonEmpty([payload.lot_province])
+      ]);
+    }
+    if (system === 'house') {
+      return joinAddressParts([
+        firstNonEmpty([payload.lot_unit_number]) ? `Unit ${payload.lot_unit_number}` : '',
+        [firstNonEmpty([payload.lot_street_number]), firstNonEmpty([payload.lot_street_name])].filter(Boolean).join(' ').trim(),
+        firstNonEmpty([payload.lot_subdivision]),
+        firstNonEmpty([payload.lot_barangay]),
+        firstNonEmpty([payload.lot_city]),
+        firstNonEmpty([payload.lot_province])
+      ]);
+    }
+
+    return applicant;
+  }
+
   function residentInfoFromRow(row) {
     const payload = row && row.payload && typeof row.payload === 'object' ? row.payload : {};
     const bits = [];
@@ -655,6 +710,18 @@
     const raw = String(value || '').trim();
     if (!raw) return '-';
     const key = raw.toLowerCase().replace(/[^a-z0-9]+/g, '');
+    if (key.includes('electricalpermit')) {
+      return 'Barangay Clearance for Electrical Permit';
+    }
+    if (key.includes('waterpermit')) {
+      return 'Barangay Clearance for Water Permit';
+    }
+    if (key.includes('residentialbuildingpermit')) {
+      return 'Barangay Clearance for Residential Building Permit';
+    }
+    if (key.includes('commercialbuildingpermit')) {
+      return 'Barangay Clearance for Commercial Building Permit';
+    }
     if (key.includes('businesspermit') || key.includes('businessclearance') || key.includes('clearanceforbusinesspermit')) {
       return 'Barangay Clearance for Business Permit';
     }
@@ -784,6 +851,12 @@
       relationship_proof_file_path: 'Proof of Relationship',
       relationship_proof_file_paths: 'Proof of Relationship Attachment',
       valid_id_file_path: 'Valid ID',
+      or_vehicle_file_path: 'O.R. of the Vehicle',
+      cr_vehicle_file_path: 'C.R. of the Vehicle',
+      toda_poda_cert_file_path: 'TODA / PODA Certification',
+      authorization_vehicle_file_path: 'Authorization of Vehicle',
+      deed_of_sale_file_path: 'Notarized Deed of Sale',
+      last_year_clearance_file_path: 'Barangay Clearance from Previous Year',
       business_reg_file_path: 'Business Registration',
       proof_address_file_path: 'Proof of Business Address',
       business_photo_file_path: 'Establishment Photo',
@@ -939,9 +1012,18 @@
   }
 
   function previewIndigencyIssuedText(value) {
-    const raw = String(value || '').trim();
-    const d = raw ? new Date(raw) : new Date();
-    if (Number.isNaN(d.getTime())) return raw || dr_now_text();
+    const raw = stripTemplateTokens(value);
+    const normalized = String(raw || '').trim();
+    const formattedTokenMatch = normalized.match(/^(\d{1,2})(st|nd|rd|th)\s+day\s+of\s+([A-Za-z]+)\s+(\d{4})$/i);
+    if (formattedTokenMatch) {
+      return `${formattedTokenMatch[1]}${formattedTokenMatch[2].toLowerCase()} day of ${formattedTokenMatch[3].toUpperCase()} ${formattedTokenMatch[4]}`;
+    }
+    const parsed = normalized ? (parseFlexibleDate(normalized) || new Date(normalized)) : new Date();
+    const d = parsed instanceof Date ? parsed : new Date();
+    if (Number.isNaN(d.getTime())) {
+      const fallback = new Date();
+      return previewIndigencyIssuedText(fallback.toISOString());
+    }
     const day = d.getDate();
     const month = d.toLocaleDateString('en-US', { month: 'long' }).toUpperCase();
     const year = d.getFullYear();
@@ -1024,6 +1106,8 @@
     if (text.includes('identity')) return 'identity';
     if (text.includes('residency') || text.includes('residence')) return 'residency';
     if (text.includes('goodmoral')) return 'goodmoral';
+    if (text.includes('electricalpermit') || text.includes('waterpermit') || text.includes('residentialbuildingpermit') || text.includes('commercialbuildingpermit')) return 'generalpermitclearance';
+    if (text.includes('tricycle')) return 'tricycleclearance';
     if (text.includes('businesspermit') || text.includes('businessclearance') || text.includes('clearanceforbusinesspermit')) return 'businessclearance';
     if (text.includes('barangayclearance') || text.includes('barangaycertification') || text === 'clearance') return 'generic';
     return 'generic';
@@ -1123,6 +1207,26 @@
       payload.business_approval_type,
       payload.businessApprovalType
     ]));
+    const franchisee = firstNonEmpty([
+      payload._preview_franchisee,
+      payload.franchisee,
+      payload.vehicle_franchise
+    ]);
+    const vehicleType = firstNonEmpty([
+      payload._preview_vehicle_type,
+      payload.vehicle_make,
+      payload.type_of_vehicle
+    ]);
+    const registrationNumber = firstNonEmpty([
+      payload._preview_registration_number,
+      payload.cr_number,
+      payload.registration_number,
+      payload.or_number
+    ]);
+    const bodyNumber = firstNonEmpty([
+      payload._preview_body_number,
+      payload.body_number
+    ]);
     const fatherName = [
       firstNonEmpty([payload.father_first_name]),
       firstNonEmpty([payload.father_middle_name]),
@@ -1190,6 +1294,18 @@
       if (!childName && !childAge) continue;
       childLines.push(`${childName}${childAge ? `, ${childAge} y/o` : ''}`.trim());
     }
+    const requestedDocType = firstNonEmpty([payload.document_type, row.document_type, 'Certificate']);
+    const generalPermitPurpose = generalClearancePurposeFromDocType(requestedDocType);
+    const generalPermitLocation = buildGeneralPermitLocation(
+      payload,
+      firstNonEmpty([
+        payload.applicant_full_address,
+        payload.full_address,
+        payload.full_address_display,
+        residentProfile.full_address
+      ])
+    );
+    const generalPermitRemarks = firstNonEmpty([payload.remarks, payload.ownership_type]);
     const knownPayloadKeys = new Set([
       'action', 'csrf_token', 'redirect', 'document_type',
       'last_name', 'lastname', 'first_name', 'firstname', 'middle_name', 'middlename', 'suffix', 'suffix_name',
@@ -1200,6 +1316,13 @@
       'business_name', 'businessName', 'business_trade_name', 'trade_name', 'establishment_name', 'business_establishment',
       '_preview_business_approval_type', 'business_approval_type', 'businessApprovalType',
       '_preview_plate_number', 'plate_number', 'business_plate_number', 'vehicle_plate_number',
+      '_preview_franchisee', 'franchisee', 'vehicle_franchise', '_preview_vehicle_type', 'vehicle_make', 'type_of_vehicle',
+      '_preview_registration_number', 'registration_number', 'cr_number', 'or_number', '_preview_body_number', 'body_number',
+      'vehicle_named_to_owner', 'applicant_last_name', 'applicant_first_name', 'applicant_middle_name', 'applicant_suffix',
+      'applicant_contact_number', 'applicant_full_address',
+      'lot_same_address', 'lot_address_system', 'lot_unit_number', 'lot_street_number', 'lot_street_name',
+      'lot_subdivision', 'lot_number', 'block_number', 'lot_phase_number', 'lot_barangay', 'lot_city', 'lot_province',
+      'project_location', 'ownership_type',
       'years_of_residency', 'months_of_residency',
       'child_birthplace', 'child_nationality', 'birthplace', 'place_of_birth', 'location', 'remarks',
       'father_first_name', 'father_middle_name', 'father_last_name', 'father_suffix',
@@ -1218,7 +1341,6 @@
       additionalDetails.push({ label: friendlyLabel(k), value });
     });
 
-    const requestedDocType = firstNonEmpty([payload.document_type, row.document_type, 'Certificate']);
     const inferredBusinessClearance = !!businessName
       || /business\s+permit/i.test(firstNonEmpty([row.purpose, payload.request_purpose, payload.purpose]));
 
@@ -1235,11 +1357,15 @@
         fullNameFromRow(row)
       ),
       fullAddress: upperText(stripAreaFromAddress(getPersonal('Full Address', '') || residentProfile.full_address || payload.full_address || payload.full_address_display || payload.address || payload.complete_address || '-'), '-'),
-      purpose: upperText(firstNonEmpty([row.purpose, payload.purpose, payload.request_purpose, '-']), '-'),
+      purpose: upperText(generalPermitPurpose || firstNonEmpty([row.purpose, payload.purpose, payload.request_purpose, '-']), '-'),
       businessName: upperText(businessName || '', ''),
       businessAddress: upperText(businessAddress || '', ''),
       businessApprovalType,
+      franchisee: upperText(franchisee || '', ''),
+      vehicleType: upperText(vehicleType || '', ''),
+      registrationNumber: upperText(registrationNumber || '', ''),
       plateNumber: upperText(plateNumber || '', ''),
+      bodyNumber: upperText(bodyNumber || '', ''),
       operatorName: upperText(firstNonEmpty([
         payload.operator_name,
         payload.business_operator_name,
@@ -1247,7 +1373,13 @@
       ]), ''),
       operatorAddress: upperText(composeBarangayAddress(operatorAddressRaw || residentProfile.full_address || payload.full_address || ''), ''),
       amount: upperText(previewAmount, ''),
-      issuedDate: row.submitted_at || dr_now_text(),
+      issuedDate: firstNonEmpty([
+        row.release_timestamp,
+        row.completed_at,
+        row.ready_at,
+        row.submitted_at,
+        dr_now_text()
+      ]),
       approvedByName: upperText(firstNonEmptyName([
         row.reviewed_by,
         row.personnel_name,
@@ -1279,6 +1411,7 @@
         payload.government_position_group,
         payload.institution_name
       ]), ''),
+      certificateNumber: upperText(firstNonEmpty([row.certificate_number, payload.certificate_number]), ''),
       requestFor: upperText(firstNonEmpty([payload.request_purpose]), ''),
       orNumber: upperText(stripTemplateTokens(firstNonEmpty([row.or_number])), ''),
       yearsResidency: upperText(firstNonEmpty([payload.years_of_residency]), ''),
@@ -1288,11 +1421,11 @@
       childNationality: upperText(firstNonEmpty([payload.child_nationality]), ''),
       birthdate: upperText(previewBornOnDate(applicantBirthdateRaw), ''),
       birthplace: upperText(firstNonEmpty([payload.birthplace, payload.place_of_birth, payload.child_birthplace]), ''),
-      location: upperText(firstNonEmpty([payload.location, payload.complete_address, payload.address, payload.full_address, residentProfile.full_address]), ''),
+      location: upperText(generalPermitLocation || firstNonEmpty([payload.location, payload.complete_address, payload.address, payload.full_address, residentProfile.full_address]), ''),
       applicantResidenceAddress: upperText(firstNonEmpty([payload.full_address, payload.full_address_display, payload.address, residentProfile.full_address]), ''),
       cohabitantResidenceAddress: upperText(buildCohabitantAddress(payload, firstNonEmpty([payload.full_address, payload.full_address_display, residentProfile.full_address])), ''),
       cohabitationResidenceAddress: upperText(buildCohabitationAddress(payload, firstNonEmpty([payload.full_address, payload.full_address_display, residentProfile.full_address])), ''),
-      remarks: upperText(firstNonEmpty([payload.remarks, payload.remark, row.status_remarks, row.status_reason]), ''),
+      remarks: upperText(generalPermitRemarks || firstNonEmpty([payload.remarks, payload.remark, row.status_remarks, row.status_reason]), ''),
       fatherName: upperText(fatherName, ''),
       motherName: upperText(motherName, ''),
       cohabitantName: upperText(cohabitantName, ''),
@@ -1327,7 +1460,9 @@
     const docType = String(state.docType || 'Certificate').trim() || 'Certificate';
     const docKey = normalizePreviewDocKey(docType);
     const isIndigency = docKey === 'indigency';
+    const isGeneralPermitClearance = docKey === 'generalpermitclearance';
     const isBusinessPermitClearance = docKey === 'businessclearance';
+    const isTricyclePermitClearance = docKey === 'tricycleclearance';
     const isGoodMoral = docKey === 'goodmoral';
     const isResidency = docKey === 'residency';
     const isCohabitation = docKey === 'cohabitation';
@@ -1337,11 +1472,17 @@
     const fullName = String(state.fullName || '-').trim() || '-';
     const fullAddress = String(state.fullAddress || '-').trim() || '-';
     const purpose = String(state.purpose || '-').trim() || '-';
+    const location = String(state.location || '').trim();
+    const franchisee = String(state.franchisee || '').trim();
+    const vehicleType = String(state.vehicleType || '').trim();
+    const registrationNumber = String(state.registrationNumber || '').trim();
     const issuedDateWord = previewIndigencyIssuedText(state.issuedDate || '');
+    const certificateNumber = String(state.certificateNumber || '').trim();
     const birthdate = String(state.birthdate || '').trim();
     const birthplace = String(state.birthplace || '').trim();
     const remarks = String(state.remarks || '').trim();
     const requestFor = String(state.requestFor || '').trim();
+    const bodyNumber = String(state.bodyNumber || '').trim();
     const age = String(state.age || '').trim();
     const cohabitantName = String(state.cohabitantName || '').trim();
     const cohabitantAgeRawState = String(state.cohabitantAge || '').trim();
@@ -1374,17 +1515,22 @@
     const requestOfficerLine2 = String(state.requestOfficerLine2 || '').trim();
     const requestOfficerLine3 = String(state.requestOfficerLine3 || '').trim();
     const safe = (value, fallback = '-') => (String(value || '').trim() || fallback);
+    const templateSafe = (value, fallback = '-') => {
+      const text = String(value || '').trim();
+      return (text && text !== '-') ? text : fallback;
+    };
     const businessMetaValue = (key, value) => {
       const text = String(value || '').trim();
       if (!text) return '<span class="doc-preview-business-meta-line"></span>';
       return previewEditable(key, text, '_____');
     };
-    const businessCheckMark = (type, placeholder) => {
+    const businessCheckMark = (type) => {
       const selected = businessApprovalType === type;
       return `
         <span class="doc-preview-business-check-mark${selected ? ' doc-preview-business-check-mark--selected' : ''}">
-          <span class="doc-preview-business-check-placeholder">${esc(placeholder)}</span>
-          <span class="doc-preview-business-check-inline">&#10003;</span>
+          <span class="doc-preview-business-check-line"></span>
+          <span class="doc-preview-business-check-tick">✓</span>
+          <span class="doc-preview-business-check-line"></span>
         </span>
       `;
     };
@@ -1439,6 +1585,145 @@
       `;
       metaHtml = '';
       issuedLine = `Issued this <strong>${esc(issuedDateWord)}</strong>, at the office of the punong Barangay, Barangay San Jose, Rodriguez (Montalban), Rizal.`;
+    } else if (isGeneralPermitClearance) {
+      titleHtml = '<div class="doc-preview-generalclearance-office"><div>TANGGAPAN NG PUNONG BARANGAY</div><div>BARANGAY CLEARANCE</div></div>';
+      contentHtml = `
+        <p class="doc-preview-generalclearance-lead"><strong>TO WHOM IT MAY CONCERN::</strong></p>
+        <p class="doc-preview-generalclearance-intro">
+          This is to certify that the person whose name and thumb mark appears here on has
+          requested a Barangay Clearance from this office and the information are listed below:
+        </p>
+        <div class="doc-preview-generalclearance-fields">
+          <div class="doc-preview-generalclearance-field">
+            <strong class="doc-preview-generalclearance-field-label">Name</strong>
+            <strong class="doc-preview-generalclearance-field-colon">:</strong>
+            <div class="doc-preview-generalclearance-field-value"><strong>${esc(templateSafe(fullName, '${FULL_NAME}'))}</strong></div>
+          </div>
+          <div class="doc-preview-generalclearance-field doc-preview-generalclearance-field--address">
+            <strong class="doc-preview-generalclearance-field-label">Residential Address</strong>
+            <strong class="doc-preview-generalclearance-field-colon">:</strong>
+            <div class="doc-preview-generalclearance-field-value"><strong>${esc(templateSafe(fullAddress, '${ADDRESS}'))}</strong><br><strong>Barangay San Jose, Montalban, Rizal</strong></div>
+          </div>
+          <div class="doc-preview-generalclearance-field">
+            <strong class="doc-preview-generalclearance-field-label">Location</strong>
+            <strong class="doc-preview-generalclearance-field-colon">:</strong>
+            <div class="doc-preview-generalclearance-field-value"><strong>${esc(templateSafe(location, '${LOCATION}'))}</strong></div>
+          </div>
+          <div class="doc-preview-generalclearance-field">
+            <strong class="doc-preview-generalclearance-field-label">Remarks</strong>
+            <strong class="doc-preview-generalclearance-field-colon">:</strong>
+            <div class="doc-preview-generalclearance-field-value"><strong>${esc(templateSafe(remarks, '${REMARKS}'))}</strong></div>
+          </div>
+          <div class="doc-preview-generalclearance-field">
+            <strong class="doc-preview-generalclearance-field-label">Purpose</strong>
+            <strong class="doc-preview-generalclearance-field-colon">:</strong>
+            <div class="doc-preview-generalclearance-field-value"><strong>${esc(templateSafe(purpose, '${PURPOSE}'))}</strong></div>
+          </div>
+        </div>
+        <p class="doc-preview-generalclearance-note">
+          This clearance is being issued pursuant to Barangay Revenue Code ORDINANCE NO.<br>11 - 2019
+        </p>
+      `;
+      issuedLine = `Issued this <strong>${esc(issuedDateWord)}</strong> at the office of the Punong Barangay, Barangay<br>San Jose, Montalban, Rizal`;
+      metaHtml = `
+        <div class="doc-preview-generalclearance-meta">
+          <div class="doc-preview-generalclearance-meta-row">
+            <div class="doc-preview-generalclearance-meta-label"><strong>CTC No.</strong></div>
+            <div class="doc-preview-generalclearance-meta-colon">:</div>
+            <div class="doc-preview-generalclearance-meta-value"><strong>${esc(templateSafe(certificateNumber, '${CERTIFICATE_NUMBER}'))}</strong></div>
+          </div>
+          <div class="doc-preview-generalclearance-meta-row">
+            <div class="doc-preview-generalclearance-meta-label"><strong>Issued at</strong></div>
+            <div class="doc-preview-generalclearance-meta-colon">:</div>
+            <div class="doc-preview-generalclearance-meta-value"><span class="doc-preview-generalclearance-meta-line"></span></div>
+          </div>
+          <div class="doc-preview-generalclearance-meta-row">
+            <div class="doc-preview-generalclearance-meta-label"><strong>Issued On</strong></div>
+            <div class="doc-preview-generalclearance-meta-colon">:</div>
+            <div class="doc-preview-generalclearance-meta-value"><span class="doc-preview-generalclearance-meta-line"></span></div>
+          </div>
+          <div class="doc-preview-generalclearance-meta-row">
+            <div class="doc-preview-generalclearance-meta-label"><strong>Amount</strong></div>
+            <div class="doc-preview-generalclearance-meta-colon">:</div>
+            <div class="doc-preview-generalclearance-meta-value"><strong>${esc(templateSafe(amount, '${AMOUNT}'))}</strong></div>
+          </div>
+          <div class="doc-preview-generalclearance-meta-row">
+            <div class="doc-preview-generalclearance-meta-label"><strong>OR No.</strong></div>
+            <div class="doc-preview-generalclearance-meta-colon">:</div>
+            <div class="doc-preview-generalclearance-meta-value"><strong>${esc(templateSafe(state.orNumber, '${OR_NUMBER}'))}</strong></div>
+          </div>
+        </div>
+      `;
+    } else if (isTricyclePermitClearance) {
+      titleHtml = '<div class="doc-preview-tricycle-office"><div>TANGGAPAN NG PUNONG BARANGAY</div><div>BARANGAY CLEARANCE</div></div>';
+      contentHtml = `
+        <p class="doc-preview-tricycle-lead"><strong>TO WHOM IT MAY CONCERN:</strong></p>
+        <p class="doc-preview-tricycle-intro">
+          This is to certify that the person whose name and thumb mark appears here on has
+          requested a Barangay Clearance from this office and the information are listed below:
+        </p>
+        <div class="doc-preview-tricycle-fields">
+          <div class="doc-preview-tricycle-field">
+            <strong class="doc-preview-tricycle-field-label">Name</strong>
+            <strong class="doc-preview-tricycle-field-colon">:</strong>
+            <div class="doc-preview-tricycle-field-value"><strong>${esc(templateSafe(fullName, '${NAME}'))}</strong></div>
+          </div>
+          <div class="doc-preview-tricycle-field doc-preview-tricycle-field--address">
+            <strong class="doc-preview-tricycle-field-label">Address</strong>
+            <strong class="doc-preview-tricycle-field-colon">:</strong>
+            <div class="doc-preview-tricycle-field-value"><strong>${esc(templateSafe(fullAddress, '${ADDRESS}'))}</strong><br><strong>Barangay San Jose, Montalban, Rizal</strong></div>
+          </div>
+          <div class="doc-preview-tricycle-field">
+            <strong class="doc-preview-tricycle-field-label">Location</strong>
+            <strong class="doc-preview-tricycle-field-colon">:</strong>
+            <div class="doc-preview-tricycle-field-value"><strong>${esc(templateSafe(franchisee, '${LOCATION_OF_TODA/PODA}'))}</strong></div>
+          </div>
+          <div class="doc-preview-tricycle-field">
+            <strong class="doc-preview-tricycle-field-label">Type of Vehicle</strong>
+            <strong class="doc-preview-tricycle-field-colon">:</strong>
+            <div class="doc-preview-tricycle-field-value"><strong>${esc(templateSafe(vehicleType, '${TYPE_OF_VEHICLE}'))}</strong></div>
+          </div>
+          <div class="doc-preview-tricycle-field">
+            <strong class="doc-preview-tricycle-field-label">Registration No.</strong>
+            <strong class="doc-preview-tricycle-field-colon">:</strong>
+            <div class="doc-preview-tricycle-field-value"><strong>${esc(templateSafe(registrationNumber, '${REGISTRATION_NUMBER}'))}</strong></div>
+          </div>
+          <div class="doc-preview-tricycle-field">
+            <strong class="doc-preview-tricycle-field-label">Plate No.</strong>
+            <strong class="doc-preview-tricycle-field-colon">:</strong>
+            <div class="doc-preview-tricycle-field-value"><strong>${esc(templateSafe(plateNumber, '${PLATE_NUMBER}'))}</strong></div>
+          </div>
+          <div class="doc-preview-tricycle-field">
+            <strong class="doc-preview-tricycle-field-label">Body No.</strong>
+            <strong class="doc-preview-tricycle-field-colon">:</strong>
+            <div class="doc-preview-tricycle-field-value"><strong>${esc(templateSafe(bodyNumber, '${BODY_NUMBER}'))}</strong></div>
+          </div>
+        </div>
+        <p class="doc-preview-tricycle-purpose">
+          This certification is being issued upon the request of the above subject person for his/her
+          application for necessary permit
+        </p>
+      `;
+      issuedLine = `Issued this <strong>${esc(issuedDateWord)}</strong> at the office of the Punong Barangay, Barangay<br>San Jose, Montalban, Rizal`;
+      metaHtml = `
+        <div class="doc-preview-tricycle-meta">
+          <div class="doc-preview-tricycle-meta-row">
+            <div class="doc-preview-tricycle-meta-label"><strong>Clearance No.</strong></div>
+            <div class="doc-preview-tricycle-meta-colon">:</div>
+            <div class="doc-preview-tricycle-meta-value"><strong>${esc(templateSafe(certificateNumber, '${CLEARANCE_NUMBER}'))}</strong></div>
+          </div>
+          <div class="doc-preview-tricycle-meta-row">
+            <div class="doc-preview-tricycle-meta-label"><strong>Reciept No.</strong></div>
+            <div class="doc-preview-tricycle-meta-colon">:</div>
+            <div class="doc-preview-tricycle-meta-value"><strong>${esc(templateSafe(state.orNumber, '${RECIEPT_NUMBER}'))}</strong></div>
+          </div>
+          <div class="doc-preview-tricycle-meta-row">
+            <div class="doc-preview-tricycle-meta-label"><strong>Amount</strong></div>
+            <div class="doc-preview-tricycle-meta-colon">:</div>
+            <div class="doc-preview-tricycle-meta-value"><strong>${esc(templateSafe(amount, '${AMOUNT}'))}</strong></div>
+          </div>
+        </div>
+      `;
     } else if (isBusinessPermitClearance) {
       titleHtml = '<div class="doc-preview-goodmoral-office doc-preview-business-office"><div>TANGGAPAN NG PUNONG BARANGAY</div><div>BARANGAY CLEARANCE FOR BUSINESS PERMIT</div></div>';
       contentHtml = `
@@ -1458,20 +1743,20 @@
         </p>
         <div class="doc-preview-business-checks">
           <div class="doc-preview-business-check-row">
-            ${businessCheckMark('not_banned', '__/__')}
+            ${businessCheckMark('not_banned')}
             <span>Not among those business or trade activities being banned to be established in this Barangay</span>
           </div>
           <div class="doc-preview-business-check-row">
-            ${businessCheckMark('no_objection', '__/__')}
+            ${businessCheckMark('no_objection')}
             <span>Interposes no objection for the issuance of the corresponding Business Permit being applied for.</span>
           </div>
           <div class="doc-preview-business-check-row">
-            ${businessCheckMark('temporary_clearance', '_____')}
+            ${businessCheckMark('temporary_clearance')}
             <span>Recommendations only the issuance of "Temporary Barangay Clearance" subject for revocation anytime provided that the requirements under existing Barangay Ordinance, Rules and Regulations should be complied with, otherwise this Barangay should take the necessary actions within legal bounds to stop its continued operations.</span>
           </div>
         </div>
       `;
-      issuedLine = `Issued this <strong>${esc(issuedDateWord)}</strong> at the office of the Punong Barangay, Barangay<br>San Jose, Montalban, Rizal`;
+      issuedLine = `Issued this <strong>${esc(issuedDateWord)}</strong> at the office of the Punong Barangay, Barangay San Jose, Montalban, Rizal.`;
       metaHtml = '';
     } else if (isGoodMoral) {
       contentHtml = `
@@ -1621,11 +1906,15 @@
 
     const paperClass = isIndigency
       ? 'doc-preview-paper doc-preview-paper--indigency'
-      : (isBusinessPermitClearance
+      : isBusinessPermitClearance
         ? 'doc-preview-paper doc-preview-paper--business'
-        : (isGoodMoral || isResidency || isCohabitation || isFirstTimeJobSeeker
-          ? `doc-preview-paper doc-preview-paper--goodmoral${(isCohabitation && cohabitationHasChildren) ? ' doc-preview-paper--cohabitation-children' : ''}${isFirstTimeJobSeeker ? ' doc-preview-paper--ftjs' : ''}${isRelationshipJailVisit ? ' doc-preview-paper--jail' : ''}`
-          : 'doc-preview-paper'));
+        : isGeneralPermitClearance
+          ? 'doc-preview-paper doc-preview-paper--generalclearance'
+          : isTricyclePermitClearance
+            ? 'doc-preview-paper doc-preview-paper--tricycle'
+            : (isGoodMoral || isResidency || isCohabitation || isFirstTimeJobSeeker)
+              ? `doc-preview-paper doc-preview-paper--goodmoral${(isCohabitation && cohabitationHasChildren) ? ' doc-preview-paper--cohabitation-children' : ''}${isFirstTimeJobSeeker ? ' doc-preview-paper--ftjs' : ''}${isRelationshipJailVisit ? ' doc-preview-paper--jail' : ''}`
+              : 'doc-preview-paper';
 
     const qrBlockHtml = qrUrl !== ''
       ? `
@@ -1686,6 +1975,42 @@
         </div>
       `;
       footerNoteHtml = 'This document is valid until the end of the year,<br>Check the qr code to verify the authenticity of this document.';
+    } else if (isGeneralPermitClearance) {
+      footerAreaHtml = `
+        <div class="doc-preview-generalclearance-footer-area${qrBlockHtml ? '' : ' doc-preview-generalclearance-footer-area--noqr'}">
+          <div class="doc-preview-generalclearance-issuedby">Issued by: <strong>MINERVA D. QUITA</strong><br><em>Barangay Secretary</em></div>
+          <div class="doc-preview-generalclearance-signing">
+            <div class="doc-preview-signature doc-preview-generalclearance-signature">
+              <div class="name">${esc(String(state.approvedByName || 'HON. GLENN S. EVANGELISTA').trim() || 'HON. GLENN S. EVANGELISTA')}</div>
+              <div>Punong Barangay</div>
+            </div>
+            <div class="doc-preview-signature doc-preview-generalclearance-signature">
+              <div class="name">MR. JOSEPH C. PATRICIO</div>
+              <div>Head, Monitoring &amp; Collection Dept.</div>
+            </div>
+          </div>
+          ${qrBlockHtml}
+        </div>
+      `;
+      footerNoteHtml = 'This clearance is valid for Forty-five (45) days from the date issued and not valid without official seal. Check the qr code to verify the authenticity of this document.';
+    } else if (isTricyclePermitClearance) {
+      footerAreaHtml = `
+        <div class="doc-preview-tricycle-footer-area${qrBlockHtml ? '' : ' doc-preview-tricycle-footer-area--noqr'}">
+          <div class="doc-preview-tricycle-issuedby">Issued by: <strong>MINERVA D. QUITA</strong><br><em>Barangay Secretary</em></div>
+          <div class="doc-preview-tricycle-signing">
+            <div class="doc-preview-signature doc-preview-tricycle-signature">
+              <div class="name">${esc(String(state.approvedByName || 'HON. GLENN S. EVANGELISTA').trim() || 'HON. GLENN S. EVANGELISTA')}</div>
+              <div>Punong Barangay</div>
+            </div>
+            <div class="doc-preview-signature doc-preview-tricycle-signature">
+              <div class="name">MR. JOSEPH C. PATRICIO</div>
+              <div>Head, Monitoring &amp; Collection Dept.</div>
+            </div>
+          </div>
+          ${qrBlockHtml}
+        </div>
+      `;
+      footerNoteHtml = 'Check the qr code to verify the authenticity of this document.';
     } else {
       const footerAreaClass = `doc-preview-footer-area${isFirstTimeJobSeeker ? ' doc-preview-footer-area--ftjs' : ''}${qrBlockHtml ? '' : ' doc-preview-footer-area--noqr'}`;
       footerAreaHtml = isFirstTimeJobSeeker
@@ -2190,6 +2515,17 @@
 
   function openDocumentModal(docUrl, title = 'Document Viewer', returnTarget = '', options = {}) {
     if (!docUrl || !paymentProofModal || !paymentProofWrap || !paymentProofOpenNew) return;
+    const bustedUrl = (() => {
+      const stamp = String(Date.now());
+      try {
+        const u = new URL(String(docUrl), window.location.origin);
+        u.searchParams.set('_ts', stamp);
+        return u.toString();
+      } catch (_) {
+        const raw = String(docUrl);
+        return `${raw}${raw.includes('?') ? '&' : '?'}_ts=${stamp}`;
+      }
+    })();
     paymentProofReturnTarget = String(returnTarget || '').trim();
     if (paymentProofTitle) {
       paymentProofTitle.textContent = String(title || 'Document Viewer').trim() || 'Document Viewer';
@@ -2206,12 +2542,12 @@
       paymentProofCloseBtn.classList.toggle('d-none', proofOnly);
     }
     paymentProofPrintUrl = '';
-    paymentProofOpenNew.href = docUrl;
-    const lower = String(docUrl).toLowerCase();
+    paymentProofOpenNew.href = bustedUrl;
+    const lower = String(bustedUrl).toLowerCase();
     const isImageAsset = /\.(png|jpe?g|gif|webp|bmp|svg)(\?|#|$)/i.test(lower);
     let isLikelyPdf = lower.endsWith('.pdf');
     try {
-      const u = new URL(docUrl, window.location.origin);
+      const u = new URL(bustedUrl, window.location.origin);
       const explicitFormat = String(u.searchParams.get('format') || '').toLowerCase();
       if (explicitFormat === 'pdf') {
         isLikelyPdf = true;
@@ -2221,15 +2557,15 @@
     }
 
     if (!isImageAsset) {
-      paymentProofWrap.innerHTML = `<iframe src="${docUrl}" style="width:100%;height:70vh;border:1px solid #ddd;border-radius:8px;"></iframe>`;
+      paymentProofWrap.innerHTML = `<iframe src="${bustedUrl}" style="width:100%;height:70vh;border:1px solid #ddd;border-radius:8px;"></iframe>`;
     } else {
-      paymentProofWrap.innerHTML = `<img src="${docUrl}" alt="Document Preview" style="max-width:100%;max-height:70vh;border:1px solid #ddd;border-radius:8px;">`;
+      paymentProofWrap.innerHTML = `<img src="${bustedUrl}" alt="Document Preview" style="max-width:100%;max-height:70vh;border:1px solid #ddd;border-radius:8px;">`;
     }
     if (paymentProofPrintBtn) {
       const allowPrint = !!(options && options.allowPrint);
       paymentProofPrintBtn.classList.toggle('d-none', !(allowPrint && isLikelyPdf && !proofOnly));
       if (allowPrint && isLikelyPdf && !proofOnly) {
-        paymentProofPrintUrl = docUrl;
+        paymentProofPrintUrl = bustedUrl;
       }
     }
     paymentProofModal.show();
@@ -3323,7 +3659,9 @@
           'cohabitation_variant', 'cohabitant_id_front_path', 'cohabitant_id_back_path',
           'detention_proof_file_path', 'detention_proof_file_paths',
           'relationship_proof_file_path', 'relationship_proof_file_paths',
-          'valid_id_file_path', 'business_reg_file_path', 'proof_address_file_path',
+          'valid_id_file_path', 'or_vehicle_file_path', 'cr_vehicle_file_path',
+          'toda_poda_cert_file_path', 'authorization_vehicle_file_path', 'deed_of_sale_file_path',
+          'last_year_clearance_file_path', 'business_reg_file_path', 'proof_address_file_path',
           'business_photo_file_path', 'renewal_valid_id_file_path', 'renewal_business_reg_file_path',
           'renewal_proof_address_file_path'
         ]);

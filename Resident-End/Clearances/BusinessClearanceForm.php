@@ -196,25 +196,77 @@ $ownerFullAddress = htmlspecialchars(implode(', ', $ownerFullAddressParts), ENT_
                 </div>
                 <h2 class="section-title text-center text-dark">Business Details</h2>
                 <div class="form-row"><div class="full-width"><div class="input-stack"><label class="top-label">Name of Business <span class="required-asterisk">*</span></label><input type="text" name="business_name" required></div></div></div>
-                <div id="businessLocationWrapper" class="form-row">
+                <div class="form-row">
+                    <div class="full-width">
+                        <label class="top-label check-item">
+                            <input type="checkbox" id="businessSameAddress" name="business_same_address">
+                            <span>Same address as applicant</span>
+                        </label>
+                    </div>
+                </div>
+                <div id="businessAddressSystemRow" class="form-row">
+                    <div class="full-width">
+                        <div class="input-stack">
+                            <label class="top-label" for="businessAddressSystem">Address System <span class="required-asterisk">*</span></label>
+                            <select id="businessAddressSystem" name="business_address_system" class="form-select w-100">
+                                <option value="">Select</option>
+                                <option value="house">House Numbering System</option>
+                                <option value="lot_block">Lot/Block System</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+                <div id="businessFullAddressWrapper" class="form-row d-none">
+                    <div class="full-width">
+                        <label class="top-label">Address Details (Same as Applicant) <span class="required-asterisk">*</span></label>
+                        <input type="text" class="form-control" id="businessFullAddressDisplay" readonly value="<?php echo $ownerFullAddress; ?>">
+                    </div>
+                </div>
+                <div id="businessHouseSystemWrapper" class="form-row pt-0 d-none">
                     <div class="full-width">
                         <div class="row mb-3">
                             <div class="col-md-4">
-                                <label class="top-label" for="business_house_number">House Number <span class="required-asterisk">*</span></label>
-                                <input type="text" id="business_house_number" name="business_house_number" required>
+                                <label class="top-label" for="business_unit_number">Unit / Apartment Number</label>
+                                <input type="text" id="business_unit_number" name="business_unit_number">
+                            </div>
+                            <div class="col-md-4">
+                                <label class="top-label" for="business_street_number">Street Number <span class="required-asterisk">*</span></label>
+                                <input type="text" id="business_street_number" name="business_street_number">
                             </div>
                             <div class="col-md-4">
                                 <label class="top-label" for="business_street_name">Street Name <span class="required-asterisk">*</span></label>
-                                <input type="text" id="business_street_name" name="business_street_name" required>
-                            </div>
-                            <div class="col-md-4">
-                                <label class="top-label" for="business_subdivision">Subdivision</label>
-                                <input type="text" id="business_subdivision" name="business_subdivision">
+                                <input type="text" id="business_street_name" name="business_street_name">
                             </div>
                         </div>
                     </div>
                 </div>
-                <div class="form-row">
+                <div id="businessSubdivisionHouseRow" class="form-row pt-0 d-none">
+                    <div class="full-width">
+                        <div class="input-stack">
+                            <label class="top-label" for="business_subdivision">Subdivision</label>
+                            <input type="text" id="business_subdivision" name="business_subdivision">
+                        </div>
+                    </div>
+                </div>
+                <div id="businessBlockSystemWrapper" class="form-row pt-0 d-none">
+                    <div class="input-stack">
+                        <label class="top-label" for="business_lot_number">Lot Number <span class="required-asterisk">*</span></label>
+                        <input type="text" id="business_lot_number" name="business_lot_number">
+                    </div>
+                    <div class="input-stack">
+                        <label class="top-label" for="business_block_number">Block Number <span class="required-asterisk">*</span></label>
+                        <input type="text" id="business_block_number" name="business_block_number">
+                    </div>
+                    <div class="input-stack">
+                        <label class="top-label" for="business_phase_number">Phase <span class="required-asterisk">*</span></label>
+                        <input type="text" id="business_phase_number" name="business_phase_number">
+                    </div>
+                    <div class="input-stack">
+                        <label class="top-label" for="business_subdivision_block">Subdivision</label>
+                        <input type="text" id="business_subdivision_block" name="business_subdivision_block">
+                    </div>
+                </div>
+                <div id="businessBarangayRow" class="form-row">
                     <div class="full-width">
                         <div class="row mb-3">
                             <div class="col-md-4">
@@ -260,40 +312,6 @@ $ownerFullAddress = htmlspecialchars(implode(', ', $ownerFullAddressParts), ENT_
                     <p class="form-subtitle">Accepted: PDF, JPG, JPEG, PNG</p>
 
                     <div id="documentUploadNew">
-                    <div class="form-row">
-                        <div class="full-width">
-                            <div class="row mb-3">
-                                <div class="col-md-6">
-                                    <label class="top-label" for="validIdType">Valid Government-Issued ID <span class="required-asterisk">*</span></label>
-                                    <select id="validIdType" name="valid_id_type" class="form-select">
-                                        <option value="">Select</option>
-                                        <option value="philsys">PhilSys ID</option>
-                                        <option value="umid">UMID</option>
-                                        <option value="passport">Passport</option>
-                                        <option value="drivers_license">Driver's License</option>
-                                        <option value="prc">PRC ID</option>
-                                        <option value="postal">Postal ID</option>
-                                        <option value="gsis">GSIS ID</option>
-                                        <option value="sss">SSS ID</option>
-                                    </select>
-                                </div>
-                                <div class="col-md-6">
-                                    <label class="top-label" for="validIdFile">Upload Valid ID <span class="required-asterisk">*</span></label>
-                                    <input type="file" id="validIdFile" name="valid_id_file" class="form-control" accept=".pdf,.jpg,.jpeg,.png">
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    <div id="validIdNumberRow" class="form-row d-none">
-                        <div class="full-width">
-                            <div class="input-stack">
-                                <label class="top-label" for="validIdNumber">Valid ID Number <span class="required-asterisk">*</span></label>
-                                <input type="text" id="validIdNumber" name="valid_id_number" placeholder="Enter ID number">
-                                <div id="validIdNumberError" class="text-danger small d-none">Invalid ID number</div>
-                            </div>
-                        </div>
-                    </div>
-
                     <div class="form-row">
                         <div class="full-width">
                             <div class="row mb-3">
@@ -356,40 +374,6 @@ $ownerFullAddress = htmlspecialchars(implode(', ', $ownerFullAddressParts), ENT_
                     </div>
 
                     <div id="documentUploadRenewal" class="d-none">
-                        <div class="form-row">
-                            <div class="full-width">
-                                <div class="row mb-3">
-                                    <div class="col-md-6">
-                                        <label class="top-label" for="renewalValidIdType">Valid Government-Issued ID <span class="required-asterisk">*</span></label>
-                                        <select id="renewalValidIdType" name="renewal_valid_id_type" class="form-select">
-                                            <option value="">Select</option>
-                                            <option value="philsys">PhilSys ID</option>
-                                            <option value="umid">UMID</option>
-                                            <option value="passport">Passport</option>
-                                            <option value="drivers_license">Driver's License</option>
-                                            <option value="prc">PRC ID</option>
-                                            <option value="postal">Postal ID</option>
-                                            <option value="gsis">GSIS ID</option>
-                                            <option value="sss">SSS ID</option>
-                                        </select>
-                                    </div>
-                                    <div class="col-md-6">
-                                        <label class="top-label" for="renewalValidIdFile">Upload Valid ID <span class="required-asterisk">*</span></label>
-                                        <input type="file" id="renewalValidIdFile" name="renewal_valid_id_file" class="form-control" accept=".pdf,.jpg,.jpeg,.png">
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                        <div id="renewalValidIdNumberRow" class="form-row d-none">
-                            <div class="full-width">
-                                <div class="input-stack">
-                                    <label class="top-label" for="renewalValidIdNumber">Valid ID Number <span class="required-asterisk">*</span></label>
-                                    <input type="text" id="renewalValidIdNumber" name="renewal_valid_id_number" placeholder="Enter ID number">
-                                    <div id="renewalValidIdNumberError" class="text-danger small d-none">Invalid ID number</div>
-                                </div>
-                            </div>
-                        </div>
-
                         <div class="form-row">
                             <div class="full-width">
                                 <div class="row mb-3">

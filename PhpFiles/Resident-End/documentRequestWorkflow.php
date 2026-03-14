@@ -448,16 +448,59 @@ function dr_document_type_token(string $value): string {
 }
 
 function dr_build_business_clearance_address(array $source): string {
-    $parts = [];
-    $streetLine = trim(implode(' ', array_filter([
-        trim((string)($source['business_house_number'] ?? '')),
-        trim((string)($source['business_street_name'] ?? ''))
-    ], static fn($v) => $v !== '')));
-    if ($streetLine !== '') {
-        $parts[] = $streetLine;
+    $sameAsOwner = strtolower(trim((string)($source['business_same_address'] ?? '')));
+    if (in_array($sameAsOwner, ['1', 'true', 'yes', 'on'], true)) {
+        return trim((string)($source['owner_full_address'] ?? $source['full_address'] ?? ''));
     }
 
-    foreach (['business_subdivision', 'business_barangay', 'business_city', 'business_province'] as $key) {
+    $system = strtolower(trim((string)($source['business_address_system'] ?? '')));
+    $parts = [];
+
+    if ($system === 'lot_block') {
+        $lotNumber = trim((string)($source['business_lot_number'] ?? ''));
+        $blockNumber = trim((string)($source['business_block_number'] ?? ''));
+        $phaseNumber = trim((string)($source['business_phase_number'] ?? ''));
+        $subdivision = trim((string)($source['business_subdivision_block'] ?? ''));
+
+        if ($lotNumber === '' && $blockNumber === '' && $phaseNumber === '') {
+            return '';
+        }
+
+        if ($lotNumber !== '') {
+            $parts[] = 'Lot ' . $lotNumber;
+        }
+        if ($blockNumber !== '') {
+            $parts[] = 'Blk ' . $blockNumber;
+        }
+        if ($phaseNumber !== '') {
+            $parts[] = 'Phase ' . $phaseNumber;
+        }
+        if ($subdivision !== '') {
+            $parts[] = $subdivision;
+        }
+    } else {
+        $unitNumber = trim((string)($source['business_unit_number'] ?? ''));
+        if ($unitNumber !== '') {
+            $parts[] = 'Unit ' . $unitNumber;
+        }
+
+        $streetLine = trim(implode(' ', array_filter([
+            trim((string)($source['business_street_number'] ?? $source['business_house_number'] ?? '')),
+            trim((string)($source['business_street_name'] ?? ''))
+        ], static fn($v) => $v !== '')));
+        if ($streetLine !== '') {
+            $parts[] = $streetLine;
+        } else {
+            return '';
+        }
+
+        $subdivision = trim((string)($source['business_subdivision'] ?? ''));
+        if ($subdivision !== '') {
+            $parts[] = $subdivision;
+        }
+    }
+
+    foreach (['business_barangay', 'business_city', 'business_province'] as $key) {
         $value = trim((string)($source[$key] ?? ''));
         if ($value !== '') {
             $parts[] = $value;
@@ -883,6 +926,9 @@ if ($action === 'submit_request') {
         if ($businessFullAddress === '') {
             $businessFullAddress = dr_build_business_clearance_address($_POST);
         }
+        if ($businessFullAddress === '') {
+            dr_respond_json(422, ['success' => false, 'message' => 'Business address is required.']);
+        }
         if ($businessFullAddress !== '') {
             $_POST['business_full_address'] = $businessFullAddress;
             $_POST['location'] = $businessFullAddress;
@@ -911,12 +957,10 @@ if ($action === 'submit_request') {
 
         $uploadSets = $applicationType === 'Renewal'
             ? [
-                ['field' => 'renewal_valid_id_file', 'folder' => 'DocumentRequests/BusinessClearance/ValidIDs', 'message' => 'Renewal valid government-issued ID'],
                 ['field' => 'renewal_business_reg_file', 'folder' => 'DocumentRequests/BusinessClearance/BusinessRegistrations', 'message' => 'Updated business registration'],
                 ['field' => 'renewal_proof_address_file', 'folder' => 'DocumentRequests/BusinessClearance/ProofOfAddress', 'message' => 'Updated proof of business address'],
             ]
             : [
-                ['field' => 'valid_id_file', 'folder' => 'DocumentRequests/BusinessClearance/ValidIDs', 'message' => 'Valid government-issued ID'],
                 ['field' => 'business_reg_file', 'folder' => 'DocumentRequests/BusinessClearance/BusinessRegistrations', 'message' => 'Business registration'],
                 ['field' => 'proof_address_file', 'folder' => 'DocumentRequests/BusinessClearance/ProofOfAddress', 'message' => 'Proof of business address'],
                 ['field' => 'business_photo_file', 'folder' => 'DocumentRequests/BusinessClearance/BusinessPhotos', 'message' => 'Picture of establishment or business'],
@@ -924,14 +968,10 @@ if ($action === 'submit_request') {
 
         $requiredFieldMap = $applicationType === 'Renewal'
             ? [
-                'renewal_valid_id_type' => 'Valid government-issued ID type is required.',
-                'renewal_valid_id_number' => 'Valid ID number is required.',
                 'renewal_business_reg_type' => 'Updated business registration type is required.',
                 'renewal_proof_address_type' => 'Updated proof of business address type is required.',
             ]
             : [
-                'valid_id_type' => 'Valid government-issued ID type is required.',
-                'valid_id_number' => 'Valid ID number is required.',
                 'business_reg_type' => 'Business registration type is required.',
                 'proof_address_type' => 'Proof of business address type is required.',
             ];
@@ -954,6 +994,92 @@ if ($action === 'submit_request') {
                 dr_respond_json(422, ['success' => false, 'message' => $uploadSet['message'] . ': ' . $upload['error']]);
             }
             $_POST[$uploadSet['field'] . '_path'] = (string)($upload['path'] ?? '');
+        }
+    }
+
+    $isTricyclePermitRequest = in_array($documentTypeToken, [
+        'barangayclearancefortricyclepermit',
+        'clearancefortricyclepermit',
+        'tricyclepermit',
+        'fortricyclepermit',
+    ], true);
+    if ($isTricyclePermitRequest) {
+        $applicationType = trim((string)($_POST['application_type'] ?? ''));
+        if (!in_array($applicationType, ['New', 'Renewal'], true)) {
+            dr_respond_json(422, ['success' => false, 'message' => 'Application type is required.']);
+        }
+
+        $allowedFranchisees = [
+            'Private - FAMILY USE',
+            'Private - DELIVERY USE',
+            'SJ-1 NEW ROTODA',
+            'SJ-4 KV1 TODA',
+            'SJ-5 UPLAND TODA',
+            'SUB-PODA',
+        ];
+        $franchisee = trim((string)($_POST['franchisee'] ?? $_POST['vehicle_franchise'] ?? ''));
+        if (!in_array($franchisee, $allowedFranchisees, true)) {
+            dr_respond_json(422, ['success' => false, 'message' => 'Valid franchisee is required.']);
+        }
+        $_POST['franchisee'] = $franchisee;
+        $_POST['vehicle_franchise'] = $franchisee;
+
+        $vehicleNamedToOwner = strtolower(trim((string)($_POST['vehicle_named_to_owner'] ?? '')));
+        if (!in_array($vehicleNamedToOwner, ['yes', 'no'], true)) {
+            dr_respond_json(422, ['success' => false, 'message' => 'Please indicate whether the vehicle is named after the owner.']);
+        }
+        $_POST['vehicle_named_to_owner'] = $vehicleNamedToOwner;
+
+        $requiredUploads = [
+            ['field' => 'or_vehicle_file', 'folder' => 'DocumentRequests/TricyclePermit/VehicleOR', 'message' => 'O.R. of the vehicle'],
+            ['field' => 'cr_vehicle_file', 'folder' => 'DocumentRequests/TricyclePermit/VehicleCR', 'message' => 'C.R. of the vehicle'],
+            ['field' => 'toda_poda_cert_file', 'folder' => 'DocumentRequests/TricyclePermit/TodaPodaCertification', 'message' => 'TODA / PODA certification'],
+        ];
+        foreach ($requiredUploads as $uploadSet) {
+            $upload = dr_save_upload($_FILES[$uploadSet['field']] ?? [], $uploadSet['folder'], ['jpg', 'jpeg', 'png', 'pdf']);
+            if (!empty($upload['error'])) {
+                dr_respond_json(422, ['success' => false, 'message' => $uploadSet['message'] . ': ' . $upload['error']]);
+            }
+            $_POST[$uploadSet['field'] . '_path'] = (string)($upload['path'] ?? '');
+        }
+
+        $authorizationUploadError = (int)(($_FILES['authorization_vehicle_file']['error'] ?? UPLOAD_ERR_NO_FILE));
+        if ($authorizationUploadError !== UPLOAD_ERR_NO_FILE) {
+            $authorizationUpload = dr_save_upload($_FILES['authorization_vehicle_file'] ?? [], 'DocumentRequests/TricyclePermit/VehicleAuthorization', ['jpg', 'jpeg', 'png', 'pdf']);
+            if (!empty($authorizationUpload['error'])) {
+                dr_respond_json(422, ['success' => false, 'message' => 'Authorization of vehicle: ' . $authorizationUpload['error']]);
+            }
+            $_POST['authorization_vehicle_file_path'] = (string)($authorizationUpload['path'] ?? '');
+        } else {
+            $_POST['authorization_vehicle_file_path'] = '';
+        }
+
+        if ($vehicleNamedToOwner === 'no') {
+            $deedUpload = dr_save_upload($_FILES['deed_of_sale_file'] ?? [], 'DocumentRequests/TricyclePermit/DeedOfSale', ['jpg', 'jpeg', 'png', 'pdf']);
+            if (!empty($deedUpload['error'])) {
+                dr_respond_json(422, ['success' => false, 'message' => 'Notarized deed of sale: ' . $deedUpload['error']]);
+            }
+            $_POST['deed_of_sale_file_path'] = (string)($deedUpload['path'] ?? '');
+        } else {
+            $_POST['deed_of_sale_file_path'] = '';
+        }
+
+        if ($applicationType === 'Renewal') {
+            $clearanceUpload = dr_save_upload($_FILES['last_year_clearance_file'] ?? [], 'DocumentRequests/TricyclePermit/PreviousBarangayClearance', ['jpg', 'jpeg', 'png', 'pdf']);
+            if (!empty($clearanceUpload['error'])) {
+                dr_respond_json(422, ['success' => false, 'message' => 'Barangay clearance from previous year: ' . $clearanceUpload['error']]);
+            }
+            $_POST['last_year_clearance_file_path'] = (string)($clearanceUpload['path'] ?? '');
+        } else {
+            $_POST['last_year_clearance_file_path'] = '';
+        }
+
+        $purposeText = $applicationType === 'Renewal' ? 'Tricycle Permit - Renewal' : 'Tricycle Permit - New Application';
+        if (trim((string)($_POST['request_purpose'] ?? '')) === '') {
+            $_POST['request_purpose'] = $purposeText;
+        }
+        if (trim((string)($_POST['purpose'] ?? '')) === '') {
+            $_POST['purpose'] = $purposeText;
         }
     }
 

@@ -28,11 +28,6 @@ document.addEventListener("DOMContentLoaded", () => {
     const secCertificateFile = document.getElementById("secCertificateFile");
     const secCertificateDropzone = document.getElementById("secCertificateDropzone");
     const secCertificateSelectedFile = document.getElementById("secCertificateSelectedFile");
-    const validIdType = document.getElementById("validIdType");
-    const validIdFile = document.getElementById("validIdFile");
-    const validIdNumberRow = document.getElementById("validIdNumberRow");
-    const validIdNumber = document.getElementById("validIdNumber");
-    const validIdNumberError = document.getElementById("validIdNumberError");
     const proofAddressType = document.getElementById("proofAddressType");
     const proofAddressFile = document.getElementById("proofAddressFile");
     const proofAddressNumberRow = document.getElementById("proofAddressNumberRow");
@@ -76,17 +71,6 @@ document.addEventListener("DOMContentLoaded", () => {
     };
 
     const normalizeValue = (value) => (value || "").replace(/[\s-]/g, "").toUpperCase();
-
-    const validIdRegexMap = {
-        philsys: /^\d{12}$/,
-        umid: /^\d{12}$/,
-        passport: /^[A-Z]{1,2}\d{7}$/,
-        drivers_license: /^\d{10}$/,
-        prc: /^\d{7}$/,
-        postal: /^\d{12}$/,
-        gsis: /^(?:\d{10}|\d{12})$/,
-        sss: /^\d{10}$/
-    };
 
     const proofAddressRegexMap = {
         lease: /^.+$/,
@@ -251,8 +235,6 @@ document.addEventListener("DOMContentLoaded", () => {
         if (documentUploadSection) {
             documentUploadSection.classList.remove("d-none");
         }
-        setRequired(validIdType, true);
-        setRequired(validIdFile, true);
         setRequired(proofAddressType, true);
         setRequired(proofAddressFile, true);
         const needsSecCertificate = ownershipType?.value === "Partnership" || ownershipType?.value === "Company";
@@ -269,7 +251,6 @@ document.addEventListener("DOMContentLoaded", () => {
         syncLotAddress();
         applyLotAddressSystem(useApplicant);
 
-        updateNumberRow(validIdType, validIdNumberRow, validIdNumber);
         updateNumberRow(proofAddressType, proofAddressNumberRow, proofAddressNumber);
         submitBtn.disabled = !form.checkValidity();
     };
@@ -279,18 +260,9 @@ document.addEventListener("DOMContentLoaded", () => {
     lotAddressSystem?.addEventListener("change", updateState);
     lotSameAddress?.addEventListener("change", updateState);
     ownershipType?.addEventListener("change", updateState);
-    validIdType?.addEventListener("change", () => {
-        updateNumberRow(validIdType, validIdNumberRow, validIdNumber);
-        validateNumberInput(validIdNumber, validIdRegexMap, validIdNumberError);
-        updateState();
-    });
     proofAddressType?.addEventListener("change", () => {
         updateNumberRow(proofAddressType, proofAddressNumberRow, proofAddressNumber);
         validateNumberInput(proofAddressNumber, proofAddressRegexMap, proofAddressNumberError);
-        updateState();
-    });
-    validIdNumber?.addEventListener("input", () => {
-        validateNumberInput(validIdNumber, validIdRegexMap, validIdNumberError);
         updateState();
     });
     proofAddressNumber?.addEventListener("input", () => {

@@ -76,7 +76,6 @@ require_once __DIR__ . "/../includes/resident_access_guard.php";
                                     <li class='mb-2'>
                                         New Application
                                         <ol class='mt-1 ps-3 requirements-numeric'>
-                                            <li>Valid Government-Issued ID</li>
                                             <li>
                                                 Business Registration
                                                 <ol class='mt-1 ps-3 requirements-alpha'>
@@ -107,7 +106,6 @@ require_once __DIR__ . "/../includes/resident_access_guard.php";
                                     <li class='mb-2'>
                                         Renewal
                                         <ol class='mt-1 ps-3 requirements-numeric'>
-                                            <li>Valid Government-Issued ID</li>
                                             <li>Business Clearance from the previous year</li>
                                             <li>
                                                 Updated Business Registration
@@ -152,22 +150,24 @@ require_once __DIR__ . "/../includes/resident_access_guard.php";
                                     <li class='mb-2'>
                                         New Application
                                         <ol class='mt-1 ps-3 requirements-numeric'>
-                                            <li>Valid Government-Issued ID</li>
+                                            <li>O.R. of the Vehicle</li>
+                                            <li>C.R. of the Vehicle</li>
                                             <li>TODA/PODA Certification</li>
-                                            <li>LTO Registration Documents (O.R. and C.R.)</li>
+                                            <li>Authorization of Vehicle (if applicable)</li>
                                         </ol>
                                     </li>
                                     <li class='mb-2'>
                                         Renewal
                                         <ol class='mt-1 ps-3 requirements-numeric'>
-                                            <li>Valid Government-Issued ID</li>
+                                            <li>O.R. of the Vehicle</li>
+                                            <li>C.R. of the Vehicle</li>
                                             <li>TODA/PODA Certification</li>
-                                            <li>LTO Registration Documents (O.R. and C.R.)</li>
+                                            <li>Authorization of Vehicle (if applicable)</li>
                                             <li>Barangay Clearance from the previous year</li>
                                         </ol>
                                     </li>
                                 </ul>
-                                <p class='mt-2 mb-0 text-muted small'>If LTO Registration is not named to the owner/operator, please upload a notarized Deed of Sale.</p>
+                                <p class='mt-2 mb-0 text-muted small'>If the vehicle is not named after the owner, upload a notarized deed of sale.</p>
                             "
                         >
                             Apply Now
@@ -192,7 +192,6 @@ require_once __DIR__ . "/../includes/resident_access_guard.php";
                                     <li>
                                         New Application
                                         <ol class='mt-1 ps-3 requirements-numeric'>
-                                            <li>Valid Government-Issued ID</li>
                                             <li>
                                                 Proof of Address, one of the following:
                                                 <ol class='mt-1 ps-3 requirements-alpha'>
@@ -239,7 +238,6 @@ require_once __DIR__ . "/../includes/resident_access_guard.php";
                                     <li>
                                         New Application
                                         <ol class='mt-1 ps-3 requirements-numeric'>
-                                            <li>Valid Government-Issued ID</li>
                                             <li>
                                                 Proof of Address, one of the following:
                                                 <ol class='mt-1 ps-3 requirements-alpha'>
@@ -286,7 +284,6 @@ require_once __DIR__ . "/../includes/resident_access_guard.php";
                                     <li>
                                         New Application
                                         <ol class='mt-1 ps-3 requirements-numeric'>
-                                            <li>Valid Government-Issued ID</li>
                                             <li>
                                                 Proof of Address, one of the following:
                                                 <ol class='mt-1 ps-3 requirements-alpha'>
@@ -333,7 +330,6 @@ require_once __DIR__ . "/../includes/resident_access_guard.php";
                                     <li>
                                         New Application
                                         <ol class='mt-1 ps-3 requirements-numeric'>
-                                            <li>Valid Government-Issued ID</li>
                                             <li>
                                                 Proof of Address, one of the following:
                                                 <ol class='mt-1 ps-3 requirements-alpha'>

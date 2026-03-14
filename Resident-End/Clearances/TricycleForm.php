@@ -149,7 +149,15 @@ $ownerFullAddress = htmlspecialchars(implode(', ', $ownerFullAddressParts), ENT_
             </div>
             <p class="form-subtitle">All fields marked with <span class="required-asterisk">*</span> are required</p>
 
+<<<<<<< Updated upstream
             <form class="page-form" action="#" method="POST" enctype="multipart/form-data">
+=======
+            <form action="<?= htmlspecialchars($baseUrl) ?>/PhpFiles/Resident-End/documentRequestWorkflow.php" method="POST" enctype="multipart/form-data">
+                <input type="hidden" name="action" value="submit_request">
+                <input type="hidden" name="document_type" value="Barangay Clearance for Tricycle Permit">
+                <input type="hidden" name="redirect" value="1">
+                <input type="hidden" name="request_purpose" id="tricycleRequestPurpose" value="Tricycle Permit - New Application">
+>>>>>>> Stashed changes
 
                 <h2 class="section-title text-center text-dark">Applicant Information</h2>
                 <div class="form-row">
@@ -207,8 +215,16 @@ $ownerFullAddress = htmlspecialchars(implode(', ', $ownerFullAddressParts), ENT_
                 <h2 class="section-title text-center text-dark">Vehicle Information</h2>
                 <div class="form-row two-col-row">
                     <div class="input-stack">
-                        <label class="top-label">Franchise <span class="required-asterisk">*</span></label>
-                        <input type="text" name="vehicle_franchise" required>
+                        <label class="top-label" for="franchiseeSelect">Franchisee <span class="required-asterisk">*</span></label>
+                        <select id="franchiseeSelect" name="franchisee" class="form-select" required>
+                            <option value="">Select</option>
+                            <option value="Private - FAMILY USE">Private - FAMILY USE</option>
+                            <option value="Private - DELIVERY USE">Private - DELIVERY USE</option>
+                            <option value="SJ-1 NEW ROTODA">SJ-1 NEW ROTODA</option>
+                            <option value="SJ-4 KV1 TODA">SJ-4 KV1 TODA</option>
+                            <option value="SJ-5 UPLAND TODA">SJ-5 UPLAND TODA</option>
+                            <option value="SUB-PODA">SUB-PODA</option>
+                        </select>
                     </div>
                     <div class="input-stack">
                         <label class="top-label">Make <span class="required-asterisk">*</span></label>
@@ -255,70 +271,86 @@ $ownerFullAddress = htmlspecialchars(implode(', ', $ownerFullAddressParts), ENT_
                     <p class="form-subtitle">Accepted: PDF, JPG, JPEG, PNG</p>
                     <div class="form-row">
                         <div class="full-width">
-                            <div class="row mb-3">
-                                <div class="col-md-6">
-                                    <label class="top-label" for="validIdType">Valid Government-Issued ID <span class="required-asterisk">*</span></label>
-                                    <select id="validIdType" name="valid_id_type" class="form-select">
-                                        <option value="">Select</option>
-                                        <option value="philsys">PhilSys ID</option>
-                                        <option value="umid">UMID</option>
-                                        <option value="passport">Passport</option>
-                                        <option value="drivers_license">Driver's License</option>
-                                        <option value="prc">PRC ID</option>
-                                        <option value="postal">Postal ID</option>
-                                        <option value="gsis">GSIS ID</option>
-                                        <option value="sss">SSS ID</option>
-                                    </select>
+                            <div class="d-flex align-items-center justify-content-start gap-3 app-type-row">
+                                <p class="if-building-note mb-0">Is the vehicle named after the owner?</p>
+                                <div class="check-item">
+                                    <input type="radio" id="vehicleNamedYes" name="vehicle_named_to_owner" value="yes" class="clearance-radio">
+                                    <label class="app-type-label" for="vehicleNamedYes">Yes</label>
                                 </div>
-                                <div class="col-md-6">
-                                    <label class="top-label" for="validIdFile">Upload Valid ID <span class="required-asterisk">*</span></label>
-                                    <input type="file" id="validIdFile" name="valid_id_file" class="form-control" accept=".pdf,.jpg,.jpeg,.png">
+                                <div class="check-item">
+                                    <input type="radio" id="vehicleNamedNo" name="vehicle_named_to_owner" value="no" class="clearance-radio">
+                                    <label class="app-type-label" for="vehicleNamedNo">No</label>
                                 </div>
-                            </div>
-                        </div>
-                    </div>
-                    <div id="validIdNumberRow" class="form-row d-none">
-                        <div class="full-width">
-                            <div class="input-stack">
-                                <label class="top-label" for="validIdNumber">Valid ID Number <span class="required-asterisk">*</span></label>
-                                <input type="text" id="validIdNumber" name="valid_id_number" placeholder="Enter ID number">
-                                <div id="validIdNumberError" class="text-danger small d-none">Invalid ID number</div>
                             </div>
                         </div>
                     </div>
                     <div class="form-row two-col-row">
                         <div class="input-stack">
-                            <label class="top-label" for="tricycleTypeSelect">Tricycle Type <span class="required-asterisk">*</span></label>
-                            <select id="tricycleTypeSelect" name="tricycle_type" class="form-select">
-                                <option value="">Select</option>
-                                <option value="PODA">PODA</option>
-                                <option value="TODA">TODA</option>
-                            </select>
+                            <label class="top-label" for="orVehicleFile">O.R. of the Vehicle <span class="required-asterisk">*</span></label>
+                            <label class="upload-dropzone" id="orVehicleDropzone" for="orVehicleFile">
+                                <i class="fa-solid fa-cloud-arrow-up"></i>
+                                <span>Drag file here or click to upload</span>
+                                <small>Accepted: PDF, JPG, JPEG, PNG</small>
+                            </label>
+                            <input type="file" id="orVehicleFile" name="or_vehicle_file" class="visually-hidden" accept=".pdf,.jpg,.jpeg,.png">
+                            <div id="orVehicleSelectedFile" class="selected-files small text-muted mt-2"></div>
                         </div>
                         <div class="input-stack">
-                            <label class="top-label" id="tricycleCertLabel" for="tricycleCertFile">Upload Certification <span class="required-asterisk">*</span></label>
-                            <input type="file" id="tricycleCertFile" name="tricycle_cert_file" class="form-control" accept=".pdf,.jpg,.jpeg,.png" disabled>
+                            <label class="top-label" for="crVehicleFile">C.R. of the Vehicle <span class="required-asterisk">*</span></label>
+                            <label class="upload-dropzone" id="crVehicleDropzone" for="crVehicleFile">
+                                <i class="fa-solid fa-cloud-arrow-up"></i>
+                                <span>Drag file here or click to upload</span>
+                                <small>Accepted: PDF, JPG, JPEG, PNG</small>
+                            </label>
+                            <input type="file" id="crVehicleFile" name="cr_vehicle_file" class="visually-hidden" accept=".pdf,.jpg,.jpeg,.png">
+                            <div id="crVehicleSelectedFile" class="selected-files small text-muted mt-2"></div>
+                        </div>
+                    </div>
+                    <div class="form-row two-col-row">
+                        <div class="input-stack">
+                            <label class="top-label" for="todaPodaCertFile">TODA / PODA Certification <span class="required-asterisk">*</span></label>
+                            <label class="upload-dropzone" id="todaPodaCertDropzone" for="todaPodaCertFile">
+                                <i class="fa-solid fa-cloud-arrow-up"></i>
+                                <span>Drag file here or click to upload</span>
+                                <small>Accepted: PDF, JPG, JPEG, PNG</small>
+                            </label>
+                            <input type="file" id="todaPodaCertFile" name="toda_poda_cert_file" class="visually-hidden" accept=".pdf,.jpg,.jpeg,.png">
+                            <div id="todaPodaCertSelectedFile" class="selected-files small text-muted mt-2"></div>
+                        </div>
+                        <div class="input-stack">
+                            <label class="top-label" for="authorizationVehicleFile">Authorization of Vehicle <span class="text-muted">(if applicable)</span></label>
+                            <label class="upload-dropzone" id="authorizationVehicleDropzone" for="authorizationVehicleFile">
+                                <i class="fa-solid fa-cloud-arrow-up"></i>
+                                <span>Drag file here or click to upload</span>
+                                <small>Accepted: PDF, JPG, JPEG, PNG</small>
+                            </label>
+                            <input type="file" id="authorizationVehicleFile" name="authorization_vehicle_file" class="visually-hidden" accept=".pdf,.jpg,.jpeg,.png">
+                            <div id="authorizationVehicleSelectedFile" class="selected-files small text-muted mt-2"></div>
+                        </div>
+                    </div>
+                    <div id="deedOfSaleRow" class="form-row d-none">
+                        <div class="full-width">
+                            <div class="input-stack">
+                                <label class="top-label" for="deedOfSaleFile">Notarized Deed of Sale <span class="required-asterisk">*</span></label>
+                                <label class="upload-dropzone" id="deedOfSaleDropzone" for="deedOfSaleFile">
+                                    <i class="fa-solid fa-cloud-arrow-up"></i>
+                                    <span>Drag file here or click to upload</span>
+                                    <small>Accepted: PDF, JPG, JPEG, PNG</small>
+                                </label>
+                                <input type="file" id="deedOfSaleFile" name="deed_of_sale_file" class="visually-hidden" accept=".pdf,.jpg,.jpeg,.png" disabled>
+                                <div id="deedOfSaleSelectedFile" class="selected-files small text-muted mt-2"></div>
+                                <p class="text-muted small mt-2 mb-0">Upload the notarized deed of sale when the vehicle is not named after the owner.</p>
+                            </div>
                         </div>
                     </div>
                     <div class="form-row">
                         <div class="full-width">
                             <div class="row mb-3">
-                                <div class="col-md-12" id="ltoRegCol">
-                                    <label class="top-label" for="ltoRegFiles">LTO Registration Documents (O.R. and C.R.) <span class="required-asterisk">*</span></label>
-                                    <label class="upload-dropzone" id="ltoRegDropzone" for="ltoRegFiles">
-                                        <i class="fa-solid fa-cloud-arrow-up"></i>
-                                        <span>Drag files here or click to upload</span>
-                                        <small>Accepted: PDF, JPG, JPEG, PNG</small>
-                                    </label>
-                                    <input type="file" id="ltoRegFiles" name="lto_registration_files[]" class="visually-hidden" accept=".pdf,.jpg,.jpeg,.png" multiple>
-                                    <div id="ltoRegSelectedFile" class="selected-files small text-muted mt-2"></div>
-                                    <p class="text-muted small mt-2 mb-0">If LTO Registration is not named to the owner/operator, please upload a notarized Deed of Sale.</p>
-                                </div>
-                                <div class="col-md-6 d-none" id="lastYearClearanceCol">
+                                <div class="col-md-12 d-none" id="lastYearClearanceCol">
                                     <label class="top-label" for="lastYearClearanceFile">Barangay Clearance from Previous Year <span class="required-asterisk">*</span></label>
                                     <label class="upload-dropzone" id="lastYearClearanceDropzone" for="lastYearClearanceFile">
                                         <i class="fa-solid fa-cloud-arrow-up"></i>
-                                        <span>Drag files here or click to upload</span>
+                                        <span>Drag file here or click to upload</span>
                                         <small>Accepted: PDF, JPG, JPEG, PNG</small>
                                     </label>
                                     <input type="file" id="lastYearClearanceFile" name="last_year_clearance_file" class="visually-hidden" accept=".pdf,.jpg,.jpeg,.png" disabled>

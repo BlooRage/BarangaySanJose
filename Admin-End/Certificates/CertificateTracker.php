@@ -793,41 +793,28 @@ require_once __DIR__ . '/../includes/admin_guard.php';
       line-height: 1.28;
     }
     #viewModal .doc-preview-paper.doc-preview-paper--business .doc-preview-business-check-mark {
-      display: inline-block;
-      position: relative;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 3px;
       min-width: 48px;
-      white-space: nowrap;
-      letter-spacing: .01em;
+      height: 14px;
     }
-    #viewModal .doc-preview-paper.doc-preview-paper--business .doc-preview-business-check-inline {
-      position: absolute;
-      left: 18px;
-      top: -1px;
-      font-size: .74rem;
+    #viewModal .doc-preview-paper.doc-preview-paper--business .doc-preview-business-check-line {
+      width: 17px;
+      border-top: 2px solid #111;
+      flex: 0 0 auto;
+    }
+    #viewModal .doc-preview-paper.doc-preview-paper--business .doc-preview-business-check-tick {
+      width: 11px;
+      text-align: center;
+      font-size: 1rem;
       line-height: 1;
       font-weight: 800;
       opacity: 0;
     }
-    #viewModal .doc-preview-paper.doc-preview-paper--business .doc-preview-business-check-placeholder {
-      display: block;
-    }
-    #viewModal .doc-preview-paper.doc-preview-paper--business .doc-preview-business-check-mark--selected .doc-preview-business-check-inline {
+    #viewModal .doc-preview-paper.doc-preview-paper--business .doc-preview-business-check-mark--selected .doc-preview-business-check-tick {
       opacity: 1;
-    }
-    #viewModal .doc-preview-paper.doc-preview-paper--business .doc-preview-business-check-symbol {
-      position: absolute;
-      left: 15px;
-      top: -2px;
-      font-weight: 800;
-      font-size: 1.02rem;
-      line-height: 1;
-      opacity: 0;
-    }
-    #viewModal .doc-preview-paper.doc-preview-paper--business .doc-preview-business-check-mark--selected .doc-preview-business-check-symbol {
-      opacity: 1;
-    }
-    #viewModal .doc-preview-paper.doc-preview-paper--business .doc-preview-business-check-mark--selected {
-      font-weight: 800;
     }
     #viewModal .doc-preview-paper.doc-preview-paper--business .doc-preview-issued-line {
       width: 86%;
@@ -925,6 +912,345 @@ require_once __DIR__ . '/../includes/admin_guard.php';
     #viewModal .doc-preview-paper.doc-preview-paper--business .doc-preview-qr-box {
       width: 88px;
       height: 88px;
+      border-style: solid;
+    }
+    #viewModal .doc-preview-paper.doc-preview-paper--tricycle {
+      font-family: Arial, Helvetica, sans-serif;
+      display: flex;
+      flex-direction: column;
+      min-height: 1188px;
+      padding: 28px 44px 34px;
+    }
+    #viewModal .doc-preview-paper.doc-preview-paper--tricycle .doc-preview-hint {
+      display: none;
+    }
+    #viewModal .doc-preview-paper.doc-preview-paper--tricycle .doc-preview-head {
+      margin-bottom: 14px;
+    }
+    #viewModal .doc-preview-paper.doc-preview-paper--tricycle .doc-preview-head-center p {
+      font-family: "Times New Roman", Times, serif;
+      font-size: .88rem;
+      line-height: 1.08;
+    }
+    #viewModal .doc-preview-paper.doc-preview-paper--tricycle .doc-preview-head-center .rep {
+      font-size: 1.02rem;
+      letter-spacing: .01em;
+    }
+    #viewModal .doc-preview-paper.doc-preview-paper--tricycle .doc-preview-head-center .barangay {
+      font-size: 1.18rem;
+      letter-spacing: .01em;
+    }
+    #viewModal .doc-preview-paper.doc-preview-paper--tricycle .doc-preview-tricycle-office {
+      margin-top: 10px;
+      margin-bottom: 18px;
+      text-align: center;
+      font-weight: 800;
+      text-transform: uppercase;
+      line-height: 1.22;
+    }
+    #viewModal .doc-preview-paper.doc-preview-paper--tricycle .doc-preview-tricycle-office div:first-child {
+      font-size: 1.06rem;
+      letter-spacing: .01em;
+    }
+    #viewModal .doc-preview-paper.doc-preview-paper--tricycle .doc-preview-tricycle-office div:last-child {
+      margin-top: 4px;
+      font-size: 1.02rem;
+      letter-spacing: .01em;
+    }
+    #viewModal .doc-preview-paper.doc-preview-paper--tricycle .doc-preview-body {
+      font-size: .98rem;
+      line-height: 1.34;
+      text-align: left;
+      padding: 0 8px 0 4px;
+      flex: 1 1 auto;
+    }
+    #viewModal .doc-preview-paper.doc-preview-paper--tricycle .doc-preview-body p {
+      margin: 0;
+      text-align: left;
+    }
+    #viewModal .doc-preview-paper.doc-preview-paper--tricycle .doc-preview-tricycle-lead {
+      margin-bottom: 18px;
+      font-size: 1rem;
+    }
+    #viewModal .doc-preview-paper.doc-preview-paper--tricycle .doc-preview-tricycle-intro,
+    #viewModal .doc-preview-paper.doc-preview-paper--tricycle .doc-preview-tricycle-purpose {
+      width: 84%;
+      margin: 0 auto;
+      text-align: center !important;
+      line-height: 1.4;
+    }
+    #viewModal .doc-preview-paper.doc-preview-paper--tricycle .doc-preview-tricycle-intro {
+      margin-bottom: 18px;
+    }
+    #viewModal .doc-preview-paper.doc-preview-paper--tricycle .doc-preview-tricycle-fields {
+      width: 72%;
+      margin: 0 auto 20px;
+    }
+    #viewModal .doc-preview-paper.doc-preview-paper--tricycle .doc-preview-tricycle-field {
+      display: grid;
+      grid-template-columns: 140px 16px 1fr;
+      align-items: start;
+      margin: 0 0 2px;
+      line-height: 1.24;
+    }
+    #viewModal .doc-preview-paper.doc-preview-paper--tricycle .doc-preview-tricycle-field-label,
+    #viewModal .doc-preview-paper.doc-preview-paper--tricycle .doc-preview-tricycle-field-colon {
+      font-weight: 700;
+    }
+    #viewModal .doc-preview-paper.doc-preview-paper--tricycle .doc-preview-tricycle-field--address .doc-preview-tricycle-field-value {
+      line-height: 1.2;
+    }
+    #viewModal .doc-preview-paper.doc-preview-paper--tricycle .doc-preview-issued-line {
+      width: 84%;
+      margin: 22px auto 0;
+      text-align: center;
+      line-height: 1.32;
+      text-indent: 0;
+    }
+    #viewModal .doc-preview-paper.doc-preview-paper--tricycle .doc-preview-tricycle-meta {
+      width: 330px;
+      margin: 18px 0 0 42px;
+      font-size: .97rem;
+      line-height: 1.18;
+    }
+    #viewModal .doc-preview-paper.doc-preview-paper--tricycle .doc-preview-tricycle-meta-row {
+      display: grid;
+      grid-template-columns: 110px 14px 1fr;
+      column-gap: 4px;
+      align-items: baseline;
+      margin: 0 0 2px;
+    }
+    #viewModal .doc-preview-paper.doc-preview-paper--tricycle .doc-preview-tricycle-footer-area {
+      display: grid;
+      grid-template-columns: minmax(220px, 1fr) minmax(270px, 1fr);
+      column-gap: 34px;
+      align-items: end;
+      margin-top: auto;
+      padding-top: 38px;
+    }
+    #viewModal .doc-preview-paper.doc-preview-paper--tricycle .doc-preview-tricycle-issuedby {
+      font-size: .95rem;
+      line-height: 1.3;
+      text-align: left;
+      align-self: end;
+      padding-bottom: 28px;
+    }
+    #viewModal .doc-preview-paper.doc-preview-paper--tricycle .doc-preview-tricycle-signing {
+      display: grid;
+      justify-items: center;
+      row-gap: 30px;
+      text-align: center;
+    }
+    #viewModal .doc-preview-paper.doc-preview-paper--tricycle .doc-preview-tricycle-signature {
+      margin-top: 0;
+      justify-items: center;
+      text-align: center;
+    }
+    #viewModal .doc-preview-paper.doc-preview-paper--tricycle .doc-preview-tricycle-signature .name {
+      min-width: 252px;
+      margin-top: 0;
+      padding-top: 4px;
+      font-size: 1rem;
+    }
+    #viewModal .doc-preview-paper.doc-preview-paper--tricycle .doc-preview-tricycle-signature div:last-child {
+      font-style: italic;
+    }
+    #viewModal .doc-preview-paper.doc-preview-paper--tricycle .doc-preview-footer {
+      width: 64%;
+      margin: 104px auto 0;
+      font-size: .78rem;
+      text-align: center;
+      font-style: italic;
+      color: #111827;
+    }
+    #viewModal .doc-preview-paper.doc-preview-paper--tricycle .doc-preview-tricycle-footer-area--noqr + .doc-preview-footer {
+      margin-top: 28px;
+    }
+    #viewModal .doc-preview-paper.doc-preview-paper--tricycle .doc-preview-qr {
+      left: 50%;
+      right: auto;
+      bottom: 52px;
+      width: 88px;
+      transform: translateX(-50%);
+      font-size: 0;
+    }
+    #viewModal .doc-preview-paper.doc-preview-paper--tricycle .doc-preview-qr-box {
+      width: 80px;
+      height: 80px;
+      border-style: solid;
+    }
+    #viewModal .doc-preview-paper.doc-preview-paper--generalclearance {
+      font-family: Arial, Helvetica, sans-serif;
+      display: flex;
+      flex-direction: column;
+      min-height: 1188px;
+      padding: 28px 44px 34px;
+    }
+    #viewModal .doc-preview-paper.doc-preview-paper--generalclearance .doc-preview-hint {
+      display: none;
+    }
+    #viewModal .doc-preview-paper.doc-preview-paper--generalclearance .doc-preview-head {
+      margin-bottom: 14px;
+    }
+    #viewModal .doc-preview-paper.doc-preview-paper--generalclearance .doc-preview-head-center p {
+      font-family: "Times New Roman", Times, serif;
+      font-size: .88rem;
+      line-height: 1.08;
+    }
+    #viewModal .doc-preview-paper.doc-preview-paper--generalclearance .doc-preview-head-center .rep {
+      font-size: 1.02rem;
+      letter-spacing: .01em;
+    }
+    #viewModal .doc-preview-paper.doc-preview-paper--generalclearance .doc-preview-head-center .barangay {
+      font-size: 1.18rem;
+      letter-spacing: .01em;
+    }
+    #viewModal .doc-preview-paper.doc-preview-paper--generalclearance .doc-preview-generalclearance-office {
+      margin-top: 10px;
+      margin-bottom: 18px;
+      text-align: center;
+      font-weight: 800;
+      text-transform: uppercase;
+      line-height: 1.22;
+    }
+    #viewModal .doc-preview-paper.doc-preview-paper--generalclearance .doc-preview-generalclearance-office div:first-child {
+      font-size: 1.06rem;
+      letter-spacing: .01em;
+    }
+    #viewModal .doc-preview-paper.doc-preview-paper--generalclearance .doc-preview-generalclearance-office div:last-child {
+      margin-top: 4px;
+      font-size: 1.02rem;
+      letter-spacing: .01em;
+    }
+    #viewModal .doc-preview-paper.doc-preview-paper--generalclearance .doc-preview-body {
+      font-size: .98rem;
+      line-height: 1.34;
+      text-align: left;
+      padding: 0 8px 0 4px;
+      flex: 1 1 auto;
+    }
+    #viewModal .doc-preview-paper.doc-preview-paper--generalclearance .doc-preview-body p {
+      margin: 0;
+      text-align: left;
+    }
+    #viewModal .doc-preview-paper.doc-preview-paper--generalclearance .doc-preview-generalclearance-lead {
+      margin-bottom: 20px;
+      font-size: 1rem;
+    }
+    #viewModal .doc-preview-paper.doc-preview-paper--generalclearance .doc-preview-generalclearance-intro {
+      width: 86%;
+      margin: 0 auto 18px;
+      text-align: center !important;
+      line-height: 1.42;
+    }
+    #viewModal .doc-preview-paper.doc-preview-paper--generalclearance .doc-preview-generalclearance-fields {
+      width: 72%;
+      margin: 0 auto 20px;
+    }
+    #viewModal .doc-preview-paper.doc-preview-paper--generalclearance .doc-preview-generalclearance-field {
+      display: grid;
+      grid-template-columns: 172px 16px 1fr;
+      align-items: start;
+      margin: 0 0 2px;
+      line-height: 1.22;
+    }
+    #viewModal .doc-preview-paper.doc-preview-paper--generalclearance .doc-preview-generalclearance-field-label,
+    #viewModal .doc-preview-paper.doc-preview-paper--generalclearance .doc-preview-generalclearance-field-colon {
+      font-weight: 700;
+    }
+    #viewModal .doc-preview-paper.doc-preview-paper--generalclearance .doc-preview-generalclearance-field--address .doc-preview-generalclearance-field-value {
+      line-height: 1.18;
+    }
+    #viewModal .doc-preview-paper.doc-preview-paper--generalclearance .doc-preview-generalclearance-note {
+      width: 88%;
+      margin: 18px auto 0;
+      text-align: center !important;
+      line-height: 1.4;
+    }
+    #viewModal .doc-preview-paper.doc-preview-paper--generalclearance .doc-preview-issued-line {
+      width: 86%;
+      margin: 20px auto 0;
+      text-align: center;
+      line-height: 1.32;
+      text-indent: 0;
+    }
+    #viewModal .doc-preview-paper.doc-preview-paper--generalclearance .doc-preview-generalclearance-meta {
+      width: 308px;
+      margin: 24px 0 0 18px;
+      font-size: .97rem;
+      line-height: 1.18;
+    }
+    #viewModal .doc-preview-paper.doc-preview-paper--generalclearance .doc-preview-generalclearance-meta-row {
+      display: grid;
+      grid-template-columns: 98px 14px 1fr;
+      column-gap: 4px;
+      align-items: baseline;
+      margin: 0 0 2px;
+    }
+    #viewModal .doc-preview-paper.doc-preview-paper--generalclearance .doc-preview-generalclearance-meta-line {
+      display: inline-block;
+      width: 74px;
+      border-bottom: 1px solid #111827;
+      transform: translateY(-2px);
+    }
+    #viewModal .doc-preview-paper.doc-preview-paper--generalclearance .doc-preview-generalclearance-footer-area {
+      display: grid;
+      grid-template-columns: minmax(220px, 1fr) minmax(270px, 1fr);
+      column-gap: 36px;
+      align-items: end;
+      margin-top: auto;
+      padding-top: 32px;
+    }
+    #viewModal .doc-preview-paper.doc-preview-paper--generalclearance .doc-preview-generalclearance-issuedby {
+      font-size: .95rem;
+      line-height: 1.3;
+      text-align: left;
+      align-self: end;
+      padding-bottom: 36px;
+    }
+    #viewModal .doc-preview-paper.doc-preview-paper--generalclearance .doc-preview-generalclearance-signing {
+      display: grid;
+      justify-items: center;
+      row-gap: 34px;
+      text-align: center;
+    }
+    #viewModal .doc-preview-paper.doc-preview-paper--generalclearance .doc-preview-generalclearance-signature {
+      margin-top: 0;
+      justify-items: center;
+      text-align: center;
+    }
+    #viewModal .doc-preview-paper.doc-preview-paper--generalclearance .doc-preview-generalclearance-signature .name {
+      min-width: 270px;
+      margin-top: 0;
+      padding-top: 4px;
+      font-size: 1rem;
+    }
+    #viewModal .doc-preview-paper.doc-preview-paper--generalclearance .doc-preview-generalclearance-signature div:last-child {
+      font-style: italic;
+    }
+    #viewModal .doc-preview-paper.doc-preview-paper--generalclearance .doc-preview-footer {
+      width: 58%;
+      margin: 86px auto 0;
+      font-size: .76rem;
+      text-align: center;
+      font-style: italic;
+      color: #6b7280;
+      line-height: 1.35;
+    }
+    #viewModal .doc-preview-paper.doc-preview-paper--generalclearance .doc-preview-generalclearance-footer-area--noqr + .doc-preview-footer {
+      margin-top: 34px;
+    }
+    #viewModal .doc-preview-paper.doc-preview-paper--generalclearance .doc-preview-qr {
+      left: 50%;
+      right: auto;
+      bottom: 58px;
+      width: 88px;
+      transform: translateX(-50%);
+      font-size: 0;
+    }
+    #viewModal .doc-preview-paper.doc-preview-paper--generalclearance .doc-preview-qr-box {
+      width: 80px;
+      height: 80px;
       border-style: solid;
     }
     #viewModal .doc-preview-paper.doc-preview-paper--goodmoral.doc-preview-paper--cohabitation-children {

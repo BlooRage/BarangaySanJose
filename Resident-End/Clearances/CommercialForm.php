@@ -272,40 +272,6 @@ $ownerFullAddress = htmlspecialchars(implode(', ', $ownerFullAddressParts), ENT_
                         <div class="full-width">
                             <div class="row mb-3">
                                 <div class="col-md-6">
-                                    <label class="top-label" for="validIdType">Valid Government-Issued ID <span class="required-asterisk">*</span></label>
-                                    <select id="validIdType" name="valid_id_type" class="form-select">
-                                        <option value="">Select</option>
-                                        <option value="philsys">PhilSys ID</option>
-                                        <option value="umid">UMID</option>
-                                        <option value="passport">Passport</option>
-                                        <option value="drivers_license">Driver's License</option>
-                                        <option value="prc">PRC ID</option>
-                                        <option value="postal">Postal ID</option>
-                                        <option value="gsis">GSIS ID</option>
-                                        <option value="sss">SSS ID</option>
-                                    </select>
-                                </div>
-                                <div class="col-md-6">
-                                    <label class="top-label" for="validIdFile">Upload Valid ID <span class="required-asterisk">*</span></label>
-                                    <input type="file" id="validIdFile" name="valid_id_file" class="form-control" accept=".pdf,.jpg,.jpeg,.png">
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    <div id="validIdNumberRow" class="form-row d-none">
-                        <div class="full-width">
-                            <div class="input-stack">
-                                <label class="top-label" for="validIdNumber">Valid ID Number <span class="required-asterisk">*</span></label>
-                                <input type="text" id="validIdNumber" name="valid_id_number" placeholder="Enter ID number">
-                                <div id="validIdNumberError" class="text-danger small d-none">Invalid ID number</div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="form-row">
-                        <div class="full-width">
-                            <div class="row mb-3">
-                                <div class="col-md-6">
                                     <label class="top-label" for="proofAddressType">Proof of Address <span class="required-asterisk">*</span></label>
                                     <select id="proofAddressType" name="proof_address_type" class="form-select">
                                         <option value="">Select</option>

@@ -6,11 +6,11 @@
   const appNew = document.getElementById("app_new");
   const appRenewal = document.getElementById("app_renewal");
   const documentUploadSection = document.getElementById("documentUploadSection");
-  const validIdType = document.getElementById("validIdType");
-  const validIdFile = document.getElementById("validIdFile");
-  const validIdNumberRow = document.getElementById("validIdNumberRow");
-  const validIdNumber = document.getElementById("validIdNumber");
-  const validIdNumberError = document.getElementById("validIdNumberError");
+  const businessSameAddress = document.getElementById("businessSameAddress");
+  const businessAddressSystemRow = document.getElementById("businessAddressSystemRow");
+  const businessAddressSystem = document.getElementById("businessAddressSystem");
+  const businessFullAddressWrapper = document.getElementById("businessFullAddressWrapper");
+  const ownerFullAddress = document.getElementById("owner_full_address");
   const businessRegType = document.getElementById("businessRegType");
   const businessRegFile = document.getElementById("businessRegFile");
   const proofAddressType = document.getElementById("proofAddressType");
@@ -23,11 +23,6 @@
   const businessPhotoSelectedFile = document.getElementById("businessPhotoSelectedFile");
   const documentUploadNew = document.getElementById("documentUploadNew");
   const documentUploadRenewal = document.getElementById("documentUploadRenewal");
-  const renewalValidIdType = document.getElementById("renewalValidIdType");
-  const renewalValidIdFile = document.getElementById("renewalValidIdFile");
-  const renewalValidIdNumberRow = document.getElementById("renewalValidIdNumberRow");
-  const renewalValidIdNumber = document.getElementById("renewalValidIdNumber");
-  const renewalValidIdNumberError = document.getElementById("renewalValidIdNumberError");
   const renewalBusinessRegType = document.getElementById("renewalBusinessRegType");
   const renewalBusinessRegFile = document.getElementById("renewalBusinessRegFile");
   const renewalProofAddressType = document.getElementById("renewalProofAddressType");
@@ -38,9 +33,18 @@
   const businessContactNumber = document.getElementById("business_contact_number");
   const businessContactNumberError = document.getElementById("business_contact_number_error");
   const businessRequestPurpose = document.getElementById("businessRequestPurpose");
-  const businessHouseNumber = document.getElementById("business_house_number");
+  const businessHouseSystemWrapper = document.getElementById("businessHouseSystemWrapper");
+  const businessSubdivisionHouseRow = document.getElementById("businessSubdivisionHouseRow");
+  const businessBlockSystemWrapper = document.getElementById("businessBlockSystemWrapper");
+  const businessBarangayRow = document.getElementById("businessBarangayRow");
+  const businessUnitNumber = document.getElementById("business_unit_number");
+  const businessStreetNumber = document.getElementById("business_street_number");
   const businessStreetName = document.getElementById("business_street_name");
   const businessSubdivision = document.getElementById("business_subdivision");
+  const businessLotNumber = document.getElementById("business_lot_number");
+  const businessBlockNumber = document.getElementById("business_block_number");
+  const businessPhaseNumber = document.getElementById("business_phase_number");
+  const businessSubdivisionBlock = document.getElementById("business_subdivision_block");
   const businessBarangay = document.getElementById("business_barangay");
   const businessCity = document.getElementById("business_city");
   const businessProvince = document.getElementById("business_province");
@@ -55,18 +59,18 @@
     el.required = required;
   };
 
-  const normalizeValue = (value) => (value || '').replace(/[\s-]/g, '').toUpperCase();
-
-  const validIdRegexMap = {
-    philsys: /^\d{12}$/,
-    umid: /^\d{12}$/,
-    passport: /^[A-Z]{1,2}\d{7}$/,
-    drivers_license: /^\d{10}$/,
-    prc: /^\d{7}$/,
-    postal: /^\d{12}$/,
-    gsis: /^(?:\d{10}|\d{12})$/,
-    sss: /^\d{10}$/
+  const setWrapperState = (wrapper, enabled) => {
+    if (!wrapper) return;
+    wrapper.classList.toggle("d-none", !enabled);
+    wrapper.querySelectorAll("input, select").forEach((el) => {
+      el.disabled = !enabled;
+      if (!enabled) {
+        el.value = "";
+      }
+    });
   };
+
+  const normalizeValue = (value) => (value || '').replace(/[\s-]/g, '').toUpperCase();
 
   const proofAddressRegexMap = {
     lease: /^.+$/,
@@ -150,8 +154,38 @@
   };
 
   const buildBusinessFullAddress = () => {
+    if (businessSameAddress?.checked) {
+      return (ownerFullAddress?.value || '').trim();
+    }
+
+    const system = (businessAddressSystem?.value || '').trim();
+    if (system === 'lot_block') {
+      const lotNumber = (businessLotNumber?.value || '').trim();
+      const blockNumber = (businessBlockNumber?.value || '').trim();
+      const phaseNumber = (businessPhaseNumber?.value || '').trim();
+      if (lotNumber === '' && blockNumber === '' && phaseNumber === '') {
+        return '';
+      }
+      const parts = [
+        lotNumber ? `Lot ${lotNumber}` : '',
+        blockNumber ? `Blk ${blockNumber}` : '',
+        phaseNumber ? `Phase ${phaseNumber}` : '',
+        (businessSubdivisionBlock?.value || '').trim(),
+        (businessBarangay?.value || '').trim(),
+        (businessCity?.value || '').trim(),
+        (businessProvince?.value || '').trim()
+      ].filter(Boolean);
+      return parts.join(', ');
+    }
+
+    const streetLine = [businessStreetNumber?.value || '', businessStreetName?.value || ''].filter(Boolean).join(' ').trim();
+    if (streetLine === '') {
+      return '';
+    }
+
     const parts = [
-      [businessHouseNumber?.value || '', businessStreetName?.value || ''].filter(Boolean).join(' ').trim(),
+      businessUnitNumber?.value ? `Unit ${businessUnitNumber.value.trim()}` : '',
+      streetLine,
       (businessSubdivision?.value || '').trim(),
       (businessBarangay?.value || '').trim(),
       (businessCity?.value || '').trim(),
@@ -163,11 +197,10 @@
   const updateState = () => {
     const isNewApp = appNew?.checked === true;
     const isRenewal = appRenewal?.checked === true;
+    const isSameAddress = businessSameAddress?.checked === true;
+    const businessSystem = (businessAddressSystem?.value || '').trim();
     if (businessRequestPurpose) {
       businessRequestPurpose.value = isRenewal ? "Business Permit - Renewal" : "Business Permit - New Application";
-    }
-    if (businessFullAddress) {
-      businessFullAddress.value = buildBusinessFullAddress();
     }
     if (documentUploadSection) {
       documentUploadSection.classList.toggle("d-none", !(isNewApp || isRenewal));
@@ -178,23 +211,40 @@
     if (documentUploadRenewal) {
       documentUploadRenewal.classList.toggle("d-none", !isRenewal);
     }
-    setRequired(validIdType, isNewApp);
-    setRequired(validIdFile, isNewApp);
+
+    if (businessAddressSystemRow) {
+      businessAddressSystemRow.classList.toggle("d-none", isSameAddress);
+    }
+    if (businessFullAddressWrapper) {
+      businessFullAddressWrapper.classList.toggle("d-none", !isSameAddress);
+    }
+    setRequired(businessAddressSystem, !isSameAddress);
+
+    setWrapperState(businessHouseSystemWrapper, !isSameAddress && businessSystem === 'house');
+    setWrapperState(businessSubdivisionHouseRow, !isSameAddress && businessSystem === 'house');
+    setWrapperState(businessBlockSystemWrapper, !isSameAddress && businessSystem === 'lot_block');
+
+    setRequired(businessStreetNumber, !isSameAddress && businessSystem === 'house');
+    setRequired(businessStreetName, !isSameAddress && businessSystem === 'house');
+    setRequired(businessLotNumber, !isSameAddress && businessSystem === 'lot_block');
+    setRequired(businessBlockNumber, !isSameAddress && businessSystem === 'lot_block');
+    setRequired(businessPhaseNumber, !isSameAddress && businessSystem === 'lot_block');
+
     setRequired(businessRegType, isNewApp);
     setRequired(businessRegFile, isNewApp);
     setRequired(proofAddressType, isNewApp);
     setRequired(proofAddressFile, isNewApp);
     setRequired(businessPhotoFile, isNewApp);
-    setRequired(renewalValidIdType, isRenewal);
-    setRequired(renewalValidIdFile, isRenewal);
     setRequired(renewalBusinessRegType, isRenewal);
     setRequired(renewalBusinessRegFile, isRenewal);
     setRequired(renewalProofAddressType, isRenewal);
     setRequired(renewalProofAddressFile, isRenewal);
 
-    updateNumberRow(validIdType, validIdNumberRow, validIdNumber);
+    if (businessFullAddress) {
+      businessFullAddress.value = buildBusinessFullAddress();
+    }
+
     updateNumberRow(proofAddressType, proofAddressNumberRow, proofAddressNumber);
-    updateNumberRow(renewalValidIdType, renewalValidIdNumberRow, renewalValidIdNumber);
     updateNumberRow(renewalProofAddressType, renewalProofAddressNumberRow, renewalProofAddressNumber);
 
     if (businessContactNumber) {
@@ -208,45 +258,43 @@
     }
 
     if (!isNewApp) {
-      [validIdType, businessRegType, proofAddressType].forEach((el) => {
+      [businessRegType, proofAddressType].forEach((el) => {
         if (el) el.value = '';
       });
-      [validIdFile, businessRegFile, proofAddressFile].forEach((el) => {
+      [businessRegFile, proofAddressFile].forEach((el) => {
         if (el) el.value = '';
       });
       if (businessPhotoFile) {
         businessPhotoFile.value = '';
         renderFile(businessPhotoFile, businessPhotoSelectedFile);
       }
-      [validIdNumber, proofAddressNumber].forEach((el) => {
+      [proofAddressNumber].forEach((el) => {
         if (el) {
           el.value = '';
           el.setCustomValidity('');
         }
       });
-      if (validIdNumberError) validIdNumberError.classList.add("d-none");
       if (proofAddressNumberError) proofAddressNumberError.classList.add("d-none");
-      [validIdNumberRow, proofAddressNumberRow].forEach((row) => {
+      [proofAddressNumberRow].forEach((row) => {
         if (row) row.classList.add("d-none");
       });
     }
 
     if (!isRenewal) {
-      [renewalValidIdType, renewalBusinessRegType, renewalProofAddressType].forEach((el) => {
+      [renewalBusinessRegType, renewalProofAddressType].forEach((el) => {
         if (el) el.value = '';
       });
-      [renewalValidIdFile, renewalBusinessRegFile, renewalProofAddressFile].forEach((el) => {
+      [renewalBusinessRegFile, renewalProofAddressFile].forEach((el) => {
         if (el) el.value = '';
       });
-      [renewalValidIdNumber, renewalProofAddressNumber].forEach((el) => {
+      [renewalProofAddressNumber].forEach((el) => {
         if (el) {
           el.value = '';
           el.setCustomValidity('');
         }
       });
-      if (renewalValidIdNumberError) renewalValidIdNumberError.classList.add("d-none");
       if (renewalProofAddressNumberError) renewalProofAddressNumberError.classList.add("d-none");
-      [renewalValidIdNumberRow, renewalProofAddressNumberRow].forEach((row) => {
+      [renewalProofAddressNumberRow].forEach((row) => {
         if (row) row.classList.add("d-none");
       });
     }
@@ -263,19 +311,11 @@
 
   form.addEventListener("input", updateState);
   form.addEventListener("change", updateState);
-  validIdType?.addEventListener("change", () => {
-    updateNumberRow(validIdType, validIdNumberRow, validIdNumber);
-    validateNumberInput(validIdNumber, validIdRegexMap, validIdNumberError);
-    updateState();
-  });
+  businessSameAddress?.addEventListener("change", updateState);
+  businessAddressSystem?.addEventListener("change", updateState);
   proofAddressType?.addEventListener("change", () => {
     updateNumberRow(proofAddressType, proofAddressNumberRow, proofAddressNumber);
     validateNumberInput(proofAddressNumber, proofAddressRegexMap, proofAddressNumberError);
-    updateState();
-  });
-  renewalValidIdType?.addEventListener("change", () => {
-    updateNumberRow(renewalValidIdType, renewalValidIdNumberRow, renewalValidIdNumber);
-    validateNumberInput(renewalValidIdNumber, validIdRegexMap, renewalValidIdNumberError);
     updateState();
   });
   renewalProofAddressType?.addEventListener("change", () => {
@@ -283,16 +323,8 @@
     validateNumberInput(renewalProofAddressNumber, proofAddressRegexMap, renewalProofAddressNumberError);
     updateState();
   });
-  validIdNumber?.addEventListener("input", () => {
-    validateNumberInput(validIdNumber, validIdRegexMap, validIdNumberError);
-    updateState();
-  });
   proofAddressNumber?.addEventListener("input", () => {
     validateNumberInput(proofAddressNumber, proofAddressRegexMap, proofAddressNumberError);
-    updateState();
-  });
-  renewalValidIdNumber?.addEventListener("input", () => {
-    validateNumberInput(renewalValidIdNumber, validIdRegexMap, renewalValidIdNumberError);
     updateState();
   });
   renewalProofAddressNumber?.addEventListener("input", () => {

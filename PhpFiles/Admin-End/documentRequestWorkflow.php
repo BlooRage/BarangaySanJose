@@ -891,6 +891,67 @@ function dra_build_cohabitation_address(array $payload, string $fallback = ''): 
     return $fallback;
 }
 
+function dra_general_clearance_purpose_from_document_type(string $documentType): string {
+    $token = preg_replace('/[^a-z0-9]+/', '', strtolower(trim($documentType)));
+    if (strpos($token, 'electricalpermit') !== false) {
+        return 'ELECTRICAL PERMIT';
+    }
+    if (strpos($token, 'waterpermit') !== false) {
+        return 'WATER PERMIT';
+    }
+    if (strpos($token, 'residentialbuildingpermit') !== false) {
+        return 'RESIDENTIAL BUILDING PERMIT';
+    }
+    if (strpos($token, 'commercialbuildingpermit') !== false) {
+        return 'COMMERCIAL BUILDING PERMIT';
+    }
+    return '';
+}
+
+function dra_build_general_clearance_location(array $payload, string $fallback = ''): string {
+    $direct = trim((string)($payload['location'] ?? $payload['lot_full_address'] ?? $payload['project_location'] ?? ''));
+    if ($direct !== '') {
+        return $direct;
+    }
+
+    $sameAddress = strtolower(trim((string)($payload['lot_same_address'] ?? '')));
+    $applicantAddress = trim((string)($payload['applicant_full_address'] ?? $payload['full_address'] ?? $payload['full_address_display'] ?? ''));
+    if (in_array($sameAddress, ['1', 'true', 'yes', 'on'], true)) {
+        return $applicantAddress !== '' ? $applicantAddress : $fallback;
+    }
+
+    $system = strtolower(trim((string)($payload['lot_address_system'] ?? '')));
+    if ($system === 'lot_block') {
+        return dra_join_address_parts([
+            trim((string)($payload['lot_number'] ?? '')) !== '' ? 'Lot ' . trim((string)($payload['lot_number'] ?? '')) : '',
+            trim((string)($payload['block_number'] ?? '')) !== '' ? 'Blk ' . trim((string)($payload['block_number'] ?? '')) : '',
+            trim((string)($payload['lot_phase_number'] ?? '')) !== '' ? 'Phase ' . trim((string)($payload['lot_phase_number'] ?? '')) : '',
+            (string)($payload['lot_subdivision'] ?? ''),
+            (string)($payload['lot_barangay'] ?? ''),
+            (string)($payload['lot_city'] ?? ''),
+            (string)($payload['lot_province'] ?? ''),
+        ]);
+    }
+    if ($system === 'house') {
+        return dra_join_address_parts([
+            trim((string)($payload['lot_unit_number'] ?? '')) !== '' ? 'Unit ' . trim((string)($payload['lot_unit_number'] ?? '')) : '',
+            trim(implode(' ', array_filter([
+                trim((string)($payload['lot_street_number'] ?? '')),
+                trim((string)($payload['lot_street_name'] ?? '')),
+            ], static fn($v) => $v !== ''))),
+            (string)($payload['lot_subdivision'] ?? ''),
+            (string)($payload['lot_barangay'] ?? ''),
+            (string)($payload['lot_city'] ?? ''),
+            (string)($payload['lot_province'] ?? ''),
+        ]);
+    }
+
+    if ($applicantAddress !== '') {
+        return $applicantAddress;
+    }
+    return $fallback;
+}
+
 function dra_public_base_url(): string {
     return appBaseUrl();
 }
@@ -1251,7 +1312,32 @@ function dra_generate_issued_document(array $requestRow): ?string {
         return trim($value);
     };
     $purpose = $stripTemplateTokens($purpose);
-    $issuedAt = date('F j, Y');
+    $issuedDateRaw = '';
+    foreach ([
+        (string)($requestRow['release_timestamp'] ?? ''),
+        (string)($requestRow['completed_at'] ?? ''),
+        (string)($requestRow['ready_at'] ?? ''),
+        (string)($requestRow['submitted_at'] ?? ''),
+        (string)($requestRow['request_timestamp'] ?? ''),
+    ] as $candidateIssuedDate) {
+        $candidateIssuedDate = trim($candidateIssuedDate);
+        if ($candidateIssuedDate !== '') {
+            $issuedDateRaw = $candidateIssuedDate;
+            break;
+        }
+    }
+    try {
+        $issuedDateObj = $issuedDateRaw !== '' ? new DateTime($issuedDateRaw) : new DateTime();
+    } catch (Throwable $ignored) {
+        $issuedDateObj = new DateTime();
+    }
+    $issuedAt = $issuedDateObj->format('F j, Y');
+    $day = (int)$issuedDateObj->format('j');
+    $monthUpper = strtoupper($issuedDateObj->format('F'));
+    $yearNum = $issuedDateObj->format('Y');
+    $v = $day % 100;
+    $suffix = ($v >= 11 && $v <= 13) ? 'th' : (($day % 10 === 1) ? 'st' : (($day % 10 === 2) ? 'nd' : (($day % 10 === 3) ? 'rd' : 'th')));
+    $issuedAsDocx = $day . $suffix . ' day of ' . $monthUpper . ' ' . $yearNum;
     $payload = dra_decode_request_payload($requestRow);
 
     $fullName = trim((string)($payload['_preview_full_name'] ?? ''));
@@ -1349,6 +1435,15 @@ function dra_generate_issued_document(array $requestRow): ?string {
         'businessclearance',
         'clearanceforbusinesspermit',
     ], true);
+    $isTricyclePermitClearance = in_array($docTypeToken, [
+        'barangayclearancefortricyclepermit',
+        'clearancefortricyclepermit',
+        'tricyclepermit',
+        'tricycleclearance',
+        'fortricyclepermit',
+    ], true);
+    $generalPermitPurpose = dra_general_clearance_purpose_from_document_type($docType);
+    $isGeneralPermitClearance = ($generalPermitPurpose !== '');
     $isRelationshipJailVisit = $isCohabitation && in_array($cohabitationVariant, ['relationship_jail_visit', 'conjugal_visit'], true);
 
     // DOCX template workflow removed: force all issuance through pure-PHP renderer below.
@@ -1749,11 +1844,11 @@ function dra_generate_issued_document(array $requestRow): ?string {
         return null;
     }
 
-    $renderRevisionTag = 'r20260312n';
+    $renderRevisionTag = 'r20260312y';
     $fileName = 'issued_' . preg_replace('/[^A-Za-z0-9_-]/', '', $requestId) . '_' . $renderRevisionTag . '_' . date('YmdHis') . '.pdf';
     $diskPath = $outDir . '/' . $fileName;
 
-    if ($isBusinessPermitClearance || $isRelationshipJailVisit) {
+    if ($isBusinessPermitClearance || $isGeneralPermitClearance || $isTricyclePermitClearance || $isRelationshipJailVisit) {
         if (!class_exists('\\setasign\\Fpdi\\Fpdi')) {
             $autoloadPaths = [
                 __DIR__ . '/../../PhpFiles/PhpOffice/vendor/autoload.php',
@@ -1767,6 +1862,315 @@ function dra_generate_issued_document(array $requestRow): ?string {
                         break;
                     }
                 }
+            }
+        }
+    }
+
+    if ($isGeneralPermitClearance) {
+        $templatePath = $baseDir . '/Resident-End/Certificates/DocumentIssuance/GeneralClearance.pdf';
+        if (class_exists('\\setasign\\Fpdi\\Fpdi') && is_file($templatePath)) {
+            try {
+                $displayAddress = strtoupper($stripTemplateTokens(dra_strip_area_from_address($address !== '' ? $address : $applicantResidenceAddress)));
+                if ($displayAddress === '') {
+                    $displayAddress = '-';
+                }
+                $generalLocation = strtoupper($stripTemplateTokens(dra_build_general_clearance_location($payload, $applicantResidenceAddress)));
+                if ($generalLocation === '') {
+                    $generalLocation = '-';
+                }
+                $remarksText = strtoupper($stripTemplateTokens((string)($payload['remarks'] ?? $payload['ownership_type'] ?? '')));
+                if ($remarksText === '') {
+                    $remarksText = '-';
+                }
+                $purposeText = strtoupper($stripTemplateTokens($generalPermitPurpose));
+                if ($purposeText === '') {
+                    $purposeText = strtoupper($stripTemplateTokens((string)($payload['request_purpose'] ?? $purpose)));
+                }
+                if ($purposeText === '') {
+                    $purposeText = 'PURPOSE';
+                }
+                $clearanceNumber = strtoupper($stripTemplateTokens($certNo !== '' ? $certNo : $requestId));
+                $orNumberText = strtoupper($stripTemplateTokens($orNo));
+                $amountNumeric = null;
+                if (isset($requestRow['amount']) && $requestRow['amount'] !== null && $requestRow['amount'] !== '') {
+                    $amountNumeric = (float)$requestRow['amount'];
+                } elseif ($defaultFee !== null) {
+                    $amountNumeric = (float)$defaultFee;
+                }
+                $amountText = $amountNumeric === null ? '' : number_format($amountNumeric, 2, '.', ',');
+
+                $pdf = new \setasign\Fpdi\Fpdi();
+                $pageCount = $pdf->setSourceFile($templatePath);
+                if ($pageCount <= 0) {
+                    throw new RuntimeException('Template PDF has no readable pages.');
+                }
+                $tpl = $pdf->importPage(1);
+                $size = $pdf->getTemplateSize($tpl);
+                $pageWidth = (float)($size['width'] ?? 215.9);
+                $pageHeight = (float)($size['height'] ?? 279.4);
+                $orientation = $pageWidth > $pageHeight ? 'L' : 'P';
+                $pdf->AddPage($orientation, [$pageWidth, $pageHeight]);
+                $pdf->useTemplate($tpl);
+                $pdf->SetAutoPageBreak(false);
+                $pdf->SetFillColor(255, 255, 255);
+                $pdf->SetTextColor(0, 0, 0);
+
+                $normalizeTop = static function (float $ratio) use ($pageHeight): float {
+                    return $ratio * $pageHeight;
+                };
+                $ocrTop = static function (float $originY, float $height) use ($normalizeTop): float {
+                    return $normalizeTop(1.0 - $originY - $height);
+                };
+                $fillBox = static function (
+                    \setasign\Fpdi\Fpdi $pdfInstance,
+                    float $x,
+                    float $y,
+                    float $w,
+                    float $h,
+                    float $padX = 1.3,
+                    float $padY = 0.7
+                ): void {
+                    $pdfInstance->Rect(
+                        max(0.0, $x - $padX),
+                        max(0.0, $y - $padY),
+                        max(1.0, $w + ($padX * 2)),
+                        max(1.0, $h + ($padY * 2)),
+                        'F'
+                    );
+                };
+                $writeFittedCell = static function (
+                    \setasign\Fpdi\Fpdi $pdfInstance,
+                    float $x,
+                    float $y,
+                    float $w,
+                    float $h,
+                    string $text,
+                    string $style = '',
+                    float $fontSize = 9.2,
+                    float $minFontSize = 6.8,
+                    string $align = 'L'
+                ): void {
+                    $clean = trim((string)(preg_replace('/\s+/u', ' ', $text) ?? $text));
+                    if ($clean === '') {
+                        return;
+                    }
+                    for ($size = $fontSize; $size >= $minFontSize; $size -= 0.2) {
+                        $pdfInstance->SetFont('Arial', $style, $size);
+                        if ($pdfInstance->GetStringWidth($clean) <= $w) {
+                            break;
+                        }
+                    }
+                    $pdfInstance->SetFont('Arial', $style, max($minFontSize, $size));
+                    $pdfInstance->SetXY($x, $y);
+                    $pdfInstance->Cell($w, $h, $clean, 0, 0, $align);
+                };
+
+                $valueColumnX = 82.5;
+                $valueColumnW = $pageWidth - $valueColumnX - 16.0;
+                $valueRows = [
+                    ['y' => $ocrTop(0.6504794085013843, 0.02316908972603926), 'text' => strtoupper($fullName !== '' ? $fullName : 'RESIDENT'), 'font' => 9.1],
+                    ['y' => $ocrTop(0.6335714282970502, 0.023571428571428577), 'text' => $displayAddress, 'font' => 8.8],
+                    ['y' => $ocrTop(0.598571428541357, 0.01642857142857146), 'text' => $generalLocation, 'font' => 8.8],
+                    ['y' => $ocrTop(0.5799418605137163, 0.014534883499145446), 'text' => $remarksText, 'font' => 8.8],
+                    ['y' => $ocrTop(0.5594079238776235, 0.020719037055969336), 'text' => $purposeText, 'font' => 8.8],
+                ];
+                foreach ($valueRows as $rowValue) {
+                    $y = (float)$rowValue['y'];
+                    $fillBox($pdf, $valueColumnX, $y, $valueColumnW, 5.0, 1.2, 0.6);
+                    $writeFittedCell($pdf, $valueColumnX, $y, $valueColumnW, 4.8, (string)$rowValue['text'], 'B', (float)$rowValue['font'], 6.6, 'L');
+                }
+
+                $issuedBlockX = 23.0;
+                $issuedBlockY = $ocrTop(0.46214285744152395, 0.01928571428571424);
+                $issuedBlockW = $pageWidth - 46.0;
+                $issuedBlockH = 12.2;
+                $fillBox($pdf, $issuedBlockX, $issuedBlockY, $issuedBlockW, $issuedBlockH, 2.0, 0.9);
+                $pdf->SetFont('Arial', '', 8.8);
+                $pdf->SetXY($issuedBlockX, $issuedBlockY);
+                $pdf->MultiCell(
+                    $issuedBlockW,
+                    4.2,
+                    'Issued this ' . $issuedAsDocx . ' at the office of the Punong Barangay, Barangay' . "\n" . 'San Jose, Montalban, Rizal',
+                    0,
+                    'C'
+                );
+
+                $metaRows = [
+                    ['x' => 43.0, 'w' => 68.0, 'y' => $ocrTop(0.40552325622606245, 0.018895348140171575), 'text' => $clearanceNumber, 'font' => 8.8],
+                    ['x' => 42.0, 'w' => 38.0, 'y' => $ocrTop(0.34842425230413754, 0.019721262795584615), 'text' => $amountText, 'font' => 8.8],
+                    ['x' => 45.5, 'w' => 40.0, 'y' => $ocrTop(0.32928909936228945, 0.021654359272548218), 'text' => $orNumberText, 'font' => 8.8],
+                ];
+                foreach ($metaRows as $metaRow) {
+                    $y = (float)$metaRow['y'];
+                    $x = (float)$metaRow['x'];
+                    $w = (float)$metaRow['w'];
+                    $fillBox($pdf, $x, $y, $w, 5.0, 1.2, 0.6);
+                    $writeFittedCell($pdf, $x, $y, $w, 4.8, (string)$metaRow['text'], 'B', (float)$metaRow['font'], 6.6, 'L');
+                }
+
+                if (is_file($qrDiskPath)) {
+                    $qrSize = 20.0;
+                    $pdf->Image($qrDiskPath, ($pageWidth - $qrSize) / 2, $pageHeight - 55.0, $qrSize, $qrSize);
+                }
+
+                $pdf->Output('F', $diskPath);
+                return '/UnifiedFileAttachment/IssuedDocuments/Generated/' . $fileName;
+            } catch (Throwable $e) {
+                error_log('[dra_generate_issued_document][general_clearance_fpdi] ' . $e->getMessage());
+            }
+        }
+    }
+
+    if ($isTricyclePermitClearance) {
+        $templatePath = $baseDir . '/Resident-End/Certificates/DocumentIssuance/TricycleClearance.pdf';
+        if (class_exists('\\setasign\\Fpdi\\Fpdi') && is_file($templatePath)) {
+            try {
+                $franchisee = strtoupper($stripTemplateTokens((string)($payload['_preview_franchisee'] ?? $payload['franchisee'] ?? $payload['vehicle_franchise'] ?? '')));
+                $vehicleType = strtoupper($stripTemplateTokens((string)($payload['_preview_vehicle_type'] ?? $payload['vehicle_make'] ?? $payload['type_of_vehicle'] ?? '')));
+                if ($vehicleType === '') {
+                    $vehicleType = 'TRICYCLE';
+                }
+                $registrationNumber = strtoupper($stripTemplateTokens((string)($payload['_preview_registration_number'] ?? $payload['cr_number'] ?? $payload['registration_number'] ?? '')));
+                if ($registrationNumber === '') {
+                    $registrationNumber = strtoupper($stripTemplateTokens((string)($payload['or_number'] ?? '')));
+                }
+                $plateNumber = strtoupper($stripTemplateTokens((string)($payload['_preview_plate_number'] ?? $payload['plate_number'] ?? $payload['vehicle_plate_number'] ?? '')));
+                $bodyNumber = strtoupper($stripTemplateTokens((string)($payload['_preview_body_number'] ?? $payload['body_number'] ?? '')));
+                $clearanceNumber = strtoupper($stripTemplateTokens($certNo !== '' ? $certNo : $requestId));
+                $receiptNumber = strtoupper($stripTemplateTokens($orNo));
+                $displayName = strtoupper($fullName !== '' ? $fullName : 'RESIDENT');
+                $displayAddress = strtoupper($stripTemplateTokens($address !== '' ? $address : dra_strip_area_from_address($applicantResidenceAddress)));
+                if ($displayAddress === '') {
+                    $displayAddress = '-';
+                }
+                $amountNumeric = null;
+                if (isset($requestRow['amount']) && $requestRow['amount'] !== null && $requestRow['amount'] !== '') {
+                    $amountNumeric = (float)$requestRow['amount'];
+                } elseif ($defaultFee !== null) {
+                    $amountNumeric = (float)$defaultFee;
+                }
+                $amountText = $amountNumeric === null ? '' : number_format($amountNumeric, 2, '.', ',');
+
+                $pdf = new \setasign\Fpdi\Fpdi();
+                $pageCount = $pdf->setSourceFile($templatePath);
+                if ($pageCount <= 0) {
+                    throw new RuntimeException('Template PDF has no readable pages.');
+                }
+                $tpl = $pdf->importPage(1);
+                $size = $pdf->getTemplateSize($tpl);
+                $pageWidth = (float)($size['width'] ?? 215.9);
+                $pageHeight = (float)($size['height'] ?? 279.4);
+                $orientation = $pageWidth > $pageHeight ? 'L' : 'P';
+                $pdf->AddPage($orientation, [$pageWidth, $pageHeight]);
+                $pdf->useTemplate($tpl);
+                $pdf->SetAutoPageBreak(false);
+                $pdf->SetFillColor(255, 255, 255);
+                $pdf->SetTextColor(0, 0, 0);
+
+                $normalizeTop = static function (float $ratio) use ($pageHeight): float {
+                    return $ratio * $pageHeight;
+                };
+                $ocrTop = static function (float $originY, float $height) use ($normalizeTop): float {
+                    return $normalizeTop(1.0 - $originY - $height);
+                };
+                $fillBox = static function (
+                    \setasign\Fpdi\Fpdi $pdfInstance,
+                    float $x,
+                    float $y,
+                    float $w,
+                    float $h,
+                    float $padX = 1.3,
+                    float $padY = 0.7
+                ): void {
+                    $pdfInstance->Rect(
+                        max(0.0, $x - $padX),
+                        max(0.0, $y - $padY),
+                        max(1.0, $w + ($padX * 2)),
+                        max(1.0, $h + ($padY * 2)),
+                        'F'
+                    );
+                };
+                $writeFittedCell = static function (
+                    \setasign\Fpdi\Fpdi $pdfInstance,
+                    float $x,
+                    float $y,
+                    float $w,
+                    float $h,
+                    string $text,
+                    string $style = '',
+                    float $fontSize = 9.2,
+                    float $minFontSize = 6.8,
+                    string $align = 'L'
+                ): void {
+                    $clean = trim((string)(preg_replace('/\s+/u', ' ', $text) ?? $text));
+                    if ($clean === '') {
+                        return;
+                    }
+                    for ($size = $fontSize; $size >= $minFontSize; $size -= 0.2) {
+                        $pdfInstance->SetFont('Arial', $style, $size);
+                        if ($pdfInstance->GetStringWidth($clean) <= $w) {
+                            break;
+                        }
+                    }
+                    $pdfInstance->SetFont('Arial', $style, max($minFontSize, $size));
+                    $pdfInstance->SetXY($x, $y);
+                    $pdfInstance->Cell($w, $h, $clean, 0, 0, $align);
+                };
+
+                $valueColumnX = 84.5;
+                $valueColumnW = $pageWidth - $valueColumnX - 19.0;
+                $valueRows = [
+                    ['y' => $ocrTop(0.6342979310969139, 0.019737470944722446), 'text' => $displayName, 'font' => 9.4],
+                    ['y' => $ocrTop(0.6146032120973017, 0.022460242907206274), 'text' => $displayAddress, 'font' => 9.1],
+                    ['y' => $ocrTop(0.5799999999000001, 0.016666666666666607), 'text' => $franchisee !== '' ? $franchisee : '-', 'font' => 8.9],
+                    ['y' => $ocrTop(0.5616666667380952, 0.01666666666666672), 'text' => $vehicleType, 'font' => 9.0],
+                    ['y' => $ocrTop(0.5400000001805556, 0.021666666666666612), 'text' => $registrationNumber !== '' ? $registrationNumber : '-', 'font' => 9.0],
+                    ['y' => $ocrTop(0.52166666685, 0.018333333333333313), 'text' => $plateNumber !== '' ? $plateNumber : '-', 'font' => 9.0],
+                    ['y' => $ocrTop(0.5016666664375, 0.018333333333333313), 'text' => $bodyNumber !== '' ? $bodyNumber : '-', 'font' => 9.0],
+                ];
+                foreach ($valueRows as $rowValue) {
+                    $y = (float)$rowValue['y'];
+                    $fillBox($pdf, $valueColumnX, $y, $valueColumnW, 5.2, 1.2, 0.6);
+                    $writeFittedCell($pdf, $valueColumnX, $y, $valueColumnW, 5.0, (string)$rowValue['text'], '', (float)$rowValue['font'], 6.8, 'L');
+                }
+
+                $issuedBlockX = 25.0;
+                $issuedBlockY = $ocrTop(0.4066666666166666, 0.018333333333333313);
+                $issuedBlockW = $pageWidth - 50.0;
+                $issuedBlockH = 13.5;
+                $fillBox($pdf, $issuedBlockX, $issuedBlockY, $issuedBlockW, $issuedBlockH, 2.0, 0.9);
+                $pdf->SetFont('Arial', '', 8.8);
+                $pdf->SetXY($issuedBlockX, $issuedBlockY);
+                $pdf->MultiCell(
+                    $issuedBlockW,
+                    4.3,
+                    'Issued this ' . $issuedAsDocx . ' at the office of the Punong Barangay, Barangay' . "\n" . 'San Jose, Montalban, Rizal',
+                    0,
+                    'C'
+                );
+
+                $metaValueX = 57.0;
+                $metaValueW = 78.0;
+                $metaRows = [
+                    ['y' => $ocrTop(0.3499999998833333, 0.021666666666666723), 'text' => $clearanceNumber !== '' ? $clearanceNumber : $requestId, 'font' => 9.0],
+                    ['y' => $ocrTop(0.3316666665000001, 0.019999999999999907), 'text' => $receiptNumber, 'font' => 9.0],
+                    ['y' => $ocrTop(0.3132073218646825, 0.020252022743225018), 'text' => $amountText, 'font' => 9.0],
+                ];
+                foreach ($metaRows as $metaRow) {
+                    $y = (float)$metaRow['y'];
+                    $fillBox($pdf, $metaValueX, $y, $metaValueW, 5.2, 1.2, 0.6);
+                    $writeFittedCell($pdf, $metaValueX, $y, $metaValueW, 5.0, (string)$metaRow['text'], '', (float)$metaRow['font'], 6.8, 'L');
+                }
+
+                if (is_file($qrDiskPath)) {
+                    $qrSize = 20.0;
+                    $pdf->Image($qrDiskPath, ($pageWidth - $qrSize) / 2, $pageHeight - 49.0, $qrSize, $qrSize);
+                }
+
+                $pdf->Output('F', $diskPath);
+                return '/UnifiedFileAttachment/IssuedDocuments/Generated/' . $fileName;
+            } catch (Throwable $e) {
+                error_log('[dra_generate_issued_document][tricycle_clearance_fpdi] ' . $e->getMessage());
             }
         }
     }
@@ -1870,47 +2274,39 @@ function dra_generate_issued_document(array $requestRow): ?string {
                 }
 
                 $approvalMarkers = [
-                    ['key' => 'not_banned', 'lineY' => $normalizeTop(0.5030), 'maskX' => 23.6, 'maskY' => $normalizeTop(0.4950), 'maskW' => 9.4, 'maskH' => 7.2],
-                    ['key' => 'no_objection', 'lineY' => $normalizeTop(0.5545), 'maskX' => 23.6, 'maskY' => $normalizeTop(0.5465), 'maskW' => 9.4, 'maskH' => 7.2],
-                    ['key' => 'temporary_clearance', 'lineY' => $normalizeTop(0.6105), 'maskX' => 0.0, 'maskY' => 0.0, 'maskW' => 0.0, 'maskH' => 0.0],
+                    ['key' => 'not_banned', 'lineY' => $normalizeTop(0.5030)],
+                    ['key' => 'no_objection', 'lineY' => $normalizeTop(0.5287)],
+                    ['key' => 'temporary_clearance', 'lineY' => $normalizeTop(0.5545)],
                 ];
                 foreach ($approvalMarkers as $approvalMarker) {
-                    if ($businessApprovalType !== $approvalMarker['key']) {
-                        continue;
-                    }
                     $lineY = (float)$approvalMarker['lineY'];
-                    if ((float)$approvalMarker['maskW'] > 0.0 && (float)$approvalMarker['maskH'] > 0.0) {
-                        $fillBox(
-                            $pdf,
-                            (float)$approvalMarker['maskX'],
-                            (float)$approvalMarker['maskY'],
-                            (float)$approvalMarker['maskW'],
-                            (float)$approvalMarker['maskH'],
-                            0.25,
-                            0.25
-                        );
-                        $pdf->SetDrawColor(0, 0, 0);
-                        $pdf->SetLineWidth(0.55);
-                        $pdf->Line(24.3, $lineY, 33.5, $lineY);
-                    }
+                    $pdf->Rect(19.5, $lineY - 7.0, 17.2, 13.0, 'F');
                     $pdf->SetDrawColor(0, 0, 0);
-                    $pdf->SetLineWidth(0.78);
-                    $pdf->Line(25.6, $lineY - 1.6, 27.9, $lineY + 1.0);
-                    $pdf->Line(27.9, $lineY + 1.0, 32.8, $lineY - 4.0);
+                    $pdf->SetLineWidth(0.65);
+                    $pdf->Line(21.0, $lineY + 0.2, 25.4, $lineY + 0.2);
+                    $pdf->Line(30.1, $lineY + 0.2, 34.5, $lineY + 0.2);
+                    if ($businessApprovalType === $approvalMarker['key']) {
+                        $pdf->SetFont('ZapfDingbats', '', 16.0);
+                        $pdf->SetXY(24.9, $lineY - 6.0);
+                        $pdf->Cell(6.0, 6.0, chr(51), 0, 0, 'C');
+                    }
                     $pdf->SetLineWidth(0.2);
                 }
 
+                // The source permit PDF already contains a literal ${ISSUED_DATE_WORD} footer,
+                // so the generated copy needs to overwrite that footer in place.
                 $issuedBlockX = 26.0;
-                $issuedBlockY = $normalizeTop(0.5865);
+                $issuedMaskY = $normalizeTop(0.6170);
+                $issuedBlockY = $normalizeTop(0.6350);
                 $issuedBlockW = $pageWidth - 52.0;
-                $issuedBlockH = 12.0;
-                $fillBox($pdf, $issuedBlockX, $issuedBlockY, $issuedBlockW, $issuedBlockH, 1.6, 0.8);
-                $pdf->SetFont('Arial', '', 10.0);
+                $issuedBlockH = 19.0;
+                $pdf->Rect(24.0, $issuedMaskY, $issuedBlockW + 4.0, $issuedBlockH, 'F');
+                $pdf->SetFont('Arial', '', 9.0);
                 $pdf->SetXY($issuedBlockX, $issuedBlockY);
                 $pdf->MultiCell(
                     $issuedBlockW,
-                    4.6,
-                    'Issued this ' . $issuedAsDocx . ' at the office of the Punong Barangay, Barangay' . "\n" . 'San Jose, Montalban, Rizal',
+                    4.2,
+                    'Issued this ' . $issuedAsDocx . ' at the office of the Punong Barangay, Barangay San Jose, Montalban, Rizal.',
                     0,
                     'C'
                 );
@@ -4197,6 +4593,9 @@ if ($action === 'view_payment_proof') {
     }
 
     $mime = (string)(mime_content_type($absolute) ?: 'application/octet-stream');
+    header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
+    header('Pragma: no-cache');
+    header('Expires: 0');
     header('Content-Type: ' . $mime);
     header('Content-Disposition: inline; filename="' . basename($absolute) . '"');
     header('Content-Length: ' . filesize($absolute));
@@ -4346,7 +4745,15 @@ if ($action === 'view_issued') {
         'businessclearance',
         'clearanceforbusinesspermit',
     ], true);
-    $isTemplateBasedCertificate = $isIndigency || $isGoodMoral || $isResidency || $isCohabitation || $isFirstTimeJobSeeker || $isBusinessPermitClearance;
+    $isTricyclePermitClearance = in_array($docTypeToken, [
+        'barangayclearancefortricyclepermit',
+        'clearancefortricyclepermit',
+        'tricyclepermit',
+        'tricycleclearance',
+        'fortricyclepermit',
+    ], true);
+    $isGeneralPermitClearance = (dra_general_clearance_purpose_from_document_type((string)($row['document_type'] ?? '')) !== '');
+    $isTemplateBasedCertificate = $isIndigency || $isGoodMoral || $isResidency || $isCohabitation || $isFirstTimeJobSeeker || $isBusinessPermitClearance || $isGeneralPermitClearance || $isTricyclePermitClearance;
     $ext = strtolower(pathinfo($publicPath, PATHINFO_EXTENSION));
     $verificationCode = trim((string)($row['verification_code'] ?? ''));
     $qrPublicPath = '/UnifiedFileAttachment/IssuedDocuments/QR/qr_' . preg_replace('/[^A-Za-z0-9_-]/', '', $requestId) . '.png';
@@ -4357,7 +4764,7 @@ if ($action === 'view_issued') {
         ? [DR_STAGE_READY_FOR_CLAIM, DR_STAGE_COMPLETED]
         : [DR_STAGE_PAYMENT_VERIFIED, DR_STAGE_READY_FOR_CLAIM, DR_STAGE_COMPLETED];
     $shouldHaveQr = ($verificationCode !== '' && in_array($stage, $qrEligibleStages, true));
-    $renderRevisionTag = 'r20260311f';
+    $renderRevisionTag = 'r20260312y';
     $issuedBaseName = strtolower(basename((string)$publicPath));
     $isGeneratedIssuedPath = strpos((string)$publicPath, '/UnifiedFileAttachment/IssuedDocuments/Generated/') === 0;
     $isCurrentRenderRevision = ($issuedBaseName !== '' && strpos($issuedBaseName, strtolower($renderRevisionTag)) !== false);
@@ -4398,6 +4805,9 @@ if ($action === 'view_issued') {
     }
 
     $mime = (string)(mime_content_type($absolute) ?: 'application/octet-stream');
+    header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
+    header('Pragma: no-cache');
+    header('Expires: 0');
     header('Content-Type: ' . $mime);
     header('Content-Disposition: inline; filename="' . basename($absolute) . '"');
     header('Content-Length: ' . filesize($absolute));

@@ -1,11 +1,9 @@
 document.addEventListener("DOMContentLoaded", () => {
     const form = document.querySelector("form");
     const submitBtn = form?.querySelector(".submit-btn");
-    const tricycleTypeSelect = document.getElementById("tricycleTypeSelect");
-    const tricycleCertLabel = document.getElementById("tricycleCertLabel");
-    const tricycleCertFile = document.getElementById("tricycleCertFile");
     const appNew = document.getElementById("app_new");
     const appRenewal = document.getElementById("app_renewal");
+    const requestPurpose = document.getElementById("tricycleRequestPurpose");
     const documentUploadSection = document.getElementById("documentUploadSection");
     const bodyNumberInput = document.getElementById("bodyNumber");
     const chassisNumberInput = document.getElementById("chassisNumber");
@@ -13,14 +11,15 @@ document.addEventListener("DOMContentLoaded", () => {
     const orNumberInput = document.getElementById("orNumber");
     const crNumberInput = document.getElementById("crNumber");
     const plateNumberInput = document.getElementById("plateNumber");
-    const validIdType = document.getElementById("validIdType");
-    const validIdFile = document.getElementById("validIdFile");
-    const validIdNumberRow = document.getElementById("validIdNumberRow");
-    const validIdNumber = document.getElementById("validIdNumber");
-    const validIdNumberError = document.getElementById("validIdNumberError");
-    const ltoRegFiles = document.getElementById("ltoRegFiles");
-    const ltoRegSelectedFile = document.getElementById("ltoRegSelectedFile");
-    const ltoRegCol = document.getElementById("ltoRegCol");
+    const franchiseeSelect = document.getElementById("franchiseeSelect");
+    const vehicleNamedYes = document.getElementById("vehicleNamedYes");
+    const vehicleNamedNo = document.getElementById("vehicleNamedNo");
+    const deedOfSaleRow = document.getElementById("deedOfSaleRow");
+    const deedOfSaleFile = document.getElementById("deedOfSaleFile");
+    const orVehicleFile = document.getElementById("orVehicleFile");
+    const crVehicleFile = document.getElementById("crVehicleFile");
+    const todaPodaCertFile = document.getElementById("todaPodaCertFile");
+    const authorizationVehicleFile = document.getElementById("authorizationVehicleFile");
     const lastYearClearanceCol = document.getElementById("lastYearClearanceCol");
     const lastYearClearanceFile = document.getElementById("lastYearClearanceFile");
     const lastYearClearanceSelectedFile = document.getElementById("lastYearClearanceSelectedFile");
@@ -30,21 +29,6 @@ document.addEventListener("DOMContentLoaded", () => {
         if (!el) return;
         if (required) el.setAttribute("required", "required");
         else el.removeAttribute("required");
-    };
-
-    const updateCertificationLabel = () => {
-        if (!tricycleCertLabel) return;
-        const hasAppType = appNew?.checked === true || appRenewal?.checked === true;
-        const type = tricycleTypeSelect?.value?.trim();
-        const labelText = type ? `Upload ${type} Certification` : "Upload Certification";
-        tricycleCertLabel.innerHTML = `${labelText} <span class="required-asterisk">*</span>`;
-        if (tricycleCertFile) {
-            const canEnable = hasAppType && type;
-            tricycleCertFile.disabled = !canEnable;
-            if (!canEnable) {
-                tricycleCertFile.value = "";
-            }
-        }
     };
 
     const wireFileDisplay = (inputId, outputId) => {
@@ -62,56 +46,9 @@ document.addEventListener("DOMContentLoaded", () => {
         render();
     };
 
-    const updateState = () => {
-        const isNew = appNew?.checked === true;
-        const isRenewal = appRenewal?.checked === true;
-        const docsEnabled = isNew || isRenewal;
-
-        if (documentUploadSection) {
-            documentUploadSection.classList.toggle("d-none", !docsEnabled);
-        }
-
-        setRequired(tricycleTypeSelect, docsEnabled);
-        setRequired(tricycleCertFile, docsEnabled);
-        setRequired(validIdType, docsEnabled);
-        setRequired(validIdFile, docsEnabled);
-        setRequired(ltoRegFiles, docsEnabled);
-        setRequired(lastYearClearanceFile, isRenewal);
-
-        if (ltoRegCol) {
-            ltoRegCol.classList.toggle("col-md-12", !isRenewal);
-            ltoRegCol.classList.toggle("col-md-6", isRenewal);
-        }
-        if (lastYearClearanceCol) {
-            lastYearClearanceCol.classList.toggle("d-none", !isRenewal);
-        }
-        if (lastYearClearanceFile) {
-            lastYearClearanceFile.disabled = !isRenewal;
-            if (!isRenewal) {
-                lastYearClearanceFile.value = "";
-                if (lastYearClearanceSelectedFile) lastYearClearanceSelectedFile.textContent = "";
-            }
-        }
-
-        if (!docsEnabled) {
-            if (tricycleTypeSelect) tricycleTypeSelect.value = "";
-            if (validIdType) validIdType.value = "";
-            if (validIdNumber) {
-                validIdNumber.value = "";
-                validIdNumber.setCustomValidity("");
-            }
-            if (validIdNumberRow) validIdNumberRow.classList.add("d-none");
-            if (validIdNumberError) validIdNumberError.classList.add("d-none");
-            if (validIdFile) validIdFile.value = "";
-            if (ltoRegFiles) ltoRegFiles.value = "";
-            if (ltoRegSelectedFile) ltoRegSelectedFile.textContent = "";
-            if (lastYearClearanceFile) lastYearClearanceFile.value = "";
-            if (lastYearClearanceSelectedFile) lastYearClearanceSelectedFile.textContent = "";
-        }
-
-        updateCertificationLabel();
-        updateValidIdNumberRow();
-        submitBtn.disabled = !form.checkValidity();
+    const clearFileInput = (input, output) => {
+        if (input) input.value = "";
+        if (output) output.textContent = "";
     };
 
     const setErrorState = (input, errorEl, message) => {
@@ -168,8 +105,6 @@ document.addEventListener("DOMContentLoaded", () => {
         run();
     };
 
-    form.addEventListener("input", updateState);
-    form.addEventListener("change", updateState);
     const enforcePlateLimit = (input) => {
         if (!input) return;
         const value = (input.value || "").toUpperCase();
@@ -184,16 +119,18 @@ document.addEventListener("DOMContentLoaded", () => {
             }
             if (char === "-" || char === " ") {
                 result += char;
-                continue;
             }
         }
         if (result !== value) {
             input.value = result;
         }
     };
+
     const normalizeNumber = (input) => {
+        if (!input) return;
         input.value = input.value.replace(/[\s-]+/g, "");
     };
+
     const normalizeChassis = (input) => {
         if (!input) return;
         const raw = (input.value || "").replace(/[^a-zA-Z0-9]/g, "").toUpperCase();
@@ -201,58 +138,79 @@ document.addEventListener("DOMContentLoaded", () => {
         const second = raw.slice(6, 12);
         input.value = second.length > 0 ? `${first}-${second}` : first;
     };
-    const normalizeValue = (value) => (value || "").replace(/[\s-]/g, "").toUpperCase();
-    const validIdRegexMap = {
-        philsys: /^\d{12}$/,
-        umid: /^\d{12}$/,
-        passport: /^[A-Z]{1,2}\d{7}$/,
-        drivers_license: /^\d{10}$/,
-        prc: /^\d{7}$/,
-        postal: /^\d{12}$/,
-        gsis: /^(?:\d{10}|\d{12})$/,
-        sss: /^\d{10}$/
+
+    const updateRequestPurpose = () => {
+        if (!requestPurpose) return;
+        requestPurpose.value = appRenewal?.checked === true
+            ? "Tricycle Permit - Renewal"
+            : "Tricycle Permit - New Application";
     };
-    const updateValidIdNumberRow = () => {
-        if (!validIdType || !validIdNumberRow || !validIdNumber) return;
-        const hasValue = validIdType.value !== "";
-        validIdNumberRow.classList.toggle("d-none", !hasValue);
-        setRequired(validIdNumber, hasValue);
-        if (!hasValue) {
-            validIdNumber.value = "";
-            validIdNumber.setCustomValidity("");
-        } else {
-            validIdNumber.setCustomValidity("");
+
+    const updateState = () => {
+        const isNew = appNew?.checked === true;
+        const isRenewal = appRenewal?.checked === true;
+        const docsEnabled = isNew || isRenewal;
+        const isVehicleNamedToOwner = vehicleNamedYes?.checked === true;
+        const needsDeedOfSale = docsEnabled && vehicleNamedNo?.checked === true;
+
+        updateRequestPurpose();
+
+        if (documentUploadSection) {
+            documentUploadSection.classList.toggle("d-none", !docsEnabled);
         }
-        validIdNumber.dataset.regexKey = validIdType.value;
+
+        setRequired(franchiseeSelect, true);
+        setRequired(orVehicleFile, docsEnabled);
+        setRequired(crVehicleFile, docsEnabled);
+        setRequired(todaPodaCertFile, docsEnabled);
+        setRequired(lastYearClearanceFile, isRenewal);
+        setRequired(vehicleNamedYes, docsEnabled);
+        setRequired(vehicleNamedNo, docsEnabled);
+
+        if (deedOfSaleRow) {
+            deedOfSaleRow.classList.toggle("d-none", !needsDeedOfSale);
+        }
+        if (deedOfSaleFile) {
+            deedOfSaleFile.disabled = !needsDeedOfSale;
+            setRequired(deedOfSaleFile, needsDeedOfSale);
+            if (!needsDeedOfSale) {
+                clearFileInput(deedOfSaleFile, document.getElementById("deedOfSaleSelectedFile"));
+            }
+        }
+
+        if (lastYearClearanceCol) {
+            lastYearClearanceCol.classList.toggle("d-none", !isRenewal);
+        }
+        if (lastYearClearanceFile) {
+            lastYearClearanceFile.disabled = !isRenewal;
+            if (!isRenewal) {
+                clearFileInput(lastYearClearanceFile, lastYearClearanceSelectedFile);
+            }
+        }
+
+        if (!docsEnabled) {
+            if (vehicleNamedYes) vehicleNamedYes.checked = false;
+            if (vehicleNamedNo) vehicleNamedNo.checked = false;
+            clearFileInput(orVehicleFile, document.getElementById("orVehicleSelectedFile"));
+            clearFileInput(crVehicleFile, document.getElementById("crVehicleSelectedFile"));
+            clearFileInput(todaPodaCertFile, document.getElementById("todaPodaCertSelectedFile"));
+            clearFileInput(authorizationVehicleFile, document.getElementById("authorizationVehicleSelectedFile"));
+            clearFileInput(deedOfSaleFile, document.getElementById("deedOfSaleSelectedFile"));
+            clearFileInput(lastYearClearanceFile, lastYearClearanceSelectedFile);
+        } else if (isVehicleNamedToOwner) {
+            clearFileInput(deedOfSaleFile, document.getElementById("deedOfSaleSelectedFile"));
+        }
+
+        submitBtn.disabled = !form.checkValidity();
     };
-    const validateNumberInput = (inputEl, regexMap, errorEl) => {
-        if (!inputEl || !inputEl.required) return;
-        const rawValue = inputEl.value.trim();
-        if (rawValue === "") {
-            inputEl.setCustomValidity("");
-            if (errorEl) errorEl.classList.add("d-none");
-            return;
-        }
-        const key = inputEl.dataset.regexKey || "";
-        const regex = regexMap[key];
-        if (!regex) {
-            inputEl.setCustomValidity("Please select a valid option.");
-            if (errorEl) errorEl.classList.remove("d-none");
-            return;
-        }
-        const normalized = normalizeValue(rawValue);
-        const isInvalid = !regex.test(normalized);
-        if (isInvalid) {
-            inputEl.setCustomValidity("Please enter a valid number format.");
-            if (errorEl) errorEl.classList.remove("d-none");
-        } else {
-            inputEl.setCustomValidity("");
-            if (errorEl) errorEl.classList.add("d-none");
-        }
-    };
+
+    form.addEventListener("input", updateState);
+    form.addEventListener("change", updateState);
+
     plateNumberInput?.addEventListener("input", () => {
         enforcePlateLimit(plateNumberInput);
     });
+
     bindValidation(bodyNumberInput, document.getElementById("bodyNumberError"), {
         required: "Body number is required.",
         pattern: "Numbers only."
@@ -273,22 +231,18 @@ document.addEventListener("DOMContentLoaded", () => {
         required: "C.R. number is required.",
         pattern: "C.R. number must be 7 to 12 digits."
     }, normalizeNumber);
-    validIdType?.addEventListener("change", () => {
-        updateValidIdNumberRow();
-        validateNumberInput(validIdNumber, validIdRegexMap, validIdNumberError);
-        updateState();
-    });
-    validIdNumber?.addEventListener("input", () => {
-        validateNumberInput(validIdNumber, validIdRegexMap, validIdNumberError);
-        updateState();
-    });
-    tricycleTypeSelect?.addEventListener("change", updateCertificationLabel);
+
     appNew?.addEventListener("change", updateState);
     appRenewal?.addEventListener("change", updateState);
-    updateCertificationLabel();
-    wireFileDisplay("tricycleCertFile", "tricycleCertSelectedFile");
-    wireFileDisplay("ltoRegFiles", "ltoRegSelectedFile");
+    vehicleNamedYes?.addEventListener("change", updateState);
+    vehicleNamedNo?.addEventListener("change", updateState);
+
+    wireFileDisplay("orVehicleFile", "orVehicleSelectedFile");
+    wireFileDisplay("crVehicleFile", "crVehicleSelectedFile");
+    wireFileDisplay("todaPodaCertFile", "todaPodaCertSelectedFile");
+    wireFileDisplay("authorizationVehicleFile", "authorizationVehicleSelectedFile");
+    wireFileDisplay("deedOfSaleFile", "deedOfSaleSelectedFile");
     wireFileDisplay("lastYearClearanceFile", "lastYearClearanceSelectedFile");
-    updateValidIdNumberRow();
+
     updateState();
 });
