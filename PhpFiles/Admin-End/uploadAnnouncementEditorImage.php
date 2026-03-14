@@ -30,11 +30,11 @@ if ($tmpPath === "" || !is_uploaded_file($tmpPath)) {
   exit;
 }
 
-$maxBytes = 5 * 1024 * 1024; // 5MB
+$maxBytes = 25 * 1024 * 1024; // 25MB
 $size = (int)($file["size"] ?? 0);
 if ($size <= 0 || $size > $maxBytes) {
   http_response_code(400);
-  echo json_encode(["success" => false, "message" => "Image must be 5MB or less."]);
+  echo json_encode(["success" => false, "message" => "Image must be 25MB or less."]);
   exit;
 }
 

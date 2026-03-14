@@ -375,9 +375,16 @@ if (!empty($_SESSION['user_id']) && isset($conn) && $conn instanceof mysqli) {
 
       <li class="mb-1 mt-2 text-muted small fw-semibold px-2">Content Management</li>
       <li class="mb-2">
+        <a href="<?= htmlspecialchars(appUrl('Admin-End/Announcements/CreateAnnouncement.php')) ?>"
+           class="btn btn-toggle d-flex align-items-center gap-2 rounded <?= $current == 'CreateAnnouncement.php' ? 'active' : '' ?>"
+           style="<?= $current == 'CreateAnnouncement.php' ? 'outline: none; box-shadow: none;' : '' ?>">
+          <i class="fas fa-file-pen"></i> Create
+        </a>
+      </li>
+      <li class="mb-2">
         <a href="<?= htmlspecialchars(appUrl('Admin-End/Announcements/Announcements.php')) ?>"
-           class="btn btn-toggle d-flex align-items-center gap-2 rounded <?= $isContentMgmtActive ? 'active' : '' ?>"
-           style="<?= $isContentMgmtActive ? 'outline: none; box-shadow: none;' : '' ?>">
+           class="btn btn-toggle d-flex align-items-center gap-2 rounded <?= $current == 'Announcements.php' ? 'active' : '' ?>"
+           style="<?= $current == 'Announcements.php' ? 'outline: none; box-shadow: none;' : '' ?>">
           <i class="fas fa-bullhorn"></i> Announcements
         </a>
       </li>

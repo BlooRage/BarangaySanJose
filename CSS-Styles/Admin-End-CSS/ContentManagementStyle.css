@@ -2,25 +2,239 @@
   border: 1px solid #e8e8e8;
   border-radius: 16px;
   background: #fff;
+  font-family: 'Geist', sans-serif;
 }
 
 .announcement-create-shell {
   border: 1px solid #e8e8e8;
   border-radius: 16px;
   background: #fff;
+  font-family: 'Geist', sans-serif;
 }
 
 .announcement-section-card {
-  border: 1px solid #e9ecef;
-  border-radius: 12px;
+  border: 1px solid #f1a24d;
+  border-radius: 18px;
   background: #fff;
-  padding: 1rem;
+  padding: 1rem 1rem 1.1rem;
+  box-shadow: 0 1px 0 rgba(241, 162, 77, 0.08);
 }
 
 .announcement-section-title {
   font-size: 1rem;
   font-weight: 700;
   margin-bottom: 0.9rem;
+  color: #a95a00;
+}
+
+.announcement-compose-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 1rem;
+  padding: 0 0 1rem;
+  border-bottom: 1px dashed #f3d2a6;
+  border-radius: 0;
+  background: transparent;
+}
+
+.announcement-create-divider {
+  width: 100%;
+  margin: 1rem 0 1.1rem;
+  border-top: 1px dashed #e9ecef;
+}
+
+.announcement-compose-subtitle {
+  max-width: 720px;
+  color: #6c757d;
+  font-size: 0.95rem;
+}
+
+.announcement-create-guide {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 1.5rem;
+  padding: 1.1rem 1.2rem;
+  border: 1px solid #f1a24d;
+  border-radius: 18px;
+  background: linear-gradient(135deg, #fffaf5 0%, #ffffff 100%);
+}
+
+.announcement-create-guide-copy {
+  flex: 1 1 360px;
+}
+
+.announcement-create-guide-text {
+  color: #5c6670;
+  font-size: 0.93rem;
+}
+
+.announcement-create-guide-kicker {
+  display: inline-block;
+  margin-bottom: 0.4rem;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #a95a00;
+}
+
+.announcement-create-guide-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(180px, 1fr));
+  gap: 0.9rem;
+  flex: 1 1 420px;
+}
+
+.announcement-guide-block {
+  padding: 0.85rem 0.95rem;
+  border: 1px solid #f3d2a6;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.88);
+}
+
+.announcement-guide-title {
+  margin: 0 0 0.55rem;
+  font-size: 0.92rem;
+  font-weight: 700;
+  color: #8a5308;
+}
+
+.announcement-guide-list {
+  margin: 0;
+  padding-left: 1.05rem;
+  color: #5c6670;
+  font-size: 0.9rem;
+}
+
+.announcement-guide-list li + li {
+  margin-top: 0.35rem;
+}
+
+.announcement-compose-tags,
+.announcement-content-hints {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.announcement-compose-tags {
+  justify-content: flex-end;
+}
+
+.announcement-compose-tag,
+.announcement-content-hint {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.35rem 0.7rem;
+  border-radius: 999px;
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.announcement-compose-tag {
+  border: 1px solid #f0c89d;
+  background: #fff;
+  color: #a95a00;
+}
+
+.announcement-editor-panel {
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  padding: 0;
+}
+
+.announcement-editor-panel-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 1rem;
+  margin-bottom: 0.85rem;
+  padding-bottom: 0.85rem;
+  border-bottom: 1px dashed #e9ecef;
+}
+
+.announcement-editor-helper {
+  color: #6c757d;
+  font-size: 0.92rem;
+}
+
+.announcement-primary-title-wrap {
+  margin-bottom: 1.1rem;
+}
+
+.announcement-primary-title-input {
+  min-height: calc(1.5em + 0.75rem + 2px);
+  font-size: 1rem;
+  font-weight: 400;
+  border-radius: 0.375rem;
+}
+
+.announcement-secondary-title-input {
+  min-height: calc(1.5em + 0.75rem + 2px);
+  font-size: 1rem;
+  font-weight: 400;
+  border-radius: 0.375rem;
+}
+
+.announcement-dual-compose-header {
+  margin-bottom: 1.25rem;
+  padding: 0 0 0.9rem;
+  border-bottom: 1px dashed #e9ecef;
+  border-left: 0;
+  border-radius: 0;
+  background: transparent;
+}
+
+.announcement-dual-panel {
+  padding: 0.25rem 0 0;
+}
+
+.announcement-dual-panel .announcement-card-title {
+  margin-bottom: 0.7rem;
+}
+
+.announcement-dual-card {
+  border-color: #f3d2a6;
+  border-radius: 16px;
+  box-shadow: none;
+  padding: 1rem 1rem 1.1rem;
+}
+
+.announcement-placement-title {
+  display: block;
+  width: 100%;
+  padding: 0 0 0.55rem 0;
+  border-radius: 0;
+  border-left: 0;
+  border-bottom: 1px dashed #e9ecef;
+  font-size: 1rem;
+  font-weight: 700;
+  font-family: 'Geist', sans-serif;
+  color: #a95a00 !important;
+}
+
+.announcement-config-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1.25rem;
+}
+
+.announcement-config-panel {
+  min-width: 0;
+}
+
+.announcement-config-panel + .announcement-config-panel {
+  padding-left: 1.25rem;
+  border-left: 1px dashed #e9ecef;
+}
+
+.announcement-content-hint {
+  background: #fff6e8;
+  color: #8a5308;
+  border: 1px solid #f3d2a6;
 }
 
 .announcement-editor {
@@ -30,12 +244,14 @@
 
 .announcement-create-shell .note-editor.note-frame {
   border: 1px solid #ced4da;
-  border-radius: 0.375rem;
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.45);
 }
 
 .announcement-create-shell .note-editor .note-toolbar {
   border-bottom: 1px solid #dee2e6;
-  background: #f8f9fa;
+  background: linear-gradient(180deg, #f8f9fa 0%, #f1f4f7 100%);
 }
 
 .announcement-create-shell .note-editor .note-toolbar,
@@ -54,11 +270,74 @@
 .announcement-create-shell .note-editor .note-editing-area .note-editable {
   min-height: 220px;
   font-size: 0.95rem;
+  background: #fff;
+  padding: 1rem 1.05rem;
 }
 
 .announcement-create-shell .note-editor .note-editing-area .note-editable img {
   max-width: 100%;
   height: auto;
+}
+
+#dualPlacementFields .announcement-editor-panel-head {
+  margin-bottom: 0.7rem;
+  padding-bottom: 0.7rem;
+}
+
+#dualPlacementFields .announcement-editor-helper {
+  max-width: 880px;
+  font-size: 0.92rem;
+  color: #6c757d;
+}
+
+#dualPlacementFields .announcement-secondary-title-input {
+  margin-bottom: 0.1rem;
+}
+
+#dualPlacementFields .form-label {
+  font-size: 1rem;
+  font-weight: 600;
+  color: #212529;
+}
+
+#dualPlacementFields .announcement-card-title {
+  font-family: 'Geist', sans-serif;
+  font-size: 1rem;
+  font-weight: 700;
+  color: #212529;
+}
+
+.announcement-counter-note {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 0.85rem;
+  align-items: center;
+}
+
+.announcement-counter-text {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #6c757d;
+}
+
+.announcement-counter-warning {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #b26a00;
+}
+
+
+@media (max-width: 991.98px) {
+  .announcement-config-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .announcement-config-panel + .announcement-config-panel {
+    padding-left: 0;
+    border-left: 0;
+    padding-top: 1rem;
+    border-top: 1px dashed #e9ecef;
+  }
 }
 
 .note-editor.note-frame.fullscreen,
@@ -99,11 +378,40 @@
   padding-top: 0.75rem;
 }
 
+.announcement-channel-item + .announcement-channel-item {
+  margin-top: 0.85rem;
+}
+
+.announcement-channel-item .channel-field {
+  margin-top: 0.65rem;
+  padding-left: 1.6rem;
+}
+
+.channel-field-collapsible {
+  overflow: hidden;
+  max-height: 220px;
+  opacity: 1;
+  transition: max-height 220ms ease, opacity 180ms ease, margin-top 180ms ease, padding-top 180ms ease;
+}
+
+.channel-field-collapsible.is-collapsed {
+  max-height: 0;
+  opacity: 0;
+  margin-top: 0;
+  padding-top: 0;
+  border-top: 0;
+}
+
 .announcement-sticky-actions {
   position: static;
   background: #fff;
   border-top: 1px solid #e9ecef;
   padding-top: 0.9rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.75rem;
 }
 
 /* Mirrors resident masterlist list-control styling for consistency. */
@@ -212,6 +520,25 @@
   flex: 0 1 auto;
 }
 
+.admin-list-actions--linear {
+  gap: 10px;
+}
+
+.btn-linear-control {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: 38px;
+  padding: 0 12px;
+  border-radius: 10px;
+  white-space: nowrap;
+}
+
+.btn-linear-control i {
+  margin: 0 !important;
+}
+
 .admin-search {
   min-width: 220px;
   max-width: 320px;
@@ -238,9 +565,9 @@
   align-items: center;
   justify-content: center;
   gap: 6px;
-  padding: 6px 15px;
-  border-radius: 8px;
-  font-size: 0.85rem;
+  padding: 6px 18px;
+  border-radius: 10px;
+  font-size: 0.875rem;
   font-weight: 700;
   letter-spacing: 0;
   width: fit-content;
@@ -301,9 +628,21 @@
   align-items: center;
 }
 
+.announcement-primary-actions form,
+.announcement-review-actions form {
+  display: inline-flex;
+  margin: 0;
+}
+
 .announcement-primary-actions .btn,
 .announcement-review-actions .btn {
-  min-width: 74px;
+  min-width: 0;
+  height: auto;
+  padding: var(--bs-btn-padding-y) var(--bs-btn-padding-x);
+  border-radius: var(--bs-btn-border-radius);
+  font-size: var(--bs-btn-font-size);
+  font-weight: var(--bs-btn-font-weight);
+  line-height: var(--bs-btn-line-height);
 }
 
 .announcement-details-dialog {
@@ -320,6 +659,7 @@
 .announcement-details-title {
   font-weight: 700;
   color: #111;
+  font-family: 'Charis SIL Bold', serif;
 }
 
 .announcement-details-id {
@@ -379,6 +719,32 @@
   color: #495057;
   background: #e9ecef;
   border-color: #d5dbe1;
+}
+
+.announcement-details-card,
+.announcement-form-card {
+  border: 1px solid #f1a24d;
+  border-radius: 18px;
+  background: #fff;
+  padding: 1rem 1rem 1.1rem;
+}
+
+.announcement-card-title {
+  margin: 0 0 10px;
+  font-size: 1rem;
+  font-weight: 700;
+  color: #212529;
+  padding-bottom: 6px;
+  border-bottom: 1px dashed #e9ecef;
+  font-family: 'Geist', sans-serif;
+}
+
+.announcement-content-surface {
+  min-height: 160px;
+  border: 1px solid #d8dee6;
+  border-radius: 12px;
+  background: #f8fafc;
+  padding: 1rem;
 }
 
 .announcement-status-select.status-approved {
@@ -466,10 +832,21 @@
   overflow: visible;
 }
 
+.announcement-shell .admin-list-toolbar {
+  overflow-x: visible;
+  overflow-y: visible;
+  flex-wrap: wrap;
+  row-gap: 12px;
+}
+
 .announcement-shell .status-filter-btn {
   border-radius: 10px;
   border-width: 1px;
   overflow: visible;
+  padding: 0.375rem 0.75rem;
+  font-size: 0.875rem;
+  font-weight: 700;
+  line-height: 1.25;
 }
 
 .announcement-shell .status-filter-btn[data-filter="Approved"],
@@ -498,6 +875,11 @@
   background-color: #495057 !important;
   border-color: #495057 !important;
   font-weight: 700;
+}
+
+.announcement-shell #btnAnnouncementsTableRefresh.is-loading i,
+.announcement-shell #btnReviewQueueRefresh.is-loading i {
+  animation: adminSpin 900ms linear infinite;
 }
 
 .announcement-shell #filterButton,
@@ -551,7 +933,13 @@
 #modalReviewQueueColumns .modal-footer,
 #modalAnnouncementFlash .modal-footer,
 #modalSuperAdminRepostConfirm .modal-footer,
-#modalSuperAdminPostConfirm .modal-footer {
+#modalSuperAdminPostConfirm .modal-footer,
+#modalDeniedAnnouncementDraftNotice .modal-footer,
+#modalDeniedAnnouncementSaveConfirm .modal-footer,
+#modalDeniedAnnouncementResubmitConfirm .modal-footer,
+#modalApprovedAnnouncementSaveConfirm .modal-footer,
+#modalPendingAnnouncementSaveConfirm .modal-footer,
+#modalSuperAdminApprovedCloseConfirm .modal-footer {
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
@@ -568,7 +956,13 @@
 #modalReviewQueueColumns .modal-footer > form:not(.d-none),
 #modalAnnouncementFlash .modal-footer > form:not(.d-none),
 #modalSuperAdminRepostConfirm .modal-footer > form:not(.d-none),
-#modalSuperAdminPostConfirm .modal-footer > form:not(.d-none) {
+#modalSuperAdminPostConfirm .modal-footer > form:not(.d-none),
+#modalDeniedAnnouncementDraftNotice .modal-footer > form:not(.d-none),
+#modalDeniedAnnouncementSaveConfirm .modal-footer > form:not(.d-none),
+#modalDeniedAnnouncementResubmitConfirm .modal-footer > form:not(.d-none),
+#modalApprovedAnnouncementSaveConfirm .modal-footer > form:not(.d-none),
+#modalPendingAnnouncementSaveConfirm .modal-footer > form:not(.d-none),
+#modalSuperAdminApprovedCloseConfirm .modal-footer > form:not(.d-none) {
   display: flex !important;
   flex: 1 1 180px;
   margin: 0;
@@ -583,7 +977,13 @@
 #modalReviewQueueColumns .modal-footer > form.d-none,
 #modalAnnouncementFlash .modal-footer > form.d-none,
 #modalSuperAdminRepostConfirm .modal-footer > form.d-none,
-#modalSuperAdminPostConfirm .modal-footer > form.d-none {
+#modalSuperAdminPostConfirm .modal-footer > form.d-none,
+#modalDeniedAnnouncementDraftNotice .modal-footer > form.d-none,
+#modalDeniedAnnouncementSaveConfirm .modal-footer > form.d-none,
+#modalDeniedAnnouncementResubmitConfirm .modal-footer > form.d-none,
+#modalApprovedAnnouncementSaveConfirm .modal-footer > form.d-none,
+#modalPendingAnnouncementSaveConfirm .modal-footer > form.d-none,
+#modalSuperAdminApprovedCloseConfirm .modal-footer > form.d-none {
   display: none !important;
 }
 
@@ -597,6 +997,12 @@
 #modalAnnouncementFlash .modal-footer > .btn,
 #modalSuperAdminRepostConfirm .modal-footer > .btn,
 #modalSuperAdminPostConfirm .modal-footer > .btn,
+#modalDeniedAnnouncementDraftNotice .modal-footer > .btn,
+#modalDeniedAnnouncementSaveConfirm .modal-footer > .btn,
+#modalDeniedAnnouncementResubmitConfirm .modal-footer > .btn,
+#modalApprovedAnnouncementSaveConfirm .modal-footer > .btn,
+#modalPendingAnnouncementSaveConfirm .modal-footer > .btn,
+#modalSuperAdminApprovedCloseConfirm .modal-footer > .btn,
 #modalViewAnnouncement .modal-footer > form .btn,
 #modalDeleteAnnouncement .modal-footer > form .btn,
 #modalEditAnnouncement .modal-footer > form .btn,
@@ -606,9 +1012,19 @@
 #modalReviewQueueColumns .modal-footer > form .btn,
 #modalAnnouncementFlash .modal-footer > form .btn,
 #modalSuperAdminRepostConfirm .modal-footer > form .btn,
-#modalSuperAdminPostConfirm .modal-footer > form .btn {
+#modalSuperAdminPostConfirm .modal-footer > form .btn,
+#modalDeniedAnnouncementDraftNotice .modal-footer > form .btn,
+#modalDeniedAnnouncementSaveConfirm .modal-footer > form .btn,
+#modalDeniedAnnouncementResubmitConfirm .modal-footer > form .btn,
+#modalApprovedAnnouncementSaveConfirm .modal-footer > form .btn,
+#modalPendingAnnouncementSaveConfirm .modal-footer > form .btn,
+#modalSuperAdminApprovedCloseConfirm .modal-footer > form .btn {
   flex: 1 1 180px;
   width: 100%;
+  min-height: 42px;
+  padding: 0.65rem 1rem;
+  border-radius: 0.5rem;
+  font-weight: 600;
 }
 
 #modalViewAnnouncement .modal-content,
@@ -620,14 +1036,43 @@
 #modalReviewQueueColumns .modal-content,
 #modalAnnouncementFlash .modal-content,
 #modalSuperAdminRepostConfirm .modal-content,
-#modalSuperAdminPostConfirm .modal-content {
-  border-radius: 10px;
+#modalSuperAdminPostConfirm .modal-content,
+#modalDeniedAnnouncementDraftNotice .modal-content,
+#modalDeniedAnnouncementSaveConfirm .modal-content,
+#modalDeniedAnnouncementResubmitConfirm .modal-content,
+#modalApprovedAnnouncementSaveConfirm .modal-content,
+#modalPendingAnnouncementSaveConfirm .modal-content,
+#modalSuperAdminApprovedCloseConfirm .modal-content {
+  border: 0;
+  border-radius: 0.75rem;
+  box-shadow: 0 14px 40px rgba(15, 23, 42, 0.12);
+}
+
+#modalAnnouncementFlash .modal-dialog,
+#modalSuperAdminRepostConfirm .modal-dialog,
+#modalSuperAdminPostConfirm .modal-dialog,
+#modalDeniedAnnouncementDraftNotice .modal-dialog,
+#modalDeniedAnnouncementSaveConfirm .modal-dialog,
+#modalDeniedAnnouncementResubmitConfirm .modal-dialog,
+#modalApprovedAnnouncementSaveConfirm .modal-dialog,
+#modalPendingAnnouncementSaveConfirm .modal-dialog,
+#modalSuperAdminApprovedCloseConfirm .modal-dialog {
+  width: min(92vw, 680px);
+  max-width: 680px;
 }
 
 #modalDeleteAnnouncement .modal-header,
 #modalAnnouncementFlash .modal-header,
 #modalSuperAdminRepostConfirm .modal-header,
-#modalSuperAdminPostConfirm .modal-header {
+#modalSuperAdminPostConfirm .modal-header,
+#modalDeniedAnnouncementDraftNotice .modal-header,
+#modalDeniedAnnouncementSaveConfirm .modal-header,
+#modalDeniedAnnouncementResubmitConfirm .modal-header,
+#modalApprovedAnnouncementSaveConfirm .modal-header,
+#modalPendingAnnouncementSaveConfirm .modal-header,
+#modalSuperAdminApprovedCloseConfirm .modal-header {
+  border: 0;
+  padding: 1.5rem 1.5rem 0.5rem;
   justify-content: center;
   text-align: center;
 }
@@ -635,16 +1080,148 @@
 #modalDeleteAnnouncement .modal-header .modal-title,
 #modalAnnouncementFlash .modal-header .modal-title,
 #modalSuperAdminRepostConfirm .modal-header .modal-title,
-#modalSuperAdminPostConfirm .modal-header .modal-title {
+#modalSuperAdminPostConfirm .modal-header .modal-title,
+#modalDeniedAnnouncementDraftNotice .modal-header .modal-title,
+#modalDeniedAnnouncementSaveConfirm .modal-header .modal-title,
+#modalDeniedAnnouncementResubmitConfirm .modal-header .modal-title,
+#modalApprovedAnnouncementSaveConfirm .modal-header .modal-title,
+#modalPendingAnnouncementSaveConfirm .modal-header .modal-title,
+#modalSuperAdminApprovedCloseConfirm .modal-header .modal-title {
   width: 100%;
   text-align: center;
+  font-weight: 700;
 }
 
 #modalDeleteAnnouncement .modal-body,
 #modalAnnouncementFlash .modal-body,
 #modalSuperAdminRepostConfirm .modal-body,
-#modalSuperAdminPostConfirm .modal-body {
+#modalSuperAdminPostConfirm .modal-body,
+#modalDeniedAnnouncementDraftNotice .modal-body,
+#modalDeniedAnnouncementSaveConfirm .modal-body,
+#modalDeniedAnnouncementResubmitConfirm .modal-body,
+#modalApprovedAnnouncementSaveConfirm .modal-body,
+#modalPendingAnnouncementSaveConfirm .modal-body,
+#modalSuperAdminApprovedCloseConfirm .modal-body {
   text-align: center;
+  padding: 0.75rem 1.5rem 1.25rem;
+}
+
+#modalViewAnnouncement .modal-header,
+#modalEditAnnouncement .modal-header,
+#modalFilter .modal-header,
+#modalReviewQueueFilter .modal-header,
+#modalTableColumns .modal-header,
+#modalReviewQueueColumns .modal-header {
+  border: 0;
+  padding: 1.5rem 1.5rem 0.75rem;
+}
+
+#modalViewAnnouncement .modal-header .modal-title,
+#modalEditAnnouncement .modal-header .modal-title,
+#modalFilter .modal-header .modal-title,
+#modalReviewQueueFilter .modal-header .modal-title,
+#modalTableColumns .modal-header .modal-title,
+#modalReviewQueueColumns .modal-header .modal-title {
+  font-weight: 700;
+}
+
+#modalViewAnnouncement .modal-body,
+#modalEditAnnouncement .modal-body,
+#modalFilter .modal-body,
+#modalReviewQueueFilter .modal-body,
+#modalTableColumns .modal-body,
+#modalReviewQueueColumns .modal-body {
+  padding: 0.75rem 1.5rem 1.25rem;
+}
+
+#modalViewAnnouncement .modal-footer,
+#modalEditAnnouncement .modal-footer,
+#modalFilter .modal-footer,
+#modalReviewQueueFilter .modal-footer,
+#modalTableColumns .modal-footer,
+#modalReviewQueueColumns .modal-footer,
+#modalDeleteAnnouncement .modal-footer,
+#modalAnnouncementFlash .modal-footer,
+#modalSuperAdminRepostConfirm .modal-footer,
+#modalSuperAdminPostConfirm .modal-footer,
+#modalDeniedAnnouncementDraftNotice .modal-footer,
+#modalDeniedAnnouncementSaveConfirm .modal-footer,
+#modalDeniedAnnouncementResubmitConfirm .modal-footer,
+#modalApprovedAnnouncementSaveConfirm .modal-footer,
+#modalPendingAnnouncementSaveConfirm .modal-footer,
+#modalSuperAdminApprovedCloseConfirm .modal-footer {
+  border: 0;
+  padding: 0.75rem 1.5rem 1.5rem;
+}
+
+#modalViewAnnouncement .modal-footer,
+#modalEditAnnouncement .modal-footer {
+  gap: 0.75rem;
+}
+
+#modalDeleteAnnouncement .modal-footer,
+#modalAnnouncementFlash .modal-footer,
+#modalSuperAdminRepostConfirm .modal-footer,
+#modalSuperAdminPostConfirm .modal-footer,
+#modalDeniedAnnouncementDraftNotice .modal-footer,
+#modalDeniedAnnouncementSaveConfirm .modal-footer,
+#modalDeniedAnnouncementResubmitConfirm .modal-footer,
+#modalApprovedAnnouncementSaveConfirm .modal-footer,
+#modalPendingAnnouncementSaveConfirm .modal-footer,
+#modalSuperAdminApprovedCloseConfirm .modal-footer {
+  gap: 0.75rem;
+}
+
+/* Detail/edit modals: keep footer actions compact and right-aligned like other admin pages. */
+#modalViewAnnouncement .modal-footer,
+#modalEditAnnouncement .modal-footer,
+#modalFilter .modal-footer,
+#modalReviewQueueFilter .modal-footer,
+#modalTableColumns .modal-footer,
+#modalReviewQueueColumns .modal-footer {
+  justify-content: flex-end;
+}
+
+#modalViewAnnouncement .modal-footer > .btn,
+#modalEditAnnouncement .modal-footer > .btn,
+#modalFilter .modal-footer > .btn,
+#modalReviewQueueFilter .modal-footer > .btn,
+#modalTableColumns .modal-footer > .btn,
+#modalReviewQueueColumns .modal-footer > .btn,
+#modalViewAnnouncement .modal-footer > form .btn,
+#modalEditAnnouncement .modal-footer > form .btn,
+#modalFilter .modal-footer > form .btn,
+#modalReviewQueueFilter .modal-footer > form .btn,
+#modalTableColumns .modal-footer > form .btn,
+#modalReviewQueueColumns .modal-footer > form .btn {
+  flex: 0 0 auto;
+  width: auto;
+  min-width: 140px;
+}
+
+/* Small confirmation modals: balanced full-width pair buttons like complaint/admin confirmations. */
+#modalDeleteAnnouncement .modal-footer > .btn,
+#modalAnnouncementFlash .modal-footer > .btn,
+#modalSuperAdminRepostConfirm .modal-footer > .btn,
+#modalSuperAdminPostConfirm .modal-footer > .btn,
+#modalDeniedAnnouncementDraftNotice .modal-footer > .btn,
+#modalDeniedAnnouncementSaveConfirm .modal-footer > .btn,
+#modalDeniedAnnouncementResubmitConfirm .modal-footer > .btn,
+#modalApprovedAnnouncementSaveConfirm .modal-footer > .btn,
+#modalPendingAnnouncementSaveConfirm .modal-footer > .btn,
+#modalSuperAdminApprovedCloseConfirm .modal-footer > .btn,
+#modalDeleteAnnouncement .modal-footer > form .btn,
+#modalAnnouncementFlash .modal-footer > form .btn,
+#modalSuperAdminRepostConfirm .modal-footer > form .btn,
+#modalSuperAdminPostConfirm .modal-footer > form .btn,
+#modalDeniedAnnouncementDraftNotice .modal-footer > form .btn,
+#modalDeniedAnnouncementSaveConfirm .modal-footer > form .btn,
+#modalDeniedAnnouncementResubmitConfirm .modal-footer > form .btn,
+#modalApprovedAnnouncementSaveConfirm .modal-footer > form .btn,
+#modalPendingAnnouncementSaveConfirm .modal-footer > form .btn,
+#modalSuperAdminApprovedCloseConfirm .modal-footer > form .btn {
+  flex: 1 1 0;
+  min-width: 0;
 }
 
 /* Modal action layout:
@@ -696,6 +1273,283 @@
 #modalDeleteAnnouncement .modal-footer.modal-grid-actions .modal-action-secondary {
   grid-column: span 1;
   width: 100%;
+}
+
+/* Match announcement modals to the admin reference modals instead of the old
+   announcement-specific stretched footer system. */
+#modalViewAnnouncement .modal-header,
+#modalEditAnnouncement .modal-header {
+  padding: 0 0 1rem;
+}
+
+#modalViewAnnouncement .modal-body,
+#modalEditAnnouncement .modal-body {
+  padding: 0;
+}
+
+#modalViewAnnouncement .modal-footer,
+#modalEditAnnouncement .modal-footer {
+  padding: 1.25rem 0 0;
+  display: flex !important;
+  justify-content: space-between !important;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+.announcement-modal-footer-start,
+.announcement-modal-footer-end {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.announcement-modal-footer-start {
+  justify-content: flex-start;
+}
+
+.announcement-modal-footer-end {
+  justify-content: flex-end;
+  margin-left: auto;
+}
+
+#modalViewAnnouncement .announcement-modal-footer-start > .btn,
+#modalViewAnnouncement .announcement-modal-footer-end > .btn,
+#modalEditAnnouncement .announcement-modal-footer-start > .btn,
+#modalEditAnnouncement .announcement-modal-footer-end > .btn {
+  width: auto !important;
+  min-width: 96px;
+  min-height: auto;
+  padding: var(--bs-btn-padding-y) var(--bs-btn-padding-x);
+  border-radius: var(--bs-btn-border-radius);
+  font-size: var(--bs-btn-font-size);
+  font-weight: var(--bs-btn-font-weight);
+  line-height: var(--bs-btn-line-height);
+}
+
+@media (max-width: 768px) {
+  .announcement-create-guide,
+  .announcement-compose-header,
+  .announcement-editor-panel-head {
+    flex-direction: column;
+  }
+
+  .announcement-create-guide-grid,
+  .announcement-compose-tags {
+    grid-template-columns: 1fr;
+  }
+
+  .announcement-modal-footer-start,
+  .announcement-modal-footer-end {
+    width: 100%;
+  }
+
+  .announcement-modal-footer-end {
+    margin-left: 0;
+    justify-content: flex-end;
+  }
+}
+
+#modalDeleteAnnouncement .modal-footer,
+#modalAnnouncementFlash .modal-footer,
+#modalSuperAdminRepostConfirm .modal-footer,
+#modalSuperAdminPostConfirm .modal-footer,
+#modalDeniedAnnouncementDraftNotice .modal-footer,
+#modalDeniedAnnouncementSaveConfirm .modal-footer,
+#modalDeniedAnnouncementResubmitConfirm .modal-footer,
+#modalApprovedAnnouncementSaveConfirm .modal-footer,
+#modalPendingAnnouncementSaveConfirm .modal-footer,
+#modalSuperAdminApprovedCloseConfirm .modal-footer {
+  border-top: 0 !important;
+  display: flex !important;
+  justify-content: stretch !important;
+  align-items: stretch;
+  flex-wrap: nowrap;
+  gap: 0.75rem;
+}
+
+#modalDeleteAnnouncement .modal-footer > .btn,
+#modalAnnouncementFlash .modal-footer > .btn,
+#modalSuperAdminRepostConfirm .modal-footer > .btn,
+#modalSuperAdminPostConfirm .modal-footer > .btn,
+#modalDeniedAnnouncementDraftNotice .modal-footer > .btn,
+#modalDeniedAnnouncementSaveConfirm .modal-footer > .btn,
+#modalDeniedAnnouncementResubmitConfirm .modal-footer > .btn,
+#modalApprovedAnnouncementSaveConfirm .modal-footer > .btn,
+#modalPendingAnnouncementSaveConfirm .modal-footer > .btn,
+#modalSuperAdminApprovedCloseConfirm .modal-footer > .btn,
+#modalDeleteAnnouncement .modal-footer > form,
+#modalAnnouncementFlash .modal-footer > form,
+#modalSuperAdminRepostConfirm .modal-footer > form,
+#modalSuperAdminPostConfirm .modal-footer > form,
+#modalDeniedAnnouncementDraftNotice .modal-footer > form,
+#modalDeniedAnnouncementSaveConfirm .modal-footer > form,
+#modalDeniedAnnouncementResubmitConfirm .modal-footer > form,
+#modalApprovedAnnouncementSaveConfirm .modal-footer > form,
+#modalPendingAnnouncementSaveConfirm .modal-footer > form,
+#modalSuperAdminApprovedCloseConfirm .modal-footer > form {
+  flex: 1 1 0 !important;
+  width: 100% !important;
+  margin: 0;
+}
+
+#modalDeleteAnnouncement .modal-footer > .btn,
+#modalAnnouncementFlash .modal-footer > .btn,
+#modalSuperAdminRepostConfirm .modal-footer > .btn,
+#modalSuperAdminPostConfirm .modal-footer > .btn,
+#modalDeniedAnnouncementDraftNotice .modal-footer > .btn,
+#modalDeniedAnnouncementSaveConfirm .modal-footer > .btn,
+#modalDeniedAnnouncementResubmitConfirm .modal-footer > .btn,
+#modalApprovedAnnouncementSaveConfirm .modal-footer > .btn,
+#modalPendingAnnouncementSaveConfirm .modal-footer > .btn,
+#modalSuperAdminApprovedCloseConfirm .modal-footer > .btn,
+#modalDeleteAnnouncement .modal-footer > form .btn,
+#modalAnnouncementFlash .modal-footer > form .btn,
+#modalSuperAdminRepostConfirm .modal-footer > form .btn,
+#modalSuperAdminPostConfirm .modal-footer > form .btn,
+#modalDeniedAnnouncementDraftNotice .modal-footer > form .btn,
+#modalDeniedAnnouncementSaveConfirm .modal-footer > form .btn,
+#modalDeniedAnnouncementResubmitConfirm .modal-footer > form .btn,
+#modalApprovedAnnouncementSaveConfirm .modal-footer > form .btn,
+#modalPendingAnnouncementSaveConfirm .modal-footer > form .btn,
+#modalSuperAdminApprovedCloseConfirm .modal-footer > form .btn {
+  width: 100% !important;
+  min-width: 0 !important;
+  min-height: auto;
+  --bs-btn-padding-y: 0.375rem;
+  --bs-btn-padding-x: 0.75rem;
+  --bs-btn-font-size: 1rem;
+  --bs-btn-font-weight: 400;
+  --bs-btn-line-height: 1.5;
+  --bs-btn-border-radius: 0.375rem;
+  padding: var(--bs-btn-padding-y) var(--bs-btn-padding-x);
+  border-radius: var(--bs-btn-border-radius);
+  font-size: var(--bs-btn-font-size);
+  font-weight: var(--bs-btn-font-weight);
+  line-height: var(--bs-btn-line-height);
+}
+
+#modalAnnouncementFlash .modal-header,
+#modalSuperAdminRepostConfirm .modal-header,
+#modalSuperAdminPostConfirm .modal-header,
+#modalDeniedAnnouncementDraftNotice .modal-header,
+#modalDeniedAnnouncementSaveConfirm .modal-header,
+#modalDeniedAnnouncementResubmitConfirm .modal-header,
+#modalApprovedAnnouncementSaveConfirm .modal-header,
+#modalPendingAnnouncementSaveConfirm .modal-header,
+#modalSuperAdminApprovedCloseConfirm .modal-header {
+  justify-content: center;
+  text-align: center;
+  padding-bottom: 0 !important;
+}
+
+#modalAnnouncementFlash .modal-header .modal-title,
+#modalSuperAdminRepostConfirm .modal-header .modal-title,
+#modalSuperAdminPostConfirm .modal-header .modal-title,
+#modalDeniedAnnouncementDraftNotice .modal-header .modal-title,
+#modalDeniedAnnouncementSaveConfirm .modal-header .modal-title,
+#modalDeniedAnnouncementResubmitConfirm .modal-header .modal-title,
+#modalApprovedAnnouncementSaveConfirm .modal-header .modal-title,
+#modalPendingAnnouncementSaveConfirm .modal-header .modal-title,
+#modalSuperAdminApprovedCloseConfirm .modal-header .modal-title {
+  width: 100%;
+  text-align: center;
+}
+
+#modalAnnouncementFlash .modal-body,
+#modalSuperAdminRepostConfirm .modal-body,
+#modalSuperAdminPostConfirm .modal-body,
+#modalDeniedAnnouncementDraftNotice .modal-body,
+#modalDeniedAnnouncementSaveConfirm .modal-body,
+#modalDeniedAnnouncementResubmitConfirm .modal-body,
+#modalApprovedAnnouncementSaveConfirm .modal-body,
+#modalPendingAnnouncementSaveConfirm .modal-body,
+#modalSuperAdminApprovedCloseConfirm .modal-body {
+  text-align: center;
+}
+
+.announcement-shell .review-queue-heading,
+.announcement-shell .review-queue-description,
+.announcement-shell .announcement-details-title,
+.announcement-shell .announcement-card-title,
+#modalViewAnnouncement .modal-title,
+#modalEditAnnouncement .modal-title,
+#modalDeleteAnnouncement .modal-title,
+#modalAnnouncementFlash .modal-title,
+#modalSuperAdminRepostConfirm .modal-title,
+#modalSuperAdminPostConfirm .modal-title,
+#modalDeniedAnnouncementDraftNotice .modal-title,
+#modalDeniedAnnouncementSaveConfirm .modal-title,
+#modalDeniedAnnouncementResubmitConfirm .modal-title,
+#modalApprovedAnnouncementSaveConfirm .modal-title,
+#modalPendingAnnouncementSaveConfirm .modal-title,
+#modalSuperAdminApprovedCloseConfirm .modal-title,
+.announcement-shell .btn,
+#modalViewAnnouncement .btn,
+#modalEditAnnouncement .btn,
+#modalDeleteAnnouncement .btn,
+#modalAnnouncementFlash .btn,
+#modalSuperAdminRepostConfirm .btn,
+#modalSuperAdminPostConfirm .btn,
+#modalDeniedAnnouncementDraftNotice .btn,
+#modalDeniedAnnouncementSaveConfirm .btn,
+#modalDeniedAnnouncementResubmitConfirm .btn,
+#modalApprovedAnnouncementSaveConfirm .btn,
+#modalPendingAnnouncementSaveConfirm .btn,
+#modalSuperAdminApprovedCloseConfirm .btn {
+  font-family: inherit;
+}
+
+.announcement-shell,
+.announcement-shell table,
+.announcement-shell .form-control,
+.announcement-shell .input-group-text,
+.announcement-shell .small,
+.announcement-shell .badge,
+.announcement-shell .status-pill,
+.announcement-shell .review-queue-description,
+#modalViewAnnouncement,
+#modalEditAnnouncement,
+#modalDeleteAnnouncement,
+#modalAnnouncementFlash,
+#modalSuperAdminRepostConfirm,
+#modalSuperAdminPostConfirm,
+#modalDeniedAnnouncementDraftNotice,
+#modalDeniedAnnouncementSaveConfirm,
+#modalDeniedAnnouncementResubmitConfirm,
+#modalApprovedAnnouncementSaveConfirm,
+#modalPendingAnnouncementSaveConfirm,
+#modalSuperAdminApprovedCloseConfirm {
+  font-family: 'Geist', sans-serif;
+}
+
+#modalViewAnnouncement .modal-header .modal-title,
+#modalEditAnnouncement .modal-header .modal-title,
+#modalDeleteAnnouncement .modal-header .modal-title,
+#modalAnnouncementFlash .modal-header .modal-title,
+#modalSuperAdminRepostConfirm .modal-header .modal-title,
+#modalSuperAdminPostConfirm .modal-header .modal-title,
+#modalDeniedAnnouncementDraftNotice .modal-header .modal-title,
+#modalDeniedAnnouncementSaveConfirm .modal-header .modal-title,
+#modalDeniedAnnouncementResubmitConfirm .modal-header .modal-title,
+#modalApprovedAnnouncementSaveConfirm .modal-header .modal-title,
+#modalPendingAnnouncementSaveConfirm .modal-header .modal-title,
+#modalSuperAdminApprovedCloseConfirm .modal-header .modal-title {
+  font-family: 'Charis SIL Bold', serif !important;
+}
+
+#modalDeleteAnnouncement .modal-header,
+#modalAnnouncementFlash .modal-header,
+#modalSuperAdminRepostConfirm .modal-header,
+#modalSuperAdminPostConfirm .modal-header,
+#modalDeniedAnnouncementDraftNotice .modal-header,
+#modalDeniedAnnouncementSaveConfirm .modal-header,
+#modalDeniedAnnouncementResubmitConfirm .modal-header,
+#modalApprovedAnnouncementSaveConfirm .modal-header,
+#modalPendingAnnouncementSaveConfirm .modal-header,
+#modalSuperAdminApprovedCloseConfirm .modal-header {
+  padding-top: 0;
 }
 
 @media (max-width: 992px) {
@@ -889,6 +1743,19 @@
   #modalDeleteAnnouncement .modal-footer.modal-grid-actions .modal-action-secondary {
     grid-column: 1 / -1;
   }
+
+  #modalDeleteAnnouncement .modal-footer,
+  #modalAnnouncementFlash .modal-footer,
+  #modalSuperAdminRepostConfirm .modal-footer,
+  #modalSuperAdminPostConfirm .modal-footer,
+  #modalDeniedAnnouncementDraftNotice .modal-footer,
+  #modalDeniedAnnouncementSaveConfirm .modal-footer,
+  #modalDeniedAnnouncementResubmitConfirm .modal-footer,
+  #modalApprovedAnnouncementSaveConfirm .modal-footer,
+  #modalPendingAnnouncementSaveConfirm .modal-footer,
+  #modalSuperAdminApprovedCloseConfirm .modal-footer {
+    flex-wrap: wrap;
+  }
 }
 
 @media (max-width: 576px) {
@@ -900,5 +1767,324 @@
   .announcement-primary-actions,
   .announcement-review-actions {
     flex-wrap: wrap;
+  }
+}
+
+/* Final normalization for announcement confirmation/notification modals. */
+#modalAnnouncementFlash .modal-dialog,
+#modalSuperAdminRepostConfirm .modal-dialog,
+#modalSuperAdminPostConfirm .modal-dialog,
+#modalDeniedAnnouncementDraftNotice .modal-dialog,
+#modalDeniedAnnouncementSaveConfirm .modal-dialog,
+#modalDeniedAnnouncementResubmitConfirm .modal-dialog,
+#modalApprovedAnnouncementSaveConfirm .modal-dialog,
+#modalPendingAnnouncementSaveConfirm .modal-dialog,
+#modalSuperAdminApprovedCloseConfirm .modal-dialog {
+  width: min(92vw, 640px) !important;
+  max-width: 640px !important;
+  margin: 1rem auto;
+}
+
+#modalAnnouncementFlash .modal-content,
+#modalSuperAdminRepostConfirm .modal-content,
+#modalSuperAdminPostConfirm .modal-content,
+#modalDeniedAnnouncementDraftNotice .modal-content,
+#modalDeniedAnnouncementSaveConfirm .modal-content,
+#modalDeniedAnnouncementResubmitConfirm .modal-content,
+#modalApprovedAnnouncementSaveConfirm .modal-content,
+#modalPendingAnnouncementSaveConfirm .modal-content,
+#modalSuperAdminApprovedCloseConfirm .modal-content {
+  overflow: hidden;
+  border-radius: 0.85rem;
+}
+
+#modalAnnouncementFlash .modal-header,
+#modalSuperAdminRepostConfirm .modal-header,
+#modalSuperAdminPostConfirm .modal-header,
+#modalDeniedAnnouncementDraftNotice .modal-header,
+#modalDeniedAnnouncementSaveConfirm .modal-header,
+#modalDeniedAnnouncementResubmitConfirm .modal-header,
+#modalApprovedAnnouncementSaveConfirm .modal-header,
+#modalPendingAnnouncementSaveConfirm .modal-header,
+#modalSuperAdminApprovedCloseConfirm .modal-header {
+  padding: 1.25rem 1.25rem 0.8rem !important;
+  min-height: 0;
+}
+
+#modalAnnouncementFlash .modal-body,
+#modalSuperAdminRepostConfirm .modal-body,
+#modalSuperAdminPostConfirm .modal-body,
+#modalDeniedAnnouncementDraftNotice .modal-body,
+#modalDeniedAnnouncementSaveConfirm .modal-body,
+#modalDeniedAnnouncementResubmitConfirm .modal-body,
+#modalApprovedAnnouncementSaveConfirm .modal-body,
+#modalPendingAnnouncementSaveConfirm .modal-body,
+#modalSuperAdminApprovedCloseConfirm .modal-body {
+  padding: 1rem 1.25rem 1.1rem !important;
+  font-size: 1rem;
+  line-height: 1.45;
+}
+
+#modalAnnouncementFlash .modal-footer,
+#modalSuperAdminRepostConfirm .modal-footer,
+#modalSuperAdminPostConfirm .modal-footer,
+#modalDeniedAnnouncementDraftNotice .modal-footer,
+#modalDeniedAnnouncementSaveConfirm .modal-footer,
+#modalDeniedAnnouncementResubmitConfirm .modal-footer,
+#modalApprovedAnnouncementSaveConfirm .modal-footer,
+#modalPendingAnnouncementSaveConfirm .modal-footer,
+#modalSuperAdminApprovedCloseConfirm .modal-footer {
+  padding: 0 1.25rem 1.25rem !important;
+  display: flex !important;
+  flex-wrap: nowrap !important;
+  align-items: stretch !important;
+  gap: 0.75rem !important;
+}
+
+#modalAnnouncementFlash .modal-footer > .btn,
+#modalSuperAdminRepostConfirm .modal-footer > .btn,
+#modalSuperAdminPostConfirm .modal-footer > .btn,
+#modalDeniedAnnouncementDraftNotice .modal-footer > .btn,
+#modalDeniedAnnouncementSaveConfirm .modal-footer > .btn,
+#modalDeniedAnnouncementResubmitConfirm .modal-footer > .btn,
+#modalApprovedAnnouncementSaveConfirm .modal-footer > .btn,
+#modalPendingAnnouncementSaveConfirm .modal-footer > .btn,
+#modalSuperAdminApprovedCloseConfirm .modal-footer > .btn,
+#modalAnnouncementFlash .modal-footer > form,
+#modalSuperAdminRepostConfirm .modal-footer > form,
+#modalSuperAdminPostConfirm .modal-footer > form,
+#modalDeniedAnnouncementDraftNotice .modal-footer > form,
+#modalDeniedAnnouncementSaveConfirm .modal-footer > form,
+#modalDeniedAnnouncementResubmitConfirm .modal-footer > form,
+#modalApprovedAnnouncementSaveConfirm .modal-footer > form,
+#modalPendingAnnouncementSaveConfirm .modal-footer > form,
+#modalSuperAdminApprovedCloseConfirm .modal-footer > form {
+  flex: 1 1 0 !important;
+  width: 100% !important;
+  margin: 0 !important;
+}
+
+#modalAnnouncementFlash .modal-footer > .btn,
+#modalSuperAdminRepostConfirm .modal-footer > .btn,
+#modalSuperAdminPostConfirm .modal-footer > .btn,
+#modalDeniedAnnouncementDraftNotice .modal-footer > .btn,
+#modalDeniedAnnouncementSaveConfirm .modal-footer > .btn,
+#modalDeniedAnnouncementResubmitConfirm .modal-footer > .btn,
+#modalApprovedAnnouncementSaveConfirm .modal-footer > .btn,
+#modalPendingAnnouncementSaveConfirm .modal-footer > .btn,
+#modalSuperAdminApprovedCloseConfirm .modal-footer > .btn,
+#modalAnnouncementFlash .modal-footer > form .btn,
+#modalSuperAdminRepostConfirm .modal-footer > form .btn,
+#modalSuperAdminPostConfirm .modal-footer > form .btn,
+#modalDeniedAnnouncementDraftNotice .modal-footer > form .btn,
+#modalDeniedAnnouncementSaveConfirm .modal-footer > form .btn,
+#modalDeniedAnnouncementResubmitConfirm .modal-footer > form .btn,
+#modalApprovedAnnouncementSaveConfirm .modal-footer > form .btn,
+#modalPendingAnnouncementSaveConfirm .modal-footer > form .btn,
+#modalSuperAdminApprovedCloseConfirm .modal-footer > form .btn {
+  width: 100% !important;
+  min-height: 50px !important;
+  padding: 0.5rem 0.95rem !important;
+  font-size: 1rem !important;
+  line-height: 1.5 !important;
+  border-radius: 0.55rem !important;
+}
+
+@media (max-width: 576px) {
+  #modalAnnouncementFlash .modal-dialog,
+  #modalSuperAdminRepostConfirm .modal-dialog,
+  #modalSuperAdminPostConfirm .modal-dialog,
+  #modalDeniedAnnouncementDraftNotice .modal-dialog,
+  #modalDeniedAnnouncementSaveConfirm .modal-dialog,
+  #modalDeniedAnnouncementResubmitConfirm .modal-dialog,
+  #modalApprovedAnnouncementSaveConfirm .modal-dialog,
+  #modalPendingAnnouncementSaveConfirm .modal-dialog,
+  #modalSuperAdminApprovedCloseConfirm .modal-dialog {
+    width: min(96vw, 640px) !important;
+    margin: 0.75rem auto;
+  }
+
+  #modalAnnouncementFlash .modal-header,
+  #modalSuperAdminRepostConfirm .modal-header,
+  #modalSuperAdminPostConfirm .modal-header,
+  #modalDeniedAnnouncementDraftNotice .modal-header,
+  #modalDeniedAnnouncementSaveConfirm .modal-header,
+  #modalDeniedAnnouncementResubmitConfirm .modal-header,
+  #modalApprovedAnnouncementSaveConfirm .modal-header,
+  #modalPendingAnnouncementSaveConfirm .modal-header,
+  #modalSuperAdminApprovedCloseConfirm .modal-header,
+  #modalAnnouncementFlash .modal-body,
+  #modalSuperAdminRepostConfirm .modal-body,
+  #modalSuperAdminPostConfirm .modal-body,
+  #modalDeniedAnnouncementDraftNotice .modal-body,
+  #modalDeniedAnnouncementSaveConfirm .modal-body,
+  #modalDeniedAnnouncementResubmitConfirm .modal-body,
+  #modalApprovedAnnouncementSaveConfirm .modal-body,
+  #modalPendingAnnouncementSaveConfirm .modal-body,
+  #modalSuperAdminApprovedCloseConfirm .modal-body,
+  #modalAnnouncementFlash .modal-footer,
+  #modalSuperAdminRepostConfirm .modal-footer,
+  #modalSuperAdminPostConfirm .modal-footer,
+  #modalDeniedAnnouncementDraftNotice .modal-footer,
+  #modalDeniedAnnouncementSaveConfirm .modal-footer,
+  #modalDeniedAnnouncementResubmitConfirm .modal-footer,
+  #modalApprovedAnnouncementSaveConfirm .modal-footer,
+  #modalPendingAnnouncementSaveConfirm .modal-footer,
+  #modalSuperAdminApprovedCloseConfirm .modal-footer {
+    padding-left: 1rem !important;
+    padding-right: 1rem !important;
+  }
+
+  #modalAnnouncementFlash .modal-footer,
+  #modalSuperAdminRepostConfirm .modal-footer,
+  #modalSuperAdminPostConfirm .modal-footer,
+  #modalDeniedAnnouncementDraftNotice .modal-footer,
+  #modalDeniedAnnouncementSaveConfirm .modal-footer,
+  #modalDeniedAnnouncementResubmitConfirm .modal-footer,
+  #modalApprovedAnnouncementSaveConfirm .modal-footer,
+  #modalPendingAnnouncementSaveConfirm .modal-footer,
+  #modalSuperAdminApprovedCloseConfirm .modal-footer {
+    flex-wrap: wrap !important;
+  }
+}
+
+.dashboard-announcements-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.dashboard-announcement-banner {
+  cursor: pointer;
+}
+
+.dashboard-announcement-banner .bg-orange h3 {
+  padding: 0 2.25rem;
+  font-size: clamp(1.05rem, 2vw, 1.45rem);
+  line-height: 1.3;
+  word-break: break-word;
+}
+
+.dashboard-announcement-close {
+  position: absolute;
+  top: 8px;
+  right: 10px;
+  width: 28px;
+  height: 28px;
+  border: none;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.15);
+  color: #fff;
+  font-size: 18px;
+  line-height: 1;
+  opacity: 0;
+  pointer-events: none;
+  z-index: 2;
+  transition: opacity 0.2s ease;
+}
+
+.dashboard-announcement-banner:hover .dashboard-announcement-close {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.dashboard-announcement-preview {
+  width: 100%;
+  max-width: 860px;
+  margin: 1rem auto 0;
+  max-height: min(40vh, 360px);
+  overflow-y: auto;
+  overflow-x: hidden;
+  font-size: 1rem;
+  color: #495057;
+  text-align: left;
+  line-height: 1.4;
+  position: relative;
+  padding-right: 0.5rem;
+}
+
+.dashboard-announcement-preview p,
+.dashboard-announcement-preview ul,
+.dashboard-announcement-preview ol,
+.dashboard-announcement-preview h1,
+.dashboard-announcement-preview h2,
+.dashboard-announcement-preview h3,
+.dashboard-announcement-preview h4,
+.dashboard-announcement-preview h5,
+.dashboard-announcement-preview h6,
+.dashboard-announcement-preview div {
+  margin-bottom: 0.75rem;
+}
+
+.dashboard-announcement-preview > :last-child {
+  margin-bottom: 0;
+}
+
+.dashboard-announcement-preview img,
+.dashboard-announcement-preview video,
+.dashboard-announcement-preview iframe,
+.dashboard-announcement-preview table {
+  max-width: 100%;
+}
+
+.dashboard-announcement-preview * {
+  word-break: break-word;
+}
+
+.dashboard-announcement-footer {
+  width: 100%;
+  max-width: 860px;
+  margin: 1rem auto 0;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.dashboard-announcement-posted {
+  font-size: 0.85rem;
+  color: #6c757d;
+}
+
+@media (max-width: 768px) {
+  .dashboard-announcements-stack {
+    gap: 1rem;
+  }
+
+  .dashboard-announcement-close {
+    top: 10px;
+    right: 10px;
+  }
+
+  .dashboard-announcement-preview {
+    max-height: min(44vh, 320px);
+    margin-top: 0.85rem;
+    font-size: 0.95rem;
+    padding-right: 0.35rem;
+  }
+
+  .dashboard-announcement-footer {
+    margin-top: 0.85rem;
+  }
+}
+
+@media (max-width: 576px) {
+  .dashboard-announcement-banner .bg-orange h3 {
+    padding: 0 2rem;
+    font-size: 1rem;
+  }
+
+  .dashboard-announcement-close {
+    width: 26px;
+    height: 26px;
+    font-size: 16px;
+  }
+
+  .dashboard-announcement-preview {
+    max-height: min(48vh, 280px);
+    font-size: 0.92rem;
+    line-height: 1.5;
+  }
+
+  .dashboard-announcement-posted {
+    font-size: 0.8rem;
   }
 }

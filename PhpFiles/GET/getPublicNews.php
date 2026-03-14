@@ -29,7 +29,16 @@ foreach ($items as $item) {
         $sortTimestamp = $ts;
     }
 
-    $contentHtml = (string)($item['content_html'] ?? '');
+    $title = (string)($item['public_news_title'] ?? '');
+    if ($title === '') {
+        $title = (string)($item['title'] ?? '');
+    }
+
+    $contentHtml = (string)($item['public_news_content_html'] ?? '');
+    if ($contentHtml === '') {
+        $contentHtml = (string)($item['content_html'] ?? '');
+    }
+
     $imageUrl = '';
     if (preg_match('/<img[^>]+src=["\']([^"\']+)["\']/i', $contentHtml, $matches)) {
         $imageUrl = (string)($matches[1] ?? '');
@@ -37,7 +46,7 @@ foreach ($items as $item) {
 
     $publicNewsItems[] = [
         'id' => (string)($item['id'] ?? ''),
-        'title' => (string)($item['title'] ?? ''),
+        'title' => $title,
         'content_html' => $contentHtml,
         'posted_date' => $postedDate,
         'image_url' => $imageUrl,

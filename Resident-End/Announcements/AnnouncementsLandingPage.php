@@ -45,8 +45,8 @@ foreach ($items as $item) {
   }
 
   $websiteAnnouncements[] = [
-    'title' => (string)($item['title'] ?? ''),
-    'content_html' => (string)($item['content_html'] ?? ''),
+    'title' => (string)(($item['public_title'] ?? '') !== '' ? $item['public_title'] : ($item['title'] ?? '')),
+    'content_html' => (string)(($item['public_content_html'] ?? '') !== '' ? $item['public_content_html'] : ($item['content_html'] ?? '')),
     'posted_date' => $postedDate
   ];
 }

@@ -36,127 +36,239 @@ $isSuperAdmin = $sessionRole === 'superadmin';
       </div>
       <hr><br>
 
+      <section class="announcement-create-guide mb-4">
+        <div class="announcement-create-guide-copy">
+          <div class="announcement-create-guide-kicker">Before You Start</div>
+          <h5 class="announcement-section-title mb-1">Content Tips</h5>
+          <p class="announcement-compose-subtitle mb-2">Write the main title and body that will be shown in your selected placements and delivery channels.</p>
+          <p class="announcement-create-guide-text mb-0">Use a clear headline, a short opening summary, and bullet points when you need residents to follow instructions quickly.</p>
+        </div>
+        <div class="announcement-create-guide-grid">
+          <div class="announcement-guide-block">
+            <h6 class="announcement-guide-title">Editor Tools</h6>
+            <ul class="announcement-guide-list">
+              <li>Rich text formatting for clearer layout</li>
+              <li>Image uploads up to 25 MB</li>
+              <li>Ready for guest and account views</li>
+            </ul>
+          </div>
+          <div class="announcement-guide-block">
+            <h6 class="announcement-guide-title">Writing Tips</h6>
+            <ul class="announcement-guide-list">
+              <li>Start with a clear headline</li>
+              <li>Add a short opening summary</li>
+              <li>Use bullet points for instructions</li>
+            </ul>
+          </div>
+        </div>
+      </section>
+
       <form class="announcement-create-shell p-3 p-md-4 shadow-sm" action="../../PhpFiles/Admin-End/announcementsCreation.php" method="post">
         <input type="hidden" name="channel_context" value="<?= htmlspecialchars($deliveryChannel) ?>">
         <div class="row g-4">
           <div class="col-12">
             <section class="announcement-section-card">
-              <h5 class="announcement-section-title">Content</h5>
-              <div class="mb-3">
-                <label for="announcementTitle" class="form-label fw-semibold">Announcement Title</label>
-                <input id="announcementTitle" name="title" type="text" class="form-control" placeholder="Enter announcement title" required>
-              </div>
-
-              <div class="mb-2">
-                <label class="form-label fw-semibold">Announcement Body</label>
-                <div id="announcementEditor"></div>
-                <input type="hidden" id="announcementContent" name="content_html">
-              </div>
-              <small class="text-muted">Use bullets, numbering, and formatting for clearer notices.</small>
-            </section>
-          </div>
-
-          <div class="col-12 col-lg-6">
-            <section class="announcement-section-card h-100">
-              <h5 class="announcement-section-title">Delivery Channels</h5>
-
-              <div class="form-check">
-                <input class="form-check-input channel-checkbox" type="checkbox" value="public" id="channelPublic" name="channels[]" <?= $deliveryChannel === 'public' || $deliveryChannel === 'all' ? 'checked' : '' ?>>
-                <label class="form-check-label" for="channelPublic">Public Announcement</label>
-              </div>
-              <div class="form-check">
-                <input class="form-check-input channel-checkbox" type="checkbox" value="public_news" id="channelPublicNews" name="channels[]" <?= $deliveryChannel === 'public_news' || $deliveryChannel === 'all' ? 'checked' : '' ?>>
-                <label class="form-check-label" for="channelPublicNews">Public News</label>
-              </div>
-              <div class="form-check">
-                <input class="form-check-input channel-checkbox" type="checkbox" value="website" id="channelWebsite" name="channels[]" <?= $deliveryChannel === 'website' || $deliveryChannel === 'all' ? 'checked' : '' ?>>
-                <label class="form-check-label" for="channelWebsite">Account Page</label>
-              </div>
-              <div class="form-check">
-                <input class="form-check-input channel-checkbox" type="checkbox" value="sms" id="channelSms" name="channels[]" <?= $deliveryChannel === 'sms' || $deliveryChannel === 'all' ? 'checked' : '' ?>>
-                <label class="form-check-label" for="channelSms">SMS</label>
-              </div>
-              <div class="form-check mb-3">
-                <input class="form-check-input channel-checkbox" type="checkbox" value="email" id="channelEmail" name="channels[]" <?= $deliveryChannel === 'email' || $deliveryChannel === 'all' ? 'checked' : '' ?>>
-                <label class="form-check-label" for="channelEmail">Email</label>
-              </div>
-
-              <div id="smsField" class="channel-field d-none">
-                <label for="smsPreview" class="form-label mb-1">SMS Preview (plain text)</label>
-                <textarea id="smsPreview" class="form-control" rows="3" readonly></textarea>
-                <small id="smsCounter" class="text-muted">0 / 160 characters</small>
-              </div>
-
-              <div id="emailField" class="channel-field d-none mt-3">
-                <label for="emailSubject" class="form-label mb-1">Email Subject</label>
-                <input id="emailSubject" type="text" class="form-control" name="email_subject" placeholder="Enter email subject">
-              </div>
-            </section>
-          </div>
-
-          <div class="col-12 col-lg-6">
-            <section class="announcement-section-card h-100">
-              <h5 class="announcement-section-title">Audience</h5>
-              <div class="form-check mb-2">
-                <input class="form-check-input" type="radio" name="audience_scope" id="audienceAll" value="all" checked>
-                <label class="form-check-label" for="audienceAll">All Residents</label>
-              </div>
-              <div class="form-check mb-3">
-                <input class="form-check-input" type="radio" name="audience_scope" id="audienceCustom" value="custom">
-                <label class="form-check-label" for="audienceCustom">Custom Audience</label>
-              </div>
-
-              <div id="customAudienceFields" class="row g-2 d-none">
-                <div class="col-12">
-                  <label class="form-label mb-1">Area</label>
-                  <select class="form-select" name="area">
-                    <option value="">Select Area</option>
-                    <option>Area 1</option>
-                    <option>Area 2</option>
-                    <option>Area 3</option>
-                    <option>Area 4</option>
-                    <option>Area 5</option>
-                    <option>Area 6</option>
-                  </select>
+              <h5 class="announcement-section-title">Distribution and Audience Setup</h5>
+              <div class="announcement-config-grid">
+                <div class="announcement-config-panel">
+                  <h6 class="announcement-card-title">Page Placement</h6>
+                  <label class="form-label fw-semibold mb-2">Where should this appear?</label>
+                  <div class="form-check mb-2">
+                    <input class="form-check-input placement-checkbox" type="checkbox" value="public_news" id="placementPublicNews" name="placements[]" <?= $deliveryChannel === 'public_news' || $deliveryChannel === 'all' ? 'checked' : '' ?>>
+                    <label class="form-check-label" for="placementPublicNews">News Section</label>
+                    <div class="form-text mt-0">Shows in the featured news area of the guest news page.</div>
+                  </div>
+                  <div class="form-check">
+                    <input class="form-check-input placement-checkbox" type="checkbox" value="announcement" id="placementPublic" name="placements[]" <?= in_array($deliveryChannel, ['public', 'website', 'all'], true) ? 'checked' : '' ?>>
+                    <label class="form-check-label" for="placementPublic">Announcements</label>
+                    <div class="form-text mt-0">Shows in the announcements area for guest and/or account views.</div>
+                  </div>
+                  <div id="dualPlacementNotice" class="alert alert-light border mt-3 mb-0 d-none" role="status">
+                    Create a separate News Section version and Announcements version below.
+                  </div>
                 </div>
-                <div class="col-12">
-                  <label class="form-label mb-1">Role Group</label>
-                  <select class="form-select" name="role_group">
-                    <option value="">Select Group</option>
-                    <option>Officials</option>
-                    <option>Employees</option>
-                    <option>Residents</option>
-                  </select>
+
+                <div class="announcement-config-panel">
+                  <h6 class="announcement-card-title">Audience and Publishing</h6>
+                  <div class="form-check mb-2">
+                    <input class="form-check-input" type="radio" name="audience_scope" id="audienceAll" value="all" checked>
+                    <label class="form-check-label" for="audienceAll">All Residents</label>
+                  </div>
+                  <div class="form-check mb-3">
+                    <input class="form-check-input" type="radio" name="audience_scope" id="audienceCustom" value="custom">
+                    <label class="form-check-label" for="audienceCustom">Custom Audience</label>
+                  </div>
+
+                  <div id="customAudienceFields" class="row g-2 d-none">
+                    <div class="col-12">
+                      <label class="form-label mb-1">Area</label>
+                      <select class="form-select" name="area">
+                        <option value="">Select Area</option>
+                        <option>Area 1</option>
+                        <option>Area 2</option>
+                        <option>Area 3</option>
+                        <option>Area 4</option>
+                        <option>Area 5</option>
+                        <option>Area 6</option>
+                      </select>
+                    </div>
+                    <div class="col-12">
+                      <label class="form-label mb-1">Role Group</label>
+                      <select class="form-select" name="role_group">
+                        <option value="">Select Group</option>
+                        <option>Officials</option>
+                        <option>Employees</option>
+                        <option>Residents</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  <div class="announcement-create-divider"></div>
+                  <div class="row g-3">
+                    <div class="col-12">
+                      <label class="form-label mb-1">Schedule Date (optional)</label>
+                      <input type="date" class="form-control" name="schedule_date">
+                    </div>
+                    <div class="col-12">
+                      <label class="form-label mb-1">Schedule Time (optional)</label>
+                      <input type="time" class="form-control" name="schedule_time">
+                    </div>
+                  </div>
+                </div>
+
+                <div class="announcement-config-panel">
+                  <h6 class="announcement-card-title">Additional Delivery</h6>
+                  <div id="announcementDestinationsGroup">
+                    <div class="form-check mb-3">
+                      <input class="form-check-input channel-checkbox" type="checkbox" value="public" id="channelGuestPage" name="channels[]" <?= $deliveryChannel === 'public' || $deliveryChannel === 'all' ? 'checked' : '' ?>>
+                      <label class="form-check-label" for="channelGuestPage">Guest Page</label>
+                    </div>
+
+                    <div class="form-check mb-3">
+                      <input class="form-check-input channel-checkbox" type="checkbox" value="website" id="channelWebsite" name="channels[]" <?= $deliveryChannel === 'website' || $deliveryChannel === 'all' ? 'checked' : '' ?>>
+                      <label class="form-check-label" for="channelWebsite">Account Page</label>
+                    </div>
+                  </div>
+
+                  <div class="announcement-channel-item">
+                    <div class="form-check mb-0">
+                      <input class="form-check-input channel-checkbox" type="checkbox" value="sms" id="channelSms" name="channels[]" <?= $deliveryChannel === 'sms' || $deliveryChannel === 'all' ? 'checked' : '' ?>>
+                      <label class="form-check-label" for="channelSms">SMS</label>
+                    </div>
+                    <div id="smsField" class="channel-field channel-field-collapsible is-collapsed" aria-hidden="true">
+                      <label for="smsPreview" class="form-label mb-1">SMS Preview (plain text)</label>
+                      <textarea id="smsPreview" class="form-control" rows="3" readonly></textarea>
+                      <small id="smsCounter" class="text-muted">0 / 160 characters</small>
+                    </div>
+                  </div>
+
+                  <div class="announcement-channel-item">
+                    <div class="form-check mb-0">
+                      <input class="form-check-input channel-checkbox" type="checkbox" value="email" id="channelEmail" name="channels[]" <?= $deliveryChannel === 'email' || $deliveryChannel === 'all' ? 'checked' : '' ?>>
+                      <label class="form-check-label" for="channelEmail">Email</label>
+                    </div>
+                    <div id="emailField" class="channel-field channel-field-collapsible is-collapsed" aria-hidden="true">
+                      <label for="emailSubject" class="form-label mb-1">Email Subject</label>
+                      <input id="emailSubject" type="text" class="form-control" name="email_subject" placeholder="Enter email subject">
+                    </div>
+                  </div>
                 </div>
               </div>
             </section>
           </div>
 
           <div class="col-12">
-            <section class="announcement-section-card">
-              <h5 class="announcement-section-title">Publish Settings</h5>
-              <div class="row g-3">
-                <div class="col-12 col-md-6">
-                  <label class="form-label mb-1">Schedule Date (optional)</label>
-                  <input type="date" class="form-control" name="schedule_date">
+            <div id="sharedContentFields">
+              <section class="announcement-section-card">
+                <div class="mb-3 announcement-primary-title-wrap">
+                  <label for="announcementTitle" class="form-label fw-semibold">Title</label>
+                  <input id="announcementTitle" name="title" type="text" class="form-control announcement-primary-title-input" placeholder="Enter announcement title" required>
                 </div>
-                <div class="col-12 col-md-6">
-                  <label class="form-label mb-1">Schedule Time (optional)</label>
-                  <input type="time" class="form-control" name="schedule_time">
+
+                <div class="announcement-create-divider"></div>
+
+                <div class="announcement-editor-panel">
+                  <div class="announcement-editor-panel-head">
+                    <div>
+                      <label class="form-label fw-semibold mb-1">Body</label>
+                      <p class="announcement-editor-helper mb-0">Use headings, lists, and short paragraphs so the announcement stays readable in both news and announcement views.</p>
+                    </div>
+                  </div>
+                  <div id="announcementEditor"></div>
+                  <input type="hidden" id="announcementContent" name="content_html">
+                  <div id="sharedSidebarWarning" class="announcement-counter-note d-none mt-2">
+                    <span id="sharedSidebarCounter" class="announcement-counter-text">0 characters</span>
+                    <span id="sharedSidebarWarningText" class="announcement-counter-warning d-none">Warning: Sidebar announcements should stay concise to avoid crowding the guest page.</span>
+                  </div>
                 </div>
-              </div>
-            </section>
+              </section>
+            </div>
+
+            <div id="dualPlacementFields" class="d-none">
+                <div class="row g-4">
+                  <div class="col-12">
+                    <div class="announcement-section-card announcement-dual-card h-100">
+                      <h6 class="announcement-card-title announcement-placement-title">News Section</h6>
+                      <div class="mb-3">
+                        <label for="publicNewsTitle" class="form-label fw-semibold">Title</label>
+                        <input id="publicNewsTitle" name="public_news_title" type="text" class="form-control announcement-secondary-title-input" placeholder="Enter main news title">
+                      </div>
+                      <div class="announcement-editor-panel">
+                        <div class="announcement-editor-panel-head">
+                          <div>
+                            <label class="form-label fw-semibold mb-1">Body</label>
+                            <p class="announcement-editor-helper mb-0">This version appears in the featured news area of the guest page.</p>
+                          </div>
+                        </div>
+                        <div id="publicNewsEditor"></div>
+                        <input type="hidden" id="publicNewsContent" name="public_news_content_html">
+                        <div class="announcement-counter-note mt-2">
+                          <span id="publicNewsCounter" class="announcement-counter-text">0 characters</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div class="col-12">
+                    <div class="announcement-section-card announcement-dual-card h-100">
+                      <h6 class="announcement-card-title announcement-placement-title">Announcements</h6>
+                      <div class="mb-3">
+                        <label for="publicAnnouncementTitle" class="form-label fw-semibold">Title</label>
+                        <input id="publicAnnouncementTitle" name="public_title" type="text" class="form-control announcement-secondary-title-input" placeholder="Enter sidebar announcement title">
+                      </div>
+                      <div class="announcement-editor-panel">
+                        <div class="announcement-editor-panel-head">
+                          <div>
+                            <label class="form-label fw-semibold mb-1">Body</label>
+                            <p class="announcement-editor-helper mb-0">This version appears in the announcements area for guest and account views.</p>
+                          </div>
+                        </div>
+                        <div id="publicAnnouncementEditor"></div>
+                        <input type="hidden" id="publicAnnouncementContent" name="public_content_html">
+                        <div class="announcement-counter-note mt-2">
+                          <span id="publicAnnouncementCounter" class="announcement-counter-text">0 characters</span>
+                          <span id="publicAnnouncementWarning" class="announcement-counter-warning d-none">Warning: Sidebar announcements should stay concise to avoid crowding the guest page.</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+            </div>
           </div>
         </div>
 
-        <div class="announcement-sticky-actions d-flex flex-wrap justify-content-end gap-2 mt-4">
-          <a href="Announcements.php<?= $deliveryChannel !== 'all' ? '?channel=' . urlencode($deliveryChannel) : '' ?>" class="btn btn-outline-secondary">Close</a>
-          <button type="submit" name="submit_action" value="draft" class="btn btn-warning text-dark">Save as Draft</button>
-          <?php if ($isSuperAdmin): ?>
-            <button type="submit" id="btnPostAnnouncement" name="submit_action" value="approved" class="btn btn-primary text-white">Post</button>
-          <?php else: ?>
-            <button type="submit" name="submit_action" value="pending" class="btn btn-primary text-white">Submit for Review</button>
-          <?php endif; ?>
+        <div class="announcement-sticky-actions mt-4">
+          <div class="announcement-modal-footer-start">
+            <button type="submit" name="submit_action" value="draft" class="btn btn-warning text-dark">Save as Draft</button>
+            <?php if ($isSuperAdmin): ?>
+              <button type="submit" id="btnPostAnnouncement" name="submit_action" value="approved" class="btn btn-primary text-white">Post</button>
+            <?php else: ?>
+              <button type="submit" name="submit_action" value="pending" class="btn btn-primary text-white">Submit for Review</button>
+            <?php endif; ?>
+          </div>
+          <div class="announcement-modal-footer-end">
+            <a href="Announcements.php<?= $deliveryChannel !== 'all' ? '?channel=' . urlencode($deliveryChannel) : '' ?>" class="btn btn-outline-secondary">Close</a>
+          </div>
         </div>
       </form>
 
@@ -164,16 +276,16 @@ $isSuperAdmin = $sessionRole === 'superadmin';
         <div class="modal fade" id="modalSuperAdminPostConfirm" tabindex="-1" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
           <div class="modal-dialog modal-dialog-centered">
             <div class="modal-content">
-              <div class="modal-header">
-                <h5 class="modal-title">Confirm Post Announcement</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+              <div class="modal-header border-0 pb-0 bg-white">
+                <h5 class="modal-title w-100 text-center text-dark">Confirm Post Announcement</h5>
               </div>
-              <div class="modal-body">
+              <hr class="my-0">
+              <div class="modal-body text-center">
                 <p class="mb-0">Are you sure this announcement is ready to post?</p>
               </div>
-              <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
-                <button type="button" class="btn btn-primary text-white" id="btnConfirmPostAnnouncement">Yes, Post Announcement</button>
+              <div class="modal-footer border-0 pt-0 d-flex gap-2">
+                <button type="button" class="btn btn-primary text-white flex-fill" id="btnConfirmPostAnnouncement">Yes, Post Announcement</button>
+                <button type="button" class="btn btn-secondary flex-fill" data-bs-dismiss="modal">Later</button>
               </div>
             </div>
           </div>
@@ -187,18 +299,38 @@ $isSuperAdmin = $sessionRole === 'superadmin';
   <script src="../../summernote-0.9.0-dist/summernote-lite.min.js?v=20260307-2"></script>
   <script>
     (function () {
-      const MAX_IMAGE_SIZE_BYTES = 5 * 1024 * 1024;
+      const MAX_IMAGE_SIZE_BYTES = 25 * 1024 * 1024;
 
+      const sharedContentFields = document.getElementById("sharedContentFields");
+      const dualPlacementFields = document.getElementById("dualPlacementFields");
+      const sharedTitleInput = document.getElementById("announcementTitle");
       const contentInput = document.getElementById("announcementContent");
+      const publicNewsTitleInput = document.getElementById("publicNewsTitle");
+      const publicAnnouncementTitleInput = document.getElementById("publicAnnouncementTitle");
+      const publicNewsContentInput = document.getElementById("publicNewsContent");
+      const publicAnnouncementContentInput = document.getElementById("publicAnnouncementContent");
+      const publicNewsCounter = document.getElementById("publicNewsCounter");
+      const sharedSidebarWarning = document.getElementById("sharedSidebarWarning");
+      const sharedSidebarCounter = document.getElementById("sharedSidebarCounter");
+      const sharedSidebarWarningText = document.getElementById("sharedSidebarWarningText");
+      const publicAnnouncementCounter = document.getElementById("publicAnnouncementCounter");
+      const publicAnnouncementWarning = document.getElementById("publicAnnouncementWarning");
       const smsPreview = document.getElementById("smsPreview");
       const smsCounter = document.getElementById("smsCounter");
+      const placementPublicNews = document.getElementById("placementPublicNews");
+      const placementPublic = document.getElementById("placementPublic");
+      const dualPlacementNotice = document.getElementById("dualPlacementNotice");
+      const announcementDestinationsGroup = document.getElementById("announcementDestinationsGroup");
+      const channelGuestPage = document.getElementById("channelGuestPage");
       const channelSms = document.getElementById("channelSms");
       const channelEmail = document.getElementById("channelEmail");
       const smsField = document.getElementById("smsField");
       const emailField = document.getElementById("emailField");
       const audienceAll = document.getElementById("audienceAll");
       const customAudienceFields = document.getElementById("customAudienceFields");
-      const editorEl = $("#announcementEditor");
+      const sharedEditorEl = $("#announcementEditor");
+      const publicNewsEditorEl = $("#publicNewsEditor");
+      const publicAnnouncementEditorEl = $("#publicAnnouncementEditor");
       const fullToolbar = [
         ["style", ["style"]],
         ["font", ["bold", "italic", "underline", "clear"]],
@@ -211,19 +343,88 @@ $isSuperAdmin = $sessionRole === 'superadmin';
         ["view", ["fullscreen", "codeview", "help"]]
       ];
 
-      function updateEditorOutputs() {
-        const html = editorEl.summernote("code");
+      function getPlainTextFromHtml(html) {
         const temp = document.createElement("div");
         temp.innerHTML = html;
-        const plain = (temp.textContent || temp.innerText || "").trim();
-        contentInput.value = html;
+        return (temp.textContent || temp.innerText || "").trim();
+      }
+
+      function isDualPlacementSelected() {
+        return !!(placementPublicNews && placementPublicNews.checked && placementPublic && placementPublic.checked);
+      }
+
+      function updateEditorOutputs() {
+        const sharedHtml = sharedEditorEl.summernote("code");
+        const publicNewsHtml = publicNewsEditorEl.summernote("code");
+        const publicAnnouncementHtml = publicAnnouncementEditorEl.summernote("code");
+        const dualPlacementActive = isDualPlacementSelected();
+        const sharedPlain = getPlainTextFromHtml(sharedHtml);
+        const publicNewsPlain = getPlainTextFromHtml(publicNewsHtml);
+        const publicAnnouncementPlain = getPlainTextFromHtml(publicAnnouncementHtml);
+        const sidebarOnlyMode = !dualPlacementActive && placementPublic && placementPublic.checked && (!placementPublicNews || !placementPublicNews.checked);
+
+        contentInput.value = dualPlacementActive ? publicNewsHtml : sharedHtml;
+        publicNewsContentInput.value = publicNewsHtml;
+        publicAnnouncementContentInput.value = publicAnnouncementHtml;
+
+        if (dualPlacementActive) {
+          sharedTitleInput.value = (publicNewsTitleInput.value || publicAnnouncementTitleInput.value || "").trim();
+        }
+
+        const previewSource = dualPlacementActive ? publicNewsHtml : sharedHtml;
+        const plain = getPlainTextFromHtml(previewSource);
         smsPreview.value = plain;
         smsCounter.textContent = plain.length + " / 160 characters";
+
+        if (sharedSidebarWarning && sharedSidebarCounter && sharedSidebarWarningText) {
+          sharedSidebarWarning.classList.toggle("d-none", !sidebarOnlyMode);
+          sharedSidebarCounter.textContent = sharedPlain.length + " characters";
+          sharedSidebarWarningText.classList.toggle("d-none", sharedPlain.length <= 280);
+        }
+
+        if (publicAnnouncementCounter && publicAnnouncementWarning) {
+          publicAnnouncementCounter.textContent = publicAnnouncementPlain.length + " characters";
+          publicAnnouncementWarning.classList.toggle("d-none", publicAnnouncementPlain.length <= 280);
+        }
+
+        if (publicNewsCounter) {
+          publicNewsCounter.textContent = publicNewsPlain.length + " characters";
+        }
+
       }
 
       function toggleChannelFields() {
-        smsField.classList.toggle("d-none", !channelSms.checked);
-        emailField.classList.toggle("d-none", !channelEmail.checked);
+        const showSms = !!channelSms.checked;
+        const showEmail = !!channelEmail.checked;
+        smsField.classList.toggle("is-collapsed", !showSms);
+        smsField.setAttribute("aria-hidden", showSms ? "false" : "true");
+        emailField.classList.toggle("is-collapsed", !showEmail);
+        emailField.setAttribute("aria-hidden", showEmail ? "false" : "true");
+      }
+
+      function togglePlacementGuidance() {
+        const hasNewsPlacement = placementPublicNews && placementPublicNews.checked;
+        const hasAnnouncementPlacement = placementPublic && placementPublic.checked;
+        const dualPlacementActive = hasNewsPlacement && hasAnnouncementPlacement;
+        if (dualPlacementNotice) {
+          dualPlacementNotice.classList.toggle("d-none", !dualPlacementActive);
+          dualPlacementNotice.textContent = dualPlacementActive
+            ? "Create a separate main news version and sidebar announcement version below."
+            : "";
+        }
+        if (sharedContentFields && dualPlacementFields) {
+          sharedContentFields.classList.toggle("d-none", dualPlacementActive);
+          dualPlacementFields.classList.toggle("d-none", !dualPlacementActive);
+        }
+        if (announcementDestinationsGroup) {
+          announcementDestinationsGroup.classList.toggle("d-none", !hasAnnouncementPlacement);
+        }
+        if (!hasAnnouncementPlacement) {
+          if (channelGuestPage) channelGuestPage.checked = false;
+          const accountPageCheckbox = document.getElementById("channelWebsite");
+          if (accountPageCheckbox) accountPageCheckbox.checked = false;
+        }
+        updateEditorOutputs();
       }
 
       function toggleAudienceFields() {
@@ -276,44 +477,9 @@ $isSuperAdmin = $sessionRole === 'superadmin';
         return imageUrl;
       }
 
-      editorEl.summernote({
-        placeholder: "Write your announcement here...",
-        height: 260,
-        minHeight: 220,
-        dialogsInBody: true,
-        fontNames: [
-          "Arial", "Arial Black", "Comic Sans MS", "Courier New", "Helvetica", "Impact",
-          "Lucida Grande", "Tahoma", "Times New Roman", "Trebuchet MS", "Verdana", "Georgia"
-        ],
-        fontSizes: ["8", "9", "10", "11", "12", "14", "16", "18", "20", "24", "28", "32", "36", "48", "64", "82", "150"],
-        toolbar: fullToolbar,
-        callbacks: {
-          onChange: function () {
-            updateEditorOutputs();
-          },
-          onImageUpload: async function (files) {
-            for (const file of files) {
-              if (!file) continue;
-              if (file.size > MAX_IMAGE_SIZE_BYTES) {
-                alert("Image must be 5MB or less.");
-                continue;
-              }
-              try {
-                const imageUrl = await uploadEditorImage(file);
-                editorEl.summernote("insertImage", imageUrl);
-              } catch (err) {
-                alert(err.message || "Unable to upload image.");
-              }
-            }
-            updateEditorOutputs();
-          }
-        }
-      });
-      const toolbarGroups = editorEl.next(".note-editor").find(".note-toolbar .note-btn-group").length;
-      if (toolbarGroups <= 1) {
-        editorEl.summernote("destroy");
-        editorEl.summernote({
-          placeholder: "Write your announcement here...",
+      function buildEditorConfig(placeholder, editorInstance) {
+        return {
+          placeholder: placeholder,
           height: 260,
           minHeight: 220,
           dialogsInBody: true,
@@ -331,12 +497,12 @@ $isSuperAdmin = $sessionRole === 'superadmin';
               for (const file of files) {
                 if (!file) continue;
                 if (file.size > MAX_IMAGE_SIZE_BYTES) {
-                  alert("Image must be 5MB or less.");
+                  alert("Image must be 25MB or less.");
                   continue;
                 }
                 try {
                   const imageUrl = await uploadEditorImage(file);
-                  editorEl.summernote("insertImage", imageUrl);
+                  editorInstance.summernote("insertImage", imageUrl);
                 } catch (err) {
                   alert(err.message || "Unable to upload image.");
                 }
@@ -344,14 +510,46 @@ $isSuperAdmin = $sessionRole === 'superadmin';
               updateEditorOutputs();
             }
           }
-        });
+        };
       }
+
+      function initEditor(editorInstance, placeholder) {
+        editorInstance.summernote(buildEditorConfig(placeholder, editorInstance));
+        const toolbarGroups = editorInstance.next(".note-editor").find(".note-toolbar .note-btn-group").length;
+        if (toolbarGroups <= 1) {
+          editorInstance.summernote("destroy");
+          editorInstance.summernote(buildEditorConfig(placeholder, editorInstance));
+        }
+      }
+
+      initEditor(sharedEditorEl, "Write your announcement here...");
+      initEditor(publicNewsEditorEl, "Write the main news content here...");
+      initEditor(publicAnnouncementEditorEl, "Write the sidebar announcement content here...");
       applyToolbarTooltips();
       updateEditorOutputs();
 
       const createForm = document.querySelector("form.announcement-create-shell");
       if (createForm) {
-        createForm.addEventListener("submit", function () {
+        createForm.addEventListener("submit", function (event) {
+          const dualPlacementActive = isDualPlacementSelected();
+          const hasAnnouncementPlacement = !!(placementPublic && placementPublic.checked);
+          const hasAnnouncementDestination = !!((channelGuestPage && channelGuestPage.checked) || (document.getElementById("channelWebsite") && document.getElementById("channelWebsite").checked));
+          if (hasAnnouncementPlacement && !hasAnnouncementDestination) {
+            event.preventDefault();
+            alert("Select Guest Page or Account Page when Announcements is selected.");
+            return;
+          }
+          if (dualPlacementActive) {
+            const publicNewsTitle = (publicNewsTitleInput.value || "").trim();
+            const publicAnnouncementTitle = (publicAnnouncementTitleInput.value || "").trim();
+            const publicNewsBody = getPlainTextFromHtml(publicNewsEditorEl.summernote("code"));
+            const publicAnnouncementBody = getPlainTextFromHtml(publicAnnouncementEditorEl.summernote("code"));
+            if (publicNewsTitle === "" || publicAnnouncementTitle === "" || publicNewsBody === "" || publicAnnouncementBody === "") {
+              event.preventDefault();
+              alert("Fill in both the Main News and Sidebar Announcement title and body before submitting.");
+              return;
+            }
+          }
           updateEditorOutputs();
         });
       }
@@ -397,6 +595,16 @@ $isSuperAdmin = $sessionRole === 'superadmin';
         el.addEventListener("change", toggleChannelFields);
       });
       toggleChannelFields();
+
+      document.querySelectorAll(".placement-checkbox").forEach((el) => {
+        el.addEventListener("change", togglePlacementGuidance);
+      });
+      togglePlacementGuidance();
+
+      [sharedTitleInput, publicNewsTitleInput, publicAnnouncementTitleInput].forEach((el) => {
+        if (!el) return;
+        el.addEventListener("input", updateEditorOutputs);
+      });
 
       document.querySelectorAll("input[name='audience_scope']").forEach((el) => {
         el.addEventListener("change", toggleAudienceFields);

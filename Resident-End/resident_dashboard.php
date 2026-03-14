@@ -1,6 +1,7 @@
-<?php
+﻿<?php
 $allowUnregistered = false;
 require_once __DIR__ . "/includes/resident_access_guard.php";
+require_once __DIR__ . "/../PhpFiles/Admin-End/announcementsStore.php";
 
 $isResidentNotVerified = false;
 $showNotVerifiedModal = false;
@@ -34,6 +35,48 @@ if (!empty($_SESSION['show_not_verified_modal']) && $isResidentNotVerified) {
 if (isset($_SESSION['show_not_verified_modal'])) {
   unset($_SESSION['show_not_verified_modal']);
 }
+
+$residentAnnouncements = [];
+$announcementItems = announcements_load_all();
+usort($announcementItems, static function (array $a, array $b): int {
+  $aDate = (string)($a['publish_date'] ?? $a['created_at'] ?? '');
+  $bDate = (string)($b['publish_date'] ?? $b['created_at'] ?? '');
+  $aTs = strtotime($aDate) ?: 0;
+  $bTs = strtotime($bDate) ?: 0;
+  return $bTs <=> $aTs;
+});
+foreach ($announcementItems as $item) {
+  $channels = array_values(array_filter((array)($item['channels'] ?? []), function ($ch) {
+    return in_array((string)$ch, ['website', 'public', 'public_news', 'sms', 'email'], true);
+  }));
+  $status = strtolower((string)($item['status'] ?? 'draft'));
+  if ($status !== 'approved' || !in_array('website', $channels, true)) {
+    continue;
+  }
+
+  $rawPosted = (string)($item['publish_date'] ?? '');
+  if ($rawPosted === '' || $rawPosted === '-') {
+    $rawPosted = (string)($item['created_at'] ?? '');
+  }
+  $postedDate = '-';
+  $ts = strtotime($rawPosted);
+  if ($ts !== false) {
+    $postedDate = date('M d, Y', $ts);
+  }
+
+  $title = trim((string)(($item['public_title'] ?? '') !== '' ? $item['public_title'] : ($item['title'] ?? '')));
+  $contentHtml = (string)(($item['public_content_html'] ?? '') !== '' ? $item['public_content_html'] : ($item['content_html'] ?? ''));
+  $contentPreviewHtml = trim(strip_tags(
+    $contentHtml,
+    '<p><br><b><strong><i><em><u><ul><ol><li><span><div><h1><h2><h3><h4><h5><h6><font><a>'
+  ));
+
+  $residentAnnouncements[] = [
+    'title' => $title !== '' ? $title : 'Untitled Announcement',
+    'content_html' => $contentPreviewHtml !== '' ? $contentPreviewHtml : '<p>Tap to view the latest account-page announcement.</p>',
+    'posted_date' => $postedDate
+  ];
+}
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -49,6 +92,7 @@ if (isset($_SESSION['show_not_verified_modal'])) {
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
 
   <link rel="stylesheet" href="../CSS-Styles/Resident-End-CSS/residentDashboard.css">
+  <link rel="stylesheet" href="../CSS-Styles/Admin-End-CSS/ContentManagementStyle.css">
   <style>
     .verify-cta-card {
       position: relative;
@@ -107,9 +151,28 @@ if (isset($_SESSION['show_not_verified_modal'])) {
         </div>
       </div>
 
+      <?php if ($residentAnnouncements): ?>
+        <div class="dashboard-announcements-stack mb-4">
+          <?php foreach ($residentAnnouncements as $index => $announcement): ?>
+            <div class="dashboard-announcement-banner rounded-4 overflow-hidden shadow-sm border-orange-thin position-relative mb-3" id="dashboardAnnouncementCard<?= (int)$index ?>" onclick="location.href='Announcements/AnnouncementsLandingPage.php'" role="button" tabindex="0">
+              <button type="button" class="dashboard-announcement-close" data-announcement-close="dashboardAnnouncementCard<?= (int)$index ?>" aria-label="Close">×</button>
+              <div class="bg-orange text-center py-3">
+                <h3 class="text-white fw-bold mb-0"><?= htmlspecialchars($announcement['title']) ?></h3>
+              </div>
+              <div class="bg-white p-4 p-md-5">
+                <div class="dashboard-announcement-preview"><?= $announcement['content_html'] ?></div>
+                <div class="dashboard-announcement-footer">
+                  <div class="dashboard-announcement-posted">Posted: <?= htmlspecialchars($announcement['posted_date']) ?></div>
+                </div>
+              </div>
+            </div>
+          <?php endforeach; ?>
+        </div>
+      <?php endif; ?>
+
       <?php if ($isResidentNotVerified): ?>
         <div class="verify-cta-card rounded-4 overflow-hidden shadow-sm border-orange-thin bg-white mb-4" id="verifyCtaCard">
-          <button type="button" class="verify-cta-close" id="verifyCtaCloseBtn" aria-label="Close">�</button>
+          <button type="button" class="verify-cta-close" id="verifyCtaCloseBtn" aria-label="Close">×</button>
           <div class="bg-orange text-center py-2">
             <h3 class="text-white fw-bold mb-0">ACCOUNT VERIFICATION</h3>
           </div>
@@ -247,8 +310,21 @@ if (isset($_SESSION['show_not_verified_modal'])) {
         verifyCtaCard.classList.add("d-none");
       });
     }
+
+    document.querySelectorAll("[data-announcement-close]").forEach((closeBtn) => {
+      closeBtn.addEventListener("click", (event) => {
+        event.stopPropagation();
+        const cardId = closeBtn.getAttribute("data-announcement-close");
+        if (!cardId) return;
+        const card = document.getElementById(cardId);
+        if (card) {
+          card.classList.add("d-none");
+        }
+      });
+    });
   </script>
 
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 </body>
 </html>
+

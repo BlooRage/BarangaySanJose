@@ -27,10 +27,20 @@ foreach ($items as $item) {
         $postedDate = date('F d, Y', $ts);
     }
 
+    $title = (string)($item['public_title'] ?? '');
+    if ($title === '') {
+        $title = (string)($item['title'] ?? '');
+    }
+
+    $contentHtml = (string)($item['public_content_html'] ?? '');
+    if ($contentHtml === '') {
+        $contentHtml = (string)($item['content_html'] ?? '');
+    }
+
     $publicAnnouncements[] = [
         'id' => (string)($item['id'] ?? ''),
-        'title' => (string)($item['title'] ?? ''),
-        'content_html' => (string)($item['content_html'] ?? ''),
+        'title' => $title,
+        'content_html' => $contentHtml,
         'posted_date' => $postedDate
     ];
 }

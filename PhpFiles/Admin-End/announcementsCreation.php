@@ -106,9 +106,31 @@ function ann_creator_display_label(mysqli $conn, string $userId, string $fallbac
 
 $title = trim((string)($_POST["title"] ?? ""));
 $contentHtml = trim((string)($_POST["content_html"] ?? ""));
+$publicNewsTitle = trim((string)($_POST["public_news_title"] ?? ""));
+$publicNewsContentHtml = trim((string)($_POST["public_news_content_html"] ?? ""));
+$publicTitle = trim((string)($_POST["public_title"] ?? ""));
+$publicContentHtml = trim((string)($_POST["public_content_html"] ?? ""));
+$placements = array_values(array_unique(array_filter((array)($_POST["placements"] ?? []), function ($ch) {
+  return in_array((string)$ch, ["announcement", "public_news"], true);
+})));
 $channels = array_values(array_unique(array_filter((array)($_POST["channels"] ?? []), function ($ch) {
   return in_array((string)$ch, ["website", "public", "public_news", "sms", "email"], true);
 })));
+$contentChannels = [];
+if (in_array("public_news", $placements, true)) {
+  $contentChannels[] = "public_news";
+}
+if (in_array("announcement", $placements, true)) {
+  if (in_array("public", $channels, true)) {
+    $contentChannels[] = "public";
+  }
+  if (in_array("website", $channels, true)) {
+    $contentChannels[] = "website";
+  }
+}
+$channels = array_values(array_unique(array_merge($contentChannels, array_values(array_filter($channels, function ($ch) {
+  return in_array((string)$ch, ["sms", "email"], true);
+})))));
 $audienceScope = trim((string)($_POST["audience_scope"] ?? "all"));
 $area = trim((string)($_POST["area"] ?? ""));
 $roleGroup = trim((string)($_POST["role_group"] ?? ""));
@@ -124,16 +146,46 @@ $redirectBase = "../../Admin-End/Announcements/Announcements.php";
 $redirectUrl = $channelContext === "all" ? $redirectBase : ($redirectBase . "?channel=" . urlencode($channelContext));
 
 if ($title === "") {
-  ann_redirect_with_flash($redirectUrl, "warning", "Announcement title is required.");
-}
-
-$plainContent = trim(strip_tags($contentHtml));
-if ($plainContent === "") {
-  ann_redirect_with_flash($redirectUrl, "warning", "Announcement content is required.");
+  $title = $publicNewsTitle !== "" ? $publicNewsTitle : $publicTitle;
 }
 
 if (!$channels) {
   ann_redirect_with_flash($redirectUrl, "warning", "Select at least one delivery channel.");
+}
+
+$hasAnnouncementPlacement = in_array("announcement", $placements, true);
+if ($hasAnnouncementPlacement && !array_intersect(["public", "website"], $channels)) {
+  ann_redirect_with_flash($redirectUrl, "warning", "Select Guest Page or Account Page when Announcements is selected.");
+}
+
+$isDualPlacement = $hasAnnouncementPlacement && in_array("public_news", $placements, true);
+if ($isDualPlacement) {
+  if ($publicNewsTitle === "" || trim(strip_tags($publicNewsContentHtml)) === "") {
+    ann_redirect_with_flash($redirectUrl, "warning", "News Section title and content are required when both placements are selected.");
+  }
+  if ($publicTitle === "" || trim(strip_tags($publicContentHtml)) === "") {
+    ann_redirect_with_flash($redirectUrl, "warning", "Announcements title and content are required when both placements are selected.");
+  }
+
+  $title = $publicNewsTitle;
+  $contentHtml = $publicNewsContentHtml;
+} else {
+  $plainContent = trim(strip_tags($contentHtml));
+  if ($title === "") {
+    ann_redirect_with_flash($redirectUrl, "warning", "Announcement title is required.");
+  }
+  if ($plainContent === "") {
+    ann_redirect_with_flash($redirectUrl, "warning", "Announcement content is required.");
+  }
+
+  if (in_array("public_news", $placements, true)) {
+    $publicNewsTitle = $title;
+    $publicNewsContentHtml = $contentHtml;
+  }
+  if ($hasAnnouncementPlacement) {
+    $publicTitle = $title;
+    $publicContentHtml = $contentHtml;
+  }
 }
 
 $sessionRole = strtolower(trim((string)($_SESSION["role"] ?? "")));
@@ -180,6 +232,10 @@ $record = [
   "created_by_user_id" => $createdByUserId,
   "created_by_role" => $createdByRole,
   "content_html" => $contentHtml,
+  "public_news_title" => $publicNewsTitle,
+  "public_news_content_html" => $publicNewsContentHtml,
+  "public_title" => $publicTitle,
+  "public_content_html" => $publicContentHtml,
   "created_at" => date("Y-m-d H:i:s")
 ];
 

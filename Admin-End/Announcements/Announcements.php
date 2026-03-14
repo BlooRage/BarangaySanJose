@@ -376,6 +376,8 @@ function announcement_ordered_channels(array $channels): array
   <link href="../../summernote-0.9.0-dist/summernote-lite.min.css?v=20260307-2" rel="stylesheet">
   <link rel="stylesheet" href="../../CSS-Styles/Admin-End-CSS/AdminDashboardStyle.css">
   <link rel="stylesheet" href="../../CSS-Styles/Admin-End-CSS/ContentManagementStyle.css?v=20260311-34">
+  <link rel="stylesheet" href="../../CSS-Styles/Admin-End-CSS/ResidentMasterlistStyle.css?v=20260227-2">
+  <link rel="stylesheet" href="../../CSS-Styles/Admin-End-CSS/EditRequestsStyle.css?v=20260227-5">
 </head>
 <body>
   <div class="d-flex flex-column flex-md-row" style="min-height: 100vh;">
@@ -387,14 +389,8 @@ function announcement_ordered_channels(array $channels): array
       </h2>
       <hr><br>
 
-      <div class="d-flex flex-wrap align-items-center justify-content-start gap-3 mb-4">
-        <a href="CreateAnnouncement.php<?= $deliveryChannel !== 'all' ? '?channel=' . urlencode($deliveryChannel) : '' ?>" class="btn btn-primary fw-semibold">
-          <i class="fa-solid fa-plus me-1"></i> Create Announcement
-        </a>
-      </div>
-
       <?php if ($isSuperAdmin): ?>
-        <div class="announcement-shell p-3 p-md-4 shadow-sm mb-4">
+        <div class="announcement-shell edit-requests-shell bg-white p-4 pt-3 rounded-4 shadow-sm border mb-4">
           <div class="review-queue-top d-flex flex-wrap align-items-start justify-content-between gap-3 mb-2">
             <div class="review-queue-title-wrap">
               <div class="d-flex flex-wrap align-items-center gap-2 mb-1">
@@ -403,7 +399,7 @@ function announcement_ordered_channels(array $channels): array
               <p class="small text-muted mb-0 review-queue-description">Shows pending announcements submitted by admin/official/personnel accounts.</p>
             </div>
 
-            <div class="admin-list-actions review-queue-actions">
+            <div class="admin-list-actions admin-list-actions--linear review-queue-actions">
               <form class="announcement-search-form" method="get" action="Announcements.php">
                 <input type="hidden" name="channel" value="<?= htmlspecialchars($deliveryChannel) ?>">
                 <input type="hidden" name="status" value="<?= htmlspecialchars($statusFilter) ?>">
@@ -415,15 +411,15 @@ function announcement_ordered_channels(array $channels): array
                 </div>
               </form>
 
-              <button class="btn btn-outline-secondary btn-icon" type="button" data-bs-toggle="modal" data-bs-target="#modalReviewQueueFilter" title="Filter review queue" aria-label="Filter review queue">
+              <button class="btn btn-outline-secondary btn-linear-control" type="button" data-bs-toggle="modal" data-bs-target="#modalReviewQueueFilter" title="Filter review queue" aria-label="Filter review queue">
                 <i class="fas fa-filter"></i>
                 <span class="visually-hidden">Filter review queue</span>
               </button>
-              <button class="btn btn-outline-secondary btn-icon" type="button" data-bs-toggle="modal" data-bs-target="#modalReviewQueueColumns" title="Review queue columns" aria-label="Review queue columns">
+              <button class="btn btn-outline-secondary btn-linear-control" type="button" data-bs-toggle="modal" data-bs-target="#modalReviewQueueColumns" title="Review queue columns" aria-label="Review queue columns">
                 <i class="fa-solid fa-sliders"></i>
                 <span class="visually-hidden">Review queue columns</span>
               </button>
-              <a class="btn btn-outline-secondary btn-icon" id="btnReviewQueueRefresh" href="<?= htmlspecialchars(buildReviewQueueUrl($deliveryChannel, $statusFilter, $searchTerm, $queueChannelFilter, $queueSearchTerm)) ?>" title="Refresh review queue" aria-label="Refresh review queue">
+              <a class="btn btn-outline-secondary btn-linear-control" id="btnReviewQueueRefresh" href="<?= htmlspecialchars(buildReviewQueueUrl($deliveryChannel, $statusFilter, $searchTerm, $queueChannelFilter, $queueSearchTerm)) ?>" title="Refresh review queue" aria-label="Refresh review queue">
                 <i class="fa-solid fa-arrows-rotate"></i>
                 <span class="visually-hidden">Refresh review queue</span>
               </a>
@@ -461,7 +457,7 @@ function announcement_ordered_channels(array $channels): array
                       <td><?= htmlspecialchars($item['created_by']) ?></td>
                       <td class="text-end">
                         <div class="announcement-primary-actions justify-content-end">
-                          <button
+                            <button
                             class="btn btn-primary btn-sm text-white btn-view-announcement"
                             type="button"
                             data-bs-toggle="modal"
@@ -512,7 +508,7 @@ function announcement_ordered_channels(array $channels): array
         </div>
       <?php endif; ?>
 
-      <div class="announcement-shell resident-masterlist-shell p-3 p-md-4 shadow-sm">
+      <div class="announcement-shell edit-requests-shell bg-white p-4 pt-3 rounded-4 shadow-sm border">
         <?php if ($isSuperAdmin): ?>
           <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-1">
             <h5 class="mb-0 fw-bold review-queue-heading">All Announcements</h5>
@@ -544,7 +540,7 @@ function announcement_ordered_channels(array $channels): array
           </div>
 
           <div class="admin-list-toolbar-end">
-            <div class="admin-list-actions">
+            <div class="admin-list-actions admin-list-actions--linear">
               <form class="announcement-search-form" method="get" action="Announcements.php">
                 <input type="hidden" name="channel" value="<?= htmlspecialchars($deliveryChannel) ?>">
                 <input type="hidden" name="status" value="<?= htmlspecialchars($statusFilter) ?>">
@@ -554,15 +550,15 @@ function announcement_ordered_channels(array $channels): array
                 </div>
               </form>
 
-              <button class="btn btn-outline-secondary btn-icon" type="button" data-bs-toggle="modal" data-bs-target="#modalFilter" id="filterButton" title="Filter" aria-label="Filter">
+              <button class="btn btn-outline-secondary btn-linear-control" type="button" data-bs-toggle="modal" data-bs-target="#modalFilter" id="filterButton" title="Filter" aria-label="Filter">
                 <i class="fas fa-filter"></i>
                 <span class="visually-hidden">Filter</span>
               </button>
-              <button class="btn btn-outline-secondary btn-icon" type="button" data-bs-toggle="modal" data-bs-target="#modalTableColumns" id="btnAnnouncementsColumns" title="Columns" aria-label="Columns">
+              <button class="btn btn-outline-secondary btn-linear-control" type="button" data-bs-toggle="modal" data-bs-target="#modalTableColumns" id="btnAnnouncementsColumns" title="Columns" aria-label="Columns">
                 <i class="fa-solid fa-sliders"></i>
                 <span class="visually-hidden">Columns</span>
               </button>
-              <a class="btn btn-outline-secondary btn-icon" id="btnAnnouncementsTableRefresh" href="<?= htmlspecialchars(buildAnnouncementsUrl($deliveryChannel, $statusFilter)) ?>" title="Refresh table" aria-label="Refresh table">
+              <a class="btn btn-outline-secondary btn-linear-control" id="btnAnnouncementsTableRefresh" href="<?= htmlspecialchars(buildAnnouncementsUrl($deliveryChannel, $statusFilter)) ?>" title="Refresh table" aria-label="Refresh table">
                 <i class="fa-solid fa-arrows-rotate"></i>
                 <span class="visually-hidden">Refresh</span>
               </a>
@@ -770,7 +766,7 @@ function announcement_ordered_channels(array $channels): array
 
   <div class="modal fade" id="modalDeleteAnnouncement" tabindex="-1" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
     <div class="modal-dialog modal-dialog-centered">
-      <form class="modal-content" id="deleteAnnouncementForm" method="post" action="../../PhpFiles/Admin-End/announcementsActions.php">
+      <form class="modal-content p-3" id="deleteAnnouncementForm" method="post" action="../../PhpFiles/Admin-End/announcementsActions.php">
         <?= csrfTokenField() ?>
         <input type="hidden" id="deleteAnnouncementIdInput" name="announcement_id" value="">
         <input type="hidden" id="deleteChannelInput" name="channel" value="<?= htmlspecialchars($deliveryChannel) ?>">
@@ -779,18 +775,19 @@ function announcement_ordered_channels(array $channels): array
         <input type="hidden" id="deleteQueueChannelInput" name="queue_channel" value="<?= htmlspecialchars($queueChannelFilter) ?>">
         <input type="hidden" id="deleteQueueQueryInput" name="queue_q" value="<?= htmlspecialchars($queueSearchTerm) ?>">
         <input type="hidden" name="action" value="delete">
-        <div class="modal-header">
-          <h5 class="modal-title">Delete Announcement</h5>
+        <div class="modal-header justify-content-center border-0 pb-0">
+          <h5 class="modal-title fw-bold text-center w-100">Delete Announcement</h5>
           <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
         </div>
-        <div class="modal-body">
+        <hr class="my-2">
+        <div class="modal-body text-center">
           <p class="mb-2">Are you sure you want to delete this announcement?</p>
           <p class="fw-semibold mb-0" id="deleteAnnouncementTitle">-</p>
           <p class="small text-muted mt-2 mb-0">This action cannot be undone.</p>
         </div>
-        <div class="modal-footer">
-          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-          <button type="submit" class="btn btn-danger">Delete</button>
+        <div class="modal-footer border-0 pt-0 d-flex gap-2 w-100">
+          <button type="button" class="btn btn-secondary flex-fill" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn btn-danger flex-fill">Delete</button>
         </div>
       </form>
     </div>
@@ -871,15 +868,16 @@ function announcement_ordered_channels(array $channels): array
 
   <div class="modal fade" id="modalViewAnnouncement" tabindex="-1" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
     <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable announcement-details-dialog">
-      <div class="modal-content announcement-details-content">
+      <div class="modal-content announcement-details-content border-0 rounded-2 p-4">
         <div class="modal-header border-0">
-          <h3 class="announcement-details-title mb-0">
+          <h5 class="modal-title announcement-details-title mb-0">
             Announcement Details: <span id="viewAnnouncementRef" class="announcement-details-id">#-</span>
-          </h3>
+          </h5>
           <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
         </div>
         <div class="modal-body">
-          <div class="announcement-details-container">
+          <div class="announcement-details-card">
+            <h5 class="announcement-card-title">Announcement Summary</h5>
             <div class="row g-3">
               <div class="col-md-6">
                 <p class="announcement-detail-label">Title</p>
@@ -906,18 +904,21 @@ function announcement_ordered_channels(array $channels): array
                 <p class="announcement-detail-value" id="viewAnnouncementPublishDate">-</p>
               </div>
             </div>
-            <hr>
-            <div>
-              <div id="viewAnnouncementReviewNotice" class="alert alert-danger d-none mb-3" role="alert"></div>
-              <p class="announcement-detail-label mb-1">Announcement Content</p>
-              <div id="viewAnnouncementContent" class="border rounded p-3 bg-white" style="min-height: 160px;"></div>
-            </div>
+          </div>
+          <div class="announcement-details-card announcement-details-card--content mt-4">
+            <h5 class="announcement-card-title">Announcement Content</h5>
+            <div id="viewAnnouncementReviewNotice" class="alert alert-danger d-none mb-3" role="alert"></div>
+            <div id="viewAnnouncementContent" class="announcement-content-surface"></div>
           </div>
         </div>
         <div class="modal-footer border-0">
-          <button type="button" class="btn btn-warning text-dark d-none" id="btnViewEditAnnouncement">Edit</button>
-          <button type="button" class="btn btn-outline-danger d-none" id="btnViewDeleteAnnouncement">Delete</button>
-          <button type="button" class="btn btn-secondary" id="btnViewCloseAnnouncement" data-bs-dismiss="modal">Close</button>
+          <div class="announcement-modal-footer-start">
+            <button type="button" class="btn btn-warning text-dark d-none" id="btnViewEditAnnouncement">Edit</button>
+          </div>
+          <div class="announcement-modal-footer-end">
+            <button type="button" class="btn btn-outline-danger d-none" id="btnViewDeleteAnnouncement">Delete</button>
+            <button type="button" class="btn btn-secondary" id="btnViewCloseAnnouncement" data-bs-dismiss="modal">Close</button>
+          </div>
         </div>
       </div>
     </div>
@@ -925,7 +926,7 @@ function announcement_ordered_channels(array $channels): array
 
   <div class="modal fade" id="modalEditAnnouncement" tabindex="-1" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
     <div class="modal-dialog modal-dialog-centered modal-lg">
-      <form class="modal-content" id="editAnnouncementForm" method="post" action="../../PhpFiles/Admin-End/announcementsActions.php">
+      <form class="modal-content border-0 rounded-2 p-4" id="editAnnouncementForm" method="post" action="../../PhpFiles/Admin-End/announcementsActions.php">
         <?= csrfTokenField() ?>
         <input type="hidden" name="action" value="update">
         <input type="hidden" id="editAnnouncementIdInput" name="announcement_id" value="">
@@ -934,74 +935,82 @@ function announcement_ordered_channels(array $channels): array
         <input type="hidden" name="q" value="<?= htmlspecialchars($searchTerm) ?>">
         <input type="hidden" name="queue_channel" value="<?= htmlspecialchars($queueChannelFilter) ?>">
         <input type="hidden" name="queue_q" value="<?= htmlspecialchars($queueSearchTerm) ?>">
-        <div class="modal-header">
-          <h5 class="modal-title">Edit Announcement</h5>
+        <div class="modal-header border-0">
+          <h5 class="modal-title fw-bold">Edit Announcement</h5>
           <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
         </div>
         <div class="modal-body">
-          <div class="mb-3">
+          <div class="announcement-form-card">
+            <h5 class="announcement-card-title">Announcement Details</h5>
+            <div class="mb-3">
             <label for="editAnnouncementTitleInput" class="form-label">Title</label>
             <input type="text" class="form-control" id="editAnnouncementTitleInput" name="title" required>
-          </div>
-          <div class="mb-3">
-            <label for="editAnnouncementAudienceInput" class="form-label">Audience</label>
-            <input type="text" class="form-control" id="editAnnouncementAudienceInput" name="audience" required>
-          </div>
-          <div class="mb-3">
-            <label class="form-label d-block">Delivery Channels</label>
-            <div class="d-flex flex-wrap gap-3">
-              <label class="form-check-label d-flex align-items-center gap-2">
-                <input class="form-check-input m-0" type="checkbox" name="channels[]" value="public" id="editChannelPublic">
-                <span>Public Announcement</span>
-              </label>
-              <label class="form-check-label d-flex align-items-center gap-2">
-                <input class="form-check-input m-0" type="checkbox" name="channels[]" value="public_news" id="editChannelPublicNews">
-                <span>Public News</span>
-              </label>
-              <label class="form-check-label d-flex align-items-center gap-2">
-                <input class="form-check-input m-0" type="checkbox" name="channels[]" value="website" id="editChannelWebsite">
-                <span>Account Page</span>
-              </label>
-              <label class="form-check-label d-flex align-items-center gap-2">
-                <input class="form-check-input m-0" type="checkbox" name="channels[]" value="sms" id="editChannelSms">
-                <span>SMS</span>
-              </label>
-              <label class="form-check-label d-flex align-items-center gap-2">
-                <input class="form-check-input m-0" type="checkbox" name="channels[]" value="email" id="editChannelEmail">
-                <span>Email</span>
-              </label>
             </div>
-          </div>
-          <div class="row g-3">
-            <?php if ($isSuperAdmin): ?>
-              <div class="col-md-6">
-                <label for="editAnnouncementStatusInput" class="form-label">Status</label>
-                <select class="form-select announcement-status-select status-draft" id="editAnnouncementStatusInput" name="status_update">
-                  <option value="draft">Draft</option>
-                  <option value="pending">Pending</option>
-                  <option value="approved">Approved</option>
-                </select>
+            <div class="mb-3">
+              <label for="editAnnouncementAudienceInput" class="form-label">Audience</label>
+              <input type="text" class="form-control" id="editAnnouncementAudienceInput" name="audience" required>
+            </div>
+            <div class="mb-3">
+              <label class="form-label d-block">Delivery Channels</label>
+              <div class="d-flex flex-wrap gap-3">
+                <label class="form-check-label d-flex align-items-center gap-2">
+                  <input class="form-check-input m-0" type="checkbox" name="channels[]" value="public" id="editChannelPublic">
+                  <span>Public Announcement</span>
+                </label>
+                <label class="form-check-label d-flex align-items-center gap-2">
+                  <input class="form-check-input m-0" type="checkbox" name="channels[]" value="public_news" id="editChannelPublicNews">
+                  <span>Public News</span>
+                </label>
+                <label class="form-check-label d-flex align-items-center gap-2">
+                  <input class="form-check-input m-0" type="checkbox" name="channels[]" value="website" id="editChannelWebsite">
+                  <span>Account Page</span>
+                </label>
+                <label class="form-check-label d-flex align-items-center gap-2">
+                  <input class="form-check-input m-0" type="checkbox" name="channels[]" value="sms" id="editChannelSms">
+                  <span>SMS</span>
+                </label>
+                <label class="form-check-label d-flex align-items-center gap-2">
+                  <input class="form-check-input m-0" type="checkbox" name="channels[]" value="email" id="editChannelEmail">
+                  <span>Email</span>
+                </label>
               </div>
-              <div class="col-md-6">
-            <?php else: ?>
-              <input type="hidden" id="editAnnouncementStatusInput" name="status_update" value="draft">
-              <div class="col-12">
-            <?php endif; ?>
-              <label for="editAnnouncementPublishDateInput" class="form-label">Publish Date</label>
-              <input type="text" class="form-control" id="editAnnouncementPublishDateInput" name="publish_date" placeholder="YYYY-MM-DD HH:MM">
+            </div>
+            <div class="row g-3">
+              <?php if ($isSuperAdmin): ?>
+                <div class="col-md-6">
+                  <label for="editAnnouncementStatusInput" class="form-label">Status</label>
+                  <select class="form-select announcement-status-select status-draft" id="editAnnouncementStatusInput" name="status_update">
+                    <option value="draft">Draft</option>
+                    <option value="pending">Pending</option>
+                    <option value="approved">Approved</option>
+                  </select>
+                </div>
+                <div class="col-md-6">
+              <?php else: ?>
+                <input type="hidden" id="editAnnouncementStatusInput" name="status_update" value="draft">
+                <div class="col-12">
+              <?php endif; ?>
+                <label for="editAnnouncementPublishDateInput" class="form-label">Publish Date</label>
+                <input type="text" class="form-control" id="editAnnouncementPublishDateInput" name="publish_date" placeholder="YYYY-MM-DD HH:MM">
+              </div>
             </div>
           </div>
-          <div class="mt-3">
+          <div class="announcement-form-card mt-4">
+            <h5 class="announcement-card-title">Announcement Content</h5>
             <label for="editAnnouncementContentInput" class="form-label">Content</label>
             <div id="editAnnouncementEditor"></div>
             <input type="hidden" id="editAnnouncementContentInput" name="content_html" required>
           </div>
         </div>
-        <div class="modal-footer">
-          <button type="button" class="btn btn-outline-danger d-none" id="btnEditDeleteAnnouncement">Delete</button>
-          <button type="button" class="btn btn-secondary" id="btnEditCancel">Close</button>
-          <button type="submit" class="btn btn-warning text-dark" id="btnEditSaveDraft">Save Changes</button>
-          <button type="submit" class="btn btn-primary d-none" id="btnEditSubmitReview">Submit for Review</button>
+        <div class="modal-footer border-0">
+          <div class="announcement-modal-footer-start">
+            <button type="submit" class="btn btn-warning text-dark" id="btnEditSaveDraft">Save Changes</button>
+            <button type="submit" class="btn btn-primary d-none" id="btnEditSubmitReview">Submit for Review</button>
+          </div>
+          <div class="announcement-modal-footer-end">
+            <button type="button" class="btn btn-outline-danger d-none" id="btnEditDeleteAnnouncement">Delete</button>
+            <button type="button" class="btn btn-secondary" id="btnEditCancel">Close</button>
+          </div>
         </div>
       </form>
     </div>
@@ -1010,16 +1019,16 @@ function announcement_ordered_channels(array $channels): array
   <div class="modal fade" id="modalDeniedAnnouncementDraftNotice" tabindex="-1" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
     <div class="modal-dialog modal-dialog-centered">
       <div class="modal-content">
-        <div class="modal-header">
-          <h5 class="modal-title">Draft Notice</h5>
-          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        <div class="modal-header border-0 pb-0 bg-white">
+          <h5 class="modal-title w-100 text-center text-dark">Draft Notice</h5>
         </div>
-        <div class="modal-body">
+        <hr class="my-0">
+        <div class="modal-body text-center">
           <p class="mb-0">This announcement was denied. If you continue editing, your creation will now be saved as draft.</p>
         </div>
-        <div class="modal-footer">
-          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-          <button type="button" class="btn btn-warning text-dark" id="btnConfirmDeniedAnnouncementDraftNotice">Continue Editing</button>
+        <div class="modal-footer border-0 pt-0 d-flex gap-2">
+          <button type="button" class="btn btn-warning text-dark flex-fill" id="btnConfirmDeniedAnnouncementDraftNotice">Continue Editing</button>
+          <button type="button" class="btn btn-secondary flex-fill" data-bs-dismiss="modal">Later</button>
         </div>
       </div>
     </div>
@@ -1028,16 +1037,16 @@ function announcement_ordered_channels(array $channels): array
   <div class="modal fade" id="modalDeniedAnnouncementSaveConfirm" tabindex="-1" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
     <div class="modal-dialog modal-dialog-centered">
       <div class="modal-content">
-        <div class="modal-header">
-          <h5 class="modal-title">Confirm Save Changes</h5>
-          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        <div class="modal-header border-0 pb-0 bg-white">
+          <h5 class="modal-title w-100 text-center text-dark">Confirm Save Changes</h5>
         </div>
-        <div class="modal-body">
+        <hr class="my-0">
+        <div class="modal-body text-center">
           <p class="mb-0">Are you sure you want to save these changes? This announcement will be moved to draft status.</p>
         </div>
-        <div class="modal-footer">
-          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-          <button type="button" class="btn btn-warning text-dark" id="btnConfirmDeniedAnnouncementSave">Yes, Save Changes</button>
+        <div class="modal-footer border-0 pt-0 d-flex gap-2">
+          <button type="button" class="btn btn-warning text-dark flex-fill" id="btnConfirmDeniedAnnouncementSave">Yes, Save Changes</button>
+          <button type="button" class="btn btn-secondary flex-fill" data-bs-dismiss="modal">Later</button>
         </div>
       </div>
     </div>
@@ -1046,16 +1055,16 @@ function announcement_ordered_channels(array $channels): array
   <div class="modal fade" id="modalDeniedAnnouncementResubmitConfirm" tabindex="-1" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
     <div class="modal-dialog modal-dialog-centered">
       <div class="modal-content">
-        <div class="modal-header">
-          <h5 class="modal-title">Confirm Resubmission</h5>
-          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        <div class="modal-header border-0 pb-0 bg-white">
+          <h5 class="modal-title w-100 text-center text-dark">Confirm Resubmission</h5>
         </div>
-        <div class="modal-body">
+        <hr class="my-0">
+        <div class="modal-body text-center">
           <p class="mb-0">Are you sure that you are ready to submit again?</p>
         </div>
-        <div class="modal-footer">
-          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-          <button type="button" class="btn btn-primary" id="btnConfirmDeniedAnnouncementResubmit">Yes, Submit Again</button>
+        <div class="modal-footer border-0 pt-0 d-flex gap-2">
+          <button type="button" class="btn btn-primary flex-fill" id="btnConfirmDeniedAnnouncementResubmit">Yes, Submit Again</button>
+          <button type="button" class="btn btn-secondary flex-fill" data-bs-dismiss="modal">Later</button>
         </div>
       </div>
     </div>
@@ -1064,16 +1073,16 @@ function announcement_ordered_channels(array $channels): array
   <div class="modal fade" id="modalApprovedAnnouncementSaveConfirm" tabindex="-1" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
     <div class="modal-dialog modal-dialog-centered">
       <div class="modal-content">
-        <div class="modal-header">
-          <h5 class="modal-title">Confirm Save Changes</h5>
-          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        <div class="modal-header border-0 pb-0 bg-white">
+          <h5 class="modal-title w-100 text-center text-dark">Confirm Save Changes</h5>
         </div>
-        <div class="modal-body">
+        <hr class="my-0">
+        <div class="modal-body text-center">
           <p class="mb-0">Are you sure you want to save these changes? These changes will be submitted for review.</p>
         </div>
-        <div class="modal-footer">
-          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-          <button type="button" class="btn btn-warning text-dark" id="btnConfirmApprovedAnnouncementSave">Yes, Save Changes</button>
+        <div class="modal-footer border-0 pt-0 d-flex gap-2">
+          <button type="button" class="btn btn-warning text-dark flex-fill" id="btnConfirmApprovedAnnouncementSave">Yes, Save Changes</button>
+          <button type="button" class="btn btn-secondary flex-fill" data-bs-dismiss="modal">Later</button>
         </div>
       </div>
     </div>
@@ -1082,16 +1091,16 @@ function announcement_ordered_channels(array $channels): array
   <div class="modal fade" id="modalPendingAnnouncementSaveConfirm" tabindex="-1" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
     <div class="modal-dialog modal-dialog-centered">
       <div class="modal-content">
-        <div class="modal-header">
-          <h5 class="modal-title">Confirm Save Changes</h5>
-          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        <div class="modal-header border-0 pb-0 bg-white">
+          <h5 class="modal-title w-100 text-center text-dark">Confirm Save Changes</h5>
         </div>
-        <div class="modal-body">
+        <hr class="my-0">
+        <div class="modal-body text-center">
           <p class="mb-0">Are you sure you want to save these changes and update the pending approval for review?</p>
         </div>
-        <div class="modal-footer">
-          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-          <button type="button" class="btn btn-warning text-dark" id="btnConfirmPendingAnnouncementSave">Yes, Save Changes</button>
+        <div class="modal-footer border-0 pt-0 d-flex gap-2">
+          <button type="button" class="btn btn-warning text-dark flex-fill" id="btnConfirmPendingAnnouncementSave">Yes, Save Changes</button>
+          <button type="button" class="btn btn-secondary flex-fill" data-bs-dismiss="modal">Later</button>
         </div>
       </div>
     </div>
@@ -1100,16 +1109,16 @@ function announcement_ordered_channels(array $channels): array
   <div class="modal fade" id="modalSuperAdminApprovedCloseConfirm" tabindex="-1" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
     <div class="modal-dialog modal-dialog-centered">
       <div class="modal-content">
-        <div class="modal-header">
-          <h5 class="modal-title">Confirm Close</h5>
-          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        <div class="modal-header border-0 pb-0 bg-white">
+          <h5 class="modal-title w-100 text-center text-dark">Confirm Close</h5>
         </div>
-        <div class="modal-body">
+        <hr class="my-0">
+        <div class="modal-body text-center">
           <p class="mb-0">Are you sure you want to close? Any unsaved changes will be lost.</p>
         </div>
-        <div class="modal-footer">
-          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-          <button type="button" class="btn btn-primary" id="btnConfirmSuperAdminApprovedClose">Yes, Close</button>
+        <div class="modal-footer border-0 pt-0 d-flex gap-2">
+          <button type="button" class="btn btn-primary flex-fill" id="btnConfirmSuperAdminApprovedClose">Yes, Close</button>
+          <button type="button" class="btn btn-secondary flex-fill" data-bs-dismiss="modal">Later</button>
         </div>
       </div>
     </div>
@@ -1119,16 +1128,16 @@ function announcement_ordered_channels(array $channels): array
     <div class="modal fade" id="modalSuperAdminRepostConfirm" tabindex="-1" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
       <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content">
-          <div class="modal-header">
-            <h5 class="modal-title">Confirm Save Changes</h5>
-            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+          <div class="modal-header border-0 pb-0 bg-white">
+            <h5 class="modal-title w-100 text-center text-dark">Confirm Save Changes</h5>
           </div>
-          <div class="modal-body">
+          <hr class="my-0">
+          <div class="modal-body text-center">
             <p class="mb-0">Are you ready to save these changes? When you save, this announcement will be posted.</p>
           </div>
-          <div class="modal-footer">
-            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-            <button type="button" class="btn btn-primary" id="btnConfirmSuperAdminRepost">Yes, Save Changes</button>
+          <div class="modal-footer border-0 pt-0 d-flex gap-2">
+            <button type="button" class="btn btn-primary flex-fill" id="btnConfirmSuperAdminRepost">Yes, Save Changes</button>
+            <button type="button" class="btn btn-secondary flex-fill" data-bs-dismiss="modal">Later</button>
           </div>
         </div>
       </div>
@@ -1150,15 +1159,15 @@ function announcement_ordered_channels(array $channels): array
     <div class="modal fade" id="modalAnnouncementFlash" tabindex="-1" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
       <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content">
-          <div class="modal-header">
-            <h5 class="modal-title"><?= htmlspecialchars($flashTitle) ?></h5>
-            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+          <div class="modal-header border-0 pb-0 bg-white">
+            <h5 class="modal-title w-100 text-center text-dark"><?= htmlspecialchars($flashTitle) ?></h5>
           </div>
-          <div class="modal-body">
+          <hr class="my-0">
+          <div class="modal-body text-center">
             <p class="mb-0"><?= htmlspecialchars((string)$flash['message']) ?></p>
           </div>
-          <div class="modal-footer">
-            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+          <div class="modal-footer border-0 pt-0 d-flex gap-2">
+            <button type="button" class="btn btn-primary flex-fill" data-bs-dismiss="modal">Okay</button>
           </div>
         </div>
       </div>
