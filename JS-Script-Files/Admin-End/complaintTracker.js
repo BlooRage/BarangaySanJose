@@ -57,7 +57,8 @@
             return;
         }
         const status = String(detail?.status_name || "").trim().toLowerCase();
-        const isFinal = ["resolved", "dropped", "endorsed"].includes(status);
+        const hasLinkedBlotter = String(detail?.blotter_id || "").trim() !== "";
+        const isFinal = ["resolved", "dropped"].includes(status) || (status === "endorsed" && hasLinkedBlotter);
         complaintActionButtons.classList.toggle("d-none", isFinal);
     }
 
