@@ -47,11 +47,11 @@
     return String(v ?? '').replace(/[&<>\"']/g, (m) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '\"': '&quot;', "'": '&#39;' }[m]));
   }
 
-  function formField(label, value, raw = false, wide = false) {
+  function formField(label, value, raw = false) {
     const text = String(value ?? '').trim();
     const rendered = raw ? (text || '-') : esc(text || '-');
     return `
-      <div class="tracker-form-field${wide ? ' tracker-form-field--wide' : ''}">
+      <div class="tracker-form-field">
         <p class="tracker-form-label">${esc(label)}</p>
         <div class="tracker-form-value">${rendered}</div>
       </div>
@@ -70,7 +70,7 @@
     const clean = (Array.isArray(fields) ? fields : []).filter((f) => f && String(f.value ?? '').trim() !== '');
     if (!clean.length) return '';
     const cls = gridClassByCount(clean.length, maxCols);
-    return `<div class="tracker-form-grid ${cls}">${clean.map((f) => formField(f.label, f.value, !!f.raw, !!f.wide)).join('')}</div>`;
+    return `<div class="tracker-form-grid ${cls}">${clean.map((f) => formField(f.label, f.value, !!f.raw)).join('')}</div>`;
   }
 
   function formSection(title, content) {
@@ -199,7 +199,7 @@
     return line || String(fallbackRaw || '-');
   }
 
-  function renderParticipantGrid(participant, opts = {}) {
+  function renderParticipantGrid(participant) {
     const address = parseAddressParts(participant?.address || '');
     const hasStructuredAddress = Object.values(address).some((v) => String(v || '').trim() !== '');
     const fields = [
@@ -210,13 +210,9 @@
     ];
 
     if (hasStructuredAddress) {
-      fields.push({
-        label: 'Address',
-        value: formatCompleteAddress(address, participant?.address || '-'),
-        wide: !!opts.wideAddress
-      });
+fields.push({ label: 'Address', value: formatCompleteAddress(address, participant?.address || '-') });
     } else {
-      fields.push({ label: 'Address', value: participant?.address || '-', wide: !!opts.wideAddress });
+fields.push({ label: 'Address', value: participant?.address || '-' });
     }
 
     return renderFieldGrid(fields, 2);
@@ -643,22 +639,17 @@
       const complainant = d.complainant || {};
       const respondent = d.respondent || {};
 
-      const blotterMainGrid = renderFieldGrid([
+      const blotterGrid = renderFieldGrid([
         { label: 'Blotter ID', value: d.blotter_id || '-' },
         { label: 'Blotter Number', value: d.blotter_number || d.blotter_id || '-' },
         { label: 'Date Filed', value: d.date_filed || '-' },
-        { label: 'Time Filed', value: d.time_filed || '-' }
-      ], 4);
-
-      const blotterStatusGrid = renderFieldGrid([
+        { label: 'Time Filed', value: d.time_filed || '-' },
         { label: 'Status', value: d.status_name || '-' },
         { label: 'Case Level', value: d.level_name || '-' }
-      ], 2);
+      ], 4);
 
-      const blotterGrid = `<div class="d-grid gap-3">${[blotterMainGrid, blotterStatusGrid].filter(Boolean).join('')}</div>`;
-
-      const complainantGrid = renderParticipantGrid(complainant, { wideAddress: true });
-      const respondentGrid = renderParticipantGrid(respondent, { wideAddress: true });
+      const complainantGrid = renderParticipantGrid(complainant);
+      const respondentGrid = renderParticipantGrid(respondent);
 
       const incidentGrid = renderFieldGrid([
         { label: 'Incident Date', value: d.incident_date || '-' },
