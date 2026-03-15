@@ -96,8 +96,8 @@ require_once __DIR__ . '/../includes/admin_guard.php';
     #table-certificateTracker .col-action { width: 15%; }
 
     #viewModal .modal-dialog {
-      width: min(88vw, 920px);
-      max-width: 920px;
+      width: 75vw;
+      max-width: 1500px;
       height: 78vh;
     }
     #viewModal .modal-content {
@@ -266,6 +266,7 @@ require_once __DIR__ . '/../includes/admin_guard.php';
     }
     @media (max-width: 767px) {
       #viewModal .tracker-form-grid { grid-template-columns: 1fr; }
+      #viewModal .modal-dialog { width: 96vw; max-width: 96vw; }
     }
     @media (max-width: 992px) {
       #viewModal .submitted-docs-grid { grid-template-columns: 1fr; }
@@ -526,6 +527,6 @@ require_once __DIR__ . '/../includes/admin_guard.php';
 window.CERT_TRACKER_DEFAULT_STAGE = 'finance';
 </script>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-<script src="../../JS-Script-Files/Admin-End/certificateTrackerScript.js?v=20260311-08"></script>
+<script src="../../JS-Script-Files/Admin-End/certificateTrackerScript.js?v=20260315-02"></script>
 </body>
 </html>

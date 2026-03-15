@@ -42,6 +42,22 @@ require_once __DIR__ . "/../includes/admin_guard.php";
         #viewModal .tracker-form-section {
             border-color: #e78924;
         }
+
+        #viewModal .modal-dialog {
+            width: 75vw;
+            max-width: 1500px;
+        }
+
+        #viewModal .tracker-form-field--wide {
+            grid-column: 1 / -1;
+        }
+
+        @media (max-width: 768px) {
+            #viewModal .modal-dialog {
+                width: 96vw;
+                max-width: 96vw;
+            }
+        }
     </style>
 </head>
 
@@ -232,6 +248,6 @@ require_once __DIR__ . "/../includes/admin_guard.php";
     };
 </script>
 <script src="../../JS-Script-Files/Admin-End/tableColumnsGeneric.js?v=20260215-1"></script>
-<script src="../../JS-Script-Files/Admin-End/blotterTracker.js?v=20260307-4"></script>
+<script src="../../JS-Script-Files/Admin-End/blotterTracker.js?v=20260315-2"></script>
 </body>
 </html>
