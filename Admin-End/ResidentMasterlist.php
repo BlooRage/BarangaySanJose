@@ -272,7 +272,7 @@ if (isset($conn) && $conn instanceof mysqli) {
 
 <!-- MODAL stays unchanged -->
 <div class="modal fade" id="modal-viewEntry" tabindex="-1" data-bs-backdrop="static" data-bs-keyboard="false">
-    <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable" id="div-modalSizing">
+    <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable" id="div-modalSizing" style="max-width: 1500px; width: 75vw;">
         <div class="modal-content border-0 rounded-2 p-4">
             <div class="modal-header border-0">
                 <h5 class="modal-title">Resident Details: <span id="span-displayID" class="text-warning"></span></h5>
