@@ -103,10 +103,9 @@ require_once __DIR__ . '/../includes/admin_guard.php';
       line-height: 1.35;
     }
     #viewModal .modal-dialog {
-      width: 75vw;
-      max-width: 1500px;
-      height: 88vh;
-      margin: 1rem auto;
+      width: min(88vw, 920px);
+      max-width: 920px;
+      height: 78vh;
     }
     #viewModal .modal-content {
       border: 0;
@@ -156,7 +155,7 @@ require_once __DIR__ . '/../includes/admin_guard.php';
     }
     #viewModal .tracker-form-grid {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+      grid-template-columns: repeat(2, minmax(0, 1fr));
       gap: 14px 12px;
     }
     #viewModal .tracker-form-grid.cols-4 {
@@ -1639,10 +1638,6 @@ require_once __DIR__ . '/../includes/admin_guard.php';
       #viewModal .tracker-form-grid.cols-3 {
         grid-template-columns: 1fr;
       }
-      #viewModal .modal-dialog {
-        width: 96vw;
-        max-width: 96vw;
-      }
       #viewModal .template-preview-overlays {
         position: static;
         margin-top: 12px;
@@ -1995,6 +1990,6 @@ require_once __DIR__ . '/../includes/admin_guard.php';
   };
 </script>
 <script src="../../JS-Script-Files/Admin-End/tableColumnsGeneric.js?v=20260215-1"></script>
-  <script src="../../JS-Script-Files/Admin-End/certificateTrackerScript.js?v=20260315-01"></script>
+<script src="../../JS-Script-Files/Admin-End/certificateTrackerScript.js?v=20260311-08"></script>
 </body>
 </html>

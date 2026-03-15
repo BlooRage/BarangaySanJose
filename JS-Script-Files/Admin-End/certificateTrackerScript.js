@@ -775,11 +775,11 @@
     `;
   }
 
-  function formField(label, value, raw = false, wide = false) {
+  function formField(label, value, raw = false) {
     const text = String(value ?? '').trim();
     const rendered = raw ? (text || '-') : esc(text || '-');
     return `
-      <div class="tracker-form-field${wide ? ' tracker-form-field--wide' : ''}">
+      <div class="tracker-form-field">
         <p class="tracker-form-label">${esc(label)}</p>
         <div class="tracker-form-value">${rendered}</div>
       </div>
@@ -823,66 +823,7 @@
     const clean = visibleFields(fields);
     if (!clean.length) return '';
     const cls = gridClassByCount(clean.length, maxCols);
-    return `<div class="tracker-form-grid ${cls}">${clean.map((f) => formField(f.label, f.value, !!f.raw, !!f.wide)).join('')}</div>`;
-  }
-
-  function renderRequestDetailsGrid(fields) {
-    const clean = visibleFields(fields);
-    if (!clean.length) return '';
-
-    const normalizeLabel = (label) => String(label || '').toLowerCase().replace(/\s+/g, ' ').trim();
-    const takeFirst = (arr, predicate) => {
-      const idx = arr.findIndex((f) => f && predicate(normalizeLabel(f.label)));
-      if (idx === -1) return null;
-      return arr.splice(idx, 1)[0];
-    };
-
-    const remaining = clean.slice();
-
-    const purpose = takeFirst(remaining, (l) => l === 'purpose' || l.includes('purpose'));
-    const lastName = takeFirst(remaining, (l) => l.includes('last name'));
-    const firstName = takeFirst(remaining, (l) => l.includes('first name'));
-    const middleName = takeFirst(remaining, (l) => l.includes('middle name'));
-
-    const contactNumber = takeFirst(
-      remaining,
-      (l) => l.includes('contact number') || l.includes('mobile number') || l.includes('phone number')
-    );
-    const fullAddress = takeFirst(remaining, (l) => l === 'address' || l.includes('full address'));
-
-    const ownershipType = takeFirst(remaining, (l) => l.includes('ownership type'));
-    const proofAddressType = takeFirst(remaining, (l) => l.includes('proof') && l.includes('address') && l.includes('type'));
-    const proofAddressNumber = takeFirst(
-      remaining,
-      (l) => l.includes('proof') && l.includes('address') && (l.includes('number') || l.includes('no') || l.includes('#'))
-    );
-
-    const blocks = [];
-
-    if (purpose) {
-      blocks.push(renderFieldGrid([{ ...purpose, wide: true }], 1));
-    }
-
-    const nameRow = [lastName, firstName, middleName].filter(Boolean);
-    if (nameRow.length) {
-      blocks.push(renderFieldGrid(nameRow, 3));
-    }
-
-    const contactRow = [contactNumber, fullAddress].filter(Boolean);
-    if (contactRow.length) {
-      blocks.push(renderFieldGrid(contactRow, 2));
-    }
-
-    const ownershipRow = [ownershipType, proofAddressType, proofAddressNumber].filter(Boolean);
-    if (ownershipRow.length) {
-      blocks.push(renderFieldGrid(ownershipRow, 3));
-    }
-
-    if (remaining.length) {
-      blocks.push(renderFieldGrid(remaining.map((f) => ({ ...f, wide: true })), 1));
-    }
-
-    return `<div class="d-grid gap-3">${blocks.filter(Boolean).join('')}</div>`;
+    return `<div class="tracker-form-grid ${cls}">${clean.map((f) => formField(f.label, f.value, !!f.raw)).join('')}</div>`;
   }
 
   function looksLikeFilePath(key, value) {
@@ -3563,22 +3504,15 @@
             '-'
           ]);
           const verifiedDetailsGrid = isVerifiedPayment
-            ? (() => {
-                const requestedDocGrid = renderFieldGrid([
-                  { label: 'Requested Document', value: compactDocument, wide: true }
-                ], 1);
-                const processedOrGrid = renderFieldGrid([
-                  { label: 'Processed By', value: processedByText },
-                  { label: 'OR Number', value: firstNonEmpty([row.or_number, '-']) },
-                ], 2);
-                const restGrid = renderFieldGrid([
-                  { label: 'Price', value: verifiedAmountText },
-                  { label: 'Transaction Number', value: firstNonEmpty([row.payment_reference, '-']) },
-                  { label: 'Submitted Date', value: firstNonEmpty([row.payment_submitted_at, row.submitted_at, '-']) },
-                  { label: 'Date Verified', value: verifiedAtText },
-                ], 3);
-                return `<div class="d-grid gap-3">${[requestedDocGrid, processedOrGrid, restGrid].filter(Boolean).join('')}</div>`;
-              })()
+            ? renderFieldGrid([
+                { label: 'Requested Document', value: compactDocument },
+                { label: 'Processed By', value: processedByText },
+                { label: 'OR Number', value: firstNonEmpty([row.or_number, '-']) },
+                { label: 'Price', value: verifiedAmountText },
+                { label: 'Transaction Number', value: firstNonEmpty([row.payment_reference, '-']) },
+                { label: 'Submitted Date', value: firstNonEmpty([row.payment_submitted_at, row.submitted_at, '-']) },
+                { label: 'Date Verified', value: verifiedAtText },
+              ], 3)
             : '';
           const paymentProofUrl = resolvePaymentProofUrl(row, String(row.request_id || ''));
           const paymentProofHtml = paymentProofUrl
@@ -3857,7 +3791,7 @@
             : '';
           html += formSection('Personal Information', personalHtml, personalAction);
         }
-        const reqGrid = renderRequestDetailsGrid(requestFields);
+        const reqGrid = renderFieldGrid(requestFields, 3);
         if (reqGrid) {
           html += formSection('Request Details', reqGrid);
         }
