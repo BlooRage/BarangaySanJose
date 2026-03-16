@@ -333,6 +333,47 @@ function GenerateBlotterID(mysqli $conn) {
     return $prefix . str_pad((string)$nextSeq, 5, "0", STR_PAD_LEFT);
 }
 
+function GenerateBlotterRequestID(mysqli $conn) {
+    $year = date("Y");
+    $prefix = "BR" . $year;
+    $like = $prefix . "%";
+    $seqKey = 'BRID:' . $year;
+
+    if (!ensureIdSequenceTable($conn)) {
+        error_log("GenerateBlotterRequestID sequence table unavailable.");
+        return false;
+    }
+
+    $stmt = $conn->prepare("
+        INSERT INTO idsequencetbl (seq_key, last_seq)
+        SELECT ?, LAST_INSERT_ID(COALESCE(MAX(CAST(RIGHT(request_id, 5) AS UNSIGNED)), 0) + 1)
+        FROM blotterrequeststbl
+        WHERE request_id LIKE ?
+        ON DUPLICATE KEY UPDATE
+            last_seq = LAST_INSERT_ID(last_seq + 1)
+    ");
+    if (!$stmt) {
+        error_log("GenerateBlotterRequestID sequence prepare failed: " . $conn->error);
+        return false;
+    }
+
+    $stmt->bind_param("ss", $seqKey, $like);
+    if (!$stmt->execute()) {
+        error_log("GenerateBlotterRequestID sequence execute failed: " . $stmt->error);
+        $stmt->close();
+        return false;
+    }
+    $stmt->close();
+
+    $nextSeq = (int)$conn->insert_id;
+    if ($nextSeq <= 0 || $nextSeq > 99999) {
+        error_log("GenerateBlotterRequestID sequence out of range for prefix {$prefix}: {$nextSeq}");
+        return false;
+    }
+
+    return $prefix . str_pad((string)$nextSeq, 5, "0", STR_PAD_LEFT);
+}
+
 function GenerateAppointmentID(mysqli $conn) {
     $year = date("y");
     $prefix = "AP" . $year;

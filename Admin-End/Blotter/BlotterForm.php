@@ -77,6 +77,7 @@ require_once __DIR__ . "/../includes/admin_guard.php";
             <p class="form-subtitle mb-4 text-center">All fields marked with <span class="required-asterisk">*</span> are required.</p>
 
             <form method="POST" action="../../PhpFiles/Admin-End/blotterManagement.php" id="blotterForm" class="page-form" enctype="multipart/form-data">
+                <?= csrfTokenField() ?>
                 <h3 class="section-title mb-3 text-center">Blotter Information</h3>
                 <div class="row g-3 mb-3">
                     <div class="col-12 col-md-6">

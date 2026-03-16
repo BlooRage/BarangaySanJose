@@ -42,6 +42,10 @@
     let currentDetail = null;
     let pendingComplaintAction = null;
 
+    if (endorseBtn) {
+        endorseBtn.textContent = "Send for Blotter Review";
+    }
+
     function esc(v) {
         return String(v ?? "").replace(/[&<>\"']/g, (m) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;", "'": "&#39;" }[m]));
     }
@@ -58,7 +62,9 @@
         }
         const status = String(detail?.status_name || "").trim().toLowerCase();
         const hasLinkedBlotter = String(detail?.blotter_id || "").trim() !== "";
-        const isFinal = ["resolved", "dropped"].includes(status) || (status === "endorsed" && hasLinkedBlotter);
+        const requestStatus = String(detail?.blotter_request_status || "").trim().toLowerCase();
+        const hasOpenRequest = ["pending", "approved"].includes(requestStatus);
+        const isFinal = ["resolved", "dropped"].includes(status) || (status === "endorsed" && hasLinkedBlotter) || hasOpenRequest;
         complaintActionButtons.classList.toggle("d-none", isFinal);
     }
 
@@ -195,7 +201,7 @@
         return data;
     }
 
-    function formField(label, value, raw = false) {
+    function formField(label, value, raw = false, fullWidth = false) {
         const text = String(value ?? "").trim();
         const rendered = raw ? (text || "-") : esc(text || "-");
         return `
@@ -218,14 +224,13 @@
         const clean = (Array.isArray(fields) ? fields : []).filter((f) => f && String(f.value ?? "").trim() !== "");
         if (!clean.length) return "";
         const cls = gridClassByCount(clean.length, maxCols);
-        return `<div class="tracker-form-grid ${cls}">${clean.map((f) => formField(f.label, f.value, !!f.raw)).join("")}</div>`;
+        return `<div class="tracker-form-grid ${cls}">${clean.map((f) => formField(f.label, f.value, !!f.raw, !!f.fullWidth)).join("")}</div>`;
     }
 
     function renderAddressFieldGrid(fields) {
         const clean = (Array.isArray(fields) ? fields : []).filter((f) => f && String(f.value ?? "").trim() !== "");
         if (!clean.length) return "";
-        const gridClass = clean.length === 1 ? "cols-1" : "cols-3";
-        return `<div class="tracker-form-grid ${gridClass}">${clean.map((f) => formField(f.label, f.value, !!f.raw)).join("")}</div>`;
+        return `<div class="tracker-form-grid cols-1">${clean.map((f) => formField(f.label, f.value, !!f.raw, true)).join("")}</div>`;
     }
 
     function formSection(title, content) {
@@ -303,6 +308,28 @@
         `;
     }
 
+    function buildBlotterRequestNotice(detail) {
+        const status = String(detail?.blotter_request_status || "").trim().toLowerCase();
+        const notes = String(detail?.blotter_request_notes || "").trim();
+
+        if (status === "pending" || status === "approved") {
+            return "Blotter request is still under review.";
+        }
+
+        if (status === "rejected") {
+            return notes !== ""
+                ? `Previous blotter request was rejected. Review remarks: ${notes}`
+                : "Previous blotter request was rejected.";
+        }
+
+        return "";
+    }
+
+    function hasVisibleBlotterRequestDetails(detail) {
+        const status = String(detail?.blotter_request_status || "").trim().toLowerCase();
+        return status === "pending" || status === "approved";
+    }
+
     async function postJson(payload) {
         const res = await fetch(endpoint, {
             method: "POST",
@@ -336,7 +363,7 @@
 
         let title = "Update Complaint";
         if (actionType === "resolved") title = "Mark Complaint Resolved";
-        if (actionType === "endorsement") title = "Endorse Complaint to Blotter";
+        if (actionType === "endorsement") title = "Send Complaint for Blotter Review";
         if (actionType === "dropped") title = "Drop Complaint";
         if (complaintActionModalTitle) complaintActionModalTitle.textContent = title;
 
@@ -395,7 +422,7 @@
 
             let actionText = "update this complaint";
             if (pendingComplaintAction === "resolved") actionText = "mark this complaint as resolved";
-            if (pendingComplaintAction === "endorsement") actionText = "endorse this complaint to blotter";
+            if (pendingComplaintAction === "endorsement") actionText = "send this complaint to blotter review";
             if (pendingComplaintAction === "dropped") actionText = "drop this complaint";
             if (complaintActionConfirmText) {
                 complaintActionConfirmText.textContent = `Are you sure you want to ${actionText}?`;
@@ -470,17 +497,27 @@
             ].join("");
 
             const intakeNotesSection = formSection("Intake Notes", renderIntakeNotesEditor(d.intake_notes || ""));
+            const blotterRequestNotice = buildBlotterRequestNotice(d);
+            const showBlotterRequestDetails = hasVisibleBlotterRequestDetails(d);
 
             const notesGrid = [
                 renderFieldGrid([
                     { label: "Case Remarks", value: d.case_remarks || "-" },
                     { label: "Escalated to Blotter", value: Number(d.escalated_to_blotter || 0) === 1 ? `Yes${d.blotter_id ? ` (${d.blotter_id})` : ""}` : "No" },
                 ], 2),
+                showBlotterRequestDetails ? renderFieldGrid([
+                    { label: "Blotter Request ID", value: d.blotter_request_id || "-" },
+                    { label: "Blotter Request Status", value: d.blotter_request_status || "-" },
+                    { label: "Request Submitted", value: d.blotter_request_requested_at || "-" },
+                    { label: "Request Reviewed", value: d.blotter_request_reviewed_at || "-" },
+                ], 2) : "",
                 renderFieldGrid([
                     { label: "Resident Narration", value: d.case_details || "-" },
                 ], 1),
                 renderFieldGrid([
                     { label: "Screening Notes", value: d.screening_notes || "-" },
+                    ...(showBlotterRequestDetails ? [{ label: "Request Review Notes", value: d.blotter_request_notes || "-" }] : []),
+                    ...(blotterRequestNotice ? [{ label: "Blotter Request Note", value: blotterRequestNotice }] : []),
                 ], 1),
             ].join("");
 

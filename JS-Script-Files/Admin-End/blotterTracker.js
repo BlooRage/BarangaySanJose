@@ -47,11 +47,11 @@
     return String(v ?? '').replace(/[&<>\"']/g, (m) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '\"': '&quot;', "'": '&#39;' }[m]));
   }
 
-  function formField(label, value, raw = false) {
+  function formField(label, value, raw = false, fullWidth = false) {
     const text = String(value ?? '').trim();
     const rendered = raw ? (text || '-') : esc(text || '-');
     return `
-      <div class="tracker-form-field">
+      <div class="tracker-form-field${fullWidth ? ' tracker-form-field--full' : ''}">
         <p class="tracker-form-label">${esc(label)}</p>
         <div class="tracker-form-value">${rendered}</div>
       </div>
@@ -70,7 +70,7 @@
     const clean = (Array.isArray(fields) ? fields : []).filter((f) => f && String(f.value ?? '').trim() !== '');
     if (!clean.length) return '';
     const cls = gridClassByCount(clean.length, maxCols);
-    return `<div class="tracker-form-grid ${cls}">${clean.map((f) => formField(f.label, f.value, !!f.raw)).join('')}</div>`;
+    return `<div class="tracker-form-grid ${cls}">${clean.map((f) => formField(f.label, f.value, !!f.raw, !!f.fullWidth)).join('')}</div>`;
   }
 
   function formSection(title, content) {
@@ -210,13 +210,14 @@
     ];
 
     if (hasStructuredAddress) {
-fields.push({ label: 'Address', value: formatCompleteAddress(address, participant?.address || '-') });
+fields.push({ label: 'Address', value: formatCompleteAddress(address, participant?.address || '-'), fullWidth: true });
     } else {
-fields.push({ label: 'Address', value: participant?.address || '-' });
+fields.push({ label: 'Address', value: participant?.address || '-', fullWidth: true });
     }
 
     return renderFieldGrid(fields, 2);
   }
+
 
   function buildTableRow(row) {
     const blotterIdDisplay = row.blotter_id || '-';
@@ -726,3 +727,4 @@ fields.push({ label: 'Address', value: participant?.address || '-' });
   initCaseActionFlow();
   loadList();
 })();
+

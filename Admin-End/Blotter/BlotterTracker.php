@@ -33,14 +33,60 @@ require_once __DIR__ . "/../includes/admin_guard.php";
         }
 
         #viewModal .modal-content {
-            border: 0;
-            border-radius: .5rem;
-            padding: 1rem;
-            background: #ffffff;
+            border: 1px solid #e9ecef;
+            border-radius: 16px;
+            overflow: hidden;
+            background: #fff;
+        }
+
+        #viewModal .modal-header,
+        #viewModal .modal-body,
+        #viewModal .modal-footer {
+            padding: 1rem 1.25rem;
+        }
+
+        #viewModal .modal-body {
+            background: #fff;
+        }
+
+        #viewModal .tracker-profile-view {
+            display: grid;
+            gap: 12px;
         }
 
         #viewModal .tracker-form-section {
             border-color: #e78924;
+            margin-top: 0;
+            display: grid;
+            gap: 12px;
+        }
+
+        #viewModal .tracker-form-section-title {
+            margin: 0;
+        }
+
+        #viewModal .tracker-form-grid {
+            gap: 12px;
+        }
+
+        #viewModal .tracker-form-section > .tracker-form-grid + .tracker-form-grid,
+        #viewModal .tracker-form-section > .tracker-form-grid + .tracker-form-field,
+        #viewModal .tracker-form-section > .tracker-form-field + .tracker-form-grid,
+        #viewModal .tracker-form-section > .tracker-form-field + .tracker-form-field {
+            margin-top: 0;
+        }
+
+        #viewModal .tracker-form-field {
+            gap: 6px;
+        }
+
+        #viewModal .tracker-form-label {
+            margin: 0;
+            line-height: 1.2;
+        }
+
+        #viewModal .tracker-form-value {
+            line-height: 1.45;
         }
     </style>
 </head>
@@ -140,7 +186,7 @@ require_once __DIR__ . "/../includes/admin_guard.php";
 </div>
 
 <div class="modal fade tracker-profile-modal" id="viewModal" tabindex="-1" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
-    <div class="modal-dialog modal-xl modal-dialog-centered">
+    <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable" id="div-modalSizing" style="max-width: 1500px; width: 75vw;">
         <div class="modal-content">
             <div class="modal-header">
                 <h5 class="modal-title" id="viewModalTitle">Blotter Details</h5>
@@ -235,3 +281,4 @@ require_once __DIR__ . "/../includes/admin_guard.php";
 <script src="../../JS-Script-Files/Admin-End/blotterTracker.js?v=20260307-4"></script>
 </body>
 </html>
+
