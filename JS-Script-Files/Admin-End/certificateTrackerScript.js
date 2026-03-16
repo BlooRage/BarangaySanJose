@@ -1022,16 +1022,16 @@
       blocks.push(...tricycleRows.filter(Boolean));
     } else if (hasGeneralPermitLayout) {
       const permitRows = [
-        renderFieldGrid([{ ...purpose, wide: true }].filter(Boolean), 1),
-        renderFieldGrid([ownerLastName, ownerFirstName, ownerMiddleName, ownerPhone].filter(Boolean), 4),
-        renderFieldGrid([{ ...ownerFullAddress, wide: true }].filter(Boolean), 1),
+        renderFieldGrid(purpose ? [{ ...purpose, wide: true }] : [], 1),
+        renderFieldGrid([ownerLastName, ownerFirstName, ownerMiddleName].filter(Boolean), 3),
+        renderFieldGrid([ownerPhone, ownerFullAddress].filter(Boolean), 2),
         renderFieldGrid([proofAddressType, proofAddressNumber].filter(Boolean), 2),
-        renderFieldGrid([{ ...lotAddressSystem, wide: true }].filter(Boolean), 1),
+        renderFieldGrid(lotAddressSystem ? [{ ...lotAddressSystem, wide: true }] : [], 1),
         renderFieldGrid([lotStreetNumber, lotStreetName].filter(Boolean), 2),
         renderFieldGrid([lotBarangay, lotCity, lotProvince].filter(Boolean), 3),
-        renderFieldGrid([{ ...location, wide: true }].filter(Boolean), 1),
-        renderFieldGrid([{ ...projectLocation, wide: true }].filter(Boolean), 1),
-        renderFieldGrid([{ ...lotFullAddress, wide: true }].filter(Boolean), 1)
+        renderFieldGrid(location ? [{ ...location, wide: true }] : [], 1),
+        renderFieldGrid(projectLocation ? [{ ...projectLocation, wide: true }] : [], 1),
+        renderFieldGrid(lotFullAddress ? [{ ...lotFullAddress, wide: true }] : [], 1)
       ];
       blocks.push(...permitRows.filter(Boolean));
     } else {
