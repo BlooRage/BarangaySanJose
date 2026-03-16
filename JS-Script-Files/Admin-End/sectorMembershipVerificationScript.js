@@ -367,9 +367,13 @@
       const residentInfo = `
         <div class="tracker-form-section highlight">
           <h5 class="tracker-form-section-title">Resident Information</h5>
-          <div class="tracker-form-grid cols-3">
+          <div class="tracker-form-grid cols-1">
             ${field("Resident ID", app.resident_id)}
+          </div>
+          <div class="tracker-form-grid cols-1">
             ${field("Name", app.full_name)}
+          </div>
+          <div class="tracker-form-grid cols-4">
             ${field("Age", ageValue)}
             ${field("Sex", app.sex)}
             ${field("Birthday", fmtBirthday)}
