@@ -852,43 +852,207 @@
 
     const remaining = clean.slice();
 
+    const applicationType = takeFirst(remaining, (l) => l === 'application type');
+    const paymentMethod = takeFirst(remaining, (l) => l === 'payment method');
     const purpose = takeFirst(remaining, (l) => l === 'purpose' || l.includes('purpose'));
-    const lastName = takeFirst(remaining, (l) => l.includes('last name'));
-    const firstName = takeFirst(remaining, (l) => l.includes('first name'));
-    const middleName = takeFirst(remaining, (l) => l.includes('middle name'));
 
-    const contactNumber = takeFirst(
+    const ownerLastName = takeFirst(remaining, (l) =>
+      l === 'owner last name' || l.includes('owner last name') || l === 'applicant last name' || l.includes('applicant last name')
+    ) || takeFirst(remaining, (l) => l.includes('last name'));
+    const ownerFirstName = takeFirst(remaining, (l) =>
+      l === 'owner first name' || l.includes('owner first name') || l === 'applicant first name' || l.includes('applicant first name')
+    ) || takeFirst(remaining, (l) => l.includes('first name'));
+    const ownerMiddleName = takeFirst(remaining, (l) =>
+      l === 'owner middle name' || l.includes('owner middle name') || l === 'applicant middle name' || l.includes('applicant middle name')
+    ) || takeFirst(remaining, (l) => l.includes('middle name'));
+    const ownerPhone = takeFirst(
+      remaining,
+      (l) =>
+        l === 'owner phone'
+        || l.includes('owner phone')
+        || l.includes('owner contact number')
+        || l === 'applicant phone'
+        || l.includes('applicant phone')
+        || l.includes('applicant contact number')
+    ) || takeFirst(
       remaining,
       (l) => l.includes('contact number') || l.includes('mobile number') || l.includes('phone number')
     );
-    const fullAddress = takeFirst(remaining, (l) => l === 'address' || l.includes('full address'));
+    const ownerFullAddress = takeFirst(
+      remaining,
+      (l) =>
+        l === 'owner full address'
+        || l.includes('owner full address')
+        || l === 'applicant full address'
+        || l.includes('applicant full address')
+    ) || takeFirst(remaining, (l) => l === 'address' || l.includes('full address'));
 
-    const ownershipType = takeFirst(remaining, (l) => l.includes('ownership type'));
     const proofAddressType = takeFirst(remaining, (l) => l.includes('proof') && l.includes('address') && l.includes('type'));
     const proofAddressNumber = takeFirst(
       remaining,
       (l) => l.includes('proof') && l.includes('address') && (l.includes('number') || l.includes('no') || l.includes('#'))
     );
 
+    const businessName = takeFirst(remaining, (l) => l === 'business name');
+    const businessContactNumber = takeFirst(
+      remaining,
+      (l) => l === 'business contact number' || l === 'business contact num' || l === 'business phone'
+    );
+    const businessAddressSystem = takeFirst(remaining, (l) => l === 'business address system' || l === 'business add system');
+    const businessStreetNumber = takeFirst(remaining, (l) => l === 'business street number' || l === 'business street num');
+    const businessStreetName = takeFirst(remaining, (l) => l === 'business street name');
+    const businessSubdivision = takeFirst(remaining, (l) => l === 'business subdivision' || l === 'subdivision');
+    const businessBarangay = takeFirst(remaining, (l) => l === 'business barangay');
+    const businessCity = takeFirst(remaining, (l) => l === 'business city');
+    const businessProvince = takeFirst(remaining, (l) => l === 'business province');
+    const businessFullAddress = takeFirst(remaining, (l) => l === 'business full address');
+    const initialOperationDate = takeFirst(remaining, (l) => l === 'initial operation date');
+    const owner = takeFirst(remaining, (l) => l === 'owner');
+    const businessRegistrationType = takeFirst(remaining, (l) => l === 'business registration type');
+    const birthplace = takeFirst(remaining, (l) => l === 'birthplace' || l === 'place of birth');
+    const prevLastName = takeFirst(remaining, (l) => l === 'prev last name' || l === 'previous last name');
+    const prevFirstName = takeFirst(remaining, (l) => l === 'prev first name' || l === 'previous first name');
+    const prevMiddleName = takeFirst(remaining, (l) => l === 'prev middle name' || l === 'previous middle name');
+    const prevSuffix = takeFirst(remaining, (l) => l === 'prev suffix' || l === 'previous suffix');
+    const prevFullName = takeFirst(remaining, (l) => l === 'prev full name' || l === 'previous full name');
+    const prevBusinessApprovalType = takeFirst(
+      remaining,
+      (l) => l === 'prev business approval type' || l === 'previous business approval type'
+    );
+    const prevPlateNum = takeFirst(remaining, (l) => l === 'prev plate num' || l === 'previous plate num');
+
+    const lotAddressSystem = takeFirst(remaining, (l) => l === 'lot address system');
+    const lotStreetNumber = takeFirst(remaining, (l) => l === 'lot street number');
+    const lotStreetName = takeFirst(remaining, (l) => l === 'lot street name');
+    const lotSubdivision = takeFirst(remaining, (l) => l === 'lot subdivision' || l === 'subdivision');
+    const lotBarangay = takeFirst(remaining, (l) => l === 'lot barangay');
+    const lotCity = takeFirst(remaining, (l) => l === 'lot city');
+    const lotProvince = takeFirst(remaining, (l) => l === 'lot province');
+    const location = takeFirst(remaining, (l) => l === 'location');
+    const projectLocation = takeFirst(remaining, (l) => l === 'project location');
+    const lotFullAddress = takeFirst(remaining, (l) => l === 'lot full address');
+
+    const franchisee = takeFirst(remaining, (l) => l === 'franchisee');
+    const plateNumber = takeFirst(remaining, (l) => l === 'plate number' || l === 'plate no.' || l === 'plate no');
+    const bodyNumber = takeFirst(remaining, (l) => l === 'body number' || l === 'body no.' || l === 'body no');
+    const chassisNumber = takeFirst(remaining, (l) => l === 'chassis number' || l === 'chassis no.' || l === 'chassis no');
+    const motorNumber = takeFirst(remaining, (l) => l === 'motor number' || l === 'motor no.' || l === 'motor no');
+    const orNumber = takeFirst(remaining, (l) => l === 'or number' || l === 'or no.' || l === 'or no');
+    const crNumber = takeFirst(remaining, (l) => l === 'cr number' || l === 'cr no.' || l === 'cr no');
+    const vehicleMake = takeFirst(remaining, (l) => l === 'vehicle make');
+    const vehicleNamedToOwner = takeFirst(remaining, (l) => l === 'vehicle named to owner');
+    const vehicleFranchise = takeFirst(remaining, (l) => l === 'vehicle franchise');
+
     const blocks = [];
+    const hasBusinessSpecificLayout = !!(
+      businessName
+      || businessContactNumber
+      || businessAddressSystem
+      || businessStreetNumber
+      || businessStreetName
+      || businessBarangay
+      || businessCity
+      || businessProvince
+      || businessFullAddress
+      || initialOperationDate
+      || businessRegistrationType
+      || prevBusinessApprovalType
+      || prevPlateNum
+    );
+    const hasTricycleSpecificLayout = !!(
+      franchisee
+      || plateNumber
+      || bodyNumber
+      || chassisNumber
+      || motorNumber
+      || orNumber
+      || crNumber
+      || vehicleMake
+      || vehicleNamedToOwner
+      || vehicleFranchise
+    );
+    const hasGeneralPermitLayout = !!(
+      lotAddressSystem
+      || lotStreetNumber
+      || lotStreetName
+      || lotBarangay
+      || lotCity
+      || lotProvince
+      || location
+      || projectLocation
+      || lotFullAddress
+      || proofAddressType
+      || proofAddressNumber
+    );
 
-    if (purpose) {
-      blocks.push(renderFieldGrid([{ ...purpose, wide: true }], 1));
-    }
+    if (hasBusinessSpecificLayout) {
+      const assembledPrevFullName = firstNonEmpty([
+        prevFullName?.value,
+        [prevLastName?.value, prevFirstName?.value, prevMiddleName?.value, prevSuffix?.value].filter(Boolean).join(' ').trim()
+      ]);
+      const businessRows = [
+        renderFieldGrid([{ ...applicationType, wide: true }].filter(Boolean), 1),
+        renderFieldGrid([{ ...purpose, wide: true }].filter(Boolean), 1),
+        renderFieldGrid([ownerLastName, ownerFirstName, ownerMiddleName, ownerPhone].filter(Boolean), 4),
+        renderFieldGrid([businessName, businessContactNumber].filter(Boolean), 2),
+        renderFieldGrid([{ ...businessAddressSystem, wide: true }].filter(Boolean), 1),
+        renderFieldGrid([businessStreetNumber, businessStreetName, businessSubdivision].filter(Boolean), 3),
+        renderFieldGrid([businessBarangay, businessCity, businessProvince].filter(Boolean), 3),
+        renderFieldGrid([{ ...businessFullAddress, wide: true }].filter(Boolean), 1),
+        renderFieldGrid([{ ...initialOperationDate, wide: true }].filter(Boolean), 1),
+        renderFieldGrid([owner, businessRegistrationType].filter(Boolean), 2),
+        renderFieldGrid([{ ...birthplace, wide: true }].filter(Boolean), 1),
+        renderFieldGrid([
+          assembledPrevFullName ? { label: 'Prev Full Name', value: assembledPrevFullName } : null,
+          prevBusinessApprovalType,
+          prevPlateNum
+        ].filter(Boolean), 3)
+      ];
+      blocks.push(...businessRows.filter(Boolean));
+    } else if (hasTricycleSpecificLayout) {
+      const tricycleRows = [
+        renderFieldGrid([{ ...applicationType, wide: true }].filter(Boolean), 1),
+        renderFieldGrid([{ ...franchisee, wide: true }].filter(Boolean), 1),
+        renderFieldGrid([plateNumber, bodyNumber].filter(Boolean), 2),
+        renderFieldGrid([chassisNumber, motorNumber].filter(Boolean), 2),
+        renderFieldGrid([orNumber, crNumber].filter(Boolean), 2),
+        renderFieldGrid([vehicleMake, vehicleNamedToOwner].filter(Boolean), 2),
+        renderFieldGrid([{ ...vehicleFranchise, wide: true }].filter(Boolean), 1)
+      ];
+      blocks.push(...tricycleRows.filter(Boolean));
+    } else if (hasGeneralPermitLayout) {
+      const permitRows = [
+        renderFieldGrid([{ ...purpose, wide: true }].filter(Boolean), 1),
+        renderFieldGrid([ownerLastName, ownerFirstName, ownerMiddleName, ownerPhone].filter(Boolean), 4),
+        renderFieldGrid([{ ...ownerFullAddress, wide: true }].filter(Boolean), 1),
+        renderFieldGrid([proofAddressType, proofAddressNumber].filter(Boolean), 2),
+        renderFieldGrid([{ ...lotAddressSystem, wide: true }].filter(Boolean), 1),
+        renderFieldGrid([lotStreetNumber, lotStreetName].filter(Boolean), 2),
+        renderFieldGrid([lotBarangay, lotCity, lotProvince].filter(Boolean), 3),
+        renderFieldGrid([{ ...location, wide: true }].filter(Boolean), 1),
+        renderFieldGrid([{ ...projectLocation, wide: true }].filter(Boolean), 1),
+        renderFieldGrid([{ ...lotFullAddress, wide: true }].filter(Boolean), 1)
+      ];
+      blocks.push(...permitRows.filter(Boolean));
+    } else {
+      if (purpose) {
+        blocks.push(renderFieldGrid([{ ...purpose, wide: true }], 1));
+      }
 
-    const nameRow = [lastName, firstName, middleName].filter(Boolean);
-    if (nameRow.length) {
-      blocks.push(renderFieldGrid(nameRow, 3));
-    }
+      const nameRow = [ownerLastName, ownerFirstName, ownerMiddleName].filter(Boolean);
+      if (nameRow.length) {
+        blocks.push(renderFieldGrid(nameRow, 3));
+      }
 
-    const contactRow = [contactNumber, fullAddress].filter(Boolean);
-    if (contactRow.length) {
-      blocks.push(renderFieldGrid(contactRow, 2));
-    }
+      const contactRow = [ownerPhone, ownerFullAddress].filter(Boolean);
+      if (contactRow.length) {
+        blocks.push(renderFieldGrid(contactRow, 2));
+      }
 
-    const ownershipRow = [ownershipType, proofAddressType, proofAddressNumber].filter(Boolean);
-    if (ownershipRow.length) {
-      blocks.push(renderFieldGrid(ownershipRow, 3));
+      const fallbackRow = [proofAddressType, proofAddressNumber].filter(Boolean);
+      if (fallbackRow.length) {
+        blocks.push(renderFieldGrid(fallbackRow, 2));
+      }
     }
 
     if (remaining.length) {
@@ -3897,7 +4061,7 @@
             : '';
           html += formSection('Personal Information', personalHtml, personalAction);
         }
-        const reqGrid = renderFieldGrid(requestFields, 3);
+        const reqGrid = renderRequestDetailsGrid(requestFields);
         if (reqGrid) {
           html += formSection('Request Details', reqGrid);
         }
