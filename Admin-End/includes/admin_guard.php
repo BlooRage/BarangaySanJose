@@ -34,7 +34,7 @@ if (in_array($roleNorm, ['official', 'personnel'], true) && isset($conn) && $con
             $stmt->close();
             $inviteStatus = strtolower(trim((string)($row['status'] ?? '')));
             if ($inviteStatus !== 'completed') {
-                header('Location: ' . appUrl('/Guest-End/official_onboarding.php'));
+                header('Location: ' . appUrl('/official-onboarding'));
                 exit;
             }
         }

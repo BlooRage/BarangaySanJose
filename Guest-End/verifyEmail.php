@@ -1,6 +1,7 @@
 <?php
 // Guest-End/verifyEmail.php
 require_once __DIR__ . "/../PhpFiles/General/connection.php";
+require_once __DIR__ . "/../PhpFiles/General/security.php";
 
 $uid   = $_GET['uid'] ?? '';
 $token = $_GET['token'] ?? '';
@@ -60,7 +61,7 @@ try {
   $conn->commit();
 
   echo "✅ Email verified successfully: " . htmlspecialchars($email);
-  echo "<br><br><a href='../Guest-End/login.php'>Go to Login</a>";
+  echo '<br><br><a href="' . htmlspecialchars(appUrl('/login'), ENT_QUOTES, 'UTF-8') . '">Go to Login</a>';
 
 } catch (Exception $e) {
   $conn->rollback();

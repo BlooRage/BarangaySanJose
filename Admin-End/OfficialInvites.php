@@ -197,7 +197,7 @@ function send_invite_email(array $invite, string $rawToken): bool {
     $smtpConfig = require __DIR__ . "/../PhpFiles/General/mailConfigurations.php";
     $sender = new EmailSender($smtpConfig);
     $baseUrl = oi_app_base_url();
-    $link = $baseUrl . "/Guest-End/official_onboarding.php?invite=" . urlencode($rawToken);
+    $link = appBaseUrl() . appUrl('/official-onboarding?invite=' . urlencode($rawToken));
     $fullName = trim(
         (string)($invite['firstname'] ?? '')
         . ' '

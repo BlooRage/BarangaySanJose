@@ -332,7 +332,7 @@ if ($residentId !== '' && isset($conn) && $conn instanceof mysqli) {
         <i class="fa-solid fa-circle-user"></i> Account
       </a>
       <a class="btn btn-danger btn-sm w-100 logout-link"
-         href="<?= htmlspecialchars($baseUrl, ENT_QUOTES, 'UTF-8') ?>/PhpFiles/Login/logout.php"
+         href="<?= htmlspecialchars($baseUrl, ENT_QUOTES, 'UTF-8') ?>/logout"
          data-logout-message="Are you sure you want to logout?">
         <i class="bi bi-box-arrow-right me-1"></i> Logout
       </a>

@@ -6,6 +6,9 @@
 
 require_once __DIR__ . "/../PhpFiles/General/security.php";
 
+$appRoot = appRootPath();
+$guestBaseHref = ($appRoot === '' ? '' : $appRoot) . '/Guest-End/';
+
 // Prevent redirect loops when a stale session has user_id but missing role.
 if (!empty($_SESSION['user_id']) && !empty($_SESSION['role'])) {
   header("Location: ../PhpFiles/Login/unifiedProfileCheck.php");
@@ -19,6 +22,7 @@ if (!empty($_SESSION['user_id']) && empty($_SESSION['role'])) {
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
+    <base href="<?= htmlspecialchars($guestBaseHref, ENT_QUOTES, 'UTF-8') ?>">
     
   <link rel="icon" href="../Images/favicon_sanjose.png?v=20260211">
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -42,7 +46,7 @@ if (!empty($_SESSION['user_id']) && empty($_SESSION['role'])) {
   <body>
     <div class="navbarWrapper">    <nav class="navbar navbar-expand-xl align-items-center navbar-light bg-white shadow-sm">
       <div class="container-fluid align-items-center px-4">
-        <a id="navbarBrand" class="navbar-brand" href="#">
+        <a id="navbarBrand" class="navbar-brand" href="<?= htmlspecialchars(appUrl('/'), ENT_QUOTES, 'UTF-8') ?>">
           <img src="../Images/San_Jose_LOGO.jpg" alt="Logo" id="navbarLogo" class="d-inline-block align-text-center" />
           Barangay San Jose
         </a>
@@ -51,13 +55,13 @@ if (!empty($_SESSION['user_id']) && empty($_SESSION['role'])) {
         </button>
         <div class="collapse navbar-collapse" id="navbarNav">
           <ul id="navbarLinks" class="navbar-nav ms-auto">
-            <li class="nav-item mx-lg-3"><a class="nav-link" href="../index.html">Home</a></li>
-            <li class="nav-item mx-lg-3"><a class="nav-link" href="government.html">Government</a></li>
-            <li class="nav-item mx-lg-3"><a class="nav-link" href="services.html">Services</a></li>
-            <li class="nav-item mx-lg-3"><a class="nav-link" href="news.html">News</a></li>
-            <li class="nav-item mx-lg-3"><a class="nav-link" href="faq.html">FAQ</a></li>
-            <li class="nav-item mx-lg-3"><a class="nav-link" href="contact.html">Contact</a></li>
-        <li class="nav-item"><a class="nav-link active" aria-current="page" href="login.php">Login</a></li>
+            <li class="nav-item mx-lg-3"><a class="nav-link" href="<?= htmlspecialchars(appUrl('/'), ENT_QUOTES, 'UTF-8') ?>">Home</a></li>
+            <li class="nav-item mx-lg-3"><a class="nav-link" href="<?= htmlspecialchars(appUrl('/government'), ENT_QUOTES, 'UTF-8') ?>">Government</a></li>
+            <li class="nav-item mx-lg-3"><a class="nav-link" href="<?= htmlspecialchars(appUrl('/services'), ENT_QUOTES, 'UTF-8') ?>">Services</a></li>
+            <li class="nav-item mx-lg-3"><a class="nav-link" href="<?= htmlspecialchars(appUrl('/news'), ENT_QUOTES, 'UTF-8') ?>">News</a></li>
+            <li class="nav-item mx-lg-3"><a class="nav-link" href="<?= htmlspecialchars(appUrl('/faq'), ENT_QUOTES, 'UTF-8') ?>">FAQ</a></li>
+            <li class="nav-item mx-lg-3"><a class="nav-link" href="<?= htmlspecialchars(appUrl('/contact'), ENT_QUOTES, 'UTF-8') ?>">Contact</a></li>
+        <li class="nav-item"><a class="nav-link active" aria-current="page" href="<?= htmlspecialchars(appUrl('/login'), ENT_QUOTES, 'UTF-8') ?>">Login</a></li>
           </ul>
         </div>
       </div>
@@ -91,7 +95,10 @@ if (!empty($_SESSION['user_id']) && empty($_SESSION['role'])) {
 
             <div id="loginFormErrors" class="text-danger" style="font-size: 0.9rem; margin-bottom: 10px"></div>
 
-            <button type="submit" class="btn btn-primary w-100 mb-2">Login</button>
+            <button type="submit" class="btn btn-primary w-100 mb-2 d-inline-flex align-items-center justify-content-center gap-2" id="loginSubmitBtn">
+              <span class="spinner-border spinner-border-sm d-none" id="loginSubmitSpinner" aria-hidden="true"></span>
+              <span id="loginSubmitLabel">Login</span>
+            </button>
 
             <p class="mt-3 text-center">
               Don't have an account?

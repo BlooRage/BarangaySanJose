@@ -968,9 +968,7 @@ function dra_public_base_url(): string {
 function dra_qr_verify_url(string $requestId, string $verificationCode): string {
     $vc = $verificationCode !== '' ? $verificationCode : $requestId;
     return rtrim(dra_public_base_url(), '/')
-        . '/Guest-End/TransactionInformation.html?request_id='
-        . rawurlencode($requestId)
-        . '&vc=' . rawurlencode($vc);
+        . appUrl('/transaction-information?request_id=' . rawurlencode($requestId) . '&vc=' . rawurlencode($vc));
 }
 
 function dra_humanize_document_type(string $docType): string {

@@ -29,7 +29,7 @@ if (in_array($role, ['Official', 'Officials', 'Personnel', 'Personnels', 'SuperA
         $invite = $stmtInvite->get_result()->fetch_assoc();
         $stmtInvite->close();
         if ($invite) {
-            header('Location: ' . appUrl('/Guest-End/official_onboarding.php'));
+            header('Location: ' . appUrl('/official-onboarding'));
             exit;
         }
     }
@@ -69,7 +69,7 @@ switch ($role) {
         $stmt->close();
 
         if (!$profileData && in_array($role, ['Official', 'Officials', 'Personnel', 'Personnels', 'SuperAdmin', 'Admin', 'Employee'], true)) {
-            header('Location: ' . appUrl('/Guest-End/official_onboarding.php'));
+            header('Location: ' . appUrl('/official-onboarding'));
             exit;
         }
 
@@ -94,7 +94,7 @@ switch ($role) {
                 $stmtApproval->close();
                 $inviteStatus = strtolower(trim((string)($approvalRow['status'] ?? '')));
                 if ($inviteStatus !== 'completed') {
-                    header('Location: ' . appUrl('/Guest-End/official_onboarding.php'));
+                    header('Location: ' . appUrl('/official-onboarding'));
                     exit;
                 }
             }

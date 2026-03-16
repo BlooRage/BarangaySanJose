@@ -27,6 +27,9 @@ const forgotLink = document.getElementById("forgotPasswordLink");
 
 const loginUserField = document.getElementById("userAccount");
 const loginPasswordField = document.getElementById("loginPassword");
+const loginSubmitBtn = document.getElementById("loginSubmitBtn");
+const loginSubmitSpinner = document.getElementById("loginSubmitSpinner");
+const loginSubmitLabel = document.getElementById("loginSubmitLabel");
 
 // ===== Error Containers =====
 const signupErrors = document.getElementById("signupFormErrors");
@@ -211,6 +214,17 @@ const showError = (message, formType = "signup", field = null, clearBothPassword
         confirmPasswordInput.value = "";
       }
     }
+  }
+};
+
+const setLoginButtonLoading = (isLoading) => {
+  if (!loginSubmitBtn) return;
+  loginSubmitBtn.disabled = !!isLoading;
+  if (loginSubmitSpinner) {
+    loginSubmitSpinner.classList.toggle("d-none", !isLoading);
+  }
+  if (loginSubmitLabel) {
+    loginSubmitLabel.textContent = isLoading ? "Logging in..." : "Login";
   }
 };
 
@@ -1111,6 +1125,7 @@ if (loginForm) {
   loginForm.addEventListener("submit", async (e) => {
     e.preventDefault();
     resetErrors("login");
+    setLoginButtonLoading(false);
 
     const username = (loginUserField?.value || "").trim();
     const password = (loginPasswordField?.value || "").trim();
@@ -1123,6 +1138,8 @@ if (loginForm) {
     }
 
     try {
+      setLoginButtonLoading(true);
+
       const formData = new FormData();
       formData.append("user", username);
       formData.append("loginPassword", password);
@@ -1166,6 +1183,8 @@ if (loginForm) {
       window.location.href = data.redirect;
     } catch (err) {
       showError("Unable to login. Please try again later.", "login");
+    } finally {
+      setLoginButtonLoading(false);
     }
   });
 }

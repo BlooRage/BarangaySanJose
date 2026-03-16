@@ -11,6 +11,9 @@ require_once __DIR__ . "/../PhpFiles/General/sendSMS.php";
 require_once __DIR__ . "/../PhpFiles/EmailHandlers/emailSender.php";
 require_once __DIR__ . "/../PhpFiles/General/mailConfigurations.php";
 
+$appRoot = appRootPath();
+$guestBaseHref = ($appRoot === '' ? '' : $appRoot) . '/Guest-End/';
+
 oi_ensure_invite_table($conn);
 
 $errors = [];
@@ -1013,6 +1016,7 @@ if ($mode === 'password') {
 <html lang="en">
 <head>
     <meta charset="UTF-8">
+    <base href="<?= htmlspecialchars($guestBaseHref, ENT_QUOTES, 'UTF-8') ?>">
     <link rel="icon" href="../Images/favicon_sanjose.png?v=20260211">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Official Account Onboarding</title>
@@ -1263,7 +1267,7 @@ if ($mode === 'password') {
                         </li>
                     <?php else: ?>
                         <li class="nav-item">
-                            <a class="nav-link" href="<?= htmlspecialchars(appUrl('/Guest-End/login.php')) ?>">Login</a>
+                            <a class="nav-link" href="<?= htmlspecialchars(appUrl('/login')) ?>">Login</a>
                         </li>
                     <?php endif; ?>
                 </ul>
@@ -1571,7 +1575,7 @@ if ($mode === 'password') {
                     Your onboarding is complete and your profile is now waiting for SuperAdmin approval.
                 </div>
                 <p class="text-muted mb-3">You can logout and login later. Access will be enabled after approval.</p>
-                <a href="../PhpFiles/Login/logout.php" class="btn btn-outline-secondary">Logout</a>
+                <a href="<?= htmlspecialchars(appUrl('/logout'), ENT_QUOTES, 'UTF-8') ?>" class="btn btn-outline-secondary">Logout</a>
             <?php else: ?>
                 <div class="alert alert-danger mb-0">
                     Invite link is invalid or already used. If you already saved your password, login using your account to resume onboarding.

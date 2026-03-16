@@ -85,7 +85,7 @@ require_once __DIR__ . "/includes/resident_access_guard.php";
 
         <div class="collapse navbar-collapse" id="navbarNav">
           <ul id="navbarLinks" class="navbar-nav ms-auto">
-            <li class="nav-item"><a class="nav-link logout-link" href="<?= htmlspecialchars($baseUrl) ?>/PhpFiles/Login/logout.php" data-logout-message="Are you sure you want to logout? Changes won't be saved.">Logout</a></li>
+            <li class="nav-item"><a class="nav-link logout-link" href="<?= htmlspecialchars($baseUrl) ?>/logout" data-logout-message="Are you sure you want to logout? Changes won't be saved.">Logout</a></li>
           </ul>
         </div>
 

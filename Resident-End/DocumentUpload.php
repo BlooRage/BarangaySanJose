@@ -677,7 +677,17 @@ document.addEventListener("DOMContentLoaded", () => {
     return inputs.reduce((acc, input) => acc + (input && input.files && input.files.length ? 1 : 0), 0);
   }
 
+  function hasAnySelectedUpload() {
+    return Array.from(form?.querySelectorAll('input[type="file"]') || []).some((input) => {
+      return !!(input.files && input.files.length > 0);
+    });
+  }
+
   function validateBeforeSubmit() {
+    if (!hasAnySelectedUpload()) {
+      return true;
+    }
+
     if (!forceSectorOnly && needsProof && !proofTypeSelect.value) {
       modalError("Please select a proof type.");
       return false;

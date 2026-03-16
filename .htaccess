@@ -1,4 +1,5 @@
 Options -Indexes
+Options -MultiViews
 
 <IfModule mod_rewrite.c>
 RewriteEngine On
@@ -16,4 +17,51 @@ RewriteRule "(^|/)\.DS_Store$" - [F,L,NC]
 RewriteRule "(^|/)DATABASE QUERIES\.txt$" - [F,L,NC]
 RewriteRule "(^|/)composer-email-handler/(composer\.(json|lock)|vendor/)" - [F,L,NC]
 RewriteRule "(^|/).*\.(sql|bak|old|orig|ini|log|env)$" - [F,L,NC]
+
+# Keep legacy extensionless public paths working too.
+RewriteRule ^index/?$ index.html [L,NC]
+RewriteRule ^Guest-End/login/?$ Guest-End/login.php [L,NC]
+RewriteRule ^Guest-End/government/?$ Guest-End/government.html [L,NC]
+RewriteRule ^Guest-End/services/?$ Guest-End/services.html [L,NC]
+RewriteRule ^Guest-End/news/?$ Guest-End/news.html [L,NC]
+RewriteRule ^Guest-End/faq/?$ Guest-End/faq.html [L,NC]
+RewriteRule ^Guest-End/contact/?$ Guest-End/contact.html [L,NC]
+RewriteRule ^Guest-End/TransactionInformation/?$ Guest-End/TransactionInformation.html [L,NC]
+RewriteRule ^Guest-End/official_onboarding/?$ Guest-End/official_onboarding.php [L,NC]
+RewriteRule ^Guest-End/verifyEmail/?$ Guest-End/verifyEmail.php [L,NC]
+
+# Friendly public routes
+RewriteRule ^$ index.html [L]
+RewriteRule ^home/?$ index.html [L,NC]
+RewriteRule ^privacy/?$ privacy.html [L,NC]
+RewriteRule ^login/?$ Guest-End/login.php [L,NC]
+RewriteRule ^government/?$ Guest-End/government.html [L,NC]
+RewriteRule ^services/?$ Guest-End/services.html [L,NC]
+RewriteRule ^news/?$ Guest-End/news.html [L,NC]
+RewriteRule ^faq/?$ Guest-End/faq.html [L,NC]
+RewriteRule ^contact/?$ Guest-End/contact.html [L,NC]
+RewriteRule ^transaction-information/?$ Guest-End/TransactionInformation.html [L,NC]
+RewriteRule ^official-onboarding/?$ Guest-End/official_onboarding.php [L,NC]
+RewriteRule ^verify-email/?$ Guest-End/verifyEmail.php [L,NC]
+RewriteRule ^logout/?$ PhpFiles/Login/logout.php [L,NC]
+
+# Public page URLs: redirect GET/HEAD requests from *.php / *.html to extensionless paths.
+# Keep PhpFiles endpoints untouched so POST actions and AJAX routes continue to work normally.
+RewriteCond %{REQUEST_METHOD} ^(?:GET|HEAD)$ [NC]
+RewriteCond %{REQUEST_URI} !/PhpFiles/ [NC]
+RewriteCond %{THE_REQUEST} \s/+([^\s?]+?)\.(?:php|html)(?:\?|\s) [NC]
+RewriteRule ^ /%1 [R=302,L,NE]
+
+# Resolve extensionless public page URLs back to their real PHP/HTML files.
+RewriteCond %{REQUEST_URI} !/PhpFiles/ [NC]
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteCond %{REQUEST_FILENAME}.php -f
+RewriteRule ^(.+?)/?$ $1.php [L]
+
+RewriteCond %{REQUEST_URI} !/PhpFiles/ [NC]
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteCond %{REQUEST_FILENAME}.html -f
+RewriteRule ^(.+?)/?$ $1.html [L]
 </IfModule>

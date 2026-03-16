@@ -247,6 +247,7 @@ function dr_save_upload(array $file, string $folder, ?array $allowedExtensions =
     return ['path' => '/UnifiedFileAttachment/' . trim($folder, '/') . '/' . $name, 'error' => null];
 }
 
+
 function dr_ensure_pdf_tools(): bool {
     static $ready = null;
     if ($ready !== null) {

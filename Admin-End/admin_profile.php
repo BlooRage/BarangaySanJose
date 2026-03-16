@@ -223,12 +223,12 @@ if ($userId !== '') {
 }
 
 if (!$account) {
-    header('Location: ../Guest-End/login.php');
+    header('Location: ' . appUrl('/login'));
     exit;
 }
 
 if (!$profile) {
-    header('Location: ../Guest-End/official_onboarding.php');
+    header('Location: ' . appUrl('/official-onboarding'));
     exit;
 }
 
@@ -256,8 +256,9 @@ if ($stmtAvatar) {
     if ($avatar && !empty($avatar['file_path'])) {
         $path = str_replace("\\", "/", trim((string)$avatar['file_path']));
         $path = ltrim($path, "/");
-        if (stripos($path, "BarangaySanJose/") === 0) {
-            $path = substr($path, strlen("BarangaySanJose/"));
+        $rootPrefix = trim(appRootPath(), '/');
+        if ($rootPrefix !== '' && stripos($path, $rootPrefix . '/') === 0) {
+            $path = substr($path, strlen($rootPrefix) + 1);
         }
         if ($path !== '') {
             $profileImageUrl = "../" . $path;

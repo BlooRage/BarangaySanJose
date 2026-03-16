@@ -127,13 +127,181 @@ function ra_status_meta(string $type, string $statusName, array $row = []): arra
     return ['label' => $label, 'pill' => 'pending'];
 }
 
+function ra_summary_family(string $transactionType): ?string
+{
+    $type = strtoupper(trim($transactionType));
+    if ($type === 'DOCUMENT_REQUEST') {
+        return 'Document Requests';
+    }
+    if (in_array($type, ['EDIT_REQUEST_PROFILE', 'EDIT_REQUEST_ADDRESS', 'EDIT_REQUEST_EMERGENCY'], true)) {
+        return 'Edit Requests';
+    }
+    if (in_array($type, ['SECTOR_MEMBERSHIP', 'SECTOR_MEMBERSHIP_VERIFICATION'], true)) {
+        return 'Sector Membership';
+    }
+    if (in_array($type, ['RESIDENT_PROFILING', 'PROOF_OF_RESIDENCY'], true)) {
+        return 'Resident Profiling';
+    }
+    return null;
+}
+
+function ra_stage_key(?array $metadata): string
+{
+    if (!is_array($metadata)) {
+        return '';
+    }
+    return strtolower(trim((string)($metadata['stage'] ?? '')));
+}
+
+function ra_status_key(string $value): string
+{
+    return strtolower(preg_replace('/[\s_-]+/', '', trim($value)));
+}
+
+function ra_is_resident_attention_needed(string $transactionType, string $statusName, ?array $metadata = null): bool
+{
+    $family = ra_summary_family($transactionType);
+    if ($family === null) {
+        return false;
+    }
+
+    $stage = ra_stage_key($metadata);
+    if ($family === 'Document Requests') {
+        return in_array($stage, ['for_payment', 'payment_rejected', 'ready_for_claim', 'for_interview', 'for_inspection'], true);
+    }
+
+    $statusKey = ra_status_key($statusName);
+    return in_array($statusKey, ['rejected', 'denied', 'notverified'], true);
+}
+
+function ra_is_active_transaction(string $transactionType, string $statusName, ?array $metadata = null): bool
+{
+    $family = ra_summary_family($transactionType);
+    if ($family === null) {
+        return false;
+    }
+
+    $stage = ra_stage_key($metadata);
+    if ($family === 'Document Requests') {
+        return !in_array($stage, ['completed', 'cancelled', 'rejected', 'interview_failed', 'inspection_failed'], true);
+    }
+
+    $statusKey = ra_status_key($statusName);
+    return !in_array($statusKey, ['approved', 'verified', 'completed', 'done', 'rejected', 'denied', 'notverified', 'cancelled'], true);
+}
+
+function ra_resident_transaction_status(string $transactionType, string $statusName, ?array $metadata = null): array
+{
+    $family = ra_summary_family($transactionType);
+    if ($family === 'Document Requests' && is_array($metadata)) {
+        $stageLabel = trim((string)($metadata['stage_label'] ?? ''));
+        $stage = ra_stage_key($metadata);
+        $pill = 'pending';
+        if (in_array($stage, ['completed'], true)) {
+            $pill = 'approved';
+        } elseif (in_array($stage, ['cancelled', 'rejected', 'interview_failed', 'inspection_failed'], true)) {
+            $pill = 'archived';
+        } elseif (in_array($stage, ['ready_for_claim', 'payment_verified'], true)) {
+            $pill = 'info';
+        }
+        return [
+            'label' => $stageLabel !== '' ? $stageLabel : (trim($statusName) !== '' ? trim($statusName) : 'Submitted'),
+            'pill' => $pill,
+        ];
+    }
+
+    return ra_status_meta('transaction', $statusName, []);
+}
+
 $residentUserId = (string)($_SESSION['user_id'] ?? '');
 $complaints = [];
 $appointments = [];
 $allActivities = [];
+$summaryActivities = [];
+$summaryTotalActivities = 0;
+$summaryNeedsAttention = 0;
+$summaryActiveTransactions = 0;
+$summaryTrackedServices = 0;
 $loadNotices = [];
 
 if ($residentUserId !== '' && isset($conn) && $conn instanceof mysqli) {
+    if (ra_table_exists($conn, 'residenttransactiontbl')) {
+        $summarySql = "
+            SELECT
+                t.transaction_id,
+                t.transaction_type,
+                t.title,
+                t.details,
+                COALESCE(s.status_name, CONCAT('Status #', t.status_id)) AS status_name,
+                t.metadata_json,
+                t.created_at,
+                t.updated_at,
+                t.reviewed_at
+            FROM residenttransactiontbl t
+            LEFT JOIN statuslookuptbl s ON s.status_id = t.status_id
+            WHERE (t.resident_user_id = ? OR t.user_id = ?)
+            ORDER BY COALESCE(t.updated_at, t.reviewed_at, t.created_at) DESC, t.transaction_id DESC
+        ";
+        $stmtSummary = $conn->prepare($summarySql);
+        if ($stmtSummary) {
+            $stmtSummary->bind_param('ss', $residentUserId, $residentUserId);
+            $stmtSummary->execute();
+            $resultSummary = $stmtSummary->get_result();
+            $trackedServices = [];
+
+            while ($row = $resultSummary->fetch_assoc()) {
+                $transactionType = (string)($row['transaction_type'] ?? '');
+                $family = ra_summary_family($transactionType);
+                if ($family === null) {
+                    continue;
+                }
+
+                $metadata = null;
+                $metadataJson = trim((string)($row['metadata_json'] ?? ''));
+                if ($metadataJson !== '') {
+                    $decoded = json_decode($metadataJson, true);
+                    if (is_array($decoded)) {
+                        $metadata = $decoded;
+                    }
+                }
+
+                $statusMeta = ra_resident_transaction_status($transactionType, (string)($row['status_name'] ?? ''), $metadata);
+                $timestamp = trim((string)($row['updated_at'] ?? ''));
+                if ($timestamp === '') {
+                    $timestamp = trim((string)($row['reviewed_at'] ?? ''));
+                }
+                if ($timestamp === '') {
+                    $timestamp = trim((string)($row['created_at'] ?? ''));
+                }
+
+                $summaryActivities[] = [
+                    'type' => $family,
+                    'reference_id' => (string)($row['transaction_id'] ?? ''),
+                    'title' => (string)($row['title'] ?? $family),
+                    'status_label' => $statusMeta['label'],
+                    'status_pill' => $statusMeta['pill'],
+                    'timestamp' => $timestamp,
+                    'timestamp_display' => ra_format_datetime($timestamp),
+                    'description' => trim((string)($row['details'] ?? '')),
+                ];
+
+                $summaryTotalActivities++;
+                if (ra_is_resident_attention_needed($transactionType, (string)($row['status_name'] ?? ''), $metadata)) {
+                    $summaryNeedsAttention++;
+                }
+                if (ra_is_active_transaction($transactionType, (string)($row['status_name'] ?? ''), $metadata)) {
+                    $summaryActiveTransactions++;
+                }
+                $trackedServices[$family] = true;
+            }
+
+            $summaryTrackedServices = count($trackedServices);
+            $stmtSummary->close();
+        } else {
+            $loadNotices[] = 'Transaction summary could not be loaded right now.';
+        }
+    }
+
     if (
         ra_table_exists($conn, 'casereportstbl') &&
         ra_table_exists($conn, 'complaintstbl') &&
@@ -295,7 +463,11 @@ foreach ($allActivities as $activity) {
     }
 }
 
-$recentActivity = array_slice($allActivities, 0, 6);
+usort($summaryActivities, static function (array $a, array $b): int {
+    return strcmp((string)($b['timestamp'] ?? ''), (string)($a['timestamp'] ?? ''));
+});
+
+$recentActivity = array_slice(!empty($summaryActivities) ? $summaryActivities : $allActivities, 0, 6);
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -346,7 +518,7 @@ $recentActivity = array_slice($allActivities, 0, 6);
 
         .summary-grid {
             display: grid;
-            grid-template-columns: repeat(3, minmax(0, 1fr));
+            grid-template-columns: repeat(4, minmax(0, 1fr));
             gap: 1rem;
             margin-top: 1rem;
         }
@@ -539,18 +711,23 @@ $recentActivity = array_slice($allActivities, 0, 6);
                 <div class="summary-grid">
                     <article class="summary-card">
                         <div class="summary-label">Total Activities</div>
-                        <div class="summary-value"><?= count($allActivities) ?></div>
-                        <div class="summary-subtext">Combined complaint and appointment records.</div>
+                        <div class="summary-value"><?= $summaryTotalActivities ?></div>
+                        <div class="summary-subtext">All resident requests from documents, edits, sector membership, and profiling.</div>
                     </article>
                     <article class="summary-card">
                         <div class="summary-label">Needs Attention</div>
-                        <div class="summary-value"><?= $pendingCount ?></div>
-                        <div class="summary-subtext">Pending or recently rescheduled items.</div>
+                        <div class="summary-value"><?= $summaryNeedsAttention ?></div>
+                        <div class="summary-subtext">Transactions waiting for resident action like payment, claim, interview, inspection, or resubmission.</div>
+                    </article>
+                    <article class="summary-card">
+                        <div class="summary-label">Active Transactions</div>
+                        <div class="summary-value"><?= $summaryActiveTransactions ?></div>
+                        <div class="summary-subtext">Requests that are still open and moving through the workflow.</div>
                     </article>
                     <article class="summary-card">
                         <div class="summary-label">Tracked Services</div>
-                        <div class="summary-value"><?= count($complaints) + count($appointments) > 0 ? 2 : 0 ?></div>
-                        <div class="summary-subtext">Complaints and appointments only.</div>
+                        <div class="summary-value"><?= $summaryTrackedServices ?></div>
+                        <div class="summary-subtext">Distinct resident service groups currently tracked in your transaction history.</div>
                     </article>
                 </div>
 
@@ -560,10 +737,10 @@ $recentActivity = array_slice($allActivities, 0, 6);
 
                 <section class="section-card">
                     <h2 class="section-heading">Recent Activity</h2>
-                    <p class="muted-copy mb-0">Your latest submissions appear here first.</p>
+                    <p class="muted-copy mb-0">Your latest resident transactions and service submissions appear here first.</p>
 
                     <?php if (empty($recentActivity)): ?>
-                        <div class="empty-state">No activity records found yet. Once you submit a complaint or an appointment, it will appear here.</div>
+                        <div class="empty-state">No activity records found yet. Once you submit a resident request, it will appear here.</div>
                     <?php else: ?>
                         <div class="activity-feed">
                             <?php foreach ($recentActivity as $item): ?>

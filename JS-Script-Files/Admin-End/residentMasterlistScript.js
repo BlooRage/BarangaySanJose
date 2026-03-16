@@ -315,7 +315,7 @@ document.addEventListener("DOMContentLoaded", () => {
           const message = data?.message || `Failed to load residents (HTTP ${res.status}).`;
           // Most common: session expired or role mismatch, so force re-login.
           if (res.status === 401 || res.status === 403) {
-            window.location.href = "../Guest-End/login.php";
+            window.location.href = "../login";
             return [];
           }
           throw new Error(message);
@@ -325,7 +325,7 @@ document.addEventListener("DOMContentLoaded", () => {
           const message = data?.message || "Unexpected response while loading residents.";
           // If we got redirected to HTML (e.g., login page), treat as auth failure.
           if (!isJson) {
-            window.location.href = "../Guest-End/login.php";
+            window.location.href = "../login";
             return [];
           }
           throw new Error(message);

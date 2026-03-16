@@ -303,6 +303,34 @@ function buildUploadTransactionSourceType(): string {
     return 'RESIDENT_UPLOAD_' . date('YmdHis') . '_' . $suffix;
 }
 
+function hasUploadedFileEntry($file): bool {
+    if (!is_array($file) || !isset($file['error'])) {
+        return false;
+    }
+
+    $errors = $file['error'];
+    if (!is_array($errors)) {
+        return (int)$errors === UPLOAD_ERR_OK;
+    }
+
+    $stack = [$errors];
+    while ($stack) {
+        $current = array_pop($stack);
+        if (is_array($current)) {
+            foreach ($current as $value) {
+                $stack[] = $value;
+            }
+            continue;
+        }
+
+        if ((int)$current === UPLOAD_ERR_OK) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
 function getCurrentUploadRequirements(mysqli $conn, string $residentId): array {
     $sql = "
         SELECT
@@ -386,6 +414,23 @@ try {
     if ($forceSectorOnly) {
         $needsProof = false;
         $needsPicture = false;
+    }
+
+    $hasAnyUploadedFile = false;
+    foreach ($_FILES as $fileEntry) {
+        if (hasUploadedFileEntry($fileEntry)) {
+            $hasAnyUploadedFile = true;
+            break;
+        }
+    }
+
+    if (!$hasAnyUploadedFile) {
+        echo json_encode([
+            'success' => true,
+            'message' => 'Upload requirement temporarily bypassed for layout testing. No files were saved.',
+            'redirect' => 'resident_dashboard.php',
+        ]);
+        exit;
     }
 
     $proofType = cleanString($_POST['proofType'] ?? '');

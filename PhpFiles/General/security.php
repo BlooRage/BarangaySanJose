@@ -76,7 +76,36 @@ function appRootPath(): string
 function appUrl(string $path): string
 {
     $p = '/' . ltrim($path, '/');
-    return appRootPath() . $p;
+    if (!preg_match('/^([^?#]*)(.*)$/', $p, $matches)) {
+        return appRootPath() . $p;
+    }
+
+    $pathOnly = $matches[1];
+    $suffix = $matches[2];
+
+    if (stripos($pathOnly, '/PhpFiles/') !== 0) {
+        $pathOnly = preg_replace('/\.(php|html)$/i', '', $pathOnly);
+    }
+
+    $publicAliases = [
+        '/index' => '/',
+        '/PhpFiles/Login/logout.php' => '/logout',
+        '/Guest-End/login' => '/login',
+        '/Guest-End/government' => '/government',
+        '/Guest-End/services' => '/services',
+        '/Guest-End/news' => '/news',
+        '/Guest-End/faq' => '/faq',
+        '/Guest-End/contact' => '/contact',
+        '/Guest-End/TransactionInformation' => '/transaction-information',
+        '/Guest-End/official_onboarding' => '/official-onboarding',
+        '/Guest-End/verifyEmail' => '/verify-email',
+    ];
+
+    if (isset($publicAliases[$pathOnly])) {
+        $pathOnly = $publicAliases[$pathOnly];
+    }
+
+    return appRootPath() . $pathOnly . $suffix;
 }
 
 function appBaseUrl(): string
@@ -143,7 +172,7 @@ function redirectToLogin(string $queryString = ''): void
     if ($qs !== '' && $qs[0] !== '?') {
         $qs = '?' . ltrim($qs, '?');
     }
-    header('Location: ' . appUrl('/Guest-End/login.php') . $qs);
+    header('Location: ' . appUrl('/login') . $qs);
     exit;
 }
 
