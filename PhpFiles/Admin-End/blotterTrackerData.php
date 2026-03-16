@@ -83,6 +83,40 @@ function getCurrentBlotterStatusName(mysqli $conn, string $caseId): string {
     return trim((string)($row['status_name'] ?? ''));
 }
 
+function loadCaseSignatures(mysqli $conn, string $caseId): array {
+    if (!tableExists($conn, 'casesignaturestbl')) {
+        return [];
+    }
+
+    $stmt = $conn->prepare("
+        SELECT signature_role, file_path, mime_type, captured_at
+        FROM casesignaturestbl
+        WHERE case_id = ?
+        ORDER BY signature_id ASC
+    ");
+    if (!$stmt) {
+        return [];
+    }
+    $stmt->bind_param("s", $caseId);
+    $stmt->execute();
+    $res = $stmt->get_result();
+    $items = [];
+    while ($row = $res->fetch_assoc()) {
+        $role = trim((string)($row['signature_role'] ?? ''));
+        if ($role === '') {
+            continue;
+        }
+        $items[$role] = [
+            'file_path' => $row['file_path'] ?? '',
+            'mime_type' => $row['mime_type'] ?? 'image/png',
+            'captured_at' => $row['captured_at'] ?? ''
+        ];
+    }
+    $stmt->close();
+
+    return $items;
+}
+
 if ($action === 'list') {
     $sql = "
         SELECT
@@ -251,6 +285,7 @@ if ($action === 'detail') {
         'complaint_type' => $detail['complaint_type'],
         'narrative_type' => $narrativeType,
         'narrative_value' => $narrativeValue,
+        'signatures' => loadCaseSignatures($conn, $caseId),
         'complainant' => $participants['Complainant'] ?? [],
         'respondent' => $participants['Respondent'] ?? []
     ];

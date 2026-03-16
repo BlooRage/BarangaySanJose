@@ -6,6 +6,7 @@ require_once "../General/security.php";
 require_once "../General/uniqueIDGenerate.php";
 
 requireRoleSession(['SuperAdmin', 'Official', 'Officials', 'Personnel', 'Personnels', 'Admin', 'Employee']);
+verifyCsrfToken(false);
 
 function str_field($value): ?string {
     $value = trim((string)$value);
@@ -36,6 +37,94 @@ function getStatusId(mysqli $conn, string $name, string $type): int {
         throw new Exception("Status not found: {$name} ({$type})");
     }
     return (int)$res['status_id'];
+}
+
+function tableExists(mysqli $conn, string $tableName): bool {
+    $stmt = $conn->prepare("
+        SELECT 1
+        FROM information_schema.TABLES
+        WHERE TABLE_SCHEMA = DATABASE()
+          AND TABLE_NAME = ?
+        LIMIT 1
+    ");
+    if (!$stmt) {
+        return false;
+    }
+    $stmt->bind_param("s", $tableName);
+    $stmt->execute();
+    $row = $stmt->get_result()->fetch_row();
+    $stmt->close();
+    return !empty($row);
+}
+
+function parseSignatureDataUrl(?string $value): ?string {
+    $value = trim((string)$value);
+    if ($value === '') {
+        return null;
+    }
+
+    if (!preg_match('/^data:image\/png;base64,([A-Za-z0-9+\/=\r\n]+)$/', $value, $matches)) {
+        http_response_code(400);
+        exit("Invalid signature format.");
+    }
+
+    $binary = base64_decode($matches[1], true);
+    if ($binary === false || $binary === '') {
+        http_response_code(400);
+        exit("Invalid signature data.");
+    }
+
+    if (!str_starts_with($binary, "\x89PNG\r\n\x1a\n")) {
+        http_response_code(400);
+        exit("Signature must be a PNG image.");
+    }
+
+    return $binary;
+}
+
+function saveSignatureFile(string $caseId, string $role, string $binary): string {
+    $uploadRoot = realpath(__DIR__ . "/../..");
+    if ($uploadRoot === false) {
+        $uploadRoot = __DIR__ . "/../..";
+    }
+
+    $roleSlug = strtolower(preg_replace('/[^a-z0-9]+/i', '_', $role) ?? $role);
+    $uploadDir = rtrim($uploadRoot, "/\\") . "/UnifiedFileAttachment/CaseSignatures/" . $caseId;
+    if (!is_dir($uploadDir) && !@mkdir($uploadDir, 0755, true) && !is_dir($uploadDir)) {
+        throw new Exception("Failed to create signature directory.");
+    }
+
+    $filename = $roleSlug . "_" . date('Ymd_His') . "_" . bin2hex(random_bytes(4)) . ".png";
+    $destPath = $uploadDir . "/" . $filename;
+    if (file_put_contents($destPath, $binary) === false) {
+        throw new Exception("Failed to save {$role} signature.");
+    }
+
+    return "UnifiedFileAttachment/CaseSignatures/{$caseId}/{$filename}";
+}
+
+function upsertCaseSignature(mysqli $conn, string $caseId, string $role, string $filePath, ?string $capturedByUserId): void {
+    $stmt = $conn->prepare("
+        INSERT INTO casesignaturestbl
+            (case_id, signature_role, file_path, mime_type, captured_by_user_id)
+        VALUES
+            (?, ?, ?, 'image/png', ?)
+        ON DUPLICATE KEY UPDATE
+            file_path = VALUES(file_path),
+            mime_type = VALUES(mime_type),
+            captured_by_user_id = VALUES(captured_by_user_id),
+            updated_at = CURRENT_TIMESTAMP()
+    ");
+    if (!$stmt) {
+        throw new Exception("Prepare failed (signature upsert): " . $conn->error);
+    }
+    $stmt->bind_param("ssss", $caseId, $role, $filePath, $capturedByUserId);
+    if (!$stmt->execute()) {
+        $error = $stmt->error ?: $conn->error;
+        $stmt->close();
+        throw new Exception("Failed to save {$role} signature record: " . $error);
+    }
+    $stmt->close();
 }
 
 function validateIncidentDateTime(string $incidentDate, string $incidentTime): void {
@@ -85,6 +174,8 @@ $complaintTypeOther = str_field($_POST['complaint_type_other'] ?? '');
 $complaintType = $complaintTypeSelected === 'Other' ? $complaintTypeOther : $complaintTypeSelected;
 $narrativeMethod = str_field($_POST['narrative_input_method'] ?? 'text');
 $narrativeText = str_field($_POST['narrative_report'] ?? '');
+$complainantSignatureBinary = null;
+$respondentSignatureBinary = null;
 
 if (!$blotterNumber || !$dateFiled || !$timeFiled || !$complainantLast || !$complainantFirst || !$respondentLast || !$respondentFirst || !$incidentDate || !$incidentTime || !$incidentPlace || !$complaintType) {
     http_response_code(400);
@@ -96,6 +187,19 @@ validateIncidentDateTime($incidentDate, $incidentTime);
 if ($narrativeMethod === 'text' && !$narrativeText) {
     http_response_code(400);
     exit("Narrative report is required.");
+}
+
+if ($narrativeMethod === 'text') {
+    if (!tableExists($conn, 'casesignaturestbl')) {
+        http_response_code(500);
+        exit("Signature table is not available. Run the signature migration first.");
+    }
+    $complainantSignatureBinary = parseSignatureDataUrl($_POST['complainant_signature'] ?? '');
+    $respondentSignatureBinary = parseSignatureDataUrl($_POST['respondent_signature'] ?? '');
+    if ($complainantSignatureBinary === null || $respondentSignatureBinary === null) {
+        http_response_code(400);
+        exit("Complainant and respondent signatures are required for typed narratives.");
+    }
 }
 
 $complainantAddress = buildAddress([
@@ -174,6 +278,7 @@ if ($narrativeMethod === 'file') {
 }
 
 $actorUserId = isset($_SESSION['user_id']) ? (string)$_SESSION['user_id'] : null;
+$savedSignaturePaths = [];
 
 $conn->begin_transaction();
 try {
@@ -277,6 +382,18 @@ try {
     }
     $stmtParticipant->close();
 
+    if ($complainantSignatureBinary !== null) {
+        $complainantSignaturePath = saveSignatureFile($caseId, 'Complainant', $complainantSignatureBinary);
+        $savedSignaturePaths[] = $complainantSignaturePath;
+        upsertCaseSignature($conn, $caseId, 'Complainant', $complainantSignaturePath, $actorUserId);
+    }
+
+    if ($respondentSignatureBinary !== null) {
+        $respondentSignaturePath = saveSignatureFile($caseId, 'Respondent', $respondentSignatureBinary);
+        $savedSignaturePaths[] = $respondentSignaturePath;
+        upsertCaseSignature($conn, $caseId, 'Respondent', $respondentSignaturePath, $actorUserId);
+    }
+
     $conn->commit();
 
     $redirectBase = dirname($_SERVER['SCRIPT_NAME']);
@@ -285,6 +402,16 @@ try {
     exit;
 } catch (Exception $e) {
     $conn->rollback();
+    foreach ($savedSignaturePaths as $relativePath) {
+        $absolutePath = realpath(__DIR__ . "/../..");
+        if ($absolutePath === false) {
+            $absolutePath = __DIR__ . "/../..";
+        }
+        $target = rtrim($absolutePath, "/\\") . "/" . ltrim(str_replace("\\", "/", $relativePath), "/");
+        if (is_file($target)) {
+            @unlink($target);
+        }
+    }
     if (isset($stmtCase) && $stmtCase instanceof mysqli_stmt) $stmtCase->close();
     if (isset($stmtBlotter) && $stmtBlotter instanceof mysqli_stmt) $stmtBlotter->close();
     if (isset($stmtParticipant) && $stmtParticipant instanceof mysqli_stmt) $stmtParticipant->close();

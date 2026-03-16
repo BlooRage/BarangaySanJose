@@ -495,6 +495,19 @@
     return '';
   }
 
+  function normalizeDisplayCasing(value) {
+    const text = String(value ?? '').trim();
+    if (!text) return text;
+    if (!/[a-z]/i.test(text)) return text;
+    if (/@|:\/\//.test(text)) return text;
+
+    const lettersOnly = text.replace(/[^a-z]/gi, '');
+    if (!lettersOnly) return text;
+    if (lettersOnly !== lettersOnly.toLowerCase()) return text;
+
+    return text.toLowerCase().replace(/\b([a-z])/g, (match) => match.toUpperCase());
+  }
+
   function looksLikeOfficialId(value) {
     const s = String(value || '').trim();
     if (!s) return false;
@@ -775,7 +788,7 @@
     `;
   }
 
-  function formField(label, value, raw = false) {
+  function formField(label, value, raw = false, wide = false) {
     const text = String(value ?? '').trim();
     const rendered = raw ? (text || '-') : esc(text || '-');
     return `
@@ -823,7 +836,230 @@
     const clean = visibleFields(fields);
     if (!clean.length) return '';
     const cls = gridClassByCount(clean.length, maxCols);
-    return `<div class="tracker-form-grid ${cls}">${clean.map((f) => formField(f.label, f.value, !!f.raw)).join('')}</div>`;
+    return `<div class="tracker-form-grid ${cls}">${clean.map((f) => formField(f.label, f.value, !!f.raw, !!f.wide)).join('')}</div>`;
+  }
+
+  function renderRequestDetailsGrid(fields) {
+    const clean = visibleFields(fields);
+    if (!clean.length) return '';
+
+    const normalizeLabel = (label) => String(label || '').toLowerCase().replace(/\s+/g, ' ').trim();
+    const takeFirst = (arr, predicate) => {
+      const idx = arr.findIndex((f) => f && predicate(normalizeLabel(f.label)));
+      if (idx === -1) return null;
+      return arr.splice(idx, 1)[0];
+    };
+
+    const remaining = clean.slice();
+
+    const applicationType = takeFirst(remaining, (l) => l === 'application type');
+    const paymentMethod = takeFirst(remaining, (l) => l === 'payment method');
+    const purpose = takeFirst(remaining, (l) => l === 'purpose' || l.includes('purpose'));
+
+    const ownerLastName = takeFirst(remaining, (l) =>
+      l === 'owner last name' || l.includes('owner last name') || l === 'applicant last name' || l.includes('applicant last name')
+    ) || takeFirst(remaining, (l) => l.includes('last name'));
+    const ownerFirstName = takeFirst(remaining, (l) =>
+      l === 'owner first name' || l.includes('owner first name') || l === 'applicant first name' || l.includes('applicant first name')
+    ) || takeFirst(remaining, (l) => l.includes('first name'));
+    const ownerMiddleName = takeFirst(remaining, (l) =>
+      l === 'owner middle name' || l.includes('owner middle name') || l === 'applicant middle name' || l.includes('applicant middle name')
+    ) || takeFirst(remaining, (l) => l.includes('middle name'));
+    const ownerPhone = takeFirst(
+      remaining,
+      (l) =>
+        l === 'owner phone'
+        || l.includes('owner phone')
+        || l.includes('owner contact number')
+        || l === 'applicant phone'
+        || l.includes('applicant phone')
+        || l.includes('applicant contact number')
+    ) || takeFirst(
+      remaining,
+      (l) => l.includes('contact number') || l.includes('mobile number') || l.includes('phone number')
+    );
+    const ownerFullAddress = takeFirst(
+      remaining,
+      (l) =>
+        l === 'owner full address'
+        || l.includes('owner full address')
+        || l === 'applicant full address'
+        || l.includes('applicant full address')
+    ) || takeFirst(remaining, (l) => l === 'address' || l.includes('full address'));
+
+    const proofAddressType = takeFirst(remaining, (l) => l.includes('proof') && l.includes('address') && l.includes('type'));
+    const proofAddressNumber = takeFirst(
+      remaining,
+      (l) => l.includes('proof') && l.includes('address') && (l.includes('number') || l.includes('no') || l.includes('#'))
+    );
+
+    const businessName = takeFirst(remaining, (l) => l === 'business name');
+    const businessContactNumber = takeFirst(
+      remaining,
+      (l) => l === 'business contact number' || l === 'business contact num' || l === 'business phone'
+    );
+    const businessAddressSystem = takeFirst(remaining, (l) => l === 'business address system' || l === 'business add system');
+    const businessStreetNumber = takeFirst(remaining, (l) => l === 'business street number' || l === 'business street num');
+    const businessStreetName = takeFirst(remaining, (l) => l === 'business street name');
+    const businessSubdivision = takeFirst(remaining, (l) => l === 'business subdivision' || l === 'subdivision');
+    const businessBarangay = takeFirst(remaining, (l) => l === 'business barangay');
+    const businessCity = takeFirst(remaining, (l) => l === 'business city');
+    const businessProvince = takeFirst(remaining, (l) => l === 'business province');
+    const businessFullAddress = takeFirst(remaining, (l) => l === 'business full address');
+    const initialOperationDate = takeFirst(remaining, (l) => l === 'initial operation date');
+    const owner = takeFirst(remaining, (l) => l === 'owner');
+    const businessRegistrationType = takeFirst(remaining, (l) => l === 'business registration type');
+    const birthplace = takeFirst(remaining, (l) => l === 'birthplace' || l === 'place of birth');
+    const prevLastName = takeFirst(remaining, (l) => l === 'prev last name' || l === 'previous last name');
+    const prevFirstName = takeFirst(remaining, (l) => l === 'prev first name' || l === 'previous first name');
+    const prevMiddleName = takeFirst(remaining, (l) => l === 'prev middle name' || l === 'previous middle name');
+    const prevSuffix = takeFirst(remaining, (l) => l === 'prev suffix' || l === 'previous suffix');
+    const prevFullName = takeFirst(remaining, (l) => l === 'prev full name' || l === 'previous full name');
+    const prevBusinessApprovalType = takeFirst(
+      remaining,
+      (l) => l === 'prev business approval type' || l === 'previous business approval type'
+    );
+    const prevPlateNum = takeFirst(remaining, (l) => l === 'prev plate num' || l === 'previous plate num');
+
+    const lotAddressSystem = takeFirst(remaining, (l) => l === 'lot address system');
+    const lotStreetNumber = takeFirst(remaining, (l) => l === 'lot street number');
+    const lotStreetName = takeFirst(remaining, (l) => l === 'lot street name');
+    const lotSubdivision = takeFirst(remaining, (l) => l === 'lot subdivision' || l === 'subdivision');
+    const lotBarangay = takeFirst(remaining, (l) => l === 'lot barangay');
+    const lotCity = takeFirst(remaining, (l) => l === 'lot city');
+    const lotProvince = takeFirst(remaining, (l) => l === 'lot province');
+    const location = takeFirst(remaining, (l) => l === 'location');
+    const projectLocation = takeFirst(remaining, (l) => l === 'project location');
+    const lotFullAddress = takeFirst(remaining, (l) => l === 'lot full address');
+
+    const franchisee = takeFirst(remaining, (l) => l === 'franchisee');
+    const plateNumber = takeFirst(remaining, (l) => l === 'plate number' || l === 'plate no.' || l === 'plate no');
+    const bodyNumber = takeFirst(remaining, (l) => l === 'body number' || l === 'body no.' || l === 'body no');
+    const chassisNumber = takeFirst(remaining, (l) => l === 'chassis number' || l === 'chassis no.' || l === 'chassis no');
+    const motorNumber = takeFirst(remaining, (l) => l === 'motor number' || l === 'motor no.' || l === 'motor no');
+    const orNumber = takeFirst(remaining, (l) => l === 'or number' || l === 'or no.' || l === 'or no');
+    const crNumber = takeFirst(remaining, (l) => l === 'cr number' || l === 'cr no.' || l === 'cr no');
+    const vehicleMake = takeFirst(remaining, (l) => l === 'vehicle make');
+    const vehicleNamedToOwner = takeFirst(remaining, (l) => l === 'vehicle named to owner');
+    const vehicleFranchise = takeFirst(remaining, (l) => l === 'vehicle franchise');
+
+    const blocks = [];
+    const hasBusinessSpecificLayout = !!(
+      businessName
+      || businessContactNumber
+      || businessAddressSystem
+      || businessStreetNumber
+      || businessStreetName
+      || businessBarangay
+      || businessCity
+      || businessProvince
+      || businessFullAddress
+      || initialOperationDate
+      || businessRegistrationType
+      || prevBusinessApprovalType
+      || prevPlateNum
+    );
+    const hasTricycleSpecificLayout = !!(
+      franchisee
+      || plateNumber
+      || bodyNumber
+      || chassisNumber
+      || motorNumber
+      || orNumber
+      || crNumber
+      || vehicleMake
+      || vehicleNamedToOwner
+      || vehicleFranchise
+    );
+    const hasGeneralPermitLayout = !!(
+      lotAddressSystem
+      || lotStreetNumber
+      || lotStreetName
+      || lotBarangay
+      || lotCity
+      || lotProvince
+      || location
+      || projectLocation
+      || lotFullAddress
+      || proofAddressType
+      || proofAddressNumber
+    );
+
+    if (hasBusinessSpecificLayout) {
+      const assembledPrevFullName = firstNonEmpty([
+        prevFullName?.value,
+        [prevLastName?.value, prevFirstName?.value, prevMiddleName?.value, prevSuffix?.value].filter(Boolean).join(' ').trim()
+      ]);
+      const businessRows = [
+        renderFieldGrid([{ ...applicationType, wide: true }].filter(Boolean), 1),
+        renderFieldGrid([{ ...purpose, wide: true }].filter(Boolean), 1),
+        renderFieldGrid([ownerLastName, ownerFirstName, ownerMiddleName, ownerPhone].filter(Boolean), 4),
+        renderFieldGrid([businessName, businessContactNumber].filter(Boolean), 2),
+        renderFieldGrid([{ ...businessAddressSystem, wide: true }].filter(Boolean), 1),
+        renderFieldGrid([businessStreetNumber, businessStreetName, businessSubdivision].filter(Boolean), 3),
+        renderFieldGrid([businessBarangay, businessCity, businessProvince].filter(Boolean), 3),
+        renderFieldGrid([{ ...businessFullAddress, wide: true }].filter(Boolean), 1),
+        renderFieldGrid([{ ...initialOperationDate, wide: true }].filter(Boolean), 1),
+        renderFieldGrid([owner, businessRegistrationType].filter(Boolean), 2),
+        renderFieldGrid([{ ...birthplace, wide: true }].filter(Boolean), 1),
+        renderFieldGrid([
+          assembledPrevFullName ? { label: 'Prev Full Name', value: assembledPrevFullName } : null,
+          prevBusinessApprovalType,
+          prevPlateNum
+        ].filter(Boolean), 3)
+      ];
+      blocks.push(...businessRows.filter(Boolean));
+    } else if (hasTricycleSpecificLayout) {
+      const tricycleRows = [
+        renderFieldGrid([{ ...applicationType, wide: true }].filter(Boolean), 1),
+        renderFieldGrid([{ ...franchisee, wide: true }].filter(Boolean), 1),
+        renderFieldGrid([plateNumber, bodyNumber].filter(Boolean), 2),
+        renderFieldGrid([chassisNumber, motorNumber].filter(Boolean), 2),
+        renderFieldGrid([orNumber, crNumber].filter(Boolean), 2),
+        renderFieldGrid([vehicleMake, vehicleNamedToOwner].filter(Boolean), 2),
+        renderFieldGrid([{ ...vehicleFranchise, wide: true }].filter(Boolean), 1)
+      ];
+      blocks.push(...tricycleRows.filter(Boolean));
+    } else if (hasGeneralPermitLayout) {
+      const permitRows = [
+        renderFieldGrid(purpose ? [{ ...purpose, wide: true }] : [], 1),
+        renderFieldGrid([ownerLastName, ownerFirstName, ownerMiddleName].filter(Boolean), 3),
+        renderFieldGrid([ownerPhone, ownerFullAddress].filter(Boolean), 2),
+        renderFieldGrid([proofAddressType, proofAddressNumber].filter(Boolean), 2),
+        renderFieldGrid(lotAddressSystem ? [{ ...lotAddressSystem, wide: true }] : [], 1),
+        renderFieldGrid([lotStreetNumber, lotStreetName].filter(Boolean), 2),
+        renderFieldGrid([lotBarangay, lotCity, lotProvince].filter(Boolean), 3),
+        renderFieldGrid(location ? [{ ...location, wide: true }] : [], 1),
+        renderFieldGrid(projectLocation ? [{ ...projectLocation, wide: true }] : [], 1),
+        renderFieldGrid(lotFullAddress ? [{ ...lotFullAddress, wide: true }] : [], 1)
+      ];
+      blocks.push(...permitRows.filter(Boolean));
+    } else {
+      if (purpose) {
+        blocks.push(renderFieldGrid([{ ...purpose, wide: true }], 1));
+      }
+
+      const nameRow = [ownerLastName, ownerFirstName, ownerMiddleName].filter(Boolean);
+      if (nameRow.length) {
+        blocks.push(renderFieldGrid(nameRow, 3));
+      }
+
+      const contactRow = [ownerPhone, ownerFullAddress].filter(Boolean);
+      if (contactRow.length) {
+        blocks.push(renderFieldGrid(contactRow, 2));
+      }
+
+      const fallbackRow = [proofAddressType, proofAddressNumber].filter(Boolean);
+      if (fallbackRow.length) {
+        blocks.push(renderFieldGrid(fallbackRow, 2));
+      }
+    }
+
+    if (remaining.length) {
+      blocks.push(renderFieldGrid(remaining.map((f) => ({ ...f, wide: true })), 1));
+    }
+
+    return `<div class="d-grid gap-3">${blocks.filter(Boolean).join('')}</div>`;
   }
 
   function looksLikeFilePath(key, value) {
@@ -2206,6 +2442,39 @@
       middle_name: 'Middle Name',
       suffix_name: 'Suffix',
       suffix: 'Suffix',
+      o_ln: 'Owner Last Name',
+      o_fn: 'Owner First Name',
+      o_mn: 'Owner Middle Name',
+      o_sfx: 'Owner Suffix',
+      o_phone: 'Owner Phone',
+      owner_full_address: 'Owner Full Address',
+      application_type: 'Application Type',
+      business_name: 'Business Name',
+      b_name: 'Business Name',
+      business_contact_number: 'Business Contact Num',
+      b_contact_1: 'Business Contact Num',
+      business_address_system: 'Business Add System',
+      business_street_number: 'Business Street Num',
+      business_street_name: 'Business Street Name',
+      business_subdivision: 'Subdivision',
+      business_subdivision_block: 'Subdivision',
+      business_barangay: 'Business Barangay',
+      business_city: 'Business City',
+      business_province: 'Business Province',
+      business_full_address: 'Business Full Address',
+      initial_operation_date: 'Initial Operation Date',
+      b_date: 'Initial Operation Date',
+      owner_type: 'Owner',
+      business_reg_type: 'Business Registration Type',
+      renewal_business_reg_type: 'Business Registration Type',
+      ro_ln: 'Prev Last Name',
+      ro_fn: 'Prev First Name',
+      ro_mn: 'Prev Middle Name',
+      ro_sfx: 'Prev Suffix',
+      business_approval_type: 'Prev Business Approval Type',
+      _preview_business_approval_type: 'Prev Business Approval Type',
+      business_plate_number: 'Prev Plate Num',
+      _preview_plate_number: 'Prev Plate Num',
       contact_number: 'Contact Number',
       phone_number: 'Contact Number',
       full_address: 'Full Address',
@@ -2249,14 +2518,14 @@
   function setById(id, value) {
     const el = document.getElementById(id);
     if (!el) return;
-    el.textContent = String(value ?? '—').trim() || '—';
+    el.textContent = normalizeDisplayCasing(String(value ?? '—').trim()) || '—';
   }
 
   function setAddressField(containerId, valueId, value) {
     const container = document.getElementById(containerId);
     const valueEl = document.getElementById(valueId);
     if (!container || !valueEl) return;
-    const text = String(value ?? '').trim();
+    const text = normalizeDisplayCasing(String(value ?? '').trim());
     if (text === '') {
       container.classList.add('d-none');
       valueEl.textContent = '';
@@ -2494,9 +2763,9 @@
 
   function rowHtml(row) {
     const reasonValue = firstNonEmpty([row.status_remarks, row.status_reason]);
-    const reason = reasonValue ? `<div class="text-danger small mt-1">Reason: ${esc(reasonValue)}</div>` : '';
+    const reason = reasonValue ? `<div class="text-danger small mt-1">Reason: ${esc(normalizeDisplayCasing(reasonValue))}</div>` : '';
     const fullName = fullNameFromRow(row);
-    const purpose = firstNonEmpty([row.purpose, '-']);
+    const purpose = normalizeDisplayCasing(firstNonEmpty([row.purpose, '-']));
     const statusKey = statusBucket(row);
     const financeStatusLabel = {
       verified: 'Verified',
@@ -2504,7 +2773,8 @@
       pending_verification: 'Pending Verification',
       cancelled: 'Cancelled',
       unpaid: 'Unpaid'
-    }[statusKey] || firstNonEmpty([row.payment_status_name, row.payment_status_label, row.stage_label, row.stage, '-']);
+    }[statusKey] || normalizeDisplayCasing(firstNonEmpty([row.payment_status_name, row.payment_status_label, row.stage_label, row.stage, '-']));
+    const stageLabel = normalizeDisplayCasing(row.stage_label || row.stage || '');
     return `
       <tr>
         <td class="fw-semibold">${esc(row.request_id)}</td>
@@ -2514,7 +2784,7 @@
         <td>
           <div class="cell-purpose">${esc(purpose)}</div>
         </td>
-        <td>${badge(isFinancePaymentsPage ? statusKey : row.stage, esc(isFinancePaymentsPage ? financeStatusLabel : (row.stage_label || row.stage || '')))}${reason}</td>
+        <td>${badge(isFinancePaymentsPage ? statusKey : row.stage, esc(isFinancePaymentsPage ? financeStatusLabel : stageLabel))}${reason}</td>
         <td>${esc(row.submitted_at || '-')}</td>
         <td>${actionButtons(row)}</td>
       </tr>
@@ -3791,7 +4061,7 @@
             : '';
           html += formSection('Personal Information', personalHtml, personalAction);
         }
-        const reqGrid = renderFieldGrid(requestFields, 3);
+        const reqGrid = renderRequestDetailsGrid(requestFields);
         if (reqGrid) {
           html += formSection('Request Details', reqGrid);
         }

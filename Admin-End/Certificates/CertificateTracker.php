@@ -103,9 +103,9 @@ require_once __DIR__ . '/../includes/admin_guard.php';
       line-height: 1.35;
     }
     #viewModal .modal-dialog {
-      width: min(88vw, 920px);
-      max-width: 920px;
-      height: 78vh;
+      width: 75vw;
+      max-width: 1500px;
+      height: 88vh;
     }
     #viewModal .modal-content {
       border: 0;
@@ -1990,6 +1990,6 @@ require_once __DIR__ . '/../includes/admin_guard.php';
   };
 </script>
 <script src="../../JS-Script-Files/Admin-End/tableColumnsGeneric.js?v=20260215-1"></script>
-<script src="../../JS-Script-Files/Admin-End/certificateTrackerScript.js?v=20260311-08"></script>
+<script src="../../JS-Script-Files/Admin-End/certificateTrackerScript.js?v=20260316-03"></script>
 </body>
 </html>

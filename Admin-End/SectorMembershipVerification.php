@@ -332,6 +332,6 @@ include 'includes/sidebar.php';
   };
 </script>
 <script src="../JS-Script-Files/Admin-End/tableColumnsGeneric.js?v=20260215-1"></script>
-<script src="../JS-Script-Files/Admin-End/sectorMembershipVerificationScript.js?v=20260227-1"></script>
+<script src="../JS-Script-Files/Admin-End/sectorMembershipVerificationScript.js?v=20260316-01"></script>
 </body>
 </html>

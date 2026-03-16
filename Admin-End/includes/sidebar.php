@@ -6,7 +6,7 @@ $residentMgmtPages = ['ResidentMasterlist.php', 'ResidentArchive.php', 'EditRequ
 $appointmentPages = ['AppointmentTracker.php'];
 $certPages = ['CertificateTracker.php'];
 $financePages = ['FinancePayments.php'];
-$blotterPages = ['BlotterForm.php', 'BlotterTracker.php'];
+$blotterPages = ['BlotterForm.php', 'BlotterTracker.php', 'ReviewQueue.php'];
 $complaintPages = ['ComplaintForm.php', 'ComplaintTracker.php'];
 $contentMgmtPages = ['Announcements.php', 'CreateAnnouncement.php'];
 $userMgmtPages = ['UserMasterlist.php'];
@@ -326,19 +326,25 @@ if (!empty($_SESSION['user_id']) && isset($conn) && $conn instanceof mysqli) {
         </a>
       </li>
       <li class="mb-1">
-        <button class="btn btn-toggle d-flex align-items-center gap-2 rounded <?= $current == 'BlotterTracker.php' ? '' : 'collapsed' ?>"
+        <button class="btn btn-toggle d-flex align-items-center gap-2 rounded <?= $isBlotterActive ? '' : 'collapsed' ?>"
                 data-bs-toggle="collapse"
                 data-bs-target="#blotter-tools-collapse"
-                aria-expanded="<?= $current == 'BlotterTracker.php' ? 'true' : 'false' ?>">
+                aria-expanded="<?= $isBlotterActive ? 'true' : 'false' ?>">
           <i class="fas fa-toolbox"></i> e-Blotter Tools
         </button>
 
-        <div class="collapse <?= $current == 'BlotterTracker.php' ? 'show' : '' ?>" id="blotter-tools-collapse">
+        <div class="collapse <?= $isBlotterActive ? 'show' : '' ?>" id="blotter-tools-collapse">
           <ul class="btn-toggle-nav list-unstyled fw-normal pb-1 small">
             <li>
               <a href="<?= htmlspecialchars(appUrl('Admin-End/Blotter/BlotterTracker.php')) ?>"
                  class="link-dark rounded <?= $current == 'BlotterTracker.php' ? 'active' : '' ?>">
                 Tracker
+              </a>
+            </li>
+            <li>
+              <a href="<?= htmlspecialchars(appUrl('Admin-End/Blotter/ReviewQueue.php')) ?>"
+                 class="link-dark rounded <?= $current == 'ReviewQueue.php' ? 'active' : '' ?>">
+                Review Queue
               </a>
             </li>
           </ul>

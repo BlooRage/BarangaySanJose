@@ -227,6 +227,12 @@
     gap: 4px;
 }
 
+
+
+#viewModal .tracker-form-field--full {
+    grid-column: 1 / -1;
+}
+
 #viewModal .tracker-form-label {
     margin: 6px 0 0;
     font-size: 0.76rem;
@@ -268,3 +274,4 @@
         height: calc(100vh - 185px);
     }
 }
+

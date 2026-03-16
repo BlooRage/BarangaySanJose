@@ -27,78 +27,6 @@
             white-space: nowrap;
         }
 
-        #modal-viewEntry .modal-dialog {
-            width: min(88vw, 920px);
-            max-width: 920px;
-            height: 78vh;
-        }
-
-        #modal-viewEntry .modal-content {
-            border: 0;
-            border-radius: .5rem;
-            padding: 1rem;
-            background: #ffffff;
-            overflow: hidden;
-            height: 100%;
-        }
-
-        #modal-viewEntry .modal-header {
-            border-bottom: 1px solid #e9ecef;
-            background: #ffffff;
-        }
-
-        #modal-viewEntry .modal-title {
-            font-weight: 600;
-        }
-
-        #modal-viewEntry .modal-body {
-            overflow-y: auto;
-            overflow-x: hidden;
-            min-height: 0;
-            background: #ffffff;
-            padding: 14px;
-        }
-
-        #modal-viewEntry .tracker-profile-view {
-            display: grid;
-            gap: 12px;
-        }
-
-        #modal-viewEntry .tracker-form-section {
-            border: 1px solid #e78924;
-            background: #ffffff;
-            border-radius: 12px;
-            padding: 12px;
-            margin-top: 10px;
-        }
-
-        #modal-viewEntry .tracker-form-section-title {
-            margin: 0 0 10px;
-            font-size: 1rem;
-            font-weight: 700;
-            color: #212529;
-            border-bottom: 1px dashed #e9ecef;
-            padding-bottom: 6px;
-        }
-
-        #modal-viewEntry .tracker-form-section .text-muted.small.mb-0 {
-            margin: 6px 0 0;
-            font-size: 0.76rem;
-            color: #6b7280 !important;
-            font-weight: 700;
-        }
-
-        #modal-viewEntry .tracker-form-section p.fw-bold.mb-0 {
-            min-height: 38px;
-            border: 1px solid #dbe0e6;
-            border-radius: 8px;
-            background: #f8fafc;
-            padding: 8px 10px;
-            font-size: 0.92rem;
-            color: #111827;
-            font-weight: 500;
-            word-break: break-word;
-        }
     </style>
 </head>
 
@@ -344,7 +272,7 @@ if (isset($conn) && $conn instanceof mysqli) {
 
 <!-- MODAL stays unchanged -->
 <div class="modal fade" id="modal-viewEntry" tabindex="-1" data-bs-backdrop="static" data-bs-keyboard="false">
-    <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable" id="div-modalSizing">
+    <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable" id="div-modalSizing" style="max-width: 1500px; width: 75vw;">
         <div class="modal-content border-0 rounded-2 p-4">
             <div class="modal-header border-0">
                 <h5 class="modal-title">Resident Details: <span id="span-displayID" class="text-warning"></span></h5>

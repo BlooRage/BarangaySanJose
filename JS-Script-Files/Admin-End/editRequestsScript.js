@@ -181,7 +181,7 @@ document.addEventListener("DOMContentLoaded", () => {
   const txtRequestResident = document.getElementById("txt-requestResident");
   const txtRequestResidentId = document.getElementById("txt-requestResidentId");
   const txtRequestType = document.getElementById("txt-requestType");
-  const badgeRequestStatus = document.getElementById("badge-requestStatus");
+  const txtRequestStatus = document.getElementById("txt-requestStatus");
   const txtRequestCreated = document.getElementById("txt-requestCreated");
   const txtRequestReviewed = document.getElementById("txt-requestReviewed");
   const currentDetailsEl = document.getElementById("currentDetails");
@@ -400,7 +400,7 @@ document.addEventListener("DOMContentLoaded", () => {
               spanRequestTypeHeader.textContent = req.request_type ? humanizeKey(req.request_type) : "Request";
             }
             if (txtRequestResident) txtRequestResident.textContent = req.resident_name || "—";
-            if (txtRequestResidentId) txtRequestResidentId.textContent = req.resident_id ? `Resident ID: ${req.resident_id}` : "—";
+            if (txtRequestResidentId) txtRequestResidentId.textContent = req.resident_id || "—";
             if (txtRequestType) txtRequestType.textContent = req.request_type || "—";
             if (txtRequestCreated) txtRequestCreated.textContent = formatDate(req.created_at);
             if (txtRequestReviewed) {
@@ -412,9 +412,8 @@ document.addEventListener("DOMContentLoaded", () => {
             }
 
             const statusText = statusLabel(req.status_name);
-            if (badgeRequestStatus) {
-              badgeRequestStatus.textContent = statusText;
-              badgeRequestStatus.className = `badge ${modalStatusBadgeClass(statusText)}`;
+            if (txtRequestStatus) {
+              txtRequestStatus.textContent = statusText;
             }
 
             const currentItems = [];

@@ -90,7 +90,13 @@
         }
 
         #modal-viewRequest .request-meta__grid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
             gap: 14px 12px;
+        }
+
+        #modal-viewRequest .request-meta__cell--wide {
+            grid-column: 1 / -1;
         }
 
         #modal-viewRequest .request-card {
@@ -272,10 +278,13 @@ include "includes/sidebar.php";
                 <div class="div-infoContainer request-meta tracker-form-section">
                     <h5 class="tracker-form-section-title">Request Summary</h5>
                     <div class="request-meta__grid">
-                        <div class="request-meta__cell">
+                        <div class="request-meta__cell request-meta__cell--wide">
+                            <div class="request-meta__label">Resident ID:</div>
+                            <div id="txt-requestResidentId" class="request-meta__value"></div>
+                        </div>
+                        <div class="request-meta__cell request-meta__cell--wide">
                             <div class="request-meta__label">Resident:</div>
                             <div id="txt-requestResident" class="request-meta__value"></div>
-                            <div id="txt-requestResidentId" class="request-meta__sub"></div>
                         </div>
                         <div class="request-meta__cell">
                             <div class="request-meta__label">Request Type:</div>
@@ -283,19 +292,21 @@ include "includes/sidebar.php";
                         </div>
                         <div class="request-meta__cell">
                             <div class="request-meta__label">Status:</div>
-                            <span id="badge-requestStatus" class="badge bg-warning text-white">Pending</span>
+                            <div id="txt-requestStatus" class="request-meta__value"></div>
                         </div>
-                        <div class="request-meta__cell">
-                            <div class="request-meta__label">Submitted:</div>
-                            <div id="txt-requestCreated" class="request-meta__value"></div>
-                        </div>
-                        <div class="request-meta__cell">
-                            <div class="request-meta__label">Reviewed:</div>
-                            <div id="txt-requestReviewed" class="request-meta__value"></div>
-                        </div>
-                        <div class="request-meta__cell">
-                            <div class="request-meta__label">Reviewed By:</div>
-                            <div id="txt-requestReviewedBy" class="request-meta__value"></div>
+                        <div class="request-meta__row3 request-meta__cell--wide">
+                            <div class="request-meta__cell">
+                                <div class="request-meta__label">Submitted:</div>
+                                <div id="txt-requestCreated" class="request-meta__value"></div>
+                            </div>
+                            <div class="request-meta__cell">
+                                <div class="request-meta__label">Reviewed:</div>
+                                <div id="txt-requestReviewed" class="request-meta__value"></div>
+                            </div>
+                            <div class="request-meta__cell">
+                                <div class="request-meta__label">Reviewed By:</div>
+                                <div id="txt-requestReviewedBy" class="request-meta__value"></div>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -383,6 +394,6 @@ include "includes/sidebar.php";
   };
 </script>
 <script src="../JS-Script-Files/Admin-End/tableColumnsGeneric.js?v=20260215-1"></script>
-<script src="../JS-Script-Files/Admin-End/editRequestsScript.js?v=20260227-1"></script>
+<script src="../JS-Script-Files/Admin-End/editRequestsScript.js?v=20260316-01"></script>
 </body>
 </html>

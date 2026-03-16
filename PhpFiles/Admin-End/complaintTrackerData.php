@@ -3,6 +3,7 @@ session_start();
 
 require_once "../General/connection.php";
 require_once "../General/security.php";
+require_once "../General/uniqueIDGenerate.php";
 
 requireRoleSession(['SuperAdmin', 'Official', 'Officials', 'Personnel', 'Personnels', 'Admin', 'Employee']);
 
@@ -112,8 +113,250 @@ function formatDisplayTimestamp(?string $value): string
         return $value;
     }
 }
+
+function getLatestBlotterRequest(mysqli $conn, string $caseId): ?array
+{
+    if (!tableExists($conn, 'blotterrequeststbl')) {
+        return null;
+    }
+
+    $stmt = $conn->prepare("
+        SELECT
+            br.request_id,
+            br.review_notes,
+            br.requested_at,
+            br.reviewed_at,
+            br.approved_blotter_case_id,
+            br.approved_blotter_id,
+            s.status_name AS request_status_name
+        FROM blotterrequeststbl br
+        LEFT JOIN statuslookuptbl s ON s.status_id = br.request_status_id
+        WHERE br.complaint_case_id = ?
+        LIMIT 1
+    ");
+    if (!$stmt) {
+        return null;
+    }
+    $stmt->bind_param("s", $caseId);
+    $stmt->execute();
+    $row = $stmt->get_result()->fetch_assoc();
+    $stmt->close();
+    return $row ?: null;
+}
+
+function createBlotterRequest(mysqli $conn, array $complaintRow, string $actorUserId, string $remarks): array
+{
+    if (!tableExists($conn, 'blotterrequeststbl')) {
+        throw new Exception('Missing table blotterrequeststbl. Run the blotter request migration first.');
+    }
+
+    $requestStatusId = getStatusId($conn, 'Pending', 'BlotterRequest');
+    if ($requestStatusId <= 0) {
+        throw new Exception('Blotter request pending status mapping not found in statuslookuptbl.');
+    }
+
+    $existing = getLatestBlotterRequest($conn, (string)$complaintRow['case_id']);
+    if ($existing && strtolower(trim((string)($existing['request_status_name'] ?? ''))) === 'rejected') {
+        $reopenedNotes = appendMultilineNote($existing['review_notes'] ?? '', $remarks);
+        $stmt = $conn->prepare("
+            UPDATE blotterrequeststbl
+            SET request_status_id = ?,
+                review_notes = ?,
+                recommended_by_user_id = ?,
+                reviewed_by_user_id = NULL,
+                reviewed_at = NULL,
+                approved_blotter_case_id = NULL,
+                approved_blotter_id = NULL,
+                updated_at = CURRENT_TIMESTAMP()
+            WHERE request_id = ?
+            LIMIT 1
+        ");
+        if (!$stmt) {
+            throw new Exception('Failed to prepare blotter request reopen.');
+        }
+        $stmt->bind_param("isss", $requestStatusId, $reopenedNotes, $actorUserId, $existing['request_id']);
+        $stmt->execute();
+        $stmt->close();
+
+        return [
+            'request_id' => $existing['request_id'],
+            'request_status_name' => 'Pending',
+        ];
+    }
+
+    $requestId = GenerateBlotterRequestID($conn);
+    if (!$requestId) {
+        throw new Exception('Failed to generate blotter request ID.');
+    }
+
+    $stmt = $conn->prepare("
+        INSERT INTO blotterrequeststbl
+            (request_id, complaint_case_id, complaint_id, request_status_id, review_notes, recommended_by_user_id)
+        VALUES
+            (?, ?, ?, ?, ?, ?)
+    ");
+    if (!$stmt) {
+        throw new Exception('Failed to prepare blotter request insert.');
+    }
+    $stmt->bind_param(
+        "sssiss",
+        $requestId,
+        $complaintRow['case_id'],
+        $complaintRow['complaint_id'],
+        $requestStatusId,
+        $remarks,
+        $actorUserId
+    );
+    $stmt->execute();
+    $stmt->close();
+
+    return [
+        'request_id' => $requestId,
+        'request_status_name' => 'Pending',
+    ];
+}
+
+function createBlotterFromComplaint(mysqli $conn, array $complaintRow, string $actorUserId, string $remarks): array
+{
+    $blotterStatusId = getStatusId($conn, 'Active', 'Blotter');
+    $blotterLevelId = getStatusId($conn, 'Blotter Only', 'BlotterLevel');
+    if ($blotterStatusId <= 0 || $blotterLevelId <= 0) {
+        throw new Exception('Blotter status or level mapping not found in statuslookuptbl.');
+    }
+
+    $blotterCaseId = GenerateCaseID($conn);
+    $blotterId = GenerateBlotterID($conn);
+    if (!$blotterCaseId || !$blotterId) {
+        throw new Exception('Failed to generate blotter identifiers.');
+    }
+
+    $blotterNumber = $blotterId;
+    $dateFiled = date('Y-m-d');
+    $timeFiled = date('H:i:s');
+    $residentUserId = trim((string)($complaintRow['resident_user_id'] ?? ''));
+    if ($residentUserId === '') {
+        $residentUserId = null;
+    }
+
+    $caseRemarks = trim((string)($complaintRow['case_remarks'] ?? ''));
+    $endorsementNote = 'Endorsed from complaint ' . trim((string)($complaintRow['complaint_id'] ?? $complaintRow['case_id'] ?? ''));
+    if ($remarks !== '') {
+        $endorsementNote .= '. Screening notes: ' . $remarks;
+    }
+    $caseRemarks = appendMultilineNote($caseRemarks, $endorsementNote);
+
+    $insertCaseStmt = $conn->prepare("
+        INSERT INTO casereportstbl
+            (case_id, resident_user_id, report_type, incident_date, incident_time, incident_place, complaint_type,
+             case_details, case_remarks, case_status_id, case_level_id, user_id_official_update_by, user_id_official_reviewed_by, user_id_official_record_by)
+        VALUES
+            (?, ?, 'Blotter', ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?)
+    ");
+    if (!$insertCaseStmt) {
+        throw new Exception('Failed to prepare blotter case insert.');
+    }
+    $insertCaseStmt->bind_param(
+        'ssssssssiiss',
+        $blotterCaseId,
+        $residentUserId,
+        $complaintRow['incident_date'],
+        $complaintRow['incident_time'],
+        $complaintRow['incident_place'],
+        $complaintRow['complaint_type'],
+        $complaintRow['case_details'],
+        $caseRemarks,
+        $blotterStatusId,
+        $blotterLevelId,
+        $actorUserId,
+        $actorUserId
+    );
+    $insertCaseStmt->execute();
+    $insertCaseStmt->close();
+
+    $insertBlotterStmt = $conn->prepare("
+        INSERT INTO barangayblottertbl
+            (blotter_id, case_id, blotter_number, logbook_id, date_filed, time_filed)
+        VALUES
+            (?, ?, ?, NULL, ?, ?)
+    ");
+    if (!$insertBlotterStmt) {
+        throw new Exception('Failed to prepare blotter insert.');
+    }
+    $insertBlotterStmt->bind_param('sssss', $blotterId, $blotterCaseId, $blotterNumber, $dateFiled, $timeFiled);
+    $insertBlotterStmt->execute();
+    $insertBlotterStmt->close();
+
+    $participantSelectStmt = $conn->prepare("
+        SELECT participant_role, lastname, firstname, middlename, suffix, contact_number, email, address, age, sex, remarks
+        FROM caseparticipantstbl
+        WHERE case_id = ?
+        ORDER BY participant_id ASC
+    ");
+    if (!$participantSelectStmt) {
+        throw new Exception('Failed to load complaint participants: ' . $conn->error);
+    }
+    $participantSelectStmt->bind_param('s', $complaintRow['case_id']);
+    $participantSelectStmt->execute();
+    $participantRows = $participantSelectStmt->get_result()->fetch_all(MYSQLI_ASSOC);
+    $participantSelectStmt->close();
+
+    if (!empty($participantRows)) {
+        $participantInsertStmt = $conn->prepare("
+            INSERT INTO caseparticipantstbl
+                (case_id, participant_role, lastname, firstname, middlename, suffix, contact_number, email, address, age, sex, remarks)
+            VALUES
+                (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ");
+        if (!$participantInsertStmt) {
+            throw new Exception('Failed to prepare blotter participant insert.');
+        }
+
+        foreach ($participantRows as $participantRow) {
+            $participantInsertStmt->bind_param(
+                'ssssssssssss',
+                $blotterCaseId,
+                $participantRow['participant_role'],
+                $participantRow['lastname'],
+                $participantRow['firstname'],
+                $participantRow['middlename'],
+                $participantRow['suffix'],
+                $participantRow['contact_number'],
+                $participantRow['email'],
+                $participantRow['address'],
+                $participantRow['age'],
+                $participantRow['sex'],
+                $participantRow['remarks']
+            );
+            $participantInsertStmt->execute();
+        }
+        $participantInsertStmt->close();
+    }
+
+    if (tableExists($conn, 'caseupdateslogtbl')) {
+        $blotterLogStmt = $conn->prepare("
+            INSERT INTO caseupdateslogtbl (case_id, log_entry, logged_by_user_id)
+            VALUES (?, ?, ?)
+        ");
+        if (!$blotterLogStmt) {
+            throw new Exception('Failed to prepare blotter case log.');
+        }
+        $blotterLogEntry = $endorsementNote;
+        $blotterLogStmt->bind_param('sss', $blotterCaseId, $blotterLogEntry, $actorUserId);
+        $blotterLogStmt->execute();
+        $blotterLogStmt->close();
+    }
+
+    return [
+        'case_id' => $blotterCaseId,
+        'blotter_id' => $blotterId,
+        'blotter_number' => $blotterNumber,
+    ];
+}
 if (!tableExists($conn, 'complaintstbl')) {
     respond(false, [], 'Missing table complaintstbl. Run the complaint migration first.');
+}
+if (!tableExists($conn, 'blotterrequeststbl')) {
+    respond(false, [], 'Missing table blotterrequeststbl. Run the blotter request migration first.');
 }
 
 $action = '';
@@ -137,6 +380,8 @@ if ($action === 'list') {
             ct.subject_kind,
             ct.escalated_to_blotter,
             ct.blotter_id,
+            br.request_id,
+            br.request_status_name,
             cp.firstname,
             cp.middlename,
             cp.lastname,
@@ -145,6 +390,15 @@ if ($action === 'list') {
         INNER JOIN complaintstbl ct ON ct.case_id = c.case_id
         LEFT JOIN statuslookuptbl s ON s.status_id = c.case_status_id
         LEFT JOIN statuslookuptbl l ON l.status_id = c.case_level_id
+        LEFT JOIN (
+            SELECT
+                br1.complaint_case_id,
+                br1.request_id,
+                COALESCE(s1.status_name, 'Pending') AS request_status_name
+            FROM blotterrequeststbl br1
+            LEFT JOIN statuslookuptbl s1 ON s1.status_id = br1.request_status_id
+        ) br
+            ON br.complaint_case_id = c.case_id
         LEFT JOIN (
             SELECT
                 case_id,
@@ -171,8 +425,11 @@ if ($action === 'list') {
     $items = [];
     while ($row = $res->fetch_assoc()) {
         $statusName = trim((string)($row['status_name'] ?? 'Pending'));
+        $requestStatusName = trim((string)($row['request_status_name'] ?? ''));
         $statusKey = 'pending';
         if ((int)($row['escalated_to_blotter'] ?? 0) === 1) {
+            $statusKey = 'escalated';
+        } elseif (in_array(strtolower($requestStatusName), ['pending', 'approved'], true)) {
             $statusKey = 'escalated';
         } elseif (stripos($statusName, 'resolved') !== false) {
             $statusKey = 'resolved';
@@ -194,6 +451,8 @@ if ($action === 'list') {
             'subject_kind' => $row['subject_kind'] ?? '',
             'escalated_to_blotter' => (int)($row['escalated_to_blotter'] ?? 0),
             'blotter_id' => $row['blotter_id'] ?? null,
+            'blotter_request_id' => $row['request_id'] ?? null,
+            'blotter_request_status' => $requestStatusName !== '' ? $requestStatusName : null,
             'complainant_name' => participantDisplayName($row),
         ];
     }
@@ -287,6 +546,8 @@ if ($action === 'detail') {
     }
     $stmt->close();
 
+    $requestDetail = getLatestBlotterRequest($conn, $caseId);
+
     respond(true, [
         'detail' => [
             'case_id' => (string)$detail['case_id'],
@@ -310,6 +571,11 @@ if ($action === 'detail') {
             'escalated_to_blotter' => (int)($detail['escalated_to_blotter'] ?? 0),
             'blotter_id' => $detail['blotter_id'] ?? null,
             'blotter_number' => $detail['blotter_number'] ?? null,
+            'blotter_request_id' => $requestDetail['request_id'] ?? null,
+            'blotter_request_status' => $requestDetail['request_status_name'] ?? null,
+            'blotter_request_notes' => $requestDetail['review_notes'] ?? null,
+            'blotter_request_requested_at' => isset($requestDetail['requested_at']) ? formatDisplayTimestamp($requestDetail['requested_at']) : null,
+            'blotter_request_reviewed_at' => isset($requestDetail['reviewed_at']) ? formatDisplayTimestamp($requestDetail['reviewed_at']) : null,
             'complaint_origin' => $detail['complaint_origin'] ?? '',
             'complainant' => $participants['Complainant'] ?? null,
             'respondent' => $participants['Respondent'] ?? null,
@@ -430,9 +696,16 @@ if ($action === 'update_case_outcome') {
     $oldStmt = $conn->prepare("
         SELECT
             c.case_id,
+            c.resident_user_id,
+            c.incident_date,
+            c.incident_time,
+            c.incident_place,
+            c.complaint_type,
+            c.case_details,
             s.status_name AS old_status_name,
             l.status_name AS old_level_name,
             c.case_remarks,
+            ct.complaint_id,
             ct.screening_notes,
             ct.escalated_to_blotter,
             ct.blotter_id
@@ -444,7 +717,8 @@ if ($action === 'update_case_outcome') {
         LIMIT 1
     ");
     if (!$oldStmt) {
-        respond(false, [], 'Failed to load current complaint state.');
+        error_log('Failed to prepare current complaint state query: ' . $conn->error);
+        respond(false, [], 'Failed to load current complaint state: ' . $conn->error);
     }
     $oldStmt->bind_param("s", $caseId);
     $oldStmt->execute();
@@ -456,7 +730,19 @@ if ($action === 'update_case_outcome') {
 
     $oldStatusName = trim((string)($oldRow['old_status_name'] ?? 'Pending'));
     $oldLevelName = trim((string)($oldRow['old_level_name'] ?? 'Complaint Only'));
-    if (in_array(strtolower($oldStatusName), ['resolved', 'dropped', 'endorsed'], true)) {
+    $existingBlotterId = trim((string)($oldRow['blotter_id'] ?? ''));
+    $existingRequest = getLatestBlotterRequest($conn, $caseId);
+    $existingRequestStatus = strtolower(trim((string)($existingRequest['request_status_name'] ?? '')));
+    if (in_array(strtolower($oldStatusName), ['resolved', 'dropped'], true)) {
+        respond(false, [], 'Complaint status is already finalized and cannot be changed again.');
+    }
+    if ($actionType === 'endorsement' && $existingBlotterId !== '') {
+        respond(false, [], 'Complaint is already linked to a blotter.');
+    }
+    if ($actionType === 'endorsement' && in_array($existingRequestStatus, ['pending', 'approved'], true)) {
+        respond(false, [], 'A blotter review request already exists for this complaint.');
+    }
+    if (strtolower($oldStatusName) === 'endorsed' && $existingBlotterId !== '') {
         respond(false, [], 'Complaint status is already finalized and cannot be changed again.');
     }
 
@@ -468,9 +754,8 @@ if ($action === 'update_case_outcome') {
     } elseif ($actionType === 'dropped') {
         $newStatusName = 'Dropped';
     } else {
-        $newStatusName = 'Endorsed';
         $newLevelName = 'Endorsed to Blotter';
-        $markEscalated = 1;
+        $newStatusName = $oldStatusName !== '' ? $oldStatusName : 'Pending';
     }
 
     $newStatusId = getStatusId($conn, $newStatusName, 'Complaint');
@@ -480,10 +765,18 @@ if ($action === 'update_case_outcome') {
     }
 
     $updatedScreeningNotes = appendMultilineNote($oldRow['screening_notes'] ?? '', $remarks);
+    $caseRemarksNote = "Screening notes ({$newStatusName}): {$remarks}";
+    $updatedCaseRemarks = appendMultilineNote($oldRow['case_remarks'] ?? '', $caseRemarksNote);
+    $createdRequest = null;
     $logEntry = "Complaint status updated: {$oldStatusName} -> {$newStatusName}; Complaint level: {$oldLevelName} -> {$newLevelName}; Remarks: {$remarks}";
 
     $conn->begin_transaction();
     try {
+        if ($actionType === 'endorsement') {
+            $createdRequest = createBlotterRequest($conn, $oldRow, $actorUserId, $remarks);
+            $logEntry .= '; Blotter review request created: ' . ($createdRequest['request_id'] ?? '');
+        }
+
         $updateStmt = $conn->prepare("
             UPDATE casereportstbl
             SET case_status_id = ?, case_level_id = ?, case_remarks = ?, user_id_official_update_by = ?
@@ -493,7 +786,7 @@ if ($action === 'update_case_outcome') {
         if (!$updateStmt) {
             throw new Exception('Failed to prepare complaint update.');
         }
-        $updateStmt->bind_param("iisss", $newStatusId, $newLevelId, $oldRow['case_remarks'], $actorUserId, $caseId);
+        $updateStmt->bind_param("iisss", $newStatusId, $newLevelId, $updatedCaseRemarks, $actorUserId, $caseId);
         $updateStmt->execute();
         $updateStmt->close();
 
@@ -502,14 +795,16 @@ if ($action === 'update_case_outcome') {
             SET escalated_to_blotter = ?,
                 escalated_to_blotter_at = CASE WHEN ? = 1 THEN NOW() ELSE escalated_to_blotter_at END,
                 escalated_by_user_id = CASE WHEN ? = 1 THEN ? ELSE escalated_by_user_id END,
-                screening_notes = ?
+                screening_notes = ?,
+                blotter_id = CASE WHEN ? = 1 AND ? <> '' THEN ? ELSE blotter_id END
             WHERE case_id = ?
             LIMIT 1
         ");
         if (!$complaintUpdateStmt) {
             throw new Exception('Failed to prepare complaint metadata update.');
         }
-        $complaintUpdateStmt->bind_param("iiisss", $markEscalated, $markEscalated, $markEscalated, $actorUserId, $updatedScreeningNotes, $caseId);
+        $newBlotterId = '';
+        $complaintUpdateStmt->bind_param("iiississs", $markEscalated, $markEscalated, $markEscalated, $actorUserId, $updatedScreeningNotes, $markEscalated, $newBlotterId, $newBlotterId, $caseId);
         $complaintUpdateStmt->execute();
         $complaintUpdateStmt->close();
 
@@ -530,7 +825,8 @@ if ($action === 'update_case_outcome') {
         respond(true, [], 'Complaint updated.');
     } catch (Throwable $e) {
         $conn->rollback();
-        respond(false, [], 'Failed to update complaint.');
+        error_log('Failed to update complaint endorsement: ' . $e->getMessage());
+        respond(false, [], 'Failed to update complaint: ' . $e->getMessage());
     }
 }
 
