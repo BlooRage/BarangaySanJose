@@ -499,8 +499,12 @@ foreach ($appointmentRows as $r) {
       const btnFilterApply = document.getElementById("btnAppointmentFilterApply");
       const btnFilterReset = document.getElementById("btnAppointmentFilterReset");
       const refreshBtn = document.getElementById("btnAppointmentRefresh");
+      const AUTO_REFRESH_SECONDS = 15;
       let activeFilter = "ALL";
       let currentPage = 1;
+      let autoRefreshSecondsLeft = AUTO_REFRESH_SECONDS;
+      let autoRefreshInterval = null;
+      let autoRefreshInFlight = false;
 
       const getRows = () => Array.from(tbody.querySelectorAll("tr")).filter((row) => row.querySelector("td"));
 
@@ -608,12 +612,75 @@ foreach ($appointmentRows as $r) {
         refreshBtn.classList.toggle("is-loading", !!on);
         refreshBtn.disabled = !!on;
       };
-      const triggerRefresh = () => {
-        setRefreshLoading(true);
-        window.setTimeout(() => {
-          window.location.reload();
-        }, 250);
+
+      const setText = (id, value) => {
+        const el = document.getElementById(id);
+        if (el) el.textContent = value && String(value).trim() !== "" ? value : "-";
       };
+
+      const bindViewButtons = () => {
+        tbody.querySelectorAll(".btn-view-appointment").forEach((btn) => {
+          btn.addEventListener("click", () => {
+            setText("viewAppointmentId", btn.dataset.appointmentId);
+            setText("viewDateFiled", btn.dataset.dateFiled);
+            setText("viewApplicantName", btn.dataset.applicantName);
+            setText("viewContactNumber", btn.dataset.contactNumber);
+            setText("viewAddress", btn.dataset.address);
+            setText("viewSubject", btn.dataset.subject);
+            setText("viewAppointmentDate", btn.dataset.appointmentDate);
+            setText("viewAppointmentTime", btn.dataset.appointmentTime);
+            setText("viewPurpose", btn.dataset.purpose);
+            setText("viewStatus", btn.dataset.status);
+          });
+        });
+      };
+
+      const refreshTableOnly = async () => {
+        if (autoRefreshInFlight) return;
+        autoRefreshInFlight = true;
+        autoRefreshSecondsLeft = AUTO_REFRESH_SECONDS;
+        setRefreshLoading(true);
+        try {
+          const response = await fetch(window.location.href, {
+            credentials: "same-origin",
+            headers: { "X-Requested-With": "XMLHttpRequest" }
+          });
+          const html = await response.text();
+          if (!response.ok) {
+            throw new Error("Failed to refresh appointment requests.");
+          }
+          const doc = new DOMParser().parseFromString(html, "text/html");
+          const nextTbody = doc.getElementById("appointmentTbody");
+          if (!nextTbody) {
+            throw new Error("Refreshed appointment table was not found.");
+          }
+          tbody.innerHTML = nextTbody.innerHTML;
+          bindViewButtons();
+          updatePendingBadge();
+          render();
+        } catch (error) {
+          console.error("Unable to refresh appointment requests:", error);
+        } finally {
+          autoRefreshInFlight = false;
+          setRefreshLoading(false);
+        }
+      };
+
+      const triggerRefresh = () => {
+        refreshTableOnly().catch(() => {});
+      };
+
+      const startAutoRefresh = () => {
+        if (autoRefreshInterval) window.clearInterval(autoRefreshInterval);
+        autoRefreshInterval = window.setInterval(() => {
+          if (autoRefreshInFlight) return;
+          autoRefreshSecondsLeft -= 1;
+          if (autoRefreshSecondsLeft <= 0) {
+            triggerRefresh();
+          }
+        }, 1000);
+      };
+
       refreshBtn?.addEventListener("click", triggerRefresh);
 
       searchInput?.addEventListener("input", () => {
@@ -625,29 +692,11 @@ foreach ($appointmentRows as $r) {
         render();
       });
 
-      const setText = (id, value) => {
-        const el = document.getElementById(id);
-        if (el) el.textContent = value && String(value).trim() !== "" ? value : "-";
-      };
-
-      document.querySelectorAll(".btn-view-appointment").forEach((btn) => {
-        btn.addEventListener("click", () => {
-          setText("viewAppointmentId", btn.dataset.appointmentId);
-          setText("viewDateFiled", btn.dataset.dateFiled);
-          setText("viewApplicantName", btn.dataset.applicantName);
-          setText("viewContactNumber", btn.dataset.contactNumber);
-          setText("viewAddress", btn.dataset.address);
-          setText("viewSubject", btn.dataset.subject);
-          setText("viewAppointmentDate", btn.dataset.appointmentDate);
-          setText("viewAppointmentTime", btn.dataset.appointmentTime);
-          setText("viewPurpose", btn.dataset.purpose);
-          setText("viewStatus", btn.dataset.status);
-        });
-      });
-
+      bindViewButtons();
       updatePendingBadge();
       activateStatusButton(activeFilter);
       render();
+      startAutoRefresh();
     })();
   </script>
 </body>

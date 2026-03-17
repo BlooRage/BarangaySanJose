@@ -5,7 +5,7 @@ require_once __DIR__ . "/announcementsStore.php";
 require_once __DIR__ . "/announcementDelivery.php";
 
 if ($_SERVER["REQUEST_METHOD"] !== "POST") {
-  header("Location: ../../Admin-End/Announcements/Announcements.php");
+  header("Location: " . appUrl('/Admin-End/Announcements/Announcements.php'));
   exit;
 }
 
@@ -145,7 +145,7 @@ if (!in_array($channelContext, ["all", "website", "public", "public_news", "sms"
   $channelContext = "all";
 }
 
-$redirectBase = "../../Admin-End/Announcements/Announcements.php";
+$redirectBase = appUrl('/Admin-End/Announcements/Announcements.php');
 $redirectUrl = $channelContext === "all" ? $redirectBase : ($redirectBase . "?channel=" . urlencode($channelContext));
 
 if ($title === "") {
@@ -262,5 +262,4 @@ if ($status === "approved") {
   $msg = "Announcement posted successfully." . ann_delivery_message_suffix($deliveryResult);
 }
 ann_redirect_with_flash($redirectUrl, "success", $msg);
-
 

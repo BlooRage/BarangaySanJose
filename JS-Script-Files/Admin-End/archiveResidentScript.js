@@ -13,7 +13,7 @@ document.addEventListener("DOMContentLoaded", () => {
     let currentPage = 1;
     let entriesPerPage = Math.max(1, Number.parseInt(entriesPerPageInput?.value || "20", 10) || 20);
 
-    const AUTO_REFRESH_SECONDS = 60;
+    const AUTO_REFRESH_SECONDS = 15;
     let autoRefreshSecondsLeft = AUTO_REFRESH_SECONDS;
 	    let autoRefreshInterval = null;
 	    let autoRefreshInFlight = false;

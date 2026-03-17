@@ -4,6 +4,7 @@ declare(strict_types=1);
 require_once __DIR__ . '/../General/security.php';
 require_once __DIR__ . '/../General/connection.php';
 require_once __DIR__ . '/../General/documentRequestWorkflow.php';
+require_once __DIR__ . '/../General/audit.php';
 
 requireRoleSession(['SuperAdmin', 'Official', 'Officials', 'Personnel', 'Personnels', 'Admin', 'Employee'], true);
 
@@ -18,6 +19,7 @@ if ($action === '') {
 if ($action === 'maintenance_run') {
     dr_ensure_table($conn);
     dr_ensure_general_fees_table($conn);
+    dr_ensure_clearance_fee_types_table($conn);
     $syncedFinance = dr_backfill_missing_finance_transactions($conn, 2000);
     $prunedFree = dr_prune_free_document_finance_transactions($conn, 5000);
     $syncedIssuance = dr_backfill_missing_issuance_requests($conn, 5000);
@@ -38,7 +40,121 @@ if ($action === 'optimize_indexes') {
     dr_respond_json(200, ['success' => true, 'message' => 'List indexes checked/applied.']);
 }
 
-$currentUserId = (string)($_SESSION['user_id'] ?? '');
+if ($action === 'bulk_regenerate_issued') {
+    $currentRenderRevision = 'r20260318s';
+    $limit = (int)($_REQUEST['limit'] ?? 200);
+    if ($limit <= 0) {
+        $limit = 200;
+    }
+    if ($limit > 1000) {
+        $limit = 1000;
+    }
+    $singleRequestId = trim((string)($_REQUEST['request_id'] ?? ''));
+    $likePattern = '/UnifiedFileAttachment/IssuedDocuments/Generated/%';
+    $stalePattern = '%' . strtolower($currentRenderRevision) . '%';
+    $stages = [
+        strtolower((string)DR_STAGE_PAYMENT_VERIFIED),
+        strtolower((string)DR_STAGE_READY_FOR_CLAIM),
+        strtolower((string)DR_STAGE_COMPLETED),
+    ];
+
+    if ($singleRequestId !== '') {
+        $stmt = $conn->prepare(
+            "SELECT request_id
+             FROM documentrequesttbl
+             WHERE request_id = ?
+               AND issued_file_path LIKE ?
+               AND stage IN (?, ?, ?)
+             LIMIT 1"
+        );
+        if (!$stmt) {
+            dr_respond_json(500, ['success' => false, 'message' => 'Failed to prepare regeneration query.']);
+        }
+        $stmt->bind_param('sssss', $singleRequestId, $likePattern, $stages[0], $stages[1], $stages[2]);
+    } else {
+        $stmt = $conn->prepare(
+            "SELECT request_id
+             FROM documentrequesttbl
+             WHERE issued_file_path LIKE ?
+               AND stage IN (?, ?, ?)
+               AND LOWER(issued_file_path) NOT LIKE ?
+             ORDER BY request_id ASC
+             LIMIT ?"
+        );
+        if (!$stmt) {
+            dr_respond_json(500, ['success' => false, 'message' => 'Failed to prepare regeneration query.']);
+        }
+        $stmt->bind_param('sssssi', $likePattern, $stages[0], $stages[1], $stages[2], $stalePattern, $limit);
+    }
+
+    $stmt->execute();
+    $candidateIds = [];
+    $rs = $stmt->get_result();
+    while ($candidateRow = $rs->fetch_assoc()) {
+        $candidateIds[] = trim((string)($candidateRow['request_id'] ?? ''));
+    }
+    $stmt->close();
+
+    $updated = [];
+    $failed = [];
+    $skipped = [];
+
+    foreach ($candidateIds as $candidateRequestId) {
+        if ($candidateRequestId === '') {
+            continue;
+        }
+        $requestRow = dr_fetch_request($conn, $candidateRequestId);
+        if (!$requestRow) {
+            $failed[] = ['request_id' => $candidateRequestId, 'reason' => 'Request not found.'];
+            continue;
+        }
+
+        $patch = [];
+        $verificationCode = trim((string)($requestRow['verification_code'] ?? ''));
+        if ($verificationCode === '') {
+            $verificationCode = strtoupper(bin2hex(random_bytes(8)));
+            $requestRow['verification_code'] = $verificationCode;
+            $patch['verification_code'] = $verificationCode;
+            $patch['qr_code_path'] = '/UnifiedFileAttachment/IssuedDocuments/QR/qr_' . preg_replace('/[^A-Za-z0-9_-]/', '', $candidateRequestId) . '.png';
+        }
+
+        $generated = trim((string)(dra_generate_issued_document_safe($requestRow) ?? ''));
+        if ($generated === '') {
+            $failed[] = ['request_id' => $candidateRequestId, 'reason' => 'Issued document regeneration failed.'];
+            continue;
+        }
+
+        $patch['issued_file_path'] = $generated;
+        $updatedRow = dr_update_stage($conn, $candidateRequestId, (string)($requestRow['stage'] ?? ''), $patch);
+        if (!$updatedRow) {
+            $failed[] = ['request_id' => $candidateRequestId, 'reason' => 'Database update failed.'];
+            continue;
+        }
+
+        $updated[] = [
+            'request_id' => $candidateRequestId,
+            'issued_file_path' => $generated,
+        ];
+    }
+
+    if (!$candidateIds && $singleRequestId !== '') {
+        $skipped[] = ['request_id' => $singleRequestId, 'reason' => 'No generated issued file found for that request in an eligible stage.'];
+    }
+
+    dr_respond_json(200, [
+        'success' => true,
+        'render_revision' => $currentRenderRevision,
+        'processed' => count($candidateIds),
+        'updated_count' => count($updated),
+        'failed_count' => count($failed),
+        'updated' => $updated,
+        'failed' => $failed,
+        'skipped' => $skipped,
+    ]);
+}
+
+$currentUserId   = (string)($_SESSION['user_id'] ?? '');
+$currentUserRole = (string)($_SESSION['role'] ?? 'Employee');
 
 function dra_is_finance_user(mysqli $conn, string $userId): bool {
     $userId = trim($userId);
@@ -1047,6 +1163,15 @@ function dra_is_first_time_job_seeker(array $requestRow): bool {
     return is_string($normalized) && strpos($normalized, 'firsttimejobseeker') !== false;
 }
 
+function dra_requires_manual_issued_upload(array $requestRow): bool {
+    $docType = trim((string)($requestRow['document_type'] ?? ''));
+    if ($docType === '') {
+        $payload = dra_decode_request_payload($requestRow);
+        $docType = trim((string)($payload['document_type'] ?? ''));
+    }
+    return dr_is_barangay_id_document_type($docType);
+}
+
 function dra_normalize_business_approval_type(string $value): string {
     $token = strtolower(trim($value));
     if ($token === '') {
@@ -1087,6 +1212,7 @@ function dra_apply_preview_edits(mysqli $conn, string $requestId, array &$reques
     $businessName = trim((string)($edited['businessName'] ?? ''));
     $fullAddress = trim((string)($edited['fullAddress'] ?? ''));
     $fullName = trim((string)($edited['fullName'] ?? ''));
+    $remarks = trim((string)($edited['remarks'] ?? ''));
     $cohabitantName = trim((string)($edited['cohabitantName'] ?? ''));
     $cohabitantRelationship = trim((string)($edited['cohabitantRelationship'] ?? ''));
     $detentionFacility = trim((string)($edited['detentionFacility'] ?? ''));
@@ -1130,6 +1256,9 @@ function dra_apply_preview_edits(mysqli $conn, string $requestId, array &$reques
     }
     if ($fullName !== '') {
         $payload['_preview_full_name'] = $fullName;
+    }
+    if ($remarks !== '') {
+        $payload['remarks'] = $remarks;
     }
     if ($cohabitantName !== '') {
         $payload['cohabitant_full_name'] = $cohabitantName;
@@ -1355,7 +1484,13 @@ function dra_generate_issued_document(array $requestRow): ?string {
         $fullName = trim((string)($requestRow['resident_id'] ?? 'Resident'));
     }
     $fullName = $stripTemplateTokens($fullName);
-    $applicantResidenceAddress = trim((string)($payload['full_address'] ?? $payload['full_address_display'] ?? ''));
+    $residentProfileForAddress = dra_resident_profile_snapshot(
+        $conn,
+        trim((string)($requestRow['resident_user_id'] ?? '')),
+        trim((string)($requestRow['resident_id'] ?? ''))
+    );
+    $residentDbAddress = trim((string)($residentProfileForAddress['full_address'] ?? ''));
+    $applicantResidenceAddress = $residentDbAddress !== '' ? $residentDbAddress : trim((string)($payload['full_address'] ?? $payload['full_address_display'] ?? ''));
     if ($applicantResidenceAddress === '') {
         $applicantResidenceAddress = 'Barangay San Jose, Rodriguez, Rizal';
     }
@@ -1363,7 +1498,7 @@ function dra_generate_issued_document(array $requestRow): ?string {
     $applicantAddressWithBarangay = dra_compose_barangay_address($applicantResidenceAddress);
     $cohabitantResidenceAddress = $stripTemplateTokens(dra_build_cohabitant_address($payload, $applicantResidenceAddress));
     $cohabitationResidenceAddress = $stripTemplateTokens(dra_build_cohabitation_address($payload, $applicantResidenceAddress));
-    $address = trim((string)($payload['full_address'] ?? 'Barangay San Jose, Rodriguez, Rizal'));
+    $address = $residentDbAddress !== '' ? $residentDbAddress : trim((string)($payload['full_address'] ?? 'Barangay San Jose, Rodriguez, Rizal'));
     $address = dra_strip_area_from_address($address);
     if ($address === '') {
         $address = 'Barangay San Jose, Rodriguez, Rizal';
@@ -1381,8 +1516,35 @@ function dra_generate_issued_document(array $requestRow): ?string {
 
     $verificationCode = trim((string)($requestRow['verification_code'] ?? ''));
     $currentStage = strtolower(trim((string)($requestRow['stage'] ?? '')));
+    $requestFee = null;
+    if (isset($requestRow['fee_amount']) && $requestRow['fee_amount'] !== null && $requestRow['fee_amount'] !== '' && is_numeric((string)$requestRow['fee_amount'])) {
+        $requestFee = (float)$requestRow['fee_amount'];
+    }
+    $taggedClearanceFee = null;
+    if ($requestFee === null && dr_is_clearance_document_type($docType)) {
+        $taggedTotal = dr_get_clearance_fee_total_for_request($conn, $requestId);
+        if ($taggedTotal > 0) {
+            $taggedClearanceFee = (float)$taggedTotal;
+        }
+    }
     $defaultFee = dr_get_fee_amount_for_document_type($conn, $docType);
-    $isFreeDocument = ($defaultFee !== null && (float)$defaultFee <= 0.0);
+    $effectiveFee = $requestFee ?? $taggedClearanceFee ?? $defaultFee;
+    $resolveAmountNumeric = static function () use ($requestRow, $requestFee, $taggedClearanceFee, $defaultFee): ?float {
+        if (isset($requestRow['amount']) && $requestRow['amount'] !== null && $requestRow['amount'] !== '' && is_numeric((string)$requestRow['amount'])) {
+            return (float)$requestRow['amount'];
+        }
+        if ($requestFee !== null) {
+            return (float)$requestFee;
+        }
+        if ($taggedClearanceFee !== null) {
+            return (float)$taggedClearanceFee;
+        }
+        if ($defaultFee !== null) {
+            return (float)$defaultFee;
+        }
+        return null;
+    };
+    $isFreeDocument = ($effectiveFee !== null && (float)$effectiveFee <= 0.0);
     $qrEligibleStages = $isFreeDocument
         ? [
             strtolower((string)DR_STAGE_READY_FOR_CLAIM),
@@ -1851,7 +2013,7 @@ function dra_generate_issued_document(array $requestRow): ?string {
         return null;
     }
 
-    $renderRevisionTag = 'r20260312y';
+    $renderRevisionTag = 'r20260318s';
     $fileName = 'issued_' . preg_replace('/[^A-Za-z0-9_-]/', '', $requestId) . '_' . $renderRevisionTag . '_' . date('YmdHis') . '.pdf';
     $diskPath = $outDir . '/' . $fileName;
 
@@ -1877,6 +2039,7 @@ function dra_generate_issued_document(array $requestRow): ?string {
         $templatePath = $baseDir . '/Resident-End/Certificates/DocumentIssuance/GeneralClearance.pdf';
         if (class_exists('\\setasign\\Fpdi\\Fpdi') && is_file($templatePath)) {
             try {
+                $displayName = strtoupper($stripTemplateTokens($fullName !== '' ? $fullName : 'RESIDENT'));
                 $displayAddress = strtoupper($stripTemplateTokens(dra_strip_area_from_address($address !== '' ? $address : $applicantResidenceAddress)));
                 if ($displayAddress === '') {
                     $displayAddress = '-';
@@ -1898,12 +2061,7 @@ function dra_generate_issued_document(array $requestRow): ?string {
                 }
                 $clearanceNumber = strtoupper($stripTemplateTokens($certNo !== '' ? $certNo : $requestId));
                 $orNumberText = strtoupper($stripTemplateTokens($orNo));
-                $amountNumeric = null;
-                if (isset($requestRow['amount']) && $requestRow['amount'] !== null && $requestRow['amount'] !== '') {
-                    $amountNumeric = (float)$requestRow['amount'];
-                } elseif ($defaultFee !== null) {
-                    $amountNumeric = (float)$defaultFee;
-                }
+                $amountNumeric = $resolveAmountNumeric();
                 $amountText = $amountNumeric === null ? '' : number_format($amountNumeric, 2, '.', ',');
 
                 $pdf = new \setasign\Fpdi\Fpdi();
@@ -1922,20 +2080,14 @@ function dra_generate_issued_document(array $requestRow): ?string {
                 $pdf->SetFillColor(255, 255, 255);
                 $pdf->SetTextColor(0, 0, 0);
 
-                $normalizeTop = static function (float $ratio) use ($pageHeight): float {
-                    return $ratio * $pageHeight;
-                };
-                $ocrTop = static function (float $originY, float $height) use ($normalizeTop): float {
-                    return $normalizeTop(1.0 - $originY - $height);
-                };
                 $fillBox = static function (
                     \setasign\Fpdi\Fpdi $pdfInstance,
                     float $x,
                     float $y,
                     float $w,
                     float $h,
-                    float $padX = 1.3,
-                    float $padY = 0.7
+                    float $padX = 1.2,
+                    float $padY = 0.6
                 ): void {
                     $pdfInstance->Rect(
                         max(0.0, $x - $padX),
@@ -1953,8 +2105,8 @@ function dra_generate_issued_document(array $requestRow): ?string {
                     float $h,
                     string $text,
                     string $style = '',
-                    float $fontSize = 9.2,
-                    float $minFontSize = 6.8,
+                    float $fontSize = 11.8,
+                    float $minFontSize = 9.8,
                     string $align = 'L'
                 ): void {
                     $clean = trim((string)(preg_replace('/\s+/u', ' ', $text) ?? $text));
@@ -1971,53 +2123,132 @@ function dra_generate_issued_document(array $requestRow): ?string {
                     $pdfInstance->SetXY($x, $y);
                     $pdfInstance->Cell($w, $h, $clean, 0, 0, $align);
                 };
-
-                $valueColumnX = 82.5;
-                $valueColumnW = $pageWidth - $valueColumnX - 16.0;
-                $valueRows = [
-                    ['y' => $ocrTop(0.6504794085013843, 0.02316908972603926), 'text' => strtoupper($fullName !== '' ? $fullName : 'RESIDENT'), 'font' => 9.1],
-                    ['y' => $ocrTop(0.6335714282970502, 0.023571428571428577), 'text' => $displayAddress, 'font' => 8.8],
-                    ['y' => $ocrTop(0.598571428541357, 0.01642857142857146), 'text' => $generalLocation, 'font' => 8.8],
-                    ['y' => $ocrTop(0.5799418605137163, 0.014534883499145446), 'text' => $remarksText, 'font' => 8.8],
-                    ['y' => $ocrTop(0.5594079238776235, 0.020719037055969336), 'text' => $purposeText, 'font' => 8.8],
+                $drawUnderlinedFooterValue = static function (
+                    \setasign\Fpdi\Fpdi $pdfInstance,
+                    float $lineX1,
+                    float $lineX2,
+                    float $y,
+                    string $value = '',
+                    float $fontSize = 11.0,
+                    ?float $maskX1 = null,
+                    ?float $maskX2 = null
+                ) use ($fillBox, $writeFittedCell): void {
+                    $lineWidth = max(8.0, $lineX2 - $lineX1);
+                    $maskStart = $maskX1 ?? ($lineX1 - 0.6);
+                    $maskEnd = $maskX2 ?? ($lineX2 + 0.6);
+                    $fillBox($pdfInstance, $maskStart, $y - 0.2, max(1.0, $maskEnd - $maskStart), 5.8, 0.25, 0.35);
+                    $pdfInstance->SetDrawColor(65, 65, 65);
+                    $pdfInstance->SetLineWidth(0.28);
+                    $pdfInstance->Line($lineX1, $y + 4.8, $lineX2, $y + 4.8);
+                    $pdfInstance->SetDrawColor(0, 0, 0);
+                    $pdfInstance->SetLineWidth(0.2);
+                    $cleanValue = trim((string)$value);
+                    if ($cleanValue !== '') {
+                        $writeFittedCell($pdfInstance, $lineX1 + 0.8, $y - 0.1, max(4.0, $lineWidth - 1.6), 5.2, $cleanValue, '', $fontSize, 9.4, 'L');
+                    }
+                };
+                // Align the dynamic text with the revised March 2026 General Clearance template.
+                $infoLabelX = 48.5;
+                $infoColonX = 89.0;
+                $infoValueX = 96.0;
+                $infoValueW = $pageWidth - $infoValueX - 24.0;
+                $infoTopY = 89.3;
+                $pdf->Rect(31.0, 86.8, 137.0, 35.8, 'F');
+                $infoRows = [
+                    ['label' => 'Name', 'value' => $displayName, 'y' => $infoTopY],
+                    ['label' => 'Residential Address', 'value' => $displayAddress, 'y' => $infoTopY + 5.8],
+                    ['label' => '', 'value' => 'Barangay San Jose, Montalban, Rizal', 'y' => $infoTopY + 11.1, 'value_x' => $infoValueX, 'font_size' => 11.0],
+                    ['label' => 'Location', 'value' => $generalLocation, 'y' => $infoTopY + 16.8],
+                    ['label' => 'Remarks', 'value' => $remarksText, 'y' => $infoTopY + 22.4],
+                    ['label' => 'Purpose', 'value' => $purposeText, 'y' => $infoTopY + 28.0],
                 ];
-                foreach ($valueRows as $rowValue) {
-                    $y = (float)$rowValue['y'];
-                    $fillBox($pdf, $valueColumnX, $y, $valueColumnW, 5.0, 1.2, 0.6);
-                    $writeFittedCell($pdf, $valueColumnX, $y, $valueColumnW, 4.8, (string)$rowValue['text'], 'B', (float)$rowValue['font'], 6.6, 'L');
+                foreach ($infoRows as $infoRow) {
+                    $rowY = (float)$infoRow['y'];
+                    $label = (string)($infoRow['label'] ?? '');
+                    $value = trim((string)($infoRow['value'] ?? ''));
+                    if ($label !== '') {
+                        $pdf->SetFont('Arial', 'B', 11.4);
+                        $pdf->SetXY($infoLabelX, $rowY);
+                        $pdf->Cell($infoColonX - $infoLabelX - 2.0, 5.3, $label, 0, 0, 'L');
+                        $pdf->SetXY($infoColonX, $rowY);
+                        $pdf->Cell(3.0, 5.3, ':', 0, 0, 'L');
+                    }
+                    if ($value !== '') {
+                        $valueX = isset($infoRow['value_x']) ? (float)$infoRow['value_x'] : $infoValueX;
+                        $valueW = isset($infoRow['value_w']) ? (float)$infoRow['value_w'] : $infoValueW;
+                        $align = (string)($infoRow['align'] ?? 'L');
+                        $fontSize = (float)($infoRow['font_size'] ?? 11.8);
+                        $writeFittedCell($pdf, $valueX, $rowY, $valueW, 5.3, $value, 'B', $fontSize, 9.8, $align);
+                    }
                 }
 
-                $issuedBlockX = 23.0;
-                $issuedBlockY = $ocrTop(0.46214285744152395, 0.01928571428571424);
-                $issuedBlockW = $pageWidth - 46.0;
+                // The source General Clearance PDF includes a literal ${ISSUED_DATE_WORD} token,
+                // so we need to mask that footer area before drawing the finalized text.
+                $issuedBlockX = 20.0;
+                $issuedBlockY = 145.3;
+                $issuedTextY = 146.5;
+                $issuedBlockW = $pageWidth - 40.0;
                 $issuedBlockH = 12.2;
-                $fillBox($pdf, $issuedBlockX, $issuedBlockY, $issuedBlockW, $issuedBlockH, 2.0, 0.9);
-                $pdf->SetFont('Arial', '', 8.8);
-                $pdf->SetXY($issuedBlockX, $issuedBlockY);
+                $fillBox($pdf, $issuedBlockX, $issuedBlockY, $issuedBlockW, $issuedBlockH, 1.8, 0.8);
+                $pdf->SetFont('Arial', '', 9.8);
+                $pdf->SetXY($issuedBlockX, $issuedTextY);
                 $pdf->MultiCell(
                     $issuedBlockW,
-                    4.2,
+                    4.8,
                     'Issued this ' . $issuedAsDocx . ' at the office of the Punong Barangay, Barangay' . "\n" . 'San Jose, Montalban, Rizal',
                     0,
                     'C'
                 );
 
-                $metaRows = [
-                    ['x' => 43.0, 'w' => 68.0, 'y' => $ocrTop(0.40552325622606245, 0.018895348140171575), 'text' => $clearanceNumber, 'font' => 8.8],
-                    ['x' => 42.0, 'w' => 38.0, 'y' => $ocrTop(0.34842425230413754, 0.019721262795584615), 'text' => $amountText, 'font' => 8.8],
-                    ['x' => 45.5, 'w' => 40.0, 'y' => $ocrTop(0.32928909936228945, 0.021654359272548218), 'text' => $orNumberText, 'font' => 8.8],
+                $footerBlockX = 14.0;
+                $footerBlockY = 161.4;
+                $footerBlockW = 82.0;
+                $footerBlockH = 34.0;
+                $pdf->Rect($footerBlockX, $footerBlockY, $footerBlockW, $footerBlockH, 'F');
+
+                $footerRows = [
+                    ['label' => 'CTC No.', 'value' => $clearanceNumber],
+                    ['label' => 'Issued at', 'value' => ''],
+                    ['label' => 'Issued On', 'value' => ''],
+                    ['label' => 'Amount', 'value' => $amountText],
+                    ['label' => 'OR No.', 'value' => $orNumberText],
                 ];
-                foreach ($metaRows as $metaRow) {
-                    $y = (float)$metaRow['y'];
-                    $x = (float)$metaRow['x'];
-                    $w = (float)$metaRow['w'];
-                    $fillBox($pdf, $x, $y, $w, 5.0, 1.2, 0.6);
-                    $writeFittedCell($pdf, $x, $y, $w, 4.8, (string)$metaRow['text'], 'B', (float)$metaRow['font'], 6.6, 'L');
+                $footerLabelX = 16.5;
+                $footerColonX = 41.5;
+                $footerLineX1 = 47.2;
+                $footerLineX2 = 92.0;
+                $footerRowY = 162.4;
+                foreach ($footerRows as $footerRow) {
+                    $pdf->SetFont('Arial', 'B', 9.8);
+                    $pdf->SetXY($footerLabelX, $footerRowY);
+                    $pdf->Cell(max(10.0, $footerColonX - $footerLabelX - 1.0), 5.6, (string)$footerRow['label'], 0, 0, 'L');
+                    $pdf->SetXY($footerColonX, $footerRowY);
+                    $pdf->Cell(3.0, 5.6, ':', 0, 0, 'L');
+
+                    $drawUnderlinedFooterValue(
+                        $pdf,
+                        $footerLineX1,
+                        $footerLineX2,
+                        $footerRowY,
+                        (string)$footerRow['value'],
+                        10.8,
+                        $footerLineX1 - 0.6,
+                        $footerLineX2 + 0.6
+                    );
+                    $footerRowY += 6.0;
                 }
 
                 if (is_file($qrDiskPath)) {
                     $qrSize = 20.0;
-                    $pdf->Image($qrDiskPath, ($pageWidth - $qrSize) / 2, $pageHeight - 55.0, $qrSize, $qrSize);
+                    $qrRightMargin = 9.0;
+                    $qrBottomMargin = 8.0;
+                    $pdf->Image(
+                        $qrDiskPath,
+                        $pageWidth - $qrSize - $qrRightMargin,
+                        $pageHeight - $qrSize - $qrBottomMargin,
+                        $qrSize,
+                        $qrSize
+                    );
                 }
 
                 $pdf->Output('F', $diskPath);
@@ -2033,6 +2264,10 @@ function dra_generate_issued_document(array $requestRow): ?string {
         if (class_exists('\\setasign\\Fpdi\\Fpdi') && is_file($templatePath)) {
             try {
                 $franchisee = strtoupper($stripTemplateTokens((string)($payload['_preview_franchisee'] ?? $payload['franchisee'] ?? $payload['vehicle_franchise'] ?? '')));
+                $todaPodaLocation = strtoupper($stripTemplateTokens((string)($payload['_preview_toda_poda_location'] ?? $payload['location_of_toda_poda'] ?? $payload['location'] ?? '')));
+                if ($todaPodaLocation === '') {
+                    $todaPodaLocation = $franchisee;
+                }
                 $vehicleType = strtoupper($stripTemplateTokens((string)($payload['_preview_vehicle_type'] ?? $payload['vehicle_make'] ?? $payload['type_of_vehicle'] ?? '')));
                 if ($vehicleType === '') {
                     $vehicleType = 'TRICYCLE';
@@ -2045,17 +2280,12 @@ function dra_generate_issued_document(array $requestRow): ?string {
                 $bodyNumber = strtoupper($stripTemplateTokens((string)($payload['_preview_body_number'] ?? $payload['body_number'] ?? '')));
                 $clearanceNumber = strtoupper($stripTemplateTokens($certNo !== '' ? $certNo : $requestId));
                 $receiptNumber = strtoupper($stripTemplateTokens($orNo));
-                $displayName = strtoupper($fullName !== '' ? $fullName : 'RESIDENT');
+                $displayName = strtoupper($stripTemplateTokens($fullName !== '' ? $fullName : 'RESIDENT'));
                 $displayAddress = strtoupper($stripTemplateTokens($address !== '' ? $address : dra_strip_area_from_address($applicantResidenceAddress)));
                 if ($displayAddress === '') {
                     $displayAddress = '-';
                 }
-                $amountNumeric = null;
-                if (isset($requestRow['amount']) && $requestRow['amount'] !== null && $requestRow['amount'] !== '') {
-                    $amountNumeric = (float)$requestRow['amount'];
-                } elseif ($defaultFee !== null) {
-                    $amountNumeric = (float)$defaultFee;
-                }
+                $amountNumeric = $resolveAmountNumeric();
                 $amountText = $amountNumeric === null ? '' : number_format($amountNumeric, 2, '.', ',');
 
                 $pdf = new \setasign\Fpdi\Fpdi();
@@ -2105,8 +2335,8 @@ function dra_generate_issued_document(array $requestRow): ?string {
                     float $h,
                     string $text,
                     string $style = '',
-                    float $fontSize = 9.2,
-                    float $minFontSize = 6.8,
+                    float $fontSize = 11.0,
+                    float $minFontSize = 9.2,
                     string $align = 'L'
                 ): void {
                     $clean = trim((string)(preg_replace('/\s+/u', ' ', $text) ?? $text));
@@ -2123,22 +2353,30 @@ function dra_generate_issued_document(array $requestRow): ?string {
                     $pdfInstance->SetXY($x, $y);
                     $pdfInstance->Cell($w, $h, $clean, 0, 0, $align);
                 };
-
-                $valueColumnX = 84.5;
-                $valueColumnW = $pageWidth - $valueColumnX - 19.0;
-                $valueRows = [
-                    ['y' => $ocrTop(0.6342979310969139, 0.019737470944722446), 'text' => $displayName, 'font' => 9.4],
-                    ['y' => $ocrTop(0.6146032120973017, 0.022460242907206274), 'text' => $displayAddress, 'font' => 9.1],
-                    ['y' => $ocrTop(0.5799999999000001, 0.016666666666666607), 'text' => $franchisee !== '' ? $franchisee : '-', 'font' => 8.9],
-                    ['y' => $ocrTop(0.5616666667380952, 0.01666666666666672), 'text' => $vehicleType, 'font' => 9.0],
-                    ['y' => $ocrTop(0.5400000001805556, 0.021666666666666612), 'text' => $registrationNumber !== '' ? $registrationNumber : '-', 'font' => 9.0],
-                    ['y' => $ocrTop(0.52166666685, 0.018333333333333313), 'text' => $plateNumber !== '' ? $plateNumber : '-', 'font' => 9.0],
-                    ['y' => $ocrTop(0.5016666664375, 0.018333333333333313), 'text' => $bodyNumber !== '' ? $bodyNumber : '-', 'font' => 9.0],
+                $infoLabelX = 39.0;
+                $infoColonX = 79.0;
+                $infoValueX = 84.5;
+                $infoValueW = $pageWidth - $infoValueX - 22.0;
+                $infoTopY = $ocrTop(0.6358, 0.0240);
+                $infoBlockH = 38.0;
+                $pdf->Rect($infoLabelX - 4.0, $infoTopY - 2.0, ($pageWidth - $infoLabelX - 18.0), $infoBlockH, 'F');
+                $infoRows = [
+                    ['label' => 'Name', 'value' => $displayName, 'y' => $infoTopY],
+                    ['label' => 'Address', 'value' => $displayAddress, 'y' => $infoTopY + 5.8],
+                    ['label' => 'Location', 'value' => $todaPodaLocation !== '' ? $todaPodaLocation : '-', 'y' => $infoTopY + 12.0],
+                    ['label' => 'Type of Vehicle', 'value' => $vehicleType, 'y' => $infoTopY + 17.8],
+                    ['label' => 'Registration No.', 'value' => $registrationNumber !== '' ? $registrationNumber : '-', 'y' => $infoTopY + 23.6],
+                    ['label' => 'Plate No.', 'value' => $plateNumber !== '' ? $plateNumber : '-', 'y' => $infoTopY + 29.4],
+                    ['label' => 'Body No.', 'value' => $bodyNumber !== '' ? $bodyNumber : '-', 'y' => $infoTopY + 35.2],
                 ];
-                foreach ($valueRows as $rowValue) {
-                    $y = (float)$rowValue['y'];
-                    $fillBox($pdf, $valueColumnX, $y, $valueColumnW, 5.2, 1.2, 0.6);
-                    $writeFittedCell($pdf, $valueColumnX, $y, $valueColumnW, 5.0, (string)$rowValue['text'], '', (float)$rowValue['font'], 6.8, 'L');
+                foreach ($infoRows as $infoRow) {
+                    $rowY = (float)$infoRow['y'];
+                    $pdf->SetFont('Arial', 'B', 11.0);
+                    $pdf->SetXY($infoLabelX, $rowY);
+                    $pdf->Cell($infoColonX - $infoLabelX - 2.0, 5.2, (string)$infoRow['label'], 0, 0, 'L');
+                    $pdf->SetXY($infoColonX, $rowY);
+                    $pdf->Cell(3.0, 5.2, ':', 0, 0, 'L');
+                    $writeFittedCell($pdf, $infoValueX, $rowY, $infoValueW, 5.2, trim((string)$infoRow['value']), 'B', 11.0, 9.2, 'L');
                 }
 
                 $issuedBlockX = 25.0;
@@ -2159,14 +2397,14 @@ function dra_generate_issued_document(array $requestRow): ?string {
                 $metaValueX = 57.0;
                 $metaValueW = 78.0;
                 $metaRows = [
-                    ['y' => $ocrTop(0.3499999998833333, 0.021666666666666723), 'text' => $clearanceNumber !== '' ? $clearanceNumber : $requestId, 'font' => 9.0],
-                    ['y' => $ocrTop(0.3316666665000001, 0.019999999999999907), 'text' => $receiptNumber, 'font' => 9.0],
-                    ['y' => $ocrTop(0.3132073218646825, 0.020252022743225018), 'text' => $amountText, 'font' => 9.0],
+                    ['y' => $ocrTop(0.3499999998833333, 0.021666666666666723), 'text' => $clearanceNumber !== '' ? $clearanceNumber : $requestId, 'font' => 11.0],
+                    ['y' => $ocrTop(0.3316666665000001, 0.019999999999999907), 'text' => $receiptNumber, 'font' => 11.0],
+                    ['y' => $ocrTop(0.3132073218646825, 0.020252022743225018), 'text' => $amountText, 'font' => 11.0],
                 ];
                 foreach ($metaRows as $metaRow) {
                     $y = (float)$metaRow['y'];
                     $fillBox($pdf, $metaValueX, $y, $metaValueW, 5.2, 1.2, 0.6);
-                    $writeFittedCell($pdf, $metaValueX, $y, $metaValueW, 5.0, (string)$metaRow['text'], '', (float)$metaRow['font'], 6.8, 'L');
+                    $writeFittedCell($pdf, $metaValueX, $y, $metaValueW, 5.0, (string)$metaRow['text'], '', (float)$metaRow['font'], 9.2, 'L');
                 }
 
                 if (is_file($qrDiskPath)) {
@@ -2193,14 +2431,9 @@ function dra_generate_issued_document(array $requestRow): ?string {
                 if ($businessAddress === '') {
                     $businessAddress = $applicantResidenceAddress;
                 }
-                $operatorName = $fullName !== '' ? $fullName : 'RESIDENT';
+                $operatorName = strtoupper($stripTemplateTokens($fullName !== '' ? $fullName : 'RESIDENT'));
                 $operatorAddress = $applicantAddressWithBarangay !== '' ? $applicantAddressWithBarangay : $applicantResidenceAddress;
-                $amountNumeric = null;
-                if (isset($requestRow['amount']) && $requestRow['amount'] !== null && $requestRow['amount'] !== '') {
-                    $amountNumeric = (float)$requestRow['amount'];
-                } elseif ($defaultFee !== null) {
-                    $amountNumeric = (float)$defaultFee;
-                }
+                $amountNumeric = $resolveAmountNumeric();
                 $amountText = $amountNumeric === null ? '' : number_format($amountNumeric, 2, '.', ',');
 
                 $pdf = new \setasign\Fpdi\Fpdi();
@@ -2217,7 +2450,7 @@ function dra_generate_issued_document(array $requestRow): ?string {
                 $pdf->useTemplate($tpl);
                 $pdf->SetAutoPageBreak(false);
                 $pdf->SetFillColor(255, 255, 255);
-                $pdf->SetTextColor(0, 0, 0);
+                $pdf->SetTextColor(20, 20, 20);
 
                 $normalizeTop = static function (float $value) use ($pageHeight): float {
                     return $value * $pageHeight;
@@ -2228,8 +2461,8 @@ function dra_generate_issued_document(array $requestRow): ?string {
                     float $y,
                     float $w,
                     float $h,
-                    float $padX = 1.5,
-                    float $padY = 0.9
+                    float $padX = 0.9,
+                    float $padY = 0.45
                 ): void {
                     $pdfInstance->Rect(
                         max(0.0, $x - $padX),
@@ -2247,8 +2480,8 @@ function dra_generate_issued_document(array $requestRow): ?string {
                     float $h,
                     string $text,
                     string $style = '',
-                    float $fontSize = 10.0,
-                    float $minFontSize = 7.0,
+                    float $fontSize = 11.0,
+                    float $minFontSize = 9.2,
                     string $align = 'L'
                 ): void {
                     $clean = trim((string)(preg_replace('/\s+/u', ' ', $text) ?? $text));
@@ -2265,7 +2498,6 @@ function dra_generate_issued_document(array $requestRow): ?string {
                     $pdfInstance->SetXY($x, $y);
                     $pdfInstance->Cell($w, $h, $clean, 0, 0, $align);
                 };
-
                 $bodyLeft = 32.0;
                 $bodyWidth = $pageWidth - ($bodyLeft * 2);
                 $bodyLineHeight = 5.8;
@@ -2276,8 +2508,8 @@ function dra_generate_issued_document(array $requestRow): ?string {
                     [$normalizeTop(0.3580), strtoupper($operatorAddress !== '' ? $operatorAddress : '-')],
                 ];
                 foreach ($bodyValues as [$topY, $value]) {
-                    $fillBox($pdf, $bodyLeft, $topY, $bodyWidth, 6.4);
-                    $writeFittedCell($pdf, $bodyLeft, $topY, $bodyWidth, $bodyLineHeight, (string)$value, 'B', 10.2, 7.2, 'C');
+                    $fillBox($pdf, $bodyLeft, $topY, $bodyWidth, 6.0, 0.9, 0.45);
+                    $writeFittedCell($pdf, $bodyLeft, $topY, $bodyWidth, $bodyLineHeight, (string)$value, 'B', 11.0, 9.2, 'C');
                 }
 
                 $approvalMarkers = [
@@ -2320,9 +2552,11 @@ function dra_generate_issued_document(array $requestRow): ?string {
 
                 $metaBlockX = 19.0;
                 $metaBlockY = $normalizeTop(0.8290);
-                $metaBlockW = 92.0;
-                $metaBlockH = 27.5;
-                $fillBox($pdf, $metaBlockX, $metaBlockY, $metaBlockW, $metaBlockH, 2.0, 1.0);
+                $metaMaskX = $metaBlockX - 0.8;
+                $metaMaskY = $metaBlockY - 0.8;
+                $metaMaskW = 82.0;
+                $metaMaskH = 33.0;
+                $pdf->Rect($metaMaskX, $metaMaskY, $metaMaskW, $metaMaskH, 'F');
                 $metaRows = [
                     ['label' => 'O.R No.', 'value' => $orNo],
                     ['label' => 'Amount', 'value' => $amountText],
@@ -2330,14 +2564,28 @@ function dra_generate_issued_document(array $requestRow): ?string {
                     ['label' => 'Date Issued', 'value' => $issuedAt],
                     ['label' => 'Place Issued', 'value' => 'Barangay San Jose'],
                 ];
-                $metaY = $metaBlockY + 0.5;
+                $labelX = 18.5;
+                $colonX = 46.0;
+                $lineX1 = 52.5;
+                $lineX2 = 90.5;
+                $metaY = $metaBlockY + 0.1;
                 foreach ($metaRows as $rowMeta) {
-                    $pdf->SetFont('Arial', '', 9.5);
-                    $pdf->SetXY($metaBlockX + 2.0, $metaY);
-                    $pdf->Cell(28.0, 5.2, $rowMeta['label'], 0, 0, 'L');
-                    $pdf->Cell(4.0, 5.2, ':', 0, 0, 'C');
-                    $writeFittedCell($pdf, $metaBlockX + 34.5, $metaY, 50.0, 5.2, (string)$rowMeta['value'], '', 9.5, 7.2, 'L');
-                    $metaY += 5.0;
+                    $pdf->SetFont('Arial', 'B', 9.6);
+                    $pdf->SetXY($labelX, $metaY);
+                    $pdf->Cell(max(10.0, $colonX - $labelX - 1.0), 5.6, (string)$rowMeta['label'], 0, 0, 'L');
+                    $pdf->SetXY($colonX, $metaY);
+                    $pdf->Cell(3.0, 5.6, ':', 0, 0, 'L');
+                    $fillBox($pdf, $lineX1 - 0.5, $metaY - 0.15, ($lineX2 - $lineX1) + 1.0, 5.6, 0.25, 0.3);
+                    $pdf->SetDrawColor(65, 65, 65);
+                    $pdf->SetLineWidth(0.28);
+                    $pdf->Line($lineX1, $metaY + 4.8, $lineX2, $metaY + 4.8);
+                    $pdf->SetDrawColor(0, 0, 0);
+                    $pdf->SetLineWidth(0.2);
+                    $metaValue = trim((string)($rowMeta['value'] ?? ''));
+                    if ($metaValue !== '') {
+                        $writeFittedCell($pdf, $lineX1 + 0.8, $metaY - 0.1, ($lineX2 - $lineX1) - 1.4, 5.6, $metaValue, '', 11.0, 9.2, 'L');
+                    }
+                    $metaY += 6.0;
                 }
 
                 if (is_file($qrDiskPath)) {
@@ -2458,7 +2706,7 @@ function dra_generate_issued_document(array $requestRow): ?string {
         $pdf->Image($rightLogo, 168, 14, 26, 26);
     }
     $isSpecialCertificate = $isIndigency || $isGoodMoral || $isResidency || $isCohabitation || $isFirstTimeJobSeeker;
-    $fontFace = 'Times';
+    $fontFace = 'Arial';
     $indigencyFont = 'Arial';
 
     $pdf->SetFont($fontFace, 'B', 11);
@@ -2467,7 +2715,7 @@ function dra_generate_issued_document(array $requestRow): ?string {
     $pdf->Cell(0, 5, 'LALAWIGAN NG RIZAL', 0, 1, 'C');
     $pdf->Cell(0, 5, 'BAYAN NG RODRIGUEZ', 0, 1, 'C');
     $pdf->Ln(1);
-    $pdf->SetFont($fontFace, 'B', 16);
+    $pdf->SetFont($fontFace, 'B', 14);
     $pdf->Cell(0, 7, 'BARANGAY SAN JOSE', 0, 1, 'C');
     if ($isSpecialCertificate) {
         $pdf->Ln(1);
@@ -3040,7 +3288,7 @@ function dra_generate_issued_document(array $requestRow): ?string {
             );
         } elseif ($isResidency) {
             $writeIndentedParagraph(
-                'This is to certify that the person whose name appears here on has requested a Barangay Clearance from this office and the information are listed below:',
+                'This is to certify that the person whose name appears here on has requested a Certificate of Residency from this office and the information are listed below:',
                 7,
                 18,
                 10,
@@ -3079,13 +3327,12 @@ function dra_generate_issued_document(array $requestRow): ?string {
                 $pdf->SetY($endY);
             };
 
-            $row('Name', $fullName !== '' ? $fullName : '-');
-            $row('Address', $address !== '' ? $address : '-');
-            $row('', 'BARANGAY SAN JOSE, MONTALBAN, RIZAL');
-            $row('Birthday', $birthdateValue !== '' ? $birthdateValue : '-');
-            $row('Birthplace', $birthplaceValue !== '' ? $birthplaceValue : '-');
-            $row('Remarks', $remarksValue !== '' ? $remarksValue : '-', true);
-            $row('Purpose', $requestPurpose !== '' ? $requestPurpose : '-', true);
+            $row('Name', $fullName !== '' ? $fullName : '-', false);
+            $row('Address', $applicantResidenceAddress !== '' ? $applicantResidenceAddress : '-', false);
+            $row('Birthday', $birthdateValue !== '' ? $birthdateValue : '-', false);
+            $row('Birthplace', $birthplaceValue !== '' ? $birthplaceValue : '-', false);
+            $row('Remarks', $remarksValue !== '' ? $remarksValue : '-', false);
+            $row('Purpose', $requestPurpose !== '' ? $requestPurpose : '-', false);
             $pdf->Ln(4);
         } elseif ($isRelationshipJailVisit) {
             $writeRichParagraph(
@@ -3263,7 +3510,7 @@ function dra_generate_issued_document(array $requestRow): ?string {
         } elseif ($isResidency) {
             $writeRichParagraph(
                 [
-                    ['text' => 'This clearance is being issued pursuant to Barangay Revenue Code ORDINANCE NO. 11 - 2019', 'bold' => false],
+                    ['text' => 'This certification is being issued pursuant to Barangay Revenue Code ORDINANCE NO. 11-2019', 'bold' => false],
                 ],
                 7,
                 18,
@@ -4568,7 +4815,12 @@ if ($action === 'get_request') {
     // dedicated resident profile viewer instead of every modal open.
     $row['resident_profile'] = [];
     $row['stage_label'] = dr_stage_label((string)($row['stage'] ?? ''));
-    $row['fee_amount'] = dr_get_fee_amount_for_document_type($conn, (string)($row['document_type'] ?? ''));
+    $storedFeeAmount = $row['fee_amount'] ?? null;
+    if ($storedFeeAmount !== null && is_numeric((string)$storedFeeAmount)) {
+        $row['fee_amount'] = (float)$storedFeeAmount;
+    } else {
+        $row['fee_amount'] = dr_get_fee_amount_for_document_type($conn, (string)($row['document_type'] ?? ''));
+    }
 
     dr_respond_json(200, ['success' => true, 'item' => $row]);
 }
@@ -4612,10 +4864,6 @@ if ($action === 'view_payment_proof') {
 }
 
 if ($action === 'view_preview_issued') {
-    if (dra_is_finance_user($conn, $currentUserId)) {
-        http_response_code(403);
-        exit('Finance users are not allowed to preview issued documents.');
-    }
     if ($requestId === '') {
         http_response_code(422);
         exit('Missing request ID.');
@@ -4678,10 +4926,6 @@ if ($action === 'view_preview_docx') {
 }
 
 if ($action === 'view_preview_docx_html') {
-    if (dra_is_finance_user($conn, $currentUserId)) {
-        http_response_code(403);
-        exit('Finance users are not allowed to preview issued documents.');
-    }
     if ($requestId === '') {
         http_response_code(422);
         exit('Missing request ID.');
@@ -4697,10 +4941,6 @@ if ($action === 'view_preview_docx_html') {
 }
 
 if ($action === 'view_preview_docx_image') {
-    if (dra_is_finance_user($conn, $currentUserId)) {
-        http_response_code(403);
-        exit('Finance users are not allowed to preview issued documents.');
-    }
     if ($requestId === '') {
         http_response_code(422);
         exit('Missing request ID.');
@@ -4716,10 +4956,6 @@ if ($action === 'view_preview_docx_image') {
 }
 
 if ($action === 'view_issued') {
-    if (dra_is_finance_user($conn, $currentUserId)) {
-        http_response_code(403);
-        exit('Finance users are not allowed to view issued documents.');
-    }
     if ($requestId === '') {
         http_response_code(422);
         exit('Missing request ID.');
@@ -4772,7 +5008,7 @@ if ($action === 'view_issued') {
         ? [DR_STAGE_READY_FOR_CLAIM, DR_STAGE_COMPLETED]
         : [DR_STAGE_PAYMENT_VERIFIED, DR_STAGE_READY_FOR_CLAIM, DR_STAGE_COMPLETED];
     $shouldHaveQr = ($verificationCode !== '' && in_array($stage, $qrEligibleStages, true));
-    $renderRevisionTag = 'r20260312y';
+    $renderRevisionTag = 'r20260318s';
     $issuedBaseName = strtolower(basename((string)$publicPath));
     $isGeneratedIssuedPath = strpos((string)$publicPath, '/UnifiedFileAttachment/IssuedDocuments/Generated/') === 0;
     $isCurrentRenderRevision = ($issuedBaseName !== '' && strpos($issuedBaseName, strtolower($renderRevisionTag)) !== false);
@@ -4823,7 +5059,13 @@ if ($action === 'view_issued') {
     exit;
 }
 
-if ($requestId === '' && $action !== 'list') {
+$actionsWithoutRequestId = [
+    'list',
+    'list_fee_types', 'save_fee_type', 'delete_fee_type',
+    'submit_fee_change_request', 'list_fee_change_requests',
+    'cancel_fee_change_request', 'process_fee_change_request',
+];
+if ($requestId === '' && !in_array($action, $actionsWithoutRequestId, true)) {
     dr_respond_json(422, ['success' => false, 'message' => 'Missing request ID.']);
 }
 
@@ -4847,9 +5089,22 @@ if ($action === 'personnel_approve') {
     }
 
     $isFirstTimeJobSeeker = dra_is_first_time_job_seeker($row);
+    $isClearanceDoc = dr_is_clearance_document_type((string)($row['document_type'] ?? ''));
+    if ($isClearanceDoc) {
+        dr_ensure_clearance_fee_types_table($conn);
+        dr_ensure_clearance_row_for_request($conn, $row);
+    }
+
     $defaultFee = dr_get_fee_amount_for_document_type($conn, (string)($row['document_type'] ?? ''));
     if ($isFirstTimeJobSeeker) {
         $defaultFee = 0.0;
+    }
+    if (!$isFirstTimeJobSeeker && $isClearanceDoc) {
+        $taggedFees = dr_get_clearance_fees_for_request($conn, $requestId);
+        if (!$taggedFees) {
+            dr_respond_json(422, ['success' => false, 'message' => 'Please tag the applicable fees before approving this request.']);
+        }
+        $defaultFee = dr_get_clearance_fee_total_for_request($conn, $requestId);
     }
     $isFreeDocument = ($defaultFee !== null && (float)$defaultFee <= 0.0);
     $nextStage = $isFirstTimeJobSeeker
@@ -4900,16 +5155,21 @@ if ($action === 'personnel_approve') {
             )
         );
     } else {
+        $notificationTitle = 'Document Request Approved for Payment';
+        $notificationMessage = dra_request_notice($updated, $requestId, 'approved and is now waiting for payment.');
+        if ($isFreeDocument) {
+            $notificationTitle = 'Document Request Approved for Release';
+            $notificationMessage = dra_request_notice($updated, $requestId, 'approved and is now for release.');
+        }
         dra_send_notification_deferred(
             $conn,
             $updated,
-            $isFreeDocument ? 'Document Request Approved for Release' : 'Document Request Approved for Payment',
-            $isFreeDocument
-                ? dra_request_notice($updated, $requestId, 'approved and is now for release.')
-                : dra_request_notice($updated, $requestId, 'approved and is now waiting for payment.')
+            $notificationTitle,
+            $notificationMessage
         );
     }
 
+    try { insertUnifiedAuditLog($conn, $currentUserId, $currentUserRole, 'Document Requests', 'document_request', $requestId, 'Approve', 'stage', (string)($row['stage'] ?? ''), $nextStage, (string)($row['document_type'] ?? '')); } catch (Throwable $__e) {}
     dr_respond_json(200, ['success' => true, 'request' => $updated]);
 }
 
@@ -4936,6 +5196,7 @@ if ($action === 'personnel_reject') {
         dra_request_notice($updated, $requestId, 'rejected. Reason: ' . $reason)
     );
 
+    try { insertUnifiedAuditLog($conn, $currentUserId, $currentUserRole, 'Document Requests', 'document_request', $requestId, 'Reject', 'stage', (string)($row['stage'] ?? ''), DR_STAGE_REJECTED, $reason); } catch (Throwable $__e) {}
     dr_respond_json(200, ['success' => true, 'request' => $updated]);
 }
 
@@ -4983,6 +5244,7 @@ if ($action === 'interview_pass') {
         dra_request_notice($updated, $requestId, 'approved after interview and is now ready for release.')
     );
 
+    try { insertUnifiedAuditLog($conn, $currentUserId, $currentUserRole, 'Document Requests', 'document_request', $requestId, 'Interview Pass', 'stage', DR_STAGE_FOR_INTERVIEW, DR_STAGE_READY_FOR_CLAIM, (string)($row['document_type'] ?? '')); } catch (Throwable $__e) {}
     dr_respond_json(200, ['success' => true, 'request' => $updated]);
 }
 
@@ -5018,6 +5280,7 @@ if ($action === 'interview_fail') {
         dra_request_notice($updated, $requestId, 'did not pass the interview. Reason: ' . $reason)
     );
 
+    try { insertUnifiedAuditLog($conn, $currentUserId, $currentUserRole, 'Document Requests', 'document_request', $requestId, 'Interview Fail', 'stage', DR_STAGE_FOR_INTERVIEW, DR_STAGE_INTERVIEW_FAILED, $reason); } catch (Throwable $__e) {}
     dr_respond_json(200, ['success' => true, 'request' => $updated]);
 }
 
@@ -5034,8 +5297,22 @@ if ($action === 'finance_verify') {
     $amountRaw = trim((string)($_POST['amount'] ?? ''));
     $orNumber = trim((string)($_POST['or_number'] ?? ''));
     $defaultFee = dr_get_fee_amount_for_document_type($conn, (string)($row['document_type'] ?? ''));
+    $taggedFeeTotal = null;
+    if (dr_is_clearance_document_type((string)($row['document_type'] ?? ''))) {
+        $taggedFees = dr_get_clearance_fees_for_request($conn, $requestId);
+        if ($taggedFees) {
+            $taggedFeeTotal = 0.0;
+            foreach ($taggedFees as $taggedFee) {
+                $taggedFeeTotal += (float)($taggedFee['amount'] ?? 0);
+            }
+        }
+    }
     $resolvedAmount = null;
-    if ($defaultFee !== null) {
+    if (isset($row['fee_amount']) && $row['fee_amount'] !== null && is_numeric((string)$row['fee_amount'])) {
+        $resolvedAmount = (float)$row['fee_amount'];
+    } elseif ($taggedFeeTotal !== null) {
+        $resolvedAmount = $taggedFeeTotal;
+    } elseif ($defaultFee !== null) {
         // Finance amount is system-controlled from configured fee.
         $resolvedAmount = (float)$defaultFee;
     } elseif (isset($row['amount']) && $row['amount'] !== null && is_numeric((string)$row['amount'])) {
@@ -5050,6 +5327,40 @@ if ($action === 'finance_verify') {
     }
     if ($orNumber === '') {
         dr_respond_json(422, ['success' => false, 'message' => 'OR number is required.']);
+    }
+
+    $requiresManualIssuedUpload = dra_requires_manual_issued_upload($row);
+    if ($requiresManualIssuedUpload) {
+        $patch = [
+            'amount' => $resolvedAmount,
+            'or_number' => $orNumber,
+            'status_reason' => null,
+            'finance_user_id' => $currentUserId,
+            'finance_decision_at' => dr_now(),
+        ];
+        if ($verifyMode === 'walkin' || in_array($currentStage, [DR_STAGE_FOR_PAYMENT, DR_STAGE_PAYMENT_REJECTED], true)) {
+            $patch['payment_method'] = 'barangay';
+            $patch['payment_submitted_at'] = dr_now();
+            $patch['payment_proof_path'] = null;
+            $patch['payment_reference'] = null;
+        } elseif ($verifyMode === 'gcash') {
+            $patch['payment_method'] = 'gcash';
+        }
+
+        $updated = dr_update_stage($conn, $requestId, DR_STAGE_PAYMENT_VERIFIED, $patch);
+        if (!$updated) {
+            dr_respond_json(500, ['success' => false, 'message' => 'Unable to verify payment.']);
+        }
+
+        dra_send_notification_deferred(
+            $conn,
+            $updated,
+            'Payment Verified - Release Preparation Pending',
+            dra_request_notice($updated, $requestId, 'payment verified. OR: ' . $orNumber . '. The request is now awaiting final ID preparation for release.')
+        );
+
+        try { insertUnifiedAuditLog($conn, $currentUserId, $currentUserRole, 'Document Requests', 'document_request', $requestId, 'Finance Verify', 'stage', $currentStage, DR_STAGE_PAYMENT_VERIFIED, 'OR: ' . $orNumber . ' | ₱' . number_format((float)$resolvedAmount, 2)); } catch (Throwable $__e) {}
+        dr_respond_json(200, ['success' => true, 'request' => $updated]);
     }
 
     $certificateNumber = dr_make_certificate_number($orNumber);
@@ -5100,6 +5411,7 @@ if ($action === 'finance_verify') {
         dra_request_notice($updated, $requestId, 'payment verified. OR: ' . $orNumber . '. Certificate no: ' . $certificateNumber . '. The document is now for release.')
     );
 
+    try { insertUnifiedAuditLog($conn, $currentUserId, $currentUserRole, 'Document Requests', 'document_request', $requestId, 'Finance Verify', 'stage', $currentStage, DR_STAGE_READY_FOR_CLAIM, 'OR: ' . $orNumber . ' | Cert: ' . $certificateNumber . ' | ₱' . number_format((float)$resolvedAmount, 2)); } catch (Throwable $__e) {}
     dr_respond_json(200, ['success' => true, 'request' => $updated]);
 }
 
@@ -5126,15 +5438,20 @@ if ($action === 'finance_reject') {
         dra_request_notice($updated, $requestId, 'payment rejected. Reason: ' . $reason)
     );
 
+    try { insertUnifiedAuditLog($conn, $currentUserId, $currentUserRole, 'Document Requests', 'document_request', $requestId, 'Finance Reject Payment', 'stage', (string)($row['stage'] ?? ''), DR_STAGE_PAYMENT_REJECTED, $reason); } catch (Throwable $__e) {}
     dr_respond_json(200, ['success' => true, 'request' => $updated]);
 }
 
 if ($action === 'mark_ready') {
+    $requiresManualIssuedUpload = dra_requires_manual_issued_upload($row);
     $verificationCode = trim((string)($row['verification_code'] ?? ''));
     if ($verificationCode === '') {
         $verificationCode = strtoupper(bin2hex(random_bytes(8)));
     }
     $issuedPath = dra_save_upload($_FILES['issued_file'] ?? [], 'IssuedDocuments');
+    if ($requiresManualIssuedUpload && ($issuedPath === null || trim((string)$issuedPath) === '')) {
+        dr_respond_json(422, ['success' => false, 'message' => 'Please upload the prepared Barangay ID file before marking this request ready.']);
+    }
     if ($issuedPath === null) {
         // Auto-generate issued document when manual upload is not provided.
         $issuedPath = dra_generate_issued_document_safe(array_merge((array)$row, [
@@ -5160,10 +5477,11 @@ if ($action === 'mark_ready') {
     dra_send_notification_deferred(
         $conn,
         $updated,
-        'Document Ready for Claim',
-        dra_request_notice($updated, $requestId, 'prepared and is now for release.')
+        $requiresManualIssuedUpload ? 'Barangay ID Ready for Claim' : 'Document Ready for Claim',
+        dra_request_notice($updated, $requestId, $requiresManualIssuedUpload ? 'prepared and is now ready for ID release.' : 'prepared and is now for release.')
     );
 
+    try { insertUnifiedAuditLog($conn, $currentUserId, $currentUserRole, 'Document Requests', 'document_request', $requestId, 'Mark Ready', 'stage', (string)($row['stage'] ?? ''), DR_STAGE_READY_FOR_CLAIM, (string)($row['document_type'] ?? '')); } catch (Throwable $__e) {}
     dr_respond_json(200, ['success' => true, 'request' => $updated]);
 }
 
@@ -5209,7 +5527,373 @@ if ($action === 'mark_completed') {
         dra_request_notice($updated, $requestId, 'completed and released.')
     );
 
+    try { insertUnifiedAuditLog($conn, $currentUserId, $currentUserRole, 'Document Requests', 'document_request', $requestId, 'Release', 'stage', (string)($row['stage'] ?? ''), DR_STAGE_COMPLETED, (string)($row['document_type'] ?? '')); } catch (Throwable $__e) {}
     dr_respond_json(200, ['success' => true, 'request' => $updated]);
+}
+
+// ── Clearance Fee Types CRUD + Fee Change Request Workflow ───────────────────
+
+if ($action === 'list_fee_types') {
+    dr_ensure_clearance_fee_types_table($conn);
+    $scope = trim((string)($_GET['scope'] ?? 'approved'));
+    if ($scope === 'pending') {
+        $stmt = $conn->prepare("SELECT * FROM clearancefeetypetbl WHERE status='pending' ORDER BY created_at ASC");
+    } elseif ($scope === 'all') {
+        $stmt = $conn->prepare("SELECT * FROM clearancefeetypetbl ORDER BY fee_name ASC");
+    } else {
+        $stmt = $conn->prepare("SELECT fee_type_id, fee_name, default_amount, status FROM clearancefeetypetbl WHERE status='approved' ORDER BY fee_name ASC");
+    }
+    if (!$stmt) dr_respond_json(500, ['success' => false, 'message' => 'DB error.']);
+    $stmt->execute();
+    $rows = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+    $stmt->close();
+    dr_respond_json(200, ['success' => true, 'fee_types' => $rows]);
+}
+
+if ($action === 'save_fee_type') {
+    // Finance-only: direct save bypasses approval workflow
+    dr_ensure_clearance_fee_types_table($conn);
+    $feeTypeId     = (int)trim((string)($_POST['fee_type_id'] ?? '0'));
+    $feeName       = trim((string)($_POST['fee_name'] ?? ''));
+    $defaultAmount = max(0.0, (float)($_POST['default_amount'] ?? 0));
+    $statusRaw     = trim((string)($_POST['status'] ?? 'approved'));
+    $status        = in_array($statusRaw, ['approved', 'rejected'], true) ? $statusRaw : 'approved';
+    if ($feeName === '') dr_respond_json(400, ['success' => false, 'message' => 'Fee name is required.']);
+    if ($feeTypeId > 0) {
+        $stmt = $conn->prepare(
+            "UPDATE clearancefeetypetbl
+             SET fee_name=?, default_amount=?, proposed_amount=NULL, change_type=NULL,
+                 status=?, updated_at=NOW()
+             WHERE fee_type_id=?"
+        );
+        if (!$stmt) dr_respond_json(500, ['success' => false, 'message' => 'DB error.']);
+        $stmt->bind_param('sdsi', $feeName, $defaultAmount, $status, $feeTypeId);
+    } else {
+        $stmt = $conn->prepare(
+            "INSERT INTO clearancefeetypetbl (fee_name, default_amount, status) VALUES (?, ?, ?)"
+        );
+        if (!$stmt) dr_respond_json(500, ['success' => false, 'message' => 'DB error.']);
+        $stmt->bind_param('sds', $feeName, $defaultAmount, $status);
+    }
+    if (!$stmt->execute()) {
+        $stmt->close();
+        dr_respond_json(409, ['success' => false, 'message' => 'Fee name already exists or DB error.']);
+    }
+    $newId = $feeTypeId > 0 ? $feeTypeId : (int)$conn->insert_id;
+    $stmt->close();
+    try { insertUnifiedAuditLog($conn, $currentUserId, $currentUserRole, 'Fee Management', 'fee_type', (string)$newId, $feeTypeId > 0 ? 'Update Fee Type' : 'Add Fee Type', 'fee_name', null, $feeName, '₱' . number_format($defaultAmount, 2) . ' | ' . $status); } catch (Throwable $__e) {}
+    dr_respond_json(200, ['success' => true, 'fee_type_id' => $newId]);
+}
+
+if ($action === 'delete_fee_type') {
+    $feeTypeId = (int)trim((string)($_POST['fee_type_id'] ?? ''));
+    if ($feeTypeId <= 0) dr_respond_json(400, ['success' => false, 'message' => 'Invalid fee type ID.']);
+    $auditFeeName = '';
+    $__s = $conn->prepare("SELECT fee_name FROM clearancefeetypetbl WHERE fee_type_id=? LIMIT 1");
+    if ($__s) { $__s->bind_param('i', $feeTypeId); $__s->execute(); $__r = $__s->get_result()->fetch_assoc(); $auditFeeName = (string)($__r['fee_name'] ?? ''); $__s->close(); }
+    $stmt = $conn->prepare("DELETE FROM clearancefeetypetbl WHERE fee_type_id=?");
+    if (!$stmt) dr_respond_json(500, ['success' => false, 'message' => 'DB error.']);
+    $stmt->bind_param('i', $feeTypeId);
+    $stmt->execute();
+    $stmt->close();
+    try { insertUnifiedAuditLog($conn, $currentUserId, $currentUserRole, 'Fee Management', 'fee_type', (string)$feeTypeId, 'Delete Fee Type', 'fee_name', $auditFeeName, null, null); } catch (Throwable $__e) {}
+    dr_respond_json(200, ['success' => true]);
+}
+
+// ── Fee Change Requests (merged into clearancefeetypetbl) ────────────────────
+
+if ($action === 'submit_fee_change_request') {
+    dr_ensure_clearance_fee_types_table($conn);
+    $requestType     = trim((string)($_POST['request_type'] ?? ''));
+    $proposedFeeName = trim((string)($_POST['proposed_fee_name'] ?? ''));
+    $proposedAmount  = max(0.0, (float)($_POST['proposed_amount'] ?? 0));
+    $notes           = trim((string)($_POST['notes'] ?? ''));
+    $userId          = trim((string)($_SESSION['user_id'] ?? $_SESSION['admin_id'] ?? ''));
+
+    if (!in_array($requestType, ['add_type', 'edit_price'], true)) {
+        dr_respond_json(400, ['success' => false, 'message' => 'Invalid request type.']);
+    }
+    if ($proposedFeeName === '') {
+        dr_respond_json(400, ['success' => false, 'message' => 'Fee name is required.']);
+    }
+
+    if ($requestType === 'add_type') {
+        // Insert new pending row
+        $stmt = $conn->prepare(
+            "INSERT INTO clearancefeetypetbl
+             (fee_name, default_amount, proposed_amount, status, change_type, notes, requested_by_user_id)
+             VALUES (?, ?, ?, 'pending', 'new_type', ?, ?)"
+        );
+        if (!$stmt) dr_respond_json(500, ['success' => false, 'message' => 'DB error.']);
+        $stmt->bind_param('ssdss', $proposedFeeName, $proposedAmount, $proposedAmount, $notes, $userId);
+        if (!$stmt->execute()) {
+            $stmt->close();
+            dr_respond_json(409, ['success' => false, 'message' => 'Fee name already exists or DB error.']);
+        }
+        $newFeeId = (string)$conn->insert_id;
+        $stmt->close();
+        try { insertUnifiedAuditLog($conn, $currentUserId, $currentUserRole, 'Fee Management', 'fee_type', $newFeeId, 'Request New Fee Type', 'fee_name', null, $proposedFeeName, '₱' . number_format($proposedAmount, 2) . ($notes ? ' | ' . $notes : '')); } catch (Throwable $__e) {}
+        dr_respond_json(200, ['success' => true]);
+    }
+
+    // edit_price: mark the existing approved row as pending with proposed amount
+    $feeTypeId = (int)($_POST['fee_type_id'] ?? 0);
+    if ($feeTypeId <= 0) {
+        dr_respond_json(400, ['success' => false, 'message' => 'Fee type ID is required for price edit.']);
+    }
+    $stmt = $conn->prepare(
+        "UPDATE clearancefeetypetbl
+         SET proposed_amount=?, status='pending', change_type='price_edit',
+             notes=?, requested_by_user_id=?, reviewed_by_user_id=NULL,
+             reviewed_at=NULL, review_notes=NULL, updated_at=NOW()
+         WHERE fee_type_id=? AND status='approved'"
+    );
+    if (!$stmt) dr_respond_json(500, ['success' => false, 'message' => 'DB error.']);
+    $stmt->bind_param('dssi', $proposedAmount, $notes, $userId, $feeTypeId);
+    $stmt->execute();
+    $affected = $stmt->affected_rows;
+    $stmt->close();
+    if ($affected === 0) {
+        dr_respond_json(409, ['success' => false, 'message' => 'Fee type not found or already has a pending change.']);
+    }
+    try { insertUnifiedAuditLog($conn, $currentUserId, $currentUserRole, 'Fee Management', 'fee_type', (string)$feeTypeId, 'Request Price Edit', 'proposed_amount', null, '₱' . number_format($proposedAmount, 2), $notes); } catch (Throwable $__e) {}
+    dr_respond_json(200, ['success' => true]);
+}
+
+if ($action === 'list_fee_change_requests') {
+    dr_ensure_clearance_fee_types_table($conn);
+    $scope  = trim((string)($_GET['scope'] ?? ''));
+    $userId = trim((string)($_SESSION['user_id'] ?? $_SESSION['admin_id'] ?? ''));
+    $rows   = [];
+    if ($scope === 'all_pending') {
+        // Finance: see all pending requests
+        $res = $conn->query(
+            "SELECT * FROM clearancefeetypetbl WHERE status='pending' ORDER BY updated_at ASC LIMIT 200"
+        );
+        if ($res) {
+            while ($r = $res->fetch_assoc()) { $rows[] = $r; }
+        }
+    } else {
+        // Admin: see own pending requests
+        $stmt = $conn->prepare(
+            "SELECT * FROM clearancefeetypetbl WHERE requested_by_user_id=? AND status='pending' ORDER BY updated_at DESC LIMIT 100"
+        );
+        if ($stmt) {
+            $stmt->bind_param('s', $userId);
+            $stmt->execute();
+            $res = $stmt->get_result();
+            while ($r = $res->fetch_assoc()) { $rows[] = $r; }
+            $stmt->close();
+        }
+    }
+    dr_respond_json(200, ['success' => true, 'requests' => $rows]);
+}
+
+if ($action === 'cancel_fee_change_request') {
+    dr_ensure_clearance_fee_types_table($conn);
+    $feeTypeId = (int)($_POST['fee_type_id'] ?? 0);
+    $userId    = trim((string)($_SESSION['user_id'] ?? $_SESSION['admin_id'] ?? ''));
+    if ($feeTypeId <= 0) {
+        dr_respond_json(400, ['success' => false, 'message' => 'Invalid ID.']);
+    }
+
+    // Fetch pending row to know the change_type and fee_name for audit
+    $stmt = $conn->prepare(
+        "SELECT change_type, fee_name FROM clearancefeetypetbl
+         WHERE fee_type_id=? AND requested_by_user_id=? AND status='pending' LIMIT 1"
+    );
+    if (!$stmt) dr_respond_json(500, ['success' => false, 'message' => 'DB error.']);
+    $stmt->bind_param('is', $feeTypeId, $userId);
+    $stmt->execute();
+    $fcr = $stmt->get_result()->fetch_assoc();
+    $stmt->close();
+    if (!$fcr) {
+        dr_respond_json(409, ['success' => false, 'message' => 'Request not found or already processed.']);
+    }
+
+    if ($fcr['change_type'] === 'new_type') {
+        // Pending new type — mark as rejected (removes from catalog)
+        $stmt = $conn->prepare(
+            "UPDATE clearancefeetypetbl SET status='rejected', review_notes='Cancelled by requester', updated_at=NOW()
+             WHERE fee_type_id=?"
+        );
+    } else {
+        // price_edit — clear pending state, restore approved status
+        $stmt = $conn->prepare(
+            "UPDATE clearancefeetypetbl
+             SET proposed_amount=NULL, change_type=NULL, status='approved',
+                 notes=NULL, requested_by_user_id=NULL, review_notes=NULL, updated_at=NOW()
+             WHERE fee_type_id=?"
+        );
+    }
+    if (!$stmt) dr_respond_json(500, ['success' => false, 'message' => 'DB error.']);
+    $stmt->bind_param('i', $feeTypeId);
+    $stmt->execute();
+    $stmt->close();
+    try { insertUnifiedAuditLog($conn, $currentUserId, $currentUserRole, 'Fee Management', 'fee_type', (string)$feeTypeId, 'Cancel Fee Change Request', 'change_type', $fcr['change_type'], null, (string)($fcr['fee_name'] ?? '')); } catch (Throwable $__e) {}
+    dr_respond_json(200, ['success' => true]);
+}
+
+if ($action === 'process_fee_change_request') {
+    dr_ensure_clearance_fee_types_table($conn);
+    $feeTypeId   = (int)($_POST['fee_type_id'] ?? 0);
+    $decision    = trim((string)($_POST['decision'] ?? ''));
+    $reviewNotes = trim((string)($_POST['review_notes'] ?? ''));
+    $reviewerId  = trim((string)($_SESSION['user_id'] ?? $_SESSION['admin_id'] ?? ''));
+
+    if ($feeTypeId <= 0 || !in_array($decision, ['approved', 'rejected'], true)) {
+        dr_respond_json(400, ['success' => false, 'message' => 'Invalid parameters.']);
+    }
+
+    // Fetch the pending row
+    $stmt = $conn->prepare(
+        "SELECT * FROM clearancefeetypetbl WHERE fee_type_id=? AND status='pending' LIMIT 1"
+    );
+    if (!$stmt) dr_respond_json(500, ['success' => false, 'message' => 'DB error.']);
+    $stmt->bind_param('i', $feeTypeId);
+    $stmt->execute();
+    $fcr = $stmt->get_result()->fetch_assoc();
+    $stmt->close();
+    if (!$fcr) {
+        dr_respond_json(404, ['success' => false, 'message' => 'Request not found or already processed.']);
+    }
+
+    if ($decision === 'approved') {
+        if ($fcr['change_type'] === 'new_type') {
+            // Approve new fee type — activate it
+            $stmt = $conn->prepare(
+                "UPDATE clearancefeetypetbl
+                 SET status='approved', change_type=NULL, proposed_amount=NULL,
+                     reviewed_by_user_id=?, reviewed_at=NOW(), review_notes=?, updated_at=NOW()
+                 WHERE fee_type_id=?"
+            );
+            if (!$stmt) dr_respond_json(500, ['success' => false, 'message' => 'DB error.']);
+            $stmt->bind_param('ssi', $reviewerId, $reviewNotes, $feeTypeId);
+        } else {
+            // Approve price edit — promote proposed_amount to default_amount
+            $stmt = $conn->prepare(
+                "UPDATE clearancefeetypetbl
+                 SET default_amount=proposed_amount, proposed_amount=NULL, change_type=NULL,
+                     status='approved', reviewed_by_user_id=?, reviewed_at=NOW(),
+                     review_notes=?, updated_at=NOW()
+                 WHERE fee_type_id=?"
+            );
+            if (!$stmt) dr_respond_json(500, ['success' => false, 'message' => 'DB error.']);
+            $stmt->bind_param('ssi', $reviewerId, $reviewNotes, $feeTypeId);
+        }
+    } else {
+        // Rejected
+        if ($fcr['change_type'] === 'new_type') {
+            // Reject new type — mark as rejected
+            $stmt = $conn->prepare(
+                "UPDATE clearancefeetypetbl
+                 SET status='rejected', change_type=NULL, proposed_amount=NULL,
+                     reviewed_by_user_id=?, reviewed_at=NOW(), review_notes=?, updated_at=NOW()
+                 WHERE fee_type_id=?"
+            );
+        } else {
+            // Reject price edit — clear pending, restore approved
+            $stmt = $conn->prepare(
+                "UPDATE clearancefeetypetbl
+                 SET proposed_amount=NULL, change_type=NULL, status='approved',
+                     notes=NULL, requested_by_user_id=NULL,
+                     reviewed_by_user_id=?, reviewed_at=NOW(), review_notes=?, updated_at=NOW()
+                 WHERE fee_type_id=?"
+            );
+        }
+        if (!$stmt) dr_respond_json(500, ['success' => false, 'message' => 'DB error.']);
+        $stmt->bind_param('ssi', $reviewerId, $reviewNotes, $feeTypeId);
+    }
+    $stmt->execute();
+    $stmt->close();
+    try { insertUnifiedAuditLog($conn, $currentUserId, $currentUserRole, 'Fee Management', 'fee_type', (string)$feeTypeId, ucfirst($decision) . ' Fee Change Request', 'change_type', $fcr['change_type'], $decision, ($reviewNotes ?: (string)($fcr['fee_name'] ?? ''))); } catch (Throwable $__e) {}
+    dr_respond_json(200, ['success' => true]);
+}
+
+// ── Tag Clearance Fees ───────────────────────────────────────────────────────
+
+if ($action === 'tag_clearance_fees') {
+    $feesRaw = trim((string)($_POST['fees'] ?? ''));
+    $fees = json_decode($feesRaw, true);
+    if (!is_array($fees)) $fees = [];
+    $transitionToPayment = ((string)($_POST['transition_to_payment'] ?? '0') === '1');
+    $currentStage = strtolower(trim((string)($row['stage'] ?? '')));
+
+    // Validate: each entry must have fee_name (string) and amount (numeric >= 0)
+    $cleanFees = [];
+    foreach ($fees as $f) {
+        $name = trim((string)($f['fee_name'] ?? ''));
+        $amt  = max(0.0, (float)($f['amount'] ?? 0));
+        if ($name !== '') {
+            $cleanFees[] = ['fee_name' => $name, 'amount' => $amt];
+        }
+    }
+
+    if (!in_array($currentStage, [DR_STAGE_SUBMITTED, DR_STAGE_FEE_TAGGING], true)) {
+        dr_respond_json(409, ['success' => false, 'message' => 'Request is no longer eligible for fee tagging.']);
+    }
+
+    // Ensure clearance row exists
+    dr_ensure_clearance_fee_types_table($conn);
+    dr_ensure_clearance_row_for_request($conn, $row);
+
+    $clearanceId = dr_get_clearance_id_for_request($conn, $requestId);
+    if (!$clearanceId) {
+        dr_respond_json(500, ['success' => false, 'message' => 'Could not locate clearance record for this request.']);
+    }
+
+    // Replace all existing fees for this clearance
+    $delStmt = $conn->prepare("DELETE FROM clearancefeestbl WHERE clearance_id=?");
+    if ($delStmt) { $delStmt->bind_param('i', $clearanceId); $delStmt->execute(); $delStmt->close(); }
+
+    $total = 0.0;
+    if (!empty($cleanFees)) {
+        $insStmt = $conn->prepare("INSERT INTO clearancefeestbl (clearance_id, fee_type, amount) VALUES (?, ?, ?)");
+        if ($insStmt) {
+            foreach ($cleanFees as $fee) {
+                $insStmt->bind_param('isd', $clearanceId, $fee['fee_name'], $fee['amount']);
+                $insStmt->execute();
+                $total += $fee['amount'];
+            }
+            $insStmt->close();
+        }
+    }
+
+    $patch = ['fee_amount' => $total > 0 ? $total : null];
+    if ($transitionToPayment) {
+        $updated = dr_update_stage($conn, $requestId, DR_STAGE_FOR_PAYMENT, $patch);
+        if (!$updated) {
+            dr_respond_json(500, ['success' => false, 'message' => 'Failed to move request to payment stage.']);
+        }
+
+        dra_send_notification_deferred(
+            $conn,
+            $updated,
+            'Document Request Ready for Payment',
+            dra_request_notice($updated, $requestId, 'is ready for payment. Please log in to view the fee breakdown and complete your payment.')
+        );
+
+        $feesSummary = implode(', ', array_map(fn($f) => $f['fee_name'] . ' ₱' . number_format($f['amount'], 2), $cleanFees));
+        try { insertUnifiedAuditLog($conn, $currentUserId, $currentUserRole, 'Document Requests', 'document_request', $requestId, 'Tag Clearance Fees', 'fee_amount', null, '₱' . number_format($total, 2), $feesSummary); } catch (Throwable $__e) {}
+        dr_respond_json(200, ['success' => true, 'request' => $updated, 'total' => $total]);
+    }
+
+    $updated = dr_update_stage($conn, $requestId, $currentStage, $patch);
+    if (!$updated) {
+        dr_respond_json(500, ['success' => false, 'message' => 'Failed to save the tagged fees.']);
+    }
+
+    $feesSummary = implode(', ', array_map(fn($f) => $f['fee_name'] . ' ₱' . number_format($f['amount'], 2), $cleanFees));
+    try { insertUnifiedAuditLog($conn, $currentUserId, $currentUserRole, 'Document Requests', 'document_request', $requestId, 'Tag Clearance Fees', 'fee_amount', null, '₱' . number_format($total, 2), $feesSummary); } catch (Throwable $__e) {}
+    dr_respond_json(200, ['success' => true, 'request' => $updated, 'total' => $total]);
+}
+
+// ── Get Clearance Fees for a Request ────────────────────────────────────────
+
+if ($action === 'get_clearance_fees') {
+    $fees = dr_get_clearance_fees_for_request($conn, $requestId);
+    $total = array_sum(array_column($fees, 'amount'));
+    dr_respond_json(200, ['success' => true, 'fees' => $fees, 'total' => $total]);
 }
 
 dr_respond_json(404, ['success' => false, 'message' => 'Unknown action.']);

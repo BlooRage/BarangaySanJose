@@ -8,7 +8,7 @@
     role: "ALL",
     verification: "ALL",
     pagination: { currentPage: 1, entriesPerPage: 20 },
-    auto: { secondsLeft: 60, interval: null, inFlight: false },
+    auto: { secondsLeft: 15, interval: null, inFlight: false },
   };
 
   const tbody = el("userMasterTbody");
@@ -174,7 +174,7 @@
       if (tbody) tbody.innerHTML = `<tr><td colspan="9" class="text-center text-danger py-4">${safe(err?.message || "Unable to load users.")}</td></tr>`;
     } finally {
       state.auto.inFlight = false;
-      state.auto.secondsLeft = 60;
+      state.auto.secondsLeft = 15;
       renderCountdown();
       if (refreshBtn) {
         refreshBtn.classList.remove("is-loading");

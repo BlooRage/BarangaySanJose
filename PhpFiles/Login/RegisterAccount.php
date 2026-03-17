@@ -1,9 +1,14 @@
 <?php
+require_once __DIR__ . "/../General/security.php";
+require_once __DIR__ . "/redirectDestination.php";
+
 header('Content-Type: application/json');
 require '../General/connection.php';
 require '../General/uniqueIDGenerate.php';
 
-session_start();
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
 ini_set('display_errors', 0); // Never show errors to browser
 ini_set('log_errors', 1);
 error_reporting(E_ALL);
@@ -180,7 +185,7 @@ VALUES (?, ?, 1, ?, 0, ?, ?, ?, ?, ?)
 
     echo json_encode([
         "success" => true,
-        "redirect" => "../PhpFiles/Login/unifiedProfileCheck.php"
+        "redirect" => resolveUnifiedProfileRedirect($conn, $UserID, $RoleAccess)
     ]);
     exit;
 

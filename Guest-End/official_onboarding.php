@@ -10,6 +10,7 @@ require_once __DIR__ . "/../PhpFiles/General/uniqueIDGenerate.php";
 require_once __DIR__ . "/../PhpFiles/General/sendSMS.php";
 require_once __DIR__ . "/../PhpFiles/EmailHandlers/emailSender.php";
 require_once __DIR__ . "/../PhpFiles/General/mailConfigurations.php";
+require_once __DIR__ . "/../PhpFiles/Login/redirectDestination.php";
 
 $appRoot = appRootPath();
 $guestBaseHref = ($appRoot === '' ? '' : $appRoot) . '/Guest-End/';
@@ -520,7 +521,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         $_SESSION['role'] = $roleAccess;
                         $_SESSION['logged_in'] = true;
                         $_SESSION['last_activity'] = time();
-                        header('Location: official_onboarding.php');
+                        header('Location: ' . appUrl('/official-onboarding'));
                         exit;
                     } catch (Throwable $e) {
                         $conn->rollback();
@@ -944,7 +945,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $upInvite->close();
                 }
 
-                header('Location: ../PhpFiles/Login/unifiedProfileCheck.php');
+                header('Location: ' . resolveUnifiedProfileRedirect($conn, $loggedUserId, $loggedRole));
                 exit;
             } catch (Throwable $e) {
                 $errors[] = $e->getMessage();
@@ -989,7 +990,7 @@ if ($mode === 'resume') {
         if ($roleNormalized !== 'superadmin' && $inviteStatus !== 'completed') {
             $resumeStep = 'pending_approval';
         } else {
-            header('Location: ../PhpFiles/Login/unifiedProfileCheck.php');
+            header('Location: ' . resolveUnifiedProfileRedirect($conn, $loggedUserId, $loggedRole));
             exit;
         }
     }

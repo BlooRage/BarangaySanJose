@@ -24,7 +24,7 @@ $user = $res->fetch_assoc();
 $email = $user['email'];
 
 if ((int)$user['email_verify'] === 1) {
-  header("Location: ../../Resident-End/resident_dashboard.php?email=already_verified");
+  header("Location: " . appUrl('/Resident-End/resident_dashboard.php?email=already_verified'));
   exit;
 }
 
@@ -65,9 +65,9 @@ $sent = $emailSender->send([
 ]);
 
 if ($sent) {
-  header("Location: ../../Resident-End/resident_dashboard.php?email=sent");
+  header("Location: " . appUrl('/Resident-End/resident_dashboard.php?email=sent'));
   exit;
 }
 
-header("Location: ../../Resident-End/resident_dashboard.php?email=failed");
+header("Location: " . appUrl('/Resident-End/resident_dashboard.php?email=failed'));
 exit;

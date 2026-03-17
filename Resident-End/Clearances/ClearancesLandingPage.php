@@ -69,7 +69,7 @@ require_once __DIR__ . "/../includes/resident_access_guard.php";
                             data-bs-toggle="modal"
                             data-bs-target="#requirementsModal"
                             data-title="Business Clearance Requirements"
-                            data-apply-href="BusinessClearanceForm.php"
+                            data-apply-href="BusinessClearanceForm"
                             data-body="
                                 <p class='mb-2'><span class='fw-semibold'>Filing a renewal application is required one (1) year from the issuance date of your permit.</span></p>
                                 <ul class='mb-0 ps-3 requirements-top'>
@@ -144,7 +144,7 @@ require_once __DIR__ . "/../includes/resident_access_guard.php";
                             data-bs-toggle="modal"
                             data-bs-target="#requirementsModal"
                             data-title="Tricycle Permit Requirements"
-                            data-apply-href="TricycleForm.php"
+                            data-apply-href="TricycleForm"
                             data-body="
                                 <ul class='mb-0 ps-3 requirements-top'>
                                     <li class='mb-2'>
@@ -186,7 +186,7 @@ require_once __DIR__ . "/../includes/resident_access_guard.php";
                             data-bs-toggle="modal"
                             data-bs-target="#requirementsModal"
                             data-title="Barangay Clearance for Electrical Permit Requirements"
-                            data-apply-href="ElectricalForm.php"
+                            data-apply-href="ElectricalForm"
                             data-body="
                                 <ul class='mb-0 ps-3 requirements-top'>
                                     <li>
@@ -232,7 +232,7 @@ require_once __DIR__ . "/../includes/resident_access_guard.php";
                             data-bs-toggle="modal"
                             data-bs-target="#requirementsModal"
                             data-title="Barangay Clearance for Water Permit Requirements"
-                            data-apply-href="WaterForm.php"
+                            data-apply-href="WaterForm"
                             data-body="
                                 <ul class='mb-0 ps-3 requirements-top'>
                                     <li>
@@ -278,7 +278,7 @@ require_once __DIR__ . "/../includes/resident_access_guard.php";
                             data-bs-toggle="modal"
                             data-bs-target="#requirementsModal"
                             data-title="Barangay Clearance for Residential Permit Requirements"
-                            data-apply-href="ResidentialForm.php"
+                            data-apply-href="ResidentialForm"
                             data-body="
                                 <ul class='mb-0 ps-3 requirements-top'>
                                     <li>
@@ -324,7 +324,7 @@ require_once __DIR__ . "/../includes/resident_access_guard.php";
                             data-bs-toggle="modal"
                             data-bs-target="#requirementsModal"
                             data-title="Barangay Clearance for Commercial Permit Requirements"
-                            data-apply-href="CommercialForm.php"
+                            data-apply-href="CommercialForm"
                             data-body="
                                 <ul class='mb-0 ps-3 requirements-top'>
                                     <li>
@@ -365,7 +365,7 @@ require_once __DIR__ . "/../includes/resident_access_guard.php";
                         <img src="../../Icons/Dashboard/clearancepermits.png" class="certificate-icon" alt="For Other Permits">
                         <h3>FOR OTHER PERMITS</h3>
                         <p class="certificate-text">Apply for barangay clearance required for other permit processing.</p>
-                        <button class="btn apply-btn" onclick="location.href='OtherPermitsForm.php'">Apply Now</button>
+                        <button class="btn apply-btn" onclick="location.href='OtherPermitsForm'">Apply Now</button>
                     </div>
                 </div> -->
             </div>

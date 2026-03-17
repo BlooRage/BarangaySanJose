@@ -150,7 +150,7 @@ foreach ($announcementItems as $item) {
       <?php if ($residentAnnouncements): ?>
         <div class="dashboard-announcements-stack mb-4">
           <?php foreach ($residentAnnouncements as $index => $announcement): ?>
-            <div class="dashboard-announcement-banner rounded-4 overflow-hidden shadow-sm border-orange-thin position-relative mb-3" id="dashboardAnnouncementCard<?= (int)$index ?>" onclick="location.href='Announcements/AnnouncementsLandingPage.php'" role="button" tabindex="0">
+            <div class="dashboard-announcement-banner rounded-4 overflow-hidden shadow-sm border-orange-thin position-relative mb-3" id="dashboardAnnouncementCard<?= (int)$index ?>" onclick="location.href='Announcements/AnnouncementsLandingPage'" role="button" tabindex="0">
               <button type="button" class="dashboard-announcement-close" data-announcement-close="dashboardAnnouncementCard<?= (int)$index ?>" aria-label="Close">×</button>
               <div class="bg-orange text-center py-3">
                 <h3 class="text-white fw-bold mb-0"><?= htmlspecialchars($announcement['title']) ?></h3>
@@ -174,7 +174,7 @@ foreach ($announcementItems as $item) {
           </div>
           <div class="verify-cta-body p-3 p-md-4 text-center">
             <p class="text-muted mb-2">Want to access most modules? Verify now.</p>
-            <a href="DocumentUpload.php" class="btn btn-primary px-4">Verify Now</a>
+            <a href="DocumentUpload" class="btn btn-primary px-4">Verify Now</a>
           </div>
         </div>
       <?php endif; ?>
@@ -186,7 +186,7 @@ foreach ($announcementItems as $item) {
         <div class="col-12 col-md-4 col-lg-3">
           <div id="card-serviceRequest-certificates"
                class="card-action h-100 p-4 rounded-4 text-center d-flex flex-column align-items-center justify-content-center border-0 shadow-sm"
-               onclick="location.href='Certificates/CertificatesLandingPage.php'">
+               onclick="location.href='Certificates/CertificatesLandingPage'">
             <i class="fa-solid fa-file-lines fa-2xl mb-3"></i><br>
             <span class="fw-bold small">CERTIFICATE REQUEST</span>
           </div>
@@ -195,7 +195,7 @@ foreach ($announcementItems as $item) {
         <div class="col-12 col-md-4 col-lg-3">
           <div id="card-serviceRequest-clearances"
                class="card-action h-100 p-4 rounded-4 text-center d-flex flex-column align-items-center justify-content-center border-0 shadow-sm"
-               onclick="location.href='Clearances/ClearancesLandingPage.php'">
+               onclick="location.href='Clearances/ClearancesLandingPage'">
             <i class="fa-solid fa-clipboard-check fa-2xl mb-3"></i><br>
             <span class="fw-bold small">CLEARANCES</span>
           </div>
@@ -204,7 +204,7 @@ foreach ($announcementItems as $item) {
         <div class="col-12 col-md-4 col-lg-3">
           <div id="card-serviceRequest-brgyId"
                class="card-action h-100 p-4 rounded-4 text-center d-flex flex-column align-items-center justify-content-center border-0 shadow-sm"
-               onclick="location.href='BarangayId/BarangayIdLandingPage.php'">
+               onclick="location.href='BarangayId/BarangayIdLandingPage'">
             <i class="fa-solid fa-id-card fa-2xl mb-3"></i><br>
             <span class="fw-bold small">BARANGAY ID</span>
           </div>
@@ -213,7 +213,7 @@ foreach ($announcementItems as $item) {
         <div class="col-12 col-md-4 col-lg-3">
           <div id="card-serviceRequest-appointments"
                class="card-action h-100 p-4 rounded-4 text-center d-flex flex-column align-items-center justify-content-center border-0 shadow-sm"
-               onclick="location.href='Appointments/AppointmentsLandingPage.php'">
+               onclick="location.href='Appointments/AppointmentsLandingPage'">
             <i class="fa-solid fa-calendar-check fa-2xl mb-3"></i><br>
             <span class="fw-bold small">APPOINTMENTS</span>
           </div>
@@ -222,7 +222,7 @@ foreach ($announcementItems as $item) {
         <div class="col-12 col-md-4 col-lg-3">
           <div id="card-serviceRequest-announcements"
                class="card-action h-100 p-4 rounded-4 text-center d-flex flex-column align-items-center justify-content-center border-0 shadow-sm"
-               onclick="location.href='Announcements/AnnouncementsLandingPage.php'">
+               onclick="location.href='Announcements/AnnouncementsLandingPage'">
             <i class="fa-solid fa-bullhorn fa-2xl mb-3"></i><br>
             <span class="fw-bold small">ANNOUNCEMENTS</span>
           </div>
@@ -231,7 +231,7 @@ foreach ($announcementItems as $item) {
         <div class="col-12 col-md-4 col-lg-3">
           <div id="card-serviceRequest-transactions"
                class="card-action h-100 p-4 rounded-4 text-center d-flex flex-column align-items-center justify-content-center border-0 shadow-sm"
-               onclick="location.href='resident_transactions.php'">
+               onclick="location.href='resident_transactions'">
             <i class="fa-solid fa-money-check-dollar fa-2xl mb-3"></i><br>
             <span class="fw-bold small">TRANSACTIONS</span>
           </div>
@@ -240,7 +240,7 @@ foreach ($announcementItems as $item) {
         <div class="col-12 col-md-4 col-lg-3">
           <div id="card-serviceRequest-complaints"
                class="card-action h-100 p-4 rounded-4 text-center d-flex flex-column align-items-center justify-content-center border-0 shadow-sm"
-               onclick="location.href='Complaints/ComplaintsLandingPage.php'">
+               onclick="location.href='Complaints/ComplaintsLandingPage'">
             <i class="fa-solid fa-comment-dots fa-2xl mb-3"></i><br>
             <span class="fw-bold small">COMPLAINTS</span>
           </div>
@@ -249,7 +249,7 @@ foreach ($announcementItems as $item) {
         <div class="col-6 col-md-4 col-lg-3">
           <div id="card-serviceRequest-profile"
                class="card-action h-100 p-4 rounded-4 text-center d-flex flex-column align-items-center justify-content-center border-0 shadow-sm"
-               onclick="location.href='resident_profile.php'">
+               onclick="location.href='resident_profile'">
             <i class="fa-solid fa-user-circle fa-2xl mb-3"></i><br>
             <span class="fw-bold small">MY PROFILE</span>
           </div>
@@ -271,7 +271,7 @@ foreach ($announcementItems as $item) {
           You are not yet a verified resident, which means you cannot access most modules.
         </div>
         <div class="modal-footer border-0 pt-0 d-flex gap-2">
-          <a href="DocumentUpload.php" class="btn btn-primary flex-fill">Verify Now</a>
+          <a href="DocumentUpload" class="btn btn-primary flex-fill">Verify Now</a>
           <button type="button" class="btn btn-secondary flex-fill" data-bs-dismiss="modal">Later</button>
         </div>
       </div>
@@ -323,4 +323,3 @@ foreach ($announcementItems as $item) {
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 </body>
 </html>
-

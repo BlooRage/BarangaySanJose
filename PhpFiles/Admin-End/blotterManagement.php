@@ -396,8 +396,7 @@ try {
 
     $conn->commit();
 
-    $redirectBase = dirname($_SERVER['SCRIPT_NAME']);
-    $redirectUrl = $redirectBase . "/../../Admin-End/Blotter/BlotterForm.php?success=1&case_id=" . $caseId;
+    $redirectUrl = appUrl('/Admin-End/Blotter/BlotterForm.php?success=1&case_id=' . rawurlencode((string)$caseId));
     header("Location: " . $redirectUrl);
     exit;
 } catch (Exception $e) {

@@ -9,6 +9,7 @@ $financePages = ['FinancePayments.php'];
 $blotterPages = ['BlotterForm.php', 'BlotterTracker.php', 'ReviewQueue.php'];
 $complaintPages = ['ComplaintForm.php', 'ComplaintTracker.php'];
 $contentMgmtPages = ['Announcements.php', 'CreateAnnouncement.php'];
+$reportPages = ['Reports.php'];
 $userMgmtPages = ['UserMasterlist.php'];
 $adminMgmtPages = ['OfficialsManagement.php', 'OfficialInvites.php'];
 
@@ -46,10 +47,13 @@ $isComplaintActive = in_array($current, $complaintPages);
 $isContentMgmtActive = in_array($current, $contentMgmtPages);
 $isUserMgmtActive = in_array($current, $userMgmtPages);
 $isAdminMgmtActive = in_array($current, $adminMgmtPages);
+$isReportActive = in_array($current, $reportPages);
+$reportModule = strtolower(trim((string)($_GET['module'] ?? '')));
 $isSuperAdminSidebar = ((string)($_SESSION['role'] ?? '') === 'SuperAdmin');
 $financeSection = strtolower(trim((string)($_GET['section'] ?? 'tracker')));
 $isFinanceFeesActive = $current === 'FinancePayments.php' && $financeSection === 'fees';
-$isFinanceTrackerActive = $current === 'FinancePayments.php' && $financeSection !== 'fees';
+$isFinanceCashbookActive = $current === 'FinancePayments.php' && $financeSection === 'cashbook';
+$isFinanceTrackerActive = $current === 'FinancePayments.php' && !in_array($financeSection, ['fees', 'cashbook'], true);
 
 $adminDisplayName = "Admin User";
 $adminPosition = "Administrator";
@@ -268,8 +272,8 @@ if (!empty($_SESSION['user_id']) && isset($conn) && $conn instanceof mysqli) {
               </a>
             </li>
             <li>
-              <a href="<?= htmlspecialchars(appUrl('Admin-End/HeadofTheFamilyVerification.php')) ?>"
-                 class="link-dark rounded <?= $current == 'HeadofTheFamilyVerification.php' ? 'active' : '' ?>">
+              <a href="<?= htmlspecialchars(appUrl('Admin-End/HeadOfTheFamilyVerification.php')) ?>"
+                 class="link-dark rounded <?= $current == 'HeadOfTheFamilyVerification.php' ? 'active' : '' ?>">
                 Head of the Family Verification
               </a>
             </li>
@@ -326,6 +330,12 @@ if (!empty($_SESSION['user_id']) && isset($conn) && $conn instanceof mysqli) {
               <a href="<?= htmlspecialchars(appUrl('Admin-End/Certificates/FinancePayments.php')) ?>"
                  class="link-dark rounded <?= $isFinanceTrackerActive ? 'active' : '' ?>">
                 Payment Tracker
+              </a>
+            </li>
+            <li>
+              <a href="<?= htmlspecialchars(appUrl('Admin-End/Certificates/FinancePayments.php')) ?>?section=cashbook"
+                 class="link-dark rounded <?= $isFinanceCashbookActive ? 'active' : '' ?>">
+                Cashbook
               </a>
             </li>
             <li>
@@ -414,6 +424,57 @@ if (!empty($_SESSION['user_id']) && isset($conn) && $conn instanceof mysqli) {
            style="<?= $current == 'Announcements.php' ? 'outline: none; box-shadow: none;' : '' ?>">
           <i class="fas fa-bullhorn"></i> Announcements
         </a>
+      </li>
+
+      <li class="mb-1 mt-2 text-muted small fw-semibold px-2">Reports</li>
+      <li class="mb-1">
+        <button class="btn btn-toggle d-flex align-items-center gap-2 rounded <?= $isReportActive ? '' : 'collapsed' ?>"
+                data-bs-toggle="collapse"
+                data-bs-target="#reports-collapse"
+                aria-expanded="<?= $isReportActive ? 'true' : 'false' ?>">
+          <i class="fas fa-chart-bar"></i> Reports
+        </button>
+
+        <div class="collapse <?= $isReportActive ? 'show' : '' ?>" id="reports-collapse">
+          <ul class="btn-toggle-nav list-unstyled fw-normal pb-1 small">
+            <li>
+              <a href="<?= htmlspecialchars(appUrl('Admin-End/Reports/Reports.php')) ?>?module=document_requests"
+                 class="link-dark rounded <?= ($current === 'Reports.php' && $reportModule === 'document_requests') ? 'active' : '' ?>">
+                Document Requests
+              </a>
+            </li>
+            <li>
+              <a href="<?= htmlspecialchars(appUrl('Admin-End/Reports/Reports.php')) ?>?module=financial"
+                 class="link-dark rounded <?= ($current === 'Reports.php' && $reportModule === 'financial') ? 'active' : '' ?>">
+                Financial
+              </a>
+            </li>
+            <li>
+              <a href="<?= htmlspecialchars(appUrl('Admin-End/Reports/Reports.php')) ?>?module=residents"
+                 class="link-dark rounded <?= ($current === 'Reports.php' && $reportModule === 'residents') ? 'active' : '' ?>">
+                Residents
+              </a>
+            </li>
+            <li>
+              <a href="<?= htmlspecialchars(appUrl('Admin-End/Reports/Reports.php')) ?>?module=appointments"
+                 class="link-dark rounded <?= ($current === 'Reports.php' && $reportModule === 'appointments') ? 'active' : '' ?>">
+                Appointments
+              </a>
+            </li>
+            <li>
+              <a href="<?= htmlspecialchars(appUrl('Admin-End/Reports/Reports.php')) ?>?module=blotter"
+                 class="link-dark rounded <?= ($current === 'Reports.php' && $reportModule === 'blotter') ? 'active' : '' ?>">
+                Blotter
+              </a>
+            </li>
+            <li>
+              <a href="<?= htmlspecialchars(appUrl('Admin-End/Reports/Reports.php')) ?>?module=complaints"
+                 class="link-dark rounded <?= ($current === 'Reports.php' && $reportModule === 'complaints') ? 'active' : '' ?>">
+                Complaints
+              </a>
+            </li>
+          </ul>
+        </div>
       </li>
 
       <?php if ($isSuperAdminSidebar): ?>

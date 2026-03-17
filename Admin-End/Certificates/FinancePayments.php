@@ -4,7 +4,7 @@ require_once __DIR__ . '/../includes/admin_guard.php';
 
 $financeBaseUrl = appUrl('/Admin-End/Certificates/FinancePayments.php');
 $financeSection = strtolower(trim((string)($_GET['section'] ?? 'tracker')));
-if (!in_array($financeSection, ['tracker', 'fees'], true)) {
+if (!in_array($financeSection, ['tracker', 'fees', 'cashbook'], true)) {
   $financeSection = 'tracker';
 }
 
@@ -92,6 +92,42 @@ function fp_fetch_document_type(mysqli $conn, int $documentTypeId): ?array
   $row = $stmt->get_result()->fetch_assoc() ?: null;
   $stmt->close();
   return $row;
+}
+
+function fp_fetch_cashbook_entries(mysqli $conn, string $dateFrom, string $dateTo): array
+{
+  $rows = [];
+  $stmt = $conn->prepare("
+    SELECT
+      dr.request_id,
+      COALESCE(dr.document_type, 'Unknown') AS document_type,
+      dr.or_number,
+      dr.certificate_number,
+      COALESCE(dr.fee_amount, 0) AS amount,
+      COALESCE(dr.payment_method, '') AS payment_method,
+      dr.finance_decision_at,
+      dr.finance_user_id,
+      TRIM(CONCAT_WS(' ',
+        NULLIF(TRIM(COALESCE(ft.applicant_firstname, '')), ''),
+        NULLIF(TRIM(COALESCE(ft.applicant_middleInitial, '')), ''),
+        NULLIF(TRIM(COALESCE(ft.applicant_lastname, '')), '')
+      )) AS applicant_name
+    FROM documentrequesttbl dr
+    LEFT JOIN financetransactiontbl ft ON ft.request_id = dr.request_id
+    WHERE dr.or_number IS NOT NULL
+      AND dr.or_number != ''
+      AND DATE(dr.finance_decision_at) BETWEEN ? AND ?
+    ORDER BY dr.finance_decision_at DESC
+  ");
+  if (!$stmt) return [];
+  $stmt->bind_param('ss', $dateFrom, $dateTo);
+  $stmt->execute();
+  $result = $stmt->get_result();
+  while ($row = $result->fetch_assoc()) {
+    $rows[] = $row;
+  }
+  $stmt->close();
+  return $rows;
 }
 
 if ($financeSection === 'fees' || $_SERVER['REQUEST_METHOD'] === 'POST') {
@@ -194,6 +230,21 @@ $feeFlash = fp_take_flash();
 $feeRows = [];
 $availableFeeDocuments = [];
 $editingFee = null;
+
+$cashbookEntries   = [];
+$cashbookTotal     = 0.0;
+$cashbookDateFrom  = date('Y-m-d');
+$cashbookDateTo    = date('Y-m-d');
+
+if ($financeSection === 'cashbook') {
+  $cashbookDateFrom = trim((string)($_GET['date_from'] ?? date('Y-m-d')));
+  $cashbookDateTo   = trim((string)($_GET['date_to']   ?? date('Y-m-d')));
+  if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $cashbookDateFrom)) $cashbookDateFrom = date('Y-m-d');
+  if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $cashbookDateTo))   $cashbookDateTo   = date('Y-m-d');
+  if ($cashbookDateFrom > $cashbookDateTo)                      $cashbookDateTo   = $cashbookDateFrom;
+  $cashbookEntries = fp_fetch_cashbook_entries($conn, $cashbookDateFrom, $cashbookDateTo);
+  $cashbookTotal   = (float)array_sum(array_column($cashbookEntries, 'amount'));
+}
 
 if ($financeSection === 'fees') {
   $feeRowsResult = $conn->query("
@@ -551,6 +602,19 @@ if ($financeSection === 'fees') {
         min-width: 118px;
       }
     }
+    #paymentsPanel,
+    #clearanceFeesPanel {
+      border-top-left-radius: 0 !important;
+    }
+    #feeTypesTableBody tr { cursor: default; }
+    .cashbook-table th, .cashbook-table td { font-size: .88rem; }
+    @media print {
+      body { background: #fff !important; }
+      #main-display { padding: 0 !important; }
+      .d-print-none, aside, header, #dashboard-sidebar, #admin-mobile-header { display: none !important; }
+      .cashbook-shell { max-width: 100% !important; }
+      .finance-fee-card { box-shadow: none !important; border: none !important; }
+    }
   </style>
 </head>
 <body>
@@ -558,11 +622,29 @@ if ($financeSection === 'fees') {
   <?php include __DIR__ . '/../includes/sidebar.php'; ?>
 
   <main id="main-display" class="flex-grow-1 p-3 p-md-4 p-xl-5 bg-light">
-    <h2 class="mb-4" style="font-family: 'Charis SIL Bold'; color: #DE710C; ">Finance Payments</h2>
+    <h2 class="mb-4" style="font-family: 'Charis SIL Bold'; color: #DE710C;">Finance Payments</h2>
     <hr class="mb-4">
 
     <?php if ($financeSection === 'fees'): ?>
-      <div class="finance-fee-shell">
+      <ul class="nav nav-tabs mb-0" id="feesTabs" style="border-bottom:0">
+        <li class="nav-item">
+          <button class="nav-link active fw-semibold" id="tabGeneralFees" type="button">
+            <i class="fas fa-file-invoice-dollar me-1"></i>General Fees
+          </button>
+        </li>
+        <li class="nav-item">
+          <button class="nav-link fw-semibold" id="tabClearanceFees" type="button">
+            <i class="fas fa-tags me-1"></i>Clearance Fees
+          </button>
+        </li>
+        <li class="nav-item">
+          <button class="nav-link fw-semibold" id="tabPendingRequests" type="button">
+            <i class="fas fa-bell me-1"></i>Pending Requests
+            <span id="pendingRequestsBadge" class="badge bg-danger ms-1 d-none">0</span>
+          </button>
+        </li>
+      </ul>
+      <div id="generalFeesPanel" class="finance-fee-shell">
         <?php if ($feeFlash): ?>
           <div class="alert alert-<?= htmlspecialchars((string)($feeFlash['type'] ?? 'info'), ENT_QUOTES, 'UTF-8') ?> rounded-4 shadow-sm">
             <?= htmlspecialchars((string)($feeFlash['message'] ?? ''), ENT_QUOTES, 'UTF-8') ?>
@@ -712,7 +794,200 @@ if ($financeSection === 'fees') {
             </div>
           </div>
         </div>
+      </div><!-- end #generalFeesPanel -->
+
+      <!-- ── CLEARANCE FEES PANEL ───────────────────────────────────────────── -->
+      <div id="clearanceFeesPanel" class="d-none bg-white p-4 rounded-4 rounded-tl-0 shadow-sm border">
+        <div class="row g-4">
+
+          <!-- Left: fee types table -->
+          <div class="col-lg-7">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+              <h5 class="fw-bold mb-0">Clearance Fee Types</h5>
+              <button class="btn btn-sm btn-outline-secondary" id="btnRefreshFeeTable" title="Refresh">
+                <i class="fa-solid fa-arrows-rotate"></i>
+              </button>
+            </div>
+            <div class="table-responsive">
+              <table class="table table-sm table-hover align-middle">
+                <thead class="table-light">
+                  <tr>
+                    <th>#</th>
+                    <th>Fee Name</th>
+                    <th>Default Amount</th>
+                    <th>Status</th>
+                    <th class="text-end">Actions</th>
+                  </tr>
+                </thead>
+                <tbody id="feeTypesTableBody">
+                  <tr><td colspan="5" class="text-center text-muted py-3">Loading…</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- Right: add / edit form -->
+          <div class="col-lg-5">
+            <div class="border rounded-3 p-3 bg-light">
+              <h6 class="fw-semibold mb-3" id="feeFormTitle">
+                <i class="fas fa-plus-circle me-1 text-primary"></i>Add Fee Type
+              </h6>
+              <input type="hidden" id="feeFormId">
+              <div class="mb-3">
+                <label class="form-label fw-semibold small">Fee Name <span class="text-danger">*</span></label>
+                <input type="text" class="form-control" id="feeFormName" placeholder="e.g. Inspection Fee, Application Fee">
+              </div>
+              <div class="mb-3">
+                <label class="form-label fw-semibold small">Default Amount (₱)</label>
+                <div class="input-group">
+                  <span class="input-group-text">₱</span>
+                  <input type="number" class="form-control" id="feeFormAmount" value="0.00" min="0" step="0.01">
+                </div>
+                <div class="form-text">Used as the pre-filled default when admin tags fees to a request.</div>
+              </div>
+              <div class="mb-3 form-check form-switch">
+                <input class="form-check-input" type="checkbox" role="switch" id="feeFormActive" checked>
+                <label class="form-check-label small" for="feeFormActive">Active (appears when tagging fees)</label>
+              </div>
+              <div id="feeFormError" class="alert alert-danger d-none py-2 small mb-3"></div>
+              <div class="d-flex gap-2">
+                <button type="button" class="btn btn-primary flex-fill" id="feeFormSaveBtn">
+                  <i class="fas fa-save me-1"></i>Save
+                </button>
+                <button type="button" class="btn btn-outline-secondary" id="feeFormCancelBtn" title="Reset form">
+                  <i class="fas fa-times"></i>
+                </button>
+              </div>
+            </div>
+          </div>
+
+        </div>
+      </div><!-- end #clearanceFeesPanel -->
+
+      <!-- ── PENDING FEE CHANGE REQUESTS PANEL ──────────────────────────── -->
+      <div id="pendingRequestsPanel" class="d-none bg-white p-4 rounded-4 rounded-tl-0 shadow-sm border">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+          <h5 class="fw-bold mb-0">Pending Fee Change Requests</h5>
+          <button class="btn btn-sm btn-outline-secondary" id="btnRefreshPendingRequests" title="Refresh">
+            <i class="fa-solid fa-arrows-rotate"></i>
+          </button>
+        </div>
+        <div class="table-responsive">
+          <table class="table table-sm align-middle">
+            <thead class="table-light">
+              <tr>
+                <th>Type</th>
+                <th>Fee Name</th>
+                <th>Current Amount</th>
+                <th>Proposed Amount</th>
+                <th>Notes</th>
+                <th>Requested By</th>
+                <th>Submitted</th>
+                <th class="text-end">Actions</th>
+              </tr>
+            </thead>
+            <tbody id="pendingRequestsBody">
+              <tr><td colspan="8" class="text-center text-muted py-3">Loading…</td></tr>
+            </tbody>
+          </table>
+        </div>
       </div>
+
+    <?php elseif ($financeSection === 'cashbook'): ?>
+      <div class="cashbook-shell finance-fee-shell">
+        <div class="finance-fee-card p-4">
+          <div class="d-flex flex-wrap justify-content-between align-items-start gap-3 mb-4 d-print-none">
+            <div>
+              <h4 class="mb-1" style="font-family: 'Charis SIL Bold'; color: #DE710C;">Cashbook</h4>
+              <p class="text-muted mb-0 small">Daily collection log of all verified payments with issued OR numbers.</p>
+            </div>
+            <button class="btn btn-outline-dark btn-sm" onclick="window.print()">
+              <i class="fas fa-print me-1"></i>Print
+            </button>
+          </div>
+
+          <!-- Date range filter -->
+          <form method="get" action="" class="d-flex flex-wrap gap-2 align-items-end mb-4 d-print-none">
+            <input type="hidden" name="section" value="cashbook">
+            <div>
+              <label class="form-label fw-semibold small mb-1">Date From</label>
+              <input type="date" name="date_from" class="form-control form-control-sm"
+                     value="<?= htmlspecialchars($cashbookDateFrom, ENT_QUOTES, 'UTF-8') ?>">
+            </div>
+            <div>
+              <label class="form-label fw-semibold small mb-1">Date To</label>
+              <input type="date" name="date_to" class="form-control form-control-sm"
+                     value="<?= htmlspecialchars($cashbookDateTo, ENT_QUOTES, 'UTF-8') ?>">
+            </div>
+            <button type="submit" class="btn btn-primary btn-sm align-self-end">Apply</button>
+            <?php if ($cashbookDateFrom !== date('Y-m-d') || $cashbookDateTo !== date('Y-m-d')): ?>
+              <a href="?section=cashbook" class="btn btn-outline-secondary btn-sm align-self-end">Today</a>
+            <?php endif; ?>
+          </form>
+
+          <!-- Print-only header -->
+          <div class="d-none d-print-block mb-3">
+            <h5 class="fw-bold">Barangay San Jose — Collection Register</h5>
+            <div class="small">Period: <?= htmlspecialchars($cashbookDateFrom, ENT_QUOTES, 'UTF-8') ?> to <?= htmlspecialchars($cashbookDateTo, ENT_QUOTES, 'UTF-8') ?></div>
+            <div class="small text-muted">Printed: <?= date('Y-m-d H:i') ?></div>
+          </div>
+
+          <?php if (!$cashbookEntries): ?>
+            <div class="finance-fee-empty text-center py-5">
+              <i class="fas fa-book-open fa-2x mb-3 d-block text-muted"></i>
+              No verified payments found for the selected date range.
+            </div>
+          <?php else: ?>
+            <div class="table-responsive">
+              <table class="table table-sm table-bordered align-middle finance-fee-table cashbook-table">
+                <thead class="table-light">
+                  <tr>
+                    <th>#</th>
+                    <th>Date &amp; Time</th>
+                    <th>OR Number</th>
+                    <th>Certificate No.</th>
+                    <th>Resident / Applicant</th>
+                    <th>Document Type</th>
+                    <th>Method</th>
+                    <th class="text-end">Amount</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <?php foreach ($cashbookEntries as $i => $entry): ?>
+                    <?php $method = strtolower((string)($entry['payment_method'] ?? '')); ?>
+                    <tr>
+                      <td class="text-muted small"><?= $i + 1 ?></td>
+                      <td class="small"><?= htmlspecialchars((string)($entry['finance_decision_at'] ?? ''), ENT_QUOTES, 'UTF-8') ?></td>
+                      <td class="fw-semibold"><?= htmlspecialchars((string)($entry['or_number'] ?? ''), ENT_QUOTES, 'UTF-8') ?></td>
+                      <td class="small text-muted"><?= htmlspecialchars((string)($entry['certificate_number'] ?? '—'), ENT_QUOTES, 'UTF-8') ?></td>
+                      <td>
+                        <div class="fw-semibold small"><?= htmlspecialchars((string)($entry['applicant_name'] ?? ''), ENT_QUOTES, 'UTF-8') ?></div>
+                        <div class="text-muted" style="font-size:.73rem"><?= htmlspecialchars((string)($entry['request_id'] ?? ''), ENT_QUOTES, 'UTF-8') ?></div>
+                      </td>
+                      <td class="small"><?= htmlspecialchars((string)($entry['document_type'] ?? ''), ENT_QUOTES, 'UTF-8') ?></td>
+                      <td>
+                        <span class="badge <?= $method === 'gcash' ? 'bg-primary' : 'bg-secondary' ?>">
+                          <?= $method === 'gcash' ? 'GCash' : ($method === 'barangay' ? 'Walk-in' : htmlspecialchars(ucfirst($method), ENT_QUOTES, 'UTF-8')) ?>
+                        </span>
+                      </td>
+                      <td class="text-end finance-fee-amount">₱<?= number_format((float)($entry['amount'] ?? 0), 2) ?></td>
+                    </tr>
+                  <?php endforeach; ?>
+                </tbody>
+                <tfoot class="table-light fw-bold">
+                  <tr>
+                    <td colspan="7" class="text-end">
+                      Total Collections (<?= count($cashbookEntries) ?> transaction<?= count($cashbookEntries) === 1 ? '' : 's' ?>)
+                    </td>
+                    <td class="text-end finance-fee-amount">₱<?= number_format($cashbookTotal, 2) ?></td>
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
+          <?php endif; ?>
+        </div>
+      </div>
+
     <?php else: ?>
       <div class="bg-white p-4 rounded-4 shadow-sm border resident-masterlist-shell certificate-tracker-shell">
         <div class="admin-list-toolbar mb-3">
@@ -769,6 +1044,9 @@ if ($financeSection === 'fees') {
   </main>
 </div>
 
+<?php if ($financeSection === 'tracker' || $financeSection === 'cashbook'): ?>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<?php endif; ?>
 <?php if ($financeSection === 'tracker'): ?>
 <div class="modal fade" id="modalFinanceFilter" tabindex="-1" aria-hidden="true">
   <div class="modal-dialog modal-dialog-centered">
@@ -954,10 +1232,285 @@ if ($financeSection === 'fees') {
 <script>
 window.CERT_TRACKER_DEFAULT_STAGE = 'finance';
 </script>
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-<script src="../../JS-Script-Files/Admin-End/certificateTrackerScript.js?v=20260311-08"></script>
+<script src="../../JS-Script-Files/Admin-End/certificateTrackerScript.js?v=20260317-03"></script>
 <?php else: ?>
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+(function () {
+  'use strict';
+
+  const API = (function () {
+    const base = window.location.pathname.replace(/\/[^/]*$/, '');
+    return base.replace(/\/Admin-End\/Certificates$/, '') + '/PhpFiles/Admin-End/documentRequestWorkflow.php';
+  })();
+
+  // ── Page tab switching ────────────────────────────────────────────────────
+  const tabGeneralFees      = document.getElementById('tabGeneralFees');
+  const tabClearanceFees    = document.getElementById('tabClearanceFees');
+  const tabPendingRequests  = document.getElementById('tabPendingRequests');
+  const generalFeesPanel    = document.getElementById('generalFeesPanel');
+  const feesPanel           = document.getElementById('clearanceFeesPanel');
+  const pendingRequestsPanel = document.getElementById('pendingRequestsPanel');
+  let feesLoaded = false;
+  let pendingLoaded = false;
+
+  function showGeneralTab() {
+    tabGeneralFees.classList.add('active');
+    tabClearanceFees.classList.remove('active');
+    tabPendingRequests.classList.remove('active');
+    generalFeesPanel.classList.remove('d-none');
+    feesPanel.classList.add('d-none');
+    pendingRequestsPanel.classList.add('d-none');
+  }
+
+  function showFeesTab() {
+    tabClearanceFees.classList.add('active');
+    tabGeneralFees.classList.remove('active');
+    tabPendingRequests.classList.remove('active');
+    feesPanel.classList.remove('d-none');
+    generalFeesPanel.classList.add('d-none');
+    pendingRequestsPanel.classList.add('d-none');
+    if (!feesLoaded) { feesLoaded = true; loadFeeTypes(); }
+  }
+
+  function showPendingTab() {
+    tabPendingRequests.classList.add('active');
+    tabGeneralFees.classList.remove('active');
+    tabClearanceFees.classList.remove('active');
+    pendingRequestsPanel.classList.remove('d-none');
+    generalFeesPanel.classList.add('d-none');
+    feesPanel.classList.add('d-none');
+    if (!pendingLoaded) { pendingLoaded = true; loadPendingRequests(); }
+  }
+
+  tabGeneralFees.addEventListener('click', showGeneralTab);
+  tabClearanceFees.addEventListener('click', showFeesTab);
+  tabPendingRequests.addEventListener('click', showPendingTab);
+
+  // ── Helpers ───────────────────────────────────────────────────────────────
+  function esc(v) {
+    return String(v ?? '').replace(/[&<>"']/g, (m) =>
+      ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[m]));
+  }
+
+  function showFormError(msg) {
+    const el = document.getElementById('feeFormError');
+    if (!el) return;
+    el.textContent = msg;
+    el.classList.toggle('d-none', !msg);
+  }
+
+  // ── Load & render fee types ───────────────────────────────────────────────
+  async function loadFeeTypes() {
+    const tbody = document.getElementById('feeTypesTableBody');
+    if (!tbody) return;
+    tbody.innerHTML = '<tr><td colspan="5" class="text-center text-muted py-3"><i class="fas fa-spinner fa-spin me-1"></i>Loading…</td></tr>';
+    try {
+      const res  = await fetch(`${API}?action=list_fee_types`);
+      const data = await res.json();
+      if (!data.success) throw new Error(data.message || 'Failed to load.');
+      renderFeeTable(data.fee_types || []);
+    } catch (e) {
+      tbody.innerHTML = `<tr><td colspan="5" class="text-danger text-center py-3">${esc(e.message)}</td></tr>`;
+    }
+  }
+
+  function renderFeeTable(rows) {
+    const tbody = document.getElementById('feeTypesTableBody');
+    if (!tbody) return;
+    if (!rows.length) {
+      tbody.innerHTML = '<tr><td colspan="5" class="text-muted text-center py-3">No fee types yet. Add one using the form.</td></tr>';
+      return;
+    }
+    tbody.innerHTML = rows.map((ft, i) => `
+      <tr>
+        <td class="text-muted small">${i + 1}</td>
+        <td class="fw-semibold">${esc(ft.fee_name)}</td>
+        <td>₱${Number(ft.default_amount).toFixed(2)}</td>
+        <td>
+          <span class="badge ${ft.status === 'approved' ? 'bg-success' : 'bg-secondary'}">
+            ${ft.status === 'approved' ? 'Active' : (ft.status || 'Inactive')}
+          </span>
+        </td>
+        <td class="text-end">
+          <button class="btn btn-sm btn-outline-primary me-1 py-0 px-2"
+            onclick="financeEditFee(${ft.fee_type_id},${JSON.stringify(ft.fee_name)},${ft.default_amount},${JSON.stringify(ft.status)})">
+            <i class="fas fa-pen"></i>
+          </button>
+          <button class="btn btn-sm btn-outline-danger py-0 px-2"
+            onclick="financeDeleteFee(${ft.fee_type_id},${JSON.stringify(ft.fee_name)})">
+            <i class="fas fa-trash"></i>
+          </button>
+        </td>
+      </tr>`).join('');
+  }
+
+  // ── Form helpers ──────────────────────────────────────────────────────────
+  function resetForm() {
+    document.getElementById('feeFormId').value     = '';
+    document.getElementById('feeFormName').value   = '';
+    document.getElementById('feeFormAmount').value = '0.00';
+    document.getElementById('feeFormActive').checked = true;
+    document.getElementById('feeFormTitle').innerHTML =
+      '<i class="fas fa-plus-circle me-1 text-primary"></i>Add Fee Type';
+    showFormError('');
+  }
+
+  window.financeEditFee = function (id, name, amount, status) {
+    document.getElementById('feeFormId').value     = id;
+    document.getElementById('feeFormName').value   = name;
+    document.getElementById('feeFormAmount').value = Number(amount).toFixed(2);
+    document.getElementById('feeFormActive').checked = status === 'approved';
+    document.getElementById('feeFormTitle').innerHTML =
+      '<i class="fas fa-pen me-1 text-warning"></i>Edit Fee Type';
+    showFormError('');
+    document.getElementById('feeFormName').focus();
+  };
+
+  window.financeDeleteFee = async function (id, name) {
+    if (!confirm(`Delete fee type "${name}"?\n\nThis cannot be undone.`)) return;
+    try {
+      const body = new FormData();
+      body.append('action', 'delete_fee_type');
+      body.append('fee_type_id', id);
+      const res  = await fetch(API, { method: 'POST', body });
+      const data = await res.json();
+      if (!data.success) throw new Error(data.message || 'Delete failed.');
+      await loadFeeTypes();
+    } catch (e) {
+      alert(e.message);
+    }
+  };
+
+  // ── Save (create / update) ────────────────────────────────────────────────
+  async function saveFeeType() {
+    const id     = document.getElementById('feeFormId').value.trim();
+    const name   = document.getElementById('feeFormName').value.trim();
+    const amount = parseFloat(document.getElementById('feeFormAmount').value) || 0;
+    const active = document.getElementById('feeFormActive').checked;
+    showFormError('');
+    if (!name) { showFormError('Fee name is required.'); document.getElementById('feeFormName').focus(); return; }
+
+    const saveBtn = document.getElementById('feeFormSaveBtn');
+    saveBtn.disabled = true;
+    const origHtml = saveBtn.innerHTML;
+    saveBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Saving…';
+
+    try {
+      const body = new FormData();
+      body.append('action', 'save_fee_type');
+      if (id) body.append('fee_type_id', id);
+      body.append('fee_name', name);
+      body.append('default_amount', String(amount));
+      body.append('status', active ? 'approved' : 'rejected');
+      const res  = await fetch(API, { method: 'POST', body });
+      const data = await res.json();
+      if (!data.success) throw new Error(data.message || 'Save failed.');
+      resetForm();
+      await loadFeeTypes();
+    } catch (e) {
+      showFormError(e.message);
+    } finally {
+      saveBtn.disabled = false;
+      saveBtn.innerHTML = origHtml;
+    }
+  }
+
+  // ── Wire buttons ──────────────────────────────────────────────────────────
+  document.getElementById('feeFormSaveBtn').addEventListener('click', saveFeeType);
+  document.getElementById('feeFormCancelBtn').addEventListener('click', resetForm);
+  document.getElementById('btnRefreshFeeTable').addEventListener('click', loadFeeTypes);
+
+  // Allow Enter key in fee name field to save
+  document.getElementById('feeFormName').addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') { e.preventDefault(); saveFeeType(); }
+  });
+
+  // ── Pending Fee Change Requests ───────────────────────────────────────────
+  async function loadPendingRequests() {
+    const tbody = document.getElementById('pendingRequestsBody');
+    if (!tbody) return;
+    tbody.innerHTML = '<tr><td colspan="8" class="text-center text-muted py-3"><i class="fas fa-spinner fa-spin me-1"></i>Loading…</td></tr>';
+    try {
+      const res  = await fetch(`${API}?action=list_fee_change_requests&scope=all_pending`);
+      const data = await res.json();
+      if (!data.success) throw new Error(data.message || 'Failed.');
+      renderPendingRequests(data.requests || data.fee_types || []);
+    } catch (e) {
+      tbody.innerHTML = `<tr><td colspan="8" class="text-danger text-center py-3">${esc(e.message)}</td></tr>`;
+    }
+  }
+
+  function updatePendingBadge(count) {
+    const badge = document.getElementById('pendingRequestsBadge');
+    if (!badge) return;
+    if (count > 0) {
+      badge.textContent = count;
+      badge.classList.remove('d-none');
+    } else {
+      badge.classList.add('d-none');
+    }
+  }
+
+  function renderPendingRequests(rows) {
+    updatePendingBadge(rows.length);
+    const tbody = document.getElementById('pendingRequestsBody');
+    if (!rows.length) {
+      tbody.innerHTML = '<tr><td colspan="8" class="text-muted text-center py-3">No pending requests.</td></tr>';
+      return;
+    }
+    tbody.innerHTML = rows.map(r => `
+      <tr>
+        <td><span class="badge bg-secondary">${r.change_type === 'new_type' ? 'New Type' : 'Price Edit'}</span></td>
+        <td class="fw-semibold">${esc(r.fee_name)}</td>
+        <td>${r.change_type === 'price_edit' ? '₱' + Number(r.default_amount).toFixed(2) : '—'}</td>
+        <td>₱${Number(r.proposed_amount || r.default_amount).toFixed(2)}</td>
+        <td class="small text-muted">${esc(r.notes || '—')}</td>
+        <td class="small">${esc(r.requested_by_user_id || '—')}</td>
+        <td class="small text-muted">${esc(r.updated_at || r.created_at || '')}</td>
+        <td class="text-end">
+          <button class="btn btn-sm btn-success me-1 py-0 px-2" onclick="financeApproveFcr(${r.fee_type_id})">Approve</button>
+          <button class="btn btn-sm btn-outline-danger py-0 px-2" onclick="financeRejectFcr(${r.fee_type_id})">Reject</button>
+        </td>
+      </tr>`).join('');
+  }
+
+  window.financeApproveFcr = async function(id) {
+    if (!confirm('Approve this fee change request? The catalog will be updated automatically.')) return;
+    try {
+      const fd = new FormData();
+      fd.append('action', 'process_fee_change_request');
+      fd.append('fee_type_id', id);
+      fd.append('decision', 'approved');
+      const res  = await fetch(API, { method: 'POST', body: fd });
+      const data = await res.json();
+      if (!data.success) throw new Error(data.message || 'Approve failed.');
+      pendingLoaded = false;
+      await loadPendingRequests();
+    } catch (e) { alert(e.message); }
+  };
+
+  window.financeRejectFcr = async function(id) {
+    const reviewNotes = prompt('Reason for rejection (optional):') ?? '';
+    try {
+      const fd = new FormData();
+      fd.append('action', 'process_fee_change_request');
+      fd.append('fee_type_id', id);
+      fd.append('decision', 'rejected');
+      fd.append('review_notes', reviewNotes);
+      const res  = await fetch(API, { method: 'POST', body: fd });
+      const data = await res.json();
+      if (!data.success) throw new Error(data.message || 'Reject failed.');
+      pendingLoaded = false;
+      await loadPendingRequests();
+    } catch (e) { alert(e.message); }
+  };
+
+  document.getElementById('btnRefreshPendingRequests').addEventListener('click', () => {
+    pendingLoaded = false;
+    loadPendingRequests();
+  });
+})();
+</script>
 <?php endif; ?>
 </body>
 </html>

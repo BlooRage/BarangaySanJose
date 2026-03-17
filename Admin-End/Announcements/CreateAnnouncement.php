@@ -30,7 +30,7 @@ $isSuperAdmin = $sessionRole === 'superadmin';
     <main id="main-display" class="flex-grow-1 p-3 p-md-4 p-xl-5 bg-light">
       <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
         <h2 class="mb-0" style="font-family: 'Charis SIL Bold'; color: #DE710C;">Create Announcement</h2>
-        <a href="Announcements.php<?= $deliveryChannel !== 'all' ? '?channel=' . urlencode($deliveryChannel) : '' ?>" class="btn btn-outline-secondary btn-sm">
+        <a href="<?= htmlspecialchars(appUrl('/Admin-End/Announcements/Announcements.php')) ?><?= $deliveryChannel !== 'all' ? '?channel=' . urlencode($deliveryChannel) : '' ?>" class="btn btn-outline-secondary btn-sm">
           <i class="fa-solid fa-arrow-left me-1"></i> Back to List
         </a>
       </div>
@@ -265,7 +265,7 @@ $isSuperAdmin = $sessionRole === 'superadmin';
             <?php endif; ?>
           </div>
           <div class="announcement-modal-footer-end">
-            <a href="Announcements.php<?= $deliveryChannel !== 'all' ? '?channel=' . urlencode($deliveryChannel) : '' ?>" class="btn btn-outline-secondary">Close</a>
+            <a href="<?= htmlspecialchars(appUrl('/Admin-End/Announcements/Announcements.php')) ?><?= $deliveryChannel !== 'all' ? '?channel=' . urlencode($deliveryChannel) : '' ?>" class="btn btn-outline-secondary">Close</a>
           </div>
         </div>
       </form>
@@ -608,4 +608,3 @@ $isSuperAdmin = $sessionRole === 'superadmin';
   </script>
 </body>
 </html>
-

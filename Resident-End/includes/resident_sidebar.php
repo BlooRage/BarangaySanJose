@@ -220,7 +220,7 @@ if ($residentId !== '' && isset($conn) && $conn instanceof mysqli) {
        class="d-flex flex-column flex-shrink-0 p-3 bg-white border-end shadow-sm">
 
   <!-- LOGO HEADER (ADMIN-STYLE) -->
-  <a href="<?= htmlspecialchars($baseUrl, ENT_QUOTES, 'UTF-8') ?>/Resident-End/AdminDashboard.php" class="d-flex align-items-center pb-3 mb-3 link-dark text-decoration-none border-bottom">
+  <a href="<?= htmlspecialchars($baseUrl, ENT_QUOTES, 'UTF-8') ?>/Resident-End/resident_dashboard" class="d-flex align-items-center pb-3 mb-3 link-dark text-decoration-none border-bottom">
     <img src="<?= htmlspecialchars($baseUrl, ENT_QUOTES, 'UTF-8') ?>/Images/San_Jose_LOGO.jpg" class="me-2" style="width: 32px; height: 32px;">
     <span class="fs-5 fw-semibold logo-name">Barangay San Jose</span>
   </a>
@@ -245,7 +245,7 @@ if ($residentId !== '' && isset($conn) && $conn instanceof mysqli) {
 
       <div id="group-navHome" class="mb-3">
         <p class="text-muted small fw-bold mb-1">Home</p>
-        <a href="<?= htmlspecialchars($baseUrl, ENT_QUOTES, 'UTF-8') ?>/Resident-End/resident_dashboard.php"
+        <a href="<?= htmlspecialchars($baseUrl, ENT_QUOTES, 'UTF-8') ?>/Resident-End/resident_dashboard"
            class="a-sidebarLink <?= activeLink('resident_dashboard.php', $current) ?>">
           <i class="fa-solid fa-newspaper"></i>Dashboard
         </a>
@@ -253,23 +253,23 @@ if ($residentId !== '' && isset($conn) && $conn instanceof mysqli) {
 
       <div id="group-navServices" class="mb-3">
         <p class="text-muted small fw-bold mb-1">Services</p>
-        <a href="<?= htmlspecialchars($baseUrl, ENT_QUOTES, 'UTF-8') ?>/Resident-End/Certificates/CertificatesLandingPage.php"
+        <a href="<?= htmlspecialchars($baseUrl, ENT_QUOTES, 'UTF-8') ?>/Resident-End/Certificates/CertificatesLandingPage"
            class="a-sidebarLink <?= activeLink('resident_certificates.php', $current) ?>">
           <i class="fa-solid fa-certificate"></i>Certificates
         </a>
-        <a href="<?= htmlspecialchars($baseUrl, ENT_QUOTES, 'UTF-8') ?>/Resident-End/Clearances/ClearancesLandingPage.php"
+        <a href="<?= htmlspecialchars($baseUrl, ENT_QUOTES, 'UTF-8') ?>/Resident-End/Clearances/ClearancesLandingPage"
            class="a-sidebarLink <?= activeLink('resident_clearances.php', $current) ?>">
           <i class="fa-solid fa-file-circle-check fa-sm"></i>Clearances
         </a>
-        <a href="<?= htmlspecialchars($baseUrl, ENT_QUOTES, 'UTF-8') ?>/Resident-End/BarangayId/BarangayIdLandingPage.php"
+        <a href="<?= htmlspecialchars($baseUrl, ENT_QUOTES, 'UTF-8') ?>/Resident-End/BarangayId/BarangayIdLandingPage"
            class="a-sidebarLink <?= (in_array($current, ['BarangayIdLandingPage.php', 'BarangayIdForm.php'], true) ? 'active' : '') ?>">
           <i class="fa-solid fa-id-badge fa-lg"></i>Barangay ID
         </a>
-        <a href="<?= htmlspecialchars($baseUrl, ENT_QUOTES, 'UTF-8') ?>/Resident-End/Complaints/ComplaintsLandingPage.php"
+        <a href="<?= htmlspecialchars($baseUrl, ENT_QUOTES, 'UTF-8') ?>/Resident-End/Complaints/ComplaintsLandingPage"
            class="a-sidebarLink <?= (in_array($current, ['ComplaintsForm.php'], true) ? 'active' : '') ?>">
           <i class="fa-solid fa-comment-dots"></i>Complaints
         </a>
-        <a href="<?= htmlspecialchars($baseUrl, ENT_QUOTES, 'UTF-8') ?>/Resident-End/Appointments/AppointmentsLandingPage.php"
+        <a href="<?= htmlspecialchars($baseUrl, ENT_QUOTES, 'UTF-8') ?>/Resident-End/Appointments/AppointmentsLandingPage"
            class="a-sidebarLink <?= (in_array($current, ['AppointmentForm.php'], true) ? 'active' : '') ?>">
           <i class="fa-regular fa-calendar-days"></i>Appointments
         </a>
@@ -277,7 +277,7 @@ if ($residentId !== '' && isset($conn) && $conn instanceof mysqli) {
 
       <div id="group-navInfo" class="mb-3">
         <p class="text-muted small fw-bold mb-1">Info</p>
-        <a href="<?= htmlspecialchars($baseUrl, ENT_QUOTES, 'UTF-8') ?>/Resident-End/Announcements/AnnouncementsLandingPage.php"
+        <a href="<?= htmlspecialchars($baseUrl, ENT_QUOTES, 'UTF-8') ?>/Resident-End/Announcements/AnnouncementsLandingPage"
            class="a-sidebarLink <?= (in_array($current, ['AnnouncementsLandingPage.php'], true) ? 'active' : '') ?>">
           <i class="fa-solid fa-bullhorn"></i>Announcements
         </a>
@@ -290,31 +290,31 @@ if ($residentId !== '' && isset($conn) && $conn instanceof mysqli) {
         <div class="collapse <?= $isTransactionsActive ? 'show' : '' ?>" id="resident-transactions-collapse">
           <ul class="btn-toggle-nav list-unstyled fw-normal pb-1 small">
             <li>
-              <a href="<?= htmlspecialchars($baseUrl, ENT_QUOTES, 'UTF-8') ?>/Resident-End/resident_activity.php"
+              <a href="<?= htmlspecialchars($baseUrl, ENT_QUOTES, 'UTF-8') ?>/Resident-End/resident_activity"
                  class="link-dark rounded <?= activeLink('resident_activity.php', $current) ?>">
                 Summary
               </a>
             </li>
             <li>
-              <a href="<?= htmlspecialchars($baseUrl, ENT_QUOTES, 'UTF-8') ?>/Resident-End/resident_transactions.php"
+              <a href="<?= htmlspecialchars($baseUrl, ENT_QUOTES, 'UTF-8') ?>/Resident-End/resident_transactions"
                  class="link-dark rounded <?= activeLink('resident_transactions.php', $current) ?>">
                 All Transactions
               </a>
             </li>
             <li>
-              <a href="<?= htmlspecialchars($baseUrl, ENT_QUOTES, 'UTF-8') ?>/Resident-End/document_requests.php"
+              <a href="<?= htmlspecialchars($baseUrl, ENT_QUOTES, 'UTF-8') ?>/Resident-End/document_requests"
                  class="link-dark rounded <?= activeLink('document_requests.php', $current) ?>">
                 Document Request
               </a>
             </li>
             <li>
-              <a href="<?= htmlspecialchars($baseUrl, ENT_QUOTES, 'UTF-8') ?>/Resident-End/appointment_tracker.php"
+              <a href="<?= htmlspecialchars($baseUrl, ENT_QUOTES, 'UTF-8') ?>/Resident-End/appointment_tracker"
                  class="link-dark rounded <?= activeLink('appointment_tracker.php', $current) ?>">
                 Appointment Schedules
               </a>
             </li>
             <li>
-              <a href="<?= htmlspecialchars($baseUrl, ENT_QUOTES, 'UTF-8') ?>/Resident-End/complaint_tracker.php"
+              <a href="<?= htmlspecialchars($baseUrl, ENT_QUOTES, 'UTF-8') ?>/Resident-End/complaint_tracker"
                  class="link-dark rounded <?= activeLink('complaint_tracker.php', $current) ?>">
                 Complaint Tracking
               </a>
@@ -328,7 +328,7 @@ if ($residentId !== '' && isset($conn) && $conn instanceof mysqli) {
 
     <div class="sidebar-actions">
       <a class="account-button btn btn-sm w-100 mb-2"
-         href="<?= htmlspecialchars($baseUrl, ENT_QUOTES, 'UTF-8') ?>/Resident-End/resident_profile.php">
+         href="<?= htmlspecialchars($baseUrl, ENT_QUOTES, 'UTF-8') ?>/Resident-End/resident_profile">
         <i class="fa-solid fa-circle-user"></i> Account
       </a>
       <a class="btn btn-danger btn-sm w-100 logout-link"

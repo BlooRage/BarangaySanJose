@@ -724,6 +724,7 @@ foreach ($appointmentRows as $row) {
         const entriesPerPageInput = document.getElementById("entriesPerPageInput");
         const paginationEl = document.getElementById("appointmentPagination");
         const refreshBtn = document.getElementById("btnAppointmentTableRefresh");
+        const pendingBadge = document.getElementById("pendingAppointmentBadge");
         const filterButtons = Array.from(document.querySelectorAll(".status-filter-btn"));
         const reviewForm = document.getElementById("appointmentReviewForm");
         const reviewActionInput = document.getElementById("reviewActionInput");
@@ -750,6 +751,69 @@ foreach ($appointmentRows as $row) {
         let currentPage = 1;
         let activeFilter = "";
         let pendingReviewAction = "";
+        const AUTO_REFRESH_SECONDS = 15;
+        let autoRefreshSecondsLeft = AUTO_REFRESH_SECONDS;
+        let autoRefreshInterval = null;
+        let autoRefreshInFlight = false;
+
+        function setRefreshLoading(on) {
+            if (!refreshBtn) return;
+            refreshBtn.classList.toggle("is-loading", !!on);
+            refreshBtn.disabled = !!on;
+        }
+
+        function updatePendingBadge() {
+            if (!pendingBadge) return;
+            const count = allRows.filter((row) => String(row.dataset.status || "").trim().toLowerCase() === "pending").length;
+            pendingBadge.textContent = String(count);
+            pendingBadge.classList.toggle("d-none", count <= 0);
+        }
+
+        async function refreshTableOnly() {
+            if (autoRefreshInFlight || !tableBody) return;
+            autoRefreshInFlight = true;
+            autoRefreshSecondsLeft = AUTO_REFRESH_SECONDS;
+            setRefreshLoading(true);
+            try {
+                const response = await fetch(window.location.href, {
+                    credentials: "same-origin",
+                    headers: { "X-Requested-With": "XMLHttpRequest" }
+                });
+                const html = await response.text();
+                if (!response.ok) {
+                    throw new Error("Failed to refresh appointments.");
+                }
+                const doc = new DOMParser().parseFromString(html, "text/html");
+                const nextBody = doc.getElementById("tableBody");
+                if (!nextBody) {
+                    throw new Error("Refreshed appointment table was not found.");
+                }
+                tableBody.innerHTML = nextBody.innerHTML;
+                allRows = Array.from(tableBody.querySelectorAll("tr")).filter((row) => row.dataset.status !== undefined);
+                updatePendingBadge();
+                renderTable();
+            } catch (error) {
+                console.error("Unable to refresh appointment tracker:", error);
+            } finally {
+                autoRefreshInFlight = false;
+                setRefreshLoading(false);
+            }
+        }
+
+        function triggerRefresh() {
+            refreshTableOnly().catch(() => {});
+        }
+
+        function startAutoRefresh() {
+            if (autoRefreshInterval) window.clearInterval(autoRefreshInterval);
+            autoRefreshInterval = window.setInterval(() => {
+                if (autoRefreshInFlight) return;
+                autoRefreshSecondsLeft -= 1;
+                if (autoRefreshSecondsLeft <= 0) {
+                    triggerRefresh();
+                }
+            }, 1000);
+        }
 
         function renderPagination(total) {
             if (!paginationEl) return;
@@ -837,9 +901,7 @@ foreach ($appointmentRows as $row) {
             renderTable();
         });
 
-        refreshBtn?.addEventListener("click", () => {
-            window.location.reload();
-        });
+        refreshBtn?.addEventListener("click", triggerRefresh);
 
         modal?.addEventListener("show.bs.modal", (event) => {
             const button = event.relatedTarget;
@@ -976,7 +1038,9 @@ foreach ($appointmentRows as $row) {
         }
 
         setFilterButtonState("");
+        updatePendingBadge();
         renderTable();
+        startAutoRefresh();
     })();
 </script>
 </body>

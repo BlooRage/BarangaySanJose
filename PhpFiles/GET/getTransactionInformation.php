@@ -201,7 +201,7 @@ if ($fullName === '') {
     $fullName = 'Resident';
 }
 
-$address = ti_value($payload, ['full_address'], 'Barangay San Jose, Rodriguez, Rizal');
+$address = ti_value($payload, ['applicant_full_address', 'owner_full_address', 'full_address', 'full_address_display', 'address', 'complete_address'], 'Barangay San Jose, Rodriguez, Rizal');
 $purpose = trim((string)($row['purpose'] ?? ''));
 if ($purpose === '') {
     $purpose = ti_value($payload, ['request_purpose', 'purpose'], '-');

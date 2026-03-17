@@ -44,6 +44,7 @@ RewriteRule ^transaction-information/?$ Guest-End/TransactionInformation.html [L
 RewriteRule ^official-onboarding/?$ Guest-End/official_onboarding.php [L,NC]
 RewriteRule ^verify-email/?$ Guest-End/verifyEmail.php [L,NC]
 RewriteRule ^logout/?$ PhpFiles/Login/logout.php [L,NC]
+RewriteRule ^account-redirect/?$ PhpFiles/Login/unifiedProfileCheck.php [L,NC]
 
 # Public page URLs: redirect GET/HEAD requests from *.php / *.html to extensionless paths.
 # Keep PhpFiles endpoints untouched so POST actions and AJAX routes continue to work normally.

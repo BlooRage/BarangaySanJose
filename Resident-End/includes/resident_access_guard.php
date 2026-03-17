@@ -29,12 +29,12 @@ $allowUnregistered = $allowUnregistered ?? false;
 
 // Not yet profiled → force to registration (unless explicitly allowed)
 if (!$hasResidentProfile && !$allowUnregistered) {
-    header("Location: resident_registration.php");
+    header("Location: " . appUrl('/Resident-End/resident_registration.php'));
     exit;
 }
 
 // Already profiled → keep out of registration page
 if ($hasResidentProfile && $allowUnregistered) {
-    header("Location: resident_dashboard.php");
+    header("Location: " . appUrl('/Resident-End/resident_dashboard.php'));
     exit;
 }

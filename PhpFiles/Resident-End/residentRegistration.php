@@ -1,5 +1,6 @@
 <?php
 session_start();
+require_once __DIR__ . "/../General/security.php";
 include "../General/connection.php";
 require_once "../General/uniqueIDGenerate.php";
 require_once "../General/audit.php";
@@ -1701,7 +1702,7 @@ try {
     echo json_encode([
         "success" => true,
         "message" => $message,
-        "redirect" => "resident_dashboard.php"
+        "redirect" => appUrl('/Resident-End/resident_dashboard.php')
     ]);
     exit;
 

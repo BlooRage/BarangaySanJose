@@ -13,7 +13,7 @@
     profileApproval: "ALL",
     canManageActions: false,
     pagination: { currentPage: 1, entriesPerPage: 20 },
-    auto: { secondsLeft: 60, interval: null, inFlight: false },
+    auto: { secondsLeft: 15, interval: null, inFlight: false },
   };
 
   const tbody = el("officialsMgmtTbody");
@@ -493,7 +493,7 @@
       }
     } finally {
       state.auto.inFlight = false;
-      state.auto.secondsLeft = 60;
+      state.auto.secondsLeft = 15;
       renderCountdown();
       setRefreshState(false);
     }

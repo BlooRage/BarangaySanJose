@@ -99,6 +99,7 @@ function appUrl(string $path): string
     $publicAliases = [
         '/index' => '/',
         '/PhpFiles/Login/logout.php' => '/logout',
+        '/PhpFiles/Login/unifiedProfileCheck.php' => '/account-redirect',
         '/Guest-End/login' => '/login',
         '/Guest-End/government' => '/government',
         '/Guest-End/services' => '/services',

@@ -12,7 +12,7 @@
       to: "",   // YYYY-MM-DD
     },
     auto: {
-      secondsLeft: 60,
+      secondsLeft: 15,
       interval: null,
       inFlight: false,
     },
@@ -290,7 +290,7 @@
   };
 
   // ========================
-  // AUTO REFRESH + MANUAL REFRESH (60s)
+  // AUTO REFRESH + MANUAL REFRESH (15s)
   // ========================
   const renderCountdown = () => {
     const c = el("auditAutoRefreshCountdown");
@@ -299,7 +299,7 @@
   };
 
   const resetCountdown = () => {
-    state.auto.secondsLeft = 60;
+    state.auto.secondsLeft = 15;
     renderCountdown();
   };
 

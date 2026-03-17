@@ -4,6 +4,7 @@ ini_set('log_errors', 1);
 error_reporting(E_ALL);
 
 require_once "../General/security.php";
+require_once __DIR__ . "/redirectDestination.php";
 header('Content-Type: application/json');
 date_default_timezone_set('Asia/Manila');
 
@@ -292,7 +293,7 @@ $_SESSION['show_not_verified_modal'] = true;
 echo json_encode([
     'success'  => true,
     'status'   => 'active',
-    'redirect' => '../PhpFiles/Login/unifiedProfileCheck.php'
+    'redirect' => resolveUnifiedProfileRedirect($conn, (string)$userData['user_id'], (string)$userData['role_access'])
 ]);
 exit;
 ?>

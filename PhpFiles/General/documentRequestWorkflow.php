@@ -12,6 +12,7 @@ const DR_STAGE_INTERVIEW_FAILED = 'interview_failed';
 const DR_STAGE_FOR_INSPECTION = 'for_inspection';
 const DR_STAGE_INSPECTION_FAILED = 'inspection_failed';
 const DR_STAGE_REJECTED = 'rejected';
+const DR_STAGE_FEE_TAGGING = 'fee_tagging';
 const DR_STAGE_FOR_PAYMENT = 'for_payment';
 const DR_STAGE_PAYMENT_SUBMITTED = 'payment_submitted';
 const DR_STAGE_PAYMENT_REJECTED = 'payment_rejected';
@@ -42,6 +43,7 @@ function dr_add_working_days(string $fromDateTime, int $workingDays): string {
             $added++;
         }
     }
+    $date->setTime(16, 30, 0);
     return $date->format('Y-m-d H:i:s');
 }
 
@@ -533,6 +535,8 @@ function dr_generate_request_id(mysqli $conn): string {
 function dr_normalize_document_type(string $value): string {
     $key = strtolower(trim($value));
     $map = [
+        'barangayid' => 'Barangay ID',
+        'applicationforbarangayid' => 'Barangay ID',
         'cohabitation' => 'Certificate of Cohabitation',
         'indigency' => 'CertificateOfIndigency',
         'certificate of indigency' => 'CertificateOfIndigency',
@@ -583,6 +587,16 @@ function dr_is_clearance_document_type(string $documentType): bool {
         }
     }
     return false;
+}
+
+function dr_is_barangay_id_document_type(string $documentType): bool {
+    $doc = strtolower(trim($documentType));
+    if ($doc === '') {
+        return false;
+    }
+    $token = dr_canonical_document_type_key($doc);
+    return in_array($token, ['barangayid', 'applicationforbarangayid'], true)
+        || strpos($doc, 'barangay id') !== false;
 }
 
 function dr_request_application_type(array $requestRow, array $payload): string {
@@ -680,6 +694,7 @@ function dr_stage_label(string $stage): string {
         DR_STAGE_FOR_INSPECTION => 'For Inspection',
         DR_STAGE_INSPECTION_FAILED => 'Inspection Failed',
         DR_STAGE_REJECTED => 'Rejected',
+        DR_STAGE_FEE_TAGGING => 'Approved',
         DR_STAGE_FOR_PAYMENT => 'For Payment',
         DR_STAGE_PAYMENT_SUBMITTED => 'Pending Payment Verification',
         DR_STAGE_PAYMENT_REJECTED => 'Payment Rejected',
@@ -699,6 +714,7 @@ function dr_stage_to_request_status_names(string $stage): array {
         DR_STAGE_FOR_INSPECTION => ['ForInspection'],
         DR_STAGE_INSPECTION_FAILED => ['InspectionFailed'],
         DR_STAGE_REJECTED => ['Rejected'],
+        DR_STAGE_FEE_TAGGING => ['FeeTagging'],
         DR_STAGE_FOR_PAYMENT => ['ForPayment'],
         DR_STAGE_PAYMENT_SUBMITTED => ['PaymentSubmitted'],
         DR_STAGE_PAYMENT_REJECTED => ['PaymentRejected'],
@@ -720,6 +736,7 @@ function dr_status_name_to_stage(string $statusName): ?string {
         'forinspection' => DR_STAGE_FOR_INSPECTION,
         'inspectionfailed' => DR_STAGE_INSPECTION_FAILED,
         'rejected' => DR_STAGE_REJECTED,
+        'feetagging' => DR_STAGE_FEE_TAGGING,
         'forpayment' => DR_STAGE_FOR_PAYMENT,
         'paymentsubmitted' => DR_STAGE_PAYMENT_SUBMITTED,
         'paymentrejected' => DR_STAGE_PAYMENT_REJECTED,
@@ -1166,9 +1183,17 @@ function dr_sync_transaction(mysqli $conn, array $request): void {
         return;
     }
 
-    // Free documents must not exist in finance transactions.
+    // Prefer the request-specific fee (for tagged clearances) before falling back
+    // to the generic configured document fee.
+    $requestFee = null;
+    if (isset($request['fee_amount']) && $request['fee_amount'] !== null && $request['fee_amount'] !== '' && is_numeric((string)$request['fee_amount'])) {
+        $requestFee = (float)$request['fee_amount'];
+    }
     $configuredFee = dr_get_fee_amount_for_document_type($conn, $docType);
-    $isFreeDocument = ($configuredFee !== null && (float)$configuredFee <= 0.0);
+    $effectiveFee = $requestFee !== null ? $requestFee : $configuredFee;
+
+    // Free documents must not exist in finance transactions.
+    $isFreeDocument = ($effectiveFee !== null && (float)$effectiveFee <= 0.0);
     if ($isFreeDocument) {
         $del = $conn->prepare("DELETE FROM financetransactiontbl WHERE request_id = ? LIMIT 1");
         if ($del) {
@@ -1207,7 +1232,9 @@ function dr_sync_transaction(mysqli $conn, array $request): void {
     }
 
     $txAmount = isset($request['amount']) ? (float)$request['amount'] : null;
-    if (($txAmount === null || $txAmount <= 0.0) && $configuredFee !== null && (float)$configuredFee > 0.0) {
+    if (($txAmount === null || $txAmount <= 0.0) && $requestFee !== null && (float)$requestFee > 0.0) {
+        $txAmount = (float)$requestFee;
+    } elseif (($txAmount === null || $txAmount <= 0.0) && $configuredFee !== null && (float)$configuredFee > 0.0) {
         $txAmount = (float)$configuredFee;
     }
     $txOr = trim((string)($request['or_number'] ?? ''));
@@ -1734,7 +1761,7 @@ function dr_send_notification(mysqli $conn, array $request, string $subject, str
             $statusLabel = '-';
         }
         $rejectionReason = trim((string)($request['status_remarks'] ?? $request['status_reason'] ?? ''));
-        $amountValue = $request['amount'] ?? null;
+        $amountValue = $request['amount'] ?? ($request['fee_amount'] ?? null);
         $amount = '';
         if ($amountValue !== null && $amountValue !== '' && is_numeric((string)$amountValue)) {
             $amount = 'PHP ' . number_format((float)$amountValue, 2);
@@ -2160,6 +2187,63 @@ function dr_upsert_clearance_request(
     }
 }
 
+function dr_upsert_barangay_id_request(mysqli $conn, string $requestId, string $idDetails): void {
+    if (!dr_table_exists($conn, 'barangayidrequesttbl')
+        || !dr_column_exists($conn, 'barangayidrequesttbl', 'request_id')
+        || !dr_column_exists($conn, 'barangayidrequesttbl', 'id_details')) {
+        return;
+    }
+
+    $sql = "
+        INSERT INTO barangayidrequesttbl (request_id, id_details)
+        VALUES (?, ?)
+        ON DUPLICATE KEY UPDATE
+            id_details = VALUES(id_details),
+            updated_at = CURRENT_TIMESTAMP
+    ";
+    $stmt = $conn->prepare($sql);
+    if (!$stmt) {
+        error_log('[documentRequestWorkflow][barangayid] prepare failed: ' . $conn->error);
+        return;
+    }
+    $stmt->bind_param('ss', $requestId, $idDetails);
+    if (!$stmt->execute()) {
+        error_log('[documentRequestWorkflow][barangayid] upsert failed: ' . $stmt->error . ' | request_id=' . $requestId);
+    }
+    $stmt->close();
+}
+
+function dr_ensure_barangay_id_row_for_request(mysqli $conn, array $requestRow): void {
+    $requestId = trim((string)($requestRow['request_id'] ?? ''));
+    if ($requestId === '') {
+        return;
+    }
+
+    $detailsRaw = (string)($requestRow['request_details'] ?? $requestRow['payload_json'] ?? '{}');
+    $payload = json_decode($detailsRaw, true);
+    if (!is_array($payload)) {
+        $payload = [];
+    }
+
+    $docType = trim((string)($requestRow['document_type'] ?? ''));
+    if ($docType === '') {
+        $docType = trim((string)($payload['document_type'] ?? ''));
+    }
+    $docType = dr_normalize_document_type($docType);
+    if (!dr_is_barangay_id_document_type($docType)) {
+        return;
+    }
+
+    $idDetails = dr_safe_json([
+        'source' => 'barangay_id_request_enforcement',
+        'submitted_payload' => $payload,
+        'resident_id' => trim((string)($requestRow['resident_id'] ?? '')),
+        'resident_user_id' => trim((string)($requestRow['resident_user_id'] ?? $requestRow['user_id'] ?? '')),
+        'purpose' => trim((string)($requestRow['purpose'] ?? $payload['request_purpose'] ?? $payload['purpose'] ?? '')),
+    ]);
+    dr_upsert_barangay_id_request($conn, $requestId, $idDetails);
+}
+
 function dr_ensure_issuance_row_for_request(mysqli $conn, array $requestRow): void {
     $requestId = trim((string)($requestRow['request_id'] ?? ''));
     if ($requestId === '') {
@@ -2235,6 +2319,7 @@ function dr_ensure_clearance_row_for_request(mysqli $conn, array $requestRow): v
 }
 
 function dr_sync_request_child_rows(mysqli $conn, array $requestRow): void {
+    dr_ensure_barangay_id_row_for_request($conn, $requestRow);
     dr_ensure_issuance_row_for_request($conn, $requestRow);
     dr_ensure_clearance_row_for_request($conn, $requestRow);
 }
@@ -2599,4 +2684,97 @@ function dr_get_fee_amount_for_document_type(mysqli $conn, string $documentType)
     $stmt->close();
     $cache[$cacheKey] = $ok ? (float)$amount : null;
     return $cache[$cacheKey];
+}
+
+function dr_ensure_clearance_fee_types_table(mysqli $conn): void {
+    static $done = false;
+    if ($done) return;
+    $done = true;
+    // Create table with full schema if it doesn't exist yet
+    $conn->query("
+        CREATE TABLE IF NOT EXISTS clearancefeetypetbl (
+            fee_type_id          BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT,
+            fee_name             VARCHAR(120) NOT NULL,
+            default_amount       DECIMAL(12,2) NOT NULL DEFAULT 0.00,
+            proposed_amount      DECIMAL(12,2) DEFAULT NULL,
+            status               ENUM('pending','approved','rejected') NOT NULL DEFAULT 'approved',
+            change_type          ENUM('new_type','price_edit') DEFAULT NULL,
+            notes                TEXT DEFAULT NULL,
+            requested_by_user_id VARCHAR(64) DEFAULT NULL,
+            reviewed_by_user_id  VARCHAR(64) DEFAULT NULL,
+            reviewed_at          DATETIME DEFAULT NULL,
+            review_notes         TEXT DEFAULT NULL,
+            created_at           DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            updated_at           DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            PRIMARY KEY (fee_type_id),
+            UNIQUE KEY uq_clearancefeetypes_name (fee_name),
+            KEY idx_clearancefeetypes_status (status)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
+    ");
+    // Upgrade existing table: add columns introduced in the merged schema
+    // These are safe to run on a table that already has the columns (ignored by MariaDB/MySQL)
+    $conn->query("ALTER TABLE clearancefeetypetbl ADD COLUMN IF NOT EXISTS proposed_amount DECIMAL(12,2) DEFAULT NULL");
+    $conn->query("ALTER TABLE clearancefeetypetbl ADD COLUMN IF NOT EXISTS status ENUM('pending','approved','rejected') NOT NULL DEFAULT 'approved'");
+    $conn->query("ALTER TABLE clearancefeetypetbl ADD COLUMN IF NOT EXISTS change_type ENUM('new_type','price_edit') DEFAULT NULL");
+    $conn->query("ALTER TABLE clearancefeetypetbl ADD COLUMN IF NOT EXISTS notes TEXT DEFAULT NULL");
+    $conn->query("ALTER TABLE clearancefeetypetbl ADD COLUMN IF NOT EXISTS requested_by_user_id VARCHAR(64) DEFAULT NULL");
+    $conn->query("ALTER TABLE clearancefeetypetbl ADD COLUMN IF NOT EXISTS reviewed_by_user_id VARCHAR(64) DEFAULT NULL");
+    $conn->query("ALTER TABLE clearancefeetypetbl ADD COLUMN IF NOT EXISTS reviewed_at DATETIME DEFAULT NULL");
+    $conn->query("ALTER TABLE clearancefeetypetbl ADD COLUMN IF NOT EXISTS review_notes TEXT DEFAULT NULL");
+    // Migrate is_active=0 rows to rejected (silently ignored if is_active column doesn't exist)
+    @$conn->query("UPDATE clearancefeetypetbl SET status='rejected' WHERE is_active=0");
+    // Add status index if missing
+    $conn->query("ALTER TABLE clearancefeetypetbl ADD KEY IF NOT EXISTS idx_clearancefeetypes_status (status)");
+    // Seed common fee types if none exist yet
+    $conn->query("
+        INSERT IGNORE INTO clearancefeetypetbl (fee_name, default_amount, status) VALUES
+            ('Application Fee', 100.00, 'approved'),
+            ('Inspection Fee',  200.00, 'approved'),
+            ('Processing Fee',   50.00, 'approved'),
+            ('Clearance Fee',   150.00, 'approved')
+    ");
+}
+
+function dr_get_clearance_fees_for_request(mysqli $conn, string $requestId): array {
+    $requestId = trim($requestId);
+    if ($requestId === '' || !dr_table_exists($conn, 'clearancefeestbl') || !dr_table_exists($conn, 'clearancerequesttbl')) {
+        return [];
+    }
+    $stmt = $conn->prepare("
+        SELECT cf.clearance_fee_id, cf.fee_type, cf.amount
+        FROM clearancefeestbl cf
+        JOIN clearancerequesttbl cr ON cr.clearance_id = cf.clearance_id
+        WHERE cr.request_id = ?
+        ORDER BY cf.clearance_fee_id ASC
+    ");
+    if (!$stmt) return [];
+    $stmt->bind_param('s', $requestId);
+    $stmt->execute();
+    $rows = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+    $stmt->close();
+    return $rows;
+}
+
+function dr_get_clearance_fee_total_for_request(mysqli $conn, string $requestId): float {
+    $fees = dr_get_clearance_fees_for_request($conn, $requestId);
+    $total = 0.0;
+    foreach ($fees as $fee) {
+        $total += (float)($fee['amount'] ?? 0);
+    }
+    return $total;
+}
+
+function dr_get_clearance_id_for_request(mysqli $conn, string $requestId): ?int {
+    $requestId = trim($requestId);
+    if ($requestId === '' || !dr_table_exists($conn, 'clearancerequesttbl')) {
+        return null;
+    }
+    $stmt = $conn->prepare("SELECT clearance_id FROM clearancerequesttbl WHERE request_id = ? LIMIT 1");
+    if (!$stmt) return null;
+    $stmt->bind_param('s', $requestId);
+    $stmt->execute();
+    $stmt->bind_result($cid);
+    $found = $stmt->fetch();
+    $stmt->close();
+    return ($found && $cid) ? (int)$cid : null;
 }

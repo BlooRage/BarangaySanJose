@@ -933,7 +933,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['resident_id'])) {
         $stmt->close();
     }
 
-    header("Location: ../../Admin-End/residentMasterlist.php");
+    header("Location: " . appUrl('/Admin-End/ResidentMasterlist.php'));
     exit;
 }
 

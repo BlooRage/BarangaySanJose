@@ -9,6 +9,7 @@
   const tableBody = document.getElementById('tableBody');
   const searchInput = document.getElementById('searchInput');
   const stageTabs = Array.from(document.querySelectorAll('[data-stage-filter]'));
+  const barangayIdTabCount = document.getElementById('barangayIdTabCount');
   const pendingTabCount = document.getElementById('pendingTabCount');
   const releaseTabCount = document.getElementById('releaseTabCount');
   const unpaidTabCount = document.getElementById('unpaidTabCount');
@@ -22,6 +23,386 @@
   const btnFinanceFilterReset = document.getElementById('btnFinanceFilterReset');
   const financeColChecks = Array.from(document.querySelectorAll('[data-finance-col-index]'));
   const btnFinanceColumnsReset = document.getElementById('btnFinanceColumnsReset');
+
+  function getOrCreateModalInstance(modalEl, options = {}) {
+    if (!modalEl || !window.bootstrap?.Modal) return null;
+    if (typeof bootstrap.Modal.getOrCreateInstance === 'function') {
+      return bootstrap.Modal.getOrCreateInstance(modalEl, options);
+    }
+    const existing = typeof bootstrap.Modal.getInstance === 'function'
+      ? bootstrap.Modal.getInstance(modalEl)
+      : null;
+    return existing || new bootstrap.Modal(modalEl, options);
+  }
+
+  let feeTypeCatalogCache = null;
+  let feeTypeCatalogPromise = null;
+  let feeTaggingLoadToken = 0;
+  let feeCatalogModalBound = false;
+
+  async function fetchFeeTypeCatalog(options = {}) {
+    const force = !!options.force;
+    if (!force && Array.isArray(feeTypeCatalogCache)) {
+      return feeTypeCatalogCache;
+    }
+    if (!force && feeTypeCatalogPromise) {
+      return feeTypeCatalogPromise;
+    }
+
+    const runner = (async () => {
+      const data = await fetchJson(`${endpoint}?action=list_fee_types`);
+      const rows = Array.isArray(data?.fee_types) ? data.fee_types : [];
+      feeTypeCatalogCache = rows;
+      return rows;
+    })();
+
+    if (!force) {
+      feeTypeCatalogPromise = runner;
+    }
+
+    try {
+      return await runner;
+    } finally {
+      if (!force) {
+        feeTypeCatalogPromise = null;
+      }
+    }
+  }
+
+  function warmFeeTypeCatalogCache() {
+    fetchFeeTypeCatalog().catch(() => {});
+  }
+
+  async function fetchTaggedClearanceFees(requestId) {
+    const q = new URLSearchParams({
+      action: 'get_clearance_fees',
+      request_id: String(requestId || '').trim()
+    });
+    const data = await fetchJson(`${endpoint}?${q.toString()}`);
+    return Array.isArray(data?.fees) ? data.fees : [];
+  }
+
+  function resolveSystemAmount(row, fallbackValue = null) {
+    const candidates = [fallbackValue, row?.fee_amount, row?.amount];
+    for (const candidate of candidates) {
+      if (candidate === null || candidate === undefined || String(candidate).trim() === '') {
+        continue;
+      }
+      const numeric = Number(candidate);
+      if (Number.isFinite(numeric)) {
+        return numeric;
+      }
+    }
+    return null;
+  }
+
+  function formatPhpAmount(value, fallback = '-') {
+    return Number.isFinite(value) ? `PHP ${value.toFixed(2)}` : fallback;
+  }
+
+  function renderFinanceVerifyPrompt({
+    row,
+    isPendingVerification = false,
+    isWalkInStage = false,
+    feeRows = null,
+    loadingBreakdown = false,
+    breakdownError = '',
+    fallbackAmount = null
+  } = {}) {
+    const payload = row && row.payload && typeof row.payload === 'object' ? row.payload : {};
+    const residentProfile = row && row.resident_profile && typeof row.resident_profile === 'object'
+      ? row.resident_profile
+      : {};
+    const customerName = fullNameFromRow(row) || '-';
+    const customerAddress = firstNonEmpty([
+      payload.full_address,
+      payload.full_address_display,
+      payload.address,
+      payload.complete_address,
+      residentProfile.full_address,
+      row?.full_address,
+      row?.address,
+      '-'
+    ]);
+    const method = firstNonEmpty([row?.payment_method, isWalkInStage ? 'Barangay Walk-in' : 'GCash']);
+    const docNameForPrompt = normalizeDocumentTypeDisplay(firstNonEmpty([row?.document_type, '-']));
+    const taggedFees = Array.isArray(feeRows) ? feeRows : [];
+    const taggedTotal = taggedFees.length
+      ? taggedFees.reduce((sum, fee) => sum + (Number(fee?.amount) || 0), 0)
+      : null;
+    const resolvedAmount = resolveSystemAmount(row, fallbackAmount ?? taggedTotal);
+    const showBreakdown = taggedFees.length > 0;
+    const showAmountOnly = !showBreakdown && Number.isFinite(resolvedAmount);
+
+    let intro = 'Review the payment details below and enter the OR number to continue.';
+    if (isWalkInStage) {
+      intro = showBreakdown
+        ? 'The tagged fee breakdown below will be used for this walk-in payment. Enter the OR number to continue.'
+        : (showAmountOnly
+            ? 'The system amount below will be used for this walk-in payment. Enter the OR number to continue.'
+            : 'Enter the paid amount and OR number to record this walk-in payment.');
+    } else if (isPendingVerification) {
+      intro = showBreakdown
+        ? 'Review the tagged fee breakdown below and enter the OR number to continue.'
+        : 'Review the transaction details below and enter the OR number to continue.';
+    }
+
+    const breakdownLines = showBreakdown
+      ? taggedFees.map((fee) => {
+          const feeName = firstNonEmpty([fee?.fee_type, fee?.fee_name, 'Fee']);
+          const feeAmount = Number(fee?.amount);
+          return `
+            <div class="d-flex justify-content-between align-items-center py-1 border-top">
+              <span>${esc(feeName)}</span>
+              <span class="fw-semibold">${esc(formatPhpAmount(feeAmount))}</span>
+            </div>
+          `;
+        }).join('')
+      : '';
+
+    return `
+      <div class="mb-2">${esc(intro)}</div>
+      <div class="border rounded p-3 bg-light mt-2">
+        <div class="small text-muted mb-2">Payment Summary</div>
+        <div><strong>Full Name:</strong> ${esc(customerName)}</div>
+        <div><strong>Full Address:</strong> ${esc(customerAddress)}</div>
+        <div><strong>Payment Method:</strong> ${esc(method)}</div>
+        <div><strong>Requested Document:</strong> ${esc(docNameForPrompt)}</div>
+        ${showBreakdown ? `
+          <div class="mt-3">
+            <div class="fw-semibold mb-1">Tagged Fee Breakdown</div>
+            <div class="small">
+              ${breakdownLines}
+              <div class="d-flex justify-content-between align-items-center pt-2 mt-1 border-top fw-bold text-primary">
+                <span>Total</span>
+                <span>${esc(formatPhpAmount(resolveSystemAmount(row, taggedTotal)))}</span>
+              </div>
+            </div>
+          </div>
+        ` : ''}
+        ${!showBreakdown && showAmountOnly ? `
+          <div class="d-flex justify-content-between align-items-center pt-2 mt-2 border-top">
+            <span class="fw-semibold">Amount Due</span>
+            <span class="fw-bold text-primary">${esc(formatPhpAmount(resolvedAmount))}</span>
+          </div>
+        ` : ''}
+        ${loadingBreakdown ? `
+          <div class="small text-muted mt-2">
+            <span class="spinner-border spinner-border-sm me-2" aria-hidden="true"></span>
+            Loading tagged fee breakdown...
+          </div>
+        ` : ''}
+        ${breakdownError ? `<div class="small text-danger mt-2">${esc(breakdownError)}</div>` : ''}
+      </div>
+    `;
+  }
+
+  async function populateFinanceVerifyPrompt(row, options = {}) {
+    if (!actionPrompt) return;
+    const requestId = String(row?.request_id || '').trim();
+    const token = ++financeVerifySummaryToken;
+    const isPendingVerification = !!options.isPendingVerification;
+    const isWalkInStage = !!options.isWalkInStage;
+    const needsTaggedBreakdown = requestNeedsFeeTagging(row);
+
+    actionPrompt.innerHTML = renderFinanceVerifyPrompt({
+      row,
+      isPendingVerification,
+      isWalkInStage,
+      loadingBreakdown: needsTaggedBreakdown
+    });
+    actionPrompt.classList.remove('d-none');
+
+    if (!needsTaggedBreakdown || !requestId) {
+      return;
+    }
+
+    try {
+      const feeRows = await fetchTaggedClearanceFees(requestId);
+      if (
+        token !== financeVerifySummaryToken ||
+        String(actionType?.value || '') !== 'finance_verify' ||
+        String(actionRequestId?.value || '').trim() !== requestId
+      ) {
+        return;
+      }
+
+      const taggedTotal = feeRows.reduce((sum, fee) => sum + (Number(fee?.amount) || 0), 0);
+      const hasTaggedBreakdown = feeRows.length > 0 && Number.isFinite(taggedTotal);
+      const resolvedTaggedAmount = resolveSystemAmount(row, hasTaggedBreakdown ? taggedTotal : null);
+      if (hasTaggedBreakdown && actionAmount) {
+        actionAmount.value = taggedTotal.toFixed(2);
+      }
+      if (hasTaggedBreakdown) {
+        actionAmountWrap.classList.add('d-none');
+        actionAmount.required = false;
+      } else if (!isPendingVerification && !Number.isFinite(resolvedTaggedAmount)) {
+        actionAmountWrap.classList.remove('d-none');
+        actionAmount.required = true;
+        if (actionAmount) {
+          actionAmount.readOnly = false;
+          actionAmount.classList.remove('bg-light');
+        }
+      }
+
+      actionPrompt.innerHTML = renderFinanceVerifyPrompt({
+        row,
+        isPendingVerification,
+        isWalkInStage,
+        feeRows,
+        fallbackAmount: taggedTotal
+      });
+    } catch (err) {
+      if (
+        token !== financeVerifySummaryToken ||
+        String(actionType?.value || '') !== 'finance_verify' ||
+        String(actionRequestId?.value || '').trim() !== requestId
+      ) {
+        return;
+      }
+      actionPrompt.innerHTML = renderFinanceVerifyPrompt({
+        row,
+        isPendingVerification,
+        isWalkInStage,
+        breakdownError: err?.message || 'Unable to load the tagged fee breakdown.'
+      });
+      if (!isPendingVerification && !Number.isFinite(resolveSystemAmount(row))) {
+        actionAmountWrap.classList.remove('d-none');
+        actionAmount.required = true;
+        if (actionAmount) {
+          actionAmount.readOnly = false;
+          actionAmount.classList.remove('bg-light');
+        }
+      }
+    }
+  }
+
+  function renderFeeTaggingLoadingState(row) {
+    const docName = esc(row?.document_type || 'Document');
+    const residentName = esc(row?.full_name || row?.resident_name || '');
+    return `
+      <div class="small text-muted mb-3">Preparing fee tagging for <strong>${docName}</strong>${residentName ? ` - ${residentName}` : ''}</div>
+      <div class="border rounded text-center py-4 bg-light">
+        <div class="spinner-border spinner-border-sm text-primary mb-2" role="status" aria-hidden="true"></div>
+        <div class="text-muted">Loading fee options...</div>
+      </div>
+    `;
+  }
+
+  function renderFeeTaggingErrorState(message) {
+    return `<div class="alert alert-danger mb-0">${esc(message || 'Failed to load fee tagging data.')}</div>`;
+  }
+
+  function renderFeeTaggingForm(row, feeTypes, taggedFees) {
+    const taggedMap = {};
+    taggedFees.forEach((fee) => {
+      const feeName = String(fee?.fee_type || '').trim();
+      if (!feeName) return;
+      taggedMap[feeName] = fee.amount;
+    });
+
+    const docName = esc(row?.document_type || 'Document');
+    const residentName = esc(row?.full_name || row?.resident_name || '');
+    const renderedFeeNames = new Set();
+
+    let html = `<div class="small text-muted mb-3">Tagging fees for <strong>${docName}</strong>${residentName ? ` - ${residentName}` : ''}</div>`;
+    html += `<div class="table-responsive"><table class="table table-sm align-middle" id="feeTaggingTable">`;
+    html += `<thead class="table-light"><tr><th style="width:30px"><input type="checkbox" id="feeTagSelectAll" title="Select/deselect all"></th><th>Fee Name</th><th style="width:130px">Amount (₱)</th><th style="width:40px"></th></tr></thead><tbody id="feeTaggingRows">`;
+
+    const activeFeeTypes = Array.isArray(feeTypes)
+      ? feeTypes.filter((ft) => Number(ft?.is_active) === 1)
+      : [];
+
+    activeFeeTypes.forEach((ft) => {
+      const feeName = String(ft?.fee_name || '').trim();
+      if (!feeName) return;
+      renderedFeeNames.add(feeName);
+      const isChecked = Object.prototype.hasOwnProperty.call(taggedMap, feeName);
+      const amt = isChecked ? taggedMap[feeName] : ft.default_amount;
+      html += `<tr data-fee-row>
+        <td><input type="checkbox" class="fee-tag-check" ${isChecked ? 'checked' : ''}></td>
+        <td><span class="fee-tag-name">${esc(feeName)}</span></td>
+        <td><input type="number" class="form-control form-control-sm fee-tag-amount" value="${Number(amt).toFixed(2)}" min="0" step="0.01"></td>
+        <td></td>
+      </tr>`;
+    });
+
+    taggedFees.forEach((fee) => {
+      const feeName = String(fee?.fee_type || '').trim();
+      if (!feeName || renderedFeeNames.has(feeName)) return;
+      html += `<tr data-fee-row>
+        <td><input type="checkbox" class="fee-tag-check" checked></td>
+        <td><span class="fee-tag-name">${esc(feeName)}</span></td>
+        <td><input type="number" class="form-control form-control-sm fee-tag-amount" value="${Number(fee.amount || 0).toFixed(2)}" min="0" step="0.01"></td>
+        <td></td>
+      </tr>`;
+    });
+
+    if (!activeFeeTypes.length && !taggedFees.length) {
+      html += `<tr><td colspan="4" class="text-center text-muted py-3">No saved fee types yet. You can add a custom fee below.</td></tr>`;
+    }
+
+    html += `</tbody></table></div>`;
+    html += `<button type="button" class="btn btn-outline-secondary btn-sm mb-3" id="feeTagAddCustom"><i class="fas fa-plus me-1"></i>Add Custom Fee</button>`;
+    html += `<div class="d-flex justify-content-between align-items-center fw-bold border-top pt-2"><span>Total</span><span id="feeTaggingTotal" class="text-primary">₱0.00</span></div>`;
+
+    return html;
+  }
+
+  function syncFeeTagSelectAllState() {
+    const selectAll = document.getElementById('feeTagSelectAll');
+    if (!selectAll) return;
+    const checks = Array.from(document.querySelectorAll('#feeTaggingRows .fee-tag-check'));
+    if (!checks.length) {
+      selectAll.checked = false;
+      selectAll.indeterminate = false;
+      return;
+    }
+    const checkedCount = checks.filter((cb) => cb.checked).length;
+    selectAll.checked = checkedCount === checks.length;
+    selectAll.indeterminate = checkedCount > 0 && checkedCount < checks.length;
+  }
+
+  function bindFeeTaggingTable() {
+    const selectAll = document.getElementById('feeTagSelectAll');
+    if (selectAll) {
+      selectAll.addEventListener('change', () => {
+        document.querySelectorAll('#feeTaggingRows .fee-tag-check').forEach((cb) => { cb.checked = selectAll.checked; });
+        updateFeeTagTotal();
+      });
+    }
+
+    const addCustomBtn = document.getElementById('feeTagAddCustom');
+    if (addCustomBtn) {
+      addCustomBtn.addEventListener('click', () => {
+        const tbody = document.getElementById('feeTaggingRows');
+        if (!tbody) return;
+        const tr = document.createElement('tr');
+        tr.setAttribute('data-fee-row', '');
+        tr.innerHTML = `
+          <td><input type="checkbox" class="fee-tag-check" checked></td>
+          <td><input type="text" class="form-control form-control-sm fee-tag-name-input" placeholder="Fee name" style="min-width:120px"></td>
+          <td><input type="number" class="form-control form-control-sm fee-tag-amount" value="0.00" min="0" step="0.01"></td>
+          <td><button type="button" class="btn btn-sm btn-outline-danger fee-tag-remove-row" title="Remove"><i class="fas fa-times"></i></button></td>`;
+        tbody.appendChild(tr);
+        tr.querySelector('.fee-tag-remove-row').addEventListener('click', () => {
+          tr.remove();
+          updateFeeTagTotal();
+        });
+        tr.querySelector('.fee-tag-amount').addEventListener('input', updateFeeTagTotal);
+        tr.querySelector('.fee-tag-check').addEventListener('change', updateFeeTagTotal);
+        updateFeeTagTotal();
+      });
+    }
+
+    document.querySelectorAll('#feeTaggingRows .fee-tag-amount, #feeTaggingRows .fee-tag-check').forEach((el) => {
+      el.addEventListener('input', updateFeeTagTotal);
+      el.addEventListener('change', updateFeeTagTotal);
+    });
+
+    syncFeeTagSelectAllState();
+    updateFeeTagTotal();
+  }
 
   const actionModalEl = document.getElementById('actionModal');
   const actionModal = actionModalEl ? new bootstrap.Modal(actionModalEl) : null;
@@ -91,12 +472,14 @@
   let suppressActionReturn = false;
   let openPreviewAfterActionModal = false;
   let openViewDirectPreview = false;
+  let pendingPreviewStateOverride = null;
   let paymentProofReturnTarget = '';
   let paymentProofPrintUrl = '';
   let submittedFileReturnTarget = '';
   let preserveViewStateOnNextHide = false;
   let financeViewIntent = 'view';
   let templatePreviewRequestSeq = 0;
+  let financeVerifySummaryToken = 0;
   let previewScrollCleanup = null;
   const financeStages = new Set([
     'for_payment',
@@ -106,7 +489,7 @@
     'ready_for_claim',
     'completed'
   ]);
-  const isFinancePaymentsPage = window.location.pathname.toLowerCase().includes('/admin-end/certificates/financepayments.php');
+  const isFinancePaymentsPage = /\/admin-end\/certificates\/financepayments(?:\.php)?\/?$/i.test(window.location.pathname);
   const financeColumnsStorageKey = 'financePaymentsVisibleColumns';
   const defaultFinanceVisibleColumns = [1, 3, 4, 6, 7, 8];
 
@@ -367,6 +750,7 @@
     const k = String(stage || '').toLowerCase();
     if (k.includes('rejected')) return `<span class="badge bg-danger">${label}</span>`;
     if (k === 'completed') return `<span class="badge bg-success">${label}</span>`;
+    if (k === 'fee_tagging') return `<span class="badge bg-success">${label}</span>`;
     if (k === 'ready_for_claim') return `<span class="badge bg-primary">${label}</span>`;
     if (k === 'for_payment' || k === 'payment_submitted') return `<span class="badge bg-warning text-dark">${label}</span>`;
     return `<span class="badge bg-secondary">${label}</span>`;
@@ -375,9 +759,7 @@
   function actionButtons(row) {
     const viewBtn = `<button class="btn btn-sm btn-outline-secondary me-1" data-view-id="${esc(row.request_id)}">View</button>`;
     const stageKey = String(row.stage || '').toLowerCase();
-    const hasIssuedFile = String(row.issued_file_path || '').trim() !== '';
-    const canViewIssuedByStage = stageKey === 'completed' || stageKey === 'ready_for_claim' || stageKey === 'payment_verified';
-    const viewIssuedBtn = (!isFinancePaymentsPage && stageKey !== 'completed' && (hasIssuedFile || canViewIssuedByStage))
+    const viewIssuedBtn = (!isFinancePaymentsPage && stageKey !== 'completed' && canOpenIssuedDocument(row))
       ? `<button class="btn btn-sm btn-outline-success me-1" data-issued-id="${esc(row.request_id)}">View Document</button>`
       : '';
     if (isFinancePaymentsPage) {
@@ -446,6 +828,10 @@
         <button class="btn btn-sm btn-success" data-view-action="personnel_approve" data-id="${id}">${isFirstTimeJobSeeker ? 'Approve for Interview' : 'Approve'}</button>
       `;
     }
+    if (stage === 'fee_tagging') {
+      if (isFinancePaymentsPage) return '<span class="text-muted small">No actions</span>';
+      return `<button class="btn btn-sm btn-warning" data-view-action="open_fee_tagging" data-id="${id}">Continue Approval</button>`;
+    }
     if (stage === 'for_interview' && isFirstTimeJobSeeker) {
       return `
         <button class="btn btn-sm btn-danger" data-view-action="interview_fail" data-id="${id}">Fail Interview</button>
@@ -472,12 +858,14 @@
       `;
     }
     if (stage === 'payment_verified') {
+      if (isFinancePaymentsPage) return proofBtn || '<span class="text-muted small">No actions</span>';
       return `
         ${proofBtn}
         <button class="btn btn-sm btn-primary" data-view-action="mark_ready" data-id="${id}">Ready for Claim</button>
       `;
     }
     if (stage === 'ready_for_claim') {
+      if (isFinancePaymentsPage) return proofBtn || '<span class="text-muted small">No actions</span>';
       return `
         ${proofBtn}
         <button class="btn btn-sm btn-dark w-100" data-view-action="mark_completed" data-id="${id}">Release Document (Mark as Complete)</button>
@@ -725,6 +1113,9 @@
     const raw = String(value || '').trim();
     if (!raw) return '-';
     const key = raw.toLowerCase().replace(/[^a-z0-9]+/g, '');
+    if (key.includes('barangayid')) {
+      return 'Barangay ID';
+    }
     if (key.includes('electricalpermit')) {
       return 'Barangay Clearance for Electrical Permit';
     }
@@ -763,6 +1154,9 @@
     }
     if (key === 'firsttimejobseeker' || key === 'firsttimejobseekers' || key === 'firsttimejobseekercertificate') {
       return 'First Time Job Seeker Certificate';
+    }
+    if (key.includes('tricycle')) {
+      return 'Barangay Clearance for Tricycle Permit';
     }
     if (key.includes('barangayclearance') || key.includes('barangaycertification') || key === 'clearance') {
       return 'Barangay Certification';
@@ -1314,10 +1708,17 @@
     return Number.isFinite(parsed) && parsed >= 0 ? String(parsed) : '';
   }
 
+  function isTemplatePlaceholderToken(value) {
+    return /^\$\{[^}]+\}$/.test(String(value || '').trim());
+  }
+
   function previewEditable(key, value, fallback = 'Type here', extraClass = '') {
-    const text = String(value || '').trim().toUpperCase() || String(fallback || '').toUpperCase();
-    const cls = ['doc-editable', extraClass].filter(Boolean).join(' ');
-    return `<span class="${cls}" contenteditable="true" data-edit-key="${esc(key)}">${esc(text)}</span>`;
+    const rawValue = String(value || '').trim();
+    const rawFallback = String(fallback || '').trim();
+    const resolvedText = rawValue || (isTemplatePlaceholderToken(rawFallback) ? '' : rawFallback);
+    const text = resolvedText.toUpperCase();
+    const cls = ['doc-editable', !text ? 'doc-editable--empty' : '', extraClass].filter(Boolean).join(' ');
+    return `<span class="${cls}" contenteditable="true" data-edit-key="${esc(key)}">${text ? esc(text) : ''}</span>`;
   }
 
   function renderPreviewMetaRows(rows) {
@@ -1344,6 +1745,7 @@
 
   function normalizePreviewDocKey(docType) {
     const text = String(docType || '').toLowerCase().replace(/[^a-z0-9]+/g, '');
+    if (text.includes('barangayid')) return 'barangayid';
     if (text.includes('cohabitation')) return 'cohabitation';
     if (text.includes('indigency')) return 'indigency';
     if (text.includes('firsttime') || text.includes('jobseeker')) return 'firsttimejobseeker';
@@ -1372,6 +1774,55 @@
 
   function isFirstTimeJobSeekerRow(row) {
     return normalizePreviewDocKey(row?.document_type || '') === 'firsttimejobseeker';
+  }
+
+  function requestNeedsFeeTagging(row) {
+    if (!row || isFirstTimeJobSeekerRow(row)) {
+      return false;
+    }
+    const docType = String(row?.document_type || '').toLowerCase().trim();
+    if (!docType) {
+      return false;
+    }
+    if (docType.includes('clearance')) {
+      return true;
+    }
+
+    const docToken = docType.replace(/[^a-z0-9]+/g, '');
+    return [
+      'businesspermit',
+      'electricalpermit',
+      'waterpermit',
+      'residentialpermit',
+      'residentialbuildingpermit',
+      'commercialpermit',
+      'commercialbuildingpermit',
+      'tricyclepermit'
+    ].some((token) => docToken.includes(token));
+  }
+
+  function requestNeedsManualIssuedUpload(row) {
+    if (!row) {
+      return false;
+    }
+    return normalizePreviewDocKey(row?.document_type || '') === 'barangayid';
+  }
+
+  function canOpenIssuedDocument(row) {
+    if (!row) {
+      return false;
+    }
+    const stageKey = String(row?.stage || '').toLowerCase();
+    if (requestNeedsManualIssuedUpload(row)) {
+      return ['ready_for_claim', 'completed'].includes(stageKey) && String(row?.issued_file_path || '').trim() !== '';
+    }
+    return ['payment_verified', 'ready_for_claim', 'completed'].includes(stageKey);
+  }
+
+  function issuedDocumentUrl(requestId) {
+    const id = String(requestId || '').trim();
+    if (!id) return '';
+    return `${appBase}/PhpFiles/Admin-End/documentRequestWorkflow.php?action=view_issued&request_id=${encodeURIComponent(id)}&_ts=${Date.now()}`;
   }
 
   function additionalDetailRows(entries) {
@@ -1428,7 +1879,9 @@
     const previewAmount = (() => {
       const raw = String(firstNonEmpty([
         row.amount,
+        row.fee_amount,
         row.transaction_amount,
+        payload.fee_amount,
         payload.amount,
         payload.transaction_amount
       ]) || '').replace(/,/g, '').trim();
@@ -1455,6 +1908,12 @@
       payload._preview_franchisee,
       payload.franchisee,
       payload.vehicle_franchise
+    ]);
+    const tricycleLocation = firstNonEmpty([
+      payload._preview_toda_poda_location,
+      payload.location_of_toda_poda,
+      payload.location,
+      franchisee
     ]);
     const vehicleType = firstNonEmpty([
       payload._preview_vehicle_type,
@@ -1560,13 +2019,13 @@
       'business_name', 'businessName', 'business_trade_name', 'trade_name', 'establishment_name', 'business_establishment',
       '_preview_business_approval_type', 'business_approval_type', 'businessApprovalType',
       '_preview_plate_number', 'plate_number', 'business_plate_number', 'vehicle_plate_number',
-      '_preview_franchisee', 'franchisee', 'vehicle_franchise', '_preview_vehicle_type', 'vehicle_make', 'type_of_vehicle',
+      '_preview_franchisee', 'franchisee', 'vehicle_franchise', '_preview_toda_poda_location', 'location_of_toda_poda', '_preview_vehicle_type', 'vehicle_make', 'type_of_vehicle',
       '_preview_registration_number', 'registration_number', 'cr_number', 'or_number', '_preview_body_number', 'body_number',
       'vehicle_named_to_owner', 'applicant_last_name', 'applicant_first_name', 'applicant_middle_name', 'applicant_suffix',
       'applicant_contact_number', 'applicant_full_address',
       'lot_same_address', 'lot_address_system', 'lot_unit_number', 'lot_street_number', 'lot_street_name',
       'lot_subdivision', 'lot_number', 'block_number', 'lot_phase_number', 'lot_barangay', 'lot_city', 'lot_province',
-      'project_location', 'ownership_type',
+      'project_location', 'ownership_type', 'application_type', 'applicationType', 'business_type', 'businessType',
       'years_of_residency', 'months_of_residency',
       'child_birthplace', 'child_nationality', 'birthplace', 'place_of_birth', 'location', 'remarks',
       'father_first_name', 'father_middle_name', 'father_last_name', 'father_suffix',
@@ -1600,22 +2059,31 @@
         ),
         fullNameFromRow(row)
       ),
-      fullAddress: upperText(stripAreaFromAddress(getPersonal('Full Address', '') || residentProfile.full_address || payload.full_address || payload.full_address_display || payload.address || payload.complete_address || '-'), '-'),
+      contactNumber: upperText(firstNonEmpty([
+        payload.contact_number,
+        payload.phone_number,
+        row.contact_number,
+        residentProfile.phone_number
+      ]), ''),
+      fullAddress: upperText(stripAreaFromAddress(getPersonal('Full Address', '') || residentProfile.full_address || payload.applicant_full_address || payload.full_address || payload.full_address_display || payload.address || payload.complete_address || '-'), '-'),
       purpose: upperText(generalPermitPurpose || firstNonEmpty([row.purpose, payload.purpose, payload.request_purpose, '-']), '-'),
-      businessName: upperText(businessName || '', ''),
-      businessAddress: upperText(businessAddress || '', ''),
+      businessName: upperText(stripTemplateTokens(businessName || ''), ''),
+      businessType: upperText(stripTemplateTokens(firstNonEmpty([payload.business_type, payload.businessType])), ''),
+      businessAddress: upperText(stripTemplateTokens(businessAddress || ''), ''),
       businessApprovalType,
       franchisee: upperText(franchisee || '', ''),
+      tricycleLocation: upperText(tricycleLocation || '', ''),
       vehicleType: upperText(vehicleType || '', ''),
       registrationNumber: upperText(registrationNumber || '', ''),
       plateNumber: upperText(plateNumber || '', ''),
       bodyNumber: upperText(bodyNumber || '', ''),
-      operatorName: upperText(firstNonEmpty([
+      tricycleApplicationType: upperText(firstNonEmpty([payload.application_type, payload.applicationType]), ''),
+      operatorName: upperText(stripTemplateTokens(firstNonEmpty([
         payload.operator_name,
         payload.business_operator_name,
         fullNameFromRow(row)
-      ]), ''),
-      operatorAddress: upperText(composeBarangayAddress(operatorAddressRaw || residentProfile.full_address || payload.full_address || ''), ''),
+      ])), ''),
+      operatorAddress: upperText(stripTemplateTokens(composeBarangayAddress(operatorAddressRaw || residentProfile.full_address || payload.full_address || '')), ''),
       amount: upperText(previewAmount, ''),
       issuedDate: firstNonEmpty([
         row.release_timestamp,
@@ -1704,6 +2172,7 @@
     const docType = String(state.docType || 'Certificate').trim() || 'Certificate';
     const docKey = normalizePreviewDocKey(docType);
     const isIndigency = docKey === 'indigency';
+    const isBarangayId = docKey === 'barangayid';
     const isGeneralPermitClearance = docKey === 'generalpermitclearance';
     const isBusinessPermitClearance = docKey === 'businessclearance';
     const isTricyclePermitClearance = docKey === 'tricycleclearance';
@@ -1718,10 +2187,12 @@
     const purpose = String(state.purpose || '-').trim() || '-';
     const location = String(state.location || '').trim();
     const franchisee = String(state.franchisee || '').trim();
+    const tricycleLocation = String(state.tricycleLocation || franchisee || '').trim();
     const vehicleType = String(state.vehicleType || '').trim();
     const registrationNumber = String(state.registrationNumber || '').trim();
     const issuedDateWord = previewIndigencyIssuedText(state.issuedDate || '');
     const certificateNumber = String(state.certificateNumber || '').trim();
+    const contactNumber = String(state.contactNumber || '').trim();
     const birthdate = String(state.birthdate || '').trim();
     const birthplace = String(state.birthplace || '').trim();
     const remarks = String(state.remarks || '').trim();
@@ -1735,6 +2206,7 @@
     const cohabitantRelationship = String(state.cohabitantRelationship || '').trim();
     const detentionFacility = String(state.detentionFacility || '').trim();
     const businessName = String(state.businessName || '').trim();
+    const businessType = String(state.businessType || '').trim();
     const businessAddress = String(state.businessAddress || state.location || '').trim();
     const businessApprovalType = normalizeBusinessApprovalType(state.businessApprovalType || '');
     const plateNumber = String(state.plateNumber || '').trim();
@@ -1761,7 +2233,19 @@
     const safe = (value, fallback = '-') => (String(value || '').trim() || fallback);
     const templateSafe = (value, fallback = '-') => {
       const text = String(value || '').trim();
-      return (text && text !== '-') ? text : fallback;
+      if (text && text !== '-') return text;
+      const fallbackText = String(fallback || '').trim();
+      return isTemplatePlaceholderToken(fallbackText) ? '' : fallbackText;
+    };
+    const generalClearanceIssuedAt = upperText(firstNonEmpty([state.issuedAt, 'BARANGAY SAN JOSE']), '');
+    const generalClearanceIssuedOn = upperText(previewDateText(firstNonEmpty([state.issuedOn, state.issuedDate])), '');
+    const generalClearanceMetaValue = (value, fallback = '') => {
+      const text = templateSafe(value, fallback);
+      return `
+        <span class="doc-preview-generalclearance-meta-line${text ? ' doc-preview-generalclearance-meta-line--filled' : ''}">
+          ${text ? `<span class="doc-preview-generalclearance-meta-line-text">${esc(text)}</span>` : ''}
+        </span>
+      `;
     };
     const businessMetaValue = (key, value) => {
       const text = String(value || '').trim();
@@ -1781,6 +2265,11 @@
     const fullAddressWithBarangay = composeBarangayAddress(fullAddress);
     const applicantAddressWithBarangay = composeBarangayAddress(applicantResidenceAddress || fullAddress);
     const cohabitationHasChildren = isCohabitation && cohabitationChildrenCount > 0;
+    const barangayIdExtraDetails = additionalDetailRows(
+      Array.isArray(state.additionalDetails)
+        ? state.additionalDetails.filter((entry) => String(entry?.label || '').toLowerCase().startsWith('emergency '))
+        : []
+    );
 
     const residencyRows = `
       <div class="doc-to-block"><strong>Name</strong><strong>:</strong><strong>${esc(safe(fullName))}</strong></div>
@@ -1829,6 +2318,22 @@
       `;
       metaHtml = '';
       issuedLine = `Issued this <strong>${esc(issuedDateWord)}</strong>, at the office of the punong Barangay, Barangay San Jose, Rodriguez (Montalban), Rizal.`;
+    } else if (isBarangayId) {
+      titleHtml = '<div class="doc-preview-goodmoral-office"><div>TANGGAPAN NG PUNONG BARANGAY</div><div>BARANGAY ID APPLICATION</div></div>';
+      contentHtml = `
+        <p><strong>APPLICATION REVIEW</strong></p>
+        <p>
+          This preview summarizes the submitted Barangay ID application details for staff review before payment and release preparation.
+        </p>
+        <div class="doc-to-block"><strong>Name</strong><strong>:</strong><strong>${esc(safe(fullName, '-'))}</strong></div>
+        <div class="doc-to-block"><strong>Address</strong><strong>:</strong><div><strong>${esc(safe(fullAddress, '-'))}</strong><br><strong>BARANGAY SAN JOSE, MONTALBAN, RIZAL</strong></div></div>
+        <div class="doc-to-block"><strong>Birthdate</strong><strong>:</strong><strong>${esc(safe(birthdate, '-'))}</strong></div>
+        <div class="doc-to-block"><strong>Birthplace</strong><strong>:</strong><strong>${esc(safe(birthplace, '-'))}</strong></div>
+        <div class="doc-to-block"><strong>Contact Number</strong><strong>:</strong><strong>${esc(safe(contactNumber, '-'))}</strong></div>
+        ${barangayIdExtraDetails}
+      `;
+      issuedLine = 'After payment verification, the prepared Barangay ID file must be uploaded before release.';
+      metaHtml = '';
     } else if (isGeneralPermitClearance) {
       titleHtml = '<div class="doc-preview-generalclearance-office"><div>TANGGAPAN NG PUNONG BARANGAY</div><div>BARANGAY CLEARANCE</div></div>';
       contentHtml = `
@@ -1856,7 +2361,7 @@
           <div class="doc-preview-generalclearance-field">
             <strong class="doc-preview-generalclearance-field-label">Remarks</strong>
             <strong class="doc-preview-generalclearance-field-colon">:</strong>
-            <div class="doc-preview-generalclearance-field-value"><strong>${esc(templateSafe(remarks, '${REMARKS}'))}</strong></div>
+            <div class="doc-preview-generalclearance-field-value"><strong>${previewEditable('remarks', templateSafe(remarks, '${REMARKS}'), '${REMARKS}')}</strong></div>
           </div>
           <div class="doc-preview-generalclearance-field">
             <strong class="doc-preview-generalclearance-field-label">Purpose</strong>
@@ -1865,43 +2370,44 @@
           </div>
         </div>
         <p class="doc-preview-generalclearance-note">
-          This clearance is being issued pursuant to Barangay Revenue Code ORDINANCE NO.<br>11 - 2019
+          This clearance is being issued pursuant to Barangay Revenue Code ORDINANCE
+          <span class="doc-preview-generalclearance-note-nowrap">NO. 11 - 2019</span>
         </p>
       `;
-      issuedLine = `Issued this <strong>${esc(issuedDateWord)}</strong> at the office of the Punong Barangay, Barangay<br>San Jose, Montalban, Rizal`;
+      issuedLine = `Issued this <strong>${esc(issuedDateWord)}</strong> at the office of the Punong Barangay,<br>Barangay San Jose, Montalban, Rizal`;
       metaHtml = `
         <div class="doc-preview-generalclearance-meta">
           <div class="doc-preview-generalclearance-meta-row">
             <div class="doc-preview-generalclearance-meta-label"><strong>CTC No.</strong></div>
             <div class="doc-preview-generalclearance-meta-colon">:</div>
-            <div class="doc-preview-generalclearance-meta-value"><strong>${esc(templateSafe(certificateNumber, '${CERTIFICATE_NUMBER}'))}</strong></div>
+            <div class="doc-preview-generalclearance-meta-value">${generalClearanceMetaValue(certificateNumber, '${CERTIFICATE_NUMBER}')}</div>
           </div>
           <div class="doc-preview-generalclearance-meta-row">
             <div class="doc-preview-generalclearance-meta-label"><strong>Issued at</strong></div>
             <div class="doc-preview-generalclearance-meta-colon">:</div>
-            <div class="doc-preview-generalclearance-meta-value"><span class="doc-preview-generalclearance-meta-line"></span></div>
+            <div class="doc-preview-generalclearance-meta-value">${generalClearanceMetaValue(generalClearanceIssuedAt)}</div>
           </div>
           <div class="doc-preview-generalclearance-meta-row">
             <div class="doc-preview-generalclearance-meta-label"><strong>Issued On</strong></div>
             <div class="doc-preview-generalclearance-meta-colon">:</div>
-            <div class="doc-preview-generalclearance-meta-value"><span class="doc-preview-generalclearance-meta-line"></span></div>
+            <div class="doc-preview-generalclearance-meta-value">${generalClearanceMetaValue(generalClearanceIssuedOn)}</div>
           </div>
           <div class="doc-preview-generalclearance-meta-row">
             <div class="doc-preview-generalclearance-meta-label"><strong>Amount</strong></div>
             <div class="doc-preview-generalclearance-meta-colon">:</div>
-            <div class="doc-preview-generalclearance-meta-value"><strong>${esc(templateSafe(amount, '${AMOUNT}'))}</strong></div>
+            <div class="doc-preview-generalclearance-meta-value">${generalClearanceMetaValue(amount, '${AMOUNT}')}</div>
           </div>
           <div class="doc-preview-generalclearance-meta-row">
             <div class="doc-preview-generalclearance-meta-label"><strong>OR No.</strong></div>
             <div class="doc-preview-generalclearance-meta-colon">:</div>
-            <div class="doc-preview-generalclearance-meta-value"><strong>${esc(templateSafe(state.orNumber, '${OR_NUMBER}'))}</strong></div>
+            <div class="doc-preview-generalclearance-meta-value">${generalClearanceMetaValue(state.orNumber, '${OR_NUMBER}')}</div>
           </div>
         </div>
       `;
     } else if (isTricyclePermitClearance) {
       titleHtml = '<div class="doc-preview-tricycle-office"><div>TANGGAPAN NG PUNONG BARANGAY</div><div>BARANGAY CLEARANCE</div></div>';
       contentHtml = `
-        <p class="doc-preview-tricycle-lead"><strong>TO WHOM IT MAY CONCERN:</strong></p>
+        <p class="doc-preview-tricycle-lead"><strong>TO WHOM IT MAY CONCERN::</strong></p>
         <p class="doc-preview-tricycle-intro">
           This is to certify that the person whose name and thumb mark appears here on has
           requested a Barangay Clearance from this office and the information are listed below:
@@ -1910,22 +2416,22 @@
           <div class="doc-preview-tricycle-field">
             <strong class="doc-preview-tricycle-field-label">Name</strong>
             <strong class="doc-preview-tricycle-field-colon">:</strong>
-            <div class="doc-preview-tricycle-field-value"><strong>${esc(templateSafe(fullName, '${NAME}'))}</strong></div>
+            <div class="doc-preview-tricycle-field-value"><strong>${esc(templateSafe(fullName, '${FULL_NAME}'))}</strong></div>
           </div>
           <div class="doc-preview-tricycle-field doc-preview-tricycle-field--address">
-            <strong class="doc-preview-tricycle-field-label">Address</strong>
+            <strong class="doc-preview-tricycle-field-label">Residential Address</strong>
             <strong class="doc-preview-tricycle-field-colon">:</strong>
             <div class="doc-preview-tricycle-field-value"><strong>${esc(templateSafe(fullAddress, '${ADDRESS}'))}</strong><br><strong>Barangay San Jose, Montalban, Rizal</strong></div>
           </div>
           <div class="doc-preview-tricycle-field">
             <strong class="doc-preview-tricycle-field-label">Location</strong>
             <strong class="doc-preview-tricycle-field-colon">:</strong>
-            <div class="doc-preview-tricycle-field-value"><strong>${esc(templateSafe(franchisee, '${LOCATION_OF_TODA/PODA}'))}</strong></div>
+            <div class="doc-preview-tricycle-field-value"><strong>${esc(tricycleLocation)}</strong></div>
           </div>
           <div class="doc-preview-tricycle-field">
             <strong class="doc-preview-tricycle-field-label">Type of Vehicle</strong>
             <strong class="doc-preview-tricycle-field-colon">:</strong>
-            <div class="doc-preview-tricycle-field-value"><strong>${esc(templateSafe(vehicleType, '${TYPE_OF_VEHICLE}'))}</strong></div>
+            <div class="doc-preview-tricycle-field-value"><strong>${esc(templateSafe(franchisee || vehicleType, '${TYPE_OF_VEHICLE}'))}</strong></div>
           </div>
           <div class="doc-preview-tricycle-field">
             <strong class="doc-preview-tricycle-field-label">Registration No.</strong>
@@ -1942,29 +2448,52 @@
             <strong class="doc-preview-tricycle-field-colon">:</strong>
             <div class="doc-preview-tricycle-field-value"><strong>${esc(templateSafe(bodyNumber, '${BODY_NUMBER}'))}</strong></div>
           </div>
+          <div class="doc-preview-tricycle-field">
+            <strong class="doc-preview-tricycle-field-label">Remarks</strong>
+            <strong class="doc-preview-tricycle-field-colon">:</strong>
+            <div class="doc-preview-tricycle-field-value"><strong>${previewEditable('remarks', '', 'Type here')}</strong></div>
+          </div>
+          <div class="doc-preview-tricycle-field">
+            <strong class="doc-preview-tricycle-field-label">Purpose</strong>
+            <strong class="doc-preview-tricycle-field-colon">:</strong>
+            <div class="doc-preview-tricycle-field-value"><strong>${esc(templateSafe(purpose, '${PURPOSE}'))}</strong></div>
+          </div>
         </div>
         <p class="doc-preview-tricycle-purpose">
-          This certification is being issued upon the request of the above subject person for his/her
-          application for necessary permit
+          This clearance is being issued pursuant to Barangay Revenue Code ORDINANCE NO. 11 &ndash; 2019
         </p>
       `;
       issuedLine = `Issued this <strong>${esc(issuedDateWord)}</strong> at the office of the Punong Barangay, Barangay<br>San Jose, Montalban, Rizal`;
+      const tricycleMetaLine = (value) => {
+        const text = String(value || '').trim();
+        return `<span class="doc-preview-tricycle-meta-line">${text ? `<span class="doc-preview-tricycle-meta-line-text">${esc(text)}</span>` : ''}</span>`;
+      };
       metaHtml = `
         <div class="doc-preview-tricycle-meta">
           <div class="doc-preview-tricycle-meta-row">
-            <div class="doc-preview-tricycle-meta-label"><strong>Clearance No.</strong></div>
+            <div class="doc-preview-tricycle-meta-label"><strong>CTC No.</strong></div>
             <div class="doc-preview-tricycle-meta-colon">:</div>
-            <div class="doc-preview-tricycle-meta-value"><strong>${esc(templateSafe(certificateNumber, '${CLEARANCE_NUMBER}'))}</strong></div>
+            <div class="doc-preview-tricycle-meta-value">${tricycleMetaLine(certificateNumber)}</div>
           </div>
           <div class="doc-preview-tricycle-meta-row">
-            <div class="doc-preview-tricycle-meta-label"><strong>Reciept No.</strong></div>
+            <div class="doc-preview-tricycle-meta-label"><strong>Issued at</strong></div>
             <div class="doc-preview-tricycle-meta-colon">:</div>
-            <div class="doc-preview-tricycle-meta-value"><strong>${esc(templateSafe(state.orNumber, '${RECIEPT_NUMBER}'))}</strong></div>
+            <div class="doc-preview-tricycle-meta-value">${tricycleMetaLine('')}</div>
+          </div>
+          <div class="doc-preview-tricycle-meta-row">
+            <div class="doc-preview-tricycle-meta-label"><strong>Issued On</strong></div>
+            <div class="doc-preview-tricycle-meta-colon">:</div>
+            <div class="doc-preview-tricycle-meta-value">${tricycleMetaLine('')}</div>
           </div>
           <div class="doc-preview-tricycle-meta-row">
             <div class="doc-preview-tricycle-meta-label"><strong>Amount</strong></div>
             <div class="doc-preview-tricycle-meta-colon">:</div>
-            <div class="doc-preview-tricycle-meta-value"><strong>${esc(templateSafe(amount, '${AMOUNT}'))}</strong></div>
+            <div class="doc-preview-tricycle-meta-value">${tricycleMetaLine(amount)}</div>
+          </div>
+          <div class="doc-preview-tricycle-meta-row">
+            <div class="doc-preview-tricycle-meta-label"><strong>OR No.</strong></div>
+            <div class="doc-preview-tricycle-meta-colon">:</div>
+            <div class="doc-preview-tricycle-meta-value">${tricycleMetaLine(state.orNumber)}</div>
           </div>
         </div>
       `;
@@ -1974,10 +2503,11 @@
         <p class="doc-preview-business-lead"><strong>TO WHOM IT MAY CONCERN::</strong></p>
         <p class="doc-preview-business-intro">This is to certify that the business or trade activity below</p>
         <div class="doc-preview-business-fields">
-          <div class="doc-preview-business-field"><strong>${previewEditable('businessName', safe(businessName, '${BUSINESS_NAME}'), '${BUSINESS_NAME}')}</strong></div>
-          <div class="doc-preview-business-field"><strong>${previewEditable('businessAddress', safe(businessAddress, '${BUSINESS_ADDRESS}'), '${BUSINESS_ADDRESS}', 'doc-editable-multiline')}</strong></div>
-          <div class="doc-preview-business-field"><strong>${previewEditable('operatorName', safe(operatorName, '${OPERATOR_NAME}'), '${OPERATOR_NAME}')}</strong></div>
-          <div class="doc-preview-business-field"><strong>${previewEditable('operatorAddress', safe(operatorAddress, '${OPERATOR_ADDRESS}'), '${OPERATOR_ADDRESS}', 'doc-editable-multiline')}</strong></div>
+          <div class="doc-preview-business-field"><strong>${previewEditable('businessName', businessName, '${BUSINESS_NAME}')}</strong></div>
+          <div class="doc-preview-business-field"><strong>${previewEditable('businessType', businessType, '${BUSINESS_TYPE}')}</strong></div>
+          <div class="doc-preview-business-field"><strong>${previewEditable('businessAddress', businessAddress, '${BUSINESS_ADDRESS}', 'doc-editable-multiline')}</strong></div>
+          <div class="doc-preview-business-field"><strong>${previewEditable('operatorName', operatorName, '${OPERATOR_NAME}')}</strong></div>
+          <div class="doc-preview-business-field"><strong>${previewEditable('operatorAddress', operatorAddress, '${OPERATOR_ADDRESS}', 'doc-editable-multiline')}</strong></div>
         </div>
         <p class="doc-preview-business-paragraph">
           Proposed to be established or being applied for renewal for a Barangay Clearance to be used in securing corresponding Business Permit has been found to be:
@@ -2156,7 +2686,7 @@
           ? 'doc-preview-paper doc-preview-paper--generalclearance'
           : isTricyclePermitClearance
             ? 'doc-preview-paper doc-preview-paper--tricycle'
-            : (isGoodMoral || isResidency || isCohabitation || isFirstTimeJobSeeker)
+            : (isBarangayId || isGoodMoral || isResidency || isCohabitation || isFirstTimeJobSeeker)
               ? `doc-preview-paper doc-preview-paper--goodmoral${(isCohabitation && cohabitationHasChildren) ? ' doc-preview-paper--cohabitation-children' : ''}${isFirstTimeJobSeeker ? ' doc-preview-paper--ftjs' : ''}${isRelationshipJailVisit ? ' doc-preview-paper--jail' : ''}`
               : 'doc-preview-paper';
 
@@ -2218,7 +2748,7 @@
           </div>
         </div>
       `;
-      footerNoteHtml = 'This document is valid until the end of the year,<br>Check the qr code to verify the authenticity of this document.';
+      footerNoteHtml = `This document is valid until December 31, ${new Date().getFullYear()},<br>Check the qr code to verify the authenticity of this document.`;
     } else if (isGeneralPermitClearance) {
       footerAreaHtml = `
         <div class="doc-preview-generalclearance-footer-area${qrBlockHtml ? '' : ' doc-preview-generalclearance-footer-area--noqr'}">
@@ -2254,7 +2784,7 @@
           ${qrBlockHtml}
         </div>
       `;
-      footerNoteHtml = 'Check the qr code to verify the authenticity of this document.';
+      footerNoteHtml = 'This clearance is valid for Forty-five (45) days from the date issue and not valid<br>without official seal. Check the qr code to verify the authenticity of this document.';
     } else {
       const footerAreaClass = `doc-preview-footer-area${isFirstTimeJobSeeker ? ' doc-preview-footer-area--ftjs' : ''}${qrBlockHtml ? '' : ' doc-preview-footer-area--noqr'}`;
       footerAreaHtml = isFirstTimeJobSeeker
@@ -2344,7 +2874,8 @@
 
   function bindApproveScrollGate() {
     resetPreviewScrollGate();
-    if (!viewModalNextBtn || String(currentViewStage || '').toLowerCase() !== 'submitted') return;
+    const stageKey = String(currentViewStage || '').toLowerCase();
+    if (!viewModalNextBtn || (stageKey !== 'submitted' && stageKey !== 'fee_tagging')) return;
     const currentRow = itemById.get(String(currentViewRequestId || '').trim());
     if (isFirstTimeJobSeekerRow(currentRow)) {
       viewModalNextBtn.disabled = false;
@@ -2356,7 +2887,8 @@
 
     const threshold = 24;
     const update = () => {
-      if (viewMode !== 'preview' || String(currentViewStage || '').toLowerCase() !== 'submitted') return;
+      const activeStageKey = String(currentViewStage || '').toLowerCase();
+      if (viewMode !== 'preview' || (activeStageKey !== 'submitted' && activeStageKey !== 'fee_tagging')) return;
       const remaining = scrollHost.scrollHeight - scrollHost.scrollTop - scrollHost.clientHeight;
       const reachedBottom = remaining <= threshold;
       viewModalNextBtn.disabled = !reachedBottom;
@@ -2386,7 +2918,7 @@
       const rid = String(currentViewRequestId || '').trim();
       loadTemplatePreview(rid, { preserveExisting: true });
       const stageKey = String(currentViewStage || '').toLowerCase();
-      const submittedFlow = stageKey === 'submitted';
+      const submittedFlow = stageKey === 'submitted' || stageKey === 'fee_tagging';
       const releaseFlow = stageKey === 'ready_for_claim';
       viewModalBackBtn?.classList.remove('d-none');
       if (viewModalBackBtn) {
@@ -2395,7 +2927,9 @@
       if (viewModalNextBtn) {
         if (submittedFlow) {
           const currentRow = itemById.get(rid);
-          viewModalNextBtn.textContent = isFirstTimeJobSeekerRow(currentRow) ? 'Approve for Interview' : 'Save and Approve';
+          viewModalNextBtn.textContent = isFirstTimeJobSeekerRow(currentRow)
+            ? 'Approve for Interview'
+            : 'Save and Approve';
           viewModalNextBtn.classList.remove('d-none', 'btn-primary');
           viewModalNextBtn.classList.add('btn-success');
           viewModalNextBtn.disabled = !isFirstTimeJobSeekerRow(currentRow);
@@ -3007,11 +3541,15 @@
     const stage = String(row?.stage || '').toLowerCase();
     const key = String(stageFilter || '').toLowerCase();
     if (!key) return true;
+    if (key === 'barangay_id') {
+      return requestNeedsManualIssuedUpload(row);
+    }
     if (key === 'pending') {
       return (
         stage === 'submitted' ||
         stage === 'for_interview' ||
         stage === 'for_inspection' ||
+        stage === 'fee_tagging' ||
         stage === 'for_payment' ||
         stage === 'payment_submitted' ||
         stage.includes('pending')
@@ -3028,6 +3566,9 @@
 
   function updateStageTabBadges(items) {
     const rows = Array.isArray(items) ? items : [];
+    if (barangayIdTabCount) {
+      barangayIdTabCount.textContent = String(rows.filter((it) => matchesStageTabFilter(it, 'barangay_id')).length);
+    }
     if (pendingTabCount) {
       pendingTabCount.textContent = String(rows.filter((it) => matchesStageTabFilter(it, 'pending')).length);
     }
@@ -3200,6 +3741,65 @@
     return data;
   }
 
+  function rememberPreviewStateOverride(requestId, patch = {}) {
+    const rid = String(requestId || '').trim();
+    if (!rid || !patch || typeof patch !== 'object') return;
+    pendingPreviewStateOverride = {
+      requestId: rid,
+      patch: { ...patch }
+    };
+  }
+
+  function applyPendingPreviewStateOverride(requestId) {
+    const rid = String(requestId || '').trim();
+    if (!rid || !pendingPreviewStateOverride || pendingPreviewStateOverride.requestId !== rid) {
+      return;
+    }
+    const currentState = viewPreviewState && typeof viewPreviewState === 'object'
+      ? viewPreviewState
+      : {};
+    viewPreviewState = { ...currentState, ...pendingPreviewStateOverride.patch };
+    pendingPreviewStateOverride = null;
+  }
+
+  function updateCachedRequestRecord(requestId, patch = {}) {
+    const rid = String(requestId || '').trim();
+    if (!rid || !patch || typeof patch !== 'object') return;
+
+    cachedAllItems = cachedAllItems.map((item) => (
+      String(item?.request_id || '') === rid ? { ...item, ...patch } : item
+    ));
+
+    const currentItem = itemById.get(rid);
+    if (currentItem) {
+      itemById.set(rid, { ...currentItem, ...patch });
+    }
+
+    if (detailById.has(rid)) {
+      const detailItem = detailById.get(rid) || {};
+      detailById.set(rid, { ...detailItem, ...patch });
+    }
+  }
+
+  async function openRequestPreviewFromList(requestId) {
+    const rid = String(requestId || '').trim();
+    if (!rid || !tableBody) return false;
+
+    let viewBtn = Array.from(tableBody.querySelectorAll('button[data-view-id]'))
+      .find((candidate) => String(candidate.getAttribute('data-view-id') || '') === rid);
+
+    if (!viewBtn) {
+      await load({ force: true });
+      viewBtn = Array.from(tableBody.querySelectorAll('button[data-view-id]'))
+        .find((candidate) => String(candidate.getAttribute('data-view-id') || '') === rid);
+    }
+
+    if (!viewBtn) return false;
+    openViewDirectPreview = true;
+    viewBtn.click();
+    return true;
+  }
+
   async function fetchRequestDetails(requestId) {
     const id = String(requestId || '').trim();
     if (!id) return null;
@@ -3290,6 +3890,7 @@
     tableBody.innerHTML = items.map(rowHtml).join('');
     applyFinanceColumnVisibility();
     bindActionButtons();
+    bindFeeCatalogModal();
   }
 
   async function load(options = {}) {
@@ -3319,6 +3920,7 @@
   }
 
   function resetModalFields() {
+    financeVerifySummaryToken += 1;
     modalError.classList.add('d-none');
     modalError.textContent = '';
     if (actionPrompt) {
@@ -3395,10 +3997,10 @@
       actionForm.dataset.businessPlateNumber = String(plateValue || '').trim().toUpperCase();
     }
     if (modalTitle) {
-      modalTitle.textContent = 'Type of Approval';
+      modalTitle.textContent = 'Approved | Tick Selection';
     }
     if (actionPrompt) {
-      actionPrompt.textContent = 'Choose the approval type for this Barangay Clearance for Business Permit.';
+      actionPrompt.textContent = 'Choose the approval type for this Barangay Clearance for Business Permit. After this, you will tag the fees before reviewing the initial document preview.';
       actionPrompt.classList.remove('d-none');
     }
     if (actionBusinessApprovalWrap) {
@@ -3473,12 +4075,16 @@
     actionType.value = type;
     actionRequestId.value = requestId;
     const row = itemById.get(String(requestId));
+    const docKey = normalizePreviewDocKey(row?.document_type || '');
     const isFirstTimeJobSeeker = isFirstTimeJobSeekerRow(row);
+    const needsFeeTagging = requestNeedsFeeTagging(row);
+    const needsManualIssuedUpload = requestNeedsManualIssuedUpload(row);
+    const isBarangayIdRequest = docKey === 'barangayid';
     if (actionForm) {
-      actionForm.dataset.docKey = normalizePreviewDocKey(row?.document_type || '');
+      actionForm.dataset.docKey = docKey;
     }
-    const docKey = String(actionForm?.dataset?.docKey || '');
-    const isBusinessClearanceApproval = type === 'personnel_approve' && !isFirstTimeJobSeeker && docKey === 'businessclearance';
+    const actionDocKey = String(actionForm?.dataset?.docKey || '');
+    const isBusinessClearanceApproval = type === 'personnel_approve' && !isFirstTimeJobSeeker && actionDocKey === 'businessclearance';
     const existingBusinessApprovalType = normalizeBusinessApprovalType(firstNonEmpty([
       viewPreviewState?.businessApprovalType,
       row?.payload?._preview_business_approval_type,
@@ -3495,7 +4101,7 @@
     const rowStage = String(row?.stage || '').toLowerCase();
     const isWalkInFlow = rowStage === 'for_payment' || rowStage === 'payment_rejected';
     const labels = {
-      personnel_approve: isFirstTimeJobSeeker ? 'Approve for Interview' : 'Before You Approve',
+      personnel_approve: isFirstTimeJobSeeker ? 'Approve for Interview' : (needsFeeTagging ? 'Before You Tag Fees' : 'Before You Approve'),
       personnel_approve_confirm: 'Confirm Approval',
       personnel_reject: 'Reject Request',
       interview_pass: 'Approve Interview',
@@ -3518,11 +4124,19 @@
     if (type === 'personnel_approve' && actionPrompt) {
       actionPrompt.textContent = isFirstTimeJobSeeker
         ? 'This request will be moved to the interview stage. The resident will be notified to report to the barangay within 5 working days for the oath of undertaking and interview.'
-        : `Click View Document to check the document that will be issued and edit it if there are necessary changes in the details. Once everything is correct, proceed to verify the ${docName}.`;
+        : (isBarangayIdRequest
+            ? 'Click Review Application to inspect the submitted Barangay ID details. Once everything is correct, proceed to approve the request for payment.'
+        : (needsFeeTagging
+            ? `Tag the applicable fees for the ${docName} first. After confirming the fees, the initial document preview will open so you can save and approve it for payment.`
+            : `Click View Document to check the document that will be issued and edit it if there are necessary changes in the details. Once everything is correct, proceed to verify the ${docName}.`));
       actionPrompt.classList.remove('d-none');
     }
     if (type === 'personnel_approve_confirm' && actionPrompt) {
-      actionPrompt.textContent = `Please confirm that you thoroughly checked the resident's data to issue a ${docName}.`;
+      actionPrompt.textContent = isBarangayIdRequest
+        ? 'Please confirm that you thoroughly checked the submitted Barangay ID application. This will approve the request and send it to payment.'
+        : (needsFeeTagging
+            ? `Please confirm that you thoroughly checked the resident's data. This will save the ${docName} and approve it for payment.`
+            : `Please confirm that you thoroughly checked the resident's data to issue a ${docName}.`);
       actionPrompt.classList.remove('d-none');
     }
     if (type === 'mark_completed_confirm' && actionPrompt) {
@@ -3543,11 +4157,13 @@
     }
     if (actionSubmitBtn) {
       if (type === 'personnel_approve') {
-        actionSubmitBtn.textContent = isFirstTimeJobSeeker ? 'Approve for Interview' : 'View Document';
+        actionSubmitBtn.textContent = isFirstTimeJobSeeker
+          ? 'Approve for Interview'
+          : (isBarangayIdRequest ? 'Review Application' : (needsFeeTagging ? 'Tag Fees' : 'View Document'));
         actionSubmitBtn.classList.remove('btn-danger', 'btn-success', 'btn-primary');
         actionSubmitBtn.classList.add(isFirstTimeJobSeeker ? 'btn-success' : 'btn-primary');
       } else if (type === 'personnel_approve_confirm') {
-        actionSubmitBtn.textContent = 'Approve';
+        actionSubmitBtn.textContent = 'Save and Approve';
         actionSubmitBtn.classList.remove('btn-danger', 'btn-primary');
         actionSubmitBtn.classList.add('btn-success');
       } else if (type === 'interview_pass') {
@@ -3574,6 +4190,10 @@
         actionSubmitBtn.textContent = 'Reject Payment';
         actionSubmitBtn.classList.remove('btn-primary', 'btn-success');
         actionSubmitBtn.classList.add('btn-danger');
+      } else if (type === 'mark_ready') {
+        actionSubmitBtn.textContent = needsManualIssuedUpload ? 'Upload & Mark Ready' : 'Mark Ready';
+        actionSubmitBtn.classList.remove('btn-danger', 'btn-primary');
+        actionSubmitBtn.classList.add('btn-success');
       }
     }
     if (
@@ -3592,85 +4212,273 @@
       actionReason.required = true;
     }
     if (type === 'finance_verify') {
-      actionAmountWrap.classList.remove('d-none');
       actionOrWrap.classList.remove('d-none');
-      actionAmount.required = true;
       actionOr.required = true;
-      if (actionPrompt) {
-        const financeKey = isFinancePaymentsPage ? statusBucket(row) : '';
-        const stage = String(row?.stage || '').toLowerCase();
-        const isPendingVerification = isFinancePaymentsPage
-          ? financeKey === 'pending_verification'
-          : stage === 'payment_submitted';
-        const isWalkInStage = isFinancePaymentsPage
-          ? financeKey === 'unpaid' || financeKey === 'rejected'
-          : stage === 'for_payment' || stage === 'payment_rejected';
-        const payload = row && row.payload && typeof row.payload === 'object' ? row.payload : {};
-        const residentProfile = row && row.resident_profile && typeof row.resident_profile === 'object'
-          ? row.resident_profile
-          : {};
-        const customerName = fullNameFromRow(row) || '-';
-        const customerAddress = firstNonEmpty([
-          payload.full_address,
-          payload.full_address_display,
-          payload.address,
-          payload.complete_address,
-          residentProfile.full_address,
-          row?.full_address,
-          row?.address,
-          '-'
-        ]);
-        const method = firstNonEmpty([row?.payment_method, 'GCash']);
-        const docNameForPrompt = normalizeDocumentTypeDisplay(firstNonEmpty([row?.document_type, '-']));
-        const feeRaw = firstNonEmpty([row?.fee_amount, row?.amount]);
-        const feeNumber = Number(feeRaw);
-        const feeText = Number.isFinite(feeNumber) ? `PHP ${feeNumber.toFixed(2)}` : '-';
-        if (isPendingVerification) {
-          actionAmountWrap.classList.add('d-none');
-          actionAmount.required = false;
-          if (actionAmount) {
-            actionAmount.readOnly = true;
-            actionAmount.classList.add('bg-light');
-          }
-          actionPrompt.innerHTML = `
-            <div class="small text-muted mb-2">Review transaction before final verification.</div>
-            <div class="border rounded p-2 bg-light">
-              <div><strong>Full Name:</strong> ${esc(customerName)}</div>
-              <div><strong>Full Address:</strong> ${esc(customerAddress)}</div>
-              <div><strong>Payment Method:</strong> ${esc(method)}</div>
-              <div><strong>Requested Document:</strong> ${esc(docNameForPrompt)}</div>
-              <div><strong>Price:</strong> ${esc(feeText)}</div>
-            </div>
-            <div class="mt-2">Enter the OR Number to continue.</div>
-          `;
-        } else {
-          if (actionAmount) {
-            actionAmount.readOnly = false;
-            actionAmount.classList.remove('bg-light');
-          }
-          actionPrompt.textContent = isWalkInStage
-            ? 'Record barangay walk-in payment by entering the paid amount and OR number.'
-            : 'Verify the submitted payment by entering the official OR number.';
+      const financeKey = isFinancePaymentsPage ? statusBucket(row) : '';
+      const stage = String(row?.stage || '').toLowerCase();
+      const isPendingVerification = isFinancePaymentsPage
+        ? financeKey === 'pending_verification'
+        : stage === 'payment_submitted';
+      const isWalkInStage = isFinancePaymentsPage
+        ? financeKey === 'unpaid' || financeKey === 'rejected'
+        : stage === 'for_payment' || stage === 'payment_rejected';
+      const fixedAmount = resolveSystemAmount(row);
+
+      if (Number.isFinite(fixedAmount)) {
+        actionAmountWrap.classList.add('d-none');
+        actionAmount.required = false;
+        if (actionAmount) {
+          actionAmount.value = fixedAmount.toFixed(2);
+          actionAmount.readOnly = true;
+          actionAmount.classList.add('bg-light');
         }
-        actionPrompt.classList.remove('d-none');
-      }
-      if (row) {
-        const fixedAmount = firstNonEmpty([row.fee_amount, row.amount]);
-        if (fixedAmount !== '') {
-          actionAmount.value = String(fixedAmount);
+      } else if (needsFeeTagging) {
+        actionAmountWrap.classList.add('d-none');
+        actionAmount.required = false;
+        if (actionAmount) {
+          actionAmount.value = '';
+          actionAmount.readOnly = true;
+          actionAmount.classList.add('bg-light');
+        }
+      } else if (isPendingVerification) {
+        actionAmountWrap.classList.add('d-none');
+        actionAmount.required = false;
+      } else {
+        actionAmountWrap.classList.remove('d-none');
+        actionAmount.required = true;
+        if (actionAmount) {
+          actionAmount.readOnly = false;
+          actionAmount.classList.remove('bg-light');
         }
       }
+
+      populateFinanceVerifyPrompt(row, {
+        isPendingVerification,
+        isWalkInStage
+      }).catch(() => {});
     }
     if (type === 'mark_ready') {
-      actionIssuedWrap.classList.add('d-none');
       if (actionIssued) {
         actionIssued.value = '';
       }
-      actionPrompt.textContent = 'This will generate the issued document and mark the request as ready for claim.';
+      if (needsManualIssuedUpload) {
+        actionIssuedWrap.classList.remove('d-none');
+        actionIssued.required = true;
+        actionPrompt.textContent = 'Upload the prepared Barangay ID file to mark this request as ready for claim.';
+      } else {
+        actionIssuedWrap.classList.add('d-none');
+        actionPrompt.textContent = 'This will generate the issued document and mark the request as ready for claim.';
+      }
       actionPrompt.classList.remove('d-none');
     }
 
     actionModal.show();
+  }
+
+  // ── Fee Tagging Modal ────────────────────────────────────────────────────────
+
+  async function openFeeTaggingModal(requestId, options = {}) {
+    if (!requestId) return;
+    const row = itemById.get(requestId);
+    const feeTagModal = document.getElementById('feeTaggingModal');
+    if (!feeTagModal) return;
+
+    const openPreviewOnSave = options.openPreviewOnSave !== false;
+    const modeInput = document.getElementById('feeTaggingMode');
+    if (modeInput) modeInput.value = openPreviewOnSave ? 'preview' : '';
+
+    const modalTitle = feeTagModal.querySelector('.modal-title');
+    if (modalTitle) {
+      modalTitle.innerHTML = '<i class="fas fa-tags me-2 text-warning"></i>Tag Clearance Fees';
+    }
+    const submitBtn = document.getElementById('feeTaggingSubmitBtn');
+    if (submitBtn) submitBtn.textContent = openPreviewOnSave ? 'Confirm Fees & Continue' : 'Save Fees';
+
+    const feeTagBody = document.getElementById('feeTaggingBody');
+    const feeTagRequestId = document.getElementById('feeTaggingRequestId');
+    if (feeTagRequestId) feeTagRequestId.value = requestId;
+
+    const loadToken = ++feeTaggingLoadToken;
+    if (feeTagBody) feeTagBody.innerHTML = renderFeeTaggingLoadingState(row);
+    if (submitBtn) submitBtn.disabled = true;
+    getOrCreateModalInstance(feeTagModal)?.show();
+
+    try {
+      const [feeTypes, taggedFees] = await Promise.all([
+        fetchFeeTypeCatalog(),
+        fetchTaggedClearanceFees(requestId)
+      ]);
+
+      const latestRequestId = document.getElementById('feeTaggingRequestId')?.value?.trim();
+      if (loadToken !== feeTaggingLoadToken || latestRequestId !== requestId) {
+        return;
+      }
+
+      if (feeTagBody) feeTagBody.innerHTML = renderFeeTaggingForm(row, feeTypes, taggedFees);
+      bindFeeTaggingTable();
+      if (submitBtn) submitBtn.disabled = false;
+    } catch (e) {
+      if (loadToken !== feeTaggingLoadToken) {
+        return;
+      }
+      if (feeTagBody) feeTagBody.innerHTML = renderFeeTaggingErrorState(e?.message || 'Failed to load fee tagging data.');
+      if (submitBtn) submitBtn.disabled = true;
+    }
+  }
+
+  function updateFeeTagTotal() {
+    let total = 0;
+    document.querySelectorAll('#feeTaggingRows tr[data-fee-row]').forEach((row) => {
+      const check = row.querySelector('.fee-tag-check');
+      if (!check || !check.checked) return;
+      const amt = parseFloat(row.querySelector('.fee-tag-amount')?.value || '0') || 0;
+      total += amt;
+    });
+    const el = document.getElementById('feeTaggingTotal');
+    if (el) el.textContent = `₱${total.toFixed(2)}`;
+    syncFeeTagSelectAllState();
+  }
+
+  async function submitFeeTagging() {
+    const requestId = document.getElementById('feeTaggingRequestId')?.value?.trim();
+    if (!requestId) return;
+
+    const openPreviewOnSave = document.getElementById('feeTaggingMode')?.value === 'preview';
+
+    const fees = [];
+    document.querySelectorAll('#feeTaggingRows tr[data-fee-row]').forEach((row) => {
+      const check = row.querySelector('.fee-tag-check');
+      if (!check || !check.checked) return;
+      // Name could be a static span or an input (custom row)
+      const nameEl = row.querySelector('.fee-tag-name') || row.querySelector('.fee-tag-name-input');
+      const name = nameEl ? (nameEl.textContent || nameEl.value || '').trim() : '';
+      const amt = parseFloat(row.querySelector('.fee-tag-amount')?.value || '0') || 0;
+      if (name) fees.push({ fee_name: name, amount: amt });
+    });
+
+    const btn = document.getElementById('feeTaggingSubmitBtn');
+    if (btn) { btn.disabled = true; btn.textContent = 'Processing...'; }
+
+    try {
+      const body = new FormData();
+      body.append('action', 'tag_clearance_fees');
+      body.append('request_id', requestId);
+      body.append('fees', JSON.stringify(fees));
+      body.append('transition_to_payment', '0');
+      const data = await fetchJson(endpoint, { method: 'POST', body });
+      if (!data.success) {
+        alert(data.message || 'Failed to tag fees.');
+        return;
+      }
+      updateCachedRequestRecord(requestId, {
+        ...(data?.request && typeof data.request === 'object' ? data.request : {}),
+        fee_amount: Number.isFinite(Number(data?.total)) ? Number(data.total) : null
+      });
+      const feeTagModal = document.getElementById('feeTaggingModal');
+      if (feeTagModal) bootstrap.Modal.getInstance(feeTagModal)?.hide();
+      if (openPreviewOnSave) {
+        await new Promise((resolve) => window.setTimeout(resolve, 180));
+        const opened = await openRequestPreviewFromList(requestId);
+        if (!opened) {
+          await load({ force: true });
+        }
+      } else {
+        await load({ force: true });
+      }
+    } catch (e) {
+      alert(e?.message || 'Failed to tag fees. Please try again.');
+    } finally {
+      if (btn) {
+        btn.disabled = false;
+        btn.textContent = document.getElementById('feeTaggingMode')?.value === 'preview'
+          ? 'Confirm Fees & Continue'
+          : 'Save Fees';
+      }
+    }
+  }
+
+  // ── Finance Fee Catalog CRUD ─────────────────────────────────────────────────
+
+  async function openFeeCatalogModal() {
+    const modal = document.getElementById('feeCatalogModal');
+    if (!modal) return;
+    getOrCreateModalInstance(modal)?.show();
+    await refreshFeeCatalogTable({ force: true });
+  }
+
+  async function refreshFeeCatalogTable(options = {}) {
+    const force = !!options.force;
+    const tbody = document.getElementById('feeCatalogTableBody');
+    if (!tbody) return;
+    tbody.innerHTML = '<tr><td colspan="4" class="text-muted text-center py-3">Loading…</td></tr>';
+    try {
+      const rows = await fetchFeeTypeCatalog({ force });
+      if (!rows.length) { tbody.innerHTML = '<tr><td colspan="4" class="text-muted text-center">No fee types yet.</td></tr>'; return; }
+      tbody.innerHTML = rows.map((ft) => `
+        <tr>
+          <td>${esc(ft.fee_name)}</td>
+          <td>₱${Number(ft.default_amount).toFixed(2)}</td>
+          <td><span class="badge ${ft.status === 'approved' ? 'bg-success' : 'bg-secondary'}">${ft.status === 'approved' ? 'Active' : esc(ft.status)}</span></td>
+          <td class="text-end">
+            <button class="btn btn-sm btn-outline-primary me-1" onclick="editFeeType(${ft.fee_type_id},'${esc(ft.fee_name)}',${ft.default_amount},${ft.is_active})">Edit</button>
+            <button class="btn btn-sm btn-outline-danger" onclick="deleteFeeType(${ft.fee_type_id},'${esc(ft.fee_name)}')">Delete</button>
+          </td>
+        </tr>`).join('');
+    } catch (_) {
+      tbody.innerHTML = '<tr><td colspan="4" class="text-danger text-center">Error loading data.</td></tr>';
+    }
+  }
+
+  window.editFeeType = function(id, name, amount, isActive) {
+    document.getElementById('feeCatalogFeeTypeId').value = id || '';
+    document.getElementById('feeCatalogFeeName').value = name || '';
+    document.getElementById('feeCatalogDefaultAmount').value = Number(amount).toFixed(2);
+    document.getElementById('feeCatalogIsActive').checked = isActive == 1;
+    document.getElementById('feeCatalogFormTitle').textContent = id ? 'Edit Fee Type' : 'Add Fee Type';
+  };
+
+  window.deleteFeeType = async function(id, name) {
+    if (!confirm(`Delete fee type "${name}"?`)) return;
+    const body = new FormData();
+    body.append('action', 'delete_fee_type');
+    body.append('fee_type_id', id);
+    const data = await fetchJson(endpoint, { method: 'POST', body });
+    if (data.success) { await refreshFeeCatalogTable({ force: true }); }
+    else { alert(data.message || 'Delete failed.'); }
+  };
+
+  async function saveFeeCatalogForm() {
+    const id = (document.getElementById('feeCatalogFeeTypeId')?.value || '').trim();
+    const name = (document.getElementById('feeCatalogFeeName')?.value || '').trim();
+    const amount = parseFloat(document.getElementById('feeCatalogDefaultAmount')?.value || '0') || 0;
+    const isActive = document.getElementById('feeCatalogIsActive')?.checked ? 1 : 0;
+    if (!name) { alert('Fee name is required.'); return; }
+    const body = new FormData();
+    body.append('action', 'save_fee_type');
+    if (id) body.append('fee_type_id', id);
+    body.append('fee_name', name);
+    body.append('default_amount', String(amount));
+    body.append('is_active', String(isActive));
+    const data = await fetchJson(endpoint, { method: 'POST', body });
+    if (data.success) {
+      document.getElementById('feeCatalogFeeTypeId').value = '';
+      document.getElementById('feeCatalogFeeName').value = '';
+      document.getElementById('feeCatalogDefaultAmount').value = '0.00';
+      document.getElementById('feeCatalogIsActive').checked = true;
+      document.getElementById('feeCatalogFormTitle').textContent = 'Add Fee Type';
+      await refreshFeeCatalogTable({ force: true });
+    } else { alert(data.message || 'Save failed.'); }
+  }
+
+  function bindFeeCatalogModal() {
+    if (feeCatalogModalBound) return;
+    feeCatalogModalBound = true;
+    const saveBtn = document.getElementById('feeCatalogSaveBtn');
+    if (saveBtn) saveBtn.addEventListener('click', saveFeeCatalogForm);
+    const submitBtn = document.getElementById('feeTaggingSubmitBtn');
+    if (submitBtn) submitBtn.addEventListener('click', submitFeeTagging);
+    const manageFeeBtn = document.getElementById('btnManageFees');
+    if (manageFeeBtn) manageFeeBtn.addEventListener('click', openFeeCatalogModal);
   }
 
   function bindActionButtons() {
@@ -3703,6 +4511,7 @@
           }
           if (viewModalDocBtn) {
             viewModalDocBtn.classList.add('d-none');
+            viewModalDocBtn.textContent = 'View Document';
           }
           const openImmediately = isFinancePaymentsPage || !rowHasModalDetails(row);
           if (openImmediately) {
@@ -3830,9 +4639,24 @@
             viewModalActions.innerHTML = '';
           }
           if (viewModalDocBtn) {
+            const issuedDocReady = canOpenIssuedDocument(row);
+            const issuedDocUrl = issuedDocumentUrl(String(row.request_id || ''));
+            const issuedStageKey = String(row.stage || '').toLowerCase();
             viewModalDocBtn.classList.remove('d-none');
+            viewModalDocBtn.textContent = issuedDocReady ? 'View Issued Document' : 'View Document';
             viewModalDocBtn.onclick = () => {
+              if (issuedDocReady && issuedDocUrl) {
+                if (viewModalEl && viewModalEl.classList.contains('show') && viewModal) {
+                  preserveViewStateOnNextHide = true;
+                  viewModal.hide();
+                }
+                openDocumentModal(issuedDocUrl, 'Issued Document', 'view', {
+                  allowPrint: issuedStageKey === 'ready_for_claim'
+                });
+                return;
+              }
               viewPreviewState = buildPreviewState(row, payload, residentProfile, null);
+              applyPendingPreviewStateOverride(String(row.request_id || ''));
               switchViewMode('preview');
             };
           }
@@ -4106,7 +4930,7 @@
 
         const stageKeyForStatus = String(row.stage || '').toLowerCase();
         if (!isFinancePaymentsPage && stageKeyForStatus === 'completed') {
-          const completedIssuedUrl = `${appBase}/PhpFiles/Admin-End/documentRequestWorkflow.php?action=view_issued&request_id=${encodeURIComponent(String(row.request_id || ''))}`;
+          const completedIssuedUrl = `${appBase}/PhpFiles/Admin-End/documentRequestWorkflow.php?action=view_issued&request_id=${encodeURIComponent(String(row.request_id || ''))}&_ts=${Date.now()}`;
           const issuedViewerHtml = `
             <div class="tracker-form-grid cols-1">
               <div class="tracker-form-field">
@@ -4158,7 +4982,8 @@
         ], 3);
         if (statusGrid) {
           const modalActionsHtml = viewModalActionButtons(row);
-          const isPendingStage = String(row.stage || '').toLowerCase() === 'submitted';
+          const stageValue = String(row.stage || '').toLowerCase();
+          const isPendingStage = stageValue === 'submitted' || stageValue === 'fee_tagging';
           const statusActions = (modalActionsHtml && !modalActionsHtml.includes('No actions'))
             ? `<div class="tracker-status-actions${isPendingStage ? ' tracker-status-actions--split' : ''}">${modalActionsHtml}</div>`
             : '';
@@ -4167,10 +4992,12 @@
 
         viewDetailsHtml = html || '<div class="text-muted">No details.</div>';
         viewPreviewState = buildPreviewState(row, payload, residentProfile, personalMap);
+        applyPendingPreviewStateOverride(String(row.request_id || ''));
         switchViewMode('details');
         const stageKey = String(row.stage || '').toLowerCase();
         const nextEnabled = !(
           stageKey === 'submitted' ||
+          stageKey === 'fee_tagging' ||
           stageKey.includes('rejected') ||
           stageKey === 'cancelled'
         );
@@ -4197,6 +5024,20 @@
             const actionId = String(actionBtn.getAttribute('data-id') || '').trim();
             if (action === 'mark_completed') {
               openActionModal('mark_completed_confirm', actionId);
+              return;
+            }
+            if (action === 'open_fee_tagging') {
+              if (viewModalEl && viewModalEl.classList.contains('show') && viewModal) {
+                preserveViewStateOnNextHide = false;
+                viewModal.hide();
+              }
+              window.setTimeout(() => {
+                openFeeTaggingModal(actionId, { openPreviewOnSave: true });
+              }, 160);
+              return;
+            }
+            if (action === 'approve_clearance_with_fees') {
+              openActionModal('personnel_approve', actionId);
               return;
             }
             openActionModal(action, actionId);
@@ -4287,7 +5128,7 @@
         const row = itemById.get(id);
         const stageKey = String(row?.stage || '').toLowerCase();
         const allowPrint = stageKey === 'ready_for_claim';
-        const issuedUrl = `${appBase}/PhpFiles/Admin-End/documentRequestWorkflow.php?action=view_issued&request_id=${encodeURIComponent(id)}`;
+        const issuedUrl = issuedDocumentUrl(id);
         openDocumentModal(issuedUrl, 'Issued Document', '', { allowPrint });
       });
     });
@@ -4340,6 +5181,9 @@
     const currentActionValue = String(actionType.value || '');
     const currentDocKey = String(actionForm?.dataset?.docKey || '');
     const businessApprovalStep = String(actionForm?.dataset?.businessApprovalStep || '');
+    const currentRequestId = String(actionRequestId.value || '').trim();
+    const currentRow = itemById.get(currentRequestId);
+    const currentNeedsFeeTagging = requestNeedsFeeTagging(currentRow);
     if (currentActionValue === 'personnel_approve' && currentDocKey === 'businessclearance' && businessApprovalStep === 'select') {
       const selectedApprovalType = normalizeBusinessApprovalType(actionBusinessApproval?.value || '');
       const selectedPlateNumber = String(actionPlate?.value || '').trim().toUpperCase();
@@ -4352,13 +5196,27 @@
         actionForm.dataset.businessApprovalType = selectedApprovalType;
         actionForm.dataset.businessPlateNumber = selectedPlateNumber;
       }
-      configureBusinessApprovalReviewStep();
+      rememberPreviewStateOverride(currentRequestId, {
+        businessApprovalType: selectedApprovalType,
+        plateNumber: selectedPlateNumber
+      });
+      if (actionSubmitBtn) {
+        actionSubmitBtn.disabled = true;
+        actionSubmitBtn.textContent = 'Opening Fee Tagging...';
+      }
+      if (actionCancelBtn) {
+        actionCancelBtn.disabled = true;
+      }
+      suppressActionReturn = true;
+      actionModal.hide();
+      window.setTimeout(() => {
+        openFeeTaggingModal(currentRequestId, { openPreviewOnSave: true });
+      }, 160);
       return;
     }
 
     if ((actionType.value || '') === 'personnel_approve' && String(actionForm?.dataset?.docKey || '') !== 'firsttimejobseeker') {
-      // "View Document" only opens preview; it does not approve yet.
-      const rid = String(actionRequestId.value || '').trim();
+      const rid = currentRequestId;
       if (String(actionForm?.dataset?.docKey || '') === 'businessclearance') {
         const selectedApprovalType = normalizeBusinessApprovalType(
           actionForm?.dataset?.businessApprovalType || actionBusinessApproval?.value || ''
@@ -4383,6 +5241,25 @@
           viewPreviewState.businessApprovalType = selectedApprovalType;
           viewPreviewState.plateNumber = selectedPlateNumber;
         }
+        rememberPreviewStateOverride(rid, {
+          businessApprovalType: selectedApprovalType,
+          plateNumber: selectedPlateNumber
+        });
+      }
+      if (currentNeedsFeeTagging) {
+        if (actionSubmitBtn) {
+          actionSubmitBtn.disabled = true;
+          actionSubmitBtn.textContent = 'Opening Fee Tagging...';
+        }
+        if (actionCancelBtn) {
+          actionCancelBtn.disabled = true;
+        }
+        suppressActionReturn = true;
+        actionModal.hide();
+        window.setTimeout(() => {
+          openFeeTaggingModal(rid, { openPreviewOnSave: true });
+        }, 160);
+        return;
       }
       if (actionSubmitBtn) {
         actionSubmitBtn.disabled = true;
@@ -4410,11 +5287,14 @@
     const fd = new FormData();
     fd.append('action', apiAction);
     fd.append('request_id', actionRequestId.value || '');
+    const financeAmountValue = String(actionAmount?.value || '').trim();
 
     if (actionReasonWrap && !actionReasonWrap.classList.contains('d-none')) {
       fd.append('reason', actionReason.value || '');
     }
-    if (actionAmountWrap && !actionAmountWrap.classList.contains('d-none')) {
+    if (currentAction === 'finance_verify') {
+      fd.append('amount', financeAmountValue);
+    } else if (actionAmountWrap && !actionAmountWrap.classList.contains('d-none')) {
       fd.append('amount', actionAmount.value || '');
     }
     if (actionOrWrap && !actionOrWrap.classList.contains('d-none')) {
@@ -4457,8 +5337,7 @@
 
       suppressActionReturn = true;
       actionModal.hide();
-      // Keep action submit responsive; refresh table in background.
-      load({ force: true });
+      await load({ force: true });
     } catch (err) {
       if (actionSubmitBtn) {
         actionSubmitBtn.disabled = false;
@@ -4575,7 +5454,7 @@
         openActionModal('mark_completed_confirm', rid);
         return;
       }
-      if (stageKey !== 'submitted') {
+      if (stageKey !== 'submitted' && stageKey !== 'fee_tagging') {
         return;
       }
       const currentRow = itemById.get(rid);
@@ -4594,8 +5473,12 @@
     if (!id) return;
     const row = itemById.get(id);
     if (!row) return;
-    const financeKey = statusBucket(row);
-    if (financeKey !== 'unpaid' && financeKey !== 'rejected') {
+    const financeKey = isFinancePaymentsPage ? statusBucket(row) : '';
+    const stageKey = String(row?.stage || '').toLowerCase();
+    const isEligible = isFinancePaymentsPage
+      ? (financeKey === 'unpaid' || financeKey === 'rejected')
+      : (stageKey === 'for_payment' || stageKey === 'payment_rejected');
+    if (!isEligible) {
       return;
     }
     openActionModal('finance_verify', id);
@@ -4618,6 +5501,7 @@
     }
     if (viewModalDocBtn) {
       viewModalDocBtn.classList.add('d-none');
+      viewModalDocBtn.textContent = 'View Document';
       viewModalDocBtn.onclick = null;
     }
     viewDetailsHtml = '';
@@ -4629,4 +5513,267 @@
   });
 
   load();
+  warmFeeTypeCatalogCache();
+
+  // ── Fee Change Requests sub-navbar ────────────────────────────────────────
+  (function initFeeChangePanel() {
+    const tabDocRequests = document.getElementById('tabDocRequests');
+    const tabFeeRequests = document.getElementById('tabFeeRequests');
+    const docRequestsPanel = document.getElementById('docRequestsPanel');
+    const feeChangePanel   = document.getElementById('feeChangePanel');
+    if (!tabDocRequests || !tabFeeRequests) return; // not on certificate tracker page with tabs
+
+    const API = (function () {
+      const base = window.location.pathname.replace(/\/[^/]*$/, '');
+      return base.replace(/\/Admin-End\/Certificates$/, '') + '/PhpFiles/Admin-End/documentRequestWorkflow.php';
+    })();
+
+    function esc(v) {
+      return String(v ?? '').replace(/[&<>"']/g, m =>
+        ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[m]));
+    }
+
+    // ── Page tab switching ──────────────────────────────────────────────────
+    function showDocTab() {
+      tabDocRequests.classList.add('active');
+      tabFeeRequests.classList.remove('active');
+      docRequestsPanel.classList.remove('d-none');
+      feeChangePanel.classList.add('d-none');
+    }
+    function showFeeTab() {
+      tabFeeRequests.classList.add('active');
+      tabDocRequests.classList.remove('active');
+      feeChangePanel.classList.remove('d-none');
+      docRequestsPanel.classList.add('d-none');
+      loadActiveFeeSubPanel();
+    }
+    tabDocRequests.addEventListener('click', showDocTab);
+    tabFeeRequests.addEventListener('click', showFeeTab);
+
+    // ── Sub-tab switching ───────────────────────────────────────────────────
+    const subTabAddFeeType  = document.getElementById('subTabAddFeeType');
+    const subTabEditPrice   = document.getElementById('subTabEditPrice');
+    const subTabMyRequests  = document.getElementById('subTabMyRequests');
+    const fcrAddPanel       = document.getElementById('fcrAddPanel');
+    const fcrEditPanel      = document.getElementById('fcrEditPanel');
+    const fcrListPanel      = document.getElementById('fcrListPanel');
+    let activeSubTab = 'add';
+    let editCatalogLoaded = false;
+
+    function setSubTab(tab) {
+      activeSubTab = tab;
+      subTabAddFeeType.classList.toggle('active', tab === 'add');
+      subTabEditPrice.classList.toggle('active', tab === 'edit');
+      subTabMyRequests.classList.toggle('active', tab === 'list');
+      fcrAddPanel.classList.toggle('d-none', tab !== 'add');
+      fcrEditPanel.classList.toggle('d-none', tab !== 'edit');
+      fcrListPanel.classList.toggle('d-none', tab !== 'list');
+    }
+    subTabAddFeeType.addEventListener('click', () => setSubTab('add'));
+    subTabEditPrice.addEventListener('click', () => {
+      setSubTab('edit');
+      if (!editCatalogLoaded) { editCatalogLoaded = true; loadEditCatalog(); }
+    });
+    subTabMyRequests.addEventListener('click', () => {
+      setSubTab('list');
+      loadFcrList();
+    });
+
+    function loadActiveFeeSubPanel() {
+      if (activeSubTab === 'edit' && !editCatalogLoaded) { editCatalogLoaded = true; loadEditCatalog(); }
+      if (activeSubTab === 'list') loadFcrList();
+    }
+
+    // ── Add New Fee Type ────────────────────────────────────────────────────
+    function showAddError(msg) {
+      const el = document.getElementById('fcrAddError');
+      if (!el) return;
+      el.textContent = msg;
+      el.classList.toggle('d-none', !msg);
+    }
+
+    document.getElementById('fcrAddSubmitBtn').addEventListener('click', async () => {
+      const name   = document.getElementById('fcrAddName').value.trim();
+      const amount = parseFloat(document.getElementById('fcrAddAmount').value) || 0;
+      const notes  = document.getElementById('fcrAddNotes').value.trim();
+      showAddError('');
+      if (!name) { showAddError('Fee name is required.'); document.getElementById('fcrAddName').focus(); return; }
+
+      const btn = document.getElementById('fcrAddSubmitBtn');
+      btn.disabled = true;
+      const orig = btn.innerHTML;
+      btn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Submitting…';
+      try {
+        const fd = new FormData();
+        fd.append('action', 'submit_fee_change_request');
+        fd.append('request_type', 'add_type');
+        fd.append('proposed_fee_name', name);
+        fd.append('proposed_amount', String(amount));
+        fd.append('notes', notes);
+        const res  = await fetch(API, { method: 'POST', body: fd });
+        const data = await res.json();
+        if (!data.success) throw new Error(data.message || 'Submit failed.');
+        document.getElementById('fcrAddName').value   = '';
+        document.getElementById('fcrAddAmount').value = '0.00';
+        document.getElementById('fcrAddNotes').value  = '';
+        showAddError('');
+        alert('Request submitted successfully. Finance will review it shortly.');
+      } catch (e) { showAddError(e.message); }
+      finally { btn.disabled = false; btn.innerHTML = orig; }
+    });
+
+    // ── Edit Price Catalog ──────────────────────────────────────────────────
+    async function loadEditCatalog() {
+      const tbody = document.getElementById('fcrEditCatalogBody');
+      if (!tbody) return;
+      tbody.innerHTML = '<tr><td colspan="4" class="text-center text-muted py-3"><i class="fas fa-spinner fa-spin me-1"></i>Loading…</td></tr>';
+      try {
+        const res  = await fetch(`${API}?action=list_fee_types`);
+        const data = await res.json();
+        if (!data.success) throw new Error(data.message || 'Failed to load.');
+        renderEditCatalog(data.fee_types || []);
+      } catch (e) {
+        tbody.innerHTML = `<tr><td colspan="4" class="text-danger text-center py-3">${esc(e.message)}</td></tr>`;
+      }
+    }
+
+    function renderEditCatalog(rows) {
+      const tbody = document.getElementById('fcrEditCatalogBody');
+      if (!rows.length) {
+        tbody.innerHTML = '<tr><td colspan="4" class="text-muted text-center py-3">No fee types in catalog yet.</td></tr>';
+        return;
+      }
+      tbody.innerHTML = rows.map(ft => `
+        <tr>
+          <td class="fw-semibold">${esc(ft.fee_name)}</td>
+          <td>₱${Number(ft.default_amount).toFixed(2)}</td>
+          <td><span class="badge ${ft.status === 'approved' ? 'bg-success' : 'bg-secondary'}">${ft.status === 'approved' ? 'Active' : esc(ft.status)}</span></td>
+          <td class="text-end">
+            <button class="btn btn-sm btn-outline-warning py-0 px-2"
+              onclick="fcrSelectEditFee(${ft.fee_type_id},${JSON.stringify(ft.fee_name)},${ft.default_amount})">
+              Request Edit
+            </button>
+          </td>
+        </tr>`).join('');
+    }
+
+    window.fcrSelectEditFee = function(id, name, amount) {
+      document.getElementById('fcrEditFeeTypeId').value    = id;
+      document.getElementById('fcrEditFeeName').value      = name;
+      document.getElementById('fcrEditCurrentAmount').value = Number(amount).toFixed(2);
+      document.getElementById('fcrEditProposedAmount').value = Number(amount).toFixed(2);
+      document.getElementById('fcrEditNotes').value         = '';
+      document.getElementById('fcrEditFormWrap').classList.remove('d-none');
+      document.getElementById('fcrEditHint').classList.add('d-none');
+      showEditError('');
+      document.getElementById('fcrEditProposedAmount').focus();
+    };
+
+    document.getElementById('fcrEditCancelBtn').addEventListener('click', () => {
+      document.getElementById('fcrEditFormWrap').classList.add('d-none');
+      document.getElementById('fcrEditHint').classList.remove('d-none');
+    });
+
+    document.getElementById('fcrEditRefreshBtn').addEventListener('click', () => {
+      editCatalogLoaded = true;
+      loadEditCatalog();
+    });
+
+    function showEditError(msg) {
+      const el = document.getElementById('fcrEditError');
+      if (!el) return;
+      el.textContent = msg;
+      el.classList.toggle('d-none', !msg);
+    }
+
+    document.getElementById('fcrEditSubmitBtn').addEventListener('click', async () => {
+      const id       = document.getElementById('fcrEditFeeTypeId').value;
+      const name     = document.getElementById('fcrEditFeeName').value;
+      const current  = document.getElementById('fcrEditCurrentAmount').value;
+      const proposed = parseFloat(document.getElementById('fcrEditProposedAmount').value);
+      const notes    = document.getElementById('fcrEditNotes').value.trim();
+      showEditError('');
+      if (!id) { showEditError('No fee type selected.'); return; }
+      if (isNaN(proposed) || proposed < 0) { showEditError('Please enter a valid proposed amount.'); return; }
+
+      const btn = document.getElementById('fcrEditSubmitBtn');
+      btn.disabled = true;
+      const orig = btn.innerHTML;
+      btn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Submitting…';
+      try {
+        const fd = new FormData();
+        fd.append('action', 'submit_fee_change_request');
+        fd.append('request_type', 'edit_price');
+        fd.append('fee_type_id', id);
+        fd.append('proposed_fee_name', name);
+        fd.append('current_amount', current);
+        fd.append('proposed_amount', String(proposed));
+        fd.append('notes', notes);
+        const res  = await fetch(API, { method: 'POST', body: fd });
+        const data = await res.json();
+        if (!data.success) throw new Error(data.message || 'Submit failed.');
+        document.getElementById('fcrEditFormWrap').classList.add('d-none');
+        document.getElementById('fcrEditHint').classList.remove('d-none');
+        showEditError('');
+        alert('Price edit request submitted. Finance will review it.');
+      } catch (e) { showEditError(e.message); }
+      finally { btn.disabled = false; btn.innerHTML = orig; }
+    });
+
+    // ── Submitted Requests List ─────────────────────────────────────────────
+    async function loadFcrList() {
+      const tbody = document.getElementById('fcrListBody');
+      if (!tbody) return;
+      tbody.innerHTML = '<tr><td colspan="7" class="text-center text-muted py-3"><i class="fas fa-spinner fa-spin me-1"></i>Loading…</td></tr>';
+      try {
+        const res  = await fetch(`${API}?action=list_fee_change_requests`);
+        const data = await res.json();
+        if (!data.success) throw new Error(data.message || 'Failed to load.');
+        renderFcrList(data.requests || data.fee_types || []);
+      } catch (e) {
+        tbody.innerHTML = `<tr><td colspan="7" class="text-danger text-center py-3">${esc(e.message)}</td></tr>`;
+      }
+    }
+
+    function renderFcrList(rows) {
+      const tbody = document.getElementById('fcrListBody');
+      if (!rows.length) {
+        tbody.innerHTML = '<tr><td colspan="7" class="text-muted text-center py-3">No requests submitted yet.</td></tr>';
+        return;
+      }
+      const statusBadge = s => {
+        const map = { pending: 'bg-warning text-dark', approved: 'bg-success', rejected: 'bg-danger' };
+        return `<span class="badge ${map[s] || 'bg-secondary'}">${esc(s)}</span>`;
+      };
+      tbody.innerHTML = rows.map(r => `
+        <tr>
+          <td><span class="badge bg-secondary">${r.change_type === 'new_type' ? 'New Type' : 'Price Edit'}</span></td>
+          <td class="fw-semibold">${esc(r.fee_name)}</td>
+          <td>₱${Number(r.proposed_amount || r.default_amount).toFixed(2)}</td>
+          <td class="small text-muted">${esc(r.notes || '—')}</td>
+          <td>${statusBadge(r.status)}</td>
+          <td class="small text-muted">${esc(r.updated_at || r.created_at || '')}</td>
+          <td class="text-end">
+            ${r.status === 'pending'
+              ? `<button class="btn btn-sm btn-outline-danger py-0 px-2" onclick="fcrCancelRequest(${r.fee_type_id})">Cancel</button>`
+              : '—'}
+          </td>
+        </tr>`).join('');
+    }
+
+    window.fcrCancelRequest = async function(id) {
+      if (!confirm('Cancel this fee change request?')) return;
+      try {
+        const fd = new FormData();
+        fd.append('action', 'cancel_fee_change_request');
+        fd.append('fee_type_id', id);
+        const res  = await fetch(API, { method: 'POST', body: fd });
+        const data = await res.json();
+        if (!data.success) throw new Error(data.message || 'Cancel failed.');
+        loadFcrList();
+      } catch (e) { alert(e.message); }
+    };
+
+    document.getElementById('fcrListRefreshBtn').addEventListener('click', loadFcrList);
+  })();
 })();

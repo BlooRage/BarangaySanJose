@@ -3,11 +3,16 @@ ini_set('display_errors', 0);
 ini_set('log_errors', 1);
 error_reporting(E_ALL);
 
-session_start();
 header('Content-Type: application/json');
 date_default_timezone_set('Asia/Manila');
 
+require_once __DIR__ . '/../General/security.php';
 require __DIR__ . '/../General/connection.php';
+require_once __DIR__ . '/redirectDestination.php';
+
+if (session_status() === PHP_SESSION_NONE) {
+  session_start();
+}
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
   echo json_encode(['success' => false, 'error' => 'Invalid request']);
@@ -103,6 +108,6 @@ $_SESSION['show_not_verified_modal'] = true;
 
 echo json_encode([
   'success' => true,
-  'redirect' => '../PhpFiles/Login/unifiedProfileCheck.php'
+  'redirect' => resolveUnifiedProfileRedirect($conn, $user_id, (string)$user['role_access'])
 ]);
 exit;

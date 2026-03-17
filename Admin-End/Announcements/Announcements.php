@@ -350,7 +350,7 @@ function buildAnnouncementsUrl(string $channel, string $status, string $searchTe
   if ($queueChannelFilter !== 'all') {
     $query['queue_channel'] = $queueChannelFilter;
   }
-  return 'Announcements.php?' . http_build_query($query);
+  return appUrl('/Admin-End/Announcements/Announcements.php') . '?' . http_build_query($query);
 }
 
 function buildReviewQueueUrl(string $channel, string $status, string $searchTerm, string $queueChannel, string $queueSearch): string
@@ -368,7 +368,7 @@ function buildReviewQueueUrl(string $channel, string $status, string $searchTerm
   if ($queueSearch !== '') {
     $query['queue_q'] = $queueSearch;
   }
-  return 'Announcements.php?' . http_build_query($query);
+  return appUrl('/Admin-End/Announcements/Announcements.php') . '?' . http_build_query($query);
 }
 
 function announcement_ordered_channels(array $channels): array
@@ -422,7 +422,7 @@ function announcement_ordered_channels(array $channels): array
             </div>
 
             <div class="admin-list-actions admin-list-actions--linear review-queue-actions">
-              <form class="announcement-search-form" method="get" action="Announcements.php">
+              <form class="announcement-search-form" method="get" action="<?= htmlspecialchars(appUrl('/Admin-End/Announcements/Announcements.php')) ?>">
                 <input type="hidden" name="channel" value="<?= htmlspecialchars($deliveryChannel) ?>">
                 <input type="hidden" name="status" value="<?= htmlspecialchars($statusFilter) ?>">
                 <input type="hidden" name="q" value="<?= htmlspecialchars($searchTerm) ?>">
@@ -563,7 +563,7 @@ function announcement_ordered_channels(array $channels): array
 
           <div class="admin-list-toolbar-end">
             <div class="admin-list-actions admin-list-actions--linear">
-              <form class="announcement-search-form" method="get" action="Announcements.php">
+              <form class="announcement-search-form" method="get" action="<?= htmlspecialchars(appUrl('/Admin-End/Announcements/Announcements.php')) ?>">
                 <input type="hidden" name="channel" value="<?= htmlspecialchars($deliveryChannel) ?>">
                 <input type="hidden" name="status" value="<?= htmlspecialchars($statusFilter) ?>">
                 <div class="input-group admin-search">
@@ -689,7 +689,7 @@ function announcement_ordered_channels(array $channels): array
               class="form-control form-control-sm resident-entries-input"
             />
             <?php if ($isSuperAdmin): ?>
-              <span class="badge rounded-pill bg-warning-subtle text-warning-emphasis">
+              <span id="announcementsVisibleCountBadge" class="badge rounded-pill bg-warning-subtle text-warning-emphasis">
                 Showing <?= (int)count($visibleRows) ?> of <?= (int)count($filteredByChannel) ?>
               </span>
             <?php endif; ?>
@@ -701,7 +701,7 @@ function announcement_ordered_channels(array $channels): array
 
         <div class="modal fade" id="modalFilter" tabindex="-1" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
           <div class="modal-dialog modal-dialog-centered">
-            <form class="modal-content p-4" method="get" action="Announcements.php">
+            <form class="modal-content p-4" method="get" action="<?= htmlspecialchars(appUrl('/Admin-End/Announcements/Announcements.php')) ?>">
               <input type="hidden" name="q" value="<?= htmlspecialchars($searchTerm) ?>">
 
               <div class="modal-header border-0">
@@ -829,7 +829,7 @@ function announcement_ordered_channels(array $channels): array
 
   <div class="modal fade" id="modalReviewQueueFilter" tabindex="-1" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
     <div class="modal-dialog modal-dialog-centered">
-      <form class="modal-content p-4" method="get" action="Announcements.php">
+      <form class="modal-content p-4" method="get" action="<?= htmlspecialchars(appUrl('/Admin-End/Announcements/Announcements.php')) ?>">
         <input type="hidden" name="channel" value="<?= htmlspecialchars($deliveryChannel) ?>">
         <input type="hidden" name="status" value="<?= htmlspecialchars($statusFilter) ?>">
         <input type="hidden" name="q" value="<?= htmlspecialchars($searchTerm) ?>">
@@ -1251,8 +1251,9 @@ function announcement_ordered_channels(array $channels): array
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
   <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
   <script src="../../summernote-0.9.0-dist/summernote-lite.min.js?v=20260307-2"></script>
+  <script id="announcementDataPayload" type="application/json"><?= json_encode($announcementDetailsMap, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?></script>
   <script>
-    const ANNOUNCEMENT_DATA = <?= json_encode($announcementDetailsMap, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
+    let ANNOUNCEMENT_DATA = JSON.parse(document.getElementById("announcementDataPayload")?.textContent || "{}");
     const CURRENT_USER_ID = <?= json_encode($currentUserId, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
     const CURRENT_USER_DISPLAY = <?= json_encode($currentUserDisplayLabel, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
     const ANNOUNCEMENT_CHANNEL_LABELS = {
@@ -2084,6 +2085,48 @@ function announcement_ordered_channels(array $channels): array
         });
       }
 
+      if (viewEditBtn) {
+        viewEditBtn.addEventListener("click", function () {
+          const id = viewEditBtn.getAttribute("data-id") || "";
+          if (!id) {
+            return;
+          }
+          openDeniedDraftNotice(id);
+        });
+      }
+
+      document.addEventListener("click", function (event) {
+        const target = event.target;
+        if (!(target instanceof Element)) {
+          return;
+        }
+        const btn = target.closest(".btn-edit-announcement");
+        if (!(btn instanceof HTMLElement)) {
+          return;
+        }
+        if (btn.hasAttribute("disabled") || btn.classList.contains("disabled")) {
+          return;
+        }
+        const id = btn.getAttribute("data-id") || "";
+        const data = ANNOUNCEMENT_DATA[id];
+        if (!data) {
+          return;
+        }
+        const ownerId = String(data.created_by_user_id || "");
+        const createdByLabel = String(data.created_by || "");
+        const isOwner = ownerId === String(CURRENT_USER_ID || "")
+          || (ownerId === "" && createdByLabel !== "" && createdByLabel === String(CURRENT_USER_DISPLAY || ""));
+        const isDeniedDraft = String(data.status || "").toLowerCase() === "draft"
+          && String(data.review_result || "").toLowerCase() === "denied"
+          && (isOwner || isSuperAdminSession);
+        if (!isDeniedDraft) {
+          return;
+        }
+        event.preventDefault();
+        event.stopPropagation();
+        openDeniedDraftNotice(id);
+      });
+
       [
         "modalViewAnnouncement",
         "modalDeleteAnnouncement",
@@ -2180,6 +2223,7 @@ function announcement_ordered_channels(array $channels): array
         renderPage();
       });
 
+      window.renderAnnouncementsPage = renderPage;
       renderPage();
     })();
 
@@ -2255,6 +2299,7 @@ function announcement_ordered_channels(array $channels): array
         renderList();
       });
 
+      window.applyReviewQueueHiddenColumns = () => applyHidden(loadHidden());
       applyHidden(loadHidden());
     })();
 
@@ -2266,50 +2311,86 @@ function announcement_ordered_channels(array $channels): array
     })();
 
     (function () {
-      function bindRefreshSpin(buttonId) {
-        const refreshBtn = document.getElementById(buttonId);
-        if (!refreshBtn) return;
-        refreshBtn.addEventListener("click", function () {
-          refreshBtn.classList.add("is-loading");
-          refreshBtn.setAttribute("aria-busy", "true");
+      const announcementsRefreshBtn = document.getElementById("btnAnnouncementsTableRefresh");
+      const reviewQueueRefreshBtn = document.getElementById("btnReviewQueueRefresh");
+      const announcementsTableBody = document.getElementById("tableBody");
+      const reviewQueueBody = document.querySelector("#table-reviewQueueData tbody");
+      const visibleCountBadge = document.getElementById("announcementsVisibleCountBadge");
+      const AUTO_REFRESH_SECONDS = 15;
+      let autoRefreshSecondsLeft = AUTO_REFRESH_SECONDS;
+      let autoRefreshInterval = null;
+      let autoRefreshInFlight = false;
+
+      function setRefreshLoading(on) {
+        [announcementsRefreshBtn, reviewQueueRefreshBtn].forEach((button) => {
+          if (!button) return;
+          button.classList.toggle("is-loading", !!on);
+          button.setAttribute("aria-busy", on ? "true" : "false");
         });
       }
 
-      if (viewEditBtn) {
-        viewEditBtn.addEventListener("click", function () {
-          const id = viewEditBtn.getAttribute("data-id") || "";
-          if (!id) {
-            return;
+      async function refreshAnnouncementTables() {
+        if (autoRefreshInFlight || !announcementsTableBody || !reviewQueueBody) return;
+        autoRefreshInFlight = true;
+        autoRefreshSecondsLeft = AUTO_REFRESH_SECONDS;
+        setRefreshLoading(true);
+        try {
+          const response = await fetch(window.location.href, {
+            credentials: "same-origin",
+            headers: { "X-Requested-With": "XMLHttpRequest" }
+          });
+          const html = await response.text();
+          if (!response.ok) {
+            throw new Error("Failed to refresh announcement tables.");
           }
-          openDeniedDraftNotice(id);
-        });
+          const doc = new DOMParser().parseFromString(html, "text/html");
+          const nextAnnouncementsBody = doc.getElementById("tableBody");
+          const nextReviewQueueBody = doc.querySelector("#table-reviewQueueData tbody");
+          const nextAnnouncementData = doc.getElementById("announcementDataPayload");
+          if (!nextAnnouncementsBody || !nextReviewQueueBody || !nextAnnouncementData) {
+            throw new Error("Refreshed announcement data was incomplete.");
+          }
+
+          announcementsTableBody.innerHTML = nextAnnouncementsBody.innerHTML;
+          reviewQueueBody.innerHTML = nextReviewQueueBody.innerHTML;
+          ANNOUNCEMENT_DATA = JSON.parse(nextAnnouncementData.textContent || "{}");
+
+          const nextVisibleCountBadge = doc.getElementById("announcementsVisibleCountBadge");
+          if (visibleCountBadge && nextVisibleCountBadge) {
+            visibleCountBadge.textContent = nextVisibleCountBadge.textContent;
+          }
+
+          if (typeof window.renderAnnouncementsPage === "function") {
+            window.renderAnnouncementsPage();
+          }
+          if (typeof window.applyReviewQueueHiddenColumns === "function") {
+            window.applyReviewQueueHiddenColumns();
+          }
+        } catch (error) {
+          console.error("Unable to refresh announcement tables:", error);
+        } finally {
+          autoRefreshInFlight = false;
+          setRefreshLoading(false);
+        }
       }
 
-      document.querySelectorAll(".btn-edit-announcement").forEach(function (btn) {
-        btn.addEventListener("click", function (event) {
-          const id = btn.getAttribute("data-id") || "";
-          const data = ANNOUNCEMENT_DATA[id];
-          if (!data) {
-            return;
-          }
-          const ownerId = String(data.created_by_user_id || "");
-          const createdByLabel = String(data.created_by || "");
-          const isOwner = ownerId === String(CURRENT_USER_ID || "")
-            || (ownerId === "" && createdByLabel !== "" && createdByLabel === String(CURRENT_USER_DISPLAY || ""));
-          const isDeniedDraft = String(data.status || "").toLowerCase() === "draft"
-            && String(data.review_result || "").toLowerCase() === "denied"
-            && (isOwner || isSuperAdminSession);
-          if (!isDeniedDraft) {
-            return;
-          }
+      function triggerRefresh(event) {
+        if (event) {
           event.preventDefault();
-          event.stopPropagation();
-          openDeniedDraftNotice(id);
-        });
-      });
+        }
+        refreshAnnouncementTables().catch(() => {});
+      }
 
-      bindRefreshSpin("btnAnnouncementsTableRefresh");
-      bindRefreshSpin("btnReviewQueueRefresh");
+      announcementsRefreshBtn?.addEventListener("click", triggerRefresh);
+      reviewQueueRefreshBtn?.addEventListener("click", triggerRefresh);
+
+      autoRefreshInterval = window.setInterval(() => {
+        if (autoRefreshInFlight) return;
+        autoRefreshSecondsLeft -= 1;
+        if (autoRefreshSecondsLeft <= 0) {
+          refreshAnnouncementTables().catch(() => {});
+        }
+      }, 1000);
     })();
   </script>
   <script src="../../JS-Script-Files/Admin-End/tableColumnsGeneric.js?v=20260215-1"></script>

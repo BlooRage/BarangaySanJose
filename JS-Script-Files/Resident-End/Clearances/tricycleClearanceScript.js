@@ -12,6 +12,11 @@ document.addEventListener("DOMContentLoaded", () => {
     const crNumberInput = document.getElementById("crNumber");
     const plateNumberInput = document.getElementById("plateNumber");
     const franchiseeSelect = document.getElementById("franchiseeSelect");
+    const todaPodaLocationInput = document.getElementById("todaPodaLocation");
+    const todaPodaLocationValueInput = document.getElementById("todaPodaLocationValue");
+    const otherTodaPodaLocationRow = document.getElementById("otherTodaPodaLocationRow");
+    const otherTodaPodaLocationInput = document.getElementById("otherTodaPodaLocation");
+    const otherTodaPodaLocationError = document.getElementById("otherTodaPodaLocationError");
     const vehicleNamedYes = document.getElementById("vehicleNamedYes");
     const vehicleNamedNo = document.getElementById("vehicleNamedNo");
     const deedOfSaleRow = document.getElementById("deedOfSaleRow");
@@ -62,6 +67,26 @@ document.addEventListener("DOMContentLoaded", () => {
         if (!input || !errorEl) return;
         errorEl.classList.add("d-none");
         input.classList.remove("is-invalid");
+    };
+
+    const normalizeFranchisee = (value) => String(value || "").trim().replace(/\s+/g, " ").toUpperCase();
+
+    const franchiseeLocationMap = {
+        "PRIVATE - FAMILY USE": "",
+        "PRIVATE - DELIVERY USE": "",
+        "SJ1 - NEW ROTODA": "AREA 1",
+        "SJ-1 NEW ROTODA": "AREA 1",
+        "SJ2 - SUBTODA": "AREA 2",
+        "SJ-2 SUBTODA": "AREA 2",
+        "SJ3 - BAGONG BUHAY TODA": "AREA 3",
+        "SJ-3 BAGONG BUHAY TODA": "AREA 3",
+        "SJ4 - KV1 TODA": "AREA 4",
+        "SJ-4 KV1 TODA": "AREA 4",
+        "SJ5 - UPLAND TODA": "AREA 5",
+        "SJ-5 UPLAND TODA": "AREA 5",
+        "SUBPODA": "",
+        "SUB-PODA": "",
+        "OTHERS": null
     };
 
     const validateField = (input, errorEl, messages) => {
@@ -146,20 +171,69 @@ document.addEventListener("DOMContentLoaded", () => {
             : "Tricycle Permit - New Application";
     };
 
+    const updateTodaPodaLocation = () => {
+        if (!todaPodaLocationInput || !franchiseeSelect) return;
+        const franchiseeKey = normalizeFranchisee(franchiseeSelect.value);
+        const mappedLocation = Object.prototype.hasOwnProperty.call(franchiseeLocationMap, franchiseeKey)
+            ? franchiseeLocationMap[franchiseeKey]
+            : "";
+        const isOther = franchiseeKey === "OTHERS";
+        const wasOther = otherTodaPodaLocationInput?.dataset.active === "true";
+
+        todaPodaLocationInput.disabled = true;
+        todaPodaLocationInput.classList.add("location-prefilled-display");
+
+        if (isOther) {
+            todaPodaLocationInput.value = "";
+            if (otherTodaPodaLocationRow) {
+                otherTodaPodaLocationRow.classList.remove("d-none");
+            }
+            if (otherTodaPodaLocationInput) {
+                otherTodaPodaLocationInput.disabled = false;
+                if (!wasOther) {
+                    otherTodaPodaLocationInput.value = "";
+                }
+                otherTodaPodaLocationInput.placeholder = "Enter TODA / PODA location";
+                otherTodaPodaLocationInput.dataset.active = "true";
+            }
+            if (todaPodaLocationValueInput) {
+                todaPodaLocationValueInput.value = String(otherTodaPodaLocationInput?.value || "").trim();
+            }
+            return;
+        }
+
+        todaPodaLocationInput.value = mappedLocation ?? "";
+        if (todaPodaLocationValueInput) {
+            todaPodaLocationValueInput.value = mappedLocation ?? "";
+        }
+        if (otherTodaPodaLocationRow) {
+            otherTodaPodaLocationRow.classList.add("d-none");
+        }
+        if (otherTodaPodaLocationInput) {
+            otherTodaPodaLocationInput.disabled = true;
+            otherTodaPodaLocationInput.value = "";
+            otherTodaPodaLocationInput.dataset.active = "false";
+        }
+        clearErrorState(otherTodaPodaLocationInput, otherTodaPodaLocationError);
+    };
+
     const updateState = () => {
         const isNew = appNew?.checked === true;
         const isRenewal = appRenewal?.checked === true;
         const docsEnabled = isNew || isRenewal;
         const isVehicleNamedToOwner = vehicleNamedYes?.checked === true;
         const needsDeedOfSale = docsEnabled && vehicleNamedNo?.checked === true;
+        const isOtherFranchisee = normalizeFranchisee(franchiseeSelect?.value) === "OTHERS";
 
         updateRequestPurpose();
+        updateTodaPodaLocation();
 
         if (documentUploadSection) {
             documentUploadSection.classList.toggle("d-none", !docsEnabled);
         }
 
         setRequired(franchiseeSelect, true);
+        setRequired(otherTodaPodaLocationInput, isOtherFranchisee);
         setRequired(orVehicleFile, docsEnabled);
         setRequired(crVehicleFile, docsEnabled);
         setRequired(todaPodaCertFile, docsEnabled);
@@ -231,11 +305,26 @@ document.addEventListener("DOMContentLoaded", () => {
         required: "C.R. number is required.",
         pattern: "C.R. number must be 7 to 12 digits."
     }, normalizeNumber);
+    bindValidation(otherTodaPodaLocationInput, otherTodaPodaLocationError, {
+        required: "Location is required when franchisee is Others.",
+        pattern: "Location is required when franchisee is Others."
+    });
 
     appNew?.addEventListener("change", updateState);
     appRenewal?.addEventListener("change", updateState);
     vehicleNamedYes?.addEventListener("change", updateState);
     vehicleNamedNo?.addEventListener("change", updateState);
+    franchiseeSelect?.addEventListener("change", updateState);
+    otherTodaPodaLocationInput?.addEventListener("input", () => {
+        if (todaPodaLocationValueInput) {
+            todaPodaLocationValueInput.value = String(otherTodaPodaLocationInput.value || "").trim();
+        }
+    });
+    otherTodaPodaLocationInput?.addEventListener("blur", () => {
+        if (todaPodaLocationValueInput) {
+            todaPodaLocationValueInput.value = String(otherTodaPodaLocationInput.value || "").trim();
+        }
+    });
 
     wireFileDisplay("orVehicleFile", "orVehicleSelectedFile");
     wireFileDisplay("crVehicleFile", "crVehicleSelectedFile");

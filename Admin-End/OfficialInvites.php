@@ -129,7 +129,7 @@ function set_invite_flash(string $type, string $message): void {
 }
 
 function redirect_self(): void {
-    header("Location: OfficialInvites.php");
+    header("Location: " . appUrl('/Admin-End/OfficialInvites.php'));
     exit;
 }
 

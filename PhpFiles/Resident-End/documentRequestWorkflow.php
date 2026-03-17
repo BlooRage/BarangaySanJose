@@ -952,6 +952,70 @@ if ($action === 'submit_request') {
     }
 
     $documentTypeToken = dr_document_type_token($documentTypeRaw !== '' ? $documentTypeRaw : $documentType);
+    $isBarangayIdRequest = dr_is_barangay_id_document_type($documentTypeRaw !== '' ? $documentTypeRaw : $documentType);
+    if ($isBarangayIdRequest) {
+        $residentBirthSnapshot = dr_fetch_resident_birth_snapshot($conn, $residentId, $residentForeignId);
+        if (trim((string)($_POST['birthdate'] ?? '')) === '' && $residentBirthSnapshot['birthdate'] !== '') {
+            $_POST['birthdate'] = $residentBirthSnapshot['birthdate'];
+        }
+        if (trim((string)($_POST['birthplace'] ?? '')) === '' && $residentBirthSnapshot['birthplace'] !== '') {
+            $_POST['birthplace'] = $residentBirthSnapshot['birthplace'];
+        }
+
+        $contactNumber = trim((string)($_POST['contact_number'] ?? $_POST['phone_number'] ?? ''));
+        if ($contactNumber === '') {
+            dr_respond_json(422, ['success' => false, 'message' => 'Contact number is required.']);
+        }
+        $_POST['contact_number'] = $contactNumber;
+        if (trim((string)($_POST['phone_number'] ?? '')) === '') {
+            $_POST['phone_number'] = $contactNumber;
+        }
+
+        $fullAddress = trim((string)($_POST['full_address'] ?? $_POST['full_address_display'] ?? ''));
+        if ($fullAddress === '') {
+            $fullAddress = implode(', ', array_filter([
+                trim((string)($_POST['unitNumber'] ?? '')) !== '' ? 'Unit ' . trim((string)($_POST['unitNumber'] ?? '')) : '',
+                trim(implode(' ', array_filter([
+                    trim((string)($_POST['houseNumber'] ?? '')),
+                    trim((string)($_POST['streetName'] ?? '')),
+                ], static fn($v) => $v !== ''))),
+                trim((string)($_POST['subdivision'] ?? '')) !== '' ? trim((string)($_POST['subdivision'] ?? '')) . ' Subdivision' : '',
+                trim((string)($_POST['areaNumber'] ?? '')) !== '' ? 'Area ' . trim((string)($_POST['areaNumber'] ?? '')) : '',
+                'San Jose',
+                'Rodriguez',
+                'Rizal',
+            ], static fn($part) => trim((string)$part) !== ''));
+        }
+        if ($fullAddress === '') {
+            dr_respond_json(422, ['success' => false, 'message' => 'Full address is required.']);
+        }
+        $_POST['full_address'] = $fullAddress;
+        $_POST['full_address_display'] = $fullAddress;
+
+        $requiredFields = [
+            'last_name' => 'Last name is required.',
+            'first_name' => 'First name is required.',
+            'birthdate' => 'Birthdate is required.',
+            'birthplace' => 'Birthplace is required.',
+            'emergency_last' => 'Emergency contact last name is required.',
+            'emergency_first' => 'Emergency contact first name is required.',
+            'emergency_contact' => 'Emergency contact number is required.',
+        ];
+        foreach ($requiredFields as $field => $message) {
+            if (trim((string)($_POST[$field] ?? '')) === '') {
+                dr_respond_json(422, ['success' => false, 'message' => $message]);
+            }
+        }
+
+        $purposeText = 'Barangay ID Application';
+        if (trim((string)($_POST['request_purpose'] ?? '')) === '') {
+            $_POST['request_purpose'] = $purposeText;
+        }
+        if (trim((string)($_POST['purpose'] ?? '')) === '') {
+            $_POST['purpose'] = $purposeText;
+        }
+    }
+
     $isBusinessPermitClearanceRequest = in_array($documentTypeToken, [
         'barangayclearanceforbusinesspermit',
         'barangaybusinessclearance',
@@ -980,6 +1044,12 @@ if ($action === 'submit_request') {
             dr_respond_json(422, ['success' => false, 'message' => 'Business name is required.']);
         }
         $_POST['business_name'] = $businessName;
+
+        $businessType = trim((string)($_POST['business_type'] ?? ''));
+        if ($businessType === '') {
+            dr_respond_json(422, ['success' => false, 'message' => 'Nature / Type of Business is required.']);
+        }
+        $_POST['business_type'] = $businessType;
 
         $initialOperationDate = trim((string)($_POST['initial_operation_date'] ?? $_POST['b_date'] ?? ''));
         if ($initialOperationDate === '') {
@@ -1079,20 +1149,42 @@ if ($action === 'submit_request') {
             dr_respond_json(422, ['success' => false, 'message' => 'Application type is required.']);
         }
 
-        $allowedFranchisees = [
-            'Private - FAMILY USE',
-            'Private - DELIVERY USE',
-            'SJ-1 NEW ROTODA',
-            'SJ-4 KV1 TODA',
-            'SJ-5 UPLAND TODA',
-            'SUB-PODA',
+        $franchiseeMatrix = [
+            'PRIVATE - FAMILY USE' => ['franchisee' => 'Private - FAMILY USE', 'location' => ''],
+            'PRIVATE - DELIVERY USE' => ['franchisee' => 'Private - DELIVERY USE', 'location' => ''],
+            'SJ1 - NEW ROTODA' => ['franchisee' => 'SJ1 - NEW ROTODA', 'location' => 'AREA 1'],
+            'SJ-1 NEW ROTODA' => ['franchisee' => 'SJ1 - NEW ROTODA', 'location' => 'AREA 1'],
+            'SJ2 - SUBTODA' => ['franchisee' => 'SJ2 - SUBTODA', 'location' => 'AREA 2'],
+            'SJ-2 SUBTODA' => ['franchisee' => 'SJ2 - SUBTODA', 'location' => 'AREA 2'],
+            'SJ3 - BAGONG BUHAY TODA' => ['franchisee' => 'SJ3 - BAGONG BUHAY TODA', 'location' => 'AREA 3'],
+            'SJ-3 BAGONG BUHAY TODA' => ['franchisee' => 'SJ3 - BAGONG BUHAY TODA', 'location' => 'AREA 3'],
+            'SJ4 - KV1 TODA' => ['franchisee' => 'SJ4 - KV1 TODA', 'location' => 'AREA 4'],
+            'SJ-4 KV1 TODA' => ['franchisee' => 'SJ4 - KV1 TODA', 'location' => 'AREA 4'],
+            'SJ5 - UPLAND TODA' => ['franchisee' => 'SJ5 - UPLAND TODA', 'location' => 'AREA 5'],
+            'SJ-5 UPLAND TODA' => ['franchisee' => 'SJ5 - UPLAND TODA', 'location' => 'AREA 5'],
+            'SUBPODA' => ['franchisee' => 'SUBPODA', 'location' => ''],
+            'SUB-PODA' => ['franchisee' => 'SUBPODA', 'location' => ''],
+            'OTHERS' => ['franchisee' => 'OTHERS', 'location' => null],
         ];
         $franchisee = trim((string)($_POST['franchisee'] ?? $_POST['vehicle_franchise'] ?? ''));
-        if (!in_array($franchisee, $allowedFranchisees, true)) {
+        $franchiseeKey = strtoupper((string)(preg_replace('/\s+/', ' ', $franchisee) ?? $franchisee));
+        $franchiseeSelection = $franchiseeMatrix[$franchiseeKey] ?? null;
+        if (!is_array($franchiseeSelection)) {
             dr_respond_json(422, ['success' => false, 'message' => 'Valid franchisee is required.']);
+        }
+        $franchisee = (string)($franchiseeSelection['franchisee'] ?? '');
+        $todaPodaLocation = trim((string)($_POST['location_of_toda_poda'] ?? $_POST['location'] ?? ''));
+        if (($franchiseeSelection['location'] ?? null) === null) {
+            if ($todaPodaLocation === '') {
+                dr_respond_json(422, ['success' => false, 'message' => 'Location of TODA / PODA is required for Others.']);
+            }
+        } else {
+            $todaPodaLocation = (string)($franchiseeSelection['location'] ?? '');
         }
         $_POST['franchisee'] = $franchisee;
         $_POST['vehicle_franchise'] = $franchisee;
+        $_POST['location_of_toda_poda'] = $todaPodaLocation;
+        $_POST['location'] = $todaPodaLocation;
 
         $vehicleNamedToOwner = strtolower(trim((string)($_POST['vehicle_named_to_owner'] ?? '')));
         if (!in_array($vehicleNamedToOwner, ['yes', 'no'], true)) {
@@ -1608,7 +1700,7 @@ if ($action === 'submit_request') {
     }
 
     if ((isset($_POST['redirect']) && $_POST['redirect'] === '1') || strpos((string)($_SERVER['HTTP_ACCEPT'] ?? ''), 'text/html') !== false) {
-        header('Location: ' . dr_app_base_path() . '/Resident-End/document_requests.php?created=' . urlencode($requestId));
+        header('Location: ' . appUrl('/Resident-End/document_requests.php?created=' . urlencode($requestId)));
         exit;
     }
 
@@ -2198,8 +2290,17 @@ if ($action === 'list') {
         }
         $row['stage_label'] = dr_stage_label((string)$row['stage']);
         $docTypeForFee = trim((string)($row['document_type'] ?? ''));
-        $row['fee_amount'] = null;
-        if ($docTypeForFee !== '') $docTypesForFee[$docTypeForFee] = true;
+        $storedFeeAmount = $row['fee_amount'] ?? null;
+        if ($storedFeeAmount !== null && $storedFeeAmount !== '' && is_numeric((string)$storedFeeAmount)) {
+            $row['fee_amount'] = (float)$storedFeeAmount;
+        } elseif (isset($row['_tx_amount']) && $row['_tx_amount'] !== null && $row['_tx_amount'] !== '' && is_numeric((string)$row['_tx_amount'])) {
+            $row['fee_amount'] = (float)$row['_tx_amount'];
+        } else {
+            $row['fee_amount'] = null;
+            if ($docTypeForFee !== '') {
+                $docTypesForFee[$docTypeForFee] = true;
+            }
+        }
         $payload = json_decode((string)($row['request_details'] ?? $row['payload_json'] ?? '{}'), true);
         $row['payload'] = is_array($payload) ? $payload : [];
         unset(
@@ -2223,7 +2324,7 @@ if ($action === 'list') {
         $feeMap = dr_get_fee_map_for_document_types($conn, array_keys($docTypesForFee));
         foreach ($items as &$it) {
             $docType = trim((string)($it['document_type'] ?? ''));
-            if ($docType !== '' && array_key_exists($docType, $feeMap)) {
+            if ($it['fee_amount'] === null && $docType !== '' && array_key_exists($docType, $feeMap)) {
                 $it['fee_amount'] = $feeMap[$docType];
             }
         }
@@ -2231,6 +2332,16 @@ if ($action === 'list') {
     }
 
     dr_respond_json(200, ['success' => true, 'items' => $items]);
+}
+
+if ($action === 'get_clearance_fees') {
+    $requestId = trim((string)($_GET['request_id'] ?? $_POST['request_id'] ?? ''));
+    if ($requestId === '') {
+        dr_respond_json(400, ['success' => false, 'message' => 'Missing request_id.']);
+    }
+    $fees = dr_get_clearance_fees_for_request($conn, $requestId);
+    $total = array_sum(array_column($fees, 'amount'));
+    dr_respond_json(200, ['success' => true, 'fees' => $fees, 'total' => $total]);
 }
 
 dr_respond_json(404, ['success' => false, 'message' => 'Unknown action.']);

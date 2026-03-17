@@ -744,7 +744,7 @@ require_once __DIR__ . '/includes/resident_access_guard.php';
     tbody.querySelectorAll('button[data-issued]').forEach((btn) => {
       btn.addEventListener('click', () => {
         const id = String(btn.getAttribute('data-issued') || '');
-        const viewUrl = `${endpoint}?action=view_issued&request_id=${encodeURIComponent(id)}`;
+        const viewUrl = `${endpoint}?action=view_issued&request_id=${encodeURIComponent(id)}&_ts=${Date.now()}`;
         const downloadUrl = `${endpoint}?action=download_issued&request_id=${encodeURIComponent(id)}`;
         openFileViewerModal({
           title: 'Issued Document (PDF)',
@@ -1039,7 +1039,7 @@ require_once __DIR__ . '/includes/resident_access_guard.php';
       tbody.querySelectorAll('button[data-issued]').forEach((btn) => {
         btn.addEventListener('click', () => {
           const id = String(btn.getAttribute('data-issued') || '');
-          const viewUrl = `${endpoint}?action=view_issued&request_id=${encodeURIComponent(id)}`;
+          const viewUrl = `${endpoint}?action=view_issued&request_id=${encodeURIComponent(id)}&_ts=${Date.now()}`;
           const downloadUrl = `${endpoint}?action=download_issued&request_id=${encodeURIComponent(id)}`;
           openFileViewerModal({
             title: 'Issued Document (PDF)',

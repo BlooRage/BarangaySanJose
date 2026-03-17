@@ -864,7 +864,7 @@ document.addEventListener("DOMContentLoaded", () => {
         }
 
         modalSuccess(data.message || "Documents submitted successfully.", () => {
-          window.location.href = data.redirect || "resident_dashboard.php";
+          window.location.href = data.redirect || "resident_dashboard";
         });
       } catch (err) {
         modalError("Network error. Please try again.");

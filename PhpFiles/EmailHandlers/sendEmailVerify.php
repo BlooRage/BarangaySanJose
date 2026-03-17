@@ -54,7 +54,7 @@ if ((int)$user['email_verify'] === 1) {
   if (wantsJsonResponse()) {
     jsonResponse(400, ['success' => false, 'message' => 'Email already verified.']);
   }
-  header("Location: ../../Resident-End/resident_dashboard.php?email=already_verified");
+  header("Location: " . appUrl('/Resident-End/resident_dashboard.php?email=already_verified'));
   exit;
 }
 
@@ -98,7 +98,7 @@ if ($sent) {
   if (wantsJsonResponse()) {
     jsonResponse(200, ['success' => true, 'message' => 'Verification email sent.']);
   }
-  header("Location: ../../Resident-End/resident_dashboard.php?email=sent");
+  header("Location: " . appUrl('/Resident-End/resident_dashboard.php?email=sent'));
   exit;
 }
 
@@ -106,5 +106,5 @@ if (wantsJsonResponse()) {
   jsonResponse(500, ['success' => false, 'message' => 'Unable to send verification email.']);
 }
 
-header("Location: ../../Resident-End/resident_dashboard.php?email=failed");
+header("Location: " . appUrl('/Resident-End/resident_dashboard.php?email=failed'));
 exit;

@@ -7,7 +7,7 @@ require_once __DIR__ . "/announcementDelivery.php";
 requireRoleSession(['SuperAdmin', 'Official', 'Officials', 'Personnel', 'Personnels', 'Admin', 'Employee'], false);
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-  header("Location: ../../Admin-End/Announcements/Announcements.php");
+  header("Location: " . appUrl('/Admin-End/Announcements/Announcements.php'));
   exit;
 }
 verifyCsrfToken(false);
@@ -25,7 +25,7 @@ function ann_action_redirect(string $channel, string $status, string $q, string 
     $query['queue_channel'] = $queueChannel;
   }
   $_SESSION['announcement_flash'] = ['type' => $type, 'message' => $message];
-  header("Location: ../../Admin-End/Announcements/Announcements.php?" . http_build_query($query));
+  header("Location: " . appUrl('/Admin-End/Announcements/Announcements.php') . "?" . http_build_query($query));
   exit;
 }
 
@@ -390,4 +390,3 @@ foreach ($rows as $idx => $item) {
 if (!$found) {
   ann_action_redirect($channel, $status, $q, $queueQ, $queueChannel, 'warning', 'Announcement not found.');
 }
-

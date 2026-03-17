@@ -154,7 +154,7 @@ $addressReadonly = $complainantAddress !== '' ? 'readonly' : '';
     <main id="div-mainDisplay" class="flex-grow-1 px-4 pb-4 pt-0 px-md-5 pb-md-5 pt-md-0">
         
                 <div class="position-relative d-flex align-items-center justify-content-center mb-2 pt-4">
-                    <a href="<?= htmlspecialchars($baseUrl) ?>/Resident-End/resident_dashboard.php" class="back-link d-inline-flex align-items-center text-decoration-none text-dark m-0 position-absolute start-0">
+                    <a href="<?= htmlspecialchars(appUrl('Resident-End/resident_dashboard.php')) ?>" class="back-link d-inline-flex align-items-center text-decoration-none text-dark m-0 position-absolute start-0">
                         <i class="bi bi-arrow-left-short fs-3"></i>
                     </a>
                     <h1 class="form-title m-0">Complaint Form</h1>
@@ -346,4 +346,3 @@ $addressReadonly = $complainantAddress !== '' ? 'readonly' : '';
 <script src="../../JS-Script-Files/Resident-End/complaintScript.js"></script>
 </body>
 </html>
-

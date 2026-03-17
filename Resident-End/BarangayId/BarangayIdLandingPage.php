@@ -98,13 +98,13 @@ require_once __DIR__ . "/../includes/resident_access_guard.php";
                     <div class="row g-3">
                         <div class="col-12 col-md-6">
                             <div class="h-100">
-                                <img src="../../Images/barangayid/SAMPLE.png" class="img-fluid rounded id-sample-img" alt="Barangay ID Sample - Front">
+                                <img src="../../Images/Barangayid/SAMPLE.png" class="img-fluid rounded id-sample-img" alt="Barangay ID Sample - Front">
                                 <p class="page-description mt-2 mb-0 text-center">Front</p>
                             </div>
                         </div>
                         <div class="col-12 col-md-6">
                             <div class="h-100">
-                                <img src="../../Images/barangayid/BACK.png" class="img-fluid rounded id-sample-img" alt="Barangay ID Sample - Back">
+                                <img src="../../Images/Barangayid/BACK.png" class="img-fluid rounded id-sample-img" alt="Barangay ID Sample - Back">
                                 <p class="page-description mt-2 mb-0 text-center">Back</p>
                             </div>
                         </div>
@@ -112,7 +112,7 @@ require_once __DIR__ . "/../includes/resident_access_guard.php";
                 </div>
 
                 <div class="text-center apply-section mt-4">
-                    <button class="btn apply-btn" type="button" onclick="location.href='BarangayIdForm.php'">Apply Now</button>
+                    <button class="btn apply-btn" type="button" onclick="location.href='<?= htmlspecialchars(appUrl('Resident-End/BarangayId/BarangayIdForm.php')) ?>'">Apply Now</button>
                 </div>
             </div>
         </main>

@@ -88,7 +88,7 @@ $maxAppointmentDate = date('Y-m-t');
 
             <div class="main-head application-card orange-card application-card--muted py-3 mt-5 rounded">
                 <div class="main-head-content">
-                    <a href="<?= htmlspecialchars($baseUrl) ?>/Resident-End/resident_dashboard.php" class="back-link">&lt; Go Back</a>
+                    <a href="<?= htmlspecialchars(appUrl('Resident-End/resident_dashboard.php')) ?>" class="back-link">&lt; Go Back</a>
                     <h1 class="form-title" style="color: #de710c">Appointment Form</h1>
                     <p class="form-subtitle">All fields marked with <span class="required-asterisk">*</span> are required</p>
 

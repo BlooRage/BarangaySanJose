@@ -293,7 +293,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && (string)($_POST['action'] ?? '') ==
     } catch (Throwable $e) {
         rp_set_image_flash('danger', $e->getMessage());
     }
-    header('Location: resident_profile.php');
+    header('Location: ' . appUrl('/Resident-End/resident_profile.php'));
     exit;
 }
 

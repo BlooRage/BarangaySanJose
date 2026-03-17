@@ -14,7 +14,7 @@ document.addEventListener("DOMContentLoaded", () => {
   let activeHouseholdCountFilter = "";
   let activeDisplayMode = "addresses";
 
-  const AUTO_REFRESH_SECONDS = 60;
+  const AUTO_REFRESH_SECONDS = 15;
   let autoRefreshSecondsLeft = AUTO_REFRESH_SECONDS;
   let autoRefreshInterval = null;
   let autoRefreshInFlight = false;
@@ -286,5 +286,4 @@ document.addEventListener("DOMContentLoaded", () => {
     }).show();
   }
 });
-
 

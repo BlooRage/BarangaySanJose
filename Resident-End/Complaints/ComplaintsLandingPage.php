@@ -96,7 +96,7 @@ require_once __DIR__ . "/../includes/resident_access_guard.php";
                     <p class="page-description mb-3">
                         File a complaint to request barangay assistance or intervention.
                     </p>
-                    <button class="btn apply-btn" type="button" onclick="location.href='ComplaintsForm.php'">Open Form</button>
+                    <button class="btn apply-btn" type="button" onclick="location.href='ComplaintsForm'">Open Form</button>
                 </div>
             </div>
         </main>

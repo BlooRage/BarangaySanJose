@@ -988,7 +988,7 @@ require_once __DIR__ . '/../includes/admin_guard.php';
     }
     #viewModal .doc-preview-paper.doc-preview-paper--tricycle .doc-preview-tricycle-field {
       display: grid;
-      grid-template-columns: 140px 16px 1fr;
+      grid-template-columns: 158px 16px 1fr;
       align-items: start;
       margin: 0 0 2px;
       line-height: 1.24;
@@ -1019,6 +1019,25 @@ require_once __DIR__ . '/../includes/admin_guard.php';
       column-gap: 4px;
       align-items: baseline;
       margin: 0 0 2px;
+    }
+    #viewModal .doc-preview-paper.doc-preview-paper--tricycle .doc-preview-tricycle-meta-line {
+      display: flex;
+      align-items: flex-end;
+      width: 100%;
+      min-height: 1.35em;
+      padding: 0 4px 2px;
+      box-sizing: border-box;
+      border-bottom: 1px solid #111827;
+      overflow: hidden;
+    }
+    #viewModal .doc-preview-paper.doc-preview-paper--tricycle .doc-preview-tricycle-meta-line-text {
+      display: block;
+      max-width: 100%;
+      overflow: hidden;
+      white-space: nowrap;
+      text-overflow: ellipsis;
+      font-weight: 700;
+      line-height: 1.1;
     }
     #viewModal .doc-preview-paper.doc-preview-paper--tricycle .doc-preview-tricycle-footer-area {
       display: grid;
@@ -1158,40 +1177,68 @@ require_once __DIR__ . '/../includes/admin_guard.php';
     #viewModal .doc-preview-paper.doc-preview-paper--generalclearance .doc-preview-generalclearance-field-colon {
       font-weight: 700;
     }
+    #viewModal .doc-preview-paper.doc-preview-paper--generalclearance .doc-preview-generalclearance-field-value {
+      min-width: 0;
+    }
+    #viewModal .doc-preview-paper.doc-preview-paper--generalclearance .doc-preview-generalclearance-field-value .doc-editable {
+      display: block;
+      width: 100%;
+      min-width: 0;
+      box-sizing: border-box;
+    }
     #viewModal .doc-preview-paper.doc-preview-paper--generalclearance .doc-preview-generalclearance-field--address .doc-preview-generalclearance-field-value {
       line-height: 1.18;
     }
     #viewModal .doc-preview-paper.doc-preview-paper--generalclearance .doc-preview-generalclearance-note {
-      width: 88%;
-      margin: 18px auto 0;
+      width: 84%;
+      margin: 20px auto 0;
       text-align: center !important;
-      line-height: 1.4;
+      line-height: 1.38;
+    }
+    #viewModal .doc-preview-paper.doc-preview-paper--generalclearance .doc-preview-generalclearance-note-nowrap {
+      white-space: nowrap;
     }
     #viewModal .doc-preview-paper.doc-preview-paper--generalclearance .doc-preview-issued-line {
-      width: 86%;
-      margin: 20px auto 0;
+      width: 82%;
+      margin: 14px auto 0;
       text-align: center;
-      line-height: 1.32;
+      line-height: 1.42;
       text-indent: 0;
     }
     #viewModal .doc-preview-paper.doc-preview-paper--generalclearance .doc-preview-generalclearance-meta {
-      width: 308px;
-      margin: 24px 0 0 18px;
+      width: 340px;
+      margin: 18px 0 0 34px;
       font-size: .97rem;
-      line-height: 1.18;
+      line-height: 1.24;
     }
     #viewModal .doc-preview-paper.doc-preview-paper--generalclearance .doc-preview-generalclearance-meta-row {
       display: grid;
-      grid-template-columns: 98px 14px 1fr;
-      column-gap: 4px;
-      align-items: baseline;
-      margin: 0 0 2px;
+      grid-template-columns: 126px 16px minmax(120px, 1fr);
+      column-gap: 6px;
+      align-items: center;
+      margin: 0 0 6px;
+    }
+    #viewModal .doc-preview-paper.doc-preview-paper--generalclearance .doc-preview-generalclearance-meta-value {
+      min-width: 0;
     }
     #viewModal .doc-preview-paper.doc-preview-paper--generalclearance .doc-preview-generalclearance-meta-line {
-      display: inline-block;
-      width: 74px;
+      display: flex;
+      align-items: flex-end;
+      width: 100%;
+      min-height: 1.35em;
+      padding: 0 4px 2px;
+      box-sizing: border-box;
       border-bottom: 1px solid #111827;
-      transform: translateY(-2px);
+      overflow: hidden;
+    }
+    #viewModal .doc-preview-paper.doc-preview-paper--generalclearance .doc-preview-generalclearance-meta-line-text {
+      display: block;
+      max-width: 100%;
+      overflow: hidden;
+      white-space: nowrap;
+      text-overflow: ellipsis;
+      font-weight: 700;
+      line-height: 1.1;
     }
     #viewModal .doc-preview-paper.doc-preview-paper--generalclearance .doc-preview-generalclearance-footer-area {
       display: grid;
@@ -1519,6 +1566,9 @@ require_once __DIR__ . '/../includes/admin_guard.php';
       display: inline-block;
       outline: none;
     }
+    #viewModal .doc-editable--empty {
+      min-height: 1.2em;
+    }
     #viewModal .doc-editable:focus {
       border-style: solid;
       box-shadow: 0 0 0 2px rgba(245, 158, 11, .2);
@@ -1662,10 +1712,25 @@ require_once __DIR__ . '/../includes/admin_guard.php';
     <h2 class="mb-4" style="font-family: 'Charis SIL Bold'; color: #DE710C; ">Certificate Issuance</h2>
     <hr class="mb-4">
 
-    <div class="bg-white p-4 rounded-4 shadow-sm border resident-masterlist-shell certificate-tracker-shell">
+    <!-- Page-level navigation -->
+    <ul class="nav nav-tabs mb-0" id="certTrackerPageTabs" style="border-bottom:0">
+      <li class="nav-item">
+        <button class="nav-link active fw-semibold" id="tabDocRequests" type="button">
+          <i class="fas fa-file-alt me-1"></i>Document Requests
+        </button>
+      </li>
+      <li class="nav-item">
+        <button class="nav-link fw-semibold" id="tabFeeRequests" type="button">
+          <i class="fas fa-tags me-1"></i>Fee Change Requests
+        </button>
+      </li>
+    </ul>
+
+    <div id="docRequestsPanel" class="bg-white p-4 rounded-4 rounded-tl-0 shadow-sm border resident-masterlist-shell certificate-tracker-shell">
       <div class="admin-list-toolbar mb-3">
         <div class="admin-list-tabs">
           <button type="button" class="btn btn-outline-primary btn-sm status-filter-btn stage-filter-btn active" data-stage-filter="">All</button>
+          <button type="button" class="btn btn-outline-secondary btn-sm status-filter-btn stage-filter-btn fw-semibold" data-stage-filter="barangay_id">Barangay ID <span class="tab-count" id="barangayIdTabCount">0</span></button>
           <button type="button" class="btn btn-outline-secondary btn-sm status-filter-btn stage-filter-btn fw-semibold" data-stage-filter="pending">Pending <span class="tab-count" id="pendingTabCount">0</span></button>
           <button type="button" class="btn btn-outline-secondary btn-sm status-filter-btn stage-filter-btn fw-semibold" data-stage-filter="release">Release <span class="tab-count" id="releaseTabCount">0</span></button>
           <button type="button" class="btn btn-outline-secondary btn-sm status-filter-btn stage-filter-btn fw-semibold" data-stage-filter="completed">Completed</button>
@@ -1712,6 +1777,163 @@ require_once __DIR__ . '/../includes/admin_guard.php';
           </tbody>
         </table>
       </div>
+    </div>
+
+    <!-- ── FEE CHANGE REQUESTS PANEL ──────────────────────────────────────── -->
+    <div id="feeChangePanel" class="d-none bg-white p-4 rounded-4 rounded-tl-0 shadow-sm border certificate-tracker-shell">
+
+      <!-- Sub-tabs -->
+      <ul class="nav nav-pills mb-4" id="feeChangeSubTabs">
+        <li class="nav-item">
+          <button class="nav-link active" id="subTabAddFeeType" type="button">
+            <i class="fas fa-plus me-1"></i>Request New Fee Type
+          </button>
+        </li>
+        <li class="nav-item">
+          <button class="nav-link" id="subTabEditPrice" type="button">
+            <i class="fas fa-pen me-1"></i>Request Price Edit
+          </button>
+        </li>
+        <li class="nav-item">
+          <button class="nav-link" id="subTabMyRequests" type="button">
+            <i class="fas fa-list me-1"></i>Submitted Requests
+          </button>
+        </li>
+      </ul>
+
+      <!-- Sub-panel: Request New Fee Type -->
+      <div id="fcrAddPanel">
+        <div class="row g-4">
+          <div class="col-lg-5">
+            <div class="border rounded-3 p-3 bg-light">
+              <h6 class="fw-semibold mb-3"><i class="fas fa-plus-circle me-1 text-primary"></i>Request New Fee Type</h6>
+              <div class="mb-3">
+                <label class="form-label fw-semibold small">Fee Name <span class="text-danger">*</span></label>
+                <input type="text" id="fcrAddName" class="form-control" placeholder="e.g. Inspection Fee">
+              </div>
+              <div class="mb-3">
+                <label class="form-label fw-semibold small">Proposed Amount (₱)</label>
+                <div class="input-group">
+                  <span class="input-group-text">₱</span>
+                  <input type="number" id="fcrAddAmount" class="form-control" value="0.00" min="0" step="0.01">
+                </div>
+              </div>
+              <div class="mb-3">
+                <label class="form-label fw-semibold small">Notes / Justification</label>
+                <textarea id="fcrAddNotes" class="form-control" rows="3" placeholder="Why is this fee type needed?"></textarea>
+              </div>
+              <div id="fcrAddError" class="alert alert-danger d-none py-2 small mb-3"></div>
+              <button type="button" class="btn btn-primary w-100" id="fcrAddSubmitBtn">
+                <i class="fas fa-paper-plane me-1"></i>Submit Request
+              </button>
+            </div>
+          </div>
+          <div class="col-lg-7">
+            <div class="alert alert-info small mb-0">
+              <i class="fas fa-info-circle me-1"></i>
+              Your request will be reviewed by Finance. Once approved, the new fee type will be added to the clearance fee catalog.
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Sub-panel: Request Price Edit -->
+      <div id="fcrEditPanel" class="d-none">
+        <div class="row g-4">
+          <div class="col-lg-7">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+              <h6 class="fw-semibold mb-0">Current Fee Catalog</h6>
+              <button class="btn btn-sm btn-outline-secondary" id="fcrEditRefreshBtn" title="Refresh">
+                <i class="fa-solid fa-arrows-rotate"></i>
+              </button>
+            </div>
+            <div class="table-responsive">
+              <table class="table table-sm table-hover align-middle">
+                <thead class="table-light">
+                  <tr>
+                    <th>Fee Name</th>
+                    <th>Current Amount</th>
+                    <th>Status</th>
+                    <th class="text-end">Action</th>
+                  </tr>
+                </thead>
+                <tbody id="fcrEditCatalogBody">
+                  <tr><td colspan="4" class="text-center text-muted py-3">Loading…</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+          <div class="col-lg-5">
+            <div class="border rounded-3 p-3 bg-light d-none" id="fcrEditFormWrap">
+              <h6 class="fw-semibold mb-3" id="fcrEditFormTitle"><i class="fas fa-pen me-1 text-warning"></i>Request Price Edit</h6>
+              <input type="hidden" id="fcrEditFeeTypeId">
+              <div class="mb-2">
+                <label class="form-label fw-semibold small">Fee Name</label>
+                <input type="text" id="fcrEditFeeName" class="form-control" readonly>
+              </div>
+              <div class="mb-2">
+                <label class="form-label fw-semibold small">Current Amount</label>
+                <div class="input-group">
+                  <span class="input-group-text">₱</span>
+                  <input type="text" id="fcrEditCurrentAmount" class="form-control" readonly>
+                </div>
+              </div>
+              <div class="mb-3">
+                <label class="form-label fw-semibold small">Proposed Amount (₱) <span class="text-danger">*</span></label>
+                <div class="input-group">
+                  <span class="input-group-text">₱</span>
+                  <input type="number" id="fcrEditProposedAmount" class="form-control" min="0" step="0.01">
+                </div>
+              </div>
+              <div class="mb-3">
+                <label class="form-label fw-semibold small">Notes</label>
+                <textarea id="fcrEditNotes" class="form-control" rows="2"></textarea>
+              </div>
+              <div id="fcrEditError" class="alert alert-danger d-none py-2 small mb-3"></div>
+              <div class="d-flex gap-2">
+                <button type="button" class="btn btn-warning flex-fill" id="fcrEditSubmitBtn">
+                  <i class="fas fa-paper-plane me-1"></i>Submit
+                </button>
+                <button type="button" class="btn btn-outline-secondary" id="fcrEditCancelBtn">
+                  <i class="fas fa-times"></i>
+                </button>
+              </div>
+            </div>
+            <div class="text-muted small text-center mt-4" id="fcrEditHint">
+              <i class="fas fa-arrow-left me-1"></i>Select a fee type from the table to request a price edit
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Sub-panel: Submitted Requests -->
+      <div id="fcrListPanel" class="d-none">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+          <h6 class="fw-semibold mb-0">My Submitted Requests</h6>
+          <button class="btn btn-sm btn-outline-secondary" id="fcrListRefreshBtn" title="Refresh">
+            <i class="fa-solid fa-arrows-rotate"></i>
+          </button>
+        </div>
+        <div class="table-responsive">
+          <table class="table table-sm align-middle">
+            <thead class="table-light">
+              <tr>
+                <th>Type</th>
+                <th>Fee Name</th>
+                <th>Proposed Amount</th>
+                <th>Notes</th>
+                <th>Status</th>
+                <th>Submitted</th>
+                <th class="text-end">Action</th>
+              </tr>
+            </thead>
+            <tbody id="fcrListBody">
+              <tr><td colspan="7" class="text-center text-muted py-3">Loading…</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
     </div>
   </main>
 </div>
@@ -1978,6 +2200,83 @@ require_once __DIR__ . '/../includes/admin_guard.php';
   </div>
 </div>
 
+<!-- Fee Tagging Modal (Admin tags clearance fees per request) -->
+<div class="modal fade" id="feeTaggingModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title"><i class="fas fa-tags me-2 text-warning"></i>Tag Clearance Fees</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" id="feeTaggingRequestId">
+        <input type="hidden" id="feeTaggingMode">
+        <div id="feeTaggingBody">Loading…</div>
+      </div>
+      <div class="modal-footer justify-content-between">
+        <span class="text-muted small">Check the fees that apply, adjust amounts as needed, then confirm.</span>
+        <div class="d-flex gap-2">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button type="button" class="btn btn-primary" id="feeTaggingSubmitBtn">Confirm Fees &amp; Send to Payment</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Fee Catalog Management Modal (also available from CertificateTracker for admins) -->
+<div class="modal fade" id="feeCatalogModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Clearance Fee Types</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <div class="row g-3">
+          <div class="col-md-7">
+            <h6 class="fw-semibold mb-2">Existing Fee Types</h6>
+            <div class="table-responsive">
+              <table class="table table-sm align-middle">
+                <thead class="table-light">
+                  <tr><th>Name</th><th>Default Amount</th><th>Status</th><th class="text-end">Actions</th></tr>
+                </thead>
+                <tbody id="feeCatalogTableBody">
+                  <tr><td colspan="4" class="text-muted text-center py-3">Loading…</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+          <div class="col-md-5">
+            <h6 class="fw-semibold mb-2" id="feeCatalogFormTitle">Add Fee Type</h6>
+            <input type="hidden" id="feeCatalogFeeTypeId">
+            <div class="mb-2">
+              <label class="form-label small mb-1">Fee Name <span class="text-danger">*</span></label>
+              <input type="text" class="form-control form-control-sm" id="feeCatalogFeeName" placeholder="e.g. Inspection Fee">
+            </div>
+            <div class="mb-2">
+              <label class="form-label small mb-1">Default Amount (₱)</label>
+              <input type="number" class="form-control form-control-sm" id="feeCatalogDefaultAmount" value="0.00" min="0" step="0.01">
+            </div>
+            <div class="mb-3 form-check">
+              <input type="checkbox" class="form-check-input" id="feeCatalogIsActive" checked>
+              <label class="form-check-label small" for="feeCatalogIsActive">Active</label>
+            </div>
+            <button type="button" class="btn btn-primary btn-sm w-100" id="feeCatalogSaveBtn">Save Fee Type</button>
+            <button type="button" class="btn btn-outline-secondary btn-sm w-100 mt-1"
+              onclick="editFeeType('','',0,1);document.getElementById('feeCatalogFormTitle').textContent='Add Fee Type';">
+              Clear / New
+            </button>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 <script>
   window.ADMIN_TABLE_COLUMNS_CONFIG = {
@@ -1990,6 +2289,6 @@ require_once __DIR__ . '/../includes/admin_guard.php';
   };
 </script>
 <script src="../../JS-Script-Files/Admin-End/tableColumnsGeneric.js?v=20260215-1"></script>
-<script src="../../JS-Script-Files/Admin-End/certificateTrackerScript.js?v=20260316-03"></script>
+<script src="../../JS-Script-Files/Admin-End/certificateTrackerScript.js?v=20260317-03"></script>
 </body>
 </html>

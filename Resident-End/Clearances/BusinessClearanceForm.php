@@ -140,7 +140,7 @@ $ownerFullAddress = htmlspecialchars(implode(', ', $ownerFullAddressParts), ENT_
     <?php include __DIR__ . '/../includes/resident_sidebar.php'; ?>
     <main id="div-mainDisplay" class="flex-grow-1 px-4 pb-4 pt-0 px-md-5 pb-md-5 pt-md-0">
             <div class="position-relative d-flex align-items-center justify-content-center mb-2 pt-4">
-                <a href="<?= htmlspecialchars($baseUrl) ?>/Resident-End/Clearances/ClearancesLandingPage.php" class="back-link d-inline-flex align-items-center text-decoration-none text-dark m-0 position-absolute start-0">
+                <a href="<?= htmlspecialchars(appUrl('Resident-End/Clearances/ClearancesLandingPage.php')) ?>" class="back-link d-inline-flex align-items-center text-decoration-none text-dark m-0 position-absolute start-0">
                     <i class="bi bi-arrow-left-short fs-3"></i>
                 </a>
                 <h1 class="form-title m-0">Barangay Business Clearance</h1>
@@ -294,6 +294,12 @@ $ownerFullAddress = htmlspecialchars(implode(', ', $ownerFullAddressParts), ENT_
                         <label class="top-label">Contact Number</label>
                         <input type="text" id="business_contact_number" name="business_contact_number" inputmode="numeric" maxlength="11">
                         <div id="business_contact_number_error" class="text-danger small d-none">Invalid contact number</div>
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="full-width">
+                        <label class="top-label">Nature / Type of Business <span class="required-asterisk">*</span></label>
+                        <input type="text" name="business_type" id="business_type" required placeholder="e.g. Retail Store, Food & Beverages, Services">
                     </div>
                 </div>
                 <div class="form-row">

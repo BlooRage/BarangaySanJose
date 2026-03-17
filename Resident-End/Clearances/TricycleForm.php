@@ -133,6 +133,30 @@ $ownerFullAddress = htmlspecialchars(implode(', ', $ownerFullAddressParts), ENT_
             margin-top: 32px;
             margin-bottom: 24px;
         }
+        .vehicle-row--tricycle-top {
+            grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr) minmax(0, .9fr);
+            align-items: end;
+        }
+        #todaPodaLocation.location-prefilled-display[disabled] {
+            background-color: #ffffff !important;
+            color: #1f2937 !important;
+            border-color: #a8a7a7 !important;
+            cursor: default !important;
+            font-weight: 600;
+        }
+        #todaPodaLocation.location-prefilled-display[disabled]::placeholder {
+            color: transparent;
+        }
+        @media (max-width: 768px) {
+            .vehicle-row--tricycle-top {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+        @media (max-width: 480px) {
+            .vehicle-row--tricycle-top {
+                grid-template-columns: 1fr;
+            }
+        }
     </style></head>
 <body>
 
@@ -142,7 +166,7 @@ $ownerFullAddress = htmlspecialchars(implode(', ', $ownerFullAddressParts), ENT_
     <main id="div-mainDisplay" class="flex-grow-1 px-4 pb-4 pt-0 px-md-5 pb-md-5 pt-md-0">
         
             <div class="position-relative d-flex align-items-center justify-content-center mb-2 pt-4">
-                <a href="<?= htmlspecialchars($baseUrl) ?>/Resident-End/Clearances/ClearancesLandingPage.php" class="back-link d-inline-flex align-items-center text-decoration-none text-dark m-0 position-absolute start-0">
+                <a href="<?= htmlspecialchars(appUrl('Resident-End/Clearances/ClearancesLandingPage.php')) ?>" class="back-link d-inline-flex align-items-center text-decoration-none text-dark m-0 position-absolute start-0">
                     <i class="bi bi-arrow-left-short fs-3"></i>
                 </a>
                 <h1 class="form-title m-0">Barangay Clearance for Tricycle Permit</h1>
@@ -209,22 +233,39 @@ $ownerFullAddress = htmlspecialchars(implode(', ', $ownerFullAddressParts), ENT_
                     </div>
                 </div>
                 <h2 class="section-title text-center text-dark">Vehicle Information</h2>
-                <div class="form-row two-col-row">
+                <div class="form-row vehicle-row--tricycle-top">
                     <div class="input-stack">
                         <label class="top-label" for="franchiseeSelect">Franchisee <span class="required-asterisk">*</span></label>
                         <select id="franchiseeSelect" name="franchisee" class="form-select" required>
                             <option value="">Select</option>
                             <option value="Private - FAMILY USE">Private - FAMILY USE</option>
                             <option value="Private - DELIVERY USE">Private - DELIVERY USE</option>
-                            <option value="SJ-1 NEW ROTODA">SJ-1 NEW ROTODA</option>
-                            <option value="SJ-4 KV1 TODA">SJ-4 KV1 TODA</option>
-                            <option value="SJ-5 UPLAND TODA">SJ-5 UPLAND TODA</option>
-                            <option value="SUB-PODA">SUB-PODA</option>
+                            <option value="SJ1 - NEW ROTODA">SJ1 - NEW ROTODA</option>
+                            <option value="SJ2 - SUBTODA">SJ2 - SUBTODA</option>
+                            <option value="SJ3 - BAGONG BUHAY TODA">SJ3 - BAGONG BUHAY TODA</option>
+                            <option value="SJ4 - KV1 TODA">SJ4 - KV1 TODA</option>
+                            <option value="SJ5 - UPLAND TODA">SJ5 - UPLAND TODA</option>
+                            <option value="SUBPODA">SUBPODA</option>
+                            <option value="OTHERS">OTHERS</option>
                         </select>
+                    </div>
+                    <div class="input-stack">
+                        <label class="top-label" for="todaPodaLocation">Location of TODA / PODA</label>
+                        <input type="text" id="todaPodaLocation" class="location-prefilled-display" disabled>
+                        <input type="hidden" id="todaPodaLocationValue" name="location_of_toda_poda" value="">
                     </div>
                     <div class="input-stack">
                         <label class="top-label">Make <span class="required-asterisk">*</span></label>
                         <input type="text" name="vehicle_make" required>
+                    </div>
+                </div>
+                <div id="otherTodaPodaLocationRow" class="form-row d-none">
+                    <div class="full-width">
+                        <div class="input-stack">
+                            <label class="top-label" for="otherTodaPodaLocation">Other TODA / PODA Location <span class="required-asterisk">*</span></label>
+                            <input type="text" id="otherTodaPodaLocation" value="" disabled>
+                            <div id="otherTodaPodaLocationError" class="text-danger small d-none">Location is required when franchisee is Others.</div>
+                        </div>
                     </div>
                 </div>
                 <div class="form-row two-col-row">

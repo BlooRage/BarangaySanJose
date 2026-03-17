@@ -5,13 +5,15 @@
 // ✅ JS include order matches OLD (loginScripts.js then modalHandler.js)
 
 require_once __DIR__ . "/../PhpFiles/General/security.php";
+require_once __DIR__ . "/../PhpFiles/General/connection.php";
+require_once __DIR__ . "/../PhpFiles/Login/redirectDestination.php";
 
 $appRoot = appRootPath();
 $guestBaseHref = ($appRoot === '' ? '' : $appRoot) . '/Guest-End/';
 
 // Prevent redirect loops when a stale session has user_id but missing role.
 if (!empty($_SESSION['user_id']) && !empty($_SESSION['role'])) {
-  header("Location: ../PhpFiles/Login/unifiedProfileCheck.php");
+  header("Location: " . resolveUnifiedProfileRedirect($conn, (string)$_SESSION['user_id'], (string)$_SESSION['role']));
   exit;
 }
 if (!empty($_SESSION['user_id']) && empty($_SESSION['role'])) {
@@ -37,6 +39,9 @@ if (!empty($_SESSION['user_id']) && empty($_SESSION['role'])) {
     <link rel="stylesheet" href="../CSS-Styles/modalStyle.css" />
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js" defer></script>
+    <script>
+      window.APP_LOGIN_RESOLVE_REDIRECT = <?= json_encode(appUrl('/account-redirect')) ?>;
+    </script>
 
     <!-- ✅ OLD ORDER (keep this) -->
     <script src="../JS-Script-Files/loginScripts.js" defer></script>

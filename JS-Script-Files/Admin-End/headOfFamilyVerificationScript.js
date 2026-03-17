@@ -26,6 +26,9 @@ document.addEventListener("DOMContentLoaded", () => {
   let entriesPerPage = Math.max(1, Number.parseInt(entriesPerPageInput?.value || "20", 10) || 20);
 
   let inFlight = false;
+  const AUTO_REFRESH_SECONDS = 15;
+  let autoRefreshSecondsLeft = AUTO_REFRESH_SECONDS;
+  let autoRefreshInterval = null;
 
   const setRefreshLoading = (on) => {
     if (!refreshBtn) return;
@@ -188,7 +191,19 @@ document.addEventListener("DOMContentLoaded", () => {
   };
 
   const triggerRefresh = () => {
+    autoRefreshSecondsLeft = AUTO_REFRESH_SECONDS;
     fetchRows().catch(() => {});
+  };
+
+  const startAutoRefresh = () => {
+    if (autoRefreshInterval) clearInterval(autoRefreshInterval);
+    autoRefreshInterval = window.setInterval(() => {
+      if (inFlight) return;
+      autoRefreshSecondsLeft -= 1;
+      if (autoRefreshSecondsLeft <= 0) {
+        triggerRefresh();
+      }
+    }, 1000);
   };
 
   const openApproveModal = (row) => {
@@ -328,7 +343,7 @@ document.addEventListener("DOMContentLoaded", () => {
       const modalEl = document.getElementById("modalApproveHead");
       const modal = modalEl ? bootstrap.Modal.getInstance(modalEl) : null;
       if (modal) modal.hide();
-      fetchRows().catch(() => {});
+      triggerRefresh();
     } catch (err) {
       alert(err?.message || "Failed to approve application.");
     } finally {
@@ -351,7 +366,7 @@ document.addEventListener("DOMContentLoaded", () => {
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok || !data.success) throw new Error(data.message || "Failed to decline application.");
-      fetchRows().catch(() => {});
+      triggerRefresh();
     } catch (err) {
       alert(err?.message || "Failed to decline application.");
     }
@@ -404,6 +419,7 @@ document.addEventListener("DOMContentLoaded", () => {
     entriesPerPageInput.addEventListener("change", applyEntries);
   }
 
-  fetchRows().catch(() => {});
+  triggerRefresh();
+  startAutoRefresh();
   activateStatusButton(activeStatus);
 });

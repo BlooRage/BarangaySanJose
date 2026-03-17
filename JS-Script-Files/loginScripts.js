@@ -81,13 +81,14 @@ const tryAutoVerifyOtp = () => {
 
 let verifiedResetEmail = "";
 let verifiedResetPhone = "";
+const defaultLoginResolveRedirect = window.APP_LOGIN_RESOLVE_REDIRECT || "../account-redirect";
 
 // Inactive flow state
 let inactiveSession = {
   userId: null,
   phoneMasked: "+63 •••••• XXXX",
   phone10: "",      // 9XXXXXXXXX (from server)
-  redirect: "../PhpFiles/Login/unifiedProfileCheck.php",
+  redirect: defaultLoginResolveRedirect,
 };
 
 // ===== Utilities =====
@@ -293,7 +294,7 @@ const switchToLogin = () => {
   inactiveSession.userId = null;
   inactiveSession.phone10 = "";
   inactiveSession.phoneMasked = "+63 •••••• XXXX";
-  inactiveSession.redirect = "../PhpFiles/Login/unifiedProfileCheck.php";
+  inactiveSession.redirect = defaultLoginResolveRedirect;
 };
 
 // ===== Normalize Phone =====
@@ -946,7 +947,7 @@ if (verifyOTPBtn) {
       // ----- INACTIVE VERIFIED: activate + create session, then modal
       if (otpFrom === "inactive") {
         // ✅ IMPORTANT: restore correct filename casing for Hostinger
-        const vRes = await fetch("../PhpFiles/Login/UserInactivity_update.php", {
+        const vRes = await fetch("../PhpFiles/Login/userInactivity_update.php", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ ok: true }),
@@ -1173,7 +1174,7 @@ if (loginForm) {
         otpFrom = "inactive";
         inactiveSession.userId = data.user_id || null;
         inactiveSession.phoneMasked = data.phone_masked || "+63 •••••• XXXX";
-        inactiveSession.redirect = data.redirect || "../PhpFiles/Login/unifiedProfileCheck.php";
+        inactiveSession.redirect = data.redirect || defaultLoginResolveRedirect;
 
         showStep("inactive-verify-step");
         return;

@@ -45,6 +45,7 @@ if ($birthdateDisplay !== '') {
         $birthdateValue = $dt->format('Y-m-d');
     }
 }
+$birthplace = htmlspecialchars((string)($residentinformationtbl['birthplace'] ?? ''), ENT_QUOTES, 'UTF-8');
 
 $phoneNumber = htmlspecialchars((string)($useraccountstbl['phone_number'] ?? ''), ENT_QUOTES, 'UTF-8');
 $emergencyLast = htmlspecialchars((string)($residentinformationtbl['emergency_last_name'] ?? ''), ENT_QUOTES, 'UTF-8');
@@ -95,12 +96,17 @@ $fullAddress = implode(', ', array_filter([
             <div class="main-head application-card orange-card application-card--muted py-3 my-5 rounded">
                 <div class="main-head-content">
 
-                    <a href="<?= htmlspecialchars($baseUrl) ?>/Resident-End/resident_dashboard.php" class="back-link">&lt; Go Back</a>
+                    <a href="<?= htmlspecialchars(appUrl('Resident-End/BarangayId/BarangayIdLandingPage.php')) ?>" class="back-link">&lt; Go Back</a>
 
                     <h1 class="form-title">Application for Barangay ID</h1>
                     <p class="form-subtitle">All fields marked with <span class="required-asterisk">*</span> are required</p>
 
-                    <form method="POST" action="">
+                    <form method="POST" action="<?= htmlspecialchars($baseUrl) ?>/PhpFiles/Resident-End/documentRequestWorkflow.php">
+                        <input type="hidden" name="action" value="submit_request">
+                        <input type="hidden" name="document_type" value="Barangay ID">
+                        <input type="hidden" name="purpose" value="Barangay ID Application">
+                        <input type="hidden" name="request_purpose" value="Barangay ID Application">
+                        <input type="hidden" name="redirect" value="1">
 
                         <!-- PERSONAL INFORMATION -->
                         <h2 class="section-title text-center text-dark">Personal Information</h2>
@@ -132,22 +138,23 @@ $fullAddress = implode(', ', array_filter([
                                     <option value="IV" <?php echo ($suffix === 'IV') ? 'selected' : ''; ?>>IV</option>
                                     <option value="V">Others</option>
                                 </select>
+                                <input type="hidden" name="suffix_name" value="<?php echo htmlspecialchars($suffix, ENT_QUOTES, 'UTF-8'); ?>">
                             </div>
                         </div>
 
                         <div class="form-row">
                             <div>
                                 <label class="top-label">Date of Birth <span class="required-asterisk">*</span></label>
-                                <input type="date" name="birthdate" required readonly value="<?php echo htmlspecialchars($birthdateValue, ENT_QUOTES, 'UTF-8'); ?>">
+                                <input type="date" name="birthdate" required <?php echo $birthdateValue !== '' ? 'readonly' : ''; ?> value="<?php echo htmlspecialchars($birthdateValue, ENT_QUOTES, 'UTF-8'); ?>">
                             </div>
 
                             <div>
                                 <label class="top-label">Birthplace <span class="required-asterisk">*</span></label>
-                                <input type="text">
+                                <input type="text" name="birthplace" required value="<?php echo $birthplace; ?>" <?php echo $birthplace !== '' ? 'readonly' : ''; ?>>
                             </div>
                             <div class="phone">
                                 <label class="top-label">Contact Number <span class="required-asterisk">*</span></label>
-                                <input type="tel" name="phone_number" required readonly value="<?php echo $phoneNumber; ?>">
+                                <input type="tel" name="contact_number" required <?php echo $phoneNumber !== '' ? 'readonly' : ''; ?> value="<?php echo $phoneNumber; ?>">
                             </div>
 
 
@@ -157,7 +164,8 @@ $fullAddress = implode(', ', array_filter([
                         <div class="form-row">
                             <div class="full-width">
                             <label class="top-label">Address <span class="required-asterisk">*</span></label>
-                                <input type="text" name="full_address_display" readonly value="<?php echo htmlspecialchars($fullAddress, ENT_QUOTES, 'UTF-8'); ?>">
+                                <input type="text" name="full_address_display" <?php echo $fullAddress !== '' ? 'readonly' : ''; ?> value="<?php echo htmlspecialchars($fullAddress, ENT_QUOTES, 'UTF-8'); ?>">
+                                <input type="hidden" name="full_address" value="<?php echo htmlspecialchars($fullAddress, ENT_QUOTES, 'UTF-8'); ?>">
                                 <input type="hidden" name="unitNumber" value="<?php echo htmlspecialchars($unitNumber, ENT_QUOTES, 'UTF-8'); ?>">
                                 <input type="hidden" name="houseNumber" value="<?php echo htmlspecialchars($houseNumber, ENT_QUOTES, 'UTF-8'); ?>">
                                 <input type="hidden" name="streetName" value="<?php echo htmlspecialchars($streetName, ENT_QUOTES, 'UTF-8'); ?>">
@@ -208,8 +216,8 @@ $fullAddress = implode(', ', array_filter([
 
                         <!-- CERTIFICATION -->
                         <div class="agreement-row">
-                            <label class="agreement-text">
-                                <input type="checkbox" required>
+                            <label class="agreement-text" for="barangayIdAgreement">
+                                <input type="checkbox" id="barangayIdAgreement" required>
                                 I hereby certify that the above information is true and correct to the best of my knowledge and belief.
                             </label>
 
@@ -227,9 +235,14 @@ $fullAddress = implode(', ', array_filter([
         document.addEventListener("DOMContentLoaded", () => {
             const form = document.querySelector("form");
             const submitBtn = form?.querySelector(".submit-btn");
+            const fullAddressDisplay = form?.querySelector('input[name="full_address_display"]');
+            const fullAddressHidden = form?.querySelector('input[name="full_address"]');
             if (!form || !submitBtn) return;
 
             const updateState = () => {
+                if (fullAddressDisplay && fullAddressHidden) {
+                    fullAddressHidden.value = fullAddressDisplay.value.trim();
+                }
                 submitBtn.disabled = !form.checkValidity();
             };
 
@@ -241,9 +254,6 @@ $fullAddress = implode(', ', array_filter([
 </body>
 
 </html>
-
-
-
 
 
 

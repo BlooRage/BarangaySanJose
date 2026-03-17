@@ -40,7 +40,7 @@ function ap_set_flash(string $type, string $message): void
 
 function ap_redirect_self(): void
 {
-    header('Location: admin_profile.php');
+    header('Location: ' . appUrl('/Admin-End/admin_profile.php'));
     exit;
 }
 

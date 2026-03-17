@@ -1,5 +1,6 @@
 <?php
 session_start();
+require_once __DIR__ . "/../General/security.php";
 require_once __DIR__ . "/../General/connection.php";
 require_once __DIR__ . "/../General/residentTransaction.php";
 
@@ -428,7 +429,7 @@ try {
         echo json_encode([
             'success' => true,
             'message' => 'Upload requirement temporarily bypassed for layout testing. No files were saved.',
-            'redirect' => 'resident_dashboard.php',
+            'redirect' => appUrl('/Resident-End/resident_dashboard.php'),
         ]);
         exit;
     }
@@ -907,7 +908,7 @@ try {
     echo json_encode([
         'success' => true,
         'message' => 'Documents uploaded successfully. Your account is now pending verification.',
-        'redirect' => 'resident_dashboard.php',
+        'redirect' => appUrl('/Resident-End/resident_dashboard.php'),
     ]);
     exit;
 } catch (Throwable $e) {

@@ -2108,7 +2108,7 @@ function isActuallyVisible(el) {
               label: "Go to Dashboard",
               class: "btn btn-success",
               onClick: () => {
-                window.location.href = data.redirect || "resident_dashboard.php";
+                window.location.href = data.redirect || "resident_dashboard";
               },
             },
           ],

@@ -165,7 +165,7 @@ $purposeInputClass = $isRelationshipJailVisitVariant ? 'form-control text-bg-lig
             
 
                     <div class="position-relative d-flex align-items-center justify-content-center mb-2 pt-4">
-                        <a href="<?= htmlspecialchars($baseUrl) ?>/Resident-End/Certificates/CertificatesLandingPage.php" class="back-link d-inline-flex align-items-center text-decoration-none text-dark m-0 position-absolute start-0">
+                        <a href="<?= htmlspecialchars(appUrl('Resident-End/Certificates/CertificatesLandingPage.php')) ?>" class="back-link d-inline-flex align-items-center text-decoration-none text-dark m-0 position-absolute start-0">
                             <i class="bi bi-arrow-left-short fs-3"></i>
                         </a>
                         <h1 class="form-title m-0"><?= htmlspecialchars($formTitle, ENT_QUOTES, 'UTF-8') ?></h1>
@@ -917,4 +917,3 @@ $purposeInputClass = $isRelationshipJailVisitVariant ? 'form-control text-bg-lig
 </body>
 
 </html>
-
