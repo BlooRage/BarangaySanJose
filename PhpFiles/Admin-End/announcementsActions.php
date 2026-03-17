@@ -2,6 +2,7 @@
 require_once __DIR__ . "/../General/connection.php";
 require_once __DIR__ . "/../General/security.php";
 require_once __DIR__ . "/announcementsStore.php";
+require_once __DIR__ . "/announcementDelivery.php";
 
 requireRoleSession(['SuperAdmin', 'Official', 'Officials', 'Personnel', 'Personnels', 'Admin', 'Employee'], false);
 
@@ -178,7 +179,9 @@ foreach ($rows as $idx => $item) {
     if (!announcements_save_all($rows)) {
       ann_action_redirect($channel, $status, $q, $queueQ, $queueChannel, 'danger', 'Unable to save approval change.');
     }
-    ann_action_redirect($channel, $status, $q, $queueQ, $queueChannel, 'success', 'Announcement approved.');
+    $deliveryResult = ann_delivery_send($conn, $rows[$idx]);
+    announcements_save_all($rows);
+    ann_action_redirect($channel, $status, $q, $queueQ, $queueChannel, 'success', 'Announcement approved.' . ann_delivery_message_suffix($deliveryResult));
   }
 
   if ($action === 'deny') {
@@ -315,6 +318,7 @@ foreach ($rows as $idx => $item) {
     $rows[$idx]['status'] = $nextStatus;
     $rows[$idx]['updated_at'] = date('Y-m-d H:i:s');
     $rows[$idx]['updated_by'] = (string)($_SESSION['user_id'] ?? ($_SESSION['role'] ?? 'Admin'));
+    $rows[$idx] = array_merge($rows[$idx], ann_delivery_compose_fields($rows[$idx], (string)($rows[$idx]['email_subject'] ?? '')));
     if ($nextStatus === 'draft') {
       if (strtolower((string)($item['review_result'] ?? '')) === 'denied') {
         $rows[$idx]['review_result'] = '';
@@ -328,11 +332,17 @@ foreach ($rows as $idx => $item) {
     if (!announcements_save_all($rows)) {
       ann_action_redirect($channel, $status, $q, $queueQ, $queueChannel, 'danger', 'Unable to update announcement.');
     }
+    $deliverySuffix = '';
+    if ($isSuperAdmin && $nextStatus === 'approved') {
+      $deliveryResult = ann_delivery_send($conn, $rows[$idx]);
+      announcements_save_all($rows);
+      $deliverySuffix = ann_delivery_message_suffix($deliveryResult);
+    }
     $msg = (!$isSuperAdmin && $nextStatus === 'pending')
       ? 'Announcement submitted for review. Please wait for approval.'
       : ((strtolower((string)($item['review_result'] ?? '')) === 'denied' && $nextStatus === 'draft')
         ? 'Announcement changes saved as draft.'
-        : 'Announcement updated successfully.');
+        : 'Announcement updated successfully.' . $deliverySuffix);
     ann_action_redirect($channel, $status, $q, $queueQ, $queueChannel, 'success', $msg);
   }
 
@@ -380,3 +390,4 @@ foreach ($rows as $idx => $item) {
 if (!$found) {
   ann_action_redirect($channel, $status, $q, $queueQ, $queueChannel, 'warning', 'Announcement not found.');
 }
+

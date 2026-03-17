@@ -2,6 +2,7 @@
 require_once __DIR__ . "/../General/connection.php";
 require_once __DIR__ . "/../../Admin-End/includes/admin_guard.php";
 require_once __DIR__ . "/announcementsStore.php";
+require_once __DIR__ . "/announcementDelivery.php";
 
 if ($_SERVER["REQUEST_METHOD"] !== "POST") {
   header("Location: ../../Admin-End/Announcements/Announcements.php");
@@ -130,11 +131,13 @@ if (in_array("announcement", $placements, true)) {
 }
 $channels = array_values(array_unique(array_merge($contentChannels, array_values(array_filter($channels, function ($ch) {
   return in_array((string)$ch, ["sms", "email"], true);
-})))));
+}))))) ;
 $audienceScope = trim((string)($_POST["audience_scope"] ?? "all"));
 $area = trim((string)($_POST["area"] ?? ""));
 $roleGroup = trim((string)($_POST["role_group"] ?? ""));
 $submitAction = trim((string)($_POST["submit_action"] ?? "draft"));
+$emailSubjectInput = trim((string)($_POST["email_subject"] ?? ""));
+$smsMessageInput = trim((string)($_POST["sms_message"] ?? ""));
 $scheduleDate = trim((string)($_POST["schedule_date"] ?? ""));
 $scheduleTime = trim((string)($_POST["schedule_time"] ?? ""));
 $channelContext = strtolower(trim((string)($_POST["channel_context"] ?? "all")));
@@ -225,6 +228,9 @@ $record = [
   "id" => announcement_generate_id(),
   "title" => $title,
   "audience" => $audience,
+  "audience_scope" => $audienceScope,
+  "area" => $area,
+  "role_group" => $roleGroup,
   "channels" => $channels,
   "status" => $status,
   "publish_date" => $publishDate,
@@ -238,6 +244,7 @@ $record = [
   "public_content_html" => $publicContentHtml,
   "created_at" => date("Y-m-d H:i:s")
 ];
+$record = array_merge($record, ann_delivery_compose_fields($record, $emailSubjectInput, $smsMessageInput));
 
 $all = announcements_load_all();
 array_unshift($all, $record);
@@ -250,6 +257,10 @@ if ($status === "pending") {
   $msg = "Announcement submitted for review.";
 }
 if ($status === "approved") {
-  $msg = "Announcement posted successfully.";
+  $deliveryResult = ann_delivery_send($conn, $all[0]);
+  announcements_save_all($all);
+  $msg = "Announcement posted successfully." . ann_delivery_message_suffix($deliveryResult);
 }
 ann_redirect_with_flash($redirectUrl, "success", $msg);
+
+
