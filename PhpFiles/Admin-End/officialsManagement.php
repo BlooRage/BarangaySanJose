@@ -168,6 +168,156 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                 'updated' => true
             ]);
             exit;
+        } elseif ($action === 'promote') {
+            $newPosition = trim((string)($_POST['new_position'] ?? ''));
+            $areaNumber  = trim((string)($_POST['area_number'] ?? ''));
+            if ($newPosition === '') {
+                throw new Exception('New position is required.');
+            }
+
+            $positionsByRole = [
+                'SuperAdmin' => ['IT Administrator', 'Barangay Chairman'],
+                'Official'   => ['Barangay Official', 'Barangay Secretary'],
+                'Personnel'  => [
+                    'Department Public Assistance Desk',
+                    'Department Secretary',
+                    'Department OIC (Officer In Charge)',
+                    'Barangay Police',
+                    'Desk Officer',
+                    'Area OIC',
+                ],
+            ];
+            $newRole = null;
+            foreach ($positionsByRole as $roleKey => $positions) {
+                if (in_array($newPosition, $positions, true)) {
+                    $newRole = $roleKey;
+                    break;
+                }
+            }
+            if ($newRole === null) {
+                throw new Exception('Invalid position selected.');
+            }
+
+            $posColExists  = false;
+            $pColRes = $conn->query("SHOW COLUMNS FROM officialinformationtbl LIKE 'position_access'");
+            if ($pColRes instanceof mysqli_result && $pColRes->num_rows > 0) $posColExists = true;
+
+            $areaColExists = false;
+            $aColRes = $conn->query("SHOW COLUMNS FROM officialinformationtbl LIKE 'area_number'");
+            if ($aColRes instanceof mysqli_result && $aColRes->num_rows > 0) $areaColExists = true;
+
+            if ($posColExists && $areaColExists) {
+                $upOi = $conn->prepare("UPDATE officialinformationtbl SET role_access = ?, position_access = ?, area_number = ?, last_updated = CURRENT_TIMESTAMP WHERE official_id = ? LIMIT 1");
+                if (!$upOi) throw new Exception('Failed to update official record.');
+                $upOi->bind_param("ssss", $newRole, $newPosition, $areaNumber, $officialId);
+            } elseif ($posColExists) {
+                $upOi = $conn->prepare("UPDATE officialinformationtbl SET role_access = ?, position_access = ?, last_updated = CURRENT_TIMESTAMP WHERE official_id = ? LIMIT 1");
+                if (!$upOi) throw new Exception('Failed to update official record.');
+                $upOi->bind_param("sss", $newRole, $newPosition, $officialId);
+            } else {
+                $upOi = $conn->prepare("UPDATE officialinformationtbl SET role_access = ?, last_updated = CURRENT_TIMESTAMP WHERE official_id = ? LIMIT 1");
+                if (!$upOi) throw new Exception('Failed to update official record.');
+                $upOi->bind_param("ss", $newRole, $officialId);
+            }
+            $upOi->execute();
+            $upOi->close();
+
+            $upUa = $conn->prepare("UPDATE useraccountstbl SET role_access = ?, updated_at = NOW() WHERE user_id = ? LIMIT 1");
+            if (!$upUa) throw new Exception('Failed to sync user account role.');
+            $upUa->bind_param("ss", $newRole, $userId);
+            $upUa->execute();
+            $upUa->close();
+
+            insertUnifiedAuditLog(
+                $conn,
+                (string)($_SESSION['user_id'] ?? ''),
+                $actorRole,
+                'Officials Management',
+                'OfficialAccount',
+                $officialId,
+                'OFFICIAL_PROMOTE',
+                'position_access',
+                (string)($target['role_access'] ?? ''),
+                "{$newRole} / {$newPosition}",
+                "Promoted to {$newRole} / {$newPosition}.",
+                null
+            );
+
+            echo json_encode([
+                'success' => true,
+                'message' => "Official promoted to {$newRole} — {$newPosition} successfully.",
+                'updated' => true,
+            ]);
+            exit;
+        } elseif ($action === 'change_department') {
+            $newDepartment = trim((string)($_POST['new_department'] ?? ''));
+            $newDeptPosition = trim((string)($_POST['new_position'] ?? ''));
+            $areaNumber    = trim((string)($_POST['area_number'] ?? ''));
+            if ($newDepartment === '') {
+                throw new Exception('Department is required.');
+            }
+            if ($newDeptPosition === '') {
+                throw new Exception('Position is required.');
+            }
+
+            $posColExists2  = false;
+            $pColRes2 = $conn->query("SHOW COLUMNS FROM officialinformationtbl LIKE 'position_access'");
+            if ($pColRes2 instanceof mysqli_result && $pColRes2->num_rows > 0) $posColExists2 = true;
+
+            $areaColExists2 = false;
+            $aColRes2 = $conn->query("SHOW COLUMNS FROM officialinformationtbl LIKE 'area_number'");
+            if ($aColRes2 instanceof mysqli_result && $aColRes2->num_rows > 0) $areaColExists2 = true;
+
+            // Fetch current values for audit log
+            $oldDept = '';
+            $oldPos  = '';
+            $deptFetch = $conn->prepare("SELECT department, position_access FROM officialinformationtbl WHERE official_id = ? LIMIT 1");
+            if ($deptFetch) {
+                $deptFetch->bind_param("s", $officialId);
+                $deptFetch->execute();
+                $deptRow = $deptFetch->get_result()->fetch_assoc();
+                $oldDept = (string)($deptRow['department'] ?? '');
+                $oldPos  = (string)($deptRow['position_access'] ?? '');
+                $deptFetch->close();
+            }
+
+            if ($posColExists2 && $areaColExists2 && $areaNumber !== '') {
+                $upDept = $conn->prepare("UPDATE officialinformationtbl SET department = ?, position_access = ?, area_number = ?, last_updated = CURRENT_TIMESTAMP WHERE official_id = ? LIMIT 1");
+                if (!$upDept) throw new Exception('Failed to update department.');
+                $upDept->bind_param("ssss", $newDepartment, $newDeptPosition, $areaNumber, $officialId);
+            } elseif ($posColExists2) {
+                $upDept = $conn->prepare("UPDATE officialinformationtbl SET department = ?, position_access = ?, last_updated = CURRENT_TIMESTAMP WHERE official_id = ? LIMIT 1");
+                if (!$upDept) throw new Exception('Failed to update department.');
+                $upDept->bind_param("sss", $newDepartment, $newDeptPosition, $officialId);
+            } else {
+                $upDept = $conn->prepare("UPDATE officialinformationtbl SET department = ?, last_updated = CURRENT_TIMESTAMP WHERE official_id = ? LIMIT 1");
+                if (!$upDept) throw new Exception('Failed to update department.');
+                $upDept->bind_param("ss", $newDepartment, $officialId);
+            }
+            $upDept->execute();
+            $upDept->close();
+
+            insertUnifiedAuditLog(
+                $conn,
+                (string)($_SESSION['user_id'] ?? ''),
+                $actorRole,
+                'Officials Management',
+                'OfficialAccount',
+                $officialId,
+                'OFFICIAL_DEPT_CHANGE',
+                'department / position_access',
+                "{$oldDept} / {$oldPos}",
+                "{$newDepartment} / {$newDeptPosition}",
+                "Department changed to {$newDepartment}, position to {$newDeptPosition}.",
+                null
+            );
+
+            echo json_encode([
+                'success' => true,
+                'message' => "Department changed to {$newDepartment} — {$newDeptPosition} successfully.",
+                'updated' => true,
+            ]);
+            exit;
         } else {
             throw new Exception('Invalid action.');
         }
@@ -230,6 +380,13 @@ try {
     }
     $positionField = $hasPositionAccess ? 'oi.position_access' : 'oi.role_access';
 
+    $hasAreaNumber = false;
+    $areaColRes = $conn->query("SHOW COLUMNS FROM officialinformationtbl LIKE 'area_number'");
+    if ($areaColRes instanceof mysqli_result && $areaColRes->num_rows > 0) {
+        $hasAreaNumber = true;
+    }
+    $areaField = $hasAreaNumber ? 'oi.area_number' : 'NULL AS area_number';
+
     $sql = "
         SELECT
             oi.official_id,
@@ -240,6 +397,7 @@ try {
             oi.suffix,
             oi.role_access AS info_role_access,
             {$positionField} AS position_access,
+            {$areaField},
             oi.department,
             oi.date_hired,
             COALESCE(se.status_name, CONCAT('Status #', oi.status_id_employment)) AS employment_status,
@@ -320,6 +478,7 @@ try {
             'full_name' => $fullName !== '' ? $fullName : '—',
             'role_access' => $role,
             'position_access' => (string)($row['position_access'] ?? ''),
+            'area_number' => (string)($row['area_number'] ?? ''),
             'department' => (string)($row['department'] ?? ''),
             'employment_status' => (string)($row['employment_status'] ?? ''),
             'date_hired' => (string)($row['date_hired'] ?? ''),

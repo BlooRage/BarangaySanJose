@@ -1,5 +1,250 @@
 <?php
+require_once __DIR__ . '/../../PhpFiles/General/connection.php';
 require_once __DIR__ . '/../includes/admin_guard.php';
+
+$financeBaseUrl = appUrl('/Admin-End/Certificates/FinancePayments.php');
+$financeSection = strtolower(trim((string)($_GET['section'] ?? 'tracker')));
+if (!in_array($financeSection, ['tracker', 'fees'], true)) {
+  $financeSection = 'tracker';
+}
+
+function fp_redirect(string $baseUrl, string $section = 'tracker'): void
+{
+  $target = $baseUrl;
+  if ($section !== 'tracker') {
+    $target .= '?section=' . rawurlencode($section);
+  }
+  header('Location: ' . $target);
+  exit;
+}
+
+function fp_set_flash(string $type, string $message): void
+{
+  $_SESSION['finance_fee_flash'] = [
+    'type' => $type,
+    'message' => $message,
+  ];
+}
+
+function fp_take_flash(): ?array
+{
+  $flash = $_SESSION['finance_fee_flash'] ?? null;
+  unset($_SESSION['finance_fee_flash']);
+  return is_array($flash) ? $flash : null;
+}
+
+function fp_ensure_general_fees_table(mysqli $conn): void
+{
+  static $done = false;
+  if ($done) {
+    return;
+  }
+
+  $conn->query("
+    CREATE TABLE IF NOT EXISTS generalfeestbl (
+      fee_id BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT,
+      document_type_id INT(11) NOT NULL,
+      amount DECIMAL(12,2) NOT NULL DEFAULT 0.00,
+      created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      PRIMARY KEY (fee_id),
+      UNIQUE KEY uq_generalfees_document_type (document_type_id),
+      KEY idx_generalfees_amount (amount)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
+  ");
+
+  $done = true;
+}
+
+function fp_is_fee_document_type(string $documentTypeName): bool
+{
+  return stripos(trim($documentTypeName), 'certificate') !== false;
+}
+
+function fp_parse_amount(mixed $rawAmount): float
+{
+  if ($rawAmount === null || $rawAmount === '') {
+    throw new RuntimeException('Amount is required.');
+  }
+  if (!is_numeric($rawAmount)) {
+    throw new RuntimeException('Amount must be a valid number.');
+  }
+  $amount = round((float)$rawAmount, 2);
+  if ($amount < 0) {
+    throw new RuntimeException('Amount cannot be negative.');
+  }
+  return $amount;
+}
+
+function fp_fetch_document_type(mysqli $conn, int $documentTypeId): ?array
+{
+  $stmt = $conn->prepare("
+    SELECT document_type_id, document_type_name, document_category
+    FROM documenttypelookuptbl
+    WHERE document_type_id = ?
+    LIMIT 1
+  ");
+  if (!$stmt) {
+    return null;
+  }
+  $stmt->bind_param('i', $documentTypeId);
+  $stmt->execute();
+  $row = $stmt->get_result()->fetch_assoc() ?: null;
+  $stmt->close();
+  return $row;
+}
+
+if ($financeSection === 'fees' || $_SERVER['REQUEST_METHOD'] === 'POST') {
+  fp_ensure_general_fees_table($conn);
+}
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+  verifyCsrfToken(false);
+  $action = trim((string)($_POST['action'] ?? ''));
+
+  try {
+    if ($action === 'add_fee') {
+      $documentTypeId = (int)($_POST['document_type_id'] ?? 0);
+      if ($documentTypeId <= 0) {
+        throw new RuntimeException('Please choose a document type.');
+      }
+
+      $documentType = fp_fetch_document_type($conn, $documentTypeId);
+      if (!$documentType) {
+        throw new RuntimeException('Selected document type was not found.');
+      }
+      if (!fp_is_fee_document_type((string)($documentType['document_type_name'] ?? ''))) {
+        throw new RuntimeException('Only certificate-type document requests can be priced here.');
+      }
+
+      $checkStmt = $conn->prepare("SELECT fee_id FROM generalfeestbl WHERE document_type_id = ? LIMIT 1");
+      if ($checkStmt) {
+        $checkStmt->bind_param('i', $documentTypeId);
+        $checkStmt->execute();
+        $exists = $checkStmt->get_result()->fetch_assoc();
+        $checkStmt->close();
+        if ($exists) {
+          throw new RuntimeException('A price already exists for that document type.');
+        }
+      }
+
+      $amount = fp_parse_amount($_POST['amount'] ?? null);
+      $insertStmt = $conn->prepare("INSERT INTO generalfeestbl (document_type_id, amount) VALUES (?, ?)");
+      if (!$insertStmt) {
+        throw new RuntimeException('Failed to prepare the insert statement.');
+      }
+      $insertStmt->bind_param('id', $documentTypeId, $amount);
+      if (!$insertStmt->execute()) {
+        $insertStmt->close();
+        throw new RuntimeException('Failed to add the price.');
+      }
+      $insertStmt->close();
+
+      fp_set_flash('success', 'Price added successfully.');
+    } elseif ($action === 'update_fee') {
+      $feeId = (int)($_POST['fee_id'] ?? 0);
+      if ($feeId <= 0) {
+        throw new RuntimeException('Fee record was not found.');
+      }
+
+      $amount = fp_parse_amount($_POST['amount'] ?? null);
+      $updateStmt = $conn->prepare("UPDATE generalfeestbl SET amount = ?, updated_at = CURRENT_TIMESTAMP WHERE fee_id = ? LIMIT 1");
+      if (!$updateStmt) {
+        throw new RuntimeException('Failed to prepare the update statement.');
+      }
+      $updateStmt->bind_param('di', $amount, $feeId);
+      if (!$updateStmt->execute()) {
+        $updateStmt->close();
+        throw new RuntimeException('Failed to update the price.');
+      }
+      $affected = $updateStmt->affected_rows;
+      $updateStmt->close();
+      if ($affected < 0) {
+        throw new RuntimeException('Fee record was not updated.');
+      }
+
+      fp_set_flash('success', 'Price updated successfully.');
+    } elseif ($action === 'delete_fee') {
+      $feeId = (int)($_POST['fee_id'] ?? 0);
+      if ($feeId <= 0) {
+        throw new RuntimeException('Fee record was not found.');
+      }
+
+      $deleteStmt = $conn->prepare("DELETE FROM generalfeestbl WHERE fee_id = ? LIMIT 1");
+      if (!$deleteStmt) {
+        throw new RuntimeException('Failed to prepare the delete statement.');
+      }
+      $deleteStmt->bind_param('i', $feeId);
+      if (!$deleteStmt->execute()) {
+        $deleteStmt->close();
+        throw new RuntimeException('Failed to delete the price.');
+      }
+      $deleteStmt->close();
+
+      fp_set_flash('success', 'Price deleted successfully.');
+    }
+  } catch (Throwable $e) {
+    fp_set_flash('danger', $e->getMessage());
+  }
+
+  fp_redirect($financeBaseUrl, 'fees');
+}
+
+$feeFlash = fp_take_flash();
+$feeRows = [];
+$availableFeeDocuments = [];
+$editingFee = null;
+
+if ($financeSection === 'fees') {
+  $feeRowsResult = $conn->query("
+    SELECT
+      gf.fee_id,
+      gf.document_type_id,
+      gf.amount,
+      gf.updated_at,
+      dt.document_type_name,
+      dt.document_category
+    FROM generalfeestbl gf
+    LEFT JOIN documenttypelookuptbl dt
+      ON dt.document_type_id = gf.document_type_id
+    ORDER BY COALESCE(dt.document_type_name, CONCAT('Document Type #', gf.document_type_id)) ASC
+  ");
+  if ($feeRowsResult instanceof mysqli_result) {
+    while ($row = $feeRowsResult->fetch_assoc()) {
+      $feeRows[] = $row;
+    }
+    $feeRowsResult->close();
+  }
+
+  $availableDocsResult = $conn->query("
+    SELECT
+      dt.document_type_id,
+      dt.document_type_name
+    FROM documenttypelookuptbl dt
+    LEFT JOIN generalfeestbl gf
+      ON gf.document_type_id = dt.document_type_id
+    WHERE gf.document_type_id IS NULL
+      AND dt.document_category = 'DocumentRequest'
+      AND LOWER(dt.document_type_name) LIKE '%certificate%'
+    ORDER BY dt.document_type_name ASC
+  ");
+  if ($availableDocsResult instanceof mysqli_result) {
+    while ($row = $availableDocsResult->fetch_assoc()) {
+      $availableFeeDocuments[] = $row;
+    }
+    $availableDocsResult->close();
+  }
+
+  $editFeeId = (int)($_GET['edit_fee'] ?? 0);
+  if ($editFeeId > 0) {
+    foreach ($feeRows as $row) {
+      if ((int)($row['fee_id'] ?? 0) === $editFeeId) {
+        $editingFee = $row;
+        break;
+      }
+    }
+  }
+}
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -12,6 +257,35 @@ require_once __DIR__ . '/../includes/admin_guard.php';
   <link rel="stylesheet" href="../../CSS-Styles/Admin-End-CSS/AdminDashboardStyle.css">
   <link rel="stylesheet" href="../../CSS-Styles/Admin-End-CSS/ResidentMasterlistStyle.css">
   <style>
+    .finance-fee-shell {
+      max-width: 1360px;
+      margin: 0 auto;
+    }
+    .finance-fee-card {
+      border: 1px solid #ececec;
+      border-radius: 24px;
+      background: #fff;
+      box-shadow: 0 0.125rem 0.5rem rgba(0, 0, 0, 0.06);
+    }
+    .finance-fee-form-note {
+      font-size: 0.9rem;
+      color: #6c757d;
+    }
+    .finance-fee-table th,
+    .finance-fee-table td {
+      vertical-align: middle;
+    }
+    .finance-fee-amount {
+      font-weight: 700;
+      color: #198754;
+    }
+    .finance-fee-empty {
+      border: 1px dashed #d0d7de;
+      border-radius: 16px;
+      background: #f8fafc;
+      padding: 16px;
+      color: #6b7280;
+    }
     .certificate-tracker-shell {
       max-width: 1340px;
       margin: 0 auto;
@@ -287,60 +561,215 @@ require_once __DIR__ . '/../includes/admin_guard.php';
     <h2 class="mb-4" style="font-family: 'Charis SIL Bold'; color: #DE710C; ">Finance Payments</h2>
     <hr class="mb-4">
 
-    <div class="bg-white p-4 rounded-4 shadow-sm border resident-masterlist-shell certificate-tracker-shell">
-      <div class="admin-list-toolbar mb-3">
-        <div class="admin-list-tabs">
-          <button type="button" class="btn btn-outline-primary btn-sm status-filter-btn stage-filter-btn active" data-status-filter="all">All</button>
-          <button type="button" class="btn btn-outline-secondary btn-sm status-filter-btn stage-filter-btn fw-semibold" data-status-filter="verified">Verified</button>
-          <button type="button" class="btn btn-outline-secondary btn-sm status-filter-btn stage-filter-btn fw-semibold" data-status-filter="unpaid">Unpaid <span class="tab-count" id="unpaidTabCount">0</span></button>
-          <button type="button" class="btn btn-outline-secondary btn-sm status-filter-btn stage-filter-btn fw-semibold" data-status-filter="pending_verification">Pending Verification <span class="tab-count" id="pendingVerificationTabCount">0</span></button>
-        </div>
-
-        <div class="admin-list-actions">
-          <div class="input-group admin-search">
-            <input type="text" id="searchInput" class="form-control" placeholder="Request ID, resident ID, name, document">
-            <span class="input-group-text bg-white"><i class="fas fa-search"></i></span>
+    <?php if ($financeSection === 'fees'): ?>
+      <div class="finance-fee-shell">
+        <?php if ($feeFlash): ?>
+          <div class="alert alert-<?= htmlspecialchars((string)($feeFlash['type'] ?? 'info'), ENT_QUOTES, 'UTF-8') ?> rounded-4 shadow-sm">
+            <?= htmlspecialchars((string)($feeFlash['message'] ?? ''), ENT_QUOTES, 'UTF-8') ?>
           </div>
-          <button class="btn btn-outline-secondary btn-icon" type="button" data-bs-toggle="modal" data-bs-target="#modalFinanceFilter" id="btnFinanceFilter" title="Filter" aria-label="Filter">
-            <i class="fas fa-filter"></i>
-            <span class="visually-hidden">Filter</span>
-          </button>
-          <button class="btn btn-outline-secondary btn-icon admin-columns" type="button" data-bs-toggle="modal" data-bs-target="#modalFinanceColumns" id="btnFinanceColumns" title="Columns" aria-label="Columns">
-            <i class="fa-solid fa-sliders"></i>
-            <span class="visually-hidden">Columns</span>
-          </button>
-          <button class="btn btn-outline-secondary btn-icon admin-refresh" type="button" id="btnRefreshList" title="Refresh table" aria-label="Refresh table">
-            <i class="fa-solid fa-arrows-rotate"></i>
-            <span class="visually-hidden">Refresh</span>
-          </button>
+        <?php endif; ?>
+
+        <div class="row g-4">
+          <div class="col-12 col-lg-4">
+            <div class="finance-fee-card p-4 h-100">
+              <h4 class="mb-2" style="font-family: 'Charis SIL Bold'; color: #DE710C;">
+                <?= $editingFee ? 'Edit Price' : 'Add New Price' ?>
+              </h4>
+              <p class="finance-fee-form-note mb-4">
+                Manage the prices stored in <code>generalfeestbl</code>. Only certificate-type document requests are handled here.
+              </p>
+
+              <?php if ($editingFee): ?>
+                <form method="post" action="<?= htmlspecialchars($financeBaseUrl, ENT_QUOTES, 'UTF-8') ?>?section=fees" class="d-grid gap-3">
+                  <?= csrfTokenField() ?>
+                  <input type="hidden" name="action" value="update_fee">
+                  <input type="hidden" name="fee_id" value="<?= (int)($editingFee['fee_id'] ?? 0) ?>">
+
+                  <div>
+                    <label class="form-label fw-semibold">Document Type</label>
+                    <input type="text"
+                           class="form-control"
+                           value="<?= htmlspecialchars((string)($editingFee['document_type_name'] ?? ('Document Type #' . (int)($editingFee['document_type_id'] ?? 0))), ENT_QUOTES, 'UTF-8') ?>"
+                           readonly>
+                  </div>
+
+                  <div>
+                    <label class="form-label fw-semibold">Amount</label>
+                    <input type="number"
+                           name="amount"
+                           class="form-control"
+                           min="0"
+                           step="0.01"
+                           value="<?= htmlspecialchars(number_format((float)($editingFee['amount'] ?? 0), 2, '.', ''), ENT_QUOTES, 'UTF-8') ?>"
+                           required>
+                  </div>
+
+                  <div class="d-flex flex-wrap gap-2">
+                    <button type="submit" class="btn btn-primary">Save Changes</button>
+                    <a href="<?= htmlspecialchars($financeBaseUrl, ENT_QUOTES, 'UTF-8') ?>?section=fees" class="btn btn-outline-secondary">Cancel</a>
+                  </div>
+                </form>
+              <?php else: ?>
+                <form method="post" action="<?= htmlspecialchars($financeBaseUrl, ENT_QUOTES, 'UTF-8') ?>?section=fees" class="d-grid gap-3">
+                  <?= csrfTokenField() ?>
+                  <input type="hidden" name="action" value="add_fee">
+
+                  <div>
+                    <label for="feeDocumentType" class="form-label fw-semibold">Document Type</label>
+                    <select id="feeDocumentType" name="document_type_id" class="form-select" required>
+                      <option value="">Select a certificate request</option>
+                      <?php foreach ($availableFeeDocuments as $document): ?>
+                        <option value="<?= (int)($document['document_type_id'] ?? 0) ?>">
+                          <?= htmlspecialchars((string)($document['document_type_name'] ?? ''), ENT_QUOTES, 'UTF-8') ?>
+                        </option>
+                      <?php endforeach; ?>
+                    </select>
+                    <?php if (!$availableFeeDocuments): ?>
+                      <div class="form-text">All available certificate request types already have prices assigned.</div>
+                    <?php endif; ?>
+                  </div>
+
+                  <div>
+                    <label for="feeAmount" class="form-label fw-semibold">Amount</label>
+                    <input id="feeAmount"
+                           type="number"
+                           name="amount"
+                           class="form-control"
+                           min="0"
+                           step="0.01"
+                           placeholder="0.00"
+                           required>
+                  </div>
+
+                  <div class="d-flex flex-wrap gap-2">
+                    <button type="submit" class="btn btn-primary" <?= !$availableFeeDocuments ? 'disabled' : '' ?>>Add Price</button>
+                  </div>
+                </form>
+              <?php endif; ?>
+            </div>
+          </div>
+
+          <div class="col-12 col-lg-8">
+            <div class="finance-fee-card p-4 h-100">
+              <div class="d-flex flex-wrap justify-content-between align-items-start gap-3 mb-3">
+                <div>
+                  <h4 class="mb-1" style="font-family: 'Charis SIL Bold'; color: #DE710C;">Current General Fees</h4>
+                  <p class="text-muted mb-0">Edit, add, or remove the prices currently stored in <code>generalfeestbl</code>.</p>
+                </div>
+                <div class="badge bg-light text-dark border px-3 py-2">
+                  <?= count($feeRows) ?> fee<?= count($feeRows) === 1 ? '' : 's' ?>
+                </div>
+              </div>
+
+              <?php if (!$feeRows): ?>
+                <div class="finance-fee-empty">
+                  No prices are currently saved in <code>generalfeestbl</code>.
+                </div>
+              <?php else: ?>
+                <div class="table-responsive">
+                  <table class="table finance-fee-table align-middle">
+                    <thead class="table-light">
+                      <tr>
+                        <th>Document Type</th>
+                        <th>Category</th>
+                        <th>Amount</th>
+                        <th>Last Updated</th>
+                        <th class="text-end">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <?php foreach ($feeRows as $row): ?>
+                        <tr>
+                          <td>
+                            <div class="fw-semibold">
+                              <?= htmlspecialchars((string)($row['document_type_name'] ?? ('Document Type #' . (int)($row['document_type_id'] ?? 0))), ENT_QUOTES, 'UTF-8') ?>
+                            </div>
+                            <div class="small text-muted">Document Type ID: <?= (int)($row['document_type_id'] ?? 0) ?></div>
+                          </td>
+                          <td><?= htmlspecialchars((string)($row['document_category'] ?? 'N/A'), ENT_QUOTES, 'UTF-8') ?></td>
+                          <td class="finance-fee-amount">PHP <?= number_format((float)($row['amount'] ?? 0), 2) ?></td>
+                          <td><?= htmlspecialchars((string)($row['updated_at'] ?? 'N/A'), ENT_QUOTES, 'UTF-8') ?></td>
+                          <td class="text-end">
+                            <div class="d-inline-flex flex-wrap gap-2 justify-content-end">
+                              <a href="<?= htmlspecialchars($financeBaseUrl, ENT_QUOTES, 'UTF-8') ?>?section=fees&amp;edit_fee=<?= (int)($row['fee_id'] ?? 0) ?>"
+                                 class="btn btn-sm btn-outline-primary">
+                                Edit
+                              </a>
+                              <form method="post" action="<?= htmlspecialchars($financeBaseUrl, ENT_QUOTES, 'UTF-8') ?>?section=fees" onsubmit="return confirm('Delete this price?');">
+                                <?= csrfTokenField() ?>
+                                <input type="hidden" name="action" value="delete_fee">
+                                <input type="hidden" name="fee_id" value="<?= (int)($row['fee_id'] ?? 0) ?>">
+                                <button type="submit" class="btn btn-sm btn-outline-danger">Delete</button>
+                              </form>
+                            </div>
+                          </td>
+                        </tr>
+                      <?php endforeach; ?>
+                    </tbody>
+                  </table>
+                </div>
+              <?php endif; ?>
+            </div>
+          </div>
         </div>
       </div>
+    <?php else: ?>
+      <div class="bg-white p-4 rounded-4 shadow-sm border resident-masterlist-shell certificate-tracker-shell">
+        <div class="admin-list-toolbar mb-3">
+          <div class="admin-list-tabs">
+            <button type="button" class="btn btn-outline-primary btn-sm status-filter-btn stage-filter-btn active" data-status-filter="all">All</button>
+            <button type="button" class="btn btn-outline-secondary btn-sm status-filter-btn stage-filter-btn fw-semibold" data-status-filter="verified">Verified</button>
+            <button type="button" class="btn btn-outline-secondary btn-sm status-filter-btn stage-filter-btn fw-semibold" data-status-filter="unpaid">Unpaid <span class="tab-count" id="unpaidTabCount">0</span></button>
+            <button type="button" class="btn btn-outline-secondary btn-sm status-filter-btn stage-filter-btn fw-semibold" data-status-filter="pending_verification">Pending Verification <span class="tab-count" id="pendingVerificationTabCount">0</span></button>
+          </div>
 
-      <div class="table-responsive">
-        <table id="table-certificateTracker" class="table align-middle">
-          <thead>
-            <tr class="table-light">
-              <th class="col-request-id">Request ID</th>
-              <th class="col-resident-id">Resident ID</th>
-              <th class="col-full-name">Full Name</th>
-              <th class="col-document">Document Requested</th>
-              <th class="col-purpose">Purpose</th>
-              <th class="col-status">Status</th>
-              <th class="col-submitted">Submitted Date</th>
-              <th class="col-action">Action</th>
-            </tr>
-          </thead>
-          <tbody id="tableBody">
-            <tr>
-              <td colspan="8" class="text-center text-muted py-4">Loading requests...</td>
-            </tr>
-          </tbody>
-        </table>
+          <div class="admin-list-actions">
+            <div class="input-group admin-search">
+              <input type="text" id="searchInput" class="form-control" placeholder="Request ID, resident ID, name, document">
+              <span class="input-group-text bg-white"><i class="fas fa-search"></i></span>
+            </div>
+            <button class="btn btn-outline-secondary btn-icon" type="button" data-bs-toggle="modal" data-bs-target="#modalFinanceFilter" id="btnFinanceFilter" title="Filter" aria-label="Filter">
+              <i class="fas fa-filter"></i>
+              <span class="visually-hidden">Filter</span>
+            </button>
+            <button class="btn btn-outline-secondary btn-icon admin-columns" type="button" data-bs-toggle="modal" data-bs-target="#modalFinanceColumns" id="btnFinanceColumns" title="Columns" aria-label="Columns">
+              <i class="fa-solid fa-sliders"></i>
+              <span class="visually-hidden">Columns</span>
+            </button>
+            <button class="btn btn-outline-secondary btn-icon admin-refresh" type="button" id="btnRefreshList" title="Refresh table" aria-label="Refresh table">
+              <i class="fa-solid fa-arrows-rotate"></i>
+              <span class="visually-hidden">Refresh</span>
+            </button>
+          </div>
+        </div>
+
+        <div class="table-responsive">
+          <table id="table-certificateTracker" class="table align-middle">
+            <thead>
+              <tr class="table-light">
+                <th class="col-request-id">Request ID</th>
+                <th class="col-resident-id">Resident ID</th>
+                <th class="col-full-name">Full Name</th>
+                <th class="col-document">Document Requested</th>
+                <th class="col-purpose">Purpose</th>
+                <th class="col-status">Status</th>
+                <th class="col-submitted">Submitted Date</th>
+                <th class="col-action">Action</th>
+              </tr>
+            </thead>
+            <tbody id="tableBody">
+              <tr>
+                <td colspan="8" class="text-center text-muted py-4">Loading requests...</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
       </div>
-    </div>
+    <?php endif; ?>
   </main>
 </div>
 
+<?php if ($financeSection === 'tracker'): ?>
 <div class="modal fade" id="modalFinanceFilter" tabindex="-1" aria-hidden="true">
   <div class="modal-dialog modal-dialog-centered">
     <div class="modal-content p-3">
@@ -527,5 +956,8 @@ window.CERT_TRACKER_DEFAULT_STAGE = 'finance';
 </script>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 <script src="../../JS-Script-Files/Admin-End/certificateTrackerScript.js?v=20260311-08"></script>
+<?php else: ?>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<?php endif; ?>
 </body>
 </html>

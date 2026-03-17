@@ -47,6 +47,9 @@ $isContentMgmtActive = in_array($current, $contentMgmtPages);
 $isUserMgmtActive = in_array($current, $userMgmtPages);
 $isAdminMgmtActive = in_array($current, $adminMgmtPages);
 $isSuperAdminSidebar = ((string)($_SESSION['role'] ?? '') === 'SuperAdmin');
+$financeSection = strtolower(trim((string)($_GET['section'] ?? 'tracker')));
+$isFinanceFeesActive = $current === 'FinancePayments.php' && $financeSection === 'fees';
+$isFinanceTrackerActive = $current === 'FinancePayments.php' && $financeSection !== 'fees';
 
 $adminDisplayName = "Admin User";
 $adminPosition = "Administrator";
@@ -309,12 +312,30 @@ if (!empty($_SESSION['user_id']) && isset($conn) && $conn instanceof mysqli) {
       </li>
 
       <li class="mb-1 mt-2 text-muted small fw-semibold px-2">Finance Department</li>
-      <li class="mb-2">
-        <a href="<?= htmlspecialchars(appUrl('Admin-End/Certificates/FinancePayments.php')) ?>"
-           class="btn btn-toggle d-flex align-items-center gap-2 rounded <?= $isFinanceActive ? 'active' : '' ?>"
-           style="<?= $isFinanceActive ? 'outline: none; box-shadow: none;' : '' ?>">
+      <li class="mb-1">
+        <button class="btn btn-toggle d-flex align-items-center gap-2 rounded <?= $isFinanceActive ? '' : 'collapsed' ?>"
+                data-bs-toggle="collapse"
+                data-bs-target="#finance-collapse"
+                aria-expanded="<?= $isFinanceActive ? 'true' : 'false' ?>">
           <i class="fas fa-money-check-alt"></i> Finance Payments
-        </a>
+        </button>
+
+        <div class="collapse <?= $isFinanceActive ? 'show' : '' ?>" id="finance-collapse">
+          <ul class="btn-toggle-nav list-unstyled fw-normal pb-1 small">
+            <li>
+              <a href="<?= htmlspecialchars(appUrl('Admin-End/Certificates/FinancePayments.php')) ?>"
+                 class="link-dark rounded <?= $isFinanceTrackerActive ? 'active' : '' ?>">
+                Payment Tracker
+              </a>
+            </li>
+            <li>
+              <a href="<?= htmlspecialchars(appUrl('Admin-End/Certificates/FinancePayments.php')) ?>?section=fees"
+                 class="link-dark rounded <?= $isFinanceFeesActive ? 'active' : '' ?>">
+                Fee Management
+              </a>
+            </li>
+          </ul>
+        </div>
       </li>
 
       <li class="mb-1 mt-2 text-muted small fw-semibold px-2">e-Blotter Management</li>
