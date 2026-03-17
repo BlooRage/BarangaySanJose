@@ -53,8 +53,8 @@ $transactionPages = [
   'resident_activity.php',
   'resident_transactions.php',
   'document_requests.php',
-  'AppointmentsLandingPage.php',
-  'ComplaintsLandingPage.php',
+  'appointment_tracker.php',
+  'complaint_tracker.php',
 ];
 $isTransactionsActive = in_array($current, $transactionPages, true);
 
@@ -308,14 +308,14 @@ if ($residentId !== '' && isset($conn) && $conn instanceof mysqli) {
               </a>
             </li>
             <li>
-              <a href="<?= htmlspecialchars($baseUrl, ENT_QUOTES, 'UTF-8') ?>/Resident-End/Appointments/AppointmentsLandingPage.php"
-                 class="link-dark rounded <?= activeLink('AppointmentsLandingPage.php', $current) ?>">
+              <a href="<?= htmlspecialchars($baseUrl, ENT_QUOTES, 'UTF-8') ?>/Resident-End/appointment_tracker.php"
+                 class="link-dark rounded <?= activeLink('appointment_tracker.php', $current) ?>">
                 Appointment Schedules
               </a>
             </li>
             <li>
-              <a href="<?= htmlspecialchars($baseUrl, ENT_QUOTES, 'UTF-8') ?>/Resident-End/Complaints/ComplaintsLandingPage.php"
-                 class="link-dark rounded <?= activeLink('ComplaintsLandingPage.php', $current) ?>">
+              <a href="<?= htmlspecialchars($baseUrl, ENT_QUOTES, 'UTF-8') ?>/Resident-End/complaint_tracker.php"
+                 class="link-dark rounded <?= activeLink('complaint_tracker.php', $current) ?>">
                 Complaint Tracking
               </a>
             </li>

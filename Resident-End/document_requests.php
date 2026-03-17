@@ -29,6 +29,135 @@ require_once __DIR__ . '/includes/resident_access_guard.php';
   <link rel="stylesheet" href="<?= htmlspecialchars($baseUrl) ?>/CSS-Styles/Resident-End-CSS/residentDashboard.css">
   <link rel="stylesheet" href="<?= htmlspecialchars($baseUrl) ?>/CSS-Styles/Guest-End-CSS/GeneralStyle.css">
   <style>
+    .tracker-shell {
+      border-color: #f1e1cf !important;
+    }
+    .tracker-title {
+      font-family: 'Charis SIL Bold', serif;
+      color: #DE710C;
+      font-size: clamp(2rem, 4.4vw, 3rem);
+      line-height: 1.1;
+      margin: 0 0 0.65rem 0;
+    }
+    .tracker-toolbar {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex-wrap: nowrap;
+      overflow-x: auto;
+      padding-bottom: 2px;
+      margin-bottom: 1rem;
+    }
+    .tracker-tabs,
+    .tracker-actions {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex: 0 0 auto;
+      white-space: nowrap;
+    }
+    .tracker-actions {
+      margin-left: auto;
+      flex-wrap: nowrap;
+    }
+    .pending-summary-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      border: 1px solid #f3d9ad;
+      background: #fff7eb;
+      color: #8a4b00;
+      font-weight: 700;
+      border-radius: 999px;
+      padding: 6px 10px;
+      line-height: 1;
+      white-space: nowrap;
+    }
+    .pending-summary-badge .count {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-width: 24px;
+      height: 24px;
+      border-radius: 999px;
+      background: #de710c;
+      color: #fff;
+      font-size: 0.8rem;
+      padding: 0 7px;
+    }
+    .tracker-actions .input-group {
+      min-width: 260px;
+      max-width: 420px;
+      flex: 1 1 auto;
+    }
+    .tracker-tab.btn {
+      border-radius: 999px;
+      padding: 0.35rem 0.85rem;
+      font-weight: 600;
+      border-color: #e3e6ea;
+      color: #495057;
+      background: #fff;
+    }
+    .tracker-tab.btn.active {
+      border-color: rgba(254, 153, 60, 0.7);
+      color: #a04f00;
+      background: linear-gradient(180deg, #fff6ec 0%, #ffe9d1 100%);
+    }
+    .btn-icon {
+      width: 38px;
+      height: 38px;
+      padding: 0;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      flex: 0 0 38px;
+      border-radius: 10px;
+      line-height: 1;
+    }
+    .btn-icon i {
+      margin: 0 !important;
+    }
+    .refresh-btn {
+      border-color: rgba(254, 153, 60, 0.45);
+      color: #b85b00;
+      background: linear-gradient(180deg, #fffaf4 0%, #fff3e4 100%);
+      font-weight: 700;
+      transition: transform 120ms ease, box-shadow 120ms ease;
+    }
+    .refresh-btn:hover {
+      box-shadow: 0 10px 18px rgba(222, 113, 12, 0.14);
+      transform: translateY(-1px);
+    }
+    .refresh-btn.is-loading i {
+      animation: docSpin 900ms linear infinite;
+    }
+    @keyframes docSpin {
+      from { transform: rotate(0deg); }
+      to { transform: rotate(360deg); }
+    }
+    #requestCards {
+      display: none;
+    }
+    .request-card {
+      border: 1px solid #eceff3;
+      border-radius: 12px;
+      padding: 0.85rem 0.9rem;
+      background: #fff;
+      margin-bottom: 0.75rem;
+    }
+    .request-card .tracker-label {
+      font-size: 0.78rem;
+      color: #495057;
+      text-transform: uppercase;
+      letter-spacing: .02em;
+      font-weight: 800;
+    }
+    .request-card .tracker-value {
+      font-size: 0.96rem;
+      color: #212529;
+      word-break: break-word;
+      white-space: normal;
+    }
     #viewModal .modal-body {
       background: #f8fafc;
     }
@@ -85,17 +214,74 @@ require_once __DIR__ . '/includes/resident_access_guard.php';
         grid-template-columns: 1fr;
       }
     }
+    @media (max-width: 991.98px) {
+      .tracker-toolbar {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 10px;
+      }
+      .tracker-tabs,
+      .tracker-actions {
+        width: 100%;
+      }
+      .tracker-tabs {
+        overflow-x: auto;
+        padding-bottom: 4px;
+      }
+      .tracker-actions {
+        margin-left: 0;
+        justify-content: flex-start;
+        overflow-x: auto;
+        padding-bottom: 2px;
+      }
+      .tracker-actions .input-group {
+        min-width: 0;
+        max-width: none;
+        width: 100%;
+      }
+    }
+    @media (max-width: 767.98px) {
+      .table-responsive {
+        display: none;
+      }
+      #requestCards {
+        display: block;
+      }
+    }
   </style>
 </head>
 <body>
 <div class="d-flex min-vh-100">
   <?php include __DIR__ . '/includes/resident_sidebar.php'; ?>
 
-  <main id="div-mainDisplay" class="flex-grow-1 px-4 pb-4 pt-0 px-md-5 pb-md-5 pt-md-0 bg-light">
-    <div class="bg-white rounded-4 shadow-sm border p-4 mt-4">
-      <div class="d-flex align-items-center justify-content-between mb-3">
-        <h3 class="mb-0" style="font-family:'Charis SIL Bold';color:#DE710C;">Document Requests</h3>
-        <button id="btnRefresh" class="btn btn-outline-secondary btn-sm"><i class="fa-solid fa-rotate"></i> Refresh</button>
+  <main id="div-mainDisplay" class="flex-grow-1 p-4 p-md-5 bg-light">
+    <h2 class="tracker-title">Document Requests</h2>
+    <hr class="mt-0 mb-3">
+
+    <div class="bg-white rounded-4 shadow-sm border p-4 tracker-shell">
+      <div class="tracker-toolbar">
+        <div class="tracker-tabs">
+          <button type="button" class="btn tracker-tab active" data-tab="all">All</button>
+          <button type="button" class="btn tracker-tab" data-tab="pending">Pending</button>
+          <button type="button" class="btn tracker-tab" data-tab="completed">Completed</button>
+          <button type="button" class="btn tracker-tab" data-tab="cancelled">Cancelled</button>
+        </div>
+        <div class="tracker-actions">
+          <div id="requestPendingSummary" class="pending-summary-badge d-none" aria-live="polite">
+            <span>Pending</span>
+            <span id="requestPendingCount" class="count">0</span>
+          </div>
+          <div class="input-group">
+            <input id="requestSearch" class="form-control" placeholder="Search..." />
+            <span class="input-group-text bg-white"><i class="fas fa-search"></i></span>
+          </div>
+          <button id="btnFilter" class="btn btn-outline-secondary btn-icon" type="button" title="Filter" aria-label="Filter" data-bs-toggle="modal" data-bs-target="#requestFilterModal">
+            <i class="fas fa-filter"></i>
+          </button>
+          <button id="btnRefresh" class="btn refresh-btn btn-icon" type="button" title="Refresh document requests" aria-label="Refresh document requests">
+            <i class="fa-solid fa-arrows-rotate"></i>
+          </button>
+        </div>
       </div>
 
       <div class="table-responsive">
@@ -116,8 +302,48 @@ require_once __DIR__ . '/includes/resident_access_guard.php';
           </tbody>
         </table>
       </div>
+      <div id="requestCards" class="mt-2">
+        <div class="text-center text-muted py-4">Loading requests...</div>
+      </div>
     </div>
   </main>
+</div>
+
+<div class="modal fade" id="requestFilterModal" tabindex="-1" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Filter Document Requests</h5>
+      </div>
+      <div class="modal-body">
+        <div class="row g-3">
+          <div class="col-12">
+            <label class="form-label small text-muted mb-1">Status</label>
+            <select class="form-select" id="requestStatusFilter">
+              <option value="">All Status</option>
+              <option value="for_payment">For Payment</option>
+              <option value="payment_rejected">Payment Rejected</option>
+              <option value="ready_for_claim">Ready for Claim</option>
+              <option value="completed">Completed</option>
+              <option value="cancelled">Cancelled</option>
+            </select>
+          </div>
+          <div class="col-12">
+            <label class="form-label small text-muted mb-1">Date From</label>
+            <input type="date" class="form-control" id="requestDateFrom">
+          </div>
+          <div class="col-12">
+            <label class="form-label small text-muted mb-1">Date To</label>
+            <input type="date" class="form-control" id="requestDateTo">
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline-secondary" id="requestFilterReset">Reset</button>
+        <button type="button" class="btn btn-primary" id="requestFilterApply" data-bs-dismiss="modal">Apply</button>
+      </div>
+    </div>
+  </div>
 </div>
 
 <div class="modal fade" id="paymentModeModal" tabindex="-1" aria-hidden="true">
@@ -246,6 +472,7 @@ require_once __DIR__ . '/includes/resident_access_guard.php';
 (() => {
   const endpoint = '<?= htmlspecialchars($baseUrl) ?>/PhpFiles/Resident-End/documentRequestWorkflow.php';
   const tbody = document.getElementById('requestRows');
+  const cards = document.getElementById('requestCards');
   const btnRefresh = document.getElementById('btnRefresh');
   const paymentModeModal = new bootstrap.Modal(document.getElementById('paymentModeModal'));
   const paymentModeForm = document.getElementById('paymentModeForm');
@@ -272,6 +499,8 @@ require_once __DIR__ . '/includes/resident_access_guard.php';
   const paymentProofWrap = document.getElementById('paymentProofWrap');
   const paymentProofOpenNew = document.getElementById('paymentProofOpenNew');
   let itemById = new Map();
+  let allItems = [];
+  let activeTab = 'all';
   let gcashSubmitting = false;
 
   function setGcashSubmittingState(isSubmitting) {
@@ -375,6 +604,217 @@ require_once __DIR__ . '/includes/resident_access_guard.php';
       return `${viewBtn}${modeBtn}`;
     }
     return `${viewBtn}${modeBtn}`;
+  }
+
+  function filterBucket(row) {
+    const stage = String(row?.stage || '').toLowerCase();
+    if (stage === 'completed') return 'completed';
+    if (stage === 'cancelled') return 'cancelled';
+    return 'pending';
+  }
+
+  function feeTextOf(row) {
+    return (row.fee_amount !== null && row.fee_amount !== undefined && String(row.fee_amount) !== '')
+      ? `PHP ${Number(row.fee_amount).toFixed(2)}`
+      : '-';
+  }
+
+  function filteredItems() {
+    const search = String(document.getElementById('requestSearch')?.value || '').toLowerCase().trim();
+    const status = String(document.getElementById('requestStatusFilter')?.value || '').toLowerCase().trim();
+    const dateFrom = String(document.getElementById('requestDateFrom')?.value || '').trim();
+    const dateTo = String(document.getElementById('requestDateTo')?.value || '').trim();
+
+    return allItems.filter((row) => {
+      if (activeTab !== 'all' && filterBucket(row) !== activeTab) return false;
+      if (status && String(row.stage || '').toLowerCase() !== status) return false;
+
+      const haystack = [
+        row.request_id,
+        row.document_type,
+        row.purpose,
+        row.stage_label,
+        row.stage
+      ].join(' ').toLowerCase();
+      if (search && !haystack.includes(search)) return false;
+
+      const rawSubmitted = String(row.submitted_at_raw || row.submitted_at || '').trim();
+      const sourceDate = rawSubmitted.slice(0, 10);
+      if (dateFrom && sourceDate && sourceDate < dateFrom) return false;
+      if (dateTo && sourceDate && sourceDate > dateTo) return false;
+      return true;
+    });
+  }
+
+  function updatePendingSummary() {
+    const wrap = document.getElementById('requestPendingSummary');
+    const countEl = document.getElementById('requestPendingCount');
+    if (!wrap || !countEl) return;
+    const pendingCount = allItems.filter((row) => filterBucket(row) === 'pending').length;
+    countEl.textContent = String(pendingCount);
+    wrap.classList.toggle('d-none', pendingCount <= 0);
+  }
+
+  function bindRowActions() {
+    tbody.querySelectorAll('button[data-open-mode]').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const id = String(btn.getAttribute('data-open-mode') || '');
+        if (!id) return;
+        openModeModal(id);
+      });
+    });
+
+    tbody.querySelectorAll('button[data-pay-now]').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const id = String(btn.getAttribute('data-pay-now') || '');
+        openGcashModal(id);
+      });
+    });
+
+    tbody.querySelectorAll('button[data-view]').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const id = String(btn.getAttribute('data-view') || '');
+        const row = itemById.get(id);
+        if (!row) return;
+        const payload = parsePayload(row.payload);
+        const technicalKeys = new Set(['action', 'csrf_token', 'redirect']);
+        const submittedFields = [];
+        Object.keys(payload).forEach((key) => {
+          const k = String(key || '').trim();
+          if (!k || technicalKeys.has(k)) return;
+          const value = payload[key];
+          const text = Array.isArray(value) || (value && typeof value === 'object')
+            ? JSON.stringify(value)
+            : String(value ?? '').trim();
+          if (isEmptyFieldValue(text)) return;
+          submittedFields.push({ label: friendlyLabel(k), value: text });
+        });
+
+        const requestDetailsRaw = String(row.request_details ?? '').trim();
+        if (!submittedFields.length && requestDetailsRaw && requestDetailsRaw !== '{}' && requestDetailsRaw !== '[]') {
+          submittedFields.push({ label: 'Request Details', value: requestDetailsRaw });
+        }
+
+        if (!submittedFields.length) {
+          [
+            ['Purpose', row.purpose],
+            ['Status', row.stage_label || row.stage],
+            ['Submitted At', row.submitted_at],
+            ['Status Remarks', row.status_remarks]
+          ].forEach(([label, value]) => {
+            const text = String(value ?? '').trim();
+            if (!isEmptyFieldValue(text)) {
+              submittedFields.push({ label, value: text });
+            }
+          });
+        }
+
+        const gridClass = submittedFields.length <= 1 ? 'cols-1' : '';
+        const gridHtml = submittedFields.length
+          ? `<div class="tracker-form-grid ${gridClass}">${submittedFields.map((f) => formField(f.label, f.value)).join('')}</div>`
+          : '<div class="text-muted">No submitted details.</div>';
+
+        let html = `<div class="tracker-doc-highlight">Document Requested: ${escapeHtml(row.document_type || '-')}</div>`;
+        html += formSection('Submitted Form Details', gridHtml);
+        viewDetailsBody.innerHTML = html;
+        if (viewModalTitle) {
+          const requestId = String(row.request_id || '').trim();
+          viewModalTitle.textContent = requestId ? `Certificate Request (#${requestId})` : 'Certificate Request';
+        }
+        viewModal.show();
+      });
+    });
+
+    tbody.querySelectorAll('button[data-proof]').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const id = String(btn.getAttribute('data-proof') || '');
+        const row = itemById.get(id);
+        if (!row || !row.payment_proof_path) return;
+        const proofUrl = `${endpoint}?action=view_payment_proof&request_id=${encodeURIComponent(id)}`;
+        openFileViewerModal({
+          title: 'Payment Proof',
+          viewUrl: proofUrl,
+          linkText: 'Open in New Tab',
+          linkUrl: proofUrl,
+          isPdf: String(row.payment_proof_path || '').toLowerCase().endsWith('.pdf')
+        });
+      });
+    });
+
+    tbody.querySelectorAll('button[data-issued]').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const id = String(btn.getAttribute('data-issued') || '');
+        const viewUrl = `${endpoint}?action=view_issued&request_id=${encodeURIComponent(id)}`;
+        const downloadUrl = `${endpoint}?action=download_issued&request_id=${encodeURIComponent(id)}`;
+        openFileViewerModal({
+          title: 'Issued Document (PDF)',
+          viewUrl,
+          linkText: 'Download',
+          linkUrl: downloadUrl,
+          isPdf: true
+        });
+      });
+    });
+  }
+
+  function render() {
+    const items = filteredItems();
+    if (!items.length) {
+      tbody.innerHTML = '<tr><td colspan="7" class="text-center text-muted py-4">No requests found.</td></tr>';
+      if (cards) cards.innerHTML = '<div class="text-center text-muted py-4">No requests found.</div>';
+      return;
+    }
+
+    tbody.innerHTML = items.map((r) => {
+      let action = '<span class="text-muted small">-</span>';
+      const viewBtn = `<button class="btn btn-sm btn-outline-secondary me-1" data-view="${escapeHtml(r.request_id)}">View</button>`;
+      const proofBtn = r.payment_proof_path
+        ? `<button class="btn btn-sm btn-outline-dark me-1" data-proof="${escapeHtml(r.request_id)}">View Payment</button>`
+        : '';
+      const issuedBtn = `<button class="btn btn-sm btn-success" data-issued="${escapeHtml(r.request_id)}">View Document</button>`;
+      if (r.stage === 'for_payment' || r.stage === 'payment_rejected') {
+        action = paymentActions(r);
+      } else if (r.stage === 'completed') {
+        action = `${viewBtn}${proofBtn}${issuedBtn}`;
+      } else {
+        action = `${viewBtn}${proofBtn}`;
+      }
+
+      const reason = r.status_remarks ? `<div class="text-danger small mt-1">Reason: ${escapeHtml(r.status_remarks)}</div>` : '';
+      const paymentDeadline = (r.stage === 'for_payment' || r.stage === 'payment_rejected') && r.payment_deadline
+        ? `<div class="text-muted small mt-1">Payment deadline: ${escapeHtml(formatDateTime(r.payment_deadline))}</div>`
+        : '';
+      return `
+        <tr>
+          <td class="fw-semibold">${escapeHtml(r.request_id)}</td>
+          <td>${escapeHtml(r.document_type)}</td>
+          <td>${escapeHtml(r.purpose || '-')}</td>
+          <td>${escapeHtml(feeTextOf(r))}</td>
+          <td>${badge(r.stage, escapeHtml(r.stage_label || r.stage || ''))}${reason}${paymentDeadline}</td>
+          <td>${escapeHtml(r.submitted_at || '-')}</td>
+          <td>${action}</td>
+        </tr>
+      `;
+    }).join('');
+
+    if (cards) {
+      cards.innerHTML = items.map((r) => `
+        <article class="request-card">
+          <div class="tracker-label">Request</div>
+          <div class="tracker-value fw-semibold">${escapeHtml(r.request_id || '-')}</div>
+          <div class="tracker-label mt-2">Document</div>
+          <div class="tracker-value">${escapeHtml(r.document_type || '-')}</div>
+          <div class="tracker-label mt-2">Purpose</div>
+          <div class="tracker-value">${escapeHtml(r.purpose || '-')}</div>
+          <div class="tracker-label mt-2">Status</div>
+          <div class="tracker-value">${badge(r.stage, escapeHtml(r.stage_label || r.stage || ''))}</div>
+          <div class="tracker-label mt-2">Submitted</div>
+          <div class="tracker-value">${escapeHtml(r.submitted_at || '-')}</div>
+        </article>
+      `).join('');
+    }
+
+    bindRowActions();
   }
 
   function openModeModal(requestId) {
@@ -615,6 +1055,33 @@ require_once __DIR__ . '/includes/resident_access_guard.php';
     }
   }
 
+  async function load() {
+    btnRefresh?.classList.add('is-loading');
+    tbody.innerHTML = '<tr><td colspan="7" class="text-center text-muted py-4">Loading requests...</td></tr>';
+    if (cards) cards.innerHTML = '<div class="text-center text-muted py-4">Loading requests...</div>';
+    try {
+      const data = await fetchJson(endpoint + '?action=list&limit=80');
+      if (!data.success) throw new Error(data.message || 'Unable to load requests');
+
+      allItems = Array.isArray(data.items) ? data.items : [];
+      itemById = new Map(allItems.map((it) => [String(it.request_id), it]));
+      updatePendingSummary();
+      if (!allItems.length) {
+        tbody.innerHTML = '<tr><td colspan="7" class="text-center text-muted py-4">No requests yet.</td></tr>';
+        if (cards) cards.innerHTML = '<div class="text-center text-muted py-4">No requests yet.</div>';
+        return;
+      }
+
+      render();
+    } catch (err) {
+      tbody.innerHTML = `<tr><td colspan="7" class="text-center text-danger py-4">${escapeHtml(err.message || err)}</td></tr>`;
+      if (cards) cards.innerHTML = `<div class="text-center text-danger py-4">${escapeHtml(err.message || err)}</div>`;
+      document.getElementById('requestPendingSummary')?.classList.add('d-none');
+    } finally {
+      btnRefresh?.classList.remove('is-loading');
+    }
+  }
+
   function openFileViewerModal({ title, viewUrl, linkText, linkUrl, isPdf }) {
     if (paymentProofTitle) {
       paymentProofTitle.textContent = String(title || 'Document');
@@ -707,6 +1174,27 @@ require_once __DIR__ . '/includes/resident_access_guard.php';
     const requestId = String(paymentModeRequestId.value || gcashRequestId.value || '');
     barangayPaymentModal.hide();
     if (requestId) openModeModal(requestId);
+  });
+
+  document.querySelectorAll('.tracker-tab').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.tracker-tab').forEach((node) => node.classList.remove('active'));
+      btn.classList.add('active');
+      activeTab = String(btn.getAttribute('data-tab') || 'all');
+      render();
+    });
+  });
+
+  document.getElementById('requestSearch')?.addEventListener('input', render);
+  document.getElementById('requestStatusFilter')?.addEventListener('change', render);
+  document.getElementById('requestDateFrom')?.addEventListener('change', render);
+  document.getElementById('requestDateTo')?.addEventListener('change', render);
+  document.getElementById('requestFilterApply')?.addEventListener('click', render);
+  document.getElementById('requestFilterReset')?.addEventListener('click', () => {
+    document.getElementById('requestStatusFilter').value = '';
+    document.getElementById('requestDateFrom').value = '';
+    document.getElementById('requestDateTo').value = '';
+    render();
   });
 
   btnRefresh.addEventListener('click', load);
