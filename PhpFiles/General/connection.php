@@ -4,7 +4,7 @@ require_once __DIR__ . '/runtimeConfig.php';
 // Use Asia/Manila (UTC+08:00) for PHP date/time functions.
 date_default_timezone_set('Asia/Manila');
 
-$host = "srv1986.hstgr.io";
+$host = "localhost";
 $user = "u682055666_thesiscaps";
 $pass = "ThesisCaps123.";
 $dbname = "u682055666_testingBrgySJ";
