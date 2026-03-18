@@ -4,6 +4,14 @@ require_once __DIR__ . '/runtimeConfig.php';
 // Use Asia/Manila (UTC+08:00) for PHP date/time functions.
 date_default_timezone_set('Asia/Manila');
 
+$defaultDbHost = 'srv1986.hstgr.io';
+$defaultDbHostLocal = 'srv1986.hstgr.io';
+$defaultDbHostHosted = 'localhost';
+$defaultDbUser = 'u682055666_thesiscaps';
+$defaultDbPass = 'ThesisCaps123.';
+$defaultDbName = 'u682055666_testingBrgySJ';
+$defaultDbPort = 3306;
+
 if (!function_exists('db_request_host_name')) {
     function db_request_host_name(): string
     {
@@ -38,9 +46,9 @@ if (!function_exists('db_is_localhost_request')) {
     }
 }
 
-$configuredHost = trim((string)runtime_config('db.host', ''));
-$localHost = trim((string)runtime_env('DB_HOST_LOCAL', runtime_config('db.host_local', $configuredHost)));
-$hostedHost = trim((string)runtime_env('DB_HOST_HOSTED', runtime_config('db.host_hosted', 'localhost')));
+$configuredHost = trim((string)runtime_config('db.host', $defaultDbHost));
+$localHost = trim((string)runtime_env('DB_HOST_LOCAL', runtime_config('db.host_local', $defaultDbHostLocal)));
+$hostedHost = trim((string)runtime_env('DB_HOST_HOSTED', runtime_config('db.host_hosted', $defaultDbHostHosted)));
 $explicitHost = trim((string)runtime_env('DB_HOST', ''));
 
 $hostCandidates = [];
@@ -65,10 +73,10 @@ $hostCandidates = array_values(array_filter(array_unique(array_map(
 
 $host = $hostCandidates[0] ?? '';
 
-$port = (int)runtime_env('DB_PORT', runtime_config('db.port', 3306));
-$user = trim((string)runtime_env('DB_USER', runtime_config('db.user', '')));
-$pass = (string)runtime_env('DB_PASS', runtime_config('db.pass', ''));
-$dbname = trim((string)runtime_env('DB_NAME', runtime_config('db.name', '')));
+$port = (int)runtime_env('DB_PORT', runtime_config('db.port', $defaultDbPort));
+$user = trim((string)runtime_env('DB_USER', runtime_config('db.user', $defaultDbUser)));
+$pass = (string)runtime_env('DB_PASS', runtime_config('db.pass', $defaultDbPass));
+$dbname = trim((string)runtime_env('DB_NAME', runtime_config('db.name', $defaultDbName)));
 
 if ($host === '' || $user === '' || $dbname === '') {
     error_log('Database configuration is incomplete. Set DB_HOST, DB_USER, DB_PASS, and DB_NAME via environment or config.runtime.local.php.');
