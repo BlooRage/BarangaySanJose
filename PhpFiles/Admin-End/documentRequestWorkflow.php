@@ -6181,6 +6181,22 @@ if ($action === 'get_request') {
     $row['resident_profile'] = ($residentUserId !== '' || $residentId !== '')
         ? dra_resident_profile_snapshot($conn, $residentUserId, $residentId)
         : [];
+    if (is_array($row['payload']) && is_array($row['resident_profile']) && !empty($row['resident_profile'])) {
+        $residentBirthdate = trim((string)($row['resident_profile']['birthdate'] ?? ''));
+        $residentAge = trim((string)($row['resident_profile']['age'] ?? ''));
+        if (trim((string)($row['payload']['birthdate'] ?? '')) === '' && $residentBirthdate !== '') {
+            $row['payload']['birthdate'] = $residentBirthdate;
+        }
+        if (trim((string)($row['payload']['date_of_birth'] ?? '')) === '' && $residentBirthdate !== '') {
+            $row['payload']['date_of_birth'] = $residentBirthdate;
+        }
+        if (trim((string)($row['payload']['child_dob'] ?? '')) === '' && $residentBirthdate !== '') {
+            $row['payload']['child_dob'] = $residentBirthdate;
+        }
+        if (trim((string)($row['payload']['age'] ?? '')) === '' && $residentAge !== '') {
+            $row['payload']['age'] = $residentAge;
+        }
+    }
     $row['stage_label'] = dr_stage_label((string)($row['stage'] ?? ''));
     $storedFeeAmount = $row['fee_amount'] ?? null;
     if ($storedFeeAmount !== null && is_numeric((string)$storedFeeAmount)) {

@@ -615,19 +615,25 @@ $isPrintView  = ($_GET['format'] ?? '') === 'print';
     /* ── Formal report document ─────────────────────────────────────────────── */
     .rp-doc {
       background: #fff;
-      border: 1px solid #d0d7de;
-      border-radius: 8px;
-      padding: 40px 44px;
+      border: 1.5px solid #2f2f2f;
+      border-radius: 0;
+      box-sizing: border-box;
+      max-width: 8.27in;
+      min-height: 10.75in;
+      margin: 0 auto;
+      padding: 34px 36px 40px;
+      box-shadow: 0 14px 28px rgba(15, 23, 42, 0.08);
       font-size: 13px;
+      line-height: 1.45;
       color: #1a1a1a;
     }
 
     /* Header */
     .rp-doc-header {
       text-align: center;
-      border-bottom: 2px solid #6b7280;
-      padding-bottom: 16px;
-      margin-bottom: 22px;
+      border-bottom: 1.5px solid #4b5563;
+      padding-bottom: 18px;
+      margin-bottom: 24px;
     }
     .rp-brand-grid {
       display: grid;
@@ -760,8 +766,8 @@ $isPrintView  = ($_GET['format'] ?? '') === 'print';
     /* Signature block */
     .rp-footer {
       margin-top: 36px;
-      padding-top: 16px;
-      border-top: 2px solid #555;
+      padding-top: 18px;
+      border-top: 1.5px solid #4b5563;
     }
     .rp-footer-meta { font-size: 11.5px; color: #555; margin-bottom: 28px; }
     .rp-sig-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 40px; }
@@ -783,12 +789,13 @@ $isPrintView  = ($_GET['format'] ?? '') === 'print';
       .bg-white { padding: 0 !important; border: none !important; box-shadow: none !important; background: #fff !important; }
       .reports-shell { max-width: 100% !important; }
       .rp-doc {
-        border: none !important;
+        border: 1.25pt solid #2f2f2f !important;
         border-radius: 0 !important;
-        padding: 0 !important;
+        padding: 18pt 18pt 22pt !important;
         box-shadow: none !important;
         max-width: 100% !important;
         font-size: 10pt !important;
+        min-height: auto !important;
       }
       .rp-doc-header { padding-bottom: 10pt !important; margin-bottom: 14pt !important; }
       .rp-brand-grid { grid-template-columns: 70pt 1fr 70pt !important; gap: 10pt !important; }
@@ -808,8 +815,8 @@ $isPrintView  = ($_GET['format'] ?? '') === 'print';
     /* Standalone print view — applied directly (no @media wrapper needed) */
     <?php if ($isPrintView): ?>
     html, body { margin: 0; padding: 0; background: #fff; font-family: Arial, Helvetica, sans-serif; }
-    .rp-doc { border: none !important; border-radius: 0 !important; padding: 0 !important;
-              box-shadow: none !important; max-width: 100% !important; font-size: 10pt !important; }
+    .rp-doc { border: 1.25pt solid #2f2f2f !important; border-radius: 0 !important; padding: 18pt 18pt 22pt !important;
+              box-shadow: none !important; max-width: 100% !important; font-size: 10pt !important; min-height: auto !important; }
     .rp-doc-header { padding-bottom: 10pt !important; margin-bottom: 14pt !important; }
     .rp-brand-grid { grid-template-columns: 70pt 1fr 70pt !important; gap: 10pt !important; }
     .rp-brand-seal { width: 64pt !important; height: 64pt !important; }

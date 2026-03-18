@@ -2003,7 +2003,11 @@
       payload.partner_dob,
       payload.cohabitantBirthdate
     ]));
-    const applicantAgeRaw = firstNonEmpty([parseAgeText(payload.age), deriveAgeFromDate(applicantBirthdateRaw)]);
+    const applicantAgeRaw = firstNonEmpty([
+      parseAgeText(payload.age),
+      parseAgeText(residentProfile.age),
+      deriveAgeFromDate(applicantBirthdateRaw)
+    ]);
     const cohabitantAgeRaw = firstNonEmpty([
       parseAgeText(payload.cohabitant_age),
       parseAgeText(payload.partner_age),
@@ -3894,7 +3898,10 @@
     if (!row || typeof row !== 'object') return false;
     const payloadReady = row.payload && typeof row.payload === 'object' && Object.keys(row.payload).length > 0;
     const profileReady = row.resident_profile && typeof row.resident_profile === 'object' && Object.keys(row.resident_profile).length > 0;
-    return payloadReady || profileReady;
+    const hasResidentLink = String(row.resident_user_id || '').trim() !== '' || String(row.resident_id || '').trim() !== '';
+    if (!payloadReady) return false;
+    if (hasResidentLink && !profileReady) return false;
+    return true;
   }
 
   async function ensureRowDetails(row) {
