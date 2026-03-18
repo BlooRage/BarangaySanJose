@@ -25,6 +25,34 @@ function isSequentialPhone($phone) {
     return false;
 }
 
+function lookupRecentVerifiedSignupOtp(mysqli $conn, string $phoneNumber): ?array
+{
+    $verifiedStatusId = 7;
+    $recentCutoff = date('Y-m-d H:i:s', strtotime('-15 minutes'));
+
+    $stmt = $conn->prepare("
+        SELECT otp_id, request_timestamp
+        FROM otprequesttbl
+        WHERE recipient = ?
+          AND purpose = 'signup'
+          AND status_id_otp = ?
+          AND request_timestamp >= ?
+        ORDER BY request_timestamp DESC
+        LIMIT 1
+    ");
+    if (!$stmt) {
+        throw new Exception("Database error (otp fallback): " . $conn->error);
+    }
+
+    $stmt->bind_param("sis", $phoneNumber, $verifiedStatusId, $recentCutoff);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    $row = $result ? $result->fetch_assoc() : null;
+    $stmt->close();
+
+    return $row ?: null;
+}
+
 try {
     // Only allow POST
     if ($_SERVER["REQUEST_METHOD"] !== "POST") {
@@ -62,6 +90,17 @@ try {
 
     // ===== Require server-side OTP verification for signup =====
     $signupOtp = $_SESSION['signup_otp_verified'] ?? null;
+    if (!is_array($signupOtp)) {
+        $fallbackOtp = lookupRecentVerifiedSignupOtp($conn, $PhoneNumber);
+        if ($fallbackOtp) {
+            $signupOtp = [
+                'phone' => $PhoneNumber,
+                'otp_id' => (int)($fallbackOtp['otp_id'] ?? 0),
+                'verified_at' => time(),
+            ];
+            $_SESSION['signup_otp_verified'] = $signupOtp;
+        }
+    }
     if (!is_array($signupOtp)) {
         throw new Exception("Phone OTP verification is required before creating an account.");
     }

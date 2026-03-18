@@ -133,6 +133,7 @@ function oi_send_email_otp(string $email, string $otp): bool
         . '<p style="font-size:28px;font-weight:bold;letter-spacing:4px;">' . htmlspecialchars($otp, ENT_QUOTES, 'UTF-8') . '</p>'
         . '<p>This code will expire in 5 minutes.</p>';
     return $sender->send([
+        'type' => 'one_time',
         'to' => $email,
         'subject' => 'Official Account Onboarding OTP',
         'bodyHtml' => $html,

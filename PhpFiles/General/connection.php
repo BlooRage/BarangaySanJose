@@ -1,183 +1,42 @@
 <?php
 require_once __DIR__ . '/runtimeConfig.php';
 
-// Default shared target for the whole app.
-// Change this to 'localhost' or 'svr' when you want to switch globally in code.
-$dbConnectionTarget = $GLOBALS['dbConnectionTarget'] ?? 'svr';
+// Use Asia/Manila (UTC+08:00) for PHP date/time functions.
+date_default_timezone_set('Asia/Manila');
 
-if (!function_exists('db_normalize_connection_target')) {
-    function db_normalize_connection_target(?string $target, string $fallback = 'svr'): string
-    {
-        $normalized = strtolower(trim((string)$target));
-        if ($normalized === 'server') {
-            $normalized = 'svr';
-        }
+$host = trim((string)runtime_env('DB_HOST', runtime_config('db.host', '')));
+$port = (int)runtime_env('DB_PORT', runtime_config('db.port', 3306));
+$user = trim((string)runtime_env('DB_USER', runtime_config('db.user', '')));
+$pass = (string)runtime_env('DB_PASS', runtime_config('db.pass', ''));
+$dbname = trim((string)runtime_env('DB_NAME', runtime_config('db.name', '')));
 
-        return in_array($normalized, ['localhost', 'svr'], true) ? $normalized : $fallback;
-    }
+if ($host === '' || $user === '' || $dbname === '') {
+    error_log('Database configuration is incomplete. Set DB_HOST, DB_USER, DB_PASS, and DB_NAME via environment or config.runtime.local.php.');
+    http_response_code(500);
+    exit('Service temporarily unavailable.');
 }
 
-if (!function_exists('db_connection_profiles')) {
-    function db_connection_profiles(): array
-    {
-        static $profiles = null;
-        if (is_array($profiles)) {
-            return $profiles;
-        }
-
-        $serverHost = (string)runtime_env('DB_SERVER_HOST', (string)runtime_config('db.host', 'srv1986.hstgr.io'));
-        $serverPort = (int)runtime_env('DB_SERVER_PORT', (string)runtime_config('db.port', 3306));
-        $serverUser = (string)runtime_env('DB_SERVER_USER', (string)runtime_config('db.user', 'u682055666_thesiscaps'));
-        $serverPass = (string)runtime_env('DB_SERVER_PASS', (string)runtime_config('db.pass', 'ThesisCaps123.'));
-        $serverName = (string)runtime_env('DB_SERVER_NAME', (string)runtime_config('db.name', 'u682055666_testingBrgySJ'));
-
-        $profiles = [
-            'localhost' => [
-                'host' => (string)runtime_env('DB_LOCAL_HOST', '127.0.0.1'),
-                'port' => (int)runtime_env('DB_LOCAL_PORT', 3306),
-                'user' => (string)runtime_env('DB_LOCAL_USER', 'root'),
-                'pass' => (string)runtime_env('DB_LOCAL_PASS', ''),
-                'name' => (string)runtime_env('DB_LOCAL_NAME', $serverName),
-            ],
-            'svr' => [
-                'host' => $serverHost,
-                'port' => $serverPort > 0 ? $serverPort : 3306,
-                'user' => $serverUser,
-                'pass' => $serverPass,
-                'name' => $serverName,
-            ],
-        ];
-
-        return $profiles;
+mysqli_report(MYSQLI_REPORT_OFF);
+$conn = mysqli_init();
+if ($conn instanceof mysqli) {
+    // Fail fast when DB host is slow/unreachable to avoid long page stalls.
+    $conn->options(MYSQLI_OPT_CONNECT_TIMEOUT, 5);
+    if (defined('MYSQLI_OPT_READ_TIMEOUT')) {
+        $conn->options(MYSQLI_OPT_READ_TIMEOUT, 10);
     }
+    @mysqli_real_connect($conn, $host, $user, $pass, $dbname, $port > 0 ? $port : 3306);
 }
 
-if (!function_exists('db_get_connection_target')) {
-    function db_get_connection_target(string $fallback = 'svr'): string
-    {
-        $runtimeTarget = runtime_env('DB_CONNECTION_TARGET', null);
-        $globalTarget = $GLOBALS['dbConnectionTarget'] ?? null;
-        $target = $runtimeTarget !== null ? (string)$runtimeTarget : (string)$globalTarget;
-
-        return db_normalize_connection_target($target, $fallback);
-    }
+if (!($conn instanceof mysqli) || $conn->connect_error) {
+    $connectError = ($conn instanceof mysqli) ? (string)$conn->connect_error : 'mysqli_init failed';
+    error_log('Database connection failed: ' . $connectError);
+    http_response_code(500);
+    exit('Service temporarily unavailable.');
 }
 
-if (!function_exists('db_set_connection_target')) {
-    function db_set_connection_target(string $target): string
-    {
-        $normalized = db_normalize_connection_target($target);
-        $GLOBALS['dbConnectionTarget'] = $normalized;
-        return $normalized;
-    }
-}
+// Prefer UTF-8 for all queries/results.
+$conn->set_charset('utf8mb4');
 
-if (!function_exists('db_get_connection_config')) {
-    function db_get_connection_config(?string $target = null): array
-    {
-        $profiles = db_connection_profiles();
-        $normalized = db_normalize_connection_target($target ?? db_get_connection_target());
-
-        return $profiles[$normalized] ?? $profiles['svr'];
-    }
-}
-
-if (!function_exists('db_disconnect')) {
-    function db_disconnect(): void
-    {
-        if (($GLOBALS['_shared_db_connection'] ?? null) instanceof mysqli) {
-            @$GLOBALS['_shared_db_connection']->close();
-        }
-
-        unset($GLOBALS['_shared_db_connection'], $GLOBALS['_shared_db_target']);
-    }
-}
-
-if (!function_exists('db_connect')) {
-    function db_connect(?string $target = null, bool $forceReconnect = false): mysqli
-    {
-        $normalized = db_normalize_connection_target($target ?? db_get_connection_target());
-        $existing = $GLOBALS['_shared_db_connection'] ?? null;
-        $existingTarget = $GLOBALS['_shared_db_target'] ?? null;
-
-        if (
-            !$forceReconnect
-            && $existing instanceof mysqli
-            && $existingTarget === $normalized
-            && !$existing->connect_errno
-        ) {
-            $GLOBALS['conn'] = $existing;
-            return $existing;
-        }
-
-        if ($existing instanceof mysqli) {
-            @$existing->close();
-        }
-
-        $config = db_get_connection_config($normalized);
-        $host = trim((string)($config['host'] ?? ''));
-        $port = (int)($config['port'] ?? 3306);
-        $user = trim((string)($config['user'] ?? ''));
-        $pass = (string)($config['pass'] ?? '');
-        $dbname = trim((string)($config['name'] ?? ''));
-
-        if ($host === '' || $user === '' || $dbname === '') {
-            die("Connection Failed [{$normalized}]: incomplete database configuration.");
-        }
-
-        mysqli_report(MYSQLI_REPORT_OFF);
-        $conn = mysqli_init();
-        if (!($conn instanceof mysqli)) {
-            die("Connection Failed [{$normalized}]: mysqli_init failed.");
-        }
-
-        $conn->options(MYSQLI_OPT_CONNECT_TIMEOUT, 5);
-        if (defined('MYSQLI_OPT_READ_TIMEOUT')) {
-            $conn->options(MYSQLI_OPT_READ_TIMEOUT, 10);
-        }
-
-        @mysqli_real_connect($conn, $host, $user, $pass, $dbname, $port > 0 ? $port : 3306);
-        if ($conn->connect_error) {
-            die("Connection Failed [{$normalized}]: " . $conn->connect_error);
-        }
-
-        $conn->set_charset('utf8mb4');
-
-        $GLOBALS['_shared_db_connection'] = $conn;
-        $GLOBALS['_shared_db_target'] = $normalized;
-        $GLOBALS['dbConnectionTarget'] = $normalized;
-        $GLOBALS['host'] = $host;
-        $GLOBALS['port'] = $port;
-        $GLOBALS['user'] = $user;
-        $GLOBALS['pass'] = $pass;
-        $GLOBALS['dbname'] = $dbname;
-        $GLOBALS['conn'] = $conn;
-
-        return $conn;
-    }
-}
-
-if (!function_exists('db_refresh_connection')) {
-    function db_refresh_connection(?string $target = null): mysqli
-    {
-        return db_connect($target, true);
-    }
-}
-
-if (!function_exists('db_use_localhost')) {
-    function db_use_localhost(): mysqli
-    {
-        db_set_connection_target('localhost');
-        return db_refresh_connection('localhost');
-    }
-}
-
-if (!function_exists('db_use_svr')) {
-    function db_use_svr(): mysqli
-    {
-        db_set_connection_target('svr');
-        return db_refresh_connection('svr');
-    }
-}
-
-$conn = db_connect((string)$dbConnectionTarget);
+// Force MySQL session timezone to UTC+08:00.
+// This affects NOW(), CURRENT_TIMESTAMP, and timestamp defaults for this connection.
+$conn->query("SET time_zone = '+08:00'");

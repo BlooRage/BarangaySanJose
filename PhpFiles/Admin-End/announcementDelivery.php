@@ -235,7 +235,6 @@ function ann_delivery_send(mysqli $conn, array &$announcement): array
 
   if (in_array('email', $channels, true) && $announcement['email_subject'] !== '') {
     $smtpConfig = require __DIR__ . '/../General/mailConfigurations.php';
-    $senderConfig = (array)($smtpConfig['senders']['announcement'] ?? []);
     $emailSender = new EmailSender($smtpConfig);
     $plainMessage = ann_delivery_strip_html((string)$announcement['email_body_html']);
     $emailTitle = trim((string)(($announcement['public_title'] ?? '') ?: ($announcement['public_news_title'] ?? '') ?: ($announcement['title'] ?? 'Announcement')));
@@ -246,11 +245,10 @@ function ann_delivery_send(mysqli $conn, array &$announcement): array
       }
       $emailEligible++;
       $sent = $emailSender->send([
+        'type' => 'announcement',
         'to' => $recipient['email'],
         'subject' => $announcement['email_subject'],
         'template' => 'emails/announcement.php',
-        'from_email' => (string)($smtpConfig['from_email'] ?? ''),
-        'from_name' => (string)($senderConfig['from_name'] ?? 'Barangay San Jose Announcements'),
         'data' => [
           'title' => $emailTitle !== '' ? $emailTitle : 'Announcement',
           'message' => $plainMessage,

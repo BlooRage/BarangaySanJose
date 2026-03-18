@@ -212,6 +212,21 @@ document.addEventListener("DOMContentLoaded", () => {
         loadMembers();
     });
 
+    const refreshIntervalMs = 60000;
+    const refreshTimer = window.setInterval(() => {
+        if (document.hidden) return;
+        loadMembers();
+    }, refreshIntervalMs);
+
+    document.addEventListener("visibilitychange", () => {
+        if (!document.hidden) {
+            loadMembers();
+        }
+    });
+
+    window.addEventListener("beforeunload", () => {
+        window.clearInterval(refreshTimer);
+    }, { once: true });
+
     loadMembers();
-    setInterval(loadMembers, 15000);
 });

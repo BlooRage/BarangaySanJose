@@ -397,7 +397,9 @@ if ($residentId !== '' && isset($conn) && $conn instanceof mysqli) {
     const profileImg = document.getElementById("img-profileAvatar");
     if (!sidebarImg && !profileImg) return;
 
+    const POLL_INTERVAL_MS = 5 * 60 * 1000;
     let lastBaseUrl = "";
+    let pollTimer = null;
     const getBaseUrl = (url) => (url || "").split("?")[0];
     const BASE_URL = <?= json_encode($baseUrl, JSON_UNESCAPED_SLASHES) ?>;
     const PLACEHOLDER_PATH = `${BASE_URL}/Images/Profile-Placeholder.png`;
@@ -437,8 +439,24 @@ if ($residentId !== '' && isset($conn) && $conn instanceof mysqli) {
       }
     };
 
+    const startPolling = () => {
+      if (pollTimer) {
+        clearInterval(pollTimer);
+      }
+      pollTimer = window.setInterval(() => {
+        if (document.hidden) return;
+        poll();
+      }, POLL_INTERVAL_MS);
+    };
+
     poll();
-    setInterval(poll, 15000);
+    startPolling();
+
+    document.addEventListener("visibilitychange", () => {
+      if (!document.hidden) {
+        poll();
+      }
+    });
   });
 </script>
 

@@ -66,9 +66,8 @@ try {
 
         $subject = "Your OTP code is {$otpCode}";
         $sent = $sender->send([
+            'type' => 'one_time',
             'to' => $email,
-            'from_email' => 'otp@barangaysanjose-montalban.com',
-            'from_name' => 'Barangay San Jose OTP',
             'subject' => $subject,
             'template' => 'emails/changePhoneOtp.php',
             'data' => [

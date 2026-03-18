@@ -22,7 +22,8 @@ function initializeSecureSession(): void
     if (session_status() !== PHP_SESSION_NONE) {
         return;
     }
-    $isHttps = appRequestIsHttps();
+    $isHttpsTransport = appRequestIsHttpsTransport();
+    $useSecureCookie = $isHttpsTransport || (appForceHttpsConfigured() && !appRequestIsLocalhost());
 
     // Session ini + cookie params must be configured before headers are sent.
     // Some pages may accidentally output content earlier (BOM/whitespace), so
@@ -34,7 +35,7 @@ function initializeSecureSession(): void
             'lifetime' => 0,
             'path' => '/',
             'domain' => '',
-            'secure' => $isHttps,
+            'secure' => $useSecureCookie,
             'httponly' => true,
             'samesite' => 'Lax',
         ]);
@@ -108,8 +109,28 @@ function appRequestIsHttps(): bool
         return $cached;
     }
 
-    if (runtime_bool(runtime_env('APP_FORCE_HTTPS', runtime_config('app.force_https', null)), false)) {
+    if (appForceHttpsConfigured()) {
         return $cached = true;
+    }
+
+    return $cached = appRequestIsHttpsTransport();
+}
+
+function appForceHttpsConfigured(): bool
+{
+    static $cached = null;
+    if ($cached !== null) {
+        return $cached;
+    }
+
+    return $cached = runtime_bool(runtime_env('APP_FORCE_HTTPS', runtime_config('app.force_https', null)), false);
+}
+
+function appRequestIsHttpsTransport(): bool
+{
+    static $cached = null;
+    if ($cached !== null) {
+        return $cached;
     }
 
     $https = strtolower(trim((string)($_SERVER['HTTPS'] ?? '')));
@@ -138,6 +159,33 @@ function appRequestIsHttps(): bool
     }
 
     return $cached = ((string)($_SERVER['SERVER_PORT'] ?? '') === '443');
+}
+
+function appRequestIsLocalhost(): bool
+{
+    static $cached = null;
+    if ($cached !== null) {
+        return $cached;
+    }
+
+    $hostCandidates = [
+        (string)($_SERVER['HTTP_HOST'] ?? ''),
+        (string)($_SERVER['SERVER_NAME'] ?? ''),
+    ];
+
+    foreach ($hostCandidates as $candidate) {
+        $candidate = strtolower(trim((string)explode(',', $candidate)[0]));
+        if ($candidate === '') {
+            continue;
+        }
+
+        $hostOnly = preg_replace('/:\d+$/', '', $candidate);
+        if (in_array($hostOnly, ['localhost', '127.0.0.1', '::1'], true)) {
+            return $cached = true;
+        }
+    }
+
+    return $cached = false;
 }
 
 function appSanitizeHost(string $host): string

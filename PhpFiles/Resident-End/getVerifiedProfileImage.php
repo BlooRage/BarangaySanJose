@@ -14,6 +14,28 @@ if (empty($_SESSION['user_id'])) {
     exit;
 }
 
+$cacheKey = 'verified_profile_image_cache';
+$cacheTtlSeconds = 300;
+$cachedProfile = $_SESSION[$cacheKey] ?? null;
+if (is_array($cachedProfile)) {
+    $cachedUserId = (string)($cachedProfile['user_id'] ?? '');
+    $cachedImage = trim((string)($cachedProfile['profile_image'] ?? ''));
+    $cachedAt = (int)($cachedProfile['cached_at'] ?? 0);
+
+    if (
+        $cachedUserId === (string)$_SESSION['user_id']
+        && $cachedImage !== ''
+        && $cachedAt > 0
+        && (time() - $cachedAt) < $cacheTtlSeconds
+    ) {
+        echo json_encode([
+            'success' => true,
+            'profile_image' => $cachedImage,
+        ]);
+        exit;
+    }
+}
+
 require_once __DIR__ . '/../General/connection.php';
 
 $scriptName = str_replace("\\", "/", (string)($_SERVER['SCRIPT_NAME'] ?? ''));
@@ -187,6 +209,12 @@ if ($residentId !== '' && isset($conn) && $conn instanceof mysqli) {
         $stmtPic->close();
     }
 }
+
+$_SESSION[$cacheKey] = [
+    'user_id' => (string)$_SESSION['user_id'],
+    'profile_image' => $profileImage,
+    'cached_at' => time(),
+];
 
 echo json_encode([
     'success' => true,

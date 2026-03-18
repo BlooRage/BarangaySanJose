@@ -209,8 +209,6 @@ function send_invite_email(array $invite, string $rawToken): bool {
 
     return $sender->send([
         'type' => 'onboarding_access',
-        'from_email' => 'access@barangaysanjose-montalban.com',
-        'from_name' => 'Barangay San Jose',
         'to' => (string)$invite['invite_email'],
         'subject' => 'Barangay San Jose Official Account Invite',
         'data' => [
