@@ -299,7 +299,7 @@ $fullAddress = htmlspecialchars(implode(', ', $fullAddressParts), ENT_QUOTES, 'U
                             </div>
                         </div>
 
-                        <div class="form-row d-none" id="governmentOfficialRow">
+                        <div class="form-row two-col-row d-none" id="governmentOfficialRow">
                             <div>
                                 <label class="top-label" for="governmentPositionSelect">Government Office <span class="required-asterisk">*</span></label>
                                 <select name="government_position_group" id="governmentPositionSelect" onchange="window.filterIndigencyGovernmentOfficials && window.filterIndigencyGovernmentOfficials(this.value)">
