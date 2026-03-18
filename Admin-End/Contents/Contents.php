@@ -437,6 +437,28 @@ function ann_decode_faq_items(?string $json): array
   <link rel="stylesheet" href="../../CSS-Styles/Admin-End-CSS/ContentManagementStyle.css?v=20260318-36">
   <link rel="stylesheet" href="../../CSS-Styles/Admin-End-CSS/ResidentMasterlistStyle.css?v=20260227-2">
   <link rel="stylesheet" href="../../CSS-Styles/Admin-End-CSS/EditRequestsStyle.css?v=20260227-5">
+  <style>
+    .announcement-shell .table-responsive {
+      overflow-x: auto;
+      overflow-y: visible;
+      -webkit-overflow-scrolling: touch;
+    }
+
+    .announcement-shell #table-appData {
+      min-width: 1080px;
+    }
+
+    .announcement-shell #table-reviewQueueData {
+      min-width: 900px;
+    }
+
+    .announcement-shell #table-appData th,
+    .announcement-shell #table-appData td,
+    .announcement-shell #table-reviewQueueData th,
+    .announcement-shell #table-reviewQueueData td {
+      white-space: nowrap;
+    }
+  </style>
 </head>
 <body>
   <div class="d-flex flex-column flex-md-row" style="min-height: 100vh;">

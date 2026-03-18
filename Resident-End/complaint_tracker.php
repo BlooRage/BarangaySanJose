@@ -112,6 +112,84 @@ require_once __DIR__ . '/includes/resident_access_guard.php';
       white-space: normal;
     }
     #complaintCards { display: none; }
+    #complaintViewModal .modal-content {
+      border: 1px solid #e9ecef;
+      border-radius: 16px;
+      overflow: hidden;
+      background: #fff;
+    }
+    #complaintViewModal .modal-dialog {
+      max-width: 1500px;
+      width: 75vw;
+    }
+    #complaintViewModal .modal-header,
+    #complaintViewModal .modal-body,
+    #complaintViewModal .modal-footer {
+      padding: 1rem 1.25rem;
+    }
+    #complaintViewModal .modal-body {
+      background: #fff;
+    }
+    #complaintViewDetails {
+      display: grid;
+      gap: 12px;
+    }
+    #complaintViewModal .tracker-form-section {
+      border: 1px solid #e9ecef;
+      border-color: #e78924;
+      background: #ffffff;
+      border-radius: 12px;
+      padding: 12px;
+      margin-top: 0;
+      display: grid;
+      gap: 12px;
+    }
+    #complaintViewModal .tracker-form-section-title {
+      margin: 0;
+      font-size: 1rem;
+      font-weight: 700;
+      color: #212529;
+      border-bottom: 1px dashed #e9ecef;
+      padding-bottom: 6px;
+    }
+    #complaintViewModal .tracker-form-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 14px 12px;
+    }
+    #complaintViewModal .tracker-form-grid.cols-4 {
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+    }
+    #complaintViewModal .tracker-form-grid.cols-3 {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+    #complaintViewModal .tracker-form-grid.cols-1 {
+      grid-template-columns: 1fr;
+    }
+    #complaintViewModal .tracker-form-field {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    #complaintViewModal .tracker-form-label {
+      margin: 0;
+      line-height: 1.2;
+      font-size: 0.76rem;
+      color: #6b7280;
+      font-weight: 700;
+    }
+    #complaintViewModal .tracker-form-value {
+      min-height: 38px;
+      border: 1px solid #dbe0e6;
+      border-radius: 8px;
+      background: #f8fafc;
+      padding: 8px 10px;
+      font-size: 0.92rem;
+      color: #111827;
+      font-weight: 500;
+      line-height: 1.45;
+      word-break: break-word;
+    }
     @media (max-width: 991.98px) {
       .toolbar {
         flex-direction: column;
@@ -141,6 +219,14 @@ require_once __DIR__ . '/includes/resident_access_guard.php';
     @media (max-width: 767.98px) {
       .table-responsive { display: none; }
       #complaintCards { display: block; }
+      #complaintViewModal .modal-dialog {
+        width: calc(100vw - 1rem);
+      }
+      #complaintViewModal .tracker-form-grid,
+      #complaintViewModal .tracker-form-grid.cols-4,
+      #complaintViewModal .tracker-form-grid.cols-3 {
+        grid-template-columns: 1fr;
+      }
     }
   </style>
 </head>
@@ -236,30 +322,15 @@ require_once __DIR__ . '/includes/resident_access_guard.php';
   </div>
 
   <div class="modal fade" id="complaintViewModal" tabindex="-1" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
-    <div class="modal-dialog modal-lg modal-dialog-centered">
+    <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable">
       <div class="modal-content">
         <div class="modal-header">
           <h5 class="modal-title" id="complaintViewTitle">Complaint Details</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
         </div>
         <div class="modal-body">
-          <div class="row g-3">
-            <div class="col-md-6"><strong>Complaint ID:</strong><div id="complaintViewId" class="text-muted"></div></div>
-            <div class="col-md-6"><strong>Case ID:</strong><div id="complaintViewCaseId" class="text-muted"></div></div>
-            <div class="col-md-6"><strong>Status:</strong><div id="complaintViewStatus"></div></div>
-            <div class="col-md-6"><strong>Case Level:</strong><div id="complaintViewLevel" class="text-muted"></div></div>
-            <div class="col-md-6"><strong>Complaint Type:</strong><div id="complaintViewType" class="text-muted"></div></div>
-            <div class="col-md-6"><strong>Submitted At:</strong><div id="complaintViewSubmitted" class="text-muted"></div></div>
-            <div class="col-md-6"><strong>Incident Date:</strong><div id="complaintViewIncidentDate" class="text-muted"></div></div>
-            <div class="col-md-6"><strong>Incident Time:</strong><div id="complaintViewIncidentTime" class="text-muted"></div></div>
-            <div class="col-12"><strong>Incident Place:</strong><div id="complaintViewPlace" class="text-muted"></div></div>
-            <div class="col-12"><strong>Subject:</strong><div id="complaintViewSubject" class="text-muted"></div></div>
-            <div class="col-12"><strong>Complainant:</strong><div id="complaintViewComplainant" class="text-muted"></div></div>
-            <div class="col-12"><strong>Narration:</strong><div id="complaintViewNarration" class="text-muted"></div></div>
-            <div class="col-12"><strong>Witness Summary:</strong><div id="complaintViewWitness" class="text-muted"></div></div>
-            <div class="col-12"><strong>Case Remarks:</strong><div id="complaintViewRemarks" class="text-muted"></div></div>
-            <div class="col-12"><strong>Screening Notes:</strong><div id="complaintViewScreening" class="text-muted"></div></div>
-            <div class="col-12"><strong>Intake Notes:</strong><div id="complaintViewIntake" class="text-muted"></div></div>
-            <div class="col-12"><strong>Blotter Link:</strong><div id="complaintViewBlotter" class="text-muted"></div></div>
+          <div id="complaintViewDetails">
+            <div class="text-muted">Select a complaint to view details.</div>
           </div>
         </div>
         <div class="modal-footer">
@@ -316,6 +387,40 @@ require_once __DIR__ . '/includes/resident_access_guard.php';
       return "pending";
     }
 
+    function formField(label, value, options = {}) {
+      const text = String(value ?? "").trim();
+      const rendered = options.raw ? (text || "-") : escapeHtml(text || "-");
+      return `
+        <div class="tracker-form-field">
+          <p class="tracker-form-label">${escapeHtml(label)}</p>
+          <div class="tracker-form-value">${rendered}</div>
+        </div>
+      `;
+    }
+
+    function gridClassByCount(count, maxCols = 4) {
+      const n = Math.max(1, Math.min(maxCols, Number(count) || 1));
+      if (n >= 4) return "cols-4";
+      if (n === 3) return "cols-3";
+      if (n === 2) return "";
+      return "cols-1";
+    }
+
+    function renderFieldGrid(fields, maxCols = 4) {
+      const clean = (Array.isArray(fields) ? fields : []).filter((field) => field);
+      if (!clean.length) return "";
+      return `<div class="tracker-form-grid ${gridClassByCount(clean.length, maxCols)}">${clean.map((field) => formField(field.label, field.value, field)).join("")}</div>`;
+    }
+
+    function formSection(title, content) {
+      return `
+        <section class="tracker-form-section">
+          <h6 class="tracker-form-section-title">${escapeHtml(title)}</h6>
+          ${content}
+        </section>
+      `;
+    }
+
     function getFilteredComplaints() {
       const search = String(document.getElementById("complaintSearch").value || "").toLowerCase().trim();
       const status = String(document.getElementById("complaintStatusFilter").value || "").trim().toLowerCase();
@@ -344,24 +449,69 @@ require_once __DIR__ . '/includes/resident_access_guard.php';
     }
 
     function openComplaintView(item) {
-      document.getElementById("complaintViewTitle").textContent = `Complaint ${item.complaint_id || ""}`;
-      document.getElementById("complaintViewId").textContent = item.complaint_id || "-";
-      document.getElementById("complaintViewCaseId").textContent = item.case_id || "-";
-      document.getElementById("complaintViewStatus").innerHTML = `<span class="status-pill ${escapeHtml(statusBadgeClass(item.status_name))}">${escapeHtml(item.status_name || "Pending")}</span>`;
-      document.getElementById("complaintViewLevel").textContent = item.level_name || "-";
-      document.getElementById("complaintViewType").textContent = item.complaint_type || "-";
-      document.getElementById("complaintViewSubmitted").textContent = formatDateTime(item.report_timestamp);
-      document.getElementById("complaintViewIncidentDate").textContent = formatDate(item.incident_date);
-      document.getElementById("complaintViewIncidentTime").textContent = item.incident_time || "-";
-      document.getElementById("complaintViewPlace").textContent = item.incident_place || "-";
-      document.getElementById("complaintViewSubject").textContent = [item.subject_display_name, item.subject_contact_number, item.subject_address].filter(Boolean).join(" | ") || "-";
-      document.getElementById("complaintViewComplainant").textContent = [item.complainant_name, item.complainant_contact_number, item.complainant_address].filter(Boolean).join(" | ") || "-";
-      document.getElementById("complaintViewNarration").textContent = item.case_details || "-";
-      document.getElementById("complaintViewWitness").textContent = item.witness_summary || "-";
-      document.getElementById("complaintViewRemarks").textContent = item.case_remarks || "-";
-      document.getElementById("complaintViewScreening").textContent = item.screening_notes || "-";
-      document.getElementById("complaintViewIntake").textContent = item.intake_notes || "-";
-      document.getElementById("complaintViewBlotter").textContent = item.blotter_id ? `Blotter ${item.blotter_id}` : "Not endorsed to blotter";
+      const complaintViewDetails = document.getElementById("complaintViewDetails");
+      const blotterText = item.blotter_id ? `Yes (${item.blotter_id})` : "No";
+
+      document.getElementById("complaintViewTitle").textContent = "Complaint Details";
+      complaintViewDetails.innerHTML = [
+        formSection("Complaint Summary", [
+          renderFieldGrid([
+            { label: "Complaint ID", value: item.complaint_id || "-" },
+            { label: "Submitted At", value: formatDateTime(item.report_timestamp) },
+            { label: "Origin", value: "ResidentPortal" },
+            { label: "Status", value: item.status_name || "Pending" },
+          ], 4),
+          renderFieldGrid([
+            { label: "Complaint Level", value: item.level_name || "-" },
+            { label: "Complaint Type", value: item.complaint_type || "-" },
+            { label: "Incident Date", value: formatDate(item.incident_date) },
+            { label: "Incident Time", value: item.incident_time || "-" },
+          ], 4),
+          renderFieldGrid([
+            { label: "Incident Place", value: item.incident_place || "-" },
+          ], 1),
+        ].join("")),
+        formSection("Complainant Information", [
+          renderFieldGrid([
+            { label: "Full Name", value: item.complainant_name || "-" },
+            { label: "Contact Number", value: item.complainant_contact_number || "-" },
+            { label: "Age", value: item.complainant_age || "-" },
+            { label: "Sex", value: item.complainant_sex || "-" },
+          ], 2),
+          renderFieldGrid([
+            { label: "Address", value: item.complainant_address || "-" },
+          ], 1),
+        ].join("")),
+        formSection("Subject Information", [
+          renderFieldGrid([
+            { label: "Subject", value: item.subject_display_name || "-" },
+            { label: "Subject Kind", value: item.subject_kind || "-" },
+            { label: "Contact Number", value: item.subject_contact_number || "-" },
+            { label: "Complaint Type", value: item.complaint_type || "-" },
+          ], 2),
+          renderFieldGrid([
+            { label: "Known Address / Location", value: item.subject_address || "-" },
+          ], 1),
+        ].join("")),
+        formSection("Witness Information", renderFieldGrid([
+          { label: "Witness Summary", value: item.witness_summary || "-" },
+        ], 1)),
+        formSection("Intake Notes", renderFieldGrid([
+          { label: "Intake Notes", value: item.intake_notes || "-" },
+        ], 1)),
+        formSection("Narration and Notes", [
+          renderFieldGrid([
+            { label: "Case Remarks", value: item.case_remarks || "-" },
+            { label: "Escalated to Blotter", value: blotterText },
+          ], 2),
+          renderFieldGrid([
+            { label: "Resident Narration", value: item.case_details || "-" },
+          ], 1),
+          renderFieldGrid([
+            { label: "Screening Notes", value: item.screening_notes || "-" },
+          ], 2),
+        ].join("")),
+      ].join("");
 
       if (!complaintViewModal && window.bootstrap?.Modal) {
         complaintViewModal = new bootstrap.Modal(document.getElementById("complaintViewModal"));
