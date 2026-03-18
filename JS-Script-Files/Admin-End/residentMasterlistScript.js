@@ -468,7 +468,7 @@ document.addEventListener("DOMContentLoaded", () => {
     renderPagination(totalPages, totalRows);
 
     if (!pageRows.length) {
-      tbody.innerHTML = `<tr><td colspan="4" class="text-center text-muted">No records found</td></tr>`;
+      tbody.innerHTML = `<tr><td colspan="7" class="text-center text-muted">No records found</td></tr>`;
       return;
     }
 
@@ -477,16 +477,23 @@ document.addEventListener("DOMContentLoaded", () => {
       const canArchive = row.status !== "NotVerified" && row.status !== "PendingVerification";
       const canViewDocs = row.status === "PendingVerification";
       const statusPillClass = statusPillClassMap[row.status] || "";
+      const age = computeAgeFromBirthdate(row.birthdate);
+      const sex = String(row.sex ?? "").trim() || "—";
+      const areaNumber = String(row.area_number ?? "").trim() || "—";
       tr.innerHTML = `
         <td class="fw-bold">${row.resident_id}</td>
         <td>${row.full_name}</td>
+        <td>${sex}</td>
+        <td>${age}</td>
+        <td>${areaNumber}</td>
         <td><span class="status-pill ${statusPillClass}">${statusDisplayMap[row.status] ?? "UNSET"}</span></td>
-        <td class="d-flex gap-1">
-          <button type="button" class="btn btn-primary btn-sm text-white viewEntryBtn">View</button>
-          ${canViewDocs ? `<button type="button" class="btn btn-info btn-sm text-white viewDocsBtn">Documents</button>` : ""}
-          ${canArchive ? `<button type="button" class="btn btn-warning btn-sm text-dark archiveEntryBtn">Archive</button>` : ""}
+        <td>
+          <div class="resident-table-actions">
+            <button type="button" class="btn btn-primary btn-sm text-white resident-table-btn viewEntryBtn">View</button>
+            ${canViewDocs ? `<button type="button" class="btn btn-info btn-sm text-white resident-table-btn viewDocsBtn">Documents</button>` : ""}
+            ${canArchive ? `<button type="button" class="btn btn-warning btn-sm text-dark resident-table-btn archiveEntryBtn">Archive</button>` : ""}
+          </div>
         </td>
-        
       `;
 
       tr.querySelector(".viewEntryBtn").addEventListener("click", () => openViewEntry(row));

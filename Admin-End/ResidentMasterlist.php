@@ -10,7 +10,7 @@
     <script src="https://kit.fontawesome.com/3482e00999.js" crossorigin="anonymous"></script>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="../CSS-Styles/Admin-End-CSS/AdminDashboardStyle.css">
-    <link rel="stylesheet" href="../CSS-Styles/Admin-End-CSS/ResidentMasterlistStyle.css?v=20260227-2">
+    <link rel="stylesheet" href="../CSS-Styles/Admin-End-CSS/ResidentMasterlistStyle.css?v=20260318-1">
     <style>
         .resident-masterlist-shell .table-responsive {
             overflow-x: auto;
@@ -131,6 +131,9 @@ if (isset($conn) && $conn instanceof mysqli) {
                         <tr class="table-light">
                             <th>Resident ID</th>
                             <th>Resident Name</th>
+                            <th>Sex</th>
+                            <th>Age</th>
+                            <th>Area Number</th>
                             <th>Account Status</th>
                             <th>Action</th>
                         </tr>
@@ -858,6 +861,6 @@ if (isset($conn) && $conn instanceof mysqli) {
   };
 </script>
 <script src="../JS-Script-Files/Admin-End/tableColumnsGeneric.js?v=20260215-1"></script>
-<script src="../JS-Script-Files/Admin-End/residentMasterlistScript.js?v=20260227-1"></script>
+<script src="../JS-Script-Files/Admin-End/residentMasterlistScript.js?v=20260318-1"></script>
 </body>
 </html>
