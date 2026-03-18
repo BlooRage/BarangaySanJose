@@ -445,11 +445,23 @@ function ann_decode_faq_items(?string $json): array
     }
 
     .announcement-shell #table-appData {
-      min-width: 1080px;
+      width: max-content;
+      min-width: 100%;
+    }
+
+    .announcement-shell #table-appData thead th,
+    .announcement-shell #table-appData tbody td {
+      min-width: 160px;
     }
 
     .announcement-shell #table-reviewQueueData {
-      min-width: 900px;
+      width: max-content;
+      min-width: 100%;
+    }
+
+    .announcement-shell #table-reviewQueueData thead th,
+    .announcement-shell #table-reviewQueueData tbody td {
+      min-width: 160px;
     }
 
     .announcement-shell #table-appData th,
