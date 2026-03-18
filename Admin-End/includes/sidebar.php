@@ -8,13 +8,17 @@ $certPages = ['CertificateTracker.php'];
 $financePages = ['FinancePayments.php'];
 $blotterPages = ['BlotterForm.php', 'BlotterTracker.php', 'ReviewQueue.php'];
 $complaintPages = ['ComplaintForm.php', 'ComplaintTracker.php'];
-$contentMgmtPages = ['Announcements.php', 'CreateAnnouncement.php'];
+$contentMgmtPages = ['Contents.php', 'CreateContent.php'];
 $reportPages = ['Reports.php'];
 $userMgmtPages = ['UserMasterlist.php'];
 $adminMgmtPages = ['OfficialsManagement.php', 'OfficialInvites.php'];
 
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
+}
+
+if (!function_exists('appUrl')) {
+    require_once __DIR__ . '/../../PhpFiles/General/security.php';
 }
 
 $scriptName = str_replace("\\", "/", (string)($_SERVER['SCRIPT_NAME'] ?? ''));
@@ -54,6 +58,16 @@ $financeSection = strtolower(trim((string)($_GET['section'] ?? 'tracker')));
 $isFinanceFeesActive = $current === 'FinancePayments.php' && $financeSection === 'fees';
 $isFinanceCashbookActive = $current === 'FinancePayments.php' && $financeSection === 'cashbook';
 $isFinanceTrackerActive = $current === 'FinancePayments.php' && !in_array($financeSection, ['fees', 'cashbook'], true);
+$contentCreateType = strtolower(trim((string)($_GET['type'] ?? 'page')));
+if (!in_array($contentCreateType, ['page', 'delivery', 'faq'], true)) {
+    $contentCreateType = 'page';
+}
+$contentToolView = strtolower(trim((string)($_GET['tool'] ?? 'tracker')));
+if ($contentToolView !== 'tracker') {
+    $contentToolView = 'tracker';
+}
+$isContentCreateSectionActive = $current === 'CreateContent.php';
+$isContentToolsSectionActive = $current === 'Contents.php';
 
 $adminDisplayName = "Admin User";
 $adminPosition = "Administrator";
@@ -411,19 +425,55 @@ if (!empty($_SESSION['user_id']) && isset($conn) && $conn instanceof mysqli) {
       </li>
 
       <li class="mb-1 mt-2 text-muted small fw-semibold px-2">Content Management</li>
-      <li class="mb-2">
-        <a href="<?= htmlspecialchars(appUrl('Admin-End/Announcements/CreateAnnouncement.php')) ?>"
-           class="btn btn-toggle d-flex align-items-center gap-2 rounded <?= $current == 'CreateAnnouncement.php' ? 'active' : '' ?>"
-           style="<?= $current == 'CreateAnnouncement.php' ? 'outline: none; box-shadow: none;' : '' ?>">
+      <li class="mb-1">
+        <button class="btn btn-toggle d-flex align-items-center gap-2 rounded <?= $isContentCreateSectionActive ? '' : 'collapsed' ?>"
+                data-bs-toggle="collapse"
+                data-bs-target="#content-create-collapse"
+                aria-expanded="<?= $isContentCreateSectionActive ? 'true' : 'false' ?>">
           <i class="fas fa-file-pen"></i> Create
-        </a>
+        </button>
+
+        <div class="collapse <?= $isContentCreateSectionActive ? 'show' : '' ?>" id="content-create-collapse">
+          <ul class="btn-toggle-nav list-unstyled fw-normal pb-1 small">
+            <li>
+              <a href="<?= htmlspecialchars(appUrl('Admin-End/Contents/CreateContent.php')) ?>?type=page"
+                 class="link-dark rounded <?= ($current === 'CreateContent.php' && $contentCreateType === 'page') ? 'active' : '' ?>">
+                Page Announcement
+              </a>
+            </li>
+            <li>
+              <a href="<?= htmlspecialchars(appUrl('Admin-End/Contents/CreateContent.php')) ?>?type=delivery"
+                 class="link-dark rounded <?= ($current === 'CreateContent.php' && $contentCreateType === 'delivery') ? 'active' : '' ?>">
+                SMS and Email Announcement
+              </a>
+            </li>
+            <li>
+              <a href="<?= htmlspecialchars(appUrl('Admin-End/Contents/CreateContent.php')) ?>?type=faq"
+                 class="link-dark rounded <?= ($current === 'CreateContent.php' && $contentCreateType === 'faq') ? 'active' : '' ?>">
+                FAQs Page
+              </a>
+            </li>
+          </ul>
+        </div>
       </li>
       <li class="mb-2">
-        <a href="<?= htmlspecialchars(appUrl('Admin-End/Announcements/Announcements.php')) ?>"
-           class="btn btn-toggle d-flex align-items-center gap-2 rounded <?= $current == 'Announcements.php' ? 'active' : '' ?>"
-           style="<?= $current == 'Announcements.php' ? 'outline: none; box-shadow: none;' : '' ?>">
-          <i class="fas fa-bullhorn"></i> Announcements
-        </a>
+        <button class="btn btn-toggle d-flex align-items-center gap-2 rounded <?= $isContentToolsSectionActive ? '' : 'collapsed' ?>"
+                data-bs-toggle="collapse"
+                data-bs-target="#content-tools-collapse"
+                aria-expanded="<?= $isContentToolsSectionActive ? 'true' : 'false' ?>">
+          <i class="fas fa-bullhorn"></i> Content Tools
+        </button>
+
+        <div class="collapse <?= $isContentToolsSectionActive ? 'show' : '' ?>" id="content-tools-collapse">
+          <ul class="btn-toggle-nav list-unstyled fw-normal pb-1 small">
+            <li>
+              <a href="<?= htmlspecialchars(appUrl('Admin-End/Contents/Contents.php')) ?>?tool=tracker#tracker-card"
+                 class="link-dark rounded <?= ($current === 'Contents.php' && $contentToolView === 'tracker') ? 'active' : '' ?>">
+                Tracker
+              </a>
+            </li>
+          </ul>
+        </div>
       </li>
 
       <li class="mb-1 mt-2 text-muted small fw-semibold px-2">Reports</li>
@@ -601,3 +651,4 @@ if (!empty($_SESSION['user_id']) && isset($conn) && $conn instanceof mysqli) {
     syncMode();
   })();
 </script>
+

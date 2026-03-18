@@ -1,7 +1,7 @@
 ﻿<?php
 $allowUnregistered = false;
 require_once __DIR__ . "/includes/resident_access_guard.php";
-require_once __DIR__ . "/../PhpFiles/Admin-End/announcementsStore.php";
+require_once __DIR__ . "/../PhpFiles/Admin-End/contentStore.php";
 
 $isResidentNotVerified = false;
 $showNotVerifiedModal = false;

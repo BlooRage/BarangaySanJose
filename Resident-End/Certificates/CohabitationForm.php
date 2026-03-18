@@ -155,6 +155,12 @@ $purposeInputClass = $isRelationshipJailVisitVariant ? 'form-control text-bg-lig
         .cohabitation-detained-person-row {
             grid-template-columns: repeat(4, 1fr);
         }
+        .cohabitation-address-age-row {
+            grid-template-columns: repeat(4, 1fr);
+        }
+        .cohabitation-address-age-row .col-span-3 {
+            grid-column: span 3;
+        }
         .cohabitation-detained-person-row .col-span-2 {
             grid-column: span 2;
         }
@@ -230,9 +236,9 @@ $purposeInputClass = $isRelationshipJailVisitVariant ? 'form-control text-bg-lig
                             <input type="hidden" name="suffix_name" value="<?php echo htmlspecialchars($residentinformationtbl['suffix'] ?? '', ENT_QUOTES, 'UTF-8'); ?>">
                         </div>
 
-                        <div class="form-row">
-                            <div class="full-width">
-                            <label class="top-label">Address <span class="required-asterisk">*</span></label>
+                        <div class="form-row cohabitation-address-age-row">
+                            <div class="col-span-3">
+                                <label class="top-label">Address <span class="required-asterisk">*</span></label>
                                 <input type="text" class="form-control" name="full_address_display" readonly value="<?php echo $fullAddress; ?>">
                                 <input type="hidden" name="full_unit_number" value="<?php echo $applicantUnit; ?>">
                                 <input type="hidden" name="full_house_lot_number" value="<?php echo $applicantHouseOrLot; ?>">
@@ -241,6 +247,10 @@ $purposeInputClass = $isRelationshipJailVisitVariant ? 'form-control text-bg-lig
                                 <input type="hidden" name="full_barangay" value="<?php echo $applicantBarangay; ?>">
                                 <input type="hidden" name="full_area_number" value="<?php echo $applicantArea; ?>">
                                 <input type="hidden" name="full_address" value="<?php echo $fullAddress; ?>">
+                            </div>
+                            <div>
+                                <label class="top-label">Age</label>
+                                <input type="text" name="applicant_age" readonly value="<?php echo htmlspecialchars((string)($residentinformationtbl['age'] ?? ''), ENT_QUOTES, 'UTF-8'); ?>">
                             </div>
                         </div>
 
@@ -294,10 +304,16 @@ $purposeInputClass = $isRelationshipJailVisitVariant ? 'form-control text-bg-lig
                                     required
                                 >
                             </div>
-                            <div class="col-span-2">
+                            <div>
+                                <label class="top-label">Age</label>
+                                <input type="text" id="partnerAge" name="partner_age" readonly>
+                            </div>
+                            <div>
                                 <label class="top-label">Nationality <span class="required-asterisk">*</span></label>
                                 <input type="text" name="cohabitant_nationality" required>
                             </div>
+                        </div>
+                        <div class="form-row">
                             <div class="<?= $isRelationshipJailVisitVariant ? 'd-none' : '' ?>">
                                 <label class="top-label">Occupation <i>(leave blank if NA)</i></label>
                                 <input type="text" name="cohabitant_occupation">

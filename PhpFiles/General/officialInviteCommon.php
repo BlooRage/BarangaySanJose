@@ -1,6 +1,8 @@
 <?php
 declare(strict_types=1);
 
+require_once __DIR__ . '/security.php';
+
 if (!function_exists('oi_normalize_phone10')) {
     function oi_normalize_phone10(string $raw): string
     {
@@ -43,32 +45,7 @@ if (!function_exists('oi_generate_invite_token')) {
 if (!function_exists('oi_app_base_url')) {
     function oi_app_base_url(): string
     {
-        $scheme = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
-        $host = (string)($_SERVER['HTTP_HOST'] ?? '');
-        $script = (string)($_SERVER['SCRIPT_NAME'] ?? '');
-        $parts = array_values(array_filter(explode('/', trim($script, '/'))));
-        $knownTopDirs = [
-            'Admin-End',
-            'Resident-End',
-            'Guest-End',
-            'PhpFiles',
-            'CSS-Styles',
-            'JS-Script-Files',
-            'Images',
-            'UnifiedFileAttachment',
-            'Fonts',
-        ];
-
-        $prefix = '';
-        if (!empty($parts) && !in_array($parts[0], $knownTopDirs, true)) {
-            $prefix = '/' . $parts[0];
-        }
-
-        $baseHost = trim((string)$host);
-        if ($baseHost === '') {
-            $baseHost = 'localhost';
-        }
-        return rtrim($scheme . '://' . $baseHost . $prefix, '/');
+        return rtrim(appBaseUrl() . appRootPath(), '/');
     }
 }
 

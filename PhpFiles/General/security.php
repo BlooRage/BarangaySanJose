@@ -1,5 +1,7 @@
 <?php
 
+require_once __DIR__ . '/runtimeConfig.php';
+
 function applyBaselineSecurityHeaders(): void
 {
     if (headers_sent()) {
@@ -10,10 +12,7 @@ function applyBaselineSecurityHeaders(): void
     header('Referrer-Policy: strict-origin-when-cross-origin');
     header('Permissions-Policy: geolocation=(), microphone=(), camera=()');
     header("Content-Security-Policy: default-src 'self' https: data: blob:; script-src 'self' https: 'unsafe-inline'; style-src 'self' https: 'unsafe-inline'; img-src 'self' https: data: blob:; font-src 'self' https: data:; frame-ancestors 'self'; base-uri 'self'; form-action 'self'");
-    if (
-        (!empty($_SERVER['HTTPS']) && strtolower((string)$_SERVER['HTTPS']) !== 'off')
-        || ((string)($_SERVER['SERVER_PORT'] ?? '') === '443')
-    ) {
+    if (appRequestIsHttps()) {
         header('Strict-Transport-Security: max-age=31536000; includeSubDomains');
     }
 }
@@ -23,10 +22,7 @@ function initializeSecureSession(): void
     if (session_status() !== PHP_SESSION_NONE) {
         return;
     }
-    $isHttps = (
-        (!empty($_SERVER['HTTPS']) && strtolower((string)$_SERVER['HTTPS']) !== 'off')
-        || ((string)($_SERVER['SERVER_PORT'] ?? '') === '443')
-    );
+    $isHttps = appRequestIsHttps();
 
     // Session ini + cookie params must be configured before headers are sent.
     // Some pages may accidentally output content earlier (BOM/whitespace), so
@@ -52,6 +48,162 @@ function initializeSecureSession(): void
 applyBaselineSecurityHeaders();
 initializeSecureSession();
 
+function appConfiguredBaseUrlRaw(): string
+{
+    static $cached = null;
+    if ($cached !== null) {
+        return $cached;
+    }
+
+    $configured = trim((string)runtime_env('APP_BASE_URL', runtime_config('app.base_url', '')));
+    return $cached = rtrim($configured, '/');
+}
+
+function appNormalizeRootPath(string $path): string
+{
+    $path = trim(str_replace('\\', '/', $path));
+    if ($path === '' || $path === '.' || $path === '/') {
+        return '';
+    }
+
+    return '/' . trim($path, '/');
+}
+
+function appConfiguredRootPath(): string
+{
+    static $cached = null;
+    if ($cached !== null) {
+        return $cached;
+    }
+
+    $explicit = trim((string)runtime_env('APP_ROOT_PATH', runtime_config('app.root_path', '')));
+    if ($explicit !== '') {
+        return $cached = appNormalizeRootPath($explicit);
+    }
+
+    $configuredBaseUrl = appConfiguredBaseUrlRaw();
+    if ($configuredBaseUrl !== '') {
+        $path = (string)(parse_url($configuredBaseUrl, PHP_URL_PATH) ?? '');
+        return $cached = appNormalizeRootPath($path);
+    }
+
+    return $cached = '';
+}
+
+function appRequestHeader(string $key): string
+{
+    $value = $_SERVER[$key] ?? '';
+    if (!is_string($value)) {
+        return '';
+    }
+
+    $parts = explode(',', $value);
+    return trim((string)($parts[0] ?? ''));
+}
+
+function appRequestIsHttps(): bool
+{
+    static $cached = null;
+    if ($cached !== null) {
+        return $cached;
+    }
+
+    if (runtime_bool(runtime_env('APP_FORCE_HTTPS', runtime_config('app.force_https', null)), false)) {
+        return $cached = true;
+    }
+
+    $https = strtolower(trim((string)($_SERVER['HTTPS'] ?? '')));
+    if ($https !== '' && $https !== 'off') {
+        return $cached = true;
+    }
+
+    $forwardedProto = strtolower(appRequestHeader('HTTP_X_FORWARDED_PROTO'));
+    if ($forwardedProto === 'https') {
+        return $cached = true;
+    }
+
+    $forwardedSsl = strtolower(appRequestHeader('HTTP_X_FORWARDED_SSL'));
+    if ($forwardedSsl === 'on') {
+        return $cached = true;
+    }
+
+    $forwardedPort = appRequestHeader('HTTP_X_FORWARDED_PORT');
+    if ($forwardedPort === '443') {
+        return $cached = true;
+    }
+
+    $cfVisitor = trim((string)($_SERVER['HTTP_CF_VISITOR'] ?? ''));
+    if ($cfVisitor !== '' && stripos($cfVisitor, '"https"') !== false) {
+        return $cached = true;
+    }
+
+    return $cached = ((string)($_SERVER['SERVER_PORT'] ?? '') === '443');
+}
+
+function appSanitizeHost(string $host): string
+{
+    $host = trim($host);
+    if ($host === '') {
+        return '';
+    }
+
+    $host = trim((string)explode(',', $host)[0]);
+    if ($host === '') {
+        return '';
+    }
+
+    if (!preg_match('/^[A-Za-z0-9.-]+(?::\d+)?$/', $host)) {
+        return '';
+    }
+
+    return strtolower($host);
+}
+
+function appRequestHost(): string
+{
+    static $cached = null;
+    if ($cached !== null) {
+        return $cached;
+    }
+
+    $configuredBaseUrl = appConfiguredBaseUrlRaw();
+    if ($configuredBaseUrl !== '') {
+        $configuredScheme = strtolower((string)(parse_url($configuredBaseUrl, PHP_URL_SCHEME) ?? ''));
+        $configuredHost = (string)(parse_url($configuredBaseUrl, PHP_URL_HOST) ?? '');
+        $configuredPort = (int)(parse_url($configuredBaseUrl, PHP_URL_PORT) ?? 0);
+        $configuredHost = appSanitizeHost($configuredHost);
+        if ($configuredHost !== '') {
+            if ($configuredPort > 0 && !(
+                ($configuredPort === 80 && $configuredScheme === 'http')
+                || ($configuredPort === 443 && $configuredScheme === 'https')
+            )) {
+                $configuredHost .= ':' . $configuredPort;
+            }
+            return $cached = $configuredHost;
+        }
+    }
+
+    $configuredHost = appSanitizeHost((string)runtime_env('APP_HOST', runtime_config('app.host', '')));
+    if ($configuredHost !== '') {
+        return $cached = $configuredHost;
+    }
+
+    $candidates = [
+        appRequestHeader('HTTP_X_FORWARDED_HOST'),
+        (string)($_SERVER['HTTP_HOST'] ?? ''),
+        (string)($_SERVER['SERVER_NAME'] ?? ''),
+    ];
+
+    foreach ($candidates as $candidate) {
+        $candidate = appSanitizeHost($candidate);
+        if ($candidate !== '') {
+            return $cached = $candidate;
+        }
+    }
+
+    return $cached = '127.0.0.1';
+}
+
 // Build a stable app-root URL prefix so redirects work whether the app is hosted at:
 // - domain root (e.g. "/Admin-End/..."), or
 // - a subfolder (e.g. "/your-app/Admin-End/...").
@@ -60,6 +212,11 @@ function appRootPath(): string
     static $cached = null;
     if ($cached !== null) {
         return $cached;
+    }
+
+    $configured = appConfiguredRootPath();
+    if ($configured !== '') {
+        return $cached = $configured;
     }
 
     $scriptName = str_replace('\\', '/', (string)($_SERVER['SCRIPT_NAME'] ?? ''));
@@ -120,27 +277,26 @@ function appUrl(string $path): string
 
 function appBaseUrl(): string
 {
-    $configured = trim((string)(getenv('APP_BASE_URL') ?: ''));
+    $configured = appConfiguredBaseUrlRaw();
     if ($configured !== '') {
+        $scheme = (string)(parse_url($configured, PHP_URL_SCHEME) ?? '');
+        $host = (string)(parse_url($configured, PHP_URL_HOST) ?? '');
+        $port = (int)(parse_url($configured, PHP_URL_PORT) ?? 0);
+        $host = appSanitizeHost($host);
+
+        if ($scheme !== '' && $host !== '') {
+            if ($port > 0 && !(($scheme === 'http' && $port === 80) || ($scheme === 'https' && $port === 443))) {
+                $host .= ':' . $port;
+            }
+            return rtrim($scheme . '://' . $host, '/');
+        }
+
         return rtrim($configured, '/');
     }
 
-    $scheme = (
-        (!empty($_SERVER['HTTPS']) && strtolower((string)$_SERVER['HTTPS']) !== 'off')
-        || ((string)($_SERVER['SERVER_PORT'] ?? '') === '443')
-    ) ? 'https' : 'http';
+    $scheme = appRequestIsHttps() ? 'https' : 'http';
+    $host = appRequestHost();
 
-    $host = trim((string)($_SERVER['HTTP_HOST'] ?? ''));
-    if ($host === '') {
-        $host = trim((string)($_SERVER['SERVER_NAME'] ?? ''));
-    }
-
-    if ($host === '') {
-        // Safe fallback when host headers are unavailable.
-        $host = 'localhost';
-    }
-
-    // Base domain only; path prefixing is handled by appUrl().
     return rtrim($scheme . '://' . $host, '/');
 }
 

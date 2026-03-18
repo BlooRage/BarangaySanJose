@@ -281,6 +281,10 @@ if ($residentId !== '' && isset($conn) && $conn instanceof mysqli) {
            class="a-sidebarLink <?= (in_array($current, ['AnnouncementsLandingPage.php'], true) ? 'active' : '') ?>">
           <i class="fa-solid fa-bullhorn"></i>Announcements
         </a>
+        <a href="<?= htmlspecialchars($baseUrl, ENT_QUOTES, 'UTF-8') ?>/Resident-End/Downloads"
+           class="a-sidebarLink <?= activeLink('Downloads.php', $current) ?>">
+          <i class="fa-solid fa-download"></i>Downloads
+        </a>
         <button class="btn btn-toggle d-flex align-items-center gap-2 rounded <?= $isTransactionsActive ? '' : 'collapsed' ?>"
                 data-bs-toggle="collapse"
                 data-bs-target="#resident-transactions-collapse"

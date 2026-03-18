@@ -14,3 +14,11 @@ UnifiedFileAttachment/IssuedDocuments/QR/**
 
 # Existing local ignore retained.
 JS-Script-Files/Resident-End/Clearances/electricalPermitScript.js
+
+# Local runtime configuration and secrets must never be committed.
+config.runtime.local.php
+config.runtime.php
+PhpFiles/General/runtime.local.php
+PhpFiles/General/runtime.php
+.env
+.env.*

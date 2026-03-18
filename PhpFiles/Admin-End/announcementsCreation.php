@@ -1,11 +1,11 @@
 <?php
 require_once __DIR__ . "/../General/connection.php";
 require_once __DIR__ . "/../../Admin-End/includes/admin_guard.php";
-require_once __DIR__ . "/announcementsStore.php";
+require_once __DIR__ . "/contentStore.php";
 require_once __DIR__ . "/announcementDelivery.php";
 
 if ($_SERVER["REQUEST_METHOD"] !== "POST") {
-  header("Location: " . appUrl('/Admin-End/Announcements/Announcements.php'));
+  header("Location: " . appUrl('/Admin-End/Contents/Contents.php'));
   exit;
 }
 
@@ -105,6 +105,57 @@ function ann_creator_display_label(mysqli $conn, string $userId, string $fallbac
   return $fullName . " - " . $position;
 }
 
+function ann_faq_items_from_post(): array
+{
+  $questions = (array)($_POST['faq_questions'] ?? []);
+  $answers = (array)($_POST['faq_answers'] ?? []);
+  $max = max(count($questions), count($answers));
+  $items = [];
+
+  for ($i = 0; $i < $max; $i++) {
+    $question = trim((string)($questions[$i] ?? ''));
+    $answer = trim((string)($answers[$i] ?? ''));
+    if ($question === '' && trim(strip_tags($answer)) === '') {
+      continue;
+    }
+    $items[] = [
+      'question' => $question,
+      'answer' => $answer,
+    ];
+  }
+
+  return $items;
+}
+
+function ann_build_faq_html(array $items): string
+{
+  $blocks = [];
+  foreach ($items as $item) {
+    $question = htmlspecialchars((string)($item['question'] ?? ''), ENT_QUOTES, 'UTF-8');
+    $answer = trim((string)($item['answer'] ?? ''));
+    $paragraphs = preg_split('/\r?\n\r?\n+/', $answer) ?: [];
+    $htmlParts = [];
+    foreach ($paragraphs as $paragraph) {
+      $paragraph = trim($paragraph);
+      if ($paragraph === '') {
+        continue;
+      }
+      $htmlParts[] = '<p>' . nl2br(htmlspecialchars($paragraph, ENT_QUOTES, 'UTF-8')) . '</p>';
+    }
+    if (!$htmlParts) {
+      $htmlParts[] = '<p></p>';
+    }
+    $blocks[] = '<div class="faq-content-item"><h4>' . $question . '</h4><div class="faq-content-answer">' . implode('', $htmlParts) . '</div></div>';
+  }
+
+  return implode('', $blocks);
+}
+
+$contentType = strtolower(trim((string)($_POST['content_type'] ?? 'page')));
+if (!in_array($contentType, ['page', 'delivery', 'faq'], true)) {
+  $contentType = 'page';
+}
+
 $title = trim((string)($_POST["title"] ?? ""));
 $contentHtml = trim((string)($_POST["content_html"] ?? ""));
 $publicNewsTitle = trim((string)($_POST["public_news_title"] ?? ""));
@@ -117,21 +168,6 @@ $placements = array_values(array_unique(array_filter((array)($_POST["placements"
 $channels = array_values(array_unique(array_filter((array)($_POST["channels"] ?? []), function ($ch) {
   return in_array((string)$ch, ["website", "public", "public_news", "sms", "email"], true);
 })));
-$contentChannels = [];
-if (in_array("public_news", $placements, true)) {
-  $contentChannels[] = "public_news";
-}
-if (in_array("announcement", $placements, true)) {
-  if (in_array("public", $channels, true)) {
-    $contentChannels[] = "public";
-  }
-  if (in_array("website", $channels, true)) {
-    $contentChannels[] = "website";
-  }
-}
-$channels = array_values(array_unique(array_merge($contentChannels, array_values(array_filter($channels, function ($ch) {
-  return in_array((string)$ch, ["sms", "email"], true);
-}))))) ;
 $audienceScope = trim((string)($_POST["audience_scope"] ?? "all"));
 $area = trim((string)($_POST["area"] ?? ""));
 $roleGroup = trim((string)($_POST["role_group"] ?? ""));
@@ -145,49 +181,117 @@ if (!in_array($channelContext, ["all", "website", "public", "public_news", "sms"
   $channelContext = "all";
 }
 
-$redirectBase = appUrl('/Admin-End/Announcements/Announcements.php');
+$redirectBase = appUrl('/Admin-End/Contents/Contents.php');
 $redirectUrl = $channelContext === "all" ? $redirectBase : ($redirectBase . "?channel=" . urlencode($channelContext));
 
-if ($title === "") {
-  $title = $publicNewsTitle !== "" ? $publicNewsTitle : $publicTitle;
-}
-
-if (!$channels) {
-  ann_redirect_with_flash($redirectUrl, "warning", "Select at least one delivery channel.");
-}
-
+$plainContent = trim(strip_tags($contentHtml));
+$faqItemsJson = '';
 $hasAnnouncementPlacement = in_array("announcement", $placements, true);
-if ($hasAnnouncementPlacement && !array_intersect(["public", "website"], $channels)) {
-  ann_redirect_with_flash($redirectUrl, "warning", "Select Guest Page or Account Page when Announcements is selected.");
-}
-
 $isDualPlacement = $hasAnnouncementPlacement && in_array("public_news", $placements, true);
-if ($isDualPlacement) {
-  if ($publicNewsTitle === "" || trim(strip_tags($publicNewsContentHtml)) === "") {
-    ann_redirect_with_flash($redirectUrl, "warning", "News Section title and content are required when both placements are selected.");
-  }
-  if ($publicTitle === "" || trim(strip_tags($publicContentHtml)) === "") {
-    ann_redirect_with_flash($redirectUrl, "warning", "Announcements title and content are required when both placements are selected.");
-  }
 
-  $title = $publicNewsTitle;
-  $contentHtml = $publicNewsContentHtml;
-} else {
-  $plainContent = trim(strip_tags($contentHtml));
-  if ($title === "") {
-    ann_redirect_with_flash($redirectUrl, "warning", "Announcement title is required.");
-  }
-  if ($plainContent === "") {
-    ann_redirect_with_flash($redirectUrl, "warning", "Announcement content is required.");
-  }
-
+if ($contentType === 'page') {
+  $contentChannels = [];
   if (in_array("public_news", $placements, true)) {
-    $publicNewsTitle = $title;
-    $publicNewsContentHtml = $contentHtml;
+    $contentChannels[] = "public_news";
   }
   if ($hasAnnouncementPlacement) {
-    $publicTitle = $title;
-    $publicContentHtml = $contentHtml;
+    if (in_array("public", $channels, true)) {
+      $contentChannels[] = "public";
+    }
+    if (in_array("website", $channels, true)) {
+      $contentChannels[] = "website";
+    }
+  }
+  $channels = array_values(array_unique($contentChannels));
+
+  if (!$channels) {
+    ann_redirect_with_flash($redirectUrl, "warning", "Select at least one delivery channel.");
+  }
+
+  if ($hasAnnouncementPlacement && !array_intersect(["public", "website"], $channels)) {
+    ann_redirect_with_flash($redirectUrl, "warning", "Select Guest Page or Account Page when Announcements is selected.");
+  }
+
+  if ($title === "") {
+    $title = $publicNewsTitle !== "" ? $publicNewsTitle : $publicTitle;
+  }
+
+  if ($isDualPlacement) {
+    if ($publicNewsTitle === "" || trim(strip_tags($publicNewsContentHtml)) === "") {
+      ann_redirect_with_flash($redirectUrl, "warning", "News Section title and content are required when both placements are selected.");
+    }
+    if ($publicTitle === "" || trim(strip_tags($publicContentHtml)) === "") {
+      ann_redirect_with_flash($redirectUrl, "warning", "Announcements title and content are required when both placements are selected.");
+    }
+
+    $title = $publicNewsTitle;
+    $contentHtml = $publicNewsContentHtml;
+  } else {
+    if ($title === "") {
+      ann_redirect_with_flash($redirectUrl, "warning", "Announcement title is required.");
+    }
+    if ($plainContent === "") {
+      ann_redirect_with_flash($redirectUrl, "warning", "Announcement content is required.");
+    }
+
+    if (in_array("public_news", $placements, true)) {
+      $publicNewsTitle = $title;
+      $publicNewsContentHtml = $contentHtml;
+    }
+    if ($hasAnnouncementPlacement) {
+      $publicTitle = $title;
+      $publicContentHtml = $contentHtml;
+    }
+  }
+} elseif ($contentType === 'delivery') {
+  $placements = [];
+  $publicNewsTitle = '';
+  $publicNewsContentHtml = '';
+  $publicTitle = '';
+  $publicContentHtml = '';
+  $channels = array_values(array_unique(array_filter($channels, function ($ch) {
+    return in_array((string)$ch, ['sms', 'email'], true);
+  })));
+
+  if (!$channels) {
+    ann_redirect_with_flash($redirectUrl, 'warning', 'Select SMS or Email for this announcement type.');
+  }
+  if ($title === '') {
+    ann_redirect_with_flash($redirectUrl, 'warning', 'Title is required.');
+  }
+  if ($plainContent === '') {
+    ann_redirect_with_flash($redirectUrl, 'warning', 'Body is required.');
+  }
+  if (in_array('sms', $channels, true) && mb_strlen($smsMessageInput) > 320) {
+    ann_redirect_with_flash($redirectUrl, 'warning', 'SMS message must be 320 characters or less.');
+  }
+} else {
+  $placements = [];
+  $channels = [];
+  $publicNewsTitle = '';
+  $publicNewsContentHtml = '';
+  $publicTitle = '';
+  $publicContentHtml = '';
+  $faqItems = ann_faq_items_from_post();
+
+  if (!$faqItems) {
+    ann_redirect_with_flash($redirectUrl, 'warning', 'Add at least one FAQ question and answer.');
+  }
+  if (count($faqItems) > 20) {
+    ann_redirect_with_flash($redirectUrl, 'warning', 'You can only save up to 20 FAQ questions in one content item.');
+  }
+  foreach ($faqItems as $faqItem) {
+    if (($faqItem['question'] ?? '') === '' || trim(strip_tags((string)($faqItem['answer'] ?? ''))) === '') {
+      ann_redirect_with_flash($redirectUrl, 'warning', 'Complete both the question and answer for every FAQ entry.');
+    }
+  }
+
+  $title = (string)($faqItems[0]['question'] ?? 'FAQ Item');
+  $contentHtml = ann_build_faq_html($faqItems);
+  $plainContent = trim(strip_tags($contentHtml));
+  $faqItemsJson = json_encode($faqItems, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+  if ($faqItemsJson === false) {
+    $faqItemsJson = '';
   }
 }
 
@@ -227,6 +331,7 @@ $createdByDisplay = ann_creator_display_label($conn, $createdByUserId, $createdB
 $record = [
   "id" => announcement_generate_id(),
   "title" => $title,
+  "content_type" => $contentType,
   "audience" => $audience,
   "audience_scope" => $audienceScope,
   "area" => $area,
@@ -242,24 +347,30 @@ $record = [
   "public_news_content_html" => $publicNewsContentHtml,
   "public_title" => $publicTitle,
   "public_content_html" => $publicContentHtml,
-  "created_at" => date("Y-m-d H:i:s")
+  "created_at" => date("Y-m-d H:i:s"),
+  "faq_items_json" => $faqItemsJson,
 ];
 $record = array_merge($record, ann_delivery_compose_fields($record, $emailSubjectInput, $smsMessageInput));
 
 $all = announcements_load_all();
 array_unshift($all, $record);
 if (!announcements_save_all($all)) {
-  ann_redirect_with_flash($redirectUrl, "danger", "Unable to save announcement.");
+  ann_redirect_with_flash($redirectUrl, "danger", "Unable to save content item.");
 }
 
-$msg = "Announcement saved as draft.";
+$itemLabel = [
+  'page' => 'Page announcement',
+  'delivery' => 'SMS and email announcement',
+  'faq' => 'FAQ item'
+][$contentType] ?? 'Content item';
+
+$msg = $itemLabel . " saved as draft.";
 if ($status === "pending") {
-  $msg = "Announcement submitted for review.";
+  $msg = ucfirst($itemLabel) . " submitted for review.";
 }
 if ($status === "approved") {
   $deliveryResult = ann_delivery_send($conn, $all[0]);
   announcements_save_all($all);
-  $msg = "Announcement posted successfully." . ann_delivery_message_suffix($deliveryResult);
+  $msg = ucfirst($itemLabel) . " posted successfully." . ann_delivery_message_suffix($deliveryResult);
 }
 ann_redirect_with_flash($redirectUrl, "success", $msg);
-

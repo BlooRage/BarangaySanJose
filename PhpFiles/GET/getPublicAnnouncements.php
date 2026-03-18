@@ -1,5 +1,5 @@
 <?php
-require_once __DIR__ . '/../Admin-End/announcementsStore.php';
+require_once __DIR__ . '/../Admin-End/contentStore.php';
 
 header('Content-Type: application/json; charset=UTF-8');
 
@@ -49,3 +49,4 @@ echo json_encode([
     'success' => true,
     'items' => array_slice($publicAnnouncements, 0, 6)
 ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+

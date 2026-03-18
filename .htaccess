@@ -15,7 +15,11 @@ RewriteRule "(^|/)\.DS_Store$" - [F,L,NC]
 
 # Block sensitive docs and config-like files that should never be public
 RewriteRule "(^|/)DATABASE QUERIES\.txt$" - [F,L,NC]
+RewriteRule "(^|/)config\.runtime(?:\.local|\.example)?\.php$" - [F,L,NC]
+RewriteRule "(^|/)PhpFiles/General/runtime(?:\.local)?\.php$" - [F,L,NC]
 RewriteRule "(^|/)composer-email-handler/(composer\.(json|lock)|vendor/)" - [F,L,NC]
+RewriteRule "(^|/)PhpFiles/PhpOffice/composer-setup\.php$" - [F,L,NC]
+RewriteRule "(^|/)PhpFiles/PhpOffice/vendor/" - [F,L,NC]
 RewriteRule "(^|/).*\.(sql|bak|old|orig|ini|log|env)$" - [F,L,NC]
 
 # Keep legacy extensionless public paths working too.

@@ -1,12 +1,20 @@
 <?php
+require_once __DIR__ . '/runtimeConfig.php';
+
 // Use Asia/Manila (UTC+08:00) for PHP date/time functions.
 date_default_timezone_set('Asia/Manila');
 
-$host = getenv('DB_HOST') ?: "srv1986.hstgr.io";
-//srv1986.hstgr.io
-$user = getenv('DB_USER') ?: "u682055666_thesiscaps";
-$pass = getenv('DB_PASS') ?: "ThesisCaps123.";
-$dbname = getenv('DB_NAME') ?: "u682055666_testingBrgySJ";
+$host = trim((string)runtime_env('DB_HOST', runtime_config('db.host', '')));
+$port = (int)runtime_env('DB_PORT', runtime_config('db.port', 3306));
+$user = trim((string)runtime_env('DB_USER', runtime_config('db.user', '')));
+$pass = (string)runtime_env('DB_PASS', runtime_config('db.pass', ''));
+$dbname = trim((string)runtime_env('DB_NAME', runtime_config('db.name', '')));
+
+if ($host === '' || $user === '' || $dbname === '') {
+    error_log('Database configuration is incomplete. Set DB_HOST, DB_USER, DB_PASS, and DB_NAME via environment or config.runtime.local.php.');
+    http_response_code(500);
+    exit('Service temporarily unavailable.');
+}
 
 mysqli_report(MYSQLI_REPORT_OFF);
 $conn = mysqli_init();
@@ -16,7 +24,7 @@ if ($conn instanceof mysqli) {
     if (defined('MYSQLI_OPT_READ_TIMEOUT')) {
         $conn->options(MYSQLI_OPT_READ_TIMEOUT, 10);
     }
-    @mysqli_real_connect($conn, $host, $user, $pass, $dbname);
+    @mysqli_real_connect($conn, $host, $user, $pass, $dbname, $port > 0 ? $port : 3306);
 }
 
 if (!($conn instanceof mysqli) || $conn->connect_error) {
