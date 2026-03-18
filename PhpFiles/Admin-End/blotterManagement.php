@@ -177,12 +177,25 @@ $narrativeText = str_field($_POST['narrative_report'] ?? '');
 $complainantSignatureBinary = null;
 $respondentSignatureBinary = null;
 
-if (!$blotterNumber || !$dateFiled || !$timeFiled || !$complainantLast || !$complainantFirst || !$respondentLast || !$respondentFirst || !$incidentDate || !$incidentTime || !$incidentPlace || !$complaintType) {
+if (!$blotterNumber || !$dateFiled || !$timeFiled || !$complainantLast || !$complainantFirst || !$respondentLast || !$respondentFirst) {
     http_response_code(400);
     exit("Missing required fields.");
 }
 
-validateIncidentDateTime($incidentDate, $incidentTime);
+if ($narrativeMethod !== 'file' && (!$incidentDate || !$incidentTime || !$incidentPlace || !$complaintType)) {
+    http_response_code(400);
+    exit("Incident details are required for typed narratives.");
+}
+
+if ($narrativeMethod !== 'file') {
+    validateIncidentDateTime($incidentDate, $incidentTime);
+} else {
+    $incidentDate = null;
+    $incidentTime = null;
+    $incidentPlace = null;
+    $complaintType = null;
+    $complaintTypeOther = null;
+}
 
 if ($narrativeMethod === 'text' && !$narrativeText) {
     http_response_code(400);

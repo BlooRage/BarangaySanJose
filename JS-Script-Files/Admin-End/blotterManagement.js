@@ -30,11 +30,15 @@ document.addEventListener("DOMContentLoaded", () => {
     const respondentPhaseNumber = document.getElementById("respondentPhaseNumber");
     const blotterComplaintType = document.getElementById("blotterComplaintType");
     const blotterComplaintTypeOther = document.getElementById("blotterComplaintTypeOther");
+    const blotterComplaintTypeOtherAsterisk = document.getElementById("blotterComplaintTypeOtherAsterisk");
+    const incidentDetailsSection = document.getElementById("incidentDetailsSection");
+    const complaintTypeOtherRow = document.getElementById("complaintTypeOtherRow");
     const phoneInputs = form?.querySelectorAll('input[name="complainant_contact_number"], input[name="respondent_contact_number"]') || [];
     const dateFiledInput = form?.querySelector('input[name="date_filed"]');
     const timeFiledInput = form?.querySelector('input[name="time_filed"]');
     const incidentDateInput = document.getElementById("incidentDate");
     const incidentTimeInput = document.getElementById("incidentTime");
+    const incidentPlaceInput = document.getElementById("incidentPlace");
     const incidentDateError = document.getElementById("incidentDateError");
     const complainantSignatureCanvas = document.getElementById("complainantSignatureCanvas");
     const complainantSignatureData = document.getElementById("complainantSignatureData");
@@ -54,6 +58,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const signatureFullscreenSaveBtn = document.getElementById("signatureFullscreenSave");
     const narrativeSignatureModalEl = document.getElementById("narrativeSignatureModal");
     const openNarrativeSignatureModalBtn = document.getElementById("openNarrativeSignatureModal");
+    const narrativeEditorLauncherRow = document.getElementById("narrativeEditorLauncherRow");
     if (!form || !submitBtn) return;
 
     const confirmModal = confirmSubmitModalEl ? new bootstrap.Modal(confirmSubmitModalEl) : null;
@@ -70,6 +75,15 @@ document.addEventListener("DOMContentLoaded", () => {
         textWrapper?.classList.toggle("d-none", !useText);
         fileWrapper?.classList.toggle("d-none", !useFile);
         signatureSection?.classList.toggle("d-none", !useText);
+        narrativeEditorLauncherRow?.classList.toggle("d-none", !(useText || useFile));
+
+        if (openNarrativeSignatureModalBtn) {
+            openNarrativeSignatureModalBtn.textContent = useText
+                ? "Open Narrative and Signatures"
+                : useFile
+                    ? "Open Narrative Attachment"
+                    : "Open Narrative Editor";
+        }
 
         if (narrativeText) narrativeText.required = useText;
         if (fileInput) fileInput.required = useFile;
@@ -89,6 +103,39 @@ document.addEventListener("DOMContentLoaded", () => {
         if (!useFile && fileInput) {
             fileInput.setCustomValidity("");
         }
+
+        toggleIncidentDetailsDisabled(useFile);
+    };
+
+    const incidentDetailFields = [
+        incidentDateInput,
+        incidentTimeInput,
+        incidentPlaceInput,
+        blotterComplaintType,
+        blotterComplaintTypeOther
+    ].filter(Boolean);
+
+    const toggleIncidentDetailsDisabled = (disabled) => {
+        incidentDetailsSection?.classList.toggle("opacity-50", disabled);
+        complaintTypeOtherRow?.classList.toggle("d-none", disabled);
+
+        incidentDetailFields.forEach((field) => {
+            if (!field) return;
+
+            if (!Object.prototype.hasOwnProperty.call(field.dataset, "originalRequired")) {
+                field.dataset.originalRequired = field.required ? "1" : "0";
+            }
+
+            field.disabled = disabled;
+            field.required = !disabled && field.dataset.originalRequired === "1";
+
+            if (disabled) {
+                field.setCustomValidity("");
+                field.classList.remove("is-invalid");
+                const feedback = ensureFeedbackEl(field);
+                if (feedback) feedback.textContent = "";
+            }
+        });
     };
 
     const updateFileName = () => {
@@ -114,6 +161,7 @@ document.addEventListener("DOMContentLoaded", () => {
         const isOther = String(blotterComplaintType.value || "").trim() === "Other";
         blotterComplaintTypeOther.disabled = !isOther;
         setRequired(blotterComplaintTypeOther, isOther);
+        blotterComplaintTypeOtherAsterisk?.classList.toggle("d-none", !isOther);
         if (!isOther) {
             blotterComplaintTypeOther.value = "";
             blotterComplaintTypeOther.setCustomValidity("");
@@ -492,6 +540,7 @@ document.addEventListener("DOMContentLoaded", () => {
     };
 
     const validateIncidentDateTime = () => {
+        if ((inputMethod?.value || "") === "file") return true;
         if (!incidentDateInput) return true;
         const now = new Date();
         const todayIso = toIsoDate(now);
@@ -757,3 +806,4 @@ document.addEventListener("DOMContentLoaded", () => {
         successModal?.show();
     }
 });
+

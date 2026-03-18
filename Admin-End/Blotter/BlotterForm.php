@@ -60,6 +60,57 @@ require_once __DIR__ . "/../includes/admin_guard.php";
             margin-top: 32px;
             margin-bottom: 24px;
         }
+        #main-display .page-form .form-label,
+        #main-display .page-form .top-label {
+            font-size: 14px;
+        }
+        #main-display .page-form .form-control,
+        #main-display .page-form .form-select,
+        #main-display .page-form textarea.form-control {
+            font-size: 14px;
+        }
+        #main-display .page-form .form-control,
+        #main-display .page-form .form-select {
+            padding: 10px 12px;
+            border: 1px solid #a8a7a7;
+            border-radius: 6px;
+        }
+        #main-display .page-form .form-select {
+            padding-right: 2.5rem;
+            appearance: none;
+            -webkit-appearance: none;
+            -moz-appearance: none;
+            background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3e%3cpath fill='none' stroke='%23343a40' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='m2 5 6 6 6-6'/%3e%3c/svg%3e");
+            background-repeat: no-repeat;
+            background-position: right 0.75rem center;
+            background-size: 16px 12px;
+        }
+        #main-display .page-form .form-control:focus,
+        #main-display .page-form .form-select:focus {
+            outline: none;
+            border-color: #e8872f;
+            box-shadow: none;
+        }
+        #main-display .page-form .form-control.is-invalid,
+        #main-display .page-form .form-select.is-invalid,
+        #main-display .page-form textarea.form-control.is-invalid,
+        #main-display .page-form .form-row input.is-invalid,
+        #main-display .page-form .form-row select.is-invalid,
+        #main-display .page-form .form-row textarea.is-invalid {
+            border-color: #dc3545 !important;
+            box-shadow: 0 0 0 0.15rem rgba(220, 53, 69, 0.12) !important;
+            background-image: none;
+        }
+        #main-display .page-form .form-control.is-invalid:focus,
+        #main-display .page-form .form-select.is-invalid:focus,
+        #main-display .page-form textarea.form-control.is-invalid:focus,
+        #main-display .page-form .form-row input.is-invalid:focus,
+        #main-display .page-form .form-row select.is-invalid:focus,
+        #main-display .page-form .form-row textarea.is-invalid:focus {
+            outline: none;
+            border-color: #dc3545 !important;
+            box-shadow: 0 0 0 0.2rem rgba(220, 53, 69, 0.18) !important;
+        }
     </style>
 </head>
 <body>
@@ -175,7 +226,7 @@ require_once __DIR__ . "/../includes/admin_guard.php";
                     <div class="full-width">
                         <div class="row mb-3">
                             <div class="col-12 col-md-3">
-                                <label class="top-label" for="complainantAreaNumber">Area</label>
+                                <label class="top-label" for="complainantAreaNumber">Area <span class="required-asterisk">*</span></label>
                                 <select class="form-select w-100" id="complainantAreaNumber" name="complainant_area_number">
                                     <option value="">Select</option>
                                     <option value="Area 01">Area 01</option>
@@ -188,15 +239,15 @@ require_once __DIR__ . "/../includes/admin_guard.php";
                                 </select>
                             </div>
                             <div class="col-12 col-md-3">
-                                <label class="top-label">Barangay</label>
+                                <label class="top-label">Barangay <span class="required-asterisk">*</span></label>
                                 <input type="text" name="complainant_barangay" value="Barangay San Jose" readonly>
                             </div>
                             <div class="col-12 col-md-3">
-                                <label class="top-label">Municipality / City</label>
+                                <label class="top-label">Municipality / City <span class="required-asterisk">*</span></label>
                                 <input type="text" name="complainant_municipality" value="Rodriguez" readonly>
                             </div>
                             <div class="col-12 col-md-3">
-                                <label class="top-label">Province</label>
+                                <label class="top-label">Province <span class="required-asterisk">*</span></label>
                                 <input type="text" name="complainant_province" value="Rizal" readonly>
                             </div>
                         </div>
@@ -303,7 +354,7 @@ require_once __DIR__ . "/../includes/admin_guard.php";
                     <div class="full-width">
                         <div class="row mb-3">
                             <div class="col-12 col-md-3">
-                                <label class="top-label" for="respondentAreaNumber">Area</label>
+                                <label class="top-label" for="respondentAreaNumber">Area <span class="required-asterisk">*</span></label>
                                 <select class="form-select w-100" id="respondentAreaNumber" name="respondent_area_number">
                                     <option value="">Select</option>
                                     <option value="Area 01">Area 01</option>
@@ -316,15 +367,15 @@ require_once __DIR__ . "/../includes/admin_guard.php";
                                 </select>
                             </div>
                             <div class="col-12 col-md-3">
-                                <label class="top-label">Barangay</label>
+                                <label class="top-label">Barangay <span class="required-asterisk">*</span></label>
                                 <input type="text" name="respondent_barangay" value="Barangay San Jose" readonly>
                             </div>
                             <div class="col-12 col-md-3">
-                                <label class="top-label">Municipality / City</label>
+                                <label class="top-label">Municipality / City <span class="required-asterisk">*</span></label>
                                 <input type="text" name="respondent_municipality" value="Rodriguez" readonly>
                             </div>
                             <div class="col-12 col-md-3">
-                                <label class="top-label">Province</label>
+                                <label class="top-label">Province <span class="required-asterisk">*</span></label>
                                 <input type="text" name="respondent_province" value="Rizal" readonly>
                             </div>
                         </div>
@@ -350,22 +401,26 @@ require_once __DIR__ . "/../includes/admin_guard.php";
                         </select>
                     </div>
                 </div>
+                <div id="incidentDetailsSection">
                 <h3 class="section-title mb-3 text-center">Incident Details</h3>
                 <div class="row g-3 mb-3">
-                    <div class="col-12 col-md-3">
+                    <div class="col-12 col-md-4">
                         <label class="form-label">Date of Incident <span class="required-asterisk">*</span></label>
                         <input type="date" class="form-control" id="incidentDate" name="incident_date" required>
                         <div id="incidentDateError" class="invalid-feedback d-block d-none"></div>
                     </div>
-                    <div class="col-12 col-md-3">
+                    <div class="col-12 col-md-4">
                         <label class="form-label">Time of Incident <span class="required-asterisk">*</span></label>
                         <input type="time" class="form-control" id="incidentTime" name="incident_time" required>
                     </div>
-                    <div class="col-12 col-md-3">
+                    <div class="col-12 col-md-4">
                         <label class="form-label">Place of Incident <span class="required-asterisk">*</span></label>
-                        <input type="text" class="form-control" name="incident_place" required maxlength="255">
+                        <input type="text" class="form-control" id="incidentPlace" name="incident_place" required maxlength="255">
                     </div>
-                    <div class="col-12 col-md-3">
+                </div>
+
+                <div class="row g-3 mb-3" id="complaintTypeOtherRow">
+                    <div class="col-12 col-md-6">
                         <label class="form-label">Type of Complaint <span class="required-asterisk">*</span></label>
                         <select class="form-select" id="blotterComplaintType" name="complaint_type" required>
                             <option value="">Select</option>
@@ -391,13 +446,11 @@ require_once __DIR__ . "/../includes/admin_guard.php";
                             <option value="Other">Other</option>
                         </select>
                     </div>
-                </div>
-
-                <div class="row g-3 mb-3">
                     <div class="col-12 col-md-6">
-                        <label class="form-label">If Other, please specify</label>
+                        <label class="form-label">If Other, please specify <span id="blotterComplaintTypeOtherAsterisk" class="required-asterisk d-none">*</span></label>
                         <input type="text" class="form-control" id="blotterComplaintTypeOther" name="complaint_type_other" disabled>
                     </div>
+                </div>
                 </div>
 
                 <div class="row g-3 mb-3">
@@ -408,6 +461,14 @@ require_once __DIR__ . "/../includes/admin_guard.php";
                             <option value="text">Type Narrative Report</option>
                             <option value="file">Upload File (PDF/Image)</option>
                         </select>
+                    </div>
+                </div>
+
+                <div class="row g-3 mb-4 d-none" id="narrativeEditorLauncherRow">
+                    <div class="col-12">
+                        <button type="button" class="btn btn-outline-primary" id="openNarrativeSignatureModal">
+                            Open Narrative Editor
+                        </button>
                     </div>
                 </div>
 
@@ -541,6 +602,8 @@ require_once __DIR__ . "/../includes/admin_guard.php";
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-<script src="../../JS-Script-Files/Admin-End/blotterManagement.js?v=20260309-2" defer></script>
+<script src="../../JS-Script-Files/Admin-End/blotterManagement.js?v=20260318-2" defer></script>
 </body>
 </html>
+
+

@@ -31,6 +31,15 @@ require_once __DIR__ . "/../includes/resident_access_guard.php";
     <link rel="stylesheet" href="../../CSS-Styles/Resident-End-CSS/residentDashboard.css">
     <link rel="stylesheet" href="../../CSS-Styles/Guest-End-CSS/GeneralStyle.css">
     <link rel="stylesheet" href="../../CSS-Styles/Resident-End-CSS/ApplicationLandingPage.css?v=20260228-3">
+    <style>
+        .fee-note {
+            margin-top: 10px;
+            margin-bottom: 0;
+            font-size: 0.92rem;
+            font-style: italic;
+            color: #6b7280;
+        }
+    </style>
 </head>
 
 <body>
@@ -56,6 +65,7 @@ require_once __DIR__ . "/../includes/resident_access_guard.php";
                             Official proof of common-law partnership for legal or insurance claims.
                         </p>
                         <button class="btn apply-btn" type="button" onclick="location.href='CohabitationForm'">Apply Now</button>
+                        <p class="fee-note">Fee: Php50.00</p>
                     </div>
                 </div>
 
@@ -67,6 +77,7 @@ require_once __DIR__ . "/../includes/resident_access_guard.php";
                             Request a certificate of relationship for jail visitation requirements.
                         </p>
                         <button class="btn apply-btn" type="button" onclick="location.href='CohabitationForm?variant=relationship_jail_visit'">Apply Now</button>
+                        <p class="fee-note">Fee: Php50.00</p>
                     </div>
                 </div>
 
@@ -78,6 +89,7 @@ require_once __DIR__ . "/../includes/resident_access_guard.php";
                             Required for residents seeking financial, medical, or legal assistance.
                         </p>
                         <button class="btn apply-btn" onclick="location.href='IndigencyForm'">Apply Now</button>
+                        <p class="fee-note">Free</p>
                     </div>
                 </div>
 
@@ -89,6 +101,7 @@ require_once __DIR__ . "/../includes/resident_access_guard.php";
                             Avail fee waivers for government documents under Republic Act 11261.
                         </p>
                         <button class="btn apply-btn" type="button" onclick="location.href='FirstTimeJobSeekerForm'">Apply Now</button>
+                        <p class="fee-note">Free</p>
                     </div>
                 </div>
 
@@ -100,6 +113,7 @@ require_once __DIR__ . "/../includes/resident_access_guard.php";
                             Request a good moral certificate for school, employment, or other requirements.
                         </p>
                         <button class="btn apply-btn" onclick="location.href='GoodMoralForm'">Apply Now</button>
+                        <p class="fee-note">Fee: Php50.00</p>
                     </div>
                 </div>
 
@@ -111,6 +125,7 @@ require_once __DIR__ . "/../includes/resident_access_guard.php";
                             Request a residency certificate as proof of address and community residence.
                         </p>
                         <button class="btn apply-btn" type="button" onclick="location.href='ResidencyForm'">Apply Now</button>
+                        <p class="fee-note">Fee: Php50.00</p>
                     </div>
                 </div>
 

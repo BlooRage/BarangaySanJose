@@ -13,8 +13,12 @@
   const ownerFullAddress = document.getElementById("owner_full_address");
   const businessRegType = document.getElementById("businessRegType");
   const businessRegFile = document.getElementById("businessRegFile");
+  const businessRegDropzone = document.getElementById("businessRegDropzone");
+  const businessRegSelectedFile = document.getElementById("businessRegSelectedFile");
   const proofAddressType = document.getElementById("proofAddressType");
   const proofAddressFile = document.getElementById("proofAddressFile");
+  const proofAddressDropzone = document.getElementById("proofAddressDropzone");
+  const proofAddressSelectedFile = document.getElementById("proofAddressSelectedFile");
   const proofAddressNumberRow = document.getElementById("proofAddressNumberRow");
   const proofAddressNumber = document.getElementById("proofAddressNumber");
   const proofAddressNumberError = document.getElementById("proofAddressNumberError");
@@ -25,8 +29,12 @@
   const documentUploadRenewal = document.getElementById("documentUploadRenewal");
   const renewalBusinessRegType = document.getElementById("renewalBusinessRegType");
   const renewalBusinessRegFile = document.getElementById("renewalBusinessRegFile");
+  const renewalBusinessRegDropzone = document.getElementById("renewalBusinessRegDropzone");
+  const renewalBusinessRegSelectedFile = document.getElementById("renewalBusinessRegSelectedFile");
   const renewalProofAddressType = document.getElementById("renewalProofAddressType");
   const renewalProofAddressFile = document.getElementById("renewalProofAddressFile");
+  const renewalProofAddressDropzone = document.getElementById("renewalProofAddressDropzone");
+  const renewalProofAddressSelectedFile = document.getElementById("renewalProofAddressSelectedFile");
   const renewalProofAddressNumberRow = document.getElementById("renewalProofAddressNumberRow");
   const renewalProofAddressNumber = document.getElementById("renewalProofAddressNumber");
   const renewalProofAddressNumberError = document.getElementById("renewalProofAddressNumberError");
@@ -264,6 +272,8 @@
       [businessRegFile, proofAddressFile].forEach((el) => {
         if (el) el.value = '';
       });
+      renderFile(businessRegFile, businessRegSelectedFile);
+      renderFile(proofAddressFile, proofAddressSelectedFile);
       if (businessPhotoFile) {
         businessPhotoFile.value = '';
         renderFile(businessPhotoFile, businessPhotoSelectedFile);
@@ -287,6 +297,8 @@
       [renewalBusinessRegFile, renewalProofAddressFile].forEach((el) => {
         if (el) el.value = '';
       });
+      renderFile(renewalBusinessRegFile, renewalBusinessRegSelectedFile);
+      renderFile(renewalProofAddressFile, renewalProofAddressSelectedFile);
       [renewalProofAddressNumber].forEach((el) => {
         if (el) {
           el.value = '';
@@ -332,11 +344,35 @@
     updateState();
   });
   businessContactNumber?.addEventListener("input", updateState);
+  businessRegFile?.addEventListener("change", () => {
+    renderFile(businessRegFile, businessRegSelectedFile);
+    updateState();
+  });
+  proofAddressFile?.addEventListener("change", () => {
+    renderFile(proofAddressFile, proofAddressSelectedFile);
+    updateState();
+  });
   businessPhotoFile?.addEventListener("change", () => {
     renderFile(businessPhotoFile, businessPhotoSelectedFile);
     updateState();
   });
+  renewalBusinessRegFile?.addEventListener("change", () => {
+    renderFile(renewalBusinessRegFile, renewalBusinessRegSelectedFile);
+    updateState();
+  });
+  renewalProofAddressFile?.addEventListener("change", () => {
+    renderFile(renewalProofAddressFile, renewalProofAddressSelectedFile);
+    updateState();
+  });
+  bindDropzone(businessRegDropzone, businessRegFile, businessRegSelectedFile);
+  bindDropzone(proofAddressDropzone, proofAddressFile, proofAddressSelectedFile);
   bindDropzone(businessPhotoDropzone, businessPhotoFile, businessPhotoSelectedFile);
+  bindDropzone(renewalBusinessRegDropzone, renewalBusinessRegFile, renewalBusinessRegSelectedFile);
+  bindDropzone(renewalProofAddressDropzone, renewalProofAddressFile, renewalProofAddressSelectedFile);
   updateState();
+  renderFile(businessRegFile, businessRegSelectedFile);
+  renderFile(proofAddressFile, proofAddressSelectedFile);
   renderFile(businessPhotoFile, businessPhotoSelectedFile);
+  renderFile(renewalBusinessRegFile, renewalBusinessRegSelectedFile);
+  renderFile(renewalProofAddressFile, renewalProofAddressSelectedFile);
 })();

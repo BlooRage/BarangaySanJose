@@ -15,6 +15,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const complainantPhaseNumber = document.getElementById("complainantPhaseNumber");
     const natureOfComplaint = document.getElementById("natureOfComplaint") || form?.querySelector('select[name="nature_of_complaint"]') || null;
     const natureOther = document.getElementById("natureOther") || form?.querySelector('input[name="nature_other"]') || null;
+    const natureOtherAsterisk = document.getElementById("natureOtherAsterisk");
     const phoneInputs = form?.querySelectorAll('input[name="complainant_contact_number"], input[name="subject_contact_number"], input[name="witness_contact_number"]') || [];
     let isSubmitting = false;
     const touchedFields = new WeakSet();
@@ -153,6 +154,7 @@ document.addEventListener("DOMContentLoaded", () => {
         const isOther = String(natureOfComplaint.value || "").trim() === "Other";
         natureOther.disabled = !isOther;
         setRequired(natureOther, isOther);
+        natureOtherAsterisk?.classList.toggle("d-none", !isOther);
         if (!isOther) {
             natureOther.value = "";
             natureOther.setCustomValidity("");
@@ -414,3 +416,6 @@ document.addEventListener("DOMContentLoaded", () => {
         });
     }
 });
+
+
+

@@ -109,7 +109,7 @@
             <div class="modal-header">
               <div>
                 <div class="fw-bold text-dark" id="residentDateModalTitle">Select Date</div>
-                <div class="small text-muted">Choose month, day, and year.</div>
+                <div class="small text-muted" id="residentDateModalSubtitle">Choose month, day, and year.</div>
               </div>
               <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
@@ -163,6 +163,7 @@
     const modalEl = document.getElementById("residentDateModal");
     const modal = new bootstrap.Modal(modalEl);
     const modalTitle = document.getElementById("residentDateModalTitle");
+    const modalSubtitle = document.getElementById("residentDateModalSubtitle");
     const modalPreview = document.getElementById("residentDateModalPreview");
     const modalError = document.getElementById("residentDateModalError");
     const monthSelect = document.getElementById("residentDateModalMonth");
@@ -258,6 +259,11 @@
       activeProxy = proxy;
       const label = document.querySelector(`label[for="${input.id}"]`);
       modalTitle.textContent = label ? label.textContent.replace(/\s+/g, " ").trim() : "Select Date";
+      if (modalSubtitle) {
+        modalSubtitle.textContent = input.name === "incident_date"
+          ? "Choose month, day, and year. Complaints older than 6 months are invalid."
+          : "Choose month, day, and year.";
+      }
       syncModalFromInput(input);
       modal.show();
     }

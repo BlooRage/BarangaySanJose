@@ -152,6 +152,41 @@ $purposeInputClass = $isRelationshipJailVisitVariant ? 'form-control text-bg-lig
             margin-top: 32px;
             margin-bottom: 24px;
         }
+        .cohabitation-detained-person-row {
+            grid-template-columns: repeat(4, 1fr);
+        }
+        .cohabitation-address-age-row {
+            grid-template-columns: repeat(4, 1fr);
+        }
+        .cohabitation-address-age-row .col-span-3 {
+            grid-column: span 3;
+        }
+        .cohabitation-detained-person-row .col-span-2 {
+            grid-column: span 2;
+        }
+        input[name="cohabitant_dob"],
+        #cohabitationStartDisplay {
+            background-color: #ffffff !important;
+            color: #111827 !important;
+            -webkit-text-fill-color: #111827 !important;
+            border-color: #a8a7a7 !important;
+            opacity: 1 !important;
+        }
+        input[name="cohabitant_dob"]::-webkit-date-and-time-value {
+            color: #111827 !important;
+            -webkit-text-fill-color: #111827 !important;
+            opacity: 1 !important;
+        }
+        input[name="cohabitant_dob"]::-webkit-datetime-edit,
+        input[name="cohabitant_dob"]:invalid::-webkit-datetime-edit {
+            color: #111827 !important;
+            -webkit-text-fill-color: #111827 !important;
+            opacity: 1 !important;
+        }
+        #cohabitationStartDisplay::placeholder {
+            color: #111827 !important;
+            opacity: 1;
+        }
     </style></head>
 
 <body>
@@ -201,9 +236,9 @@ $purposeInputClass = $isRelationshipJailVisitVariant ? 'form-control text-bg-lig
                             <input type="hidden" name="suffix_name" value="<?php echo htmlspecialchars($residentinformationtbl['suffix'] ?? '', ENT_QUOTES, 'UTF-8'); ?>">
                         </div>
 
-                        <div class="form-row">
-                            <div class="full-width">
-                            <label class="top-label">Address <span class="required-asterisk">*</span></label>
+                        <div class="form-row cohabitation-address-age-row">
+                            <div class="col-span-3">
+                                <label class="top-label">Address <span class="required-asterisk">*</span></label>
                                 <input type="text" class="form-control" name="full_address_display" readonly value="<?php echo $fullAddress; ?>">
                                 <input type="hidden" name="full_unit_number" value="<?php echo $applicantUnit; ?>">
                                 <input type="hidden" name="full_house_lot_number" value="<?php echo $applicantHouseOrLot; ?>">
@@ -212,6 +247,10 @@ $purposeInputClass = $isRelationshipJailVisitVariant ? 'form-control text-bg-lig
                                 <input type="hidden" name="full_barangay" value="<?php echo $applicantBarangay; ?>">
                                 <input type="hidden" name="full_area_number" value="<?php echo $applicantArea; ?>">
                                 <input type="hidden" name="full_address" value="<?php echo $fullAddress; ?>">
+                            </div>
+                            <div>
+                                <label class="top-label">Age</label>
+                                <input type="text" name="applicant_age" readonly value="<?php echo htmlspecialchars((string)($residentinformationtbl['age'] ?? ''), ENT_QUOTES, 'UTF-8'); ?>">
                             </div>
                         </div>
 
@@ -242,7 +281,7 @@ $purposeInputClass = $isRelationshipJailVisitVariant ? 'form-control text-bg-lig
                             </div>
                         </div>
 
-                        <div class="form-row">
+                        <div class="form-row cohabitation-detained-person-row">
                             <div>
                                 <label class="top-label">Civil Status <span class="required-asterisk">*</span></label>
                                 <select name="cohabitant_civil_status" required>
@@ -255,13 +294,26 @@ $purposeInputClass = $isRelationshipJailVisitVariant ? 'form-control text-bg-lig
                                 </select>
                             </div>
                             <div>
+                                <label class="top-label text-dark"><?= $isRelationshipJailVisitVariant ? 'Birthday / Date of Birth' : 'Date of Birth' ?> <span class="required-asterisk">*</span></label>
+                                <input
+                                    type="text"
+                                    name="cohabitant_dob"
+                                    placeholder="Select date"
+                                    onfocus="this.type='date'"
+                                    onblur="if(!this.value){this.type='text'}"
+                                    required
+                                >
+                            </div>
+                            <div>
+                                <label class="top-label">Age</label>
+                                <input type="text" id="partnerAge" name="partner_age" readonly>
+                            </div>
+                            <div>
                                 <label class="top-label">Nationality <span class="required-asterisk">*</span></label>
                                 <input type="text" name="cohabitant_nationality" required>
                             </div>
-                            <div>
-                                <label class="top-label"><?= $isRelationshipJailVisitVariant ? 'Birthday / Date of Birth' : 'Date of Birth' ?> <span class="required-asterisk">*</span></label>
-                                <input type="date" name="cohabitant_dob" required>
-                            </div>
+                        </div>
+                        <div class="form-row">
                             <div class="<?= $isRelationshipJailVisitVariant ? 'd-none' : '' ?>">
                                 <label class="top-label">Occupation <i>(leave blank if NA)</i></label>
                                 <input type="text" name="cohabitant_occupation">
@@ -519,8 +571,8 @@ $purposeInputClass = $isRelationshipJailVisitVariant ? 'form-control text-bg-lig
 
                         <div id="relationshipLengthWrapper" class="form-row two-col-row<?= $isRelationshipJailVisitVariant ? ' d-none' : '' ?>">
                             <div>
-                                <label class="top-label"><?= htmlspecialchars($cohabitationStartLabel, ENT_QUOTES, 'UTF-8') ?> <span class="required-asterisk">*</span></label>
-                                <input type="text" class="form-control text-bg-light" id="cohabitationStartDisplay" value="" placeholder="Select month and year" readonly required>
+                                <label class="top-label text-dark"><?= htmlspecialchars($cohabitationStartLabel, ENT_QUOTES, 'UTF-8') ?> <span class="required-asterisk">*</span></label>
+                                <input type="text" class="form-control" id="cohabitationStartDisplay" value="" placeholder="Select month and year" readonly required>
                                 <input type="hidden" id="cohabitationStartDate" name="cohabitation_start_date" value="">
                             </div>
                             <div>
@@ -621,7 +673,7 @@ $purposeInputClass = $isRelationshipJailVisitVariant ? 'form-control text-bg-lig
 
                         <h2 class="section-title text-center text-dark">Detention Facility Details</h2>
                         <div class="form-row two-col-row">
-                            <div>
+                            <div class="full-width">
                                 <label class="top-label" for="detentionFacility">Police Station / BJMP <span class="required-asterisk">*</span></label>
                                 <select class="form-select" id="detentionFacility" name="detention_facility" required>
                                     <option value="">Select</option>
@@ -869,7 +921,7 @@ $purposeInputClass = $isRelationshipJailVisitVariant ? 'form-control text-bg-lig
             <div class="modal-content">
                 <div class="modal-header">
                     <div>
-                        <div class="residency-picker-panel-title"><?= htmlspecialchars($isRelationshipJailVisitVariant ? 'Started Living Together On' : 'Started Cohabitation On', ENT_QUOTES, 'UTF-8') ?></div>
+                        <div class="residency-picker-panel-title text-dark"><?= htmlspecialchars($isRelationshipJailVisitVariant ? 'Started Living Together On' : 'Started Cohabitation On', ENT_QUOTES, 'UTF-8') ?></div>
                         <p class="residency-picker-panel-note mb-0"><?= htmlspecialchars($isRelationshipJailVisitVariant ? 'Choose the month and year when they started living together.' : 'Choose the month and year when cohabitation started.', ENT_QUOTES, 'UTF-8') ?></p>
                     </div>
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
@@ -912,6 +964,7 @@ $purposeInputClass = $isRelationshipJailVisitVariant ? 'form-control text-bg-lig
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="<?= htmlspecialchars($baseUrl) ?>/JS-Script-Files/Resident-End/formValidationHighlight.js"></script>
     <script src="<?= htmlspecialchars($baseUrl) ?>/JS-Script-Files/Resident-End/dateFieldModal.js"></script>
     <script src="<?= htmlspecialchars($baseUrl) ?>/JS-Script-Files/Resident-End/Certificates/cohabitationFormScript.js?v=20260311-05"></script>
 </body>

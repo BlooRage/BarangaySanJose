@@ -12,15 +12,21 @@
   const entriesPerPageInput = document.getElementById('entriesPerPageInput');
   const paginationEl = document.getElementById('blotterPagination');
   const refreshBtn = document.getElementById('btnBlotterTableRefresh');
+  const filterButtons = Array.from(document.querySelectorAll('.status-filter-btn'));
+  const activeBlotterBadge = document.getElementById('activeBlotterBadge');
 
   const viewModalEl = document.getElementById('viewModal');
   const viewModal = viewModalEl ? new bootstrap.Modal(viewModalEl) : null;
   const viewModalTitle = document.getElementById('viewModalTitle');
   const viewDetailsBody = document.getElementById('viewDetailsBody');
+  const viewModalActionButtons = document.getElementById('viewModalActionButtons');
   const caseLogsModalEl = document.getElementById('caseLogsModal');
   const caseLogsModal = caseLogsModalEl ? new bootstrap.Modal(caseLogsModalEl) : null;
   const caseLogsModalTitle = document.getElementById('caseLogsModalTitle');
   const caseLogsBody = document.getElementById('caseLogsBody');
+  const unsupportedFileModalEl = document.getElementById('unsupportedFileModal');
+  const unsupportedFileModal = unsupportedFileModalEl ? new bootstrap.Modal(unsupportedFileModalEl) : null;
+  const btnUnsupportedFileReturn = document.getElementById('btnUnsupportedFileReturn');
   const caseActionModalEl = document.getElementById('caseActionModal');
   const caseActionModal = caseActionModalEl ? new bootstrap.Modal(caseActionModalEl) : null;
   const caseActionModalTitle = document.getElementById('caseActionModalTitle');
@@ -38,10 +44,12 @@
   let allRows = [];
   let filteredRows = [];
   let currentPage = 1;
+  let activeFilter = '';
   let currentViewCaseId = null;
   let currentDetail = null;
   let pendingCaseAction = null;
   let caseActionHandlersBound = false;
+  let unsupportedFileReturnToView = false;
 
   function esc(v) {
     return String(v ?? '').replace(/[&<>\"']/g, (m) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '\"': '&quot;', "'": '&#39;' }[m]));
@@ -305,22 +313,32 @@ fields.push({ label: 'Address', value: participant?.address || '-', fullWidth: t
 
   function applyFilters() {
     const term = String(searchInput?.value || '').trim().toLowerCase();
-    if (!term) {
-      filteredRows = [...allRows];
-    } else {
-      filteredRows = allRows.filter((row) => {
-        const hay = [
-          row.blotter_id,
-          row.blotter_number,
-          row.case_id,
-          row.complainant_name,
-          row.respondent_name
-        ].map((v) => String(v || '').toLowerCase());
-        return hay.some((v) => v.includes(term));
-      });
-    }
+    filteredRows = allRows.filter((row) => {
+      const statusKey = String(row?.status_name || '').trim().toLowerCase();
+      const matchesFilter = !activeFilter || statusKey === activeFilter;
+      if (!matchesFilter) return false;
+
+      if (!term) return true;
+      const hay = [
+        row.blotter_id,
+        row.blotter_number,
+        row.case_id,
+        row.complainant_name,
+        row.respondent_name,
+        row.status_name,
+        row.level_name
+      ].map((v) => String(v || '').toLowerCase());
+      return hay.some((v) => v.includes(term));
+    });
     currentPage = 1;
     renderTable();
+  }
+
+  function updateActiveBadge() {
+    if (!activeBlotterBadge) return;
+    const count = allRows.filter((row) => String(row?.status_name || '').trim().toLowerCase() === 'active').length;
+    activeBlotterBadge.textContent = String(count);
+    activeBlotterBadge.classList.toggle('d-none', count <= 0);
   }
 
   async function fetchJson(url, options) {
@@ -339,6 +357,7 @@ fields.push({ label: 'Address', value: participant?.address || '-', fullWidth: t
     try {
       const data = await fetchJson(`${endpoint}?action=list`);
       allRows = Array.isArray(data.items) ? data.items : [];
+      updateActiveBadge();
       applyFilters();
     } catch (err) {
       tableBody.innerHTML = `<tr><td colspan="9" class="text-center text-danger py-4">${esc(err.message || err)}</td></tr>`;
@@ -349,8 +368,21 @@ fields.push({ label: 'Address', value: participant?.address || '-', fullWidth: t
     const initialStamp = String(detail?.report_timestamp || detail?.date_filed || '-');
     let initialValueHtml = esc(detail?.narrative_value || '-');
     if (detail?.narrative_type === 'file' && detail?.narrative_value) {
-      const fileUrl = `${appBase}/${String(detail.narrative_value).replace(/^\/+/, '')}`;
-      initialValueHtml = `<a class="btn btn-sm btn-outline-primary" href="${esc(fileUrl)}" target="_blank" rel="noopener">Open Narrative File</a>`;
+      const fileUrl = String(detail?.narrative_url || '').trim()
+        || `${appBase}/${String(detail.narrative_value).replace(/^\/+/, '')}`;
+      initialValueHtml = `
+        <div class="tracker-attachment-actions">
+          <a
+            class="btn btn-sm btn-outline-primary js-blotter-attachment"
+            href="${esc(fileUrl)}"
+            data-file-url="${esc(fileUrl)}"
+            data-file-name="Narrative File"
+            data-file-mime="${esc(detail?.narrative_mime_type || '')}"
+          >Open Narrative File</a>
+        </div>
+      `;
+    } else if (detail?.narrative_type === 'text' && detail?.narrative_value) {
+      initialValueHtml = `<div class="tracker-form-value-text">${esc(detail.narrative_value || '-')}</div>`;
     }
 
     return `
@@ -362,6 +394,69 @@ fields.push({ label: 'Address', value: participant?.address || '-', fullWidth: t
         </div>
       </section>
     `;
+  }
+
+  function titleCase(value) {
+    return String(value || '')
+      .trim()
+      .replace(/[_-]+/g, ' ')
+      .replace(/\b\w/g, (m) => m.toUpperCase());
+  }
+
+  function renderSignatureSection(detail) {
+    const signatures = detail?.signatures && typeof detail.signatures === 'object'
+      ? Object.entries(detail.signatures)
+      : [];
+
+    if (!signatures.length) {
+      return '';
+    }
+
+    const cards = signatures.map(([role, item]) => {
+      const label = titleCase(role || 'Signature');
+      const fileUrl = String(item?.file_url || '').trim()
+        || (String(item?.file_path || '').trim()
+          ? `${appBase}/${String(item.file_path).replace(/^\/+/, '')}`
+          : '');
+
+      if (!fileUrl) {
+        return `
+          <article class="tracker-signature-card">
+            <div class="tracker-signature-card__header">
+              <span class="tracker-signature-card__title">${esc(label)}</span>
+            </div>
+            <div class="tracker-signature-card__empty">Signature file unavailable.</div>
+          </article>
+        `;
+      }
+
+      return `
+        <article class="tracker-signature-card">
+          <div class="tracker-signature-card__header">
+            <span class="tracker-signature-card__title">${esc(label)}</span>
+            <a
+              class="btn btn-sm btn-outline-primary js-blotter-attachment"
+              href="${esc(fileUrl)}"
+              data-file-url="${esc(fileUrl)}"
+              data-file-name="${esc(label)} Signature"
+              data-file-mime="${esc(item?.mime_type || '')}"
+            >Open</a>
+          </div>
+          <a
+            class="tracker-signature-card__preview js-blotter-attachment"
+            href="${esc(fileUrl)}"
+            data-file-url="${esc(fileUrl)}"
+            data-file-name="${esc(label)} Signature"
+            data-file-mime="${esc(item?.mime_type || '')}"
+            aria-label="Open ${esc(label)} signature"
+          >
+            <img src="${esc(fileUrl)}" alt="${esc(label)} signature preview" loading="lazy">
+          </a>
+        </article>
+      `;
+    }).join('');
+
+    return formSection('Signatures', `<div class="tracker-signature-grid">${cards}</div>`);
   }
 
   async function loadNarrativeUpdates(caseId) {
@@ -392,17 +487,6 @@ fields.push({ label: 'Address', value: participant?.address || '-', fullWidth: t
   function renderCaseManagementSection(detail) {
     const isFinalized = String(detail?.status_name || '').trim().toLowerCase() !== 'active';
     const disabledAttr = isFinalized ? 'disabled' : '';
-    const statusActions = isFinalized
-      ? `
-        <div class="small text-muted">
-          Status is final (${esc(detail?.status_name || '-')}); no further status changes are allowed.
-        </div>
-      `
-      : `
-        <button type="button" class="btn btn-sm btn-danger" id="btnMarkDropped">Mark as Dropped</button>
-        <button type="button" class="btn btn-sm btn-warning" id="btnSubjectEndorsement">Subject to Endorsement</button>
-        <button type="button" class="btn btn-sm btn-success" id="btnMarkResolved">Mark as Resolved</button>
-      `;
 
     return `
       <section class="tracker-form-section">
@@ -423,13 +507,20 @@ fields.push({ label: 'Address', value: participant?.address || '-', fullWidth: t
             <button type="button" class="btn btn-sm btn-success" id="btnAddCaseUpdate" ${disabledAttr}>Add Update</button>
           </div>
         </div>
-
-        <hr class="my-3">
-        <div class="d-flex flex-wrap gap-2">
-          ${statusActions}
-        </div>
       </section>
     `;
+  }
+
+  function syncViewModalFooterActions(detail) {
+    const isFinalized = String(detail?.status_name || '').trim().toLowerCase() !== 'active';
+    const markResolvedBtn = document.getElementById('btnMarkResolved');
+    const subjectEndorsementBtn = document.getElementById('btnSubjectEndorsement');
+    const markDroppedBtn = document.getElementById('btnMarkDropped');
+
+    markResolvedBtn?.classList.toggle('d-none', isFinalized);
+    subjectEndorsementBtn?.classList.toggle('d-none', isFinalized);
+    markDroppedBtn?.classList.toggle('d-none', isFinalized);
+    viewModalActionButtons?.classList.toggle('d-none', isFinalized);
   }
 
   function actionLabel(type) {
@@ -448,6 +539,43 @@ fields.push({ label: 'Address', value: participant?.address || '-', fullWidth: t
       return;
     }
     toModal?.show();
+  }
+
+  function getAttachmentExtension(url) {
+    const cleanUrl = String(url || '').split('?')[0].split('#')[0].trim().toLowerCase();
+    const match = cleanUrl.match(/\.([a-z0-9]+)$/i);
+    return match ? match[1] : '';
+  }
+
+  function isSupportedAttachment(fileUrl, mimeType) {
+    const mime = String(mimeType || '').trim().toLowerCase();
+    if (mime === 'application/pdf' || mime.startsWith('image/')) {
+      return true;
+    }
+
+    const ext = getAttachmentExtension(fileUrl);
+    return ['pdf', 'png', 'jpg', 'jpeg', 'webp', 'gif', 'bmp', 'svg'].includes(ext);
+  }
+
+  function bindAttachmentActions() {
+    viewDetailsBody?.querySelectorAll('.js-blotter-attachment').forEach((link) => {
+      link.addEventListener('click', (event) => {
+        event.preventDefault();
+        const fileUrl = String(link.getAttribute('data-file-url') || link.getAttribute('href') || '').trim();
+        const mimeType = String(link.getAttribute('data-file-mime') || '').trim();
+        if (!fileUrl) {
+          return;
+        }
+
+        if (isSupportedAttachment(fileUrl, mimeType)) {
+          window.open(fileUrl, '_blank', 'noopener');
+          return;
+        }
+
+        unsupportedFileReturnToView = true;
+        transitionModal(viewModalEl, viewModal, unsupportedFileModal);
+      });
+    });
   }
 
   function openCaseActionModal(type) {
@@ -631,6 +759,7 @@ fields.push({ label: 'Address', value: participant?.address || '-', fullWidth: t
     currentViewCaseId = String(caseId);
     currentDetail = null;
     viewDetailsBody.innerHTML = '<div class="text-muted">Loading details...</div>';
+    viewModalActionButtons?.classList.add('d-none');
     if (viewModalTitle) viewModalTitle.textContent = `Blotter Details (#${caseId})`;
     viewModal.show();
 
@@ -652,28 +781,34 @@ fields.push({ label: 'Address', value: participant?.address || '-', fullWidth: t
       const complainantGrid = renderParticipantGrid(complainant);
       const respondentGrid = renderParticipantGrid(respondent);
 
-      const incidentGrid = renderFieldGrid([
-        { label: 'Incident Date', value: d.incident_date || '-' },
-        { label: 'Incident Time', value: d.incident_time || '-' },
-        { label: 'Incident Place', value: d.incident_place || '-' },
-        { label: 'Complaint Type', value: d.complaint_type || '-' }
-      ], 2);
+      const incidentGrid = d.narrative_type === 'file'
+        ? ''
+        : renderFieldGrid([
+          { label: 'Incident Date', value: d.incident_date || '-' },
+          { label: 'Incident Time', value: d.incident_time || '-' },
+          { label: 'Incident Place', value: d.incident_place || '-' },
+          { label: 'Complaint Type', value: d.complaint_type || '-' }
+        ], 2);
 
       const html = [
         formSection('Blotter Information', blotterGrid),
         formSection('Complainant Information', complainantGrid),
         formSection('Respondent Information', respondentGrid),
-        formSection('Incident Details', incidentGrid),
+        incidentGrid ? formSection('Incident Details', incidentGrid) : '',
         renderNarrativeReportsSection(d),
+        renderSignatureSection(d),
         renderCaseManagementSection(d)
       ].join('');
 
       viewDetailsBody.innerHTML = html || '<div class="text-muted">No details available.</div>';
       currentDetail = d;
+      syncViewModalFooterActions(d);
+      bindAttachmentActions();
       bindViewActions();
       loadNarrativeUpdates(caseId);
     } catch (err) {
       viewDetailsBody.innerHTML = `<div class="text-danger">${esc(err.message || err)}</div>`;
+      viewModalActionButtons?.classList.add('d-none');
     }
   }
 
@@ -709,7 +844,33 @@ fields.push({ label: 'Address', value: participant?.address || '-', fullWidth: t
     }
   }
 
+  btnUnsupportedFileReturn?.addEventListener('click', () => {
+    unsupportedFileReturnToView = false;
+    transitionModal(unsupportedFileModalEl, unsupportedFileModal, viewModal);
+  });
+
+  unsupportedFileModalEl?.addEventListener('hidden.bs.modal', () => {
+    if (!unsupportedFileReturnToView) {
+      return;
+    }
+    unsupportedFileReturnToView = false;
+    viewModal?.show();
+  });
+
   let searchTimer = null;
+  filterButtons.forEach((button) => {
+    button.addEventListener('click', () => {
+      activeFilter = String(button.getAttribute('data-filter') || '').trim().toLowerCase();
+      filterButtons.forEach((btn) => {
+        const isActive = btn === button;
+        btn.classList.toggle('active', isActive);
+        btn.classList.toggle('btn-outline-primary', isActive);
+        btn.classList.toggle('btn-outline-secondary', !isActive);
+      });
+      applyFilters();
+    });
+  });
+
   searchInput?.addEventListener('input', () => {
     clearTimeout(searchTimer);
     searchTimer = setTimeout(applyFilters, 200);

@@ -88,6 +88,76 @@ require_once __DIR__ . "/../includes/admin_guard.php";
         #viewModal .tracker-form-value {
             line-height: 1.45;
         }
+
+        #viewModal .tracker-attachment-actions {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+
+        #viewModal .tracker-signature-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+            gap: 12px;
+        }
+
+        #viewModal .tracker-signature-card {
+            border: 1px solid #e9ecef;
+            border-radius: 14px;
+            padding: 12px;
+            background: #fffaf4;
+            display: grid;
+            gap: 10px;
+        }
+
+        #viewModal .tracker-signature-card__header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 10px;
+        }
+
+        #viewModal .tracker-signature-card__title {
+            font-weight: 700;
+            color: #6b4a19;
+        }
+
+        #viewModal .tracker-signature-card__preview {
+            display: block;
+            border: 1px solid #ead7bd;
+            border-radius: 12px;
+            background: #ffffff;
+            padding: 8px;
+        }
+
+        #viewModal .tracker-signature-card__preview img {
+            display: block;
+            width: 100%;
+            max-height: 200px;
+            object-fit: contain;
+        }
+
+        #viewModal .tracker-signature-card__empty {
+            color: #6c757d;
+            font-size: 0.95rem;
+        }
+
+        .resident-masterlist-shell .status-filter-btn[data-filter="endorsed"],
+        .resident-masterlist-shell .status-filter-btn[data-filter="dropped"],
+        .resident-masterlist-shell .status-filter-btn[data-filter="active"] {
+            color: #495057;
+            border-color: #6c757d;
+            background: #fff;
+        }
+
+        .resident-masterlist-shell .status-filter-btn[data-filter="endorsed"].active,
+        .resident-masterlist-shell .status-filter-btn[data-filter="dropped"].active,
+        .resident-masterlist-shell .status-filter-btn[data-filter="active"].active {
+            color: #fff !important;
+            background-color: #495057 !important;
+            border-color: #495057 !important;
+            font-weight: 700;
+        }
     </style>
 </head>
 
@@ -101,11 +171,17 @@ require_once __DIR__ . "/../includes/admin_guard.php";
         </h2>
         <hr><br>
 
-        <div id="div-tableContainer" class="bg-white p-4 rounded-4 shadow-sm border blotter-tracker-shell">
+        <div id="div-tableContainer" class="bg-white p-4 rounded-4 shadow-sm border blotter-tracker-shell resident-masterlist-shell">
 
             <div class="admin-list-toolbar mb-3 pt-2 flex-wrap">
                 <div class="admin-list-tabs">
-                    <button class="btn btn-outline-primary btn-sm status-filter-btn" type="button">All</button>
+                    <button class="btn btn-outline-primary btn-sm status-filter-btn active" type="button" data-filter="">&nbsp;&nbsp;All&nbsp;&nbsp;</button>
+                    <button class="btn btn-outline-secondary btn-sm status-filter-btn fw-semibold" type="button" data-filter="endorsed">&nbsp;&nbsp;Endorsed&nbsp;&nbsp;</button>
+                    <button class="btn btn-outline-secondary btn-sm status-filter-btn fw-semibold" type="button" data-filter="dropped">&nbsp;&nbsp;Dropped&nbsp;&nbsp;</button>
+                    <button class="btn btn-outline-secondary btn-sm status-filter-btn fw-semibold has-notif" type="button" data-filter="active">
+                        &nbsp;&nbsp;Active
+                        <span class="pending-count-badge d-none" id="activeBlotterBadge">0</span>
+                    </button>
                 </div>
 
                 <div class="admin-list-actions">
@@ -196,6 +272,11 @@ require_once __DIR__ . "/../includes/admin_guard.php";
                 <div id="viewDetailsBody" class="tracker-profile-view"></div>
             </div>
             <div class="modal-footer d-flex justify-content-between flex-wrap gap-2">
+                <div id="viewModalActionButtons" class="d-none flex-wrap gap-2">
+                    <button type="button" class="btn btn-success d-none" id="btnMarkResolved">Mark Resolved</button>
+                    <button type="button" class="btn btn-warning d-none" id="btnSubjectEndorsement">Subject to Endorsement</button>
+                    <button type="button" class="btn btn-danger d-none" id="btnMarkDropped">Mark as Dropped</button>
+                </div>
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
             </div>
         </div>
@@ -213,6 +294,24 @@ require_once __DIR__ . "/../includes/admin_guard.php";
                 <div id="caseLogsBody" class="small text-muted">Loading case logs...</div>
             </div>
             <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="unsupportedFileModal" tabindex="-1" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Unsupported File Type</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                This file type is unsupported and cannot be previewed from the blotter tracker.
+            </div>
+            <div class="modal-footer d-flex justify-content-between flex-wrap gap-2">
+                <button type="button" class="btn btn-outline-secondary" id="btnUnsupportedFileReturn">Return</button>
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
             </div>
         </div>
@@ -278,7 +377,7 @@ require_once __DIR__ . "/../includes/admin_guard.php";
     };
 </script>
 <script src="../../JS-Script-Files/Admin-End/tableColumnsGeneric.js?v=20260215-1"></script>
-<script src="../../JS-Script-Files/Admin-End/blotterTracker.js?v=20260307-4"></script>
+<script src="../../JS-Script-Files/Admin-End/blotterTracker.js?v=20260318-3"></script>
 </body>
 </html>
 

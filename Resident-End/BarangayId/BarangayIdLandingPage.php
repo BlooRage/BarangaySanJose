@@ -53,6 +53,12 @@ require_once __DIR__ . "/../includes/resident_access_guard.php";
         .apply-btn {
             min-width: 180px;
         }
+        .apply-note {
+            margin-top: 10px;
+            font-size: 0.92rem;
+            font-style: italic;
+            color: #6b7280;
+        }
         .id-sample-img {
             box-shadow: 0 10px 24px rgba(0, 0, 0, 0.18);
         }
@@ -113,6 +119,7 @@ require_once __DIR__ . "/../includes/resident_access_guard.php";
 
                 <div class="text-center apply-section mt-4">
                     <button class="btn apply-btn" type="button" onclick="location.href='<?= htmlspecialchars(appUrl('Resident-End/BarangayId/BarangayIdForm.php')) ?>'">Apply Now</button>
+                    <p class="apply-note mb-0">Renewal is free every 2 years. Renewal of lost Barangay ID will cost Php50.00</p>
                 </div>
             </div>
         </main>

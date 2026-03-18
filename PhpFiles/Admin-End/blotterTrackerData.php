@@ -117,6 +117,53 @@ function loadCaseSignatures(mysqli $conn, string $caseId): array {
     return $items;
 }
 
+function toPublicPath($path): ?string {
+    $path = trim((string)$path);
+    if ($path === '') {
+        return null;
+    }
+
+    $normalized = str_replace("\\", "/", $path);
+    $normalized = preg_replace('#/+#', '/', $normalized);
+
+    $parts = explode('/', $normalized);
+    $cleanParts = [];
+    foreach ($parts as $part) {
+        if ($part === '' || $part === '.') {
+            continue;
+        }
+        if ($part === '..') {
+            array_pop($cleanParts);
+            continue;
+        }
+        $cleanParts[] = $part;
+    }
+    $normalized = '/' . implode('/', $cleanParts);
+
+    $marker = '/UnifiedFileAttachment/';
+    $markerPos = stripos($normalized, $marker);
+    if ($markerPos !== false) {
+        return appRootPath() . substr($normalized, $markerPos);
+    }
+
+    $webRoot = realpath(__DIR__ . "/../..");
+    if ($webRoot) {
+        $rootNorm = str_replace("\\", "/", $webRoot);
+        if (strpos($normalized, $rootNorm) === 0) {
+            $rel = substr($normalized, strlen($rootNorm));
+            if ($rel === '') {
+                return null;
+            }
+            if ($rel[0] !== '/') {
+                $rel = '/' . $rel;
+            }
+            return appRootPath() . $rel;
+        }
+    }
+
+    return appRootPath() . '/' . ltrim($normalized, '/');
+}
+
 if ($action === 'list') {
     $sql = "
         SELECT
@@ -285,7 +332,11 @@ if ($action === 'detail') {
         'complaint_type' => $detail['complaint_type'],
         'narrative_type' => $narrativeType,
         'narrative_value' => $narrativeValue,
-        'signatures' => loadCaseSignatures($conn, $caseId),
+        'narrative_url' => $narrativeType === 'file' ? toPublicPath($narrativeValue) : null,
+        'signatures' => array_map(static function (array $signature): array {
+            $signature['file_url'] = toPublicPath($signature['file_path'] ?? '');
+            return $signature;
+        }, loadCaseSignatures($conn, $caseId)),
         'complainant' => $participants['Complainant'] ?? [],
         'respondent' => $participants['Respondent'] ?? []
     ];

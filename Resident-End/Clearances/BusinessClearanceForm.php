@@ -133,6 +133,14 @@ $ownerFullAddress = htmlspecialchars(implode(', ', $ownerFullAddressParts), ENT_
             margin-top: 32px;
             margin-bottom: 24px;
         }
+        input[type="date"] {
+            background-color: #ffffff !important;
+            color: #212529;
+        }
+        input[type="date"]::-webkit-datetime-edit,
+        input[type="date"]::-webkit-date-and-time-value {
+            color: #212529;
+        }
     </style>
 </head>
 <body>
@@ -288,7 +296,14 @@ $ownerFullAddress = htmlspecialchars(implode(', ', $ownerFullAddressParts), ENT_
                 <div class="form-row two-col-row">
                     <div>
                         <label class="top-label">Date of Initial Operation <span class="required-asterisk">*</span></label>
-                        <input type="date" name="initial_operation_date" required>
+                        <input
+                            type="text"
+                            name="initial_operation_date"
+                            placeholder="Select date"
+                            onfocus="this.type='date'"
+                            onblur="if(!this.value){this.type='text'}"
+                            required
+                        >
                     </div>
                     <div>
                         <label class="top-label">Contact Number</label>
@@ -351,7 +366,12 @@ $ownerFullAddress = htmlspecialchars(implode(', ', $ownerFullAddressParts), ENT_
                                 </div>
                                 <div class="col-md-6">
                                     <label class="top-label" for="proofAddressFile">Upload Proof of Address <span class="required-asterisk">*</span></label>
-                                    <input type="file" id="proofAddressFile" name="proof_address_file" class="form-control" accept=".pdf,.jpg,.jpeg,.png">
+                                    <label class="upload-dropzone" id="proofAddressDropzone" for="proofAddressFile">
+                                        <i class="fa-solid fa-cloud-arrow-up"></i>
+                                        <span>Drag files here or click to upload</span>
+                                    </label>
+                                    <input type="file" id="proofAddressFile" name="proof_address_file" class="visually-hidden" accept=".pdf,.jpg,.jpeg,.png">
+                                    <div id="proofAddressSelectedFile" class="selected-files small text-muted mt-2">No file selected</div>
                                 </div>
                             </div>
                         </div>
@@ -413,7 +433,12 @@ $ownerFullAddress = htmlspecialchars(implode(', ', $ownerFullAddressParts), ENT_
                                     </div>
                                     <div class="col-md-6">
                                         <label class="top-label" for="renewalProofAddressFile">Upload Proof of Address <span class="required-asterisk">*</span></label>
-                                        <input type="file" id="renewalProofAddressFile" name="renewal_proof_address_file" class="form-control" accept=".pdf,.jpg,.jpeg,.png">
+                                        <label class="upload-dropzone" id="renewalProofAddressDropzone" for="renewalProofAddressFile">
+                                            <i class="fa-solid fa-cloud-arrow-up"></i>
+                                            <span>Drag files here or click to upload</span>
+                                        </label>
+                                        <input type="file" id="renewalProofAddressFile" name="renewal_proof_address_file" class="visually-hidden" accept=".pdf,.jpg,.jpeg,.png">
+                                        <div id="renewalProofAddressSelectedFile" class="selected-files small text-muted mt-2">No file selected</div>
                                     </div>
                                 </div>
                             </div>
@@ -451,6 +476,7 @@ $ownerFullAddress = htmlspecialchars(implode(', ', $ownerFullAddressParts), ENT_
     </main>
 </div>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="../../JS-Script-Files/Resident-End/formValidationHighlight.js"></script>
     <script src="../../JS-Script-Files/Resident-End/dateFieldModal.js"></script>
     <script src="../../JS-Script-Files/Resident-End/Clearances/businessClearanceScript.js"></script>
 </body>

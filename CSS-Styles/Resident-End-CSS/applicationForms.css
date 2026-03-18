@@ -205,6 +205,30 @@ body {
     border-color: #e8872f;
 }
 
+.form-row input.is-invalid,
+.form-row select.is-invalid,
+.form-row textarea.is-invalid,
+.application-card input.is-invalid,
+.application-card select.is-invalid,
+.application-card textarea.is-invalid,
+.form-control.is-invalid {
+    border-color: #dc3545 !important;
+    box-shadow: 0 0 0 0.15rem rgba(220, 53, 69, 0.12);
+    background-image: none;
+}
+
+.form-row input.is-invalid:focus,
+.form-row select.is-invalid:focus,
+.form-row textarea.is-invalid:focus,
+.application-card input.is-invalid:focus,
+.application-card select.is-invalid:focus,
+.application-card textarea.is-invalid:focus,
+.form-control.is-invalid:focus {
+    border-color: #dc3545 !important;
+    box-shadow: 0 0 0 0.2rem rgba(220, 53, 69, 0.18);
+    outline: none;
+}
+
 /* Muted readonly / disabled fields */
 .application-card input[readonly],
 .application-card textarea[readonly],
