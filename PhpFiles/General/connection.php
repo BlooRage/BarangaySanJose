@@ -4,11 +4,10 @@ require_once __DIR__ . '/runtimeConfig.php';
 // Use Asia/Manila (UTC+08:00) for PHP date/time functions.
 date_default_timezone_set('Asia/Manila');
 
-$host = 'localhost';
-$port = 3306;
-$user = 'root';
-$pass = '';
-$dbname = 'u682055666_testingBrgySJ';
+$host = "srv1986.hstgr.io";
+$user = "u682055666_thesiscaps";
+$pass = "ThesisCaps123.";
+$dbname = "u682055666_testingBrgySJ";
 
 if ($host === '' || $user === '' || $dbname === '') {
     error_log('Database configuration is incomplete. Set DB_HOST, DB_USER, DB_PASS, and DB_NAME via environment or config.runtime.local.php.');
