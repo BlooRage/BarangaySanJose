@@ -1,13 +1,13 @@
 <?php
 require_once __DIR__ . "/../General/connection.php";
 require_once __DIR__ . "/../General/security.php";
-require_once __DIR__ . "/announcementsStore.php";
+require_once __DIR__ . "/contentStore.php";
 require_once __DIR__ . "/announcementDelivery.php";
 
 requireRoleSession(['SuperAdmin', 'Official', 'Officials', 'Personnel', 'Personnels', 'Admin', 'Employee'], false);
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-  header("Location: " . appUrl('/Admin-End/Announcements/Announcements.php'));
+  header("Location: " . appUrl('/Admin-End/Contents/Contents.php'));
   exit;
 }
 verifyCsrfToken(false);
@@ -25,7 +25,7 @@ function ann_action_redirect(string $channel, string $status, string $q, string 
     $query['queue_channel'] = $queueChannel;
   }
   $_SESSION['announcement_flash'] = ['type' => $type, 'message' => $message];
-  header("Location: " . appUrl('/Admin-End/Announcements/Announcements.php') . "?" . http_build_query($query));
+  header("Location: " . appUrl('/Admin-End/Contents/Contents.php') . "?" . http_build_query($query));
   exit;
 }
 
@@ -124,7 +124,7 @@ if (!in_array($queueChannel, ['all', 'website', 'public', 'public_news', 'sms', 
   $queueChannel = 'all';
 }
 if ($announcementId === '' || !in_array($action, ['approve', 'deny', 'delete', 'update', 'submit_review'], true)) {
-  ann_action_redirect($channel, $status, $q, $queueQ, $queueChannel, 'warning', 'Invalid announcement action.');
+  ann_action_redirect($channel, $status, $q, $queueQ, $queueChannel, 'warning', 'Invalid content action.');
 }
 
 $sessionRole = strtolower(trim((string)($_SESSION['role'] ?? '')));
@@ -160,13 +160,13 @@ foreach ($rows as $idx => $item) {
 
   if ($action === 'approve') {
     if (!$isSuperAdmin) {
-      ann_action_redirect($channel, $status, $q, $queueQ, $queueChannel, 'danger', 'Only SuperAdmin can approve announcements.');
+      ann_action_redirect($channel, $status, $q, $queueQ, $queueChannel, 'danger', 'Only SuperAdmin can approve content items.');
     }
     if ($isCreatedBySuperAdmin) {
-      ann_action_redirect($channel, $status, $q, $queueQ, $queueChannel, 'warning', 'SuperAdmin-created announcements are not part of the review queue.');
+      ann_action_redirect($channel, $status, $q, $queueQ, $queueChannel, 'warning', 'SuperAdmin-created content items are not part of the review queue.');
     }
     if ($currentStatus !== 'pending') {
-      ann_action_redirect($channel, $status, $q, $queueQ, $queueChannel, 'warning', 'Only pending announcements can be approved.');
+      ann_action_redirect($channel, $status, $q, $queueQ, $queueChannel, 'warning', 'Only pending content items can be approved.');
     }
     $rows[$idx]['status'] = 'approved';
     $rows[$idx]['review_result'] = 'approved';
@@ -181,37 +181,37 @@ foreach ($rows as $idx => $item) {
     }
     $deliveryResult = ann_delivery_send($conn, $rows[$idx]);
     announcements_save_all($rows);
-    ann_action_redirect($channel, $status, $q, $queueQ, $queueChannel, 'success', 'Announcement approved.' . ann_delivery_message_suffix($deliveryResult));
+    ann_action_redirect($channel, $status, $q, $queueQ, $queueChannel, 'success', 'Content approved.' . ann_delivery_message_suffix($deliveryResult));
   }
 
   if ($action === 'deny') {
     if (!$isSuperAdmin) {
-      ann_action_redirect($channel, $status, $q, $queueQ, $queueChannel, 'danger', 'Only SuperAdmin can deny announcements.');
+      ann_action_redirect($channel, $status, $q, $queueQ, $queueChannel, 'danger', 'Only SuperAdmin can deny content items.');
     }
     if ($isCreatedBySuperAdmin) {
-      ann_action_redirect($channel, $status, $q, $queueQ, $queueChannel, 'warning', 'SuperAdmin-created announcements are not part of the review queue.');
+      ann_action_redirect($channel, $status, $q, $queueQ, $queueChannel, 'warning', 'SuperAdmin-created content items are not part of the review queue.');
     }
     if ($currentStatus !== 'pending') {
-      ann_action_redirect($channel, $status, $q, $queueQ, $queueChannel, 'warning', 'Only pending announcements can be denied.');
+      ann_action_redirect($channel, $status, $q, $queueQ, $queueChannel, 'warning', 'Only pending content items can be denied.');
     }
-    // Denied announcements are returned to Draft for revision.
+    // Denied content items are returned to draft for revision.
     $rows[$idx]['status'] = 'draft';
     $rows[$idx]['review_result'] = 'denied';
-    $rows[$idx]['review_note'] = 'Your announcement was denied and returned to draft for revision.';
+    $rows[$idx]['review_note'] = 'Your content item was denied and returned to draft for revision.';
     $rows[$idx]['reviewed_at'] = date('Y-m-d H:i:s');
     $rows[$idx]['reviewed_by'] = (string)($_SESSION['user_id'] ?? 'SuperAdmin');
     if (!announcements_save_all($rows)) {
       ann_action_redirect($channel, $status, $q, $queueQ, $queueChannel, 'danger', 'Unable to save deny change.');
     }
-    ann_action_redirect($channel, $status, $q, $queueQ, $queueChannel, 'success', 'Announcement denied and returned to draft.');
+    ann_action_redirect($channel, $status, $q, $queueQ, $queueChannel, 'success', 'Content denied and returned to draft.');
   }
 
   if ($action === 'update') {
     if ($currentStatus === 'draft' && !$isOwnedByCurrentUser) {
-      ann_action_redirect($channel, $status, $q, $queueQ, $queueChannel, 'danger', 'Only the announcement creator can edit an unsubmitted draft.');
+      ann_action_redirect($channel, $status, $q, $queueQ, $queueChannel, 'danger', 'Only the content creator can edit an unsubmitted draft.');
     }
     if (!$isSuperAdmin && !$isOwnedByCurrentUser) {
-      ann_action_redirect($channel, $status, $q, $queueQ, $queueChannel, 'danger', 'Only the announcement creator can edit this announcement.');
+      ann_action_redirect($channel, $status, $q, $queueQ, $queueChannel, 'danger', 'Only the content creator can edit this content item.');
     }
 
     $title = trim((string)($_POST['title'] ?? ''));
@@ -222,7 +222,13 @@ foreach ($rows as $idx => $item) {
     $publicTitle = trim((string)($_POST['public_title'] ?? ''));
     $publicContentHtml = trim((string)($_POST['public_content_html'] ?? ''));
     $publishDate = trim((string)($_POST['publish_date'] ?? '-'));
+    $smsMessageInput = trim((string)($_POST['sms_message'] ?? ''));
+    $emailSubjectInput = trim((string)($_POST['email_subject'] ?? ''));
     $nextStatus = strtolower(trim((string)($_POST['status_update'] ?? $currentStatus)));
+    $recordContentType = strtolower(trim((string)($item['content_type'] ?? 'page')));
+    if (!in_array($recordContentType, ['page', 'delivery', 'faq'], true)) {
+      $recordContentType = 'page';
+    }
     $placements = array_values(array_unique(array_filter((array)($_POST['placements'] ?? []), function ($placement) {
       return in_array((string)$placement, ['announcement', 'public_news'], true);
     })));
@@ -231,75 +237,102 @@ foreach ($rows as $idx => $item) {
     })));
 
     if ($audience === '') {
-      ann_action_redirect($channel, $status, $q, $queueQ, $queueChannel, 'warning', 'Audience is required.');
-    }
-    if (!$placements) {
-      ann_action_redirect($channel, $status, $q, $queueQ, $queueChannel, 'warning', 'Select at least one page placement.');
-    }
-    $hasAnnouncementPlacement = in_array('announcement', $placements, true);
-    $hasNewsPlacement = in_array('public_news', $placements, true);
-    if ($hasAnnouncementPlacement && !array_intersect(['public', 'website'], $channels)) {
-      ann_action_redirect($channel, $status, $q, $queueQ, $queueChannel, 'warning', 'Select Guest Page or Account Page when Announcements is selected.');
+      $audience = 'All Residents';
     }
 
-    if ($hasAnnouncementPlacement && $hasNewsPlacement) {
-      if ($publicNewsTitle === '' || trim(strip_tags($publicNewsContentHtml)) === '') {
-        ann_action_redirect($channel, $status, $q, $queueQ, $queueChannel, 'warning', 'News Section title and body are required when both placements are selected.');
+    $hasAnnouncementPlacement = false;
+    $hasNewsPlacement = false;
+    if ($recordContentType === 'page') {
+      if (!$placements) {
+        ann_action_redirect($channel, $status, $q, $queueQ, $queueChannel, 'warning', 'Select at least one page placement.');
       }
-      if ($publicTitle === '' || trim(strip_tags($publicContentHtml)) === '') {
-        ann_action_redirect($channel, $status, $q, $queueQ, $queueChannel, 'warning', 'Announcements title and body are required when both placements are selected.');
+      $hasAnnouncementPlacement = in_array('announcement', $placements, true);
+      $hasNewsPlacement = in_array('public_news', $placements, true);
+      if ($hasAnnouncementPlacement && !array_intersect(['public', 'website'], $channels)) {
+        ann_action_redirect($channel, $status, $q, $queueQ, $queueChannel, 'warning', 'Select Guest Page or Account Page when Announcements is selected.');
       }
-      $title = $publicNewsTitle;
-      $contentHtml = $publicNewsContentHtml;
-    } elseif ($hasNewsPlacement) {
-      if ($title === '' || trim(strip_tags($contentHtml)) === '') {
-        ann_action_redirect($channel, $status, $q, $queueQ, $queueChannel, 'warning', 'Title and body are required.');
+
+      if ($hasAnnouncementPlacement && $hasNewsPlacement) {
+        if ($publicNewsTitle === '' || trim(strip_tags($publicNewsContentHtml)) === '') {
+          ann_action_redirect($channel, $status, $q, $queueQ, $queueChannel, 'warning', 'News Section title and body are required when both placements are selected.');
+        }
+        if ($publicTitle === '' || trim(strip_tags($publicContentHtml)) === '') {
+          ann_action_redirect($channel, $status, $q, $queueQ, $queueChannel, 'warning', 'Announcements title and body are required when both placements are selected.');
+        }
+        $title = $publicNewsTitle;
+        $contentHtml = $publicNewsContentHtml;
+      } elseif ($hasNewsPlacement) {
+        if ($title === '' || trim(strip_tags($contentHtml)) === '') {
+          ann_action_redirect($channel, $status, $q, $queueQ, $queueChannel, 'warning', 'Title and body are required.');
+        }
+        $publicNewsTitle = $title;
+        $publicNewsContentHtml = $contentHtml;
+        $publicTitle = '';
+        $publicContentHtml = '';
+      } elseif ($hasAnnouncementPlacement) {
+        if ($title === '' || trim(strip_tags($contentHtml)) === '') {
+          ann_action_redirect($channel, $status, $q, $queueQ, $queueChannel, 'warning', 'Title and body are required.');
+        }
+        $publicTitle = $title;
+        $publicContentHtml = $contentHtml;
+        $publicNewsTitle = '';
+        $publicNewsContentHtml = '';
       }
-      $publicNewsTitle = $title;
-      $publicNewsContentHtml = $contentHtml;
-      $publicTitle = '';
-      $publicContentHtml = '';
-    } elseif ($hasAnnouncementPlacement) {
-      if ($title === '' || trim(strip_tags($contentHtml)) === '') {
-        ann_action_redirect($channel, $status, $q, $queueQ, $queueChannel, 'warning', 'Title and body are required.');
+
+      $resolvedChannels = [];
+      if ($hasNewsPlacement) {
+        $resolvedChannels[] = 'public_news';
       }
-      $publicTitle = $title;
-      $publicContentHtml = $contentHtml;
+      if ($hasAnnouncementPlacement) {
+        if (in_array('public', $channels, true)) {
+          $resolvedChannels[] = 'public';
+        }
+        if (in_array('website', $channels, true)) {
+          $resolvedChannels[] = 'website';
+        }
+      }
+      $channels = array_values(array_unique($resolvedChannels));
+      if (!$channels) {
+        ann_action_redirect($channel, $status, $q, $queueQ, $queueChannel, 'warning', 'Select at least one valid delivery destination.');
+      }
+    } elseif ($recordContentType === 'delivery') {
+      $placements = [];
       $publicNewsTitle = '';
       $publicNewsContentHtml = '';
-    }
-
-    $resolvedChannels = [];
-    if ($hasNewsPlacement) {
-      $resolvedChannels[] = 'public_news';
-    }
-    if ($hasAnnouncementPlacement) {
-      if (in_array('public', $channels, true)) {
-        $resolvedChannels[] = 'public';
+      $publicTitle = '';
+      $publicContentHtml = '';
+      $channels = array_values(array_unique(array_filter($channels, function ($ch) {
+        return in_array((string)$ch, ['sms', 'email'], true);
+      })));
+      if ($title === '' || trim(strip_tags($contentHtml)) === '') {
+        ann_action_redirect($channel, $status, $q, $queueQ, $queueChannel, 'warning', 'Title and body are required.');
       }
-      if (in_array('website', $channels, true)) {
-        $resolvedChannels[] = 'website';
+      if (!$channels) {
+        ann_action_redirect($channel, $status, $q, $queueQ, $queueChannel, 'warning', 'Select SMS or Email for this content type.');
       }
-    }
-    if (in_array('sms', $channels, true)) {
-      $resolvedChannels[] = 'sms';
-    }
-    if (in_array('email', $channels, true)) {
-      $resolvedChannels[] = 'email';
-    }
-    $channels = array_values(array_unique($resolvedChannels));
-    if (!$channels) {
-      ann_action_redirect($channel, $status, $q, $queueQ, $queueChannel, 'warning', 'Select at least one valid delivery destination.');
+      if (in_array('sms', $channels, true) && mb_strlen($smsMessageInput) > 320) {
+        ann_action_redirect($channel, $status, $q, $queueQ, $queueChannel, 'warning', 'SMS message must be 320 characters or less.');
+      }
+    } else {
+      $placements = [];
+      $channels = [];
+      $publicNewsTitle = '';
+      $publicNewsContentHtml = '';
+      $publicTitle = '';
+      $publicContentHtml = '';
+      if ($title === '' || trim(strip_tags($contentHtml)) === '') {
+        ann_action_redirect($channel, $status, $q, $queueQ, $queueChannel, 'warning', 'Question and answer are required.');
+      }
     }
     if (!in_array($nextStatus, ['draft', 'pending', 'approved'], true)) {
       $nextStatus = $currentStatus;
     }
     if (!$isSuperAdmin) {
       if ($currentStatus === 'approved') {
-        // Any Admin edit to a published announcement must go through SuperAdmin review again.
+        // Any Admin edit to published content must go through SuperAdmin review again.
         $nextStatus = 'pending';
       } elseif ($currentStatus === 'pending') {
-        // Editing an already submitted announcement keeps it in the pending review queue.
+        // Editing already submitted content keeps it in the pending review queue.
         $nextStatus = 'pending';
       } elseif ($nextStatus === 'approved') {
         $nextStatus = 'pending';
@@ -314,11 +347,17 @@ foreach ($rows as $idx => $item) {
     $rows[$idx]['public_news_content_html'] = $publicNewsContentHtml;
     $rows[$idx]['public_title'] = $publicTitle;
     $rows[$idx]['public_content_html'] = $publicContentHtml;
+    if ($recordContentType === 'faq') {
+      $rows[$idx]['faq_items_json'] = json_encode([[
+        'question' => $title,
+        'answer' => $contentHtml
+      ]], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?: '';
+    }
     $rows[$idx]['publish_date'] = $publishDate === '' ? '-' : $publishDate;
     $rows[$idx]['status'] = $nextStatus;
     $rows[$idx]['updated_at'] = date('Y-m-d H:i:s');
     $rows[$idx]['updated_by'] = (string)($_SESSION['user_id'] ?? ($_SESSION['role'] ?? 'Admin'));
-    $rows[$idx] = array_merge($rows[$idx], ann_delivery_compose_fields($rows[$idx], (string)($rows[$idx]['email_subject'] ?? '')));
+    $rows[$idx] = array_merge($rows[$idx], ann_delivery_compose_fields($rows[$idx], $emailSubjectInput, $smsMessageInput));
     if ($nextStatus === 'draft') {
       if (strtolower((string)($item['review_result'] ?? '')) === 'denied') {
         $rows[$idx]['review_result'] = '';
@@ -330,7 +369,7 @@ foreach ($rows as $idx => $item) {
     }
 
     if (!announcements_save_all($rows)) {
-      ann_action_redirect($channel, $status, $q, $queueQ, $queueChannel, 'danger', 'Unable to update announcement.');
+      ann_action_redirect($channel, $status, $q, $queueQ, $queueChannel, 'danger', 'Unable to update content item.');
     }
     $deliverySuffix = '';
     if ($isSuperAdmin && $nextStatus === 'approved') {
@@ -339,22 +378,22 @@ foreach ($rows as $idx => $item) {
       $deliverySuffix = ann_delivery_message_suffix($deliveryResult);
     }
     $msg = (!$isSuperAdmin && $nextStatus === 'pending')
-      ? 'Announcement submitted for review. Please wait for approval.'
+      ? 'Content submitted for review. Please wait for approval.'
       : ((strtolower((string)($item['review_result'] ?? '')) === 'denied' && $nextStatus === 'draft')
-        ? 'Announcement changes saved as draft.'
-        : 'Announcement updated successfully.' . $deliverySuffix);
+        ? 'Content changes saved as draft.'
+        : 'Content updated successfully.' . $deliverySuffix);
     ann_action_redirect($channel, $status, $q, $queueQ, $queueChannel, 'success', $msg);
   }
 
   if ($action === 'submit_review') {
     if ($isSuperAdmin) {
-      ann_action_redirect($channel, $status, $q, $queueQ, $queueChannel, 'warning', 'SuperAdmin announcements do not require review submission.');
+      ann_action_redirect($channel, $status, $q, $queueQ, $queueChannel, 'warning', 'SuperAdmin content items do not require review submission.');
     }
     if (!$isOwnedByCurrentUser) {
-      ann_action_redirect($channel, $status, $q, $queueQ, $queueChannel, 'danger', 'Only the announcement creator can submit this for review.');
+      ann_action_redirect($channel, $status, $q, $queueQ, $queueChannel, 'danger', 'Only the content creator can submit this for review.');
     }
     if ($currentStatus !== 'draft') {
-      ann_action_redirect($channel, $status, $q, $queueQ, $queueChannel, 'warning', 'Only draft announcements can be submitted for review.');
+      ann_action_redirect($channel, $status, $q, $queueQ, $queueChannel, 'warning', 'Only draft content items can be submitted for review.');
     }
 
     $rows[$idx]['status'] = 'pending';
@@ -364,29 +403,33 @@ foreach ($rows as $idx => $item) {
     $rows[$idx]['review_note'] = '';
 
     if (!announcements_save_all($rows)) {
-      ann_action_redirect($channel, $status, $q, $queueQ, $queueChannel, 'danger', 'Unable to submit announcement for review.');
+      ann_action_redirect($channel, $status, $q, $queueQ, $queueChannel, 'danger', 'Unable to submit content item for review.');
     }
-    ann_action_redirect($channel, $status, $q, $queueQ, $queueChannel, 'success', 'Announcement submitted for review.');
+    ann_action_redirect($channel, $status, $q, $queueQ, $queueChannel, 'success', 'Content submitted for review.');
   }
 
   if ($action === 'delete') {
     if (!$isSuperAdmin && $currentStatus === 'draft' && !$isOwnedByCurrentUser) {
-      ann_action_redirect($channel, $status, $q, $queueQ, $queueChannel, 'danger', 'Only the announcement creator can delete an unsubmitted draft.');
+      ann_action_redirect($channel, $status, $q, $queueQ, $queueChannel, 'danger', 'Only the content creator can delete an unsubmitted draft.');
     }
     if (!$isSuperAdmin && !$isOwnedByCurrentUser) {
-      ann_action_redirect($channel, $status, $q, $queueQ, $queueChannel, 'danger', 'Only the announcement creator can delete this announcement.');
+      ann_action_redirect($channel, $status, $q, $queueQ, $queueChannel, 'danger', 'Only the content creator can delete this content item.');
     }
     if (!$isSuperAdmin && $currentStatus !== 'draft') {
-      ann_action_redirect($channel, $status, $q, $queueQ, $queueChannel, 'danger', 'Only draft announcements can be deleted.');
+      ann_action_redirect($channel, $status, $q, $queueQ, $queueChannel, 'danger', 'Only draft content items can be deleted.');
     }
     array_splice($rows, $idx, 1);
     if (!announcements_save_all($rows)) {
-      ann_action_redirect($channel, $status, $q, $queueQ, $queueChannel, 'danger', 'Unable to delete announcement.');
+      ann_action_redirect($channel, $status, $q, $queueQ, $queueChannel, 'danger', 'Unable to delete content item.');
     }
-    ann_action_redirect($channel, $status, $q, $queueQ, $queueChannel, 'success', 'Announcement deleted.');
+    ann_action_redirect($channel, $status, $q, $queueQ, $queueChannel, 'success', 'Content deleted.');
   }
 }
 
 if (!$found) {
-  ann_action_redirect($channel, $status, $q, $queueQ, $queueChannel, 'warning', 'Announcement not found.');
+  ann_action_redirect($channel, $status, $q, $queueQ, $queueChannel, 'warning', 'Content item not found.');
 }
+
+
+
+

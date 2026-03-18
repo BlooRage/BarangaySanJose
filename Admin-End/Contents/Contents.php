@@ -1,11 +1,16 @@
 <?php
 require_once __DIR__ . "/../includes/admin_guard.php";
 require_once __DIR__ . "/../../PhpFiles/General/connection.php";
-require_once __DIR__ . "/../../PhpFiles/Admin-End/announcementsStore.php";
+require_once __DIR__ . "/../../PhpFiles/Admin-End/contentStore.php";
 
 $deliveryChannel = strtolower(trim((string)($_GET['channel'] ?? 'all')));
 if (!in_array($deliveryChannel, ['all', 'website', 'public', 'public_news', 'sms', 'email'], true)) {
   $deliveryChannel = 'all';
+}
+
+$toolView = strtolower(trim((string)($_GET['tool'] ?? 'tracker')));
+if (!in_array($toolView, ['tracker', 'review_queue'], true)) {
+  $toolView = 'tracker';
 }
 
 $statusFilter = strtolower(trim((string)($_GET['status'] ?? 'all')));
@@ -24,11 +29,17 @@ $isSuperAdmin = $sessionRole === 'superadmin';
 $currentUserId = trim((string)($_SESSION['user_id'] ?? ''));
 
 $channelLabels = [
-  'public' => 'Public Announcement',
+  'public' => 'Guest Page',
   'public_news' => 'Public News',
   'website' => 'Account Page',
   'sms' => 'SMS',
   'email' => 'Email'
+];
+
+$typeLabels = [
+  'page' => 'Page Announcement',
+  'delivery' => 'SMS and Email Announcement',
+  'faq' => 'FAQs Page'
 ];
 
 $statusLabels = [
@@ -210,6 +221,7 @@ foreach ($storedAnnouncements as $item) {
   $announcementRows[] = [
     'id' => (string)($item['id'] ?? ''),
     'title' => (string)($item['title'] ?? ''),
+    'content_type' => (string)($item['content_type'] ?? 'page'),
     'audience' => (string)($item['audience'] ?? 'All Residents'),
     'channels' => $channels,
     'placements' => ann_placements_from_channels($channels),
@@ -317,6 +329,7 @@ foreach ($announcementRows as $row) {
   $announcementDetailsMap[(string)$row['id']] = [
     'id' => (string)$row['id'],
     'title' => (string)$row['title'],
+    'content_type' => (string)($row['content_type'] ?? 'page'),
     'audience' => (string)$row['audience'],
     'channels' => array_values((array)$row['channels']),
     'placements' => array_values((array)($row['placements'] ?? [])),
@@ -330,6 +343,9 @@ foreach ($announcementRows as $row) {
     'public_news_content_html' => (string)($row['public_news_content_html'] ?? ''),
     'public_title' => (string)($row['public_title'] ?? ''),
     'public_content_html' => (string)($row['public_content_html'] ?? ''),
+    'sms_message' => (string)($row['sms_message'] ?? ''),
+    'email_subject' => (string)($row['email_subject'] ?? ''),
+    'faq_items' => ann_decode_faq_items((string)($row['faq_items_json'] ?? '')),
     'review_result' => (string)($row['review_result'] ?? ''),
     'review_note' => (string)($row['review_note'] ?? ''),
     'created_at' => (string)$row['created_at'],
@@ -350,7 +366,7 @@ function buildAnnouncementsUrl(string $channel, string $status, string $searchTe
   if ($queueChannelFilter !== 'all') {
     $query['queue_channel'] = $queueChannelFilter;
   }
-  return appUrl('/Admin-End/Announcements/Announcements.php') . '?' . http_build_query($query);
+  return appUrl('/Admin-End/Contents/Contents.php') . '?' . http_build_query($query);
 }
 
 function buildReviewQueueUrl(string $channel, string $status, string $searchTerm, string $queueChannel, string $queueSearch): string
@@ -368,7 +384,7 @@ function buildReviewQueueUrl(string $channel, string $status, string $searchTerm
   if ($queueSearch !== '') {
     $query['queue_q'] = $queueSearch;
   }
-  return appUrl('/Admin-End/Announcements/Announcements.php') . '?' . http_build_query($query);
+  return appUrl('/Admin-End/Contents/Contents.php') . '?' . http_build_query($query);
 }
 
 function announcement_ordered_channels(array $channels): array
@@ -384,6 +400,27 @@ function announcement_ordered_channels(array $channels): array
 
   return $normalized;
 }
+
+function ann_decode_faq_items(?string $json): array
+{
+  $decoded = json_decode((string)$json, true);
+  if (!is_array($decoded)) {
+    return [];
+  }
+
+  return array_values(array_filter(array_map(static function ($item): array {
+    if (!is_array($item)) {
+      return ['question' => '', 'answer' => ''];
+    }
+
+    return [
+      'question' => trim((string)($item['question'] ?? '')),
+      'answer' => trim((string)($item['answer'] ?? '')),
+    ];
+  }, $decoded), static function (array $item): bool {
+    return $item['question'] !== '' || $item['answer'] !== '';
+  }));
+}
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -391,13 +428,13 @@ function announcement_ordered_channels(array $channels): array
   <meta charset="UTF-8">
   <link rel="icon" href="../../Images/favicon_sanjose.png?v=20260211">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Announcements</title>
+  <title>Content Tools</title>
 
   <script src="https://kit.fontawesome.com/3482e00999.js" crossorigin="anonymous"></script>
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
   <link href="../../summernote-0.9.0-dist/summernote-lite.min.css?v=20260307-2" rel="stylesheet">
   <link rel="stylesheet" href="../../CSS-Styles/Admin-End-CSS/AdminDashboardStyle.css">
-  <link rel="stylesheet" href="../../CSS-Styles/Admin-End-CSS/ContentManagementStyle.css?v=20260311-34">
+  <link rel="stylesheet" href="../../CSS-Styles/Admin-End-CSS/ContentManagementStyle.css?v=20260318-36">
   <link rel="stylesheet" href="../../CSS-Styles/Admin-End-CSS/ResidentMasterlistStyle.css?v=20260227-2">
   <link rel="stylesheet" href="../../CSS-Styles/Admin-End-CSS/EditRequestsStyle.css?v=20260227-5">
 </head>
@@ -407,22 +444,22 @@ function announcement_ordered_channels(array $channels): array
 
     <main id="main-display" class="flex-grow-1 p-3 p-md-4 p-xl-5 bg-light">
       <h2 class="mb-4" style="font-family: 'Charis SIL Bold'; color: #DE710C; ">
-        Announcements
+        Content Tools
       </h2>
       <hr><br>
 
       <?php if ($isSuperAdmin): ?>
-        <div class="announcement-shell edit-requests-shell bg-white p-4 pt-3 rounded-4 shadow-sm border mb-4">
+        <div id="review-queue-card" class="announcement-shell edit-requests-shell bg-white p-4 pt-3 rounded-4 shadow-sm border mb-4">
           <div class="review-queue-top d-flex flex-wrap align-items-start justify-content-between gap-3 mb-2">
             <div class="review-queue-title-wrap">
               <div class="d-flex flex-wrap align-items-center gap-2 mb-1">
                 <h5 class="mb-0 fw-bold review-queue-heading">Review Queue</h5>
               </div>
-              <p class="small text-muted mb-0 review-queue-description">Shows pending announcements submitted by admin/official/personnel accounts.</p>
+              <p class="small text-muted mb-0 review-queue-description">Shows pending content submitted by admin, official, and personnel accounts.</p>
             </div>
 
             <div class="admin-list-actions admin-list-actions--linear review-queue-actions">
-              <form class="announcement-search-form" method="get" action="<?= htmlspecialchars(appUrl('/Admin-End/Announcements/Announcements.php')) ?>">
+              <form class="announcement-search-form" method="get" action="<?= htmlspecialchars(appUrl('/Admin-End/Contents/Contents.php')) ?>">
                 <input type="hidden" name="channel" value="<?= htmlspecialchars($deliveryChannel) ?>">
                 <input type="hidden" name="status" value="<?= htmlspecialchars($statusFilter) ?>">
                 <input type="hidden" name="q" value="<?= htmlspecialchars($searchTerm) ?>">
@@ -453,6 +490,7 @@ function announcement_ordered_channels(array $channels): array
               <thead class="table-light">
                 <tr>
                   <th>Title</th>
+                  <th>Content Type</th>
                   <th>Audience</th>
                   <th>Channels</th>
                   <th>Created By</th>
@@ -462,7 +500,7 @@ function announcement_ordered_channels(array $channels): array
               <tbody>
                 <?php if (!$reviewQueueRows): ?>
                   <tr>
-                    <td colspan="5" class="text-center text-muted py-4">No pending announcements in the review queue.</td>
+                    <td colspan="7" class="text-center text-muted py-4">No pending content in the review queue.</td>
                   </tr>
                 <?php else: ?>
                   <?php foreach ($reviewQueueRows as $item): ?>
@@ -474,6 +512,7 @@ function announcement_ordered_channels(array $channels): array
                     ?>
                     <tr>
                       <td><?= htmlspecialchars($item['title']) ?></td>
+                      <td><?= htmlspecialchars($typeLabels[$item['content_type']] ?? 'Page Announcement') ?></td>
                       <td><?= htmlspecialchars($item['audience']) ?></td>
                       <td><?= htmlspecialchars($queueChannelsText) ?></td>
                       <td><?= htmlspecialchars($item['created_by']) ?></td>
@@ -530,12 +569,7 @@ function announcement_ordered_channels(array $channels): array
         </div>
       <?php endif; ?>
 
-      <div class="announcement-shell edit-requests-shell bg-white p-4 pt-3 rounded-4 shadow-sm border">
-        <?php if ($isSuperAdmin): ?>
-          <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-1">
-            <h5 class="mb-0 fw-bold review-queue-heading">All Announcements</h5>
-          </div>
-        <?php endif; ?>
+      <div id="tracker-card" class="announcement-shell edit-requests-shell bg-white p-4 pt-3 rounded-4 shadow-sm border">
 
         <div class="admin-list-toolbar mb-3 pt-2">
           <div class="admin-list-toolbar-start">
@@ -563,7 +597,7 @@ function announcement_ordered_channels(array $channels): array
 
           <div class="admin-list-toolbar-end">
             <div class="admin-list-actions admin-list-actions--linear">
-              <form class="announcement-search-form" method="get" action="<?= htmlspecialchars(appUrl('/Admin-End/Announcements/Announcements.php')) ?>">
+              <form class="announcement-search-form" method="get" action="<?= htmlspecialchars(appUrl('/Admin-End/Contents/Contents.php')) ?>">
                 <input type="hidden" name="channel" value="<?= htmlspecialchars($deliveryChannel) ?>">
                 <input type="hidden" name="status" value="<?= htmlspecialchars($statusFilter) ?>">
                 <div class="input-group admin-search">
@@ -593,6 +627,7 @@ function announcement_ordered_channels(array $channels): array
             <thead class="table-light">
               <tr>
                 <th>Title</th>
+                <th>Content Type</th>
                 <th>Audience</th>
                 <th>Channels</th>
                 <th>Created By</th>
@@ -604,7 +639,7 @@ function announcement_ordered_channels(array $channels): array
             <tbody id="tableBody">
               <?php if (!$visibleRows): ?>
                 <tr>
-                  <td colspan="7" class="text-center text-muted py-4">No announcements match the current filters.</td>
+                  <td colspan="9" class="text-center text-muted py-4">No content items match the current filters.</td>
                 </tr>
               <?php else: ?>
                 <?php foreach ($visibleRows as $item): ?>
@@ -627,6 +662,7 @@ function announcement_ordered_channels(array $channels): array
                   ?>
                   <tr>
                     <td><?= htmlspecialchars($item['title']) ?></td>
+                    <td><?= htmlspecialchars($typeLabels[$item['content_type']] ?? 'Page Announcement') ?></td>
                     <td><?= htmlspecialchars($item['audience']) ?></td>
                     <td><?= htmlspecialchars($channelsText) ?></td>
                     <td><?= htmlspecialchars($item['created_by']) ?></td>
@@ -650,7 +686,7 @@ function announcement_ordered_channels(array $channels): array
                                 type="button"
                                 disabled
                                 aria-disabled="true"
-                                title="Pending announcements in the review queue cannot be edited here.">
+                                title="Pending content in the review queue cannot be edited here.">
                                 Edit
                               </button>
                             <?php else: ?>
@@ -701,11 +737,11 @@ function announcement_ordered_channels(array $channels): array
 
         <div class="modal fade" id="modalFilter" tabindex="-1" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
           <div class="modal-dialog modal-dialog-centered">
-            <form class="modal-content p-4" method="get" action="<?= htmlspecialchars(appUrl('/Admin-End/Announcements/Announcements.php')) ?>">
+            <form class="modal-content p-4" method="get" action="<?= htmlspecialchars(appUrl('/Admin-End/Contents/Contents.php')) ?>">
               <input type="hidden" name="q" value="<?= htmlspecialchars($searchTerm) ?>">
 
               <div class="modal-header border-0">
-                <h5 class="modal-title fw-bold">Filter Announcements</h5>
+                <h5 class="modal-title fw-bold">Filter Content</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
               </div>
 
@@ -751,7 +787,7 @@ function announcement_ordered_channels(array $channels): array
                     </label>
                     <label class="d-flex align-items-center gap-2">
                       <input class="form-check-input m-0" type="radio" name="channel" value="public" <?= $deliveryChannel === 'public' ? 'checked' : '' ?>>
-                      <span>Public Announcement</span>
+                      <span>Guest Page</span>
                     </label>
                     <label class="d-flex align-items-center gap-2">
                       <input class="form-check-input m-0" type="radio" name="channel" value="public_news" <?= $deliveryChannel === 'public_news' ? 'checked' : '' ?>>
@@ -810,12 +846,12 @@ function announcement_ordered_channels(array $channels): array
         <input type="hidden" id="deleteQueueQueryInput" name="queue_q" value="<?= htmlspecialchars($queueSearchTerm) ?>">
         <input type="hidden" name="action" value="delete">
         <div class="modal-header justify-content-center border-0 pb-0">
-          <h5 class="modal-title fw-bold text-center w-100">Delete Announcement</h5>
+          <h5 class="modal-title fw-bold text-center w-100">Delete Content</h5>
           <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
         </div>
         <hr class="my-2">
         <div class="modal-body text-center">
-          <p class="mb-2">Are you sure you want to delete this announcement?</p>
+          <p class="mb-2">Are you sure you want to delete this content item?</p>
           <p class="fw-semibold mb-0" id="deleteAnnouncementTitle">-</p>
           <p class="small text-muted mt-2 mb-0">This action cannot be undone.</p>
         </div>
@@ -829,7 +865,7 @@ function announcement_ordered_channels(array $channels): array
 
   <div class="modal fade" id="modalReviewQueueFilter" tabindex="-1" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
     <div class="modal-dialog modal-dialog-centered">
-      <form class="modal-content p-4" method="get" action="<?= htmlspecialchars(appUrl('/Admin-End/Announcements/Announcements.php')) ?>">
+      <form class="modal-content p-4" method="get" action="<?= htmlspecialchars(appUrl('/Admin-End/Contents/Contents.php')) ?>">
         <input type="hidden" name="channel" value="<?= htmlspecialchars($deliveryChannel) ?>">
         <input type="hidden" name="status" value="<?= htmlspecialchars($statusFilter) ?>">
         <input type="hidden" name="q" value="<?= htmlspecialchars($searchTerm) ?>">
@@ -856,7 +892,7 @@ function announcement_ordered_channels(array $channels): array
                 </label>
                 <label class="d-flex align-items-center gap-2">
                   <input class="form-check-input m-0" type="radio" name="queue_channel" value="public" <?= $queueChannelFilter === 'public' ? 'checked' : '' ?>>
-                  <span>Public Announcement</span>
+                  <span>Guest Page</span>
                 </label>
                 <label class="d-flex align-items-center gap-2">
                   <input class="form-check-input m-0" type="radio" name="queue_channel" value="public_news" <?= $queueChannelFilter === 'public_news' ? 'checked' : '' ?>>
@@ -905,13 +941,13 @@ function announcement_ordered_channels(array $channels): array
       <div class="modal-content announcement-details-content border-0 rounded-2 p-4">
         <div class="modal-header border-0">
           <h5 class="modal-title announcement-details-title mb-0">
-            Announcement Details: <span id="viewAnnouncementRef" class="announcement-details-id">#-</span>
+            Content Details: <span id="viewAnnouncementRef" class="announcement-details-id">#-</span>
           </h5>
           <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
         </div>
         <div class="modal-body">
           <div class="announcement-details-card">
-            <h5 class="announcement-card-title">Announcement Summary</h5>
+            <h5 class="announcement-card-title">Content Summary</h5>
             <div class="row g-3">
               <div class="col-md-6">
                 <p class="announcement-detail-label">Title</p>
@@ -922,16 +958,32 @@ function announcement_ordered_channels(array $channels): array
                 <p class="announcement-detail-value" id="viewAnnouncementCreatedBy">-</p>
               </div>
               <div class="col-md-6">
+                <p class="announcement-detail-label">Content Type</p>
+                <p class="announcement-detail-value" id="viewAnnouncementType">-</p>
+              </div>
+              <div class="col-md-6">
                 <p class="announcement-detail-label">Audience</p>
                 <p class="announcement-detail-value" id="viewAnnouncementAudience">-</p>
               </div>
-              <div class="col-md-6">
+              <div class="col-md-6" id="viewAnnouncementPlacementsGroup">
                 <p class="announcement-detail-label">Page Placement</p>
                 <p class="announcement-detail-value" id="viewAnnouncementPlacements">-</p>
               </div>
-              <div class="col-md-6">
-                <p class="announcement-detail-label">Additional Delivery</p>
+              <div class="col-md-6" id="viewAnnouncementChannelsGroup">
+                <p class="announcement-detail-label">Delivery</p>
                 <p class="announcement-detail-value" id="viewAnnouncementChannels">-</p>
+              </div>
+              <div class="col-12 d-none" id="viewDeliveryMeta">
+                <div class="row g-3">
+                  <div class="col-md-6 d-none" id="viewSmsMessageGroup">
+                    <p class="announcement-detail-label">SMS Message</p>
+                    <div class="announcement-content-surface" id="viewAnnouncementSmsMessage">-</div>
+                  </div>
+                  <div class="col-md-6 d-none" id="viewEmailSubjectGroup">
+                    <p class="announcement-detail-label">Email Subject</p>
+                    <p class="announcement-detail-value" id="viewAnnouncementEmailSubject">-</p>
+                  </div>
+                </div>
               </div>
               <div class="col-md-6">
                 <p class="announcement-detail-label">Status</p>
@@ -944,7 +996,7 @@ function announcement_ordered_channels(array $channels): array
             </div>
           </div>
           <div class="announcement-details-card announcement-details-card--content mt-4">
-            <h5 class="announcement-card-title">Announcement Content</h5>
+            <h5 class="announcement-card-title" id="viewAnnouncementContentHeading">Content</h5>
             <div id="viewAnnouncementReviewNotice" class="alert alert-danger d-none mb-3" role="alert"></div>
             <div id="viewAnnouncementContent" class="announcement-content-surface"></div>
             <div id="viewAnnouncementDualContent" class="d-none">
@@ -984,19 +1036,23 @@ function announcement_ordered_channels(array $channels): array
         <input type="hidden" name="queue_channel" value="<?= htmlspecialchars($queueChannelFilter) ?>">
         <input type="hidden" name="queue_q" value="<?= htmlspecialchars($queueSearchTerm) ?>">
         <div class="modal-header border-0">
-          <h5 class="modal-title fw-bold">Edit Announcement</h5>
+          <h5 class="modal-title fw-bold">Edit Content</h5>
           <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
         </div>
         <div class="modal-body">
           <div class="announcement-form-card">
-            <h5 class="announcement-card-title">Announcement Details</h5>
+            <h5 class="announcement-card-title">Content Details</h5>
             <div class="mb-3">
+              <label class="form-label">Content Type</label>
+              <input type="text" class="form-control" id="editAnnouncementTypeDisplay" value="-" readonly>
+            </div>
+            <div class="mb-3" id="editAudienceGroup">
               <label for="editAnnouncementAudienceInput" class="form-label">Audience</label>
               <input type="text" class="form-control" id="editAnnouncementAudienceInput" name="audience" required>
             </div>
-            <div class="mb-3">
+            <div class="mb-3" id="editPagePlacementGroup">
               <label class="form-label d-block">Page Placement</label>
-              <div class="d-flex flex-wrap gap-3">
+              <div class="d-flex flex-wrap gap-3" id="editPageDestinationGroup">
                 <label class="form-check-label d-flex align-items-center gap-2">
                   <input class="form-check-input m-0 edit-placement-checkbox" type="checkbox" name="placements[]" value="public_news" id="editPlacementPublicNews">
                   <span>News Section</span>
@@ -1007,8 +1063,8 @@ function announcement_ordered_channels(array $channels): array
                 </label>
               </div>
             </div>
-            <div class="mb-3">
-              <label class="form-label d-block">Additional Delivery</label>
+            <div class="mb-3" id="editAdditionalDeliveryGroup">
+              <label class="form-label d-block" id="editAdditionalDeliveryLabel">Delivery</label>
               <div class="d-flex flex-wrap gap-3">
                 <label class="form-check-label d-flex align-items-center gap-2">
                   <input class="form-check-input m-0" type="checkbox" name="channels[]" value="public" id="editChannelPublic">
@@ -1018,6 +1074,8 @@ function announcement_ordered_channels(array $channels): array
                   <input class="form-check-input m-0" type="checkbox" name="channels[]" value="website" id="editChannelWebsite">
                   <span>Account Page</span>
                 </label>
+                </div>
+              <div class="d-flex flex-wrap gap-3 mt-3" id="editDirectDeliveryGroup">
                 <label class="form-check-label d-flex align-items-center gap-2">
                   <input class="form-check-input m-0" type="checkbox" name="channels[]" value="sms" id="editChannelSms">
                   <span>SMS</span>
@@ -1026,6 +1084,19 @@ function announcement_ordered_channels(array $channels): array
                   <input class="form-check-input m-0" type="checkbox" name="channels[]" value="email" id="editChannelEmail">
                   <span>Email</span>
                 </label>
+              </div>
+              <div id="editDeliveryMessageFields" class="d-none mt-3">
+                <div class="row g-3">
+                  <div class="col-12 col-lg-7">
+                    <label for="editSmsMessageInput" class="form-label">SMS Message</label>
+                    <textarea id="editSmsMessageInput" class="form-control" name="sms_message" rows="4" maxlength="320"></textarea>
+                    <small class="text-muted" id="editSmsCounter">0 / 320 characters</small>
+                  </div>
+                  <div class="col-12 col-lg-5">
+                    <label for="editEmailSubjectInput" class="form-label">Email Subject</label>
+                    <input type="text" class="form-control" id="editEmailSubjectInput" name="email_subject" placeholder="Enter email subject">
+                  </div>
+                </div>
               </div>
             </div>
             <div class="row g-3">
@@ -1046,13 +1117,13 @@ function announcement_ordered_channels(array $channels): array
             </div>
           </div>
           <div class="announcement-form-card mt-4">
-            <h5 class="announcement-card-title">Announcement Content</h5>
+            <h5 class="announcement-card-title">Content</h5>
             <div id="editSharedContentFields">
               <div class="announcement-primary-title-wrap">
-                <label for="editAnnouncementTitleInput" class="form-label">Title</label>
+                <label for="editAnnouncementTitleInput" class="form-label" id="editTitleLabel">Title</label>
                 <input type="text" class="form-control announcement-primary-title-input" id="editAnnouncementTitleInput" name="title" required>
               </div>
-              <label for="editAnnouncementContentInput" class="form-label">Body</label>
+              <label for="editAnnouncementContentInput" class="form-label" id="editBodyLabel">Body</label>
               <div id="editAnnouncementEditor"></div>
             </div>
             <input type="hidden" id="editAnnouncementContentInput" name="content_html" required>
@@ -1098,7 +1169,7 @@ function announcement_ordered_channels(array $channels): array
         </div>
         <hr class="my-0">
         <div class="modal-body text-center">
-          <p class="mb-0">This announcement was denied. If you continue editing, your creation will now be saved as draft.</p>
+          <p class="mb-0">This content item was denied. If you continue editing, your changes will now be saved as draft.</p>
         </div>
         <div class="modal-footer border-0 pt-0 d-flex gap-2">
           <button type="button" class="btn btn-warning text-dark flex-fill" id="btnConfirmDeniedAnnouncementDraftNotice">Continue Editing</button>
@@ -1116,7 +1187,7 @@ function announcement_ordered_channels(array $channels): array
         </div>
         <hr class="my-0">
         <div class="modal-body text-center">
-          <p class="mb-0">Are you sure you want to save these changes? This announcement will be moved to draft status.</p>
+          <p class="mb-0">Are you sure you want to save these changes? This content item will be moved to draft status.</p>
         </div>
         <div class="modal-footer border-0 pt-0 d-flex gap-2">
           <button type="button" class="btn btn-warning text-dark flex-fill" id="btnConfirmDeniedAnnouncementSave">Yes, Save Changes</button>
@@ -1207,7 +1278,7 @@ function announcement_ordered_channels(array $channels): array
           </div>
           <hr class="my-0">
           <div class="modal-body text-center">
-            <p class="mb-0">Are you ready to save these changes? When you save, this announcement will be posted.</p>
+            <p class="mb-0">Are you ready to save these changes? When you save, this content item will be posted.</p>
           </div>
           <div class="modal-footer border-0 pt-0 d-flex gap-2">
             <button type="button" class="btn btn-primary flex-fill" id="btnConfirmSuperAdminRepost">Yes, Save Changes</button>
@@ -1267,6 +1338,7 @@ function announcement_ordered_channels(array $channels): array
       public_news: "News Section",
       announcement: "Announcements"
     };
+    const ANNOUNCEMENT_TYPE_LABELS = <?= json_encode($typeLabels, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
 
     window.ADMIN_TABLE_COLUMNS_CONFIG = {
       tableSelector: "#table-appData",
@@ -1347,6 +1419,24 @@ function announcement_ordered_channels(array $channels): array
       const editPublicAnnouncementTitleInput = document.getElementById("editPublicAnnouncementTitle");
       const editPublicNewsContentInput = document.getElementById("editPublicNewsContent");
       const editPublicAnnouncementContentInput = document.getElementById("editPublicAnnouncementContent");
+      const editAnnouncementTypeDisplay = document.getElementById("editAnnouncementTypeDisplay");
+      const editAudienceGroup = document.getElementById("editAudienceGroup");
+      const editPagePlacementGroup = document.getElementById("editPagePlacementGroup");
+      const editAdditionalDeliveryGroup = document.getElementById("editAdditionalDeliveryGroup");
+      const editAdditionalDeliveryLabel = document.getElementById("editAdditionalDeliveryLabel");
+      const editPageDestinationGroup = document.getElementById("editPageDestinationGroup");
+      const editDirectDeliveryGroup = document.getElementById("editDirectDeliveryGroup");
+      const editTitleLabel = document.getElementById("editTitleLabel");
+      const editBodyLabel = document.getElementById("editBodyLabel");
+      const editDeliveryMessageFields = document.getElementById("editDeliveryMessageFields");
+      const editSmsMessageInput = document.getElementById("editSmsMessageInput");
+      const editSmsCounter = document.getElementById("editSmsCounter");
+      const editEmailSubjectInput = document.getElementById("editEmailSubjectInput");
+      const editFaqFields = document.getElementById("editFaqFields");
+      const editFaqQuestionTarget = document.getElementById("editFaqQuestionTarget");
+      const editFaqItemCount = document.getElementById("editFaqItemCount");
+      const editFaqItemsContainer = document.getElementById("editFaqItemsContainer");
+      const editFaqMaxItems = 20;
       let editEditorReady = false;
       let editPublicNewsEditorReady = false;
       let editPublicAnnouncementEditorReady = false;
@@ -1363,6 +1453,7 @@ function announcement_ordered_channels(array $channels): array
       let canShowPrimarySubmit = false;
       let pendingDeniedEditId = "";
       let editSubmitMode = "save";
+      let currentEditContentType = "page";
       const fullToolbar = [
         ["style", ["style"]],
         ["font", ["bold", "italic", "underline", "clear"]],
@@ -1430,7 +1521,7 @@ function announcement_ordered_channels(array $channels): array
 
       function initEditEditor() {
         if (!editEditorReady && editEditorEl.length) {
-          initSpecificEditor(editEditorEl, "Update announcement content...", function () {
+          initSpecificEditor(editEditorEl, "Update content...", function () {
             editEditorReady = true;
           });
         }
@@ -1444,6 +1535,12 @@ function announcement_ordered_channels(array $channels): array
             editPublicAnnouncementEditorReady = true;
           });
         }
+      }
+
+      function updateEditSmsCounter() {
+        if (!editSmsCounter || !editSmsMessageInput) return;
+        const value = editSmsMessageInput.value || "";
+        editSmsCounter.textContent = `${value.length} / 320 characters`;
       }
 
       function statusText(status, reviewResult = "", isOwner = false) {
@@ -1465,6 +1562,52 @@ function announcement_ordered_channels(array $channels): array
         return placements.map((placement) => ANNOUNCEMENT_PLACEMENT_LABELS[placement] || String(placement)).join(", ");
       }
 
+      function typeText(contentType) {
+        const key = String(contentType || "page").toLowerCase();
+        return ANNOUNCEMENT_TYPE_LABELS[key] || ANNOUNCEMENT_TYPE_LABELS.page;
+      }
+
+      function applyEditContentTypeMode(data) {
+        currentEditContentType = String(data.content_type || "page").toLowerCase();
+        const isPage = currentEditContentType === "page";
+        const isDelivery = currentEditContentType === "delivery";
+        const isFaq = currentEditContentType === "faq";
+        if (editAnnouncementTypeDisplay) {
+          editAnnouncementTypeDisplay.value = typeText(currentEditContentType);
+        }
+        if (editAudienceGroup) {
+          editAudienceGroup.classList.toggle("d-none", isFaq);
+        }
+        if (editPagePlacementGroup) {
+          editPagePlacementGroup.classList.toggle("d-none", !isPage);
+        }
+        if (editAdditionalDeliveryGroup) {
+          editAdditionalDeliveryGroup.classList.toggle("d-none", isFaq);
+        }
+        if (editAdditionalDeliveryLabel) {
+          editAdditionalDeliveryLabel.textContent = isPage ? "Page Destinations" : "Delivery";
+        }
+        if (editPageDestinationGroup) {
+          editPageDestinationGroup.classList.toggle("d-none", !isPage);
+        }
+        if (editDirectDeliveryGroup) {
+          editDirectDeliveryGroup.classList.toggle("d-none", !isDelivery);
+        }
+        if (editDeliveryMessageFields) {
+          editDeliveryMessageFields.classList.toggle("d-none", !isDelivery);
+        }
+        if (editTitleLabel) {
+          editTitleLabel.textContent = isFaq ? "Question" : "Title";
+        }
+        if (editBodyLabel) {
+          editBodyLabel.textContent = isFaq ? "Answer" : "Body";
+        }
+        if (!isPage) {
+          if (editSharedContentFields) editSharedContentFields.classList.remove("d-none");
+          if (editDualPlacementFields) editDualPlacementFields.classList.add("d-none");
+        }
+      }
+
       function syncEditAnnouncementContent() {
         if (editEditorReady) {
           document.getElementById("editAnnouncementContentInput").value = editEditorEl.summernote("code");
@@ -1478,6 +1621,11 @@ function announcement_ordered_channels(array $channels): array
       }
 
       function updateEditPlacementState() {
+        if (currentEditContentType !== "page") {
+          if (editSharedContentFields) editSharedContentFields.classList.remove("d-none");
+          if (editDualPlacementFields) editDualPlacementFields.classList.add("d-none");
+          return;
+        }
         const dualPlacement = !!editPlacementPublicNews?.checked && !!editPlacementAnnouncement?.checked;
         const sharedTitleInput = document.getElementById("editAnnouncementTitleInput");
         if (sharedTitleInput && !dualPlacement) {
@@ -1654,18 +1802,54 @@ function announcement_ordered_channels(array $channels): array
 
         if (viewRefEl) viewRefEl.textContent = "#" + (data.id || "-");
         document.getElementById("viewAnnouncementTitle").textContent = data.title || "-";
+        document.getElementById("viewAnnouncementType").textContent = typeText(data.content_type);
         document.getElementById("viewAnnouncementAudience").textContent = data.audience || "-";
-        document.getElementById("viewAnnouncementPlacements").textContent = placementText(data.placements || []);
-        document.getElementById("viewAnnouncementChannels").textContent = channelText((data.channels || []).filter((channel) => channel !== "public_news"));
         document.getElementById("viewAnnouncementPublishDate").textContent = data.publish_date || "-";
         document.getElementById("viewAnnouncementCreatedBy").textContent = data.created_by || "-";
-        const hasNewsPlacement = Array.isArray(data.placements) && data.placements.includes("public_news");
-        const hasAnnouncementPlacement = Array.isArray(data.placements) && data.placements.includes("announcement");
+        const contentType = String(data.content_type || "page").toLowerCase();
+        const isPage = contentType === "page";
+        const isDelivery = contentType === "delivery";
+        const placementsGroup = document.getElementById("viewAnnouncementPlacementsGroup");
+        const channelsGroup = document.getElementById("viewAnnouncementChannelsGroup");
+        const channelsLabel = channelsGroup ? channelsGroup.querySelector(".announcement-detail-label") : null;
+        const viewDeliveryMeta = document.getElementById("viewDeliveryMeta");
+        const viewSmsMessageGroup = document.getElementById("viewSmsMessageGroup");
+        const viewEmailSubjectGroup = document.getElementById("viewEmailSubjectGroup");
+        const viewSmsMessage = document.getElementById("viewAnnouncementSmsMessage");
+        const viewEmailSubject = document.getElementById("viewAnnouncementEmailSubject");
+        if (placementsGroup) {
+          placementsGroup.classList.toggle("d-none", !isPage);
+        }
+        if (channelsGroup) {
+          channelsGroup.classList.toggle("d-none", contentType === "faq");
+        }
+        if (channelsLabel) {
+          channelsLabel.textContent = isPage ? "Page Destinations" : "Delivery";
+        }
+        if (viewDeliveryMeta) {
+          const hasSms = isDelivery && Array.isArray(data.channels) && data.channels.includes("sms") && String(data.sms_message || "").trim() !== "";
+          const hasEmail = isDelivery && Array.isArray(data.channels) && data.channels.includes("email") && String(data.email_subject || "").trim() !== "";
+          viewDeliveryMeta.classList.toggle("d-none", !(hasSms || hasEmail));
+          if (viewSmsMessageGroup) viewSmsMessageGroup.classList.toggle("d-none", !hasSms);
+          if (viewEmailSubjectGroup) viewEmailSubjectGroup.classList.toggle("d-none", !hasEmail);
+          if (viewSmsMessage) viewSmsMessage.textContent = hasSms ? String(data.sms_message || "") : "-";
+          if (viewEmailSubject) viewEmailSubject.textContent = hasEmail ? String(data.email_subject || "") : "-";
+        }
+        document.getElementById("viewAnnouncementPlacements").textContent = placementText(data.placements || []);
+        document.getElementById("viewAnnouncementChannels").textContent = isPage
+          ? channelText((data.channels || []).filter((channel) => channel === "public" || channel === "website"))
+          : channelText((data.channels || []).filter((channel) => channel === "sms" || channel === "email"));
+        const hasNewsPlacement = isPage && Array.isArray(data.placements) && data.placements.includes("public_news");
+        const hasAnnouncementPlacement = isPage && Array.isArray(data.placements) && data.placements.includes("announcement");
         const isDualPlacement = hasNewsPlacement && hasAnnouncementPlacement;
+        const contentHeading = document.getElementById("viewAnnouncementContentHeading");
         const contentSurface = document.getElementById("viewAnnouncementContent");
         const dualContentSurface = document.getElementById("viewAnnouncementDualContent");
         const newsContentSurface = document.getElementById("viewAnnouncementNewsContent");
         const publicContentSurface = document.getElementById("viewAnnouncementPublicContent");
+        if (contentHeading) {
+          contentHeading.textContent = contentType === "faq" ? "FAQ Entries" : "Content";
+        }
         if (contentSurface && dualContentSurface && newsContentSurface && publicContentSurface) {
           contentSurface.classList.toggle("d-none", isDualPlacement);
           dualContentSurface.classList.toggle("d-none", !isDualPlacement);
@@ -1700,7 +1884,7 @@ function announcement_ordered_channels(array $channels): array
           const showDeniedNotice = isDeniedDraft;
           reviewNoticeEl.classList.toggle("d-none", !showDeniedNotice);
           reviewNoticeEl.textContent = showDeniedNotice
-            ? (String(data.review_note || "").trim() || "This announcement is denied. You can edit or delete it.")
+            ? (String(data.review_note || "").trim() || "This content item is denied. You can edit or delete it.")
             : "";
         }
 
@@ -1724,8 +1908,12 @@ function announcement_ordered_channels(array $channels): array
         if (!data) return;
 
         document.getElementById("editAnnouncementIdInput").value = data.id || "";
+        applyEditContentTypeMode(data);
         document.getElementById("editAnnouncementAudienceInput").value = data.audience || "";
         document.getElementById("editAnnouncementPublishDateInput").value = data.publish_date && data.publish_date !== "-" ? data.publish_date : "";
+        if (editSmsMessageInput) editSmsMessageInput.value = data.sms_message || "";
+        if (editEmailSubjectInput) editEmailSubjectInput.value = data.email_subject || "";
+        updateEditSmsCounter();
         if (editEditorReady) {
           editEditorEl.summernote("code", data.content_html || "");
         }
@@ -1751,11 +1939,11 @@ function announcement_ordered_channels(array $channels): array
         const placements = Array.isArray(data.placements) ? data.placements : [];
         if (editPlacementPublicNews) editPlacementPublicNews.checked = placements.includes("public_news");
         if (editPlacementAnnouncement) editPlacementAnnouncement.checked = placements.includes("announcement");
-        updateEditPlacementState();
         document.getElementById("editChannelPublic").checked = channels.includes("public");
         document.getElementById("editChannelWebsite").checked = channels.includes("website");
         document.getElementById("editChannelSms").checked = channels.includes("sms");
         document.getElementById("editChannelEmail").checked = channels.includes("email");
+        updateEditPlacementState();
 
         const ownerId = String(data.created_by_user_id || "");
         const createdByLabel = String(data.created_by || "");
@@ -1870,6 +2058,7 @@ function announcement_ordered_channels(array $channels): array
         if (!checkbox) return;
         checkbox.addEventListener("change", updateEditPlacementState);
       });
+      editSmsMessageInput?.addEventListener("input", updateEditSmsCounter);
 
       if (confirmApprovedSaveBtn && editForm) {
         confirmApprovedSaveBtn.addEventListener("click", function () {
@@ -2396,3 +2585,16 @@ function announcement_ordered_channels(array $channels): array
   <script src="../../JS-Script-Files/Admin-End/tableColumnsGeneric.js?v=20260215-1"></script>
 </body>
 </html>
+
+
+
+
+
+
+
+
+
+
+
+
+

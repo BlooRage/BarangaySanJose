@@ -3,7 +3,7 @@ require_once __DIR__ . '/../General/connection.php';
 
 function announcements_table_name(): string
 {
-  return 'announcementstbl';
+  return 'contentstbl';
 }
 
 function announcements_ensure_schema(): void
@@ -17,6 +17,7 @@ function announcements_ensure_schema(): void
 
   $table = announcements_table_name();
   $queries = [
+    "ALTER TABLE {$table} ADD COLUMN IF NOT EXISTS content_type VARCHAR(30) NOT NULL DEFAULT 'page' AFTER title",
     "ALTER TABLE {$table} ADD COLUMN IF NOT EXISTS audience_scope VARCHAR(20) NULL AFTER audience",
     "ALTER TABLE {$table} ADD COLUMN IF NOT EXISTS area VARCHAR(100) NULL AFTER audience_scope",
     "ALTER TABLE {$table} ADD COLUMN IF NOT EXISTS role_group VARCHAR(100) NULL AFTER area",
@@ -24,7 +25,8 @@ function announcements_ensure_schema(): void
     "ALTER TABLE {$table} ADD COLUMN IF NOT EXISTS email_subject VARCHAR(255) NULL AFTER sms_message",
     "ALTER TABLE {$table} ADD COLUMN IF NOT EXISTS email_body_html LONGTEXT NULL AFTER email_subject",
     "ALTER TABLE {$table} ADD COLUMN IF NOT EXISTS sms_sent_at DATETIME NULL AFTER reviewed_by",
-    "ALTER TABLE {$table} ADD COLUMN IF NOT EXISTS email_sent_at DATETIME NULL AFTER sms_sent_at"
+    "ALTER TABLE {$table} ADD COLUMN IF NOT EXISTS email_sent_at DATETIME NULL AFTER sms_sent_at",
+    "ALTER TABLE {$table} ADD COLUMN IF NOT EXISTS faq_items_json LONGTEXT NULL AFTER email_sent_at"
   ];
 
   foreach ($queries as $sql) {
@@ -78,9 +80,15 @@ function announcements_decode_channels(?string $json): array
 
 function announcements_prepare_row(array $row): array
 {
+  $contentType = (string)($row['content_type'] ?? 'page');
+  if (!in_array($contentType, ['page', 'delivery', 'faq'], true)) {
+    $contentType = 'page';
+  }
+
   return [
     'id' => trim((string)($row['id'] ?? '')),
     'title' => (string)($row['title'] ?? ''),
+    'content_type' => $contentType,
     'audience' => (string)($row['audience'] ?? 'All Residents'),
     'audience_scope' => (string)($row['audience_scope'] ?? 'all'),
     'area' => (string)($row['area'] ?? ''),
@@ -112,6 +120,7 @@ function announcements_prepare_row(array $row): array
     'reviewed_by' => (string)($row['reviewed_by'] ?? ''),
     'sms_sent_at' => trim((string)($row['sms_sent_at'] ?? '')),
     'email_sent_at' => trim((string)($row['email_sent_at'] ?? '')),
+    'faq_items_json' => (string)($row['faq_items_json'] ?? ''),
   ];
 }
 
@@ -125,6 +134,7 @@ function announcements_load_all(): array
     SELECT
       id,
       title,
+      content_type,
       audience,
       audience_scope,
       area,
@@ -151,7 +161,8 @@ function announcements_load_all(): array
       reviewed_at,
       reviewed_by,
       sms_sent_at,
-      email_sent_at
+      email_sent_at,
+      faq_items_json
     FROM {$table}
     ORDER BY COALESCE(publish_date, created_at) DESC, created_at DESC, id DESC
   ";
@@ -166,6 +177,7 @@ function announcements_load_all(): array
     $rows[] = [
       'id' => (string)($row['id'] ?? ''),
       'title' => (string)($row['title'] ?? ''),
+      'content_type' => (string)($row['content_type'] ?? 'page'),
       'audience' => (string)($row['audience'] ?? 'All Residents'),
       'audience_scope' => (string)($row['audience_scope'] ?? 'all'),
       'area' => (string)($row['area'] ?? ''),
@@ -193,6 +205,7 @@ function announcements_load_all(): array
       'reviewed_by' => (string)($row['reviewed_by'] ?? ''),
       'sms_sent_at' => ($row['sms_sent_at'] ?? null) ? announcements_format_datetime((string)$row['sms_sent_at'], '') : '',
       'email_sent_at' => ($row['email_sent_at'] ?? null) ? announcements_format_datetime((string)$row['email_sent_at'], '') : '',
+      'faq_items_json' => (string)($row['faq_items_json'] ?? ''),
     ];
   }
   $result->free();
@@ -214,6 +227,7 @@ function announcements_save_all(array $rows): bool
     INSERT INTO {$table} (
       id,
       title,
+      content_type,
       audience,
       audience_scope,
       area,
@@ -240,12 +254,14 @@ function announcements_save_all(array $rows): bool
       reviewed_at,
       reviewed_by,
       sms_sent_at,
-      email_sent_at
+      email_sent_at,
+      faq_items_json
     ) VALUES (
-      ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+      ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
     )
     ON DUPLICATE KEY UPDATE
       title = VALUES(title),
+      content_type = VALUES(content_type),
       audience = VALUES(audience),
       audience_scope = VALUES(audience_scope),
       area = VALUES(area),
@@ -272,7 +288,8 @@ function announcements_save_all(array $rows): bool
       reviewed_at = VALUES(reviewed_at),
       reviewed_by = VALUES(reviewed_by),
       sms_sent_at = VALUES(sms_sent_at),
-      email_sent_at = VALUES(email_sent_at)
+      email_sent_at = VALUES(email_sent_at),
+      faq_items_json = VALUES(faq_items_json)
   ";
 
   $stmt = $conn->prepare($sql);
@@ -286,6 +303,7 @@ function announcements_save_all(array $rows): bool
     foreach ($normalizedRows as $row) {
       $id = $row['id'];
       $title = $row['title'];
+      $contentType = $row['content_type'];
       $audience = $row['audience'];
       $audienceScope = $row['audience_scope'] !== '' ? $row['audience_scope'] : 'all';
       $area = $row['area'] !== '' ? $row['area'] : null;
@@ -316,11 +334,13 @@ function announcements_save_all(array $rows): bool
       $reviewedBy = $row['reviewed_by'] !== '' ? $row['reviewed_by'] : null;
       $smsSentAt = announcements_normalize_datetime($row['sms_sent_at']);
       $emailSentAt = announcements_normalize_datetime($row['email_sent_at']);
+      $faqItemsJson = $row['faq_items_json'] !== '' ? $row['faq_items_json'] : null;
 
       $stmt->bind_param(
-        'sssssssssssssssssssssssssssss',
+        'sssssssssssssssssssssssssssssss',
         $id,
         $title,
+        $contentType,
         $audience,
         $audienceScope,
         $area,
@@ -347,7 +367,8 @@ function announcements_save_all(array $rows): bool
         $reviewedAt,
         $reviewedBy,
         $smsSentAt,
-        $emailSentAt
+        $emailSentAt,
+        $faqItemsJson
       );
 
       if (!$stmt->execute()) {
@@ -397,3 +418,12 @@ function announcement_generate_id(): string
     return 'ann_' . date('YmdHis') . '_' . mt_rand(1000, 9999);
   }
 }
+
+
+
+
+
+
+
+
+

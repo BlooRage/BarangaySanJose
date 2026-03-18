@@ -1,5 +1,5 @@
 <?php
-require_once __DIR__ . '/../Admin-End/announcementsStore.php';
+require_once __DIR__ . '/../Admin-End/contentStore.php';
 
 header('Content-Type: application/json; charset=UTF-8');
 
@@ -67,3 +67,4 @@ echo json_encode([
     'success' => true,
     'item' => $latestItem
 ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+
