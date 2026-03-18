@@ -1,41 +1,18 @@
 <?php
-require_once __DIR__ . '/runtimeConfig.php';
-
-// Use Asia/Manila (UTC+08:00) for PHP date/time functions.
-date_default_timezone_set('Asia/Manila');
-
-$host = "localhost";
+$host = "srv1986.hstgr.io";
 $user = "u682055666_thesiscaps";
 $pass = "ThesisCaps123.";
 $dbname = "u682055666_testingBrgySJ";
 
-if ($host === '' || $user === '' || $dbname === '') {
-    error_log('Database configuration is incomplete. Set DB_HOST, DB_USER, DB_PASS, and DB_NAME via environment or config.runtime.local.php.');
-    http_response_code(500);
-    exit('Service temporarily unavailable.');
+// Create connection
+$conn = new mysqli($host, $user, $pass, $dbname);
+
+// Check connection
+if ($conn->connect_error) {
+    // If connection fails, stop execution and show error
+    die("Connection Failed: " . $conn->connect_error);
+} else {
+    // Optional: Uncomment this line if you want confirmation of success
+    //echo "✅ Connected successfully to $dbname";
 }
-
-mysqli_report(MYSQLI_REPORT_OFF);
-$conn = mysqli_init();
-if ($conn instanceof mysqli) {
-    // Fail fast when DB host is slow/unreachable to avoid long page stalls.
-    $conn->options(MYSQLI_OPT_CONNECT_TIMEOUT, 5);
-    if (defined('MYSQLI_OPT_READ_TIMEOUT')) {
-        $conn->options(MYSQLI_OPT_READ_TIMEOUT, 10);
-    }
-    @mysqli_real_connect($conn, $host, $user, $pass, $dbname, $port > 0 ? $port : 3306);
-}
-
-if (!($conn instanceof mysqli) || $conn->connect_error) {
-    $connectError = ($conn instanceof mysqli) ? (string)$conn->connect_error : 'mysqli_init failed';
-    error_log('Database connection failed: ' . $connectError);
-    http_response_code(500);
-    exit('Service temporarily unavailable.');
-}
-
-// Prefer UTF-8 for all queries/results.
-$conn->set_charset('utf8mb4');
-
-// Force MySQL session timezone to UTC+08:00.
-// This affects NOW(), CURRENT_TIMESTAMP, and timestamp defaults for this connection.
-$conn->query("SET time_zone = '+08:00'");
+?>
