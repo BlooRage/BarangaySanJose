@@ -948,6 +948,7 @@ $purposeInputClass = $isRelationshipJailVisitVariant ? 'form-control text-bg-lig
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="<?= htmlspecialchars($baseUrl) ?>/JS-Script-Files/Resident-End/formValidationHighlight.js"></script>
     <script src="<?= htmlspecialchars($baseUrl) ?>/JS-Script-Files/Resident-End/dateFieldModal.js"></script>
     <script src="<?= htmlspecialchars($baseUrl) ?>/JS-Script-Files/Resident-End/Certificates/cohabitationFormScript.js?v=20260311-05"></script>
 </body>

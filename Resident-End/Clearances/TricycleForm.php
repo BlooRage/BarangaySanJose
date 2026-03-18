@@ -411,6 +411,7 @@ $ownerFullAddress = htmlspecialchars(implode(', ', $ownerFullAddressParts), ENT_
 </div>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="../../JS-Script-Files/Resident-End/formValidationHighlight.js"></script>
     <script src="../../JS-Script-Files/Resident-End/Clearances/tricycleClearanceScript.js"></script>
 </body>
 </html>
