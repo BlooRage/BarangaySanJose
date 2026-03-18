@@ -15,6 +15,8 @@ return [
 
     'db' => [
         'host' => '127.0.0.1',
+        'host_local' => '127.0.0.1',
+        'host_hosted' => 'localhost',
         'port' => 3306,
         'user' => 'your_db_user',
         'pass' => 'your_db_password',
@@ -57,6 +59,6 @@ return [
     'sms' => [
         'semaphore_api_key' => 'your_semaphore_api_key',
         'sender' => 'BrgySanJose',
-        'endpoint' => 'https://semaphore.co/api/v4/messages',
+        'endpoint' => 'https://api.semaphore.co/api/v4/messages',
     ],
 ];

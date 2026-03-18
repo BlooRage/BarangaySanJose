@@ -2,7 +2,8 @@
 $current = basename($_SERVER['PHP_SELF']);
 
 // Group pages by section
-$residentMgmtPages = ['ResidentMasterlist.php', 'ResidentArchive.php', 'EditRequests.php', 'SectorMembershipVerification.php', 'HouseholdProfiling.php'];
+$residentMgmtPages = ['ResidentMasterlist.php', 'ResidentArchive.php', 'EditRequests.php', 'SectorMembershipVerification.php'];
+$householdProfilingPages = ['HouseholdProfiling.php', 'HeadOfTheFamilyVerification.php'];
 $appointmentPages = ['AppointmentTracker.php'];
 $certPages = ['CertificateTracker.php'];
 $financePages = ['FinancePayments.php'];
@@ -43,6 +44,7 @@ if (!function_exists('appUrl')) {
 }
 
 $isResidentMgmtActive = in_array($current, $residentMgmtPages);
+$isHouseholdProfilingActive = in_array($current, $householdProfilingPages);
 $isAppointmentActive = in_array($current, $appointmentPages);
 $isCertActive = in_array($current, $certPages);
 $isFinanceActive = in_array($current, $financePages);
@@ -55,6 +57,12 @@ $isReportActive = in_array($current, $reportPages);
 $reportModule = strtolower(trim((string)($_GET['module'] ?? '')));
 $isSuperAdminSidebar = ((string)($_SESSION['role'] ?? '') === 'SuperAdmin');
 $financeSection = strtolower(trim((string)($_GET['section'] ?? 'tracker')));
+$certificateTab = strtolower(trim((string)($_GET['tab'] ?? 'tracker')));
+$certificateDocument = strtolower(trim((string)($_GET['document'] ?? '')));
+$isBarangayIdIssuanceActive = $current === 'CertificateTracker.php'
+    && $certificateTab === 'manual'
+    && $certificateDocument === 'barangay_id';
+$isCertificateTrackerActive = $current === 'CertificateTracker.php' && !$isBarangayIdIssuanceActive;
 $isFinanceFeesActive = $current === 'FinancePayments.php' && $financeSection === 'fees';
 $isFinanceCashbookActive = $current === 'FinancePayments.php' && $financeSection === 'cashbook';
 $isFinanceTrackerActive = $current === 'FinancePayments.php' && !in_array($financeSection, ['fees', 'cashbook'], true);
@@ -324,7 +332,18 @@ if (!empty($_SESSION['user_id']) && isset($conn) && $conn instanceof mysqli) {
 
         <div class="collapse <?= $isCertActive ? 'show' : '' ?>" id="cert-collapse">
           <ul class="btn-toggle-nav list-unstyled fw-normal pb-1 small">
-            <li><a href="<?= htmlspecialchars(appUrl('Admin-End/Certificates/CertificateTracker.php')) ?>" class="link-dark rounded <?= $current == 'CertificateTracker.php' ? 'active' : '' ?>">Tracker</a></li>
+            <li>
+              <a href="<?= htmlspecialchars(appUrl('Admin-End/Certificates/CertificateTracker.php')) ?>"
+                 class="link-dark rounded <?= $isCertificateTrackerActive ? 'active' : '' ?>">
+                Tracker
+              </a>
+            </li>
+            <li>
+              <a href="<?= htmlspecialchars(appUrl('Admin-End/Certificates/CertificateTracker.php?tab=manual&document=barangay_id')) ?>"
+                 class="link-dark rounded <?= $isBarangayIdIssuanceActive ? 'active' : '' ?>">
+                Barangay ID Issuance
+              </a>
+            </li>
           </ul>
         </div>
       </li>
@@ -651,4 +670,3 @@ if (!empty($_SESSION['user_id']) && isset($conn) && $conn instanceof mysqli) {
     syncMode();
   })();
 </script>
-

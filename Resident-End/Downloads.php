@@ -304,7 +304,11 @@ if (isset($conn) && $conn instanceof mysqli) {
                                 <?php foreach ($downloadItems as $item): ?>
                                     <?php
                                     $requestId = (string)$item['request_id'];
-                                    $viewUrl = $workflowEndpoint . '?action=view_issued&request_id=' . rawurlencode($requestId);
+                                    $docTypeToken = preg_replace('/[^a-z0-9]+/i', '', strtolower((string)($item['document_type'] ?? '')));
+                                    $isBarangayId = strpos($docTypeToken, 'barangayid') !== false;
+                                    $viewUrl = $isBarangayId
+                                        ? ($baseUrl . '/Resident-End/BarangayId/DigitalId.php?request_id=' . rawurlencode($requestId))
+                                        : ($workflowEndpoint . '?action=view_issued&request_id=' . rawurlencode($requestId));
                                     $downloadUrl = $workflowEndpoint . '?action=download_issued&request_id=' . rawurlencode($requestId);
                                     ?>
                                     <tr>

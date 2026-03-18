@@ -569,6 +569,7 @@ require_once __DIR__ . '/includes/resident_access_guard.php';
 <script>
 (() => {
   const endpoint = '<?= htmlspecialchars($baseUrl) ?>/PhpFiles/Resident-End/documentRequestWorkflow.php';
+  const digitalBarangayIdPage = '<?= htmlspecialchars($baseUrl) ?>/Resident-End/BarangayId/DigitalId.php';
   const tbody = document.getElementById('requestRows');
   const cards = document.getElementById('requestCards');
   const btnRefresh = document.getElementById('btnRefresh');
@@ -891,6 +892,11 @@ require_once __DIR__ . '/includes/resident_access_guard.php';
       : '-';
   }
 
+  function isBarangayIdRequest(row) {
+    const docType = String(row?.document_type || '').toLowerCase().replace(/[^a-z0-9]+/g, '');
+    return docType.includes('barangayid');
+  }
+
   function filteredItems() {
     const search = String(document.getElementById('requestSearch')?.value || '').toLowerCase().trim();
     const status = String(document.getElementById('requestStatusFilter')?.value || '').toLowerCase().trim();
@@ -971,12 +977,15 @@ require_once __DIR__ . '/includes/resident_access_guard.php';
     tbody.querySelectorAll('button[data-issued]').forEach((btn) => {
       btn.addEventListener('click', () => {
         const id = String(btn.getAttribute('data-issued') || '');
-        const viewUrl = `${endpoint}?action=view_issued&request_id=${encodeURIComponent(id)}&_ts=${Date.now()}`;
+        const row = itemById.get(id);
         const downloadUrl = `${endpoint}?action=download_issued&request_id=${encodeURIComponent(id)}`;
+        const viewUrl = row && isBarangayIdRequest(row)
+          ? `${digitalBarangayIdPage}?request_id=${encodeURIComponent(id)}&embed=1&_ts=${Date.now()}`
+          : `${endpoint}?action=view_issued&request_id=${encodeURIComponent(id)}&_ts=${Date.now()}`;
         openFileViewerModal({
-          title: 'Issued Document (PDF)',
+          title: row && isBarangayIdRequest(row) ? 'Digital Barangay ID' : 'Issued Document (PDF)',
           viewUrl,
-          linkText: 'Download',
+          linkText: 'Download PDF',
           linkUrl: downloadUrl,
           isPdf: true
         });
@@ -1221,12 +1230,15 @@ require_once __DIR__ . '/includes/resident_access_guard.php';
       tbody.querySelectorAll('button[data-issued]').forEach((btn) => {
         btn.addEventListener('click', () => {
           const id = String(btn.getAttribute('data-issued') || '');
-          const viewUrl = `${endpoint}?action=view_issued&request_id=${encodeURIComponent(id)}&_ts=${Date.now()}`;
+          const row = itemById.get(id);
           const downloadUrl = `${endpoint}?action=download_issued&request_id=${encodeURIComponent(id)}`;
+          const viewUrl = row && isBarangayIdRequest(row)
+            ? `${digitalBarangayIdPage}?request_id=${encodeURIComponent(id)}&embed=1&_ts=${Date.now()}`
+            : `${endpoint}?action=view_issued&request_id=${encodeURIComponent(id)}&_ts=${Date.now()}`;
           openFileViewerModal({
-            title: 'Issued Document (PDF)',
+            title: row && isBarangayIdRequest(row) ? 'Digital Barangay ID' : 'Issued Document (PDF)',
             viewUrl,
-            linkText: 'Download',
+            linkText: 'Download PDF',
             linkUrl: downloadUrl,
             isPdf: true
           });

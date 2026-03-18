@@ -2789,6 +2789,7 @@ require_once __DIR__ . '/../includes/admin_guard.php';
   };
 </script>
 <script src="../../JS-Script-Files/Admin-End/tableColumnsGeneric.js?v=20260215-1"></script>
-<script src="../../JS-Script-Files/Admin-End/certificateTrackerScript.js?v=20260317-03"></script>
+<script src="../../JS-Script-Files/Shared/barangayIdDigital.js?v=20260318-01"></script>
+<script src="../../JS-Script-Files/Admin-End/certificateTrackerScript.js?v=20260318-02"></script>
 </body>
 </html>

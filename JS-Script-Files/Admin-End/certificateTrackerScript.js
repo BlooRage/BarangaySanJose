@@ -9,6 +9,10 @@
   const tableBody = document.getElementById('tableBody');
   const searchInput = document.getElementById('searchInput');
   const stageTabs = Array.from(document.querySelectorAll('[data-stage-filter]'));
+  const launchParams = new URLSearchParams(window.location.search);
+  const launchTab = String(launchParams.get('tab') || '').toLowerCase();
+  const launchManualDocument = String(launchParams.get('document') || '').toLowerCase();
+  const launchStage = String(launchParams.get('stage') || '').toLowerCase();
   const barangayIdTabCount = document.getElementById('barangayIdTabCount');
   const pendingTabCount = document.getElementById('pendingTabCount');
   const releaseTabCount = document.getElementById('releaseTabCount');
@@ -497,6 +501,23 @@
   const isFinancePaymentsPage = /\/admin-end\/certificates\/financepayments(?:\.php)?\/?$/i.test(window.location.pathname);
   const financeColumnsStorageKey = 'financePaymentsVisibleColumns';
   const defaultFinanceVisibleColumns = [1, 3, 4, 6, 7, 8];
+
+  function setActiveStageTab(stageFilter) {
+    const target = String(stageFilter || '').toLowerCase();
+    const hasMatch = stageTabs.some((tab) => String(tab.getAttribute('data-stage-filter') || '').toLowerCase() === target);
+
+    stageTabs.forEach((tab, index) => {
+      const tabFilter = String(tab.getAttribute('data-stage-filter') || '').toLowerCase();
+      const isActive = hasMatch ? tabFilter === target : index === 0;
+      tab.classList.toggle('active', isActive);
+    });
+
+    currentStage = hasMatch ? target : '';
+  }
+
+  if (launchStage) {
+    setActiveStageTab(launchStage);
+  }
 
   function esc(v) {
     return String(v ?? '').replace(/[&<>\"']/g, (m) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '\"': '&quot;', "'": '&#39;' }[m]));
@@ -2021,6 +2042,7 @@
       childLines.push(`${childName}${childAge ? `, ${childAge} y/o` : ''}`.trim());
     }
     const requestedDocType = firstNonEmpty([payload.document_type, row.document_type, 'Certificate']);
+    const isBarangayIdDocument = normalizePreviewDocKey(requestedDocType) === 'barangayid';
     const generalPermitPurpose = generalClearancePurposeFromDocType(requestedDocType);
     const generalPermitLocation = buildGeneralPermitLocation(
       payload,
@@ -2069,8 +2091,22 @@
 
     const inferredBusinessClearance = !!businessName
       || /business\s+permit/i.test(firstNonEmpty([row.purpose, payload.request_purpose, payload.purpose]));
+    const barangayIdDigitalState = (
+      isBarangayIdDocument
+      && window.BarangayIdDigital
+      && typeof window.BarangayIdDigital.createState === 'function'
+    )
+      ? window.BarangayIdDigital.createState({
+          appBase,
+          row,
+          payload,
+          residentProfile,
+          fallbackProfileImageUrl: `${appBase}/Images/Profile-Placeholder.png`,
+        })
+      : {};
 
     return {
+      ...barangayIdDigitalState,
       docType: inferredBusinessClearance
         ? 'Barangay Clearance for Business Permit'
         : normalizeDocumentTypeDisplay(requestedDocType),
@@ -2349,6 +2385,14 @@
       metaHtml = '';
       issuedLine = buildIssuedLine();
     } else if (isBarangayId) {
+      if (window.BarangayIdDigital && typeof window.BarangayIdDigital.render === 'function') {
+        return window.BarangayIdDigital.render(state, {
+          eyebrow: 'Barangay ID Preview',
+          helper: 'This preview uses the Barangay ID front and back template that staff will prepare for release.',
+          frontLabel: 'Front Template',
+          backLabel: 'Back Template',
+        });
+      }
       titleHtml = '<div class="doc-preview-goodmoral-office"><div>TANGGAPAN NG PUNONG BARANGAY</div><div>BARANGAY ID APPLICATION</div></div>';
       contentHtml = `
         <p><strong>APPLICATION REVIEW</strong></p>
@@ -5495,9 +5539,7 @@
 
   stageTabs.forEach((tab) => {
     tab.addEventListener('click', () => {
-      stageTabs.forEach((x) => x.classList.remove('active'));
-      tab.classList.add('active');
-      currentStage = tab.getAttribute('data-stage-filter') || '';
+      setActiveStageTab(tab.getAttribute('data-stage-filter') || '');
       load();
     });
   });
@@ -6387,6 +6429,20 @@
       manualUpdateSummary();
     }
 
+    function manualApplyLaunchSelection() {
+      if (launchTab !== 'manual' || !launchManualDocument || !manualDocumentType) {
+        return;
+      }
+      const hasOption = Array.from(manualDocumentType.options).some(
+        (option) => String(option.value || '').toLowerCase() === launchManualDocument
+      );
+      if (!hasOption) {
+        return;
+      }
+      manualDocumentType.value = launchManualDocument;
+      manualDocumentType.dispatchEvent(new Event('change', { bubbles: true }));
+    }
+
     manualResidentSearchBtn?.addEventListener('click', manualSearchResidents);
     manualResidentSearchInput?.addEventListener('keydown', (event) => {
       if (event.key === 'Enter') {
@@ -6584,6 +6640,7 @@
 
     manualRenderDocumentOptions();
     manualResetForm();
+    manualApplyLaunchSelection();
   })();
 
   load();
@@ -6638,6 +6695,14 @@
     tabDocRequests.addEventListener('click', showDocTab);
     tabManualIssuance?.addEventListener('click', showManualTab);
     tabFeeRequests.addEventListener('click', showFeeTab);
+
+    if (launchTab === 'manual') {
+      showManualTab();
+    } else if (launchTab === 'fees') {
+      showFeeTab();
+    } else {
+      showDocTab();
+    }
 
     // ── Sub-tab switching ───────────────────────────────────────────────────
     const subTabAddFeeType  = document.getElementById('subTabAddFeeType');

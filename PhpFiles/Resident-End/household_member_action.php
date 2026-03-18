@@ -151,6 +151,7 @@ if ($action === 'leave') {
             $emailSender = new EmailSender($smtpConfig);
             $memberName = trim($memberFirst . ' ' . $memberLast);
             $emailSender->send([
+                'type' => 'transaction',
                 'to' => $headEmail,
                 'subject' => 'Household Member Left',
                 'template' => 'emails/transactionNotification.php',
