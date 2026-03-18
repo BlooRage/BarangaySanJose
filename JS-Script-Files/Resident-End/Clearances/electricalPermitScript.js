@@ -30,6 +30,8 @@ document.addEventListener("DOMContentLoaded", () => {
     const secCertificateSelectedFile = document.getElementById("secCertificateSelectedFile");
     const proofAddressType = document.getElementById("proofAddressType");
     const proofAddressFile = document.getElementById("proofAddressFile");
+    const proofAddressDropzone = document.getElementById("proofAddressDropzone");
+    const proofAddressSelectedFile = document.getElementById("proofAddressSelectedFile");
     const proofAddressNumberRow = document.getElementById("proofAddressNumberRow");
     const proofAddressNumber = document.getElementById("proofAddressNumber");
     const proofAddressNumberError = document.getElementById("proofAddressNumberError");
@@ -269,11 +271,17 @@ document.addEventListener("DOMContentLoaded", () => {
         validateNumberInput(proofAddressNumber, proofAddressRegexMap, proofAddressNumberError);
         updateState();
     });
+    proofAddressFile?.addEventListener("change", () => {
+        renderFile(proofAddressFile, proofAddressSelectedFile);
+        updateState();
+    });
     secCertificateFile?.addEventListener("change", () => {
         renderFile(secCertificateFile, secCertificateSelectedFile);
         updateState();
     });
+    bindDropzone(proofAddressDropzone, proofAddressFile, proofAddressSelectedFile);
     bindDropzone(secCertificateDropzone, secCertificateFile, secCertificateSelectedFile);
     updateState();
+    renderFile(proofAddressFile, proofAddressSelectedFile);
     renderFile(secCertificateFile, secCertificateSelectedFile);
 });

@@ -15,6 +15,8 @@ document.addEventListener("DOMContentLoaded", () => {
     const lotSubdivisionBlock = document.getElementById("lot_subdivision_block");
     const proofAddressType = document.getElementById("proofAddressType");
     const proofAddressFile = document.getElementById("proofAddressFile");
+    const proofAddressDropzone = document.getElementById("proofAddressDropzone");
+    const proofAddressSelectedFile = document.getElementById("proofAddressSelectedFile");
     const proofAddressNumberRow = document.getElementById("proofAddressNumberRow");
     const proofAddressNumber = document.getElementById("proofAddressNumber");
     const proofAddressNumberError = document.getElementById("proofAddressNumberError");
@@ -104,6 +106,38 @@ document.addEventListener("DOMContentLoaded", () => {
         }
     };
 
+    const renderFile = (inputEl, outputEl) => {
+        if (!inputEl || !outputEl) return;
+        const names = Array.from(inputEl.files || []).map((file) => file.name);
+        outputEl.textContent = names.length ? `Selected: ${names.join(", ")}` : "No file selected";
+    };
+
+    const bindDropzone = (dropzone, inputEl, outputEl) => {
+        if (!dropzone || !inputEl || !outputEl) return;
+        ["dragenter", "dragover"].forEach((eventName) => {
+            dropzone.addEventListener(eventName, (e) => {
+                e.preventDefault();
+                dropzone.classList.add("is-dragging");
+            });
+        });
+
+        ["dragleave", "drop"].forEach((eventName) => {
+            dropzone.addEventListener(eventName, (e) => {
+                e.preventDefault();
+                dropzone.classList.remove("is-dragging");
+            });
+        });
+
+        dropzone.addEventListener("drop", (e) => {
+            const dt = e.dataTransfer;
+            if (dt && dt.files && dt.files.length) {
+                inputEl.files = dt.files;
+                renderFile(inputEl, outputEl);
+                updateState();
+            }
+        });
+    };
+
     const updateState = () => {
         const val = lotAddressSystem ? lotAddressSystem.value : "";
         setWrapperState(lotHouseWrapper, val === "house");
@@ -141,5 +175,11 @@ document.addEventListener("DOMContentLoaded", () => {
         validateNumberInput(proofAddressNumber, proofAddressRegexMap, proofAddressNumberError);
         updateState();
     });
+    proofAddressFile?.addEventListener("change", () => {
+        renderFile(proofAddressFile, proofAddressSelectedFile);
+        updateState();
+    });
+    bindDropzone(proofAddressDropzone, proofAddressFile, proofAddressSelectedFile);
     updateState();
+    renderFile(proofAddressFile, proofAddressSelectedFile);
 });
