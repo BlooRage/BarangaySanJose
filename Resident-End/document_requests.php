@@ -158,62 +158,144 @@ require_once __DIR__ . '/includes/resident_access_guard.php';
       word-break: break-word;
       white-space: normal;
     }
-    #viewModal .modal-body {
-      background: #f8fafc;
+    #viewModal .modal-content {
+      border: 1px solid #e9ecef;
+      border-radius: 16px;
+      overflow: hidden;
+      background: #fff;
     }
-    #viewModal .tracker-doc-highlight {
-      background: #dbeafe;
-      color: #1e40af;
-      border-radius: 8px;
-      padding: 10px 12px;
-      font-weight: 700;
-      margin-bottom: 12px;
+    #viewModal .modal-header,
+    #viewModal .modal-body,
+    #viewModal .modal-footer {
+      padding: 1rem 1.25rem;
+    }
+    #viewModal .modal-body {
+      background: #fff;
+    }
+    #viewModal .tracker-profile-view {
+      display: grid;
+      gap: 12px;
     }
     #viewModal .tracker-form-section {
-      border: 1px solid #e5e7eb;
-      border-radius: 10px;
+      border: 1px solid #e78924;
+      border-radius: 12px;
       background: #fff;
       padding: 12px;
-      margin-bottom: 12px;
+      margin-top: 0;
+      display: grid;
+      gap: 12px;
     }
     #viewModal .tracker-form-section-title {
+      margin: 0;
       font-size: 1rem;
       font-weight: 700;
       color: #111827;
-      margin-bottom: 10px;
     }
     #viewModal .tracker-form-grid {
       display: grid;
       grid-template-columns: repeat(2, minmax(0, 1fr));
-      gap: 10px;
+      gap: 12px;
     }
     #viewModal .tracker-form-grid.cols-1 {
       grid-template-columns: 1fr;
     }
+    #viewModal .tracker-form-grid.cols-3 {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+    #viewModal .tracker-form-grid.cols-4 {
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+    }
     #viewModal .tracker-form-field {
+      display: grid;
+      gap: 6px;
       background: #f8fafc;
       border: 1px solid #e5e7eb;
-      border-radius: 8px;
-      padding: 8px 10px;
+      border-radius: 10px;
+      padding: 10px 12px;
     }
     #viewModal .tracker-form-label {
-      margin: 0 0 3px 0;
+      margin: 0;
+      line-height: 1.2;
       font-size: .78rem;
       color: #6b7280;
       font-weight: 600;
       text-transform: capitalize;
     }
     #viewModal .tracker-form-value {
-      margin: 0;
+      line-height: 1.45;
       color: #111827;
       font-weight: 600;
       word-break: break-word;
     }
-    @media (max-width: 767px) {
-      #viewModal .tracker-form-grid {
-        grid-template-columns: 1fr;
-      }
+    #viewModal .view-form-section {
+      display: grid;
+      gap: 14px;
     }
+    #viewModal .view-form-row {
+      display: grid;
+      gap: 12px;
+    }
+    #viewModal .view-form-row.cols-2 {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+    #viewModal .view-form-row.cols-3 {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+    #viewModal .view-form-row.cols-4 {
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+    }
+    #viewModal .view-form-row.cols-5 {
+      grid-template-columns: repeat(5, minmax(0, 1fr));
+    }
+    #viewModal .view-form-field {
+      display: grid;
+      gap: 6px;
+    }
+    #viewModal .view-form-field.span-2 {
+      grid-column: span 2;
+    }
+    #viewModal .view-form-field.span-3 {
+      grid-column: span 3;
+    }
+    #viewModal .view-form-field.span-4 {
+      grid-column: span 4;
+    }
+    #viewModal .view-form-label {
+      margin: 0;
+      font-size: .92rem;
+      color: #111827;
+      font-weight: 600;
+    }
+    #viewModal .view-form-label .required {
+      color: #dc2626;
+    }
+    #viewModal .view-form-control {
+      width: 100%;
+      min-height: 44px;
+      padding: 10px 12px;
+      border: 1px solid #a8a7a7;
+      border-radius: 6px;
+      background: #f8fafc;
+      color: #111827;
+      font-weight: 500;
+      display: flex;
+      align-items: center;
+      word-break: break-word;
+    }
+    .status-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35rem;
+      border-radius: 999px;
+      padding: 0.34rem 0.78rem;
+      font-size: 0.82rem;
+      font-weight: 700;
+      white-space: nowrap;
+      border: 1px solid transparent;
+    }
+    .status-pill.pending { color: #9a3412; background: #ffedd5; border-color: #fdba74; }
+    .status-pill.approved { color: #166534; background: #dcfce7; border-color: #86efac; }
+    .status-pill.archived { color: #991b1b; background: #fee2e2; border-color: #fca5a5; }
     @media (max-width: 991.98px) {
       .tracker-toolbar {
         flex-direction: column;
@@ -246,6 +328,22 @@ require_once __DIR__ . '/includes/resident_access_guard.php';
       }
       #requestCards {
         display: block;
+      }
+      #viewModal .view-form-row.cols-2,
+      #viewModal .view-form-row.cols-3,
+      #viewModal .view-form-row.cols-4,
+      #viewModal .view-form-row.cols-5 {
+        grid-template-columns: 1fr;
+      }
+      #viewModal .view-form-field.span-2,
+      #viewModal .view-form-field.span-3,
+      #viewModal .view-form-field.span-4 {
+        grid-column: span 1;
+      }
+      #viewModal .tracker-form-grid,
+      #viewModal .tracker-form-grid.cols-3,
+      #viewModal .tracker-form-grid.cols-4 {
+        grid-template-columns: 1fr;
       }
     }
   </style>
@@ -432,15 +530,15 @@ require_once __DIR__ . '/includes/resident_access_guard.php';
   </div>
 </div>
 
-<div class="modal fade" id="viewModal" tabindex="-1" aria-hidden="true">
-  <div class="modal-dialog modal-lg modal-dialog-centered">
+<div class="modal fade tracker-profile-modal" id="viewModal" tabindex="-1" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
+  <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable" id="div-modalSizing" style="max-width: 1500px; width: 75vw;">
     <div class="modal-content">
       <div class="modal-header">
         <h5 class="modal-title" id="viewModalTitle">Certificate Request</h5>
         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
       </div>
       <div class="modal-body">
-        <div id="viewDetailsBody"></div>
+        <div id="viewDetailsBody" class="tracker-profile-view"></div>
       </div>
       <div class="modal-footer">
         <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
@@ -529,6 +627,13 @@ require_once __DIR__ . '/includes/resident_access_guard.php';
     return `<span class="badge bg-secondary">${label}</span>`;
   }
 
+  function statusPillClass(stage) {
+    const key = String(stage || '').toLowerCase();
+    if (key === 'completed' || key === 'ready_for_claim') return 'approved';
+    if (key === 'cancelled' || key.includes('rejected')) return 'archived';
+    return 'pending';
+  }
+
   function escapeHtml(v) {
     return String(v ?? '').replace(/[&<>\"']/g, (m) => ({'&':'&amp;','<':'&lt;','>':'&gt;','\"':'&quot;',"'":'&#39;'}[m]));
   }
@@ -545,13 +650,30 @@ require_once __DIR__ . '/includes/resident_access_guard.php';
     return ['-', '—', 'n/a', 'na', 'null', 'undefined'].includes(text.toLowerCase());
   }
 
-  function formField(label, value) {
+  function formField(label, value, raw = false) {
+    const text = String(value ?? '').trim();
+    const rendered = raw ? (text || '-') : escapeHtml(text || '-');
     return `
       <div class="tracker-form-field">
         <p class="tracker-form-label">${escapeHtml(label)}</p>
-        <p class="tracker-form-value">${escapeHtml(value)}</p>
+        <div class="tracker-form-value">${rendered}</div>
       </div>
     `;
+  }
+
+  function gridClassByCount(count, maxCols = 4) {
+    const n = Math.max(1, Math.min(maxCols, Number(count) || 1));
+    if (n >= 4) return 'cols-4';
+    if (n === 3) return 'cols-3';
+    if (n === 2) return '';
+    return 'cols-1';
+  }
+
+  function renderFieldGrid(fields, maxCols = 4) {
+    const clean = (Array.isArray(fields) ? fields : []).filter((f) => f && String(f.value ?? '').trim() !== '');
+    if (!clean.length) return '';
+    const cls = gridClassByCount(clean.length, maxCols);
+    return `<div class="tracker-form-grid ${cls}">${clean.map((f) => formField(f.label, f.value, !!f.raw)).join('')}</div>`;
   }
 
   function formSection(title, content) {
@@ -561,6 +683,24 @@ require_once __DIR__ . '/includes/resident_access_guard.php';
         ${content}
       </section>
     `;
+  }
+
+  function viewFormField(label, value, { span = 1, required = false } = {}) {
+    const text = String(value ?? '').trim();
+    if (!text) return '';
+    const spanClass = span > 1 ? ` span-${Math.min(4, Math.max(2, Number(span) || 1))}` : '';
+    return `
+      <div class="view-form-field${spanClass}">
+        <p class="view-form-label">${escapeHtml(label)}${required ? ' <span class="required">*</span>' : ''}</p>
+        <div class="view-form-control">${escapeHtml(text)}</div>
+      </div>
+    `;
+  }
+
+  function viewFormRow(fields, cols = 4) {
+    const html = (Array.isArray(fields) ? fields : []).filter(Boolean).join('');
+    if (!html) return '';
+    return `<div class="view-form-row cols-${cols}">${html}</div>`;
   }
 
   function parsePayload(payloadLike) {
@@ -585,6 +725,138 @@ require_once __DIR__ . '/includes/resident_access_guard.php';
     const date = new Date(normalized);
     if (Number.isNaN(date.getTime())) return raw;
     return date.toLocaleString();
+  }
+
+  function shouldHidePayloadKey(key) {
+    const normalized = String(key || '').trim().toLowerCase();
+    if (!normalized) return true;
+    if (['action', 'csrf_token', 'redirect'].includes(normalized)) return true;
+    return /(file|files|path|proof|attachment|upload|front|back)/.test(normalized);
+  }
+
+  function buildGenericSubmittedFields(row, payload) {
+    const submittedFields = [];
+    Object.keys(payload || {}).forEach((key) => {
+      const k = String(key || '').trim();
+      if (!k || shouldHidePayloadKey(k)) return;
+      const value = payload[k];
+      const text = Array.isArray(value) || (value && typeof value === 'object')
+        ? JSON.stringify(value)
+        : String(value ?? '').trim();
+      if (isEmptyFieldValue(text)) return;
+      submittedFields.push({ label: friendlyLabel(k), value: text });
+    });
+
+    const requestDetailsRaw = String(row.request_details ?? '').trim();
+    if (!submittedFields.length && requestDetailsRaw && requestDetailsRaw !== '{}' && requestDetailsRaw !== '[]') {
+      submittedFields.push({ label: 'Request Details', value: requestDetailsRaw });
+    }
+
+    if (!submittedFields.length) {
+      [
+        ['Purpose', row.purpose],
+        ['Status', row.stage_label || row.stage],
+        ['Submitted At', row.submitted_at],
+        ['Status Remarks', row.status_remarks]
+      ].forEach(([label, value]) => {
+        const text = String(value ?? '').trim();
+        if (!isEmptyFieldValue(text)) {
+          submittedFields.push({ label, value: text });
+        }
+      });
+    }
+
+    return submittedFields;
+  }
+
+  function buildRequestViewHtml(row, payload) {
+    const summarySection = formSection('Request Summary', `
+      <div class="view-form-section">
+        ${viewFormRow([
+          viewFormField('Request ID', row.request_id || '-'),
+          viewFormField('Document', row.document_type || '-'),
+        ], 2)}
+        ${viewFormRow([
+          viewFormField('Purpose', row.purpose || '-', { span: 2 }),
+          viewFormField('Fee', feeTextOf(row), { span: 2 }),
+        ], 4)}
+        ${viewFormRow([
+          viewFormField('Status', row.stage_label || row.stage || '-', { span: 2 }),
+          viewFormField('Submitted At', row.submitted_at || '-', { span: 3 }),
+        ], 5)}
+      </div>
+    `);
+
+    const documentType = String(row.document_type || payload.document_type || '').toLowerCase();
+    const variant = String(payload.cohabitation_variant || '').toLowerCase();
+    const isCohabitation = documentType.includes('cohab') || variant !== '';
+
+    if (isCohabitation) {
+      const detailsSection = formSection('Submitted Form Details', `
+        <div class="view-form-section">
+          ${viewFormRow([
+            viewFormField('Doc Type', payload.document_type || row.document_type || '-'),
+            viewFormField('Cohab Variant', payload.cohabitation_variant || '-'),
+          ], 2)}
+          ${viewFormRow([
+            viewFormField('Last Name', payload.last_name || '', { required: true }),
+            viewFormField('First Name', payload.first_name || '', { required: true }),
+            viewFormField('Middle Name', payload.middle_name || ''),
+          ], 3)}
+          ${viewFormRow([
+            viewFormField('Full Address', payload.full_address || payload.full_address_display || '', { span: 4, required: true }),
+          ], 4)}
+          ${viewFormRow([
+            viewFormField('Cohabitant Last', payload.cohabitant_last || payload.cohabitant_last_name || ''),
+            viewFormField('Cohabitant First', payload.cohabitant_first || ''),
+            viewFormField('Cohabitant Middle', payload.cohabitant_middle || ''),
+          ], 3)}
+          ${viewFormRow([
+            viewFormField('Civil Status', payload.cohabitant_civil_status || '', { span: 2, required: true }),
+            viewFormField('Cohabitant ID Number', payload.cohabitant_id_number || '', { span: 2 }),
+          ], 4)}
+          ${viewFormRow([
+            viewFormField('Cohabitant Full Address', payload.cohabitant_full_address || payload.cohabitant_full_address_display || '', { span: 4 }),
+          ], 4)}
+          ${viewFormRow([
+            viewFormField('Cohab Start Date', payload.cohabitation_start_date || '', { span: 2 }),
+            viewFormField('Duration', payload.cohabitation_duration || payload.cohabitation_duration_display || '', { span: 2 }),
+          ], 4)}
+          ${viewFormRow([
+            viewFormField('Cohab Duration Value', payload.cohabitation_duration_value || '', { span: 2 }),
+            viewFormField('Unit', payload.cohabitation_duration_unit || '', { span: 2 }),
+          ], 4)}
+          ${viewFormRow([
+            viewFormField('Cohabitant Relationship', payload.cohabitant_relationship || '', { span: 2, required: true }),
+            viewFormField('Purpose', payload.purpose || row.purpose || '', { span: 2, required: true }),
+          ], 4)}
+        </div>
+      `);
+
+      return `${summarySection}${detailsSection}`;
+    }
+
+    const submittedFields = buildGenericSubmittedFields(row, payload);
+    const submittedGrid = renderFieldGrid(submittedFields.map((f) => ({
+      label: f.label,
+      value: f.value,
+    })), 4);
+
+    return [
+      summarySection,
+      formSection('Submitted Form Details', submittedGrid || '<div class="text-muted">No submitted details.</div>'),
+    ].join('');
+  }
+
+  function openRequestView(row) {
+    if (!row) return;
+    const payload = parsePayload(row.payload);
+    viewDetailsBody.innerHTML = buildRequestViewHtml(row, payload);
+    if (viewModalTitle) {
+      const requestId = String(row.request_id || '').trim();
+      viewModalTitle.textContent = requestId ? `Certificate Request (#${requestId})` : 'Certificate Request';
+    }
+    viewModal.show();
   }
 
   function paymentActions(row) {
@@ -676,52 +948,7 @@ require_once __DIR__ . '/includes/resident_access_guard.php';
         const id = String(btn.getAttribute('data-view') || '');
         const row = itemById.get(id);
         if (!row) return;
-        const payload = parsePayload(row.payload);
-        const technicalKeys = new Set(['action', 'csrf_token', 'redirect']);
-        const submittedFields = [];
-        Object.keys(payload).forEach((key) => {
-          const k = String(key || '').trim();
-          if (!k || technicalKeys.has(k)) return;
-          const value = payload[key];
-          const text = Array.isArray(value) || (value && typeof value === 'object')
-            ? JSON.stringify(value)
-            : String(value ?? '').trim();
-          if (isEmptyFieldValue(text)) return;
-          submittedFields.push({ label: friendlyLabel(k), value: text });
-        });
-
-        const requestDetailsRaw = String(row.request_details ?? '').trim();
-        if (!submittedFields.length && requestDetailsRaw && requestDetailsRaw !== '{}' && requestDetailsRaw !== '[]') {
-          submittedFields.push({ label: 'Request Details', value: requestDetailsRaw });
-        }
-
-        if (!submittedFields.length) {
-          [
-            ['Purpose', row.purpose],
-            ['Status', row.stage_label || row.stage],
-            ['Submitted At', row.submitted_at],
-            ['Status Remarks', row.status_remarks]
-          ].forEach(([label, value]) => {
-            const text = String(value ?? '').trim();
-            if (!isEmptyFieldValue(text)) {
-              submittedFields.push({ label, value: text });
-            }
-          });
-        }
-
-        const gridClass = submittedFields.length <= 1 ? 'cols-1' : '';
-        const gridHtml = submittedFields.length
-          ? `<div class="tracker-form-grid ${gridClass}">${submittedFields.map((f) => formField(f.label, f.value)).join('')}</div>`
-          : '<div class="text-muted">No submitted details.</div>';
-
-        let html = `<div class="tracker-doc-highlight">Document Requested: ${escapeHtml(row.document_type || '-')}</div>`;
-        html += formSection('Submitted Form Details', gridHtml);
-        viewDetailsBody.innerHTML = html;
-        if (viewModalTitle) {
-          const requestId = String(row.request_id || '').trim();
-          viewModalTitle.textContent = requestId ? `Certificate Request (#${requestId})` : 'Certificate Request';
-        }
-        viewModal.show();
+        openRequestView(row);
       });
     });
 
@@ -971,52 +1198,7 @@ require_once __DIR__ . '/includes/resident_access_guard.php';
           const id = String(btn.getAttribute('data-view') || '');
           const row = itemById.get(id);
           if (!row) return;
-          const payload = parsePayload(row.payload);
-          const technicalKeys = new Set(['action', 'csrf_token', 'redirect']);
-          const submittedFields = [];
-          Object.keys(payload).forEach((key) => {
-            const k = String(key || '').trim();
-            if (!k || technicalKeys.has(k)) return;
-            const value = payload[key];
-            const text = Array.isArray(value) || (value && typeof value === 'object')
-              ? JSON.stringify(value)
-              : String(value ?? '').trim();
-            if (isEmptyFieldValue(text)) return;
-            submittedFields.push({ label: friendlyLabel(k), value: text });
-          });
-
-          const requestDetailsRaw = String(row.request_details ?? '').trim();
-          if (!submittedFields.length && requestDetailsRaw && requestDetailsRaw !== '{}' && requestDetailsRaw !== '[]') {
-            submittedFields.push({ label: 'Request Details', value: requestDetailsRaw });
-          }
-
-          if (!submittedFields.length) {
-            [
-              ['Purpose', row.purpose],
-              ['Status', row.stage_label || row.stage],
-              ['Submitted At', row.submitted_at],
-              ['Status Remarks', row.status_remarks]
-            ].forEach(([label, value]) => {
-              const text = String(value ?? '').trim();
-              if (!isEmptyFieldValue(text)) {
-                submittedFields.push({ label, value: text });
-              }
-            });
-          }
-
-          const gridClass = submittedFields.length <= 1 ? 'cols-1' : '';
-          const gridHtml = submittedFields.length
-            ? `<div class="tracker-form-grid ${gridClass}">${submittedFields.map((f) => formField(f.label, f.value)).join('')}</div>`
-            : '<div class="text-muted">No submitted details.</div>';
-
-          let html = `<div class="tracker-doc-highlight">Document Requested: ${escapeHtml(row.document_type || '-')}</div>`;
-          html += formSection('Submitted Form Details', gridHtml);
-          viewDetailsBody.innerHTML = html;
-          if (viewModalTitle) {
-            const requestId = String(row.request_id || '').trim();
-            viewModalTitle.textContent = requestId ? `Certificate Request (#${requestId})` : 'Certificate Request';
-          }
-          viewModal.show();
+          openRequestView(row);
         });
       });
 

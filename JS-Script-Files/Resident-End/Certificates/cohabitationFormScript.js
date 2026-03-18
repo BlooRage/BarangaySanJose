@@ -64,6 +64,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const cohabitationSubdivisionLot = document.getElementById("cohabitationSubdivisionLot");
     const cohabitationAreaLot = document.getElementById("cohabitationAreaNumberLot");
     const cohabitantDob = form.querySelector('input[name="cohabitant_dob"]');
+    const partnerAge = form.querySelector('input[name="partner_age"]');
     const cohabitationStartDate = document.getElementById("cohabitationStartDate");
     const cohabitationStartDisplay = document.getElementById("cohabitationStartDisplay");
     const cohabitationStartModalEl = document.getElementById("cohabitationStartModal");
@@ -389,6 +390,32 @@ document.addEventListener("DOMContentLoaded", () => {
         const okDob = validateDateNotFuture(cohabitantDob, "Date of birth");
         const okStart = validateDateNotFuture(cohabitationStartDate, "Started cohabitation date");
         return okDob && okStart;
+    };
+
+    const computePartnerAge = () => {
+        if (!partnerAge) return;
+        const raw = String(cohabitantDob?.value || "").trim();
+        if (!raw || Number.isNaN(Date.parse(raw))) {
+            partnerAge.value = "";
+            return;
+        }
+
+        const birthDate = new Date(raw);
+        const today = new Date();
+        let age = today.getFullYear() - birthDate.getFullYear();
+        const monthDiff = today.getMonth() - birthDate.getMonth();
+        const dayDiff = today.getDate() - birthDate.getDate();
+
+        if (monthDiff < 0 || (monthDiff === 0 && dayDiff < 0)) {
+            age -= 1;
+        }
+
+        if (age < 0) {
+            partnerAge.value = "";
+            return;
+        }
+
+        partnerAge.value = String(age);
     };
 
     const updateCohabitationStartPreview = () => {
@@ -1220,25 +1247,30 @@ document.addEventListener("DOMContentLoaded", () => {
         if (!el) return;
         el.addEventListener("input", () => {
             validateCohabitationDates();
+            computePartnerAge();
             computeCohabitationDuration();
             updateSubmitState();
         });
         el.addEventListener("change", () => {
             validateCohabitationDates();
+            computePartnerAge();
             computeCohabitationDuration();
             updateSubmitState();
         });
         el.addEventListener("blur", () => {
             validateCohabitationDates();
+            computePartnerAge();
             computeCohabitationDuration();
             updateSubmitState();
         });
         el.addEventListener("invalid", () => {
             validateCohabitationDates();
+            computePartnerAge();
             computeCohabitationDuration();
             updateSubmitState();
         });
     });
+    computePartnerAge();
     computeCohabitationDuration();
     agree.addEventListener("change", updateSubmitState);
     // Avoid heavy whole-form validity checks on every keystroke (causes input lag).
