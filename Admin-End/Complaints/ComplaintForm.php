@@ -210,15 +210,15 @@ $feedbackMessage = !empty($_GET['success'])
                                 </select>
                             </div>
                             <div class="col-12 col-md-3">
-                                <label class="top-label">Barangay</label>
+                                <label class="top-label">Barangay <span class="required-asterisk">*</span></label>
                                 <input type="text" name="complainant_barangay" value="Barangay San Jose" readonly>
                             </div>
                             <div class="col-12 col-md-3">
-                                <label class="top-label">Municipality / City</label>
+                                <label class="top-label">Municipality / City <span class="required-asterisk">*</span></label>
                                 <input type="text" name="complainant_municipality" value="Rodriguez" readonly>
                             </div>
                             <div class="col-12 col-md-3">
-                                <label class="top-label">Province</label>
+                                <label class="top-label">Province <span class="required-asterisk">*</span></label>
                                 <input type="text" name="complainant_province" value="Rizal" readonly>
                             </div>
                         </div>
@@ -283,7 +283,7 @@ $feedbackMessage = !empty($_GET['success'])
                         </select>
                     </div>
                     <div>
-                        <label class="top-label">If Other, please specify</label>
+                        <label class="top-label">If Other, please specify <span id="natureOtherAsterisk" class="required-asterisk d-none">*</span></label>
                         <input type="text" id="natureOther" name="nature_other">
                     </div>
                 </div>
@@ -344,7 +344,7 @@ $feedbackMessage = !empty($_GET['success'])
             <div class="agreement-row">
                 <label class="agreement-text check-item" for="agreementComplaint">
                     <input type="checkbox" id="agreementComplaint" name="certify" required>
-                    I hereby certify that the above information is true and correct to the best of my knowledge and belief.
+                    I hereby certify that the above information is true and correct to the best of my knowledge and belief. <span class="required-asterisk">*</span>
                 </label>
                 <button type="submit" class="submit-btn">SUBMIT</button>
             </div>
@@ -357,3 +357,4 @@ $feedbackMessage = !empty($_GET['success'])
 <script src="../../JS-Script-Files/Resident-End/complaintScript.js"></script>
 </body>
 </html>
+

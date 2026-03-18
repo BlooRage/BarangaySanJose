@@ -88,6 +88,59 @@ require_once __DIR__ . "/../includes/admin_guard.php";
         #viewModal .tracker-form-value {
             line-height: 1.45;
         }
+
+        #viewModal .tracker-attachment-actions {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+
+        #viewModal .tracker-signature-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+            gap: 12px;
+        }
+
+        #viewModal .tracker-signature-card {
+            border: 1px solid #e9ecef;
+            border-radius: 14px;
+            padding: 12px;
+            background: #fffaf4;
+            display: grid;
+            gap: 10px;
+        }
+
+        #viewModal .tracker-signature-card__header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 10px;
+        }
+
+        #viewModal .tracker-signature-card__title {
+            font-weight: 700;
+            color: #6b4a19;
+        }
+
+        #viewModal .tracker-signature-card__preview {
+            display: block;
+            border: 1px solid #ead7bd;
+            border-radius: 12px;
+            background: #ffffff;
+            padding: 8px;
+        }
+
+        #viewModal .tracker-signature-card__preview img {
+            display: block;
+            width: 100%;
+            max-height: 200px;
+            object-fit: contain;
+        }
+
+        #viewModal .tracker-signature-card__empty {
+            color: #6c757d;
+            font-size: 0.95rem;
+        }
     </style>
 </head>
 
@@ -219,6 +272,23 @@ require_once __DIR__ . "/../includes/admin_guard.php";
     </div>
 </div>
 
+<div class="modal fade" id="narrativeTextModal" tabindex="-1" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
+    <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="narrativeTextModalTitle">Narrative Report</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <pre id="narrativeTextModalBody" class="mb-0" style="white-space: pre-wrap; word-break: break-word; font-family: inherit;"></pre>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
 <div class="modal fade" id="caseActionModal" tabindex="-1" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content">
@@ -278,7 +348,7 @@ require_once __DIR__ . "/../includes/admin_guard.php";
     };
 </script>
 <script src="../../JS-Script-Files/Admin-End/tableColumnsGeneric.js?v=20260215-1"></script>
-<script src="../../JS-Script-Files/Admin-End/blotterTracker.js?v=20260307-4"></script>
+<script src="../../JS-Script-Files/Admin-End/blotterTracker.js?v=20260318-3"></script>
 </body>
 </html>
 

@@ -21,6 +21,10 @@
   const caseLogsModal = caseLogsModalEl ? new bootstrap.Modal(caseLogsModalEl) : null;
   const caseLogsModalTitle = document.getElementById('caseLogsModalTitle');
   const caseLogsBody = document.getElementById('caseLogsBody');
+  const narrativeTextModalEl = document.getElementById('narrativeTextModal');
+  const narrativeTextModal = narrativeTextModalEl ? new bootstrap.Modal(narrativeTextModalEl) : null;
+  const narrativeTextModalTitle = document.getElementById('narrativeTextModalTitle');
+  const narrativeTextModalBody = document.getElementById('narrativeTextModalBody');
   const caseActionModalEl = document.getElementById('caseActionModal');
   const caseActionModal = caseActionModalEl ? new bootstrap.Modal(caseActionModalEl) : null;
   const caseActionModalTitle = document.getElementById('caseActionModalTitle');
@@ -349,8 +353,23 @@ fields.push({ label: 'Address', value: participant?.address || '-', fullWidth: t
     const initialStamp = String(detail?.report_timestamp || detail?.date_filed || '-');
     let initialValueHtml = esc(detail?.narrative_value || '-');
     if (detail?.narrative_type === 'file' && detail?.narrative_value) {
-      const fileUrl = `${appBase}/${String(detail.narrative_value).replace(/^\/+/, '')}`;
-      initialValueHtml = `<a class="btn btn-sm btn-outline-primary" href="${esc(fileUrl)}" target="_blank" rel="noopener">Open Narrative File</a>`;
+      const fileUrl = String(detail?.narrative_url || '').trim()
+        || `${appBase}/${String(detail.narrative_value).replace(/^\/+/, '')}`;
+      initialValueHtml = `
+        <div class="tracker-attachment-actions">
+          <a class="btn btn-sm btn-outline-primary" href="${esc(fileUrl)}" target="_blank" rel="noopener">Open Narrative File</a>
+        </div>
+      `;
+    } else if (detail?.narrative_type === 'text' && detail?.narrative_value) {
+      const preview = `${String(detail.narrative_value).trim().slice(0, 280)}${String(detail.narrative_value).trim().length > 280 ? '...' : ''}`;
+      initialValueHtml = `
+        <div class="tracker-form-value-text">${esc(preview || '-')}</div>
+        <div class="tracker-attachment-actions mt-2">
+          <button type="button" class="btn btn-sm btn-outline-primary" id="btnOpenTypedNarrative">
+            Open Typed Narrative
+          </button>
+        </div>
+      `;
     }
 
     return `
@@ -362,6 +381,56 @@ fields.push({ label: 'Address', value: participant?.address || '-', fullWidth: t
         </div>
       </section>
     `;
+  }
+
+  function titleCase(value) {
+    return String(value || '')
+      .trim()
+      .replace(/[_-]+/g, ' ')
+      .replace(/\b\w/g, (m) => m.toUpperCase());
+  }
+
+  function renderSignatureSection(detail) {
+    const signatures = detail?.signatures && typeof detail.signatures === 'object'
+      ? Object.entries(detail.signatures)
+      : [];
+
+    if (!signatures.length) {
+      return '';
+    }
+
+    const cards = signatures.map(([role, item]) => {
+      const label = titleCase(role || 'Signature');
+      const fileUrl = String(item?.file_url || '').trim()
+        || (String(item?.file_path || '').trim()
+          ? `${appBase}/${String(item.file_path).replace(/^\/+/, '')}`
+          : '');
+
+      if (!fileUrl) {
+        return `
+          <article class="tracker-signature-card">
+            <div class="tracker-signature-card__header">
+              <span class="tracker-signature-card__title">${esc(label)}</span>
+            </div>
+            <div class="tracker-signature-card__empty">Signature file unavailable.</div>
+          </article>
+        `;
+      }
+
+      return `
+        <article class="tracker-signature-card">
+          <div class="tracker-signature-card__header">
+            <span class="tracker-signature-card__title">${esc(label)}</span>
+            <a class="btn btn-sm btn-outline-primary" href="${esc(fileUrl)}" target="_blank" rel="noopener">Open</a>
+          </div>
+          <a class="tracker-signature-card__preview" href="${esc(fileUrl)}" target="_blank" rel="noopener" aria-label="Open ${esc(label)} signature">
+            <img src="${esc(fileUrl)}" alt="${esc(label)} signature preview" loading="lazy">
+          </a>
+        </article>
+      `;
+    }).join('');
+
+    return formSection('Signatures', `<div class="tracker-signature-grid">${cards}</div>`);
   }
 
   async function loadNarrativeUpdates(caseId) {
@@ -546,6 +615,7 @@ fields.push({ label: 'Address', value: participant?.address || '-', fullWidth: t
 
   function bindViewActions() {
     const narrativeAddInput = document.getElementById('narrativeAddInput');
+    const openTypedNarrativeBtn = document.getElementById('btnOpenTypedNarrative');
     const caseUpdateInput = document.getElementById('caseUpdateInput');
     const addNarrativeBtn = document.getElementById('btnAddNarrative');
     const addUpdateBtn = document.getElementById('btnAddCaseUpdate');
@@ -555,6 +625,17 @@ fields.push({ label: 'Address', value: participant?.address || '-', fullWidth: t
     const isFinalized = String(currentDetail?.status_name || '').trim().toLowerCase() !== 'active';
 
     if (!narrativeAddInput || !addNarrativeBtn || !addUpdateBtn) return;
+
+    openTypedNarrativeBtn?.addEventListener('click', () => {
+      if (!narrativeTextModal || !narrativeTextModalBody) return;
+      const narrativeText = String(currentDetail?.narrative_value || '').trim();
+      const stamp = String(currentDetail?.report_timestamp || currentDetail?.date_filed || '').trim();
+      if (narrativeTextModalTitle) {
+        narrativeTextModalTitle.textContent = stamp ? `Narrative Report (${stamp})` : 'Narrative Report';
+      }
+      narrativeTextModalBody.textContent = narrativeText || '-';
+      narrativeTextModal.show();
+    });
 
     addNarrativeBtn.addEventListener('click', async () => {
       if (isFinalized) {
@@ -652,19 +733,22 @@ fields.push({ label: 'Address', value: participant?.address || '-', fullWidth: t
       const complainantGrid = renderParticipantGrid(complainant);
       const respondentGrid = renderParticipantGrid(respondent);
 
-      const incidentGrid = renderFieldGrid([
-        { label: 'Incident Date', value: d.incident_date || '-' },
-        { label: 'Incident Time', value: d.incident_time || '-' },
-        { label: 'Incident Place', value: d.incident_place || '-' },
-        { label: 'Complaint Type', value: d.complaint_type || '-' }
-      ], 2);
+      const incidentGrid = d.narrative_type === 'file'
+        ? ''
+        : renderFieldGrid([
+          { label: 'Incident Date', value: d.incident_date || '-' },
+          { label: 'Incident Time', value: d.incident_time || '-' },
+          { label: 'Incident Place', value: d.incident_place || '-' },
+          { label: 'Complaint Type', value: d.complaint_type || '-' }
+        ], 2);
 
       const html = [
         formSection('Blotter Information', blotterGrid),
         formSection('Complainant Information', complainantGrid),
         formSection('Respondent Information', respondentGrid),
-        formSection('Incident Details', incidentGrid),
+        incidentGrid ? formSection('Incident Details', incidentGrid) : '',
         renderNarrativeReportsSection(d),
+        renderSignatureSection(d),
         renderCaseManagementSection(d)
       ].join('');
 

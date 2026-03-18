@@ -274,6 +274,36 @@ function validateComplaintPhoneOrRedirect(string $path, $value, bool $required, 
     return $phone;
 }
 
+function parseStrictDate(string $value, DateTimeZone $timezone): ?DateTimeImmutable
+{
+    if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $value)) {
+        return null;
+    }
+
+    $date = DateTimeImmutable::createFromFormat('!Y-m-d', $value, $timezone);
+    $errors = DateTimeImmutable::getLastErrors();
+    if (!$date || ($errors !== false && (($errors['warning_count'] ?? 0) > 0 || ($errors['error_count'] ?? 0) > 0))) {
+        return null;
+    }
+
+    return $date;
+}
+
+function parseStrictTime(string $value, DateTimeZone $timezone): ?DateTimeImmutable
+{
+    if (!preg_match('/^\d{2}:\d{2}$/', $value)) {
+        return null;
+    }
+
+    $time = DateTimeImmutable::createFromFormat('!H:i', $value, $timezone);
+    $errors = DateTimeImmutable::getLastErrors();
+    if (!$time || ($errors !== false && (($errors['warning_count'] ?? 0) > 0 || ($errors['error_count'] ?? 0) > 0))) {
+        return null;
+    }
+
+    return $time;
+}
+
 function validateIncidentDateTimeOrRedirect(string $path, ?string $incidentDate, ?string $incidentTime): void
 {
     if (!$incidentDate) {
@@ -284,20 +314,21 @@ function validateIncidentDateTimeOrRedirect(string $path, ?string $incidentDate,
     $now = new DateTimeImmutable('now', $timezone);
     $oldestAllowed = $now->sub(new DateInterval('P6M'));
 
-    $dateOnly = DateTimeImmutable::createFromFormat('!Y-m-d', $incidentDate, $timezone);
+    $dateOnly = parseStrictDate($incidentDate, $timezone);
     if (!$dateOnly) {
         redirectWithMessage($path, 'error', 'Incident date is invalid.');
     }
 
-    if ($dateOnly->format('Y-m-d') < $oldestAllowed->format('Y-m-d')) {
+    if ($dateOnly < $oldestAllowed->setTime(0, 0)) {
         redirectWithMessage($path, 'error', 'Incident date must be within the past 6 months.');
     }
 
     if ($incidentTime) {
-        $incidentDateTime = DateTimeImmutable::createFromFormat('Y-m-d H:i', $incidentDate . ' ' . $incidentTime, $timezone);
-        if (!$incidentDateTime) {
+        $timeOnly = parseStrictTime($incidentTime, $timezone);
+        if (!$timeOnly) {
             redirectWithMessage($path, 'error', 'Incident time is invalid.');
         }
+        $incidentDateTime = $dateOnly->setTime((int)$timeOnly->format('H'), (int)$timeOnly->format('i'));
         if ($incidentDateTime > $now) {
             redirectWithMessage($path, 'error', 'Incident date and time cannot be in the future.');
         }
@@ -307,7 +338,7 @@ function validateIncidentDateTimeOrRedirect(string $path, ?string $incidentDate,
         return;
     }
 
-    if ($incidentDate > $now->format('Y-m-d')) {
+    if ($dateOnly > $now->setTime(0, 0)) {
         redirectWithMessage($path, 'error', 'Incident date cannot be in the future.');
     }
 }
