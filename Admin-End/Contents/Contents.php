@@ -438,6 +438,12 @@ function ann_decode_faq_items(?string $json): array
   <link rel="stylesheet" href="../../CSS-Styles/Admin-End-CSS/ResidentMasterlistStyle.css?v=20260227-2">
   <link rel="stylesheet" href="../../CSS-Styles/Admin-End-CSS/EditRequestsStyle.css?v=20260227-5">
   <style>
+    #main-display {
+      min-width: 0;
+      width: 100%;
+      overflow-x: hidden;
+    }
+
     .announcement-shell .table-responsive {
       display: block;
       width: 100%;
@@ -478,6 +484,7 @@ function ann_decode_faq_items(?string $json): array
     #tracker-card {
       width: 100%;
       max-width: 100%;
+      min-width: 0;
       overflow: hidden;
     }
   </style>
