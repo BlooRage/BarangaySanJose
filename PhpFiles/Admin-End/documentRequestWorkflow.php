@@ -6757,15 +6757,6 @@ if ($action === 'finance_verify') {
     $certificateNumber = dr_make_certificate_number($orNumber);
     $verificationCode = strtoupper(bin2hex(random_bytes(8)));
     $qrCodePath = '/UnifiedFileAttachment/IssuedDocuments/QR/qr_' . preg_replace('/[^A-Za-z0-9_-]/', '', $requestId) . '.png';
-    $issuedPath = dra_generate_issued_document_safe(array_merge((array)$row, [
-        'or_number' => $orNumber,
-        'certificate_number' => $certificateNumber,
-        'verification_code' => $verificationCode,
-    ]));
-    if ($issuedPath === null || $issuedPath === '') {
-        dr_respond_json(500, ['success' => false, 'message' => 'Payment verified, but issued document generation failed.']);
-    }
-
     $patch = [
         'amount' => $resolvedAmount,
         'or_number' => $orNumber,
@@ -6775,9 +6766,7 @@ if ($action === 'finance_verify') {
         'status_reason' => null,
         'finance_user_id' => $currentUserId,
         'finance_decision_at' => dr_now(),
-        'ready_at' => dr_now(),
     ];
-    // Walk-in verification from for-payment/rejected states is treated as barangay payment.
     if ($verifyMode === 'walkin' || in_array($currentStage, [DR_STAGE_FOR_PAYMENT, DR_STAGE_PAYMENT_REJECTED], true)) {
         $patch['payment_method'] = 'barangay';
         $patch['payment_submitted_at'] = dr_now();
@@ -6786,6 +6775,34 @@ if ($action === 'finance_verify') {
     } elseif ($verifyMode === 'gcash') {
         $patch['payment_method'] = 'gcash';
     }
+
+    $issuedPath = dra_generate_issued_document_safe(array_merge((array)$row, [
+        'or_number' => $orNumber,
+        'certificate_number' => $certificateNumber,
+        'verification_code' => $verificationCode,
+    ]));
+    if ($issuedPath === null || $issuedPath === '') {
+        $paymentRecorded = dr_update_stage($conn, $requestId, DR_STAGE_PAYMENT_VERIFIED, $patch);
+        $baseDir = realpath(__DIR__ . '/../../');
+        if ($baseDir === false) {
+            $baseDir = dirname(__DIR__, 2);
+        }
+        $diagnosticMessage = dra_issued_document_diagnostics($baseDir, array_merge((array)$row, $patch));
+        if ($paymentRecorded) {
+            dr_respond_json(500, [
+                'success' => false,
+                'payment_recorded' => true,
+                'request' => $paymentRecorded,
+                'message' => 'Payment was recorded, but issued document generation failed. ' . $diagnosticMessage,
+            ]);
+        }
+        dr_respond_json(500, [
+            'success' => false,
+            'message' => 'Unable to complete payment verification because issued document generation failed. ' . $diagnosticMessage,
+        ]);
+    }
+
+    $patch['ready_at'] = dr_now();
     $patch['issued_file_path'] = (string)$issuedPath;
 
     // Payment verification immediately makes the document ready for claim/download.
@@ -6834,6 +6851,28 @@ if ($action === 'finance_reject') {
 }
 
 if ($action === 'mark_ready') {
+    $currentStage = strtolower(trim((string)($row['stage'] ?? '')));
+    $resolvedFeeAmount = null;
+    if (isset($row['fee_amount']) && $row['fee_amount'] !== null && $row['fee_amount'] !== '' && is_numeric((string)$row['fee_amount'])) {
+        $resolvedFeeAmount = (float)$row['fee_amount'];
+    } elseif (dr_is_clearance_document_type((string)($row['document_type'] ?? ''))) {
+        $clearanceFeeTotal = dr_get_clearance_fee_total_for_request($conn, $requestId);
+        if ($clearanceFeeTotal > 0) {
+            $resolvedFeeAmount = (float)$clearanceFeeTotal;
+        }
+    } else {
+        $defaultFee = dr_get_fee_amount_for_document_type($conn, (string)($row['document_type'] ?? ''));
+        if ($defaultFee !== null) {
+            $resolvedFeeAmount = (float)$defaultFee;
+        } elseif (isset($row['amount']) && $row['amount'] !== null && $row['amount'] !== '' && is_numeric((string)$row['amount'])) {
+            $resolvedFeeAmount = (float)$row['amount'];
+        }
+    }
+    $isPaidDocument = ($resolvedFeeAmount !== null && $resolvedFeeAmount > 0);
+    if ($isPaidDocument && !in_array($currentStage, [DR_STAGE_PAYMENT_VERIFIED, DR_STAGE_READY_FOR_CLAIM, DR_STAGE_COMPLETED], true)) {
+        dr_respond_json(422, ['success' => false, 'message' => 'Verify payment first before marking this request ready.']);
+    }
+
     $requiresManualIssuedUpload = dra_requires_manual_issued_upload($row);
     $verificationCode = trim((string)($row['verification_code'] ?? ''));
     if ($verificationCode === '') {
@@ -6850,7 +6889,14 @@ if ($action === 'mark_ready') {
         ]));
     }
     if ($issuedPath === null || $issuedPath === '') {
-        dr_respond_json(500, ['success' => false, 'message' => 'Unable to mark ready without an issued document.']);
+        $baseDir = realpath(__DIR__ . '/../../');
+        if ($baseDir === false) {
+            $baseDir = dirname(__DIR__, 2);
+        }
+        dr_respond_json(500, [
+            'success' => false,
+            'message' => 'Unable to mark ready without an issued document. ' . dra_issued_document_diagnostics($baseDir, (array)$row),
+        ]);
     }
 
     $patch = [
