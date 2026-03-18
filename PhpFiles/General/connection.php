@@ -46,14 +46,16 @@ $explicitHost = trim((string)runtime_env('DB_HOST', ''));
 $hostCandidates = [];
 if ($explicitHost !== '') {
     $hostCandidates[] = $explicitHost;
-} elseif (db_request_host_name() !== '') {
+}
+
+if (db_request_host_name() !== '') {
     if (db_is_localhost_request()) {
-        $hostCandidates = [$localHost, $configuredHost, $hostedHost];
+        $hostCandidates = array_merge($hostCandidates, [$localHost, $hostedHost]);
     } else {
-        $hostCandidates = [$hostedHost, $configuredHost, $localHost];
+        $hostCandidates = array_merge($hostCandidates, [$hostedHost, $localHost]);
     }
 } else {
-    $hostCandidates = [$configuredHost, $localHost, $hostedHost];
+    $hostCandidates = array_merge($hostCandidates, [$configuredHost, $hostedHost]);
 }
 
 $hostCandidates = array_values(array_filter(array_unique(array_map(
