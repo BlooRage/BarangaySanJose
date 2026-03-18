@@ -442,6 +442,7 @@
   const paymentProofPrintBtn = document.getElementById('paymentProofPrintBtn');
   const paymentProofTitle = document.getElementById('paymentProofTitle');
   const paymentProofReturnBtn = document.getElementById('paymentProofReturnBtn');
+  const paymentProofReleaseBtn = document.getElementById('paymentProofReleaseBtn');
   const paymentProofCloseBtn = document.getElementById('paymentProofCloseBtn');
   const submittedFileModalEl = document.getElementById('submittedFileModal');
   const submittedFileModal = submittedFileModalEl ? new bootstrap.Modal(submittedFileModalEl) : null;
@@ -469,12 +470,16 @@
   let currentViewRequestId = '';
   let currentViewStage = '';
   let actionReturnTarget = '';
+  let actionReturnState = null;
   let suppressActionReturn = false;
   let openPreviewAfterActionModal = false;
   let openViewDirectPreview = false;
   let pendingPreviewStateOverride = null;
   let paymentProofReturnTarget = '';
   let paymentProofPrintUrl = '';
+  let paymentProofReleaseRequestId = '';
+  let paymentProofModalState = null;
+  let pendingPaymentProofAction = null;
   let submittedFileReturnTarget = '';
   let preserveViewStateOnNextHide = false;
   let financeViewIntent = 'view';
@@ -756,9 +761,64 @@
     return `<span class="badge bg-secondary">${label}</span>`;
   }
 
+  function resolveWorkflowStage(row) {
+    if (!row) return '';
+    const normalizeStageToken = (value) => String(value || '')
+      .trim()
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '_')
+      .replace(/^_+|_+$/g, '');
+    const normalizeStageAlias = (value) => {
+      const token = normalizeStageToken(value);
+      if (token === 'for_release' || token === 'forrelease') return 'ready_for_claim';
+      if (token === 'ready_for_release' || token === 'readyforrelease') return 'ready_for_claim';
+      return token;
+    };
+
+    const stageRaw = normalizeStageAlias(row.stage);
+    const stageLabel = normalizeStageAlias(row.stage_label);
+    const paymentToken = normalizeStageAlias(firstNonEmpty([row.payment_status_name, row.payment_status_label]));
+    const financeLikeStages = new Set([
+      'for_payment',
+      'payment_submitted',
+      'payment_rejected',
+      'payment_verified',
+      'ready_for_claim',
+      'completed'
+    ]);
+    const paymentFlowStages = new Set([
+      'for_payment',
+      'payment_submitted',
+      'payment_rejected',
+      'payment_verified'
+    ]);
+
+    let stage = stageRaw || stageLabel;
+    if (financeLikeStages.has(stageLabel)) {
+      stage = stageLabel;
+    }
+
+    // Only let payment-status labels refine active payment stages.
+    // Once a request is already for release/completed, don't downgrade it.
+    const canDeriveFromPaymentToken = !stageRaw || paymentFlowStages.has(stageRaw) || paymentFlowStages.has(stageLabel);
+    if (canDeriveFromPaymentToken) {
+      if (['paymentsubmitted', 'pending_payment_verification'].includes(paymentToken)) {
+        stage = 'payment_submitted';
+      } else if (['unpaid', 'pending'].includes(paymentToken)) {
+        stage = 'for_payment';
+      } else if (['rejected', 'denied', 'paymentrejected'].includes(paymentToken)) {
+        stage = 'payment_rejected';
+      } else if (['verified', 'approved'].includes(paymentToken)) {
+        stage = 'payment_verified';
+      }
+    }
+
+    return stage;
+  }
+
   function actionButtons(row) {
     const viewBtn = `<button class="btn btn-sm btn-outline-secondary me-1" data-view-id="${esc(row.request_id)}">View</button>`;
-    const stageKey = String(row.stage || '').toLowerCase();
+    const stageKey = resolveWorkflowStage(row);
     const viewIssuedBtn = (!isFinancePaymentsPage && stageKey !== 'completed' && canOpenIssuedDocument(row))
       ? `<button class="btn btn-sm btn-outline-success me-1" data-issued-id="${esc(row.request_id)}">View Document</button>`
       : '';
@@ -779,45 +839,7 @@
     if (!row) return '';
     const id = esc(row.request_id || '');
     const isFirstTimeJobSeeker = isFirstTimeJobSeekerRow(row);
-    const normalizeStageToken = (value) => String(value || '')
-      .trim()
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, '_')
-      .replace(/^_+|_+$/g, '');
-    const stageRaw = normalizeStageToken(row.stage);
-    const stageLabel = normalizeStageToken(row.stage_label);
-    const paymentToken = normalizeStageToken(firstNonEmpty([row.payment_status_name, row.payment_status_label]));
-    const financeLikeStages = new Set([
-      'for_payment',
-      'payment_submitted',
-      'payment_rejected',
-      'payment_verified',
-      'ready_for_claim',
-      'completed'
-    ]);
-    let stage = stageRaw || stageLabel;
-
-    // Guard against stale `row.stage` values (e.g. "submitted") by honoring
-    // explicit finance/payment labels first when present.
-    if (financeLikeStages.has(stageLabel)) {
-      stage = stageLabel;
-    }
-    // Map payment-status tokens conservatively so "Pending Verification"
-    // remains an initial review state (submitted), while payment flow uses
-    // explicit payment tokens (e.g. Pending Payment Verification).
-    // Only let payment token override when stage is absent or already in finance flow.
-    const canDeriveFromPaymentToken = !stageRaw || financeLikeStages.has(stageRaw) || financeLikeStages.has(stageLabel);
-    if (canDeriveFromPaymentToken) {
-      if (['paymentsubmitted', 'pending_payment_verification'].includes(paymentToken)) {
-        stage = 'payment_submitted';
-      } else if (['unpaid', 'pending'].includes(paymentToken)) {
-        stage = 'for_payment';
-      } else if (['rejected', 'denied', 'paymentrejected'].includes(paymentToken)) {
-        stage = 'payment_rejected';
-      } else if (['verified', 'approved'].includes(paymentToken)) {
-        stage = 'payment_verified';
-      }
-    }
+    const stage = resolveWorkflowStage(row);
     const proofBtn = (isFinancePaymentsPage && row.payment_proof_path)
       ? `<button class="btn btn-sm btn-outline-dark" data-proof-id="${id}">View Payment</button>`
       : '';
@@ -868,7 +890,7 @@
       if (isFinancePaymentsPage) return proofBtn || '<span class="text-muted small">No actions</span>';
       return `
         ${proofBtn}
-        <button class="btn btn-sm btn-dark w-100" data-view-action="mark_completed" data-id="${id}">Release Document (Mark as Complete)</button>
+        <button class="btn btn-sm btn-dark w-100" data-view-action="mark_completed" data-id="${id}">For Release</button>
       `;
     }
     return proofBtn || '<span class="text-muted small">No actions</span>';
@@ -1802,10 +1824,7 @@
   }
 
   function requestNeedsManualIssuedUpload(row) {
-    if (!row) {
-      return false;
-    }
-    return normalizePreviewDocKey(row?.document_type || '') === 'barangayid';
+    return false;
   }
 
   function canOpenIssuedDocument(row) {
@@ -2280,9 +2299,16 @@
       <div class="doc-to-block"><strong>Purpose</strong><strong>:</strong><strong>${esc(safe(purpose, '${PURPOSE}'))}</strong></div>
     `;
 
+    const buildIssuedLine = (wrapBeforeLocality = false) => {
+      const officeText = wrapBeforeLocality
+        ? 'at the office of the Punong Barangay, Barangay<br>San Jose, Montalban, Rizal'
+        : 'at the office of the Punong Barangay, Barangay San Jose, Montalban, Rizal';
+      return `Issued this <strong>${esc(issuedDateWord)}</strong> ${officeText}`;
+    };
+
     let contentHtml = '';
     let titleHtml = '<div class="doc-preview-goodmoral-office"><div>TANGGAPAN NG PUNONG BARANGAY</div><div>BARANGAY CERTIFICATION</div></div>';
-    let issuedLine = `Issued this <strong>${esc(issuedDateWord)}</strong> at the office of the Punong Barangay, Barangay San Jose, Montalban, Rizal`;
+    let issuedLine = buildIssuedLine();
     let metaHtml = renderPreviewMetaRows([
       { label: 'CTC No.:', value: '_____' },
       { label: 'Issued at:', value: '_____' },
@@ -2317,7 +2343,7 @@
         </p>
       `;
       metaHtml = '';
-      issuedLine = `Issued this <strong>${esc(issuedDateWord)}</strong>, at the office of the punong Barangay, Barangay San Jose, Rodriguez (Montalban), Rizal.`;
+      issuedLine = buildIssuedLine();
     } else if (isBarangayId) {
       titleHtml = '<div class="doc-preview-goodmoral-office"><div>TANGGAPAN NG PUNONG BARANGAY</div><div>BARANGAY ID APPLICATION</div></div>';
       contentHtml = `
@@ -2332,7 +2358,7 @@
         <div class="doc-to-block"><strong>Contact Number</strong><strong>:</strong><strong>${esc(safe(contactNumber, '-'))}</strong></div>
         ${barangayIdExtraDetails}
       `;
-      issuedLine = 'After payment verification, the prepared Barangay ID file must be uploaded before release.';
+      issuedLine = 'After payment verification, the Barangay ID will be generated from the approved front and back template with QR verification.';
       metaHtml = '';
     } else if (isGeneralPermitClearance) {
       titleHtml = '<div class="doc-preview-generalclearance-office"><div>TANGGAPAN NG PUNONG BARANGAY</div><div>BARANGAY CLEARANCE</div></div>';
@@ -2374,7 +2400,7 @@
           <span class="doc-preview-generalclearance-note-nowrap">NO. 11 - 2019</span>
         </p>
       `;
-      issuedLine = `Issued this <strong>${esc(issuedDateWord)}</strong> at the office of the Punong Barangay,<br>Barangay San Jose, Montalban, Rizal`;
+      issuedLine = `Issued this <strong>${esc(issuedDateWord)}</strong> at the office of the Punong Barangay, Barangay San Jose, Montalban, Rizal`;
       metaHtml = `
         <div class="doc-preview-generalclearance-meta">
           <div class="doc-preview-generalclearance-meta-row">
@@ -2419,7 +2445,7 @@
             <div class="doc-preview-tricycle-field-value"><strong>${esc(templateSafe(fullName, '${FULL_NAME}'))}</strong></div>
           </div>
           <div class="doc-preview-tricycle-field doc-preview-tricycle-field--address">
-            <strong class="doc-preview-tricycle-field-label">Residential Address</strong>
+            <strong class="doc-preview-tricycle-field-label">Address</strong>
             <strong class="doc-preview-tricycle-field-colon">:</strong>
             <div class="doc-preview-tricycle-field-value"><strong>${esc(templateSafe(fullAddress, '${ADDRESS}'))}</strong><br><strong>Barangay San Jose, Montalban, Rizal</strong></div>
           </div>
@@ -2448,52 +2474,36 @@
             <strong class="doc-preview-tricycle-field-colon">:</strong>
             <div class="doc-preview-tricycle-field-value"><strong>${esc(templateSafe(bodyNumber, '${BODY_NUMBER}'))}</strong></div>
           </div>
-          <div class="doc-preview-tricycle-field">
-            <strong class="doc-preview-tricycle-field-label">Remarks</strong>
-            <strong class="doc-preview-tricycle-field-colon">:</strong>
-            <div class="doc-preview-tricycle-field-value"><strong>${previewEditable('remarks', '', 'Type here')}</strong></div>
-          </div>
-          <div class="doc-preview-tricycle-field">
-            <strong class="doc-preview-tricycle-field-label">Purpose</strong>
-            <strong class="doc-preview-tricycle-field-colon">:</strong>
-            <div class="doc-preview-tricycle-field-value"><strong>${esc(templateSafe(purpose, '${PURPOSE}'))}</strong></div>
-          </div>
         </div>
         <p class="doc-preview-tricycle-purpose">
-          This clearance is being issued pursuant to Barangay Revenue Code ORDINANCE NO. 11 &ndash; 2019
+          This certification is being issued upon the request of the above subject person for his/her
+          application for necessary permit
         </p>
       `;
-      issuedLine = `Issued this <strong>${esc(issuedDateWord)}</strong> at the office of the Punong Barangay, Barangay<br>San Jose, Montalban, Rizal`;
+      issuedLine = `Issued this <strong>${esc(issuedDateWord)}</strong> at the office of the Punong Barangay, Barangay San Jose, Montalban, Rizal.`;
+      const tricycleMetaValues = [certificateNumber, state.orNumber, amount].map((value) => String(value || '').trim());
+      const tricycleMetaLongest = tricycleMetaValues.reduce((max, value) => Math.max(max, value.length), 0);
+      const tricycleMetaWidthCh = Math.max(8, tricycleMetaLongest + 1.2);
       const tricycleMetaLine = (value) => {
         const text = String(value || '').trim();
-        return `<span class="doc-preview-tricycle-meta-line">${text ? `<span class="doc-preview-tricycle-meta-line-text">${esc(text)}</span>` : ''}</span>`;
+        return `<span class="doc-preview-tricycle-meta-line" style="width:${tricycleMetaWidthCh}ch">${text ? `<span class="doc-preview-tricycle-meta-line-text">${esc(text)}</span>` : ''}</span>`;
       };
       metaHtml = `
         <div class="doc-preview-tricycle-meta">
           <div class="doc-preview-tricycle-meta-row">
-            <div class="doc-preview-tricycle-meta-label"><strong>CTC No.</strong></div>
+            <div class="doc-preview-tricycle-meta-label"><strong>Clearance No.</strong></div>
             <div class="doc-preview-tricycle-meta-colon">:</div>
             <div class="doc-preview-tricycle-meta-value">${tricycleMetaLine(certificateNumber)}</div>
           </div>
           <div class="doc-preview-tricycle-meta-row">
-            <div class="doc-preview-tricycle-meta-label"><strong>Issued at</strong></div>
+            <div class="doc-preview-tricycle-meta-label"><strong>Receipt No.</strong></div>
             <div class="doc-preview-tricycle-meta-colon">:</div>
-            <div class="doc-preview-tricycle-meta-value">${tricycleMetaLine('')}</div>
-          </div>
-          <div class="doc-preview-tricycle-meta-row">
-            <div class="doc-preview-tricycle-meta-label"><strong>Issued On</strong></div>
-            <div class="doc-preview-tricycle-meta-colon">:</div>
-            <div class="doc-preview-tricycle-meta-value">${tricycleMetaLine('')}</div>
+            <div class="doc-preview-tricycle-meta-value">${tricycleMetaLine(state.orNumber)}</div>
           </div>
           <div class="doc-preview-tricycle-meta-row">
             <div class="doc-preview-tricycle-meta-label"><strong>Amount</strong></div>
             <div class="doc-preview-tricycle-meta-colon">:</div>
             <div class="doc-preview-tricycle-meta-value">${tricycleMetaLine(amount)}</div>
-          </div>
-          <div class="doc-preview-tricycle-meta-row">
-            <div class="doc-preview-tricycle-meta-label"><strong>OR No.</strong></div>
-            <div class="doc-preview-tricycle-meta-colon">:</div>
-            <div class="doc-preview-tricycle-meta-value">${tricycleMetaLine(state.orNumber)}</div>
           </div>
         </div>
       `;
@@ -2530,7 +2540,7 @@
           </div>
         </div>
       `;
-      issuedLine = `Issued this <strong>${esc(issuedDateWord)}</strong> at the office of the Punong Barangay, Barangay San Jose, Montalban, Rizal.`;
+      issuedLine = buildIssuedLine();
       metaHtml = '';
     } else if (isGoodMoral) {
       contentHtml = `
@@ -2566,7 +2576,7 @@
           This certification is being issued pursuant to Barangay Revenue Code ORDINANCE NO. 11 – 2019.
         </p>
       `;
-      issuedLine = `Issued this <strong>${esc(issuedDateWord)}</strong> at the office of the Punong Barangay, Barangay San Jose, Montalban, Rizal.`;
+      issuedLine = buildIssuedLine();
       metaHtml = renderPreviewMetaRows([
         { label: 'CTC No.:', value: '_____' },
         { label: 'Issued at:', value: '_____' },
@@ -2934,7 +2944,7 @@
           viewModalNextBtn.classList.add('btn-success');
           viewModalNextBtn.disabled = !isFirstTimeJobSeekerRow(currentRow);
         } else if (releaseFlow) {
-          viewModalNextBtn.textContent = 'Mark as Complete / Release';
+          viewModalNextBtn.textContent = 'For Release';
           viewModalNextBtn.classList.remove('d-none', 'btn-primary');
           viewModalNextBtn.classList.add('btn-success');
           viewModalNextBtn.disabled = false;
@@ -3219,6 +3229,28 @@
     }
   });
 
+  paymentProofReleaseBtn?.addEventListener('click', async () => {
+    const requestId = String(paymentProofReleaseRequestId || '').trim();
+    if (!requestId) return;
+
+    const currentRow = itemById.get(requestId);
+    const stageKey = resolveWorkflowStage(currentRow);
+    if (stageKey !== 'ready_for_claim') {
+      alert('This request is no longer ready for release.');
+      await load({ force: true });
+      return;
+    }
+
+    pendingPaymentProofAction = {
+      type: 'mark_completed_confirm',
+      requestId,
+      returnTarget: 'paymentProof'
+    };
+    if (paymentProofModal) {
+      paymentProofModal.hide();
+    }
+  });
+
   paymentProofPrintBtn?.addEventListener('click', () => {
     const url = String(paymentProofPrintUrl || '').trim();
     if (!url) return;
@@ -3247,22 +3279,49 @@
   });
 
   paymentProofModalEl?.addEventListener('hidden.bs.modal', () => {
+    const queuedAction = pendingPaymentProofAction ? { ...pendingPaymentProofAction } : null;
+    const queuedReturnState = queuedAction && paymentProofModalState ? {
+      docUrl: paymentProofModalState.docUrl,
+      title: paymentProofModalState.title,
+      returnTarget: paymentProofModalState.returnTarget,
+      options: { ...(paymentProofModalState.options || {}) }
+    } : null;
+
     paymentProofReturnTarget = '';
     paymentProofPrintUrl = '';
+    paymentProofReleaseRequestId = '';
+    paymentProofModalState = null;
+    pendingPaymentProofAction = null;
     if (paymentProofReturnBtn) {
       paymentProofReturnBtn.classList.add('d-none');
+      paymentProofReturnBtn.disabled = false;
     }
     if (paymentProofTitle) {
       paymentProofTitle.textContent = 'Document Viewer';
     }
     if (paymentProofOpenNew) {
       paymentProofOpenNew.classList.remove('d-none');
+      paymentProofOpenNew.removeAttribute('href');
     }
     if (paymentProofCloseBtn) {
       paymentProofCloseBtn.classList.remove('d-none');
     }
     if (paymentProofPrintBtn) {
       paymentProofPrintBtn.classList.add('d-none');
+    }
+    if (paymentProofReleaseBtn) {
+      paymentProofReleaseBtn.classList.add('d-none');
+      paymentProofReleaseBtn.disabled = false;
+      paymentProofReleaseBtn.textContent = 'Release';
+    }
+    if (paymentProofWrap) {
+      paymentProofWrap.innerHTML = '';
+    }
+    if (queuedAction) {
+      openActionModal(queuedAction.type, queuedAction.requestId, {
+        returnTarget: queuedAction.returnTarget,
+        reopenState: queuedReturnState
+      });
     }
   });
 
@@ -3327,6 +3386,12 @@
 
   function openDocumentModal(docUrl, title = 'Document Viewer', returnTarget = '', options = {}) {
     if (!docUrl || !paymentProofModal || !paymentProofWrap || !paymentProofOpenNew) return;
+    paymentProofModalState = {
+      docUrl: String(docUrl || '').trim(),
+      title: String(title || 'Document Viewer').trim() || 'Document Viewer',
+      returnTarget: String(returnTarget || '').trim(),
+      options: { ...(options || {}) }
+    };
     const bustedUrl = (() => {
       const stamp = String(Date.now());
       try {
@@ -3342,18 +3407,23 @@
     if (paymentProofTitle) {
       paymentProofTitle.textContent = String(title || 'Document Viewer').trim() || 'Document Viewer';
     }
+    const normalizedTitle = String(title || '').trim().toLowerCase();
     const proofOnly = String(title || '').toLowerCase().startsWith('proof of residency');
+    const isIssuedDocument = normalizedTitle === 'issued document';
+    const releaseRequestId = String(options?.releaseRequestId || '').trim();
+    const showReturnButton = proofOnly || isIssuedDocument || paymentProofReturnTarget !== '';
     if (paymentProofReturnBtn) {
-      paymentProofReturnBtn.classList.toggle('d-none', !proofOnly && paymentProofReturnTarget === '');
+      paymentProofReturnBtn.classList.toggle('d-none', !showReturnButton);
       if (proofOnly) paymentProofReturnBtn.classList.remove('d-none');
     }
     if (paymentProofOpenNew) {
       paymentProofOpenNew.classList.toggle('d-none', proofOnly);
     }
     if (paymentProofCloseBtn) {
-      paymentProofCloseBtn.classList.toggle('d-none', proofOnly);
+      paymentProofCloseBtn.classList.toggle('d-none', proofOnly || isIssuedDocument);
     }
     paymentProofPrintUrl = '';
+    paymentProofReleaseRequestId = releaseRequestId;
     paymentProofOpenNew.href = bustedUrl;
     const lower = String(bustedUrl).toLowerCase();
     const isImageAsset = /\.(png|jpe?g|gif|webp|bmp|svg)(\?|#|$)/i.test(lower);
@@ -3375,10 +3445,15 @@
     }
     if (paymentProofPrintBtn) {
       const allowPrint = !!(options && options.allowPrint);
-      paymentProofPrintBtn.classList.toggle('d-none', !(allowPrint && isLikelyPdf && !proofOnly));
-      if (allowPrint && isLikelyPdf && !proofOnly) {
+      paymentProofPrintBtn.classList.toggle('d-none', !(allowPrint && isLikelyPdf && !proofOnly && !isIssuedDocument));
+      if (allowPrint && isLikelyPdf && !proofOnly && !isIssuedDocument) {
         paymentProofPrintUrl = bustedUrl;
       }
+    }
+    if (paymentProofReleaseBtn) {
+      paymentProofReleaseBtn.classList.toggle('d-none', !(isIssuedDocument && releaseRequestId));
+      paymentProofReleaseBtn.disabled = false;
+      paymentProofReleaseBtn.textContent = 'Release';
     }
     paymentProofModal.show();
   }
@@ -4056,18 +4131,25 @@
     }
   }
 
-  function openActionModal(type, requestId) {
+  function openActionModal(type, requestId, options = {}) {
     if (!actionModal) return;
     if (actionForm?.dataset?.verifyMode) {
       delete actionForm.dataset.verifyMode;
     }
 
-    if (viewModalEl && viewModalEl.classList.contains('show') && viewModal) {
+    const explicitReturnTarget = String(options?.returnTarget || '').trim();
+    actionReturnState = options && typeof options === 'object' && options.reopenState
+      ? { ...options.reopenState }
+      : null;
+    if (explicitReturnTarget === 'paymentProof') {
+      actionReturnTarget = 'paymentProof';
+    } else if (viewModalEl && viewModalEl.classList.contains('show') && viewModal) {
       preserveViewStateOnNextHide = true;
       viewModal.hide();
       actionReturnTarget = 'view';
     } else {
       actionReturnTarget = '';
+      actionReturnState = null;
     }
     suppressActionReturn = false;
 
@@ -4109,8 +4191,8 @@
       finance_verify: isWalkInFlow ? 'Record Walk-in Payment' : 'Verify Payment / Walk-in Payment',
       finance_reject: 'Reject Payment',
       mark_ready: 'Mark Ready for Claim',
-      mark_completed_confirm: 'Confirm Release',
-      mark_completed: 'Mark Completed'
+      mark_completed_confirm: 'For Release',
+      mark_completed: 'Release Document'
     };
     modalTitle.textContent = labels[type] || 'Update Request';
     const docName = normalizeDocumentTypeDisplay(String(row?.document_type || 'document'));
@@ -4140,7 +4222,7 @@
       actionPrompt.classList.remove('d-none');
     }
     if (type === 'mark_completed_confirm' && actionPrompt) {
-      actionPrompt.textContent = 'Are you sure you want to release this document and mark this request as completed?';
+      actionPrompt.textContent = 'Are you sure you want to release this document now? This will mark the request as completed.';
       actionPrompt.classList.remove('d-none');
     }
     if ((type === 'personnel_reject' || type === 'finance_reject') && actionPrompt) {
@@ -4175,7 +4257,7 @@
         actionSubmitBtn.classList.remove('btn-primary', 'btn-success');
         actionSubmitBtn.classList.add('btn-danger');
       } else if (type === 'mark_completed_confirm') {
-        actionSubmitBtn.textContent = 'Release';
+        actionSubmitBtn.textContent = 'Release Now';
         actionSubmitBtn.classList.remove('btn-danger', 'btn-primary');
         actionSubmitBtn.classList.add('btn-success');
       } else if (type === 'personnel_reject') {
@@ -4264,7 +4346,7 @@
       if (needsManualIssuedUpload) {
         actionIssuedWrap.classList.remove('d-none');
         actionIssued.required = true;
-        actionPrompt.textContent = 'Upload the prepared Barangay ID file to mark this request as ready for claim.';
+        actionPrompt.textContent = 'Upload the prepared issued file to mark this request as ready for claim.';
       } else {
         actionIssuedWrap.classList.add('d-none');
         actionPrompt.textContent = 'This will generate the issued document and mark the request as ready for claim.';
@@ -4634,14 +4716,14 @@
             viewModalTitle.textContent = requestId ? `Payment Transaction (#${requestId})` : 'Payment Transaction';
           }
           currentViewRequestId = String(row.request_id || '').trim();
-          currentViewStage = String(row.stage || '').toLowerCase();
+          currentViewStage = resolveWorkflowStage(row);
           if (viewModalActions) {
             viewModalActions.innerHTML = '';
           }
           if (viewModalDocBtn) {
             const issuedDocReady = canOpenIssuedDocument(row);
             const issuedDocUrl = issuedDocumentUrl(String(row.request_id || ''));
-            const issuedStageKey = String(row.stage || '').toLowerCase();
+            const issuedStageKey = resolveWorkflowStage(row);
             viewModalDocBtn.classList.remove('d-none');
             viewModalDocBtn.textContent = issuedDocReady ? 'View Issued Document' : 'View Document';
             viewModalDocBtn.onclick = () => {
@@ -4651,7 +4733,8 @@
                   viewModal.hide();
                 }
                 openDocumentModal(issuedDocUrl, 'Issued Document', 'view', {
-                  allowPrint: issuedStageKey === 'ready_for_claim'
+                  allowPrint: issuedStageKey === 'ready_for_claim',
+                  releaseRequestId: issuedStageKey === 'ready_for_claim' ? String(row.request_id || '') : ''
                 });
                 return;
               }
@@ -4994,7 +5077,7 @@
         viewPreviewState = buildPreviewState(row, payload, residentProfile, personalMap);
         applyPendingPreviewStateOverride(String(row.request_id || ''));
         switchViewMode('details');
-        const stageKey = String(row.stage || '').toLowerCase();
+        const stageKey = resolveWorkflowStage(row);
         const nextEnabled = !(
           stageKey === 'submitted' ||
           stageKey === 'fee_tagging' ||
@@ -5008,7 +5091,7 @@
         if (viewModalTitle) {
           const requestId = String(row.request_id || '').trim();
           currentViewRequestId = requestId;
-          currentViewStage = String(row.stage || '').toLowerCase();
+          currentViewStage = resolveWorkflowStage(row);
           viewModalTitle.textContent = requestId ? `Certificate Request (#${requestId})` : 'Certificate Request';
         }
         if (viewModalWalkInBtn) {
@@ -5126,10 +5209,13 @@
         const id = String(btn.getAttribute('data-issued-id') || '');
         if (!id) return;
         const row = itemById.get(id);
-        const stageKey = String(row?.stage || '').toLowerCase();
+        const stageKey = resolveWorkflowStage(row);
         const allowPrint = stageKey === 'ready_for_claim';
         const issuedUrl = issuedDocumentUrl(id);
-        openDocumentModal(issuedUrl, 'Issued Document', '', { allowPrint });
+        openDocumentModal(issuedUrl, 'Issued Document', '', {
+          allowPrint,
+          releaseRequestId: allowPrint ? id : ''
+        });
       });
     });
 
@@ -5168,6 +5254,14 @@
         }
         if (action === 'finance_reject') {
           openActionModal('finance_reject', id);
+          return;
+        }
+        if (action === 'mark_completed') {
+          openActionModal('mark_completed_confirm', id);
+          return;
+        }
+        if (action === 'mark_ready') {
+          openActionModal('mark_ready', id);
         }
       });
     });
@@ -5379,7 +5473,16 @@
     if (!suppressActionReturn && actionReturnTarget === 'view' && viewModal) {
       viewModal.show();
     }
+    if (!suppressActionReturn && actionReturnTarget === 'paymentProof' && actionReturnState) {
+      openDocumentModal(
+        actionReturnState.docUrl,
+        actionReturnState.title,
+        actionReturnState.returnTarget,
+        actionReturnState.options || {}
+      );
+    }
     actionReturnTarget = '';
+    actionReturnState = null;
     suppressActionReturn = false;
   });
 
@@ -5512,14 +5615,980 @@
     switchViewMode('details');
   });
 
+  (function initManualIssuancePanel() {
+    const manualPanel = document.getElementById('manualIssuancePanel');
+    const manualForm = document.getElementById('manualIssuanceForm');
+    if (!manualPanel || !manualForm) return;
+
+    const manualResidentModeExisting = document.getElementById('manualResidentModeExisting');
+    const manualResidentModeWalkin = document.getElementById('manualResidentModeWalkin');
+    const manualResidentLookupWrap = document.getElementById('manualResidentLookupWrap');
+    const manualResidentSearchInput = document.getElementById('manualResidentSearchInput');
+    const manualResidentSearchBtn = document.getElementById('manualResidentSearchBtn');
+    const manualResidentResultsWrap = document.getElementById('manualResidentResultsWrap');
+    const manualResidentResults = document.getElementById('manualResidentResults');
+    const manualResidentSearchHint = document.getElementById('manualResidentSearchHint');
+    const manualSelectedResidentCard = document.getElementById('manualSelectedResident');
+    const manualSelectedResidentName = document.getElementById('manualSelectedResidentName');
+    const manualSelectedResidentMeta = document.getElementById('manualSelectedResidentMeta');
+    const manualClearSelectedResidentBtn = document.getElementById('manualClearSelectedResidentBtn');
+    const manualResidentId = document.getElementById('manualResidentId');
+    const manualResidentUserId = document.getElementById('manualResidentUserId');
+    const manualDocumentType = document.getElementById('manualDocumentType');
+    const manualPurpose = document.getElementById('manualPurpose');
+    const manualDynamicFields = document.getElementById('manualDynamicFields');
+    const manualSpecificFieldsHint = document.getElementById('manualSpecificFieldsHint');
+    const manualFeeWrap = document.getElementById('manualFeeWrap');
+    const manualFeeList = document.getElementById('manualFeeList');
+    const manualFeeTotal = document.getElementById('manualFeeTotal');
+    const manualPreviewBtn = document.getElementById('manualPreviewBtn');
+    const manualSubmitBtn = document.getElementById('manualSubmitBtn');
+    const manualResetBtn = document.getElementById('manualResetBtn');
+    const manualFormAlert = document.getElementById('manualFormAlert');
+    const manualResidentSummary = document.getElementById('manualResidentSummary');
+    const manualDocumentSummary = document.getElementById('manualDocumentSummary');
+    const manualNextStageSummary = document.getElementById('manualNextStageSummary');
+    const manualLastName = document.getElementById('manualLastName');
+    const manualFirstName = document.getElementById('manualFirstName');
+    const manualMiddleName = document.getElementById('manualMiddleName');
+    const manualSuffix = document.getElementById('manualSuffix');
+    const manualBirthdate = document.getElementById('manualBirthdate');
+    const manualSex = document.getElementById('manualSex');
+    const manualCivilStatus = document.getElementById('manualCivilStatus');
+    const manualContactNumber = document.getElementById('manualContactNumber');
+    const manualBirthplace = document.getElementById('manualBirthplace');
+    const manualOccupation = document.getElementById('manualOccupation');
+    const manualReligion = document.getElementById('manualReligion');
+    const manualFullAddress = document.getElementById('manualFullAddress');
+
+    const manualDocumentConfigs = [
+      { id: 'barangay_id', group: 'ID', label: 'Barangay ID', documentType: 'Barangay ID', kind: 'barangay_id' },
+      { id: 'good_moral', group: 'Certificates', label: 'Certificate of Good Moral', documentType: 'Certificate of Good Moral', kind: 'good_moral' },
+      { id: 'residency', group: 'Certificates', label: 'Certificate of Residency', documentType: 'Certificate of Residency', kind: 'residency' },
+      { id: 'identity', group: 'Certificates', label: 'Certificate of Identity', documentType: 'Certificate of Identity', kind: 'identity' },
+      { id: 'indigency', group: 'Certificates', label: 'Certificate of Indigency', documentType: 'CertificateOfIndigency', kind: 'indigency', free: true },
+      { id: 'cohabitation', group: 'Certificates', label: 'Certificate of Cohabitation', documentType: 'Certificate of Cohabitation', kind: 'cohabitation' },
+      { id: 'jail_visit', group: 'Certificates', label: 'Certificate of Relationship for Jail Visitation', documentType: 'Certificate of Cohabitation', kind: 'jail_visit' },
+      { id: 'first_time_job_seeker', group: 'Certificates', label: 'First Time Job Seeker Certificate', documentType: 'First Time Job Seeker Certificate', kind: 'first_time_job_seeker' },
+      { id: 'electrical_clearance', group: 'Clearances', label: 'Barangay Clearance for Electrical Permit', documentType: 'Barangay Clearance for Electrical Permit', kind: 'general_clearance', clearance: true },
+      { id: 'water_clearance', group: 'Clearances', label: 'Barangay Clearance for Water Permit', documentType: 'Barangay Clearance for Water Permit', kind: 'general_clearance', clearance: true },
+      { id: 'residential_clearance', group: 'Clearances', label: 'Barangay Clearance for Residential Permit', documentType: 'Barangay Clearance for Residential Permit', kind: 'general_clearance', clearance: true },
+      { id: 'residential_building_clearance', group: 'Clearances', label: 'Barangay Clearance for Residential Building Permit', documentType: 'Barangay Clearance for Residential Building Permit', kind: 'general_clearance', clearance: true },
+      { id: 'commercial_clearance', group: 'Clearances', label: 'Barangay Clearance for Commercial Permit', documentType: 'Barangay Clearance for Commercial Permit', kind: 'general_clearance', clearance: true },
+      { id: 'commercial_building_clearance', group: 'Clearances', label: 'Barangay Clearance for Commercial Building Permit', documentType: 'Barangay Clearance for Commercial Building Permit', kind: 'general_clearance', clearance: true },
+      { id: 'business_clearance', group: 'Clearances', label: 'Barangay Clearance for Business Permit', documentType: 'Barangay Clearance for Business Permit', kind: 'business_clearance', clearance: true },
+      { id: 'tricycle_clearance', group: 'Clearances', label: 'Barangay Clearance for Tricycle Permit', documentType: 'Barangay Clearance for Tricycle Permit', kind: 'tricycle_clearance', clearance: true }
+    ];
+
+    let manualResidentSearchResults = [];
+    let manualSelectedResident = null;
+    let manualPreviewSignature = '';
+    let manualResidentSearchToken = 0;
+
+    function manualSetAlert(message = '', tone = 'warning') {
+      if (!manualFormAlert) return;
+      const tones = ['alert-warning', 'alert-danger', 'alert-success', 'alert-info'];
+      manualFormAlert.classList.remove(...tones);
+      if (!message) {
+        manualFormAlert.classList.add('d-none');
+        manualFormAlert.textContent = '';
+        return;
+      }
+      const toneClass = {
+        warning: 'alert-warning',
+        danger: 'alert-danger',
+        success: 'alert-success',
+        info: 'alert-info'
+      }[tone] || 'alert-warning';
+      manualFormAlert.classList.add(toneClass);
+      manualFormAlert.textContent = String(message);
+      manualFormAlert.classList.remove('d-none');
+    }
+
+    function manualCurrentMode() {
+      return manualResidentModeWalkin?.checked ? 'walkin' : 'existing';
+    }
+
+    function manualCurrentConfig() {
+      const key = String(manualDocumentType?.value || '').trim();
+      return manualDocumentConfigs.find((config) => config.id === key) || null;
+    }
+
+    function manualEscapeAttr(value) {
+      return String(value ?? '').replace(/"/g, '&quot;');
+    }
+
+    function manualResidentDisplayName(record) {
+      if (!record || typeof record !== 'object') return '';
+      return String(firstNonEmpty([
+        record.full_name,
+        [
+          record.firstname || record.first_name,
+          record.middlename || record.middle_name,
+          record.lastname || record.last_name,
+          record.suffix
+        ].filter(Boolean).join(' ')
+      ]) || '').trim();
+    }
+
+    function manualNormalizeResident(record) {
+      if (!record || typeof record !== 'object') return null;
+      return {
+        resident_id: String(firstNonEmpty([record.resident_id])).trim(),
+        resident_user_id: String(firstNonEmpty([record.resident_user_id, record.user_id])).trim(),
+        first_name: String(firstNonEmpty([record.firstname, record.first_name])).trim(),
+        middle_name: String(firstNonEmpty([record.middlename, record.middle_name])).trim(),
+        last_name: String(firstNonEmpty([record.lastname, record.last_name])).trim(),
+        suffix: String(firstNonEmpty([record.suffix])).trim(),
+        birthdate: String(firstNonEmpty([record.birthdate])).trim(),
+        birthplace: String(firstNonEmpty([record.birthplace])).trim(),
+        sex: String(firstNonEmpty([record.sex])).trim(),
+        civil_status: String(firstNonEmpty([record.civil_status])).trim(),
+        religion: String(firstNonEmpty([record.religion])).trim(),
+        occupation: String(firstNonEmpty([record.occupation])).trim(),
+        contact_number: String(firstNonEmpty([record.contact_number, record.phone_number])).trim(),
+        full_address: String(firstNonEmpty([record.full_address])).trim(),
+        residency_duration: String(firstNonEmpty([record.residency_duration])).trim(),
+        emergency_first_name: String(firstNonEmpty([record.emergency_first_name, record.emergency_first])).trim(),
+        emergency_middle_name: String(firstNonEmpty([record.emergency_middle_name, record.emergency_middle])).trim(),
+        emergency_last_name: String(firstNonEmpty([record.emergency_last_name, record.emergency_last])).trim(),
+        emergency_suffix: String(firstNonEmpty([record.emergency_suffix])).trim(),
+        emergency_contact: String(firstNonEmpty([record.emergency_contact, record.emergency_phone_number])).trim(),
+        emergency_address: String(firstNonEmpty([record.emergency_address])).trim(),
+        id_picture_path: String(firstNonEmpty([record.id_picture_path])).trim(),
+        full_name: manualResidentDisplayName(record),
+      };
+    }
+
+    function manualSuggestedPurpose(config) {
+      if (!config) return '';
+      if (config.kind === 'general_clearance') {
+        return generalClearancePurposeFromDocType(config.documentType);
+      }
+      if (config.kind === 'business_clearance') {
+        const applicationTypeField = manualDynamicFields?.querySelector('[data-manual-field="application_type"]');
+        const applicationType = String(applicationTypeField?.value || '').trim().toLowerCase();
+        return applicationType === 'renewal' ? 'Business Permit - Renewal' : 'Business Permit - New Application';
+      }
+      if (config.kind === 'tricycle_clearance') {
+        const applicationTypeField = manualDynamicFields?.querySelector('[data-manual-field="application_type"]');
+        const applicationType = String(applicationTypeField?.value || '').trim().toLowerCase();
+        return applicationType === 'renewal' ? 'Tricycle Permit - Renewal' : 'Tricycle Permit - New Application';
+      }
+      if (config.kind === 'barangay_id') return 'Barangay ID Application';
+      if (config.kind === 'jail_visit') return 'Jail Visitation';
+      if (config.kind === 'first_time_job_seeker') return 'First Time Job Seeker Application';
+      return '';
+    }
+
+    function manualApplySuggestedPurpose() {
+      const config = manualCurrentConfig();
+      const suggested = manualSuggestedPurpose(config);
+      const currentValue = String(manualPurpose?.value || '').trim();
+      const wasAuto = String(manualPurpose?.dataset.auto || '0') === '1';
+      if (suggested) {
+        if (!currentValue || wasAuto) {
+          manualPurpose.value = suggested;
+          manualPurpose.dataset.auto = '1';
+        }
+      } else if (!currentValue) {
+        manualPurpose.dataset.auto = '1';
+      }
+    }
+
+    function manualCurrentFeeRows() {
+      if (!manualFeeList || manualFeeWrap?.classList.contains('d-none')) return [];
+      return Array.from(manualFeeList.querySelectorAll('.manual-fee-item')).map((item) => {
+        const checkbox = item.querySelector('[data-manual-fee-check]');
+        const amountInput = item.querySelector('[data-manual-fee-amount]');
+        const feeName = String(checkbox?.getAttribute('data-fee-name') || '').trim();
+        const checked = !!checkbox?.checked;
+        const amount = Number(amountInput?.value || 0);
+        return checked && feeName
+          ? { fee_name: feeName, amount: Number.isFinite(amount) && amount >= 0 ? amount : 0 }
+          : null;
+      }).filter(Boolean);
+    }
+
+    function manualExpectedStage(config = manualCurrentConfig(), feeRows = manualCurrentFeeRows()) {
+      if (!config) {
+        return {
+          key: '',
+          label: 'Preview the document first to unlock submission.'
+        };
+      }
+      if (config.kind === 'first_time_job_seeker') {
+        return {
+          key: 'for_interview',
+          label: 'After submit: For Interview'
+        };
+      }
+      if (config.clearance) {
+        if (!feeRows.length) {
+          return {
+            key: 'needs_fee_tagging',
+            label: 'Tag at least one clearance fee before submission.'
+          };
+        }
+        const total = feeRows.reduce((sum, row) => sum + (Number(row.amount) || 0), 0);
+        return total <= 0
+          ? { key: 'ready_for_claim', label: 'After submit: Ready for Release' }
+          : { key: 'for_payment', label: 'After submit: For Payment' };
+      }
+      if (config.free) {
+        return {
+          key: 'ready_for_claim',
+          label: 'After submit: Ready for Release'
+        };
+      }
+      if (config.kind === 'barangay_id') {
+        return {
+          key: 'for_payment',
+          label: 'After submit: For Payment (finance records the walk-in amount)'
+        };
+      }
+      return {
+        key: 'for_payment',
+        label: 'After submit: For Payment'
+      };
+    }
+
+    function manualUpdateSummary() {
+      const config = manualCurrentConfig();
+      const mode = manualCurrentMode();
+      const typedName = [manualFirstName?.value, manualMiddleName?.value, manualLastName?.value, manualSuffix?.value]
+        .map((part) => String(part || '').trim())
+        .filter(Boolean)
+        .join(' ');
+
+      if (manualSelectedResident && mode === 'existing') {
+        manualResidentSummary.textContent = `${manualSelectedResident.full_name || typedName || 'Registered resident'} (${manualSelectedResident.resident_id || 'linked'})`;
+      } else if (typedName) {
+        manualResidentSummary.textContent = mode === 'walkin' ? `Walk-in: ${typedName}` : typedName;
+      } else {
+        manualResidentSummary.textContent = mode === 'walkin' ? 'Walk-in / not linked yet' : 'Registered resident not selected yet';
+      }
+
+      manualDocumentSummary.textContent = config ? config.label : 'Select a manual issuance form';
+      manualNextStageSummary.textContent = manualExpectedStage(config).label;
+    }
+
+    function manualApplyCommonFieldRequirements(config) {
+      const isBarangayId = config?.kind === 'barangay_id';
+      if (manualBirthdate) manualBirthdate.required = isBarangayId;
+      if (manualSex) manualSex.required = isBarangayId;
+      if (manualContactNumber) manualContactNumber.required = isBarangayId;
+      if (manualBirthplace) manualBirthplace.required = isBarangayId;
+    }
+
+    function manualMarkPreviewStale(silent = false) {
+      manualPreviewSignature = '';
+      if (manualSubmitBtn) {
+        manualSubmitBtn.disabled = true;
+      }
+      if (!silent && manualCurrentConfig()) {
+        manualSetAlert('Preview the latest changes before submitting this manual issuance request.', 'info');
+      }
+      manualUpdateSummary();
+    }
+
+    function manualFieldDefinitions(config) {
+      if (!config) return [];
+      switch (config.kind) {
+        case 'general_clearance':
+          return [
+            { name: 'location', label: 'Project / Permit Location', type: 'text', required: true, col: 'col-md-6' },
+            { name: 'remarks', label: 'Remarks', type: 'text', required: true, col: 'col-md-6' }
+          ];
+        case 'business_clearance':
+          return [
+            { name: 'application_type', label: 'Application Type', type: 'select', required: true, col: 'col-md-4', options: [
+              { value: 'New', label: 'New' },
+              { value: 'Renewal', label: 'Renewal' }
+            ] },
+            { name: 'business_name', label: 'Business Name', type: 'text', required: true, col: 'col-md-8' },
+            { name: 'business_type', label: 'Business Type', type: 'text', required: true, col: 'col-md-6' },
+            { name: 'business_approval_type', label: 'Approval Type', type: 'select', required: true, col: 'col-md-6', options: [
+              { value: 'not_banned', label: 'Not among banned business activities' },
+              { value: 'no_objection', label: 'Interposes no objection' },
+              { value: 'temporary_clearance', label: 'Temporary Barangay Clearance' }
+            ] },
+            { name: 'business_full_address', label: 'Business Address', type: 'textarea', required: true, col: 'col-12', rows: 2 }
+          ];
+        case 'tricycle_clearance':
+          return [
+            { name: 'application_type', label: 'Application Type', type: 'select', required: true, col: 'col-md-4', options: [
+              { value: 'New', label: 'New' },
+              { value: 'Renewal', label: 'Renewal' }
+            ] },
+            { name: 'location_of_toda_poda', label: 'Location', type: 'text', required: true, col: 'col-md-4' },
+            { name: 'vehicle_make', label: 'Type of Vehicle', type: 'text', required: true, col: 'col-md-4' },
+            { name: 'cr_number', label: 'Registration No.', type: 'text', required: true, col: 'col-md-4' },
+            { name: 'plate_number', label: 'Plate No.', type: 'text', required: true, col: 'col-md-4' },
+            { name: 'body_number', label: 'Body No.', type: 'text', required: true, col: 'col-md-4' }
+          ];
+        case 'barangay_id':
+          return [
+            { name: 'emergency_last', label: 'Emergency Last Name', type: 'text', required: true, col: 'col-md-3' },
+            { name: 'emergency_first', label: 'Emergency First Name', type: 'text', required: true, col: 'col-md-3' },
+            { name: 'emergency_middle', label: 'Emergency Middle Name', type: 'text', col: 'col-md-3' },
+            { name: 'emergency_suffix', label: 'Emergency Suffix', type: 'text', col: 'col-md-3' },
+            { name: 'emergency_contact', label: 'Emergency Contact Number', type: 'text', required: true, col: 'col-md-6' },
+            { name: 'emergency_address', label: 'Emergency Address', type: 'textarea', required: true, col: 'col-md-6', rows: 2 },
+            { name: 'barangay_id_number', label: 'Barangay ID Number', type: 'text', col: 'col-md-6', placeholder: 'Auto-generated if left blank' },
+            { name: 'barangay_id_valid_until', label: 'Valid Until', type: 'text', col: 'col-md-6', placeholder: 'Auto-generated if left blank' }
+          ];
+        case 'residency':
+          return [
+            { name: 'remarks', label: 'Remarks', type: 'text', required: true, col: 'col-md-6' }
+          ];
+        case 'identity':
+          return [
+            { name: 'remarks', label: 'Remarks', type: 'text', required: true, col: 'col-md-6' },
+            { name: 'years_of_residency', label: 'Years of Residency', type: 'number', min: '0', col: 'col-md-3' },
+            { name: 'months_of_residency', label: 'Months of Residency', type: 'number', min: '0', col: 'col-md-3' }
+          ];
+        case 'indigency':
+          return [
+            { name: 'request_officer_line1', label: 'Addressed To - Line 1', type: 'text', required: true, col: 'col-12' },
+            { name: 'request_officer_line2', label: 'Addressed To - Line 2', type: 'text', required: true, col: 'col-md-6' },
+            { name: 'request_officer_line3', label: 'Addressed To - Line 3', type: 'text', required: true, col: 'col-md-6' }
+          ];
+        case 'cohabitation':
+          return [
+            { name: 'cohabitant_first', label: 'Partner First Name', type: 'text', required: true, col: 'col-md-3' },
+            { name: 'cohabitant_middle', label: 'Partner Middle Name', type: 'text', col: 'col-md-3' },
+            { name: 'cohabitant_last', label: 'Partner Last Name', type: 'text', required: true, col: 'col-md-3' },
+            { name: 'cohabitant_suffix', label: 'Partner Suffix', type: 'text', col: 'col-md-3' },
+            { name: 'cohabitant_birthdate', label: 'Partner Birthdate', type: 'date', required: true, col: 'col-md-6' },
+            { name: 'cohabitation_start_date', label: 'Living Together Since', type: 'date', required: true, col: 'col-md-6' }
+          ];
+        case 'jail_visit':
+          return [
+            { name: 'cohabitant_first', label: 'Detainee First Name', type: 'text', required: true, col: 'col-md-3' },
+            { name: 'cohabitant_middle', label: 'Detainee Middle Name', type: 'text', col: 'col-md-3' },
+            { name: 'cohabitant_last', label: 'Detainee Last Name', type: 'text', required: true, col: 'col-md-3' },
+            { name: 'cohabitant_suffix', label: 'Detainee Suffix', type: 'text', col: 'col-md-3' },
+            { name: 'cohabitant_relationship', label: 'Relationship to Detainee', type: 'text', required: true, col: 'col-md-6' },
+            { name: 'detention_facility', label: 'Detention Facility', type: 'text', required: true, col: 'col-md-6' }
+          ];
+        case 'first_time_job_seeker':
+          return [
+            { name: 'educational_attainment', label: 'Educational Attainment', type: 'text', required: true, col: 'col-md-6' },
+            { name: 'jobstart_beneficiary', label: 'Has Availed Before?', type: 'select', required: true, col: 'col-md-6', options: [
+              { value: 'No', label: 'No' },
+              { value: 'Yes', label: 'Yes' }
+            ] },
+            { name: 'years_of_residency', label: 'Years of Residency', type: 'number', min: '0', col: 'col-md-6' },
+            { name: 'months_of_residency', label: 'Months of Residency', type: 'number', min: '0', col: 'col-md-6' }
+          ];
+        default:
+          return [];
+      }
+    }
+
+    function manualFieldHtml(field) {
+      const col = field.col || 'col-md-6';
+      const required = field.required ? 'required' : '';
+      const min = field.min !== undefined ? `min="${manualEscapeAttr(field.min)}"` : '';
+      const placeholder = field.placeholder ? `placeholder="${manualEscapeAttr(field.placeholder)}"` : '';
+      const valueAttr = field.value ? `value="${manualEscapeAttr(field.value)}"` : '';
+      const label = `${esc(field.label)}${field.required ? ' <span class="text-danger">*</span>' : ''}`;
+
+      if (field.type === 'textarea') {
+        return `
+          <div class="${col}">
+            <label class="form-label fw-semibold small">${label}</label>
+            <textarea class="form-control" rows="${field.rows || 2}" data-manual-field="${manualEscapeAttr(field.name)}" ${required} ${placeholder}></textarea>
+          </div>
+        `;
+      }
+
+      if (field.type === 'select') {
+        const options = Array.isArray(field.options) ? field.options.map((option) => `
+          <option value="${manualEscapeAttr(option.value)}">${esc(option.label)}</option>
+        `).join('') : '';
+        return `
+          <div class="${col}">
+            <label class="form-label fw-semibold small">${label}</label>
+            <select class="form-select" data-manual-field="${manualEscapeAttr(field.name)}" ${required}>
+              <option value="">Select ${esc(field.label.toLowerCase())}</option>
+              ${options}
+            </select>
+          </div>
+        `;
+      }
+
+      return `
+        <div class="${col}">
+          <label class="form-label fw-semibold small">${label}</label>
+          <input type="${manualEscapeAttr(field.type || 'text')}" class="form-control" data-manual-field="${manualEscapeAttr(field.name)}" ${required} ${placeholder} ${valueAttr} ${min}>
+        </div>
+      `;
+    }
+
+    function manualRenderDocumentOptions() {
+      if (!manualDocumentType) return;
+      const grouped = manualDocumentConfigs.reduce((map, config) => {
+        if (!map.has(config.group)) map.set(config.group, []);
+        map.get(config.group).push(config);
+        return map;
+      }, new Map());
+      let html = '<option value="">Select a manual issuance form</option>';
+      grouped.forEach((configs, group) => {
+        html += `<optgroup label="${manualEscapeAttr(group)}">`;
+        html += configs.map((config) => `<option value="${manualEscapeAttr(config.id)}">${esc(config.label)}</option>`).join('');
+        html += '</optgroup>';
+      });
+      manualDocumentType.innerHTML = html;
+    }
+
+    async function manualRenderFeeCatalog() {
+      const config = manualCurrentConfig();
+      if (!manualFeeWrap || !manualFeeList || !manualFeeTotal) return;
+      if (!config?.clearance) {
+        manualFeeWrap.classList.add('d-none');
+        manualFeeList.innerHTML = '';
+        manualFeeTotal.textContent = 'PHP 0.00';
+        return;
+      }
+
+      const previous = new Map(manualCurrentFeeRows().map((row) => [String(row.fee_name || '').toLowerCase(), row]));
+      manualFeeWrap.classList.remove('d-none');
+      manualFeeList.innerHTML = `
+        <div class="manual-search-empty">
+          <span class="spinner-border spinner-border-sm me-2" aria-hidden="true"></span>Loading fee catalog...
+        </div>
+      `;
+      try {
+        const feeTypes = await fetchFeeTypeCatalog();
+        if (!Array.isArray(feeTypes) || !feeTypes.length) {
+          manualFeeList.innerHTML = '<div class="manual-search-empty">No approved clearance fee types are available yet.</div>';
+          manualFeeTotal.textContent = 'PHP 0.00';
+          manualUpdateSummary();
+          return;
+        }
+        manualFeeList.innerHTML = feeTypes.map((feeType) => {
+          const feeName = String(firstNonEmpty([feeType?.fee_name, 'Fee'])).trim();
+          const defaultAmount = Number(feeType?.default_amount || 0);
+          const previousRow = previous.get(feeName.toLowerCase());
+          const checked = !!previousRow;
+          const amount = previousRow ? Number(previousRow.amount || 0) : defaultAmount;
+          return `
+            <div class="manual-fee-item">
+              <div class="row g-3 align-items-center">
+                <div class="col-lg-7">
+                  <div class="form-check">
+                    <input class="form-check-input" type="checkbox" id="manualFee_${manualEscapeAttr(String(feeType?.fee_type_id || feeName))}" data-manual-fee-check data-fee-name="${manualEscapeAttr(feeName)}" ${checked ? 'checked' : ''}>
+                    <label class="form-check-label" for="manualFee_${manualEscapeAttr(String(feeType?.fee_type_id || feeName))}">
+                      ${esc(feeName)}
+                    </label>
+                  </div>
+                </div>
+                <div class="col-lg-5">
+                  <div class="input-group">
+                    <span class="input-group-text">PHP</span>
+                    <input type="number" class="form-control" min="0" step="0.01" data-manual-fee-amount value="${Number.isFinite(amount) ? amount.toFixed(2) : '0.00'}">
+                  </div>
+                </div>
+              </div>
+            </div>
+          `;
+        }).join('');
+        manualUpdateFeeTotal();
+      } catch (error) {
+        manualFeeList.innerHTML = `<div class="manual-search-empty text-danger">${esc(error?.message || 'Failed to load fee catalog.')}</div>`;
+        manualFeeTotal.textContent = 'PHP 0.00';
+      }
+    }
+
+    function manualUpdateFeeTotal() {
+      const total = manualCurrentFeeRows().reduce((sum, row) => sum + (Number(row.amount) || 0), 0);
+      if (manualFeeTotal) {
+        manualFeeTotal.textContent = formatPhpAmount(total, 'PHP 0.00');
+      }
+      manualUpdateSummary();
+    }
+
+    function manualRenderDynamicFields() {
+      const config = manualCurrentConfig();
+      const fields = manualFieldDefinitions(config);
+      if (!manualDynamicFields || !manualSpecificFieldsHint) return;
+      manualApplyCommonFieldRequirements(config);
+      if (!config) {
+        manualDynamicFields.innerHTML = '<div class="col-12"><div class="manual-search-empty">Select a certificate or clearance type to load its matching manual encoding fields.</div></div>';
+        manualSpecificFieldsHint.textContent = 'Select a certificate or clearance type to load its manual encoding fields.';
+        manualRenderFeeCatalog();
+        manualUpdateSummary();
+        return;
+      }
+      manualSpecificFieldsHint.textContent = config.clearance
+        ? 'Clearance forms can also tag fees here so finance receives the exact walk-in amount.'
+        : 'Complete the extra fields that appear in the chosen handwritten form.';
+      if (!fields.length) {
+        manualDynamicFields.innerHTML = '<div class="col-12"><div class="manual-search-empty">No additional fields are required beyond the basic information and purpose for this form.</div></div>';
+      } else {
+        manualDynamicFields.innerHTML = fields.map(manualFieldHtml).join('');
+      }
+      manualApplyResidentDynamicFields();
+      manualApplySuggestedPurpose();
+      manualRenderFeeCatalog();
+      manualUpdateSummary();
+    }
+
+    function manualToggleResidentLookup() {
+      const isWalkin = manualCurrentMode() === 'walkin';
+      manualResidentLookupWrap?.classList.toggle('d-none', isWalkin);
+      if (isWalkin) {
+        manualResidentSearchInput.value = '';
+        manualResidentResultsWrap?.classList.add('d-none');
+        manualResidentResults.innerHTML = '';
+        manualResidentSearchHint?.classList.remove('d-none');
+        manualSelectedResident = null;
+        manualResidentId.value = '';
+        manualResidentUserId.value = '';
+        manualSelectedResidentCard?.classList.add('d-none');
+      }
+      manualMarkPreviewStale(true);
+      manualUpdateSummary();
+    }
+
+    function manualApplyResidentDynamicFields() {
+      if (!manualDynamicFields || !manualSelectedResident) return;
+      const resident = manualSelectedResident;
+      const fieldValues = {
+        emergency_last: resident.emergency_last_name,
+        emergency_first: resident.emergency_first_name,
+        emergency_middle: resident.emergency_middle_name,
+        emergency_suffix: resident.emergency_suffix,
+        emergency_contact: resident.emergency_contact,
+        emergency_address: resident.emergency_address,
+      };
+      Object.entries(fieldValues).forEach(([key, value]) => {
+        const input = manualDynamicFields.querySelector(`[data-manual-field="${key}"]`);
+        if (input && !String(input.value || '').trim()) {
+          input.value = String(value || '').trim();
+        }
+      });
+    }
+
+    function manualFillFormFromResident(record) {
+      const resident = manualNormalizeResident(record);
+      if (!resident) return;
+      manualSelectedResident = resident;
+      manualResidentId.value = resident.resident_id || '';
+      manualResidentUserId.value = resident.resident_user_id || '';
+      manualLastName.value = resident.last_name || '';
+      manualFirstName.value = resident.first_name || '';
+      manualMiddleName.value = resident.middle_name || '';
+      manualSuffix.value = resident.suffix || '';
+      manualBirthdate.value = resident.birthdate || '';
+      manualBirthplace.value = resident.birthplace || '';
+      manualSex.value = resident.sex || '';
+      manualCivilStatus.value = resident.civil_status || '';
+      manualContactNumber.value = resident.contact_number || '';
+      manualOccupation.value = resident.occupation || '';
+      manualReligion.value = resident.religion || '';
+      manualFullAddress.value = resident.full_address || '';
+      manualApplyResidentDynamicFields();
+
+      manualSelectedResidentName.textContent = resident.full_name || 'Linked resident';
+      manualSelectedResidentMeta.textContent = [
+        resident.resident_id ? `Resident ID: ${resident.resident_id}` : '',
+        resident.resident_user_id ? `User ID: ${resident.resident_user_id}` : '',
+        resident.full_address || '',
+      ].filter(Boolean).join(' • ');
+      manualSelectedResidentCard?.classList.remove('d-none');
+      manualResidentResultsWrap?.classList.add('d-none');
+      manualResidentResults.innerHTML = '';
+      manualResidentSearchHint?.classList.add('d-none');
+      manualMarkPreviewStale(true);
+      manualUpdateSummary();
+      manualSetAlert('Resident linked. Review the auto-filled details, edit if needed, then preview the document.', 'info');
+    }
+
+    function manualRenderResidentResults() {
+      if (!manualResidentResults || !manualResidentResultsWrap) return;
+      if (!manualResidentSearchResults.length) {
+        manualResidentResultsWrap.classList.remove('d-none');
+        manualResidentResults.innerHTML = '<div class="manual-search-empty">No registered residents matched that search. You can switch to walk-in mode if the resident is not yet registered.</div>';
+        return;
+      }
+
+      manualResidentResultsWrap.classList.remove('d-none');
+      manualResidentResults.innerHTML = manualResidentSearchResults.map((row, index) => `
+        <div class="manual-resident-result">
+          <div>
+            <div class="manual-resident-result-name">${esc(row.full_name || 'Unnamed Resident')}</div>
+            <p class="manual-resident-result-meta">
+              ${esc([row.resident_id ? `Resident ID: ${row.resident_id}` : '', row.resident_user_id ? `User ID: ${row.resident_user_id}` : '', row.contact_number ? `Contact: ${row.contact_number}` : ''].filter(Boolean).join(' • '))}
+            </p>
+            <p class="manual-resident-result-meta">${esc(row.full_address || '-')}</p>
+          </div>
+          <button type="button" class="btn btn-sm btn-outline-primary" data-manual-use-resident="${index}">
+            <i class="fas fa-link me-1"></i>Use Resident
+          </button>
+        </div>
+      `).join('');
+    }
+
+    async function manualSearchResidents() {
+      const query = String(manualResidentSearchInput?.value || '').trim();
+      if (!query) {
+        manualSetAlert('Enter a resident ID, user ID, or resident name to search the registered resident list.', 'warning');
+        manualResidentSearchInput?.focus();
+        return;
+      }
+
+      const token = ++manualResidentSearchToken;
+      manualResidentSearchBtn.disabled = true;
+      const originalLabel = manualResidentSearchBtn.innerHTML;
+      manualResidentSearchBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Searching...';
+      try {
+        const data = await fetchJson(`${endpoint}?action=search_manual_residents&q=${encodeURIComponent(query)}`);
+        if (token !== manualResidentSearchToken) {
+          return;
+        }
+        manualResidentSearchResults = Array.isArray(data?.items) ? data.items : [];
+        manualRenderResidentResults();
+        manualResidentSearchHint?.classList.add('d-none');
+      } catch (error) {
+        manualResidentResultsWrap?.classList.remove('d-none');
+        manualResidentResults.innerHTML = `<div class="manual-search-empty text-danger">${esc(error?.message || 'Resident search failed.')}</div>`;
+      } finally {
+        manualResidentSearchBtn.disabled = false;
+        manualResidentSearchBtn.innerHTML = originalLabel;
+      }
+    }
+
+    function manualBuildPayload() {
+      const config = manualCurrentConfig();
+      if (!config) return null;
+
+      const residentFullName = [manualFirstName?.value, manualMiddleName?.value, manualLastName?.value, manualSuffix?.value]
+        .map((part) => String(part || '').trim())
+        .filter(Boolean)
+        .join(' ');
+      const fullAddress = String(manualFullAddress?.value || '').trim();
+      const payload = {
+        document_type: config.documentType,
+        resident_id: String(manualResidentId?.value || '').trim(),
+        resident_user_id: String(manualResidentUserId?.value || '').trim(),
+        resident_name: residentFullName,
+        first_name: String(manualFirstName?.value || '').trim(),
+        middle_name: String(manualMiddleName?.value || '').trim(),
+        last_name: String(manualLastName?.value || '').trim(),
+        suffix: String(manualSuffix?.value || '').trim(),
+        birthdate: String(manualBirthdate?.value || '').trim(),
+        sex: String(manualSex?.value || '').trim(),
+        civil_status: String(manualCivilStatus?.value || '').trim(),
+        contact_number: String(manualContactNumber?.value || '').trim(),
+        birthplace: String(manualBirthplace?.value || '').trim(),
+        occupation: String(manualOccupation?.value || '').trim(),
+        religion: String(manualReligion?.value || '').trim(),
+        full_address: fullAddress,
+        full_address_display: fullAddress,
+        address: fullAddress,
+      };
+
+      manualDynamicFields?.querySelectorAll('[data-manual-field]').forEach((field) => {
+        const key = String(field.getAttribute('data-manual-field') || '').trim();
+        if (!key) return;
+        payload[key] = String(field.value || '').trim();
+      });
+
+      const purpose = String(manualPurpose?.value || '').trim() || manualSuggestedPurpose(config);
+      if (purpose) {
+        payload.request_purpose = purpose;
+        payload.purpose = purpose;
+      }
+
+      if (config.kind === 'cohabitation') {
+        payload.cohabitation_variant = 'standard';
+      } else if (config.kind === 'jail_visit') {
+        payload.cohabitation_variant = 'relationship_jail_visit';
+      }
+
+      return payload;
+    }
+
+    function manualPreviewStateBundle() {
+      const config = manualCurrentConfig();
+      if (!config) {
+        throw new Error('Select a certificate or clearance type first.');
+      }
+      if (!manualForm.reportValidity()) {
+        throw new Error('Complete the required form fields first.');
+      }
+
+      const payload = manualBuildPayload();
+      const feeRows = manualCurrentFeeRows();
+      const expectedStage = manualExpectedStage(config, feeRows);
+      const previewRow = {
+        document_type: config.documentType,
+        purpose: String(payload?.request_purpose || payload?.purpose || '').trim(),
+        resident_name: String(payload?.resident_name || '').trim(),
+        resident_id: String(payload?.resident_id || '').trim(),
+        resident_user_id: String(payload?.resident_user_id || '').trim(),
+        stage: expectedStage.key,
+        fee_amount: config.clearance && feeRows.length
+          ? feeRows.reduce((sum, row) => sum + (Number(row.amount) || 0), 0)
+          : null,
+        submitted_at: new Date().toISOString().slice(0, 19).replace('T', ' ')
+      };
+      const residentProfile = manualSelectedResident ? { ...manualSelectedResident } : {};
+      const signature = JSON.stringify({
+        payload,
+        feeRows,
+        resident_id: previewRow.resident_id,
+        resident_user_id: previewRow.resident_user_id,
+        document_type: config.documentType
+      });
+
+      return {
+        config,
+        payload,
+        feeRows,
+        previewRow,
+        residentProfile,
+        signature
+      };
+    }
+
+    function manualResetForm() {
+      manualForm.reset();
+      manualResidentSearchResults = [];
+      manualSelectedResident = null;
+      manualResidentId.value = '';
+      manualResidentUserId.value = '';
+      manualResidentResults.innerHTML = '';
+      manualResidentResultsWrap?.classList.add('d-none');
+      manualResidentSearchHint?.classList.remove('d-none');
+      manualSelectedResidentCard?.classList.add('d-none');
+      manualPreviewSignature = '';
+      if (manualSubmitBtn) {
+        manualSubmitBtn.disabled = true;
+      }
+      manualRenderDocumentOptions();
+      manualDynamicFields.innerHTML = '<div class="col-12"><div class="manual-search-empty">Select a certificate or clearance type to load its matching manual encoding fields.</div></div>';
+      manualFeeWrap?.classList.add('d-none');
+      manualFeeList.innerHTML = '';
+      manualFeeTotal.textContent = 'PHP 0.00';
+      manualPurpose.dataset.auto = '1';
+      manualSetAlert('', 'warning');
+      manualToggleResidentLookup();
+      manualUpdateSummary();
+    }
+
+    manualResidentSearchBtn?.addEventListener('click', manualSearchResidents);
+    manualResidentSearchInput?.addEventListener('keydown', (event) => {
+      if (event.key === 'Enter') {
+        event.preventDefault();
+        manualSearchResidents();
+      }
+    });
+
+    manualResidentResults?.addEventListener('click', (event) => {
+      const trigger = event.target.closest('[data-manual-use-resident]');
+      if (!trigger) return;
+      const index = Number(trigger.getAttribute('data-manual-use-resident') || '-1');
+      if (!Number.isInteger(index) || index < 0 || index >= manualResidentSearchResults.length) return;
+      manualFillFormFromResident(manualResidentSearchResults[index]);
+    });
+
+    manualClearSelectedResidentBtn?.addEventListener('click', () => {
+      manualSelectedResident = null;
+      manualResidentId.value = '';
+      manualResidentUserId.value = '';
+      manualSelectedResidentCard?.classList.add('d-none');
+      manualMarkPreviewStale(true);
+      manualUpdateSummary();
+      manualSetAlert('Resident link cleared. You can keep encoding this as a walk-in request or search again.', 'info');
+    });
+
+    manualResidentModeExisting?.addEventListener('change', manualToggleResidentLookup);
+    manualResidentModeWalkin?.addEventListener('change', manualToggleResidentLookup);
+
+    manualDocumentType?.addEventListener('change', () => {
+      manualRenderDynamicFields();
+      manualApplySuggestedPurpose();
+      manualMarkPreviewStale(true);
+      manualSetAlert('Document form updated. Review the fields, then preview the document again before submitting.', 'info');
+    });
+
+    manualPurpose?.addEventListener('input', () => {
+      manualPurpose.dataset.auto = manualPurpose.value.trim() ? '0' : '1';
+      manualMarkPreviewStale(true);
+    });
+
+    manualDynamicFields?.addEventListener('input', (event) => {
+      const field = event.target.closest('[data-manual-field]');
+      if (!field) return;
+      manualMarkPreviewStale(true);
+    });
+
+    manualDynamicFields?.addEventListener('change', (event) => {
+      const field = event.target.closest('[data-manual-field]');
+      if (!field) return;
+      if (String(field.getAttribute('data-manual-field') || '') === 'application_type') {
+        manualApplySuggestedPurpose();
+      }
+      manualMarkPreviewStale(true);
+    });
+
+    manualFeeList?.addEventListener('input', () => {
+      manualUpdateFeeTotal();
+      manualMarkPreviewStale(true);
+    });
+    manualFeeList?.addEventListener('change', () => {
+      manualUpdateFeeTotal();
+      manualMarkPreviewStale(true);
+    });
+
+    [
+      manualLastName,
+      manualFirstName,
+      manualMiddleName,
+      manualSuffix,
+      manualBirthdate,
+      manualSex,
+      manualCivilStatus,
+      manualContactNumber,
+      manualBirthplace,
+      manualOccupation,
+      manualReligion,
+      manualFullAddress
+    ].forEach((field) => {
+      field?.addEventListener('input', () => manualMarkPreviewStale(true));
+      field?.addEventListener('change', () => manualMarkPreviewStale(true));
+    });
+
+    manualPreviewBtn?.addEventListener('click', () => {
+      try {
+        const bundle = manualPreviewStateBundle();
+        if (bundle.config.clearance && !bundle.feeRows.length) {
+          manualSetAlert('Tag at least one clearance fee first so the manual request can proceed to finance after submission.', 'warning');
+        }
+        if (viewModalTitle) {
+          viewModalTitle.textContent = 'Manual Issuance Preview';
+        }
+        if (viewModalActions) {
+          viewModalActions.innerHTML = '';
+        }
+        if (viewModalBackBtn) {
+          viewModalBackBtn.classList.add('d-none');
+        }
+        if (viewModalNextBtn) {
+          viewModalNextBtn.classList.add('d-none');
+          viewModalNextBtn.disabled = true;
+        }
+        if (viewModalWalkInBtn) {
+          viewModalWalkInBtn.classList.add('d-none');
+          viewModalWalkInBtn.removeAttribute('data-id');
+        }
+        if (viewModalDocBtn) {
+          viewModalDocBtn.classList.add('d-none');
+          viewModalDocBtn.textContent = 'View Document';
+          viewModalDocBtn.onclick = null;
+        }
+        const previewHtml = renderDocumentPreview(
+          buildPreviewState(bundle.previewRow, bundle.payload, bundle.residentProfile, null)
+        );
+        viewDetailsBody.innerHTML = `
+          <div class="tracker-doc-highlight">
+            Manual preview for ${esc(bundle.config.label)}. If something is off, close this preview, update the form, and preview again before submitting.
+          </div>
+          ${previewHtml}
+        `;
+        viewDetailsBody.querySelectorAll('.doc-editable').forEach((editable) => {
+          editable.setAttribute('contenteditable', 'false');
+          editable.removeAttribute('data-edit-key');
+        });
+        manualPreviewSignature = bundle.signature;
+        if (manualSubmitBtn) {
+          manualSubmitBtn.disabled = false;
+        }
+        manualSetAlert('Preview confirmed. You can submit this manual issuance request now.', 'success');
+        viewModal?.show();
+      } catch (error) {
+        manualSetAlert(error?.message || 'Unable to build the manual document preview.', 'danger');
+      }
+    });
+
+    manualForm?.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      const originalSubmitLabel = manualSubmitBtn?.innerHTML || 'Submit Manual Issuance';
+      try {
+        const bundle = manualPreviewStateBundle();
+        if (manualCurrentMode() === 'existing' && !String(bundle.payload.resident_id || bundle.payload.resident_user_id || '').trim()) {
+          throw new Error('Search and link a registered resident first, or switch the request to walk-in mode.');
+        }
+        if (bundle.config.clearance && !bundle.feeRows.length) {
+          throw new Error('Tag at least one clearance fee before submitting this manual issuance request.');
+        }
+        if (bundle.signature !== manualPreviewSignature) {
+          throw new Error('Preview the latest changes before submitting this manual issuance request.');
+        }
+
+        manualSubmitBtn.disabled = true;
+        manualPreviewBtn.disabled = true;
+        manualResetBtn.disabled = true;
+        manualSubmitBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Submitting...';
+
+        const body = new FormData();
+        body.append('action', 'create_manual_request');
+        body.append('payload', JSON.stringify(bundle.payload));
+        body.append('fees', JSON.stringify(bundle.feeRows));
+        if (bundle.payload.resident_id) {
+          body.append('resident_id', String(bundle.payload.resident_id));
+        }
+        if (bundle.payload.resident_user_id) {
+          body.append('resident_user_id', String(bundle.payload.resident_user_id));
+        }
+
+        const data = await fetchJson(endpoint, { method: 'POST', body });
+        viewModal?.hide();
+        manualResetForm();
+        manualSetAlert('', 'warning');
+        document.getElementById('tabDocRequests')?.click();
+        document.querySelector('[data-stage-filter=""]')?.click();
+        if (searchInput) {
+          searchInput.value = String(data?.request_id || '').trim();
+        }
+        await load({ force: true });
+        searchInput?.dispatchEvent(new Event('input', { bubbles: true }));
+        alert(`Manual issuance request ${data?.request_id || ''} created. Next step: ${data?.stage_label || 'Review the tracker list.'}`);
+      } catch (error) {
+        manualSetAlert(error?.message || 'Failed to submit the manual issuance request.', 'danger');
+      } finally {
+        if (manualSubmitBtn) {
+          manualSubmitBtn.innerHTML = originalSubmitLabel;
+        }
+        manualPreviewBtn.disabled = false;
+        manualResetBtn.disabled = false;
+        manualSubmitBtn.disabled = !manualPreviewSignature;
+      }
+    });
+
+    manualResetBtn?.addEventListener('click', () => {
+      manualResetForm();
+      manualSetAlert('Manual issuance form cleared.', 'info');
+    });
+
+    manualRenderDocumentOptions();
+    manualResetForm();
+  })();
+
   load();
   warmFeeTypeCatalogCache();
 
   // ── Fee Change Requests sub-navbar ────────────────────────────────────────
   (function initFeeChangePanel() {
     const tabDocRequests = document.getElementById('tabDocRequests');
+    const tabManualIssuance = document.getElementById('tabManualIssuance');
     const tabFeeRequests = document.getElementById('tabFeeRequests');
     const docRequestsPanel = document.getElementById('docRequestsPanel');
+    const manualIssuancePanel = document.getElementById('manualIssuancePanel');
     const feeChangePanel   = document.getElementById('feeChangePanel');
     if (!tabDocRequests || !tabFeeRequests) return; // not on certificate tracker page with tabs
 
@@ -5536,18 +6605,31 @@
     // ── Page tab switching ──────────────────────────────────────────────────
     function showDocTab() {
       tabDocRequests.classList.add('active');
+      tabManualIssuance?.classList.remove('active');
       tabFeeRequests.classList.remove('active');
       docRequestsPanel.classList.remove('d-none');
+      manualIssuancePanel?.classList.add('d-none');
+      feeChangePanel.classList.add('d-none');
+    }
+    function showManualTab() {
+      tabManualIssuance?.classList.add('active');
+      tabDocRequests.classList.remove('active');
+      tabFeeRequests.classList.remove('active');
+      manualIssuancePanel?.classList.remove('d-none');
+      docRequestsPanel.classList.add('d-none');
       feeChangePanel.classList.add('d-none');
     }
     function showFeeTab() {
       tabFeeRequests.classList.add('active');
+      tabManualIssuance?.classList.remove('active');
       tabDocRequests.classList.remove('active');
       feeChangePanel.classList.remove('d-none');
+      manualIssuancePanel?.classList.add('d-none');
       docRequestsPanel.classList.add('d-none');
       loadActiveFeeSubPanel();
     }
     tabDocRequests.addEventListener('click', showDocTab);
+    tabManualIssuance?.addEventListener('click', showManualTab);
     tabFeeRequests.addEventListener('click', showFeeTab);
 
     // ── Sub-tab switching ───────────────────────────────────────────────────

@@ -41,7 +41,7 @@ if ($action === 'optimize_indexes') {
 }
 
 if ($action === 'bulk_regenerate_issued') {
-    $currentRenderRevision = 'r20260318s';
+    $currentRenderRevision = 'r20260318ac';
     $limit = (int)($_REQUEST['limit'] ?? 200);
     if ($limit <= 0) {
         $limit = 200;
@@ -1163,13 +1163,53 @@ function dra_is_first_time_job_seeker(array $requestRow): bool {
     return is_string($normalized) && strpos($normalized, 'firsttimejobseeker') !== false;
 }
 
+function dra_barangay_id_template_assets(): array {
+    static $resolved = null;
+    if (is_array($resolved)) {
+        return $resolved;
+    }
+
+    $resolved = ['front' => '', 'back' => ''];
+    $baseDir = realpath(__DIR__ . '/../../');
+    if ($baseDir === false) {
+        return $resolved;
+    }
+
+    $candidateSets = [
+        [
+            'front' => $baseDir . '/Resident-End/Certificates/BarangayID/FRONT.png',
+            'back' => $baseDir . '/Resident-End/Certificates/BarangayID/BACK.png',
+        ],
+        [
+            'front' => $baseDir . '/Images/Barangayid/SAMPLE.png',
+            'back' => $baseDir . '/Images/Barangayid/BACK.png',
+        ],
+    ];
+
+    foreach ($candidateSets as $set) {
+        $front = (string)($set['front'] ?? '');
+        $back = (string)($set['back'] ?? '');
+        if ($front !== '' && $back !== '' && is_file($front) && is_file($back)) {
+            $resolved = ['front' => $front, 'back' => $back];
+            break;
+        }
+    }
+
+    return $resolved;
+}
+
+function dra_has_barangay_id_template_assets(): bool {
+    $assets = dra_barangay_id_template_assets();
+    return trim((string)($assets['front'] ?? '')) !== '' && trim((string)($assets['back'] ?? '')) !== '';
+}
+
 function dra_requires_manual_issued_upload(array $requestRow): bool {
     $docType = trim((string)($requestRow['document_type'] ?? ''));
     if ($docType === '') {
         $payload = dra_decode_request_payload($requestRow);
         $docType = trim((string)($payload['document_type'] ?? ''));
     }
-    return dr_is_barangay_id_document_type($docType);
+    return dr_is_barangay_id_document_type($docType) && !dra_has_barangay_id_template_assets();
 }
 
 function dra_normalize_business_approval_type(string $value): string {
@@ -1474,6 +1514,8 @@ function dra_generate_issued_document(array $requestRow): ?string {
     $v = $day % 100;
     $suffix = ($v >= 11 && $v <= 13) ? 'th' : (($day % 10 === 1) ? 'st' : (($day % 10 === 2) ? 'nd' : (($day % 10 === 3) ? 'rd' : 'th')));
     $issuedAsDocx = $day . $suffix . ' day of ' . $monthUpper . ' ' . $yearNum;
+    $issuedOfficeSentence = 'Issued this ' . $issuedAsDocx . ' at the office of the Punong Barangay, Barangay San Jose, Montalban, Rizal';
+    $issuedOfficeSentenceWrapped = 'Issued this ' . $issuedAsDocx . ' at the office of the Punong Barangay, Barangay' . "\n" . 'San Jose, Montalban, Rizal';
     $payload = dra_decode_request_payload($requestRow);
 
     $fullName = trim((string)($payload['_preview_full_name'] ?? ''));
@@ -1611,6 +1653,7 @@ function dra_generate_issued_document(array $requestRow): ?string {
         'tricycleclearance',
         'fortricyclepermit',
     ], true);
+    $isBarangayId = dr_is_barangay_id_document_type($docType);
     $generalPermitPurpose = dra_general_clearance_purpose_from_document_type($docType);
     $isGeneralPermitClearance = ($generalPermitPurpose !== '');
     $isRelationshipJailVisit = $isCohabitation && in_array($cohabitationVariant, ['relationship_jail_visit', 'conjugal_visit'], true);
@@ -2013,7 +2056,7 @@ function dra_generate_issued_document(array $requestRow): ?string {
         return null;
     }
 
-    $renderRevisionTag = 'r20260318s';
+    $renderRevisionTag = 'r20260318ac';
     $fileName = 'issued_' . preg_replace('/[^A-Za-z0-9_-]/', '', $requestId) . '_' . $renderRevisionTag . '_' . date('YmdHis') . '.pdf';
     $diskPath = $outDir . '/' . $fileName;
 
@@ -2031,6 +2074,302 @@ function dra_generate_issued_document(array $requestRow): ?string {
                         break;
                     }
                 }
+            }
+        }
+    }
+
+    if ($isBarangayId && dra_has_barangay_id_template_assets()) {
+        $templateAssets = dra_barangay_id_template_assets();
+        $frontTemplatePath = (string)($templateAssets['front'] ?? '');
+        $backTemplatePath = (string)($templateAssets['back'] ?? '');
+        if (is_file($frontTemplatePath) && is_file($backTemplatePath)) {
+            try {
+                $residentProfile = dra_resident_profile_snapshot(
+                    $conn,
+                    trim((string)($requestRow['resident_user_id'] ?? '')),
+                    trim((string)($requestRow['resident_id'] ?? ''))
+                );
+                $upperText = static function (string $value): string {
+                    $value = trim((string)(preg_replace('/\s+/u', ' ', $value) ?? $value));
+                    if ($value === '') {
+                        return '';
+                    }
+                    return function_exists('mb_strtoupper') ? mb_strtoupper($value, 'UTF-8') : strtoupper($value);
+                };
+                $safeSubstr = static function (string $value, int $start, ?int $length = null): string {
+                    if (function_exists('mb_substr')) {
+                        return $length === null
+                            ? (string)mb_substr($value, $start, null, 'UTF-8')
+                            : (string)mb_substr($value, $start, $length, 'UTF-8');
+                    }
+                    return $length === null ? substr($value, $start) : substr($value, $start, $length);
+                };
+                $safeLen = static function (string $value): int {
+                    return function_exists('mb_strlen')
+                        ? (int)mb_strlen($value, 'UTF-8')
+                        : strlen($value);
+                };
+                $normalizePhone = static function (string $value): string {
+                    $digits = preg_replace('/\D+/', '', trim($value)) ?? '';
+                    if ($digits === '') {
+                        return '';
+                    }
+                    if (strlen($digits) === 10 && $digits[0] === '9') {
+                        return '0' . $digits;
+                    }
+                    return $digits;
+                };
+                $fitSingleLine = static function (
+                    FPDF $pdf,
+                    string $text,
+                    float $x,
+                    float $y,
+                    float $w,
+                    string $style = 'B',
+                    float $maxSize = 7.5,
+                    float $minSize = 4.5,
+                    string $align = 'L'
+                ) use ($safeSubstr): void {
+                    $text = trim($text);
+                    if ($text === '') {
+                        return;
+                    }
+                    $size = $maxSize;
+                    $pdf->SetFont('Arial', $style, $size);
+                    while ($size > $minSize && $pdf->GetStringWidth($text) > $w) {
+                        $size -= 0.2;
+                        $pdf->SetFont('Arial', $style, $size);
+                    }
+                    if ($pdf->GetStringWidth($text) > $w) {
+                        $ellipsis = '...';
+                        while ($text !== '' && $pdf->GetStringWidth($text . $ellipsis) > $w) {
+                            $text = rtrim($safeSubstr($text, 0, max(0, $safeLen($text) - 1)));
+                        }
+                        $text = $text === '' ? $ellipsis : ($text . $ellipsis);
+                    }
+                    $pdf->SetXY($x, $y);
+                    $pdf->Cell($w, 3.0, $text, 0, 0, $align, false);
+                };
+                $coverRect = static function (FPDF $pdf, float $x, float $y, float $w, float $h): void {
+                    $pdf->SetFillColor(255, 255, 255);
+                    $pdf->Rect($x, $y, $w, $h, 'F');
+                };
+                $resolveDiskPath = static function (string $storedPath) use ($baseDir): string {
+                    $path = trim($storedPath);
+                    if ($path === '') {
+                        return '';
+                    }
+                    $normalized = str_replace('\\', '/', $path);
+                    if (preg_match('/^https?:\/\//i', $normalized)) {
+                        $urlPath = parse_url($normalized, PHP_URL_PATH);
+                        $normalized = is_string($urlPath) ? $urlPath : '';
+                    }
+                    if ($normalized !== '' && strpos($normalized, $baseDir) === 0 && is_file($normalized)) {
+                        return $normalized;
+                    }
+                    $publicPath = dra_strip_legacy_base($normalized);
+                    if ($publicPath === '') {
+                        return '';
+                    }
+                    if ($publicPath[0] !== '/') {
+                        $publicPath = '/' . $publicPath;
+                    }
+                    $candidate = $baseDir . $publicPath;
+                    return is_file($candidate) ? $candidate : '';
+                };
+                $formatDate = static function (string $raw, string $fallback = ''): string {
+                    $raw = trim($raw);
+                    if ($raw === '') {
+                        return $fallback;
+                    }
+                    try {
+                        return (new DateTime($raw))->format('m/d/Y');
+                    } catch (Throwable $ignored) {
+                        return $raw;
+                    }
+                };
+                $formatDisplayName = static function (string $last, string $first, string $middle, string $suffix = '') use ($upperText, $safeSubstr): string {
+                    $last = trim($last);
+                    $first = trim($first);
+                    $middle = trim($middle);
+                    $suffix = trim($suffix);
+                    $middleInitial = $middle !== '' ? ($safeSubstr($middle, 0, 1) . '.') : '';
+                    $core = trim(implode(' ', array_values(array_filter([$first, $middleInitial, $suffix], static fn($value) => trim((string)$value) !== ''))));
+                    return $upperText(trim($last . ($core !== '' ? ', ' . $core : '')));
+                };
+                $composeCardNumber = static function () use ($payload, $requestId, $issuedDateObj, $upperText): string {
+                    $override = trim((string)($payload['barangay_id_number'] ?? $payload['resident_id_number'] ?? $payload['resident_id_no'] ?? ''));
+                    if ($override !== '') {
+                        return $upperText($override);
+                    }
+                    $digits = preg_replace('/\D+/', '', $requestId) ?? '';
+                    $serial = substr(str_pad($digits, 4, '0', STR_PAD_LEFT), -4);
+                    return 'A' . $issuedDateObj->format('Y') . '-' . $serial;
+                };
+                $composeValidUntil = static function () use ($payload, $issuedDateObj, $upperText): string {
+                    $override = trim((string)($payload['barangay_id_valid_until'] ?? $payload['valid_until'] ?? ''));
+                    if ($override !== '') {
+                        return $upperText($override);
+                    }
+                    $validUntil = clone $issuedDateObj;
+                    $validUntil->modify('+2 years');
+                    return $upperText($validUntil->format('F Y'));
+                };
+
+                $lastName = dra_manual_first_non_empty([
+                    $payload['last_name'] ?? null,
+                    $payload['lastname'] ?? null,
+                    $residentProfile['last_name'] ?? null,
+                ]);
+                $firstName = dra_manual_first_non_empty([
+                    $payload['first_name'] ?? null,
+                    $payload['firstname'] ?? null,
+                    $residentProfile['first_name'] ?? null,
+                ]);
+                $middleName = dra_manual_first_non_empty([
+                    $payload['middle_name'] ?? null,
+                    $payload['middlename'] ?? null,
+                    $residentProfile['middle_name'] ?? null,
+                ]);
+                $suffixName = dra_manual_first_non_empty([
+                    $payload['suffix_name'] ?? null,
+                    $payload['suffix'] ?? null,
+                    $residentProfile['suffix'] ?? null,
+                ]);
+                $displayName = $formatDisplayName($lastName, $firstName, $middleName, $suffixName);
+                if ($displayName === '') {
+                    $displayName = $upperText($fullName !== '' ? $fullName : 'RESIDENT');
+                }
+
+                $addressSource = dra_manual_first_non_empty([
+                    $payload['full_address'] ?? null,
+                    $payload['full_address_display'] ?? null,
+                    $payload['address'] ?? null,
+                    $residentProfile['full_address'] ?? null,
+                    $applicantResidenceAddress,
+                ]);
+                $frontAddress = dra_strip_area_from_address($addressSource);
+                $frontAddress = trim((string)(preg_replace('/\bArea\s+Area\b/i', 'Area', $frontAddress) ?? $frontAddress));
+                if ($frontAddress === '') {
+                    $frontAddress = trim($addressSource);
+                }
+                $frontAddress = $upperText($frontAddress);
+
+                $birthdateText = $upperText($formatDate(dra_manual_first_non_empty([
+                    $payload['birthdate'] ?? null,
+                    $payload['date_of_birth'] ?? null,
+                    $residentProfile['birthdate'] ?? null,
+                ])));
+                $sexRaw = dra_manual_first_non_empty([
+                    $payload['sex'] ?? null,
+                    $payload['gender'] ?? null,
+                    $residentProfile['sex'] ?? null,
+                ]);
+                $sexText = $upperText($sexRaw);
+                $birthplaceText = $upperText(dra_manual_first_non_empty([
+                    $payload['birthplace'] ?? null,
+                    $payload['place_of_birth'] ?? null,
+                    $residentProfile['birthplace'] ?? null,
+                ]));
+                $contactNumberText = $normalizePhone(dra_manual_first_non_empty([
+                    $payload['contact_number'] ?? null,
+                    $payload['phone_number'] ?? null,
+                    $residentProfile['contact_number'] ?? null,
+                ]));
+                $contactNumberText = $upperText($contactNumberText);
+
+                $emergencyDisplayName = $formatDisplayName(
+                    dra_manual_first_non_empty([
+                        $payload['emergency_last'] ?? null,
+                        $payload['emergency_last_name'] ?? null,
+                        $residentProfile['emergency_last_name'] ?? null,
+                    ]),
+                    dra_manual_first_non_empty([
+                        $payload['emergency_first'] ?? null,
+                        $payload['emergency_first_name'] ?? null,
+                        $residentProfile['emergency_first_name'] ?? null,
+                    ]),
+                    dra_manual_first_non_empty([
+                        $payload['emergency_middle'] ?? null,
+                        $payload['emergency_middle_name'] ?? null,
+                        $residentProfile['emergency_middle_name'] ?? null,
+                    ]),
+                    dra_manual_first_non_empty([
+                        $payload['emergency_suffix'] ?? null,
+                        $residentProfile['emergency_suffix'] ?? null,
+                    ])
+                );
+                $emergencyAddressText = $upperText(dra_manual_first_non_empty([
+                    $payload['emergency_address'] ?? null,
+                    $residentProfile['emergency_address'] ?? null,
+                ]));
+                $emergencyContactText = $upperText($normalizePhone(dra_manual_first_non_empty([
+                    $payload['emergency_contact'] ?? null,
+                    $payload['emergency_phone_number'] ?? null,
+                    $residentProfile['emergency_contact'] ?? null,
+                ])));
+                $cardIdText = $composeCardNumber();
+                $validUntilText = $composeValidUntil();
+                $validityNotice = 'This ID is valid until ' . $validUntilText . ' except when the holder requests for a new one.';
+
+                $photoDiskPath = $resolveDiskPath(dra_manual_first_non_empty([
+                    $payload['id_picture_path'] ?? null,
+                    $residentProfile['id_picture_path'] ?? null,
+                ]));
+
+                $pageWidth = 85.6;
+                $pageHeight = 54.1;
+                $pdf = new FPDF('L', 'mm', [$pageWidth, $pageHeight]);
+                $pdf->SetMargins(0, 0, 0);
+                $pdf->SetAutoPageBreak(false);
+                $pdf->SetTextColor(0, 0, 0);
+
+                $pdf->AddPage('L', [$pageWidth, $pageHeight]);
+                $pdf->Image($frontTemplatePath, 0.0, 0.0, $pageWidth, $pageHeight);
+                if ($photoDiskPath !== '') {
+                    $pdf->Image($photoDiskPath, 6.8, 16.3, 18.8, 22.6);
+                }
+                $coverRect($pdf, 31.8, 25.1, 44.8, 4.0);
+                $coverRect($pdf, 31.8, 31.0, 44.8, 4.2);
+                $coverRect($pdf, 31.8, 38.9, 20.4, 4.0);
+                $coverRect($pdf, 56.8, 38.9, 19.2, 4.0);
+                $coverRect($pdf, 31.8, 44.8, 45.0, 4.0);
+                $coverRect($pdf, 5.6, 44.3, 27.6, 4.4);
+                $coverRect($pdf, 6.0, 49.0, 28.2, 3.8);
+
+                $fitSingleLine($pdf, $displayName, 32.2, 25.6, 43.8, 'B', 7.2, 4.6);
+                $fitSingleLine($pdf, $frontAddress, 32.2, 31.5, 43.8, 'B', 6.4, 4.4);
+                $fitSingleLine($pdf, $birthdateText !== '' ? $birthdateText : '-', 32.2, 39.4, 19.2, 'B', 6.6, 4.5);
+                $fitSingleLine($pdf, $sexText !== '' ? $sexText : '-', 57.2, 39.4, 18.0, 'B', 6.6, 4.5);
+                $fitSingleLine($pdf, $birthplaceText !== '' ? $birthplaceText : '-', 32.2, 45.2, 43.8, 'B', 5.7, 4.2);
+                $fitSingleLine($pdf, 'VALID UNTIL: ' . ($validUntilText !== '' ? $validUntilText : '-'), 6.0, 44.8, 26.6, 'B', 4.9, 3.8);
+                $fitSingleLine($pdf, $cardIdText, 6.4, 49.4, 27.2, 'B', 6.1, 4.3);
+
+                $pdf->AddPage('L', [$pageWidth, $pageHeight]);
+                $pdf->Image($backTemplatePath, 0.0, 0.0, $pageWidth, $pageHeight);
+                $coverRect($pdf, 59.0, 2.5, 22.4, 4.3);
+                $coverRect($pdf, 6.5, 16.8, 33.0, 4.3);
+                $coverRect($pdf, 6.5, 21.8, 39.5, 4.3);
+                $coverRect($pdf, 6.5, 27.0, 21.0, 4.2);
+                $coverRect($pdf, 6.0, 31.2, 43.8, 12.2);
+
+                $fitSingleLine($pdf, $cardIdText, 59.5, 3.1, 21.0, 'B', 5.4, 4.0);
+                $fitSingleLine($pdf, $emergencyDisplayName !== '' ? $emergencyDisplayName : '-', 6.9, 17.3, 31.8, 'B', 6.1, 4.4);
+                $fitSingleLine($pdf, $emergencyAddressText !== '' ? $emergencyAddressText : '-', 6.9, 22.3, 38.6, 'B', 5.3, 3.9);
+                $fitSingleLine($pdf, $emergencyContactText !== '' ? $emergencyContactText : ($contactNumberText !== '' ? $contactNumberText : '-'), 6.9, 27.4, 20.0, 'B', 6.0, 4.3);
+
+                $pdf->SetFont('Arial', 'B', 4.2);
+                $pdf->SetXY(6.6, 32.1);
+                $pdf->MultiCell(41.0, 2.8, $validityNotice, 0, 'L', false);
+
+                if ($allowQr && is_file($qrDiskPath)) {
+                    $pdf->Image($qrDiskPath, 60.8, 27.2, 18.5, 18.5);
+                }
+
+                $pdf->Output('F', $diskPath);
+                return '/UnifiedFileAttachment/IssuedDocuments/Generated/' . $fileName;
+            } catch (Throwable $e) {
+                error_log('[dra_generate_issued_document][barangay_id_template] ' . $e->getMessage());
             }
         }
     }
@@ -2183,21 +2522,130 @@ function dra_generate_issued_document(array $requestRow): ?string {
                 }
 
                 // The source General Clearance PDF includes a literal ${ISSUED_DATE_WORD} token,
-                // so we need to mask that footer area before drawing the finalized text.
-                $issuedBlockX = 20.0;
-                $issuedBlockY = 145.3;
-                $issuedTextY = 146.5;
-                $issuedBlockW = $pageWidth - 40.0;
-                $issuedBlockH = 12.2;
-                $fillBox($pdf, $issuedBlockX, $issuedBlockY, $issuedBlockW, $issuedBlockH, 1.8, 0.8);
-                $pdf->SetFont('Arial', '', 9.8);
-                $pdf->SetXY($issuedBlockX, $issuedTextY);
-                $pdf->MultiCell(
-                    $issuedBlockW,
-                    4.8,
-                    'Issued this ' . $issuedAsDocx . ' at the office of the Punong Barangay, Barangay' . "\n" . 'San Jose, Montalban, Rizal',
-                    0,
-                    'C'
+                // so we redraw that paragraph using the template's indented, justified styling.
+                $writeIssuedParagraph = static function (
+                    \setasign\Fpdi\Fpdi $pdfInstance,
+                    array $segments,
+                    float $y,
+                    float $lineHeight,
+                    float $leftMargin,
+                    float $rightMargin,
+                    float $indent,
+                    string $fontFamily,
+                    float $fontSize
+                ) use ($pageWidth): void {
+                    $tokens = [];
+                    foreach ($segments as $segment) {
+                        $text = (string)($segment['text'] ?? '');
+                        if ($text === '') {
+                            continue;
+                        }
+                        $isBold = !empty($segment['bold']);
+                        $parts = preg_split('/(\s+)/u', $text, -1, PREG_SPLIT_DELIM_CAPTURE | PREG_SPLIT_NO_EMPTY);
+                        if (!is_array($parts)) {
+                            $parts = [$text];
+                        }
+                        foreach ($parts as $part) {
+                            $tokens[] = ['text' => $part, 'bold' => $isBold];
+                        }
+                    }
+                    if (empty($tokens)) {
+                        return;
+                    }
+
+                    $measureToken = static function (array $token) use ($pdfInstance, $fontFamily, $fontSize): float {
+                        $pdfInstance->SetFont($fontFamily, !empty($token['bold']) ? 'B' : '', $fontSize);
+                        return $pdfInstance->GetStringWidth((string)($token['text'] ?? ''));
+                    };
+
+                    $contentWidth = $pageWidth - $leftMargin - $rightMargin;
+                    $firstLineWidth = max(1.0, $contentWidth - $indent);
+                    $lines = [];
+                    $line = [];
+                    $lineWidth = 0.0;
+                    $lineMax = $firstLineWidth;
+
+                    foreach ($tokens as $token) {
+                        $text = (string)($token['text'] ?? '');
+                        if ($text === '') {
+                            continue;
+                        }
+                        $width = $measureToken($token);
+                        if (!empty($line) && ($lineWidth + $width) > $lineMax) {
+                            while (!empty($line) && preg_match('/^\s+$/u', (string)$line[count($line) - 1]['text'])) {
+                                $removed = array_pop($line);
+                                if ($removed !== null) {
+                                    $lineWidth -= $measureToken($removed);
+                                }
+                            }
+                            if (!empty($line)) {
+                                $lines[] = $line;
+                            }
+                            $line = [];
+                            $lineWidth = 0.0;
+                            $lineMax = $contentWidth;
+                            if (preg_match('/^\s+$/u', $text)) {
+                                continue;
+                            }
+                        }
+                        $line[] = $token;
+                        $lineWidth += $width;
+                    }
+                    if (!empty($line)) {
+                        $lines[] = $line;
+                    }
+
+                    foreach ($lines as $lineIndex => $lineTokens) {
+                        $lineY = $y + ($lineIndex * $lineHeight);
+                        $lineX = $leftMargin + ($lineIndex === 0 ? $indent : 0.0);
+                        $targetWidth = $lineIndex === 0 ? $firstLineWidth : $contentWidth;
+                        $actualWidth = 0.0;
+                        $spaceTokenIndexes = [];
+                        foreach ($lineTokens as $tokenIndex => $token) {
+                            $text = (string)($token['text'] ?? '');
+                            $width = $measureToken($token);
+                            $actualWidth += $width;
+                            if (preg_match('/^\s+$/u', $text)) {
+                                $spaceTokenIndexes[] = $tokenIndex;
+                            }
+                        }
+                        $justifyLine = $lineIndex < (count($lines) - 1)
+                            && count($spaceTokenIndexes) > 0
+                            && $actualWidth < $targetWidth;
+                        $extraPerSpace = $justifyLine ? (($targetWidth - $actualWidth) / count($spaceTokenIndexes)) : 0.0;
+
+                        $pdfInstance->SetXY($lineX, $lineY);
+                        foreach ($lineTokens as $token) {
+                            $text = (string)($token['text'] ?? '');
+                            $pdfInstance->SetFont($fontFamily, !empty($token['bold']) ? 'B' : '', $fontSize);
+                            $cellWidth = $pdfInstance->GetStringWidth($text);
+                            if ($justifyLine && preg_match('/^\s+$/u', $text)) {
+                                $cellWidth += $extraPerSpace;
+                            }
+                            $pdfInstance->Cell($cellWidth, $lineHeight, $text, 0, 0, 'L');
+                        }
+                    }
+                };
+
+                $issuedBlockX = 15.0;
+                $issuedBlockY = 144.6;
+                $issuedBlockW = $pageWidth - 28.0;
+                $issuedBlockH = 15.0;
+                $pdf->Rect($issuedBlockX, $issuedBlockY, $issuedBlockW, $issuedBlockH, 'F');
+                $writeIssuedParagraph(
+                    $pdf,
+                    [
+                        ['text' => 'Issued this ', 'bold' => false],
+                        ['text' => $issuedAsDocx, 'bold' => true],
+                        ['text' => ' at the office of the Punong Barangay, Barangay San Jose, Montalban, Rizal', 'bold' => false],
+                    ],
+                    146.0,
+                    5.4,
+                    18.0,
+                    10.0,
+                    12.0,
+                    'Arial',
+                    12.0
                 );
 
                 $footerBlockX = 14.0;
@@ -2316,8 +2764,8 @@ function dra_generate_issued_document(array $requestRow): ?string {
                     float $y,
                     float $w,
                     float $h,
-                    float $padX = 1.3,
-                    float $padY = 0.7
+                    float $padX = 1.2,
+                    float $padY = 0.6
                 ): void {
                     $pdfInstance->Rect(
                         max(0.0, $x - $padX),
@@ -2335,8 +2783,8 @@ function dra_generate_issued_document(array $requestRow): ?string {
                     float $h,
                     string $text,
                     string $style = '',
-                    float $fontSize = 11.0,
-                    float $minFontSize = 9.2,
+                    float $fontSize = 11.2,
+                    float $minFontSize = 9.4,
                     string $align = 'L'
                 ): void {
                     $clean = trim((string)(preg_replace('/\s+/u', ' ', $text) ?? $text));
@@ -2353,63 +2801,230 @@ function dra_generate_issued_document(array $requestRow): ?string {
                     $pdfInstance->SetXY($x, $y);
                     $pdfInstance->Cell($w, $h, $clean, 0, 0, $align);
                 };
-                $infoLabelX = 39.0;
-                $infoColonX = 79.0;
-                $infoValueX = 84.5;
-                $infoValueW = $pageWidth - $infoValueX - 22.0;
-                $infoTopY = $ocrTop(0.6358, 0.0240);
-                $infoBlockH = 38.0;
-                $pdf->Rect($infoLabelX - 4.0, $infoTopY - 2.0, ($pageWidth - $infoLabelX - 18.0), $infoBlockH, 'F');
+                // Match the March 2026 Tricycle Clearance template, including the fixed locality line under Address.
+                $infoLabelX = 37.5;
+                $infoColonX = 76.5;
+                $infoValueX = 82.0;
+                $infoValueW = $pageWidth - $infoValueX - 23.0;
+                $infoTopY = 95.0;
+                $infoLineGap = 5.45;
+                $addressLocalityLine = 'Barangay San Jose, Montalban, Rizal';
+                $pdf->Rect(31.5, 94.0, 136.0, 44.8, 'F');
                 $infoRows = [
-                    ['label' => 'Name', 'value' => $displayName, 'y' => $infoTopY],
-                    ['label' => 'Address', 'value' => $displayAddress, 'y' => $infoTopY + 5.8],
-                    ['label' => 'Location', 'value' => $todaPodaLocation !== '' ? $todaPodaLocation : '-', 'y' => $infoTopY + 12.0],
-                    ['label' => 'Type of Vehicle', 'value' => $vehicleType, 'y' => $infoTopY + 17.8],
-                    ['label' => 'Registration No.', 'value' => $registrationNumber !== '' ? $registrationNumber : '-', 'y' => $infoTopY + 23.6],
-                    ['label' => 'Plate No.', 'value' => $plateNumber !== '' ? $plateNumber : '-', 'y' => $infoTopY + 29.4],
-                    ['label' => 'Body No.', 'value' => $bodyNumber !== '' ? $bodyNumber : '-', 'y' => $infoTopY + 35.2],
+                    ['type' => 'field', 'label' => 'Name', 'value' => $displayName, 'y' => $infoTopY],
+                    ['type' => 'field', 'label' => 'Address', 'value' => $displayAddress, 'y' => $infoTopY + $infoLineGap],
+                    ['type' => 'subline', 'value' => $addressLocalityLine, 'y' => $infoTopY + ($infoLineGap * 2)],
+                    ['type' => 'field', 'label' => 'Location', 'value' => $todaPodaLocation !== '' ? $todaPodaLocation : '-', 'y' => $infoTopY + ($infoLineGap * 3)],
+                    ['type' => 'field', 'label' => 'Type of Vehicle', 'value' => $vehicleType, 'y' => $infoTopY + ($infoLineGap * 4)],
+                    ['type' => 'field', 'label' => 'Registration No.', 'value' => $registrationNumber !== '' ? $registrationNumber : '-', 'y' => $infoTopY + ($infoLineGap * 5)],
+                    ['type' => 'field', 'label' => 'Plate No.', 'value' => $plateNumber !== '' ? $plateNumber : '-', 'y' => $infoTopY + ($infoLineGap * 6)],
+                    ['type' => 'field', 'label' => 'Body No.', 'value' => $bodyNumber !== '' ? $bodyNumber : '-', 'y' => $infoTopY + ($infoLineGap * 7)],
                 ];
                 foreach ($infoRows as $infoRow) {
                     $rowY = (float)$infoRow['y'];
-                    $pdf->SetFont('Arial', 'B', 11.0);
+                    if (($infoRow['type'] ?? 'field') === 'subline') {
+                        $writeFittedCell($pdf, $infoValueX, $rowY, $infoValueW, 5.0, trim((string)$infoRow['value']), 'B', 10.0, 8.8, 'L');
+                        continue;
+                    }
+                    $pdf->SetFont('Arial', 'B', 10.9);
                     $pdf->SetXY($infoLabelX, $rowY);
                     $pdf->Cell($infoColonX - $infoLabelX - 2.0, 5.2, (string)$infoRow['label'], 0, 0, 'L');
                     $pdf->SetXY($infoColonX, $rowY);
                     $pdf->Cell(3.0, 5.2, ':', 0, 0, 'L');
-                    $writeFittedCell($pdf, $infoValueX, $rowY, $infoValueW, 5.2, trim((string)$infoRow['value']), 'B', 11.0, 9.2, 'L');
+                    $writeFittedCell($pdf, $infoValueX, $rowY, $infoValueW, 5.2, trim((string)$infoRow['value']), 'B', 10.9, 9.4, 'L');
                 }
 
-                $issuedBlockX = 25.0;
-                $issuedBlockY = $ocrTop(0.4066666666166666, 0.018333333333333313);
-                $issuedBlockW = $pageWidth - 50.0;
-                $issuedBlockH = 13.5;
-                $fillBox($pdf, $issuedBlockX, $issuedBlockY, $issuedBlockW, $issuedBlockH, 2.0, 0.9);
-                $pdf->SetFont('Arial', '', 8.8);
-                $pdf->SetXY($issuedBlockX, $issuedBlockY);
-                $pdf->MultiCell(
-                    $issuedBlockW,
-                    4.3,
-                    'Issued this ' . $issuedAsDocx . ' at the office of the Punong Barangay, Barangay' . "\n" . 'San Jose, Montalban, Rizal',
-                    0,
-                    'C'
+                $writeIssuedParagraph = static function (
+                    \setasign\Fpdi\Fpdi $pdfInstance,
+                    array $segments,
+                    float $y,
+                    float $lineHeight,
+                    float $leftMargin,
+                    float $rightMargin,
+                    float $indent,
+                    string $fontFamily,
+                    float $fontSize
+                ) use ($pageWidth): void {
+                    $tokens = [];
+                    foreach ($segments as $segment) {
+                        $text = (string)($segment['text'] ?? '');
+                        if ($text === '') {
+                            continue;
+                        }
+                        $isBold = !empty($segment['bold']);
+                        $parts = preg_split('/(\s+)/u', $text, -1, PREG_SPLIT_DELIM_CAPTURE | PREG_SPLIT_NO_EMPTY);
+                        if (!is_array($parts)) {
+                            $parts = [$text];
+                        }
+                        foreach ($parts as $part) {
+                            $tokens[] = ['text' => $part, 'bold' => $isBold];
+                        }
+                    }
+                    if (empty($tokens)) {
+                        return;
+                    }
+
+                    $measureToken = static function (array $token) use ($pdfInstance, $fontFamily, $fontSize): float {
+                        $pdfInstance->SetFont($fontFamily, !empty($token['bold']) ? 'B' : '', $fontSize);
+                        return $pdfInstance->GetStringWidth((string)($token['text'] ?? ''));
+                    };
+
+                    $contentWidth = $pageWidth - $leftMargin - $rightMargin;
+                    $firstLineWidth = max(1.0, $contentWidth - $indent);
+                    $lines = [];
+                    $line = [];
+                    $lineWidth = 0.0;
+                    $lineMax = $firstLineWidth;
+
+                    foreach ($tokens as $token) {
+                        $text = (string)($token['text'] ?? '');
+                        if ($text === '') {
+                            continue;
+                        }
+                        $width = $measureToken($token);
+                        if (!empty($line) && ($lineWidth + $width) > $lineMax) {
+                            while (!empty($line) && preg_match('/^\s+$/u', (string)$line[count($line) - 1]['text'])) {
+                                $removed = array_pop($line);
+                                if ($removed !== null) {
+                                    $lineWidth -= $measureToken($removed);
+                                }
+                            }
+                            if (!empty($line)) {
+                                $lines[] = $line;
+                            }
+                            $line = [];
+                            $lineWidth = 0.0;
+                            $lineMax = $contentWidth;
+                            if (preg_match('/^\s+$/u', $text)) {
+                                continue;
+                            }
+                        }
+                        $line[] = $token;
+                        $lineWidth += $width;
+                    }
+                    if (!empty($line)) {
+                        $lines[] = $line;
+                    }
+
+                    foreach ($lines as $lineIndex => $lineTokens) {
+                        $lineY = $y + ($lineIndex * $lineHeight);
+                        $lineX = $leftMargin + ($lineIndex === 0 ? $indent : 0.0);
+                        $targetWidth = $lineIndex === 0 ? $firstLineWidth : $contentWidth;
+                        $actualWidth = 0.0;
+                        $spaceTokenIndexes = [];
+                        foreach ($lineTokens as $tokenIndex => $token) {
+                            $text = (string)($token['text'] ?? '');
+                            $width = $measureToken($token);
+                            $actualWidth += $width;
+                            if (preg_match('/^\s+$/u', $text)) {
+                                $spaceTokenIndexes[] = $tokenIndex;
+                            }
+                        }
+                        $justifyLine = $lineIndex < (count($lines) - 1)
+                            && count($spaceTokenIndexes) > 0
+                            && $actualWidth < $targetWidth;
+                        $extraPerSpace = $justifyLine ? (($targetWidth - $actualWidth) / count($spaceTokenIndexes)) : 0.0;
+
+                        $pdfInstance->SetXY($lineX, $lineY);
+                        foreach ($lineTokens as $token) {
+                            $text = (string)($token['text'] ?? '');
+                            $pdfInstance->SetFont($fontFamily, !empty($token['bold']) ? 'B' : '', $fontSize);
+                            $cellWidth = $pdfInstance->GetStringWidth($text);
+                            if ($justifyLine && preg_match('/^\s+$/u', $text)) {
+                                $cellWidth += $extraPerSpace;
+                            }
+                            $pdfInstance->Cell($cellWidth, $lineHeight, $text, 0, 0, 'L');
+                        }
+                    }
+                };
+
+                $issuedBlockX = 15.0;
+                $issuedBlockY = $ocrTop(0.4066666666166666, 0.018333333333333313) - 0.5;
+                $issuedBlockW = $pageWidth - 28.0;
+                $issuedBlockH = 15.0;
+                $pdf->Rect($issuedBlockX, $issuedBlockY, $issuedBlockW, $issuedBlockH, 'F');
+                $writeIssuedParagraph(
+                    $pdf,
+                    [
+                        ['text' => 'Issued this ', 'bold' => false],
+                        ['text' => $issuedAsDocx, 'bold' => true],
+                        ['text' => ' at the office of the Punong Barangay, Barangay San Jose, Montalban, Rizal.', 'bold' => false],
+                    ],
+                    $issuedBlockY + 1.2,
+                    5.4,
+                    18.0,
+                    10.0,
+                    12.0,
+                    'Arial',
+                    12.0
                 );
 
-                $metaValueX = 57.0;
-                $metaValueW = 78.0;
+                $metaBlockX = 20.5;
+                $metaBlockY = 176.8;
+                $metaBlockW = 114.0;
+                $metaBlockH = 19.5;
+                $pdf->Rect($metaBlockX, $metaBlockY, $metaBlockW, $metaBlockH, 'F');
+
                 $metaRows = [
-                    ['y' => $ocrTop(0.3499999998833333, 0.021666666666666723), 'text' => $clearanceNumber !== '' ? $clearanceNumber : $requestId, 'font' => 11.0],
-                    ['y' => $ocrTop(0.3316666665000001, 0.019999999999999907), 'text' => $receiptNumber, 'font' => 11.0],
-                    ['y' => $ocrTop(0.3132073218646825, 0.020252022743225018), 'text' => $amountText, 'font' => 11.0],
+                    ['label' => 'Clearance No.', 'value' => $clearanceNumber !== '' ? $clearanceNumber : $requestId],
+                    ['label' => 'Receipt No.', 'value' => $receiptNumber],
+                    ['label' => 'Amount', 'value' => $amountText],
                 ];
+                $metaLabelX = 22.2;
+                $metaColonX = 55.2;
+                $metaValueX = 60.2;
+                $metaValueW = 70.0;
+                $measureFittedTextWidth = static function (
+                    \setasign\Fpdi\Fpdi $pdfInstance,
+                    string $text,
+                    string $style = '',
+                    float $fontSize = 11.0,
+                    float $minFontSize = 9.4,
+                    float $maxWidth = 70.0
+                ): float {
+                    $clean = trim((string)(preg_replace('/\s+/u', ' ', $text) ?? $text));
+                    if ($clean === '') {
+                        return 0.0;
+                    }
+                    for ($size = $fontSize; $size >= $minFontSize; $size -= 0.2) {
+                        $pdfInstance->SetFont('Arial', $style, $size);
+                        if ($pdfInstance->GetStringWidth($clean) <= $maxWidth) {
+                            break;
+                        }
+                    }
+                    $pdfInstance->SetFont('Arial', $style, max($minFontSize, $size));
+                    return min($maxWidth, $pdfInstance->GetStringWidth($clean));
+                };
+                $metaUnderlineW = 0.0;
                 foreach ($metaRows as $metaRow) {
-                    $y = (float)$metaRow['y'];
-                    $fillBox($pdf, $metaValueX, $y, $metaValueW, 5.2, 1.2, 0.6);
-                    $writeFittedCell($pdf, $metaValueX, $y, $metaValueW, 5.0, (string)$metaRow['text'], '', (float)$metaRow['font'], 9.2, 'L');
+                    $metaUnderlineW = max(
+                        $metaUnderlineW,
+                        $measureFittedTextWidth($pdf, (string)($metaRow['value'] ?? ''), '', 11.0, 9.4, $metaValueW)
+                    );
+                }
+                $metaY = 177.1;
+                foreach ($metaRows as $metaRow) {
+                    $pdf->SetFont('Arial', 'B', 10.8);
+                    $pdf->SetXY($metaLabelX, $metaY);
+                    $pdf->Cell(max(10.0, $metaColonX - $metaLabelX - 1.0), 5.4, (string)$metaRow['label'], 0, 0, 'L');
+                    $pdf->SetXY($metaColonX, $metaY);
+                    $pdf->Cell(3.0, 5.4, ':', 0, 0, 'L');
+                    $writeFittedCell($pdf, $metaValueX, $metaY, $metaValueW, 5.4, (string)$metaRow['value'], '', 11.0, 9.4, 'L');
+                    $pdf->Line($metaValueX, $metaY + 5.0, $metaValueX + $metaUnderlineW, $metaY + 5.0);
+                    $metaY += 6.1;
                 }
 
                 if (is_file($qrDiskPath)) {
                     $qrSize = 20.0;
-                    $pdf->Image($qrDiskPath, ($pageWidth - $qrSize) / 2, $pageHeight - 49.0, $qrSize, $qrSize);
+                    $qrRightMargin = 9.0;
+                    $qrBottomMargin = 8.0;
+                    $pdf->Image(
+                        $qrDiskPath,
+                        $pageWidth - $qrSize - $qrRightMargin,
+                        $pageHeight - $qrSize - $qrBottomMargin,
+                        $qrSize,
+                        $qrSize
+                    );
                 }
 
                 $pdf->Output('F', $diskPath);
@@ -2545,7 +3160,7 @@ function dra_generate_issued_document(array $requestRow): ?string {
                 $pdf->MultiCell(
                     $issuedBlockW,
                     4.2,
-                    'Issued this ' . $issuedAsDocx . ' at the office of the Punong Barangay, Barangay San Jose, Montalban, Rizal.',
+                    $issuedOfficeSentence,
                     0,
                     'C'
                 );
@@ -2673,7 +3288,7 @@ function dra_generate_issued_document(array $requestRow): ?string {
                 $pdf->MultiCell(
                     160.0,
                     4.8,
-                    '      Issued this ' . $issuedAsDocx . ' at the office of the Punong Barangay, Barangay San Jose, Montalban, Rizal.',
+                    '      ' . $issuedOfficeSentence,
                     0,
                     'L'
                 );
@@ -3598,7 +4213,7 @@ function dra_generate_issued_document(array $requestRow): ?string {
             [
                 ['text' => 'Issued this ', 'bold' => false],
                 ['text' => $issuedAsDocx, 'bold' => true],
-                ['text' => ', at the office of the Punong Barangay, Barangay San Jose, Montalban, Rizal', 'bold' => false],
+                ['text' => ' at the office of the Punong Barangay, Barangay San Jose, Montalban, Rizal', 'bold' => false],
             ],
             7,
             18,
@@ -3859,7 +4474,7 @@ function dra_generate_issued_document(array $requestRow): ?string {
         );
         $pdf->Ln(2);
         $writeIndentedParagraph(
-            'Issued this ' . $issuedAt . ' at Barangay San Jose, Rodriguez, Rizal.',
+            $issuedOfficeSentence,
             7,
             18,
             10,
@@ -4308,6 +4923,7 @@ function dra_resident_profile_snapshot(mysqli $conn, string $residentUserId, str
         'middle_name' => '',
         'suffix' => '',
         'birthdate' => '',
+        'birthplace' => '',
         'age' => '',
         'sex' => '',
         'civil_status' => '',
@@ -4317,6 +4933,13 @@ function dra_resident_profile_snapshot(mysqli $conn, string $residentUserId, str
         'full_address' => '',
         'barangay_residency' => '',
         'residency_duration' => '',
+        'emergency_first_name' => '',
+        'emergency_middle_name' => '',
+        'emergency_last_name' => '',
+        'emergency_suffix' => '',
+        'emergency_contact' => '',
+        'emergency_address' => '',
+        'id_picture_path' => '',
         'proof_residency_path' => '',
         'proof_residency_name' => '',
         'proof_residency_type' => '',
@@ -4332,6 +4955,7 @@ function dra_resident_profile_snapshot(mysqli $conn, string $residentUserId, str
             r.middlename,
             r.suffix,
             r.birthdate,
+            r.birthplace,
             r.baranagayresidency,
             r.sex,
             r.civil_status,
@@ -4339,6 +4963,28 @@ function dra_resident_profile_snapshot(mysqli $conn, string $residentUserId, str
             r.occupation,
             r.occupation_detail,
             u.phone_number,
+            (
+                SELECT uf.file_path
+                FROM unifiedfileattachmenttbl uf
+                LEFT JOIN documenttypelookuptbl dt
+                    ON dt.document_type_id = uf.document_type_id
+                LEFT JOIN statuslookuptbl sv
+                    ON sv.status_id = uf.status_id_verify
+                WHERE uf.source_type = 'ResidentProfiling'
+                  AND uf.source_id = r.resident_id
+                  AND (
+                        LOWER(COALESCE(dt.document_type_name, '')) = '2x2 picture'
+                        OR LOWER(COALESCE(dt.document_type_name, '')) LIKE '%2x2%'
+                      )
+                ORDER BY
+                    CASE
+                        WHEN LOWER(COALESCE(sv.status_name, '')) = 'verified' THEN 0
+                        ELSE 1
+                    END,
+                    uf.upload_timestamp DESC,
+                    uf.attachment_id DESC
+                LIMIT 1
+            ) AS id_picture_path,
             (
                 SELECT uf.file_path
                 FROM unifiedfileattachmenttbl uf
@@ -4393,9 +5039,16 @@ function dra_resident_profile_snapshot(mysqli $conn, string $residentUserId, str
             a.phase_number,
             a.subdivision,
             a.area_number
-            ,a.residency_duration
+            ,a.residency_duration,
+            e.first_name AS emergency_first_name,
+            e.middle_name AS emergency_middle_name,
+            e.last_name AS emergency_last_name,
+            e.suffix AS emergency_suffix,
+            e.phone_number AS emergency_contact,
+            e.address AS emergency_address
         FROM residentinformationtbl r
         LEFT JOIN useraccountstbl u ON u.user_id = r.user_id
+        LEFT JOIN emergencycontacttbl e ON e.user_id = r.user_id
         LEFT JOIN residentaddresstbl a
             ON a.address_id = (
                 SELECT a2.address_id
@@ -4469,6 +5122,7 @@ function dra_resident_profile_snapshot(mysqli $conn, string $residentUserId, str
         'middle_name' => (string)($row['middlename'] ?? ''),
         'suffix' => (string)($row['suffix'] ?? ''),
         'birthdate' => $birthdate,
+        'birthplace' => (string)($row['birthplace'] ?? ''),
         'age' => $age,
         'sex' => (string)($row['sex'] ?? ''),
         'civil_status' => (string)($row['civil_status'] ?? ''),
@@ -4478,6 +5132,13 @@ function dra_resident_profile_snapshot(mysqli $conn, string $residentUserId, str
         'full_address' => $fullAddress,
         'barangay_residency' => (string)($row['baranagayresidency'] ?? ''),
         'residency_duration' => (string)($row['residency_duration'] ?? ''),
+        'emergency_first_name' => (string)($row['emergency_first_name'] ?? ''),
+        'emergency_middle_name' => (string)($row['emergency_middle_name'] ?? ''),
+        'emergency_last_name' => (string)($row['emergency_last_name'] ?? ''),
+        'emergency_suffix' => (string)($row['emergency_suffix'] ?? ''),
+        'emergency_contact' => (string)($row['emergency_contact'] ?? ''),
+        'emergency_address' => (string)($row['emergency_address'] ?? ''),
+        'id_picture_path' => (string)($row['id_picture_path'] ?? ''),
         'proof_residency_path' => (string)($row['proof_residency_path'] ?? ''),
         'proof_residency_name' => (string)($row['proof_residency_name'] ?? ''),
         'proof_residency_type' => (string)($row['proof_residency_type'] ?? ''),
@@ -4486,6 +5147,710 @@ function dra_resident_profile_snapshot(mysqli $conn, string $residentUserId, str
 
     $cache[$cacheKey] = $profile;
     return $profile;
+}
+
+function dra_manual_first_non_empty(array $values, string $fallback = ''): string {
+    foreach ($values as $value) {
+        if ($value === null) {
+            continue;
+        }
+        $text = trim((string)$value);
+        if ($text !== '') {
+            return $text;
+        }
+    }
+    return trim($fallback);
+}
+
+function dra_manual_compose_full_name(array $payload, array $residentProfile = []): string {
+    $first = dra_manual_first_non_empty([
+        $payload['first_name'] ?? null,
+        $payload['firstname'] ?? null,
+        $residentProfile['first_name'] ?? null,
+    ]);
+    $middle = dra_manual_first_non_empty([
+        $payload['middle_name'] ?? null,
+        $payload['middlename'] ?? null,
+        $residentProfile['middle_name'] ?? null,
+    ]);
+    $last = dra_manual_first_non_empty([
+        $payload['last_name'] ?? null,
+        $payload['lastname'] ?? null,
+        $residentProfile['last_name'] ?? null,
+    ]);
+    $suffix = dra_manual_first_non_empty([
+        $payload['suffix'] ?? null,
+        $payload['suffix_name'] ?? null,
+        $residentProfile['suffix'] ?? null,
+    ]);
+
+    return trim(implode(' ', array_values(array_filter([$first, $middle, $last, $suffix], static fn($v) => trim((string)$v) !== ''))));
+}
+
+function dra_manual_fill_payload_from_resident(array $payload, array $residentProfile): array {
+    if (!$residentProfile) {
+        return $payload;
+    }
+
+    $payload['resident_id'] = dra_manual_first_non_empty([
+        $payload['resident_id'] ?? null,
+        $residentProfile['resident_id'] ?? null,
+    ]);
+    $payload['resident_user_id'] = dra_manual_first_non_empty([
+        $payload['resident_user_id'] ?? null,
+        $payload['user_id'] ?? null,
+        $residentProfile['resident_user_id'] ?? null,
+    ]);
+    $payload['first_name'] = dra_manual_first_non_empty([
+        $payload['first_name'] ?? null,
+        $payload['firstname'] ?? null,
+        $residentProfile['first_name'] ?? null,
+    ]);
+    $payload['middle_name'] = dra_manual_first_non_empty([
+        $payload['middle_name'] ?? null,
+        $payload['middlename'] ?? null,
+        $residentProfile['middle_name'] ?? null,
+    ]);
+    $payload['last_name'] = dra_manual_first_non_empty([
+        $payload['last_name'] ?? null,
+        $payload['lastname'] ?? null,
+        $residentProfile['last_name'] ?? null,
+    ]);
+    $payload['suffix'] = dra_manual_first_non_empty([
+        $payload['suffix'] ?? null,
+        $payload['suffix_name'] ?? null,
+        $residentProfile['suffix'] ?? null,
+    ]);
+    $payload['birthdate'] = dra_manual_first_non_empty([
+        $payload['birthdate'] ?? null,
+        $payload['date_of_birth'] ?? null,
+        $residentProfile['birthdate'] ?? null,
+    ]);
+    $payload['birthplace'] = dra_manual_first_non_empty([
+        $payload['birthplace'] ?? null,
+        $payload['place_of_birth'] ?? null,
+        $residentProfile['birthplace'] ?? null,
+    ]);
+    $payload['age'] = dra_manual_first_non_empty([
+        $payload['age'] ?? null,
+        $residentProfile['age'] ?? null,
+    ]);
+    $payload['sex'] = dra_manual_first_non_empty([
+        $payload['sex'] ?? null,
+        $payload['gender'] ?? null,
+        $residentProfile['sex'] ?? null,
+    ]);
+    $payload['civil_status'] = dra_manual_first_non_empty([
+        $payload['civil_status'] ?? null,
+        $residentProfile['civil_status'] ?? null,
+    ]);
+    $payload['religion'] = dra_manual_first_non_empty([
+        $payload['religion'] ?? null,
+        $residentProfile['religion'] ?? null,
+    ]);
+    $payload['occupation'] = dra_manual_first_non_empty([
+        $payload['occupation'] ?? null,
+        $residentProfile['occupation'] ?? null,
+    ]);
+    $payload['contact_number'] = dra_manual_first_non_empty([
+        $payload['contact_number'] ?? null,
+        $payload['phone_number'] ?? null,
+        $residentProfile['contact_number'] ?? null,
+    ]);
+    $payload['phone_number'] = dra_manual_first_non_empty([
+        $payload['phone_number'] ?? null,
+        $payload['contact_number'] ?? null,
+        $residentProfile['contact_number'] ?? null,
+    ]);
+    $payload['full_address'] = dra_manual_first_non_empty([
+        $payload['full_address'] ?? null,
+        $payload['full_address_display'] ?? null,
+        $payload['address'] ?? null,
+        $residentProfile['full_address'] ?? null,
+    ]);
+    $payload['full_address_display'] = dra_manual_first_non_empty([
+        $payload['full_address_display'] ?? null,
+        $payload['full_address'] ?? null,
+        $payload['address'] ?? null,
+        $residentProfile['full_address'] ?? null,
+    ]);
+    $payload['address'] = dra_manual_first_non_empty([
+        $payload['address'] ?? null,
+        $payload['full_address'] ?? null,
+        $payload['full_address_display'] ?? null,
+        $residentProfile['full_address'] ?? null,
+    ]);
+    $payload['barangay_residency'] = dra_manual_first_non_empty([
+        $payload['barangay_residency'] ?? null,
+        $residentProfile['barangay_residency'] ?? null,
+    ]);
+    $payload['residency_duration'] = dra_manual_first_non_empty([
+        $payload['residency_duration'] ?? null,
+        $residentProfile['residency_duration'] ?? null,
+    ]);
+    $payload['emergency_first'] = dra_manual_first_non_empty([
+        $payload['emergency_first'] ?? null,
+        $payload['emergency_first_name'] ?? null,
+        $residentProfile['emergency_first_name'] ?? null,
+    ]);
+    $payload['emergency_first_name'] = dra_manual_first_non_empty([
+        $payload['emergency_first_name'] ?? null,
+        $payload['emergency_first'] ?? null,
+        $residentProfile['emergency_first_name'] ?? null,
+    ]);
+    $payload['emergency_middle'] = dra_manual_first_non_empty([
+        $payload['emergency_middle'] ?? null,
+        $payload['emergency_middle_name'] ?? null,
+        $residentProfile['emergency_middle_name'] ?? null,
+    ]);
+    $payload['emergency_middle_name'] = dra_manual_first_non_empty([
+        $payload['emergency_middle_name'] ?? null,
+        $payload['emergency_middle'] ?? null,
+        $residentProfile['emergency_middle_name'] ?? null,
+    ]);
+    $payload['emergency_last'] = dra_manual_first_non_empty([
+        $payload['emergency_last'] ?? null,
+        $payload['emergency_last_name'] ?? null,
+        $residentProfile['emergency_last_name'] ?? null,
+    ]);
+    $payload['emergency_last_name'] = dra_manual_first_non_empty([
+        $payload['emergency_last_name'] ?? null,
+        $payload['emergency_last'] ?? null,
+        $residentProfile['emergency_last_name'] ?? null,
+    ]);
+    $payload['emergency_suffix'] = dra_manual_first_non_empty([
+        $payload['emergency_suffix'] ?? null,
+        $residentProfile['emergency_suffix'] ?? null,
+    ]);
+    $payload['emergency_contact'] = dra_manual_first_non_empty([
+        $payload['emergency_contact'] ?? null,
+        $payload['emergency_phone_number'] ?? null,
+        $residentProfile['emergency_contact'] ?? null,
+    ]);
+    $payload['emergency_address'] = dra_manual_first_non_empty([
+        $payload['emergency_address'] ?? null,
+        $residentProfile['emergency_address'] ?? null,
+    ]);
+    $payload['id_picture_path'] = dra_manual_first_non_empty([
+        $payload['id_picture_path'] ?? null,
+        $residentProfile['id_picture_path'] ?? null,
+    ]);
+    $payload['resident_name'] = dra_manual_first_non_empty([
+        $payload['resident_name'] ?? null,
+        dra_manual_compose_full_name($payload, $residentProfile),
+    ]);
+
+    return $payload;
+}
+
+function dra_manual_normalize_fee_rows($fees): array {
+    if (!is_array($fees)) {
+        return [];
+    }
+
+    $cleanFees = [];
+    foreach ($fees as $fee) {
+        if (!is_array($fee)) {
+            continue;
+        }
+        $name = trim((string)($fee['fee_name'] ?? $fee['name'] ?? ''));
+        $amount = max(0.0, (float)($fee['amount'] ?? 0));
+        if ($name === '') {
+            continue;
+        }
+        $cleanFees[] = [
+            'fee_name' => $name,
+            'amount' => $amount,
+        ];
+    }
+
+    return $cleanFees;
+}
+
+if ($action === 'search_manual_residents') {
+    $search = trim((string)($_GET['q'] ?? ''));
+    if ($search === '') {
+        dr_respond_json(200, ['success' => true, 'items' => []]);
+    }
+    if (!dr_table_exists($conn, 'residentinformationtbl')) {
+        dr_respond_json(200, ['success' => true, 'items' => []]);
+    }
+
+    $like = '%' . $search . '%';
+    $sql = "
+        SELECT
+            r.resident_id,
+            r.user_id,
+            r.firstname,
+            r.middlename,
+            r.lastname,
+            r.suffix,
+            r.birthdate,
+            r.birthplace,
+            r.sex,
+            r.civil_status,
+            r.religion,
+            r.occupation,
+            r.occupation_detail,
+            u.phone_number,
+            e.first_name AS emergency_first_name,
+            e.middle_name AS emergency_middle_name,
+            e.last_name AS emergency_last_name,
+            e.suffix AS emergency_suffix,
+            e.phone_number AS emergency_contact,
+            e.address AS emergency_address,
+            (
+                SELECT uf.file_path
+                FROM unifiedfileattachmenttbl uf
+                LEFT JOIN documenttypelookuptbl dt
+                    ON uf.document_type_id = dt.document_type_id
+                LEFT JOIN statuslookuptbl sv
+                    ON uf.status_id_verify = sv.status_id
+                WHERE uf.source_type = 'ResidentProfiling'
+                  AND uf.source_id = r.resident_id
+                  AND (
+                        LOWER(COALESCE(dt.document_type_name, '')) = '2x2 picture'
+                        OR LOWER(COALESCE(dt.document_type_name, '')) LIKE '%2x2%'
+                      )
+                ORDER BY
+                    CASE
+                        WHEN LOWER(COALESCE(sv.status_name, '')) = 'verified' THEN 0
+                        ELSE 1
+                    END,
+                    uf.upload_timestamp DESC,
+                    uf.attachment_id DESC
+                LIMIT 1
+            ) AS id_picture_path,
+            a.unit_number,
+            a.street_number,
+            a.street_name,
+            a.phase_number,
+            a.subdivision,
+            a.area_number,
+            a.residency_duration,
+            s.status_name AS resident_status
+        FROM residentinformationtbl r
+        LEFT JOIN useraccountstbl u ON u.user_id = r.user_id
+        LEFT JOIN emergencycontacttbl e ON e.user_id = r.user_id
+        LEFT JOIN statuslookuptbl s ON s.status_id = r.status_id_resident
+        LEFT JOIN residentaddresstbl a
+            ON a.address_id = (
+                SELECT a2.address_id
+                FROM residentaddresstbl a2
+                WHERE a2.resident_id = r.resident_id
+                ORDER BY a2.address_id DESC
+                LIMIT 1
+            )
+        WHERE (s.status_name <> 'Archived' OR s.status_name IS NULL)
+          AND (
+            r.resident_id LIKE ?
+            OR r.user_id LIKE ?
+            OR r.firstname LIKE ?
+            OR r.middlename LIKE ?
+            OR r.lastname LIKE ?
+            OR CONCAT_WS(' ', r.firstname, r.middlename, r.lastname, r.suffix) LIKE ?
+            OR u.phone_number LIKE ?
+            OR a.street_number LIKE ?
+            OR a.street_name LIKE ?
+            OR a.subdivision LIKE ?
+            OR a.area_number LIKE ?
+          )
+        ORDER BY r.resident_id DESC
+        LIMIT 12
+    ";
+    $stmt = $conn->prepare($sql);
+    if (!$stmt) {
+        dr_respond_json(500, ['success' => false, 'message' => 'Failed to prepare resident search query.']);
+    }
+    $stmt->bind_param('sssssssssss', $like, $like, $like, $like, $like, $like, $like, $like, $like, $like, $like);
+    $stmt->execute();
+    $result = $stmt->get_result();
+
+    $items = [];
+    while ($row = $result->fetch_assoc()) {
+        $occupationDetail = trim((string)($row['occupation_detail'] ?? ''));
+        $occupation = ((int)($row['occupation'] ?? 0) === 1)
+            ? ($occupationDetail !== '' ? $occupationDetail : 'Employed')
+            : 'Unemployed';
+
+        $addressBits = [];
+        $unitNumber = trim((string)($row['unit_number'] ?? ''));
+        $streetNumber = trim((string)($row['street_number'] ?? ''));
+        $streetName = trim((string)($row['street_name'] ?? ''));
+        $phaseNumber = trim((string)($row['phase_number'] ?? ''));
+        $subdivision = trim((string)($row['subdivision'] ?? ''));
+        $areaNumber = trim((string)($row['area_number'] ?? ''));
+        if ($unitNumber !== '') {
+            $addressBits[] = 'Unit ' . $unitNumber;
+        }
+        $streetLine = trim($streetNumber . ' ' . $streetName);
+        if ($streetLine !== '') {
+            $addressBits[] = $streetLine;
+        }
+        if ($phaseNumber !== '') {
+            $addressBits[] = 'Phase ' . $phaseNumber;
+        }
+        if ($subdivision !== '') {
+            $addressBits[] = $subdivision;
+        }
+        if ($areaNumber !== '') {
+            $addressBits[] = stripos($areaNumber, 'area') === 0 ? $areaNumber : ('Area ' . $areaNumber);
+        }
+        $addressBits[] = 'Barangay San Jose';
+        $addressBits[] = 'Montalban';
+        $addressBits[] = 'Rizal';
+
+        $fullName = trim(implode(' ', array_values(array_filter([
+            (string)($row['firstname'] ?? ''),
+            (string)($row['middlename'] ?? ''),
+            (string)($row['lastname'] ?? ''),
+            (string)($row['suffix'] ?? ''),
+        ], static fn($value) => trim((string)$value) !== ''))));
+
+        $items[] = [
+            'resident_id' => (string)($row['resident_id'] ?? ''),
+            'resident_user_id' => (string)($row['user_id'] ?? ''),
+            'firstname' => (string)($row['firstname'] ?? ''),
+            'middlename' => (string)($row['middlename'] ?? ''),
+            'lastname' => (string)($row['lastname'] ?? ''),
+            'suffix' => (string)($row['suffix'] ?? ''),
+            'full_name' => $fullName,
+            'birthdate' => (string)($row['birthdate'] ?? ''),
+            'birthplace' => (string)($row['birthplace'] ?? ''),
+            'sex' => (string)($row['sex'] ?? ''),
+            'civil_status' => (string)($row['civil_status'] ?? ''),
+            'religion' => (string)($row['religion'] ?? ''),
+            'occupation' => $occupation,
+            'contact_number' => (string)($row['phone_number'] ?? ''),
+            'full_address' => implode(', ', array_values(array_filter($addressBits, static fn($value) => trim((string)$value) !== ''))),
+            'emergency_first_name' => (string)($row['emergency_first_name'] ?? ''),
+            'emergency_middle_name' => (string)($row['emergency_middle_name'] ?? ''),
+            'emergency_last_name' => (string)($row['emergency_last_name'] ?? ''),
+            'emergency_suffix' => (string)($row['emergency_suffix'] ?? ''),
+            'emergency_contact' => (string)($row['emergency_contact'] ?? ''),
+            'emergency_address' => (string)($row['emergency_address'] ?? ''),
+            'id_picture_path' => (string)($row['id_picture_path'] ?? ''),
+            'resident_status' => (string)($row['resident_status'] ?? ''),
+            'residency_duration' => (string)($row['residency_duration'] ?? ''),
+        ];
+    }
+    $stmt->close();
+
+    dr_respond_json(200, ['success' => true, 'items' => $items]);
+}
+
+if ($action === 'create_manual_request') {
+    if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+        dr_respond_json(405, ['success' => false, 'message' => 'Manual issuance creation requires POST.']);
+    }
+
+    $payloadRaw = trim((string)($_POST['payload'] ?? ''));
+    if ($payloadRaw === '') {
+        dr_respond_json(422, ['success' => false, 'message' => 'Manual issuance payload is required.']);
+    }
+    $payload = json_decode($payloadRaw, true);
+    if (!is_array($payload)) {
+        dr_respond_json(422, ['success' => false, 'message' => 'Manual issuance payload must be valid JSON.']);
+    }
+
+    $residentId = trim((string)($_POST['resident_id'] ?? $payload['resident_id'] ?? ''));
+    $residentUserId = trim((string)($_POST['resident_user_id'] ?? $payload['resident_user_id'] ?? $payload['user_id'] ?? ''));
+    $residentProfile = ($residentId !== '' || $residentUserId !== '')
+        ? dra_resident_profile_snapshot($conn, $residentUserId, $residentId)
+        : [];
+    if (($residentId !== '' || $residentUserId !== '') && trim((string)($residentProfile['resident_id'] ?? '')) === '' && trim((string)($residentProfile['resident_user_id'] ?? '')) === '') {
+        dr_respond_json(422, ['success' => false, 'message' => 'Selected resident record could not be resolved.']);
+    }
+
+    $payload = dra_manual_fill_payload_from_resident($payload, $residentProfile);
+
+    $documentType = dr_normalize_document_type(trim((string)($payload['document_type'] ?? $_POST['document_type'] ?? '')));
+    if ($documentType === '') {
+        dr_respond_json(422, ['success' => false, 'message' => 'Document type is required.']);
+    }
+    $payload['document_type'] = $documentType;
+
+    $residentId = dra_manual_first_non_empty([
+        $payload['resident_id'] ?? null,
+        $residentProfile['resident_id'] ?? null,
+    ]);
+    $residentUserId = dra_manual_first_non_empty([
+        $payload['resident_user_id'] ?? null,
+        $payload['user_id'] ?? null,
+        $residentProfile['resident_user_id'] ?? null,
+    ]);
+
+    $fullName = dra_manual_compose_full_name($payload, $residentProfile);
+    if ($fullName === '') {
+        dr_respond_json(422, ['success' => false, 'message' => 'Resident name is required.']);
+    }
+
+    $fullAddress = dra_manual_first_non_empty([
+        $payload['full_address'] ?? null,
+        $payload['full_address_display'] ?? null,
+        $payload['address'] ?? null,
+        $residentProfile['full_address'] ?? null,
+    ]);
+    if ($fullAddress === '') {
+        dr_respond_json(422, ['success' => false, 'message' => 'Residential address is required.']);
+    }
+    $payload['full_address'] = $fullAddress;
+    $payload['full_address_display'] = dra_manual_first_non_empty([
+        $payload['full_address_display'] ?? null,
+        $fullAddress,
+    ]);
+    $payload['address'] = dra_manual_first_non_empty([
+        $payload['address'] ?? null,
+        $fullAddress,
+    ]);
+    $payload['resident_name'] = $fullName;
+
+    $generalPermitPurpose = dra_general_clearance_purpose_from_document_type($documentType);
+    $purpose = dra_manual_first_non_empty([
+        $payload['request_purpose'] ?? null,
+        $payload['purpose'] ?? null,
+        $generalPermitPurpose,
+    ]);
+    if ($purpose !== '') {
+        $payload['request_purpose'] = $purpose;
+        $payload['purpose'] = $purpose;
+    }
+
+    if (dr_is_barangay_id_document_type($documentType)) {
+        $payload['request_purpose'] = 'Barangay ID Application';
+        $payload['purpose'] = 'Barangay ID Application';
+        $requiredBarangayIdFields = [
+            'birthdate' => 'Birthdate is required for Barangay ID.',
+            'birthplace' => 'Birthplace is required for Barangay ID.',
+            'sex' => 'Sex is required for Barangay ID.',
+            'contact_number' => 'Contact number is required for Barangay ID.',
+            'emergency_last' => 'Emergency contact last name is required for Barangay ID.',
+            'emergency_first' => 'Emergency contact first name is required for Barangay ID.',
+            'emergency_contact' => 'Emergency contact number is required for Barangay ID.',
+            'emergency_address' => 'Emergency contact address is required for Barangay ID.',
+        ];
+        foreach ($requiredBarangayIdFields as $field => $message) {
+            if (trim((string)($payload[$field] ?? '')) === '') {
+                dr_respond_json(422, ['success' => false, 'message' => $message]);
+            }
+        }
+    }
+
+    $payload['_submission_channel'] = 'manual_admin_walkin';
+    $payload['_encoded_by_user_id'] = $currentUserId;
+    $payload['_encoded_at'] = dr_now();
+    $payload['_resident_link_mode'] = ($residentId !== '' || $residentUserId !== '') ? 'registered' : 'walk_in';
+
+    $cleanFees = dra_manual_normalize_fee_rows(json_decode((string)($_POST['fees'] ?? '[]'), true));
+    $isFirstTimeJobSeeker = dra_is_first_time_job_seeker(['document_type' => $documentType]);
+    $isClearanceDoc = dr_is_clearance_document_type($documentType);
+
+    $defaultFee = dr_get_fee_amount_for_document_type($conn, $documentType);
+    if ($isFirstTimeJobSeeker) {
+        $defaultFee = 0.0;
+    }
+
+    $clearanceTotal = null;
+    if ($isClearanceDoc) {
+        if (!$cleanFees) {
+            dr_respond_json(422, ['success' => false, 'message' => 'Please tag at least one clearance fee before submitting this manual issuance request.']);
+        }
+        $clearanceTotal = 0.0;
+        foreach ($cleanFees as $feeRow) {
+            $clearanceTotal += (float)$feeRow['amount'];
+        }
+    }
+
+    $now = dr_now();
+    $requestId = dr_generate_request_id($conn);
+    $documentTypeId = dr_get_or_create_document_type_id($conn, $documentType, 'DocumentRequest');
+    $statusCol = dr_request_status_column($conn);
+    $submittedStatusId = dr_find_request_status_id_by_stage($conn, DR_STAGE_SUBMITTED);
+    if ($statusCol !== null && $submittedStatusId === null) {
+        $submittedStatusId = dr_find_status_id($conn, 'PendingVerification', ['DocumentVerification'])
+            ?? dr_find_status_id($conn, 'PendingReview', ['DocumentVerification'])
+            ?? dr_find_status_id($conn, 'PendingVerification')
+            ?? dr_find_status_id($conn, 'PendingReview');
+    }
+
+    $payloadJson = dr_safe_json($payload);
+    $values = [];
+    $types = '';
+    $params = [];
+
+    $setIfColumn = static function (string $column, string $type, $value) use (&$values, &$types, &$params, $conn): void {
+        if (!dr_column_exists($conn, 'documentrequesttbl', $column)) {
+            return;
+        }
+        $values[$column] = $value;
+        $types .= $type;
+        $params[] = $value;
+    };
+
+    $setIfColumn('request_id', 's', $requestId);
+    $setIfColumn('resident_user_id', 's', $residentUserId !== '' ? $residentUserId : null);
+    $setIfColumn('resident_id', 's', $residentId !== '' ? $residentId : null);
+    $setIfColumn('resident_name', 's', $fullName);
+    $setIfColumn('document_type', 's', $documentType);
+    if (dr_column_exists($conn, 'documentrequesttbl', 'document_type_id') && $documentTypeId !== null) {
+        $values['document_type_id'] = (int)$documentTypeId;
+        $types .= 'i';
+        $params[] = (int)$documentTypeId;
+    }
+    $setIfColumn('purpose', 's', $purpose);
+    $setIfColumn('submitted_at', 's', $now);
+    $setIfColumn('created_at', 's', $now);
+    $setIfColumn('updated_at', 's', $now);
+    $setIfColumn('last_name', 's', dra_manual_first_non_empty([$payload['last_name'] ?? null, $payload['lastname'] ?? null, $residentProfile['last_name'] ?? null]));
+    $setIfColumn('first_name', 's', dra_manual_first_non_empty([$payload['first_name'] ?? null, $payload['firstname'] ?? null, $residentProfile['first_name'] ?? null]));
+    $setIfColumn('middle_name', 's', dra_manual_first_non_empty([$payload['middle_name'] ?? null, $payload['middlename'] ?? null, $residentProfile['middle_name'] ?? null]));
+    $setIfColumn('suffix', 's', dra_manual_first_non_empty([$payload['suffix'] ?? null, $payload['suffix_name'] ?? null, $residentProfile['suffix'] ?? null]));
+    $setIfColumn('request_details', 's', $payloadJson);
+    if ($statusCol !== null && $submittedStatusId !== null) {
+        $values[$statusCol] = $submittedStatusId;
+        $types .= 'i';
+        $params[] = $submittedStatusId;
+    }
+    $setIfColumn('request_timestamp', 's', $now);
+    $setIfColumn('review_timestamp', 's', null);
+    $setIfColumn('release_timestamp', 's', null);
+    $setIfColumn('document_validity', 's', date('Y-m-d H:i:s', strtotime('+1 year')));
+    $setIfColumn('qr_code_path', 's', '');
+    $setIfColumn('issued_file_path', 's', null);
+    $setIfColumn('stage', 's', DR_STAGE_SUBMITTED);
+
+    if (!$values) {
+        dr_respond_json(500, ['success' => false, 'message' => 'documentrequesttbl has no compatible columns for manual issuance.']);
+    }
+
+    $columns = array_keys($values);
+    $placeholders = implode(',', array_fill(0, count($columns), '?'));
+    $insertSql = "INSERT INTO documentrequesttbl (" . implode(',', $columns) . ") VALUES (" . $placeholders . ")";
+    $insertStmt = $conn->prepare($insertSql);
+    if (!$insertStmt) {
+        dr_respond_json(500, ['success' => false, 'message' => 'Failed to prepare manual issuance insert.']);
+    }
+
+    $refs = [];
+    foreach ($params as $k => $v) {
+        $refs[$k] = &$params[$k];
+    }
+    array_unshift($refs, $types);
+    call_user_func_array([$insertStmt, 'bind_param'], $refs);
+    if (!$insertStmt->execute()) {
+        $err = $insertStmt->error;
+        $insertStmt->close();
+        dr_respond_json(500, ['success' => false, 'message' => 'Failed to save manual issuance request. ' . $err]);
+    }
+    $insertStmt->close();
+
+    $row = dr_fetch_request($conn, $requestId);
+    if (!$row) {
+        dr_respond_json(500, ['success' => false, 'message' => 'Manual issuance request was saved but could not be reloaded.']);
+    }
+
+    if ($isClearanceDoc) {
+        dr_ensure_clearance_row_for_request($conn, $row);
+        $clearanceId = dr_get_clearance_id_for_request($conn, $requestId);
+        if (!$clearanceId) {
+            dr_respond_json(500, ['success' => false, 'message' => 'Unable to create the linked clearance fee record for this manual issuance request.']);
+        }
+
+        $deleteFeesStmt = $conn->prepare("DELETE FROM clearancefeestbl WHERE clearance_id=?");
+        if ($deleteFeesStmt) {
+            $deleteFeesStmt->bind_param('i', $clearanceId);
+            $deleteFeesStmt->execute();
+            $deleteFeesStmt->close();
+        }
+
+        $insertFeeStmt = $conn->prepare("INSERT INTO clearancefeestbl (clearance_id, fee_type, amount) VALUES (?, ?, ?)");
+        if ($insertFeeStmt) {
+            foreach ($cleanFees as $feeRow) {
+                $feeName = (string)$feeRow['fee_name'];
+                $feeAmount = (float)$feeRow['amount'];
+                $insertFeeStmt->bind_param('isd', $clearanceId, $feeName, $feeAmount);
+                $insertFeeStmt->execute();
+            }
+            $insertFeeStmt->close();
+        }
+    }
+
+    $resolvedFeeAmount = $clearanceTotal;
+    if ($resolvedFeeAmount === null && $defaultFee !== null) {
+        $resolvedFeeAmount = (float)$defaultFee;
+    }
+
+    $initialStage = DR_STAGE_FOR_PAYMENT;
+    if ($isFirstTimeJobSeeker) {
+        $initialStage = DR_STAGE_FOR_INTERVIEW;
+    } elseif ($resolvedFeeAmount !== null && $resolvedFeeAmount <= 0.0) {
+        $initialStage = DR_STAGE_READY_FOR_CLAIM;
+    }
+
+    $patch = [
+        'status_reason' => null,
+        'personnel_user_id' => $currentUserId,
+        'personnel_decision_at' => $now,
+    ];
+
+    $requiresManualIssuedUpload = dra_requires_manual_issued_upload($row);
+    if ($initialStage === DR_STAGE_READY_FOR_CLAIM && !$isFirstTimeJobSeeker) {
+        $verificationCode = trim((string)($row['verification_code'] ?? ''));
+        if ($verificationCode === '') {
+            $verificationCode = strtoupper(bin2hex(random_bytes(8)));
+        }
+        $patch['verification_code'] = $verificationCode;
+        $patch['qr_code_path'] = '/UnifiedFileAttachment/IssuedDocuments/QR/qr_' . preg_replace('/[^A-Za-z0-9_-]/', '', $requestId) . '.png';
+        $patch['ready_at'] = $now;
+    }
+
+    $updated = dr_update_stage($conn, $requestId, $initialStage, $patch);
+    if (!$updated) {
+        dr_respond_json(500, ['success' => false, 'message' => 'Manual issuance request was saved but could not be moved to the next stage.']);
+    }
+
+    if ($resolvedFeeAmount !== null) {
+        dr_sync_transaction($conn, array_merge($updated, [
+            'fee_amount' => $resolvedFeeAmount,
+        ]));
+        $updated = dr_fetch_request($conn, $requestId) ?? $updated;
+    }
+
+    if ($initialStage === DR_STAGE_READY_FOR_CLAIM && !$requiresManualIssuedUpload && !$isFirstTimeJobSeeker) {
+        $issuedPath = dra_generate_issued_document_safe($updated);
+        if (is_string($issuedPath) && trim($issuedPath) !== '') {
+            $updated = dr_update_stage($conn, $requestId, DR_STAGE_READY_FOR_CLAIM, [
+                'issued_file_path' => trim($issuedPath),
+            ]) ?? $updated;
+        }
+    }
+
+    $channelLabel = ($residentId !== '' || $residentUserId !== '') ? 'registered resident' : 'walk-in resident';
+    $auditNotes = $channelLabel . ' | ' . $documentType . ' | next stage: ' . $initialStage;
+    try {
+        insertUnifiedAuditLog(
+            $conn,
+            $currentUserId,
+            $currentUserRole,
+            'Document Requests',
+            'document_request',
+            $requestId,
+            'Create Manual Issuance Request',
+            'stage',
+            null,
+            $initialStage,
+            $auditNotes
+        );
+    } catch (Throwable $__e) {}
+
+    dr_respond_json(200, [
+        'success' => true,
+        'message' => 'Manual issuance request created successfully.',
+        'request_id' => $requestId,
+        'request' => $updated,
+        'stage' => $initialStage,
+        'stage_label' => dr_stage_label($initialStage),
+    ]);
 }
 
 if ($action !== 'list') {
@@ -4811,9 +6176,11 @@ if ($action === 'get_request') {
     $payload = json_decode((string)($row['request_details'] ?? $row['payload_json'] ?? '{}'), true);
     $row['payload'] = is_array($payload) ? $payload : [];
 
-    // Keep request modal fast. Full resident profile is loaded on demand by the
-    // dedicated resident profile viewer instead of every modal open.
-    $row['resident_profile'] = [];
+    $residentUserId = trim((string)($row['resident_user_id'] ?? ''));
+    $residentId = trim((string)($row['resident_id'] ?? ''));
+    $row['resident_profile'] = ($residentUserId !== '' || $residentId !== '')
+        ? dra_resident_profile_snapshot($conn, $residentUserId, $residentId)
+        : [];
     $row['stage_label'] = dr_stage_label((string)($row['stage'] ?? ''));
     $storedFeeAmount = $row['fee_amount'] ?? null;
     if ($storedFeeAmount !== null && is_numeric((string)$storedFeeAmount)) {
@@ -4997,7 +6364,15 @@ if ($action === 'view_issued') {
         'fortricyclepermit',
     ], true);
     $isGeneralPermitClearance = (dra_general_clearance_purpose_from_document_type((string)($row['document_type'] ?? '')) !== '');
-    $isTemplateBasedCertificate = $isIndigency || $isGoodMoral || $isResidency || $isCohabitation || $isFirstTimeJobSeeker || $isBusinessPermitClearance || $isGeneralPermitClearance || $isTricyclePermitClearance;
+    $isTemplateBasedCertificate = $isIndigency
+        || $isGoodMoral
+        || $isResidency
+        || $isCohabitation
+        || $isFirstTimeJobSeeker
+        || $isBusinessPermitClearance
+        || $isGeneralPermitClearance
+        || $isTricyclePermitClearance
+        || (dr_is_barangay_id_document_type((string)($row['document_type'] ?? '')) && dra_has_barangay_id_template_assets());
     $ext = strtolower(pathinfo($publicPath, PATHINFO_EXTENSION));
     $verificationCode = trim((string)($row['verification_code'] ?? ''));
     $qrPublicPath = '/UnifiedFileAttachment/IssuedDocuments/QR/qr_' . preg_replace('/[^A-Za-z0-9_-]/', '', $requestId) . '.png';
@@ -5008,7 +6383,7 @@ if ($action === 'view_issued') {
         ? [DR_STAGE_READY_FOR_CLAIM, DR_STAGE_COMPLETED]
         : [DR_STAGE_PAYMENT_VERIFIED, DR_STAGE_READY_FOR_CLAIM, DR_STAGE_COMPLETED];
     $shouldHaveQr = ($verificationCode !== '' && in_array($stage, $qrEligibleStages, true));
-    $renderRevisionTag = 'r20260318s';
+    $renderRevisionTag = 'r20260318ac';
     $issuedBaseName = strtolower(basename((string)$publicPath));
     $isGeneratedIssuedPath = strpos((string)$publicPath, '/UnifiedFileAttachment/IssuedDocuments/Generated/') === 0;
     $isCurrentRenderRevision = ($issuedBaseName !== '' && strpos($issuedBaseName, strtolower($renderRevisionTag)) !== false);

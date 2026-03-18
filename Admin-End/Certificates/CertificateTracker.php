@@ -1001,11 +1001,15 @@ require_once __DIR__ . '/../includes/admin_guard.php';
       line-height: 1.2;
     }
     #viewModal .doc-preview-paper.doc-preview-paper--tricycle .doc-preview-issued-line {
-      width: 84%;
-      margin: 22px auto 0;
-      text-align: center;
-      line-height: 1.32;
-      text-indent: 0;
+      display: block;
+      width: calc(100% - 108px);
+      margin: 22px 0 0 54px;
+      font-size: 12pt;
+      text-align: justify;
+      text-justify: inter-word;
+      text-align-last: left;
+      line-height: 1.4;
+      text-indent: 48px;
     }
     #viewModal .doc-preview-paper.doc-preview-paper--tricycle .doc-preview-tricycle-meta {
       width: 330px;
@@ -1021,14 +1025,14 @@ require_once __DIR__ . '/../includes/admin_guard.php';
       margin: 0 0 2px;
     }
     #viewModal .doc-preview-paper.doc-preview-paper--tricycle .doc-preview-tricycle-meta-line {
-      display: flex;
+      display: inline-flex;
       align-items: flex-end;
-      width: 100%;
       min-height: 1.35em;
       padding: 0 4px 2px;
       box-sizing: border-box;
       border-bottom: 1px solid #111827;
       overflow: hidden;
+      max-width: 100%;
     }
     #viewModal .doc-preview-paper.doc-preview-paper--tricycle .doc-preview-tricycle-meta-line-text {
       display: block;
@@ -1199,11 +1203,15 @@ require_once __DIR__ . '/../includes/admin_guard.php';
       white-space: nowrap;
     }
     #viewModal .doc-preview-paper.doc-preview-paper--generalclearance .doc-preview-issued-line {
-      width: 82%;
-      margin: 14px auto 0;
-      text-align: center;
-      line-height: 1.42;
-      text-indent: 0;
+      display: block;
+      width: calc(100% - 108px);
+      margin: 14px 0 0 54px;
+      font-size: 12pt;
+      text-align: justify;
+      text-justify: inter-word;
+      text-align-last: left;
+      line-height: 1.4;
+      text-indent: 48px;
     }
     #viewModal .doc-preview-paper.doc-preview-paper--generalclearance .doc-preview-generalclearance-meta {
       width: 340px;
@@ -1656,6 +1664,239 @@ require_once __DIR__ . '/../includes/admin_guard.php';
       font-weight: 600;
       word-break: break-word;
     }
+    .manual-issuance-header {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 16px;
+      flex-wrap: wrap;
+    }
+    .manual-issuance-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 14px;
+      border-radius: 999px;
+      background: #fff3e6;
+      border: 1px solid #fed7aa;
+      color: #9a3412;
+      font-size: .85rem;
+      font-weight: 700;
+      white-space: nowrap;
+    }
+    .manual-issuance-steps {
+      display: grid;
+      grid-template-columns: repeat(5, minmax(0, 1fr));
+      gap: 12px;
+    }
+    .manual-step {
+      border: 1px solid #e5e7eb;
+      border-radius: 18px;
+      background: linear-gradient(180deg, #ffffff 0%, #fff7ed 100%);
+      padding: 14px 16px;
+      min-height: 130px;
+    }
+    .manual-step-index {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 28px;
+      height: 28px;
+      border-radius: 999px;
+      background: #ea580c;
+      color: #fff;
+      font-size: .85rem;
+      font-weight: 700;
+      margin-bottom: 10px;
+    }
+    .manual-step-title {
+      font-size: .95rem;
+      font-weight: 700;
+      color: #111827;
+      margin-bottom: 6px;
+    }
+    .manual-step-copy {
+      font-size: .82rem;
+      color: #6b7280;
+      line-height: 1.45;
+      margin: 0;
+    }
+    .manual-issuance-card {
+      border: 1px solid #e5e7eb;
+      border-radius: 22px;
+      background: #fff;
+      padding: 18px 20px;
+      box-shadow: 0 12px 28px rgba(15, 23, 42, 0.04);
+    }
+    .manual-issuance-card + .manual-issuance-card {
+      margin-top: 16px;
+    }
+    .manual-issuance-card-title {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      flex-wrap: wrap;
+      margin-bottom: 14px;
+    }
+    .manual-issuance-card-title h6 {
+      margin: 0;
+      font-weight: 700;
+      color: #111827;
+    }
+    .manual-issuance-card-title span {
+      color: #6b7280;
+      font-size: .82rem;
+    }
+    .manual-issuance-mode-switch {
+      display: inline-flex;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+    .manual-issuance-mode-switch .form-check {
+      margin: 0;
+      padding: 0;
+    }
+    .manual-issuance-mode-switch .form-check-input {
+      display: none;
+    }
+    .manual-issuance-mode-switch .form-check-label {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 10px 14px;
+      border: 1px solid #d1d5db;
+      border-radius: 999px;
+      background: #fff;
+      color: #374151;
+      font-weight: 600;
+      cursor: pointer;
+      transition: .18s ease;
+    }
+    .manual-issuance-mode-switch .form-check-input:checked + .form-check-label {
+      background: #fff3e6;
+      border-color: #fb923c;
+      color: #9a3412;
+      box-shadow: 0 0 0 3px rgba(251, 146, 60, 0.12);
+    }
+    .manual-resident-results {
+      display: grid;
+      gap: 10px;
+    }
+    .manual-resident-result {
+      border: 1px solid #e5e7eb;
+      border-radius: 16px;
+      padding: 14px 16px;
+      background: #f8fafc;
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 14px;
+      flex-wrap: wrap;
+    }
+    .manual-resident-result-name {
+      font-size: .96rem;
+      font-weight: 700;
+      color: #111827;
+      margin-bottom: 4px;
+    }
+    .manual-resident-result-meta {
+      margin: 0;
+      color: #6b7280;
+      font-size: .84rem;
+      line-height: 1.45;
+    }
+    .manual-selected-resident {
+      border: 1px solid #fed7aa;
+      border-radius: 18px;
+      padding: 14px 16px;
+      background: #fff7ed;
+    }
+    .manual-selected-resident strong {
+      display: block;
+      color: #9a3412;
+      margin-bottom: 4px;
+    }
+    .manual-selected-resident p {
+      margin: 0;
+      color: #7c2d12;
+      font-size: .86rem;
+      line-height: 1.45;
+    }
+    .manual-selected-resident .btn {
+      margin-top: 10px;
+    }
+    .manual-issuance-summary {
+      display: grid;
+      gap: 12px;
+    }
+    .manual-summary-item {
+      border: 1px solid #e5e7eb;
+      border-radius: 16px;
+      background: #f8fafc;
+      padding: 14px 16px;
+    }
+    .manual-summary-item-label {
+      margin: 0 0 6px;
+      color: #6b7280;
+      font-size: .78rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: .04em;
+    }
+    .manual-summary-item-value {
+      margin: 0;
+      color: #111827;
+      font-size: .96rem;
+      font-weight: 700;
+      line-height: 1.4;
+    }
+    .manual-summary-note {
+      margin: 0;
+      padding: 12px 14px;
+      border-radius: 16px;
+      background: #eff6ff;
+      border: 1px solid #bfdbfe;
+      color: #1d4ed8;
+      font-size: .86rem;
+      line-height: 1.5;
+    }
+    .manual-fee-list {
+      display: grid;
+      gap: 12px;
+    }
+    .manual-fee-item {
+      border: 1px solid #e5e7eb;
+      border-radius: 16px;
+      padding: 14px 16px;
+      background: #f8fafc;
+    }
+    .manual-fee-item label {
+      font-weight: 600;
+      color: #111827;
+    }
+    .manual-fee-total {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      margin-top: 14px;
+      padding-top: 14px;
+      border-top: 1px dashed #d1d5db;
+      font-weight: 700;
+      color: #111827;
+    }
+    .manual-fee-total strong {
+      color: #0f766e;
+    }
+    .manual-search-empty {
+      border: 1px dashed #d1d5db;
+      border-radius: 16px;
+      padding: 14px 16px;
+      color: #6b7280;
+      font-size: .88rem;
+      background: #f8fafc;
+    }
 
     #residentProfileModal #div-modalSizing {
       max-width: 1200px;
@@ -1675,6 +1916,12 @@ require_once __DIR__ . '/../includes/admin_guard.php';
       .certificate-tracker-shell .tracker-doc-filter {
         min-width: 100%;
         max-width: 100%;
+      }
+      .manual-issuance-steps {
+        grid-template-columns: 1fr;
+      }
+      .manual-resident-result {
+        flex-direction: column;
       }
       #viewModal .tracker-profile-grid {
         grid-template-columns: 1fr;
@@ -1717,6 +1964,11 @@ require_once __DIR__ . '/../includes/admin_guard.php';
       <li class="nav-item">
         <button class="nav-link active fw-semibold" id="tabDocRequests" type="button">
           <i class="fas fa-file-alt me-1"></i>Document Requests
+        </button>
+      </li>
+      <li class="nav-item">
+        <button class="nav-link fw-semibold" id="tabManualIssuance" type="button">
+          <i class="fas fa-pen-to-square me-1"></i>Manual Issuance
         </button>
       </li>
       <li class="nav-item">
@@ -1776,6 +2028,253 @@ require_once __DIR__ . '/../includes/admin_guard.php';
             </tr>
           </tbody>
         </table>
+      </div>
+    </div>
+
+    <div id="manualIssuancePanel" class="d-none bg-white p-4 rounded-4 rounded-tl-0 shadow-sm border certificate-tracker-shell">
+      <div class="manual-issuance-header mb-4">
+        <div>
+          <h5 class="fw-bold mb-1">Manual / Walk-in Document Issuance</h5>
+          <p class="text-muted mb-0">
+            Encode handwritten applications here, preview the final document before submission, then send the request into the existing finance and release workflow. QR verification still applies to issued files.
+          </p>
+        </div>
+        <div class="manual-issuance-badge">
+          <i class="fas fa-shield-halved"></i>
+          Admin-only issuance flow
+        </div>
+      </div>
+
+      <div class="manual-issuance-steps mb-4">
+        <div class="manual-step">
+          <div class="manual-step-index">1</div>
+          <div class="manual-step-title">Receive Form</div>
+          <p class="manual-step-copy">Use the resident’s handwritten submission as the source document for this encoding flow.</p>
+        </div>
+        <div class="manual-step">
+          <div class="manual-step-index">2</div>
+          <div class="manual-step-title">Encode Details</div>
+          <p class="manual-step-copy">Select a registered resident or encode a walk-in resident, then complete the matching certificate or clearance form.</p>
+        </div>
+        <div class="manual-step">
+          <div class="manual-step-index">3</div>
+          <div class="manual-step-title">Preview</div>
+          <p class="manual-step-copy">Open the rendered document preview first so the encoded details match the physical form before submission.</p>
+        </div>
+        <div class="manual-step">
+          <div class="manual-step-index">4</div>
+          <div class="manual-step-title">Finance Payment</div>
+          <p class="manual-step-copy">Paid requests continue to finance for walk-in payment recording using the same request pipeline.</p>
+        </div>
+        <div class="manual-step">
+          <div class="manual-step-index">5</div>
+          <div class="manual-step-title">Release by Print</div>
+          <p class="manual-step-copy">After payment or interview handling, admin releases the final document through print while keeping QR verification active.</p>
+        </div>
+      </div>
+
+      <div class="row g-4">
+        <div class="col-xl-8">
+          <form id="manualIssuanceForm" novalidate>
+            <input type="hidden" id="manualResidentId" name="resident_id">
+            <input type="hidden" id="manualResidentUserId" name="resident_user_id">
+
+            <div class="manual-issuance-card">
+              <div class="manual-issuance-card-title">
+                <h6>Resident Source</h6>
+                <span>Registered residents can be auto-filled, but every field stays editable for this encoded request.</span>
+              </div>
+              <div class="manual-issuance-mode-switch mb-3">
+                <div class="form-check">
+                  <input class="form-check-input" type="radio" name="manualResidentMode" id="manualResidentModeExisting" value="existing" checked>
+                  <label class="form-check-label" for="manualResidentModeExisting">
+                    <i class="fas fa-user-check"></i>Registered Resident
+                  </label>
+                </div>
+                <div class="form-check">
+                  <input class="form-check-input" type="radio" name="manualResidentMode" id="manualResidentModeWalkin" value="walkin">
+                  <label class="form-check-label" for="manualResidentModeWalkin">
+                    <i class="fas fa-user-pen"></i>Walk-in / Not Registered
+                  </label>
+                </div>
+              </div>
+
+              <div id="manualResidentLookupWrap">
+                <div class="row g-3 align-items-end">
+                  <div class="col-lg-8">
+                    <label class="form-label fw-semibold small">Search Registered Resident</label>
+                    <div class="input-group">
+                      <input type="text" id="manualResidentSearchInput" class="form-control" placeholder="Resident ID, user ID, or resident name">
+                      <button type="button" class="btn btn-outline-secondary" id="manualResidentSearchBtn">
+                        <i class="fas fa-search me-1"></i>Search
+                      </button>
+                    </div>
+                  </div>
+                  <div class="col-lg-4">
+                    <div class="manual-search-empty h-100 d-flex align-items-center" id="manualResidentSearchHint">
+                      Search a registered resident to auto-fill the form, or switch to walk-in mode to encode an unregistered resident.
+                    </div>
+                  </div>
+                </div>
+                <div class="mt-3 d-none" id="manualResidentResultsWrap">
+                  <div class="manual-issuance-card-title mb-2">
+                    <h6>Search Results</h6>
+                    <span>Choose the resident record that matches the handwritten form.</span>
+                  </div>
+                  <div id="manualResidentResults" class="manual-resident-results"></div>
+                </div>
+              </div>
+
+              <div id="manualSelectedResident" class="manual-selected-resident d-none mt-3">
+                <strong id="manualSelectedResidentName">No resident linked yet</strong>
+                <p id="manualSelectedResidentMeta">Linked registered resident details will auto-fill this form and can still be edited before submission.</p>
+                <button type="button" class="btn btn-sm btn-outline-secondary" id="manualClearSelectedResidentBtn">
+                  <i class="fas fa-unlink me-1"></i>Unlink Resident
+                </button>
+              </div>
+            </div>
+
+            <div class="manual-issuance-card">
+              <div class="manual-issuance-card-title">
+                <h6>Document Setup</h6>
+                <span>Choose the form first. The matching fields and next step summary will update automatically.</span>
+              </div>
+              <div class="row g-3">
+                <div class="col-lg-7">
+                  <label for="manualDocumentType" class="form-label fw-semibold small">Certificate / Clearance Type <span class="text-danger">*</span></label>
+                  <select id="manualDocumentType" class="form-select" required>
+                    <option value="">Select a manual issuance form</option>
+                  </select>
+                </div>
+                <div class="col-lg-5">
+                  <label for="manualPurpose" class="form-label fw-semibold small">Purpose / Request For</label>
+                  <input type="text" id="manualPurpose" class="form-control" placeholder="Purpose from the handwritten form">
+                </div>
+              </div>
+            </div>
+
+            <div class="manual-issuance-card">
+              <div class="manual-issuance-card-title">
+                <h6>Personal Basic Information</h6>
+                <span>These fields will be saved with the request and used in the generated document preview.</span>
+              </div>
+              <div class="row g-3">
+                <div class="col-md-6 col-lg-3">
+                  <label for="manualLastName" class="form-label fw-semibold small">Last Name <span class="text-danger">*</span></label>
+                  <input type="text" id="manualLastName" class="form-control" required>
+                </div>
+                <div class="col-md-6 col-lg-3">
+                  <label for="manualFirstName" class="form-label fw-semibold small">First Name <span class="text-danger">*</span></label>
+                  <input type="text" id="manualFirstName" class="form-control" required>
+                </div>
+                <div class="col-md-6 col-lg-3">
+                  <label for="manualMiddleName" class="form-label fw-semibold small">Middle Name</label>
+                  <input type="text" id="manualMiddleName" class="form-control">
+                </div>
+                <div class="col-md-6 col-lg-3">
+                  <label for="manualSuffix" class="form-label fw-semibold small">Suffix</label>
+                  <input type="text" id="manualSuffix" class="form-control" placeholder="Jr., Sr., III">
+                </div>
+                <div class="col-md-6 col-lg-3">
+                  <label for="manualBirthdate" class="form-label fw-semibold small">Birthdate</label>
+                  <input type="date" id="manualBirthdate" class="form-control">
+                </div>
+                <div class="col-md-6 col-lg-3">
+                  <label for="manualSex" class="form-label fw-semibold small">Sex</label>
+                  <select id="manualSex" class="form-select">
+                    <option value="">Select sex</option>
+                    <option value="Male">Male</option>
+                    <option value="Female">Female</option>
+                  </select>
+                </div>
+                <div class="col-md-6 col-lg-3">
+                  <label for="manualCivilStatus" class="form-label fw-semibold small">Civil Status</label>
+                  <input type="text" id="manualCivilStatus" class="form-control" placeholder="Single, Married, etc.">
+                </div>
+                <div class="col-md-6 col-lg-3">
+                  <label for="manualContactNumber" class="form-label fw-semibold small">Contact Number</label>
+                  <input type="text" id="manualContactNumber" class="form-control" placeholder="09XXXXXXXXX">
+                </div>
+                <div class="col-md-6">
+                  <label for="manualBirthplace" class="form-label fw-semibold small">Birthplace</label>
+                  <input type="text" id="manualBirthplace" class="form-control" placeholder="Place of birth">
+                </div>
+                <div class="col-md-3">
+                  <label for="manualOccupation" class="form-label fw-semibold small">Occupation</label>
+                  <input type="text" id="manualOccupation" class="form-control" placeholder="Occupation">
+                </div>
+                <div class="col-md-3">
+                  <label for="manualReligion" class="form-label fw-semibold small">Religion</label>
+                  <input type="text" id="manualReligion" class="form-control" placeholder="Religion">
+                </div>
+                <div class="col-12">
+                  <label for="manualFullAddress" class="form-label fw-semibold small">Residential Address <span class="text-danger">*</span></label>
+                  <textarea id="manualFullAddress" class="form-control" rows="2" required placeholder="House / street / phase / subdivision / area"></textarea>
+                </div>
+              </div>
+            </div>
+
+            <div class="manual-issuance-card">
+              <div class="manual-issuance-card-title">
+                <h6>Document Specific Details</h6>
+                <span id="manualSpecificFieldsHint">Select a certificate or clearance type to load its manual encoding fields.</span>
+              </div>
+              <div id="manualDynamicFields" class="row g-3"></div>
+            </div>
+
+            <div class="manual-issuance-card d-none" id="manualFeeWrap">
+              <div class="manual-issuance-card-title">
+                <h6>Tagged Clearance Fees</h6>
+                <span>These tagged fees will be carried into the finance step for walk-in payment recording.</span>
+              </div>
+              <div id="manualFeeList" class="manual-fee-list"></div>
+              <div class="manual-fee-total">
+                <span>Total Tagged Amount</span>
+                <strong id="manualFeeTotal">PHP 0.00</strong>
+              </div>
+            </div>
+
+            <div id="manualFormAlert" class="alert alert-warning d-none"></div>
+
+            <div class="d-flex flex-wrap justify-content-end gap-2 mt-4">
+              <button type="button" class="btn btn-outline-secondary" id="manualResetBtn">
+                <i class="fas fa-rotate-left me-1"></i>Reset Form
+              </button>
+              <button type="button" class="btn btn-outline-primary" id="manualPreviewBtn">
+                <i class="fas fa-eye me-1"></i>Preview Document
+              </button>
+              <button type="submit" class="btn btn-primary" id="manualSubmitBtn" disabled>
+                <i class="fas fa-paper-plane me-1"></i>Submit Manual Issuance
+              </button>
+            </div>
+          </form>
+        </div>
+
+        <div class="col-xl-4">
+          <div class="manual-issuance-card sticky-xl-top" style="top: 1rem;">
+            <div class="manual-issuance-card-title">
+              <h6>Submission Summary</h6>
+              <span>Use this as a quick check before you preview and submit.</span>
+            </div>
+            <div class="manual-issuance-summary mb-3">
+              <div class="manual-summary-item">
+                <p class="manual-summary-item-label">Resident Link</p>
+                <p class="manual-summary-item-value" id="manualResidentSummary">Walk-in / not linked yet</p>
+              </div>
+              <div class="manual-summary-item">
+                <p class="manual-summary-item-label">Document Type</p>
+                <p class="manual-summary-item-value" id="manualDocumentSummary">Select a manual issuance form</p>
+              </div>
+              <div class="manual-summary-item">
+                <p class="manual-summary-item-label">Next Step After Submit</p>
+                <p class="manual-summary-item-value" id="manualNextStageSummary">Preview the document first to unlock submission.</p>
+              </div>
+            </div>
+            <p class="manual-summary-note">
+              Registered residents stay linked to their masterlist record, while walk-in residents can still be encoded and issued here without an online account. Paid requests continue to finance, and issued files still carry the QR verification flow used by the existing generator.
+            </p>
+          </div>
+        </div>
       </div>
     </div>
 
@@ -2075,9 +2574,10 @@ require_once __DIR__ . '/../includes/admin_guard.php';
         <div id="paymentProofWrap" class="w-100 text-center"></div>
       </div>
       <div class="modal-footer">
-        <button type="button" id="paymentProofReturnBtn" class="btn btn-secondary d-none">Return</button>
+        <button type="button" id="paymentProofReturnBtn" class="btn btn-secondary me-auto d-none">Return</button>
         <button type="button" id="paymentProofPrintBtn" class="btn btn-outline-dark d-none">Print</button>
         <a id="paymentProofOpenNew" class="btn btn-outline-primary" target="_blank" rel="noopener">Open in New Tab</a>
+        <button type="button" id="paymentProofReleaseBtn" class="btn btn-success d-none">Release</button>
         <button type="button" id="paymentProofCloseBtn" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
       </div>
     </div>

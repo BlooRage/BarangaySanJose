@@ -1133,7 +1133,7 @@ function dr_sync_transaction(mysqli $conn, array $request): void {
     dr_sync_stage_from_status_lookup($conn, $request);
     $requestId = (string)($request['request_id'] ?? '');
     $accountUserId = (string)($request['resident_user_id'] ?? '');
-    if ($requestId === '' || $accountUserId === '') {
+    if ($requestId === '') {
         return;
     }
 
@@ -1161,22 +1161,24 @@ function dr_sync_transaction(mysqli $conn, array $request): void {
     ];
 
     $statusId = dr_map_stage_to_transaction_status_id($conn, $stage);
-    upsertResidentTransaction(
-        $conn,
-        $accountUserId,
-        $accountUserId,
-        'DOCUMENT_REQUEST',
-        $requestId,
-        'DOCUMENT_REQUEST',
-        $docType,
-        $statusId,
-        $description,
-        $metadata,
-        null,
-        null,
-        null,
-        null
-    );
+    if ($accountUserId !== '') {
+        upsertResidentTransaction(
+            $conn,
+            $accountUserId,
+            $accountUserId,
+            'DOCUMENT_REQUEST',
+            $requestId,
+            'DOCUMENT_REQUEST',
+            $docType,
+            $statusId,
+            $description,
+            $metadata,
+            null,
+            null,
+            null,
+            null
+        );
+    }
 
     dr_ensure_request_child_tables($conn);
     if (!dr_table_exists($conn, 'financetransactiontbl')) {
@@ -2194,12 +2196,16 @@ function dr_upsert_barangay_id_request(mysqli $conn, string $requestId, string $
         return;
     }
 
+    $duplicateUpdates = ['id_details = VALUES(id_details)'];
+    if (dr_column_exists($conn, 'barangayidrequesttbl', 'updated_at')) {
+        $duplicateUpdates[] = 'updated_at = CURRENT_TIMESTAMP';
+    }
+
     $sql = "
         INSERT INTO barangayidrequesttbl (request_id, id_details)
         VALUES (?, ?)
         ON DUPLICATE KEY UPDATE
-            id_details = VALUES(id_details),
-            updated_at = CURRENT_TIMESTAMP
+            " . implode(",\n            ", $duplicateUpdates) . "
     ";
     $stmt = $conn->prepare($sql);
     if (!$stmt) {
