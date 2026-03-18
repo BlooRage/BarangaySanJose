@@ -439,6 +439,9 @@ function ann_decode_faq_items(?string $json): array
   <link rel="stylesheet" href="../../CSS-Styles/Admin-End-CSS/EditRequestsStyle.css?v=20260227-5">
   <style>
     .announcement-shell .table-responsive {
+      display: block;
+      width: 100%;
+      max-width: 100%;
       overflow-x: auto;
       overflow-y: visible;
       -webkit-overflow-scrolling: touch;
@@ -469,6 +472,13 @@ function ann_decode_faq_items(?string $json): array
     .announcement-shell #table-reviewQueueData th,
     .announcement-shell #table-reviewQueueData td {
       white-space: nowrap;
+    }
+
+    #review-queue-card,
+    #tracker-card {
+      width: 100%;
+      max-width: 100%;
+      overflow: hidden;
     }
   </style>
 </head>
