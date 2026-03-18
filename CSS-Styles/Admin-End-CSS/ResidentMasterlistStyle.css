@@ -852,13 +852,13 @@ h2.section-title {
 
 .resident-masterlist-shell #table-appData th:first-child,
 .resident-masterlist-shell #table-appData td:first-child {
-    width: 12%;
+    width: 15%;
     white-space: nowrap;
 }
 
 .resident-masterlist-shell #table-appData th:nth-child(2),
 .resident-masterlist-shell #table-appData td:nth-child(2) {
-    width: 24%;
+    width: 23%;
     white-space: normal;
 }
 
@@ -868,18 +868,18 @@ h2.section-title {
 .resident-masterlist-shell #table-appData td:nth-child(4),
 .resident-masterlist-shell #table-appData th:nth-child(5),
 .resident-masterlist-shell #table-appData td:nth-child(5) {
-    width: 7%;
+    width: 8%;
     white-space: nowrap;
 }
 
 .resident-masterlist-shell #table-appData th:nth-child(6),
 .resident-masterlist-shell #table-appData td:nth-child(6) {
-    width: 16%;
+    width: 18%;
 }
 
 .resident-masterlist-shell #table-appData th:nth-child(7),
 .resident-masterlist-shell #table-appData td:nth-child(7) {
-    width: 13%;
+    width: 20%;
     white-space: nowrap;
 }
 

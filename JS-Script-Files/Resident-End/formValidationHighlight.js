@@ -4,6 +4,7 @@
     if (!form) return;
 
     const touchedFields = new WeakSet();
+    let submitAttempted = false;
 
     const isTrackableField = (field) => {
       if (!field || field.disabled) return false;
@@ -28,7 +29,7 @@
       const hasValue = field.type === "checkbox" || field.type === "radio"
         ? field.checked
         : String(field.value || "").trim() !== "";
-      const shouldRender = touchedFields.has(field) || (!field.validity.valid && hasValue);
+      const shouldRender = touchedFields.has(field) || submitAttempted;
 
       if (!shouldRender) {
         field.classList.remove("is-invalid");
@@ -61,7 +62,7 @@
       "invalid",
       (event) => {
         const field = event.target;
-        if (!isTrackableField(field)) return;
+        if (!isTrackableField(field) || !submitAttempted) return;
         touchedFields.add(field);
         applyFieldState(field);
       },
@@ -69,6 +70,7 @@
     );
 
     form.addEventListener("submit", () => {
+      submitAttempted = true;
       form.querySelectorAll("input, select, textarea").forEach((field) => {
         if (!isTrackableField(field) || field.validity.valid || !isVisibleField(field)) return;
         touchedFields.add(field);
