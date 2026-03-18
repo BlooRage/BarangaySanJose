@@ -1,7 +1,11 @@
 <?php
-// ===== CONFIG =====
-$SEMAPHORE_API_KEY = 'ee267d0fbd5c2159bea7d72878c9d4cb';
-$SEMAPHORE_SENDER  = 'BrgySanJose';
+declare(strict_types=1);
+
+require_once __DIR__ . '/runtimeConfig.php';
+
+$SEMAPHORE_API_KEY = trim((string)runtime_env('SMS_SEMAPHORE_API_KEY', runtime_env('SMS_API_KEY', runtime_config('sms.semaphore_api_key', ''))));
+$SEMAPHORE_SENDER = trim((string)runtime_env('SMS_SENDER', runtime_config('sms.sender', 'BrgySanJose')));
+$SEMAPHORE_ENDPOINT = trim((string)runtime_env('SMS_ENDPOINT', runtime_config('sms.endpoint', 'https://semaphore.co/api/v4/messages')));
 
 /**
  * Send SMS (OTP)
@@ -10,38 +14,40 @@ $SEMAPHORE_SENDER  = 'BrgySanJose';
  * @param string|null $otpCode OTP code
  * @return bool true if sent, false if failed
  */
-function sendSMS(string $recipient, string $message, string $otpCode = null): bool {
-    global $SEMAPHORE_API_KEY, $SEMAPHORE_SENDER;
+function sendSMS(string $recipient, string $message, string $otpCode = null): bool
+{
+    global $SEMAPHORE_API_KEY, $SEMAPHORE_SENDER, $SEMAPHORE_ENDPOINT;
 
-    if (empty($SEMAPHORE_API_KEY) || empty($SEMAPHORE_SENDER)) {
-        error_log('Semaphore API Key or Sender Name is missing');
+    if (!function_exists('curl_init')) {
+        error_log('SMS sending unavailable: cURL extension is not enabled.');
         return false;
     }
 
-    // Ensure PH format (09xxxxxxxxx)
+    if ($SEMAPHORE_API_KEY === '' || $SEMAPHORE_SENDER === '') {
+        error_log('SMS sending unavailable: Semaphore API key or sender is missing.');
+        return false;
+    }
+
     $recipient = preg_replace('/[^0-9]/', '', $recipient);
 
     $parameters = [
-        'apikey'     => $SEMAPHORE_API_KEY,
-        'number'     => $recipient,
-        'message'    => $message,
-        'sendername' => $SEMAPHORE_SENDER
+        'apikey' => $SEMAPHORE_API_KEY,
+        'number' => $recipient,
+        'message' => $message,
+        'sendername' => $SEMAPHORE_SENDER,
     ];
 
-    // Use OTP endpoint if OTP is provided
-    if ($otpCode) {
+    if ($otpCode !== null && $otpCode !== '') {
         $parameters['code'] = $otpCode;
-        $url = 'https://semaphore.co/api/v4/messages';
-    } else {
-        $url = 'https://semaphore.co/api/v4/messages';
     }
 
-    $ch = curl_init($url);
+    $endpoint = $SEMAPHORE_ENDPOINT !== '' ? $SEMAPHORE_ENDPOINT : 'https://semaphore.co/api/v4/messages';
+    $ch = curl_init($endpoint);
     curl_setopt_array($ch, [
-        CURLOPT_POST           => true,
-        CURLOPT_POSTFIELDS     => http_build_query($parameters),
+        CURLOPT_POST => true,
+        CURLOPT_POSTFIELDS => http_build_query($parameters),
         CURLOPT_RETURNTRANSFER => true,
-        CURLOPT_TIMEOUT        => 30
+        CURLOPT_TIMEOUT => 30,
     ]);
 
     $output = curl_exec($ch);
@@ -55,8 +61,6 @@ function sendSMS(string $recipient, string $message, string $otpCode = null): bo
     curl_close($ch);
 
     $response = json_decode($output, true);
-
-    // Semaphore success response contains message_id or code
     if (isset($response[0]['message_id']) || isset($response['code'])) {
         return true;
     }
@@ -64,4 +68,3 @@ function sendSMS(string $recipient, string $message, string $otpCode = null): bo
     error_log('Semaphore Error: ' . $output);
     return false;
 }
-?>

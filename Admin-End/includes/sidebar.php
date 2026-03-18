@@ -17,6 +17,10 @@ if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 
+if (!function_exists('appUrl')) {
+    require_once __DIR__ . '/../../PhpFiles/General/security.php';
+}
+
 $scriptName = str_replace("\\", "/", (string)($_SERVER['SCRIPT_NAME'] ?? ''));
 $adminSegmentPos = strpos($scriptName, '/Admin-End/');
 $baseUrl = '';

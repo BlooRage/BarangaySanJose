@@ -636,43 +636,42 @@ $isPrintView  = ($_GET['format'] ?? '') === 'print';
       margin-bottom: 24px;
     }
     .rp-brand-grid {
-      display: grid;
-      grid-template-columns: 92px 1fr 92px;
-      align-items: center;
-      gap: 14px;
-    }
-    .rp-brand-seal {
-      width: 86px;
-      height: 86px;
-      object-fit: contain;
-      margin: 0 auto;
       display: block;
+      text-align: center;
     }
     .rp-brand-copy {
       text-align: center;
+      max-width: 620px;
+      margin: 0 auto;
     }
     .rp-brand-topline {
-      font-size: 11.2px;
+      font-size: 11.4px;
       text-transform: uppercase;
       letter-spacing: .04em;
       color: #374151;
       line-height: 1.35;
     }
     .rp-brand-main {
-      font-size: 20px;
-      font-weight: 800;
+      font-size: 28px;
+      font-weight: 900;
       text-transform: uppercase;
       letter-spacing: .05em;
       color: #111827;
-      margin-top: 4px;
+      margin-top: 14px;
+    }
+    .rp-brand-rule {
+      width: 240px;
+      max-width: 70%;
+      border-top: 2px solid #9ca3af;
+      margin: 10px auto 14px;
     }
     .rp-brand-subline {
-      font-size: 12.2px;
+      font-size: 12.4px;
       font-weight: 700;
       text-transform: uppercase;
       letter-spacing: .04em;
       color: #DE710C;
-      margin-top: 8px;
+      margin-top: 0;
     }
     .rp-doc-header .rp-report-title {
       font-size: 15px;
@@ -798,9 +797,10 @@ $isPrintView  = ($_GET['format'] ?? '') === 'print';
         min-height: auto !important;
       }
       .rp-doc-header { padding-bottom: 10pt !important; margin-bottom: 14pt !important; }
-      .rp-brand-grid { grid-template-columns: 70pt 1fr 70pt !important; gap: 10pt !important; }
-      .rp-brand-seal { width: 64pt !important; height: 64pt !important; }
-      .rp-brand-main { font-size: 15pt !important; }
+      .rp-brand-grid { display: block !important; }
+      .rp-brand-copy { max-width: 100% !important; }
+      .rp-brand-main { font-size: 19pt !important; margin-top: 10pt !important; }
+      .rp-brand-rule { width: 180pt !important; margin: 8pt auto 10pt !important; }
       .rp-brand-subline { font-size: 9pt !important; }
       .rp-doc-header .rp-report-title { font-size: 11pt !important; }
       .rp-section { margin-top: 14pt !important; page-break-inside: avoid; }
@@ -818,9 +818,10 @@ $isPrintView  = ($_GET['format'] ?? '') === 'print';
     .rp-doc { border: 1.25pt solid #2f2f2f !important; border-radius: 0 !important; padding: 18pt 18pt 22pt !important;
               box-shadow: none !important; max-width: 100% !important; font-size: 10pt !important; min-height: auto !important; }
     .rp-doc-header { padding-bottom: 10pt !important; margin-bottom: 14pt !important; }
-    .rp-brand-grid { grid-template-columns: 70pt 1fr 70pt !important; gap: 10pt !important; }
-    .rp-brand-seal { width: 64pt !important; height: 64pt !important; }
-    .rp-brand-main { font-size: 15pt !important; }
+    .rp-brand-grid { display: block !important; }
+    .rp-brand-copy { max-width: 100% !important; }
+    .rp-brand-main { font-size: 19pt !important; margin-top: 10pt !important; }
+    .rp-brand-rule { width: 180pt !important; margin: 8pt auto 10pt !important; }
     .rp-brand-subline { font-size: 9pt !important; }
     .rp-doc-header .rp-report-title { font-size: 11pt !important; }
     .rp-section { margin-top: 14pt !important; page-break-inside: avoid; }
@@ -896,18 +897,13 @@ $isPrintView  = ($_GET['format'] ?? '') === 'print';
         <!-- Document header -->
         <div class="rp-doc-header">
           <div class="rp-brand-grid">
-            <div>
-              <img class="rp-brand-seal" src="<?= htmlspecialchars($barangaySealUrl) ?>" alt="Barangay San Jose Seal">
-            </div>
             <div class="rp-brand-copy">
               <div class="rp-brand-topline">Republika ng Pilipinas</div>
               <div class="rp-brand-topline">Lalawigan ng Rizal</div>
               <div class="rp-brand-topline">Bayan ng Rodriguez</div>
               <div class="rp-brand-main">Barangay San Jose</div>
+              <div class="rp-brand-rule"></div>
               <div class="rp-brand-subline">Office of the Punong Barangay</div>
-            </div>
-            <div>
-              <img class="rp-brand-seal" src="<?= htmlspecialchars($municipalSealUrl) ?>" alt="Municipality of Rodriguez Seal">
             </div>
           </div>
           <div class="rp-report-title"><?= htmlspecialchars(strtoupper($currentLabel)) ?> Statistical Report</div>

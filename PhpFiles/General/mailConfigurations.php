@@ -1,56 +1,59 @@
 <?php
-// PhpFiles/General/mailConfigurations.php
-// ✅ Pure config only. No PHPMailer usage here.
+declare(strict_types=1);
 
-return [
-  'host' => 'smtp.hostinger.com',
-  'username' => 'official@barangaysanjose-montalban.com',
-  'password' => 'SanJose.Brgy@2025!',
+require_once __DIR__ . '/runtimeConfig.php';
 
-  'port' => 465,
+$mailHost = trim((string)runtime_env('MAIL_HOST', runtime_config('mail.host', 'smtp.hostinger.com')));
+$mailUsername = trim((string)runtime_env('MAIL_USERNAME', runtime_env('MAIL_USER', runtime_config('mail.username', ''))));
+$mailPassword = (string)runtime_env('MAIL_PASSWORD', runtime_env('MAIL_PASS', runtime_config('mail.password', '')));
+$mailPort = (int)runtime_env('MAIL_PORT', runtime_config('mail.port', 465));
+$mailSecure = trim((string)runtime_env('MAIL_SECURE', runtime_config('mail.secure', $mailPort === 587 ? 'tls' : 'ssl')));
+$mailSmtpAuth = runtime_bool(runtime_env('MAIL_SMTP_AUTH', runtime_config('mail.smtp_auth', true)), true);
 
-  // ✅ use strings, not PHPMailer constants
-  // 'ssl' for port 465, 'tls' for port 587
-  'secure' => 'ssl',
+$mailFromEmail = trim((string)runtime_env('MAIL_FROM_EMAIL', runtime_config('mail.from_email', $mailUsername)));
+$mailFromName = trim((string)runtime_env('MAIL_FROM_NAME', runtime_config('mail.from_name', 'Barangay San Jose')));
 
-  'smtp_auth' => true,
+$mailDomain = '';
+if ($mailFromEmail !== '' && strpos($mailFromEmail, '@') !== false) {
+    $mailDomain = (string)substr($mailFromEmail, strpos($mailFromEmail, '@') + 1);
+}
 
-  'from_email' => 'official@barangaysanjose-montalban.com',
-  'from_name'  => 'Barangay San Jose',
-
-  // optional per-type sender
-  'senders' => [
+$defaultSenders = [
     'verify' => [
-      'from_email' => 'verify@barangaysanjose-montalban.com',
-      'from_name'  => 'Barangay San Jose Verification',
+        'from_email' => $mailDomain !== '' ? 'verify@' . $mailDomain : $mailFromEmail,
+        'from_name' => 'Barangay San Jose Verification',
     ],
     'one_time' => [
-      'from_email' => 'access@barangaysanjose-montalban.com',
-      'from_name'  => 'Barangay San Jose Access',
+        'from_email' => $mailDomain !== '' ? 'access@' . $mailDomain : $mailFromEmail,
+        'from_name' => 'Barangay San Jose Access',
     ],
     'onboarding_access' => [
-      'from_email' => 'access@barangaysanjose-montalban.com',
-      'from_name'  => 'Barangay San Jose',
+        'from_email' => $mailDomain !== '' ? 'access@' . $mailDomain : $mailFromEmail,
+        'from_name' => 'Barangay San Jose',
     ],
     'announcement' => [
-      'from_email' => 'announcements@barangaysanjose-montalban.com',
-      'from_name'  => 'Barangay San Jose Announcements',
+        'from_email' => $mailDomain !== '' ? 'announcements@' . $mailDomain : $mailFromEmail,
+        'from_name' => 'Barangay San Jose Announcements',
     ],
     'transaction' => [
-      'from_email' => 'no-reply@barangaysanjose-montalban.com',
-      'from_name'  => 'Barangay San Jose Notifications',
+        'from_email' => $mailDomain !== '' ? 'no-reply@' . $mailDomain : $mailFromEmail,
+        'from_name' => 'Barangay San Jose Notifications',
     ],
-  ],
 ];
 
-// ---- SMTP CONFIG (fill these with real values) ----
-        // SMTP configuration
-        //$this->mail->isSMTP();
-        //$this->mail->Host       = 'smtp.hostinger.com';
-        //$this->mail->SMTPAuth   = true;
-        //$this->mail->Username   = 'official@barangaysanjose-montalban.com';
-        //$this->mail->Password   = 'BrgySanJose.Verify@2025';
-        //$this->mail->SMTPSecure = PHPMailer::ENCRYPTION_SMTPS;
-        //$this->mail->Port       = 465;
-        //$this->mail->setFrom('otp_verify@barangaysanjose-montalban.com', 'Barangay San Jose');
-        //$this->mail->isHTML(true);
+$configuredSenders = runtime_config('mail.senders', []);
+if (!is_array($configuredSenders)) {
+    $configuredSenders = [];
+}
+
+return [
+    'host' => $mailHost,
+    'username' => $mailUsername,
+    'password' => $mailPassword,
+    'port' => $mailPort,
+    'secure' => $mailSecure,
+    'smtp_auth' => $mailSmtpAuth,
+    'from_email' => $mailFromEmail,
+    'from_name' => $mailFromName,
+    'senders' => array_replace_recursive($defaultSenders, $configuredSenders),
+];
