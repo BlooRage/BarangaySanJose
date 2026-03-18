@@ -12,19 +12,18 @@
   const entriesPerPageInput = document.getElementById('entriesPerPageInput');
   const paginationEl = document.getElementById('blotterPagination');
   const refreshBtn = document.getElementById('btnBlotterTableRefresh');
+  const filterButtons = Array.from(document.querySelectorAll('.status-filter-btn'));
+  const activeBlotterBadge = document.getElementById('activeBlotterBadge');
 
   const viewModalEl = document.getElementById('viewModal');
   const viewModal = viewModalEl ? new bootstrap.Modal(viewModalEl) : null;
   const viewModalTitle = document.getElementById('viewModalTitle');
   const viewDetailsBody = document.getElementById('viewDetailsBody');
+  const viewModalActionButtons = document.getElementById('viewModalActionButtons');
   const caseLogsModalEl = document.getElementById('caseLogsModal');
   const caseLogsModal = caseLogsModalEl ? new bootstrap.Modal(caseLogsModalEl) : null;
   const caseLogsModalTitle = document.getElementById('caseLogsModalTitle');
   const caseLogsBody = document.getElementById('caseLogsBody');
-  const narrativeTextModalEl = document.getElementById('narrativeTextModal');
-  const narrativeTextModal = narrativeTextModalEl ? new bootstrap.Modal(narrativeTextModalEl) : null;
-  const narrativeTextModalTitle = document.getElementById('narrativeTextModalTitle');
-  const narrativeTextModalBody = document.getElementById('narrativeTextModalBody');
   const caseActionModalEl = document.getElementById('caseActionModal');
   const caseActionModal = caseActionModalEl ? new bootstrap.Modal(caseActionModalEl) : null;
   const caseActionModalTitle = document.getElementById('caseActionModalTitle');
@@ -42,6 +41,7 @@
   let allRows = [];
   let filteredRows = [];
   let currentPage = 1;
+  let activeFilter = '';
   let currentViewCaseId = null;
   let currentDetail = null;
   let pendingCaseAction = null;
@@ -309,22 +309,32 @@ fields.push({ label: 'Address', value: participant?.address || '-', fullWidth: t
 
   function applyFilters() {
     const term = String(searchInput?.value || '').trim().toLowerCase();
-    if (!term) {
-      filteredRows = [...allRows];
-    } else {
-      filteredRows = allRows.filter((row) => {
-        const hay = [
-          row.blotter_id,
-          row.blotter_number,
-          row.case_id,
-          row.complainant_name,
-          row.respondent_name
-        ].map((v) => String(v || '').toLowerCase());
-        return hay.some((v) => v.includes(term));
-      });
-    }
+    filteredRows = allRows.filter((row) => {
+      const statusKey = String(row?.status_name || '').trim().toLowerCase();
+      const matchesFilter = !activeFilter || statusKey === activeFilter;
+      if (!matchesFilter) return false;
+
+      if (!term) return true;
+      const hay = [
+        row.blotter_id,
+        row.blotter_number,
+        row.case_id,
+        row.complainant_name,
+        row.respondent_name,
+        row.status_name,
+        row.level_name
+      ].map((v) => String(v || '').toLowerCase());
+      return hay.some((v) => v.includes(term));
+    });
     currentPage = 1;
     renderTable();
+  }
+
+  function updateActiveBadge() {
+    if (!activeBlotterBadge) return;
+    const count = allRows.filter((row) => String(row?.status_name || '').trim().toLowerCase() === 'active').length;
+    activeBlotterBadge.textContent = String(count);
+    activeBlotterBadge.classList.toggle('d-none', count <= 0);
   }
 
   async function fetchJson(url, options) {
@@ -343,6 +353,7 @@ fields.push({ label: 'Address', value: participant?.address || '-', fullWidth: t
     try {
       const data = await fetchJson(`${endpoint}?action=list`);
       allRows = Array.isArray(data.items) ? data.items : [];
+      updateActiveBadge();
       applyFilters();
     } catch (err) {
       tableBody.innerHTML = `<tr><td colspan="9" class="text-center text-danger py-4">${esc(err.message || err)}</td></tr>`;
@@ -361,15 +372,7 @@ fields.push({ label: 'Address', value: participant?.address || '-', fullWidth: t
         </div>
       `;
     } else if (detail?.narrative_type === 'text' && detail?.narrative_value) {
-      const preview = `${String(detail.narrative_value).trim().slice(0, 280)}${String(detail.narrative_value).trim().length > 280 ? '...' : ''}`;
-      initialValueHtml = `
-        <div class="tracker-form-value-text">${esc(preview || '-')}</div>
-        <div class="tracker-attachment-actions mt-2">
-          <button type="button" class="btn btn-sm btn-outline-primary" id="btnOpenTypedNarrative">
-            Open Typed Narrative
-          </button>
-        </div>
-      `;
+      initialValueHtml = `<div class="tracker-form-value-text">${esc(detail.narrative_value || '-')}</div>`;
     }
 
     return `
@@ -461,17 +464,6 @@ fields.push({ label: 'Address', value: participant?.address || '-', fullWidth: t
   function renderCaseManagementSection(detail) {
     const isFinalized = String(detail?.status_name || '').trim().toLowerCase() !== 'active';
     const disabledAttr = isFinalized ? 'disabled' : '';
-    const statusActions = isFinalized
-      ? `
-        <div class="small text-muted">
-          Status is final (${esc(detail?.status_name || '-')}); no further status changes are allowed.
-        </div>
-      `
-      : `
-        <button type="button" class="btn btn-sm btn-danger" id="btnMarkDropped">Mark as Dropped</button>
-        <button type="button" class="btn btn-sm btn-warning" id="btnSubjectEndorsement">Subject to Endorsement</button>
-        <button type="button" class="btn btn-sm btn-success" id="btnMarkResolved">Mark as Resolved</button>
-      `;
 
     return `
       <section class="tracker-form-section">
@@ -492,13 +484,20 @@ fields.push({ label: 'Address', value: participant?.address || '-', fullWidth: t
             <button type="button" class="btn btn-sm btn-success" id="btnAddCaseUpdate" ${disabledAttr}>Add Update</button>
           </div>
         </div>
-
-        <hr class="my-3">
-        <div class="d-flex flex-wrap gap-2">
-          ${statusActions}
-        </div>
       </section>
     `;
+  }
+
+  function syncViewModalFooterActions(detail) {
+    const isFinalized = String(detail?.status_name || '').trim().toLowerCase() !== 'active';
+    const markResolvedBtn = document.getElementById('btnMarkResolved');
+    const subjectEndorsementBtn = document.getElementById('btnSubjectEndorsement');
+    const markDroppedBtn = document.getElementById('btnMarkDropped');
+
+    markResolvedBtn?.classList.toggle('d-none', isFinalized);
+    subjectEndorsementBtn?.classList.toggle('d-none', isFinalized);
+    markDroppedBtn?.classList.toggle('d-none', isFinalized);
+    viewModalActionButtons?.classList.toggle('d-none', isFinalized);
   }
 
   function actionLabel(type) {
@@ -615,7 +614,6 @@ fields.push({ label: 'Address', value: participant?.address || '-', fullWidth: t
 
   function bindViewActions() {
     const narrativeAddInput = document.getElementById('narrativeAddInput');
-    const openTypedNarrativeBtn = document.getElementById('btnOpenTypedNarrative');
     const caseUpdateInput = document.getElementById('caseUpdateInput');
     const addNarrativeBtn = document.getElementById('btnAddNarrative');
     const addUpdateBtn = document.getElementById('btnAddCaseUpdate');
@@ -625,17 +623,6 @@ fields.push({ label: 'Address', value: participant?.address || '-', fullWidth: t
     const isFinalized = String(currentDetail?.status_name || '').trim().toLowerCase() !== 'active';
 
     if (!narrativeAddInput || !addNarrativeBtn || !addUpdateBtn) return;
-
-    openTypedNarrativeBtn?.addEventListener('click', () => {
-      if (!narrativeTextModal || !narrativeTextModalBody) return;
-      const narrativeText = String(currentDetail?.narrative_value || '').trim();
-      const stamp = String(currentDetail?.report_timestamp || currentDetail?.date_filed || '').trim();
-      if (narrativeTextModalTitle) {
-        narrativeTextModalTitle.textContent = stamp ? `Narrative Report (${stamp})` : 'Narrative Report';
-      }
-      narrativeTextModalBody.textContent = narrativeText || '-';
-      narrativeTextModal.show();
-    });
 
     addNarrativeBtn.addEventListener('click', async () => {
       if (isFinalized) {
@@ -712,6 +699,7 @@ fields.push({ label: 'Address', value: participant?.address || '-', fullWidth: t
     currentViewCaseId = String(caseId);
     currentDetail = null;
     viewDetailsBody.innerHTML = '<div class="text-muted">Loading details...</div>';
+    viewModalActionButtons?.classList.add('d-none');
     if (viewModalTitle) viewModalTitle.textContent = `Blotter Details (#${caseId})`;
     viewModal.show();
 
@@ -754,10 +742,12 @@ fields.push({ label: 'Address', value: participant?.address || '-', fullWidth: t
 
       viewDetailsBody.innerHTML = html || '<div class="text-muted">No details available.</div>';
       currentDetail = d;
+      syncViewModalFooterActions(d);
       bindViewActions();
       loadNarrativeUpdates(caseId);
     } catch (err) {
       viewDetailsBody.innerHTML = `<div class="text-danger">${esc(err.message || err)}</div>`;
+      viewModalActionButtons?.classList.add('d-none');
     }
   }
 
@@ -794,6 +784,19 @@ fields.push({ label: 'Address', value: participant?.address || '-', fullWidth: t
   }
 
   let searchTimer = null;
+  filterButtons.forEach((button) => {
+    button.addEventListener('click', () => {
+      activeFilter = String(button.getAttribute('data-filter') || '').trim().toLowerCase();
+      filterButtons.forEach((btn) => {
+        const isActive = btn === button;
+        btn.classList.toggle('active', isActive);
+        btn.classList.toggle('btn-outline-primary', isActive);
+        btn.classList.toggle('btn-outline-secondary', !isActive);
+      });
+      applyFilters();
+    });
+  });
+
   searchInput?.addEventListener('input', () => {
     clearTimeout(searchTimer);
     searchTimer = setTimeout(applyFilters, 200);

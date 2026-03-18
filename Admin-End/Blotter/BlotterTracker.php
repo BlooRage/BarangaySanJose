@@ -141,6 +141,23 @@ require_once __DIR__ . "/../includes/admin_guard.php";
             color: #6c757d;
             font-size: 0.95rem;
         }
+
+        .resident-masterlist-shell .status-filter-btn[data-filter="endorsed"],
+        .resident-masterlist-shell .status-filter-btn[data-filter="dropped"],
+        .resident-masterlist-shell .status-filter-btn[data-filter="active"] {
+            color: #495057;
+            border-color: #6c757d;
+            background: #fff;
+        }
+
+        .resident-masterlist-shell .status-filter-btn[data-filter="endorsed"].active,
+        .resident-masterlist-shell .status-filter-btn[data-filter="dropped"].active,
+        .resident-masterlist-shell .status-filter-btn[data-filter="active"].active {
+            color: #fff !important;
+            background-color: #495057 !important;
+            border-color: #495057 !important;
+            font-weight: 700;
+        }
     </style>
 </head>
 
@@ -154,11 +171,17 @@ require_once __DIR__ . "/../includes/admin_guard.php";
         </h2>
         <hr><br>
 
-        <div id="div-tableContainer" class="bg-white p-4 rounded-4 shadow-sm border blotter-tracker-shell">
+        <div id="div-tableContainer" class="bg-white p-4 rounded-4 shadow-sm border blotter-tracker-shell resident-masterlist-shell">
 
             <div class="admin-list-toolbar mb-3 pt-2 flex-wrap">
                 <div class="admin-list-tabs">
-                    <button class="btn btn-outline-primary btn-sm status-filter-btn" type="button">All</button>
+                    <button class="btn btn-outline-primary btn-sm status-filter-btn active" type="button" data-filter="">&nbsp;&nbsp;All&nbsp;&nbsp;</button>
+                    <button class="btn btn-outline-secondary btn-sm status-filter-btn fw-semibold" type="button" data-filter="endorsed">&nbsp;&nbsp;Endorsed&nbsp;&nbsp;</button>
+                    <button class="btn btn-outline-secondary btn-sm status-filter-btn fw-semibold" type="button" data-filter="dropped">&nbsp;&nbsp;Dropped&nbsp;&nbsp;</button>
+                    <button class="btn btn-outline-secondary btn-sm status-filter-btn fw-semibold has-notif" type="button" data-filter="active">
+                        &nbsp;&nbsp;Active
+                        <span class="pending-count-badge d-none" id="activeBlotterBadge">0</span>
+                    </button>
                 </div>
 
                 <div class="admin-list-actions">
@@ -249,6 +272,11 @@ require_once __DIR__ . "/../includes/admin_guard.php";
                 <div id="viewDetailsBody" class="tracker-profile-view"></div>
             </div>
             <div class="modal-footer d-flex justify-content-between flex-wrap gap-2">
+                <div id="viewModalActionButtons" class="d-none flex-wrap gap-2">
+                    <button type="button" class="btn btn-success d-none" id="btnMarkResolved">Mark Resolved</button>
+                    <button type="button" class="btn btn-warning d-none" id="btnSubjectEndorsement">Subject to Endorsement</button>
+                    <button type="button" class="btn btn-danger d-none" id="btnMarkDropped">Mark as Dropped</button>
+                </div>
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
             </div>
         </div>
@@ -264,23 +292,6 @@ require_once __DIR__ . "/../includes/admin_guard.php";
             </div>
             <div class="modal-body">
                 <div id="caseLogsBody" class="small text-muted">Loading case logs...</div>
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
-            </div>
-        </div>
-    </div>
-</div>
-
-<div class="modal fade" id="narrativeTextModal" tabindex="-1" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
-    <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title" id="narrativeTextModalTitle">Narrative Report</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-            </div>
-            <div class="modal-body">
-                <pre id="narrativeTextModalBody" class="mb-0" style="white-space: pre-wrap; word-break: break-word; font-family: inherit;"></pre>
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
