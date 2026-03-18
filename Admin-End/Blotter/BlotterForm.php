@@ -91,6 +91,26 @@ require_once __DIR__ . "/../includes/admin_guard.php";
             border-color: #e8872f;
             box-shadow: none;
         }
+        #main-display .page-form .form-control.is-invalid,
+        #main-display .page-form .form-select.is-invalid,
+        #main-display .page-form textarea.form-control.is-invalid,
+        #main-display .page-form .form-row input.is-invalid,
+        #main-display .page-form .form-row select.is-invalid,
+        #main-display .page-form .form-row textarea.is-invalid {
+            border-color: #dc3545 !important;
+            box-shadow: 0 0 0 0.15rem rgba(220, 53, 69, 0.12) !important;
+            background-image: none;
+        }
+        #main-display .page-form .form-control.is-invalid:focus,
+        #main-display .page-form .form-select.is-invalid:focus,
+        #main-display .page-form textarea.form-control.is-invalid:focus,
+        #main-display .page-form .form-row input.is-invalid:focus,
+        #main-display .page-form .form-row select.is-invalid:focus,
+        #main-display .page-form .form-row textarea.is-invalid:focus {
+            outline: none;
+            border-color: #dc3545 !important;
+            box-shadow: 0 0 0 0.2rem rgba(220, 53, 69, 0.18) !important;
+        }
     </style>
 </head>
 <body>

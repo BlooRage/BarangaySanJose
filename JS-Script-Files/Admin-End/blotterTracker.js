@@ -24,6 +24,9 @@
   const caseLogsModal = caseLogsModalEl ? new bootstrap.Modal(caseLogsModalEl) : null;
   const caseLogsModalTitle = document.getElementById('caseLogsModalTitle');
   const caseLogsBody = document.getElementById('caseLogsBody');
+  const unsupportedFileModalEl = document.getElementById('unsupportedFileModal');
+  const unsupportedFileModal = unsupportedFileModalEl ? new bootstrap.Modal(unsupportedFileModalEl) : null;
+  const btnUnsupportedFileReturn = document.getElementById('btnUnsupportedFileReturn');
   const caseActionModalEl = document.getElementById('caseActionModal');
   const caseActionModal = caseActionModalEl ? new bootstrap.Modal(caseActionModalEl) : null;
   const caseActionModalTitle = document.getElementById('caseActionModalTitle');
@@ -46,6 +49,7 @@
   let currentDetail = null;
   let pendingCaseAction = null;
   let caseActionHandlersBound = false;
+  let unsupportedFileReturnToView = false;
 
   function esc(v) {
     return String(v ?? '').replace(/[&<>\"']/g, (m) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '\"': '&quot;', "'": '&#39;' }[m]));
@@ -368,7 +372,13 @@ fields.push({ label: 'Address', value: participant?.address || '-', fullWidth: t
         || `${appBase}/${String(detail.narrative_value).replace(/^\/+/, '')}`;
       initialValueHtml = `
         <div class="tracker-attachment-actions">
-          <a class="btn btn-sm btn-outline-primary" href="${esc(fileUrl)}" target="_blank" rel="noopener">Open Narrative File</a>
+          <a
+            class="btn btn-sm btn-outline-primary js-blotter-attachment"
+            href="${esc(fileUrl)}"
+            data-file-url="${esc(fileUrl)}"
+            data-file-name="Narrative File"
+            data-file-mime="${esc(detail?.narrative_mime_type || '')}"
+          >Open Narrative File</a>
         </div>
       `;
     } else if (detail?.narrative_type === 'text' && detail?.narrative_value) {
@@ -424,9 +434,22 @@ fields.push({ label: 'Address', value: participant?.address || '-', fullWidth: t
         <article class="tracker-signature-card">
           <div class="tracker-signature-card__header">
             <span class="tracker-signature-card__title">${esc(label)}</span>
-            <a class="btn btn-sm btn-outline-primary" href="${esc(fileUrl)}" target="_blank" rel="noopener">Open</a>
+            <a
+              class="btn btn-sm btn-outline-primary js-blotter-attachment"
+              href="${esc(fileUrl)}"
+              data-file-url="${esc(fileUrl)}"
+              data-file-name="${esc(label)} Signature"
+              data-file-mime="${esc(item?.mime_type || '')}"
+            >Open</a>
           </div>
-          <a class="tracker-signature-card__preview" href="${esc(fileUrl)}" target="_blank" rel="noopener" aria-label="Open ${esc(label)} signature">
+          <a
+            class="tracker-signature-card__preview js-blotter-attachment"
+            href="${esc(fileUrl)}"
+            data-file-url="${esc(fileUrl)}"
+            data-file-name="${esc(label)} Signature"
+            data-file-mime="${esc(item?.mime_type || '')}"
+            aria-label="Open ${esc(label)} signature"
+          >
             <img src="${esc(fileUrl)}" alt="${esc(label)} signature preview" loading="lazy">
           </a>
         </article>
@@ -516,6 +539,43 @@ fields.push({ label: 'Address', value: participant?.address || '-', fullWidth: t
       return;
     }
     toModal?.show();
+  }
+
+  function getAttachmentExtension(url) {
+    const cleanUrl = String(url || '').split('?')[0].split('#')[0].trim().toLowerCase();
+    const match = cleanUrl.match(/\.([a-z0-9]+)$/i);
+    return match ? match[1] : '';
+  }
+
+  function isSupportedAttachment(fileUrl, mimeType) {
+    const mime = String(mimeType || '').trim().toLowerCase();
+    if (mime === 'application/pdf' || mime.startsWith('image/')) {
+      return true;
+    }
+
+    const ext = getAttachmentExtension(fileUrl);
+    return ['pdf', 'png', 'jpg', 'jpeg', 'webp', 'gif', 'bmp', 'svg'].includes(ext);
+  }
+
+  function bindAttachmentActions() {
+    viewDetailsBody?.querySelectorAll('.js-blotter-attachment').forEach((link) => {
+      link.addEventListener('click', (event) => {
+        event.preventDefault();
+        const fileUrl = String(link.getAttribute('data-file-url') || link.getAttribute('href') || '').trim();
+        const mimeType = String(link.getAttribute('data-file-mime') || '').trim();
+        if (!fileUrl) {
+          return;
+        }
+
+        if (isSupportedAttachment(fileUrl, mimeType)) {
+          window.open(fileUrl, '_blank', 'noopener');
+          return;
+        }
+
+        unsupportedFileReturnToView = true;
+        transitionModal(viewModalEl, viewModal, unsupportedFileModal);
+      });
+    });
   }
 
   function openCaseActionModal(type) {
@@ -743,6 +803,7 @@ fields.push({ label: 'Address', value: participant?.address || '-', fullWidth: t
       viewDetailsBody.innerHTML = html || '<div class="text-muted">No details available.</div>';
       currentDetail = d;
       syncViewModalFooterActions(d);
+      bindAttachmentActions();
       bindViewActions();
       loadNarrativeUpdates(caseId);
     } catch (err) {
@@ -782,6 +843,19 @@ fields.push({ label: 'Address', value: participant?.address || '-', fullWidth: t
       caseLogsBody.innerHTML = `<div class="text-danger">${esc(err.message || err)}</div>`;
     }
   }
+
+  btnUnsupportedFileReturn?.addEventListener('click', () => {
+    unsupportedFileReturnToView = false;
+    transitionModal(unsupportedFileModalEl, unsupportedFileModal, viewModal);
+  });
+
+  unsupportedFileModalEl?.addEventListener('hidden.bs.modal', () => {
+    if (!unsupportedFileReturnToView) {
+      return;
+    }
+    unsupportedFileReturnToView = false;
+    viewModal?.show();
+  });
 
   let searchTimer = null;
   filterButtons.forEach((button) => {
