@@ -10,6 +10,7 @@ $financePages = ['FinancePayments.php'];
 $blotterPages = ['BlotterForm.php', 'BlotterTracker.php', 'ReviewQueue.php'];
 $complaintPages = ['ComplaintForm.php', 'ComplaintTracker.php'];
 $contentMgmtPages = ['Contents.php', 'CreateContent.php'];
+$areaManagementPages = ['AreaStatistics.php', 'AreaProfile.php'];
 $reportPages = ['Reports.php'];
 $userMgmtPages = ['UserMasterlist.php'];
 $adminMgmtPages = ['OfficialsManagement.php', 'OfficialInvites.php'];
@@ -51,10 +52,13 @@ $isFinanceActive = in_array($current, $financePages);
 $isBlotterActive = in_array($current, $blotterPages);
 $isComplaintActive = in_array($current, $complaintPages);
 $isContentMgmtActive = in_array($current, $contentMgmtPages);
+$isAreaManagementActive = in_array($current, $areaManagementPages);
 $isUserMgmtActive = in_array($current, $userMgmtPages);
 $isAdminMgmtActive = in_array($current, $adminMgmtPages);
 $isReportActive = in_array($current, $reportPages);
 $reportModule = strtolower(trim((string)($_GET['module'] ?? '')));
+$areaManagementTab = strtolower(trim((string)($_GET['tab'] ?? 'summary')));
+$areaManagementArea = trim((string)($_GET['area'] ?? ''));
 $isSuperAdminSidebar = ((string)($_SESSION['role'] ?? '') === 'SuperAdmin');
 $financeSection = strtolower(trim((string)($_GET['section'] ?? 'tracker')));
 $certificateTab = strtolower(trim((string)($_GET['tab'] ?? 'tracker')));
@@ -491,6 +495,69 @@ if (!empty($_SESSION['user_id']) && isset($conn) && $conn instanceof mysqli) {
               <a href="<?= htmlspecialchars(appUrl('Admin-End/Contents/Contents.php')) ?>?tool=tracker#tracker-card"
                  class="link-dark rounded <?= ($current === 'Contents.php' && $contentToolView === 'tracker') ? 'active' : '' ?>">
                 Tracker
+              </a>
+            </li>
+          </ul>
+        </div>
+      </li>
+
+      <li class="mb-1 mt-2 text-muted small fw-semibold px-2">Area Management</li>
+      <li class="mb-1">
+        <button class="btn btn-toggle d-flex align-items-center gap-2 rounded <?= $isAreaManagementActive ? '' : 'collapsed' ?>"
+                data-bs-toggle="collapse"
+                data-bs-target="#area-management-collapse"
+                aria-expanded="<?= $isAreaManagementActive ? 'true' : 'false' ?>">
+          <i class="fas fa-map-location-dot"></i> Area Statistics
+        </button>
+
+        <div class="collapse <?= $isAreaManagementActive ? 'show' : '' ?>" id="area-management-collapse">
+          <ul class="btn-toggle-nav list-unstyled fw-normal pb-1 small">
+            <li>
+              <a href="<?= htmlspecialchars(appUrl('Admin-End/AreaManagement/AreaStatistics.php?tab=summary')) ?>"
+                 class="link-dark rounded <?= ($current == 'AreaStatistics.php' && $areaManagementTab === 'summary') ? 'active' : '' ?>">
+                Summary
+              </a>
+            </li>
+            <li>
+              <a href="<?= htmlspecialchars(appUrl('Admin-End/AreaManagement/AreaProfile.php?area=' . rawurlencode('Area 01'))) ?>"
+                 class="link-dark rounded <?= ($current == 'AreaProfile.php' && $areaManagementArea === 'Area 01') ? 'active' : '' ?>">
+                Area 01
+              </a>
+            </li>
+            <li>
+              <a href="<?= htmlspecialchars(appUrl('Admin-End/AreaManagement/AreaProfile.php?area=' . rawurlencode('Area 1A'))) ?>"
+                 class="link-dark rounded <?= ($current == 'AreaProfile.php' && $areaManagementArea === 'Area 1A') ? 'active' : '' ?>">
+                Area 1A
+              </a>
+            </li>
+            <li>
+              <a href="<?= htmlspecialchars(appUrl('Admin-End/AreaManagement/AreaProfile.php?area=' . rawurlencode('Area 02'))) ?>"
+                 class="link-dark rounded <?= ($current == 'AreaProfile.php' && $areaManagementArea === 'Area 02') ? 'active' : '' ?>">
+                Area 02
+              </a>
+            </li>
+            <li>
+              <a href="<?= htmlspecialchars(appUrl('Admin-End/AreaManagement/AreaProfile.php?area=' . rawurlencode('Area 03'))) ?>"
+                 class="link-dark rounded <?= ($current == 'AreaProfile.php' && $areaManagementArea === 'Area 03') ? 'active' : '' ?>">
+                Area 03
+              </a>
+            </li>
+            <li>
+              <a href="<?= htmlspecialchars(appUrl('Admin-End/AreaManagement/AreaProfile.php?area=' . rawurlencode('Area 04'))) ?>"
+                 class="link-dark rounded <?= ($current == 'AreaProfile.php' && $areaManagementArea === 'Area 04') ? 'active' : '' ?>">
+                Area 04
+              </a>
+            </li>
+            <li>
+              <a href="<?= htmlspecialchars(appUrl('Admin-End/AreaManagement/AreaProfile.php?area=' . rawurlencode('Area 05'))) ?>"
+                 class="link-dark rounded <?= ($current == 'AreaProfile.php' && $areaManagementArea === 'Area 05') ? 'active' : '' ?>">
+                Area 05
+              </a>
+            </li>
+            <li>
+              <a href="<?= htmlspecialchars(appUrl('Admin-End/AreaManagement/AreaProfile.php?area=' . rawurlencode('Area 06'))) ?>"
+                 class="link-dark rounded <?= ($current == 'AreaProfile.php' && $areaManagementArea === 'Area 06') ? 'active' : '' ?>">
+                Area 06
               </a>
             </li>
           </ul>
