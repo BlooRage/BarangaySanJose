@@ -1,14 +1,22 @@
 <?php
 // PhpFiles/EmailHandlers/emailSender.php
 
-require_once __DIR__ . '/../../composer-email-handler/vendor/autoload.php';
+$emailAutoloadCandidates = [
+    __DIR__ . '/../../composer-email-handler/vendor/autoload.php',
+    __DIR__ . '/../../vendor/autoload.php',
+];
+foreach ($emailAutoloadCandidates as $emailAutoloadPath) {
+    if (is_file($emailAutoloadPath)) {
+        require_once $emailAutoloadPath;
+    }
+}
 
 use PHPMailer\PHPMailer\PHPMailer;
 use PHPMailer\PHPMailer\Exception;
 
 class EmailSender
 {
-    private PHPMailer $mail;
+    private ?PHPMailer $mail = null;
     private string $lastError = '';
 
     private string $defaultFromEmail;
@@ -27,39 +35,54 @@ class EmailSender
 
     public function __construct(array $smtpConfig = [], ?string $templatesRoot = null)
     {
-        $this->mail = new PHPMailer(true);
         $this->templatesRoot = $templatesRoot ?: (__DIR__ . '/EmailTemplates');
 
-        // ---- SMTP config ----
-        $host     = $smtpConfig['host'] ?? '';
-        $username = $smtpConfig['username'] ?? '';
-        $password = $smtpConfig['password'] ?? '';
-        $port     = $smtpConfig['port'] ?? 465;
+        $host = trim((string)($smtpConfig['host'] ?? ''));
+        $username = trim((string)($smtpConfig['username'] ?? ''));
+        $password = (string)($smtpConfig['password'] ?? '');
+        $port = (int)($smtpConfig['port'] ?? 465);
+        $smtpAuth = (bool)($smtpConfig['smtp_auth'] ?? true);
 
-        // ✅ Safe default & allow string config ('ssl'/'tls')
-        $secure = $smtpConfig['secure'] ?? PHPMailer::ENCRYPTION_SMTPS;
-        if (is_string($secure)) {
-            $s = strtolower($secure);
-            $secure = ($s === 'tls') ? PHPMailer::ENCRYPTION_STARTTLS : PHPMailer::ENCRYPTION_SMTPS;
+        $this->defaultFromEmail = trim((string)($smtpConfig['from_email'] ?? $username));
+        $this->defaultFromName = trim((string)($smtpConfig['from_name'] ?? 'Barangay San Jose'));
+        $this->typeSenders = is_array($smtpConfig['senders'] ?? null) ? $smtpConfig['senders'] : [];
+
+        if (!class_exists(PHPMailer::class)) {
+            $this->lastError = 'PHPMailer is unavailable. Ensure the mailer vendor files are deployed.';
+            error_log('[EmailSender] ' . $this->lastError);
+            return;
         }
 
-        $smtpAuth = $smtpConfig['smtp_auth'] ?? true;
+        $this->mail = new PHPMailer(true);
 
-        $this->defaultFromEmail = $smtpConfig['from_email'] ?? '';
-        $this->defaultFromName  = $smtpConfig['from_name'] ?? 'Barangay San Jose';
-        $this->typeSenders      = $smtpConfig['senders'] ?? [];
+        // Safe default & allow string config ('ssl'/'tls')
+        $secure = $smtpConfig['secure'] ?? PHPMailer::ENCRYPTION_SMTPS;
+        if (is_string($secure)) {
+            $s = strtolower(trim($secure));
+            if ($s === 'tls' || $s === 'starttls') {
+                $secure = PHPMailer::ENCRYPTION_STARTTLS;
+            } elseif ($s === 'ssl' || $s === 'smtps') {
+                $secure = PHPMailer::ENCRYPTION_SMTPS;
+            } else {
+                $secure = '';
+            }
+        }
 
         // ---- PHPMailer setup ----
         $this->mail->isSMTP();
-        $this->mail->Host       = $host;
-        $this->mail->SMTPAuth   = $smtpAuth;
-        $this->mail->Username   = $username;
-        $this->mail->Password   = $password;
+        $this->mail->Host = $host;
+        $this->mail->SMTPAuth = $smtpAuth;
+        $this->mail->Username = $username;
+        $this->mail->Password = $password;
         $this->mail->SMTPSecure = $secure;
-        $this->mail->Port       = $port;
-
+        $this->mail->Port = $port;
+        $this->mail->Timeout = (int)($smtpConfig['timeout'] ?? 30);
         $this->mail->CharSet = 'UTF-8';
         $this->mail->isHTML(true);
+
+        if (!empty($smtpConfig['smtp_options']) && is_array($smtpConfig['smtp_options'])) {
+            $this->mail->SMTPOptions = $smtpConfig['smtp_options'];
+        }
 
         if ($this->defaultFromEmail !== '') {
             $this->mail->setFrom($this->defaultFromEmail, $this->defaultFromName);
@@ -70,6 +93,17 @@ class EmailSender
     {
         try {
             $this->lastError = '';
+            if (!($this->mail instanceof PHPMailer)) {
+                throw new Exception('Mailer is not initialized. Check SMTP dependencies on the server.');
+            }
+
+            if (trim((string)$this->mail->Host) === '') {
+                throw new Exception('SMTP host is not configured.');
+            }
+            if ($this->mail->SMTPAuth && (trim((string)$this->mail->Username) === '' || $this->mail->Password === '')) {
+                throw new Exception('SMTP username or password is missing.');
+            }
+
             $this->mail->clearAllRecipients();
             $this->mail->clearAttachments();
             $this->mail->clearReplyTos();
@@ -85,9 +119,10 @@ class EmailSender
             $fromEmail = $options['from_email'] ?? $this->defaultFromEmail;
             $fromName  = $options['from_name']  ?? $this->defaultFromName;
 
-            if ($fromEmail !== '') {
-                $this->mail->setFrom($fromEmail, $fromName);
+            if ($fromEmail === '') {
+                throw new Exception('From email is not configured.');
             }
+            $this->mail->setFrom($fromEmail, $fromName);
 
             // To
             if (empty($options['to'])) {
@@ -136,7 +171,8 @@ class EmailSender
             return $sent;
 
         } catch (Exception $e) {
-            $this->lastError = $e->getMessage() . ' | ' . $this->mail->ErrorInfo;
+            $mailError = $this->mail instanceof PHPMailer ? (string)$this->mail->ErrorInfo : '';
+            $this->lastError = trim($e->getMessage() . ($mailError !== '' ? ' | ' . $mailError : ''));
             error_log('[EmailSender] ' . $this->lastError);
             return false;
         }

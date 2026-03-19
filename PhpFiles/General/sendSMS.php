@@ -7,6 +7,7 @@ $SEMAPHORE_API_KEY = trim((string)runtime_env('SMS_SEMAPHORE_API_KEY', runtime_e
 $SEMAPHORE_SENDER = trim((string)runtime_env('SMS_SENDER', runtime_config('sms.sender', 'BrgySanJose')));
 $SEMAPHORE_ENDPOINT = trim((string)runtime_env('SMS_ENDPOINT', runtime_config('sms.endpoint', 'https://api.semaphore.co/api/v4/messages')));
 $SEMAPHORE_OTP_ENDPOINT = trim((string)runtime_env('SMS_OTP_ENDPOINT', runtime_config('sms.otp_endpoint', 'https://api.semaphore.co/api/v4/otp')));
+$SMS_LAST_ERROR = '';
 
 if (!function_exists('normalizeSmsRecipient')) {
     function normalizeSmsRecipient(string $recipient): string
@@ -74,6 +75,160 @@ if (!function_exists('smsMessageWithOtpPlaceholder')) {
     }
 }
 
+if (!function_exists('smsHydrateOtpMessage')) {
+    function smsHydrateOtpMessage(string $message, string $otpCode): string
+    {
+        if ($otpCode === '') {
+            return $message;
+        }
+        return str_replace('{otp}', $otpCode, $message);
+    }
+}
+
+if (!function_exists('smsSetLastError')) {
+    function smsSetLastError(string $message): void
+    {
+        global $SMS_LAST_ERROR;
+        $SMS_LAST_ERROR = trim($message);
+    }
+}
+
+if (!function_exists('getLastSmsError')) {
+    function getLastSmsError(): string
+    {
+        global $SMS_LAST_ERROR;
+        return trim((string)$SMS_LAST_ERROR);
+    }
+}
+
+if (!function_exists('smsFormatFailure')) {
+    function smsFormatFailure(int $httpCode, string $body, string $transportError = ''): string
+    {
+        $parts = [];
+        if ($transportError !== '') {
+            $parts[] = $transportError;
+        }
+        if ($httpCode > 0) {
+            $parts[] = 'HTTP ' . $httpCode;
+        }
+
+        $decoded = json_decode($body, true);
+        if (is_array($decoded)) {
+            $rows = array_is_list($decoded) ? $decoded : [$decoded];
+            foreach ($rows as $row) {
+                if (!is_array($row)) {
+                    continue;
+                }
+                foreach (['message', 'error', 'status', 'details'] as $key) {
+                    $value = trim((string)($row[$key] ?? ''));
+                    if ($value !== '') {
+                        $parts[] = $value;
+                    }
+                }
+            }
+        }
+
+        if ($body !== '' && !$decoded) {
+            $parts[] = trim($body);
+        }
+
+        $parts = array_values(array_unique(array_filter($parts, static fn($part) => $part !== '')));
+        return $parts !== [] ? implode(' | ', $parts) : 'Unknown SMS gateway failure.';
+    }
+}
+
+if (!function_exists('smsHttpPostForm')) {
+    function smsHttpPostForm(string $endpoint, array $parameters): array
+    {
+        $payload = http_build_query($parameters);
+
+        if (function_exists('curl_init')) {
+            $ch = curl_init($endpoint);
+            curl_setopt_array($ch, [
+                CURLOPT_POST => true,
+                CURLOPT_POSTFIELDS => $payload,
+                CURLOPT_RETURNTRANSFER => true,
+                CURLOPT_HTTPHEADER => [
+                    'Accept: application/json',
+                    'Content-Type: application/x-www-form-urlencoded',
+                ],
+                CURLOPT_TIMEOUT => 30,
+            ]);
+
+            $output = curl_exec($ch);
+            $httpCode = (int)curl_getinfo($ch, CURLINFO_RESPONSE_CODE);
+            $error = '';
+            if ($output === false) {
+                $error = 'cURL Error: ' . curl_error($ch);
+            }
+            curl_close($ch);
+
+            return [
+                'ok' => $output !== false,
+                'http_code' => $httpCode,
+                'body' => $output !== false ? (string)$output : '',
+                'transport_error' => $error,
+            ];
+        }
+
+        if (!runtime_bool(ini_get('allow_url_fopen'), false)) {
+            return [
+                'ok' => false,
+                'http_code' => 0,
+                'body' => '',
+                'transport_error' => 'cURL is unavailable and allow_url_fopen is disabled.',
+            ];
+        }
+
+        $context = stream_context_create([
+            'http' => [
+                'method' => 'POST',
+                'header' => implode("\r\n", [
+                    'Accept: application/json',
+                    'Content-Type: application/x-www-form-urlencoded',
+                ]),
+                'content' => $payload,
+                'timeout' => 30,
+                'ignore_errors' => true,
+            ],
+        ]);
+
+        $output = @file_get_contents($endpoint, false, $context);
+        $httpCode = 0;
+        foreach ((array)($http_response_header ?? []) as $headerLine) {
+            if (preg_match('~^HTTP/\S+\s+(\d{3})~i', (string)$headerLine, $matches)) {
+                $httpCode = (int)$matches[1];
+                break;
+            }
+        }
+
+        return [
+            'ok' => ($output !== false) || $httpCode > 0,
+            'http_code' => $httpCode,
+            'body' => $output !== false ? (string)$output : '',
+            'transport_error' => $output === false ? 'HTTP stream request failed.' : '',
+        ];
+    }
+}
+
+if (!function_exists('smsSendRequest')) {
+    function smsSendRequest(string $endpoint, array $parameters): array
+    {
+        $http = smsHttpPostForm($endpoint, $parameters);
+        $body = (string)($http['body'] ?? '');
+        $httpCode = (int)($http['http_code'] ?? 0);
+        $decoded = json_decode($body, true);
+
+        return [
+            'success' => !empty($http['ok']) && $httpCode >= 200 && $httpCode < 300 && smsResponseIndicatesSuccess($decoded),
+            'http_code' => $httpCode,
+            'body' => $body,
+            'response' => $decoded,
+            'transport_error' => trim((string)($http['transport_error'] ?? '')),
+        ];
+    }
+}
+
 /**
  * Send SMS (OTP)
  * @param string $recipient Phone number (09xxxxxxxxx)
@@ -85,25 +240,25 @@ function sendSMS(string $recipient, string $message, string $otpCode = null): bo
 {
     global $SEMAPHORE_API_KEY, $SEMAPHORE_SENDER, $SEMAPHORE_ENDPOINT, $SEMAPHORE_OTP_ENDPOINT;
 
-    if (!function_exists('curl_init')) {
-        error_log('SMS sending unavailable: cURL extension is not enabled.');
-        return false;
-    }
+    smsSetLastError('');
 
     if ($SEMAPHORE_API_KEY === '' || $SEMAPHORE_SENDER === '') {
-        error_log('SMS sending unavailable: Semaphore API key or sender is missing.');
+        smsSetLastError('SMS sending unavailable: Semaphore API key or sender is missing.');
+        error_log('[sendSMS] ' . getLastSmsError());
         return false;
     }
 
     $recipient = normalizeSmsRecipient($recipient);
     if ($recipient === '') {
-        error_log('SMS sending unavailable: Invalid recipient number supplied.');
+        smsSetLastError('SMS sending unavailable: Invalid recipient number supplied.');
+        error_log('[sendSMS] ' . getLastSmsError());
         return false;
     }
 
     $message = trim($message);
     if ($message === '') {
-        error_log('SMS sending unavailable: Message body is empty.');
+        smsSetLastError('SMS sending unavailable: Message body is empty.');
+        error_log('[sendSMS] ' . getLastSmsError());
         return false;
     }
 
@@ -116,36 +271,36 @@ function sendSMS(string $recipient, string $message, string $otpCode = null): bo
 
     $endpoint = $SEMAPHORE_ENDPOINT !== '' ? $SEMAPHORE_ENDPOINT : 'https://api.semaphore.co/api/v4/messages';
     if ($otpCode !== null && $otpCode !== '') {
-        $parameters['message'] = smsMessageWithOtpPlaceholder($message, $otpCode);
-        $parameters['code'] = $otpCode;
-        $endpoint = $SEMAPHORE_OTP_ENDPOINT !== '' ? $SEMAPHORE_OTP_ENDPOINT : 'https://api.semaphore.co/api/v4/otp';
+        $otpParameters = $parameters;
+        $otpParameters['message'] = smsMessageWithOtpPlaceholder($message, $otpCode);
+        $otpParameters['code'] = $otpCode;
+        $otpEndpoint = $SEMAPHORE_OTP_ENDPOINT !== '' ? $SEMAPHORE_OTP_ENDPOINT : 'https://api.semaphore.co/api/v4/otp';
+
+        $otpAttempt = smsSendRequest($otpEndpoint, $otpParameters);
+        if ($otpAttempt['success']) {
+            return true;
+        }
+
+        $otpFailure = smsFormatFailure(
+            (int)$otpAttempt['http_code'],
+            (string)$otpAttempt['body'],
+            (string)$otpAttempt['transport_error']
+        );
+        error_log('[sendSMS] OTP endpoint failed, retrying messages endpoint: ' . $otpFailure);
+
+        $parameters['message'] = smsHydrateOtpMessage($otpParameters['message'], $otpCode);
     }
 
-    $ch = curl_init($endpoint);
-    curl_setopt_array($ch, [
-        CURLOPT_POST => true,
-        CURLOPT_POSTFIELDS => http_build_query($parameters),
-        CURLOPT_RETURNTRANSFER => true,
-        CURLOPT_HTTPHEADER => ['Accept: application/json'],
-        CURLOPT_TIMEOUT => 30,
-    ]);
-
-    $output = curl_exec($ch);
-    $httpCode = (int)curl_getinfo($ch, CURLINFO_RESPONSE_CODE);
-
-    if ($output === false) {
-        error_log('cURL Error: ' . curl_error($ch));
-        curl_close($ch);
-        return false;
-    }
-
-    curl_close($ch);
-
-    $response = json_decode($output, true);
-    if ($httpCode >= 200 && $httpCode < 300 && smsResponseIndicatesSuccess($response)) {
+    $attempt = smsSendRequest($endpoint, $parameters);
+    if ($attempt['success']) {
         return true;
     }
 
-    error_log('Semaphore Error (HTTP ' . $httpCode . '): ' . $output);
+    smsSetLastError(smsFormatFailure(
+        (int)$attempt['http_code'],
+        (string)$attempt['body'],
+        (string)$attempt['transport_error']
+    ));
+    error_log('[sendSMS] ' . getLastSmsError());
     return false;
 }

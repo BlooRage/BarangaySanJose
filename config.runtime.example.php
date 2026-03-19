@@ -30,8 +30,12 @@ return [
         'port' => 465,
         'secure' => 'ssl',
         'smtp_auth' => true,
+        'timeout' => 30,
         'from_email' => 'official@your-domain.example',
         'from_name' => 'Barangay San Jose',
+        // Optional advanced PHPMailer transport settings if your host needs them.
+        // Leave empty unless you are intentionally overriding TLS behavior.
+        'smtp_options' => [],
         'senders' => [
             // Optional: only use a different from_email if that mailbox/alias
             // really exists in your mail provider (e.g. Hostinger).

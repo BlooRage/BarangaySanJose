@@ -9,6 +9,11 @@ $mailPassword = (string)runtime_env('MAIL_PASSWORD', runtime_env('MAIL_PASS', ru
 $mailPort = (int)runtime_env('MAIL_PORT', runtime_config('mail.port', 465));
 $mailSecure = trim((string)runtime_env('MAIL_SECURE', runtime_config('mail.secure', $mailPort === 587 ? 'tls' : 'ssl')));
 $mailSmtpAuth = runtime_bool(runtime_env('MAIL_SMTP_AUTH', runtime_config('mail.smtp_auth', true)), true);
+$mailTimeout = (int)runtime_env('MAIL_TIMEOUT', runtime_config('mail.timeout', 30));
+$mailSmtpOptions = runtime_config('mail.smtp_options', []);
+if (!is_array($mailSmtpOptions)) {
+    $mailSmtpOptions = [];
+}
 
 $mailFromEmail = trim((string)runtime_env('MAIL_FROM_EMAIL', runtime_config('mail.from_email', $mailUsername)));
 $mailFromName = trim((string)runtime_env('MAIL_FROM_NAME', runtime_config('mail.from_name', 'Barangay San Jose')));
@@ -48,6 +53,8 @@ return [
     'port' => $mailPort,
     'secure' => $mailSecure,
     'smtp_auth' => $mailSmtpAuth,
+    'timeout' => $mailTimeout > 0 ? $mailTimeout : 30,
+    'smtp_options' => $mailSmtpOptions,
     'from_email' => $mailFromEmail,
     'from_name' => $mailFromName,
     'senders' => array_replace_recursive($defaultSenders, $configuredSenders),
