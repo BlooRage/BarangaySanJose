@@ -134,7 +134,7 @@ include 'includes/sidebar.php';
 ?>
 
     <!-- MAIN CONTENT -->
-    <main id="main-display" class="flex-grow-1 p-4 pt-3 p-md-5 bg-light">
+    <main id="main-display" class="flex-grow-1 p-3 p-md-4 p-xl-5 bg-light">
         <h2 class="mb-4" style="font-family: 'Charis SIL Bold'; color: #DE710C; ">
             Sector Membership Verification
         </h2>
@@ -142,7 +142,7 @@ include 'includes/sidebar.php';
 
         <div class="bg-white p-4 rounded-4 shadow-sm border sector-apps-shell">
 
-	            <div class="admin-list-toolbar mb-3 flex-wrap">
+	            <div class="admin-list-toolbar mb-3 pt-2 flex-wrap">
 	                <div class="admin-list-tabs">
 	                    <button class="btn btn-outline-primary btn-sm filter-btn fw-bold active" data-filter="ALL">&nbsp;&nbsp;All&nbsp;&nbsp;</button>
 	                    
@@ -177,8 +177,8 @@ include 'includes/sidebar.php';
             <div id="sectorAppsLoading" class="text-muted small mb-2">Loading applications...</div>
             <div id="sectorAppsEmpty" class="text-muted small d-none">No sector membership applications found.</div>
 
-            <div class="table-responsive">
-                <table class="table align-middle" id="table-sectorApps">
+            <div class="table-responsive compact-admin-table-shell">
+                <table class="table align-middle compact-admin-table" id="table-sectorApps">
                     <thead>
                         <tr class="table-light">
                             <th>Resident ID</th>

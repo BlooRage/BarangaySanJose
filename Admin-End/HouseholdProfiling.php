@@ -54,7 +54,7 @@ require_once __DIR__ . "/includes/admin_guard.php";
         <div class="bg-white p-4 rounded-4 shadow-sm border household-shell">
 
 	            <!-- SEARCH -->
-	            <div class="admin-list-toolbar mb-3 flex-wrap">
+	            <div class="admin-list-toolbar mb-3 pt-2 flex-wrap">
 	                <div class="admin-list-tabs"></div>
 	
 	                <div class="admin-list-actions">

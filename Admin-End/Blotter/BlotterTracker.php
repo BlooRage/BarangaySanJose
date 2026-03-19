@@ -200,14 +200,13 @@ require_once __DIR__ . "/../includes/admin_guard.php";
                 </div>
             </div>
 
-            <div class="table-responsive">
-                <table id="table-appData" class="table align-middle">
+            <div class="table-responsive compact-admin-table-shell">
+                <table id="table-appData" class="table align-middle compact-admin-table">
                     <thead>
                         <tr class="table-light">
                             <th>Blotter ID</th>
                             <th>Blotter Number</th>
                             <th>Date Filed</th>
-                            <th>Time Filed</th>
                             <th>Complainant</th>
                             <th>Respondent</th>
                             <th>Status</th>
@@ -217,7 +216,7 @@ require_once __DIR__ . "/../includes/admin_guard.php";
                     </thead>
                     <tbody id="tableBody">
                         <tr>
-                            <td colspan="9" class="text-start text-muted py-4">Loading blotter records...</td>
+                            <td colspan="8" class="text-start text-muted py-4">Loading blotter records...</td>
                         </tr>
                     </tbody>
                 </table>

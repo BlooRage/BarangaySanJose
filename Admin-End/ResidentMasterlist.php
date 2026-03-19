@@ -125,8 +125,8 @@ if (isset($conn) && $conn instanceof mysqli) {
 
 
             <!-- TABLE -->
-            <div class="table-responsive">
-                <table id="table-appData" class="table align-middle">
+            <div class="table-responsive compact-admin-table-shell">
+                <table id="table-appData" class="table align-middle compact-admin-table compact-admin-table--resident">
                     <thead>
                         <tr class="table-light">
                             <th>Resident ID</th>

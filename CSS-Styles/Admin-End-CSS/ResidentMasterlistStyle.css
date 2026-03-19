@@ -810,30 +810,35 @@ h2.section-title {
     z-index: 2;
 }
 
-.resident-masterlist-shell .table-responsive {
+.compact-admin-table-shell {
     border: 1px solid #eceff3;
-    border-radius: 16px;
+    border-radius: 8px;
     background: #fff;
+    overflow-x: auto;
+    overflow-y: hidden;
+    -webkit-overflow-scrolling: touch;
+    padding-bottom: 4px;
 }
 
-.resident-masterlist-shell #table-appData {
+.compact-admin-table {
     margin-bottom: 0;
     border-collapse: separate;
     border-spacing: 0;
-    table-layout: fixed;
     width: 100%;
 }
 
-.resident-masterlist-shell #table-appData thead th {
+.compact-admin-table thead th {
     padding: 0.52rem 0.85rem;
     font-size: 0.95rem;
     font-weight: 700;
     color: #111827;
     background: #f7f8fa;
     border-bottom: 1px solid #e5e7eb;
+    white-space: normal;
+    line-height: 1.2;
 }
 
-.resident-masterlist-shell #table-appData tbody td {
+.compact-admin-table tbody td {
     padding: 0.38rem 0.85rem;
     font-size: 0.94rem;
     color: #1f2937;
@@ -842,49 +847,90 @@ h2.section-title {
     background: #fff;
 }
 
-.resident-masterlist-shell #table-appData tbody tr:last-child td {
+.compact-admin-table tbody tr:last-child td {
     border-bottom: 0;
 }
 
-.resident-masterlist-shell #table-appData tbody tr:hover td {
+.compact-admin-table tbody tr:hover td {
     background: #fcfcfd;
 }
 
-.resident-masterlist-shell #table-appData th:first-child,
-.resident-masterlist-shell #table-appData td:first-child {
+.compact-admin-table .status-pill {
+    padding: 4px 12px;
+    font-size: 0.78rem;
+    border-width: 1px;
+}
+
+.compact-admin-table .compact-table-actions {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    flex-wrap: nowrap;
+}
+
+.compact-admin-table tbody .btn.btn-sm,
+.compact-admin-table .compact-table-btn {
+    padding: 0.22rem 0.5rem;
+    font-size: 0.76rem;
+    line-height: 1.15;
+}
+
+.compact-admin-table-shell::-webkit-scrollbar {
+    height: 8px;
+}
+
+.compact-admin-table-shell::-webkit-scrollbar-thumb {
+    background: rgba(108, 117, 125, 0.45);
+    border-radius: 999px;
+}
+
+.compact-admin-table-shell::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.resident-masterlist-shell #table-appData.compact-admin-table--resident {
+    table-layout: fixed;
+}
+
+.resident-masterlist-shell #table-appData.compact-admin-table--resident th:first-child,
+.resident-masterlist-shell #table-appData.compact-admin-table--resident td:first-child {
     width: 15%;
     white-space: nowrap;
 }
 
-.resident-masterlist-shell #table-appData th:nth-child(2),
-.resident-masterlist-shell #table-appData td:nth-child(2) {
-    width: 23%;
+.resident-masterlist-shell #table-appData.compact-admin-table--resident th:nth-child(2),
+.resident-masterlist-shell #table-appData.compact-admin-table--resident td:nth-child(2) {
+    width: 22%;
     white-space: normal;
 }
 
-.resident-masterlist-shell #table-appData th:nth-child(3),
-.resident-masterlist-shell #table-appData td:nth-child(3),
-.resident-masterlist-shell #table-appData th:nth-child(4),
-.resident-masterlist-shell #table-appData td:nth-child(4),
-.resident-masterlist-shell #table-appData th:nth-child(5),
-.resident-masterlist-shell #table-appData td:nth-child(5) {
+.resident-masterlist-shell #table-appData.compact-admin-table--resident th:nth-child(3),
+.resident-masterlist-shell #table-appData.compact-admin-table--resident td:nth-child(3),
+.resident-masterlist-shell #table-appData.compact-admin-table--resident th:nth-child(4),
+.resident-masterlist-shell #table-appData.compact-admin-table--resident td:nth-child(4) {
     width: 8%;
     white-space: nowrap;
 }
 
-.resident-masterlist-shell #table-appData th:nth-child(6),
-.resident-masterlist-shell #table-appData td:nth-child(6) {
-    width: 18%;
-}
-
-.resident-masterlist-shell #table-appData th:nth-child(7),
-.resident-masterlist-shell #table-appData td:nth-child(7) {
-    width: 20%;
+.resident-masterlist-shell #table-appData.compact-admin-table--resident th:nth-child(5),
+.resident-masterlist-shell #table-appData.compact-admin-table--resident td:nth-child(5) {
+    width: 11%;
     white-space: nowrap;
 }
 
-.resident-masterlist-shell #table-appData th:nth-child(6),
-.resident-masterlist-shell #table-appData td:nth-child(6) {
+.resident-masterlist-shell #table-appData.compact-admin-table--resident th:nth-child(6),
+.resident-masterlist-shell #table-appData.compact-admin-table--resident td:nth-child(6) {
+    width: 18%;
+}
+
+.resident-masterlist-shell #table-appData.compact-admin-table--resident th:nth-child(7),
+.resident-masterlist-shell #table-appData.compact-admin-table--resident td:nth-child(7) {
+    width: 18%;
+    white-space: nowrap;
+}
+
+.resident-masterlist-shell #table-appData.compact-admin-table--resident th:nth-child(6),
+.resident-masterlist-shell #table-appData.compact-admin-table--resident td:nth-child(6) {
     text-align: left;
 }
 
@@ -893,18 +939,6 @@ h2.section-title {
     align-items: center;
     gap: 0.25rem;
     flex-wrap: nowrap;
-}
-
-.resident-masterlist-shell #table-appData .resident-table-btn {
-    padding: 0.22rem 0.5rem;
-    font-size: 0.76rem;
-    line-height: 1.15;
-}
-
-.resident-masterlist-shell #table-appData .status-pill {
-    padding: 4px 12px;
-    font-size: 0.78rem;
-    border-width: 1px;
 }
 
 .resident-masterlist-shell #filterButton,

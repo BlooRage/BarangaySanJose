@@ -28,7 +28,7 @@
       <hr><br>
 
       <div id="div-tableContainer" class="bg-white p-4 rounded-4 shadow-sm border audit-shell">
-        <div class="admin-list-toolbar mb-3 flex-wrap">
+        <div class="admin-list-toolbar mb-3 pt-2 flex-wrap">
           <div class="admin-list-tabs">
             <div class="text-muted small">System activity trail (latest first)</div>
           </div>

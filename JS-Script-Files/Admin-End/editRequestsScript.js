@@ -111,10 +111,10 @@ document.addEventListener("DOMContentLoaded", () => {
               <span class="status-pill ${statusPillClass(statusText)}">${statusText}</span>
             </td>
             <td>
-              <div class="d-flex gap-2">
-                <button class="btn btn-primary btn-sm" data-action="view" data-id="${row.request_id}">View</button>
-                <button class="btn btn-success btn-sm" data-action="approve" data-id="${row.request_id}" ${statusText !== "Pending" ? "disabled" : ""}>Approve</button>
-                <button class="btn btn-danger btn-sm" data-action="deny" data-id="${row.request_id}" ${statusText !== "Pending" ? "disabled" : ""}>Deny</button>
+              <div class="compact-table-actions">
+                <button class="btn btn-primary btn-sm compact-table-btn" data-action="view" data-id="${row.request_id}">View</button>
+                <button class="btn btn-success btn-sm compact-table-btn" data-action="approve" data-id="${row.request_id}" ${statusText !== "Pending" ? "disabled" : ""}>Approve</button>
+                <button class="btn btn-danger btn-sm compact-table-btn" data-action="deny" data-id="${row.request_id}" ${statusText !== "Pending" ? "disabled" : ""}>Deny</button>
               </div>
             </td>
           </tr>

@@ -158,7 +158,7 @@
       <hr><br>
 
       <div id="div-tableContainer" class="bg-white p-4 rounded-4 shadow-sm border hof-shell">
-        <div class="admin-list-toolbar mb-3 flex-wrap pt-3">
+        <div class="admin-list-toolbar mb-3 pt-2 flex-wrap">
           <div class="admin-list-tabs d-flex gap-2 flex-wrap">
             <button type="button" class="btn btn-outline-primary btn-sm status-filter-btn active fw-bold" data-filter="ALL">All</button>
             <button type="button" class="btn btn-outline-secondary btn-sm status-filter-btn has-notif fw-bold" data-filter="Pending">

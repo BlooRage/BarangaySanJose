@@ -131,8 +131,8 @@ require_once __DIR__ . "/../includes/admin_guard.php";
                 </div>
             </div>
 
-            <div class="table-responsive">
-                <table id="table-appData" class="table align-middle">
+            <div class="table-responsive compact-admin-table-shell">
+                <table id="table-appData" class="table align-middle compact-admin-table">
                     <thead>
                         <tr class="table-light">
                             <th>Complaint ID</th>
@@ -268,4 +268,6 @@ require_once __DIR__ . "/../includes/admin_guard.php";
 <script src="../../JS-Script-Files/Admin-End/complaintTracker.js?v=20260311-1"></script>
 </body>
 </html>
+
+
 
