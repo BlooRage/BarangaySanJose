@@ -6,6 +6,7 @@ require_once __DIR__ . '/runtimeConfig.php';
 $SEMAPHORE_API_KEY = trim((string)runtime_env('SMS_SEMAPHORE_API_KEY', runtime_env('SMS_API_KEY', runtime_config('sms.semaphore_api_key', ''))));
 $SEMAPHORE_SENDER = trim((string)runtime_env('SMS_SENDER', runtime_config('sms.sender', 'BrgySanJose')));
 $SEMAPHORE_ENDPOINT = trim((string)runtime_env('SMS_ENDPOINT', runtime_config('sms.endpoint', 'https://api.semaphore.co/api/v4/messages')));
+$SEMAPHORE_OTP_ENDPOINT = trim((string)runtime_env('SMS_OTP_ENDPOINT', runtime_config('sms.otp_endpoint', 'https://api.semaphore.co/api/v4/otp')));
 
 if (!array_key_exists('LAST_SMS_ERROR', $GLOBALS)) {
     $GLOBALS['LAST_SMS_ERROR'] = '';
@@ -74,6 +75,23 @@ if (!function_exists('smsResponseIndicatesSuccess')) {
     }
 }
 
+if (!function_exists('smsMessageWithOtpPlaceholder')) {
+    function smsMessageWithOtpPlaceholder(string $message, string $otpCode): string
+    {
+        if ($otpCode === '') {
+            return $message;
+        }
+
+        if (strpos($message, '{otp}') !== false) {
+            return $message;
+        }
+
+        $count = 0;
+        $updated = str_replace($otpCode, '{otp}', $message, $count);
+        return $count > 0 ? $updated : $message;
+    }
+}
+
 /**
  * Send SMS (OTP)
  * @param string $recipient Phone number (09xxxxxxxxx)
@@ -83,7 +101,7 @@ if (!function_exists('smsResponseIndicatesSuccess')) {
  */
 function sendSMS(string $recipient, string $message, string $otpCode = null): bool
 {
-    global $SEMAPHORE_API_KEY, $SEMAPHORE_SENDER, $SEMAPHORE_ENDPOINT;
+    global $SEMAPHORE_API_KEY, $SEMAPHORE_SENDER, $SEMAPHORE_ENDPOINT, $SEMAPHORE_OTP_ENDPOINT;
 
     setLastSmsError('');
 
@@ -124,11 +142,13 @@ function sendSMS(string $recipient, string $message, string $otpCode = null): bo
         'sendername' => $SEMAPHORE_SENDER,
     ];
 
+    $endpoint = $SEMAPHORE_ENDPOINT !== '' ? $SEMAPHORE_ENDPOINT : 'https://api.semaphore.co/api/v4/messages';
     if ($otpCode !== null && $otpCode !== '') {
+        $parameters['message'] = smsMessageWithOtpPlaceholder($message, $otpCode);
         $parameters['code'] = $otpCode;
+        $endpoint = $SEMAPHORE_OTP_ENDPOINT !== '' ? $SEMAPHORE_OTP_ENDPOINT : 'https://api.semaphore.co/api/v4/otp';
     }
 
-    $endpoint = $SEMAPHORE_ENDPOINT !== '' ? $SEMAPHORE_ENDPOINT : 'https://api.semaphore.co/api/v4/messages';
     $ch = curl_init($endpoint);
     curl_setopt_array($ch, [
         CURLOPT_POST => true,

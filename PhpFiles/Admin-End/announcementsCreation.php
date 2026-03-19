@@ -169,8 +169,18 @@ $channels = array_values(array_unique(array_filter((array)($_POST["channels"] ??
   return in_array((string)$ch, ["website", "public", "public_news", "sms", "email"], true);
 })));
 $audienceScope = trim((string)($_POST["audience_scope"] ?? "all"));
-$area = trim((string)($_POST["area"] ?? ""));
-$roleGroup = trim((string)($_POST["role_group"] ?? ""));
+$areas = array_values(array_unique(array_filter(array_map(static function ($value): string {
+  return trim((string)$value);
+}, (array)($_POST["area"] ?? [])), static function (string $value): bool {
+  return $value !== '';
+})));
+$roleGroups = array_values(array_unique(array_filter(array_map(static function ($value): string {
+  return trim((string)$value);
+}, (array)($_POST["role_group"] ?? [])), static function (string $value): bool {
+  return $value !== '';
+})));
+$area = implode(', ', $areas);
+$roleGroup = implode(', ', $roleGroups);
 $submitAction = trim((string)($_POST["submit_action"] ?? "draft"));
 $emailSubjectInput = trim((string)($_POST["email_subject"] ?? ""));
 $smsMessageInput = trim((string)($_POST["sms_message"] ?? ""));
@@ -307,11 +317,11 @@ if ($submitAction === "approved" && $isSuperAdmin) {
 $audience = "All Residents";
 if ($audienceScope === "custom") {
   $parts = [];
-  if ($area !== "") {
-    $parts[] = $area;
+  if ($areas) {
+    $parts[] = implode(', ', $areas);
   }
-  if ($roleGroup !== "") {
-    $parts[] = $roleGroup;
+  if ($roleGroups) {
+    $parts[] = implode(', ', $roleGroups);
   }
   $audience = $parts ? implode(", ", $parts) : "Custom Audience";
 }

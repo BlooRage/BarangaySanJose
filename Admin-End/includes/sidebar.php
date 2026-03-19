@@ -162,6 +162,8 @@ if (!empty($_SESSION['user_id']) && isset($conn) && $conn instanceof mysqli) {
 }
 ?>
 
+<script src="<?= htmlspecialchars(appUrl('JS-Script-Files/modalHandler.js'), ENT_QUOTES, 'UTF-8') ?>"></script>
+
 <style>
   #admin-mobile-header {
     display: none;

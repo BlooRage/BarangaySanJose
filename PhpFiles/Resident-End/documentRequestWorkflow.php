@@ -268,7 +268,7 @@ function dr_ensure_pdf_tools(): bool {
     return $ready;
 }
 
-function dr_append_image_page_to_pdf(\setasign\Fpdi\Fpdi $pdf, string $imagePath): void {
+function dr_append_image_page_to_pdf(\setasign\Fpdi\Fpdi $pdf, string $imagePath, string $declaredExt = ''): void {
     $imageInfo = @getimagesize($imagePath);
     if ($imageInfo === false || !isset($imageInfo[0], $imageInfo[1])) {
         throw new Exception('Invalid image file.');
@@ -291,7 +291,12 @@ function dr_append_image_page_to_pdf(\setasign\Fpdi\Fpdi $pdf, string $imagePath
     $x = ($pageW - $drawW) / 2;
     $y = ($pageH - $drawH) / 2;
 
-    $pdf->Image($imagePath, $x, $y, $drawW, $drawH);
+    $imageType = strtolower(ltrim(trim($declaredExt), '.'));
+    if ($imageType === 'jpg') {
+        $imageType = 'jpeg';
+    }
+
+    $pdf->Image($imagePath, $x, $y, $drawW, $drawH, $imageType);
 }
 
 function dr_append_pdf_pages(\setasign\Fpdi\Fpdi $pdf, string $pdfPath): void {
@@ -421,14 +426,19 @@ function dr_convert_upload_to_pdf(array $file, string $folder, int $index = 1): 
                 return ['path' => null, 'error' => (string)$normalized['error']];
             }
             $normalizedImagePath = (string)($normalized['path'] ?? '');
+            $imageTypeForPdf = ($normalizedImagePath !== '' && $normalizedImagePath !== $tmp) ? 'png' : $ext;
             $pdf = new \setasign\Fpdi\Fpdi();
-            dr_append_image_page_to_pdf($pdf, $normalizedImagePath !== '' ? $normalizedImagePath : $tmp);
+            dr_append_image_page_to_pdf($pdf, $normalizedImagePath !== '' ? $normalizedImagePath : $tmp, $imageTypeForPdf);
             $pdf->Output('F', $targetPath);
         }
     } catch (Throwable $e) {
         @unlink($targetPath);
         error_log('[documentRequestWorkflow][convert_upload_to_pdf] ' . $e->getMessage());
-        return ['path' => null, 'error' => 'Failed to convert uploaded file to PDF.'];
+        $message = trim((string)$e->getMessage());
+        if ($message === '') {
+            $message = 'Failed to convert uploaded file to PDF.';
+        }
+        return ['path' => null, 'error' => $message];
     } finally {
         if ($normalizedImagePath !== null && $normalizedImagePath !== '') {
             @unlink($normalizedImagePath);

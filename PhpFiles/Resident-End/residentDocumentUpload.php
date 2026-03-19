@@ -7,6 +7,7 @@ require_once __DIR__ . "/../General/residentTransaction.php";
 use setasign\Fpdi\Fpdi;
 
 require_once __DIR__ . "/../../composer-email-handler/vendor/autoload.php";
+require_once __DIR__ . "/pdfMergeSupport.php";
 
 header('Content-Type: application/json; charset=utf-8');
 
@@ -220,41 +221,12 @@ function moveUploadedFileWithDocName(string $tmpName, string $dir, string $docTy
     ];
 }
 
-function appendImagePageToPdf(Fpdi $pdf, string $imagePath): void {
-    $imageInfo = @getimagesize($imagePath);
-    if ($imageInfo === false || !isset($imageInfo[0], $imageInfo[1])) {
-        throw new Exception("Invalid image file for PDF merge.");
-    }
-
-    $imgW = (float)$imageInfo[0];
-    $imgH = (float)$imageInfo[1];
-    $orientation = $imgW > $imgH ? 'L' : 'P';
-    $pdf->AddPage($orientation, 'A4');
-
-    $margin = 10.0;
-    $pageW = (float)$pdf->GetPageWidth();
-    $pageH = (float)$pdf->GetPageHeight();
-    $maxW = $pageW - ($margin * 2);
-    $maxH = $pageH - ($margin * 2);
-
-    $scale = min($maxW / $imgW, $maxH / $imgH);
-    $drawW = $imgW * $scale;
-    $drawH = $imgH * $scale;
-    $x = ($pageW - $drawW) / 2;
-    $y = ($pageH - $drawH) / 2;
-
-    $pdf->Image($imagePath, $x, $y, $drawW, $drawH);
+function appendImagePageToPdf(Fpdi $pdf, string $imagePath, string $declaredExt = ''): void {
+    resident_pdf_merge_append_image_page($pdf, $imagePath, $declaredExt);
 }
 
 function appendPdfFilePages(Fpdi $pdf, string $pdfPath): void {
-    $pageCount = $pdf->setSourceFile($pdfPath);
-    for ($i = 1; $i <= $pageCount; $i++) {
-        $tpl = $pdf->importPage($i);
-        $size = $pdf->getTemplateSize($tpl);
-        $orientation = $size['width'] > $size['height'] ? 'L' : 'P';
-        $pdf->AddPage($orientation, [$size['width'], $size['height']]);
-        $pdf->useTemplate($tpl);
-    }
+    resident_pdf_merge_append_pdf_pages($pdf, $pdfPath);
 }
 
 function buildMergedIdPdf(string $frontPath, string $frontExt, string $backPath, string $backExt, string $outputPath): void {
@@ -262,13 +234,13 @@ function buildMergedIdPdf(string $frontPath, string $frontExt, string $backPath,
     if ($frontExt === 'pdf') {
         appendPdfFilePages($pdf, $frontPath);
     } else {
-        appendImagePageToPdf($pdf, $frontPath);
+        appendImagePageToPdf($pdf, $frontPath, $frontExt);
     }
 
     if ($backExt === 'pdf') {
         appendPdfFilePages($pdf, $backPath);
     } else {
-        appendImagePageToPdf($pdf, $backPath);
+        appendImagePageToPdf($pdf, $backPath, $backExt);
     }
 
     $pdf->Output('F', $outputPath);
@@ -519,7 +491,7 @@ try {
             }
         }
 
-        $allowedIdExt = ['jpg', 'jpeg', 'png', 'webp', 'pdf'];
+        $allowedIdExt = ['jpg', 'jpeg', 'png', 'pdf'];
         if ($isPassport) {
             $tmpName = (string)$_FILES['idFront']['tmp_name'];
             $name = basename((string)$_FILES['idFront']['name']);
@@ -717,7 +689,7 @@ try {
 
         $docTypeId = getDocumentTypeId($conn, $docTypeValue);
         $allowedSector = ['jpg', 'jpeg', 'png', 'webp', 'pdf'];
-        $allowedSectorIdOnly = ['jpg', 'jpeg', 'png', 'webp'];
+        $allowedSectorIdOnly = ['jpg', 'jpeg', 'png'];
 
         $sectorNames = isset($file['name'][$sectorKey]) && is_array($file['name'][$sectorKey]) ? $file['name'][$sectorKey] : [];
         $sectorTmpNames = isset($file['tmp_name'][$sectorKey]) && is_array($file['tmp_name'][$sectorKey]) ? $file['tmp_name'][$sectorKey] : [];
@@ -747,7 +719,7 @@ try {
             $frontExt = strtolower(pathinfo($frontOriginal, PATHINFO_EXTENSION));
             $backExt = strtolower(pathinfo($backOriginal, PATHINFO_EXTENSION));
             if (isHeicExt($frontExt) || isHeicExt($backExt)) throw new Exception('HEIC is not supported on the server. Please upload JPG or PNG.');
-            if (!in_array($frontExt, $allowedSectorIdOnly, true) || !in_array($backExt, $allowedSectorIdOnly, true)) throw new Exception('Invalid file type for ID proof. Please upload an image (JPG/PNG/WebP).');
+            if (!in_array($frontExt, $allowedSectorIdOnly, true) || !in_array($backExt, $allowedSectorIdOnly, true)) throw new Exception('Invalid file type for ID proof. Please upload JPG, JPEG, or PNG.');
 
             $frontMoved = moveUploadedFileWithDocName($frontTmp, $uploadDirDocs, $docTypeValue . ' sector front', $userId, $frontExt);
             $backMoved = moveUploadedFileWithDocName($backTmp, $uploadDirDocs, $docTypeValue . ' sector back', $userId, $backExt);
@@ -930,7 +902,12 @@ try {
         strpos($known, 'invalid upload source') !== false ||
         strpos($known, 'no new documents') !== false ||
         strpos($known, 'heic is not supported') !== false ||
-        strpos($known, 'failed to upload file') !== false
+        strpos($known, 'failed to upload file') !== false ||
+        strpos($known, 'pdf conversion') !== false ||
+        strpos($known, 'unsupported image format') !== false ||
+        strpos($known, 'webp image') !== false ||
+        strpos($known, 'webp images') !== false ||
+        strpos($known, 'failed to convert uploaded image') !== false
     ) {
         $msg = $e->getMessage();
         $status = 400;

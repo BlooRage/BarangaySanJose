@@ -33,24 +33,27 @@ return [
         'from_email' => 'official@your-domain.example',
         'from_name' => 'Barangay San Jose',
         'senders' => [
+            // Optional: only use a different from_email if that mailbox/alias
+            // really exists in your mail provider (e.g. Hostinger).
+            // Otherwise keep it the same as your authenticated mailbox.
             'verify' => [
-                'from_email' => 'verify@your-domain.example',
+                'from_email' => 'official@your-domain.example',
                 'from_name' => 'Barangay San Jose Verification',
             ],
             'one_time' => [
-                'from_email' => 'access@your-domain.example',
+                'from_email' => 'official@your-domain.example',
                 'from_name' => 'Barangay San Jose Access',
             ],
             'onboarding_access' => [
-                'from_email' => 'access@your-domain.example',
+                'from_email' => 'official@your-domain.example',
                 'from_name' => 'Barangay San Jose',
             ],
             'announcement' => [
-                'from_email' => 'announcements@your-domain.example',
+                'from_email' => 'official@your-domain.example',
                 'from_name' => 'Barangay San Jose Announcements',
             ],
             'transaction' => [
-                'from_email' => 'no-reply@your-domain.example',
+                'from_email' => 'official@your-domain.example',
                 'from_name' => 'Barangay San Jose Notifications',
             ],
         ],
@@ -60,5 +63,6 @@ return [
         'semaphore_api_key' => 'your_semaphore_api_key',
         'sender' => 'BrgySanJose',
         'endpoint' => 'https://api.semaphore.co/api/v4/messages',
+        'otp_endpoint' => 'https://api.semaphore.co/api/v4/otp',
     ],
 ];

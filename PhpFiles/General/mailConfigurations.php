@@ -30,30 +30,25 @@ $mailSmtpAuth = runtime_bool(runtime_env('MAIL_SMTP_AUTH', runtime_config('mail.
 $mailFromEmail = trim((string)runtime_env('MAIL_FROM_EMAIL', runtime_config('mail.from_email', $mailUsername)));
 $mailFromName = trim((string)runtime_env('MAIL_FROM_NAME', runtime_config('mail.from_name', 'Barangay San Jose')));
 
-$mailDomain = '';
-if ($mailFromEmail !== '' && strpos($mailFromEmail, '@') !== false) {
-    $mailDomain = (string)substr($mailFromEmail, strpos($mailFromEmail, '@') + 1);
-}
-
 $defaultSenders = [
     'verify' => [
-        'from_email' => $mailDomain !== '' ? 'verify@' . $mailDomain : $mailFromEmail,
+        'from_email' => $mailFromEmail,
         'from_name' => 'Barangay San Jose Verification',
     ],
     'one_time' => [
-        'from_email' => $mailDomain !== '' ? 'access@' . $mailDomain : $mailFromEmail,
+        'from_email' => $mailFromEmail,
         'from_name' => 'Barangay San Jose Access',
     ],
     'onboarding_access' => [
-        'from_email' => $mailDomain !== '' ? 'access@' . $mailDomain : $mailFromEmail,
+        'from_email' => $mailFromEmail,
         'from_name' => 'Barangay San Jose',
     ],
     'announcement' => [
-        'from_email' => $mailDomain !== '' ? 'announcements@' . $mailDomain : $mailFromEmail,
+        'from_email' => $mailFromEmail,
         'from_name' => 'Barangay San Jose Announcements',
     ],
     'transaction' => [
-        'from_email' => $mailDomain !== '' ? 'no-reply@' . $mailDomain : $mailFromEmail,
+        'from_email' => $mailFromEmail,
         'from_name' => 'Barangay San Jose Notifications',
     ],
 ];

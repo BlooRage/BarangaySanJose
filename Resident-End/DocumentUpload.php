@@ -156,16 +156,16 @@ if (!in_array($resubmitMode, ['sector', 'profiling'], true)) {
                                 <div class="col-md-6">
                                     <div class="upload-box position-relative">
                                         <div class="upload-text"><i class="fa-solid fa-upload"></i><span>Drag & drop file</span></div>
-                                        <div class="upload-subtext mt-1">PDF or image</div>
-                                        <input type="file" class="form-control upload-input" id="idFrontInput" name="idFront" accept=".jpg,.jpeg,.png,.webp,.pdf">
+                                        <div class="upload-subtext mt-1">PDF, JPG, or PNG</div>
+                                        <input type="file" class="form-control upload-input" id="idFrontInput" name="idFront" accept=".jpg,.jpeg,.png,.pdf">
                                     </div>
                                     <small class="text-muted d-block text-center mt-2" id="idFrontCaption">Front</small>
                                 </div>
                                 <div class="col-md-6" id="idBackWrapper">
                                     <div class="upload-box position-relative">
                                         <div class="upload-text"><i class="fa-solid fa-upload"></i><span>Drag & drop file</span></div>
-                                        <div class="upload-subtext mt-1">PDF or image</div>
-                                        <input type="file" class="form-control upload-input" id="idBackInput" name="idBack" accept=".jpg,.jpeg,.png,.webp,.pdf">
+                                        <div class="upload-subtext mt-1">PDF, JPG, or PNG</div>
+                                        <input type="file" class="form-control upload-input" id="idBackInput" name="idBack" accept=".jpg,.jpeg,.png,.pdf">
                                     </div>
                                     <small class="text-muted d-block text-center mt-2" id="idBackCaption">Back</small>
                                 </div>
@@ -234,8 +234,8 @@ if (!in_array($resubmitMode, ['sector', 'profiling'], true)) {
                                     <div class="small text-muted mb-2 sector-idpair-hint d-none" data-sector="PWD">If you selected an ID as proof, upload clear photos of the front and back.</div>
                                     <div class="sector-upload-idpair d-none" data-sector="PWD">
                                         <div class="row g-2">
-                                            <div class="col-md-6"><div class="upload-box position-relative"><div class="upload-text"><i class="fa-solid fa-upload"></i><span>Drag & drop file</span></div><div class="upload-subtext mt-1">Image only</div><input type="file" class="form-control upload-input sector-doc-idfront" name="sectorDocFile[PWD][]" data-sector="PWD" accept=".jpg,.jpeg,.png,.webp"></div><small class="text-muted d-block text-center mt-2">Front</small></div>
-                                            <div class="col-md-6"><div class="upload-box position-relative"><div class="upload-text"><i class="fa-solid fa-upload"></i><span>Drag & drop file</span></div><div class="upload-subtext mt-1">Image only</div><input type="file" class="form-control upload-input sector-doc-idback" name="sectorDocFile[PWD][]" data-sector="PWD" accept=".jpg,.jpeg,.png,.webp"></div><small class="text-muted d-block text-center mt-2">Back</small></div>
+                                            <div class="col-md-6"><div class="upload-box position-relative"><div class="upload-text"><i class="fa-solid fa-upload"></i><span>Drag & drop file</span></div><div class="upload-subtext mt-1">JPG or PNG</div><input type="file" class="form-control upload-input sector-doc-idfront" name="sectorDocFile[PWD][]" data-sector="PWD" accept=".jpg,.jpeg,.png"></div><small class="text-muted d-block text-center mt-2">Front</small></div>
+                                            <div class="col-md-6"><div class="upload-box position-relative"><div class="upload-text"><i class="fa-solid fa-upload"></i><span>Drag & drop file</span></div><div class="upload-subtext mt-1">JPG or PNG</div><input type="file" class="form-control upload-input sector-doc-idback" name="sectorDocFile[PWD][]" data-sector="PWD" accept=".jpg,.jpeg,.png"></div><small class="text-muted d-block text-center mt-2">Back</small></div>
                                         </div>
                                     </div>
                                     <div class="sector-upload-list" data-sector="PWD"><div class="position-relative"><div class="upload-box position-relative"><div class="upload-text"><i class="fa-solid fa-upload"></i><span>Drag & drop file</span></div><div class="upload-subtext mt-1">PDF or image</div><input type="file" class="form-control upload-input sector-doc-file" id="sectorDocFilePWD" name="sectorDocFile[PWD][]" data-sector="PWD" accept=".pdf,.jpg,.jpeg,.png,.webp"></div><small class="text-muted d-block text-center mt-2">Attachment 1</small></div></div>
@@ -255,8 +255,8 @@ if (!in_array($resubmitMode, ['sector', 'profiling'], true)) {
                                     <div class="small text-muted mb-2 sector-idpair-hint d-none" data-sector="SeniorCitizen">If you selected an ID as proof, upload clear photos of the front and back.</div>
                                     <div class="sector-upload-idpair d-none" data-sector="SeniorCitizen">
                                         <div class="row g-2">
-                                            <div class="col-md-6"><div class="upload-box position-relative"><div class="upload-text"><i class="fa-solid fa-upload"></i><span>Drag & drop file</span></div><div class="upload-subtext mt-1">Image only</div><input type="file" class="form-control upload-input sector-doc-idfront" name="sectorDocFile[SeniorCitizen][]" data-sector="SeniorCitizen" accept=".jpg,.jpeg,.png,.webp"></div><small class="text-muted d-block text-center mt-2">Front</small></div>
-                                            <div class="col-md-6"><div class="upload-box position-relative"><div class="upload-text"><i class="fa-solid fa-upload"></i><span>Drag & drop file</span></div><div class="upload-subtext mt-1">Image only</div><input type="file" class="form-control upload-input sector-doc-idback" name="sectorDocFile[SeniorCitizen][]" data-sector="SeniorCitizen" accept=".jpg,.jpeg,.png,.webp"></div><small class="text-muted d-block text-center mt-2">Back</small></div>
+                                            <div class="col-md-6"><div class="upload-box position-relative"><div class="upload-text"><i class="fa-solid fa-upload"></i><span>Drag & drop file</span></div><div class="upload-subtext mt-1">JPG or PNG</div><input type="file" class="form-control upload-input sector-doc-idfront" name="sectorDocFile[SeniorCitizen][]" data-sector="SeniorCitizen" accept=".jpg,.jpeg,.png"></div><small class="text-muted d-block text-center mt-2">Front</small></div>
+                                            <div class="col-md-6"><div class="upload-box position-relative"><div class="upload-text"><i class="fa-solid fa-upload"></i><span>Drag & drop file</span></div><div class="upload-subtext mt-1">JPG or PNG</div><input type="file" class="form-control upload-input sector-doc-idback" name="sectorDocFile[SeniorCitizen][]" data-sector="SeniorCitizen" accept=".jpg,.jpeg,.png"></div><small class="text-muted d-block text-center mt-2">Back</small></div>
                                         </div>
                                     </div>
                                     <div class="sector-upload-list" data-sector="SeniorCitizen"><div class="position-relative"><div class="upload-box position-relative"><div class="upload-text"><i class="fa-solid fa-upload"></i><span>Drag & drop file</span></div><div class="upload-subtext mt-1">PDF or image</div><input type="file" class="form-control upload-input sector-doc-file" id="sectorDocFileSenior" name="sectorDocFile[SeniorCitizen][]" data-sector="SeniorCitizen" accept=".pdf,.jpg,.jpeg,.png,.webp"></div><small class="text-muted d-block text-center mt-2">Attachment 1</small></div></div>
@@ -278,8 +278,8 @@ if (!in_array($resubmitMode, ['sector', 'profiling'], true)) {
                                     <div class="small text-muted mb-2 sector-idpair-hint d-none" data-sector="Student">If you selected an ID as proof, upload clear photos of the front and back.</div>
                                     <div class="sector-upload-idpair d-none" data-sector="Student">
                                         <div class="row g-2">
-                                            <div class="col-md-6"><div class="upload-box position-relative"><div class="upload-text"><i class="fa-solid fa-upload"></i><span>Drag & drop file</span></div><div class="upload-subtext mt-1">Image only</div><input type="file" class="form-control upload-input sector-doc-idfront" name="sectorDocFile[Student][]" data-sector="Student" accept=".jpg,.jpeg,.png,.webp"></div><small class="text-muted d-block text-center mt-2">Front</small></div>
-                                            <div class="col-md-6"><div class="upload-box position-relative"><div class="upload-text"><i class="fa-solid fa-upload"></i><span>Drag & drop file</span></div><div class="upload-subtext mt-1">Image only</div><input type="file" class="form-control upload-input sector-doc-idback" name="sectorDocFile[Student][]" data-sector="Student" accept=".jpg,.jpeg,.png,.webp"></div><small class="text-muted d-block text-center mt-2">Back</small></div>
+                                            <div class="col-md-6"><div class="upload-box position-relative"><div class="upload-text"><i class="fa-solid fa-upload"></i><span>Drag & drop file</span></div><div class="upload-subtext mt-1">JPG or PNG</div><input type="file" class="form-control upload-input sector-doc-idfront" name="sectorDocFile[Student][]" data-sector="Student" accept=".jpg,.jpeg,.png"></div><small class="text-muted d-block text-center mt-2">Front</small></div>
+                                            <div class="col-md-6"><div class="upload-box position-relative"><div class="upload-text"><i class="fa-solid fa-upload"></i><span>Drag & drop file</span></div><div class="upload-subtext mt-1">JPG or PNG</div><input type="file" class="form-control upload-input sector-doc-idback" name="sectorDocFile[Student][]" data-sector="Student" accept=".jpg,.jpeg,.png"></div><small class="text-muted d-block text-center mt-2">Back</small></div>
                                         </div>
                                     </div>
                                     <div class="sector-upload-list" data-sector="Student"><div class="position-relative"><div class="upload-box position-relative"><div class="upload-text"><i class="fa-solid fa-upload"></i><span>Drag & drop file</span></div><div class="upload-subtext mt-1">PDF or image</div><input type="file" class="form-control upload-input sector-doc-file" id="sectorDocFileStudent" name="sectorDocFile[Student][]" data-sector="Student" accept=".pdf,.jpg,.jpeg,.png,.webp"></div><small class="text-muted d-block text-center mt-2">Attachment 1</small></div></div>
@@ -301,8 +301,8 @@ if (!in_array($resubmitMode, ['sector', 'profiling'], true)) {
                                     <div class="small text-muted mb-2 sector-idpair-hint d-none" data-sector="IndigenousPeople">If you selected an ID as proof, upload clear photos of the front and back.</div>
                                     <div class="sector-upload-idpair d-none" data-sector="IndigenousPeople">
                                         <div class="row g-2">
-                                            <div class="col-md-6"><div class="upload-box position-relative"><div class="upload-text"><i class="fa-solid fa-upload"></i><span>Drag & drop file</span></div><div class="upload-subtext mt-1">Image only</div><input type="file" class="form-control upload-input sector-doc-idfront" name="sectorDocFile[IndigenousPeople][]" data-sector="IndigenousPeople" accept=".jpg,.jpeg,.png,.webp"></div><small class="text-muted d-block text-center mt-2">Front</small></div>
-                                            <div class="col-md-6"><div class="upload-box position-relative"><div class="upload-text"><i class="fa-solid fa-upload"></i><span>Drag & drop file</span></div><div class="upload-subtext mt-1">Image only</div><input type="file" class="form-control upload-input sector-doc-idback" name="sectorDocFile[IndigenousPeople][]" data-sector="IndigenousPeople" accept=".jpg,.jpeg,.png,.webp"></div><small class="text-muted d-block text-center mt-2">Back</small></div>
+                                            <div class="col-md-6"><div class="upload-box position-relative"><div class="upload-text"><i class="fa-solid fa-upload"></i><span>Drag & drop file</span></div><div class="upload-subtext mt-1">JPG or PNG</div><input type="file" class="form-control upload-input sector-doc-idfront" name="sectorDocFile[IndigenousPeople][]" data-sector="IndigenousPeople" accept=".jpg,.jpeg,.png"></div><small class="text-muted d-block text-center mt-2">Front</small></div>
+                                            <div class="col-md-6"><div class="upload-box position-relative"><div class="upload-text"><i class="fa-solid fa-upload"></i><span>Drag & drop file</span></div><div class="upload-subtext mt-1">JPG or PNG</div><input type="file" class="form-control upload-input sector-doc-idback" name="sectorDocFile[IndigenousPeople][]" data-sector="IndigenousPeople" accept=".jpg,.jpeg,.png"></div><small class="text-muted d-block text-center mt-2">Back</small></div>
                                         </div>
                                     </div>
                                     <div class="sector-upload-list" data-sector="IndigenousPeople"><div class="position-relative"><div class="upload-box position-relative"><div class="upload-text"><i class="fa-solid fa-upload"></i><span>Drag & drop file</span></div><div class="upload-subtext mt-1">PDF or image</div><input type="file" class="form-control upload-input sector-doc-file" id="sectorDocFileIP" name="sectorDocFile[IndigenousPeople][]" data-sector="IndigenousPeople" accept=".pdf,.jpg,.jpeg,.png,.webp"></div><small class="text-muted d-block text-center mt-2">Attachment 1</small></div></div>
@@ -326,8 +326,8 @@ if (!in_array($resubmitMode, ['sector', 'profiling'], true)) {
                                     <div class="small text-muted mb-2 sector-idpair-hint d-none" data-sector="SingleParent">If you selected an ID as proof, upload clear photos of the front and back.</div>
                                     <div class="sector-upload-idpair d-none" data-sector="SingleParent">
                                         <div class="row g-2">
-                                            <div class="col-md-6"><div class="upload-box position-relative"><div class="upload-text"><i class="fa-solid fa-upload"></i><span>Drag & drop file</span></div><div class="upload-subtext mt-1">Image only</div><input type="file" class="form-control upload-input sector-doc-idfront" name="sectorDocFile[SingleParent][]" data-sector="SingleParent" accept=".jpg,.jpeg,.png,.webp"></div><small class="text-muted d-block text-center mt-2">Front</small></div>
-                                            <div class="col-md-6"><div class="upload-box position-relative"><div class="upload-text"><i class="fa-solid fa-upload"></i><span>Drag & drop file</span></div><div class="upload-subtext mt-1">Image only</div><input type="file" class="form-control upload-input sector-doc-idback" name="sectorDocFile[SingleParent][]" data-sector="SingleParent" accept=".jpg,.jpeg,.png,.webp"></div><small class="text-muted d-block text-center mt-2">Back</small></div>
+                                            <div class="col-md-6"><div class="upload-box position-relative"><div class="upload-text"><i class="fa-solid fa-upload"></i><span>Drag & drop file</span></div><div class="upload-subtext mt-1">JPG or PNG</div><input type="file" class="form-control upload-input sector-doc-idfront" name="sectorDocFile[SingleParent][]" data-sector="SingleParent" accept=".jpg,.jpeg,.png"></div><small class="text-muted d-block text-center mt-2">Front</small></div>
+                                            <div class="col-md-6"><div class="upload-box position-relative"><div class="upload-text"><i class="fa-solid fa-upload"></i><span>Drag & drop file</span></div><div class="upload-subtext mt-1">JPG or PNG</div><input type="file" class="form-control upload-input sector-doc-idback" name="sectorDocFile[SingleParent][]" data-sector="SingleParent" accept=".jpg,.jpeg,.png"></div><small class="text-muted d-block text-center mt-2">Back</small></div>
                                         </div>
                                     </div>
                                     <div class="sector-upload-list" data-sector="SingleParent"><div class="position-relative"><div class="upload-box position-relative"><div class="upload-text"><i class="fa-solid fa-upload"></i><span>Drag & drop file</span></div><div class="upload-subtext mt-1">PDF or image</div><input type="file" class="form-control upload-input sector-doc-file" id="sectorDocFileSoloParent" name="sectorDocFile[SingleParent][]" data-sector="SingleParent" accept=".pdf,.jpg,.jpeg,.png,.webp"></div><small class="text-muted d-block text-center mt-2">Attachment 1</small></div></div>
@@ -473,6 +473,22 @@ document.addEventListener("DOMContentLoaded", () => {
     const input = uploadBox.querySelector('input[type="file"]');
     if (!input) return;
 
+    function isMergedIdInput(targetInput) {
+      if (!targetInput) return false;
+      return targetInput.id === "idFrontInput"
+        || targetInput.id === "idBackInput"
+        || targetInput.classList.contains("sector-doc-idfront")
+        || targetInput.classList.contains("sector-doc-idback");
+    }
+
+    function mergedInputFormatMessage(targetInput) {
+      if (!targetInput) return "Please upload a supported file.";
+      if (targetInput.classList.contains("sector-doc-idfront") || targetInput.classList.contains("sector-doc-idback")) {
+        return "Please upload JPG, JPEG, or PNG.";
+      }
+      return "Please upload JPG, JPEG, PNG, or PDF.";
+    }
+
     function clearUploadVisual(targetInput) {
       if (!targetInput) return;
       const targetBox = targetInput.closest(".upload-box");
@@ -481,7 +497,7 @@ document.addEventListener("DOMContentLoaded", () => {
       targetBox.querySelectorAll(".uploaded-filename,.upload-remove").forEach((el) => el.remove());
     }
 
-    async function convertHeicIfNeeded(targetInput) {
+    async function validateSelectedFiles(targetInput) {
       if (!targetInput || !targetInput.files || targetInput.files.length === 0) return;
       const files = Array.from(targetInput.files);
       for (const file of files) {
@@ -490,7 +506,16 @@ document.addEventListener("DOMContentLoaded", () => {
         if (isHeic) {
           targetInput.value = "";
           clearUploadVisual(targetInput);
-          throw new Error("HEIC/HEIF is not supported. Please upload JPG, JPEG, PNG, WEBP, or PDF.");
+          throw new Error(isMergedIdInput(targetInput)
+            ? `HEIC/HEIF is not supported. ${mergedInputFormatMessage(targetInput)}`
+            : "HEIC/HEIF is not supported. Please upload JPG, JPEG, PNG, WEBP, or PDF.");
+        }
+
+        const isWebp = ext === "webp" || file.type === "image/webp";
+        if (isMergedIdInput(targetInput) && isWebp) {
+          targetInput.value = "";
+          clearUploadVisual(targetInput);
+          throw new Error(`WEBP cannot be converted to PDF on this server. ${mergedInputFormatMessage(targetInput)}`);
         }
       }
     }
@@ -506,11 +531,11 @@ document.addEventListener("DOMContentLoaded", () => {
       if (e.dataTransfer.files.length) {
         try {
           input.files = e.dataTransfer.files;
-          await convertHeicIfNeeded(input);
+          await validateSelectedFiles(input);
           if (input.files.length) markUploaded(uploadBox, input);
         } catch (err) {
           clearUploadVisual(input);
-          modalError(err?.message || "Unsupported file. Please upload JPG, JPEG, PNG, WEBP, or PDF.");
+          modalError(err?.message || (isMergedIdInput(input) ? mergedInputFormatMessage(input) : "Unsupported file. Please upload JPG, JPEG, PNG, WEBP, or PDF."));
         }
       }
     });
@@ -518,11 +543,11 @@ document.addEventListener("DOMContentLoaded", () => {
     input.addEventListener("change", async () => {
       if (!input.files.length) return;
       try {
-        await convertHeicIfNeeded(input);
+        await validateSelectedFiles(input);
         if (input.files.length) markUploaded(uploadBox, input);
       } catch (err) {
         clearUploadVisual(input);
-        modalError(err?.message || "Unsupported file. Please upload JPG, JPEG, PNG, WEBP, or PDF.");
+        modalError(err?.message || (isMergedIdInput(input) ? mergedInputFormatMessage(input) : "Unsupported file. Please upload JPG, JPEG, PNG, WEBP, or PDF."));
       }
     });
   }

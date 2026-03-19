@@ -220,10 +220,11 @@ $sharedMeta = [
                     <label class="form-check-label" for="audienceCustom">Custom Audience</label>
                   </div>
 
-                  <div id="customAudienceFields" class="row g-2 d-none">
+                  <div id="customAudienceFields" class="row g-3 d-none">
                     <div class="col-12">
                       <label class="form-label mb-1">Area</label>
-                      <select class="form-select" name="area">
+                      <p class="announcement-editor-helper mb-2">Choose the area that should receive this announcement.</p>
+                      <select class="form-select" name="area" disabled>
                         <option value="">Select Area</option>
                         <?php foreach ($audienceAreaOptions as $areaOption): ?>
                           <option><?= htmlspecialchars($areaOption, ENT_QUOTES, 'UTF-8') ?></option>
@@ -232,7 +233,8 @@ $sharedMeta = [
                     </div>
                     <div class="col-12">
                       <label class="form-label mb-1">Role Group</label>
-                      <select class="form-select" name="role_group">
+                      <p class="announcement-editor-helper mb-2">Filter recipients by role when this update is only for a specific group.</p>
+                      <select class="form-select" name="role_group" disabled>
                         <option value="">Select Group</option>
                         <option>Officials</option>
                         <option>Employees</option>
@@ -462,6 +464,7 @@ $sharedMeta = [
       const emailField = document.getElementById("emailField");
       const audienceAll = document.getElementById("audienceAll");
       const customAudienceFields = document.getElementById("customAudienceFields");
+      const audienceCustom = document.getElementById("audienceCustom");
       const faqItemsContainer = document.getElementById("faqItemsContainer");
       const faqAddItemBtn = document.getElementById("faqAddItemBtn");
       const faqItemCount = document.getElementById("faqItemCount");
@@ -770,10 +773,23 @@ $sharedMeta = [
       }
 
       function toggleAudienceFields() {
-        if (!customAudienceFields || !audienceAll) {
+        if (!customAudienceFields || !audienceAll || !audienceCustom) {
           return;
         }
-        customAudienceFields.classList.toggle("d-none", audienceAll.checked);
+        const useCustomAudience = audienceCustom.checked;
+        customAudienceFields.classList.toggle("d-none", !useCustomAudience);
+        customAudienceFields.querySelectorAll("input, select, textarea").forEach((field) => {
+          field.disabled = !useCustomAudience;
+          if (!useCustomAudience) {
+            if (field.tagName === "SELECT") {
+              field.selectedIndex = 0;
+            } else if (field.type === "checkbox" || field.type === "radio") {
+              field.checked = false;
+            } else {
+              field.value = "";
+            }
+          }
+        });
       }
 
       function applyToolbarTooltips() {
