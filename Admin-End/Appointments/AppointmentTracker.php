@@ -47,8 +47,11 @@ function at_status_key(string $value): string
     if (str_contains($normalized, 'approve')) {
         return 'approved';
     }
-    if (str_contains($normalized, 'deny') || str_contains($normalized, 'reject')) {
+    if (str_contains($normalized, 'deny') || str_contains($normalized, 'denied') || str_contains($normalized, 'reject')) {
         return 'denied';
+    }
+    if (str_contains($normalized, 'resched')) {
+        return 'approved';
     }
     if (str_contains($normalized, 'complete') || str_contains($normalized, 'done')) {
         return 'approved';

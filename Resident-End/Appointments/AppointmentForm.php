@@ -70,6 +70,7 @@ $maxAppointmentDate = date('Y-m-t');
 <html lang="en">
 <head>
     <meta charset="UTF-8">
+    <link rel="icon" href="../../Images/favicon_sanjose.png?v=20260211">
     <title>Appointment Form</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
@@ -78,21 +79,113 @@ $maxAppointmentDate = date('Y-m-t');
     <link rel="stylesheet" href="../../CSS-Styles/Resident-End-CSS/residentDashboard.css">
     <link rel="stylesheet" href="../../CSS-Styles/Guest-End-CSS/GeneralStyle.css">
     <link rel="stylesheet" href="../../CSS-Styles/Resident-End-CSS/applicationForms.css">
+    <style>
+        body {
+            background: #fffdfb;
+        }
+        #div-mainDisplay {
+            background: #ffffff !important;
+        }
+        #div-mainDisplay .form-title,
+        #div-mainDisplay .form-subtitle,
+        #div-mainDisplay .back-link {
+            max-width: 1180px;
+            margin-left: auto;
+            margin-right: auto;
+        }
+        #div-mainDisplay .page-form {
+            max-width: 1180px;
+            margin: 0 auto;
+            padding-bottom: 48px;
+        }
+        #div-mainDisplay .section-title,
+        #div-mainDisplay .section-kicker {
+            max-width: 1180px;
+            margin-left: auto;
+            margin-right: auto;
+        }
+        .section-kicker {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.45rem;
+            padding: 0.35rem 0.8rem;
+            border-radius: 999px;
+            border: 1px solid #f2d3b8;
+            background: #fff7ef;
+            color: #a35300;
+            font-size: 0.85rem;
+            font-weight: 700;
+            margin-bottom: 1rem;
+        }
+        .appointment-guide {
+            max-width: 1180px;
+            margin: 0 auto 1.75rem;
+            border: 1px solid #f2d9c2;
+            border-radius: 16px;
+            background: linear-gradient(180deg, #fffaf6 0%, #fff7ef 100%);
+            padding: 1rem 1.15rem;
+        }
+        .appointment-guide-title {
+            font-weight: 700;
+            color: #7c3f00;
+            margin-bottom: 0.35rem;
+        }
+        .appointment-guide-text {
+            color: #5f6b7a;
+            margin-bottom: 0;
+            font-size: 0.95rem;
+        }
+        h1.form-title {
+            font-size: 2.8rem !important;
+            font-weight: 700;
+        }
+        h2.section-title {
+            font-size: 1.35rem;
+            font-weight: 600;
+            margin-top: 32px;
+            margin-bottom: 24px;
+        }
+        .form-divider {
+            max-width: 1180px;
+            margin: 1.75rem auto 1.25rem;
+            border-color: #ebe5df;
+        }
+        input[type="date"].form-control,
+        input[type="time"].form-control {
+            background-color: #ffffff !important;
+            color: #212529;
+        }
+        input[type="date"].form-control::-webkit-date-and-time-value,
+        input[type="time"].form-control::-webkit-date-and-time-value {
+            text-align: left;
+        }
+        input[type="date"].form-control::-webkit-calendar-picker-indicator,
+        input[type="time"].form-control::-webkit-calendar-picker-indicator {
+            opacity: 1;
+        }
+    </style>
 </head>
 <body>
     <div class="d-flex min-vh-100">
 
         <?php include __DIR__ . '/../includes/resident_sidebar.php'; ?>
 
-        <main id="div-mainDisplay" class="flex-grow-1 px-4 pb-4 pt-0 px-md-5 pb-md-5 pt-md-0 bg-light">
+        <main id="div-mainDisplay" class="flex-grow-1 px-4 pb-4 pt-0 px-md-5 pb-md-5 pt-md-0">
+            <div class="position-relative d-flex align-items-center justify-content-center mb-2 pt-4">
+                <a href="<?= htmlspecialchars(appUrl('Resident-End/Appointments/AppointmentsLandingPage.php')) ?>" class="back-link d-inline-flex align-items-center text-decoration-none text-dark m-0 position-absolute start-0">
+                    <i class="bi bi-arrow-left-short fs-3"></i>
+                </a>
+                <h1 class="form-title m-0">Appointment Form</h1>
+            </div>
+            <p class="form-subtitle">Schedule a barangay visit using the same resident form layout used across other requests and applications.</p>
+            <p class="form-subtitle">All fields marked with <span class="required-asterisk">*</span> are required</p>
 
-            <div class="main-head application-card orange-card application-card--muted py-3 mt-5 rounded">
-                <div class="main-head-content">
-                    <a href="<?= htmlspecialchars(appUrl('Resident-End/resident_dashboard.php')) ?>" class="back-link">&lt; Go Back</a>
-                    <h1 class="form-title" style="color: #de710c">Appointment Form</h1>
-                    <p class="form-subtitle">All fields marked with <span class="required-asterisk">*</span> are required</p>
+            <div class="appointment-guide">
+                <div class="appointment-guide-title">Before You Submit</div>
+                <p class="appointment-guide-text">Choose a date within the current month and a time between 9:01 AM and 4:59 PM. If you select <strong>Other</strong> as the subject, include a short specific description.</p>
+            </div>
 
-                    <form method="POST" action="<?= htmlspecialchars(appUrl('/PhpFiles/Resident-End/submitAppointment.php'), ENT_QUOTES, 'UTF-8') ?>">
+            <form class="page-form" method="POST" action="<?= htmlspecialchars(appUrl('/PhpFiles/Resident-End/submitAppointment.php'), ENT_QUOTES, 'UTF-8') ?>">
                         <?= csrfTokenField() ?>
                         <input type="hidden" name="action" value="submit_appointment">
                         <?php if ($feedbackMessage !== '' && $feedbackType !== 'success'): ?>
@@ -100,24 +193,25 @@ $maxAppointmentDate = date('Y-m-t');
                                 <?php echo htmlspecialchars($feedbackMessage, ENT_QUOTES, 'UTF-8'); ?>
                             </div>
                         <?php endif; ?>
-                        <h2 class="section-title text-center text-dark">Information</h2>
+                        <div class="section-kicker"><i class="fa-regular fa-calendar-check"></i> Appointment Request</div>
+                        <h2 class="section-title text-center text-dark">Resident Information</h2>
 
                         <div class="form-row pt-0">
                             <div>
                                 <label class="top-label">Last Name <span class="required-asterisk">*</span></label>
-                                <input type="text" name="last_name" value="<?php echo $lastName; ?>" readonly>
+                                <input type="text" class="form-control" name="last_name" value="<?php echo $lastName; ?>" readonly>
                             </div>
                             <div>
                                 <label class="top-label">First Name <span class="required-asterisk">*</span></label>
-                                <input type="text" name="first_name" value="<?php echo $firstName; ?>" readonly>
+                                <input type="text" class="form-control" name="first_name" value="<?php echo $firstName; ?>" readonly>
                             </div>
                             <div>
                                 <label class="top-label">Middle Name</label>
-                                <input type="text" name="middle_name" value="<?php echo $middleName; ?>" readonly>
+                                <input type="text" class="form-control" name="middle_name" value="<?php echo $middleName; ?>" readonly>
                             </div>
                             <div>
                                 <label class="top-label">Suffix</label>
-                                <select name="suffix_name" class="text-bg-light" readonly value="<?php echo htmlspecialchars($suffix, ENT_QUOTES, 'UTF-8'); ?>" disabled>
+                                <select name="suffix_name" class="form-select text-bg-light" readonly value="<?php echo htmlspecialchars($suffix, ENT_QUOTES, 'UTF-8'); ?>" disabled>
                                     <option value="" <?php echo ($suffix === "") ? "selected" : ""; ?>>None</option>
                                     <option value="Jr." <?php echo ($suffix === "Jr.") ? "selected" : ""; ?>>Jr.</option>
                                     <option value="Sr." <?php echo ($suffix === "Sr.") ? "selected" : ""; ?>>Sr.</option>
@@ -131,24 +225,28 @@ $maxAppointmentDate = date('Y-m-t');
                         <div class="form-row">
                             <div class="full-width">
                                 <label class="top-label">Contact Number <span class="required-asterisk">*</span></label>
-                                <input type="text" name="contact_number" value="<?php echo $contactNumber; ?>" readonly>
+                                <input type="text" class="form-control" name="contact_number" value="<?php echo $contactNumber; ?>" readonly>
                             </div>
                         </div>
 
                         <div class="form-row">
                             <div class="full-width">
                             <label class="top-label">Address <span class="required-asterisk">*</span></label>
-                                <input type="text" name="full_address_display" readonly value="<?php echo htmlspecialchars($fullAddress, ENT_QUOTES, 'UTF-8'); ?>">
+                                <input type="text" class="form-control" name="full_address_display" readonly value="<?php echo htmlspecialchars($fullAddress, ENT_QUOTES, 'UTF-8'); ?>">
                                 <input type="hidden" name="unitNumber" value="<?php echo htmlspecialchars($unitNumber, ENT_QUOTES, 'UTF-8'); ?>">
                                 <input type="hidden" name="houseNumber" value="<?php echo htmlspecialchars($houseNumber, ENT_QUOTES, 'UTF-8'); ?>">
                                 <input type="hidden" name="streetName" value="<?php echo htmlspecialchars($streetName, ENT_QUOTES, 'UTF-8'); ?>">
                             </div>
                         </div>
 
+                        <hr class="form-divider">
+
+                        <h2 class="section-title text-center text-dark">Appointment Details</h2>
+
                         <div class="form-row two-col-row">
                             <div>
                                 <label class="top-label">Subject of Appointment <span class="required-asterisk">*</span></label>
-                                <select name="subject" id="appointmentSubject" required>
+                                <select class="form-select" name="subject" id="appointmentSubject" required>
                                     <option value="">Select</option>
                                     <option value="follow_up" <?php echo $formValues['subject'] === 'follow_up' ? 'selected' : ''; ?>>Follow-up Concern</option>
                                     <option value="consultation" <?php echo $formValues['subject'] === 'consultation' ? 'selected' : ''; ?>>Consultation</option>
@@ -160,6 +258,7 @@ $maxAppointmentDate = date('Y-m-t');
                                 <label class="top-label">If Other, please specify</label>
                                 <input
                                     type="text"
+                                    class="form-control"
                                     name="subject_other"
                                     id="appointmentSubjectOther"
                                     value="<?php echo htmlspecialchars($formValues['subject_other'], ENT_QUOTES, 'UTF-8'); ?>"
@@ -172,12 +271,12 @@ $maxAppointmentDate = date('Y-m-t');
                         <div class="form-row two-col-row">
                             <div>
                                 <label class="top-label">Date of Appointment <span class="required-asterisk">*</span></label>
-                                <input type="date" id="appointmentDate" name="appointment_date" min="<?php echo htmlspecialchars($minAppointmentDate, ENT_QUOTES, 'UTF-8'); ?>" max="<?php echo htmlspecialchars($maxAppointmentDate, ENT_QUOTES, 'UTF-8'); ?>" data-month-start="<?php echo htmlspecialchars($currentMonthStartDate, ENT_QUOTES, 'UTF-8'); ?>" data-month-end="<?php echo htmlspecialchars($maxAppointmentDate, ENT_QUOTES, 'UTF-8'); ?>" value="<?php echo htmlspecialchars($formValues['appointment_date'], ENT_QUOTES, 'UTF-8'); ?>" required>
+                                <input type="date" class="form-control" id="appointmentDate" name="appointment_date" min="<?php echo htmlspecialchars($minAppointmentDate, ENT_QUOTES, 'UTF-8'); ?>" max="<?php echo htmlspecialchars($maxAppointmentDate, ENT_QUOTES, 'UTF-8'); ?>" data-month-start="<?php echo htmlspecialchars($currentMonthStartDate, ENT_QUOTES, 'UTF-8'); ?>" data-month-end="<?php echo htmlspecialchars($maxAppointmentDate, ENT_QUOTES, 'UTF-8'); ?>" value="<?php echo htmlspecialchars($formValues['appointment_date'], ENT_QUOTES, 'UTF-8'); ?>" required>
                                 <div id="appointmentDateError" class="text-danger small mt-1 d-none" aria-live="polite"></div>
                             </div>
                             <div>
                                 <label class="top-label">Time of Appointment <span class="required-asterisk">*</span></label>
-                                <input type="time" id="appointmentTime" name="appointment_time" value="<?php echo htmlspecialchars($formValues['appointment_time'], ENT_QUOTES, 'UTF-8'); ?>" required>
+                                <input type="time" class="form-control" id="appointmentTime" name="appointment_time" value="<?php echo htmlspecialchars($formValues['appointment_time'], ENT_QUOTES, 'UTF-8'); ?>" required>
                                 <div id="appointmentTimeError" class="text-danger small mt-1 d-none" aria-live="polite"></div>
                             </div>
                         </div>
@@ -185,20 +284,18 @@ $maxAppointmentDate = date('Y-m-t');
                         <div class="form-row">
                             <div class="full-width">
                                 <label class="top-label">Purpose <span class="required-asterisk">*</span></label>
-                                <input type="text" name="purpose" value="<?php echo htmlspecialchars($formValues['purpose'], ENT_QUOTES, 'UTF-8'); ?>" required>
+                                <textarea class="form-control" name="purpose" rows="4" required><?php echo htmlspecialchars($formValues['purpose'], ENT_QUOTES, 'UTF-8'); ?></textarea>
                             </div>
                         </div>
 
                         <div class="agreement-row">
-                                    <label class="agreement-text check-item">
-                                        <input type="checkbox" required>I hereby certify that the above information is true and correct to the best of my knowledge and belief.
-                                    </label>
+                            <label class="agreement-text check-item">
+                                <input type="checkbox" required>I hereby certify that the above information is true and correct to the best of my knowledge and belief.
+                            </label>
 
-                                    <button type="submit" class="submit-btn">SUBMIT</button>
-                                </div>
-                    </form>
-                </div>
-            </div>
+                            <button type="submit" class="submit-btn">SUBMIT</button>
+                        </div>
+            </form>
         </main>
     </div>
 

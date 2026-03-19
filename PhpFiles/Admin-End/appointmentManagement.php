@@ -12,6 +12,15 @@ function am_redirect_with_message(string $type, string $message, array $extra = 
     exit;
 }
 
+function am_is_local_request(): bool
+{
+    $host = strtolower(trim((string)($_SERVER['HTTP_HOST'] ?? $_SERVER['SERVER_NAME'] ?? '')));
+    $host = preg_replace('/:\d+$/', '', $host);
+    $remote = strtolower(trim((string)($_SERVER['REMOTE_ADDR'] ?? '')));
+    return in_array($host, ['localhost', '127.0.0.1', '::1'], true)
+        || in_array($remote, ['127.0.0.1', '::1'], true);
+}
+
 function am_table_exists(mysqli $conn, string $tableName): bool
 {
     $stmt = $conn->prepare("
@@ -58,6 +67,64 @@ function am_table_columns(mysqli $conn, string $tableName): array
     $stmt->close();
 
     return $columns;
+}
+
+function am_official_profile_exists(mysqli $conn, string $userId): bool
+{
+    $userId = trim($userId);
+    if ($userId === '') {
+        return false;
+    }
+
+    if (!am_table_exists($conn, 'officialinformationtbl')) {
+        return false;
+    }
+
+    $stmt = $conn->prepare("
+        SELECT 1
+        FROM officialinformationtbl
+        WHERE user_id = ?
+        LIMIT 1
+    ");
+    if (!$stmt) {
+        return false;
+    }
+
+    $stmt->bind_param("s", $userId);
+    $stmt->execute();
+    $row = $stmt->get_result()->fetch_row();
+    $stmt->close();
+
+    return !empty($row);
+}
+
+function am_account_exists(mysqli $conn, string $userId): bool
+{
+    $userId = trim($userId);
+    if ($userId === '') {
+        return false;
+    }
+
+    if (!am_table_exists($conn, 'useraccountstbl')) {
+        return false;
+    }
+
+    $stmt = $conn->prepare("
+        SELECT 1
+        FROM useraccountstbl
+        WHERE user_id = ?
+        LIMIT 1
+    ");
+    if (!$stmt) {
+        return false;
+    }
+
+    $stmt->bind_param("s", $userId);
+    $stmt->execute();
+    $row = $stmt->get_result()->fetch_row();
+    $stmt->close();
+
+    return !empty($row);
 }
 
 function am_get_status_id(mysqli $conn, string $name, string $type): ?int
@@ -146,6 +213,7 @@ $confirmedDate = trim((string)($_POST['confirmed_date'] ?? ''));
 $confirmedTime = trim((string)($_POST['confirmed_time'] ?? ''));
 $remarks = trim((string)($_POST['appointment_remarks'] ?? ''));
 $reviewedByUserId = trim((string)($_SESSION['user_id'] ?? ''));
+$reviewedByOfficialUserId = am_official_profile_exists($conn, $reviewedByUserId) ? $reviewedByUserId : '';
 
 if (!in_array($action, ['approve_appointment', 'reschedule_appointment', 'deny_appointment'], true)) {
     am_redirect_with_message('error', 'Unknown appointment action.');
@@ -162,6 +230,12 @@ if (!isset($appointmentColumns['appointment_status_id'])) {
 
 if ($officialUserId !== '' && !isset($appointmentColumns['user_id_official_assigned'])) {
     am_redirect_with_message('error', 'Assigned official cannot be saved because user_id_official_assigned is missing from appointmentstbl.', [
+        'appointment_id' => $appointmentId,
+    ]);
+}
+
+if ($officialUserId !== '' && !am_account_exists($conn, $officialUserId)) {
+    am_redirect_with_message('error', 'Selected official account could not be found.', [
         'appointment_id' => $appointmentId,
     ]);
 }
@@ -223,22 +297,22 @@ try {
     $bindTypes = 'i';
     $bindValues = [$statusId];
 
-    if (isset($appointmentColumns['user_id_employee_staff'])) {
+    if (isset($appointmentColumns['user_id_employee_staff']) && $reviewedByOfficialUserId !== '') {
         $setClauses[] = 'user_id_employee_staff = ?';
         $bindTypes .= 's';
-        $bindValues[] = $reviewedByUserId !== '' ? $reviewedByUserId : null;
+        $bindValues[] = $reviewedByOfficialUserId;
     }
 
-    if (isset($appointmentColumns['user_id_official_assigned'])) {
+    if (isset($appointmentColumns['user_id_official_assigned']) && $officialUserId !== '') {
         $setClauses[] = 'user_id_official_assigned = ?';
         $bindTypes .= 's';
-        $bindValues[] = $officialUserId !== '' ? $officialUserId : null;
+        $bindValues[] = $officialUserId;
     }
 
-    if (isset($appointmentColumns['appointment_remarks'])) {
+    if (isset($appointmentColumns['appointment_remarks']) && $remarks !== '') {
         $setClauses[] = 'appointment_remarks = ?';
         $bindTypes .= 's';
-        $bindValues[] = $remarks !== '' ? $remarks : null;
+        $bindValues[] = $remarks;
     }
 
     if (isset($appointmentColumns['review_timestamp'])) {
@@ -293,5 +367,9 @@ try {
 } catch (Throwable $e) {
     $conn->rollback();
     error_log('appointmentManagement failed: ' . $e->getMessage());
-    am_redirect_with_message('error', 'Unable to update the appointment right now.', ['appointment_id' => $appointmentId]);
+    $message = 'Unable to update the appointment right now.';
+    if (am_is_local_request()) {
+        $message = $e->getMessage() !== '' ? $e->getMessage() : $message;
+    }
+    am_redirect_with_message('error', $message, ['appointment_id' => $appointmentId]);
 }

@@ -1,4 +1,4 @@
-<?php
+477777777<?php
 if (!isset($baseUrl)) {
     $scriptName = str_replace("\\", "/", (string)($_SERVER['SCRIPT_NAME'] ?? ''));
     $residentSegmentPos = strpos($scriptName, '/Resident-End/');
@@ -136,6 +136,9 @@ if (isset($conn) && $conn instanceof mysqli) {
     <style>
         body {
             background: #f8f9fb;
+        }
+        #mobile-header {
+            display: none;
         }
         #div-mainDisplay {
             background: #f8f9fb !important;
@@ -322,6 +325,9 @@ if (isset($conn) && $conn instanceof mysqli) {
             #div-mainDisplay {
                 padding: 1rem !important;
             }
+            .downloads-subtitle {
+                font-size: 0.95rem;
+            }
             .downloads-card {
                 padding: 0.9rem !important;
             }
@@ -336,6 +342,19 @@ if (isset($conn) && $conn instanceof mysqli) {
                 font-size: clamp(1.7rem, 7.5vw, 2.15rem);
                 margin-bottom: 0.4rem;
             }
+            .download-card-header {
+                flex-direction: column;
+                align-items: stretch;
+            }
+            .downloads-status-pill {
+                align-self: flex-start;
+            }
+            .download-actions {
+                flex-direction: column;
+            }
+            .download-actions .btn {
+                width: 100%;
+            }
         }
         @media (max-width: 480px) {
             .audit-table {
@@ -345,12 +364,77 @@ if (isset($conn) && $conn instanceof mysqli) {
             .audit-table th {
                 font-size: 0.875rem;
             }
+            .downloads-summary {
+                width: 100%;
+                justify-content: space-between;
+            }
+        }
+        @media (max-width: 1160px) {
+            #mobile-header {
+                display: block !important;
+                position: fixed;
+                top: 0;
+                left: 0;
+                width: 100%;
+                z-index: 1030;
+                height: auto !important;
+                padding: 0 !important;
+                margin: 0 !important;
+                overflow: visible !important;
+            }
+            #mobile-header .d-flex {
+                width: 100%;
+            }
+            #div-mainDisplay {
+                margin-left: 0 !important;
+                width: 100%;
+                padding-top: 1rem !important;
+            }
+            body {
+                padding-top: 64px;
+            }
+            #div-sidebarWrapper {
+                position: fixed !important;
+                top: 0;
+                left: 0;
+                height: 100vh !important;
+                width: 280px;
+                z-index: 1060;
+                transform: translateX(-100%);
+                transition: transform 0.28s ease;
+                box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0);
+            }
+            #div-sidebarWrapper.show {
+                transform: translateX(0);
+                box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.25);
+            }
+        }
+        @media (min-width: 1161px) {
+            body {
+                padding-top: 0;
+            }
+            #mobile-header {
+                display: none !important;
+            }
+            #div-sidebarWrapper {
+                transform: none !important;
+            }
         }
     </style>
 </head>
 <body>
 <div class="d-flex min-vh-100">
     <?php include __DIR__ . '/includes/resident_sidebar.php'; ?>
+
+    <header id="mobile-header">
+        <div class="d-flex align-items-center px-3 py-2 shadow-sm bg-white">
+            <button class="btn" id="btn-burger" type="button" aria-label="Open sidebar">
+                <i class="fa-solid fa-bars fa-lg"></i>
+            </button>
+            <img src="<?= htmlspecialchars($baseUrl) ?>/Images/San_Jose_LOGO.jpg" alt="Logo" style="width:32px;height:32px">
+            <span class="logo-name">Barangay San Jose</span>
+        </div>
+    </header>
 
     <main id="div-mainDisplay" class="flex-grow-1 p-4 p-md-5">
         <div class="downloads-shell">
@@ -491,5 +575,6 @@ if (isset($conn) && $conn instanceof mysqli) {
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script src="<?= htmlspecialchars($baseUrl) ?>/JS-Script-Files/Resident-End/profileSidebar.js"></script>
 </body>
 </html>
