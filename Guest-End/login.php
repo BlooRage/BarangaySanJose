@@ -44,7 +44,7 @@ if (!empty($_SESSION['user_id']) && empty($_SESSION['role'])) {
     </script>
 
     <!-- ✅ OLD ORDER (keep this) -->
-    <script src="../JS-Script-Files/loginScripts.js" defer></script>
+    <script src="../JS-Script-Files/loginScripts.js?v=20260319-otpfix2" defer></script>
     <script src="../JS-Script-Files/modalHandler.js" defer></script>
   </head>
 
