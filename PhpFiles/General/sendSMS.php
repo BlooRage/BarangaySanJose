@@ -3,8 +3,16 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/runtimeConfig.php';
 
-$SEMAPHORE_API_KEY = trim((string)runtime_env('SMS_SEMAPHORE_API_KEY', runtime_env('SMS_API_KEY', runtime_config('sms.semaphore_api_key', ''))));
-$SEMAPHORE_SENDER = trim((string)runtime_env('SMS_SENDER', runtime_config('sms.sender', 'BrgySanJose')));
+// Hosted fallback values mirror the currently deployed Semaphore account.
+// Environment variables and runtime config still take precedence.
+$defaultSemaphoreApiKey = 'ee267d0fbd5c2159bea7d72878c9d4cb';
+$defaultSemaphoreSender = 'BrgySanJose';
+
+$SEMAPHORE_API_KEY = trim((string)runtime_env(
+    'SMS_SEMAPHORE_API_KEY',
+    runtime_env('SMS_API_KEY', runtime_config('sms.semaphore_api_key', $defaultSemaphoreApiKey))
+));
+$SEMAPHORE_SENDER = trim((string)runtime_env('SMS_SENDER', runtime_config('sms.sender', $defaultSemaphoreSender)));
 $SEMAPHORE_ENDPOINT = trim((string)runtime_env('SMS_ENDPOINT', runtime_config('sms.endpoint', 'https://api.semaphore.co/api/v4/messages')));
 $SEMAPHORE_OTP_ENDPOINT = trim((string)runtime_env('SMS_OTP_ENDPOINT', runtime_config('sms.otp_endpoint', 'https://api.semaphore.co/api/v4/otp')));
 

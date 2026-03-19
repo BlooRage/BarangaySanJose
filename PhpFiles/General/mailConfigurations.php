@@ -20,10 +20,19 @@ if (!function_exists('mail_config_value')) {
     }
 }
 
-$mailHost = trim((string)runtime_env('MAIL_HOST', runtime_config('mail.host', 'smtp.hostinger.com')));
-$mailUsername = trim((string)runtime_env('MAIL_USERNAME', runtime_env('MAIL_USER', runtime_config('mail.username', ''))));
-$mailPassword = (string)runtime_env('MAIL_PASSWORD', runtime_env('MAIL_PASS', runtime_config('mail.password', '')));
-$mailPort = (int)runtime_env('MAIL_PORT', runtime_config('mail.port', 465));
+// Hosted fallback values mirror the currently active mailbox.
+// Environment variables and runtime config still take precedence.
+$defaultMailHost = 'smtp.hostinger.com';
+$defaultMailUsername = 'official@barangaysanjose-montalban.com';
+$defaultMailPassword = 'SanJose.Brgy@2025!';
+$defaultMailPort = 465;
+$defaultMailFromEmail = 'official@barangaysanjose-montalban.com';
+$defaultMailFromName = 'Barangay San Jose';
+
+$mailHost = trim((string)runtime_env('MAIL_HOST', runtime_config('mail.host', $defaultMailHost)));
+$mailUsername = trim((string)runtime_env('MAIL_USERNAME', runtime_env('MAIL_USER', runtime_config('mail.username', $defaultMailUsername))));
+$mailPassword = (string)runtime_env('MAIL_PASSWORD', runtime_env('MAIL_PASS', runtime_config('mail.password', $defaultMailPassword)));
+$mailPort = (int)runtime_env('MAIL_PORT', runtime_config('mail.port', $defaultMailPort));
 $mailSecure = trim((string)runtime_env('MAIL_SECURE', runtime_config('mail.secure', $mailPort === 587 ? 'tls' : 'ssl')));
 $mailSmtpAuth = runtime_bool(runtime_env('MAIL_SMTP_AUTH', runtime_config('mail.smtp_auth', true)), true);
 $mailTimeout = (int)runtime_env('MAIL_TIMEOUT', runtime_config('mail.timeout', 30));
@@ -32,8 +41,8 @@ if (!is_array($mailSmtpOptions)) {
     $mailSmtpOptions = [];
 }
 
-$mailFromEmail = trim((string)runtime_env('MAIL_FROM_EMAIL', runtime_config('mail.from_email', $mailUsername)));
-$mailFromName = trim((string)runtime_env('MAIL_FROM_NAME', runtime_config('mail.from_name', 'Barangay San Jose')));
+$mailFromEmail = trim((string)runtime_env('MAIL_FROM_EMAIL', runtime_config('mail.from_email', $mailUsername !== '' ? $mailUsername : $defaultMailFromEmail)));
+$mailFromName = trim((string)runtime_env('MAIL_FROM_NAME', runtime_config('mail.from_name', $defaultMailFromName)));
 
 $defaultSenders = [
     'verify' => [
