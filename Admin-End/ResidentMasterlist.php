@@ -18,10 +18,6 @@
             -webkit-overflow-scrolling: touch;
         }
 
-        .resident-masterlist-shell #table-appData {
-            min-width: 760px;
-        }
-
         .resident-masterlist-shell #table-appData th,
         .resident-masterlist-shell #table-appData td {
             white-space: nowrap;

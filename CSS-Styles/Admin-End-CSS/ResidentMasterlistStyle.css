@@ -899,6 +899,7 @@ h2.section-title {
 
 .resident-masterlist-shell #table-appData.compact-admin-table--resident {
     table-layout: fixed;
+    min-width: 980px;
 }
 
 .resident-masterlist-shell #table-appData.compact-admin-table--resident th:first-child,
