@@ -30,6 +30,58 @@ function cleanString($value): string {
     return trim((string)$value);
 }
 
+function normalizeFilesArray($file): array {
+    if (!$file || !is_array($file) || !isset($file['name'])) {
+        return [];
+    }
+    if (!is_array($file['name'])) {
+        return [$file];
+    }
+    $normalized = [];
+    $count = count($file['name']);
+    for ($i = 0; $i < $count; $i++) {
+        $normalized[] = [
+            'name' => $file['name'][$i] ?? '',
+            'type' => $file['type'][$i] ?? '',
+            'tmp_name' => $file['tmp_name'][$i] ?? '',
+            'error' => $file['error'][$i] ?? UPLOAD_ERR_NO_FILE,
+            'size' => $file['size'][$i] ?? 0,
+        ];
+    }
+    return $normalized;
+}
+
+function hasValidUpload(array $files): bool {
+    foreach ($files as $file) {
+        $error = (int)($file['error'] ?? UPLOAD_ERR_NO_FILE);
+        $tmpName = (string)($file['tmp_name'] ?? '');
+        $size = (int)($file['size'] ?? 0);
+        if (
+            $error === UPLOAD_ERR_OK &&
+            $tmpName !== '' &&
+            is_uploaded_file($tmpName) &&
+            $size > 0
+        ) {
+            return true;
+        }
+    }
+    return false;
+}
+
+function filterValidUploads(array $files): array {
+    return array_values(array_filter($files, function ($file) {
+        $error = (int)($file['error'] ?? UPLOAD_ERR_NO_FILE);
+        $tmpName = (string)($file['tmp_name'] ?? '');
+        $size = (int)($file['size'] ?? 0);
+        return (
+            $error === UPLOAD_ERR_OK &&
+            $tmpName !== '' &&
+            is_uploaded_file($tmpName) &&
+            $size > 0
+        );
+    }));
+}
+
 function isValidAddressLikeText(string $value): bool {
     $value = trim($value);
     if ($value === '') {
@@ -77,6 +129,99 @@ function getResidentId(mysqli $conn, string $userId): ?string {
     $stmt->fetch();
     $stmt->close();
     return $residentId ?: null;
+}
+
+function isHeicExt(string $ext): bool {
+    return in_array($ext, ['heic', 'heif'], true);
+}
+
+function sanitizeDocTypeToken(string $docType): string {
+    $token = preg_replace('/[^A-Za-z0-9]+/', '', $docType);
+    return $token !== '' ? $token : 'Document';
+}
+
+function buildAttachmentFileName(string $docType, string $userId, string $ext, int $index = 0): string {
+    $base = sanitizeDocTypeToken($docType) . $userId;
+    if ($index > 0) {
+        $base .= '_' . $index;
+    }
+    return $base . '.' . strtolower($ext);
+}
+
+function toDbWebPath(string $absolutePath): string {
+    $absolutePath = str_replace("\\", "/", trim($absolutePath));
+    $projectRoot = realpath(__DIR__ . "/../..");
+    $marker = "/UnifiedFileAttachment/";
+    $markerPos = strpos($absolutePath, $marker);
+    if ($markerPos !== false) {
+        return ltrim(substr($absolutePath, $markerPos), "/");
+    }
+
+    if ($projectRoot) {
+        $rootNorm = str_replace("\\", "/", $projectRoot);
+        if (strpos($absolutePath, $rootNorm) === 0) {
+            $rel = ltrim(substr($absolutePath, strlen($rootNorm)), "/");
+            return $rel;
+        }
+    }
+
+    return ltrim($absolutePath, "/");
+}
+
+function moveUploadedFileWithDocName(string $tmpName, string $dir, string $docType, string $userId, string $ext): array {
+    if ($tmpName === '' || !is_uploaded_file($tmpName)) {
+        throw new Exception('Invalid upload source.');
+    }
+
+    $index = 0;
+    $fileName = buildAttachmentFileName($docType, $userId, $ext, $index);
+    $target = rtrim($dir, "/") . "/" . $fileName;
+
+    while (file_exists($target)) {
+        $index++;
+        $fileName = buildAttachmentFileName($docType, $userId, $ext, $index);
+        $target = rtrim($dir, "/") . "/" . $fileName;
+    }
+
+    if (!move_uploaded_file($tmpName, $target)) {
+        throw new Exception('Failed to upload file.');
+    }
+
+    return [
+        'file_name' => $fileName,
+        'file_path' => toDbWebPath($target),
+        'disk_path' => $target,
+    ];
+}
+
+function getDocumentTypeId(mysqli $conn, string $name): int {
+    $q = $conn->prepare("SELECT document_type_id FROM documenttypelookuptbl WHERE LOWER(document_type_name) = LOWER(?) AND document_category = 'EditRequest' LIMIT 1");
+    if (!$q) {
+        throw new Exception('Prepare failed (getDocumentTypeId): ' . $conn->error);
+    }
+    $q->bind_param("s", $name);
+    $q->execute();
+    $res = $q->get_result()->fetch_assoc();
+    $q->close();
+    if ($res && isset($res['document_type_id'])) {
+        return (int)$res['document_type_id'];
+    }
+
+    $ins = $conn->prepare("INSERT INTO documenttypelookuptbl (document_type_name, document_category) VALUES (?, 'EditRequest')");
+    if (!$ins) {
+        throw new Exception('Prepare failed (create document type): ' . $conn->error);
+    }
+    $ins->bind_param("s", $name);
+    if (!$ins->execute()) {
+        $ins->close();
+        throw new Exception("Failed to create document type: {$name}");
+    }
+    $newId = (int)$ins->insert_id;
+    $ins->close();
+    if ($newId <= 0) {
+        throw new Exception("Unable to resolve document type: {$name}");
+    }
+    return $newId;
 }
 
 function isHeadOfFamily(mysqli $conn, string $residentId): bool {
@@ -182,6 +327,13 @@ $addressSystem = strtolower(cleanString($payload['address_system'] ?? 'house'));
 $houseOwnership = cleanString($payload['house_ownership'] ?? '');
 $houseType = cleanString($payload['house_type'] ?? '');
 $residencyDuration = 'Less than 6 months';
+$supportingAddressType = cleanString($payload['supporting_address_type'] ?? '');
+$supportingAddressFiles = normalizeFilesArray($_FILES['supporting_address_file'] ?? null);
+$allowedSupportingDocTypes = [
+    'Contract of Lease',
+    'Transfer Certificate of Title',
+    'Tax Declaration',
+];
 
 if (!in_array($addressSystem, ['house', 'lot_block'], true)) {
     http_response_code(400);
@@ -206,6 +358,18 @@ if ($addressSystem === 'house') {
 if ($houseOwnership === '' || $houseType === '') {
     http_response_code(400);
     echo json_encode(['success' => false, 'message' => 'House ownership and house type are required.']);
+    exit;
+}
+
+if (!in_array($supportingAddressType, $allowedSupportingDocTypes, true)) {
+    http_response_code(400);
+    echo json_encode(['success' => false, 'message' => 'Please select a valid supporting document type for address change.']);
+    exit;
+}
+
+if (!hasValidUpload($supportingAddressFiles)) {
+    http_response_code(400);
+    echo json_encode(['success' => false, 'message' => 'Supporting document is required for address change.']);
     exit;
 }
 
@@ -335,6 +499,13 @@ if ($pendingStatusId === null) {
     exit;
 }
 
+$statusVerifyId = getStatusId($conn, 'PendingReview', 'ResidentDocumentProfiling');
+if ($statusVerifyId === null) {
+    http_response_code(500);
+    echo json_encode(['success' => false, 'message' => 'Attachment verification status missing.']);
+    exit;
+}
+
 // Block duplicate pending address requests
 $dup = $conn->prepare("
     SELECT 1
@@ -406,37 +577,98 @@ if ($newHeadResidentId !== '') {
     $changes['new_head_resident_id'] = $newHeadResidentId;
 }
 
-$stmt = $conn->prepare("
-    INSERT INTO resident_edit_requesttbl
-        (resident_id, user_id, request_type, status_id, requested_changes)
-    VALUES (?, ?, 'address', ?, ?)
-");
-if (!$stmt) {
-    http_response_code(500);
-    echo json_encode(['success' => false, 'message' => 'Failed to prepare edit request.']);
+$userFolder = preg_replace('/[^A-Za-z0-9_-]/', '', (string)$userId);
+if ($userFolder === '') {
+    http_response_code(400);
+    echo json_encode(['success' => false, 'message' => 'Invalid user folder name.']);
     exit;
 }
-$changesJson = json_encode($changes, JSON_UNESCAPED_SLASHES);
-$stmt->bind_param("ssis", $residentId, $userId, $pendingStatusId, $changesJson);
-if (!$stmt->execute()) {
+$uploadDir = __DIR__ . "/../../UnifiedFileAttachment/Documents/{$userFolder}/";
+if (!is_dir($uploadDir) && !mkdir($uploadDir, 0777, true)) {
     http_response_code(500);
-    echo json_encode(['success' => false, 'message' => 'Failed to submit edit request.']);
+    echo json_encode(['success' => false, 'message' => 'Failed to create upload directory.']);
     exit;
 }
-$requestId = (int)$stmt->insert_id;
-$stmt->close();
 
-createResidentTransaction(
-    $conn,
-    (string)$userId,
-    (string)$userId,
-    'EDIT_REQUEST',
-    (string)$requestId,
-    mapEditRequestTransactionType('address'),
-    mapEditRequestTitle('address'),
-    (int)$pendingStatusId,
-    mapEditRequestDescription('address'),
-    ['request_type' => 'address']
-);
+$allowedExt = ['jpg', 'jpeg', 'png', 'webp', 'pdf'];
+$conn->begin_transaction();
 
-echo json_encode(['success' => true, 'message' => 'Address change request submitted.']);
+try {
+    $stmt = $conn->prepare("
+        INSERT INTO resident_edit_requesttbl
+            (resident_id, user_id, request_type, status_id, requested_changes)
+        VALUES (?, ?, 'address', ?, ?)
+    ");
+    if (!$stmt) {
+        throw new Exception('Failed to prepare edit request.');
+    }
+    $changesJson = json_encode($changes, JSON_UNESCAPED_SLASHES);
+    $stmt->bind_param("ssis", $residentId, $userId, $pendingStatusId, $changesJson);
+    if (!$stmt->execute()) {
+        throw new Exception('Failed to submit edit request.');
+    }
+    $requestId = (int)$stmt->insert_id;
+    $stmt->close();
+
+    $docTypeId = getDocumentTypeId($conn, $supportingAddressType);
+    $remarks = 'edit_request_supporting:address';
+    foreach (filterValidUploads($supportingAddressFiles) as $supportingFile) {
+        $ext = strtolower(pathinfo($supportingFile['name'] ?? '', PATHINFO_EXTENSION));
+        if (isHeicExt($ext)) {
+            throw new Exception('HEIC is not supported. Please upload JPG or PNG.');
+        }
+        if (!in_array($ext, $allowedExt, true)) {
+            throw new Exception('Invalid file type for supporting document.');
+        }
+
+        $moved = moveUploadedFileWithDocName($supportingFile['tmp_name'], $uploadDir, $supportingAddressType, $userId, $ext);
+        $ins = $conn->prepare("
+            INSERT INTO unifiedfileattachmenttbl
+                (source_type, source_id, document_type_id, file_name, file_path, file_type, user_id_uploaded_by, status_id_verify, remarks, id_number)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ");
+        if (!$ins) {
+            throw new Exception('Failed to prepare supporting document attachment.');
+        }
+        $sourceType = 'ResidentEditRequest';
+        $sourceId = (string)$requestId;
+        $idNumber = null;
+        $ins->bind_param(
+            "ssissssiss",
+            $sourceType,
+            $sourceId,
+            $docTypeId,
+            $moved['file_name'],
+            $moved['file_path'],
+            $ext,
+            $userId,
+            $statusVerifyId,
+            $remarks,
+            $idNumber
+        );
+        if (!$ins->execute()) {
+            throw new Exception('Failed to save supporting document attachment.');
+        }
+        $ins->close();
+    }
+
+    createResidentTransaction(
+        $conn,
+        (string)$userId,
+        (string)$userId,
+        'EDIT_REQUEST',
+        (string)$requestId,
+        mapEditRequestTransactionType('address'),
+        mapEditRequestTitle('address'),
+        (int)$pendingStatusId,
+        mapEditRequestDescription('address'),
+        ['request_type' => 'address']
+    );
+
+    $conn->commit();
+    echo json_encode(['success' => true, 'message' => 'Address change request submitted.']);
+} catch (Throwable $e) {
+    $conn->rollback();
+    http_response_code(400);
+    echo json_encode(['success' => false, 'message' => $e->getMessage() ?: 'Failed to submit address change request.']);
+}

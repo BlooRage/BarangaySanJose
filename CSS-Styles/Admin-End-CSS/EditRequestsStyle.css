@@ -32,7 +32,7 @@
 
 #table-editRequests th:nth-child(5),
 #table-editRequests td:nth-child(5) {
-    text-align: center;
+    text-align: left;
 }
 
 .request-card {

@@ -5,6 +5,24 @@ require_once __DIR__ . "/../General/connection.php";
 requireAuthenticatedSession(true);
 
 function getResidentProfileData(mysqli $conn, string $userId): array {
+    $deriveResidentAddressSystem = static function (array $address): string {
+        $storedSystem = strtolower(trim((string)($address['address_system'] ?? '')));
+        if (in_array($storedSystem, ['house', 'lot_block'], true)) {
+            return $storedSystem;
+        }
+
+        $streetNumber = trim((string)($address['street_number'] ?? ''));
+        $streetName = trim((string)($address['street_name'] ?? ''));
+        if (
+            preg_match('/^\s*lot\b/i', $streetNumber) ||
+            preg_match('/^\s*block\b/i', $streetName)
+        ) {
+            return 'lot_block';
+        }
+
+        return 'house';
+    };
+
     $residentinformationtbl = [
         'resident_id' => '',
         'firstname' => '',
@@ -45,7 +63,8 @@ function getResidentProfileData(mysqli $conn, string $userId): array {
 	        'area_number' => '',
 	        'house_type' => '',
 	        'house_ownership' => '',
-	        'residency_duration' => ''
+	        'residency_duration' => '',
+            'address_system' => 'house'
 	    ];
 
     $useraccountstbl = [
@@ -191,8 +210,10 @@ function getResidentProfileData(mysqli $conn, string $userId): array {
 	                    'area_number' => $addr['area_number'] ?? '',
 	                    'house_type' => $addr['house_type'] ?? '',
 	                    'house_ownership' => $addr['house_ownership'] ?? '',
-	                    'residency_duration' => $addr['residency_duration'] ?? ''
+	                    'residency_duration' => $addr['residency_duration'] ?? '',
+                        'address_system' => 'house'
 	                ];
+                    $residentaddresstbl['address_system'] = $deriveResidentAddressSystem($residentaddresstbl);
 	            }
             $stmtAddr->close();
 	        }
@@ -243,8 +264,10 @@ function getResidentProfileData(mysqli $conn, string $userId): array {
                                 'area_number' => (string)($approvedChanges['area_number'] ?? $residentaddresstbl['area_number']),
                                 'house_type' => (string)($approvedChanges['house_type'] ?? $residentaddresstbl['house_type']),
                                 'house_ownership' => (string)($approvedChanges['house_ownership'] ?? $residentaddresstbl['house_ownership']),
-                                'residency_duration' => (string)($approvedChanges['residency_duration'] ?? $residentaddresstbl['residency_duration'])
+                                'residency_duration' => (string)($approvedChanges['residency_duration'] ?? $residentaddresstbl['residency_duration']),
+                                'address_system' => (string)($approvedChanges['address_system'] ?? $residentaddresstbl['address_system'])
                             ];
+                            $residentaddresstbl['address_system'] = $deriveResidentAddressSystem($residentaddresstbl);
                         }
                     }
                 }

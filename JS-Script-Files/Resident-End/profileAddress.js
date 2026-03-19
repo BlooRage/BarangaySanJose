@@ -1,9 +1,11 @@
 document.addEventListener("DOMContentLoaded", () => {
     const AUTO_RESIDENCY_DURATION = "Less than 6 months";
     const saveBtn = document.getElementById("btnSaveAddress");
-    if (!saveBtn) return;
+    const reviewBtn = document.getElementById("btnAddressReview");
+    if (!saveBtn || !reviewBtn) return;
 
     const resultEl = document.getElementById("addressSaveResult");
+    const uploadResultEl = document.getElementById("addressUploadResult");
     const headBlock = document.getElementById("headReassignBlock");
     const headSelect = document.getElementById("newHeadResidentId");
     const headEmpty = document.getElementById("headReassignEmpty");
@@ -14,6 +16,8 @@ document.addEventListener("DOMContentLoaded", () => {
         document.getElementById("btnOpenEditAddress") ||
         document.querySelector('[data-bs-target="#addAddressModal"]');
     const modalEl = document.getElementById("addAddressModal");
+    const uploadModalEl = document.getElementById("editAddressUploadModal");
+    const backToFormBtn = document.getElementById("btnAddressBackToForm");
     const noticeModalEl = document.getElementById("residentNoticeModal");
     const noticeTitleEl = document.getElementById("residentNoticeTitle");
     const noticeBodyEl = document.getElementById("residentNoticeBody");
@@ -24,12 +28,15 @@ document.addEventListener("DOMContentLoaded", () => {
         window.RESIDENT_PROFILE_EDIT_BLOCK_MESSAGE ||
         "Your account must be verified before you can change your address.";
     let requiresReassign = false;
+    let suppressFormResetOnHide = false;
     const isHead = headBlock?.dataset?.isHead === "1";
     const addressSystemEl = document.getElementById("addressSystemEdit");
     const houseWrapper = document.getElementById("addressHouseWrapper");
     const lotBlockWrapper = document.getElementById("addressLotBlockWrapper");
     const houseTypeEl = document.getElementById("addressHouseType");
     const houseTypeOtherEl = document.getElementById("addressHouseTypeOther");
+    const addressSupportTypeEl = document.getElementById("addressSupportType");
+    const addressSupportFileEl = document.getElementById("addressSupportFile");
     const fieldIds = [
         "addressSystemEdit",
         "addressUnitNumberHouse",
@@ -47,8 +54,15 @@ document.addEventListener("DOMContentLoaded", () => {
         "addressHouseOwnership",
         "addressHouseType",
         "addressHouseTypeOther",
+        "addressSupportType",
+        "addressSupportFile",
         "addressResidencyDuration",
     ];
+    const allowedSupportDocTypes = new Set([
+        "Contract of Lease",
+        "Transfer Certificate of Title",
+        "Tax Declaration",
+    ]);
     const initialValues = {};
     fieldIds.forEach((id) => {
         const el = document.getElementById(id);
@@ -101,10 +115,29 @@ document.addEventListener("DOMContentLoaded", () => {
         };
     };
 
+    const getCurrentProfilePayload = () => ({
+        address_system: modalEl?.dataset?.currentAddressSystem || "house",
+        unit_number: modalEl?.dataset?.currentUnitNumber || "",
+        street_number: modalEl?.dataset?.currentStreetNumber || "",
+        street_name: modalEl?.dataset?.currentStreetName || "",
+        phase_number: modalEl?.dataset?.currentPhaseNumber || "",
+        subdivision: modalEl?.dataset?.currentSubdivision || "",
+        area_number: modalEl?.dataset?.currentAreaNumber || "",
+        house_ownership: modalEl?.dataset?.currentHouseOwnership || "",
+        house_type: modalEl?.dataset?.currentHouseType || "",
+        residency_duration: modalEl?.dataset?.currentResidencyDuration || AUTO_RESIDENCY_DURATION,
+    });
+
     const setMessage = (message, isError = false) => {
         if (!resultEl) return;
         resultEl.textContent = message || "";
         resultEl.className = isError ? "small mb-2 text-danger" : "small mb-2 text-success";
+    };
+
+    const setUploadMessage = (message, isError = false) => {
+        if (!uploadResultEl) return;
+        uploadResultEl.textContent = message || "";
+        uploadResultEl.className = isError ? "small mt-2 text-danger" : "small mt-2 text-success";
     };
 
     const clearFieldErrors = () => {
@@ -114,7 +147,10 @@ document.addEventListener("DOMContentLoaded", () => {
         });
     };
 
-    const failField = (fieldId, message) => {
+    const failField = (fieldId, message, showErrors = true) => {
+        if (!showErrors) {
+            return false;
+        }
         clearFieldErrors();
         const el = document.getElementById(fieldId);
         if (el) el.classList.add("is-invalid");
@@ -172,28 +208,41 @@ document.addEventListener("DOMContentLoaded", () => {
         return false;
     };
 
-    const validate = () => {
-        clearFieldErrors();
+    const validate = ({ showErrors = true, includeSupportDocs = true } = {}) => {
+        if (showErrors) {
+            clearFieldErrors();
+        }
         const system = getAddressSystem();
         if (!["house", "lot_block"].includes(system)) {
-            return failField("addressSystemEdit", "Please select an address system.");
+            return failField("addressSystemEdit", "Please select an address system.", showErrors);
         }
         const address = getAddressFields();
 
         if (system === "house") {
-            if (!address.street_number) return failField("addressStreetNumberHouse", "House number is required.");
-            if (!address.street_name) return failField("addressStreetNameHouse", "Street name is required.");
-            if (!address.area_number) return failField("addressAreaNumberHouse", "Area is required.");
+            if (!address.street_number) return failField("addressStreetNumberHouse", "House number is required.", showErrors);
+            if (!address.street_name) return failField("addressStreetNameHouse", "Street name is required.", showErrors);
+            if (!address.area_number) return failField("addressAreaNumberHouse", "Area is required.", showErrors);
         } else {
-            if (!address.street_number) return failField("addressLotNumber", "Lot number is required.");
-            if (!address.phase_number) return failField("addressBlockNumber", "Block number is required.");
-            if (!address.area_number) return failField("addressAreaNumberLot", "Area is required.");
+            if (!address.street_number) return failField("addressLotNumber", "Lot number is required.", showErrors);
+            if (!address.phase_number) return failField("addressBlockNumber", "Block number is required.", showErrors);
+            if (!address.area_number) return failField("addressAreaNumberLot", "Area is required.", showErrors);
         }
 
         if (!getValue("addressHouseOwnership") || !getHouseTypeValue()) {
-            if (!getValue("addressHouseOwnership")) return failField("addressHouseOwnership", "House ownership is required.");
-            if (!getHouseTypeValue()) return failField("addressHouseType", "House type is required.");
+            if (!getValue("addressHouseOwnership")) return failField("addressHouseOwnership", "House ownership is required.", showErrors);
+            if (!getHouseTypeValue()) return failField("addressHouseType", "House type is required.", showErrors);
             return false;
+        }
+
+        if (includeSupportDocs) {
+            const supportType = addressSupportTypeEl ? addressSupportTypeEl.value.trim() : "";
+            const supportFiles = addressSupportFileEl ? Array.from(addressSupportFileEl.files || []) : [];
+            if (!allowedSupportDocTypes.has(supportType)) {
+                return failField("addressSupportType", "Please select a valid supporting document type.", showErrors);
+            }
+            if (supportFiles.length === 0) {
+                return failField("addressSupportFile", "Please upload at least one supporting document.", showErrors);
+            }
         }
 
         const fields = system === "lot_block"
@@ -216,32 +265,35 @@ document.addEventListener("DOMContentLoaded", () => {
         for (const field of fields) {
             const value = getValue(field.id);
             if (value && field.max && value.length > field.max) {
-                return failField(field.id, `${field.label} must be ${field.max} characters or less.`);
+                return failField(field.id, `${field.label} must be ${field.max} characters or less.`, showErrors);
             }
             if (field.type === "number" && value && !isValidAddressLikeField(value)) {
-                return failField(field.id, `${field.label} contains invalid characters.`);
+                return failField(field.id, `${field.label} contains invalid characters.`, showErrors);
             }
             if (field.type === "area" && value && !areaOptions.has(value)) {
-                return failField(field.id, "Please select a valid area.");
+                return failField(field.id, "Please select a valid area.", showErrors);
             }
             if (field.type === "text" && value && !isValidAddressLikeField(value)) {
-                return failField(field.id, `${field.label} contains invalid characters.`);
+                return failField(field.id, `${field.label} contains invalid characters.`, showErrors);
             }
             if (value && field.gibberish && looksLikeGibberish(value)) {
-                return failField(field.id, `${field.label} looks invalid. Please enter a real ${field.label.toLowerCase()}.`);
+                return failField(field.id, `${field.label} looks invalid. Please enter a real ${field.label.toLowerCase()}.`, showErrors);
             }
         }
 
         const houseTypeCustom = getValue("addressHouseTypeOther");
         if (houseTypeCustom && !isValidTextField(houseTypeCustom)) {
-            return failField("addressHouseTypeOther", "House type must contain valid text only.");
+            return failField("addressHouseTypeOther", "House type must contain valid text only.", showErrors);
         }
 
-        setMessage("");
+        if (showErrors) {
+            setMessage("");
+        }
         return true;
     };
 
     let initialPayload = {};
+    let currentProfilePayload = getCurrentProfilePayload();
 
     const isDirty = () => {
         const current = buildPayload();
@@ -249,10 +301,90 @@ document.addEventListener("DOMContentLoaded", () => {
         return JSON.stringify(current) !== JSON.stringify(initial);
     };
 
+    const escapeHtml = (value) =>
+        String(value ?? "")
+            .replace(/&/g, "&amp;")
+            .replace(/</g, "&lt;")
+            .replace(/>/g, "&gt;")
+            .replace(/\"/g, "&quot;")
+            .replace(/'/g, "&#039;");
+
+    const formatValue = (value) => (value && String(value).trim() !== "" ? String(value) : "N/A");
+
+    const humanizeAddressSystem = (value) =>
+        value === "lot_block" ? "Lot/Block System" : value === "house" ? "House Numbering System" : formatValue(value);
+
+    const buildChangeRows = () => {
+        const current = buildPayload();
+        const initial = currentProfilePayload || {};
+        const labels = {
+            address_system: "Address System",
+            unit_number: "Unit / Apartment Number",
+            street_number: current.address_system === "lot_block" ? "Lot" : "House Number",
+            street_name: "Street Name",
+            phase_number: current.address_system === "lot_block" ? "Block" : "Phase",
+            subdivision: "Subdivision",
+            area_number: "Area",
+            house_ownership: "House Ownership",
+            house_type: "House Type",
+            residency_duration: "Residency Duration",
+        };
+        const rows = [];
+
+        Object.entries(labels).forEach(([key, label]) => {
+            const fromRaw = initial[key] ?? "";
+            const toRaw = current[key] ?? "";
+            const from = key === "address_system" ? humanizeAddressSystem(fromRaw) : formatValue(fromRaw);
+            const to = key === "address_system" ? humanizeAddressSystem(toRaw) : formatValue(toRaw);
+            if (from !== to) {
+                rows.push({ field: label, from, to });
+            }
+        });
+
+        if (requiresReassign && headSelect && headSelect.value.trim()) {
+            const selectedText = headSelect.options[headSelect.selectedIndex]?.text || headSelect.value.trim();
+            rows.push({ field: "New Head of Household", from: "Current head", to: selectedText });
+        }
+
+        return rows;
+    };
+
+    const reviewHtml = (rows) => {
+        const items = rows
+            .map(
+                (row) => `
+                <tr>
+                    <td class="text-start fw-semibold">${escapeHtml(row.field)}</td>
+                    <td class="text-start">${escapeHtml(row.from)}</td>
+                    <td class="text-start">${escapeHtml(row.to)}</td>
+                </tr>`
+            )
+            .join("");
+
+        return `
+            <div class="table-responsive">
+                <table class="table table-sm align-middle mb-0">
+                    <thead>
+                        <tr>
+                            <th class="text-start">Field</th>
+                            <th class="text-start">From</th>
+                            <th class="text-start">To</th>
+                        </tr>
+                    </thead>
+                    <tbody>${items}</tbody>
+                </table>
+            </div>`;
+    };
+
     const resetForm = () => {
         fieldIds.forEach((id) => {
             const el = document.getElementById(id);
-            if (el) el.value = initialValues[id] ?? "";
+            if (!el) return;
+            if (el.type === "file") {
+                el.value = "";
+                return;
+            }
+            el.value = initialValues[id] ?? "";
         });
         const residencyEl = document.getElementById("addressResidencyDuration");
         if (residencyEl) residencyEl.value = AUTO_RESIDENCY_DURATION;
@@ -260,6 +392,7 @@ document.addEventListener("DOMContentLoaded", () => {
         toggleHouseTypeOther();
         if (headSelect) headSelect.value = "";
         if (resultEl) resultEl.textContent = "";
+        if (uploadResultEl) uploadResultEl.textContent = "";
         clearFieldErrors();
         if (headEmpty) headEmpty.classList.add("d-none");
         updateSaveState();
@@ -269,15 +402,21 @@ document.addEventListener("DOMContentLoaded", () => {
 
     const updateSaveState = () => {
         const hasChanges = isDirty();
-        const valid = hasChanges ? validate() : true;
+        const valid = hasChanges ? validate({ showErrors: false, includeSupportDocs: false }) : true;
         const needsHead = requiresReassign && headSelect && !headSelect.value.trim();
         if (!hasChanges) {
+            setMessage("");
+            clearFieldErrors();
+        } else if (valid) {
             setMessage("");
             clearFieldErrors();
         } else if (needsHead) {
             setMessage("Please assign a new head of household first.", true);
         } else if (isPendingRequest) {
             setMessage("You already have a pending address change request.", true);
+        } else {
+            setMessage("");
+            clearFieldErrors();
         }
         saveBtn.disabled = !hasChanges || !valid || needsHead || isPendingRequest;
     };
@@ -330,11 +469,90 @@ document.addEventListener("DOMContentLoaded", () => {
         headSelect.addEventListener("change", updateSaveState);
     }
 
+    const hideFormModalIfOpen = async () => {
+        if (!modalEl || !window.bootstrap?.Modal) return false;
+        const formModal = bootstrap.Modal.getInstance(modalEl);
+        if (!formModal || !modalEl.classList.contains("show")) return false;
+
+        await new Promise((resolve) => {
+            const onHidden = () => resolve();
+            modalEl.addEventListener("hidden.bs.modal", onHidden, { once: true });
+            suppressFormResetOnHide = true;
+            formModal.hide();
+        });
+        return true;
+    };
+
+    const openUploadModal = () => {
+        if (!uploadModalEl || !window.bootstrap?.Modal) return;
+        bootstrap.Modal.getOrCreateInstance(uploadModalEl).show();
+    };
+
+    const openReviewStep = async () => {
+        setMessage("");
+        if (!isDirty()) {
+            setMessage("No changes detected.", true);
+            return;
+        }
+        if (!validate({ showErrors: true, includeSupportDocs: false })) {
+            return;
+        }
+        if (requiresReassign) {
+            const newHeadId = headSelect ? headSelect.value.trim() : "";
+            if (!newHeadId) {
+                setMessage("Please assign a new head of household first.", true);
+                return;
+            }
+        }
+
+        const rows = buildChangeRows();
+        if (!rows.length) {
+            setMessage("No changes detected.", true);
+            return;
+        }
+
+        const formWasOpen = await hideFormModalIfOpen();
+        if (window.UniversalModal?.open) {
+            await new Promise((resolve) => {
+                window.UniversalModal.open({
+                    title: "Review Changes",
+                    messageHtml: reviewHtml(rows),
+                    buttons: [
+                        { label: "Back", class: "btn btn-outline-secondary", onClick: () => resolve(false) },
+                        { label: "Continue", class: "btn btn-primary", onClick: () => resolve(true) },
+                    ],
+                });
+            }).then((proceed) => {
+                if (proceed) {
+                    setUploadMessage("Upload the required supporting document(s) before submitting.");
+                    openUploadModal();
+                    return;
+                }
+                if (formWasOpen) {
+                    openModal();
+                }
+            });
+            return;
+        }
+
+        const proceed = window.confirm("Review complete. Continue to document upload?");
+        if (proceed) {
+            setUploadMessage("Upload the required supporting document(s) before submitting.");
+            openUploadModal();
+            return;
+        }
+        if (formWasOpen) {
+            openModal();
+        }
+    };
+
+    reviewBtn.addEventListener("click", openReviewStep);
+
     saveBtn.addEventListener("click", async () => {
         saveBtn.disabled = true;
-        setMessage("");
+        setUploadMessage("");
 
-        if (!validate()) {
+        if (!validate({ showErrors: true, includeSupportDocs: true })) {
             saveBtn.disabled = false;
             return;
         }
@@ -349,15 +567,26 @@ document.addEventListener("DOMContentLoaded", () => {
         }
 
         const payload = buildPayload();
+        const formData = new FormData();
+        Object.entries(payload).forEach(([key, value]) => {
+            formData.append(key, value);
+        });
         if (requiresReassign && headSelect) {
-            payload.new_head_resident_id = headSelect.value.trim();
+            formData.append("new_head_resident_id", headSelect.value.trim());
+        }
+        if (addressSupportTypeEl) {
+            formData.append("supporting_address_type", addressSupportTypeEl.value.trim());
+        }
+        if (addressSupportFileEl) {
+            Array.from(addressSupportFileEl.files || []).forEach((file) => {
+                formData.append("supporting_address_file[]", file);
+            });
         }
 
         try {
             const res = await fetch("../PhpFiles/Resident-End/resident_address_update.php", {
                 method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify(payload),
+                body: formData,
             });
             const data = await res.json().catch(() => ({}));
             if (!res.ok || !data.success) {
@@ -371,6 +600,7 @@ document.addEventListener("DOMContentLoaded", () => {
             }
 
             if (resultEl) resultEl.textContent = "";
+            if (uploadResultEl) uploadResultEl.textContent = "";
             if (noticeTitleEl) noticeTitleEl.textContent = "Request Submitted";
             if (noticeBodyEl) noticeBodyEl.textContent = data.message || "Address change request submitted.";
             if (noticeModalEl && window.bootstrap?.Modal) {
@@ -381,7 +611,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 window.location.reload();
             }, 800);
         } catch (err) {
-            setMessage(err?.message || "Failed to update address.", true);
+            setUploadMessage(err?.message || "Failed to update address.", true);
         } finally {
             saveBtn.disabled = false;
         }
@@ -448,6 +678,7 @@ document.addEventListener("DOMContentLoaded", () => {
         initialValues.addressResidencyDuration = AUTO_RESIDENCY_DURATION;
     }
     initialPayload = buildPayload();
+    currentProfilePayload = getCurrentProfilePayload();
     loadHeadReassign();
     const showNotice = (title, message) => {
         if (noticeTitleEl) noticeTitleEl.textContent = title || "Notice";
@@ -456,6 +687,10 @@ document.addEventListener("DOMContentLoaded", () => {
         if (modalEl && window.bootstrap?.Modal) {
             const openModal = bootstrap.Modal.getInstance(modalEl);
             if (openModal) openModal.hide();
+        }
+        if (uploadModalEl && window.bootstrap?.Modal) {
+            const uploadOpenModal = bootstrap.Modal.getInstance(uploadModalEl);
+            if (uploadOpenModal) uploadOpenModal.hide();
         }
         bootstrap.Modal.getOrCreateInstance(noticeModalEl).show();
     };
@@ -478,6 +713,20 @@ document.addEventListener("DOMContentLoaded", () => {
         if (!modalEl || !window.bootstrap?.Modal) return;
         bootstrap.Modal.getOrCreateInstance(modalEl).show();
     };
+
+    if (backToFormBtn) {
+        backToFormBtn.addEventListener("click", () => {
+            if (uploadModalEl && window.bootstrap?.Modal) {
+                const uploadModal = bootstrap.Modal.getInstance(uploadModalEl);
+                if (uploadModal) {
+                    uploadModal.hide();
+                }
+            }
+            setTimeout(() => {
+                openModal();
+            }, 150);
+        });
+    }
 
     const showBeforeYouGo = () => {
         if (!beforeModalEl || !beforeContinueBtn || !window.bootstrap?.Modal) {
@@ -516,9 +765,14 @@ document.addEventListener("DOMContentLoaded", () => {
                     if (data.pending?.address) {
                         isPendingRequest = true;
                         if (resultEl) resultEl.textContent = "";
+                        if (uploadResultEl) uploadResultEl.textContent = "";
                         if (modalEl && window.bootstrap?.Modal) {
                             const modal = bootstrap.Modal.getInstance(modalEl);
                             if (modal) modal.hide();
+                        }
+                        if (uploadModalEl && window.bootstrap?.Modal) {
+                            const uploadModal = bootstrap.Modal.getInstance(uploadModalEl);
+                            if (uploadModal) uploadModal.hide();
                         }
                     }
                     if (data.denied?.address && deniedAlert) {
@@ -588,7 +842,17 @@ document.addEventListener("DOMContentLoaded", () => {
             showNotice("Pending Request", "You already have a pending address change request.");
         });
         modalEl.addEventListener("hidden.bs.modal", () => {
+            if (suppressFormResetOnHide) {
+                suppressFormResetOnHide = false;
+                return;
+            }
             resetForm();
+        });
+    }
+    if (uploadModalEl) {
+        uploadModalEl.addEventListener("hidden.bs.modal", () => {
+            clearFieldErrors();
+            setUploadMessage("");
         });
     }
     primeStatus();

@@ -137,10 +137,10 @@ document.addEventListener("DOMContentLoaded", () => {
         <td>${safe(row.decided_by_user_id)}</td>
         <td>${safe(row.decided_at)}</td>
         <td>
-          <div class="d-flex gap-2">
-            <button type="button" class="btn btn-outline-secondary btn-sm btn-view">View</button>
-            <button type="button" class="btn btn-success btn-sm btn-approve" ${canAct ? "" : "disabled"}>Approve</button>
-            <button type="button" class="btn btn-danger btn-sm btn-decline" ${canAct ? "" : "disabled"}>Decline</button>
+          <div class="compact-table-actions">
+            <button type="button" class="btn btn-outline-secondary btn-sm compact-table-btn btn-view">View</button>
+            <button type="button" class="btn btn-success btn-sm compact-table-btn btn-approve" ${canAct ? "" : "disabled"}>Approve</button>
+            <button type="button" class="btn btn-danger btn-sm compact-table-btn btn-decline" ${canAct ? "" : "disabled"}>Decline</button>
           </div>
         </td>
       `;

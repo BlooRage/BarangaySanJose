@@ -36,7 +36,6 @@
     }
 
     .hof-shell #table-hofQueue {
-      width: max-content;
       min-width: 100%;
     }
 
@@ -47,15 +46,7 @@
     }
 
     .status-pill {
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      min-width: 108px;
-      padding: 6px 14px;
-      border-radius: 999px;
-      font-size: 0.82rem;
-      font-weight: 700;
-      border: 1px solid transparent;
+      min-width: 0;
     }
 
     .status-pill.pending {
@@ -65,15 +56,15 @@
     }
 
     .status-pill.approved {
-      color: #166534;
-      background: #dcfce7;
-      border-color: #bbf7d0;
+      color: #18613f;
+      background: #d4e8db;
+      border-color: #c0dac9;
     }
 
     .status-pill.declined {
-      color: #991b1b;
-      background: #fee2e2;
-      border-color: #fecaca;
+      color: #8f2932;
+      background: #e8cfd3;
+      border-color: #e0bcc2;
     }
 
     .status-filter-btn { display: inline-flex; align-items: center; gap: 6px; }
@@ -188,8 +179,8 @@
           </div>
         </div>
 
-        <div class="table-responsive">
-          <table class="table table-hover align-middle mb-0" id="table-hofQueue">
+        <div class="table-responsive compact-admin-table-shell">
+          <table class="table table-hover align-middle mb-0 compact-admin-table" id="table-hofQueue">
             <thead class="table-light">
               <tr>
                 <th>Address</th>

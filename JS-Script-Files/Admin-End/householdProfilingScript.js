@@ -145,7 +145,9 @@ document.addEventListener("DOMContentLoaded", () => {
         <td>${col2Value}</td>
         <td>${col3Value}</td>
         <td>
-          <button type="button" class="btn btn-primary btn-sm text-white viewEntryBtn">View</button>
+          <div class="compact-table-actions">
+            <button type="button" class="btn btn-primary btn-sm text-white compact-table-btn viewEntryBtn">View</button>
+          </div>
         </td>
       `;
 

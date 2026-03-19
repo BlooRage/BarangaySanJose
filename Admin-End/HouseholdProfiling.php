@@ -79,8 +79,8 @@ require_once __DIR__ . "/includes/admin_guard.php";
 	            </div>
 
             <!-- TABLE -->
-            <div class="table-responsive">
-                <table class="table align-middle" id="table-householdProfiling">
+            <div class="table-responsive compact-admin-table-shell">
+                <table class="table align-middle compact-admin-table" id="table-householdProfiling">
                     <thead>
                         <tr class="table-light">
                             <th id="th-col-1">Address ID</th>

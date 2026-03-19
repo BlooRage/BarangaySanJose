@@ -539,7 +539,7 @@ if ($residentId !== '' && isset($conn) && $conn instanceof mysqli) {
                                   if ($lastName !== '' || $firstName !== '') {
                                       $fullNameDisplay = trim($lastName . ', ' . $firstName);
                                       if ($middleInitial !== '') {
-                                          $fullNameDisplay .= ', ' . $middleInitial;
+                                          $fullNameDisplay .= ' ' . $middleInitial;
                                       }
                                   }
                                 ?>
@@ -624,12 +624,15 @@ if ($residentId !== '' && isset($conn) && $conn instanceof mysqli) {
                                   }
                                   $parts = [];
                                   if ($unitNumber !== '') $parts[] = 'Unit ' . $unitNumber;
-                                  if ($houseNo !== '') $parts[] = $houseNo;
-                                  if ($streetDisplay !== '') $parts[] = $streetDisplay;
+                                  if ($houseNo !== '' && $streetDisplay !== '') {
+                                    $parts[] = $houseNo . ' ' . $streetDisplay;
+                                  } else {
+                                    if ($houseNo !== '') $parts[] = $houseNo;
+                                    if ($streetDisplay !== '') $parts[] = $streetDisplay;
+                                  }
                                   if ($phase !== '') $parts[] = $phase;
                                   if ($subdivision !== '') $parts[] = $subdivision;
                                   $parts[] = 'San Jose';
-                                  if ($area !== '') $parts[] = $area;
                                   $parts[] = 'Rodriguez';
                                   $parts[] = 'Rizal';
                                   $parts[] = '1860';
@@ -1241,8 +1244,71 @@ if ($residentId !== '' && isset($conn) && $conn instanceof mysqli) {
         </div>
     </div>
 
+    <?php
+        $addressSystemCurrent = strtolower(trim((string)($residentaddresstbl['address_system'] ?? 'house')));
+        if (!in_array($addressSystemCurrent, ['house', 'lot_block'], true)) {
+            $addressSystemCurrent = 'house';
+        }
+        $addressUnitCurrent = trim((string)($residentaddresstbl['unit_number'] ?? ''));
+        $addressStreetNumberCurrent = trim((string)($residentaddresstbl['street_number'] ?? ''));
+        $addressStreetNameCurrent = trim((string)($residentaddresstbl['street_name'] ?? ''));
+        $addressPhaseCurrent = trim((string)($residentaddresstbl['phase_number'] ?? ''));
+        $addressSubdivisionCurrent = trim((string)($residentaddresstbl['subdivision'] ?? ''));
+        $addressAreaCurrent = trim((string)($residentaddresstbl['area_number'] ?? ''));
+        $addressHouseOwnershipCurrent = trim((string)($residentaddresstbl['house_ownership'] ?? ''));
+        $addressHouseTypeCurrent = trim((string)($residentaddresstbl['house_type'] ?? ''));
+        $addressKnownHouseTypes = ['Concrete', 'Semi-Concrete', 'Wood/Light Materials', 'Makeshift/Salvaged Materials', 'Shanty/Informal'];
+        $addressHouseTypeIsOther = $addressHouseTypeCurrent !== '' && !in_array($addressHouseTypeCurrent, $addressKnownHouseTypes, true);
+        $addressHouseTypeSelectValue = $addressHouseTypeIsOther ? 'Other' : $addressHouseTypeCurrent;
 
-     <div class="modal fade" id="addAddressModal" tabindex="-1" data-bs-backdrop="static" data-bs-keyboard="false">
+        $addressUnitHouseValue = $addressSystemCurrent === 'house' ? $addressUnitCurrent : '';
+        $addressStreetNumberHouseValue = $addressSystemCurrent === 'house' ? $addressStreetNumberCurrent : '';
+        $addressStreetNameHouseValue = $addressSystemCurrent === 'house' ? $addressStreetNameCurrent : '';
+        $addressPhaseHouseValue = $addressSystemCurrent === 'house' ? $addressPhaseCurrent : '';
+        $addressSubdivisionHouseValue = $addressSystemCurrent === 'house' ? $addressSubdivisionCurrent : '';
+        $addressAreaHouseValue = $addressSystemCurrent === 'house' ? $addressAreaCurrent : '';
+
+        $addressLotNumberValue = $addressStreetNumberCurrent;
+        if ($addressSystemCurrent === 'lot_block') {
+            $addressLotNumberValue = preg_replace('/^\s*Lot\s*/i', '', $addressLotNumberValue);
+        } else {
+            $addressLotNumberValue = '';
+        }
+        $addressBlockNumberValue = $addressPhaseCurrent;
+        if ($addressSystemCurrent === 'lot_block' && $addressBlockNumberValue === '') {
+            $addressBlockNumberValue = preg_replace('/^\s*Block\s*/i', '', $addressStreetNameCurrent);
+        }
+        if ($addressSystemCurrent !== 'lot_block') {
+            $addressBlockNumberValue = '';
+        }
+        $addressStreetNameLotValue = $addressSystemCurrent === 'lot_block'
+            ? preg_replace('/^\s*Block\s*/i', '', ($addressPhaseCurrent === '' ? '' : $addressStreetNameCurrent))
+            : '';
+        if ($addressSystemCurrent === 'lot_block' && preg_match('/^\s*Block\b/i', $addressStreetNameCurrent)) {
+            $addressStreetNameLotValue = '';
+        }
+        $addressUnitLotValue = $addressSystemCurrent === 'lot_block' ? $addressUnitCurrent : '';
+        $addressSubdivisionLotValue = $addressSystemCurrent === 'lot_block' ? $addressSubdivisionCurrent : '';
+        $addressAreaLotValue = $addressSystemCurrent === 'lot_block' ? $addressAreaCurrent : '';
+    ?>
+
+     <div
+        class="modal fade"
+        id="addAddressModal"
+        tabindex="-1"
+        data-bs-backdrop="static"
+        data-bs-keyboard="false"
+        data-current-address-system="<?= htmlspecialchars($addressSystemCurrent, ENT_QUOTES, 'UTF-8') ?>"
+        data-current-unit-number="<?= htmlspecialchars($addressUnitCurrent, ENT_QUOTES, 'UTF-8') ?>"
+        data-current-street-number="<?= htmlspecialchars($addressStreetNumberCurrent, ENT_QUOTES, 'UTF-8') ?>"
+        data-current-street-name="<?= htmlspecialchars($addressStreetNameCurrent, ENT_QUOTES, 'UTF-8') ?>"
+        data-current-phase-number="<?= htmlspecialchars($addressPhaseCurrent, ENT_QUOTES, 'UTF-8') ?>"
+        data-current-subdivision="<?= htmlspecialchars($addressSubdivisionCurrent, ENT_QUOTES, 'UTF-8') ?>"
+        data-current-area-number="<?= htmlspecialchars($addressAreaCurrent, ENT_QUOTES, 'UTF-8') ?>"
+        data-current-house-ownership="<?= htmlspecialchars($addressHouseOwnershipCurrent, ENT_QUOTES, 'UTF-8') ?>"
+        data-current-house-type="<?= htmlspecialchars($addressHouseTypeCurrent, ENT_QUOTES, 'UTF-8') ?>"
+        data-current-residency-duration="<?= htmlspecialchars((string)($residentaddresstbl['residency_duration'] ?? 'Less than 6 months'), ENT_QUOTES, 'UTF-8') ?>"
+    >
         <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
             <div class="modal-content">
 
@@ -1273,7 +1339,7 @@ if ($residentId !== '' && isset($conn) && $conn instanceof mysqli) {
                         <div class="col-12">
                             <label class="form-label mb-1" for="addressSystemEdit">Address System <span class="text-danger">*</span></label>
                             <select class="form-select" id="addressSystemEdit">
-                                <option value="" selected>Select</option>
+                                <option value="">Select</option>
                                 <option value="house">House Numbering System</option>
                                 <option value="lot_block">Lot/Block System</option>
                             </select>
@@ -1389,10 +1455,9 @@ if ($residentId !== '' && isset($conn) && $conn instanceof mysqli) {
                         </div>
                         <div class="col-md-4">
                             <label class="form-label mb-1" for="addressHouseType">House Type <span class="text-danger">*</span></label>
-                            <?php $houseTypeOptions = ['Concrete', 'Semi-Concrete', 'Wood/Light Materials', 'Makeshift/Salvaged Materials', 'Shanty/Informal']; ?>
                             <select class="form-select" id="addressHouseType">
                                 <option value="">Select</option>
-                                <?php foreach ($houseTypeOptions as $opt): ?>
+                                <?php foreach ($addressKnownHouseTypes as $opt): ?>
                                     <option value="<?= htmlspecialchars($opt) ?>"><?= htmlspecialchars($opt) ?></option>
                                 <?php endforeach; ?>
                                 <option value="Other">Other</option>
@@ -1411,9 +1476,46 @@ if ($residentId !== '' && isset($conn) && $conn instanceof mysqli) {
 
                 <div class="modal-footer">
                     <button class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                    <button class="btn btn-success" id="btnSaveAddress" type="button">Save</button>
+                    <button class="btn btn-primary" id="btnAddressReview" type="button">Review Changes</button>
                 </div>
 
+            </div>
+        </div>
+    </div>
+
+    <div class="modal fade" id="editAddressUploadModal" tabindex="-1" data-bs-backdrop="static" data-bs-keyboard="false">
+        <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Upload Supporting Documents</h5>
+                    <button class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="doc-required-box mb-3">
+                        <div class="small fw-semibold text-muted mb-2">For Address Change</div>
+                        <label class="form-label">Supporting Document Type</label>
+                        <select class="form-select mb-2" id="addressSupportType">
+                            <option value="">Select document type</option>
+                            <option value="Contract of Lease">Contract of Lease</option>
+                            <option value="Transfer Certificate of Title">Transfer Certificate of Title</option>
+                            <option value="Tax Declaration">Tax Declaration</option>
+                        </select>
+                        <label class="form-label">Supporting Document</label>
+                        <div class="upload-dropzone" data-upload-input="addressSupportFile">
+                            <div class="upload-dropzone__content">
+                                <div class="upload-dropzone__title"><i class="fa-solid fa-upload me-1"></i>Drag and drop files or click to upload</div>
+                                <div class="upload-dropzone__meta" id="addressSupportFileMeta">PDF or image, multiple files allowed</div>
+                            </div>
+                            <input type="file" class="form-control upload-dropzone-input" id="addressSupportFile" accept=".jpg,.jpeg,.png,.webp,.pdf" multiple>
+                        </div>
+                        <div class="form-text">Upload at least one proof of address document for this change. You can select multiple files.</div>
+                    </div>
+                    <div id="addressUploadResult" class="small mt-2"></div>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-outline-secondary" id="btnAddressBackToForm" type="button">Back</button>
+                    <button class="btn btn-primary" id="btnSaveAddress" type="button">Submit Request</button>
+                </div>
             </div>
         </div>
     </div>
