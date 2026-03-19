@@ -18,9 +18,49 @@
             -webkit-overflow-scrolling: touch;
         }
 
+        .resident-masterlist-shell #table-appData.compact-admin-table--resident {
+            table-layout: fixed;
+            min-width: 980px;
+            width: 100%;
+        }
+
         .resident-masterlist-shell #table-appData th,
         .resident-masterlist-shell #table-appData td {
             white-space: nowrap;
+        }
+
+        .resident-masterlist-shell #table-appData.compact-admin-table--resident th:first-child,
+        .resident-masterlist-shell #table-appData.compact-admin-table--resident td:first-child {
+            width: 15%;
+        }
+
+        .resident-masterlist-shell #table-appData.compact-admin-table--resident th:nth-child(2),
+        .resident-masterlist-shell #table-appData.compact-admin-table--resident td:nth-child(2) {
+            width: 22%;
+            white-space: normal;
+        }
+
+        .resident-masterlist-shell #table-appData.compact-admin-table--resident th:nth-child(3),
+        .resident-masterlist-shell #table-appData.compact-admin-table--resident td:nth-child(3),
+        .resident-masterlist-shell #table-appData.compact-admin-table--resident th:nth-child(4),
+        .resident-masterlist-shell #table-appData.compact-admin-table--resident td:nth-child(4) {
+            width: 8%;
+        }
+
+        .resident-masterlist-shell #table-appData.compact-admin-table--resident th:nth-child(5),
+        .resident-masterlist-shell #table-appData.compact-admin-table--resident td:nth-child(5) {
+            width: 11%;
+        }
+
+        .resident-masterlist-shell #table-appData.compact-admin-table--resident th:nth-child(6),
+        .resident-masterlist-shell #table-appData.compact-admin-table--resident td:nth-child(6) {
+            width: 18%;
+            text-align: left;
+        }
+
+        .resident-masterlist-shell #table-appData.compact-admin-table--resident th:nth-child(7),
+        .resident-masterlist-shell #table-appData.compact-admin-table--resident td:nth-child(7) {
+            width: 18%;
         }
 
     </style>
