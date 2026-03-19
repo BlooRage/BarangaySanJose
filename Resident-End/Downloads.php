@@ -135,40 +135,52 @@ if (isset($conn) && $conn instanceof mysqli) {
     <link rel="stylesheet" href="<?= htmlspecialchars($baseUrl) ?>/CSS-Styles/Guest-End-CSS/GeneralStyle.css">
     <style>
         body {
-            background: #fffdfb;
+            background: #f8f9fb;
         }
         #div-mainDisplay {
-            background: #ffffff !important;
+            background: #f8f9fb !important;
         }
         .downloads-shell {
-            max-width: 1300px;
-            margin: 0 auto;
+            width: 100%;
         }
-        .downloads-title {
+        .txn-page-title {
             font-family: 'Charis SIL Bold', serif;
             color: #de710c;
-            font-size: clamp(2rem, 4.2vw, 3rem);
+            font-size: clamp(2rem, 4.4vw, 3rem);
             line-height: 1.1;
-            margin: 0;
+            margin: 0 0 0.65rem 0;
         }
         .downloads-subtitle {
             color: #5f6b7a;
-            max-width: 780px;
-            margin-bottom: 1.5rem;
+            max-width: 760px;
         }
         .downloads-card {
             background: #ffffff;
-            border: 1px solid #f2dcc5;
-            border-radius: 18px;
-            box-shadow: 0 14px 36px rgba(15, 23, 42, 0.08);
+            border: 1px solid rgba(15, 23, 42, 0.08);
+            border-radius: 1rem;
+            box-shadow: 0 0.125rem 0.25rem rgba(15, 23, 42, 0.04);
+        }
+        .admin-list-toolbar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 1rem;
+            flex-wrap: wrap;
+        }
+        .admin-list-actions {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            flex-wrap: wrap;
+            margin-left: auto;
         }
         .downloads-summary {
             display: inline-flex;
             align-items: center;
             gap: 10px;
-            background: #fff2e4;
+            background: linear-gradient(180deg, #fff6ec 0%, #ffe9d1 100%);
             color: #a35300;
-            border: 1px solid #f2c79b;
+            border: 1px solid rgba(254, 153, 60, 0.45);
             border-radius: 999px;
             padding: 8px 14px;
             font-weight: 700;
@@ -185,41 +197,34 @@ if (isset($conn) && $conn instanceof mysqli) {
             padding: 0 8px;
             font-size: 0.85rem;
         }
-        .downloads-table-wrap {
+        .table-responsive {
             overflow-x: auto;
         }
-        .downloads-table {
-            --bs-table-bg: #ffffff;
-            --bs-table-striped-bg: #ffffff;
-            --bs-table-hover-bg: #fffaf5;
-            --bs-table-accent-bg: transparent;
-            margin-bottom: 0;
+        .audit-table {
             min-width: 920px;
-            background: #ffffff;
+            --bs-table-hover-bg: #fff8f1;
+            --bs-table-accent-bg: transparent;
         }
-        .downloads-table thead th {
-            background: #fff3e4;
-            color: #7c3f00;
-            border-bottom-color: #f1d6ba;
-            font-size: 0.84rem;
+        .audit-table thead th {
+            background: #f8f9fb;
+            color: #495057;
+            font-size: 0.82rem;
             text-transform: uppercase;
             letter-spacing: 0.03em;
+            border-bottom-color: #e3e6ea;
+            white-space: nowrap;
         }
-        .downloads-table tbody,
-        .downloads-table tbody tr,
-        .downloads-table tbody td {
-            background: #ffffff !important;
-        }
-        .downloads-table tbody td {
+        .audit-table tbody td {
             vertical-align: middle;
-            border-color: #f3e5d6;
+            border-color: #edf0f3;
+            background: #fff !important;
         }
-        .downloads-table tbody tr:hover td {
-            background: #fffaf5 !important;
+        .audit-table tbody tr:hover td {
+            background: #fff8f1 !important;
         }
         .doc-title {
             font-weight: 700;
-            color: #1f2937;
+            color: #111827;
         }
         .doc-purpose {
             color: #6b7280;
@@ -245,6 +250,54 @@ if (isset($conn) && $conn instanceof mysqli) {
             border-color: #c76309;
             color: #fff;
         }
+        .downloads-status-pill {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.4rem;
+            padding: 0.35rem 0.75rem;
+            border-radius: 999px;
+            background: #eefaf2;
+            color: #177245;
+            border: 1px solid #cfead9;
+            font-size: 0.83rem;
+            font-weight: 700;
+            white-space: nowrap;
+        }
+        #downloadCards {
+            display: none;
+        }
+        .download-card {
+            border: 1px solid #eceff3;
+            border-radius: 12px;
+            padding: 0.9rem;
+            background: #fff;
+            margin-bottom: 0.75rem;
+        }
+        .download-card-header {
+            display: flex;
+            align-items: flex-start;
+            justify-content: space-between;
+            gap: 0.75rem;
+            margin-bottom: 0.75rem;
+        }
+        .download-card-meta {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 0.5rem;
+        }
+        .download-card .txn-label {
+            font-size: 0.78rem;
+            color: #495057;
+            text-transform: uppercase;
+            letter-spacing: .02em;
+            font-weight: 800;
+        }
+        .download-card .txn-value {
+            font-size: 0.96rem;
+            color: #212529;
+            word-break: break-word;
+            white-space: normal;
+        }
         .empty-state {
             padding: 3rem 1.5rem;
             text-align: center;
@@ -255,6 +308,44 @@ if (isset($conn) && $conn instanceof mysqli) {
             color: #de710c;
             margin-bottom: 0.9rem;
         }
+        @media (max-width: 991.98px) {
+            .admin-list-toolbar {
+                flex-direction: column;
+                align-items: stretch;
+            }
+            .admin-list-actions {
+                margin-left: 0;
+                justify-content: flex-start;
+            }
+        }
+        @media (max-width: 767.98px) {
+            #div-mainDisplay {
+                padding: 1rem !important;
+            }
+            .downloads-card {
+                padding: 0.9rem !important;
+            }
+            .table-responsive {
+                display: none;
+            }
+            #downloadCards {
+                display: block;
+                margin-top: 0.25rem;
+            }
+            .txn-page-title {
+                font-size: clamp(1.7rem, 7.5vw, 2.15rem);
+                margin-bottom: 0.4rem;
+            }
+        }
+        @media (max-width: 480px) {
+            .audit-table {
+                min-width: 760px;
+            }
+            .audit-table td,
+            .audit-table th {
+                font-size: 0.875rem;
+            }
+        }
     </style>
 </head>
 <body>
@@ -263,21 +354,17 @@ if (isset($conn) && $conn instanceof mysqli) {
 
     <main id="div-mainDisplay" class="flex-grow-1 p-4 p-md-5">
         <div class="downloads-shell">
-            <div class="d-flex flex-column flex-md-row align-items-md-end justify-content-between gap-3 mb-4">
+            <div class="mb-4">
                 <div>
-                    <h1 class="downloads-title">Downloads</h1>
-                    <hr class="mt-3 mb-3">
+                    <h1 class="txn-page-title">Downloads</h1>
+                    <hr class="mt-0 mb-3">
                     <p class="downloads-subtitle mb-0">
                         Download your approved and released document requests here. Only documents that are ready and have an issued file available will appear in this list.
                     </p>
                 </div>
-                <div class="downloads-summary">
-                    <span>Available Files</span>
-                    <span class="count"><?= count($downloadItems) ?></span>
-                </div>
             </div>
 
-            <section class="downloads-card p-3 p-md-4">
+            <section class="downloads-card p-4 audit-shell">
                 <?php if ($queryError !== ''): ?>
                     <div class="alert alert-warning mb-0"><?= htmlspecialchars($queryError) ?></div>
                 <?php elseif (!$downloadItems): ?>
@@ -287,8 +374,21 @@ if (isset($conn) && $conn instanceof mysqli) {
                         <p class="mb-0">Once your document requests are approved, issued, and ready for release, they will appear here for download.</p>
                     </div>
                 <?php else: ?>
-                    <div class="downloads-table-wrap">
-                        <table class="table downloads-table">
+                    <div class="admin-list-toolbar mb-3">
+                        <div>
+                            <h2 class="h5 mb-1 fw-bold">Released Documents</h2>
+                            <p class="text-muted small mb-0">This table follows the same transaction-style layout used in your resident history pages.</p>
+                        </div>
+                        <div class="admin-list-actions">
+                            <div class="downloads-summary">
+                                <span>Available Files</span>
+                                <span class="count"><?= count($downloadItems) ?></span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="table-responsive">
+                        <table class="table table-hover align-middle mb-0 audit-table">
                             <thead>
                                 <tr>
                                     <th>Request ID</th>
@@ -297,6 +397,7 @@ if (isset($conn) && $conn instanceof mysqli) {
                                     <th>Submitted</th>
                                     <th>Released</th>
                                     <th>Valid Until</th>
+                                    <th>Status</th>
                                     <th>Action</th>
                                 </tr>
                             </thead>
@@ -318,6 +419,7 @@ if (isset($conn) && $conn instanceof mysqli) {
                                         <td><?= htmlspecialchars((string)$item['submitted_at']) ?></td>
                                         <td><?= htmlspecialchars((string)$item['released_at']) ?></td>
                                         <td><?= htmlspecialchars((string)$item['valid_until']) ?></td>
+                                        <td><span class="downloads-status-pill"><i class="fa-solid fa-circle-check"></i> Ready</span></td>
                                         <td>
                                             <div class="download-actions">
                                                 <a class="btn btn-sm btn-outline-secondary" href="<?= htmlspecialchars($viewUrl) ?>" target="_blank" rel="noopener">
@@ -332,6 +434,55 @@ if (isset($conn) && $conn instanceof mysqli) {
                                 <?php endforeach; ?>
                             </tbody>
                         </table>
+                    </div>
+
+                    <div id="downloadCards" class="mt-2">
+                        <?php foreach ($downloadItems as $item): ?>
+                            <?php
+                            $requestId = (string)$item['request_id'];
+                            $docTypeToken = preg_replace('/[^a-z0-9]+/i', '', strtolower((string)($item['document_type'] ?? '')));
+                            $isBarangayId = strpos($docTypeToken, 'barangayid') !== false;
+                            $viewUrl = $isBarangayId
+                                ? ($baseUrl . '/Resident-End/BarangayId/DigitalId.php?request_id=' . rawurlencode($requestId))
+                                : ($workflowEndpoint . '?action=view_issued&request_id=' . rawurlencode($requestId));
+                            $downloadUrl = $workflowEndpoint . '?action=download_issued&request_id=' . rawurlencode($requestId);
+                            ?>
+                            <article class="download-card">
+                                <div class="download-card-header">
+                                    <div>
+                                        <div class="doc-title"><?= htmlspecialchars((string)$item['document_type']) ?></div>
+                                        <div class="request-id mt-1"><?= htmlspecialchars($requestId) ?></div>
+                                    </div>
+                                    <span class="downloads-status-pill"><i class="fa-solid fa-circle-check"></i> Ready</span>
+                                </div>
+                                <div class="download-card-meta">
+                                    <div>
+                                        <div class="txn-label">Purpose</div>
+                                        <div class="txn-value"><?= htmlspecialchars((string)$item['purpose']) ?></div>
+                                    </div>
+                                    <div>
+                                        <div class="txn-label">Submitted</div>
+                                        <div class="txn-value"><?= htmlspecialchars((string)$item['submitted_at']) ?></div>
+                                    </div>
+                                    <div>
+                                        <div class="txn-label">Released</div>
+                                        <div class="txn-value"><?= htmlspecialchars((string)$item['released_at']) ?></div>
+                                    </div>
+                                    <div>
+                                        <div class="txn-label">Valid Until</div>
+                                        <div class="txn-value"><?= htmlspecialchars((string)$item['valid_until']) ?></div>
+                                    </div>
+                                </div>
+                                <div class="download-actions mt-3">
+                                    <a class="btn btn-sm btn-outline-secondary" href="<?= htmlspecialchars($viewUrl) ?>" target="_blank" rel="noopener">
+                                        <i class="fa-regular fa-eye me-1"></i>View
+                                    </a>
+                                    <a class="btn btn-sm btn-download" href="<?= htmlspecialchars($downloadUrl) ?>">
+                                        <i class="fa-solid fa-download me-1"></i>Download
+                                    </a>
+                                </div>
+                            </article>
+                        <?php endforeach; ?>
                     </div>
                 <?php endif; ?>
             </section>
