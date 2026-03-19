@@ -54,6 +54,44 @@ $guideMeta = [
   ]
 ];
 $guide = $guideMeta[$contentType];
+$audienceAreaOptions = [
+  'Barangay Wide',
+  'Area 01',
+  'Area 1A',
+  'Area 02',
+  'Area 03',
+  'Area 04',
+  'Area 05',
+  'Area 06',
+];
+$residentAreaRes = $conn->query("
+  SELECT DISTINCT area_number
+  FROM residentaddresstbl
+  WHERE area_number IS NOT NULL AND TRIM(area_number) <> ''
+  ORDER BY area_number ASC
+");
+if ($residentAreaRes instanceof mysqli_result) {
+  while ($row = $residentAreaRes->fetch_assoc()) {
+    $value = trim((string)($row['area_number'] ?? ''));
+    if ($value !== '' && !in_array($value, $audienceAreaOptions, true)) {
+      $audienceAreaOptions[] = $value;
+    }
+  }
+}
+$officialAreaRes = $conn->query("
+  SELECT DISTINCT area_number
+  FROM officialinformationtbl
+  WHERE area_number IS NOT NULL AND TRIM(area_number) <> ''
+  ORDER BY area_number ASC
+");
+if ($officialAreaRes instanceof mysqli_result) {
+  while ($row = $officialAreaRes->fetch_assoc()) {
+    $value = trim((string)($row['area_number'] ?? ''));
+    if ($value !== '' && !in_array($value, $audienceAreaOptions, true)) {
+      $audienceAreaOptions[] = $value;
+    }
+  }
+}
 $sharedMeta = [
   'page' => [
     'title_label' => 'Title',
@@ -184,36 +222,24 @@ $sharedMeta = [
 
                   <div id="customAudienceFields" class="row g-3 d-none">
                     <div class="col-12">
-                      <div class="announcement-audience-group">
-                        <div class="announcement-audience-group-head">
-                          <label class="form-label mb-1">Select Area</label>
-                          <p class="announcement-editor-helper mb-0">Choose one or more areas that should receive this announcement.</p>
-                        </div>
-                        <div class="announcement-checkbox-grid announcement-checkbox-grid--area" data-custom-audience-group="area">
-                          <?php foreach (['Area 1', 'Area 1A', 'Area 2', 'Area 3', 'Area 4', 'Area 5', 'Area 6'] as $areaOption): ?>
-                          <label class="announcement-checkbox-card announcement-checkbox-card--area">
-                            <input class="form-check-input" type="checkbox" name="area[]" value="<?= htmlspecialchars($areaOption) ?>" disabled>
-                            <span><?= htmlspecialchars($areaOption) ?></span>
-                          </label>
-                          <?php endforeach; ?>
-                        </div>
-                      </div>
+                      <label class="form-label mb-1">Area</label>
+                      <p class="announcement-editor-helper mb-2">Choose the area that should receive this announcement.</p>
+                      <select class="form-select" name="area" disabled>
+                        <option value="">Select Area</option>
+                        <?php foreach ($audienceAreaOptions as $areaOption): ?>
+                          <option><?= htmlspecialchars($areaOption, ENT_QUOTES, 'UTF-8') ?></option>
+                        <?php endforeach; ?>
+                      </select>
                     </div>
                     <div class="col-12">
-                      <div class="announcement-audience-group">
-                        <div class="announcement-audience-group-head">
-                          <label class="form-label mb-1">Role Group</label>
-                          <p class="announcement-editor-helper mb-0">Filter recipients by role when this update is only for a specific group.</p>
-                        </div>
-                        <div class="announcement-checkbox-grid announcement-checkbox-grid--role" data-custom-audience-group="role_group">
-                          <?php foreach (['Officials', 'Employees', 'Residents'] as $roleGroupOption): ?>
-                          <label class="announcement-checkbox-card announcement-checkbox-card--role">
-                            <input class="form-check-input" type="checkbox" name="role_group[]" value="<?= htmlspecialchars($roleGroupOption) ?>" disabled>
-                            <span><?= htmlspecialchars($roleGroupOption) ?></span>
-                          </label>
-                          <?php endforeach; ?>
-                        </div>
-                      </div>
+                      <label class="form-label mb-1">Role Group</label>
+                      <p class="announcement-editor-helper mb-2">Filter recipients by role when this update is only for a specific group.</p>
+                      <select class="form-select" name="role_group" disabled>
+                        <option value="">Select Group</option>
+                        <option>Officials</option>
+                        <option>Employees</option>
+                        <option>Residents</option>
+                      </select>
                     </div>
                   </div>
 
@@ -752,10 +778,16 @@ $sharedMeta = [
         }
         const useCustomAudience = audienceCustom.checked;
         customAudienceFields.classList.toggle("d-none", !useCustomAudience);
-        customAudienceFields.querySelectorAll("input[type='checkbox']").forEach((checkbox) => {
-          checkbox.disabled = !useCustomAudience;
+        customAudienceFields.querySelectorAll("input, select, textarea").forEach((field) => {
+          field.disabled = !useCustomAudience;
           if (!useCustomAudience) {
-            checkbox.checked = false;
+            if (field.tagName === "SELECT") {
+              field.selectedIndex = 0;
+            } else if (field.type === "checkbox" || field.type === "radio") {
+              field.checked = false;
+            } else {
+              field.value = "";
+            }
           }
         });
       }

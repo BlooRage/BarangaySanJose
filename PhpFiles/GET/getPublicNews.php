@@ -63,8 +63,14 @@ if (is_array($latestItem)) {
     unset($latestItem['sort_ts']);
 }
 
+$newsItems = array_map(static function (array $item): array {
+    unset($item['sort_ts']);
+    return $item;
+}, $publicNewsItems);
+
 echo json_encode([
     'success' => true,
-    'item' => $latestItem
+    'item' => $latestItem,
+    'items' => $newsItems
 ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
 

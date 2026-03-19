@@ -7,7 +7,24 @@ $SEMAPHORE_API_KEY = trim((string)runtime_env('SMS_SEMAPHORE_API_KEY', runtime_e
 $SEMAPHORE_SENDER = trim((string)runtime_env('SMS_SENDER', runtime_config('sms.sender', 'BrgySanJose')));
 $SEMAPHORE_ENDPOINT = trim((string)runtime_env('SMS_ENDPOINT', runtime_config('sms.endpoint', 'https://api.semaphore.co/api/v4/messages')));
 $SEMAPHORE_OTP_ENDPOINT = trim((string)runtime_env('SMS_OTP_ENDPOINT', runtime_config('sms.otp_endpoint', 'https://api.semaphore.co/api/v4/otp')));
-$SMS_LAST_ERROR = '';
+
+if (!array_key_exists('LAST_SMS_ERROR', $GLOBALS)) {
+    $GLOBALS['LAST_SMS_ERROR'] = '';
+}
+
+if (!function_exists('setLastSmsError')) {
+    function setLastSmsError(string $message): void
+    {
+        $GLOBALS['LAST_SMS_ERROR'] = trim($message);
+    }
+}
+
+if (!function_exists('getLastSmsError')) {
+    function getLastSmsError(): string
+    {
+        return trim((string)($GLOBALS['LAST_SMS_ERROR'] ?? ''));
+    }
+}
 
 if (!function_exists('normalizeSmsRecipient')) {
     function normalizeSmsRecipient(string $recipient): string
@@ -81,23 +98,8 @@ if (!function_exists('smsHydrateOtpMessage')) {
         if ($otpCode === '') {
             return $message;
         }
+
         return str_replace('{otp}', $otpCode, $message);
-    }
-}
-
-if (!function_exists('smsSetLastError')) {
-    function smsSetLastError(string $message): void
-    {
-        global $SMS_LAST_ERROR;
-        $SMS_LAST_ERROR = trim($message);
-    }
-}
-
-if (!function_exists('getLastSmsError')) {
-    function getLastSmsError(): string
-    {
-        global $SMS_LAST_ERROR;
-        return trim((string)$SMS_LAST_ERROR);
     }
 }
 
@@ -126,9 +128,7 @@ if (!function_exists('smsFormatFailure')) {
                     }
                 }
             }
-        }
-
-        if ($body !== '' && !$decoded) {
+        } elseif (trim($body) !== '') {
             $parts[] = trim($body);
         }
 
@@ -157,9 +157,9 @@ if (!function_exists('smsHttpPostForm')) {
 
             $output = curl_exec($ch);
             $httpCode = (int)curl_getinfo($ch, CURLINFO_RESPONSE_CODE);
-            $error = '';
+            $transportError = '';
             if ($output === false) {
-                $error = 'cURL Error: ' . curl_error($ch);
+                $transportError = 'cURL Error: ' . curl_error($ch);
             }
             curl_close($ch);
 
@@ -167,7 +167,7 @@ if (!function_exists('smsHttpPostForm')) {
                 'ok' => $output !== false,
                 'http_code' => $httpCode,
                 'body' => $output !== false ? (string)$output : '',
-                'transport_error' => $error,
+                'transport_error' => $transportError,
             ];
         }
 
@@ -240,25 +240,28 @@ function sendSMS(string $recipient, string $message, string $otpCode = null): bo
 {
     global $SEMAPHORE_API_KEY, $SEMAPHORE_SENDER, $SEMAPHORE_ENDPOINT, $SEMAPHORE_OTP_ENDPOINT;
 
-    smsSetLastError('');
+    setLastSmsError('');
 
     if ($SEMAPHORE_API_KEY === '' || $SEMAPHORE_SENDER === '') {
-        smsSetLastError('SMS sending unavailable: Semaphore API key or sender is missing.');
-        error_log('[sendSMS] ' . getLastSmsError());
+        $error = 'SMS sending unavailable: Semaphore API key or sender is missing.';
+        setLastSmsError($error);
+        error_log('[sendSMS] ' . $error);
         return false;
     }
 
     $recipient = normalizeSmsRecipient($recipient);
     if ($recipient === '') {
-        smsSetLastError('SMS sending unavailable: Invalid recipient number supplied.');
-        error_log('[sendSMS] ' . getLastSmsError());
+        $error = 'SMS sending unavailable: Invalid recipient number supplied.';
+        setLastSmsError($error);
+        error_log('[sendSMS] ' . $error);
         return false;
     }
 
     $message = trim($message);
     if ($message === '') {
-        smsSetLastError('SMS sending unavailable: Message body is empty.');
-        error_log('[sendSMS] ' . getLastSmsError());
+        $error = 'SMS sending unavailable: Message body is empty.';
+        setLastSmsError($error);
+        error_log('[sendSMS] ' . $error);
         return false;
     }
 
@@ -296,11 +299,12 @@ function sendSMS(string $recipient, string $message, string $otpCode = null): bo
         return true;
     }
 
-    smsSetLastError(smsFormatFailure(
+    $error = smsFormatFailure(
         (int)$attempt['http_code'],
         (string)$attempt['body'],
         (string)$attempt['transport_error']
-    ));
-    error_log('[sendSMS] ' . getLastSmsError());
+    );
+    setLastSmsError($error);
+    error_log('[sendSMS] ' . $error);
     return false;
 }
