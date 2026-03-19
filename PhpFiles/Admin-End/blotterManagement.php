@@ -57,6 +57,113 @@ function tableExists(mysqli $conn, string $tableName): bool {
     return !empty($row);
 }
 
+function normalizeDateValue(?string $value): ?string {
+    $value = trim((string)$value);
+    if ($value === '') {
+        return null;
+    }
+
+    $date = DateTimeImmutable::createFromFormat('Y-m-d', $value);
+    if (!$date instanceof DateTimeImmutable) {
+        return null;
+    }
+
+    return $date->format('Y-m-d');
+}
+
+function normalizeTimeValue(?string $value): ?string {
+    $value = trim((string)$value);
+    if ($value === '') {
+        return null;
+    }
+
+    foreach (['H:i:s', 'H:i'] as $format) {
+        $time = DateTimeImmutable::createFromFormat($format, $value);
+        if ($time instanceof DateTimeImmutable) {
+            return $time->format('H:i:s');
+        }
+    }
+
+    return null;
+}
+
+function describeUploadError(int $errorCode): string {
+    return match ($errorCode) {
+        UPLOAD_ERR_INI_SIZE, UPLOAD_ERR_FORM_SIZE => 'Narrative file is too large.',
+        UPLOAD_ERR_PARTIAL => 'Narrative file upload was interrupted. Please try again.',
+        UPLOAD_ERR_NO_FILE => 'Narrative file is required.',
+        UPLOAD_ERR_NO_TMP_DIR => 'Server upload temp directory is missing.',
+        UPLOAD_ERR_CANT_WRITE => 'Server could not write the uploaded narrative file.',
+        UPLOAD_ERR_EXTENSION => 'A server extension blocked the narrative upload.',
+        default => 'Narrative file upload failed.',
+    };
+}
+
+function normalizeActorUserId(mysqli $conn, ?string $userId): ?string {
+    $userId = str_field($userId ?? '');
+    if ($userId === null) {
+        return null;
+    }
+
+    $stmt = $conn->prepare("
+        SELECT 1
+        FROM useraccountstbl
+        WHERE user_id = ?
+        LIMIT 1
+    ");
+    if (!$stmt) {
+        return null;
+    }
+
+    $stmt->bind_param("s", $userId);
+    $stmt->execute();
+    $exists = $stmt->get_result()->fetch_row();
+    $stmt->close();
+
+    return $exists ? $userId : null;
+}
+
+function blotterNumberExists(mysqli $conn, string $blotterNumber): bool {
+    $stmt = $conn->prepare("
+        SELECT 1
+        FROM barangayblottertbl
+        WHERE blotter_number = ?
+        LIMIT 1
+    ");
+    if (!$stmt) {
+        throw new Exception("Prepare failed (blotter number check): " . $conn->error);
+    }
+
+    $stmt->bind_param("s", $blotterNumber);
+    $stmt->execute();
+    $exists = $stmt->get_result()->fetch_row();
+    $stmt->close();
+
+    return !empty($exists);
+}
+
+function describeSqlFailure(mysqli $conn, ?mysqli_stmt $stmt, string $fallback): string {
+    $errno = $stmt?->errno ?: $conn->errno;
+    $error = trim((string)($stmt?->error ?: $conn->error ?: ''));
+
+    if ($errno === 1062) {
+        if (stripos($error, 'blotter_number') !== false || stripos($error, 'uniq_blotter_number') !== false) {
+            return 'Blotter number already exists. Please use a different blotter number.';
+        }
+        return 'A duplicate record already exists.';
+    }
+
+    if ($errno === 1452) {
+        return 'A related record could not be linked. Please refresh and sign in again.';
+    }
+
+    if ($errno === 1048 || $errno === 1364) {
+        return 'A required database value is missing.';
+    }
+
+    return $error !== '' ? $error : $fallback;
+}
+
 function parseSignatureDataUrl(?string $value): ?string {
     $value = trim((string)$value);
     if ($value === '') {
@@ -92,6 +199,9 @@ function saveSignatureFile(string $caseId, string $role, string $binary): string
     $uploadDir = rtrim($uploadRoot, "/\\") . "/UnifiedFileAttachment/CaseSignatures/" . $caseId;
     if (!is_dir($uploadDir) && !@mkdir($uploadDir, 0755, true) && !is_dir($uploadDir)) {
         throw new Exception("Failed to create signature directory.");
+    }
+    if (!is_writable($uploadDir)) {
+        throw new Exception("Signature directory is not writable.");
     }
 
     $filename = $roleSlug . "_" . date('Ymd_His') . "_" . bin2hex(random_bytes(4)) . ".png";
@@ -147,8 +257,8 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') !== 'POST') {
 }
 
 $blotterNumber = str_field($_POST['blotter_number'] ?? '');
-$dateFiled = str_field($_POST['date_filed'] ?? '');
-$timeFiled = str_field($_POST['time_filed'] ?? '');
+$dateFiled = normalizeDateValue($_POST['date_filed'] ?? '') ?? date('Y-m-d');
+$timeFiled = normalizeTimeValue($_POST['time_filed'] ?? '') ?? date('H:i:s');
 
 $complainantLast = str_field($_POST['complainant_last_name'] ?? '');
 $complainantFirst = str_field($_POST['complainant_first_name'] ?? '');
@@ -177,7 +287,7 @@ $narrativeText = str_field($_POST['narrative_report'] ?? '');
 $complainantSignatureBinary = null;
 $respondentSignatureBinary = null;
 
-if (!$blotterNumber || !$dateFiled || !$timeFiled || !$complainantLast || !$complainantFirst || !$respondentLast || !$respondentFirst) {
+if (!$blotterNumber || !$complainantLast || !$complainantFirst || !$respondentLast || !$respondentFirst) {
     http_response_code(400);
     exit("Missing required fields.");
 }
@@ -251,11 +361,13 @@ $respondentRemarks = null;
 $caseDetails = $narrativeText;
 $caseRemarks = null;
 $uploadPathForDb = null;
+$savedNarrativeAbsolutePath = null;
 
 if ($narrativeMethod === 'file') {
-    if (!isset($_FILES['narrative_file']) || $_FILES['narrative_file']['error'] !== UPLOAD_ERR_OK) {
+    $uploadError = (int)($_FILES['narrative_file']['error'] ?? UPLOAD_ERR_NO_FILE);
+    if (!isset($_FILES['narrative_file']) || $uploadError !== UPLOAD_ERR_OK) {
         http_response_code(400);
-        exit("Narrative file is required.");
+        exit(describeUploadError($uploadError));
     }
 
     $allowedExtensions = ['pdf', 'jpg', 'jpeg', 'png', 'webp'];
@@ -275,6 +387,10 @@ if ($narrativeMethod === 'file') {
     if (!is_dir($uploadDir)) {
         @mkdir($uploadDir, 0755, true);
     }
+    if (!is_dir($uploadDir) || !is_writable($uploadDir)) {
+        http_response_code(500);
+        exit("Narrative upload directory is not writable.");
+    }
 
     $safeBase = preg_replace('/[^a-zA-Z0-9_-]/', '', pathinfo($fileName, PATHINFO_FILENAME));
     $safeBase = $safeBase !== '' ? $safeBase : 'narrative';
@@ -285,16 +401,21 @@ if ($narrativeMethod === 'file') {
         exit("Failed to save narrative file.");
     }
 
+    $savedNarrativeAbsolutePath = $destPath;
     $uploadPathForDb = "UnifiedFileAttachment/BlotterNarratives/" . $uniqueName;
     $caseDetails = $uploadPathForDb;
     $caseRemarks = "Narrative file uploaded";
 }
 
-$actorUserId = isset($_SESSION['user_id']) ? (string)$_SESSION['user_id'] : null;
+$actorUserId = normalizeActorUserId($conn, $_SESSION['user_id'] ?? null);
 $savedSignaturePaths = [];
 
 $conn->begin_transaction();
 try {
+    if (blotterNumberExists($conn, $blotterNumber)) {
+        throw new Exception("Blotter number already exists. Please use a different blotter number.");
+    }
+
     $statusId = getStatusId($conn, "Active", "Blotter");
     $levelId = getStatusId($conn, "Blotter Only", "BlotterLevel");
     $caseId = GenerateCaseID($conn);
@@ -330,7 +451,9 @@ try {
         $actorUserId,
         $actorUserId
     );
-    $stmtCase->execute();
+    if (!$stmtCase->execute()) {
+        throw new Exception("Failed to insert blotter case: " . describeSqlFailure($conn, $stmtCase, 'Case insert failed.'));
+    }
     $stmtCase->close();
 
     $stmtBlotter = $conn->prepare("
@@ -343,7 +466,9 @@ try {
         throw new Exception("Prepare failed (blotter insert): " . $conn->error);
     }
     $stmtBlotter->bind_param("sssss", $blotterId, $caseId, $blotterNumber, $dateFiled, $timeFiled);
-    $stmtBlotter->execute();
+    if (!$stmtBlotter->execute()) {
+        throw new Exception("Failed to insert blotter record: " . describeSqlFailure($conn, $stmtBlotter, 'Blotter insert failed.'));
+    }
     $stmtBlotter->close();
 
     $stmtParticipant = $conn->prepare("
@@ -412,8 +537,11 @@ try {
     $redirectUrl = appUrl('/Admin-End/Blotter/BlotterForm.php?success=1&case_id=' . rawurlencode((string)$caseId));
     header("Location: " . $redirectUrl);
     exit;
-} catch (Exception $e) {
+} catch (Throwable $e) {
     $conn->rollback();
+    if ($savedNarrativeAbsolutePath !== null && is_file($savedNarrativeAbsolutePath)) {
+        @unlink($savedNarrativeAbsolutePath);
+    }
     foreach ($savedSignaturePaths as $relativePath) {
         $absolutePath = realpath(__DIR__ . "/../..");
         if ($absolutePath === false) {
