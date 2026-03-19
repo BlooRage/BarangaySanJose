@@ -7,6 +7,24 @@ $SEMAPHORE_API_KEY = trim((string)runtime_env('SMS_SEMAPHORE_API_KEY', runtime_e
 $SEMAPHORE_SENDER = trim((string)runtime_env('SMS_SENDER', runtime_config('sms.sender', 'BrgySanJose')));
 $SEMAPHORE_ENDPOINT = trim((string)runtime_env('SMS_ENDPOINT', runtime_config('sms.endpoint', 'https://api.semaphore.co/api/v4/messages')));
 
+if (!array_key_exists('LAST_SMS_ERROR', $GLOBALS)) {
+    $GLOBALS['LAST_SMS_ERROR'] = '';
+}
+
+if (!function_exists('setLastSmsError')) {
+    function setLastSmsError(string $message): void
+    {
+        $GLOBALS['LAST_SMS_ERROR'] = trim($message);
+    }
+}
+
+if (!function_exists('getLastSmsError')) {
+    function getLastSmsError(): string
+    {
+        return trim((string)($GLOBALS['LAST_SMS_ERROR'] ?? ''));
+    }
+}
+
 if (!function_exists('normalizeSmsRecipient')) {
     function normalizeSmsRecipient(string $recipient): string
     {
@@ -67,25 +85,35 @@ function sendSMS(string $recipient, string $message, string $otpCode = null): bo
 {
     global $SEMAPHORE_API_KEY, $SEMAPHORE_SENDER, $SEMAPHORE_ENDPOINT;
 
+    setLastSmsError('');
+
     if (!function_exists('curl_init')) {
-        error_log('SMS sending unavailable: cURL extension is not enabled.');
+        $error = 'SMS sending unavailable: cURL extension is not enabled.';
+        setLastSmsError($error);
+        error_log($error);
         return false;
     }
 
     if ($SEMAPHORE_API_KEY === '' || $SEMAPHORE_SENDER === '') {
-        error_log('SMS sending unavailable: Semaphore API key or sender is missing.');
+        $error = 'SMS sending unavailable: Semaphore API key or sender is missing.';
+        setLastSmsError($error);
+        error_log($error);
         return false;
     }
 
     $recipient = normalizeSmsRecipient($recipient);
     if ($recipient === '') {
-        error_log('SMS sending unavailable: Invalid recipient number supplied.');
+        $error = 'SMS sending unavailable: Invalid recipient number supplied.';
+        setLastSmsError($error);
+        error_log($error);
         return false;
     }
 
     $message = trim($message);
     if ($message === '') {
-        error_log('SMS sending unavailable: Message body is empty.');
+        $error = 'SMS sending unavailable: Message body is empty.';
+        setLastSmsError($error);
+        error_log($error);
         return false;
     }
 
@@ -114,7 +142,9 @@ function sendSMS(string $recipient, string $message, string $otpCode = null): bo
     $httpCode = (int)curl_getinfo($ch, CURLINFO_RESPONSE_CODE);
 
     if ($output === false) {
-        error_log('cURL Error: ' . curl_error($ch));
+        $error = 'cURL Error: ' . curl_error($ch);
+        setLastSmsError($error);
+        error_log($error);
         curl_close($ch);
         return false;
     }
@@ -123,9 +153,12 @@ function sendSMS(string $recipient, string $message, string $otpCode = null): bo
 
     $response = json_decode($output, true);
     if ($httpCode >= 200 && $httpCode < 300 && smsResponseIndicatesSuccess($response)) {
+        setLastSmsError('');
         return true;
     }
 
-    error_log('Semaphore Error (HTTP ' . $httpCode . '): ' . $output);
+    $error = 'Semaphore Error (HTTP ' . $httpCode . '): ' . $output;
+    setLastSmsError($error);
+    error_log($error);
     return false;
 }

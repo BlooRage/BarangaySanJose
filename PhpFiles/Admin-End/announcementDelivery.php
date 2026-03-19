@@ -2,6 +2,37 @@
 require_once __DIR__ . '/../General/connection.php';
 require_once __DIR__ . '/../General/sendSMS.php';
 require_once __DIR__ . '/../EmailHandlers/emailSender.php';
+require_once __DIR__ . '/../General/runtimeConfig.php';
+
+function ann_delivery_missing_mail_fields(array $emailConfig): array
+{
+  $missing = [];
+  if (trim((string)($emailConfig['host'] ?? '')) === '') {
+    $missing[] = 'mail.host';
+  }
+  if (trim((string)($emailConfig['username'] ?? '')) === '') {
+    $missing[] = 'mail.username';
+  }
+  if ((string)($emailConfig['password'] ?? '') === '') {
+    $missing[] = 'mail.password';
+  }
+  if (trim((string)($emailConfig['from_email'] ?? '')) === '') {
+    $missing[] = 'mail.from_email';
+  }
+  return $missing;
+}
+
+function ann_delivery_missing_sms_fields(): array
+{
+  $missing = [];
+  if (trim((string)runtime_env('SMS_SEMAPHORE_API_KEY', runtime_env('SMS_API_KEY', runtime_config('sms.semaphore_api_key', '')))) === '') {
+    $missing[] = 'sms.semaphore_api_key';
+  }
+  if (trim((string)runtime_env('SMS_SENDER', runtime_config('sms.sender', 'BrgySanJose'))) === '') {
+    $missing[] = 'sms.sender';
+  }
+  return $missing;
+}
 
 function ann_delivery_strip_html(string $html): string
 {
@@ -59,7 +90,23 @@ function ann_delivery_normalize_group(string $group): string
 
 function ann_delivery_normalize_area(?string $area): string
 {
-  return strtolower(trim((string)$area));
+  $area = strtolower(trim((string)$area));
+  if ($area === '') {
+    return '';
+  }
+
+  $area = preg_replace('/\s+/', ' ', $area);
+  if ($area === 'barangay wide' || $area === 'barangaywide') {
+    return 'barangaywide';
+  }
+
+  if (preg_match('/^area\s*0*(\d+)\s*([a-z]?)$/', $area, $matches)) {
+    $number = (string)((int)$matches[1]);
+    $suffix = strtolower((string)($matches[2] ?? ''));
+    return 'area' . $number . $suffix;
+  }
+
+  return preg_replace('/[^a-z0-9]+/', '', $area);
 }
 
 function ann_delivery_is_verified_resident_status(?string $statusName): bool
@@ -96,6 +143,12 @@ function ann_delivery_normalize_phone(?string $phone): string
     return '0' . substr($digits, 2);
   }
   return '';
+}
+
+function ann_delivery_has_usable_email(?string $email): bool
+{
+  $email = trim((string)$email);
+  return $email !== '' && filter_var($email, FILTER_VALIDATE_EMAIL) !== false;
 }
 
 function ann_delivery_staff_group_matches(?string $accountRole, ?string $infoRole, string $targetGroup): bool
@@ -143,9 +196,7 @@ function ann_delivery_fetch_resident_recipients(mysqli $conn, string $areaFilter
     $recipients[] = [
       'user_id' => (string)($row['user_id'] ?? ''),
       'email' => trim((string)($row['email'] ?? '')),
-      'email_verified' => (int)($row['email_verify'] ?? 0) === 1,
       'phone' => ann_delivery_normalize_phone((string)($row['phone_number'] ?? '')),
-      'phone_verified' => (int)($row['phoneNum_verify'] ?? 0) === 1,
     ];
   }
   $stmt->close();
@@ -171,9 +222,7 @@ function ann_delivery_fetch_staff_recipients(mysqli $conn, string $targetGroup, 
     $recipients[] = [
       'user_id' => (string)($row['user_id'] ?? ''),
       'email' => trim((string)($row['email'] ?? '')),
-      'email_verified' => (int)($row['email_verify'] ?? 0) === 1,
       'phone' => ann_delivery_normalize_phone((string)($row['phone_number'] ?? '')),
-      'phone_verified' => (int)($row['phoneNum_verify'] ?? 0) === 1,
     ];
   }
   $stmt->close();
@@ -217,15 +266,24 @@ function ann_delivery_send(mysqli $conn, array &$announcement): array
   $emailCount = 0;
   $smsEligible = 0;
   $emailEligible = 0;
+  $smsMissing = ann_delivery_missing_sms_fields();
+  $smsConfigured = $smsMissing === [];
+  $smsLastError = '';
+  $emailConfig = require __DIR__ . '/../General/mailConfigurations.php';
+  $emailMissing = ann_delivery_missing_mail_fields($emailConfig);
+  $emailConfigured = $emailMissing === [];
+  $emailLastError = '';
 
   if (in_array('sms', $channels, true) && $announcement['sms_message'] !== '') {
     foreach ($recipients as $recipient) {
-      if (!$recipient['phone_verified'] || $recipient['phone'] === '') {
+      if ($recipient['phone'] === '') {
         continue;
       }
       $smsEligible++;
       if (sendSMS($recipient['phone'], $announcement['sms_message'])) {
         $smsCount++;
+      } else {
+        $smsLastError = getLastSmsError();
       }
     }
     if ($smsCount > 0) {
@@ -234,13 +292,12 @@ function ann_delivery_send(mysqli $conn, array &$announcement): array
   }
 
   if (in_array('email', $channels, true) && $announcement['email_subject'] !== '') {
-    $smtpConfig = require __DIR__ . '/../General/mailConfigurations.php';
-    $emailSender = new EmailSender($smtpConfig);
+    $emailSender = new EmailSender($emailConfig);
     $plainMessage = ann_delivery_strip_html((string)$announcement['email_body_html']);
     $emailTitle = trim((string)(($announcement['public_title'] ?? '') ?: ($announcement['public_news_title'] ?? '') ?: ($announcement['title'] ?? 'Announcement')));
 
     foreach ($recipients as $recipient) {
-      if (!$recipient['email_verified'] || $recipient['email'] === '') {
+      if (!ann_delivery_has_usable_email($recipient['email'] ?? '')) {
         continue;
       }
       $emailEligible++;
@@ -256,6 +313,8 @@ function ann_delivery_send(mysqli $conn, array &$announcement): array
       ]);
       if ($sent) {
         $emailCount++;
+      } else {
+        $emailLastError = $emailSender->getLastError();
       }
     }
 
@@ -270,6 +329,12 @@ function ann_delivery_send(mysqli $conn, array &$announcement): array
     'email_eligible' => $emailEligible,
     'sms_count' => $smsCount,
     'email_count' => $emailCount,
+    'sms_configured' => $smsConfigured,
+    'sms_missing' => $smsMissing,
+    'sms_last_error' => $smsLastError,
+    'email_configured' => $emailConfigured,
+    'email_missing' => $emailMissing,
+    'email_last_error' => $emailLastError,
   ];
 }
 
@@ -281,17 +346,31 @@ function ann_delivery_message_suffix(array $result): string
   $smsEligible = (int)($result['sms_eligible'] ?? 0);
   $emailEligible = (int)($result['email_eligible'] ?? 0);
   $recipientCount = (int)($result['recipient_count'] ?? 0);
+  $smsConfigured = (bool)($result['sms_configured'] ?? true);
+  $emailConfigured = (bool)($result['email_configured'] ?? true);
+  $smsMissing = array_values(array_filter((array)($result['sms_missing'] ?? []), 'is_string'));
+  $emailMissing = array_values(array_filter((array)($result['email_missing'] ?? []), 'is_string'));
+  $smsLastError = trim((string)($result['sms_last_error'] ?? ''));
+  $emailLastError = trim((string)($result['email_last_error'] ?? ''));
 
   if ($smsCount > 0) {
     $parts[] = 'SMS sent: ' . $smsCount;
+  } elseif (!$smsConfigured) {
+    $parts[] = 'SMS not configured' . ($smsMissing ? ' (' . implode(', ', $smsMissing) . ')' : '');
+  } elseif ($smsEligible > 0) {
+    $parts[] = 'SMS delivery failed' . ($smsLastError !== '' ? ' (' . $smsLastError . ')' : '');
   } elseif ($smsEligible === 0 && $recipientCount > 0) {
-    $parts[] = 'No verified SMS recipients found';
+    $parts[] = 'No SMS recipients with mobile numbers found';
   }
 
   if ($emailCount > 0) {
     $parts[] = 'Email sent: ' . $emailCount;
+  } elseif (!$emailConfigured) {
+    $parts[] = 'Email not configured' . ($emailMissing ? ' (' . implode(', ', $emailMissing) . ')' : '');
+  } elseif ($emailEligible > 0) {
+    $parts[] = 'Email delivery failed' . ($emailLastError !== '' ? ' (' . $emailLastError . ')' : '');
   } elseif ($emailEligible === 0 && $recipientCount > 0) {
-    $parts[] = 'No verified email recipients found';
+    $parts[] = 'No recipients with valid email addresses found';
   }
 
   if ($recipientCount === 0) {

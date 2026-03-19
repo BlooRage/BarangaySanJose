@@ -3,6 +3,23 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/runtimeConfig.php';
 
+if (!function_exists('mail_config_value')) {
+    function mail_config_value(array $config, string $key, $fallback = '')
+    {
+        if (!array_key_exists($key, $config)) {
+            return $fallback;
+        }
+
+        $value = $config[$key];
+        if (is_string($value)) {
+            $value = trim($value);
+            return $value !== '' ? $value : $fallback;
+        }
+
+        return $value ?? $fallback;
+    }
+}
+
 $mailHost = trim((string)runtime_env('MAIL_HOST', runtime_config('mail.host', 'smtp.hostinger.com')));
 $mailUsername = trim((string)runtime_env('MAIL_USERNAME', runtime_env('MAIL_USER', runtime_config('mail.username', ''))));
 $mailPassword = (string)runtime_env('MAIL_PASSWORD', runtime_env('MAIL_PASS', runtime_config('mail.password', '')));
@@ -46,6 +63,26 @@ if (!is_array($configuredSenders)) {
     $configuredSenders = [];
 }
 
+$resolvedSenders = $defaultSenders;
+foreach ($configuredSenders as $senderType => $senderConfig) {
+    if (!is_array($senderConfig)) {
+        continue;
+    }
+
+    $resolvedSenders[$senderType] = [
+        'from_email' => mail_config_value(
+            $senderConfig,
+            'from_email',
+            (string)($defaultSenders[$senderType]['from_email'] ?? $mailFromEmail)
+        ),
+        'from_name' => mail_config_value(
+            $senderConfig,
+            'from_name',
+            (string)($defaultSenders[$senderType]['from_name'] ?? $mailFromName)
+        ),
+    ];
+}
+
 return [
     'host' => $mailHost,
     'username' => $mailUsername,
@@ -55,5 +92,5 @@ return [
     'smtp_auth' => $mailSmtpAuth,
     'from_email' => $mailFromEmail,
     'from_name' => $mailFromName,
-    'senders' => array_replace_recursive($defaultSenders, $configuredSenders),
+    'senders' => $resolvedSenders,
 ];

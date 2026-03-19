@@ -54,6 +54,44 @@ $guideMeta = [
   ]
 ];
 $guide = $guideMeta[$contentType];
+$audienceAreaOptions = [
+  'Barangay Wide',
+  'Area 01',
+  'Area 1A',
+  'Area 02',
+  'Area 03',
+  'Area 04',
+  'Area 05',
+  'Area 06',
+];
+$residentAreaRes = $conn->query("
+  SELECT DISTINCT area_number
+  FROM residentaddresstbl
+  WHERE area_number IS NOT NULL AND TRIM(area_number) <> ''
+  ORDER BY area_number ASC
+");
+if ($residentAreaRes instanceof mysqli_result) {
+  while ($row = $residentAreaRes->fetch_assoc()) {
+    $value = trim((string)($row['area_number'] ?? ''));
+    if ($value !== '' && !in_array($value, $audienceAreaOptions, true)) {
+      $audienceAreaOptions[] = $value;
+    }
+  }
+}
+$officialAreaRes = $conn->query("
+  SELECT DISTINCT area_number
+  FROM officialinformationtbl
+  WHERE area_number IS NOT NULL AND TRIM(area_number) <> ''
+  ORDER BY area_number ASC
+");
+if ($officialAreaRes instanceof mysqli_result) {
+  while ($row = $officialAreaRes->fetch_assoc()) {
+    $value = trim((string)($row['area_number'] ?? ''));
+    if ($value !== '' && !in_array($value, $audienceAreaOptions, true)) {
+      $audienceAreaOptions[] = $value;
+    }
+  }
+}
 $sharedMeta = [
   'page' => [
     'title_label' => 'Title',
@@ -187,12 +225,9 @@ $sharedMeta = [
                       <label class="form-label mb-1">Area</label>
                       <select class="form-select" name="area">
                         <option value="">Select Area</option>
-                        <option>Area 1</option>
-                        <option>Area 2</option>
-                        <option>Area 3</option>
-                        <option>Area 4</option>
-                        <option>Area 5</option>
-                        <option>Area 6</option>
+                        <?php foreach ($audienceAreaOptions as $areaOption): ?>
+                          <option><?= htmlspecialchars($areaOption, ENT_QUOTES, 'UTF-8') ?></option>
+                        <?php endforeach; ?>
                       </select>
                     </div>
                     <div class="col-12">

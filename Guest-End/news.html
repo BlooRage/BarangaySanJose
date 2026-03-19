@@ -78,6 +78,15 @@
                     <div class="articleBody" id="publicNewsBody">
                         <p>No public news available yet.</p>
                     </div>
+
+                    <section class="moreNewsSection" id="moreNewsSection" style="display: none;">
+                        <div class="moreNewsDivider">
+                            <span class="moreNewsDividerLine"></span>
+                            <span class="moreNewsDividerText">More News</span>
+                            <span class="moreNewsDividerLine"></span>
+                        </div>
+                        <div class="moreNewsList" id="moreNewsList"></div>
+                    </section>
                 </div>
                 
 
@@ -219,12 +228,24 @@
             }).join('');
         }
 
+        function toPreviewText(html, maxLength) {
+            const wrapper = document.createElement('div');
+            wrapper.innerHTML = String(html || '');
+            const plain = (wrapper.textContent || wrapper.innerText || '').replace(/\s+/g, ' ').trim();
+            if (!plain) {
+                return 'No details available yet.';
+            }
+            return plain.length > maxLength ? plain.slice(0, maxLength).trimEnd() + '...' : plain;
+        }
+
         (function () {
             const headlineEl = document.getElementById("publicNewsHeadline");
             const dateEl = document.getElementById("publicNewsDate");
             const bodyEl = document.getElementById("publicNewsBody");
             const imageWrapperEl = document.getElementById("publicNewsImageWrapper");
-            if (headlineEl && dateEl && bodyEl && imageWrapperEl) {
+            const moreNewsSectionEl = document.getElementById("moreNewsSection");
+            const moreNewsListEl = document.getElementById("moreNewsList");
+            if (headlineEl && dateEl && bodyEl && imageWrapperEl && moreNewsSectionEl && moreNewsListEl) {
                 imageWrapperEl.style.display = "none";
                 fetch("../PhpFiles/GET/getPublicNews.php", {
                     headers: {
@@ -238,9 +259,11 @@
                     return response.json();
                 })
                 .then(function (payload) {
-                    const item = payload && payload.item ? payload.item : null;
+                    const items = payload && Array.isArray(payload.items) ? payload.items : [];
+                    const item = payload && payload.item ? payload.item : (items[0] || null);
                     if (!item) {
                         imageWrapperEl.style.display = "none";
+                        moreNewsSectionEl.style.display = "none";
                         return;
                     }
 
@@ -256,11 +279,39 @@
                     } else {
                         imageWrapperEl.style.display = "none";
                     }
+
+                    const moreItems = items.slice(1);
+                    if (!moreItems.length) {
+                        moreNewsSectionEl.style.display = "none";
+                        moreNewsListEl.innerHTML = "";
+                        return;
+                    }
+
+                    moreNewsSectionEl.style.display = "";
+                    moreNewsListEl.innerHTML = moreItems.map(function (newsItem, idx) {
+                        const imageHtml = newsItem.image_url
+                            ? '<div class="moreNewsCardImage"><img src="' + escapeHtml(newsItem.image_url) + '" alt="' + escapeHtml(newsItem.title || 'News image') + '"></div>'
+                            : '';
+                        const divider = idx < moreItems.length - 1 ? '<div class="moreNewsCardDivider"></div>' : '';
+                        return ''
+                            + '<article class="moreNewsCard">'
+                            + '  <div class="moreNewsCardInner">'
+                            +       imageHtml
+                            + '    <div class="moreNewsCardContent">'
+                            + '      <p class="moreNewsCardDate">' + escapeHtml(newsItem.posted_date || '-') + '</p>'
+                            + '      <h3 class="moreNewsCardTitle">' + escapeHtml(newsItem.title || 'Untitled news') + '</h3>'
+                            + '      <p class="moreNewsCardText">' + escapeHtml(toPreviewText(newsItem.content_html || '', 220)) + '</p>'
+                            + '    </div>'
+                            + '  </div>'
+                            +      divider
+                            + '</article>';
+                    }).join('');
                 })
                 .catch(function () {
                     headlineEl.textContent = "Latest Barangay News";
                     dateEl.textContent = "-";
                     imageWrapperEl.style.display = "none";
+                    moreNewsSectionEl.style.display = "none";
                 });
             }
         })();
@@ -296,16 +347,6 @@
                     return;
                 }
 
-                function toPreviewText(html) {
-                    const wrapper = document.createElement('div');
-                    wrapper.innerHTML = String(html || '');
-                    const plain = (wrapper.textContent || wrapper.innerText || '').replace(/\s+/g, ' ').trim();
-                    if (!plain) {
-                        return 'No announcement details available.';
-                    }
-                    return plain.length > 140 ? plain.slice(0, 140).trimEnd() + '...' : plain;
-                }
-
                 listEl.innerHTML = items.map(function (item, idx) {
                     const divider = idx < items.length - 1 ? '<hr class="sidebarDivider">' : '';
                     return ''
@@ -314,7 +355,7 @@
                         + ' data-announcement-date="' + escapeHtml(item.posted_date || '-') + '"'
                         + ' data-announcement-content="' + encodeURIComponent(item.content_html || '') + '">'
                         + '  <p class="announcementText">' + escapeHtml(item.title || 'Untitled announcement') + '</p>'
-                        + '  <div class="announcementPreviewText">' + escapeHtml(toPreviewText(item.content_html || '')) + '</div>'
+                        + '  <div class="announcementPreviewText">' + escapeHtml(toPreviewText(item.content_html || '', 140)) + '</div>'
                         + '  <span class="announcementDate">' + escapeHtml(item.posted_date || '-') + '</span>'
                         + '</div>'
                         + divider;
