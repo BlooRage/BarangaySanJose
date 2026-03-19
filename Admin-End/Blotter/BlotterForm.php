@@ -16,6 +16,9 @@ if (!isset($baseUrl)) {
 
 require_once __DIR__ . "/../../PhpFiles/General/connection.php";
 require_once __DIR__ . "/../includes/admin_guard.php";
+
+$defaultFiledDate = date('Y-m-d');
+$defaultFiledTime = date('H:i');
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -137,11 +140,11 @@ require_once __DIR__ . "/../includes/admin_guard.php";
                     </div>
                     <div class="col-12 col-md-3">
                         <label class="form-label">Date Filed (Petsa ng Paghahain) <span class="required-asterisk">*</span></label>
-                        <input type="date" class="form-control" name="date_filed" required readonly>
+                        <input type="date" class="form-control" name="date_filed" value="<?= htmlspecialchars($defaultFiledDate) ?>" required readonly>
                     </div>
                     <div class="col-12 col-md-3">
                         <label class="form-label">Time Filed (Oras ng Paghahain) <span class="required-asterisk">*</span></label>
-                        <input type="time" class="form-control" name="time_filed" required readonly>
+                        <input type="time" class="form-control" name="time_filed" value="<?= htmlspecialchars($defaultFiledTime) ?>" required readonly>
                     </div>
                 </div>
 
@@ -605,5 +608,4 @@ require_once __DIR__ . "/../includes/admin_guard.php";
 <script src="../../JS-Script-Files/Admin-End/blotterManagement.js?v=20260318-2" defer></script>
 </body>
 </html>
-
 
