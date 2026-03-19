@@ -78,7 +78,7 @@ function at_status_pill(string $value): string
         return 'approved';
     }
     if ($key === 'denied') {
-        return 'archived';
+        return 'denied';
     }
     return 'pending';
 }
