@@ -33,6 +33,7 @@ if (!isset($baseUrl)) {
     <link rel="stylesheet" href="<?= htmlspecialchars((string)($baseUrl ?? ''), ENT_QUOTES, 'UTF-8') ?>/CSS-Styles/Guest-End-CSS/GeneralStyle.css">
     <link rel="stylesheet" href="<?= htmlspecialchars((string)($baseUrl ?? ''), ENT_QUOTES, 'UTF-8') ?>/CSS-Styles/Resident-End-CSS/residentDashboard.css">
     <link rel="stylesheet" href="<?= htmlspecialchars((string)($baseUrl ?? ''), ENT_QUOTES, 'UTF-8') ?>/CSS-Styles/NavbarFooterStyle.css">
+    <script src="<?= htmlspecialchars((string)($baseUrl ?? ''), ENT_QUOTES, 'UTF-8') ?>/JS-Script-Files/modalHandler.js" defer></script>
 </head>
 
 

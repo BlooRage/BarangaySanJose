@@ -1,136 +1,200 @@
 :root {
     color-scheme: light;
+    --um-surface: #ffffff;
+    --um-text: #1f2937;
+    --um-muted: #667085;
+    --um-border: #e5e7eb;
+    --um-shadow: 0 18px 55px rgba(15, 23, 42, 0.18);
+    --um-radius: 22px;
 }
+
 @media (prefers-color-scheme: dark) {
     :root {
         color-scheme: light;
     }
+
     body {
         background-color: #ffffff;
         color: #000000;
     }
 }
 
-/* ===== Modal Container ===== */
-.modalContainer {
-    background-color: #ffffff;
-    border-radius: 15px;
-    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
-    border: none;
+.uniform-modal .modal-dialog {
+    max-width: 420px;
 }
 
-/* ===== Modal Header (BLACK) ===== */
+.uniform-modal .modal-content {
+    background: linear-gradient(180deg, #ffffff 0%, #fffaf3 100%);
+    border: 1px solid rgba(222, 113, 12, 0.14);
+    border-radius: var(--um-radius);
+    box-shadow: var(--um-shadow);
+    overflow: hidden;
+}
+
 #umContent .modal-header {
-          /* black header */
-    color: #000000;
-    border-radius: 15px 15px 0 0;     /* match container radius */
-    padding: 16px 20px;
+    color: var(--um-text);
+    padding: 22px 26px 0;
 }
 
-/* ===== Modal Title ===== */
-#umContent .modal-title {
-	      color: #000000;
-	      font-weight: 700;
-	      font-size: 1.1rem;
-	      margin: 0;
-}
-/* Universal modal title color */
-.modal .modal-title {
-    color: #000000;
-}
-
-/* Ensure non-.modal-title headers (e.g. <h4>, <h5>) in modal headers are also black by default. */
+#umContent .modal-title,
+.modal .modal-title,
 .modal .modal-header {
-    color: #000000;
+    color: var(--um-text);
 }
-/* Hide X/close button sitewide */
+
+#umContent .modal-title {
+    font-size: 1.18rem;
+    font-weight: 800;
+    letter-spacing: -0.02em;
+    margin: 0;
+}
+
 .modal .btn-close {
     display: none !important;
 }
 
-/* Login success modal title visibility */
-#accountVerifiedModal .modal-title {
-    color: #000000;
-}
-
-/* Faster modal open/close */
 .modal.fade {
-    transition: opacity 0.15s linear;
+    transition: opacity 0.18s linear;
 }
 
 .modal.fade .modal-dialog {
-    transition: transform 0.15s ease-out, opacity 0.15s ease-out;
+    transition: transform 0.18s ease-out, opacity 0.18s ease-out;
 }
 
-/* ===== Divider lines (clean separation) ===== */
 #umContent hr {
-    margin: 0;
-    border-color: #e5e5e5;
+    border-color: var(--um-border);
+    margin: 0 24px;
+    opacity: 1;
 }
 
-/* ===== Modal Body ===== */
 #umContent .modal-body {
-    color: #333333;
-    font-size: 0.95rem;
-    padding: 20px;
+    color: var(--um-text);
+    font-size: 0.97rem;
+    line-height: 1.6;
+    padding: 24px 26px 10px;
 }
 
-/* ===== Modal Footer ===== */
 #umContent .modal-footer {
-    padding: 16px 20px 20px;
+    padding: 10px 26px 24px;
 }
 
-/* ===== Base Modal Button ===== */
+.uniform-modal__icon {
+    width: 74px;
+    height: 74px;
+    margin: 0 auto 18px;
+    border-radius: 999px;
+    display: grid;
+    place-items: center;
+    font-size: 1.9rem;
+    background: #eef4ff;
+    color: #175cd3;
+    box-shadow: inset 0 0 0 1px rgba(23, 92, 211, 0.1);
+}
+
+.uniform-modal__copy {
+    color: var(--um-text);
+}
+
+.uniform-modal__copy p {
+    color: var(--um-text);
+}
+
+#umContent[data-tone="success"] .uniform-modal__icon {
+    background: #ecfdf3;
+    color: #027a48;
+    box-shadow: inset 0 0 0 1px rgba(2, 122, 72, 0.12);
+}
+
+#umContent[data-tone="warning"] .uniform-modal__icon {
+    background: #fff7e8;
+    color: #de710c;
+    box-shadow: inset 0 0 0 1px rgba(222, 113, 12, 0.14);
+}
+
+#umContent[data-tone="danger"] .uniform-modal__icon {
+    background: #fef3f2;
+    color: #d92d20;
+    box-shadow: inset 0 0 0 1px rgba(217, 45, 32, 0.12);
+}
+
+#umContent[data-tone="info"] .uniform-modal__icon {
+    background: #eef4ff;
+    color: #175cd3;
+    box-shadow: inset 0 0 0 1px rgba(23, 92, 211, 0.1);
+}
+
 .modalBtn {
-    border-radius: 10px;
-    padding: 10px 25px;
+    border-radius: 14px;
+    min-height: 46px;
+    padding: 10px 18px;
     border: none;
-    font-weight: 600;
-    transition: background-color 0.2s ease, box-shadow 0.2s ease;
-    color: #ffffff;
+    font-weight: 700;
+    transition: transform 0.18s ease, box-shadow 0.18s ease, background-color 0.18s ease, border-color 0.18s ease;
+    box-shadow: 0 10px 24px rgba(15, 23, 42, 0.08);
 }
 
-/* ===== Bootstrap Color Mapping ===== */
-/* Primary */
+.modalBtn:hover,
+.modalBtn:focus {
+    transform: translateY(-1px);
+    box-shadow: 0 14px 28px rgba(15, 23, 42, 0.14);
+}
+
 .modalBtn.btn-primary {
-    background-color: var(--bs-primary);
-}
-.modalBtn.btn-primary:hover {
-    background-color: var(--bs-primary-bg-subtle, #0b5ed7);
-}
-
-/* Success */
-.modalBtn.btn-success {
-    background-color: var(--bs-success);
-}
-.modalBtn.btn-success:hover {
-    background-color: #157347;
-}
-
-/* Danger */
-.modalBtn.btn-danger {
-    background-color: var(--bs-danger);
-}
-.modalBtn.btn-danger:hover {
-    background-color: #bb2d3b;
-}
-
-/* Warning */
-.modalBtn.btn-warning {
-    background-color: var(--bs-warning);
-    color: #000;
-}
-.modalBtn.btn-warning:hover {
-    background-color: #e0a800;
-}
-
-/* Secondary / Outline */
-.modalBtn.btn-outline-secondary {
-    background-color: transparent;
-    color: var(--bs-secondary);
-    border: 2px solid var(--bs-secondary);
-}
-.modalBtn.btn-outline-secondary:hover {
-    background-color: var(--bs-secondary);
+    background-color: #175cd3;
     color: #ffffff;
+}
+
+.modalBtn.btn-primary:hover,
+.modalBtn.btn-primary:focus {
+    background-color: #1849a9;
+    color: #ffffff;
+}
+
+.modalBtn.btn-success {
+    background-color: #039855;
+    color: #ffffff;
+}
+
+.modalBtn.btn-success:hover,
+.modalBtn.btn-success:focus {
+    background-color: #027a48;
+    color: #ffffff;
+}
+
+.modalBtn.btn-danger {
+    background-color: #d92d20;
+    color: #ffffff;
+}
+
+.modalBtn.btn-danger:hover,
+.modalBtn.btn-danger:focus {
+    background-color: #b42318;
+    color: #ffffff;
+}
+
+.modalBtn.btn-warning {
+    background-color: #de710c;
+    color: #ffffff;
+}
+
+.modalBtn.btn-warning:hover,
+.modalBtn.btn-warning:focus {
+    background-color: #b95606;
+    color: #ffffff;
+}
+
+.modalBtn.btn-secondary,
+.modalBtn.btn-outline-secondary {
+    background-color: #ffffff;
+    color: #344054;
+    border: 1px solid #d0d5dd;
+}
+
+.modalBtn.btn-secondary:hover,
+.modalBtn.btn-secondary:focus,
+.modalBtn.btn-outline-secondary:hover,
+.modalBtn.btn-outline-secondary:focus {
+    background-color: #f8fafc;
+    color: #1f2937;
+    border-color: #cbd5e1;
 }

@@ -972,13 +972,13 @@ require_once __DIR__ . "/includes/resident_access_guard.php";
                       <i class="fa-solid fa-upload"></i>
                       <span>Drag & drop file</span>
                     </div>
-                    <div class="upload-subtext mt-1">PDF or image</div>
+                    <div class="upload-subtext mt-1">PDF, JPG, or PNG</div>
                     <input
                       type="file"
                       class="form-control upload-input"
                       id="idFrontInput"
 	                      name="idFront"
-	                      accept="image/*,.pdf,.heic,.heif">
+	                      accept=".jpg,.jpeg,.png,.pdf">
 	                  </div>
 	                  <small class="text-muted d-block text-center mt-2" id="idFrontCaption">Front</small>
 	                </div>
@@ -989,13 +989,13 @@ require_once __DIR__ . "/includes/resident_access_guard.php";
 	                      <i class="fa-solid fa-upload"></i>
                       <span>Drag & drop file</span>
                     </div>
-                    <div class="upload-subtext mt-1">PDF or image</div>
+                    <div class="upload-subtext mt-1">PDF, JPG, or PNG</div>
                     <input
                       type="file"
                       class="form-control upload-input"
 	                      id="idBackInput"
 	                      name="idBack"
-	                      accept="image/*,.pdf,.heic,.heif">
+	                      accept=".jpg,.jpeg,.png,.pdf">
 	                  </div>
 	                  <small class="text-muted d-block text-center mt-2" id="idBackCaption">Back</small>
 	                </div>
@@ -1107,8 +1107,8 @@ require_once __DIR__ . "/includes/resident_access_guard.php";
 	                            <i class="fa-solid fa-upload"></i>
 	                            <span>Drag & drop file</span>
 	                          </div>
-	                          <div class="upload-subtext mt-1">Image only</div>
-	                          <input type="file" class="form-control upload-input sector-doc-idfront" name="sectorDocFile[PWD][]" data-sector="PWD" accept="image/*,.heic,.heif">
+	                          <div class="upload-subtext mt-1">JPG or PNG</div>
+	                          <input type="file" class="form-control upload-input sector-doc-idfront" name="sectorDocFile[PWD][]" data-sector="PWD" accept=".jpg,.jpeg,.png">
 	                        </div>
 	                        <small class="text-muted d-block text-center mt-2">Front</small>
 	                      </div>
@@ -1118,8 +1118,8 @@ require_once __DIR__ . "/includes/resident_access_guard.php";
 	                            <i class="fa-solid fa-upload"></i>
 	                            <span>Drag & drop file</span>
 	                          </div>
-	                          <div class="upload-subtext mt-1">Image only</div>
-	                          <input type="file" class="form-control upload-input sector-doc-idback" name="sectorDocFile[PWD][]" data-sector="PWD" accept="image/*,.heic,.heif">
+	                          <div class="upload-subtext mt-1">JPG or PNG</div>
+	                          <input type="file" class="form-control upload-input sector-doc-idback" name="sectorDocFile[PWD][]" data-sector="PWD" accept=".jpg,.jpeg,.png">
 	                        </div>
 	                        <small class="text-muted d-block text-center mt-2">Back</small>
 	                      </div>
@@ -1162,8 +1162,8 @@ require_once __DIR__ . "/includes/resident_access_guard.php";
 	                            <i class="fa-solid fa-upload"></i>
 	                            <span>Drag & drop file</span>
 	                          </div>
-	                          <div class="upload-subtext mt-1">Image only</div>
-	                          <input type="file" class="form-control upload-input sector-doc-idfront" name="sectorDocFile[SeniorCitizen][]" data-sector="SeniorCitizen" accept="image/*,.heic,.heif">
+	                          <div class="upload-subtext mt-1">JPG or PNG</div>
+	                          <input type="file" class="form-control upload-input sector-doc-idfront" name="sectorDocFile[SeniorCitizen][]" data-sector="SeniorCitizen" accept=".jpg,.jpeg,.png">
 	                        </div>
 	                        <small class="text-muted d-block text-center mt-2">Front</small>
 	                      </div>
@@ -1173,8 +1173,8 @@ require_once __DIR__ . "/includes/resident_access_guard.php";
 	                            <i class="fa-solid fa-upload"></i>
 	                            <span>Drag & drop file</span>
 	                          </div>
-	                          <div class="upload-subtext mt-1">Image only</div>
-	                          <input type="file" class="form-control upload-input sector-doc-idback" name="sectorDocFile[SeniorCitizen][]" data-sector="SeniorCitizen" accept="image/*,.heic,.heif">
+	                          <div class="upload-subtext mt-1">JPG or PNG</div>
+	                          <input type="file" class="form-control upload-input sector-doc-idback" name="sectorDocFile[SeniorCitizen][]" data-sector="SeniorCitizen" accept=".jpg,.jpeg,.png">
 	                        </div>
 	                        <small class="text-muted d-block text-center mt-2">Back</small>
 	                      </div>
@@ -1219,8 +1219,8 @@ require_once __DIR__ . "/includes/resident_access_guard.php";
 	                            <i class="fa-solid fa-upload"></i>
 	                            <span>Drag & drop file</span>
 	                          </div>
-	                          <div class="upload-subtext mt-1">Image only</div>
-	                          <input type="file" class="form-control upload-input sector-doc-idfront" name="sectorDocFile[Student][]" data-sector="Student" accept="image/*,.heic,.heif">
+	                          <div class="upload-subtext mt-1">JPG or PNG</div>
+	                          <input type="file" class="form-control upload-input sector-doc-idfront" name="sectorDocFile[Student][]" data-sector="Student" accept=".jpg,.jpeg,.png">
 	                        </div>
 	                        <small class="text-muted d-block text-center mt-2">Front</small>
 	                      </div>
@@ -1230,8 +1230,8 @@ require_once __DIR__ . "/includes/resident_access_guard.php";
 	                            <i class="fa-solid fa-upload"></i>
 	                            <span>Drag & drop file</span>
 	                          </div>
-	                          <div class="upload-subtext mt-1">Image only</div>
-	                          <input type="file" class="form-control upload-input sector-doc-idback" name="sectorDocFile[Student][]" data-sector="Student" accept="image/*,.heic,.heif">
+	                          <div class="upload-subtext mt-1">JPG or PNG</div>
+	                          <input type="file" class="form-control upload-input sector-doc-idback" name="sectorDocFile[Student][]" data-sector="Student" accept=".jpg,.jpeg,.png">
 	                        </div>
 	                        <small class="text-muted d-block text-center mt-2">Back</small>
 	                      </div>
@@ -1276,8 +1276,8 @@ require_once __DIR__ . "/includes/resident_access_guard.php";
 	                            <i class="fa-solid fa-upload"></i>
 	                            <span>Drag & drop file</span>
 	                          </div>
-	                          <div class="upload-subtext mt-1">Image only</div>
-	                          <input type="file" class="form-control upload-input sector-doc-idfront" name="sectorDocFile[IndigenousPeople][]" data-sector="IndigenousPeople" accept="image/*,.heic,.heif">
+	                          <div class="upload-subtext mt-1">JPG or PNG</div>
+	                          <input type="file" class="form-control upload-input sector-doc-idfront" name="sectorDocFile[IndigenousPeople][]" data-sector="IndigenousPeople" accept=".jpg,.jpeg,.png">
 	                        </div>
 	                        <small class="text-muted d-block text-center mt-2">Front</small>
 	                      </div>
@@ -1287,8 +1287,8 @@ require_once __DIR__ . "/includes/resident_access_guard.php";
 	                            <i class="fa-solid fa-upload"></i>
 	                            <span>Drag & drop file</span>
 	                          </div>
-	                          <div class="upload-subtext mt-1">Image only</div>
-	                          <input type="file" class="form-control upload-input sector-doc-idback" name="sectorDocFile[IndigenousPeople][]" data-sector="IndigenousPeople" accept="image/*,.heic,.heif">
+	                          <div class="upload-subtext mt-1">JPG or PNG</div>
+	                          <input type="file" class="form-control upload-input sector-doc-idback" name="sectorDocFile[IndigenousPeople][]" data-sector="IndigenousPeople" accept=".jpg,.jpeg,.png">
 	                        </div>
 	                        <small class="text-muted d-block text-center mt-2">Back</small>
 	                      </div>
@@ -1335,8 +1335,8 @@ require_once __DIR__ . "/includes/resident_access_guard.php";
 	                            <i class="fa-solid fa-upload"></i>
 	                            <span>Drag & drop file</span>
 	                          </div>
-	                          <div class="upload-subtext mt-1">Image only</div>
-	                          <input type="file" class="form-control upload-input sector-doc-idfront" name="sectorDocFile[SingleParent][]" data-sector="SingleParent" accept="image/*,.heic,.heif">
+	                          <div class="upload-subtext mt-1">JPG or PNG</div>
+	                          <input type="file" class="form-control upload-input sector-doc-idfront" name="sectorDocFile[SingleParent][]" data-sector="SingleParent" accept=".jpg,.jpeg,.png">
 	                        </div>
 	                        <small class="text-muted d-block text-center mt-2">Front</small>
 	                      </div>
@@ -1346,8 +1346,8 @@ require_once __DIR__ . "/includes/resident_access_guard.php";
 	                            <i class="fa-solid fa-upload"></i>
 	                            <span>Drag & drop file</span>
 	                          </div>
-	                          <div class="upload-subtext mt-1">Image only</div>
-	                          <input type="file" class="form-control upload-input sector-doc-idback" name="sectorDocFile[SingleParent][]" data-sector="SingleParent" accept="image/*,.heic,.heif">
+	                          <div class="upload-subtext mt-1">JPG or PNG</div>
+	                          <input type="file" class="form-control upload-input sector-doc-idback" name="sectorDocFile[SingleParent][]" data-sector="SingleParent" accept=".jpg,.jpeg,.png">
 	                        </div>
 	                        <small class="text-muted d-block text-center mt-2">Back</small>
 	                      </div>
@@ -1643,7 +1643,23 @@ proofTypeSelect.addEventListener("change", () => {
 document.addEventListener("DOMContentLoaded", () => {
 
 
-  async function convertHeicIfNeeded(input) {
+  function isMergedIdInput(input) {
+    if (!input) return false;
+    return input.id === "idFrontInput"
+      || input.id === "idBackInput"
+      || input.classList.contains("sector-doc-idfront")
+      || input.classList.contains("sector-doc-idback");
+  }
+
+  function mergedInputFormatMessage(input) {
+    if (!input) return "Please upload a supported file.";
+    if (input.classList.contains("sector-doc-idfront") || input.classList.contains("sector-doc-idback")) {
+      return "Please upload JPG, JPEG, or PNG.";
+    }
+    return "Please upload JPG, JPEG, PNG, or PDF.";
+  }
+
+  async function validateSelectedFiles(input) {
     if (!input || !input.files || input.files.length === 0) return;
 
     const files = Array.from(input.files);
@@ -1652,14 +1668,21 @@ document.addEventListener("DOMContentLoaded", () => {
     for (const file of files) {
       const ext = (file.name.split(".").pop() || "").toLowerCase();
       const isHeic = ext === "heic" || ext === "heif" || file.type === "image/heic" || file.type === "image/heif";
+      const isWebp = ext === "webp" || file.type === "image/webp";
+
+      if (isMergedIdInput(input) && isWebp) {
+        input.value = "";
+        throw new Error(`WEBP cannot be converted to PDF on this server. ${mergedInputFormatMessage(input)}`);
+      }
+
       if (!isHeic) {
         converted.push(file);
         continue;
       }
 
       if (typeof heic2any !== "function") {
-        alert("HEIC conversion failed. Please upload JPG or PNG.");
-        return;
+        input.value = "";
+        throw new Error(`HEIC conversion failed. ${isMergedIdInput(input) ? mergedInputFormatMessage(input) : "Please upload JPG or PNG."}`);
       }
 
       try {
@@ -1669,8 +1692,8 @@ document.addEventListener("DOMContentLoaded", () => {
         converted.push(jpgFile);
       } catch (err) {
         console.error(err);
-        alert("HEIC conversion failed. Please upload JPG or PNG.");
-        return;
+        input.value = "";
+        throw new Error(`HEIC conversion failed. ${isMergedIdInput(input) ? mergedInputFormatMessage(input) : "Please upload JPG or PNG."}`);
       }
     }
 
@@ -1702,10 +1725,14 @@ document.addEventListener("DOMContentLoaded", () => {
       uploadBox.classList.remove("dragover");
 
       if (e.dataTransfer.files.length) {
-        input.files = e.dataTransfer.files;
-        await convertHeicIfNeeded(input);
-        if (input.files.length) {
-          markUploaded(uploadBox, input);
+        try {
+          input.files = e.dataTransfer.files;
+          await validateSelectedFiles(input);
+          if (input.files.length) {
+            markUploaded(uploadBox, input);
+          }
+        } catch (err) {
+          alert(err?.message || "Unsupported file selected.");
         }
       }
     });
@@ -1713,9 +1740,13 @@ document.addEventListener("DOMContentLoaded", () => {
     // File selected
     input.addEventListener("change", async () => {
       if (input.files.length) {
-        await convertHeicIfNeeded(input);
-        if (input.files.length) {
-          markUploaded(uploadBox, input);
+        try {
+          await validateSelectedFiles(input);
+          if (input.files.length) {
+            markUploaded(uploadBox, input);
+          }
+        } catch (err) {
+          alert(err?.message || "Unsupported file selected.");
         }
       }
     });

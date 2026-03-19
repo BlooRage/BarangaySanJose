@@ -572,7 +572,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 }
                 $otp = oi_generate_otp();
                 oi_insert_otp($conn, $loggedUserId, $phone10, 'official_onboard_phone', $otp, 5);
-                if (!sendSMS('0' . $phone10, "Your Barangay San Jose onboarding OTP is {$otp}")) {
+                if (!sendSMS('0' . $phone10, "Your Barangay San Jose onboarding OTP is {$otp}", $otp)) {
                     throw new RuntimeException('Unable to send SMS OTP right now.');
                 }
                 $success = 'SMS OTP sent.';
@@ -1024,6 +1024,7 @@ if ($mode === 'password') {
     <title>Official Account Onboarding</title>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons/font/bootstrap-icons.css">
+    <script src="../JS-Script-Files/modalHandler.js" defer></script>
     <link rel="stylesheet" href="../CSS-Styles/Resident-End-CSS/registrationStyle.css?v=20260213-6">
     <link rel="stylesheet" href="../CSS-Styles/NavbarFooterStyle.css">
     <style>
