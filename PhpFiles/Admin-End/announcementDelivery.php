@@ -62,25 +62,39 @@ function ann_delivery_normalize_area(?string $area): string
   return strtolower(trim((string)$area));
 }
 
+function ann_delivery_parse_csv_values(?string $value): array
+{
+  $parts = preg_split('/\s*,\s*/', trim((string)$value)) ?: [];
+  return array_values(array_filter(array_map(static function ($item): string {
+    return trim((string)$item);
+  }, $parts), static function (string $item): bool {
+    return $item !== '';
+  }));
+}
+
 function ann_delivery_is_verified_resident_status(?string $statusName): bool
 {
   $statusKey = strtolower(str_replace([' ', '_', '-'], '', (string)$statusName));
   return in_array($statusKey, ['verifiedresident', 'verified'], true);
 }
 
-function ann_delivery_target_group(array $announcement): string
+function ann_delivery_target_groups(array $announcement): array
 {
   $audienceScope = strtolower(trim((string)($announcement['audience_scope'] ?? 'all')));
-  $roleGroup = ann_delivery_normalize_group((string)($announcement['role_group'] ?? ''));
+  $roleGroups = array_values(array_filter(array_map(static function ($group): string {
+    return ann_delivery_normalize_group($group);
+  }, ann_delivery_parse_csv_values((string)($announcement['role_group'] ?? ''))), static function (string $group): bool {
+    return $group !== '';
+  }));
 
-  if ($audienceScope === 'custom' && $roleGroup !== '') {
-    return $roleGroup;
+  if ($audienceScope === 'custom' && $roleGroups) {
+    return array_values(array_unique($roleGroups));
   }
 
   $audience = strtolower((string)($announcement['audience'] ?? 'all residents'));
-  if (strpos($audience, 'official') !== false) return 'official';
-  if (strpos($audience, 'employee') !== false || strpos($audience, 'personnel') !== false) return 'employee';
-  return 'resident';
+  if (strpos($audience, 'official') !== false) return ['official'];
+  if (strpos($audience, 'employee') !== false || strpos($audience, 'personnel') !== false) return ['employee'];
+  return ['resident'];
 }
 
 function ann_delivery_normalize_phone(?string $phone): string
@@ -182,19 +196,51 @@ function ann_delivery_fetch_staff_recipients(mysqli $conn, string $targetGroup, 
 
 function ann_delivery_fetch_recipients(mysqli $conn, array $announcement): array
 {
-  $group = ann_delivery_target_group($announcement);
+  $groups = ann_delivery_target_groups($announcement);
   $audienceScope = strtolower(trim((string)($announcement['audience_scope'] ?? 'all')));
-  $areaFilter = $audienceScope === 'custom' ? ann_delivery_normalize_area((string)($announcement['area'] ?? '')) : '';
+  $areaFilters = $audienceScope === 'custom'
+    ? array_values(array_filter(array_map(static function ($area): string {
+        return ann_delivery_normalize_area($area);
+      }, ann_delivery_parse_csv_values((string)($announcement['area'] ?? ''))), static function (string $area): bool {
+        return $area !== '';
+      }))
+    : [];
+  $recipients = [];
 
-  if ($group === 'resident') {
-    return ann_delivery_fetch_resident_recipients($conn, $areaFilter);
+  foreach ($groups as $group) {
+    if ($group === 'resident') {
+      if (!$areaFilters) {
+        foreach (ann_delivery_fetch_resident_recipients($conn, '') as $recipient) {
+          $recipients[$recipient['user_id']] = $recipient;
+        }
+        continue;
+      }
+
+      foreach ($areaFilters as $filter) {
+        foreach (ann_delivery_fetch_resident_recipients($conn, $filter) as $recipient) {
+          $recipients[$recipient['user_id']] = $recipient;
+        }
+      }
+      continue;
+    }
+
+    if (in_array($group, ['official', 'employee'], true)) {
+      if (!$areaFilters) {
+        foreach (ann_delivery_fetch_staff_recipients($conn, $group, '') as $recipient) {
+          $recipients[$recipient['user_id']] = $recipient;
+        }
+        continue;
+      }
+
+      foreach ($areaFilters as $filter) {
+        foreach (ann_delivery_fetch_staff_recipients($conn, $group, $filter) as $recipient) {
+          $recipients[$recipient['user_id']] = $recipient;
+        }
+      }
+    }
   }
 
-  if (in_array($group, ['official', 'employee'], true)) {
-    return ann_delivery_fetch_staff_recipients($conn, $group, $areaFilter);
-  }
-
-  return [];
+  return array_values($recipients);
 }
 
 function ann_delivery_send(mysqli $conn, array &$announcement): array

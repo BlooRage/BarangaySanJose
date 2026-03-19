@@ -182,27 +182,38 @@ $sharedMeta = [
                     <label class="form-check-label" for="audienceCustom">Custom Audience</label>
                   </div>
 
-                  <div id="customAudienceFields" class="row g-2 d-none">
+                  <div id="customAudienceFields" class="row g-3 d-none">
                     <div class="col-12">
-                      <label class="form-label mb-1">Area</label>
-                      <select class="form-select" name="area">
-                        <option value="">Select Area</option>
-                        <option>Area 1</option>
-                        <option>Area 2</option>
-                        <option>Area 3</option>
-                        <option>Area 4</option>
-                        <option>Area 5</option>
-                        <option>Area 6</option>
-                      </select>
+                      <div class="announcement-audience-group">
+                        <div class="announcement-audience-group-head">
+                          <label class="form-label mb-1">Select Area</label>
+                          <p class="announcement-editor-helper mb-0">Choose one or more areas that should receive this announcement.</p>
+                        </div>
+                        <div class="announcement-checkbox-grid announcement-checkbox-grid--area" data-custom-audience-group="area">
+                          <?php foreach (['Area 1', 'Area 1A', 'Area 2', 'Area 3', 'Area 4', 'Area 5', 'Area 6'] as $areaOption): ?>
+                          <label class="announcement-checkbox-card announcement-checkbox-card--area">
+                            <input class="form-check-input" type="checkbox" name="area[]" value="<?= htmlspecialchars($areaOption) ?>" disabled>
+                            <span><?= htmlspecialchars($areaOption) ?></span>
+                          </label>
+                          <?php endforeach; ?>
+                        </div>
+                      </div>
                     </div>
                     <div class="col-12">
-                      <label class="form-label mb-1">Role Group</label>
-                      <select class="form-select" name="role_group">
-                        <option value="">Select Group</option>
-                        <option>Officials</option>
-                        <option>Employees</option>
-                        <option>Residents</option>
-                      </select>
+                      <div class="announcement-audience-group">
+                        <div class="announcement-audience-group-head">
+                          <label class="form-label mb-1">Role Group</label>
+                          <p class="announcement-editor-helper mb-0">Filter recipients by role when this update is only for a specific group.</p>
+                        </div>
+                        <div class="announcement-checkbox-grid announcement-checkbox-grid--role" data-custom-audience-group="role_group">
+                          <?php foreach (['Officials', 'Employees', 'Residents'] as $roleGroupOption): ?>
+                          <label class="announcement-checkbox-card announcement-checkbox-card--role">
+                            <input class="form-check-input" type="checkbox" name="role_group[]" value="<?= htmlspecialchars($roleGroupOption) ?>" disabled>
+                            <span><?= htmlspecialchars($roleGroupOption) ?></span>
+                          </label>
+                          <?php endforeach; ?>
+                        </div>
+                      </div>
                     </div>
                   </div>
 
@@ -427,6 +438,7 @@ $sharedMeta = [
       const emailField = document.getElementById("emailField");
       const audienceAll = document.getElementById("audienceAll");
       const customAudienceFields = document.getElementById("customAudienceFields");
+      const audienceCustom = document.getElementById("audienceCustom");
       const faqItemsContainer = document.getElementById("faqItemsContainer");
       const faqAddItemBtn = document.getElementById("faqAddItemBtn");
       const faqItemCount = document.getElementById("faqItemCount");
@@ -735,10 +747,17 @@ $sharedMeta = [
       }
 
       function toggleAudienceFields() {
-        if (!customAudienceFields || !audienceAll) {
+        if (!customAudienceFields || !audienceAll || !audienceCustom) {
           return;
         }
-        customAudienceFields.classList.toggle("d-none", audienceAll.checked);
+        const useCustomAudience = audienceCustom.checked;
+        customAudienceFields.classList.toggle("d-none", !useCustomAudience);
+        customAudienceFields.querySelectorAll("input[type='checkbox']").forEach((checkbox) => {
+          checkbox.disabled = !useCustomAudience;
+          if (!useCustomAudience) {
+            checkbox.checked = false;
+          }
+        });
       }
 
       function applyToolbarTooltips() {
