@@ -136,8 +136,8 @@ include "includes/sidebar.php";
         </h2>
         <hr><br>
 
-        <div id="div-tableContainer" class="bg-white p-4 pt-3 rounded-4 shadow-sm border edit-requests-shell">
-	            <div class="admin-list-toolbar mb-3 flex-wrap">
+        <div id="div-tableContainer" class="bg-white p-4 rounded-4 shadow-sm border edit-requests-shell">
+	            <div class="admin-list-toolbar mb-3 pt-2 flex-wrap">
 	                <div class="admin-list-tabs">
 	                    <button class="btn btn-outline-primary btn-sm status-filter-btn active fw-bold" data-filter="ALL">All</button>
 	                    <button class="btn btn-outline-secondary btn-sm status-filter-btn fw-bold" data-filter="Approved">Approved</button>
@@ -221,8 +221,8 @@ include "includes/sidebar.php";
               </div>
             </div>
 
-            <div class="table-responsive">
-                <table class="table align-middle" id="table-editRequests">
+            <div class="table-responsive compact-admin-table-shell">
+                <table class="table align-middle compact-admin-table" id="table-editRequests">
                     <thead>
                         <tr class="table-light">
                             <th>Request ID</th>

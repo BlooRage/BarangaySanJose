@@ -34,7 +34,7 @@ require_once __DIR__ . "/includes/admin_guard.php";
         <div class="bg-white p-4 rounded-4 shadow-sm border archive-shell">
 
 	            <!-- SEARCH -->
-	            <div class="admin-list-toolbar mb-3 flex-wrap">
+	            <div class="admin-list-toolbar mb-3 pt-2 flex-wrap">
 	                <div class="admin-list-tabs"></div>
 
 	                <div class="admin-list-actions">
@@ -59,8 +59,8 @@ require_once __DIR__ . "/includes/admin_guard.php";
 	            </div>
 
             <!-- TABLE -->
-            <div class="table-responsive">
-                <table class="table align-middle" id="table-residentArchive">
+            <div class="table-responsive compact-admin-table-shell">
+                <table class="table align-middle compact-admin-table" id="table-residentArchive">
                     <thead>
                         <tr class="table-light">
                             <th>Resident ID</th>

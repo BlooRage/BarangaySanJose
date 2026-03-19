@@ -233,11 +233,14 @@
       tdStatus.appendChild(wrap);
 
       const tdAction = document.createElement("td");
+      const actionWrap = document.createElement("div");
+      actionWrap.className = "compact-table-actions";
       const btn = document.createElement("button");
-      btn.className = "btn btn-outline-primary btn-sm";
+      btn.className = "btn btn-outline-primary btn-sm compact-table-btn";
       btn.innerText = "View";
       btn.addEventListener("click", () => openViewer(a));
-      tdAction.appendChild(btn);
+      actionWrap.appendChild(btn);
+      tdAction.appendChild(actionWrap);
 
       tr.appendChild(tdId);
       tr.appendChild(tdName);

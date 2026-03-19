@@ -164,6 +164,34 @@ function toPublicPath($path): ?string {
     return appRootPath() . '/' . ltrim($normalized, '/');
 }
 
+function formatFiledDateTime($dateValue, $timeValue): string {
+    $dateValue = trim((string)$dateValue);
+    $timeValue = trim((string)$timeValue);
+
+    if ($dateValue === '' && $timeValue === '') {
+        return '';
+    }
+
+    $combined = trim($dateValue . ' ' . $timeValue);
+    if ($combined !== '') {
+        $timestamp = strtotime($combined);
+        if ($timestamp !== false) {
+            return date('M j, Y g:iA', $timestamp);
+        }
+    }
+
+    if ($dateValue !== '') {
+        $dateOnly = strtotime($dateValue);
+        if ($dateOnly !== false) {
+            return $timeValue !== ''
+                ? date('M j, Y', $dateOnly) . ' ' . $timeValue
+                : date('M j, Y', $dateOnly);
+        }
+    }
+
+    return $combined;
+}
+
 if ($action === 'list') {
     $sql = "
         SELECT
@@ -220,8 +248,7 @@ if ($action === 'list') {
             'case_id' => $row['case_id'],
             'blotter_id' => $row['blotter_id'],
             'blotter_number' => $row['blotter_number'],
-            'date_filed' => $row['date_filed'],
-            'time_filed' => $row['time_filed'],
+            'date_filed' => formatFiledDateTime($row['date_filed'], $row['time_filed']),
             'status_name' => $row['status_name'],
             'level_name' => $row['level_name'],
             'complainant_name' => $fullName,
@@ -321,8 +348,7 @@ if ($action === 'detail') {
         'case_id' => $detail['case_id'],
         'blotter_id' => $detail['blotter_id'],
         'blotter_number' => $detail['blotter_number'],
-        'date_filed' => $detail['date_filed'],
-        'time_filed' => $detail['time_filed'],
+        'date_filed' => formatFiledDateTime($detail['date_filed'], $detail['time_filed']),
         'report_timestamp' => $detail['report_timestamp'],
         'status_name' => $detail['status_name'],
         'level_name' => $detail['level_name'],

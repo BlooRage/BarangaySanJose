@@ -78,7 +78,7 @@
       <hr><br>
 
       <div class="bg-white p-4 rounded-4 shadow-sm border resident-masterlist-shell user-masterlist-shell">
-        <div class="admin-list-toolbar mb-3 flex-wrap">
+        <div class="admin-list-toolbar mb-3 pt-2 flex-wrap">
           <div class="admin-list-tabs">
             <button class="btn btn-outline-primary btn-sm status-filter-btn active" data-filter="ALL">All</button>
             <button class="btn btn-outline-secondary btn-sm status-filter-btn has-notif" data-filter="Pending">
@@ -107,8 +107,8 @@
           </div>
         </div>
 
-        <div class="table-responsive">
-          <table class="table table-hover align-middle mb-0 user-masterlist-table">
+        <div class="table-responsive compact-admin-table-shell">
+          <table class="table table-hover align-middle mb-0 user-masterlist-table compact-admin-table">
             <thead class="table-light">
               <tr>
                 <th>User ID</th>

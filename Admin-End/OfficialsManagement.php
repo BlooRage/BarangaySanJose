@@ -130,7 +130,7 @@ $officialsMgmtPositionsByDepartment = [
       <hr><br>
 
       <div class="bg-white p-4 rounded-4 shadow-sm border resident-masterlist-shell officials-masterlist-shell">
-        <div class="admin-list-toolbar mb-3 flex-wrap">
+        <div class="admin-list-toolbar mb-3 pt-2 flex-wrap">
           <div class="admin-list-tabs">
             <button class="btn btn-outline-primary btn-sm status-filter-btn active" data-filter="ALL">All</button>
             <button class="btn btn-outline-secondary btn-sm status-filter-btn" data-filter="SuperAdmin">SuperAdmin</button>

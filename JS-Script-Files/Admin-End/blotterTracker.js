@@ -231,7 +231,6 @@ fields.push({ label: 'Address', value: participant?.address || '-', fullWidth: t
     const blotterIdDisplay = row.blotter_id || '-';
     const blotterNumber = row.blotter_number || '-';
     const dateFiled = row.date_filed || '-';
-    const timeFiled = row.time_filed || '-';
     const complainant = formatNameWithMiddleInitial(row.complainant_name || '-');
     const respondent = formatNameWithMiddleInitial(row.respondent_name || '-');
     const status = row.status_name || '-';
@@ -245,7 +244,6 @@ fields.push({ label: 'Address', value: participant?.address || '-', fullWidth: t
         <td>${esc(blotterIdDisplay)}</td>
         <td>${esc(blotterNumber)}</td>
         <td>${esc(dateFiled)}</td>
-        <td>${esc(timeFiled)}</td>
         <td>${esc(complainant)}</td>
         <td>${esc(respondent)}</td>
         <td>${statusBadge}</td>
@@ -353,14 +351,14 @@ fields.push({ label: 'Address', value: participant?.address || '-', fullWidth: t
 
   async function loadList() {
     if (!tableBody) return;
-    tableBody.innerHTML = `<tr><td colspan="9" class="text-center text-muted py-4">Loading blotter records...</td></tr>`;
+    tableBody.innerHTML = `<tr><td colspan="8" class="text-center text-muted py-4">Loading blotter records...</td></tr>`;
     try {
       const data = await fetchJson(`${endpoint}?action=list`);
       allRows = Array.isArray(data.items) ? data.items : [];
       updateActiveBadge();
       applyFilters();
     } catch (err) {
-      tableBody.innerHTML = `<tr><td colspan="9" class="text-center text-danger py-4">${esc(err.message || err)}</td></tr>`;
+      tableBody.innerHTML = `<tr><td colspan="8" class="text-center text-danger py-4">${esc(err.message || err)}</td></tr>`;
     }
   }
 
@@ -773,7 +771,6 @@ fields.push({ label: 'Address', value: participant?.address || '-', fullWidth: t
         { label: 'Blotter ID', value: d.blotter_id || '-' },
         { label: 'Blotter Number', value: d.blotter_number || d.blotter_id || '-' },
         { label: 'Date Filed', value: d.date_filed || '-' },
-        { label: 'Time Filed', value: d.time_filed || '-' },
         { label: 'Status', value: d.status_name || '-' },
         { label: 'Case Level', value: d.level_name || '-' }
       ], 4);

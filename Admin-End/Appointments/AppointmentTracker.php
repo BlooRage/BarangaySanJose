@@ -439,8 +439,8 @@ foreach ($appointmentRows as $row) {
                 </div>
             </div>
 
-            <div class="table-responsive">
-                <table id="table-appointmentData" class="table align-middle">
+            <div class="table-responsive compact-admin-table-shell">
+                <table id="table-appointmentData" class="table align-middle compact-admin-table">
                     <thead>
                         <tr class="table-light">
                             <th>Appointment ID</th>
