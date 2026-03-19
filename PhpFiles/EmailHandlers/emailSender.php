@@ -11,12 +11,9 @@ foreach ($emailAutoloadCandidates as $emailAutoloadPath) {
     }
 }
 
-use PHPMailer\PHPMailer\PHPMailer;
-use PHPMailer\PHPMailer\Exception;
-
 class EmailSender
 {
-    private ?PHPMailer $mail = null;
+    private ?\PHPMailer\PHPMailer\PHPMailer $mail = null;
     private string $lastError = '';
 
     private string $defaultFromEmail;
@@ -47,22 +44,22 @@ class EmailSender
         $this->defaultFromName = trim((string)($smtpConfig['from_name'] ?? 'Barangay San Jose'));
         $this->typeSenders = is_array($smtpConfig['senders'] ?? null) ? $smtpConfig['senders'] : [];
 
-        if (!class_exists(PHPMailer::class)) {
+        if (!class_exists(\PHPMailer\PHPMailer\PHPMailer::class)) {
             $this->lastError = 'PHPMailer is unavailable. Ensure the mailer vendor files are deployed.';
             error_log('[EmailSender] ' . $this->lastError);
             return;
         }
 
-        $this->mail = new PHPMailer(true);
+        $this->mail = new \PHPMailer\PHPMailer\PHPMailer(true);
 
         // Safe default & allow string config ('ssl'/'tls')
-        $secure = $smtpConfig['secure'] ?? PHPMailer::ENCRYPTION_SMTPS;
+        $secure = $smtpConfig['secure'] ?? \PHPMailer\PHPMailer\PHPMailer::ENCRYPTION_SMTPS;
         if (is_string($secure)) {
             $s = strtolower(trim($secure));
             if ($s === 'tls' || $s === 'starttls') {
-                $secure = PHPMailer::ENCRYPTION_STARTTLS;
+                $secure = \PHPMailer\PHPMailer\PHPMailer::ENCRYPTION_STARTTLS;
             } elseif ($s === 'ssl' || $s === 'smtps') {
-                $secure = PHPMailer::ENCRYPTION_SMTPS;
+                $secure = \PHPMailer\PHPMailer\PHPMailer::ENCRYPTION_SMTPS;
             } else {
                 $secure = '';
             }
@@ -93,15 +90,15 @@ class EmailSender
     {
         try {
             $this->lastError = '';
-            if (!($this->mail instanceof PHPMailer)) {
-                throw new Exception('Mailer is not initialized. Check SMTP dependencies on the server.');
+            if (!($this->mail instanceof \PHPMailer\PHPMailer\PHPMailer)) {
+                throw new \RuntimeException('Mailer is not initialized. Check SMTP dependencies on the server.');
             }
 
             if (trim((string)$this->mail->Host) === '') {
-                throw new Exception('SMTP host is not configured.');
+                throw new \RuntimeException('SMTP host is not configured.');
             }
             if ($this->mail->SMTPAuth && (trim((string)$this->mail->Username) === '' || $this->mail->Password === '')) {
-                throw new Exception('SMTP username or password is missing.');
+                throw new \RuntimeException('SMTP username or password is missing.');
             }
 
             $this->mail->clearAllRecipients();
@@ -120,13 +117,13 @@ class EmailSender
             $fromName  = $options['from_name']  ?? $this->defaultFromName;
 
             if ($fromEmail === '') {
-                throw new Exception('From email is not configured.');
+                throw new \RuntimeException('From email is not configured.');
             }
             $this->mail->setFrom($fromEmail, $fromName);
 
             // To
             if (empty($options['to'])) {
-                throw new Exception("Missing 'to' address.");
+                throw new \RuntimeException("Missing 'to' address.");
             }
             if (is_array($options['to'])) {
                 foreach ($options['to'] as $addr) $this->mail->addAddress($addr);
@@ -136,13 +133,13 @@ class EmailSender
 
             // Subject
             $subject = trim($options['subject'] ?? '');
-            if ($subject === '') throw new Exception("Missing 'subject'.");
+            if ($subject === '') throw new \RuntimeException("Missing 'subject'.");
             $this->mail->Subject = $subject;
 
             // Template by type
             if (empty($options['template']) && !empty($options['type'])) {
                 $t = $options['type'];
-                if (!isset($this->templateMap[$t])) throw new Exception("Unknown email type: {$t}");
+                if (!isset($this->templateMap[$t])) throw new \RuntimeException("Unknown email type: {$t}");
                 $options['template'] = $this->templateMap[$t];
             }
 
@@ -158,7 +155,7 @@ class EmailSender
                 $bodyText = $bodyText ?: $this->htmlToText($bodyHtml);
             }
 
-            if ($bodyHtml === '') throw new Exception("Email body is empty.");
+            if ($bodyHtml === '') throw new \RuntimeException("Email body is empty.");
 
             $this->mail->Body    = $bodyHtml;
             $this->mail->AltBody = $bodyText ?: $this->htmlToText($bodyHtml);
@@ -170,8 +167,8 @@ class EmailSender
             }
             return $sent;
 
-        } catch (Exception $e) {
-            $mailError = $this->mail instanceof PHPMailer ? (string)$this->mail->ErrorInfo : '';
+        } catch (\Throwable $e) {
+            $mailError = $this->mail instanceof \PHPMailer\PHPMailer\PHPMailer ? (string)$this->mail->ErrorInfo : '';
             $this->lastError = trim($e->getMessage() . ($mailError !== '' ? ' | ' . $mailError : ''));
             error_log('[EmailSender] ' . $this->lastError);
             return false;
@@ -189,7 +186,7 @@ class EmailSender
         $layoutPath   = $this->templatesRoot . '/layout.php';
 
         if (!file_exists($templatePath) || !file_exists($layoutPath)) {
-            throw new Exception("Email template or layout missing.");
+            throw new \RuntimeException("Email template or layout missing.");
         }
 
         $data['__content_template'] = $templatePath;

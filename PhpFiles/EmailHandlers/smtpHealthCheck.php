@@ -46,4 +46,8 @@ if ($sent) {
 }
 
 http_response_code(500);
-echo json_encode(['success' => false, 'message' => 'SMTP health check failed.']);
+echo json_encode([
+  'success' => false,
+  'message' => 'SMTP health check failed.',
+  'detail' => $emailSender->getLastError(),
+]);

@@ -1,4 +1,6 @@
 <?php
+// Copy this to config.runtime.php or config.runtime.local.php on the target server.
+// Both runtime files are gitignored, so they must be uploaded/deployed manually.
 return [
     'app' => [
         // Example: https://barangaysanjose-montalban.com
