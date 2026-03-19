@@ -368,16 +368,55 @@ fields.push({ label: 'Address', value: participant?.address || '-', fullWidth: t
     if (detail?.narrative_type === 'file' && detail?.narrative_value) {
       const fileUrl = String(detail?.narrative_url || '').trim()
         || `${appBase}/${String(detail.narrative_value).replace(/^\/+/, '')}`;
+      const fileName = String(detail?.narrative_value || 'Narrative File').split('/').pop() || 'Narrative File';
+      const mimeType = String(detail?.narrative_mime_type || '').trim();
+      const ext = getAttachmentExtension(fileUrl);
+      const isPdf = mimeType.toLowerCase() === 'application/pdf' || ext === 'pdf';
+      const isImage = mimeType.toLowerCase().startsWith('image/') || ['png', 'jpg', 'jpeg', 'webp', 'gif', 'bmp', 'svg'].includes(ext);
+      let previewHtml = `
+        <div class="small text-muted">
+          Preview is unavailable for this file type. Use the buttons above to open or download the attachment.
+        </div>
+      `;
+      if (isImage) {
+        previewHtml = `
+          <a
+            class="d-block border rounded-3 overflow-hidden bg-white js-blotter-attachment"
+            href="${esc(fileUrl)}"
+            data-file-url="${esc(fileUrl)}"
+            data-file-name="${esc(fileName)}"
+            data-file-mime="${esc(mimeType)}"
+            aria-label="Open ${esc(fileName)}"
+          >
+            <img src="${esc(fileUrl)}" alt="${esc(fileName)}" class="img-fluid d-block mx-auto" style="max-height: 420px; object-fit: contain;">
+          </a>
+        `;
+      } else if (isPdf) {
+        previewHtml = `
+          <iframe
+            src="${esc(fileUrl)}"
+            title="${esc(fileName)}"
+            class="w-100 border rounded-3 bg-white"
+            style="min-height: 480px;"
+          ></iframe>
+        `;
+      }
       initialValueHtml = `
         <div class="tracker-attachment-actions">
           <a
             class="btn btn-sm btn-outline-primary js-blotter-attachment"
             href="${esc(fileUrl)}"
             data-file-url="${esc(fileUrl)}"
-            data-file-name="Narrative File"
-            data-file-mime="${esc(detail?.narrative_mime_type || '')}"
+            data-file-name="${esc(fileName)}"
+            data-file-mime="${esc(mimeType)}"
           >Open Narrative File</a>
+          <a
+            class="btn btn-sm btn-outline-secondary"
+            href="${esc(fileUrl)}"
+            download
+          >Download</a>
         </div>
+        <div class="tracker-attachment-preview mt-2">${previewHtml}</div>
       `;
     } else if (detail?.narrative_type === 'text' && detail?.narrative_value) {
       initialValueHtml = `<div class="tracker-form-value-text">${esc(detail.narrative_value || '-')}</div>`;

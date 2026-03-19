@@ -164,6 +164,25 @@ function toPublicPath($path): ?string {
     return appRootPath() . '/' . ltrim($normalized, '/');
 }
 
+function inferMimeTypeFromPath(?string $path): string {
+    $path = strtolower(trim((string)$path));
+    if ($path === '') {
+        return '';
+    }
+
+    $extension = strtolower(pathinfo(parse_url($path, PHP_URL_PATH) ?: $path, PATHINFO_EXTENSION));
+    return match ($extension) {
+        'pdf' => 'application/pdf',
+        'jpg', 'jpeg' => 'image/jpeg',
+        'png' => 'image/png',
+        'webp' => 'image/webp',
+        'gif' => 'image/gif',
+        'bmp' => 'image/bmp',
+        'svg' => 'image/svg+xml',
+        default => '',
+    };
+}
+
 function formatFiledDateTime($dateValue, $timeValue): string {
     $dateValue = trim((string)$dateValue);
     $timeValue = trim((string)$timeValue);
@@ -359,6 +378,7 @@ if ($action === 'detail') {
         'narrative_type' => $narrativeType,
         'narrative_value' => $narrativeValue,
         'narrative_url' => $narrativeType === 'file' ? toPublicPath($narrativeValue) : null,
+        'narrative_mime_type' => $narrativeType === 'file' ? inferMimeTypeFromPath($narrativeValue) : '',
         'signatures' => array_map(static function (array $signature): array {
             $signature['file_url'] = toPublicPath($signature['file_path'] ?? '');
             return $signature;
