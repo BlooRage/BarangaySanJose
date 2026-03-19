@@ -679,16 +679,65 @@ document.addEventListener("DOMContentLoaded", () => {
         const zone = document.querySelector(`.upload-dropzone[data-upload-input="${inputEl.id}"]`);
         const meta = document.getElementById(inputEl.id + "Meta");
         if (!zone) return;
+        const defaultMetaText = meta ? meta.textContent : "";
+        const acceptTokens = String(inputEl.getAttribute("accept") || "")
+            .split(",")
+            .map((token) => token.trim().toLowerCase())
+            .filter(Boolean);
+
+        const allowedMessage = () => {
+            const base = String(defaultMetaText || "Please upload a supported file.")
+                .replace(/\s*Saved as PDF\.\s*$/i, ".")
+                .trim();
+            return base || "Please upload a supported file.";
+        };
+
+        const fileMatchesAccept = (file) => {
+            if (!file || !acceptTokens.length) return true;
+            const fileName = String(file.name || "");
+            const fileExt = fileName.includes(".")
+                ? "." + fileName.split(".").pop().toLowerCase()
+                : "";
+            const fileType = String(file.type || "").toLowerCase();
+
+            return acceptTokens.some((token) => {
+                if (token.startsWith(".")) {
+                    return token === fileExt;
+                }
+                if (token.endsWith("/*")) {
+                    return fileType.startsWith(token.slice(0, -1));
+                }
+                return fileType === token;
+            });
+        };
+
+        const resetInputSelection = () => {
+            inputEl.value = "";
+            if (meta) {
+                meta.textContent = defaultMetaText;
+            }
+        };
+
+        const validateSelectedFile = () => {
+            const file = inputEl.files && inputEl.files.length ? inputEl.files[0] : null;
+            if (!file) return true;
+            if (fileMatchesAccept(file)) return true;
+            resetInputSelection();
+            alert(allowedMessage());
+            updateSubmitState();
+            return false;
+        };
 
         const setMeta = () => {
             if (!meta) return;
             const files = inputEl.files ? Array.from(inputEl.files) : [];
             meta.textContent = files.length === 1
                 ? files[0].name
-                : "JPG, JPEG, PNG, WEBP, or PDF";
+                : defaultMetaText;
         };
 
         inputEl.addEventListener("change", () => {
+            if (!validateSelectedFile()) return;
             setMeta();
             updateSubmitState();
         });
@@ -713,6 +762,7 @@ document.addEventListener("DOMContentLoaded", () => {
             const dt = new DataTransfer();
             dt.items.add(droppedFiles[0]);
             inputEl.files = dt.files;
+            if (!validateSelectedFile()) return;
             inputEl.dispatchEvent(new Event("change", { bubbles: true }));
         });
 
