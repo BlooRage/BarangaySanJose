@@ -827,6 +827,15 @@ h2.section-title {
     width: 100%;
 }
 
+.compact-admin-table--wide {
+    min-width: 980px;
+}
+
+.compact-admin-table--wide th:last-child,
+.compact-admin-table--wide td:last-child {
+    white-space: nowrap;
+}
+
 .compact-admin-table thead th {
     padding: 0.52rem 0.85rem;
     font-size: 0.95rem;

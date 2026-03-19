@@ -201,7 +201,7 @@ require_once __DIR__ . "/../includes/admin_guard.php";
             </div>
 
             <div class="table-responsive compact-admin-table-shell">
-                <table id="table-appData" class="table align-middle compact-admin-table">
+                <table id="table-appData" class="table align-middle compact-admin-table compact-admin-table--wide">
                     <thead>
                         <tr class="table-light">
                             <th>Blotter ID</th>

@@ -237,8 +237,8 @@ fields.push({ label: 'Address', value: participant?.address || '-', fullWidth: t
     const level = row.level_name || '-';
     const statusBadge = badge(status, toneForStatus(status));
     const levelBadge = badge(level, toneForCaseLevel(level));
-    const viewBtn = `<button class="btn btn-sm btn-outline-secondary" data-view-id="${esc(row.case_id)}">View</button>`;
-    const logsBtn = `<button class="btn btn-sm btn-outline-primary ms-1" data-logs-id="${esc(row.case_id)}">Case Logs</button>`;
+    const viewBtn = `<button class="btn btn-sm btn-outline-secondary compact-table-btn" data-view-id="${esc(row.case_id)}">View</button>`;
+    const logsBtn = `<button class="btn btn-sm btn-outline-primary compact-table-btn" data-logs-id="${esc(row.case_id)}">Case Logs</button>`;
     return `
       <tr>
         <td>${esc(blotterIdDisplay)}</td>
@@ -248,7 +248,7 @@ fields.push({ label: 'Address', value: participant?.address || '-', fullWidth: t
         <td>${esc(respondent)}</td>
         <td>${statusBadge}</td>
         <td>${levelBadge}</td>
-        <td>${viewBtn}${logsBtn}</td>
+        <td><div class="compact-table-actions">${viewBtn}${logsBtn}</div></td>
       </tr>
     `;
   }
