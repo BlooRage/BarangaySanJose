@@ -19,6 +19,7 @@ if (trim((string)($_SESSION['user_id'] ?? '')) === '') {
 require_once __DIR__ . '/runtimeConfig.php';
 require_once __DIR__ . '/mailConfigurations.php';
 require_once __DIR__ . '/sendSMS.php';
+require_once __DIR__ . '/../EmailHandlers/emailSender.php';
 
 $projectRoot = runtime_project_root();
 
@@ -27,7 +28,13 @@ $autoloadCandidates = [
     $projectRoot . '/vendor/autoload.php',
 ];
 $autoloadLoaded = false;
+$autoloadPresence = [];
 foreach ($autoloadCandidates as $autoloadCandidate) {
+    $autoloadPresence[] = [
+        'path' => hosted_health_relpath($projectRoot, $autoloadCandidate),
+        'present' => is_file($autoloadCandidate),
+        'readable' => is_readable($autoloadCandidate),
+    ];
     if (is_file($autoloadCandidate)) {
         require_once $autoloadCandidate;
         $autoloadLoaded = true;
@@ -148,6 +155,7 @@ function hosted_health_document_request_pdf_smoke(): array
 }
 
 $mailConfig = require __DIR__ . '/mailConfigurations.php';
+$emailSender = new EmailSender($mailConfig);
 $runtimeSourceRows = [];
 foreach (runtime_config_sources() as $path) {
     $runtimeSourceRows[] = [
@@ -170,6 +178,8 @@ echo json_encode([
         }, false),
     ],
     'mail' => [
+        'autoload_candidates' => $autoloadPresence,
+        'phpmailer_available' => class_exists(\PHPMailer\PHPMailer\PHPMailer::class),
         'host_set' => trim((string)($mailConfig['host'] ?? '')) !== '',
         'username_set' => trim((string)($mailConfig['username'] ?? '')) !== '',
         'password_set' => (string)($mailConfig['password'] ?? '') !== '',
@@ -177,6 +187,8 @@ echo json_encode([
         'smtp_auth' => (bool)($mailConfig['smtp_auth'] ?? false),
         'secure' => trim((string)($mailConfig['secure'] ?? '')),
         'port' => (int)($mailConfig['port'] ?? 0),
+        'mailer_ready' => $emailSender->getLastError() === '',
+        'mailer_error' => $emailSender->getLastError(),
     ],
     'sms' => [
         'api_key_set' => trim((string)runtime_config('sms.semaphore_api_key', '')) !== '',

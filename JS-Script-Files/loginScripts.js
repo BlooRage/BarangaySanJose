@@ -521,6 +521,32 @@ function clearOtpUI() {
   if (otpErrorDiv) hideErrorBox(otpErrorDiv);
 }
 
+function setOtpStatusMessage(state, displayText = "") {
+  const safeDisplayText = displayText || otpMessage?.dataset.displayText || "+63 •••••• XXXX";
+
+  if (otpMessage) {
+    otpMessage.dataset.displayText = safeDisplayText;
+
+    if (state === "pending") {
+      otpMessage.innerHTML = `We are sending an OTP to <strong>${safeDisplayText}</strong>`;
+      return;
+    }
+
+    if (state === "failed") {
+      otpMessage.innerHTML = `We could not send an OTP to <strong>${safeDisplayText}</strong>.`;
+      return;
+    }
+
+    otpMessage.innerHTML = `Check your phone. An OTP has been sent to <strong>${safeDisplayText}</strong>`;
+    return;
+  }
+
+  const strong = otpForm?.querySelector(".otp-text strong");
+  if (strong) {
+    strong.textContent = safeDisplayText;
+  }
+}
+
 // ===== Back to Login (used by multiple flows) =====
 function backToLogin() {
   switchToLogin();
@@ -575,12 +601,7 @@ function showOTPForm(purpose, userData = {}) {
     displayText = `+63 ******${phone10.slice(-4)}`;
   }
 
-  if (otpMessage) {
-    otpMessage.innerHTML = `Check your phone. An OTP has been sent to <strong>${displayText || "+63 •••••• XXXX"}</strong>`;
-  } else {
-    const strong = otpForm?.querySelector(".otp-text strong");
-    if (strong) strong.textContent = displayText || "+63 •••••• XXXX";
-  }
+  setOtpStatusMessage("pending", displayText || "+63 •••••• XXXX");
 
   updateOtpBackUI();
 
@@ -588,12 +609,26 @@ function showOTPForm(purpose, userData = {}) {
   if (userData?.phone) {
     const phone10 = phoneForDB(userData.phone);
     otpRecipient = phoneForOTP(phone10); // 0XXXXXXXXXX
-    sendOTP(otpRecipient, purpose);
-    startResendCountdown(purpose, 120);
+    sendOTP(otpRecipient, purpose)
+      .then(() => {
+        setOtpStatusMessage("sent", displayText || "+63 •••••• XXXX");
+        startResendCountdown(purpose, 120);
+      })
+      .catch((err) => {
+        setOtpStatusMessage("failed", displayText || "+63 •••••• XXXX");
+        showOtpError(err?.message || "Unable to send OTP. Please try again later.");
+      });
   } else if (userData?.phone10) {
     otpRecipient = phoneForOTP(userData.phone10);
-    sendOTP(otpRecipient, purpose);
-    startResendCountdown(purpose, 120);
+    sendOTP(otpRecipient, purpose)
+      .then(() => {
+        setOtpStatusMessage("sent", displayText || "+63 •••••• XXXX");
+        startResendCountdown(purpose, 120);
+      })
+      .catch((err) => {
+        setOtpStatusMessage("failed", displayText || "+63 •••••• XXXX");
+        showOtpError(err?.message || "Unable to send OTP. Please try again later.");
+      });
   }
 }
 
@@ -634,30 +669,29 @@ function startResendCountdown(purpose, seconds = 120) {
 
 // ===== Send OTP (server-side generation + SMS dispatch) =====
 async function sendOTP(recipient, purpose, reuse = false) {
+  const genForm = new FormData();
+  genForm.append("recipient", recipient); // 0XXXXXXXXXX
+  genForm.append("purpose", purpose);
+
+  const genRes = await fetch("../PhpFiles/OTPHandlers/generate_otp.php", {
+    method: "POST",
+    body: genForm,
+  });
+
+  const genText = await genRes.text();
+
+  let genData;
   try {
-    const genForm = new FormData();
-    genForm.append("recipient", recipient); // 0XXXXXXXXXX
-    genForm.append("purpose", purpose);
-
-    const genRes = await fetch("../PhpFiles/OTPHandlers/generate_otp.php", {
-      method: "POST",
-      body: genForm,
-    });
-
-    const genText = await genRes.text();
-
-    let genData;
-    try {
-      genData = JSON.parse(genText);
-    } catch {
-      throw new Error("Invalid JSON from generate_otp.php");
-    }
-
-    if (!genData.success) throw new Error(genData.error || "OTP sending failed");
-  } catch (err) {
-    showOtpError("Unable to send OTP. Please try again later.");
-    throw err;
+    genData = JSON.parse(genText);
+  } catch {
+    throw new Error("Invalid response from OTP service.");
   }
+
+  if (!genData.success) {
+    throw new Error(genData.error || "OTP sending failed");
+  }
+
+  return genData;
 }
 
 // ===== Resend OTP (single listener) =====
@@ -672,10 +706,12 @@ if (resendOTPBtn) {
 
     try {
       await sendOTP(otpRecipient, otpFrom, true);
+      setOtpStatusMessage("sent");
       resendOTPBtn.textContent = "OTP Resent!";
       startResendCountdown(otpFrom, 120);
     } catch (err) {
-      showOtpError("Unable to resend OTP. Please try again later.");
+      setOtpStatusMessage("failed");
+      showOtpError(err?.message || "Unable to resend OTP. Please try again later.");
     }
   });
 }

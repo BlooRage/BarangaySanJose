@@ -45,6 +45,11 @@ $stmt = $conn->prepare("
     VALUES (?, ?, ?, ?, ?, ?, ?)
 ");
 
+if (!$stmt) {
+    echo json_encode(['success' => false, 'error' => 'Unable to prepare OTP request.']);
+    exit;
+}
+
 $stmt->bind_param(
     "ssssssi",
     $user_id,
@@ -56,8 +61,14 @@ $stmt->bind_param(
     $STATUS_PENDING
 );
 
-$stmt->execute();
+$executed = $stmt->execute();
+$otp_id = $executed ? (int)$stmt->insert_id : 0;
 $stmt->close();
+
+if (!$executed) {
+    echo json_encode(['success' => false, 'error' => 'Unable to store OTP request.']);
+    exit;
+}
 
 // ===== Send OTP on server-side only (do not expose OTP to client) =====
 $recipient_sms = '0' . $recipient_db; // 11 digits
@@ -65,9 +76,18 @@ $message = "Your OTP code is $otp_code";
 $sent = sendSMS($recipient_sms, $message, $otp_code);
 
 if (!$sent) {
+    if ($otp_id > 0) {
+        $cleanup = $conn->prepare("DELETE FROM otprequesttbl WHERE otp_id = ? LIMIT 1");
+        if ($cleanup) {
+            $cleanup->bind_param("i", $otp_id);
+            $cleanup->execute();
+            $cleanup->close();
+        }
+    }
+
     echo json_encode([
         'success' => false,
-        'error' => 'Failed to send OTP. Please try again.'
+        'error' => getLastSmsError() !== '' ? getLastSmsError() : 'Failed to send OTP. Please try again.'
     ]);
     exit;
 }

@@ -21,7 +21,10 @@ try {
     if ($sent) {
         echo json_encode(['success' => true]);
     } else {
-        echo json_encode(['success' => false, 'error' => 'Failed to send SMS. Check API key, sender, and recipient number.']);
+        echo json_encode([
+            'success' => false,
+            'error' => getLastSmsError() !== '' ? getLastSmsError() : 'Failed to send SMS. Check API key, sender, and recipient number.',
+        ]);
     }
 } catch (Exception $e) {
     echo json_encode(['success' => false, 'error' => $e->getMessage()]);
