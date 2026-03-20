@@ -59,9 +59,11 @@ foreach ($announcementItems as $item) {
     $rawPosted = (string)($item['created_at'] ?? '');
   }
   $postedDate = '-';
+  $postedDateIso = '';
   $ts = strtotime($rawPosted);
   if ($ts !== false) {
     $postedDate = date('M d, Y', $ts);
+    $postedDateIso = date('Y-m-d', $ts);
   }
 
   $title = trim((string)(($item['public_title'] ?? '') !== '' ? $item['public_title'] : ($item['title'] ?? '')));
@@ -70,7 +72,8 @@ foreach ($announcementItems as $item) {
   $residentAnnouncements[] = [
     'title' => $title !== '' ? $title : 'Untitled Announcement',
     'content_html' => trim($contentHtml) !== '' ? $contentHtml : '<p>Tap to view the latest account-page announcement.</p>',
-    'posted_date' => $postedDate
+    'posted_date' => $postedDate,
+    'posted_date_iso' => $postedDateIso
   ];
 }
 ?>
@@ -90,6 +93,186 @@ foreach ($announcementItems as $item) {
   <link rel="stylesheet" href="../CSS-Styles/Resident-End-CSS/residentDashboard.css">
   <link rel="stylesheet" href="../CSS-Styles/Admin-End-CSS/ContentManagementStyle.css">
   <style>
+    .dashboard-main-grid {
+      display: grid;
+      grid-template-columns: minmax(0, 1.45fr) minmax(300px, 0.78fr);
+      gap: 1.25rem;
+      align-items: start;
+    }
+    .dashboard-announcement-panel,
+    .dashboard-calendar-panel {
+      min-width: 0;
+    }
+    .dashboard-calendar-card {
+      background: #fff;
+      border: 1px solid #f1dac4;
+      border-radius: 16px;
+      box-shadow: 0 14px 34px rgba(15, 23, 42, 0.06);
+      overflow: hidden;
+      position: sticky;
+      top: 1.25rem;
+    }
+    .dashboard-calendar-head {
+      padding: 1rem 1.1rem 0.9rem;
+      background: linear-gradient(135deg, #fff8ef 0%, #fff1df 100%);
+      border-bottom: 1px solid #f5dfc8;
+    }
+    .dashboard-calendar-kicker {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.45rem;
+      font-size: 0.76rem;
+      font-weight: 800;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: #a35300;
+      margin-bottom: 0.45rem;
+    }
+    .dashboard-calendar-title {
+      font-family: 'Charis SIL Bold', serif;
+      font-size: 1.45rem;
+      color: #7c3f00;
+      margin: 0 0 0.25rem;
+    }
+    .dashboard-calendar-copy {
+      color: #6b7280;
+      margin: 0;
+      font-size: 0.94rem;
+      line-height: 1.5;
+    }
+    .dashboard-calendar-body {
+      padding: 1rem 1.1rem 1.1rem;
+    }
+    .dashboard-calendar-toolbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 0.75rem;
+      margin-bottom: 0.85rem;
+    }
+    .dashboard-calendar-month {
+      font-weight: 800;
+      color: #1f2937;
+      font-size: 1rem;
+    }
+    .dashboard-calendar-nav {
+      width: 36px;
+      height: 36px;
+      border-radius: 10px;
+      border: 1px solid #e7d8c8;
+      background: #fffaf4;
+      color: #8a5308;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .dashboard-calendar-nav:hover {
+      background: #fff2e4;
+      border-color: #de710c;
+      color: #de710c;
+    }
+    .dashboard-calendar-weekdays,
+    .dashboard-calendar-grid {
+      display: grid;
+      grid-template-columns: repeat(7, minmax(0, 1fr));
+      gap: 0.35rem;
+    }
+    .dashboard-calendar-weekdays {
+      margin-bottom: 0.45rem;
+    }
+    .dashboard-calendar-weekdays span {
+      text-align: center;
+      font-size: 0.76rem;
+      font-weight: 700;
+      color: #9aa3af;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+    .dashboard-calendar-day {
+      border: 0;
+      min-height: 42px;
+      border-radius: 10px;
+      background: #fff;
+      color: #1f2937;
+      font-weight: 700;
+      position: relative;
+      transition: background-color 0.2s ease, color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
+    }
+    .dashboard-calendar-day:hover {
+      background: #fff3e4;
+      color: #a35300;
+      transform: translateY(-1px);
+    }
+    .dashboard-calendar-day.is-outside {
+      color: #c1c7d0;
+      background: #fafafa;
+    }
+    .dashboard-calendar-day.is-selected {
+      background: #de710c;
+      color: #fff;
+      box-shadow: 0 10px 20px rgba(222, 113, 12, 0.22);
+    }
+    .dashboard-calendar-day.has-announcements::after {
+      content: "";
+      position: absolute;
+      bottom: 7px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: #de710c;
+    }
+    .dashboard-calendar-day.is-selected.has-announcements::after {
+      background: #fff;
+    }
+    .dashboard-calendar-footer {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.65rem;
+      align-items: center;
+      justify-content: space-between;
+      margin-top: 1rem;
+      padding-top: 0.95rem;
+      border-top: 1px solid #f0ede8;
+    }
+    .dashboard-calendar-selection {
+      font-size: 0.9rem;
+      color: #5f6b7a;
+      margin: 0;
+    }
+    .dashboard-calendar-reset {
+      border: 1px solid #ead7c2;
+      background: #fff;
+      color: #7c3f00;
+      border-radius: 999px;
+      padding: 0.45rem 0.9rem;
+      font-weight: 700;
+      font-size: 0.86rem;
+    }
+    .dashboard-calendar-reset:hover {
+      background: #fff5ea;
+      border-color: #de710c;
+      color: #de710c;
+    }
+    .dashboard-empty-filter {
+      display: none;
+      background: #fff;
+      border: 1px dashed #ecc9a4;
+      border-radius: 16px;
+      padding: 2rem 1.5rem;
+      text-align: center;
+      color: #6b7280;
+      box-shadow: 0 10px 28px rgba(15, 23, 42, 0.04);
+    }
+    .dashboard-empty-filter.is-visible {
+      display: block;
+    }
+    .dashboard-empty-filter i {
+      font-size: 1.8rem;
+      color: #de710c;
+      margin-bottom: 0.8rem;
+    }
     .verify-cta-card {
       position: relative;
     }
@@ -112,6 +295,14 @@ foreach ($announcementItems as $item) {
     .verify-cta-card:hover .verify-cta-close {
       opacity: 1;
       pointer-events: auto;
+    }
+    @media (max-width: 991.98px) {
+      .dashboard-main-grid {
+        grid-template-columns: 1fr;
+      }
+      .dashboard-calendar-card {
+        position: static;
+      }
     }
   </style>
 </head>
@@ -148,22 +339,66 @@ foreach ($announcementItems as $item) {
       </div>
 
       <?php if ($residentAnnouncements): ?>
-        <div class="dashboard-announcements-stack mb-4">
-          <?php foreach ($residentAnnouncements as $index => $announcement): ?>
-            <div class="dashboard-announcement-banner rounded-4 overflow-hidden shadow-sm border-orange-thin position-relative mb-3" id="dashboardAnnouncementCard<?= (int)$index ?>" onclick="location.href='Announcements/AnnouncementsLandingPage'" role="button" tabindex="0">
-              <button type="button" class="dashboard-announcement-close" data-announcement-close="dashboardAnnouncementCard<?= (int)$index ?>" aria-label="Close">×</button>
-              <div class="bg-orange text-center py-3">
-                <h3 class="text-white fw-bold mb-0"><?= htmlspecialchars($announcement['title']) ?></h3>
+        <section class="dashboard-main-grid mb-4">
+          <div class="dashboard-announcement-panel">
+            <div class="dashboard-announcements-stack" id="dashboardAnnouncementsStack">
+              <?php foreach ($residentAnnouncements as $index => $announcement): ?>
+                <div class="dashboard-announcement-banner rounded-4 overflow-hidden shadow-sm border-orange-thin position-relative mb-3" id="dashboardAnnouncementCard<?= (int)$index ?>" data-announcement-date="<?= htmlspecialchars($announcement['posted_date_iso']) ?>" onclick="location.href='Announcements/AnnouncementsLandingPage'" role="button" tabindex="0">
+                  <button type="button" class="dashboard-announcement-close" data-announcement-close="dashboardAnnouncementCard<?= (int)$index ?>" aria-label="Close">×</button>
+                  <div class="bg-orange text-center py-3">
+                    <h3 class="text-white fw-bold mb-0"><?= htmlspecialchars($announcement['title']) ?></h3>
+                  </div>
+                  <div class="bg-white p-3 p-md-4 dashboard-announcement-body">
+                    <div class="dashboard-announcement-preview"><?= $announcement['content_html'] ?></div>
+                    <div class="dashboard-announcement-footer">
+                      <div class="dashboard-announcement-posted">Posted: <?= htmlspecialchars($announcement['posted_date']) ?></div>
+                    </div>
+                  </div>
+                </div>
+              <?php endforeach; ?>
+            </div>
+            <div class="dashboard-empty-filter" id="dashboardAnnouncementEmptyState">
+              <i class="fa-regular fa-calendar-xmark"></i>
+              <h3 class="h5 mb-2">No announcements for this date</h3>
+              <p class="mb-0">Pick another day on the calendar to check account-page announcements for that schedule.</p>
+            </div>
+          </div>
+
+          <aside class="dashboard-calendar-panel">
+            <div class="dashboard-calendar-card">
+              <div class="dashboard-calendar-head">
+                <div class="dashboard-calendar-kicker"><i class="fa-regular fa-calendar-days"></i> Announcement Calendar</div>
+                <h3 class="dashboard-calendar-title">Browse by Date</h3>
+                <p class="dashboard-calendar-copy"><i>Gamitin ang kalendaryo upang paghiwa-hiwalayin ang mga anunsyo sa dashboard batay sa petsa ng pag-post. Ang mga petsang may anunsyo ay nakatala sa ibaba.</i> </p>
               </div>
-              <div class="bg-white p-3 p-md-4 dashboard-announcement-body">
-                <div class="dashboard-announcement-preview"><?= $announcement['content_html'] ?></div>
-                <div class="dashboard-announcement-footer">
-                  <div class="dashboard-announcement-posted">Posted: <?= htmlspecialchars($announcement['posted_date']) ?></div>
+              <div class="dashboard-calendar-body">
+                <div class="dashboard-calendar-toolbar">
+                  <button type="button" class="dashboard-calendar-nav" id="dashboardCalendarPrev" aria-label="Previous month">
+                    <i class="fa-solid fa-chevron-left"></i>
+                  </button>
+                  <div class="dashboard-calendar-month" id="dashboardCalendarMonthLabel">-</div>
+                  <button type="button" class="dashboard-calendar-nav" id="dashboardCalendarNext" aria-label="Next month">
+                    <i class="fa-solid fa-chevron-right"></i>
+                  </button>
+                </div>
+                <div class="dashboard-calendar-weekdays">
+                  <span>Sun</span>
+                  <span>Mon</span>
+                  <span>Tue</span>
+                  <span>Wed</span>
+                  <span>Thu</span>
+                  <span>Fri</span>
+                  <span>Sat</span>
+                </div>
+                <div class="dashboard-calendar-grid" id="dashboardCalendarGrid" aria-live="polite"></div>
+                <div class="dashboard-calendar-footer">
+                  <p class="dashboard-calendar-selection" id="dashboardCalendarSelection">Showing all announcement dates</p>
+                  <button type="button" class="dashboard-calendar-reset" id="dashboardCalendarReset">Show All</button>
                 </div>
               </div>
             </div>
-          <?php endforeach; ?>
-        </div>
+          </aside>
+        </section>
       <?php endif; ?>
 
       <?php if ($isResidentNotVerified): ?>
@@ -318,6 +553,130 @@ foreach ($announcementItems as $item) {
         }
       });
     });
+
+    (() => {
+      const announcementCards = Array.from(document.querySelectorAll("[data-announcement-date]"));
+      const calendarGrid = document.getElementById("dashboardCalendarGrid");
+      const monthLabel = document.getElementById("dashboardCalendarMonthLabel");
+      const selectionLabel = document.getElementById("dashboardCalendarSelection");
+      const resetBtn = document.getElementById("dashboardCalendarReset");
+      const prevBtn = document.getElementById("dashboardCalendarPrev");
+      const nextBtn = document.getElementById("dashboardCalendarNext");
+      const emptyState = document.getElementById("dashboardAnnouncementEmptyState");
+      if (!announcementCards.length || !calendarGrid || !monthLabel || !selectionLabel || !resetBtn || !prevBtn || !nextBtn) {
+        return;
+      }
+
+      const announcementDates = Array.from(new Set(announcementCards
+        .map((card) => String(card.getAttribute("data-announcement-date") || "").trim())
+        .filter(Boolean)));
+
+      const today = new Date();
+      let selectedDate = "";
+      let currentViewDate = announcementDates.length
+        ? new Date(announcementDates[0] + "T00:00:00")
+        : new Date(today.getFullYear(), today.getMonth(), 1);
+
+      function formatIso(date) {
+        const year = date.getFullYear();
+        const month = String(date.getMonth() + 1).padStart(2, "0");
+        const day = String(date.getDate()).padStart(2, "0");
+        return `${year}-${month}-${day}`;
+      }
+
+      function formatReadable(isoDate) {
+        if (!isoDate) {
+          return "Showing all announcement dates";
+        }
+        const date = new Date(isoDate + "T00:00:00");
+        return `Showing announcements for ${date.toLocaleDateString(undefined, { month: "long", day: "numeric", year: "numeric" })}`;
+      }
+
+      function applyAnnouncementFilter() {
+        let visibleCount = 0;
+        announcementCards.forEach((card) => {
+          const cardDate = String(card.getAttribute("data-announcement-date") || "").trim();
+          const shouldShow = selectedDate === "" || cardDate === selectedDate;
+          card.classList.toggle("d-none", !shouldShow);
+          if (shouldShow) {
+            visibleCount += 1;
+          }
+        });
+        selectionLabel.textContent = formatReadable(selectedDate);
+        if (emptyState) {
+          emptyState.classList.toggle("is-visible", visibleCount === 0);
+        }
+      }
+
+      function renderCalendar() {
+        const year = currentViewDate.getFullYear();
+        const month = currentViewDate.getMonth();
+        monthLabel.textContent = currentViewDate.toLocaleDateString(undefined, { month: "long", year: "numeric" });
+        calendarGrid.innerHTML = "";
+
+        const firstDay = new Date(year, month, 1);
+        const startWeekday = firstDay.getDay();
+        const daysInMonth = new Date(year, month + 1, 0).getDate();
+        const daysInPrevMonth = new Date(year, month, 0).getDate();
+        const totalCells = Math.ceil((startWeekday + daysInMonth) / 7) * 7;
+
+        for (let cellIndex = 0; cellIndex < totalCells; cellIndex += 1) {
+          let dateObj;
+          let isOutside = false;
+
+          if (cellIndex < startWeekday) {
+            dateObj = new Date(year, month - 1, daysInPrevMonth - startWeekday + cellIndex + 1);
+            isOutside = true;
+          } else if (cellIndex >= startWeekday + daysInMonth) {
+            dateObj = new Date(year, month + 1, cellIndex - (startWeekday + daysInMonth) + 1);
+            isOutside = true;
+          } else {
+            dateObj = new Date(year, month, cellIndex - startWeekday + 1);
+          }
+
+          const iso = formatIso(dateObj);
+          const button = document.createElement("button");
+          button.type = "button";
+          button.className = "dashboard-calendar-day";
+          button.textContent = String(dateObj.getDate());
+          if (isOutside) {
+            button.classList.add("is-outside");
+          }
+          if (announcementDates.includes(iso)) {
+            button.classList.add("has-announcements");
+          }
+          if (selectedDate === iso) {
+            button.classList.add("is-selected");
+          }
+          button.addEventListener("click", () => {
+            selectedDate = iso;
+            currentViewDate = new Date(dateObj.getFullYear(), dateObj.getMonth(), 1);
+            applyAnnouncementFilter();
+            renderCalendar();
+          });
+          calendarGrid.appendChild(button);
+        }
+      }
+
+      prevBtn.addEventListener("click", () => {
+        currentViewDate = new Date(currentViewDate.getFullYear(), currentViewDate.getMonth() - 1, 1);
+        renderCalendar();
+      });
+
+      nextBtn.addEventListener("click", () => {
+        currentViewDate = new Date(currentViewDate.getFullYear(), currentViewDate.getMonth() + 1, 1);
+        renderCalendar();
+      });
+
+      resetBtn.addEventListener("click", () => {
+        selectedDate = "";
+        applyAnnouncementFilter();
+        renderCalendar();
+      });
+
+      applyAnnouncementFilter();
+      renderCalendar();
+    })();
   </script>
 
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
