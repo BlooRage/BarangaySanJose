@@ -2301,13 +2301,15 @@ if ($action === 'list') {
         $row['stage_label'] = dr_stage_label((string)$row['stage']);
         $docTypeForFee = trim((string)($row['document_type'] ?? ''));
         $storedFeeAmount = $row['fee_amount'] ?? null;
-        if ($storedFeeAmount !== null && $storedFeeAmount !== '' && is_numeric((string)$storedFeeAmount)) {
+        if (strcasecmp($docTypeForFee, 'Barangay ID') === 0) {
+            $row['fee_amount'] = 0.0;
+        } elseif ($storedFeeAmount !== null && $storedFeeAmount !== '' && is_numeric((string)$storedFeeAmount)) {
             $row['fee_amount'] = (float)$storedFeeAmount;
         } elseif (isset($row['_tx_amount']) && $row['_tx_amount'] !== null && $row['_tx_amount'] !== '' && is_numeric((string)$row['_tx_amount'])) {
             $row['fee_amount'] = (float)$row['_tx_amount'];
         } else {
             $row['fee_amount'] = null;
-            if ($docTypeForFee !== '') {
+            if ($docTypeForFee !== '' && strcasecmp($docTypeForFee, 'Barangay ID') !== 0) {
                 $docTypesForFee[$docTypeForFee] = true;
             }
         }

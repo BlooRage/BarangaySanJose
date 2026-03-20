@@ -1,6 +1,13 @@
 ﻿<?php
 $allowUnregistered = false;
 require_once __DIR__ . "/../includes/resident_access_guard.php";
+
+$frontTemplateRelative = 'Resident-End/Certificates/BarangayID/FRONT_EMPTY.png';
+$backTemplateRelative = 'Resident-End/Certificates/BarangayID/BACK_EMPTY.png';
+$frontTemplateDiskPath = realpath(__DIR__ . '/../Certificates/BarangayID/FRONT_EMPTY.png');
+$backTemplateDiskPath = realpath(__DIR__ . '/../Certificates/BarangayID/BACK_EMPTY.png');
+$frontTemplateUrl = appUrl($frontTemplateRelative) . '?v=' . (string)(($frontTemplateDiskPath && is_file($frontTemplateDiskPath)) ? @filemtime($frontTemplateDiskPath) : time());
+$backTemplateUrl = appUrl($backTemplateRelative) . '?v=' . (string)(($backTemplateDiskPath && is_file($backTemplateDiskPath)) ? @filemtime($backTemplateDiskPath) : time());
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -109,13 +116,13 @@ require_once __DIR__ . "/../includes/resident_access_guard.php";
                     <div class="row g-3">
                         <div class="col-12 col-md-6">
                             <div class="h-100">
-                                <img src="<?= htmlspecialchars(appUrl('Resident-End/Certificates/BarangayID/FRONT_EMPTY.png')) ?>" class="img-fluid rounded id-sample-img" alt="Barangay ID Template - Front">
+                                <img src="<?= htmlspecialchars($frontTemplateUrl) ?>" class="img-fluid rounded id-sample-img" alt="Barangay ID Template - Front">
                                 <p class="page-description mt-2 mb-0 text-center">Front</p>
                             </div>
                         </div>
                         <div class="col-12 col-md-6">
                             <div class="h-100">
-                                <img src="<?= htmlspecialchars(appUrl('Resident-End/Certificates/BarangayID/BACK_EMPTY.png')) ?>" class="img-fluid rounded id-sample-img" alt="Barangay ID Template - Back">
+                                <img src="<?= htmlspecialchars($backTemplateUrl) ?>" class="img-fluid rounded id-sample-img" alt="Barangay ID Template - Back">
                                 <p class="page-description mt-2 mb-0 text-center">Back</p>
                             </div>
                         </div>

@@ -782,7 +782,8 @@ function dra_fetch_request_for_modal_fast(mysqli $conn, string $requestId): ?arr
     $row['released_by'] = trim((string)($row['_released_by_name'] ?? ''));
     $row['personnel_name'] = trim((string)($row['_personnel_name'] ?? ''));
     $row['finance_user_name'] = trim((string)($row['_finance_user_name'] ?? ''));
-    $row['amount'] = isset($row['_tx_amount']) ? (float)$row['_tx_amount'] : null;
+    $isBarangayIdDocument = strcasecmp(trim((string)($row['document_type'] ?? '')), 'Barangay ID') === 0;
+    $row['amount'] = $isBarangayIdDocument ? 0.0 : (isset($row['_tx_amount']) ? (float)$row['_tx_amount'] : null);
     $row['payment_method'] = (string)($row['_tx_payment_method'] ?? '');
     $row['payment_proof_path'] = (string)($row['_tx_payment_proof_path'] ?? '');
     $row['or_number'] = (string)($row['_tx_or_number'] ?? '');
@@ -1261,35 +1262,14 @@ function dra_barangay_id_template_assets(): array {
         return $resolved;
     }
 
-    $candidateSets = [
-        [
-            'front' => $baseDir . '/Resident-End/Certificates/BarangayID/FRONT_EMPTY.png',
-            'back' => $baseDir . '/Resident-End/Certificates/BarangayID/BACK_EMPTY.png',
+    $front = $baseDir . '/Resident-End/Certificates/BarangayID/FRONT_EMPTY.png';
+    $back = $baseDir . '/Resident-End/Certificates/BarangayID/BACK_EMPTY.png';
+    if (is_file($front) && is_file($back)) {
+        $resolved = [
+            'front' => $front,
+            'back' => $back,
             'variant' => 'empty',
-        ],
-        [
-            'front' => $baseDir . '/Resident-End/Certificates/BarangayID/FRONT.png',
-            'back' => $baseDir . '/Resident-End/Certificates/BarangayID/BACK.png',
-            'variant' => 'sample',
-        ],
-        [
-            'front' => $baseDir . '/Images/Barangayid/SAMPLE.png',
-            'back' => $baseDir . '/Images/Barangayid/BACK.png',
-            'variant' => 'sample',
-        ],
-    ];
-
-    foreach ($candidateSets as $set) {
-        $front = (string)($set['front'] ?? '');
-        $back = (string)($set['back'] ?? '');
-        if ($front !== '' && $back !== '' && is_file($front) && is_file($back)) {
-            $resolved = [
-                'front' => $front,
-                'back' => $back,
-                'variant' => (string)($set['variant'] ?? 'sample'),
-            ];
-            break;
-        }
+        ];
     }
 
     return $resolved;
@@ -1298,6 +1278,10 @@ function dra_barangay_id_template_assets(): array {
 function dra_has_barangay_id_template_assets(): bool {
     $assets = dra_barangay_id_template_assets();
     return trim((string)($assets['front'] ?? '')) !== '' && trim((string)($assets['back'] ?? '')) !== '';
+}
+
+function dra_barangay_id_render_revision(): string {
+    return 'r20260320bid07';
 }
 
 function dra_requires_manual_issued_upload(array $requestRow): bool {
@@ -2153,7 +2137,7 @@ function dra_generate_issued_document(array $requestRow): ?string {
         return null;
     }
 
-    $renderRevisionTag = 'r20260318ac';
+    $renderRevisionTag = $isBarangayId ? dra_barangay_id_render_revision() : 'r20260318ac';
     $fileName = 'issued_' . preg_replace('/[^A-Za-z0-9_-]/', '', $requestId) . '_' . $renderRevisionTag . '_' . date('YmdHis') . '.pdf';
     $diskPath = $outDir . '/' . $fileName;
 
@@ -2405,6 +2389,32 @@ function dra_generate_issued_document(array $requestRow): ?string {
                     $validUntil->modify('+2 years');
                     return $upperText($validUntil->format('m/d/Y'));
                 };
+                $resolveFpdfImageType = static function (string $diskPath): string {
+                    $diskPath = trim($diskPath);
+                    if ($diskPath === '' || !is_file($diskPath)) {
+                        return '';
+                    }
+                    $imageType = null;
+                    if (function_exists('exif_imagetype')) {
+                        $detected = @exif_imagetype($diskPath);
+                        if (is_int($detected)) {
+                            $imageType = $detected;
+                        }
+                    }
+                    if ($imageType === null && function_exists('getimagesize')) {
+                        $info = @getimagesize($diskPath);
+                        if (is_array($info) && isset($info[2]) && is_int($info[2])) {
+                            $imageType = $info[2];
+                        }
+                    }
+                    if ($imageType === IMAGETYPE_PNG) {
+                        return 'PNG';
+                    }
+                    if ($imageType === IMAGETYPE_JPEG) {
+                        return 'JPEG';
+                    }
+                    return '';
+                };
 
                 $lastName = dra_manual_first_non_empty([
                     $payload['last_name'] ?? null,
@@ -2510,6 +2520,7 @@ function dra_generate_issued_document(array $requestRow): ?string {
                     $residentProfile['id_picture_url'] ?? null,
                     $residentProfile['id_picture_path'] ?? null,
                 ]));
+                $photoImageType = $resolveFpdfImageType($photoDiskPath);
 
                 $pageWidth = 85.6;
                 $pageHeight = 54.1;
@@ -2520,8 +2531,12 @@ function dra_generate_issued_document(array $requestRow): ?string {
 
                 $pdf->AddPage('L', [$pageWidth, $pageHeight]);
                 $pdf->Image($frontTemplatePath, 0.0, 0.0, $pageWidth, $pageHeight);
-                if ($photoDiskPath !== '') {
-                    $pdf->Image($photoDiskPath, 7.9, 22.1, 22.0, 22.0);
+                if ($photoDiskPath !== '' && $photoImageType !== '') {
+                    try {
+                        $pdf->Image($photoDiskPath, 7.9, 22.1, 22.0, 22.0, $photoImageType);
+                    } catch (Throwable $photoError) {
+                        error_log('[dra_generate_issued_document][barangay_id_photo] ' . $photoError->getMessage());
+                    }
                 }
                 if ($usesBlankTemplate) {
                     $fitSingleLine($pdf, $displayName, 32.5, 25.0, 45.0, 'B', 7.2, 4.6);
@@ -2554,7 +2569,7 @@ function dra_generate_issued_document(array $requestRow): ?string {
                 }
 
                 $pdf->AddPage('L', [$pageWidth, $pageHeight]);
-                $pdf->Image($backTemplatePath, 0.0, 0.0, $pageWidth, $pageHeight);
+                $pdf->Image($backTemplatePath, 0.0, 0.0, $pageWidth, $pageHeight, 'PNG');
                 if ($usesBlankTemplate) {
                     $pdf->SetTextColor(198, 40, 40);
                     $fitSingleLine($pdf, $cardIdText, 63.0, 3.6, 19.8, 'B', 7.6, 5.0, 'R');
@@ -6310,7 +6325,7 @@ if ($action === 'list') {
             dr_sync_stage_from_status_lookup($conn, $row);
         }
         $row['stage_label'] = dr_stage_label((string)$row['stage']);
-        $row['fee_amount'] = null;
+        $row['fee_amount'] = $isBarangayIdDocument ? 0.0 : null;
         $row['_doc_type_for_fee'] = trim((string)($row['document_type'] ?? ''));
         if ($isFinanceList) {
             // Keep finance list response lean; detailed request payload is not needed on initial list render.
@@ -6366,7 +6381,7 @@ if ($action === 'list') {
         $docTypesForFee = [];
         foreach ($items as $row) {
             $docTypeForFee = trim((string)($row['_doc_type_for_fee'] ?? ''));
-            if ($docTypeForFee !== '') {
+            if (!$isBarangayIdDocument && $docTypeForFee !== '') {
                 $docTypesForFee[$docTypeForFee] = true;
             }
         }
@@ -6564,6 +6579,91 @@ if ($action === 'view_preview_docx_image') {
     exit;
 }
 
+if ($action === 'view_issued_card') {
+    if ($requestId === '') {
+        http_response_code(422);
+        exit('Missing request ID.');
+    }
+    $row = dr_fetch_request($conn, $requestId);
+    if (!$row) {
+        http_response_code(404);
+        exit('Request not found.');
+    }
+    $stage = strtolower(trim((string)($row['stage'] ?? '')));
+    if (!in_array($stage, [DR_STAGE_PAYMENT_VERIFIED, DR_STAGE_READY_FOR_CLAIM, DR_STAGE_COMPLETED], true)) {
+        http_response_code(422);
+        exit('Issued document is not available for this request stage yet.');
+    }
+    if (!dr_is_barangay_id_document_type((string)($row['document_type'] ?? ''))) {
+        http_response_code(404);
+        exit('Card preview is available for Barangay ID only.');
+    }
+    if (!dra_has_barangay_id_template_assets()) {
+        http_response_code(404);
+        exit('Barangay ID template assets are not configured.');
+    }
+
+    $payload = dra_decode_request_payload($row);
+    $residentProfile = dra_resident_profile_snapshot(
+        $conn,
+        trim((string)($row['resident_user_id'] ?? '')),
+        trim((string)($row['resident_id'] ?? ''))
+    );
+    $templateAssets = dra_barangay_id_template_assets();
+    $frontTemplateUrl = dra_public_asset_path((string)($templateAssets['front'] ?? ''));
+    $backTemplateUrl = dra_public_asset_path((string)($templateAssets['back'] ?? ''));
+    $frontTemplateVersion = '';
+    $backTemplateVersion = '';
+    $frontTemplateDiskPath = (string)($templateAssets['front'] ?? '');
+    $backTemplateDiskPath = (string)($templateAssets['back'] ?? '');
+    if ($frontTemplateDiskPath !== '' && is_file($frontTemplateDiskPath)) {
+        $frontTemplateVersion = (string)@filemtime($frontTemplateDiskPath);
+    }
+    if ($backTemplateDiskPath !== '' && is_file($backTemplateDiskPath)) {
+        $backTemplateVersion = (string)@filemtime($backTemplateDiskPath);
+    }
+    $templateVariant = strtolower(trim((string)($templateAssets['variant'] ?? 'sample')));
+    $baseUrl = rtrim(dra_public_base_url(), '/');
+
+    header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
+    header('Pragma: no-cache');
+    header('Expires: 0');
+    header('Content-Type: text/html; charset=UTF-8');
+    echo '<!doctype html><html lang="en"><head><meta charset="utf-8">';
+    echo '<meta name="viewport" content="width=device-width, initial-scale=1">';
+    echo '<title>Digital Barangay ID</title>';
+    echo '<style>
+        html, body { margin: 0; padding: 0; background: #f3f4f6; font-family: Arial, Helvetica, sans-serif; }
+        .barangay-id-issued-shell { padding: 18px; }
+      </style>';
+    echo '<script src="' . htmlspecialchars($baseUrl . '/JS-Script-Files/Shared/barangayIdDigital.js?v=20260320-25', ENT_QUOTES, 'UTF-8') . '"></script>';
+    echo '</head><body>';
+    echo '<div id="digitalBarangayIdAdminWrap" class="barangay-id-issued-shell"></div>';
+    echo '<script>';
+    echo '(() => {';
+    echo 'const wrap = document.getElementById("digitalBarangayIdAdminWrap");';
+    echo 'if (!wrap || !window.BarangayIdDigital || typeof window.BarangayIdDigital.createState !== "function") { return; }';
+    echo 'const appBase = ' . json_encode($baseUrl, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) . ';';
+    echo 'const row = ' . json_encode($row, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) . ' || {};';
+    echo 'const payload = ' . json_encode($payload, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) . ' || {};';
+    echo 'const residentProfile = ' . json_encode($residentProfile, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) . ' || {};';
+    echo 'const state = window.BarangayIdDigital.createState({';
+    echo '  appBase,';
+    echo '  row,';
+    echo '  payload,';
+    echo '  residentProfile,';
+    echo '  frontTemplateUrl: ' . json_encode($frontTemplateUrl !== '' ? ($baseUrl . $frontTemplateUrl . ($frontTemplateVersion !== '' ? '?v=' . rawurlencode($frontTemplateVersion) : '')) : '', JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) . ',';
+    echo '  backTemplateUrl: ' . json_encode($backTemplateUrl !== '' ? ($baseUrl . $backTemplateUrl . ($backTemplateVersion !== '' ? '?v=' . rawurlencode($backTemplateVersion) : '')) : '', JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) . ',';
+    echo '  templateVariant: ' . json_encode($templateVariant, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) . ',';
+    echo '  fallbackProfileImageUrl: appBase + "/Images/Profile-Placeholder.png"';
+    echo '});';
+    echo 'wrap.innerHTML = window.BarangayIdDigital.render(state, { showIntro: false, frontLabel: "Front Template", backLabel: "Back Template" });';
+    echo '})();';
+    echo '</script>';
+    echo '</body></html>';
+    exit;
+}
+
 if ($action === 'view_issued') {
     if ($requestId === '') {
         http_response_code(422);
@@ -6625,7 +6725,9 @@ if ($action === 'view_issued') {
         ? [DR_STAGE_READY_FOR_CLAIM, DR_STAGE_COMPLETED]
         : [DR_STAGE_PAYMENT_VERIFIED, DR_STAGE_READY_FOR_CLAIM, DR_STAGE_COMPLETED];
     $shouldHaveQr = ($verificationCode !== '' && in_array($stage, $qrEligibleStages, true));
-    $renderRevisionTag = 'r20260318ac';
+    $renderRevisionTag = (dr_is_barangay_id_document_type((string)($row['document_type'] ?? '')) && dra_has_barangay_id_template_assets())
+        ? dra_barangay_id_render_revision()
+        : 'r20260318ac';
     $issuedBaseName = strtolower(basename((string)$publicPath));
     $isGeneratedIssuedPath = strpos((string)$publicPath, '/UnifiedFileAttachment/IssuedDocuments/Generated/') === 0;
     $isCurrentRenderRevision = ($issuedBaseName !== '' && strpos($issuedBaseName, strtolower($renderRevisionTag)) !== false);
@@ -7079,7 +7181,9 @@ if ($action === 'finance_reject') {
 if ($action === 'mark_ready') {
     $currentStage = strtolower(trim((string)($row['stage'] ?? '')));
     $resolvedFeeAmount = null;
-    if (isset($row['fee_amount']) && $row['fee_amount'] !== null && $row['fee_amount'] !== '' && is_numeric((string)$row['fee_amount'])) {
+    if (strcasecmp(trim((string)($row['document_type'] ?? '')), 'Barangay ID') === 0) {
+        $resolvedFeeAmount = 0.0;
+    } elseif (isset($row['fee_amount']) && $row['fee_amount'] !== null && $row['fee_amount'] !== '' && is_numeric((string)$row['fee_amount'])) {
         $resolvedFeeAmount = (float)$row['fee_amount'];
     } elseif (dr_is_clearance_document_type((string)($row['document_type'] ?? ''))) {
         $clearanceFeeTotal = dr_get_clearance_fee_total_for_request($conn, $requestId);
@@ -7153,7 +7257,16 @@ if ($action === 'mark_completed') {
         'completed_at' => dr_now(),
     ];
     $issuedPath = trim((string)($row['issued_file_path'] ?? ''));
-    if ($issuedPath === '') {
+    $isBarangayIdWithTemplate = dr_is_barangay_id_document_type((string)($row['document_type'] ?? ''))
+        && dra_has_barangay_id_template_assets();
+    $barangayIdRenderRevisionTag = dra_barangay_id_render_revision();
+    $issuedBaseName = strtolower(basename($issuedPath));
+    $isGeneratedIssuedPath = strpos($issuedPath, '/UnifiedFileAttachment/IssuedDocuments/Generated/') === 0;
+    $isCurrentBarangayIdRender = $issuedBaseName !== ''
+        && strpos($issuedBaseName, strtolower($barangayIdRenderRevisionTag)) !== false;
+    $shouldGenerateIssuedPath = ($issuedPath === '')
+        || ($isBarangayIdWithTemplate && (!$isGeneratedIssuedPath || !$isCurrentBarangayIdRender));
+    if ($shouldGenerateIssuedPath) {
         $verificationCode = trim((string)($row['verification_code'] ?? ''));
         if ($verificationCode === '') {
             $verificationCode = strtoupper(bin2hex(random_bytes(8)));

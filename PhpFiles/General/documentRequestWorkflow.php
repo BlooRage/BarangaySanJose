@@ -2669,6 +2669,9 @@ function dr_get_fee_amount_for_document_type(mysqli $conn, string $documentType)
     if (!dr_is_issuance_document_type($documentType)) {
         return null;
     }
+    if (strcasecmp(trim($documentType), 'Barangay ID') === 0) {
+        return 0.0;
+    }
     $cacheKey = dr_canonical_document_type_key($documentType);
     if (array_key_exists($cacheKey, $cache)) {
         return $cache[$cacheKey];

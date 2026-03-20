@@ -1,7 +1,7 @@
 (() => {
   const PAGE_WIDTH_MM = 85.6;
   const PAGE_HEIGHT_MM = 54.1;
-  const TEMPLATE_ASSET_VERSION = '20260320-02';
+  const TEMPLATE_ASSET_VERSION = '20260320-04';
 
   function esc(value) {
     return String(value ?? '').replace(/[&<>"']/g, (match) => ({
@@ -447,7 +447,7 @@
         /_EMPTY\.[a-z0-9]+(?:[?#].*)?$/i.test(resolvedFrontTemplateUrl)
         && /_EMPTY\.[a-z0-9]+(?:[?#].*)?$/i.test(resolvedBackTemplateUrl)
       ) ? 'empty' : '',
-      'sample'
+      'empty'
     ]);
 
     return {
@@ -469,9 +469,9 @@
       qrUrl,
       templateVariant: resolvedTemplateVariant,
       frontTemplateUrl: resolvedFrontTemplateUrl,
-      frontTemplateFallbackUrl: `${appBase}/Resident-End/Certificates/BarangayID/FRONT.png?v=${TEMPLATE_ASSET_VERSION}`,
+      frontTemplateFallbackUrl: resolvedFrontTemplateUrl,
       backTemplateUrl: resolvedBackTemplateUrl,
-      backTemplateFallbackUrl: `${appBase}/Resident-End/Certificates/BarangayID/BACK.png?v=${TEMPLATE_ASSET_VERSION}`,
+      backTemplateFallbackUrl: resolvedBackTemplateUrl,
     };
   }
 

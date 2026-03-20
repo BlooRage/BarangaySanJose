@@ -1868,10 +1868,25 @@
     return ['payment_verified', 'ready_for_claim', 'completed'].includes(stageKey);
   }
 
-  function issuedDocumentUrl(requestId) {
+  function issuedDocumentFileUrl(requestId) {
     const id = String(requestId || '').trim();
     if (!id) return '';
     return `${appBase}/PhpFiles/Admin-End/documentRequestWorkflow.php?action=view_issued&request_id=${encodeURIComponent(id)}&_ts=${Date.now()}`;
+  }
+
+  function issuedDocumentUrl(requestId, row = null) {
+    const id = String(requestId || '').trim();
+    if (!id) return '';
+    const action = normalizePreviewDocKey(row?.document_type || '') === 'barangayid'
+      ? 'view_issued_card'
+      : 'view_issued';
+    return `${appBase}/PhpFiles/Admin-End/documentRequestWorkflow.php?action=${action}&request_id=${encodeURIComponent(id)}&_ts=${Date.now()}`;
+  }
+
+  function issuedDocumentTitle(row) {
+    return normalizePreviewDocKey(row?.document_type || '') === 'barangayid'
+      ? 'Digital Barangay ID'
+      : 'Issued Document';
   }
 
   function additionalDetailRows(entries) {
@@ -2110,6 +2125,9 @@
           row,
           payload,
           residentProfile,
+          frontTemplateUrl: `${appBase}/Resident-End/Certificates/BarangayID/FRONT_EMPTY.png?v=${Date.now()}`,
+          backTemplateUrl: `${appBase}/Resident-End/Certificates/BarangayID/BACK_EMPTY.png?v=${Date.now()}`,
+          templateVariant: 'empty',
           fallbackProfileImageUrl: `${appBase}/Images/Profile-Placeholder.png`,
         })
       : {};
@@ -2944,7 +2962,10 @@
     const stageKey = String(currentViewStage || '').toLowerCase();
     if (!viewModalNextBtn || (stageKey !== 'submitted' && stageKey !== 'fee_tagging')) return;
     const currentRow = itemById.get(String(currentViewRequestId || '').trim());
-    if (isFirstTimeJobSeekerRow(currentRow)) {
+    if (
+      isFirstTimeJobSeekerRow(currentRow)
+      || normalizePreviewDocKey(currentRow?.document_type || '') === 'barangayid'
+    ) {
       viewModalNextBtn.disabled = false;
       viewModalNextBtn.title = '';
       return;
@@ -4782,7 +4803,7 @@
           }
           if (viewModalDocBtn) {
             const issuedDocReady = canOpenIssuedDocument(row);
-            const issuedDocUrl = issuedDocumentUrl(String(row.request_id || ''));
+            const issuedDocUrl = issuedDocumentUrl(String(row.request_id || ''), row);
             const issuedStageKey = resolveWorkflowStage(row);
             viewModalDocBtn.classList.remove('d-none');
             viewModalDocBtn.textContent = issuedDocReady ? 'View Issued Document' : 'View Document';
@@ -4792,7 +4813,7 @@
                   preserveViewStateOnNextHide = true;
                   viewModal.hide();
                 }
-                openDocumentModal(issuedDocUrl, 'Issued Document', 'view', {
+                openDocumentModal(issuedDocUrl, issuedDocumentTitle(row), 'view', {
                   allowPrint: issuedStageKey === 'ready_for_claim',
                   releaseRequestId: issuedStageKey === 'ready_for_claim' ? String(row.request_id || '') : ''
                 });
@@ -5073,20 +5094,25 @@
 
         const stageKeyForStatus = String(row.stage || '').toLowerCase();
         if (!isFinancePaymentsPage && stageKeyForStatus === 'completed') {
-          const completedIssuedUrl = `${appBase}/PhpFiles/Admin-End/documentRequestWorkflow.php?action=view_issued&request_id=${encodeURIComponent(String(row.request_id || ''))}&_ts=${Date.now()}`;
+          const completedIssuedUrl = issuedDocumentUrl(String(row.request_id || ''), row);
+          const completedIssuedFileUrl = issuedDocumentFileUrl(String(row.request_id || ''));
+          const completedIssuedTitle = issuedDocumentTitle(row);
+          const completedIssuedLabel = normalizePreviewDocKey(row?.document_type || '') === 'barangayid'
+            ? 'Digital Barangay ID'
+            : 'Issued Document';
           const issuedViewerHtml = `
             <div class="tracker-form-grid cols-1">
               <div class="tracker-form-field">
-                <p class="tracker-form-label">Issued Document</p>
+                <p class="tracker-form-label">${esc(completedIssuedLabel)}</p>
                 <div class="tracker-form-value d-flex justify-content-between align-items-center gap-2">
                   <span>Open the issued document only when needed.</span>
-                  <button type="button" class="btn btn-sm btn-primary" data-view-doc-url="${esc(completedIssuedUrl)}" data-view-doc-title="Issued Document">View</button>
+                  <button type="button" class="btn btn-sm btn-primary" data-view-doc-url="${esc(completedIssuedUrl)}" data-view-doc-title="${esc(completedIssuedTitle)}">View</button>
                 </div>
               </div>
             </div>
           `;
-          const issuedActionHtml = `<a class="btn btn-sm btn-outline-primary" href="${completedIssuedUrl}" target="_blank" rel="noopener">Open in New Tab</a>`;
-          html += formSection('Issued Document', issuedViewerHtml, issuedActionHtml);
+          const issuedActionHtml = `<a class="btn btn-sm btn-outline-primary" href="${completedIssuedFileUrl}" target="_blank" rel="noopener">Open in New Tab</a>`;
+          html += formSection(completedIssuedLabel, issuedViewerHtml, issuedActionHtml);
         }
 
         const isRejectedStatus = stageKeyForStatus.includes('rejected') || stageKeyForStatus === 'interview_failed' || stageKeyForStatus === 'cancelled';
@@ -5271,8 +5297,8 @@
         const row = itemById.get(id);
         const stageKey = resolveWorkflowStage(row);
         const allowPrint = stageKey === 'ready_for_claim';
-        const issuedUrl = issuedDocumentUrl(id);
-        openDocumentModal(issuedUrl, 'Issued Document', '', {
+        const issuedUrl = issuedDocumentUrl(id, row);
+        openDocumentModal(issuedUrl, issuedDocumentTitle(row), '', {
           allowPrint,
           releaseRequestId: allowPrint ? id : ''
         });
@@ -5910,8 +5936,8 @@
       }
       if (config.kind === 'barangay_id') {
         return {
-          key: 'for_payment',
-          label: 'After submit: For Payment (finance records the walk-in amount)'
+          key: 'ready_for_claim',
+          label: 'After submit: Ready for Release'
         };
       }
       return {

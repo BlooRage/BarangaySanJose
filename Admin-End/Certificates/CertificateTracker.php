@@ -2802,7 +2802,7 @@ if ($certificateLaunchTab === 'manual' && $certificateLaunchDocument === 'barang
   };
 </script>
 <script src="../../JS-Script-Files/Admin-End/tableColumnsGeneric.js?v=20260215-1"></script>
-<script src="../../JS-Script-Files/Shared/barangayIdDigital.js?v=20260320-23"></script>
-<script src="../../JS-Script-Files/Admin-End/certificateTrackerScript.js?v=20260320-02"></script>
+<script src="../../JS-Script-Files/Shared/barangayIdDigital.js?v=20260320-25"></script>
+<script src="../../JS-Script-Files/Admin-End/certificateTrackerScript.js?v=20260320-06"></script>
 </body>
 </html>
