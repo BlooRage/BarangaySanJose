@@ -194,18 +194,15 @@ $fullAddress = htmlspecialchars(implode(', ', $fullAddressParts), ENT_QUOTES, 'U
                 </div>
 
                 <div class="form-row">
-                    <div class="full-width">
+                    <div class="tablet-full">
                         <div class="input-stack">
                             <label class="top-label">Contact Number<span class="required-asterisk">*</span></label>
                             <input type="text" name="contact_number" readonly value="<?php echo $phoneNumber; ?>">
                         </div>
                     </div>
-                </div>
-
-                <div class="form-row">
-                    <div class="full-width">
+                    <div class="span-3">
                         <div class="input-stack">
-                            <label class="top-label">Full Address <span class="required-asterisk">*</span></label>
+                            <label class="top-label">Address <span class="required-asterisk">*</span></label>
                             <input type="text" name="full_address" readonly value="<?php echo $fullAddress; ?>">
                         </div>
                     </div>

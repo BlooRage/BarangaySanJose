@@ -175,21 +175,14 @@ $ownerFullAddress = htmlspecialchars(implode(', ', $ownerFullAddressParts), ENT_
                 </div>
 
                 <div class="form-row">
-                    <div class="contact">
-                        <div class="input-stack">
-                            <label class="top-label">Contact Number</label>
-                            <input type="text" name="owner_phone" value="<?php echo $ownerPhone; ?>" readonly>
-                        </div>
+                    <div class="input-stack tablet-full">
+                        <label class="top-label">Contact Number</label>
+                        <input type="text" name="owner_phone" value="<?php echo $ownerPhone; ?>" readonly>
                     </div>
-                </div>
-
-                <div class="form-row">
-                    <div class="full-width">
-                        <div class="input-stack mb-3">
-                            <label class="top-label" for="owner_full_address">Address <span class="required-asterisk">*</span></label>
-                            <input type="text" id="owner_full_address" name="owner_full_address" value="<?php echo $ownerFullAddress; ?>" readonly>
-                        </div>
-                        </div>
+                    <div class="input-stack mb-3 span-3">
+                        <label class="top-label" for="owner_full_address">Address <span class="required-asterisk">*</span></label>
+                        <input type="text" id="owner_full_address" name="owner_full_address" value="<?php echo $ownerFullAddress; ?>" readonly>
+                    </div>
                 </div>
                 <div class="form-row">
                     <div class="full-width">

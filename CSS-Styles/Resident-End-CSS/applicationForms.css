@@ -255,6 +255,14 @@ body {
     grid-column: span 2;
 }
 
+.span-3 {
+    grid-column: span 3;
+}
+
+.tablet-full {
+    grid-column: span 1;
+}
+
 .contact {
     grid-column: span 4;
 }
@@ -677,7 +685,10 @@ body {
     .form-row {
         grid-template-columns: repeat(2, 1fr);
     }
-    .full-width {
+    .full-width,
+    .phone,
+    .span-3,
+    .tablet-full {
         grid-column: span 2;
     }
     .agreement-text {
@@ -699,7 +710,10 @@ body {
     .form-row {
         grid-template-columns: 1fr;
     }
-    .full-width {
+    .full-width,
+    .phone,
+    .span-3,
+    .tablet-full {
         grid-column: span 1;
     }
     .agreement-row {

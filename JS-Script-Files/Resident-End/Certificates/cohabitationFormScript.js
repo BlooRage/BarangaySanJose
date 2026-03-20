@@ -87,6 +87,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const cohabitantIdDetails = document.getElementById("cohabitantIdDetails");
     const cohabitantIdNumber = document.getElementById("cohabitantIdNumber");
     const cohabitantIdFront = document.getElementById("cohabitantIdFront");
+    const cohabitantIdFrontField = document.getElementById("cohabitantIdFrontField");
     const cohabitantIdBack = document.getElementById("cohabitantIdBack");
     const cohabitantIdBackField = document.getElementById("cohabitantIdBackField");
     const cohabitantIdGuideText = document.getElementById("cohabitantIdGuideText");
@@ -566,6 +567,10 @@ document.addEventListener("DOMContentLoaded", () => {
             if (!hasType || isPassport) {
                 cohabitantIdBack.value = "";
             }
+        }
+
+        if (cohabitantIdFrontField) {
+            cohabitantIdFrontField.classList.toggle("full-width", hasType && isPassport);
         }
 
         if (cohabitantIdGuideText) {

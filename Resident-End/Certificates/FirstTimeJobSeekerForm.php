@@ -262,12 +262,19 @@ $fullAddress = htmlspecialchars(implode(', ', $fullAddressParts), ENT_QUOTES, 'U
                             </div>
                         </div>
 
-                        <div class="form-row two-col-row">
-                            <div>
+                        <div class="form-row">
+                            <div class="tablet-full">
                                 <label class="top-label">Contact Number <span class="required-asterisk">*</span></label>
                                 <input type="text" name="phone_number" value="<?php echo $phoneNumber; ?>" readonly>
                             </div>
-                            <div>
+                            <div class="span-3">
+                                <label class="top-label">Address <span class="required-asterisk">*</span></label>
+                                <input type="text" name="full_address" readonly value="<?php echo $fullAddress; ?>">
+                            </div>
+                        </div>
+
+                        <div class="form-row">
+                            <div class="full-width">
                                 <label class="top-label">Educational Attainment <span class="required-asterisk">*</span></label>
                                 <select name="educational_attainment" required>
                                     <option value="">Select Educational Attainment</option>
@@ -276,13 +283,6 @@ $fullAddress = htmlspecialchars(implode(', ', $fullAddressParts), ENT_QUOTES, 'U
                                     <option value="College Undergraduate">College Undergraduate</option>
                                     <option value="College Graduate">College Graduate</option>
                                 </select>
-                            </div>
-                        </div>
-
-                        <div class="form-row">
-                            <div class="full-width">
-                                <label class="top-label">Full Address <span class="required-asterisk">*</span></label>
-                                <input type="text" name="full_address" readonly value="<?php echo $fullAddress; ?>">
                             </div>
                         </div>
 

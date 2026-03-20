@@ -1,4 +1,4 @@
-477777777<?php
+<?php
 if (!isset($baseUrl)) {
     $scriptName = str_replace("\\", "/", (string)($_SERVER['SCRIPT_NAME'] ?? ''));
     $residentSegmentPos = strpos($scriptName, '/Resident-End/');
@@ -438,15 +438,11 @@ if (isset($conn) && $conn instanceof mysqli) {
 
     <main id="div-mainDisplay" class="flex-grow-1 p-4 p-md-5">
         <div class="downloads-shell">
-            <div class="mb-4">
-                <div>
-                    <h1 class="txn-page-title">Downloads</h1>
-                    <hr class="mt-0 mb-3">
-                    <p class="downloads-subtitle mb-0">
-                        Download your approved and released document requests here. Only documents that are ready and have an issued file available will appear in this list.
-                    </p>
-                </div>
-            </div>
+            <h1 class="txn-page-title">Downloads</h1>
+            <hr class="mt-0 mb-3">
+            <p class="downloads-subtitle mb-4">
+                Download your approved and released document requests here. Only documents that are ready and have an issued file available will appear in this list.
+            </p>
 
             <section class="downloads-card p-4 audit-shell">
                 <?php if ($queryError !== ''): ?>
