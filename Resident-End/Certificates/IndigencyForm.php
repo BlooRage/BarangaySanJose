@@ -263,9 +263,13 @@ $fullAddress = htmlspecialchars(implode(', ', $fullAddressParts), ENT_QUOTES, 'U
                         </div>
 
                         <div class="form-row">
-                            <div class="full-width">
+                            <div class="tablet-full">
                                 <label class="top-label">Contact Number <span class="required-asterisk">*</span></label>
                                 <input type="text" name="contact_number" value="<?php echo $phoneNumber; ?>" readonly>
+                            </div>
+                            <div class="span-3">
+                                <label class="top-label">Address <span class="required-asterisk">*</span></label>
+                                <input type="text" name="full_address" readonly value="<?php echo $fullAddress; ?>">
                             </div>
                         </div>
 
@@ -361,13 +365,6 @@ $fullAddress = htmlspecialchars(implode(', ', $fullAddressParts), ENT_QUOTES, 'U
                             <div>
                                 <label class="top-label" for="institutionPosition">Position</label>
                                 <input type="text" name="institution_position" id="institutionPosition" placeholder="Optional">
-                            </div>
-                        </div>
-
-                        <div class="form-row">
-                            <div class="full-width">
-                                <label class="top-label">Full Address <span class="required-asterisk">*</span></label>
-                                <input type="text" name="full_address" readonly value="<?php echo $fullAddress; ?>">
                             </div>
                         </div>
 

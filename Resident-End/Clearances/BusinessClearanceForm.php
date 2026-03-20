@@ -178,13 +178,14 @@ $ownerFullAddress = htmlspecialchars(implode(', ', $ownerFullAddressParts), ENT_
                         <input type="hidden" name="o_sfx" value="<?php echo htmlspecialchars((string)$ownerSuffix, ENT_QUOTES, 'UTF-8'); ?>">
                     </div>
                 </div>
-                <div class="form-row"><div class="full-width"><div class="input-stack"><label class="top-label">Contact Number <span class="required-asterisk">*</span></label><input type="text" name="o_phone" value="<?php echo $ownerPhone; ?>" readonly></div></div></div>
-                <div id="ownerAddressWrapper" class="form-row">
-                    <div class="full-width">
-                        <div class="input-stack mb-3">
-                            <label class="top-label" for="owner_full_address">Address <span class="required-asterisk">*</span></label>
-                            <input type="text" id="owner_full_address" name="owner_full_address" value="<?php echo $ownerFullAddress; ?>" readonly>
-                        </div>
+                <div id="ownerContactAddressRow" class="form-row">
+                    <div class="input-stack tablet-full">
+                        <label class="top-label">Contact Number <span class="required-asterisk">*</span></label>
+                        <input type="text" name="o_phone" value="<?php echo $ownerPhone; ?>" readonly>
+                    </div>
+                    <div class="input-stack mb-3 span-3">
+                        <label class="top-label" for="owner_full_address">Address <span class="required-asterisk">*</span></label>
+                        <input type="text" id="owner_full_address" name="owner_full_address" value="<?php echo $ownerFullAddress; ?>" readonly>
                     </div>
                 </div>
                 <div class="form-row">
@@ -366,12 +367,7 @@ $ownerFullAddress = htmlspecialchars(implode(', ', $ownerFullAddressParts), ENT_
                                 </div>
                                 <div class="col-md-6">
                                     <label class="top-label" for="proofAddressFile">Upload Proof of Address <span class="required-asterisk">*</span></label>
-                                    <label class="upload-dropzone" id="proofAddressDropzone" for="proofAddressFile">
-                                        <i class="fa-solid fa-cloud-arrow-up"></i>
-                                        <span>Drag files here or click to upload</span>
-                                    </label>
-                                    <input type="file" id="proofAddressFile" name="proof_address_file" class="visually-hidden" accept=".pdf,.jpg,.jpeg,.png">
-                                    <div id="proofAddressSelectedFile" class="selected-files small text-muted mt-2">No file selected</div>
+                                    <input type="file" id="proofAddressFile" name="proof_address_file" class="form-control" accept=".pdf,.jpg,.jpeg,.png">
                                 </div>
                             </div>
                         </div>
@@ -433,12 +429,7 @@ $ownerFullAddress = htmlspecialchars(implode(', ', $ownerFullAddressParts), ENT_
                                     </div>
                                     <div class="col-md-6">
                                         <label class="top-label" for="renewalProofAddressFile">Upload Proof of Address <span class="required-asterisk">*</span></label>
-                                        <label class="upload-dropzone" id="renewalProofAddressDropzone" for="renewalProofAddressFile">
-                                            <i class="fa-solid fa-cloud-arrow-up"></i>
-                                            <span>Drag files here or click to upload</span>
-                                        </label>
-                                        <input type="file" id="renewalProofAddressFile" name="renewal_proof_address_file" class="visually-hidden" accept=".pdf,.jpg,.jpeg,.png">
-                                        <div id="renewalProofAddressSelectedFile" class="selected-files small text-muted mt-2">No file selected</div>
+                                        <input type="file" id="renewalProofAddressFile" name="renewal_proof_address_file" class="form-control" accept=".pdf,.jpg,.jpeg,.png">
                                     </div>
                                 </div>
                             </div>

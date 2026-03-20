@@ -5,6 +5,65 @@
 
     const touchedFields = new WeakSet();
     let submitAttempted = false;
+    const submitControls = Array.from(
+      form.querySelectorAll('button[type="submit"], input[type="submit"]')
+    );
+
+    const getSubmitLabel = (control) => {
+      if (!control) return "Submit";
+      const tagName = String(control.tagName || "").toLowerCase();
+      if (tagName === "input") {
+        return String(control.value || "Submit");
+      }
+      return String(control.innerHTML || control.textContent || "Submit");
+    };
+
+    const setSubmitLoadingState = () => {
+      submitControls.forEach((control) => {
+        if (!control) return;
+        if (!control.dataset.originalLabel) {
+          control.dataset.originalLabel = getSubmitLabel(control);
+        }
+
+        const tagName = String(control.tagName || "").toLowerCase();
+        if (tagName === "input") {
+          control.value = "Submitting...";
+        } else {
+          control.innerHTML = '<span class="spinner-border spinner-border-sm me-2" aria-hidden="true"></span>Submitting...';
+        }
+
+        control.disabled = true;
+        control.setAttribute("aria-busy", "true");
+      });
+    };
+
+    const resetSubmitLoadingState = () => {
+      delete form.dataset.submitting;
+      submitControls.forEach((control) => {
+        if (!control) return;
+        const originalLabel = control.dataset.originalLabel;
+        if (originalLabel) {
+          const tagName = String(control.tagName || "").toLowerCase();
+          if (tagName === "input") {
+            control.value = originalLabel;
+          } else {
+            control.innerHTML = originalLabel;
+          }
+        }
+        control.disabled = false;
+        control.removeAttribute("aria-busy");
+      });
+      syncSubmitDisabledState();
+    };
+
+    const syncSubmitDisabledState = () => {
+      if (form.dataset.submitting === "true") return;
+      const isValid = form.checkValidity();
+      submitControls.forEach((control) => {
+        if (!control) return;
+        control.disabled = !isValid;
+      });
+    };
 
     const isTrackableField = (field) => {
       if (!field || field.disabled) return false;
@@ -69,17 +128,34 @@
       true
     );
 
-    form.addEventListener("submit", () => {
+    form.addEventListener("submit", (event) => {
       submitAttempted = true;
       form.querySelectorAll("input, select, textarea").forEach((field) => {
         if (!isTrackableField(field) || field.validity.valid || !isVisibleField(field)) return;
         touchedFields.add(field);
       });
       applyAllTouchedStates();
+
+      if (!form.checkValidity()) {
+        resetSubmitLoadingState();
+        return;
+      }
+
+      if (form.dataset.submitting === "true") {
+        event.preventDefault();
+        return;
+      }
+
+      form.dataset.submitting = "true";
+      setSubmitLoadingState();
     });
 
     form.addEventListener("input", applyAllTouchedStates);
     form.addEventListener("change", applyAllTouchedStates);
+    form.addEventListener("input", syncSubmitDisabledState);
+    form.addEventListener("change", syncSubmitDisabledState);
+    window.addEventListener("pageshow", resetSubmitLoadingState);
+    syncSubmitDisabledState();
   };
 
   if (document.readyState === "loading") {

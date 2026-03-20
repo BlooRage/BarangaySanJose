@@ -66,6 +66,26 @@ foreach ($items as $item) {
   <link rel="stylesheet" href="../../CSS-Styles/Resident-End-CSS/residentDashboard.css">
   <link rel="stylesheet" href="../../CSS-Styles/Resident-End-CSS/ApplicationLandingPage.css?v=20260228-3">
   <style>
+    body {
+      background: #f8f9fa;
+    }
+
+    #div-mainDisplay {
+      background: #f8f9fa !important;
+    }
+
+    .txn-page-title {
+      font-family: 'Charis SIL Bold', serif;
+      color: #DE710C;
+      font-size: clamp(2rem, 4.4vw, 3rem);
+      line-height: 1.1;
+      margin: 0 0 0.65rem 0;
+    }
+
+    .page-description {
+      color: #5f6470;
+    }
+
     .announcements-list {
       display: flex;
       flex-direction: column;
@@ -127,10 +147,16 @@ foreach ($items as $item) {
     }
 
     @media (max-width: 767px) {
+      .txn-page-title {
+        font-size: clamp(1.7rem, 7.5vw, 2.15rem);
+        margin-bottom: 0.4rem;
+      }
+
       .announcement-entry {
         border-radius: 14px;
         padding: 1rem;
       }
+
       .announcement-title {
         font-size: 1.3rem;
       }
@@ -142,8 +168,8 @@ foreach ($items as $item) {
     <?php include __DIR__ . '/../includes/resident_sidebar.php'; ?>
 
     <main id="div-mainDisplay" class="main-content flex-grow-1 p-4 p-md-5 bg-light">
-      <h1 class="page-title">Announcements</h1>
-      <hr>
+      <h1 class="txn-page-title">Announcements</h1>
+      <hr class="mt-0 mb-3">
 
       <p class="page-description">
         Stay informed with verified barangay updates, advisories, and reminders posted through the official account page channel.

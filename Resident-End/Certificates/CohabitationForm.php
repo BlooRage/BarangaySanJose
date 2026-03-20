@@ -419,7 +419,7 @@ $purposeInputClass = $isRelationshipJailVisitVariant ? 'form-control text-bg-lig
                         </div>
 
                         <div id="cohabitantIdUploadRow" class="form-row two-col-row">
-                            <div>
+                            <div id="cohabitantIdFrontField">
                                 <label class="top-label" for="cohabitantIdFront"><span id="cohabitantIdFrontLabel">Front of Valid ID</span> <span class="required-asterisk">*</span></label>
                                 <label class="upload-dropzone" data-upload-input="cohabitantIdFront" for="cohabitantIdFront">
                                     <i class="fa-solid fa-upload"></i>

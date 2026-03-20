@@ -197,24 +197,18 @@ $ownerFullAddress = htmlspecialchars(implode(', ', $ownerFullAddressParts), ENT_
                     </div>
                 </div>
                 <div class="form-row">
-                    <div class="full-width">
-                        <div class="input-stack">
-                            <label class="top-label">Contact Number <span class="required-asterisk">*</span></label>
-                            <input type="text" name="applicant_contact_number" value="<?php echo $ownerPhone; ?>" readonly required>
-                        </div>
+                    <div class="input-stack tablet-full">
+                        <label class="top-label">Contact Number <span class="required-asterisk">*</span></label>
+                        <input type="text" name="applicant_contact_number" value="<?php echo $ownerPhone; ?>" readonly required>
                     </div>
-                </div>
-                <div class="form-row">
-                    <div class="full-width">
-                        <div class="input-stack mb-3">
-                            <label class="top-label" for="applicant_full_address">Address <span class="required-asterisk">*</span></label>
-                            <input type="text" id="applicant_full_address" name="applicant_full_address" value="<?php echo $ownerFullAddress; ?>" readonly>
-                            <input type="hidden" id="applicantUnitNumber" value="<?php echo htmlspecialchars($ownerUnitNumberRaw, ENT_QUOTES, 'UTF-8'); ?>">
-                            <input type="hidden" id="applicantStreetNumber" value="<?php echo htmlspecialchars($ownerHouseNumberRaw, ENT_QUOTES, 'UTF-8'); ?>">
-                            <input type="hidden" id="applicantStreetName" value="<?php echo htmlspecialchars($ownerStreetNameRaw, ENT_QUOTES, 'UTF-8'); ?>">
-                            <input type="hidden" id="applicantSubdivision" value="<?php echo htmlspecialchars($ownerSubdivisionRaw, ENT_QUOTES, 'UTF-8'); ?>">
-                            <input type="hidden" id="applicantFullAddress" value="<?php echo $ownerFullAddress; ?>">
-                        </div>
+                    <div class="input-stack mb-3 span-3">
+                        <label class="top-label" for="applicant_full_address">Address <span class="required-asterisk">*</span></label>
+                        <input type="text" id="applicant_full_address" name="applicant_full_address" value="<?php echo $ownerFullAddress; ?>" readonly>
+                        <input type="hidden" id="applicantUnitNumber" value="<?php echo htmlspecialchars($ownerUnitNumberRaw, ENT_QUOTES, 'UTF-8'); ?>">
+                        <input type="hidden" id="applicantStreetNumber" value="<?php echo htmlspecialchars($ownerHouseNumberRaw, ENT_QUOTES, 'UTF-8'); ?>">
+                        <input type="hidden" id="applicantStreetName" value="<?php echo htmlspecialchars($ownerStreetNameRaw, ENT_QUOTES, 'UTF-8'); ?>">
+                        <input type="hidden" id="applicantSubdivision" value="<?php echo htmlspecialchars($ownerSubdivisionRaw, ENT_QUOTES, 'UTF-8'); ?>">
+                        <input type="hidden" id="applicantFullAddress" value="<?php echo $ownerFullAddress; ?>">
                     </div>
                 </div>
                 <div class="form-row">

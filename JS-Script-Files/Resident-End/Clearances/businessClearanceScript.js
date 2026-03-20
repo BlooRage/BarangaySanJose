@@ -13,12 +13,8 @@
   const ownerFullAddress = document.getElementById("owner_full_address");
   const businessRegType = document.getElementById("businessRegType");
   const businessRegFile = document.getElementById("businessRegFile");
-  const businessRegDropzone = document.getElementById("businessRegDropzone");
-  const businessRegSelectedFile = document.getElementById("businessRegSelectedFile");
   const proofAddressType = document.getElementById("proofAddressType");
   const proofAddressFile = document.getElementById("proofAddressFile");
-  const proofAddressDropzone = document.getElementById("proofAddressDropzone");
-  const proofAddressSelectedFile = document.getElementById("proofAddressSelectedFile");
   const proofAddressNumberRow = document.getElementById("proofAddressNumberRow");
   const proofAddressNumber = document.getElementById("proofAddressNumber");
   const proofAddressNumberError = document.getElementById("proofAddressNumberError");
@@ -29,12 +25,8 @@
   const documentUploadRenewal = document.getElementById("documentUploadRenewal");
   const renewalBusinessRegType = document.getElementById("renewalBusinessRegType");
   const renewalBusinessRegFile = document.getElementById("renewalBusinessRegFile");
-  const renewalBusinessRegDropzone = document.getElementById("renewalBusinessRegDropzone");
-  const renewalBusinessRegSelectedFile = document.getElementById("renewalBusinessRegSelectedFile");
   const renewalProofAddressType = document.getElementById("renewalProofAddressType");
   const renewalProofAddressFile = document.getElementById("renewalProofAddressFile");
-  const renewalProofAddressDropzone = document.getElementById("renewalProofAddressDropzone");
-  const renewalProofAddressSelectedFile = document.getElementById("renewalProofAddressSelectedFile");
   const renewalProofAddressNumberRow = document.getElementById("renewalProofAddressNumberRow");
   const renewalProofAddressNumber = document.getElementById("renewalProofAddressNumber");
   const renewalProofAddressNumberError = document.getElementById("renewalProofAddressNumberError");
@@ -127,38 +119,6 @@
       inputEl.setCustomValidity('');
       if (errorEl) errorEl.classList.add("d-none");
     }
-  };
-
-  const renderFile = (inputEl, outputEl) => {
-    if (!inputEl || !outputEl) return;
-    const names = Array.from(inputEl.files || []).map((file) => file.name);
-    outputEl.textContent = names.length ? `Selected: ${names.join(", ")}` : "No file selected";
-  };
-
-  const bindDropzone = (dropzone, inputEl, outputEl) => {
-    if (!dropzone || !inputEl || !outputEl) return;
-    ["dragenter", "dragover"].forEach((eventName) => {
-      dropzone.addEventListener(eventName, (e) => {
-        e.preventDefault();
-        dropzone.classList.add("is-dragging");
-      });
-    });
-
-    ["dragleave", "drop"].forEach((eventName) => {
-      dropzone.addEventListener(eventName, (e) => {
-        e.preventDefault();
-        dropzone.classList.remove("is-dragging");
-      });
-    });
-
-    dropzone.addEventListener("drop", (e) => {
-      const dt = e.dataTransfer;
-      if (dt && dt.files && dt.files.length) {
-        inputEl.files = dt.files;
-        renderFile(inputEl, outputEl);
-        updateState();
-      }
-    });
   };
 
   const buildBusinessFullAddress = () => {
@@ -272,11 +232,8 @@
       [businessRegFile, proofAddressFile].forEach((el) => {
         if (el) el.value = '';
       });
-      renderFile(businessRegFile, businessRegSelectedFile);
-      renderFile(proofAddressFile, proofAddressSelectedFile);
       if (businessPhotoFile) {
         businessPhotoFile.value = '';
-        renderFile(businessPhotoFile, businessPhotoSelectedFile);
       }
       [proofAddressNumber].forEach((el) => {
         if (el) {
@@ -297,8 +254,6 @@
       [renewalBusinessRegFile, renewalProofAddressFile].forEach((el) => {
         if (el) el.value = '';
       });
-      renderFile(renewalBusinessRegFile, renewalBusinessRegSelectedFile);
-      renderFile(renewalProofAddressFile, renewalProofAddressSelectedFile);
       [renewalProofAddressNumber].forEach((el) => {
         if (el) {
           el.value = '';
@@ -344,35 +299,46 @@
     updateState();
   });
   businessContactNumber?.addEventListener("input", updateState);
-  businessRegFile?.addEventListener("change", () => {
-    renderFile(businessRegFile, businessRegSelectedFile);
-    updateState();
-  });
-  proofAddressFile?.addEventListener("change", () => {
-    renderFile(proofAddressFile, proofAddressSelectedFile);
-    updateState();
-  });
-  businessPhotoFile?.addEventListener("change", () => {
-    renderFile(businessPhotoFile, businessPhotoSelectedFile);
-    updateState();
-  });
-  renewalBusinessRegFile?.addEventListener("change", () => {
-    renderFile(renewalBusinessRegFile, renewalBusinessRegSelectedFile);
-    updateState();
-  });
-  renewalProofAddressFile?.addEventListener("change", () => {
-    renderFile(renewalProofAddressFile, renewalProofAddressSelectedFile);
-    updateState();
-  });
-  bindDropzone(businessRegDropzone, businessRegFile, businessRegSelectedFile);
-  bindDropzone(proofAddressDropzone, proofAddressFile, proofAddressSelectedFile);
-  bindDropzone(businessPhotoDropzone, businessPhotoFile, businessPhotoSelectedFile);
-  bindDropzone(renewalBusinessRegDropzone, renewalBusinessRegFile, renewalBusinessRegSelectedFile);
-  bindDropzone(renewalProofAddressDropzone, renewalProofAddressFile, renewalProofAddressSelectedFile);
+  businessRegFile?.addEventListener("change", updateState);
+  proofAddressFile?.addEventListener("change", updateState);
+  businessPhotoFile?.addEventListener("change", updateState);
+  renewalBusinessRegFile?.addEventListener("change", updateState);
+  renewalProofAddressFile?.addEventListener("change", updateState);
+  if (businessPhotoDropzone && businessPhotoFile && businessPhotoSelectedFile) {
+    const renderBusinessPhotoFile = () => {
+      const names = Array.from(businessPhotoFile.files || []).map((file) => file.name);
+      businessPhotoSelectedFile.textContent = names.length ? `Selected: ${names.join(", ")}` : "";
+    };
+
+    ["dragenter", "dragover"].forEach((eventName) => {
+      businessPhotoDropzone.addEventListener(eventName, (e) => {
+        e.preventDefault();
+        businessPhotoDropzone.classList.add("is-dragging");
+      });
+    });
+
+    ["dragleave", "drop"].forEach((eventName) => {
+      businessPhotoDropzone.addEventListener(eventName, (e) => {
+        e.preventDefault();
+        businessPhotoDropzone.classList.remove("is-dragging");
+      });
+    });
+
+    businessPhotoDropzone.addEventListener("drop", (e) => {
+      const dt = e.dataTransfer;
+      if (dt && dt.files && dt.files.length) {
+        businessPhotoFile.files = dt.files;
+        renderBusinessPhotoFile();
+        updateState();
+      }
+    });
+
+    businessPhotoFile.addEventListener("change", () => {
+      renderBusinessPhotoFile();
+      updateState();
+    });
+
+    renderBusinessPhotoFile();
+  }
   updateState();
-  renderFile(businessRegFile, businessRegSelectedFile);
-  renderFile(proofAddressFile, proofAddressSelectedFile);
-  renderFile(businessPhotoFile, businessPhotoSelectedFile);
-  renderFile(renewalBusinessRegFile, renewalBusinessRegSelectedFile);
-  renderFile(renewalProofAddressFile, renewalProofAddressSelectedFile);
 })();
