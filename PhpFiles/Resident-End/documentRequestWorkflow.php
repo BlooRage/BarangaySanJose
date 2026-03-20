@@ -613,6 +613,42 @@ function dr_fetch_resident_birth_snapshot(mysqli $conn, string $residentId, stri
     ];
 }
 
+function dr_fetch_resident_barangay_id_snapshot(mysqli $conn, string $residentId, string $userId): array {
+    $sql = "
+        SELECT
+            r.birthdate,
+            r.birthplace,
+            r.sex,
+            e.address AS emergency_address
+        FROM residentinformationtbl r
+        LEFT JOIN emergencycontacttbl e
+            ON e.user_id = r.user_id
+        WHERE r.resident_id = ? OR r.user_id = ?
+        ORDER BY CASE WHEN r.resident_id = ? THEN 0 ELSE 1 END
+        LIMIT 1
+    ";
+    $stmt = $conn->prepare($sql);
+    if (!$stmt) {
+        return [
+            'birthdate' => '',
+            'birthplace' => '',
+            'sex' => '',
+            'emergency_address' => '',
+        ];
+    }
+    $stmt->bind_param('sss', $residentId, $userId, $residentId);
+    $stmt->execute();
+    $row = $stmt->get_result()->fetch_assoc();
+    $stmt->close();
+
+    return [
+        'birthdate' => trim((string)($row['birthdate'] ?? '')),
+        'birthplace' => trim((string)($row['birthplace'] ?? '')),
+        'sex' => trim((string)($row['sex'] ?? '')),
+        'emergency_address' => trim((string)($row['emergency_address'] ?? '')),
+    ];
+}
+
 function dr_has_column(mysqli $conn, string $table, string $column): bool {
     static $cache = [];
     $tableEsc = preg_replace('/[^a-zA-Z0-9_]/', '', $table);
@@ -964,12 +1000,18 @@ if ($action === 'submit_request') {
     $documentTypeToken = dr_document_type_token($documentTypeRaw !== '' ? $documentTypeRaw : $documentType);
     $isBarangayIdRequest = dr_is_barangay_id_document_type($documentTypeRaw !== '' ? $documentTypeRaw : $documentType);
     if ($isBarangayIdRequest) {
-        $residentBirthSnapshot = dr_fetch_resident_birth_snapshot($conn, $residentId, $residentForeignId);
-        if (trim((string)($_POST['birthdate'] ?? '')) === '' && $residentBirthSnapshot['birthdate'] !== '') {
-            $_POST['birthdate'] = $residentBirthSnapshot['birthdate'];
+        $residentBarangayIdSnapshot = dr_fetch_resident_barangay_id_snapshot($conn, $residentId, $residentForeignId);
+        if (trim((string)($_POST['birthdate'] ?? '')) === '' && $residentBarangayIdSnapshot['birthdate'] !== '') {
+            $_POST['birthdate'] = $residentBarangayIdSnapshot['birthdate'];
         }
-        if (trim((string)($_POST['birthplace'] ?? '')) === '' && $residentBirthSnapshot['birthplace'] !== '') {
-            $_POST['birthplace'] = $residentBirthSnapshot['birthplace'];
+        if (trim((string)($_POST['birthplace'] ?? '')) === '' && $residentBarangayIdSnapshot['birthplace'] !== '') {
+            $_POST['birthplace'] = $residentBarangayIdSnapshot['birthplace'];
+        }
+        if (trim((string)($_POST['sex'] ?? $_POST['gender'] ?? '')) === '' && $residentBarangayIdSnapshot['sex'] !== '') {
+            $_POST['sex'] = $residentBarangayIdSnapshot['sex'];
+        }
+        if (trim((string)($_POST['emergency_address'] ?? '')) === '' && $residentBarangayIdSnapshot['emergency_address'] !== '') {
+            $_POST['emergency_address'] = $residentBarangayIdSnapshot['emergency_address'];
         }
 
         $contactNumber = trim((string)($_POST['contact_number'] ?? $_POST['phone_number'] ?? ''));

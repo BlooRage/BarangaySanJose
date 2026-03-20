@@ -1281,7 +1281,7 @@ function dra_has_barangay_id_template_assets(): bool {
 }
 
 function dra_barangay_id_render_revision(): string {
-    return 'r20260320bid07';
+    return 'r20260320bid08';
 }
 
 function dra_requires_manual_issued_upload(array $requestRow): bool {
@@ -2448,12 +2448,7 @@ function dra_generate_issued_document(array $requestRow): ?string {
                     $residentProfile['full_address'] ?? null,
                     $applicantResidenceAddress,
                 ]);
-                $frontAddress = dra_strip_area_from_address($addressSource);
-                $frontAddress = trim((string)(preg_replace('/\bArea\s+Area\b/i', 'Area', $frontAddress) ?? $frontAddress));
-                if ($frontAddress === '') {
-                    $frontAddress = trim($addressSource);
-                }
-                $frontAddress = $upperText($frontAddress);
+                $frontAddress = $upperText($addressSource);
 
                 $birthdateText = $upperText($formatDate(dra_manual_first_non_empty([
                     $payload['birthdate'] ?? null,
@@ -2540,7 +2535,7 @@ function dra_generate_issued_document(array $requestRow): ?string {
                 }
                 if ($usesBlankTemplate) {
                     $fitSingleLine($pdf, $displayName, 32.5, 25.0, 45.0, 'B', 7.2, 4.6);
-                    $fitTwoLines($pdf, $frontAddress, 32.5, 31.0, 47.0, 2.4, 'B', 6.0, 4.0);
+                    $fitTwoLines($pdf, $frontAddress, 32.5, 31.0, 47.0, 2.15, 'B', 5.6, 3.2);
                     $fitSingleLine($pdf, $birthdateText !== '' ? $birthdateText : '-', 32.5, 39.0, 20.5, 'B', 6.4, 4.4);
                     $fitSingleLine($pdf, $sexText !== '' ? $sexText : '-', 57.5, 39.0, 19.5, 'B', 6.4, 4.4);
                     $fitSingleLine($pdf, $birthplaceText !== '' ? $birthplaceText : '-', 32.5, 45.0, 44.8, 'B', 5.5, 4.0);
@@ -2555,7 +2550,7 @@ function dra_generate_issued_document(array $requestRow): ?string {
                     $fitSingleLine($pdf, 'Name', 32.2, 24.08, 9.0, 'I', 5.1, 4.0);
                     $fitSingleLine($pdf, $displayName, 32.2, 26.28, 44.8, 'B', 7.2, 4.6);
                     $fitSingleLine($pdf, 'Address', 32.2, 30.58, 12.0, 'I', 5.1, 4.0);
-                    $fitTwoLines($pdf, $frontAddress, 32.2, 32.78, 44.8, 2.4, 'B', 6.0, 4.0);
+                    $fitTwoLines($pdf, $frontAddress, 32.2, 32.78, 44.8, 2.15, 'B', 5.6, 3.2);
                     $fitSingleLine($pdf, 'Date of Birth', 32.2, 38.48, 18.0, 'I', 5.1, 4.0);
                     $fitSingleLine($pdf, $birthdateText !== '' ? $birthdateText : '-', 32.2, 40.78, 20.5, 'B', 6.4, 4.4);
                     $fitSingleLine($pdf, 'Sex', 57.2, 38.48, 8.0, 'I', 5.1, 4.0);
@@ -2575,7 +2570,7 @@ function dra_generate_issued_document(array $requestRow): ?string {
                     $fitSingleLine($pdf, $cardIdText, 63.0, 3.6, 19.8, 'B', 7.6, 5.0, 'R');
                     $pdf->SetTextColor(0, 0, 0);
                     $fitSingleLine($pdf, $emergencyDisplayName !== '' ? $emergencyDisplayName : '-', 7.0, 17.0, 35.0, 'B', 5.4, 4.0);
-                    $fitTwoLines($pdf, $emergencyAddressText !== '' ? $emergencyAddressText : '-', 7.0, 22.08, 35.0, 2.2, 'B', 4.7, 3.6);
+                    $fitTwoLines($pdf, $emergencyAddressText !== '' ? $emergencyAddressText : '-', 7.0, 22.08, 35.0, 2.0, 'B', 4.7, 3.0);
                     $fitSingleLine($pdf, $emergencyContactText !== '' ? $emergencyContactText : ($contactNumberText !== '' ? $contactNumberText : '-'), 7.0, 28.5, 19.0, 'B', 5.0, 3.8);
                 } else {
                     $coverRect($pdf, 57.8, 1.0, 25.0, 6.0);
@@ -2587,7 +2582,7 @@ function dra_generate_issued_document(array $requestRow): ?string {
                     $fitSingleLine($pdf, 'Name', 6.9, 17.5, 8.0, 'I', 5.0, 4.0);
                     $fitSingleLine($pdf, $emergencyDisplayName !== '' ? $emergencyDisplayName : '-', 6.9, 19.7, 33.0, 'B', 6.0, 4.3);
                     $fitSingleLine($pdf, 'Address', 6.9, 23.8, 10.0, 'I', 5.0, 4.0);
-                    $fitSingleLine($pdf, $emergencyAddressText !== '' ? $emergencyAddressText : '-', 6.9, 26.0, 39.6, 'B', 5.3, 3.9);
+                    $fitTwoLines($pdf, $emergencyAddressText !== '' ? $emergencyAddressText : '-', 6.9, 26.0, 39.6, 2.0, 'B', 5.0, 3.2);
                     $fitSingleLine($pdf, 'Contact', 6.9, 30.0, 10.0, 'I', 5.0, 4.0);
                     $fitSingleLine($pdf, $emergencyContactText !== '' ? $emergencyContactText : ($contactNumberText !== '' ? $contactNumberText : '-'), 6.9, 32.2, 22.0, 'B', 6.0, 4.3);
                 }
@@ -6636,7 +6631,7 @@ if ($action === 'view_issued_card') {
         html, body { margin: 0; padding: 0; background: #f3f4f6; font-family: Arial, Helvetica, sans-serif; }
         .barangay-id-issued-shell { padding: 18px; }
       </style>';
-    echo '<script src="' . htmlspecialchars($baseUrl . '/JS-Script-Files/Shared/barangayIdDigital.js?v=20260320-25', ENT_QUOTES, 'UTF-8') . '"></script>';
+    echo '<script src="' . htmlspecialchars($baseUrl . '/JS-Script-Files/Shared/barangayIdDigital.js?v=20260320-26', ENT_QUOTES, 'UTF-8') . '"></script>';
     echo '</head><body>';
     echo '<div id="digitalBarangayIdAdminWrap" class="barangay-id-issued-shell"></div>';
     echo '<script>';

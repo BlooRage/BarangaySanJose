@@ -284,9 +284,209 @@ $serializedRow = $requestRow ? [
             box-shadow: none;
             background: #fff;
         }
+        .digital-id-viewer {
+            display: grid;
+            gap: 18px;
+        }
+        .digital-id-viewer__header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 16px;
+            flex-wrap: wrap;
+            padding-bottom: 10px;
+            border-bottom: 1px solid rgba(221, 226, 235, 0.95);
+        }
+        .digital-id-viewer__status {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            min-width: 0;
+        }
+        .digital-id-viewer__status-icon {
+            width: 58px;
+            height: 58px;
+            border-radius: 18px;
+            background: linear-gradient(180deg, #ecf4ff 0%, #f8fbff 100%);
+            border: 1px solid rgba(76, 108, 193, 0.2);
+            color: #1e4eb6;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.55rem;
+            box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.75);
+        }
+        .digital-id-viewer__status-text {
+            min-width: 0;
+        }
+        .digital-id-viewer__status-title {
+            margin: 0;
+            font-size: clamp(1.35rem, 2.7vw, 2.35rem);
+            line-height: 1.05;
+            font-weight: 800;
+            color: #1c4fb7;
+        }
+        .digital-id-viewer__status-title span {
+            color: #6bb12f;
+        }
+        .digital-id-viewer__status-copy {
+            margin: 6px 0 0;
+            color: #6c7280;
+            font-size: 0.95rem;
+        }
+        .digital-id-viewer__chips {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            flex-wrap: wrap;
+            justify-content: flex-end;
+        }
+        .digital-id-viewer__chip {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 14px;
+            border-radius: 999px;
+            background: #f4f8ff;
+            border: 1px solid rgba(89, 123, 209, 0.2);
+            color: #25417d;
+            font-weight: 700;
+            font-size: 0.9rem;
+        }
+        .digital-id-viewer__stage {
+            position: relative;
+            overflow: hidden;
+            border-radius: 26px;
+            border: 1px solid rgba(198, 214, 245, 0.8);
+            background:
+                radial-gradient(circle at top left, rgba(227, 237, 255, 0.95), transparent 34%),
+                linear-gradient(180deg, #fafdff 0%, #edf4ff 100%);
+            padding: 24px;
+            min-height: 340px;
+            display: grid;
+            place-items: center;
+        }
+        .digital-id-viewer__card-stage {
+            width: min(100%, 1160px);
+            margin: 0 auto;
+        }
+        .digital-id-viewer__card-stage .barangay-id-card {
+            width: 100%;
+            margin: 0;
+            border-radius: 28px;
+            box-shadow: 0 24px 60px rgba(28, 56, 112, 0.16);
+        }
+        .digital-id-viewer__card-stage .barangay-id-card__bg {
+            border-radius: 28px;
+        }
+        .digital-id-viewer__qr-stage {
+            width: min(100%, 540px);
+            min-height: 420px;
+            display: grid;
+            place-items: center;
+            gap: 18px;
+            padding: 30px;
+            border-radius: 28px;
+            background: rgba(255, 255, 255, 0.94);
+            border: 1px solid rgba(199, 216, 247, 0.95);
+            box-shadow: 0 24px 60px rgba(28, 56, 112, 0.12);
+        }
+        .digital-id-viewer__qr-frame {
+            width: min(100%, 360px);
+            aspect-ratio: 1 / 1;
+            border-radius: 26px;
+            background: #fff;
+            border: 1px dashed rgba(59, 94, 176, 0.3);
+            display: grid;
+            place-items: center;
+            overflow: hidden;
+        }
+        .digital-id-viewer__qr-frame img {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+        }
+        .digital-id-viewer__qr-placeholder {
+            text-align: center;
+            color: #5b6785;
+            font-weight: 700;
+            font-size: 1.05rem;
+            padding: 20px;
+        }
+        .digital-id-viewer__qr-caption {
+            margin: 0;
+            text-align: center;
+            color: #4c5e84;
+            font-weight: 600;
+            max-width: 420px;
+        }
+        .digital-id-viewer__footer {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 14px;
+            flex-wrap: wrap;
+        }
+        .digital-id-viewer__footer-actions {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            flex-wrap: wrap;
+            margin-left: auto;
+        }
+        .digital-id-viewer__btn {
+            border-radius: 16px;
+            font-weight: 800;
+            padding: 12px 18px;
+            border: 0;
+            transition: transform 120ms ease, box-shadow 120ms ease, opacity 120ms ease;
+        }
+        .digital-id-viewer__btn:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 12px 24px rgba(28, 56, 112, 0.16);
+        }
+        .digital-id-viewer__btn--close {
+            background: linear-gradient(180deg, #f51f24 0%, #d91318 100%);
+            color: #fff;
+        }
+        .digital-id-viewer__btn--mode {
+            background: linear-gradient(180deg, #2553be 0%, #143d9d 100%);
+            color: #fff;
+            min-width: 152px;
+        }
+        .digital-id-viewer__btn--mode.is-active {
+            background: linear-gradient(180deg, #2d67ea 0%, #1e4fc1 100%);
+            box-shadow: 0 16px 30px rgba(37, 83, 190, 0.24);
+        }
+        .digital-id-viewer__btn--mode.is-inactive {
+            opacity: 0.82;
+        }
         @media (max-width: 767.98px) {
             .digital-id-card-shell {
                 border-radius: 20px;
+            }
+            .digital-id-viewer__status {
+                align-items: flex-start;
+            }
+            .digital-id-viewer__stage {
+                padding: 14px;
+                border-radius: 20px;
+                min-height: 240px;
+            }
+            .digital-id-viewer__card-stage .barangay-id-card,
+            .digital-id-viewer__card-stage .barangay-id-card__bg {
+                border-radius: 20px;
+            }
+            .digital-id-viewer__footer-actions {
+                width: 100%;
+                margin-left: 0;
+            }
+            .digital-id-viewer__btn {
+                width: 100%;
+                justify-content: center;
+            }
+            .digital-id-viewer__btn--mode {
+                min-width: 0;
             }
         }
     </style>
@@ -352,7 +552,7 @@ $serializedRow = $requestRow ? [
 <?php endif; ?>
 
 <?php if ($errorMessage === ''): ?>
-    <script src="<?= htmlspecialchars($baseUrl) ?>/JS-Script-Files/Shared/barangayIdDigital.js?v=20260320-25"></script>
+    <script src="<?= htmlspecialchars($baseUrl) ?>/JS-Script-Files/Shared/barangayIdDigital.js?v=20260320-26"></script>
     <script>
         (() => {
             const wrap = document.getElementById('digitalBarangayIdWrap');
@@ -365,7 +565,152 @@ $serializedRow = $requestRow ? [
             const appBase = <?= json_encode($baseUrl, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
             const profileImageEndpoint = <?= json_encode($profileImageEndpoint, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
             const initialProfileImageUrl = <?= json_encode($resolvedProfileImageUrl, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
+            const documentRequestsUrl = <?= json_encode($documentRequestsUrl, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
             const embedMode = <?= $embedMode ? 'true' : 'false' ?>;
+
+            function closeDigitalIdView() {
+                if (!embedMode) {
+                    window.location.href = documentRequestsUrl;
+                    return;
+                }
+                try {
+                    const parentDoc = window.parent && window.parent.document;
+                    const modalEl = parentDoc ? parentDoc.getElementById('paymentProofModal') : null;
+                    if (modalEl) {
+                        const modalApi = window.parent && window.parent.bootstrap && window.parent.bootstrap.Modal;
+                        if (modalApi && typeof modalApi.getInstance === 'function') {
+                            const instance = modalApi.getInstance(modalEl) || new modalApi(modalEl);
+                            instance.hide();
+                            return;
+                        }
+                        const dismissBtn = modalEl.querySelector('[data-bs-dismiss="modal"], .btn-close');
+                        if (dismissBtn instanceof HTMLElement) {
+                            dismissBtn.click();
+                            return;
+                        }
+                    }
+                } catch (_) {}
+                if (window.history.length > 1) {
+                    window.history.back();
+                }
+            }
+
+            function buildDigitalViewer(state) {
+                const scratch = document.createElement('div');
+                scratch.innerHTML = window.BarangayIdDigital.render(state, {
+                    showIntro: false,
+                    frontLabel: 'Front Template',
+                    backLabel: 'Back Template',
+                });
+
+                const renderedCards = scratch.querySelectorAll('.barangay-id-card');
+                const frontCard = renderedCards[0] || null;
+                const backCard = renderedCards[1] || null;
+
+                if (!frontCard || !backCard) {
+                    wrap.className = '';
+                    wrap.innerHTML = scratch.innerHTML;
+                    return;
+                }
+
+                wrap.className = 'digital-id-viewer';
+                wrap.innerHTML = `
+                    <div class="digital-id-viewer__header">
+                        <div class="digital-id-viewer__status">
+                            <span class="digital-id-viewer__status-icon"><i class="fa-regular fa-id-card"></i></span>
+                            <div class="digital-id-viewer__status-text">
+                                <p class="digital-id-viewer__status-title">Digital ID is <span>Active</span></p>
+                                <p class="digital-id-viewer__status-copy">This resident-side view mirrors the released Barangay ID and keeps the front, back, and QR verification handy.</p>
+                            </div>
+                        </div>
+                        <div class="digital-id-viewer__chips">
+                            <span class="digital-id-viewer__chip"><i class="fa-solid fa-id-card-clip"></i>${state.cardNumber || '-'}</span>
+                            <span class="digital-id-viewer__chip"><i class="fa-solid fa-circle-check"></i>Ready for verification</span>
+                        </div>
+                    </div>
+                    <div class="digital-id-viewer__stage" data-digital-id-stage></div>
+                    <div class="digital-id-viewer__footer">
+                        <button type="button" class="digital-id-viewer__btn digital-id-viewer__btn--close" data-digital-close>Close</button>
+                        <div class="digital-id-viewer__footer-actions">
+                            <button type="button" class="digital-id-viewer__btn digital-id-viewer__btn--mode" data-digital-mode="front"><i class="fa-regular fa-id-card me-2"></i>Frontside</button>
+                            <button type="button" class="digital-id-viewer__btn digital-id-viewer__btn--mode" data-digital-mode="back"><i class="fa-solid fa-right-left me-2"></i>Backside</button>
+                            <button type="button" class="digital-id-viewer__btn digital-id-viewer__btn--mode" data-digital-mode="qr"><i class="fa-solid fa-qrcode me-2"></i>QR Code</button>
+                        </div>
+                    </div>
+                `;
+
+                const stage = wrap.querySelector('[data-digital-id-stage]');
+                const modeButtons = Array.from(wrap.querySelectorAll('[data-digital-mode]'));
+                const closeBtn = wrap.querySelector('[data-digital-close]');
+
+                const setButtonState = (activeMode) => {
+                    modeButtons.forEach((button) => {
+                        const isActive = String(button.getAttribute('data-digital-mode') || '') === activeMode;
+                        button.classList.toggle('is-active', isActive);
+                        button.classList.toggle('is-inactive', !isActive);
+                    });
+                };
+
+                const showCard = (card) => {
+                    stage.replaceChildren();
+                    const frame = document.createElement('div');
+                    frame.className = 'digital-id-viewer__card-stage';
+                    frame.appendChild(card.cloneNode(true));
+                    stage.appendChild(frame);
+                };
+
+                const showQr = () => {
+                    stage.replaceChildren();
+                    const qrStage = document.createElement('div');
+                    qrStage.className = 'digital-id-viewer__qr-stage';
+                    const qrFrame = document.createElement('div');
+                    qrFrame.className = 'digital-id-viewer__qr-frame';
+
+                    if (state.qrUrl) {
+                        const qrImage = document.createElement('img');
+                        qrImage.src = state.qrUrl;
+                        qrImage.alt = 'Barangay ID QR code';
+                        qrFrame.appendChild(qrImage);
+                    } else {
+                        const placeholder = document.createElement('div');
+                        placeholder.className = 'digital-id-viewer__qr-placeholder';
+                        placeholder.textContent = 'QR code is not available yet.';
+                        qrFrame.appendChild(placeholder);
+                    }
+
+                    const caption = document.createElement('p');
+                    caption.className = 'digital-id-viewer__qr-caption';
+                    caption.textContent = state.qrUrl
+                        ? 'Use this QR code when staff or offices need to verify the released Barangay ID.'
+                        : 'The released Barangay ID QR will appear here once it is available for verification.';
+
+                    qrStage.appendChild(qrFrame);
+                    qrStage.appendChild(caption);
+                    stage.appendChild(qrStage);
+                };
+
+                const renderMode = (mode) => {
+                    setButtonState(mode);
+                    if (mode === 'back') {
+                        showCard(backCard);
+                        return;
+                    }
+                    if (mode === 'qr') {
+                        showQr();
+                        return;
+                    }
+                    showCard(frontCard);
+                };
+
+                closeBtn?.addEventListener('click', closeDigitalIdView);
+                modeButtons.forEach((button) => {
+                    button.addEventListener('click', () => {
+                        renderMode(String(button.getAttribute('data-digital-mode') || 'front'));
+                    });
+                });
+
+                renderMode('front');
+            }
 
             function renderDigitalCard(profileImageUrl = '') {
                 const state = window.BarangayIdDigital.createState({
@@ -375,14 +720,7 @@ $serializedRow = $requestRow ? [
                     profileImageUrl,
                     fallbackProfileImageUrl: `${appBase}/Images/Profile-Placeholder.png`,
                 });
-                wrap.className = '';
-                wrap.innerHTML = window.BarangayIdDigital.render(state, {
-                    eyebrow: embedMode ? 'Digital Barangay ID' : 'Resident Digital Barangay ID',
-                    helper: embedMode ? '' : 'Use the PDF buttons above if you need the printable issued version.',
-                    showIntro: !embedMode,
-                    frontLabel: 'Front Template',
-                    backLabel: 'Back Template',
-                });
+                buildDigitalViewer(state);
             }
 
             renderDigitalCard(initialProfileImageUrl);

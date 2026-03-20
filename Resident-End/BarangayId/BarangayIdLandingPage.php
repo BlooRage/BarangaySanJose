@@ -8,6 +8,31 @@ $frontTemplateDiskPath = realpath(__DIR__ . '/../Certificates/BarangayID/FRONT_E
 $backTemplateDiskPath = realpath(__DIR__ . '/../Certificates/BarangayID/BACK_EMPTY.png');
 $frontTemplateUrl = appUrl($frontTemplateRelative) . '?v=' . (string)(($frontTemplateDiskPath && is_file($frontTemplateDiskPath)) ? @filemtime($frontTemplateDiskPath) : time());
 $backTemplateUrl = appUrl($backTemplateRelative) . '?v=' . (string)(($backTemplateDiskPath && is_file($backTemplateDiskPath)) ? @filemtime($backTemplateDiskPath) : time());
+$latestDigitalIdRequestId = '';
+if (isset($conn) && $conn instanceof mysqli && isset($userId)) {
+    $sql = "
+        SELECT request_id
+        FROM documentrequesttbl
+        WHERE resident_user_id = ?
+          AND LOWER(TRIM(COALESCE(document_type, ''))) = 'barangay id'
+          AND LOWER(TRIM(COALESCE(stage, ''))) = 'completed'
+        ORDER BY COALESCE(release_timestamp, completed_at, ready_at, submitted_at, request_timestamp) DESC, request_id DESC
+        LIMIT 1
+    ";
+    $stmtDigitalId = $conn->prepare($sql);
+    if ($stmtDigitalId) {
+        $stmtDigitalId->bind_param('s', $userId);
+        $stmtDigitalId->execute();
+        $stmtDigitalId->bind_result($resolvedRequestId);
+        if ($stmtDigitalId->fetch() && is_string($resolvedRequestId)) {
+            $latestDigitalIdRequestId = trim($resolvedRequestId);
+        }
+        $stmtDigitalId->close();
+    }
+}
+$digitalIdViewUrl = $latestDigitalIdRequestId !== ''
+    ? appUrl('Resident-End/BarangayId/DigitalId.php?request_id=' . rawurlencode($latestDigitalIdRequestId))
+    : '';
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -58,14 +83,38 @@ $backTemplateUrl = appUrl($backTemplateRelative) . '?v=' . (string)(($backTempla
         .apply-section {
             padding-top: 12px;
         }
+        .apply-actions {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 12px;
+            flex-wrap: wrap;
+        }
         .apply-btn {
             min-width: 180px;
+        }
+        .digital-id-btn {
+            min-width: 210px;
+            background: linear-gradient(180deg, #2553be 0%, #143d9d 100%);
+            color: #fff;
+            border: 0;
+            box-shadow: 0 14px 28px rgba(37, 83, 190, 0.18);
+        }
+        .digital-id-btn:hover {
+            color: #fff;
+            box-shadow: 0 18px 30px rgba(37, 83, 190, 0.22);
         }
         .apply-note {
             margin-top: 10px;
             font-size: 0.92rem;
             font-style: italic;
             color: #6b7280;
+        }
+        .digital-id-note {
+            margin-top: 10px;
+            font-size: 0.92rem;
+            font-weight: 600;
+            color: #2150b9;
         }
         .id-sample-img {
             box-shadow: 0 10px 24px rgba(0, 0, 0, 0.18);
@@ -87,6 +136,7 @@ $backTemplateUrl = appUrl($backTemplateRelative) . '?v=' . (string)(($backTempla
                 </div>
                 <?php
                 $barangayIdNavActive = 'overview';
+                $barangayIdNavRequestId = $latestDigitalIdRequestId;
                 include __DIR__ . '/includes/barangay_id_nav.php';
                 ?>
                 <hr>
@@ -130,7 +180,15 @@ $backTemplateUrl = appUrl($backTemplateRelative) . '?v=' . (string)(($backTempla
                 </div>
 
                 <div class="text-center apply-section mt-4">
-                    <button class="btn apply-btn" type="button" onclick="location.href='<?= htmlspecialchars(appUrl('Resident-End/BarangayId/BarangayIdForm.php')) ?>'">Apply Now</button>
+                    <div class="apply-actions">
+                        <button class="btn apply-btn" type="button" onclick="location.href='<?= htmlspecialchars(appUrl('Resident-End/BarangayId/BarangayIdForm.php')) ?>'">Apply Now</button>
+                        <?php if ($digitalIdViewUrl !== ''): ?>
+                            <button class="btn digital-id-btn" type="button" onclick="location.href='<?= htmlspecialchars($digitalIdViewUrl) ?>'">View Digital ID</button>
+                        <?php endif; ?>
+                    </div>
+                    <?php if ($digitalIdViewUrl !== ''): ?>
+                        <p class="digital-id-note mb-0">Your latest released Barangay ID is already available online.</p>
+                    <?php endif; ?>
                     <p class="apply-note mb-0">Renewal is free every 2 years. Renewal of lost Barangay ID will cost Php50.00</p>
                 </div>
             </div>

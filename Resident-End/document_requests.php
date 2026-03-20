@@ -979,14 +979,15 @@ require_once __DIR__ . '/includes/resident_access_guard.php';
         const id = String(btn.getAttribute('data-issued') || '');
         const row = itemById.get(id);
         const downloadUrl = `${endpoint}?action=download_issued&request_id=${encodeURIComponent(id)}`;
+        const fullDigitalIdUrl = `${digitalBarangayIdPage}?request_id=${encodeURIComponent(id)}&_ts=${Date.now()}`;
         const viewUrl = row && isBarangayIdRequest(row)
           ? `${digitalBarangayIdPage}?request_id=${encodeURIComponent(id)}&embed=1&_ts=${Date.now()}`
           : `${endpoint}?action=view_issued&request_id=${encodeURIComponent(id)}&_ts=${Date.now()}`;
         openFileViewerModal({
           title: row && isBarangayIdRequest(row) ? 'Digital Barangay ID' : 'Issued Document (PDF)',
           viewUrl,
-          linkText: 'Download PDF',
-          linkUrl: downloadUrl,
+          linkText: row && isBarangayIdRequest(row) ? 'Open Full Page' : 'Download PDF',
+          linkUrl: row && isBarangayIdRequest(row) ? fullDigitalIdUrl : downloadUrl,
           isPdf: true
         });
       });
@@ -1007,7 +1008,7 @@ require_once __DIR__ . '/includes/resident_access_guard.php';
       const proofBtn = r.payment_proof_path
         ? `<button class="btn btn-sm btn-outline-dark me-1" data-proof="${escapeHtml(r.request_id)}">View Payment</button>`
         : '';
-      const issuedBtn = `<button class="btn btn-sm btn-success" data-issued="${escapeHtml(r.request_id)}">View Document</button>`;
+      const issuedBtn = `<button class="btn btn-sm btn-success" data-issued="${escapeHtml(r.request_id)}">${isBarangayIdRequest(r) ? 'View Digital ID' : 'View Document'}</button>`;
       if (r.stage === 'for_payment' || r.stage === 'payment_rejected') {
         action = paymentActions(r);
       } else if (r.stage === 'completed') {
@@ -1158,7 +1159,7 @@ require_once __DIR__ . '/includes/resident_access_guard.php';
         const proofBtn = r.payment_proof_path
           ? `<button class="btn btn-sm btn-outline-dark me-1" data-proof="${escapeHtml(r.request_id)}">View Payment</button>`
           : '';
-        const issuedBtn = `<button class="btn btn-sm btn-success" data-issued="${escapeHtml(r.request_id)}">View Document</button>`;
+        const issuedBtn = `<button class="btn btn-sm btn-success" data-issued="${escapeHtml(r.request_id)}">${isBarangayIdRequest(r) ? 'View Digital ID' : 'View Document'}</button>`;
         if (r.stage === 'for_payment' || r.stage === 'payment_rejected') {
           action = paymentActions(r);
         } else if (r.stage === 'completed') {
@@ -1232,14 +1233,15 @@ require_once __DIR__ . '/includes/resident_access_guard.php';
           const id = String(btn.getAttribute('data-issued') || '');
           const row = itemById.get(id);
           const downloadUrl = `${endpoint}?action=download_issued&request_id=${encodeURIComponent(id)}`;
+          const fullDigitalIdUrl = `${digitalBarangayIdPage}?request_id=${encodeURIComponent(id)}&_ts=${Date.now()}`;
           const viewUrl = row && isBarangayIdRequest(row)
             ? `${digitalBarangayIdPage}?request_id=${encodeURIComponent(id)}&embed=1&_ts=${Date.now()}`
             : `${endpoint}?action=view_issued&request_id=${encodeURIComponent(id)}&_ts=${Date.now()}`;
           openFileViewerModal({
             title: row && isBarangayIdRequest(row) ? 'Digital Barangay ID' : 'Issued Document (PDF)',
             viewUrl,
-            linkText: 'Download PDF',
-            linkUrl: downloadUrl,
+            linkText: row && isBarangayIdRequest(row) ? 'Open Full Page' : 'Download PDF',
+            linkUrl: row && isBarangayIdRequest(row) ? fullDigitalIdUrl : downloadUrl,
             isPdf: true
           });
         });

@@ -1,7 +1,7 @@
 (() => {
   const PAGE_WIDTH_MM = 85.6;
   const PAGE_HEIGHT_MM = 54.1;
-  const TEMPLATE_ASSET_VERSION = '20260320-04';
+  const TEMPLATE_ASSET_VERSION = '20260320-05';
 
   function esc(value) {
     return String(value ?? '').replace(/[&<>"']/g, (match) => ({
@@ -394,12 +394,12 @@
       firstNonEmpty([payload.suffix_name, payload.suffix, residentProfile.suffix])
     ) || upper(firstNonEmpty([payload.resident_name, row.resident_name]), 'RESIDENT');
 
-    const fullAddress = upper(stripAreaFromAddress(firstNonEmpty([
+    const fullAddress = upper(firstNonEmpty([
       payload.full_address,
       payload.full_address_display,
       payload.address,
       residentProfile.full_address
-    ])));
+    ]));
     const birthdate = upper(formatDisplayDate(firstNonEmpty([
       payload.birthdate,
       payload.date_of_birth,
