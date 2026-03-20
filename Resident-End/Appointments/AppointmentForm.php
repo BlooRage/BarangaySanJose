@@ -62,9 +62,8 @@ $feedbackType = !empty($_GET['success']) ? 'success' : (!empty($_GET['error']) ?
 $feedbackMessage = !empty($_GET['success'])
     ? (string)$_GET['success']
     : (!empty($_GET['error']) ? (string)$_GET['error'] : '');
-$currentMonthStartDate = date('Y-m-01');
 $minAppointmentDate = date('Y-m-d', strtotime('+1 day'));
-$maxAppointmentDate = date('Y-m-t');
+$maxAppointmentDate = date('Y-12-31');
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -119,7 +118,7 @@ $maxAppointmentDate = date('Y-m-t');
         }
         .appointment-guide {
             max-width: 1180px;
-            margin: 0 auto 1.75rem;
+            margin: 1.1rem auto 1.5rem;
             border: 1px solid #f2d9c2;
             border-radius: 16px;
             background: linear-gradient(180deg, #fffaf6 0%, #fff7ef 100%);
@@ -142,7 +141,7 @@ $maxAppointmentDate = date('Y-m-t');
         h2.section-title {
             font-size: 1.35rem;
             font-weight: 600;
-            margin-top: 32px;
+            margin-top: 12px;
             margin-bottom: 24px;
         }
         .form-divider {
@@ -177,12 +176,11 @@ $maxAppointmentDate = date('Y-m-t');
                 </a>
                 <h1 class="form-title m-0">Appointment Form</h1>
             </div>
-            <p class="form-subtitle">Schedule a barangay visit using the same resident form layout used across other requests and applications.</p>
             <p class="form-subtitle">All fields marked with <span class="required-asterisk">*</span> are required</p>
 
             <div class="appointment-guide">
                 <div class="appointment-guide-title">Before You Submit</div>
-                <p class="appointment-guide-text">Choose a date within the current month and a time between 9:01 AM and 4:59 PM. If you select <strong>Other</strong> as the subject, include a short specific description.</p>
+                <p class="appointment-guide-text">Choose a future date within the current year and a time between 9:01 AM and 4:59 PM. If you select <strong>Other</strong> as the subject, include a short specific description.</p>
             </div>
 
             <form class="page-form" method="POST" action="<?= htmlspecialchars(appUrl('/PhpFiles/Resident-End/submitAppointment.php'), ENT_QUOTES, 'UTF-8') ?>">
@@ -193,7 +191,6 @@ $maxAppointmentDate = date('Y-m-t');
                                 <?php echo htmlspecialchars($feedbackMessage, ENT_QUOTES, 'UTF-8'); ?>
                             </div>
                         <?php endif; ?>
-                        <div class="section-kicker"><i class="fa-regular fa-calendar-check"></i> Appointment Request</div>
                         <h2 class="section-title text-center text-dark">Resident Information</h2>
 
                         <div class="form-row pt-0">
@@ -271,7 +268,7 @@ $maxAppointmentDate = date('Y-m-t');
                         <div class="form-row two-col-row">
                             <div>
                                 <label class="top-label">Date of Appointment <span class="required-asterisk">*</span></label>
-                                <input type="date" class="form-control" id="appointmentDate" name="appointment_date" min="<?php echo htmlspecialchars($minAppointmentDate, ENT_QUOTES, 'UTF-8'); ?>" max="<?php echo htmlspecialchars($maxAppointmentDate, ENT_QUOTES, 'UTF-8'); ?>" data-month-start="<?php echo htmlspecialchars($currentMonthStartDate, ENT_QUOTES, 'UTF-8'); ?>" data-month-end="<?php echo htmlspecialchars($maxAppointmentDate, ENT_QUOTES, 'UTF-8'); ?>" value="<?php echo htmlspecialchars($formValues['appointment_date'], ENT_QUOTES, 'UTF-8'); ?>" required>
+                                <input type="date" class="form-control" id="appointmentDate" name="appointment_date" min="<?php echo htmlspecialchars($minAppointmentDate, ENT_QUOTES, 'UTF-8'); ?>" max="<?php echo htmlspecialchars($maxAppointmentDate, ENT_QUOTES, 'UTF-8'); ?>" data-year-end="<?php echo htmlspecialchars($maxAppointmentDate, ENT_QUOTES, 'UTF-8'); ?>" value="<?php echo htmlspecialchars($formValues['appointment_date'], ENT_QUOTES, 'UTF-8'); ?>" required>
                                 <div id="appointmentDateError" class="text-danger small mt-1 d-none" aria-live="polite"></div>
                             </div>
                             <div>
@@ -349,20 +346,14 @@ $maxAppointmentDate = date('Y-m-t');
                 day: "numeric",
             });
             const currentYear = today.getFullYear();
-            const currentMonth = today.getMonth();
-            const currentMonthStartIso = appointmentDateInput?.dataset.monthStart || `${todayIso.slice(0, 7)}-01`;
-            const endOfMonthIso = appointmentDateInput?.dataset.monthEnd || new Date(currentYear, currentMonth + 1, 0).toISOString().split("T")[0];
-            const currentMonthDisplay = today.toLocaleDateString(undefined, {
-                year: "numeric",
-                month: "long",
-            });
+            const endOfYearIso = appointmentDateInput?.dataset.yearEnd || `${currentYear}-12-31`;
 
             const validateAppointmentDate = () => {
                 if (!appointmentDateInput) return true;
 
                 const value = String(appointmentDateInput.value || "").trim();
                 const isTodayOrPast = value !== "" && value <= todayIso;
-                const isOutsideCurrentMonth = value !== "" && (value < currentMonthStartIso || value > endOfMonthIso);
+                const isOutsideCurrentYear = value !== "" && value > endOfYearIso;
 
                 if (isTodayOrPast) {
                     const msg = `Incorrect Input. Date must be after ${todayDisplay}`;
@@ -374,8 +365,8 @@ $maxAppointmentDate = date('Y-m-t');
                     return false;
                 }
 
-                if (isOutsideCurrentMonth) {
-                    const msg = `Incorrect Input. Date must be within ${currentMonthDisplay}`;
+                if (isOutsideCurrentYear) {
+                    const msg = `Incorrect Input. Date must be within ${currentYear}`;
                     appointmentDateInput.setCustomValidity(msg);
                     if (appointmentDateError) {
                         appointmentDateError.textContent = msg;
@@ -392,13 +383,13 @@ $maxAppointmentDate = date('Y-m-t');
                 return true;
             };
 
-            const enforceCurrentMonthDate = () => {
+            const enforceCurrentYearDate = () => {
                 if (!appointmentDateInput) return;
 
                 const value = String(appointmentDateInput.value || "").trim();
                 if (value === "") return;
 
-                if (value < currentMonthStartIso || value > endOfMonthIso) {
+                if (value > endOfYearIso) {
                     appointmentDateInput.value = "";
                 }
             };
@@ -468,7 +459,7 @@ $maxAppointmentDate = date('Y-m-t');
             form.addEventListener("change", updateState);
             appointmentDateInput?.addEventListener("input", updateState);
             appointmentDateInput?.addEventListener("change", () => {
-                enforceCurrentMonthDate();
+                enforceCurrentYearDate();
                 updateState();
             });
             appointmentDateInput?.addEventListener("keyup", validateAppointmentDate);

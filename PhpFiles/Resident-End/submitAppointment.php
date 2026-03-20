@@ -174,16 +174,15 @@ if ($appointmentDate === '' || $appointmentTime === '' || $purpose === '') {
 $timezone = new DateTimeZone(date_default_timezone_get() ?: 'Asia/Manila');
 $now = new DateTimeImmutable('now', $timezone);
 $minAppointmentDate = $now->modify('+1 day')->format('Y-m-d');
-$monthStart = $now->format('Y-m-01');
-$monthEnd = $now->format('Y-m-t');
+$yearEnd = $now->format('Y-12-31');
 
 $schedule = DateTimeImmutable::createFromFormat('Y-m-d H:i', $appointmentDate . ' ' . $appointmentTime, $timezone);
 if (!$schedule || $schedule->format('Y-m-d') !== $appointmentDate || $schedule->format('H:i') !== $appointmentTime) {
     appointmentRedirectWithMessage('error', 'Appointment date or time is invalid.');
 }
 
-if ($appointmentDate < $minAppointmentDate || $appointmentDate < $monthStart || $appointmentDate > $monthEnd) {
-    appointmentRedirectWithMessage('error', 'Date of appointment must be within the current month and after today.');
+if ($appointmentDate < $minAppointmentDate || $appointmentDate > $yearEnd) {
+    appointmentRedirectWithMessage('error', 'Date of appointment must be after today and within the current year.');
 }
 
 if ($appointmentTime < '09:01' || $appointmentTime > '16:59') {

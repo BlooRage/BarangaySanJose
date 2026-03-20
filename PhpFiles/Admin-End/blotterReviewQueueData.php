@@ -101,7 +101,7 @@ function formatDisplayTimestamp(?string $value): string
     }
     try {
         $date = new DateTime($value);
-        return $date->format('M d, Y h:iA');
+        return $date->format('M d, Y h:i A');
     } catch (Throwable $e) {
         return $value;
     }

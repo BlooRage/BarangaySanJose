@@ -776,30 +776,35 @@ h2.section-title {
     overflow: visible;
 }
 
-.resident-masterlist-shell .status-filter-btn[data-filter="ALL"] {
+.resident-masterlist-shell .status-filter-btn[data-filter="ALL"],
+.resident-masterlist-shell .status-filter-btn[data-filter=""] {
     color: #0d6efd;
     border-color: #0d6efd;
     background: #fff;
 }
 
-.resident-masterlist-shell .status-filter-btn[data-filter="VerifiedResident"],
-.resident-masterlist-shell .status-filter-btn[data-filter="NotVerified"],
-.resident-masterlist-shell .status-filter-btn[data-filter="PendingVerification"] {
+.resident-masterlist-shell .status-filter-btn:not([data-filter="ALL"]):not([data-filter=""]) {
     color: #495057;
-    border-color: #6c757d;
+    border-color: #495057;
     background: #fff;
 }
 
-.resident-masterlist-shell .status-filter-btn[data-filter="ALL"].active {
+.resident-masterlist-shell .status-filter-btn:not([data-filter="ALL"]):not([data-filter=""]):hover,
+.resident-masterlist-shell .status-filter-btn:not([data-filter="ALL"]):not([data-filter=""]):focus-visible {
+    color: #343a40;
+    border-color: #343a40;
+    background: #f8f9fa;
+}
+
+.resident-masterlist-shell .status-filter-btn[data-filter="ALL"].active,
+.resident-masterlist-shell .status-filter-btn[data-filter=""].active {
     color: #fff !important;
     background-color: #0d6efd !important;
     border-color: #0d6efd !important;
     font-weight: 700;
 }
 
-.resident-masterlist-shell .status-filter-btn[data-filter="VerifiedResident"].active,
-.resident-masterlist-shell .status-filter-btn[data-filter="NotVerified"].active,
-.resident-masterlist-shell .status-filter-btn[data-filter="PendingVerification"].active {
+.resident-masterlist-shell .status-filter-btn:not([data-filter="ALL"]):not([data-filter=""]).active {
     color: #fff !important;
     background-color: #495057 !important;
     border-color: #495057 !important;

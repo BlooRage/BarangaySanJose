@@ -13,7 +13,90 @@ require_once __DIR__ . "/../includes/admin_guard.php";
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="../../CSS-Styles/Admin-End-CSS/AdminDashboardStyle.css">
     <link rel="stylesheet" href="../../CSS-Styles/Admin-End-CSS/ResidentMasterlistStyle.css?v=20260227-2">
-    <link rel="stylesheet" href="../../CSS-Styles/Admin-End-CSS/BlotterMangementStyle.css?v=20260305-1">
+    <link rel="stylesheet" href="../../CSS-Styles/Admin-End-CSS/BlotterMangementStyle.css?v=20260320-2">
+    <style>
+        body {
+            overflow-x: hidden;
+        }
+
+        #main-display {
+            min-width: 0;
+            overflow-x: hidden;
+        }
+
+        #div-tableContainer {
+            width: 100%;
+            max-width: 100%;
+            min-width: 0;
+        }
+
+        .blotter-tracker-shell .compact-admin-table-shell {
+            width: 100%;
+            max-width: 100%;
+        }
+
+        #table-appData th,
+        #table-appData td {
+            text-align: left;
+        }
+
+        #viewModal .modal-content {
+            border: 1px solid #e9ecef;
+            border-radius: 16px;
+            overflow: hidden;
+            background: #fff;
+        }
+
+        #viewModal .modal-header,
+        #viewModal .modal-body,
+        #viewModal .modal-footer {
+            padding: 1rem 1.25rem;
+        }
+
+        #viewModal .modal-body {
+            background: #fff;
+        }
+
+        #viewModal .tracker-profile-view {
+            display: grid;
+            gap: 12px;
+        }
+
+        #viewModal .tracker-form-section {
+            border-color: #e78924;
+            margin-top: 0;
+            display: grid;
+            gap: 12px;
+        }
+
+        #viewModal .tracker-form-section-title {
+            margin: 0;
+        }
+
+        #viewModal .tracker-form-grid {
+            gap: 12px;
+        }
+
+        #viewModal .tracker-form-section > .tracker-form-grid + .tracker-form-grid,
+        #viewModal .tracker-form-section > .tracker-form-grid + .tracker-form-field,
+        #viewModal .tracker-form-section > .tracker-form-field + .tracker-form-grid,
+        #viewModal .tracker-form-section > .tracker-form-field + .tracker-form-field {
+            margin-top: 0;
+        }
+
+        #viewModal .tracker-form-field {
+            gap: 6px;
+        }
+
+        #viewModal .tracker-form-label {
+            margin: 0;
+            line-height: 1.2;
+        }
+
+        #viewModal .tracker-form-value {
+            line-height: 1.45;
+        }
+    </style>
 </head>
 <body>
 <div class="d-flex flex-column flex-md-row" style="min-height: 100vh;">
@@ -23,13 +106,16 @@ require_once __DIR__ . "/../includes/admin_guard.php";
         <h2 class="mb-4" style="font-family: 'Charis SIL Bold'; color: #DE710C;">Blotter Review Queue</h2>
         <hr><br>
 
-        <div class="bg-white p-4 rounded-4 shadow-sm border blotter-tracker-shell">
+        <div id="div-tableContainer" class="bg-white p-4 rounded-4 shadow-sm border blotter-tracker-shell resident-masterlist-shell">
             <div class="admin-list-toolbar mb-3 pt-2 flex-wrap">
                 <div class="admin-list-tabs">
-                    <button class="btn btn-outline-primary btn-sm status-filter-btn active" type="button" data-filter="">&nbsp;&nbsp;All&nbsp;&nbsp;</button>
-                    <button class="btn btn-outline-secondary btn-sm status-filter-btn" type="button" data-filter="pending">&nbsp;&nbsp;Pending&nbsp;&nbsp;</button>
-                    <button class="btn btn-outline-secondary btn-sm status-filter-btn" type="button" data-filter="approved">&nbsp;&nbsp;Approved&nbsp;&nbsp;</button>
-                    <button class="btn btn-outline-secondary btn-sm status-filter-btn" type="button" data-filter="rejected">&nbsp;&nbsp;Rejected&nbsp;&nbsp;</button>
+                    <button class="btn btn-outline-primary btn-sm status-filter-btn fw-semibold active" type="button" data-filter="">&nbsp;&nbsp;All&nbsp;&nbsp;</button>
+                    <button class="btn btn-outline-secondary btn-sm status-filter-btn fw-semibold" type="button" data-filter="approved">&nbsp;&nbsp;Approved&nbsp;&nbsp;</button>
+                    <button class="btn btn-outline-secondary btn-sm status-filter-btn fw-semibold" type="button" data-filter="rejected">&nbsp;&nbsp;Rejected&nbsp;&nbsp;</button>
+                    <button class="btn btn-outline-secondary btn-sm status-filter-btn fw-semibold has-notif" type="button" data-filter="pending">
+                        &nbsp;&nbsp;Pending
+                        <span id="pendingReviewBadge" class="pending-count-badge d-none">0</span>
+                    </button>
                 </div>
 
                 <div class="admin-list-actions">
@@ -44,8 +130,8 @@ require_once __DIR__ . "/../includes/admin_guard.php";
                 </div>
             </div>
 
-            <div class="table-responsive">
-                <table id="table-appData" class="table align-middle">
+            <div class="table-responsive compact-admin-table-shell">
+                <table id="table-appData" class="table align-middle compact-admin-table compact-admin-table--wide">
                     <thead>
                         <tr class="table-light">
                             <th>Request ID</th>
@@ -69,7 +155,7 @@ require_once __DIR__ . "/../includes/admin_guard.php";
 </div>
 
 <div class="modal fade tracker-profile-modal" id="viewModal" tabindex="-1" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
-    <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable" style="max-width: 1400px; width: 75vw;">
+    <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable" style="max-width: 1500px; width: 75vw;">
         <div class="modal-content">
             <div class="modal-header">
                 <h5 class="modal-title" id="viewModalTitle">Blotter Request Details</h5>
@@ -129,6 +215,6 @@ require_once __DIR__ . "/../includes/admin_guard.php";
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-<script src="../../JS-Script-Files/Admin-End/blotterReviewQueue.js?v=20260316-1"></script>
+<script src="../../JS-Script-Files/Admin-End/blotterReviewQueue.js?v=20260320-1"></script>
 </body>
 </html>
