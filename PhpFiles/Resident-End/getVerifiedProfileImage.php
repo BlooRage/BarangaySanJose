@@ -17,14 +17,16 @@ if (empty($_SESSION['user_id'])) {
 $cacheKey = 'verified_profile_image_cache';
 $cacheTtlSeconds = 300;
 $cachedProfile = $_SESSION[$cacheKey] ?? null;
+$defaultPlaceholderSuffix = '/Images/Profile-Placeholder.png';
 if (is_array($cachedProfile)) {
     $cachedUserId = (string)($cachedProfile['user_id'] ?? '');
     $cachedImage = trim((string)($cachedProfile['profile_image'] ?? ''));
     $cachedAt = (int)($cachedProfile['cached_at'] ?? 0);
+    $isPlaceholderCache = $cachedImage === '' || str_ends_with($cachedImage, $defaultPlaceholderSuffix);
 
     if (
         $cachedUserId === (string)$_SESSION['user_id']
-        && $cachedImage !== ''
+        && !$isPlaceholderCache
         && $cachedAt > 0
         && (time() - $cachedAt) < $cacheTtlSeconds
     ) {
@@ -116,6 +118,72 @@ function toPublicPath($path): ?string {
 }
 }
 
+if (!function_exists('resolveResident2x2Path')) {
+function resolveResident2x2Path(mysqli $conn, string $residentId): string {
+    $residentId = trim($residentId);
+    if ($residentId === '') {
+        return '';
+    }
+
+    $sql = "
+        SELECT uf.file_path
+        FROM unifiedfileattachmenttbl uf
+        LEFT JOIN documenttypelookuptbl dt
+            ON dt.document_type_id = uf.document_type_id
+        LEFT JOIN statuslookuptbl sv
+            ON sv.status_id = uf.status_id_verify
+        LEFT JOIN resident_edit_requesttbl rer
+            ON uf.source_type = 'ResidentEditRequest'
+           AND rer.request_id = uf.source_id
+        LEFT JOIN statuslookuptbl rs
+            ON rs.status_id = rer.status_id
+        WHERE LOWER(COALESCE(dt.document_type_name, '')) = '2x2 picture'
+          AND (
+                LOWER(COALESCE(dt.document_category, 'residentprofiling')) = 'residentprofiling'
+                OR LOWER(COALESCE(dt.document_category, '')) = 'editrequest'
+                OR dt.document_category IS NULL
+              )
+          AND (
+                (
+                    uf.source_type IN ('ResidentProfiling', 'RESIDENT_PROFILE')
+                    AND uf.source_id = ?
+                )
+                OR
+                (
+                    uf.source_type = 'ResidentEditRequest'
+                    AND rer.resident_id = ?
+                    AND rer.request_type = 'profile'
+                )
+              )
+        ORDER BY
+            CASE
+                WHEN uf.source_type = 'ResidentEditRequest'
+                     AND LOWER(COALESCE(rs.status_name, '')) = 'approvedrequest' THEN 0
+                WHEN uf.source_type IN ('ResidentProfiling', 'RESIDENT_PROFILE')
+                     AND LOWER(COALESCE(sv.status_name, '')) IN ('verified', 'approved') THEN 0
+                WHEN uf.source_type IN ('ResidentProfiling', 'RESIDENT_PROFILE') THEN 1
+                ELSE 2
+            END,
+            uf.upload_timestamp DESC,
+            uf.attachment_id DESC
+        LIMIT 1
+    ";
+
+    $stmt = $conn->prepare($sql);
+    if (!$stmt) {
+        return '';
+    }
+
+    $stmt->bind_param('ss', $residentId, $residentId);
+    $stmt->execute();
+    $stmt->bind_result($resolvedPath);
+    $path = ($stmt->fetch() && is_string($resolvedPath)) ? trim($resolvedPath) : '';
+    $stmt->close();
+
+    return $path;
+}
+}
+
 if (!function_exists('publicPathExists')) {
 function publicPathExists(?string $publicPath): bool {
     global $baseUrl;
@@ -165,48 +233,12 @@ if (isset($conn) && $conn instanceof mysqli) {
 }
 
 if ($residentId !== '' && isset($conn) && $conn instanceof mysqli) {
-    $stmtPic = $conn->prepare("
-        SELECT uf.file_path
-        FROM unifiedfileattachmenttbl uf
-        INNER JOIN documenttypelookuptbl dt
-            ON uf.document_type_id = dt.document_type_id
-        LEFT JOIN statuslookuptbl s
-            ON uf.status_id_verify = s.status_id
-        LEFT JOIN resident_edit_requesttbl rer
-            ON uf.source_type = 'ResidentEditRequest'
-           AND rer.request_id = uf.source_id
-        LEFT JOIN statuslookuptbl rs
-            ON rer.status_id = rs.status_id
-        WHERE LOWER(dt.document_type_name) = LOWER('2x2 Picture')
-          AND (dt.document_category = 'ResidentProfiling' OR dt.document_category = 'EditRequest' OR dt.document_category IS NULL)
-          AND (
-                (
-                    uf.source_type IN ('ResidentProfiling', 'RESIDENT_PROFILE')
-                    AND uf.source_id = ?
-                    AND (s.status_name = 'Verified' OR s.status_name = 'Approved')
-                )
-                OR
-                (
-                    uf.source_type = 'ResidentEditRequest'
-                    AND rer.resident_id = ?
-                    AND rer.request_type = 'profile'
-                    AND rs.status_name = 'ApprovedRequest'
-                )
-          )
-        ORDER BY uf.upload_timestamp DESC, uf.attachment_id DESC
-        LIMIT 1
-    ");
-    if ($stmtPic) {
-        $stmtPic->bind_param("ss", $residentId, $residentId);
-        $stmtPic->execute();
-        $stmtPic->bind_result($verifiedPicPath);
-        if ($stmtPic->fetch() && !empty($verifiedPicPath)) {
-            $publicPath = toPublicPath($verifiedPicPath);
-            if (!empty($publicPath) && publicPathExists($publicPath)) {
-                $profileImage = $publicPath;
-            }
+    $verifiedPicPath = resolveResident2x2Path($conn, $residentId);
+    if ($verifiedPicPath !== '') {
+        $publicPath = toPublicPath($verifiedPicPath);
+        if (!empty($publicPath) && publicPathExists($publicPath)) {
+            $profileImage = $publicPath;
         }
-        $stmtPic->close();
     }
 }
 

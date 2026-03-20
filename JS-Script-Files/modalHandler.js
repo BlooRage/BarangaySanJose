@@ -4,7 +4,7 @@
   }
 
   const nativeAlert = typeof window.alert === "function" ? window.alert.bind(window) : () => {};
-  const MODAL_VERSION = "20260318-03";
+  const MODAL_VERSION = "20260320-02";
   const MODAL_ID = "universalModal";
   const STYLESHEET_ID = "universalModalStylesheet";
   const OBSERVER_FLAG = "__universalModalObserverBound";
@@ -308,16 +308,32 @@
     if (alertEl.classList.contains("d-none")) return false;
     if (alertEl.hidden) return false;
 
+    let current = alertEl;
+    while (current instanceof HTMLElement) {
+      if (current.hidden || current.classList.contains("d-none")) {
+        return false;
+      }
+
+      const currentStyle = window.getComputedStyle(current);
+      if (currentStyle.display === "none" || currentStyle.visibility === "hidden") {
+        return false;
+      }
+
+      current = current.parentElement;
+    }
+
     const style = window.getComputedStyle(alertEl);
     if (style.display === "none" || style.visibility === "hidden") return false;
+    if (style.opacity === "0") return false;
+    if (alertEl.getClientRects().length === 0) return false;
     if (!String(alertEl.textContent || "").trim()) return false;
 
     return true;
   }
 
-  function isPageLevelAlert(alertEl) {
-    if (alertEl.dataset.modalUpgrade === "true") {
-      return true;
+  function shouldUpgradeAlert(alertEl) {
+    if (!(alertEl instanceof HTMLElement)) {
+      return false;
     }
     if (alertEl.dataset.modalInline === "true") {
       return false;
@@ -325,7 +341,7 @@
     if (alertEl.closest(".modal")) {
       return false;
     }
-    return true;
+    return alertEl.dataset.modalUpgrade === "true";
   }
 
   function alertSignature(alertEl) {
@@ -340,7 +356,7 @@
   }
 
   function upgradeAlertElement(alertEl) {
-    if (!isAlertVisible(alertEl) || !isPageLevelAlert(alertEl)) {
+    if (!shouldUpgradeAlert(alertEl) || !isAlertVisible(alertEl)) {
       return;
     }
 

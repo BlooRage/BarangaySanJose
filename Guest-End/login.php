@@ -44,8 +44,8 @@ if (!empty($_SESSION['user_id']) && empty($_SESSION['role'])) {
     </script>
 
     <!-- ✅ OLD ORDER (keep this) -->
-    <script src="../JS-Script-Files/loginScripts.js?v=20260319-otpfix2" defer></script>
-    <script src="../JS-Script-Files/modalHandler.js" defer></script>
+    <script src="../JS-Script-Files/loginScripts.js?v=20260320-inactive-modal1" defer></script>
+    <script src="../JS-Script-Files/modalHandler.js?v=20260320-01" defer></script>
   </head>
 
   <body>
@@ -66,7 +66,9 @@ if (!empty($_SESSION['user_id']) && empty($_SESSION['role'])) {
             <li class="nav-item mx-lg-3"><a class="nav-link" href="<?= htmlspecialchars(appUrl('/news'), ENT_QUOTES, 'UTF-8') ?>">News</a></li>
             <li class="nav-item mx-lg-3"><a class="nav-link" href="<?= htmlspecialchars(appUrl('/faq'), ENT_QUOTES, 'UTF-8') ?>">FAQ</a></li>
             <li class="nav-item mx-lg-3"><a class="nav-link" href="<?= htmlspecialchars(appUrl('/contact'), ENT_QUOTES, 'UTF-8') ?>">Contact</a></li>
-        <li class="nav-item"><a class="nav-link active" aria-current="page" href="<?= htmlspecialchars(appUrl('/login'), ENT_QUOTES, 'UTF-8') ?>">Login</a></li>
+            <li class="nav-item">
+              <a class="nav-link btn btn-orange text-white px-4 ms-2" href="<?= htmlspecialchars(appUrl('/login'), ENT_QUOTES, 'UTF-8') ?>">Login</a>
+            </li>
           </ul>
         </div>
       </div>
@@ -175,7 +177,7 @@ if (!empty($_SESSION['user_id']) && empty($_SESSION['role'])) {
             <h1 class="mb-1 fs-2 text-center"><strong>Verify Your Account</strong></h1>
             <p class="text-center fs-6 text-muted mb-3">Let's verify your account first.</p>
 
-            <div class="alert alert-warning" role="alert">
+            <div class="alert alert-warning" role="alert" data-modal-inline="true">
               You’ve been inactive for a long time. The system needs to verify your account first.
             </div>
 

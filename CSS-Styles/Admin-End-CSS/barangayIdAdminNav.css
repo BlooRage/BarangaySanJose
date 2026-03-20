@@ -1,0 +1,91 @@
+.barangay-id-admin-nav-shell {
+    display: grid;
+    gap: 0.65rem;
+    margin: 0 0 1.5rem;
+}
+
+.barangay-id-admin-nav-title {
+    margin: 0;
+    font-size: 0.82rem;
+    font-weight: 800;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: #8f5b24;
+}
+
+.barangay-id-admin-nav {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.8rem;
+}
+
+.barangay-id-admin-nav__link {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.7rem;
+    padding: 0.82rem 1.05rem;
+    border-radius: 18px;
+    border: 1px solid #efdbc6;
+    background: linear-gradient(180deg, #fffdf9 0%, #fff6ea 100%);
+    color: #6a4521;
+    text-decoration: none;
+    font-weight: 700;
+    box-shadow: 0 10px 22px rgba(145, 87, 24, 0.08);
+    transition: transform 140ms ease, box-shadow 140ms ease, border-color 140ms ease, background 140ms ease;
+}
+
+.barangay-id-admin-nav__link:hover,
+.barangay-id-admin-nav__link:focus {
+    color: #6a4521;
+    border-color: #e9b37b;
+    background: #fff1de;
+    text-decoration: none;
+    transform: translateY(-1px);
+    box-shadow: 0 14px 26px rgba(145, 87, 24, 0.12);
+}
+
+.barangay-id-admin-nav__link.is-active {
+    color: #ffffff;
+    border-color: #de710c;
+    background: linear-gradient(135deg, #fe993c 0%, #de710c 100%);
+    box-shadow: 0 16px 28px rgba(222, 113, 12, 0.22);
+}
+
+.barangay-id-admin-nav__link.is-active:hover,
+.barangay-id-admin-nav__link.is-active:focus {
+    color: #ffffff;
+    border-color: #de710c;
+    background: linear-gradient(135deg, #fe993c 0%, #de710c 100%);
+}
+
+.barangay-id-admin-nav__icon {
+    width: 1.15rem;
+    text-align: center;
+    flex: 0 0 1.15rem;
+}
+
+.barangay-id-admin-nav__meta {
+    display: grid;
+    gap: 0.12rem;
+}
+
+.barangay-id-admin-nav__label {
+    line-height: 1.1;
+}
+
+.barangay-id-admin-nav__hint {
+    font-size: 0.79rem;
+    font-weight: 600;
+    opacity: 0.84;
+    line-height: 1.2;
+}
+
+@media (max-width: 767.98px) {
+    .barangay-id-admin-nav {
+        flex-direction: column;
+    }
+
+    .barangay-id-admin-nav__link {
+        width: 100%;
+    }
+}

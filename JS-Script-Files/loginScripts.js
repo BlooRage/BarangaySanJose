@@ -90,6 +90,7 @@ let inactiveSession = {
   phone10: "",      // 9XXXXXXXXX (from server)
   redirect: defaultLoginResolveRedirect,
 };
+const inactiveWarningMessage = "You’ve been inactive for a long time. The system needs to verify your account first.";
 
 // ===== Utilities =====
 const toggleActiveForm = (show, hide) => {
@@ -269,6 +270,28 @@ const showStep = (stepId) => {
 
   const el = document.getElementById(stepId);
   if (el) el.classList.add("active");
+};
+
+const showInactiveWarningStep = () => {
+  const openStep = () => showStep("inactive-verify-step");
+
+  if (!window.UniversalModal?.open) {
+    openStep();
+    return;
+  }
+
+  UniversalModal.open({
+    tone: "warning",
+    title: "Warning",
+    message: inactiveWarningMessage,
+    buttons: [
+      {
+        label: "OK",
+        class: "btn btn-warning w-100",
+        onClick: openStep,
+      },
+    ],
+  });
 };
 
 // ===== Form Switching (keeps transitions) =====
@@ -1212,7 +1235,7 @@ if (loginForm) {
         inactiveSession.phoneMasked = data.phone_masked || "+63 •••••• XXXX";
         inactiveSession.redirect = data.redirect || defaultLoginResolveRedirect;
 
-        showStep("inactive-verify-step");
+        showInactiveWarningStep();
         return;
       }
 

@@ -890,6 +890,92 @@ function dra_strip_legacy_base(string $publicPath): string {
     return $publicPath;
 }
 
+function dra_public_asset_path(string $storedPath): string {
+    $storedPath = trim($storedPath);
+    if ($storedPath === '') {
+        return '';
+    }
+    if (preg_match('/^https?:\/\//i', $storedPath)) {
+        return $storedPath;
+    }
+    $relative = trim(dra_strip_legacy_base($storedPath));
+    if ($relative === '') {
+        return '';
+    }
+    return '/' . ltrim($relative, '/');
+}
+
+function dra_resolve_resident_2x2_picture_path(mysqli $conn, string $residentId): string {
+    static $cache = [];
+
+    $residentId = trim($residentId);
+    if ($residentId === '') {
+        return '';
+    }
+    if (array_key_exists($residentId, $cache)) {
+        return $cache[$residentId];
+    }
+
+    $sql = "
+        SELECT uf.file_path
+        FROM unifiedfileattachmenttbl uf
+        LEFT JOIN documenttypelookuptbl dt
+            ON dt.document_type_id = uf.document_type_id
+        LEFT JOIN statuslookuptbl sv
+            ON sv.status_id = uf.status_id_verify
+        LEFT JOIN resident_edit_requesttbl rer
+            ON uf.source_type = 'ResidentEditRequest'
+           AND rer.request_id = uf.source_id
+        LEFT JOIN statuslookuptbl rs
+            ON rs.status_id = rer.status_id
+        WHERE LOWER(COALESCE(dt.document_type_name, '')) = '2x2 picture'
+          AND (
+                LOWER(COALESCE(dt.document_category, 'residentprofiling')) = 'residentprofiling'
+                OR LOWER(COALESCE(dt.document_category, '')) = 'editrequest'
+                OR dt.document_category IS NULL
+              )
+          AND (
+                (
+                    uf.source_type IN ('ResidentProfiling', 'RESIDENT_PROFILE')
+                    AND uf.source_id = ?
+                )
+                OR
+                (
+                    uf.source_type = 'ResidentEditRequest'
+                    AND rer.resident_id = ?
+                    AND rer.request_type = 'profile'
+                )
+              )
+        ORDER BY
+            CASE
+                WHEN uf.source_type = 'ResidentEditRequest'
+                     AND LOWER(COALESCE(rs.status_name, '')) = 'approvedrequest' THEN 0
+                WHEN uf.source_type IN ('ResidentProfiling', 'RESIDENT_PROFILE')
+                     AND LOWER(COALESCE(sv.status_name, '')) IN ('verified', 'approved') THEN 0
+                WHEN uf.source_type IN ('ResidentProfiling', 'RESIDENT_PROFILE') THEN 1
+                ELSE 2
+            END,
+            uf.upload_timestamp DESC,
+            uf.attachment_id DESC
+        LIMIT 1
+    ";
+
+    $stmt = $conn->prepare($sql);
+    if (!$stmt) {
+        $cache[$residentId] = '';
+        return '';
+    }
+
+    $stmt->bind_param('ss', $residentId, $residentId);
+    $stmt->execute();
+    $stmt->bind_result($resolvedPath);
+    $path = ($stmt->fetch() && is_string($resolvedPath)) ? trim($resolvedPath) : '';
+    $stmt->close();
+
+    $cache[$residentId] = $path;
+    return $path;
+}
+
 function dra_h(string $v): string {
     return htmlspecialchars($v, ENT_QUOTES, 'UTF-8');
 }
@@ -1169,7 +1255,7 @@ function dra_barangay_id_template_assets(): array {
         return $resolved;
     }
 
-    $resolved = ['front' => '', 'back' => ''];
+    $resolved = ['front' => '', 'back' => '', 'variant' => ''];
     $baseDir = realpath(__DIR__ . '/../../');
     if ($baseDir === false) {
         return $resolved;
@@ -1177,12 +1263,19 @@ function dra_barangay_id_template_assets(): array {
 
     $candidateSets = [
         [
+            'front' => $baseDir . '/Resident-End/Certificates/BarangayID/FRONT_EMPTY.png',
+            'back' => $baseDir . '/Resident-End/Certificates/BarangayID/BACK_EMPTY.png',
+            'variant' => 'empty',
+        ],
+        [
             'front' => $baseDir . '/Resident-End/Certificates/BarangayID/FRONT.png',
             'back' => $baseDir . '/Resident-End/Certificates/BarangayID/BACK.png',
+            'variant' => 'sample',
         ],
         [
             'front' => $baseDir . '/Images/Barangayid/SAMPLE.png',
             'back' => $baseDir . '/Images/Barangayid/BACK.png',
+            'variant' => 'sample',
         ],
     ];
 
@@ -1190,7 +1283,11 @@ function dra_barangay_id_template_assets(): array {
         $front = (string)($set['front'] ?? '');
         $back = (string)($set['back'] ?? '');
         if ($front !== '' && $back !== '' && is_file($front) && is_file($back)) {
-            $resolved = ['front' => $front, 'back' => $back];
+            $resolved = [
+                'front' => $front,
+                'back' => $back,
+                'variant' => (string)($set['variant'] ?? 'sample'),
+            ];
             break;
         }
     }
@@ -2150,6 +2247,99 @@ function dra_generate_issued_document(array $requestRow): ?string {
                     $pdf->SetXY($x, $y);
                     $pdf->Cell($w, 3.0, $text, 0, 0, $align, false);
                 };
+                $wrapTextToWidth = static function (FPDF $pdf, string $text, float $w) use ($safeSubstr, $safeLen): array {
+                    $text = trim(preg_replace('/\s+/', ' ', $text) ?? $text);
+                    if ($text === '') {
+                        return [];
+                    }
+
+                    $words = preg_split('/\s+/', $text) ?: [$text];
+                    $lines = [];
+                    $current = '';
+
+                    $appendChunk = static function (string $line, string $chunk): string {
+                        return trim($line === '' ? $chunk : ($line . ' ' . $chunk));
+                    };
+
+                    foreach ($words as $word) {
+                        $word = trim((string)$word);
+                        if ($word === '') {
+                            continue;
+                        }
+
+                        $candidate = $appendChunk($current, $word);
+                        if ($current !== '' && $pdf->GetStringWidth($candidate) > $w) {
+                            $lines[] = $current;
+                            $current = '';
+                        }
+
+                        if ($pdf->GetStringWidth($word) <= $w) {
+                            $current = $appendChunk($current, $word);
+                            continue;
+                        }
+
+                        $fragment = '';
+                        for ($i = 0; $i < $safeLen($word); $i++) {
+                            $char = $safeSubstr($word, $i, 1);
+                            $candidateFragment = $fragment . $char;
+                            if ($fragment !== '' && $pdf->GetStringWidth($candidateFragment) > $w) {
+                                $lines[] = $fragment;
+                                $fragment = $char;
+                            } else {
+                                $fragment = $candidateFragment;
+                            }
+                        }
+                        $current = trim($fragment);
+                    }
+
+                    if ($current !== '') {
+                        $lines[] = $current;
+                    }
+
+                    return $lines;
+                };
+                $fitTwoLines = static function (
+                    FPDF $pdf,
+                    string $text,
+                    float $x,
+                    float $y,
+                    float $w,
+                    float $lineHeight = 2.6,
+                    string $style = 'B',
+                    float $maxSize = 6.4,
+                    float $minSize = 4.0
+                ) use ($safeSubstr, $safeLen, $wrapTextToWidth): void {
+                    $text = trim($text);
+                    if ($text === '') {
+                        return;
+                    }
+
+                    $size = $maxSize;
+                    $lines = [];
+                    while ($size >= $minSize) {
+                        $pdf->SetFont('Arial', $style, $size);
+                        $lines = $wrapTextToWidth($pdf, $text, $w);
+                        if (count($lines) <= 2) {
+                            break;
+                        }
+                        $size -= 0.2;
+                    }
+
+                    if (count($lines) > 2) {
+                        $pdf->SetFont('Arial', $style, max($minSize, $size));
+                        $lines = array_slice($lines, 0, 2);
+                        $ellipsis = '...';
+                        $lastLine = trim((string)($lines[1] ?? ''));
+                        while ($lastLine !== '' && $pdf->GetStringWidth($lastLine . $ellipsis) > $w) {
+                            $lastLine = rtrim($safeSubstr($lastLine, 0, max(0, $safeLen($lastLine) - 1)));
+                        }
+                        $lines[1] = $lastLine === '' ? $ellipsis : ($lastLine . $ellipsis);
+                    }
+
+                    $pdf->SetFont('Arial', $style, max($minSize, $size));
+                    $pdf->SetXY($x, $y);
+                    $pdf->MultiCell($w, $lineHeight, implode("\n", $lines), 0, 'L', false);
+                };
                 $coverRect = static function (FPDF $pdf, float $x, float $y, float $w, float $h): void {
                     $pdf->SetFillColor(255, 255, 255);
                     $pdf->Rect($x, $y, $w, $h, 'F');
@@ -2213,7 +2403,7 @@ function dra_generate_issued_document(array $requestRow): ?string {
                     }
                     $validUntil = clone $issuedDateObj;
                     $validUntil->modify('+2 years');
-                    return $upperText($validUntil->format('F Y'));
+                    return $upperText($validUntil->format('m/d/Y'));
                 };
 
                 $lastName = dra_manual_first_non_empty([
@@ -2311,9 +2501,13 @@ function dra_generate_issued_document(array $requestRow): ?string {
                 $cardIdText = $composeCardNumber();
                 $validUntilText = $composeValidUntil();
                 $validityNotice = 'This ID is valid until ' . $validUntilText . ' except when the holder requests for a new one.';
+                $templateVariant = strtolower(trim((string)($templateAssets['variant'] ?? 'sample')));
+                $usesBlankTemplate = $templateVariant === 'empty';
 
                 $photoDiskPath = $resolveDiskPath(dra_manual_first_non_empty([
+                    $payload['id_picture_url'] ?? null,
                     $payload['id_picture_path'] ?? null,
+                    $residentProfile['id_picture_url'] ?? null,
                     $residentProfile['id_picture_path'] ?? null,
                 ]));
 
@@ -2327,43 +2521,70 @@ function dra_generate_issued_document(array $requestRow): ?string {
                 $pdf->AddPage('L', [$pageWidth, $pageHeight]);
                 $pdf->Image($frontTemplatePath, 0.0, 0.0, $pageWidth, $pageHeight);
                 if ($photoDiskPath !== '') {
-                    $pdf->Image($photoDiskPath, 6.8, 16.3, 18.8, 22.6);
+                    $pdf->Image($photoDiskPath, 7.9, 22.1, 22.0, 22.0);
                 }
-                $coverRect($pdf, 31.8, 25.1, 44.8, 4.0);
-                $coverRect($pdf, 31.8, 31.0, 44.8, 4.2);
-                $coverRect($pdf, 31.8, 38.9, 20.4, 4.0);
-                $coverRect($pdf, 56.8, 38.9, 19.2, 4.0);
-                $coverRect($pdf, 31.8, 44.8, 45.0, 4.0);
-                $coverRect($pdf, 5.6, 44.3, 27.6, 4.4);
-                $coverRect($pdf, 6.0, 49.0, 28.2, 3.8);
+                if ($usesBlankTemplate) {
+                    $fitSingleLine($pdf, $displayName, 32.5, 25.0, 45.0, 'B', 7.2, 4.6);
+                    $fitTwoLines($pdf, $frontAddress, 32.5, 31.0, 47.0, 2.4, 'B', 6.0, 4.0);
+                    $fitSingleLine($pdf, $birthdateText !== '' ? $birthdateText : '-', 32.5, 39.0, 20.5, 'B', 6.4, 4.4);
+                    $fitSingleLine($pdf, $sexText !== '' ? $sexText : '-', 57.5, 39.0, 19.5, 'B', 6.4, 4.4);
+                    $fitSingleLine($pdf, $birthplaceText !== '' ? $birthplaceText : '-', 32.5, 45.0, 44.8, 'B', 5.5, 4.0);
+                    $fitSingleLine($pdf, $validUntilText !== '' ? $validUntilText : '-', 16.8, 45.0, 17.4, 'B', 4.8, 3.7);
+                    $pdf->SetTextColor(198, 40, 40);
+                    $fitSingleLine($pdf, $cardIdText, 11.0, 47.7, 28.4, 'B', 7.8, 5.0);
+                    $pdf->SetTextColor(0, 0, 0);
+                } else {
+                    $coverRect($pdf, 31.0, 22.8, 49.2, 27.2);
+                    $coverRect($pdf, 4.8, 43.7, 31.8, 10.4);
 
-                $fitSingleLine($pdf, $displayName, 32.2, 25.6, 43.8, 'B', 7.2, 4.6);
-                $fitSingleLine($pdf, $frontAddress, 32.2, 31.5, 43.8, 'B', 6.4, 4.4);
-                $fitSingleLine($pdf, $birthdateText !== '' ? $birthdateText : '-', 32.2, 39.4, 19.2, 'B', 6.6, 4.5);
-                $fitSingleLine($pdf, $sexText !== '' ? $sexText : '-', 57.2, 39.4, 18.0, 'B', 6.6, 4.5);
-                $fitSingleLine($pdf, $birthplaceText !== '' ? $birthplaceText : '-', 32.2, 45.2, 43.8, 'B', 5.7, 4.2);
-                $fitSingleLine($pdf, 'VALID UNTIL: ' . ($validUntilText !== '' ? $validUntilText : '-'), 6.0, 44.8, 26.6, 'B', 4.9, 3.8);
-                $fitSingleLine($pdf, $cardIdText, 6.4, 49.4, 27.2, 'B', 6.1, 4.3);
+                    $fitSingleLine($pdf, 'Name', 32.2, 24.08, 9.0, 'I', 5.1, 4.0);
+                    $fitSingleLine($pdf, $displayName, 32.2, 26.28, 44.8, 'B', 7.2, 4.6);
+                    $fitSingleLine($pdf, 'Address', 32.2, 30.58, 12.0, 'I', 5.1, 4.0);
+                    $fitTwoLines($pdf, $frontAddress, 32.2, 32.78, 44.8, 2.4, 'B', 6.0, 4.0);
+                    $fitSingleLine($pdf, 'Date of Birth', 32.2, 38.48, 18.0, 'I', 5.1, 4.0);
+                    $fitSingleLine($pdf, $birthdateText !== '' ? $birthdateText : '-', 32.2, 40.78, 20.5, 'B', 6.4, 4.4);
+                    $fitSingleLine($pdf, 'Sex', 57.2, 38.48, 8.0, 'I', 5.1, 4.0);
+                    $fitSingleLine($pdf, $sexText !== '' ? $sexText : '-', 57.2, 40.78, 19.5, 'B', 6.4, 4.4);
+                    $fitSingleLine($pdf, 'Place of Birth', 32.2, 44.78, 18.0, 'I', 5.1, 4.0);
+                    $fitSingleLine($pdf, $birthplaceText !== '' ? $birthplaceText : '-', 32.2, 46.98, 44.8, 'B', 5.5, 4.0);
+                    $fitSingleLine($pdf, 'VALID UNTIL: ' . ($validUntilText !== '' ? $validUntilText : '-'), 6.0, 44.78, 28.6, 'B', 4.8, 3.7);
+                    $pdf->SetTextColor(198, 40, 40);
+                    $fitSingleLine($pdf, $cardIdText, 6.4, 49.58, 28.4, 'B', 6.8, 4.4);
+                    $pdf->SetTextColor(0, 0, 0);
+                }
 
                 $pdf->AddPage('L', [$pageWidth, $pageHeight]);
                 $pdf->Image($backTemplatePath, 0.0, 0.0, $pageWidth, $pageHeight);
-                $coverRect($pdf, 59.0, 2.5, 22.4, 4.3);
-                $coverRect($pdf, 6.5, 16.8, 33.0, 4.3);
-                $coverRect($pdf, 6.5, 21.8, 39.5, 4.3);
-                $coverRect($pdf, 6.5, 27.0, 21.0, 4.2);
-                $coverRect($pdf, 6.0, 31.2, 43.8, 12.2);
+                if ($usesBlankTemplate) {
+                    $pdf->SetTextColor(198, 40, 40);
+                    $fitSingleLine($pdf, $cardIdText, 63.0, 3.6, 19.8, 'B', 7.6, 5.0, 'R');
+                    $pdf->SetTextColor(0, 0, 0);
+                    $fitSingleLine($pdf, $emergencyDisplayName !== '' ? $emergencyDisplayName : '-', 7.0, 17.0, 35.0, 'B', 5.4, 4.0);
+                    $fitTwoLines($pdf, $emergencyAddressText !== '' ? $emergencyAddressText : '-', 7.0, 22.08, 35.0, 2.2, 'B', 4.7, 3.6);
+                    $fitSingleLine($pdf, $emergencyContactText !== '' ? $emergencyContactText : ($contactNumberText !== '' ? $contactNumberText : '-'), 7.0, 28.5, 19.0, 'B', 5.0, 3.8);
+                } else {
+                    $coverRect($pdf, 57.8, 1.0, 25.0, 6.0);
+                    $coverRect($pdf, 5.8, 14.8, 45.5, 30.6);
 
-                $fitSingleLine($pdf, $cardIdText, 59.5, 3.1, 21.0, 'B', 5.4, 4.0);
-                $fitSingleLine($pdf, $emergencyDisplayName !== '' ? $emergencyDisplayName : '-', 6.9, 17.3, 31.8, 'B', 6.1, 4.4);
-                $fitSingleLine($pdf, $emergencyAddressText !== '' ? $emergencyAddressText : '-', 6.9, 22.3, 38.6, 'B', 5.3, 3.9);
-                $fitSingleLine($pdf, $emergencyContactText !== '' ? $emergencyContactText : ($contactNumberText !== '' ? $contactNumberText : '-'), 6.9, 27.4, 20.0, 'B', 6.0, 4.3);
+                    $pdf->SetTextColor(198, 40, 40);
+                    $fitSingleLine($pdf, $cardIdText, 59.5, 3.3, 21.5, 'B', 7.6, 5.0, 'R');
+                    $pdf->SetTextColor(0, 0, 0);
+                    $fitSingleLine($pdf, 'Name', 6.9, 17.5, 8.0, 'I', 5.0, 4.0);
+                    $fitSingleLine($pdf, $emergencyDisplayName !== '' ? $emergencyDisplayName : '-', 6.9, 19.7, 33.0, 'B', 6.0, 4.3);
+                    $fitSingleLine($pdf, 'Address', 6.9, 23.8, 10.0, 'I', 5.0, 4.0);
+                    $fitSingleLine($pdf, $emergencyAddressText !== '' ? $emergencyAddressText : '-', 6.9, 26.0, 39.6, 'B', 5.3, 3.9);
+                    $fitSingleLine($pdf, 'Contact', 6.9, 30.0, 10.0, 'I', 5.0, 4.0);
+                    $fitSingleLine($pdf, $emergencyContactText !== '' ? $emergencyContactText : ($contactNumberText !== '' ? $contactNumberText : '-'), 6.9, 32.2, 22.0, 'B', 6.0, 4.3);
+                }
 
-                $pdf->SetFont('Arial', 'B', 4.2);
-                $pdf->SetXY(6.6, 32.1);
-                $pdf->MultiCell(41.0, 2.8, $validityNotice, 0, 'L', false);
+                if (!$usesBlankTemplate) {
+                    $pdf->SetFont('Arial', 'I', 4.2);
+                    $pdf->SetXY(7.3, 36.6);
+                    $pdf->MultiCell(40.5, 2.8, $validityNotice, 0, 'C', false);
+                }
 
                 if ($allowQr && is_file($qrDiskPath)) {
-                    $pdf->Image($qrDiskPath, 60.8, 27.2, 18.5, 18.5);
+                    $pdf->Image($qrDiskPath, 47.6, 16.2, 32.3, 31.4);
                 }
 
                 $pdf->Output('F', $diskPath);
@@ -4940,6 +5161,7 @@ function dra_resident_profile_snapshot(mysqli $conn, string $residentUserId, str
         'emergency_contact' => '',
         'emergency_address' => '',
         'id_picture_path' => '',
+        'id_picture_url' => '',
         'proof_residency_path' => '',
         'proof_residency_name' => '',
         'proof_residency_type' => '',
@@ -5113,6 +5335,7 @@ function dra_resident_profile_snapshot(mysqli $conn, string $residentUserId, str
     $occupation = ((int)($row['occupation'] ?? 0) === 1)
         ? ($occupationDetail !== '' ? $occupationDetail : 'Employed')
         : 'Unemployed';
+    $resolvedIdPicturePath = dra_resolve_resident_2x2_picture_path($conn, (string)($row['resident_id'] ?? ''));
 
     $profile = [
         'resident_id' => (string)($row['resident_id'] ?? ''),
@@ -5138,7 +5361,8 @@ function dra_resident_profile_snapshot(mysqli $conn, string $residentUserId, str
         'emergency_suffix' => (string)($row['emergency_suffix'] ?? ''),
         'emergency_contact' => (string)($row['emergency_contact'] ?? ''),
         'emergency_address' => (string)($row['emergency_address'] ?? ''),
-        'id_picture_path' => (string)($row['id_picture_path'] ?? ''),
+        'id_picture_path' => $resolvedIdPicturePath !== '' ? $resolvedIdPicturePath : (string)($row['id_picture_path'] ?? ''),
+        'id_picture_url' => dra_public_asset_path($resolvedIdPicturePath !== '' ? $resolvedIdPicturePath : (string)($row['id_picture_path'] ?? '')),
         'proof_residency_path' => (string)($row['proof_residency_path'] ?? ''),
         'proof_residency_name' => (string)($row['proof_residency_name'] ?? ''),
         'proof_residency_type' => (string)($row['proof_residency_type'] ?? ''),
@@ -5506,6 +5730,7 @@ if ($action === 'search_manual_residents') {
             (string)($row['lastname'] ?? ''),
             (string)($row['suffix'] ?? ''),
         ], static fn($value) => trim((string)$value) !== ''))));
+        $resolvedIdPicturePath = dra_resolve_resident_2x2_picture_path($conn, (string)($row['resident_id'] ?? ''));
 
         $items[] = [
             'resident_id' => (string)($row['resident_id'] ?? ''),
@@ -5529,7 +5754,8 @@ if ($action === 'search_manual_residents') {
             'emergency_suffix' => (string)($row['emergency_suffix'] ?? ''),
             'emergency_contact' => (string)($row['emergency_contact'] ?? ''),
             'emergency_address' => (string)($row['emergency_address'] ?? ''),
-            'id_picture_path' => (string)($row['id_picture_path'] ?? ''),
+            'id_picture_path' => $resolvedIdPicturePath !== '' ? $resolvedIdPicturePath : (string)($row['id_picture_path'] ?? ''),
+            'id_picture_url' => dra_public_asset_path($resolvedIdPicturePath !== '' ? $resolvedIdPicturePath : (string)($row['id_picture_path'] ?? '')),
             'resident_status' => (string)($row['resident_status'] ?? ''),
             'residency_duration' => (string)($row['residency_duration'] ?? ''),
         ];

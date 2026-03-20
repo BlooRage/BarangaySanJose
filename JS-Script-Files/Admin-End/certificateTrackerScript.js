@@ -13,6 +13,7 @@
   const launchTab = String(launchParams.get('tab') || '').toLowerCase();
   const launchManualDocument = String(launchParams.get('document') || '').toLowerCase();
   const launchStage = String(launchParams.get('stage') || '').toLowerCase();
+  const launchFilterDocument = String(launchParams.get('filter_document') || '').trim();
   const barangayIdTabCount = document.getElementById('barangayIdTabCount');
   const pendingTabCount = document.getElementById('pendingTabCount');
   const releaseTabCount = document.getElementById('releaseTabCount');
@@ -1800,6 +1801,14 @@
     if (text.includes('businesspermit') || text.includes('businessclearance') || text.includes('clearanceforbusinesspermit')) return 'businessclearance';
     if (text.includes('barangayclearance') || text.includes('barangaycertification') || text === 'clearance') return 'generic';
     return 'generic';
+  }
+
+  function canonicalDocumentFilterValue(value) {
+    const raw = String(value || '').trim();
+    if (!raw) {
+      return '';
+    }
+    return normalizePreviewDocKey(raw) === 'barangayid' ? 'Barangay ID' : raw;
   }
 
   function normalizeBusinessApprovalType(value) {
@@ -3665,7 +3674,7 @@
     const key = String(stageFilter || '').toLowerCase();
     if (!key) return true;
     if (key === 'barangay_id') {
-      return requestNeedsManualIssuedUpload(row);
+      return normalizePreviewDocKey(row?.document_type || '') === 'barangayid';
     }
     if (key === 'pending') {
       return (
@@ -5567,6 +5576,14 @@
     load();
   });
 
+  const initialDocumentFilter = canonicalDocumentFilterValue(launchFilterDocument);
+  if (initialDocumentFilter) {
+    currentDocumentTypeFilter = initialDocumentFilter;
+    if (isFinancePaymentsPage) {
+      financeFilterDocumentType = initialDocumentFilter;
+    }
+  }
+
   btnFinanceFilterReset?.addEventListener('click', () => {
     financeFilterDocumentType = '';
     financeFilterMethod = '';
@@ -5804,6 +5821,7 @@
         emergency_suffix: String(firstNonEmpty([record.emergency_suffix])).trim(),
         emergency_contact: String(firstNonEmpty([record.emergency_contact, record.emergency_phone_number])).trim(),
         emergency_address: String(firstNonEmpty([record.emergency_address])).trim(),
+        id_picture_url: String(firstNonEmpty([record.id_picture_url])).trim(),
         id_picture_path: String(firstNonEmpty([record.id_picture_path])).trim(),
         full_name: manualResidentDisplayName(record),
       };

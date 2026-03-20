@@ -17,6 +17,7 @@ require_once __DIR__ . "/../includes/resident_access_guard.php";
     <link rel="stylesheet" href="../../CSS-Styles/Resident-End-CSS/residentDashboard.css">
     <link rel="stylesheet" href="../../CSS-Styles/Guest-End-CSS/GeneralStyle.css">
     <link rel="stylesheet" href="../../CSS-Styles/Resident-End-CSS/ApplicationLandingPage.css?v=20260228-3">
+    <link rel="stylesheet" href="../../CSS-Styles/Resident-End-CSS/barangayIdNav.css">
     <style>
         body {
             background: #fffdfb;
@@ -77,6 +78,10 @@ require_once __DIR__ . "/../includes/resident_access_guard.php";
                         <h1 class="page-title mb-1">Barangay ID Application</h1>
                     </div>
                 </div>
+                <?php
+                $barangayIdNavActive = 'overview';
+                include __DIR__ . '/includes/barangay_id_nav.php';
+                ?>
                 <hr>
 
                 <p class="page-description mb-4">
@@ -100,17 +105,17 @@ require_once __DIR__ . "/../includes/resident_access_guard.php";
                 </div>
 
                 <div class="mt-4">
-                    <h2 class="page-subtitle mb-3">Barangay ID Sample</h2>
+                    <h2 class="page-subtitle mb-3">Barangay ID Template</h2>
                     <div class="row g-3">
                         <div class="col-12 col-md-6">
                             <div class="h-100">
-                                <img src="../../Images/Barangayid/SAMPLE.png" class="img-fluid rounded id-sample-img" alt="Barangay ID Sample - Front">
+                                <img src="<?= htmlspecialchars(appUrl('Resident-End/Certificates/BarangayID/FRONT_EMPTY.png')) ?>" class="img-fluid rounded id-sample-img" alt="Barangay ID Template - Front">
                                 <p class="page-description mt-2 mb-0 text-center">Front</p>
                             </div>
                         </div>
                         <div class="col-12 col-md-6">
                             <div class="h-100">
-                                <img src="../../Images/Barangayid/BACK.png" class="img-fluid rounded id-sample-img" alt="Barangay ID Sample - Back">
+                                <img src="<?= htmlspecialchars(appUrl('Resident-End/Certificates/BarangayID/BACK_EMPTY.png')) ?>" class="img-fluid rounded id-sample-img" alt="Barangay ID Template - Back">
                                 <p class="page-description mt-2 mb-0 text-center">Back</p>
                             </div>
                         </div>

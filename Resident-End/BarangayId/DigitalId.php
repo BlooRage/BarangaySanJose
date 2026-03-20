@@ -18,12 +18,112 @@ $allowUnregistered = false;
 require_once __DIR__ . '/../includes/resident_access_guard.php';
 require_once __DIR__ . '/../../PhpFiles/General/documentRequestWorkflow.php';
 
+if (!function_exists('drd_public_asset_path')) {
+    function drd_public_asset_path(string $baseUrl, string $storedPath): string
+    {
+        $storedPath = trim($storedPath);
+        if ($storedPath === '') {
+            return '';
+        }
+        if (preg_match('/^https?:\/\//i', $storedPath)) {
+            return $storedPath;
+        }
+
+        $normalized = str_replace('\\', '/', $storedPath);
+        $marker = '/UnifiedFileAttachment/';
+        $markerPos = stripos($normalized, $marker);
+        if ($markerPos !== false) {
+            return rtrim($baseUrl, '/') . substr($normalized, $markerPos);
+        }
+
+        $projectRoot = realpath(__DIR__ . '/../../');
+        if ($projectRoot !== false) {
+            $rootNorm = str_replace('\\', '/', $projectRoot);
+            if (strpos($normalized, $rootNorm) === 0) {
+                $relative = substr($normalized, strlen($rootNorm));
+                return rtrim($baseUrl, '/') . '/' . ltrim((string)$relative, '/');
+            }
+        }
+
+        return rtrim($baseUrl, '/') . '/' . ltrim($normalized, '/');
+    }
+}
+
+if (!function_exists('drd_resolve_resident_2x2_picture_path')) {
+    function drd_resolve_resident_2x2_picture_path(mysqli $conn, string $residentId): string
+    {
+        $residentId = trim($residentId);
+        if ($residentId === '') {
+            return '';
+        }
+
+        $sql = "
+            SELECT uf.file_path
+            FROM unifiedfileattachmenttbl uf
+            LEFT JOIN documenttypelookuptbl dt
+                ON dt.document_type_id = uf.document_type_id
+            LEFT JOIN statuslookuptbl sv
+                ON sv.status_id = uf.status_id_verify
+            LEFT JOIN resident_edit_requesttbl rer
+                ON uf.source_type = 'ResidentEditRequest'
+               AND rer.request_id = uf.source_id
+            LEFT JOIN statuslookuptbl rs
+                ON rs.status_id = rer.status_id
+            WHERE LOWER(COALESCE(dt.document_type_name, '')) = '2x2 picture'
+              AND (
+                    LOWER(COALESCE(dt.document_category, 'residentprofiling')) = 'residentprofiling'
+                    OR LOWER(COALESCE(dt.document_category, '')) = 'editrequest'
+                    OR dt.document_category IS NULL
+                  )
+              AND (
+                    (
+                        uf.source_type IN ('ResidentProfiling', 'RESIDENT_PROFILE')
+                        AND uf.source_id = ?
+                    )
+                    OR
+                    (
+                        uf.source_type = 'ResidentEditRequest'
+                        AND rer.resident_id = ?
+                        AND rer.request_type = 'profile'
+                    )
+                  )
+            ORDER BY
+                CASE
+                    WHEN uf.source_type = 'ResidentEditRequest'
+                         AND LOWER(COALESCE(rs.status_name, '')) = 'approvedrequest' THEN 0
+                    WHEN uf.source_type IN ('ResidentProfiling', 'RESIDENT_PROFILE')
+                         AND LOWER(COALESCE(sv.status_name, '')) IN ('verified', 'approved') THEN 0
+                    WHEN uf.source_type IN ('ResidentProfiling', 'RESIDENT_PROFILE') THEN 1
+                    ELSE 2
+                END,
+                uf.upload_timestamp DESC,
+                uf.attachment_id DESC
+            LIMIT 1
+        ";
+
+        $stmt = $conn->prepare($sql);
+        if (!$stmt) {
+            return '';
+        }
+
+        $stmt->bind_param('ss', $residentId, $residentId);
+        $stmt->execute();
+        $stmt->bind_result($resolvedPath);
+        $path = ($stmt->fetch() && is_string($resolvedPath)) ? trim($resolvedPath) : '';
+        $stmt->close();
+
+        return $path;
+    }
+}
+
 $embedMode = isset($_GET['embed']) && (string)$_GET['embed'] === '1';
 $requestId = trim((string)($_GET['request_id'] ?? ''));
 $userId = (string)($_SESSION['user_id'] ?? '');
 $errorMessage = '';
 $requestRow = null;
 $payload = [];
+$resolvedProfileImageUrl = '';
+$resolvedProfileImagePath = '';
 
 if ($requestId === '') {
     $errorMessage = 'Missing request ID.';
@@ -38,6 +138,32 @@ if ($requestId === '') {
     } else {
         $decodedPayload = json_decode((string)($requestRow['request_details'] ?? '{}'), true);
         $payload = is_array($decodedPayload) ? $decodedPayload : [];
+
+        if (isset($conn) && $conn instanceof mysqli && $userId !== '') {
+            $stmtResident = $conn->prepare("
+                SELECT resident_id
+                FROM residentinformationtbl
+                WHERE user_id = ?
+                LIMIT 1
+            ");
+            if ($stmtResident) {
+                $stmtResident->bind_param('s', $userId);
+                $stmtResident->execute();
+                $stmtResident->bind_result($residentId);
+                if ($stmtResident->fetch() && is_string($residentId)) {
+                    $resolvedProfileImagePath = drd_resolve_resident_2x2_picture_path($conn, $residentId);
+                    $resolvedProfileImageUrl = drd_public_asset_path($baseUrl, $resolvedProfileImagePath);
+                }
+                $stmtResident->close();
+            }
+        }
+
+        if ($resolvedProfileImagePath !== '') {
+            $payload['id_picture_path'] = $resolvedProfileImagePath;
+        }
+        if ($resolvedProfileImageUrl !== '') {
+            $payload['id_picture_url'] = $resolvedProfileImageUrl;
+        }
     }
 }
 
@@ -76,6 +202,7 @@ $serializedRow = $requestRow ? [
     <?php if (!$embedMode): ?>
         <link rel="stylesheet" href="<?= htmlspecialchars($baseUrl) ?>/CSS-Styles/Resident-End-CSS/residentDashboard.css">
         <link rel="stylesheet" href="<?= htmlspecialchars($baseUrl) ?>/CSS-Styles/Guest-End-CSS/GeneralStyle.css">
+        <link rel="stylesheet" href="<?= htmlspecialchars($baseUrl) ?>/CSS-Styles/Resident-End-CSS/barangayIdNav.css">
     <?php endif; ?>
     <style>
         body {
@@ -194,6 +321,11 @@ $serializedRow = $requestRow ? [
                                     <h1 class="digital-id-page-title">Digital Barangay ID</h1>
                                     <p class="digital-id-page-copy">This view mirrors the approved Barangay ID front and back template tied to your completed request.</p>
                                 </div>
+                                <?php
+                                $barangayIdNavActive = 'digital';
+                                $barangayIdNavRequestId = $requestId;
+                                include __DIR__ . '/includes/barangay_id_nav.php';
+                                ?>
                                 <div class="digital-id-meta">
                                     <span class="digital-id-meta-chip"><i class="fa-solid fa-id-card-clip"></i><?= htmlspecialchars($requestId) ?></span>
                                     <span class="digital-id-meta-chip"><i class="fa-solid fa-circle-check"></i>Completed Request</span>
@@ -220,7 +352,7 @@ $serializedRow = $requestRow ? [
 <?php endif; ?>
 
 <?php if ($errorMessage === ''): ?>
-    <script src="<?= htmlspecialchars($baseUrl) ?>/JS-Script-Files/Shared/barangayIdDigital.js?v=20260318-01"></script>
+    <script src="<?= htmlspecialchars($baseUrl) ?>/JS-Script-Files/Shared/barangayIdDigital.js?v=20260320-23"></script>
     <script>
         (() => {
             const wrap = document.getElementById('digitalBarangayIdWrap');
@@ -232,6 +364,7 @@ $serializedRow = $requestRow ? [
             const payload = <?= json_encode($payload, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?> || {};
             const appBase = <?= json_encode($baseUrl, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
             const profileImageEndpoint = <?= json_encode($profileImageEndpoint, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
+            const initialProfileImageUrl = <?= json_encode($resolvedProfileImageUrl, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
             const embedMode = <?= $embedMode ? 'true' : 'false' ?>;
 
             function renderDigitalCard(profileImageUrl = '') {
@@ -252,7 +385,7 @@ $serializedRow = $requestRow ? [
                 });
             }
 
-            renderDigitalCard('');
+            renderDigitalCard(initialProfileImageUrl);
 
             fetch(profileImageEndpoint, {
                 method: 'GET',

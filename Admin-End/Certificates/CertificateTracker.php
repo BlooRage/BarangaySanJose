@@ -1,5 +1,16 @@
 <?php
 require_once __DIR__ . '/../includes/admin_guard.php';
+
+$certificateLaunchTab = strtolower(trim((string)($_GET['tab'] ?? '')));
+$certificateLaunchDocument = strtolower(trim((string)($_GET['document'] ?? '')));
+$certificateLaunchStage = strtolower(trim((string)($_GET['stage'] ?? '')));
+$barangayIdAdminNavActive = 'applications';
+
+if ($certificateLaunchTab === 'manual' && $certificateLaunchDocument === 'barangay_id') {
+  $barangayIdAdminNavActive = 'manual';
+} elseif ($certificateLaunchStage === 'release') {
+  $barangayIdAdminNavActive = 'release';
+}
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -10,6 +21,7 @@ require_once __DIR__ . '/../includes/admin_guard.php';
   <script src="https://kit.fontawesome.com/3482e00999.js" crossorigin="anonymous"></script>
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
   <link rel="stylesheet" href="../../CSS-Styles/Admin-End-CSS/AdminDashboardStyle.css">
+  <link rel="stylesheet" href="../../CSS-Styles/Admin-End-CSS/barangayIdAdminNav.css">
   <link rel="stylesheet" href="../../CSS-Styles/Admin-End-CSS/ResidentMasterlistStyle.css">
   <style>
     .certificate-tracker-shell {
@@ -1958,6 +1970,7 @@ require_once __DIR__ . '/../includes/admin_guard.php';
   <main id="main-display" class="flex-grow-1 p-3 p-md-4 p-xl-5 bg-light">
     <h2 class="mb-4" style="font-family: 'Charis SIL Bold'; color: #DE710C; ">Certificate Issuance</h2>
     <hr class="mb-4">
+    <?php include __DIR__ . '/includes/barangay_id_admin_nav.php'; ?>
 
     <!-- Page-level navigation -->
     <ul class="nav nav-tabs mb-0" id="certTrackerPageTabs" style="border-bottom:0">
@@ -2789,7 +2802,7 @@ require_once __DIR__ . '/../includes/admin_guard.php';
   };
 </script>
 <script src="../../JS-Script-Files/Admin-End/tableColumnsGeneric.js?v=20260215-1"></script>
-<script src="../../JS-Script-Files/Shared/barangayIdDigital.js?v=20260318-01"></script>
-<script src="../../JS-Script-Files/Admin-End/certificateTrackerScript.js?v=20260318-02"></script>
+<script src="../../JS-Script-Files/Shared/barangayIdDigital.js?v=20260320-23"></script>
+<script src="../../JS-Script-Files/Admin-End/certificateTrackerScript.js?v=20260320-02"></script>
 </body>
 </html>
