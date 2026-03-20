@@ -673,7 +673,9 @@ $recentActivity = array_slice(!empty($summaryActivities) ? $summaryActivities : 
         }
 
         .appointments-table td:nth-child(3) .feed-meta {
-            white-space: normal;
+            white-space: nowrap;
+            font-size: 0.76rem;
+            line-height: 1.1;
         }
 
         .appointments-table th:nth-child(4),

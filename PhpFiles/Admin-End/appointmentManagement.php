@@ -177,16 +177,15 @@ function am_validate_schedule(string $date, string $time): string
     $timezone = new DateTimeZone(date_default_timezone_get() ?: 'Asia/Manila');
     $now = new DateTimeImmutable('now', $timezone);
     $minDate = $now->modify('+1 day')->format('Y-m-d');
-    $monthStart = $now->format('Y-m-01');
-    $monthEnd = $now->format('Y-m-t');
+    $yearEnd = $now->format('Y-12-31');
 
     $schedule = DateTimeImmutable::createFromFormat('Y-m-d H:i', $date . ' ' . $time, $timezone);
     if (!$schedule || $schedule->format('Y-m-d') !== $date || $schedule->format('H:i') !== $time) {
         throw new Exception('Confirmed appointment date or time is invalid.');
     }
 
-    if ($date < $minDate || $date < $monthStart || $date > $monthEnd) {
-        throw new Exception('Confirmed appointment date must be within the current month and after today.');
+    if ($date < $minDate || $date > $yearEnd) {
+        throw new Exception('Confirmed appointment date must be after today and within the current year.');
     }
 
     if ($time < '09:01' || $time > '16:59') {

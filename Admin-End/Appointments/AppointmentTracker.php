@@ -2,6 +2,9 @@
 require_once __DIR__ . "/../../PhpFiles/General/connection.php";
 require_once __DIR__ . "/../includes/admin_guard.php";
 
+$minConfirmedDate = date('Y-m-d', strtotime('+1 day'));
+$maxConfirmedDate = date('Y-12-31');
+
 function at_table_columns(mysqli $conn, string $tableName): array
 {
     $columns = [];
@@ -83,6 +86,11 @@ function at_status_pill(string $value): string
     return 'pending';
 }
 
+function at_is_rescheduled(string $value): bool
+{
+    return str_contains(strtolower(trim($value)), 'resched');
+}
+
 function at_format_datetime(?string $value, string $fallback = '-'): string
 {
     $text = trim((string)$value);
@@ -120,6 +128,55 @@ function at_format_time(?string $value, string $fallback = '-'): string
         return $text;
     }
     return date('h:i A', $timestamp);
+}
+
+function at_middle_initial_name(string $value, string $fallback = '-'): string
+{
+    $name = trim($value);
+    if ($name === '') {
+        return $fallback;
+    }
+
+    $parts = preg_split('/\s+/', $name) ?: [];
+    $parts = array_values(array_filter($parts, static fn($part) => trim((string)$part) !== ''));
+    if (count($parts) <= 2) {
+        return $name;
+    }
+
+    $suffixes = ['jr', 'jr.', 'sr', 'sr.', 'ii', 'iii', 'iv', 'v'];
+    $suffix = '';
+    $lastPart = strtolower((string)end($parts));
+    if (in_array($lastPart, $suffixes, true)) {
+        $suffix = ' ' . array_pop($parts);
+    }
+
+    if (count($parts) <= 2) {
+        return implode(' ', $parts) . $suffix;
+    }
+
+    $lastName = array_pop($parts);
+    $givenNames = [];
+    if ($parts !== []) {
+        $givenNames[] = array_shift($parts);
+    }
+    if (count($parts) >= 2) {
+        $givenNames[] = array_shift($parts);
+    }
+
+    $middleInitials = array_map(static function ($part): string {
+        $segment = trim((string)$part);
+        if ($segment === '') {
+            return '';
+        }
+        return strtoupper(substr($segment, 0, 1)) . '.';
+    }, $parts);
+    $middleInitials = array_values(array_filter($middleInitials, static fn($part) => $part !== ''));
+
+    return trim(implode(' ', array_filter([
+        implode(' ', $givenNames),
+        implode(' ', $middleInitials),
+        $lastName,
+    ])) . $suffix);
 }
 
 function at_flash_message(string $key): string
@@ -188,30 +245,51 @@ if (!$conn->query("SHOW TABLES LIKE 'appointmentstbl'")->num_rows) {
     $result = $conn->query($sql);
     if ($result instanceof mysqli_result) {
         while ($row = $result->fetch_assoc()) {
-            $statusName = at_status_label((string)($row['status_name'] ?? 'Pending'));
+            $rawStatusName = (string)($row['status_name'] ?? 'Pending');
+            $statusName = at_status_label($rawStatusName);
+            $isRescheduled = at_is_rescheduled($rawStatusName);
             $subject = at_value($row, 'subject', '-');
             $subjectOther = at_value($row, 'subject_other', '');
             if (strcasecmp($subject, 'Other') === 0 && $subjectOther !== '') {
                 $subject = 'Other: ' . $subjectOther;
             }
 
+            $preferredScheduleTimestamp = at_value($row, 'preferred_schedule_timestamp', '');
+            $confirmedScheduleTimestamp = at_value($row, 'confirmed_schedule_timestamp', '');
+            $preferredAppointmentDate = at_format_date($row['preferred_schedule_timestamp'] ?? null);
+            $preferredAppointmentTime = at_format_time($row['preferred_schedule_timestamp'] ?? null);
+            $confirmedAppointmentDate = at_format_date($row['confirmed_schedule_timestamp'] ?? null);
+            $confirmedAppointmentTime = at_format_time($row['confirmed_schedule_timestamp'] ?? null);
+            $scheduleDisplay = trim($preferredAppointmentDate . ' ' . $preferredAppointmentTime);
+            $scheduleSubtitle = '';
+
+            if ($confirmedScheduleTimestamp !== '') {
+                $scheduleDisplay = trim($confirmedAppointmentDate . ' ' . $confirmedAppointmentTime);
+                if ($isRescheduled && $preferredScheduleTimestamp !== '') {
+                    $scheduleSubtitle = 'Preferred: ' . trim($preferredAppointmentDate . ' ' . $preferredAppointmentTime);
+                }
+            }
+
             $appointmentRows[] = [
                 'appointment_id' => at_value($row, 'appointment_id', '-'),
                 'request_timestamp' => at_value($row, 'request_timestamp', ''),
                 'request_timestamp_display' => at_format_datetime($row['request_timestamp'] ?? null),
-                'resident_name' => at_value($row, 'name', '-'),
+                'resident_name' => at_middle_initial_name(at_value($row, 'name', '')),
                 'contact_number' => at_value($row, 'contact_number', '-'),
                 'subject' => $subject,
                 'purpose' => at_value($row, 'purpose', '-'),
-                'preferred_schedule_timestamp' => at_value($row, 'preferred_schedule_timestamp', ''),
-                'preferred_appointment_date' => at_format_date($row['preferred_schedule_timestamp'] ?? null),
-                'preferred_appointment_time' => at_format_time($row['preferred_schedule_timestamp'] ?? null),
-                'confirmed_schedule_timestamp' => at_value($row, 'confirmed_schedule_timestamp', ''),
-                'confirmed_appointment_date' => at_format_date($row['confirmed_schedule_timestamp'] ?? null),
-                'confirmed_appointment_time' => at_format_time($row['confirmed_schedule_timestamp'] ?? null),
+                'preferred_schedule_timestamp' => $preferredScheduleTimestamp,
+                'preferred_appointment_date' => $preferredAppointmentDate,
+                'preferred_appointment_time' => $preferredAppointmentTime,
+                'confirmed_schedule_timestamp' => $confirmedScheduleTimestamp,
+                'confirmed_appointment_date' => $confirmedAppointmentDate,
+                'confirmed_appointment_time' => $confirmedAppointmentTime,
+                'schedule_display' => $scheduleDisplay !== '' ? $scheduleDisplay : '-',
+                'schedule_subtitle' => $scheduleSubtitle,
                 'status_name' => $statusName,
                 'status_key' => at_status_key($statusName),
                 'status_pill' => at_status_pill($statusName),
+                'status_subtitle' => $isRescheduled ? 'Rescheduled' : '',
                 'staff_name' => at_value($row, 'staff_name', '-'),
                 'official_user_id' => at_value($row, 'official_user_id', ''),
                 'official_name' => at_value($row, 'official_name', '-'),
@@ -295,6 +373,26 @@ foreach ($appointmentRows as $row) {
         .appointment-tracker-shell {
             max-width: 1340px;
             margin: 0 auto;
+        }
+
+        .appointment-cell-main {
+            color: #1f2937;
+            font-weight: 600;
+            line-height: 1.35;
+        }
+
+        .appointment-cell-subtitle {
+            margin-top: 0.2rem;
+            color: #6b7280;
+            font-size: 0.72rem;
+            line-height: 1.15;
+            white-space: nowrap;
+        }
+
+        .appointment-status-stack {
+            display: inline-flex;
+            flex-direction: column;
+            align-items: flex-start;
         }
 
         #viewModal .modal-content {
@@ -450,7 +548,7 @@ foreach ($appointmentRows as $row) {
                             <th>Date Submitted</th>
                             <th>Resident</th>
                             <th>Subject</th>
-                            <th>Preferred Schedule</th>
+                            <th>Schedule</th>
                             <th>Status</th>
                             <th>Action</th>
                         </tr>
@@ -481,8 +579,20 @@ foreach ($appointmentRows as $row) {
                                     <td><?= htmlspecialchars($row['request_timestamp_display'], ENT_QUOTES, 'UTF-8') ?></td>
                                     <td><?= htmlspecialchars($row['resident_name'], ENT_QUOTES, 'UTF-8') ?></td>
                                     <td><?= htmlspecialchars($row['subject'], ENT_QUOTES, 'UTF-8') ?></td>
-                                    <td><?= htmlspecialchars($row['preferred_appointment_date'] . ' ' . $row['preferred_appointment_time'], ENT_QUOTES, 'UTF-8') ?></td>
-                                    <td><span class="status-pill <?= htmlspecialchars($row['status_pill'], ENT_QUOTES, 'UTF-8') ?>"><?= htmlspecialchars($row['status_name'], ENT_QUOTES, 'UTF-8') ?></span></td>
+                                    <td>
+                                        <div class="appointment-cell-main"><?= htmlspecialchars($row['schedule_display'], ENT_QUOTES, 'UTF-8') ?></div>
+                                        <?php if ($row['schedule_subtitle'] !== ''): ?>
+                                            <div class="appointment-cell-subtitle"><?= htmlspecialchars($row['schedule_subtitle'], ENT_QUOTES, 'UTF-8') ?></div>
+                                        <?php endif; ?>
+                                    </td>
+                                    <td>
+                                        <div class="appointment-status-stack">
+                                            <span class="status-pill <?= htmlspecialchars($row['status_pill'], ENT_QUOTES, 'UTF-8') ?>"><?= htmlspecialchars($row['status_name'], ENT_QUOTES, 'UTF-8') ?></span>
+                                            <?php if ($row['status_subtitle'] !== ''): ?>
+                                                <div class="appointment-cell-subtitle"><?= htmlspecialchars($row['status_subtitle'], ENT_QUOTES, 'UTF-8') ?></div>
+                                            <?php endif; ?>
+                                        </div>
+                                    </td>
                                     <td>
                                         <button
                                             class="btn btn-sm btn-outline-secondary"
@@ -656,7 +766,7 @@ foreach ($appointmentRows as $row) {
                                 </div>
                                 <div class="tracker-form-field">
                                     <label class="tracker-form-label" for="reviewConfirmedDate">Confirmed Date</label>
-                                    <input class="form-control" type="date" name="confirmed_date" id="reviewConfirmedDate">
+                                    <input class="form-control" type="date" name="confirmed_date" id="reviewConfirmedDate" min="<?= htmlspecialchars($minConfirmedDate, ENT_QUOTES, 'UTF-8') ?>" max="<?= htmlspecialchars($maxConfirmedDate, ENT_QUOTES, 'UTF-8') ?>">
                                 </div>
                                 <div class="tracker-form-field">
                                     <label class="tracker-form-label" for="reviewConfirmedTime">Confirmed Time</label>

@@ -195,7 +195,7 @@ function formatFiledDateTime($dateValue, $timeValue): string {
     if ($combined !== '') {
         $timestamp = strtotime($combined);
         if ($timestamp !== false) {
-            return date('M j, Y g:iA', $timestamp);
+            return date('M j, Y g:i A', $timestamp);
         }
     }
 
@@ -272,6 +272,14 @@ if ($action === 'list') {
             'level_name' => $row['level_name'],
             'complainant_name' => $fullName,
             'respondent_name' => $respondentName,
+            'complainant_firstname' => $row['firstname'] ?? '',
+            'complainant_middlename' => $row['middlename'] ?? '',
+            'complainant_lastname' => $row['lastname'] ?? '',
+            'complainant_suffix' => $row['suffix'] ?? '',
+            'respondent_firstname' => $row['respondent_firstname'] ?? '',
+            'respondent_middlename' => $row['respondent_middlename'] ?? '',
+            'respondent_lastname' => $row['respondent_lastname'] ?? '',
+            'respondent_suffix' => $row['respondent_suffix'] ?? '',
         ];
     }
     $stmt->close();

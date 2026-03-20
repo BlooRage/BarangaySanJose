@@ -11,6 +11,7 @@
   const searchInput = document.getElementById('searchInput');
   const refreshBtn = document.getElementById('btnQueueRefresh');
   const filterButtons = Array.from(document.querySelectorAll('.status-filter-btn'));
+  const pendingBadge = document.getElementById('pendingReviewBadge');
   const viewModalEl = document.getElementById('viewModal');
   const viewModal = viewModalEl ? new bootstrap.Modal(viewModalEl) : null;
   const viewModalTitle = document.getElementById('viewModalTitle');
@@ -91,9 +92,16 @@
         <td>${esc(row.complainant_name || '-')}</td>
         <td>${esc(row.complaint_type || '-')}</td>
         <td>${badge(row.request_status_name || 'Pending', toneForStatus(row.request_status_name))}</td>
-        <td><button class="btn btn-sm btn-outline-secondary" data-view-id="${esc(row.request_id)}">View</button></td>
+        <td><span class="compact-table-actions"><button class="btn btn-sm btn-outline-secondary compact-table-btn" data-view-id="${esc(row.request_id)}">View</button></span></td>
       </tr>
     `;
+  }
+
+  function updatePendingBadge() {
+    if (!pendingBadge) return;
+    const count = allRows.filter((row) => String(row?.request_status_name || '').trim().toLowerCase() === 'pending').length;
+    pendingBadge.textContent = String(count);
+    pendingBadge.classList.toggle('d-none', count <= 0);
   }
 
   function renderTable() {
@@ -144,6 +152,7 @@
     try {
       const data = await fetchJson(`${endpoint}?action=list`);
       allRows = Array.isArray(data.items) ? data.items : [];
+      updatePendingBadge();
       applyFilters();
     } catch (error) {
       tableBody.innerHTML = `<tr><td colspan="7" class="text-start text-danger py-4">${esc(error.message || error)}</td></tr>`;

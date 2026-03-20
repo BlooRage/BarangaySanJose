@@ -16,6 +16,26 @@ require_once __DIR__ . "/../includes/admin_guard.php";
     <link rel="stylesheet" href="../../CSS-Styles/Admin-End-CSS/ResidentMasterlistStyle.css?v=20260227-2">
     <link rel="stylesheet" href="../../CSS-Styles/Admin-End-CSS/BlotterMangementStyle.css?v=20260305-1">
     <style>
+        body {
+            overflow-x: hidden;
+        }
+
+        #main-display {
+            min-width: 0;
+            overflow-x: hidden;
+        }
+
+        #div-tableContainer {
+            width: 100%;
+            max-width: 100%;
+            min-width: 0;
+        }
+
+        .blotter-tracker-shell .compact-admin-table-shell {
+            width: 100%;
+            max-width: 100%;
+        }
+
         #table-appData th,
         #table-appData td {
             text-align: left;
@@ -142,22 +162,6 @@ require_once __DIR__ . "/../includes/admin_guard.php";
             font-size: 0.95rem;
         }
 
-        .resident-masterlist-shell .status-filter-btn[data-filter="endorsed"],
-        .resident-masterlist-shell .status-filter-btn[data-filter="dropped"],
-        .resident-masterlist-shell .status-filter-btn[data-filter="active"] {
-            color: #495057;
-            border-color: #6c757d;
-            background: #fff;
-        }
-
-        .resident-masterlist-shell .status-filter-btn[data-filter="endorsed"].active,
-        .resident-masterlist-shell .status-filter-btn[data-filter="dropped"].active,
-        .resident-masterlist-shell .status-filter-btn[data-filter="active"].active {
-            color: #fff !important;
-            background-color: #495057 !important;
-            border-color: #495057 !important;
-            font-weight: 700;
-        }
     </style>
 </head>
 
@@ -376,7 +380,7 @@ require_once __DIR__ . "/../includes/admin_guard.php";
     };
 </script>
 <script src="../../JS-Script-Files/Admin-End/tableColumnsGeneric.js?v=20260215-1"></script>
-<script src="../../JS-Script-Files/Admin-End/blotterTracker.js?v=20260318-3"></script>
+<script src="../../JS-Script-Files/Admin-End/blotterTracker.js?v=20260320-1"></script>
 </body>
 </html>
 

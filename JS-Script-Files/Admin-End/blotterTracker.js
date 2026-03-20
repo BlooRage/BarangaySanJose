@@ -90,33 +90,16 @@
     `;
   }
 
-  function formatNameWithMiddleInitial(fullName) {
-    const raw = String(fullName ?? '').trim().replace(/\s+/g, ' ');
-    if (!raw || raw === '-') return '-';
-    const suffixSet = new Set(['jr', 'jr.', 'sr', 'sr.', 'ii', 'iii', 'iv', 'v']);
-    const tokens = raw.split(' ').filter(Boolean);
-    if (tokens.length < 3) return raw;
+  function formatNameWithMiddleInitial(parts) {
+    const first = String(parts?.firstname ?? '').trim().replace(/\s+/g, ' ');
+    const middle = String(parts?.middlename ?? '').trim().replace(/\s+/g, ' ');
+    const last = String(parts?.lastname ?? '').trim().replace(/\s+/g, ' ');
+    const suffix = String(parts?.suffix ?? '').trim().replace(/\s+/g, ' ');
+    const fallback = String(parts?.fullName ?? '').trim().replace(/\s+/g, ' ');
 
-    let suffix = '';
-    const tail = tokens[tokens.length - 1].toLowerCase();
-    const core = [...tokens];
-    if (suffixSet.has(tail)) {
-      suffix = core.pop() || '';
-    }
-
-    if (core.length < 3) {
-      return [core.join(' '), suffix].filter(Boolean).join(' ');
-    }
-
-    const first = core[0];
-    const last = core[core.length - 1];
-    const middleTokens = core.slice(1, -1);
-    const middleInitials = middleTokens
-      .map((m) => String(m || '').trim())
-      .filter(Boolean)
-      .map((m) => `${m.charAt(0).toUpperCase()}.`);
-
-    return [first, ...middleInitials, last, suffix].filter(Boolean).join(' ');
+    const middleInitial = middle ? `${middle.charAt(0).toUpperCase()}.` : '';
+    const formatted = [first, middleInitial, last, suffix].filter(Boolean).join(' ');
+    return formatted || fallback || '-';
   }
 
   function toneForStatus(statusName) {
@@ -231,8 +214,20 @@ fields.push({ label: 'Address', value: participant?.address || '-', fullWidth: t
     const blotterIdDisplay = row.blotter_id || '-';
     const blotterNumber = row.blotter_number || '-';
     const dateFiled = row.date_filed || '-';
-    const complainant = formatNameWithMiddleInitial(row.complainant_name || '-');
-    const respondent = formatNameWithMiddleInitial(row.respondent_name || '-');
+    const complainant = formatNameWithMiddleInitial({
+      firstname: row.complainant_firstname,
+      middlename: row.complainant_middlename,
+      lastname: row.complainant_lastname,
+      suffix: row.complainant_suffix,
+      fullName: row.complainant_name
+    });
+    const respondent = formatNameWithMiddleInitial({
+      firstname: row.respondent_firstname,
+      middlename: row.respondent_middlename,
+      lastname: row.respondent_lastname,
+      suffix: row.respondent_suffix,
+      fullName: row.respondent_name
+    });
     const status = row.status_name || '-';
     const level = row.level_name || '-';
     const statusBadge = badge(status, toneForStatus(status));
