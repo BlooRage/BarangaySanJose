@@ -82,10 +82,7 @@ function as_count_age_bands(array $rows): array
     $bands = [
         'Male' => 0,
         'Female' => 0,
-        'Minor (0-17)' => 0,
-        'Senior (60+)' => 0,
     ];
-    $today = new DateTimeImmutable('today');
 
     foreach ($rows as $row) {
         $sex = trim((string)($row['sex'] ?? ''));
@@ -93,24 +90,6 @@ function as_count_age_bands(array $rows): array
             $bands['Male']++;
         } elseif ($sex === 'Female') {
             $bands['Female']++;
-        }
-
-        $birthdate = trim((string)($row['birthdate'] ?? ''));
-        if ($birthdate === '' || $birthdate === '0000-00-00') {
-            continue;
-        }
-
-        try {
-            $age = $today->diff(new DateTimeImmutable($birthdate))->y;
-        } catch (Throwable $e) {
-            continue;
-        }
-
-        if ($age < 18) {
-            $bands['Minor (0-17)']++;
-        }
-        if ($age >= 60) {
-            $bands['Senior (60+)']++;
         }
     }
 

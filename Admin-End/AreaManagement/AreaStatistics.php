@@ -21,10 +21,19 @@ require_once __DIR__ . '/../includes/admin_guard.php';
   <?php include __DIR__ . '/../includes/sidebar.php'; ?>
 
   <main class="flex-grow-1 p-3 p-md-4 p-xl-5 bg-light" id="main-display" data-endpoint="../../PhpFiles/Admin-End/areaStatisticsData.php" data-page-scope="barangay">
-    <section class="area-page-header">
-      <h1 class="area-page-title">Area Statistics Summary</h1>
-      <hr class="area-page-rule">
-    </section>
+    <div class="area-loading-overlay" id="areaLoadingOverlay" aria-hidden="true">
+      <div class="area-loading-card" role="status" aria-live="polite">
+        <div class="spinner-border area-loading-spinner" aria-hidden="true"></div>
+        <div>
+          <strong class="area-loading-title">Loading statistics</strong>
+          <p class="area-loading-copy mb-0">Applying filters and refreshing the dashboard.</p>
+        </div>
+      </div>
+    </div>
+    <h2 class="mb-4" style="font-family: 'Charis SIL Bold'; color: #DE710C;">
+      Area Statistics Summary
+    </h2>
+    <hr><br>
 
     <section class="area-filter-panel">
       <div class="area-filter-head">
@@ -153,7 +162,7 @@ require_once __DIR__ . '/../includes/admin_guard.php';
             </div>
             <span class="chart-total">Demographics</span>
           </div>
-          <div class="chart-canvas-wrap">
+          <div class="chart-canvas-wrap area-chart-canvas-wrap--donut">
             <canvas class="area-demographic-chart" aria-label="Area demographic chart"></canvas>
           </div>
         </article>

@@ -10,10 +10,15 @@
   const statusSelect = document.getElementById('statusSelect');
   const resetBtn = document.querySelector('.area-reset-btn');
   const applyBtn = document.getElementById('btnApplyAreaFilters');
+  const loadingOverlay = document.getElementById('areaLoadingOverlay');
   const widgetList = document.getElementById('widgetCustomizerList');
   const resetWidgetBtn = document.getElementById('btnResetWidgetLayout');
   const widgetNodes = Array.from(document.querySelectorAll('[data-widget]'));
   const widgetStorageKey = `area_widget_layout:${fixedScope.replace(/\s+/g, '_').toLowerCase()}:${window.location.pathname.toLowerCase()}`;
+  const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  let hasInitializedLayout = false;
+  let appliedFilterSnapshot = '';
+  let isLoading = false;
 
   const chartPalette = {
     orange: '#de710c',
@@ -41,6 +46,44 @@
     if (dateToInput && !dateToInput.value) dateToInput.value = defaults.to;
     if (moduleSelect && !moduleSelect.value) moduleSelect.value = 'all';
     if (statusSelect && !statusSelect.value) statusSelect.value = 'all';
+  }
+
+  function getCurrentFilterState() {
+    return JSON.stringify({
+      module: moduleSelect?.value || 'all',
+      status: statusSelect?.value || 'all',
+      dateFrom: dateFromInput?.value || '',
+      dateTo: dateToInput?.value || ''
+    });
+  }
+
+  function updateApplyButtonState() {
+    if (!applyBtn) return;
+    applyBtn.disabled = isLoading || getCurrentFilterState() === appliedFilterSnapshot;
+  }
+
+  function markFiltersApplied() {
+    appliedFilterSnapshot = getCurrentFilterState();
+    updateApplyButtonState();
+  }
+
+  function setLoadingState(nextLoading) {
+    isLoading = nextLoading;
+    mainDisplay.classList.toggle('is-loading', nextLoading);
+    if (loadingOverlay) {
+      loadingOverlay.setAttribute('aria-hidden', nextLoading ? 'false' : 'true');
+    }
+
+    if (applyBtn) {
+      applyBtn.textContent = nextLoading ? 'Applying...' : 'Apply Filters';
+    }
+
+    [moduleSelect, dateFromInput, dateToInput, statusSelect, resetBtn].forEach((input) => {
+      if (!input) return;
+      input.disabled = nextLoading;
+    });
+
+    updateApplyButtonState();
   }
 
   function startPageAnimation() {
@@ -74,13 +117,14 @@
         labels: [],
         datasets: [{
           data: [],
-          backgroundColor: [chartPalette.sky, chartPalette.rose, chartPalette.orange, chartPalette.amber],
+          backgroundColor: [chartPalette.sky, chartPalette.rose],
           borderColor: '#fff',
           borderWidth: 4
         }]
       },
       options: {
-        maintainAspectRatio: false,
+        maintainAspectRatio: true,
+        aspectRatio: 1,
         cutout: '62%',
         plugins: { legend: { position: 'bottom', labels: { usePointStyle: true, padding: 16 } } }
       }
@@ -138,6 +182,8 @@
   }
 
   function collapseWidget(node) {
+    node.getAnimations().forEach((animation) => animation.cancel());
+    node.style.display = '';
     node.style.maxHeight = `${node.scrollHeight}px`;
     window.requestAnimationFrame(() => {
       node.classList.add('area-widget-hidden');
@@ -146,9 +192,19 @@
   }
 
   function expandWidget(node) {
+    node.getAnimations().forEach((animation) => animation.cancel());
+    node.style.display = '';
     node.classList.remove('area-widget-hidden');
+    node.style.transform = '';
+    node.style.opacity = '';
+    node.style.marginTop = '';
+    node.style.marginBottom = '';
+    node.style.paddingTop = '';
+    node.style.paddingBottom = '';
+    node.style.borderWidth = '';
     node.style.maxHeight = '0px';
     window.requestAnimationFrame(() => {
+      updateDynamicLayouts();
       node.style.maxHeight = `${node.scrollHeight}px`;
     });
   }
@@ -158,9 +214,19 @@
     if (event.propertyName !== 'max-height') return;
     if (node.classList.contains('area-widget-hidden')) {
       node.style.maxHeight = '0px';
+      node.style.display = 'none';
     } else {
       node.style.maxHeight = 'none';
+      node.style.display = '';
+      node.style.transform = '';
+      node.style.opacity = '';
+      node.style.marginTop = '';
+      node.style.marginBottom = '';
+      node.style.paddingTop = '';
+      node.style.paddingBottom = '';
+      node.style.borderWidth = '';
     }
+    updateDynamicLayouts();
   }
 
   function applyWidgetState() {
@@ -173,8 +239,208 @@
         expandWidget(node);
       } else if (!visible && !alreadyHidden) {
         collapseWidget(node);
+      } else if (!visible && alreadyHidden) {
+        node.style.display = 'none';
+      } else if (visible) {
+        node.style.display = '';
       }
     });
+    updateDynamicLayouts();
+  }
+
+  function visibleGridItems(grid) {
+    return Array.from(grid.querySelectorAll(':scope > .area-grid-item')).filter((item) => !item.classList.contains('area-widget-hidden'));
+  }
+
+  function clearDynamicSpans(items) {
+    items.forEach((item) => {
+      delete item.dataset.dynamicSpan;
+    });
+  }
+
+  function setDynamicSpan(item, span) {
+    item.dataset.dynamicSpan = String(span);
+  }
+
+  function resizeChartsSoon() {
+    window.requestAnimationFrame(() => {
+      Object.values(charts).forEach((chart) => {
+        if (!chart) return;
+        chart.resize();
+        chart.update('none');
+      });
+    });
+  }
+
+  function captureWidgetRects() {
+    const rects = new Map();
+    widgetNodes.forEach((node) => {
+      if (node.style.display === 'none' || node.classList.contains('area-widget-hidden')) return;
+      rects.set(node, node.getBoundingClientRect());
+    });
+    return rects;
+  }
+
+  function animateLayoutShift(beforeRects) {
+    if (prefersReducedMotion || !hasInitializedLayout) return;
+
+    window.requestAnimationFrame(() => {
+      widgetNodes.forEach((node) => {
+        if (node.style.display === 'none' || node.classList.contains('area-widget-hidden')) return;
+
+        const before = beforeRects.get(node);
+        if (!before) return;
+
+        const after = node.getBoundingClientRect();
+        const deltaX = before.left - after.left;
+        const deltaY = before.top - after.top;
+        const scaleX = before.width > 0 ? before.width / Math.max(after.width, 1) : 1;
+        const scaleY = before.height > 0 ? before.height / Math.max(after.height, 1) : 1;
+
+        if (Math.abs(deltaX) < 1 && Math.abs(deltaY) < 1 && Math.abs(scaleX - 1) < 0.01 && Math.abs(scaleY - 1) < 0.01) {
+          return;
+        }
+
+        node.animate(
+          [
+            {
+              transform: `translate(${deltaX}px, ${deltaY}px) scale(${scaleX}, ${scaleY})`,
+              transformOrigin: 'top left'
+            },
+            {
+              transform: 'translate(0, 0) scale(1, 1)',
+              transformOrigin: 'top left'
+            }
+          ],
+          {
+            duration: 520,
+            easing: 'cubic-bezier(0.16, 1, 0.3, 1)',
+            fill: 'both'
+          }
+        );
+      });
+    });
+  }
+
+  function layoutCardGrid(grid) {
+    const items = Array.from(grid.querySelectorAll(':scope > .area-grid-item'));
+    clearDynamicSpans(items);
+
+    const visible = visibleGridItems(grid);
+    for (let index = 0; index < visible.length;) {
+      const remaining = visible.length - index;
+      const rowSize = Math.min(4, remaining);
+      const span = rowSize === 1 ? 12 : rowSize === 2 ? 6 : rowSize === 3 ? 4 : 3;
+
+      for (let rowIndex = 0; rowIndex < rowSize; rowIndex += 1) {
+        setDynamicSpan(visible[index + rowIndex], span);
+      }
+
+      index += rowSize;
+    }
+  }
+
+  function widgetKind(item) {
+    if (item.classList.contains('area-grid-item--full')) return 'full';
+    if (item.classList.contains('area-grid-item--wide')) return 'wide';
+    return 'regular';
+  }
+
+  function layoutContentGrid(grid) {
+    const items = Array.from(grid.querySelectorAll(':scope > .area-grid-item'));
+    clearDynamicSpans(items);
+
+    const visible = visibleGridItems(grid);
+    for (let index = 0; index < visible.length;) {
+      const current = visible[index];
+      const currentKind = widgetKind(current);
+      const next = visible[index + 1];
+      const nextKind = next ? widgetKind(next) : null;
+      const third = visible[index + 2];
+      const thirdKind = third ? widgetKind(third) : null;
+
+      if (currentKind === 'full') {
+        setDynamicSpan(current, 12);
+        index += 1;
+        continue;
+      }
+
+      if (currentKind === 'wide') {
+        if (next && nextKind === 'regular') {
+          setDynamicSpan(current, 8);
+          setDynamicSpan(next, 4);
+          index += 2;
+          continue;
+        }
+
+        setDynamicSpan(current, 12);
+        index += 1;
+        continue;
+      }
+
+      if (next && nextKind === 'regular') {
+        if (third && thirdKind === 'regular') {
+          setDynamicSpan(current, 4);
+          setDynamicSpan(next, 4);
+          setDynamicSpan(third, 4);
+          index += 3;
+          continue;
+        }
+
+        setDynamicSpan(current, 6);
+        setDynamicSpan(next, 6);
+        index += 2;
+        continue;
+      }
+
+      setDynamicSpan(current, 12);
+      index += 1;
+    }
+  }
+
+  function layoutSpotlightSections() {
+    document.querySelectorAll('.area-spotlight').forEach((spotlight) => {
+      const copy = spotlight.querySelector('.area-spotlight-copy');
+      const metrics = spotlight.querySelector('.area-spotlight-metrics');
+      const metricItems = metrics
+        ? Array.from(metrics.children).filter((item) => item.style.display !== 'none' && !item.classList.contains('area-widget-hidden'))
+        : [];
+      const copyVisible = !!(copy && copy.style.display !== 'none' && !copy.classList.contains('area-widget-hidden'));
+
+      spotlight.dataset.copyVisible = copyVisible ? 'true' : 'false';
+      spotlight.dataset.metricCount = String(metricItems.length);
+      spotlight.dataset.layout = copyVisible && metricItems.length > 0
+        ? 'hero-metrics'
+        : copyVisible
+          ? 'hero-only'
+          : 'metrics-only';
+
+      if (!metrics) return;
+
+      const columnCount = metricItems.length <= 1 ? 1 : 2;
+      metrics.style.gridTemplateColumns = `repeat(${columnCount}, minmax(0, 1fr))`;
+    });
+  }
+
+  function updateDynamicLayouts() {
+    const beforeRects = captureWidgetRects();
+
+    layoutSpotlightSections();
+
+    document.querySelectorAll('.area-dashboard-grid').forEach((grid) => {
+      if (grid.classList.contains('area-dashboard-grid--cards')) {
+        layoutCardGrid(grid);
+        return;
+      }
+
+      if (grid.classList.contains('area-dashboard-grid--content')) {
+        layoutContentGrid(grid);
+      }
+    });
+
+    resizeChartsSoon();
+    animateLayoutShift(beforeRects);
+    hasInitializedLayout = true;
   }
 
   function buildWidgetCustomizer() {
@@ -251,6 +517,7 @@
   }
 
   async function loadData() {
+    setLoadingState(true);
     try {
       const response = await fetch(`${endpoint}?${params().toString()}`, { credentials: 'same-origin' });
       if (!response.ok) throw new Error(`Request failed with status ${response.status}`);
@@ -272,16 +539,21 @@
 
       renderHighlights(payload.highlights || []);
       renderTable(payload.table || []);
+      markFiltersApplied();
     } catch (error) {
       renderHighlights([
         { label: 'Load error', value: 'Failed to fetch area statistics.' },
         { label: 'Details', value: error instanceof Error ? error.message : 'Unknown error' }
       ]);
       renderTable([]);
+    } finally {
+      setLoadingState(false);
     }
   }
 
   setDefaults();
+  appliedFilterSnapshot = getCurrentFilterState();
+  updateApplyButtonState();
   widgetNodes.forEach((node) => node.addEventListener('transitionend', finalizeWidgetTransition));
   buildWidgetCustomizer();
   applyWidgetState();
@@ -290,8 +562,10 @@
 
   [moduleSelect, dateFromInput, dateToInput, statusSelect].forEach((input) => {
     if (!input) return;
+    input.addEventListener('change', updateApplyButtonState);
+    input.addEventListener('input', updateApplyButtonState);
     input.addEventListener('keydown', (event) => {
-      if (event.key === 'Enter' && applyBtn) {
+      if (event.key === 'Enter' && applyBtn && !applyBtn.disabled) {
         event.preventDefault();
         loadData();
       }
@@ -305,6 +579,7 @@
       if (statusSelect) statusSelect.value = 'all';
       if (dateFromInput) dateFromInput.value = defaults.from;
       if (dateToInput) dateToInput.value = defaults.to;
+      updateApplyButtonState();
     });
   }
 

@@ -27,13 +27,19 @@ if (!in_array($requestedArea, $allowedAreas, true)) {
   <?php include __DIR__ . '/../includes/sidebar.php'; ?>
 
   <main class="flex-grow-1 p-3 p-md-4 p-xl-5 bg-light" id="main-display" data-endpoint="../../PhpFiles/Admin-End/areaStatisticsData.php" data-page-scope="<?= htmlspecialchars($requestedArea) ?>">
-    <section class="area-page-header area-page-header--with-action">
-      <div>
-        <h1 class="area-page-title"><?= htmlspecialchars($requestedArea) ?> Statistics</h1>
+    <div class="area-loading-overlay" id="areaLoadingOverlay" aria-hidden="true">
+      <div class="area-loading-card" role="status" aria-live="polite">
+        <div class="spinner-border area-loading-spinner" aria-hidden="true"></div>
+        <div>
+          <strong class="area-loading-title">Loading statistics</strong>
+          <p class="area-loading-copy mb-0">Applying filters and refreshing the dashboard.</p>
+        </div>
       </div>
-      <a class="btn btn-outline-secondary btn-sm" href="<?= htmlspecialchars(appUrl('Admin-End/AreaManagement/AreaStatistics.php')) ?>">Back to Summary</a>
-    </section>
-    <hr class="area-page-rule">
+    </div>
+    <h2 class="mb-4" style="font-family: 'Charis SIL Bold'; color: #DE710C;">
+      <?= htmlspecialchars($requestedArea) ?> Statistics
+    </h2>
+    <hr><br>
 
     <section class="area-filter-panel">
       <div class="area-filter-head">
@@ -81,25 +87,25 @@ if (!in_array($requestedArea, $allowedAreas, true)) {
     </section>
 
     <section class="area-spotlight">
-      <div class="area-spotlight-copy" data-widget="profile-hero" data-widget-label="Area Hero">
+      <div class="area-spotlight-copy">
         <p class="area-eyebrow mb-2">Area Profile</p>
         <h2 class="area-spotlight-title mb-2"><?= htmlspecialchars($requestedArea) ?></h2>
         <p class="analytics-copy mb-0">Single-area operational view separated from the barangay summary page.</p>
       </div>
       <div class="area-spotlight-metrics">
-        <div class="area-mini-stat" data-widget="profile-population-card" data-widget-label="Population Tile">
+        <div class="area-mini-stat">
           <span class="area-mini-label">Population</span>
           <strong class="area-mini-value" data-stat="population">0</strong>
         </div>
-        <div class="area-mini-stat" data-widget="profile-households-card" data-widget-label="Households Tile">
+        <div class="area-mini-stat">
           <span class="area-mini-label">Households</span>
           <strong class="area-mini-value" data-stat="households">0</strong>
         </div>
-        <div class="area-mini-stat" data-widget="profile-documents-card" data-widget-label="Documents Tile">
+        <div class="area-mini-stat">
           <span class="area-mini-label">Documents</span>
           <strong class="area-mini-value" data-stat="documents">0</strong>
         </div>
-        <div class="area-mini-stat" data-widget="profile-cases-card" data-widget-label="Cases Tile">
+        <div class="area-mini-stat">
           <span class="area-mini-label">Cases</span>
           <strong class="area-mini-value" data-stat="cases">0</strong>
         </div>
@@ -144,7 +150,7 @@ if (!in_array($requestedArea, $allowedAreas, true)) {
             </div>
             <span class="chart-total">Demographics</span>
           </div>
-          <div class="chart-canvas-wrap">
+          <div class="chart-canvas-wrap area-chart-canvas-wrap--donut">
             <canvas class="area-demographic-chart" aria-label="Area demographic chart"></canvas>
           </div>
         </article>
