@@ -1171,7 +1171,90 @@ function dra_public_base_url(): string {
 function dra_qr_verify_url(string $requestId, string $verificationCode): string {
     $vc = $verificationCode !== '' ? $verificationCode : $requestId;
     return rtrim(dra_public_base_url(), '/')
-        . appUrl('/transaction-information?request_id=' . rawurlencode($requestId) . '&vc=' . rawurlencode($vc));
+        . appUrl('/transactions?request_id=' . rawurlencode($requestId) . '&vc=' . rawurlencode($vc));
+}
+
+function dra_qr_image_fallback_url(string $requestId, string $verificationCode): string {
+    $verifyUrl = dra_qr_verify_url($requestId, $verificationCode);
+    return 'https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=' . rawurlencode($verifyUrl);
+}
+
+function dra_inline_png_data_uri(string $diskPath): string {
+    $diskPath = trim($diskPath);
+    if ($diskPath === '' || !is_file($diskPath) || !is_readable($diskPath)) {
+        return '';
+    }
+    $content = @file_get_contents($diskPath);
+    if ($content === false || $content === '') {
+        return '';
+    }
+    return 'data:image/png;base64,' . base64_encode($content);
+}
+
+function dra_ensure_qr_image(string $requestId, string $verificationCode, string $qrDiskPath): bool {
+    $requestId = trim($requestId);
+    $verificationCode = trim($verificationCode);
+    $qrDiskPath = trim($qrDiskPath);
+    if ($requestId === '' || $verificationCode === '' || $qrDiskPath === '') {
+        return false;
+    }
+
+    $qrDir = dirname($qrDiskPath);
+    if (!is_dir($qrDir)) {
+        @mkdir($qrDir, 0775, true);
+    }
+
+    $verifyUrl = dra_qr_verify_url($requestId, $verificationCode);
+    $metaPath = $qrDiskPath . '.meta.json';
+    if (is_file($qrDiskPath) && @filesize($qrDiskPath) > 0) {
+        $metaRaw = @file_get_contents($metaPath);
+        $meta = is_string($metaRaw) && $metaRaw !== '' ? json_decode($metaRaw, true) : null;
+        $storedVerifyUrl = is_array($meta) ? trim((string)($meta['verify_url'] ?? '')) : '';
+        if ($storedVerifyUrl !== '' && hash_equals($storedVerifyUrl, $verifyUrl)) {
+            return true;
+        }
+    }
+
+    $qrApi = 'https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=' . rawurlencode($verifyUrl);
+    $ctx = stream_context_create([
+        'http' => ['timeout' => 6, 'ignore_errors' => true],
+        'ssl' => ['verify_peer' => false, 'verify_peer_name' => false],
+    ]);
+    $qrContent = @file_get_contents($qrApi, false, $ctx);
+    if ($qrContent !== false && strlen($qrContent) > 500) {
+        $saved = @file_put_contents($qrDiskPath, $qrContent) !== false;
+        if ($saved) {
+            @file_put_contents($metaPath, json_encode([
+                'verify_url' => $verifyUrl,
+                'updated_at' => date('c'),
+            ], JSON_UNESCAPED_SLASHES));
+        }
+        return $saved;
+    }
+
+    // Fallback image when the external QR service is unreachable.
+    if (function_exists('imagecreatetruecolor')) {
+        $img = imagecreatetruecolor(220, 220);
+        if ($img !== false) {
+            $white = imagecolorallocate($img, 255, 255, 255);
+            $black = imagecolorallocate($img, 0, 0, 0);
+            imagefilledrectangle($img, 0, 0, 220, 220, $white);
+            imagerectangle($img, 0, 0, 219, 219, $black);
+            imagestring($img, 4, 78, 90, 'QR', $black);
+            imagestring($img, 2, 12, 198, substr($verificationCode, 0, 28), $black);
+            $saved = imagepng($img, $qrDiskPath);
+            imagedestroy($img);
+            if ($saved) {
+                @file_put_contents($metaPath, json_encode([
+                    'verify_url' => $verifyUrl,
+                    'updated_at' => date('c'),
+                ], JSON_UNESCAPED_SLASHES));
+            }
+            return $saved;
+        }
+    }
+
+    return false;
 }
 
 function dra_humanize_document_type(string $docType): string {
@@ -5472,6 +5555,15 @@ function dra_manual_fill_payload_from_resident(array $payload, array $residentPr
     $payload['sex'] = dra_manual_first_non_empty([
         $payload['sex'] ?? null,
         $payload['gender'] ?? null,
+        $payload['child_sex'] ?? null,
+        $payload['sex_display'] ?? null,
+        $payload['gender_display'] ?? null,
+        $residentProfile['sex'] ?? null,
+    ]);
+    $payload['gender'] = dra_manual_first_non_empty([
+        $payload['gender'] ?? null,
+        $payload['sex'] ?? null,
+        $payload['child_sex'] ?? null,
         $residentProfile['sex'] ?? null,
     ]);
     $payload['civil_status'] = dra_manual_first_non_empty([
@@ -6598,12 +6690,84 @@ if ($action === 'view_issued_card') {
         exit('Barangay ID template assets are not configured.');
     }
 
+    $baseDir = realpath(__DIR__ . '/../../');
+    if ($baseDir === false) {
+        http_response_code(500);
+        exit('Path resolution failed.');
+    }
+
+    $originalVerificationCode = trim((string)($row['verification_code'] ?? ''));
+    $originalQrCodePath = trim((string)($row['qr_code_path'] ?? ''));
+    $verificationCode = $originalVerificationCode;
+    $qrPublicPath = '/UnifiedFileAttachment/IssuedDocuments/QR/qr_' . preg_replace('/[^A-Za-z0-9_-]/', '', $requestId) . '.png';
+    $qrDiskPath = $baseDir . $qrPublicPath;
+    $qrPathChanged = false;
+
+    if ($verificationCode === '') {
+        $verificationCode = strtoupper(bin2hex(random_bytes(8)));
+        $row['verification_code'] = $verificationCode;
+    }
+
+    if (trim((string)($row['qr_code_path'] ?? '')) === '') {
+        $row['qr_code_path'] = $qrPublicPath;
+        $qrPathChanged = true;
+    }
+
+    $hasLocalQr = dra_ensure_qr_image($requestId, $verificationCode, $qrDiskPath);
+    $previewQrPath = ($hasLocalQr || is_file($qrDiskPath))
+        ? dra_inline_png_data_uri($qrDiskPath)
+        : '';
+    if ($previewQrPath === '') {
+        $previewQrPath = dra_qr_image_fallback_url($requestId, $verificationCode);
+    }
+
+    if ($qrPathChanged || $originalVerificationCode !== $verificationCode || $originalQrCodePath !== $qrPublicPath) {
+        $patch = [
+            'verification_code' => $verificationCode,
+            'qr_code_path' => $qrPublicPath,
+        ];
+        $updatedRow = dr_update_stage($conn, $requestId, (string)($row['stage'] ?? ''), $patch);
+        if (is_array($updatedRow)) {
+            $row = $updatedRow;
+        }
+    }
+
+    $row['qr_code_path'] = $previewQrPath;
+
     $payload = dra_decode_request_payload($row);
+    $row['resident_id'] = dra_manual_first_non_empty([
+        $row['resident_id'] ?? null,
+        $payload['resident_id'] ?? null,
+    ]);
+    $row['resident_user_id'] = dra_manual_first_non_empty([
+        $row['resident_user_id'] ?? null,
+        $payload['resident_user_id'] ?? null,
+        $payload['user_id'] ?? null,
+    ]);
     $residentProfile = dra_resident_profile_snapshot(
         $conn,
         trim((string)($row['resident_user_id'] ?? '')),
         trim((string)($row['resident_id'] ?? ''))
     );
+    $payload = dra_manual_fill_payload_from_resident($payload, $residentProfile);
+    $payload['qr_code_path'] = $previewQrPath;
+    $residentSex = trim((string)($residentProfile['sex'] ?? ''));
+    $payload['sex'] = $residentSex !== '' ? $residentSex : dra_manual_first_non_empty([
+        $payload['sex'] ?? null,
+        $payload['gender'] ?? null,
+        $payload['child_sex'] ?? null,
+        $payload['sex_display'] ?? null,
+        $payload['gender_display'] ?? null,
+        $row['sex'] ?? null,
+    ]);
+    $payload['gender'] = $payload['sex'];
+    $payload['card_sex'] = $payload['sex'];
+    $residentProfile['sex'] = $residentSex !== '' ? $residentSex : (string)($residentProfile['sex'] ?? '');
+    $payload['full_address'] = dra_compose_barangay_address((string)($payload['full_address'] ?? $payload['full_address_display'] ?? $payload['address'] ?? ''));
+    $payload['full_address_display'] = $payload['full_address'];
+    $payload['address'] = $payload['full_address'];
+    $payload['emergency_address'] = dra_compose_barangay_address((string)($payload['emergency_address'] ?? ''));
+    $row['sex'] = $residentSex !== '' ? $residentSex : (string)($payload['sex'] ?? '');
     $templateAssets = dra_barangay_id_template_assets();
     $frontTemplateUrl = dra_public_asset_path((string)($templateAssets['front'] ?? ''));
     $backTemplateUrl = dra_public_asset_path((string)($templateAssets['back'] ?? ''));
@@ -6631,7 +6795,7 @@ if ($action === 'view_issued_card') {
         html, body { margin: 0; padding: 0; background: #f3f4f6; font-family: Arial, Helvetica, sans-serif; }
         .barangay-id-issued-shell { padding: 18px; }
       </style>';
-    echo '<script src="' . htmlspecialchars($baseUrl . '/JS-Script-Files/Shared/barangayIdDigital.js?v=20260320-26', ENT_QUOTES, 'UTF-8') . '"></script>';
+    echo '<script src="' . htmlspecialchars($baseUrl . '/JS-Script-Files/Shared/barangayIdDigital.js?v=20260321-04', ENT_QUOTES, 'UTF-8') . '"></script>';
     echo '</head><body>';
     echo '<div id="digitalBarangayIdAdminWrap" class="barangay-id-issued-shell"></div>';
     echo '<script>';
@@ -6803,6 +6967,7 @@ if ($action === 'personnel_approve') {
     }
 
     $isFirstTimeJobSeeker = dra_is_first_time_job_seeker($row);
+    $isBarangayIdDocument = dr_is_barangay_id_document_type((string)($row['document_type'] ?? ''));
     $isClearanceDoc = dr_is_clearance_document_type((string)($row['document_type'] ?? ''));
     if ($isClearanceDoc) {
         dr_ensure_clearance_fee_types_table($conn);
@@ -6810,7 +6975,7 @@ if ($action === 'personnel_approve') {
     }
 
     $defaultFee = dr_get_fee_amount_for_document_type($conn, (string)($row['document_type'] ?? ''));
-    if ($isFirstTimeJobSeeker) {
+    if ($isFirstTimeJobSeeker || $isBarangayIdDocument) {
         $defaultFee = 0.0;
     }
     if (!$isFirstTimeJobSeeker && $isClearanceDoc) {

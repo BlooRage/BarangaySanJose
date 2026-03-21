@@ -189,7 +189,7 @@ $sharedMeta = [
                     <label class="form-check-label" for="placementPublic">Announcements</label>
                     <div class="form-text mt-0">Shows in the announcements area for guest and/or account views.</div>
                   </div>
-                  <div id="dualPlacementNotice" class="alert alert-light border mt-3 mb-0 d-none" role="status">
+                  <div id="dualPlacementNotice" class="rounded-3 border bg-light px-3 py-2 small text-body-secondary mt-3 mb-0 d-none" role="status">
                     Create a separate News Section version and Announcements version below.
                   </div>
                 </div>
@@ -1055,7 +1055,6 @@ $sharedMeta = [
   </script>
 </body>
 </html>
-
 
 
 

@@ -101,10 +101,6 @@ $fullAddress = implode(', ', array_filter([
 
                     <h1 class="form-title">Application for Barangay ID</h1>
                     <p class="form-subtitle">All fields marked with <span class="required-asterisk">*</span> are required</p>
-                    <?php
-                    $barangayIdNavActive = 'apply';
-                    include __DIR__ . '/includes/barangay_id_nav.php';
-                    ?>
 
                     <form method="POST" action="<?= htmlspecialchars($baseUrl) ?>/PhpFiles/Resident-End/documentRequestWorkflow.php">
                         <input type="hidden" name="action" value="submit_request">
@@ -259,7 +255,6 @@ $fullAddress = implode(', ', array_filter([
 </body>
 
 </html>
-
 
 
 
