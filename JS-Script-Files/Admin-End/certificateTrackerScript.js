@@ -3911,10 +3911,11 @@
     const res = await fetch(url, { ...options, headers, credentials: 'same-origin' });
     const contentType = (res.headers.get('content-type') || '').toLowerCase();
     const text = await res.text();
-    const looksHtml = text.trim().startsWith('<!DOCTYPE') || text.trim().startsWith('<html');
+    const bodyText = String(text || '').trim().replace(/^\uFEFF/, '');
+    const looksHtml = bodyText.startsWith('<!DOCTYPE') || bodyText.startsWith('<html');
+    const looksJson = bodyText.startsWith('{') || bodyText.startsWith('[');
 
-    if (!contentType.includes('application/json')) {
-      const bodyText = String(text || '').trim();
+    if (!contentType.includes('application/json') && !looksJson) {
       const lowerBody = bodyText.toLowerCase();
       if (lowerBody.includes('service temporarily unavailable')) {
         throw new Error('Database is temporarily unavailable. Please try again in a moment.');
@@ -3930,7 +3931,7 @@
 
     let data;
     try {
-      data = JSON.parse(text);
+      data = JSON.parse(bodyText);
     } catch (_) {
       throw new Error('Invalid JSON response from server.');
     }

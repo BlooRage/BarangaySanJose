@@ -6347,6 +6347,7 @@ if ($action === 'list') {
                 $row['document_type'] = $docType;
             }
         }
+        $isBarangayIdDocument = dr_is_barangay_id_document_type((string)($row['document_type'] ?? ''));
         if (trim((string)($row['certificate_number'] ?? '')) === '') {
             $issuedCertNo = trim((string)($row['_issuance_certificate_number'] ?? ''));
             if ($issuedCertNo !== '') {
