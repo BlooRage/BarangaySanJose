@@ -87,7 +87,7 @@ $officialsMgmtPositionsByDepartment = [
   <script src="https://kit.fontawesome.com/3482e00999.js" crossorigin="anonymous"></script>
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
   <link rel="stylesheet" href="../CSS-Styles/Admin-End-CSS/AdminDashboardStyle.css">
-  <link rel="stylesheet" href="../CSS-Styles/Admin-End-CSS/ResidentMasterlistStyle.css?v=20260227-2">
+  <link rel="stylesheet" href="../CSS-Styles/Admin-End-CSS/ResidentMasterlistStyle.css?v=20260319-1">
   <style>
     #main-display {
       min-width: 0;
@@ -117,6 +117,23 @@ $officialsMgmtPositionsByDepartment = [
       overflow: hidden;
       text-overflow: ellipsis;
     }
+    .resident-masterlist-shell .status-filter-btn[data-permission-filter] {
+      color: #495057;
+      border-color: #495057;
+      background: #fff;
+    }
+    .resident-masterlist-shell .status-filter-btn[data-permission-filter]:hover,
+    .resident-masterlist-shell .status-filter-btn[data-permission-filter]:focus-visible {
+      color: #343a40;
+      border-color: #343a40;
+      background: #f8f9fa;
+    }
+    .resident-masterlist-shell .status-filter-btn[data-permission-filter].active {
+      color: #fff !important;
+      background-color: #495057 !important;
+      border-color: #495057 !important;
+      font-weight: 700;
+    }
   </style>
 </head>
 <body>
@@ -129,16 +146,16 @@ $officialsMgmtPositionsByDepartment = [
       </h2>
       <hr><br>
 
-      <div class="bg-white p-4 rounded-4 shadow-sm border resident-masterlist-shell officials-masterlist-shell">
+      <div id="div-tableContainer" class="bg-white p-4 rounded-4 shadow-sm border resident-masterlist-shell officials-masterlist-shell">
         <div class="admin-list-toolbar mb-3 pt-2 flex-wrap">
           <div class="admin-list-tabs">
-            <button class="btn btn-outline-primary btn-sm status-filter-btn active" data-filter="ALL">All</button>
-            <button class="btn btn-outline-secondary btn-sm status-filter-btn" data-filter="SuperAdmin">SuperAdmin</button>
-            <button class="btn btn-outline-secondary btn-sm status-filter-btn" data-filter="Official">Official</button>
-            <button class="btn btn-outline-secondary btn-sm status-filter-btn" data-filter="Personnel">Personnel</button>
-            <button class="btn btn-outline-secondary btn-sm status-filter-btn" data-permission-filter="Active">Active</button>
-            <button class="btn btn-outline-secondary btn-sm status-filter-btn has-notif" data-permission-filter="Revoked">
-              Revoked
+            <button class="btn btn-outline-primary btn-sm status-filter-btn active" data-filter="ALL">&nbsp;&nbsp;All&nbsp;&nbsp;</button>
+            <button class="btn btn-outline-secondary btn-sm status-filter-btn fw-semibold" data-filter="SuperAdmin">&nbsp;&nbsp;SuperAdmin&nbsp;&nbsp;</button>
+            <button class="btn btn-outline-secondary btn-sm status-filter-btn fw-semibold" data-filter="Official">&nbsp;&nbsp;Official&nbsp;&nbsp;</button>
+            <button class="btn btn-outline-secondary btn-sm status-filter-btn fw-semibold" data-filter="Personnel">&nbsp;&nbsp;Personnel&nbsp;&nbsp;</button>
+            <button class="btn btn-outline-secondary btn-sm status-filter-btn fw-semibold" data-permission-filter="Active">&nbsp;&nbsp;Active&nbsp;&nbsp;</button>
+            <button class="btn btn-outline-secondary btn-sm status-filter-btn fw-semibold has-notif" data-permission-filter="Revoked">
+              &nbsp;&nbsp;Revoked&nbsp;&nbsp;
               <span id="revokedOfficialsBadge" class="pending-count-badge d-none">0</span>
             </button>
           </div>
@@ -147,7 +164,7 @@ $officialsMgmtPositionsByDepartment = [
               <input id="officialsMgmtSearch" class="form-control" placeholder="Search official ID / user ID / name / department" />
               <span class="input-group-text bg-white"><i class="fas fa-search"></i></span>
             </div>
-            <button id="btnOfficialsMgmtFilter" class="btn btn-outline-secondary btn-icon" type="button" title="Filter" aria-label="Filter" data-bs-toggle="modal" data-bs-target="#modalOfficialsMgmtFilter">
+            <button id="btnOfficialsMgmtFilter" class="btn btn-outline-secondary btn-icon admin-filter" type="button" title="Filter" aria-label="Filter" data-bs-toggle="modal" data-bs-target="#modalOfficialsMgmtFilter">
               <i class="fas fa-filter"></i>
               <span class="visually-hidden">Filter</span>
             </button>
@@ -159,12 +176,11 @@ $officialsMgmtPositionsByDepartment = [
               <i class="fa-solid fa-arrows-rotate"></i>
               <span class="visually-hidden">Refresh</span>
             </button>
-            <span id="officialsMgmtAutoRefreshCountdown" class="small text-muted"></span>
           </div>
         </div>
 
-        <div class="table-responsive">
-          <table id="table-officialsMgmt" class="table table-hover align-middle mb-0 officials-masterlist-table">
+        <div class="table-responsive compact-admin-table-shell">
+          <table id="table-officialsMgmt" class="table table-hover align-middle mb-0 officials-masterlist-table compact-admin-table compact-admin-table--wide">
             <thead class="table-light">
               <tr>
                 <th>Official ID</th>

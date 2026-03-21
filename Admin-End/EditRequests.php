@@ -139,29 +139,29 @@ include "includes/sidebar.php";
         <div id="div-tableContainer" class="bg-white p-4 rounded-4 shadow-sm border edit-requests-shell">
 	            <div class="admin-list-toolbar mb-3 pt-2 flex-wrap">
 	                <div class="admin-list-tabs">
-	                    <button class="btn btn-outline-primary btn-sm status-filter-btn active fw-bold" data-filter="ALL">All</button>
-	                    <button class="btn btn-outline-secondary btn-sm status-filter-btn fw-bold" data-filter="Approved">Approved</button>
-	                    <button class="btn btn-outline-secondary btn-sm status-filter-btn fw-bold" data-filter="Denied">Denied</button>
-                        <button class="btn btn-outline-secondary btn-sm status-filter-btn has-notif fw-bold" data-filter="Pending">
-	                        Pending
+	                    <button class="btn btn-outline-primary btn-sm status-filter-btn active" data-filter="ALL">&nbsp;&nbsp;All&nbsp;&nbsp;</button>
+	                    <button class="btn btn-outline-secondary btn-sm status-filter-btn fw-semibold" data-filter="Approved">&nbsp;&nbsp;Approved&nbsp;&nbsp;</button>
+	                    <button class="btn btn-outline-secondary btn-sm status-filter-btn fw-semibold" data-filter="Denied">&nbsp;&nbsp;Denied&nbsp;&nbsp;</button>
+                        <button class="btn btn-outline-secondary btn-sm status-filter-btn has-notif fw-semibold" data-filter="Pending">
+	                        &nbsp;&nbsp;Pending
 	                        <span id="pendingRequestBadge" class="pending-count-badge d-none">0</span>
 	                    </button>
 	                </div>
 	
-	                <div class="admin-list-actions admin-list-actions--linear">
+	                <div class="admin-list-actions">
 	                    <div class="input-group admin-search">
 	                        <input type="text" id="searchInput" class="form-control" placeholder="Resident ID or Name">
 	                        <span class="input-group-text bg-white"><i class="fas fa-search"></i></span>
 	                    </div>
-	                    <button class="btn btn-outline-secondary btn-linear-control" type="button" data-bs-toggle="modal" data-bs-target="#modalFilter" id="filterButton" title="Filter" aria-label="Filter">
+	                    <button class="btn btn-outline-secondary btn-icon admin-filter" type="button" data-bs-toggle="modal" data-bs-target="#modalFilter" id="filterButton" title="Filter" aria-label="Filter">
 	                        <i class="fas fa-filter"></i>
 	                        <span class="visually-hidden">Filter</span>
 	                    </button>
-	                    <button class="btn btn-outline-secondary btn-linear-control" type="button" data-bs-toggle="modal" data-bs-target="#modalTableColumns" id="btnEditRequestsColumns" title="Columns" aria-label="Columns">
+	                    <button class="btn btn-outline-secondary btn-icon admin-columns" type="button" data-bs-toggle="modal" data-bs-target="#modalTableColumns" id="btnEditRequestsColumns" title="Columns" aria-label="Columns">
 	                        <i class="fa-solid fa-sliders"></i>
 	                        <span class="visually-hidden">Columns</span>
 	                    </button>
-	                    <button class="btn btn-outline-secondary btn-linear-control" type="button" id="btnEditRequestsRefresh" title="Refresh table" aria-label="Refresh table">
+	                    <button class="btn btn-outline-secondary btn-icon admin-refresh" type="button" id="btnEditRequestsRefresh" title="Refresh table" aria-label="Refresh table">
 	                        <i class="fa-solid fa-arrows-rotate"></i>
 	                        <span class="visually-hidden">Refresh</span>
 	                    </button>
@@ -226,6 +226,7 @@ include "includes/sidebar.php";
                     <thead>
                         <tr class="table-light">
                             <th>Request ID</th>
+                            <th>Resident ID</th>
                             <th>Resident</th>
                             <th>Type</th>
                             <th>Submitted</th>
@@ -235,7 +236,7 @@ include "includes/sidebar.php";
                     </thead>
                     <tbody id="tableBody">
                         <tr>
-                            <td colspan="6" class="text-center text-muted py-4">
+                            <td colspan="7" class="text-center text-muted py-4">
                                 No edit requests yet.
                             </td>
                         </tr>

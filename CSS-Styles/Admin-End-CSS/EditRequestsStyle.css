@@ -197,25 +197,6 @@
     transform: none;
 }
 
-.admin-list-actions--linear {
-    gap: 10px;
-}
-
-.btn-linear-control {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    gap: 6px;
-    height: 38px;
-    padding: 0 12px;
-    border-radius: 10px;
-    white-space: nowrap;
-}
-
-.btn-linear-control i {
-    margin: 0 !important;
-}
-
 /* ==========================
    Edit Requests Toolbar
    ========================== */
@@ -231,36 +212,49 @@
     overflow: visible;
 }
 
+.edit-requests-shell .admin-list-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex: 0 0 auto;
+    margin-left: auto;
+}
+
 .edit-requests-shell .status-filter-btn {
     border-radius: 10px;
     border-width: 1px;
     overflow: visible;
 }
 
-.edit-requests-shell .status-filter-btn[data-filter="ALL"] {
+.edit-requests-shell .status-filter-btn[data-filter="ALL"],
+.edit-requests-shell .status-filter-btn[data-filter=""] {
     color: #0d6efd;
     border-color: #0d6efd;
     background: #fff;
 }
 
-.edit-requests-shell .status-filter-btn[data-filter="Pending"],
-.edit-requests-shell .status-filter-btn[data-filter="Approved"],
-.edit-requests-shell .status-filter-btn[data-filter="Denied"] {
+.edit-requests-shell .status-filter-btn:not([data-filter="ALL"]):not([data-filter=""]) {
     color: #495057;
-    border-color: #6c757d;
+    border-color: #495057;
     background: #fff;
 }
 
-.edit-requests-shell .status-filter-btn[data-filter="ALL"].active {
+.edit-requests-shell .status-filter-btn:not([data-filter="ALL"]):not([data-filter=""]):hover,
+.edit-requests-shell .status-filter-btn:not([data-filter="ALL"]):not([data-filter=""]):focus-visible {
+    color: #343a40;
+    border-color: #343a40;
+    background: #f8f9fa;
+}
+
+.edit-requests-shell .status-filter-btn[data-filter="ALL"].active,
+.edit-requests-shell .status-filter-btn[data-filter=""].active {
     color: #fff !important;
     background-color: #0d6efd !important;
     border-color: #0d6efd !important;
     font-weight: 700;
 }
 
-.edit-requests-shell .status-filter-btn[data-filter="Pending"].active,
-.edit-requests-shell .status-filter-btn[data-filter="Approved"].active,
-.edit-requests-shell .status-filter-btn[data-filter="Denied"].active {
+.edit-requests-shell .status-filter-btn:not([data-filter="ALL"]):not([data-filter=""]).active {
     color: #fff !important;
     background-color: #495057 !important;
     border-color: #495057 !important;
@@ -278,14 +272,14 @@
         row-gap: 8px;
     }
 
-    .edit-requests-shell .admin-list-actions--linear {
+    .edit-requests-shell .admin-list-actions {
         width: 100%;
         margin-left: 0;
         flex-wrap: wrap;
         gap: 8px;
     }
 
-    .edit-requests-shell .admin-list-actions--linear .admin-search {
+    .edit-requests-shell .admin-list-actions .admin-search {
         min-width: 0;
         max-width: 100%;
         width: 100%;

@@ -284,7 +284,7 @@ foreach ($appointmentRows as $r) {
               <input id="appointmentSearch" class="form-control" placeholder="Search appointment/applicant/purpose..." />
               <span class="input-group-text bg-white"><i class="fas fa-search"></i></span>
             </div>
-            <button id="btnAppointmentFilter" class="btn btn-outline-secondary btn-icon" type="button" title="Filter" aria-label="Filter" data-bs-toggle="modal" data-bs-target="#modalAppointmentFilter">
+            <button id="btnAppointmentFilter" class="btn btn-outline-secondary btn-icon admin-filter" type="button" title="Filter" aria-label="Filter" data-bs-toggle="modal" data-bs-target="#modalAppointmentFilter">
               <i class="fas fa-filter"></i>
               <span class="visually-hidden">Filter</span>
             </button>

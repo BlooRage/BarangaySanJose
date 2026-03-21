@@ -27,7 +27,7 @@
       </h2>
       <hr><br>
 
-      <div id="div-tableContainer" class="bg-white p-4 rounded-4 shadow-sm border audit-shell">
+      <div id="div-tableContainer" class="bg-white p-4 rounded-4 shadow-sm border resident-masterlist-shell audit-shell">
         <div class="admin-list-toolbar mb-3 pt-2 flex-wrap">
           <div class="admin-list-tabs">
             <div class="text-muted small">System activity trail (latest first)</div>
@@ -38,15 +38,15 @@
               <span class="input-group-text bg-white"><i class="fas fa-search"></i>
             </span>
             </div>
-            <button id="btnAuditFilter" class="btn btn-outline-secondary btn-icon" type="button" title="Filter" aria-label="Filter" data-bs-toggle="modal" data-bs-target="#modalAuditFilter">
+            <button id="btnAuditFilter" class="btn btn-outline-secondary btn-icon admin-filter" type="button" title="Filter" aria-label="Filter" data-bs-toggle="modal" data-bs-target="#modalAuditFilter">
               <i class="fas fa-filter"></i>
               <span class="visually-hidden">Filter</span>
             </button>
-            <button id="btnAuditColumns" class="btn btn-outline-secondary btn-icon" type="button" title="Columns" aria-label="Columns" data-bs-toggle="modal" data-bs-target="#modalAuditColumns">
+            <button id="btnAuditColumns" class="btn btn-outline-secondary btn-icon admin-columns" type="button" title="Columns" aria-label="Columns" data-bs-toggle="modal" data-bs-target="#modalAuditColumns">
               <i class="fa-solid fa-sliders"></i>
               <span class="visually-hidden">Columns</span>
             </button>
-            <button id="btnAuditRefresh" class="btn btn-outline-secondary btn-icon" type="button" title="Refresh table" aria-label="Refresh table">
+            <button id="btnAuditRefresh" class="btn btn-outline-secondary btn-icon admin-refresh" type="button" title="Refresh table" aria-label="Refresh table">
               <i class="fa-solid fa-arrows-rotate"></i>
               <span class="visually-hidden">Refresh</span>
             </button>
@@ -55,8 +55,8 @@
           </div>
         </div>
 
-        <div class="table-responsive">
-          <table class="table table-hover align-middle mb-0 audit-table">
+        <div class="table-responsive compact-admin-table-shell">
+          <table class="table table-hover align-middle mb-0 audit-table compact-admin-table compact-admin-table--wide">
             <thead class="table-light">
               <tr id="auditTheadRow"></tr>
             </thead>

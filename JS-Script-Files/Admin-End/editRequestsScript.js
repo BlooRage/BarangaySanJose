@@ -86,7 +86,7 @@ document.addEventListener("DOMContentLoaded", () => {
     if (pageRows.length === 0) {
       tbody.innerHTML = `
         <tr>
-          <td colspan="6" class="text-center text-muted py-4">
+          <td colspan="7" class="text-center text-muted py-4">
             No edit requests yet.
           </td>
         </tr>
@@ -94,17 +94,14 @@ document.addEventListener("DOMContentLoaded", () => {
       return;
     }
 
-    tbody.innerHTML = filtered
-      .slice(start, start + entriesPerPage)
+    tbody.innerHTML = pageRows
       .map((row) => {
         const statusText = statusLabel(row.status_name);
         return `
           <tr>
             <td>${row.request_id}</td>
-            <td>
-              <div class="fw-semibold">${row.resident_name || "—"}</div>
-              <div class="text-muted small">${row.resident_id || "—"}</div>
-            </td>
+            <td>${row.resident_id || "—"}</td>
+            <td><div class="fw-semibold">${row.resident_name || "—"}</div></td>
             <td class="text-capitalize">${row.request_type || "—"}</td>
             <td>${formatDate(row.created_at)}</td>
             <td>
@@ -261,7 +258,7 @@ document.addEventListener("DOMContentLoaded", () => {
     } catch (err) {
       tbody.innerHTML = `
         <tr>
-          <td colspan="6" class="text-center text-danger py-4">
+          <td colspan="7" class="text-center text-danger py-4">
             ${err?.message || "Failed to load edit requests."}
           </td>
         </tr>

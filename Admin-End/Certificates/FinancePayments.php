@@ -1010,7 +1010,7 @@ if ($financeSection === 'fees') {
               <input type="text" id="searchInput" class="form-control" placeholder="Request ID, resident ID, name, document">
               <span class="input-group-text bg-white"><i class="fas fa-search"></i></span>
             </div>
-            <button class="btn btn-outline-secondary btn-icon" type="button" data-bs-toggle="modal" data-bs-target="#modalFinanceFilter" id="btnFinanceFilter" title="Filter" aria-label="Filter">
+            <button class="btn btn-outline-secondary btn-icon admin-filter" type="button" data-bs-toggle="modal" data-bs-target="#modalFinanceFilter" id="btnFinanceFilter" title="Filter" aria-label="Filter">
               <i class="fas fa-filter"></i>
               <span class="visually-hidden">Filter</span>
             </button>

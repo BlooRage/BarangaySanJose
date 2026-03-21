@@ -38,6 +38,9 @@ if ($certificateLaunchTab === 'manual' && $certificateLaunchDocument === 'barang
       gap: 12px;
       overflow: visible;
     }
+    #docRequestsPanel {
+      border-top-left-radius: 0 !important;
+    }
     .certificate-tracker-shell .stage-filter-btn {
       border-radius: 10px;
       border-width: 1px;
@@ -2006,7 +2009,7 @@ if ($certificateLaunchTab === 'manual' && $certificateLaunchDocument === 'barang
             <input type="text" id="searchInput" class="form-control" placeholder="Request ID, resident ID, name, address">
             <span class="input-group-text bg-white"><i class="fas fa-search"></i></span>
           </div>
-          <button class="btn btn-outline-secondary btn-icon" type="button" id="filterButton" title="Filter" aria-label="Filter">
+          <button class="btn btn-outline-secondary btn-icon admin-filter" type="button" id="filterButton" title="Filter" aria-label="Filter">
             <i class="fas fa-filter"></i>
             <span class="visually-hidden">Filter</span>
           </button>
@@ -2044,7 +2047,7 @@ if ($certificateLaunchTab === 'manual' && $certificateLaunchDocument === 'barang
       </div>
     </div>
 
-    <div id="manualIssuancePanel" class="d-none bg-white p-4 rounded-4 rounded-tl-0 shadow-sm border certificate-tracker-shell">
+    <div id="manualIssuancePanel" class="d-none bg-white p-4 rounded-4 shadow-sm border certificate-tracker-shell">
       <div class="manual-issuance-header mb-4">
         <div>
           <h5 class="fw-bold mb-1">Manual / Walk-in Document Issuance</h5>
@@ -2292,7 +2295,7 @@ if ($certificateLaunchTab === 'manual' && $certificateLaunchDocument === 'barang
     </div>
 
     <!-- ── FEE CHANGE REQUESTS PANEL ──────────────────────────────────────── -->
-    <div id="feeChangePanel" class="d-none bg-white p-4 rounded-4 rounded-tl-0 shadow-sm border certificate-tracker-shell">
+    <div id="feeChangePanel" class="d-none bg-white p-4 rounded-4 shadow-sm border certificate-tracker-shell">
 
       <!-- Sub-tabs -->
       <ul class="nav nav-pills mb-4" id="feeChangeSubTabs">

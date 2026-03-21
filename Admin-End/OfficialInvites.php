@@ -532,6 +532,43 @@ if ($q) {
         $rows[] = $row;
     }
 }
+
+function oi_status_pill_class(string $value, string $type = 'generic'): string {
+    $normalized = strtolower(trim($value));
+
+    if ($type === 'invite_status') {
+        if ($normalized === 'completed') {
+            return 'approved';
+        }
+        if ($normalized === 'revoked' || $normalized === 'expired') {
+            return 'denied';
+        }
+        if ($normalized === 'pending' || $normalized === 'inprogress') {
+            return 'pending';
+        }
+    }
+
+    if ($type === 'invite_step') {
+        if ($normalized === 'completed') {
+            return 'approved';
+        }
+        if ($normalized === 'password' || $normalized === 'profile' || $normalized === 'verification') {
+            return 'pending';
+        }
+    }
+
+    if (preg_match('/active|approved|verified|completed/', $normalized)) {
+        return 'approved';
+    }
+    if (preg_match('/revoked|rejected|denied|expired|inactive|disabled|suspended/', $normalized)) {
+        return 'denied';
+    }
+    if (preg_match('/pending|progress|review|password|profile|verification/', $normalized)) {
+        return 'pending';
+    }
+
+    return 'archived';
+}
 ?>
 <!doctype html>
 <html lang="en">
@@ -542,7 +579,9 @@ if ($q) {
     <script src="https://kit.fontawesome.com/3482e00999.js" crossorigin="anonymous"></script>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css">
     <link rel="stylesheet" href="../CSS-Styles/Admin-End-CSS/AdminDashboardStyle.css">
+    <link rel="stylesheet" href="../CSS-Styles/Admin-End-CSS/ResidentMasterlistStyle.css?v=20260319-1">
     <style>
+      #main-display { min-width: 0; }
       .invite-form-shell { border: 1px solid #f1e1cf; border-radius: 16px; background: #fff; }
       .invite-form-header { border-bottom: 1px solid #f3e7d9; padding-bottom: 12px; margin-bottom: 16px; }
       .invite-section { border: 1px solid #ececec; border-radius: 12px; background: #fcfcfd; padding: 14px 14px 10px; }
@@ -564,6 +603,40 @@ if ($q) {
       .invite-modal-title-centered { width: 100%; text-align: center; font-weight: 700; }
       .invite-auth-summary { font-size: 0.95rem; line-height: 1.45; color: #374151; }
       .invite-auth-summary strong { color: #111827; }
+      .invite-history-shell {
+        border: 1px solid #f1e1cf;
+        border-radius: 16px;
+        background: #fff;
+        width: 100%;
+        max-width: 100%;
+        overflow-x: hidden;
+        overflow-y: visible;
+      }
+      .invite-history-shell .table-responsive {
+        overflow-x: auto;
+        overflow-y: visible;
+        -webkit-overflow-scrolling: touch;
+      }
+      .invite-history-table {
+        min-width: 1280px;
+      }
+      .invite-history-table th,
+      .invite-history-table td {
+        vertical-align: middle;
+      }
+      .invite-history-table th:nth-child(2),
+      .invite-history-table td:nth-child(2) {
+        min-width: 220px;
+        white-space: nowrap;
+      }
+      .invite-history-table th:nth-child(9),
+      .invite-history-table td:nth-child(9) {
+        min-width: 185px;
+        white-space: nowrap;
+      }
+      .invite-history-table td:nth-child(10) {
+        white-space: nowrap;
+      }
     </style>
 </head>
 <body class="bg-light">
@@ -712,11 +785,13 @@ if ($q) {
             </div>
         </div>
 
-        <div class="card shadow-sm">
-            <div class="card-body">
-                <h5 class="card-title">Recent Invites</h5>
-                <div class="table-responsive">
-                    <table class="table table-sm align-middle">
+        <div id="div-tableContainer" class="shadow-sm mb-4 p-4 invite-history-shell resident-masterlist-shell">
+            <div class="invite-form-header">
+                <h5 class="card-title mb-1">Recent Invites</h5>
+                <div class="invite-help">Latest 100 invite records with onboarding state and remaining actions.</div>
+            </div>
+                <div class="table-responsive compact-admin-table-shell">
+                    <table class="table table-sm align-middle mb-0 invite-history-table compact-admin-table compact-admin-table--wide">
                         <thead>
                         <tr>
                             <th>ID</th>
@@ -735,6 +810,8 @@ if ($q) {
                         <?php foreach ($rows as $r): ?>
                             <?php
                             $name = trim(($r['firstname'] ?? '') . ' ' . (($r['middlename'] ?? '') !== '' ? ($r['middlename'] . ' ') : '') . ($r['lastname'] ?? '') . (($r['suffix'] ?? '') !== '' ? (' ' . $r['suffix']) : ''));
+                            $statusValue = (string)($r['status'] ?? '');
+                            $stepValue = (string)($r['onboarding_step'] ?? '');
                             ?>
                             <tr>
                                 <td><?= htmlspecialchars((string)((trim((string)($r['invite_code'] ?? '')) !== '') ? $r['invite_code'] : (string)((int)$r['invite_id'])), ENT_QUOTES, 'UTF-8') ?></td>
@@ -756,10 +833,11 @@ if ($q) {
                                     <div><?= htmlspecialchars((string)$r['invite_email'], ENT_QUOTES, 'UTF-8') ?></div>
                                     <div class="text-muted">+63<?= htmlspecialchars((string)$r['invite_phone'], ENT_QUOTES, 'UTF-8') ?></div>
                                 </td>
-                                <td><?= htmlspecialchars((string)$r['status'], ENT_QUOTES, 'UTF-8') ?></td>
-                                <td><?= htmlspecialchars((string)$r['onboarding_step'], ENT_QUOTES, 'UTF-8') ?></td>
+                                <td><span class="status-pill <?= htmlspecialchars(oi_status_pill_class($statusValue, 'invite_status'), ENT_QUOTES, 'UTF-8') ?>"><?= htmlspecialchars($statusValue, ENT_QUOTES, 'UTF-8') ?></span></td>
+                                <td><span class="status-pill <?= htmlspecialchars(oi_status_pill_class($stepValue, 'invite_step'), ENT_QUOTES, 'UTF-8') ?>"><?= htmlspecialchars($stepValue, ENT_QUOTES, 'UTF-8') ?></span></td>
                                 <td><?= htmlspecialchars((string)$r['expires_at'], ENT_QUOTES, 'UTF-8') ?></td>
                                 <td>
+                                    <div class="compact-table-actions">
                                     <?php if ((string)$r['status'] === 'Pending'): ?>
                                         <form method="post" class="d-inline">
                                             <input type="hidden" name="action" value="resend_invite">
@@ -768,7 +846,7 @@ if ($q) {
                                             <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($csrfToken, ENT_QUOTES, 'UTF-8') ?>">
                                             <button
                                                 type="button"
-                                                class="btn btn-outline-primary btn-sm js-invite-action-btn"
+                                                class="btn btn-outline-primary btn-sm compact-table-btn js-invite-action-btn"
                                                 data-action-label="Resend"
                                                 data-action-verb="resend"
                                                 data-invite-name="<?= htmlspecialchars($name, ENT_QUOTES, 'UTF-8') ?>"
@@ -783,20 +861,20 @@ if ($q) {
                                             <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($csrfToken, ENT_QUOTES, 'UTF-8') ?>">
                                             <button
                                                 type="button"
-                                                class="btn btn-outline-danger btn-sm js-invite-action-btn"
+                                                class="btn btn-outline-danger btn-sm compact-table-btn js-invite-action-btn"
                                                 data-action-label="Revoke"
                                                 data-action-verb="revoke"
                                                 data-invite-name="<?= htmlspecialchars($name, ENT_QUOTES, 'UTF-8') ?>"
                                             >Revoke</button>
                                         </form>
                                     <?php endif; ?>
+                                    </div>
                                 </td>
                             </tr>
                         <?php endforeach; ?>
                         </tbody>
                     </table>
                 </div>
-            </div>
         </div>
 
     </main>

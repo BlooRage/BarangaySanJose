@@ -142,7 +142,33 @@ html, body {
     }
 }
 
-/* "Columns" (blue) + "Refresh" (orange) button styling shared across admin list pages. */
+/* "Filter" (slate) + "Columns" (blue) + "Refresh" (orange) button styling shared across admin list pages. */
+.admin-filter {
+    border-color: rgba(108, 117, 125, 0.28);
+    color: #495057;
+    background: linear-gradient(180deg, #fbfcfd 0%, #f3f6f8 100%);
+    font-weight: 700;
+    letter-spacing: 0.2px;
+    transition: transform 120ms ease, box-shadow 120ms ease, background-color 120ms ease, border-color 120ms ease;
+}
+
+.admin-filter:hover {
+    border-color: rgba(73, 80, 87, 0.45);
+    color: #343a40;
+    background: linear-gradient(180deg, #f8fafb 0%, #edf1f4 100%);
+    box-shadow: 0 10px 18px rgba(73, 80, 87, 0.10);
+    transform: translateY(-1px);
+}
+
+.admin-filter:active {
+    transform: translateY(0);
+    box-shadow: 0 6px 12px rgba(73, 80, 87, 0.10);
+}
+
+.admin-filter:focus-visible {
+    box-shadow: 0 0 0 .2rem rgba(108, 117, 125, 0.18);
+}
+
 .admin-columns {
     border-color: rgba(13, 110, 253, 0.25);
     color: #0d47a1;
@@ -354,9 +380,47 @@ html, body {
     border: 2px solid #d5dbe1;
 }
 
+.sector-apps-shell #table-sectorApps {
+    table-layout: fixed;
+    min-width: 980px;
+}
+
 #table-sectorApps th:nth-child(4),
 #table-sectorApps td:nth-child(4) {
-    text-align: center;
+    width: 180px;
+    text-align: left;
+}
+
+.sector-apps-shell #table-sectorApps td:nth-child(4) > div {
+    align-items: flex-start;
+}
+
+.sector-apps-shell #table-sectorApps th:last-child,
+.sector-apps-shell #table-sectorApps td:last-child {
+    width: 120px;
+    text-align: left;
+    white-space: nowrap;
+}
+
+.sector-apps-shell #table-sectorApps .compact-table-actions {
+    justify-content: flex-start;
+    width: 100%;
+}
+
+.sector-apps-shell #table-sectorApps .compact-table-btn,
+.sector-apps-shell #table-sectorApps button[data-view-id] {
+    color: #fff;
+    border-color: #0d6efd;
+    background: #0d6efd;
+    font-weight: 700;
+    letter-spacing: 0.15px;
+}
+
+.sector-apps-shell #table-sectorApps .compact-table-btn:hover,
+.sector-apps-shell #table-sectorApps button[data-view-id]:hover {
+    color: #fff;
+    border-color: #0b5ed7;
+    background: #0b5ed7;
 }
 
 
@@ -730,17 +794,10 @@ h2.section-title {
     color: #fff !important;
 }
 
-/* Make search input and filter button align perfectly */
-#searchInput,
-#filterButton {
-    height: 38px; /* same as Bootstrap default form-control height */
-    padding: 0.375rem 0.75rem; /* match Bootstrap input padding */
-}
-
-#filterButton {
-    display: flex;
-    align-items: center;
-    justify-content: center;
+/* Keep household search input aligned with admin toolbar controls */
+#searchInput {
+    height: 38px;
+    padding: 0.375rem 0.75rem;
 }
 
 /* Keep document confirm modal actions on one row */
@@ -889,6 +946,30 @@ h2.section-title {
     line-height: 1.15;
 }
 
+.compact-admin-table .compact-table-btn.btn-outline-secondary,
+.compact-admin-table .compact-table-btn.btn-outline-primary,
+.compact-admin-table .compact-table-btn.btn-primary,
+.compact-admin-table .viewEntryBtn,
+.compact-admin-table .btn-view-appointment,
+.compact-admin-table button[data-view-id] {
+    color: #fff;
+    border-color: #0d6efd;
+    background: #0d6efd;
+    font-weight: 400 !important;
+    letter-spacing: 0.15px;
+}
+
+.compact-admin-table .compact-table-btn.btn-outline-secondary:hover,
+.compact-admin-table .compact-table-btn.btn-outline-primary:hover,
+.compact-admin-table .compact-table-btn.btn-primary:hover,
+.compact-admin-table .viewEntryBtn:hover,
+.compact-admin-table .btn-view-appointment:hover,
+.compact-admin-table button[data-view-id]:hover {
+    color: #fff;
+    border-color: #0b5ed7;
+    background: #0b5ed7;
+}
+
 .compact-admin-table-shell::-webkit-scrollbar {
     height: 8px;
 }
@@ -954,22 +1035,6 @@ h2.section-title {
     align-items: center;
     gap: 0.25rem;
     flex-wrap: nowrap;
-}
-
-.resident-masterlist-shell #filterButton,
-.resident-masterlist-shell #btnResidentColumns,
-.resident-masterlist-shell #btnResidentTableRefresh {
-    color: #6c757d;
-    border-color: #6c757d;
-    background-color: #fff;
-}
-
-.resident-masterlist-shell #filterButton:hover,
-.resident-masterlist-shell #btnResidentColumns:hover,
-.resident-masterlist-shell #btnResidentTableRefresh:hover {
-    color: #495057;
-    border-color: #495057;
-    background-color: #f8f9fa;
 }
 
 .resident-masterlist-shell #btnResidentTableRefresh.is-loading i {

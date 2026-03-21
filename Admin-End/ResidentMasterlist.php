@@ -10,7 +10,7 @@
     <script src="https://kit.fontawesome.com/3482e00999.js" crossorigin="anonymous"></script>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="../CSS-Styles/Admin-End-CSS/AdminDashboardStyle.css">
-    <link rel="stylesheet" href="../CSS-Styles/Admin-End-CSS/ResidentMasterlistStyle.css?v=20260319-1">
+    <link rel="stylesheet" href="../CSS-Styles/Admin-End-CSS/ResidentMasterlistStyle.css?v=20260321-2">
     <style>
         .resident-masterlist-shell .table-responsive {
             overflow-x: auto;
@@ -143,15 +143,15 @@ if (isset($conn) && $conn instanceof mysqli) {
 	                        <input type="text" id="searchInput" class="form-control" placeholder="Resident ID or Name">
 	                        <span class="input-group-text bg-white"><i class="fas fa-search"></i></span>
 	                    </div>
-	                    <button class="btn btn-outline-secondary btn-icon" type="button" data-bs-toggle="modal" data-bs-target="#modalFilter" id="filterButton" title="Filter" aria-label="Filter">
+	                    <button class="btn btn-outline-secondary btn-icon admin-filter" type="button" data-bs-toggle="modal" data-bs-target="#modalFilter" id="filterButton" title="Filter" aria-label="Filter">
 	                        <i class="fas fa-filter"></i>
 	                        <span class="visually-hidden">Filter</span>
 	                    </button>
-	                    <button class="btn btn-outline-secondary btn-icon" type="button" data-bs-toggle="modal" data-bs-target="#modalTableColumns" id="btnResidentColumns" title="Columns" aria-label="Columns">
+	                    <button class="btn btn-outline-secondary btn-icon admin-columns" type="button" data-bs-toggle="modal" data-bs-target="#modalTableColumns" id="btnResidentColumns" title="Columns" aria-label="Columns">
 	                        <i class="fa-solid fa-sliders"></i>
 	                        <span class="visually-hidden">Columns</span>
 	                    </button>
-	                    <button class="btn btn-outline-secondary btn-icon" type="button" id="btnResidentTableRefresh" title="Refresh table" aria-label="Refresh table">
+	                    <button class="btn btn-outline-secondary btn-icon admin-refresh" type="button" id="btnResidentTableRefresh" title="Refresh table" aria-label="Refresh table">
 	                        <i class="fa-solid fa-arrows-rotate"></i>
 	                        <span class="visually-hidden">Refresh</span>
 	                    </button>
@@ -897,6 +897,6 @@ if (isset($conn) && $conn instanceof mysqli) {
   };
 </script>
 <script src="../JS-Script-Files/Admin-End/tableColumnsGeneric.js?v=20260215-1"></script>
-<script src="../JS-Script-Files/Admin-End/residentMasterlistScript.js?v=20260319-1"></script>
+<script src="../JS-Script-Files/Admin-End/residentMasterlistScript.js?v=20260321-2"></script>
 </body>
 </html>

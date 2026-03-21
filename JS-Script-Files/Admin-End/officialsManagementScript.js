@@ -48,10 +48,28 @@
       "'": "&#39;",
     }[match]));
 
-  const badgeHtml = (text, tone) => {
-    const cls = tone === "ok" ? "bg-success" : tone === "danger" ? "bg-danger" : "bg-secondary";
-    return `<span class="badge ${cls}">${escapeHtml(safe(text))}</span>`;
+  const statusPillClass = (value, type = "generic") => {
+    const normalized = String(value ?? "").trim().toLowerCase();
+
+    if (type === "permission") {
+      return normalized === "revoked" ? "denied" : "approved";
+    }
+
+    if (type === "profileApproval") {
+      if (normalized === "approved") return "approved";
+      if (normalized === "rejected") return "denied";
+      return "pending";
+    }
+
+    if (/active|verified|enabled|approved|completed/.test(normalized)) return "approved";
+    if (/revoked|rejected|denied|inactive|disabled|suspended/.test(normalized)) return "denied";
+    if (/pending|onboarding|review/.test(normalized)) return "pending";
+
+    return "archived";
   };
+
+  const statusPillHtml = (text, type) =>
+    `<span class="status-pill ${statusPillClass(text, type)}">${escapeHtml(safe(text))}</span>`;
 
   const getUniqueValues = (key) => {
     const values = new Set();
@@ -247,9 +265,7 @@
     }
 
     tbody.innerHTML = pageRows.map((row) => {
-      const permissionTone = String(row.permission_state || "") === "Revoked" ? "danger" : "ok";
       const approvalState = String(row.profile_approval_state || "PendingApproval");
-      const approvalTone = approvalState === "Approved" ? "ok" : (approvalState === "Rejected" ? "danger" : "secondary");
 
       return `
         <tr>
@@ -261,9 +277,9 @@
           <td>${escapeHtml(safe(row.department))}</td>
           <td>${escapeHtml(safe(row.employment_status))}</td>
           <td>${escapeHtml(safe(row.date_hired))}</td>
-          <td>${escapeHtml(safe(row.account_status))}</td>
-          <td>${badgeHtml(row.permission_state, permissionTone)}</td>
-          <td>${badgeHtml(approvalState, approvalTone)}</td>
+          <td>${statusPillHtml(row.account_status, "accountStatus")}</td>
+          <td>${statusPillHtml(row.permission_state, "permission")}</td>
+          <td>${statusPillHtml(approvalState, "profileApproval")}</td>
           <td>${actionButtonHtml(row)}</td>
         </tr>
       `;

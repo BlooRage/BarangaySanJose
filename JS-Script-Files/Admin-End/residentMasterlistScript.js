@@ -62,6 +62,14 @@ document.addEventListener("DOMContentLoaded", () => {
     searchInput.value = initialResidentSearch;
   }
 
+  const syncActiveFilterButtons = () => {
+    document.querySelectorAll(".status-filter-btn").forEach((button) => {
+      button.classList.toggle("active", String(button.dataset.filter || "") === activeFilter);
+    });
+  };
+
+  syncActiveFilterButtons();
+
   const viewModalEl = document.getElementById("modal-viewEntry");
   const verifyResidentModalEl = document.getElementById("modal-verifyResidentConfirm");
   const verifyWarningModalEl = document.getElementById("modal-verifyResidentWarning");
@@ -411,9 +419,8 @@ document.addEventListener("DOMContentLoaded", () => {
   // ========================
   document.querySelectorAll(".status-filter-btn").forEach(btn => {
     btn.addEventListener("click", () => {
-      document.querySelectorAll(".status-filter-btn").forEach(b => b.classList.remove("active"));
-      btn.classList.add("active");
       activeFilter = btn.dataset.filter;
+      syncActiveFilterButtons();
       currentPage = 1;
       applyFilterAndRender();
     });

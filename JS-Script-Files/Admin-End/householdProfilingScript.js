@@ -37,6 +37,29 @@ document.addEventListener("DOMContentLoaded", () => {
     return raw;
   }
 
+  function syncDisplayModeControls() {
+    if (displayModeAddresses) displayModeAddresses.checked = activeDisplayMode === "addresses";
+    if (displayModeHeads) displayModeHeads.checked = activeDisplayMode === "heads";
+    if (filterHouseholdCountInput) {
+      const disableCount = activeDisplayMode === "heads";
+      filterHouseholdCountInput.disabled = disableCount;
+      if (disableCount) filterHouseholdCountInput.value = "";
+    }
+    if (searchInput) {
+      searchInput.placeholder = activeDisplayMode === "heads"
+        ? "Resident ID, Name, or Address"
+        : "Address ID or Address Name";
+    }
+  }
+
+  function applyDisplayMode(mode) {
+    activeDisplayMode = mode === "heads" ? "heads" : "addresses";
+    if (activeDisplayMode === "heads") {
+      activeHouseholdCountFilter = "";
+    }
+    syncDisplayModeControls();
+  }
+
   function getFilteredAddresses() {
     let filtered = allAddresses;
 
@@ -74,6 +97,7 @@ document.addEventListener("DOMContentLoaded", () => {
       });
   }
   fetchHeads();
+  syncDisplayModeControls();
 
   const renderCountdown = () => {
     if (!countdownEl) return;
@@ -175,24 +199,12 @@ document.addEventListener("DOMContentLoaded", () => {
   // ========================
   if (btnApplyFilter) {
     btnApplyFilter.addEventListener("click", () => {
-      activeDisplayMode = displayModeHeads && displayModeHeads.checked ? "heads" : "addresses";
+      applyDisplayMode(displayModeHeads && displayModeHeads.checked ? "heads" : "addresses");
       const checkedBoxes = document.querySelectorAll(".filter-checkbox:checked");
       activeAreaFilters = Array.from(checkedBoxes).map(cb => cb.value);
       activeHouseholdCountFilter = filterHouseholdCountInput ? filterHouseholdCountInput.value.trim() : "";
-      if (activeDisplayMode === "heads") {
-        activeHouseholdCountFilter = "";
-        if (filterHouseholdCountInput) {
-          filterHouseholdCountInput.value = "";
-          filterHouseholdCountInput.disabled = true;
-        }
-      } else if (filterHouseholdCountInput) {
-        filterHouseholdCountInput.disabled = false;
-      }
-      if (searchInput) {
-        searchInput.placeholder = activeDisplayMode === "heads"
-          ? "Resident ID, Name, or Address"
-          : "Address ID or Address Name";
-      }
+      if (activeDisplayMode === "heads") activeHouseholdCountFilter = "";
+      syncDisplayModeControls();
       fetchHeads(searchInput ? searchInput.value.trim() : "");
       renderTable(getFilteredAddresses());
 
@@ -210,11 +222,7 @@ document.addEventListener("DOMContentLoaded", () => {
       activeAreaFilters = [];
       activeHouseholdCountFilter = "";
       if (filterHouseholdCountInput) filterHouseholdCountInput.value = "";
-      if (displayModeAddresses) displayModeAddresses.checked = true;
-      if (displayModeHeads) displayModeHeads.checked = false;
-      activeDisplayMode = "addresses";
-      if (filterHouseholdCountInput) filterHouseholdCountInput.disabled = false;
-      if (searchInput) searchInput.placeholder = "Address ID or Address Name";
+      applyDisplayMode("addresses");
       fetchHeads(searchInput ? searchInput.value.trim() : "");
       renderTable(getFilteredAddresses());
     });

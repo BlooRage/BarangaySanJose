@@ -29,36 +29,19 @@
     .user-masterlist-shell .user-masterlist-table {
       min-width: 1100px;
     }
-    .status-pill {
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
-      padding: 6px 12px;
-      border-radius: 8px;
-      font-size: 12px;
-      font-weight: 600;
-      letter-spacing: 0.2px;
-      width: fit-content;
-      line-height: 1;
+    .user-masterlist-shell .user-masterlist-table th:nth-child(2),
+    .user-masterlist-shell .user-masterlist-table td:nth-child(2) {
+      min-width: 220px;
+      white-space: nowrap;
+    }
+    .user-masterlist-shell .user-masterlist-table th:nth-child(8),
+    .user-masterlist-shell .user-masterlist-table td:nth-child(8) {
+      min-width: 180px;
+      white-space: nowrap;
     }
     .user-masterlist-shell td:nth-child(6),
     .user-masterlist-shell td:nth-child(7) {
       white-space: nowrap;
-    }
-    .status-pill.pending {
-      color: #664d03;
-      background: #fff3cd;
-      border: 1px solid #654f0d;
-    }
-    .status-pill.approved {
-      color: #0f5132;
-      background: #d1e7dd;
-      border: 1px solid #0e5837;
-    }
-    .status-pill.denied {
-      color: #842029;
-      background: #f8d7da;
-      border: 1px solid #940f1c;
     }
   </style>
 </head>
@@ -77,15 +60,15 @@
       </h2>
       <hr><br>
 
-      <div class="bg-white p-4 rounded-4 shadow-sm border resident-masterlist-shell user-masterlist-shell">
+      <div id="div-tableContainer" class="bg-white p-4 rounded-4 shadow-sm border resident-masterlist-shell user-masterlist-shell">
         <div class="admin-list-toolbar mb-3 pt-2 flex-wrap">
           <div class="admin-list-tabs">
-            <button class="btn btn-outline-primary btn-sm status-filter-btn active" data-filter="ALL">All</button>
-            <button class="btn btn-outline-secondary btn-sm status-filter-btn has-notif" data-filter="Pending">
-              Pending
+            <button class="btn btn-outline-primary btn-sm status-filter-btn active" data-filter="ALL">&nbsp;&nbsp;All&nbsp;&nbsp;</button>
+            <button class="btn btn-outline-secondary btn-sm status-filter-btn fw-semibold has-notif" data-filter="Pending">
+              &nbsp;&nbsp;Pending
               <span id="pendingUserBadge" class="pending-count-badge d-none">0</span>
             </button>
-            <button class="btn btn-outline-secondary btn-sm status-filter-btn" data-filter="Verified">Verified</button>
+            <button class="btn btn-outline-secondary btn-sm status-filter-btn fw-semibold" data-filter="Verified">&nbsp;&nbsp;Verified&nbsp;&nbsp;</button>
           </div>
           <div class="admin-list-actions d-flex flex-row flex-nowrap align-items-center gap-2 ms-auto">
             <div class="input-group admin-search">
@@ -99,16 +82,15 @@
               <option value="Personnel">Personnel</option>
               <option value="SuperAdmin">SuperAdmin</option>
             </select>
-            <button id="btnUserMasterRefresh" class="btn btn-outline-secondary btn-icon" type="button" title="Refresh table" aria-label="Refresh table">
+            <button id="btnUserMasterRefresh" class="btn btn-outline-secondary btn-icon admin-refresh" type="button" title="Refresh table" aria-label="Refresh table">
               <i class="fa-solid fa-arrows-rotate"></i>
               <span class="visually-hidden">Refresh</span>
             </button>
-            <span id="userMasterAutoRefreshCountdown" class="small text-muted d-none"></span>
           </div>
         </div>
 
         <div class="table-responsive compact-admin-table-shell">
-          <table class="table table-hover align-middle mb-0 user-masterlist-table compact-admin-table">
+          <table class="table table-hover align-middle mb-0 user-masterlist-table compact-admin-table compact-admin-table--wide">
             <thead class="table-light">
               <tr>
                 <th>User ID</th>

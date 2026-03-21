@@ -123,7 +123,7 @@ require_once __DIR__ . "/../includes/admin_guard.php";
                         <input type="text" id="searchInput" class="form-control" placeholder="Request ID, Complaint ID, Complainant, Complaint Type">
                         <span class="input-group-text bg-white"><i class="fas fa-search"></i></span>
                     </div>
-                    <button class="btn btn-outline-secondary btn-icon" type="button" id="btnQueueRefresh" title="Refresh table" aria-label="Refresh table">
+                    <button class="btn btn-outline-secondary btn-icon admin-refresh" type="button" id="btnQueueRefresh" title="Refresh table" aria-label="Refresh table">
                         <i class="fa-solid fa-arrows-rotate"></i>
                         <span class="visually-hidden">Refresh</span>
                     </button>

@@ -67,55 +67,6 @@
       border-color: #e0bcc2;
     }
 
-    .status-filter-btn { display: inline-flex; align-items: center; gap: 6px; }
-
-    .hof-shell .status-filter-btn {
-      border-radius: 10px;
-      border-width: 1px;
-      overflow: visible;
-    }
-
-    .hof-shell .status-filter-btn[data-filter="ALL"] {
-      color: #0d6efd;
-      border-color: #0d6efd;
-      background: #fff;
-    }
-
-    .hof-shell .status-filter-btn[data-filter="Pending"],
-    .hof-shell .status-filter-btn[data-filter="Approved"],
-    .hof-shell .status-filter-btn[data-filter="Declined"] {
-      color: #495057;
-      border-color: #6c757d;
-      background: #fff;
-    }
-
-    .hof-shell .status-filter-btn[data-filter="ALL"].active {
-      color: #fff !important;
-      background-color: #0d6efd !important;
-      border-color: #0d6efd !important;
-      font-weight: 700;
-    }
-
-    .hof-shell .status-filter-btn[data-filter="Pending"].active,
-    .hof-shell .status-filter-btn[data-filter="Approved"].active,
-    .hof-shell .status-filter-btn[data-filter="Declined"].active {
-      color: #fff !important;
-      background-color: #495057 !important;
-      border-color: #495057 !important;
-      font-weight: 700;
-    }
-
-    .hof-shell .btn-icon {
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      gap: 6px;
-      height: 38px;
-      padding: 0 12px;
-      border-radius: 10px;
-      white-space: nowrap;
-    }
-
     .hof-view-card {
       border: 1px solid #f1e1cf;
       border-radius: 12px;
@@ -148,23 +99,23 @@
       </h2>
       <hr><br>
 
-      <div id="div-tableContainer" class="bg-white p-4 rounded-4 shadow-sm border hof-shell">
+      <div id="div-tableContainer" class="bg-white p-4 rounded-4 shadow-sm border resident-masterlist-shell hof-shell">
         <div class="admin-list-toolbar mb-3 pt-2 flex-wrap">
-          <div class="admin-list-tabs d-flex gap-2 flex-wrap">
-            <button type="button" class="btn btn-outline-primary btn-sm status-filter-btn active fw-bold" data-filter="ALL">All</button>
-            <button type="button" class="btn btn-outline-secondary btn-sm status-filter-btn has-notif fw-bold" data-filter="Pending">
-              Pending
+          <div class="admin-list-tabs">
+            <button type="button" class="btn btn-outline-primary btn-sm status-filter-btn active" data-filter="ALL">&nbsp;&nbsp;All&nbsp;&nbsp;</button>
+            <button type="button" class="btn btn-outline-secondary btn-sm status-filter-btn fw-semibold" data-filter="Approved">&nbsp;&nbsp;Approved&nbsp;&nbsp;</button>
+            <button type="button" class="btn btn-outline-secondary btn-sm status-filter-btn fw-semibold" data-filter="Declined">&nbsp;&nbsp;Declined&nbsp;&nbsp;</button>
+            <button type="button" class="btn btn-outline-secondary btn-sm status-filter-btn has-notif fw-semibold" data-filter="Pending">
+              &nbsp;&nbsp;Pending
               <span id="pendingHofBadge" class="pending-count-badge d-none">0</span>
             </button>
-            <button type="button" class="btn btn-outline-secondary btn-sm status-filter-btn fw-bold" data-filter="Approved">Approved</button>
-            <button type="button" class="btn btn-outline-secondary btn-sm status-filter-btn fw-bold" data-filter="Declined">Declined</button>
           </div>
-          <div class="admin-list-actions d-flex align-items-center gap-2 ms-auto">
-            <div class="input-group admin-search me-2">
+          <div class="admin-list-actions">
+            <div class="input-group admin-search">
               <input id="hofSearch" class="form-control" placeholder="Search address/group/status..." />
               <span class="input-group-text bg-white"><i class="fas fa-search"></i></span>
             </div>
-            <button id="btnHofFilter" class="btn btn-outline-secondary btn-icon" type="button" title="Filter" aria-label="Filter" data-bs-toggle="modal" data-bs-target="#modalHofFilter">
+            <button id="btnHofFilter" class="btn btn-outline-secondary btn-icon admin-filter" type="button" title="Filter" aria-label="Filter" data-bs-toggle="modal" data-bs-target="#modalHofFilter">
               <i class="fas fa-filter"></i>
               <span class="visually-hidden">Filter</span>
             </button>

@@ -158,15 +158,15 @@ include 'includes/sidebar.php';
 	                        <input type="text" id="searchInput" class="form-control" placeholder="Search Resident ID / Name / Sector">
 	                        <span class="input-group-text bg-white"><i class="fas fa-search"></i></span>
 	                    </div>
-	                    <button class="btn btn-outline-secondary btn-icon" type="button" data-bs-toggle="modal" data-bs-target="#modalFilter" id="filterButton" title="Filter" aria-label="Filter">
+	                    <button class="btn btn-outline-secondary btn-icon admin-filter" type="button" data-bs-toggle="modal" data-bs-target="#modalFilter" id="filterButton" title="Filter" aria-label="Filter">
 	                        <i class="fas fa-filter"></i>
 	                        <span class="visually-hidden">Filter</span>
 	                    </button>
-	                    <button class="btn btn-outline-secondary btn-icon" type="button" data-bs-toggle="modal" data-bs-target="#modalTableColumns" id="btnSectorAppsColumns" title="Columns" aria-label="Columns">
+	                    <button class="btn btn-outline-secondary btn-icon admin-columns" type="button" data-bs-toggle="modal" data-bs-target="#modalTableColumns" id="btnSectorAppsColumns" title="Columns" aria-label="Columns">
 	                        <i class="fa-solid fa-sliders"></i>
 	                        <span class="visually-hidden">Columns</span>
 	                    </button>
-	                    <button class="btn btn-outline-secondary btn-icon" type="button" id="btnSectorAppsRefresh" title="Refresh table" aria-label="Refresh table">
+	                    <button class="btn btn-outline-secondary btn-icon admin-refresh" type="button" id="btnSectorAppsRefresh" title="Refresh table" aria-label="Refresh table">
 	                        <i class="fa-solid fa-arrows-rotate"></i>
 	                        <span class="visually-hidden">Refresh</span>
 	                    </button>

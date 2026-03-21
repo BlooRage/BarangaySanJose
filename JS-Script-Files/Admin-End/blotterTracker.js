@@ -233,7 +233,7 @@ fields.push({ label: 'Address', value: participant?.address || '-', fullWidth: t
     const statusBadge = badge(status, toneForStatus(status));
     const levelBadge = badge(level, toneForCaseLevel(level));
     const viewBtn = `<button class="btn btn-sm btn-outline-secondary compact-table-btn" data-view-id="${esc(row.case_id)}">View</button>`;
-    const logsBtn = `<button class="btn btn-sm btn-outline-primary compact-table-btn" data-logs-id="${esc(row.case_id)}">Case Logs</button>`;
+    const logsBtn = `<button class="btn btn-sm btn-warning compact-table-btn" data-logs-id="${esc(row.case_id)}">Case Logs</button>`;
     return `
       <tr>
         <td>${esc(blotterIdDisplay)}</td>

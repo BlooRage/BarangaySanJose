@@ -529,11 +529,11 @@ foreach ($appointmentRows as $row) {
                         <input type="text" id="searchInput" class="form-control" placeholder="Appointment ID, resident, subject, purpose">
                         <span class="input-group-text bg-white"><i class="fas fa-search"></i></span>
                     </div>
-                    <button class="btn btn-outline-secondary btn-icon" type="button" data-bs-toggle="modal" data-bs-target="#modalTableColumns" id="btnAppointmentColumns" title="Columns" aria-label="Columns">
+                    <button class="btn btn-outline-secondary btn-icon admin-columns" type="button" data-bs-toggle="modal" data-bs-target="#modalTableColumns" id="btnAppointmentColumns" title="Columns" aria-label="Columns">
                         <i class="fa-solid fa-sliders"></i>
                         <span class="visually-hidden">Columns</span>
                     </button>
-                    <button class="btn btn-outline-secondary btn-icon" type="button" id="btnAppointmentTableRefresh" title="Refresh table" aria-label="Refresh table">
+                    <button class="btn btn-outline-secondary btn-icon admin-refresh" type="button" id="btnAppointmentTableRefresh" title="Refresh table" aria-label="Refresh table">
                         <i class="fa-solid fa-arrows-rotate"></i>
                         <span class="visually-hidden">Refresh</span>
                     </button>
@@ -595,7 +595,7 @@ foreach ($appointmentRows as $row) {
                                     </td>
                                     <td>
                                         <button
-                                            class="btn btn-sm btn-outline-secondary"
+                                            class="btn btn-sm btn-primary"
                                             type="button"
                                             data-bs-toggle="modal"
                                             data-bs-target="#viewModal"
