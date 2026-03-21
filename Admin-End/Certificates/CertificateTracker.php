@@ -1970,7 +1970,6 @@ if ($certificateLaunchTab === 'manual' && $certificateLaunchDocument === 'barang
   <main id="main-display" class="flex-grow-1 p-3 p-md-4 p-xl-5 bg-light">
     <h2 class="mb-4" style="font-family: 'Charis SIL Bold'; color: #DE710C; ">Certificate Issuance</h2>
     <hr class="mb-4">
-    <?php include __DIR__ . '/includes/barangay_id_admin_nav.php'; ?>
 
     <!-- Page-level navigation -->
     <ul class="nav nav-tabs mb-0" id="certTrackerPageTabs" style="border-bottom:0">
@@ -2316,7 +2315,7 @@ if ($certificateLaunchTab === 'manual' && $certificateLaunchDocument === 'barang
       <!-- Sub-panel: Request New Fee Type -->
       <div id="fcrAddPanel">
         <div class="row g-4">
-          <div class="col-lg-5">
+          <div class="col-lg-6">
             <div class="border rounded-3 p-3 bg-light">
               <h6 class="fw-semibold mb-3"><i class="fas fa-plus-circle me-1 text-primary"></i>Request New Fee Type</h6>
               <div class="mb-3">
@@ -2334,16 +2333,11 @@ if ($certificateLaunchTab === 'manual' && $certificateLaunchDocument === 'barang
                 <label class="form-label fw-semibold small">Notes / Justification</label>
                 <textarea id="fcrAddNotes" class="form-control" rows="3" placeholder="Why is this fee type needed?"></textarea>
               </div>
-              <div id="fcrAddError" class="alert alert-danger d-none py-2 small mb-3"></div>
+              <div id="fcrAddError" class="alert alert-danger d-none py-2 small mb-3" data-modal-inline="true"></div>
+              <div id="fcrAddSuccess" class="alert alert-success d-none py-2 small mb-3" data-modal-inline="true"></div>
               <button type="button" class="btn btn-primary w-100" id="fcrAddSubmitBtn">
                 <i class="fas fa-paper-plane me-1"></i>Submit Request
               </button>
-            </div>
-          </div>
-          <div class="col-lg-7">
-            <div class="alert alert-info small mb-0">
-              <i class="fas fa-info-circle me-1"></i>
-              Your request will be reviewed by Finance. Once approved, the new fee type will be added to the clearance fee catalog.
             </div>
           </div>
         </div>
@@ -2401,7 +2395,7 @@ if ($certificateLaunchTab === 'manual' && $certificateLaunchDocument === 'barang
                 <label class="form-label fw-semibold small">Notes</label>
                 <textarea id="fcrEditNotes" class="form-control" rows="2"></textarea>
               </div>
-              <div id="fcrEditError" class="alert alert-danger d-none py-2 small mb-3"></div>
+              <div id="fcrEditError" class="alert alert-danger d-none py-2 small mb-3" data-modal-inline="true"></div>
               <div class="d-flex gap-2">
                 <button type="button" class="btn btn-warning flex-fill" id="fcrEditSubmitBtn">
                   <i class="fas fa-paper-plane me-1"></i>Submit
@@ -2411,6 +2405,7 @@ if ($certificateLaunchTab === 'manual' && $certificateLaunchDocument === 'barang
                 </button>
               </div>
             </div>
+            <div id="fcrEditSuccess" class="alert alert-success d-none py-2 small mb-3" data-modal-inline="true"></div>
             <div class="text-muted small text-center mt-4" id="fcrEditHint">
               <i class="fas fa-arrow-left me-1"></i>Select a fee type from the table to request a price edit
             </div>
@@ -2802,7 +2797,7 @@ if ($certificateLaunchTab === 'manual' && $certificateLaunchDocument === 'barang
   };
 </script>
 <script src="../../JS-Script-Files/Admin-End/tableColumnsGeneric.js?v=20260215-1"></script>
-<script src="../../JS-Script-Files/Shared/barangayIdDigital.js?v=20260320-26"></script>
-<script src="../../JS-Script-Files/Admin-End/certificateTrackerScript.js?v=20260320-06"></script>
+<script src="../../JS-Script-Files/Shared/barangayIdDigital.js?v=20260321-04"></script>
+<script src="../../JS-Script-Files/Admin-End/certificateTrackerScript.js?v=20260321-11"></script>
 </body>
 </html>

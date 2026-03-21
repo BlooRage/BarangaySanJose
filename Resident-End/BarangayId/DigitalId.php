@@ -167,12 +167,6 @@ if ($requestId === '') {
     }
 }
 
-$downloadUrl = $requestId !== ''
-    ? appUrl('/PhpFiles/Resident-End/documentRequestWorkflow.php?action=download_issued&request_id=' . rawurlencode($requestId))
-    : '#';
-$pdfViewUrl = $requestId !== ''
-    ? appUrl('/PhpFiles/Resident-End/documentRequestWorkflow.php?action=view_issued&request_id=' . rawurlencode($requestId))
-    : '#';
 $documentRequestsUrl = appUrl('/Resident-End/document_requests.php');
 $profileImageEndpoint = appUrl('/PhpFiles/Resident-End/getVerifiedProfileImage.php');
 $serializedRow = $requestRow ? [
@@ -252,16 +246,6 @@ $serializedRow = $requestRow ? [
             font-weight: 700;
             font-size: 0.88rem;
         }
-        .digital-id-actions {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 10px;
-        }
-        .digital-id-actions .btn {
-            border-radius: 999px;
-            font-weight: 700;
-            padding-inline: 16px;
-        }
         .digital-id-loading {
             display: grid;
             place-items: center;
@@ -288,70 +272,43 @@ $serializedRow = $requestRow ? [
             display: grid;
             gap: 18px;
         }
-        .digital-id-viewer__header {
+        .digital-id-viewer__toolbar {
             display: flex;
             align-items: center;
             justify-content: space-between;
-            gap: 16px;
+            gap: 14px;
             flex-wrap: wrap;
-            padding-bottom: 10px;
-            border-bottom: 1px solid rgba(221, 226, 235, 0.95);
         }
-        .digital-id-viewer__status {
-            display: flex;
-            align-items: center;
-            gap: 16px;
-            min-width: 0;
-        }
-        .digital-id-viewer__status-icon {
-            width: 58px;
-            height: 58px;
-            border-radius: 18px;
-            background: linear-gradient(180deg, #ecf4ff 0%, #f8fbff 100%);
-            border: 1px solid rgba(76, 108, 193, 0.2);
-            color: #1e4eb6;
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 1.55rem;
-            box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.75);
-        }
-        .digital-id-viewer__status-text {
-            min-width: 0;
-        }
-        .digital-id-viewer__status-title {
-            margin: 0;
-            font-size: clamp(1.35rem, 2.7vw, 2.35rem);
-            line-height: 1.05;
-            font-weight: 800;
-            color: #1c4fb7;
-        }
-        .digital-id-viewer__status-title span {
-            color: #6bb12f;
-        }
-        .digital-id-viewer__status-copy {
-            margin: 6px 0 0;
-            color: #6c7280;
-            font-size: 0.95rem;
-        }
-        .digital-id-viewer__chips {
+        .digital-id-viewer__badge-group {
             display: flex;
             align-items: center;
             gap: 10px;
             flex-wrap: wrap;
-            justify-content: flex-end;
         }
-        .digital-id-viewer__chip {
+        .digital-id-viewer__badge {
             display: inline-flex;
             align-items: center;
             gap: 8px;
-            padding: 8px 14px;
+            padding: 10px 14px;
             border-radius: 999px;
-            background: #f4f8ff;
-            border: 1px solid rgba(89, 123, 209, 0.2);
-            color: #25417d;
-            font-weight: 700;
+            background: #fff;
+            border: 1px solid rgba(214, 180, 138, 0.95);
+            color: #835425;
             font-size: 0.9rem;
+            font-weight: 800;
+            box-shadow: 0 10px 24px rgba(120, 78, 17, 0.08);
+        }
+        .digital-id-viewer__badge--side {
+            background: linear-gradient(135deg, #fff4e4 0%, #ffe2ba 100%);
+            color: #9a4c00;
+            border-color: rgba(234, 170, 90, 0.86);
+        }
+        .digital-id-viewer__hint {
+            margin: 0;
+            color: #6d553c;
+            font-size: 0.95rem;
+            line-height: 1.45;
+            max-width: 460px;
         }
         .digital-id-viewer__stage {
             position: relative;
@@ -360,24 +317,52 @@ $serializedRow = $requestRow ? [
             border: 1px solid rgba(198, 214, 245, 0.8);
             background:
                 radial-gradient(circle at top left, rgba(227, 237, 255, 0.95), transparent 34%),
-                linear-gradient(180deg, #fafdff 0%, #edf4ff 100%);
-            padding: 24px;
+                linear-gradient(180deg, #fffdf8 0%, #edf4ff 100%);
+            box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.95);
+            padding: clamp(16px, 2.4vw, 28px);
             min-height: 340px;
             display: grid;
             place-items: center;
         }
+        .digital-id-viewer__stage::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background:
+                linear-gradient(135deg, rgba(255, 255, 255, 0.5), transparent 48%),
+                radial-gradient(circle at 20% 18%, rgba(255, 224, 177, 0.38), transparent 24%);
+            pointer-events: none;
+        }
+        .digital-id-viewer__stage::after {
+            content: '';
+            position: absolute;
+            inset: 16px;
+            border-radius: 22px;
+            border: 1px dashed rgba(114, 146, 205, 0.22);
+            pointer-events: none;
+        }
         .digital-id-viewer__card-stage {
-            width: min(100%, 1160px);
+            position: relative;
+            z-index: 1;
+            width: min(100%, 980px);
             margin: 0 auto;
+        }
+        .digital-id-viewer__card-stage.is-animating-forward {
+            animation: digitalIdFlipForward 420ms cubic-bezier(0.22, 1, 0.36, 1);
+            transform-origin: center center;
+        }
+        .digital-id-viewer__card-stage.is-animating-backward {
+            animation: digitalIdFlipBackward 420ms cubic-bezier(0.22, 1, 0.36, 1);
+            transform-origin: center center;
         }
         .digital-id-viewer__card-stage .barangay-id-card {
             width: 100%;
             margin: 0;
-            border-radius: 28px;
-            box-shadow: 0 24px 60px rgba(28, 56, 112, 0.16);
+            border-radius: 30px;
+            box-shadow: 0 26px 64px rgba(28, 56, 112, 0.14);
         }
         .digital-id-viewer__card-stage .barangay-id-card__bg {
-            border-radius: 28px;
+            border-radius: 30px;
         }
         .digital-id-viewer__qr-stage {
             width: min(100%, 540px);
@@ -435,9 +420,13 @@ $serializedRow = $requestRow ? [
             margin-left: auto;
         }
         .digital-id-viewer__btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
             border-radius: 16px;
             font-weight: 800;
-            padding: 12px 18px;
+            padding: 12px 20px;
             border: 0;
             transition: transform 120ms ease, box-shadow 120ms ease, opacity 120ms ease;
         }
@@ -446,36 +435,74 @@ $serializedRow = $requestRow ? [
             box-shadow: 0 12px 24px rgba(28, 56, 112, 0.16);
         }
         .digital-id-viewer__btn--close {
-            background: linear-gradient(180deg, #f51f24 0%, #d91318 100%);
-            color: #fff;
+            background: #fff;
+            color: #8a4b00;
+            border: 1px solid rgba(227, 185, 131, 0.95);
+            box-shadow: 0 10px 22px rgba(120, 78, 17, 0.08);
         }
         .digital-id-viewer__btn--mode {
-            background: linear-gradient(180deg, #2553be 0%, #143d9d 100%);
+            background: linear-gradient(180deg, #f59b2a 0%, #dd7309 100%);
             color: #fff;
-            min-width: 152px;
+            min-width: 180px;
         }
-        .digital-id-viewer__btn--mode.is-active {
-            background: linear-gradient(180deg, #2d67ea 0%, #1e4fc1 100%);
-            box-shadow: 0 16px 30px rgba(37, 83, 190, 0.24);
+        @keyframes digitalIdFlipForward {
+            0% {
+                opacity: 0.45;
+                transform: perspective(1400px) rotateY(-16deg) scale(0.97) translateX(-18px);
+            }
+            55% {
+                opacity: 1;
+                transform: perspective(1400px) rotateY(6deg) scale(1.012) translateX(6px);
+            }
+            100% {
+                opacity: 1;
+                transform: perspective(1400px) rotateY(0deg) scale(1) translateX(0);
+            }
         }
-        .digital-id-viewer__btn--mode.is-inactive {
-            opacity: 0.82;
+        @keyframes digitalIdFlipBackward {
+            0% {
+                opacity: 0.45;
+                transform: perspective(1400px) rotateY(16deg) scale(0.97) translateX(18px);
+            }
+            55% {
+                opacity: 1;
+                transform: perspective(1400px) rotateY(-6deg) scale(1.012) translateX(-6px);
+            }
+            100% {
+                opacity: 1;
+                transform: perspective(1400px) rotateY(0deg) scale(1) translateX(0);
+            }
         }
         @media (max-width: 767.98px) {
             .digital-id-card-shell {
                 border-radius: 20px;
             }
-            .digital-id-viewer__status {
-                align-items: flex-start;
+            .digital-id-viewer__toolbar {
+                align-items: stretch;
+            }
+            .digital-id-viewer__hint {
+                max-width: none;
+                font-size: 0.92rem;
             }
             .digital-id-viewer__stage {
                 padding: 14px;
                 border-radius: 20px;
                 min-height: 240px;
             }
+            .digital-id-viewer__stage::after {
+                inset: 10px;
+                border-radius: 16px;
+            }
             .digital-id-viewer__card-stage .barangay-id-card,
             .digital-id-viewer__card-stage .barangay-id-card__bg {
                 border-radius: 20px;
+            }
+            .digital-id-viewer__badge,
+            .digital-id-viewer__badge-group {
+                width: 100%;
+            }
+            .digital-id-viewer__badge {
+                justify-content: center;
             }
             .digital-id-viewer__footer-actions {
                 width: 100%;
@@ -521,22 +548,9 @@ $serializedRow = $requestRow ? [
                                     <h1 class="digital-id-page-title">Digital Barangay ID</h1>
                                     <p class="digital-id-page-copy">This view mirrors the approved Barangay ID front and back template tied to your completed request.</p>
                                 </div>
-                                <?php
-                                $barangayIdNavActive = 'digital';
-                                $barangayIdNavRequestId = $requestId;
-                                include __DIR__ . '/includes/barangay_id_nav.php';
-                                ?>
                                 <div class="digital-id-meta">
                                     <span class="digital-id-meta-chip"><i class="fa-solid fa-id-card-clip"></i><?= htmlspecialchars($requestId) ?></span>
                                     <span class="digital-id-meta-chip"><i class="fa-solid fa-circle-check"></i>Completed Request</span>
-                                </div>
-                                <div class="digital-id-actions">
-                                    <a class="btn btn-outline-secondary" href="<?= htmlspecialchars($pdfViewUrl) ?>" target="_blank" rel="noopener">
-                                        <i class="fa-regular fa-eye me-2"></i>Open PDF
-                                    </a>
-                                    <a class="btn btn-primary" href="<?= htmlspecialchars($downloadUrl) ?>">
-                                        <i class="fa-solid fa-download me-2"></i>Download PDF
-                                    </a>
                                 </div>
                             </div>
                             <div id="digitalBarangayIdWrap" class="digital-id-loading">
@@ -552,7 +566,7 @@ $serializedRow = $requestRow ? [
 <?php endif; ?>
 
 <?php if ($errorMessage === ''): ?>
-    <script src="<?= htmlspecialchars($baseUrl) ?>/JS-Script-Files/Shared/barangayIdDigital.js?v=20260320-26"></script>
+    <script src="<?= htmlspecialchars($baseUrl) ?>/JS-Script-Files/Shared/barangayIdDigital.js?v=20260321-04"></script>
     <script>
         (() => {
             const wrap = document.getElementById('digitalBarangayIdWrap');
@@ -615,101 +629,84 @@ $serializedRow = $requestRow ? [
 
                 wrap.className = 'digital-id-viewer';
                 wrap.innerHTML = `
-                    <div class="digital-id-viewer__header">
-                        <div class="digital-id-viewer__status">
-                            <span class="digital-id-viewer__status-icon"><i class="fa-regular fa-id-card"></i></span>
-                            <div class="digital-id-viewer__status-text">
-                                <p class="digital-id-viewer__status-title">Digital ID is <span>Active</span></p>
-                                <p class="digital-id-viewer__status-copy">This resident-side view mirrors the released Barangay ID and keeps the front, back, and QR verification handy.</p>
-                            </div>
+                    <div class="digital-id-viewer__toolbar">
+                        <div class="digital-id-viewer__badge-group">
+                            <span class="digital-id-viewer__badge digital-id-viewer__badge--side" data-digital-side-badge>
+                                <i class="fa-solid fa-id-card"></i>
+                                Front of ID
+                            </span>
+                            <span class="digital-id-viewer__badge">
+                                <i class="fa-solid fa-shield-halved"></i>
+                                Resident Copy
+                            </span>
                         </div>
-                        <div class="digital-id-viewer__chips">
-                            <span class="digital-id-viewer__chip"><i class="fa-solid fa-id-card-clip"></i>${state.cardNumber || '-'}</span>
-                            <span class="digital-id-viewer__chip"><i class="fa-solid fa-circle-check"></i>Ready for verification</span>
-                        </div>
+                        <p class="digital-id-viewer__hint" data-digital-side-hint>
+                            Front view of your completed Barangay ID.
+                        </p>
                     </div>
                     <div class="digital-id-viewer__stage" data-digital-id-stage></div>
                     <div class="digital-id-viewer__footer">
-                        <button type="button" class="digital-id-viewer__btn digital-id-viewer__btn--close" data-digital-close>Close</button>
+                        <button type="button" class="digital-id-viewer__btn digital-id-viewer__btn--close" data-digital-close>
+                            <i class="fa-solid fa-arrow-left"></i>
+                            Close
+                        </button>
                         <div class="digital-id-viewer__footer-actions">
-                            <button type="button" class="digital-id-viewer__btn digital-id-viewer__btn--mode" data-digital-mode="front"><i class="fa-regular fa-id-card me-2"></i>Frontside</button>
-                            <button type="button" class="digital-id-viewer__btn digital-id-viewer__btn--mode" data-digital-mode="back"><i class="fa-solid fa-right-left me-2"></i>Backside</button>
-                            <button type="button" class="digital-id-viewer__btn digital-id-viewer__btn--mode" data-digital-mode="qr"><i class="fa-solid fa-qrcode me-2"></i>QR Code</button>
+                            <button type="button" class="digital-id-viewer__btn digital-id-viewer__btn--mode" data-digital-flip>
+                                <i class="fa-solid fa-right-left"></i>
+                                Show Back ID
+                            </button>
                         </div>
                     </div>
                 `;
 
                 const stage = wrap.querySelector('[data-digital-id-stage]');
-                const modeButtons = Array.from(wrap.querySelectorAll('[data-digital-mode]'));
                 const closeBtn = wrap.querySelector('[data-digital-close]');
+                const flipBtn = wrap.querySelector('[data-digital-flip]');
+                const sideBadge = wrap.querySelector('[data-digital-side-badge]');
+                const sideHint = wrap.querySelector('[data-digital-side-hint]');
+                let currentSide = 'front';
 
-                const setButtonState = (activeMode) => {
-                    modeButtons.forEach((button) => {
-                        const isActive = String(button.getAttribute('data-digital-mode') || '') === activeMode;
-                        button.classList.toggle('is-active', isActive);
-                        button.classList.toggle('is-inactive', !isActive);
-                    });
-                };
-
-                const showCard = (card) => {
+                const showCard = (card, animationClass = '') => {
                     stage.replaceChildren();
                     const frame = document.createElement('div');
                     frame.className = 'digital-id-viewer__card-stage';
+                    if (animationClass) {
+                        frame.classList.add(animationClass);
+                    }
                     frame.appendChild(card.cloneNode(true));
                     stage.appendChild(frame);
                 };
 
-                const showQr = () => {
-                    stage.replaceChildren();
-                    const qrStage = document.createElement('div');
-                    qrStage.className = 'digital-id-viewer__qr-stage';
-                    const qrFrame = document.createElement('div');
-                    qrFrame.className = 'digital-id-viewer__qr-frame';
-
-                    if (state.qrUrl) {
-                        const qrImage = document.createElement('img');
-                        qrImage.src = state.qrUrl;
-                        qrImage.alt = 'Barangay ID QR code';
-                        qrFrame.appendChild(qrImage);
-                    } else {
-                        const placeholder = document.createElement('div');
-                        placeholder.className = 'digital-id-viewer__qr-placeholder';
-                        placeholder.textContent = 'QR code is not available yet.';
-                        qrFrame.appendChild(placeholder);
+                const renderSide = () => {
+                    const isBack = currentSide === 'back';
+                    if (sideBadge) {
+                        sideBadge.innerHTML = isBack
+                            ? '<i class="fa-solid fa-address-card"></i>Back of ID'
+                            : '<i class="fa-solid fa-id-card"></i>Front of ID';
                     }
-
-                    const caption = document.createElement('p');
-                    caption.className = 'digital-id-viewer__qr-caption';
-                    caption.textContent = state.qrUrl
-                        ? 'Use this QR code when staff or offices need to verify the released Barangay ID.'
-                        : 'The released Barangay ID QR will appear here once it is available for verification.';
-
-                    qrStage.appendChild(qrFrame);
-                    qrStage.appendChild(caption);
-                    stage.appendChild(qrStage);
-                };
-
-                const renderMode = (mode) => {
-                    setButtonState(mode);
-                    if (mode === 'back') {
-                        showCard(backCard);
-                        return;
+                    if (sideHint) {
+                        sideHint.textContent = isBack
+                            ? 'Back view with emergency contact details and the verification QR code.'
+                            : 'Front view of your completed Barangay ID.';
                     }
-                    if (mode === 'qr') {
-                        showQr();
-                        return;
+                    if (flipBtn) {
+                        flipBtn.innerHTML = isBack
+                            ? '<i class="fa-solid fa-right-left"></i>Show Front ID'
+                            : '<i class="fa-solid fa-right-left"></i>Show Back ID';
                     }
-                    showCard(frontCard);
+                    showCard(
+                        isBack ? backCard : frontCard,
+                        isBack ? 'is-animating-forward' : 'is-animating-backward'
+                    );
                 };
 
                 closeBtn?.addEventListener('click', closeDigitalIdView);
-                modeButtons.forEach((button) => {
-                    button.addEventListener('click', () => {
-                        renderMode(String(button.getAttribute('data-digital-mode') || 'front'));
-                    });
+                flipBtn?.addEventListener('click', () => {
+                    currentSide = currentSide === 'front' ? 'back' : 'front';
+                    renderSide();
                 });
 
-                renderMode('front');
+                renderSide();
             }
 
             function renderDigitalCard(profileImageUrl = '') {

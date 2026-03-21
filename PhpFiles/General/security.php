@@ -311,6 +311,7 @@ function appUrl(string $path): string
         '/Guest-End/news' => '/news',
         '/Guest-End/faq' => '/faq',
         '/Guest-End/contact' => '/contact',
+        '/Guest-End/transactions' => '/transactions',
         '/Guest-End/TransactionInformation' => '/transaction-information',
         '/Guest-End/official_onboarding' => '/official-onboarding',
         '/Guest-End/verifyEmail' => '/verify-email',

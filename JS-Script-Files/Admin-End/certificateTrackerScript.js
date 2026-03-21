@@ -1889,6 +1889,40 @@
       : 'Issued Document';
   }
 
+  function barangayIdResidentSex(row, payload = {}, residentProfile = {}) {
+    return firstNonEmpty([
+      residentProfile.sex,
+      row?.resident_profile?.sex,
+      payload.card_sex,
+      payload.sex,
+      payload.gender,
+      payload.child_sex,
+      row?.sex
+    ]);
+  }
+
+  function barangayIdVerificationUrl(row, payload = {}) {
+    const requestId = String(firstNonEmpty([row?.request_id, payload.request_id]) || '').trim();
+    if (!requestId) return '';
+    const verificationCode = String(firstNonEmpty([
+      row?.verification_code,
+      payload.verification_code,
+      requestId
+    ]) || '').trim();
+    const appOrigin = `${window.location.origin}${appBase}`;
+    return `${appOrigin}/transactions?request_id=${encodeURIComponent(requestId)}&vc=${encodeURIComponent(verificationCode || requestId)}`;
+  }
+
+  function barangayIdQrPreviewUrl(row, payload = {}) {
+    const existing = firstNonEmpty([row?.qr_code_path, payload.qr_code_path]);
+    if (existing) {
+      return resolvePublicUrl(existing);
+    }
+    const verifyUrl = barangayIdVerificationUrl(row, payload);
+    if (!verifyUrl) return '';
+    return `https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent(verifyUrl)}`;
+  }
+
   function additionalDetailRows(entries) {
     const rows = Array.isArray(entries) ? entries.filter((it) => it && it.label && it.value) : [];
     if (!rows.length) return '';
@@ -2027,7 +2061,7 @@
       const dur = stripTrailingParenthetical(cohabitationDuration);
       return dur ? `${base} (${dur.toLowerCase()})` : base;
     })();
-    const sexValue = firstNonEmpty([payload.sex, payload.gender, residentProfile.sex]);
+    const sexValue = barangayIdResidentSex(row, payload, residentProfile) || firstNonEmpty([payload.sex, payload.gender, residentProfile.sex]);
     const residencySinceText = buildResidencySinceText(
       firstNonEmpty([payload.barangay_residency, residentProfile.barangay_residency]),
       firstNonEmpty([payload.years_of_residency]),
@@ -2122,9 +2156,22 @@
     )
       ? window.BarangayIdDigital.createState({
           appBase,
-          row,
-          payload,
-          residentProfile,
+          row: {
+            ...row,
+            qr_code_path: barangayIdQrPreviewUrl(row, payload),
+            sex: sexValue || row?.sex || ''
+          },
+          payload: {
+            ...payload,
+            qr_code_path: barangayIdQrPreviewUrl(row, payload),
+            sex: sexValue || payload.sex || payload.gender || '',
+            gender: sexValue || payload.gender || payload.sex || '',
+            card_sex: sexValue || payload.card_sex || ''
+          },
+          residentProfile: {
+            ...residentProfile,
+            sex: sexValue || residentProfile.sex || ''
+          },
           frontTemplateUrl: `${appBase}/Resident-End/Certificates/BarangayID/FRONT_EMPTY.png?v=${Date.now()}`,
           backTemplateUrl: `${appBase}/Resident-End/Certificates/BarangayID/BACK_EMPTY.png?v=${Date.now()}`,
           templateVariant: 'empty',
@@ -2424,7 +2471,7 @@
       contentHtml = `
         <p><strong>APPLICATION REVIEW</strong></p>
         <p>
-          This preview summarizes the submitted Barangay ID application details for staff review before payment and release preparation.
+          This preview summarizes the submitted Barangay ID application details for staff review before release preparation.
         </p>
         <div class="doc-to-block"><strong>Name</strong><strong>:</strong><strong>${esc(safe(fullName, '-'))}</strong></div>
         <div class="doc-to-block"><strong>Address</strong><strong>:</strong><div><strong>${esc(safe(fullAddress, '-'))}</strong><br><strong>BARANGAY SAN JOSE, MONTALBAN, RIZAL</strong></div></div>
@@ -2433,7 +2480,7 @@
         <div class="doc-to-block"><strong>Contact Number</strong><strong>:</strong><strong>${esc(safe(contactNumber, '-'))}</strong></div>
         ${barangayIdExtraDetails}
       `;
-      issuedLine = 'After payment verification, the Barangay ID will be generated from the approved front and back template with QR verification.';
+      issuedLine = 'After approval, the Barangay ID will be generated from the approved front and back template with QR verification.';
       metaHtml = '';
     } else if (isGeneralPermitClearance) {
       titleHtml = '<div class="doc-preview-generalclearance-office"><div>TANGGAPAN NG PUNONG BARANGAY</div><div>BARANGAY CLEARANCE</div></div>';
@@ -4288,7 +4335,7 @@
       actionPrompt.textContent = isFirstTimeJobSeeker
         ? 'This request will be moved to the interview stage. The resident will be notified to report to the barangay within 5 working days for the oath of undertaking and interview.'
         : (isBarangayIdRequest
-            ? 'Click Review Application to inspect the submitted Barangay ID details. Once everything is correct, proceed to approve the request for payment.'
+            ? 'Click Review Application to inspect the submitted Barangay ID details. Once everything is correct, proceed to approve the request for release.'
         : (needsFeeTagging
             ? `Tag the applicable fees for the ${docName} first. After confirming the fees, the initial document preview will open so you can save and approve it for payment.`
             : `Click View Document to check the document that will be issued and edit it if there are necessary changes in the details. Once everything is correct, proceed to verify the ${docName}.`));
@@ -4296,7 +4343,7 @@
     }
     if (type === 'personnel_approve_confirm' && actionPrompt) {
       actionPrompt.textContent = isBarangayIdRequest
-        ? 'Please confirm that you thoroughly checked the submitted Barangay ID application. This will approve the request and send it to payment.'
+        ? 'Please confirm that you thoroughly checked the submitted Barangay ID application. This will approve the request and move it directly to release.'
         : (needsFeeTagging
             ? `Please confirm that you thoroughly checked the resident's data. This will save the ${docName} and approve it for payment.`
             : `Please confirm that you thoroughly checked the resident's data to issue a ${docName}.`);
@@ -5754,7 +5801,7 @@
     const manualFullAddress = document.getElementById('manualFullAddress');
 
     const manualDocumentConfigs = [
-      { id: 'barangay_id', group: 'ID', label: 'Barangay ID', documentType: 'Barangay ID', kind: 'barangay_id' },
+      { id: 'barangay_id', group: 'ID', label: 'Barangay ID', documentType: 'Barangay ID', kind: 'barangay_id', free: true },
       { id: 'good_moral', group: 'Certificates', label: 'Certificate of Good Moral', documentType: 'Certificate of Good Moral', kind: 'good_moral' },
       { id: 'residency', group: 'Certificates', label: 'Certificate of Residency', documentType: 'Certificate of Residency', kind: 'residency' },
       { id: 'identity', group: 'Certificates', label: 'Certificate of Identity', documentType: 'Certificate of Identity', kind: 'identity' },
@@ -6783,11 +6830,40 @@
     }
 
     // ── Add New Fee Type ────────────────────────────────────────────────────
-    function showAddError(msg) {
-      const el = document.getElementById('fcrAddError');
+    function setFeeRequestAlert(elementId, message = '', tone = 'danger') {
+      const el = document.getElementById(elementId);
       if (!el) return;
-      el.textContent = msg;
-      el.classList.toggle('d-none', !msg);
+      el.classList.remove('alert-danger', 'alert-success', 'alert-warning', 'alert-info');
+      if (!message) {
+        el.textContent = '';
+        el.classList.add('d-none');
+        return;
+      }
+
+      const toneClass = {
+        danger: 'alert-danger',
+        success: 'alert-success',
+        warning: 'alert-warning',
+        info: 'alert-info'
+      }[tone] || 'alert-danger';
+
+      el.textContent = message;
+      el.classList.add(toneClass);
+      el.classList.remove('d-none');
+    }
+
+    function showAddError(msg) {
+      setFeeRequestAlert('fcrAddError', msg, 'danger');
+      if (msg) {
+        setFeeRequestAlert('fcrAddSuccess', '');
+      }
+    }
+
+    function showAddSuccess(msg) {
+      setFeeRequestAlert('fcrAddSuccess', msg, 'success');
+      if (msg) {
+        setFeeRequestAlert('fcrAddError', '');
+      }
     }
 
     document.getElementById('fcrAddSubmitBtn').addEventListener('click', async () => {
@@ -6795,6 +6871,7 @@
       const amount = parseFloat(document.getElementById('fcrAddAmount').value) || 0;
       const notes  = document.getElementById('fcrAddNotes').value.trim();
       showAddError('');
+      showAddSuccess('');
       if (!name) { showAddError('Fee name is required.'); document.getElementById('fcrAddName').focus(); return; }
 
       const btn = document.getElementById('fcrAddSubmitBtn');
@@ -6815,7 +6892,7 @@
         document.getElementById('fcrAddAmount').value = '0.00';
         document.getElementById('fcrAddNotes').value  = '';
         showAddError('');
-        alert('Request submitted successfully. Finance will review it shortly.');
+        showAddSuccess('Request submitted successfully. Finance will review it shortly.');
       } catch (e) { showAddError(e.message); }
       finally { btn.disabled = false; btn.innerHTML = orig; }
     });
@@ -6864,12 +6941,15 @@
       document.getElementById('fcrEditFormWrap').classList.remove('d-none');
       document.getElementById('fcrEditHint').classList.add('d-none');
       showEditError('');
+      showEditSuccess('');
       document.getElementById('fcrEditProposedAmount').focus();
     };
 
     document.getElementById('fcrEditCancelBtn').addEventListener('click', () => {
       document.getElementById('fcrEditFormWrap').classList.add('d-none');
       document.getElementById('fcrEditHint').classList.remove('d-none');
+      showEditError('');
+      showEditSuccess('');
     });
 
     document.getElementById('fcrEditRefreshBtn').addEventListener('click', () => {
@@ -6878,10 +6958,17 @@
     });
 
     function showEditError(msg) {
-      const el = document.getElementById('fcrEditError');
-      if (!el) return;
-      el.textContent = msg;
-      el.classList.toggle('d-none', !msg);
+      setFeeRequestAlert('fcrEditError', msg, 'danger');
+      if (msg) {
+        setFeeRequestAlert('fcrEditSuccess', '');
+      }
+    }
+
+    function showEditSuccess(msg) {
+      setFeeRequestAlert('fcrEditSuccess', msg, 'success');
+      if (msg) {
+        setFeeRequestAlert('fcrEditError', '');
+      }
     }
 
     document.getElementById('fcrEditSubmitBtn').addEventListener('click', async () => {
@@ -6891,6 +6978,7 @@
       const proposed = parseFloat(document.getElementById('fcrEditProposedAmount').value);
       const notes    = document.getElementById('fcrEditNotes').value.trim();
       showEditError('');
+      showEditSuccess('');
       if (!id) { showEditError('No fee type selected.'); return; }
       if (isNaN(proposed) || proposed < 0) { showEditError('Please enter a valid proposed amount.'); return; }
 
@@ -6913,7 +7001,7 @@
         document.getElementById('fcrEditFormWrap').classList.add('d-none');
         document.getElementById('fcrEditHint').classList.remove('d-none');
         showEditError('');
-        alert('Price edit request submitted. Finance will review it.');
+        showEditSuccess('Price edit request submitted. Finance will review it.');
       } catch (e) { showEditError(e.message); }
       finally { btn.disabled = false; btn.innerHTML = orig; }
     });

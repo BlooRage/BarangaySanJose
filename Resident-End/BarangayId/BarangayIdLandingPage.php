@@ -76,6 +76,35 @@ $digitalIdViewUrl = $latestDigitalIdRequestId !== ''
             border-radius: 16px;
             padding: 20px 24px;
         }
+        .id-overview-layout {
+            display: grid;
+            grid-template-columns: minmax(0, 1.05fr) minmax(0, 0.95fr);
+            gap: 24px;
+            align-items: start;
+        }
+        .id-preview-panel {
+            background: linear-gradient(180deg, #fffaf4 0%, #fff2e2 100%);
+            border: 1px solid #f2d9c2;
+            border-radius: 20px;
+            padding: 22px;
+            box-shadow: 0 14px 30px rgba(138, 75, 0, 0.08);
+        }
+        .id-preview-stack {
+            display: grid;
+            gap: 18px;
+        }
+        .id-preview-card {
+            display: grid;
+            gap: 10px;
+        }
+        .id-preview-label {
+            margin: 0;
+            font-size: 0.92rem;
+            font-weight: 800;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            color: #8a4b00;
+        }
         .info-list {
             padding-left: 1.2rem;
             margin-bottom: 0;
@@ -119,6 +148,11 @@ $digitalIdViewUrl = $latestDigitalIdRequestId !== ''
         .id-sample-img {
             box-shadow: 0 10px 24px rgba(0, 0, 0, 0.18);
         }
+        @media (max-width: 991.98px) {
+            .id-overview-layout {
+                grid-template-columns: 1fr;
+            }
+        }
     </style>
 </head>
 
@@ -134,49 +168,40 @@ $digitalIdViewUrl = $latestDigitalIdRequestId !== ''
                         <h1 class="page-title mb-1">Barangay ID Application</h1>
                     </div>
                 </div>
-                <?php
-                $barangayIdNavActive = 'overview';
-                $barangayIdNavRequestId = $latestDigitalIdRequestId;
-                include __DIR__ . '/includes/barangay_id_nav.php';
-                ?>
-                <hr>
-
                 <p class="page-description mb-4">
                     Welcome to the Barangay San Jose Online Barangay ID Application. Select the service below to proceed with your Barangay ID request.
                 </p>
 
-                <div class="info-card">
-                    <h2 class="page-subtitle mb-2">Where You Can Use Your Barangay ID</h2>
-                    <p class="page-description mb-2">Your Barangay ID can be presented for:</p>
-                    <ul class="page-description info-list">
-                        <li>Verification of residence within Barangay San Jose</li>
-                        <li>Transactions and requests at the barangay hall (certificates, clearances, permits)</li>
-                        <li>Access to barangay programs, benefits, and community services</li>
-                        <li>Local identification for school or clinic records and other community requirements</li>
-                        <li>Supporting ID for local businesses and neighborhood associations</li>
-                        <li>Supports Digital ID</li>
-                    </ul>
-                    <p class="page-description mt-3 mb-0">
-                        Note: Acceptance may vary by agency or establishment. Please bring additional valid IDs if required.
-                    </p>
-                </div>
-
-                <div class="mt-4">
-                    <h2 class="page-subtitle mb-3">Barangay ID Template</h2>
-                    <div class="row g-3">
-                        <div class="col-12 col-md-6">
-                            <div class="h-100">
+                <div class="id-overview-layout mt-4">
+                    <section class="id-preview-panel">
+                        <h2 class="page-subtitle mb-3">Barangay ID Preview</h2>
+                        <div class="id-preview-stack">
+                            <div class="id-preview-card">
+                                <p class="id-preview-label">Front ID</p>
                                 <img src="<?= htmlspecialchars($frontTemplateUrl) ?>" class="img-fluid rounded id-sample-img" alt="Barangay ID Template - Front">
-                                <p class="page-description mt-2 mb-0 text-center">Front</p>
                             </div>
-                        </div>
-                        <div class="col-12 col-md-6">
-                            <div class="h-100">
+                            <div class="id-preview-card">
+                                <p class="id-preview-label">Back ID</p>
                                 <img src="<?= htmlspecialchars($backTemplateUrl) ?>" class="img-fluid rounded id-sample-img" alt="Barangay ID Template - Back">
-                                <p class="page-description mt-2 mb-0 text-center">Back</p>
                             </div>
                         </div>
-                    </div>
+                    </section>
+
+                    <section class="info-card h-100">
+                        <h2 class="page-subtitle mb-2">Where Can You Use Barangay ID</h2>
+                        <p class="page-description mb-2">Your Barangay ID can be presented for:</p>
+                        <ul class="page-description info-list">
+                            <li>Verification of residence within Barangay San Jose</li>
+                            <li>Transactions and requests at the barangay hall (certificates, clearances, permits)</li>
+                            <li>Access to barangay programs, benefits, and community services</li>
+                            <li>Local identification for school or clinic records and other community requirements</li>
+                            <li>Supporting ID for local businesses and neighborhood associations</li>
+                            <li>Supports Digital ID</li>
+                        </ul>
+                        <p class="page-description mt-3 mb-0">
+                            Note: Acceptance may vary by agency or establishment. Please bring additional valid IDs if required.
+                        </p>
+                    </section>
                 </div>
 
                 <div class="text-center apply-section mt-4">
