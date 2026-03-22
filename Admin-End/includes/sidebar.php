@@ -57,6 +57,9 @@ $isAdminMgmtActive = in_array($current, $adminMgmtPages);
 $isReportActive = in_array($current, $reportPages);
 $isStatisticsActive = ($current === 'AdminDashboard.php');
 $reportModule = strtolower(trim((string)($_GET['module'] ?? '')));
+if ($reportModule === 'document_requests') {
+    $reportModule = 'certificate_issuance';
+}
 $areaManagementTab = strtolower(trim((string)($_GET['tab'] ?? 'summary')));
 $areaManagementArea = trim((string)($_GET['area'] ?? ''));
 $isSuperAdminSidebar = ((string)($_SESSION['role'] ?? '') === 'SuperAdmin');
@@ -79,6 +82,8 @@ $isIdIssuanceTrackerActive = $current === 'CertificateTracker.php'
         || strcasecmp($certificateFilterDocument, 'Barangay ID') === 0
     );
 $isIdIssuanceActive = $isIdIssuanceTrackerActive || $isIdIssuanceManualActive;
+$isCertificateTrackerActive = $current === 'CertificateTracker.php' && !$isIdIssuanceActive;
+$isCertActive = $isCertificateTrackerActive;
 $isClearanceIssuanceActive = $current === 'CertificateTracker.php'
     && !$isIdIssuanceActive
     && in_array($certificateFilterDocumentToken, ['__clearances__', '__clearance__', 'clearance', 'clearances'], true);
@@ -890,9 +895,15 @@ if (!empty($_SESSION['user_id']) && isset($conn) && $conn instanceof mysqli) {
         <div class="collapse <?= $isReportActive ? 'show' : '' ?>" id="reports-collapse">
           <ul class="btn-toggle-nav list-unstyled fw-normal pb-1 small">
             <li>
-              <a href="<?= htmlspecialchars(appUrl('Admin-End/Reports/Reports.php')) ?>?module=document_requests"
-                 class="link-dark rounded <?= ($current === 'Reports.php' && $reportModule === 'document_requests') ? 'active' : '' ?>">
-                Document Requests
+              <a href="<?= htmlspecialchars(appUrl('Admin-End/Reports/Reports.php')) ?>?module=certificate_issuance"
+                 class="link-dark rounded <?= ($current === 'Reports.php' && $reportModule === 'certificate_issuance') ? 'active' : '' ?>">
+                Certificate Issuance
+              </a>
+            </li>
+            <li>
+              <a href="<?= htmlspecialchars(appUrl('Admin-End/Reports/Reports.php')) ?>?module=clearance_issuance"
+                 class="link-dark rounded <?= ($current === 'Reports.php' && $reportModule === 'clearance_issuance') ? 'active' : '' ?>">
+                Clearance Issuance
               </a>
             </li>
             <li>

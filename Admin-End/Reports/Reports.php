@@ -51,6 +51,53 @@ function rp_pct(float $part, float $total): string {
     return number_format(($part / $total) * 100, 1) . '%';
 }
 
+function rp_roman_numeral(int $value): string {
+    if ($value <= 0) {
+        return '0';
+    }
+
+    $map = [
+        1000 => 'M',
+        900 => 'CM',
+        500 => 'D',
+        400 => 'CD',
+        100 => 'C',
+        90 => 'XC',
+        50 => 'L',
+        40 => 'XL',
+        10 => 'X',
+        9 => 'IX',
+        5 => 'V',
+        4 => 'IV',
+        1 => 'I',
+    ];
+
+    $result = '';
+    foreach ($map as $arabic => $roman) {
+        while ($value >= $arabic) {
+            $result .= $roman;
+            $value -= $arabic;
+        }
+    }
+
+    return $result;
+}
+
+function rp_section_heading(array $orderedSections, array $visibleSections, string $key): string {
+    $position = 0;
+    foreach ($orderedSections as $sectionKey => $label) {
+        if (!in_array($sectionKey, $visibleSections, true)) {
+            continue;
+        }
+        $position++;
+        if ($sectionKey === $key) {
+            return rp_roman_numeral($position) . '. ' . $label;
+        }
+    }
+
+    return $orderedSections[$key] ?? ucwords(str_replace('_', ' ', $key));
+}
+
 function rp_stage_label(string $stage): string {
     $normalized = strtolower(trim($stage));
     $map = [
@@ -97,7 +144,7 @@ function rp_document_type_label(string $raw): string {
         return 'Unspecified';
     }
 
-    $key = strtolower(preg_replace('/[^a-z0-9]+/', '', $value));
+    $key = preg_replace('/[^a-z0-9]+/', '', strtolower($value));
     $map = [
         'certificateofindigency' => 'Certificate of Indigency',
         'goodmoral' => 'Certificate of Good Moral',
@@ -140,6 +187,148 @@ function rp_document_type_label(string $raw): string {
     }
 
     return $value;
+}
+
+function rp_parse_query_list($value, ?callable $normalizer = null): array {
+    $items = is_array($value) ? $value : [$value];
+    $resolved = [];
+    foreach ($items as $item) {
+        $text = trim((string)$item);
+        if ($text === '') {
+            continue;
+        }
+        if ($normalizer !== null) {
+            $text = trim((string)$normalizer($text));
+            if ($text === '') {
+                continue;
+            }
+        }
+        $resolved[] = $text;
+    }
+    return array_values(array_unique($resolved));
+}
+
+function rp_document_request_key(string $raw): string {
+    $value = trim($raw);
+    if ($value === '') {
+        return '';
+    }
+
+    $key = preg_replace('/[^a-z0-9]+/', '', strtolower($value));
+    $map = [
+        'barangayid' => 'barangay_id',
+        'applicationforbarangayid' => 'barangay_id',
+        'cohabitation' => 'cert_cohabitation',
+        'certificateofcohabitation' => 'cert_cohabitation',
+        'goodmoral' => 'cert_good_moral',
+        'certificateofgoodmoral' => 'cert_good_moral',
+        'certificateforjailvisitation' => 'cert_jail_visitation',
+        'certificateofrelationshipforjailvisitation' => 'cert_jail_visitation',
+        'certificateofrelationshipforjailvisit' => 'cert_jail_visitation',
+        'jailvisitation' => 'cert_jail_visitation',
+        'firsttimejobseeker' => 'cert_first_time_job_seeker',
+        'firsttimejobseekercertificate' => 'cert_first_time_job_seeker',
+        'certificateforfirsttimejobseeker' => 'cert_first_time_job_seeker',
+        'residency' => 'cert_residency',
+        'certificateofresidency' => 'cert_residency',
+        'certificateofresidence' => 'cert_residency',
+        'indigency' => 'cert_indigency',
+        'certificateofindigency' => 'cert_indigency',
+    ];
+    if (isset($map[$key])) {
+        return $map[$key];
+    }
+    if (str_contains($key, 'businesspermit') || str_contains($key, 'businessclearance')) {
+        return 'clr_business_permit';
+    }
+    if (str_contains($key, 'tricyclepermit') || str_contains($key, 'tricycleclearance')) {
+        return 'clr_tricycle_permit';
+    }
+    if (str_contains($key, 'electricalpermit') || str_contains($key, 'electricpermit')) {
+        return 'clr_electric_permit';
+    }
+    if (str_contains($key, 'waterpermit')) {
+        return 'clr_water_permit';
+    }
+    if (str_contains($key, 'residentialpermit') || str_contains($key, 'residentialbuildingpermit')) {
+        return 'clr_residential_permit';
+    }
+    if (str_contains($key, 'commercialpermit') || str_contains($key, 'commercialbuildingpermit')) {
+        return 'clr_commercial_permit';
+    }
+
+    return '';
+}
+
+function rp_issuance_module_config(string $module): ?array {
+    $configs = [
+        'certificate_issuance' => [
+            'label' => 'Certificate Issuance Report',
+            'summary_label' => 'Certificate Issuance Requests',
+            'request_types' => [
+                'cert_cohabitation' => 'Certificate of Cohabitation',
+                'cert_good_moral' => 'Certificate of Good Moral',
+                'cert_jail_visitation' => 'Certificate of Relationship for Jail Visitation',
+                'cert_first_time_job_seeker' => 'First Time Job Seeker Certificate',
+                'cert_residency' => 'Certificate of Residency',
+                'cert_indigency' => 'Certificate of Indigency',
+                'barangay_id' => 'Barangay ID',
+            ],
+        ],
+        'clearance_issuance' => [
+            'label' => 'Clearance Issuance Report',
+            'summary_label' => 'Clearance Issuance Requests',
+            'request_types' => [
+                'clr_business_permit' => 'Clearance for Business Permit',
+                'clr_tricycle_permit' => 'Clearance for Tricycle Permit',
+                'clr_electric_permit' => 'Clearance for Electric Permit',
+                'clr_water_permit' => 'Clearance for Water Permit',
+                'clr_residential_permit' => 'Clearance for Residential Permit',
+                'clr_commercial_permit' => 'Clearance for Commercial Permit',
+            ],
+        ],
+    ];
+
+    return $configs[$module] ?? null;
+}
+
+function rp_request_status_options(): array {
+    return [
+        'completed' => 'Completed',
+        'pending' => 'Pending',
+        'rejected' => 'Rejected',
+    ];
+}
+
+function rp_request_status_key(string $stage): string {
+    $normalized = strtolower(trim($stage));
+    if ($normalized === 'completed') {
+        return 'completed';
+    }
+    if (in_array($normalized, ['rejected', 'cancelled', 'interview_failed', 'inspection_failed', 'payment_rejected'], true)) {
+        return 'rejected';
+    }
+    return 'pending';
+}
+
+function rp_request_channel_label(array $payload): string {
+    $channel = strtolower(trim((string)($payload['_submission_channel'] ?? '')));
+    if ($channel !== '' && str_contains($channel, 'walkin')) {
+        return 'Walk-in';
+    }
+    return 'Online';
+}
+
+function rp_decode_json_assoc($raw): array {
+    if (is_array($raw)) {
+        return $raw;
+    }
+    $text = trim((string)$raw);
+    if ($text === '') {
+        return [];
+    }
+    $decoded = json_decode($text, true);
+    return is_array($decoded) ? $decoded : [];
 }
 
 function rp_first_existing_datetime_expr(mysqli $conn, string $table, string $alias, array $columns): string {
@@ -268,7 +457,7 @@ function rp_normalize_sector_label(string $value): string {
         return '';
     }
 
-    $normalized = strtolower(preg_replace('/[^a-z]/', '', $raw));
+    $normalized = preg_replace('/[^a-z]/', '', strtolower($raw));
     $map = [
         'pwd' => 'PWD',
         'seniorcitizen' => 'Senior Citizen',
@@ -319,15 +508,275 @@ function rp_sql_quote(mysqli $conn, string $value): string {
     return "'" . $conn->real_escape_string($value) . "'";
 }
 
+function rp_sql_in_list(mysqli $conn, array $values): string {
+    return implode(', ', array_map(
+        static fn(string $value): string => rp_sql_quote($conn, $value),
+        array_values(array_filter(array_map(static fn($value): string => trim((string)$value), $values), static fn(string $value): bool => $value !== ''))
+    ));
+}
+
 function rp_csv_contains_expr(mysqli $conn, string $columnExpr, string $value): string {
     $normalizedValue = strtolower(str_replace(' ', '', rp_normalize_sector_label($value)));
     return "FIND_IN_SET(" . rp_sql_quote($conn, $normalizedValue) . ", REPLACE(REPLACE(LOWER(COALESCE({$columnExpr}, '')), ', ', ','), ' ', '')) > 0";
 }
 
+function rp_csv_contains_any_expr(mysqli $conn, string $columnExpr, array $values): string {
+    $clauses = [];
+    foreach ($values as $value) {
+        $normalized = trim((string)$value);
+        if ($normalized === '') {
+            continue;
+        }
+        $clauses[] = rp_csv_contains_expr($conn, $columnExpr, $normalized);
+    }
+    if ($clauses === []) {
+        return '1 = 1';
+    }
+    return '(' . implode(' OR ', $clauses) . ')';
+}
+
+function rp_sector_rollup_rows(array $rows, string $sectorKey = 'sector_membership', ?string $amountKey = null, string $labelKey = 'sector'): array {
+    $rollup = [];
+    foreach (array_keys(rp_official_sector_options()) as $sectorLabel) {
+        $rollup[$sectorLabel] = [
+            $labelKey => $sectorLabel,
+            'total' => 0,
+        ];
+        if ($amountKey !== null) {
+            $rollup[$sectorLabel]['amount'] = 0.0;
+        }
+    }
+
+    foreach ($rows as $row) {
+        $amount = $amountKey !== null ? (float)($row[$amountKey] ?? 0) : 0.0;
+        $labels = array_values(array_intersect(
+            array_unique(array_map('rp_normalize_sector_label', rp_parse_csv_values((string)($row[$sectorKey] ?? '')))),
+            array_keys($rollup)
+        ));
+        foreach ($labels as $label) {
+            $rollup[$label]['total']++;
+            if ($amountKey !== null) {
+                $rollup[$label]['amount'] += $amount;
+            }
+        }
+    }
+
+    return array_values(array_filter($rollup, static function (array $row) use ($amountKey): bool {
+        if ((int)($row['total'] ?? 0) > 0) {
+            return true;
+        }
+        return $amountKey !== null && (float)($row['amount'] ?? 0) > 0;
+    }));
+}
+
+function rp_render_hidden_input(string $name, string $value): void {
+    echo '<input type="hidden" name="' . htmlspecialchars($name, ENT_QUOTES, 'UTF-8') . '" value="' . htmlspecialchars($value, ENT_QUOTES, 'UTF-8') . '">' . "\n";
+}
+
+function rp_render_hidden_inputs(string $name, array $values): void {
+    foreach ($values as $value) {
+        $text = trim((string)$value);
+        if ($text === '') {
+            continue;
+        }
+        rp_render_hidden_input($name . '[]', $text);
+    }
+}
+
+function rp_breakdown_area_column_key(string $area): string {
+    return 'breakdown_area_' . strtolower(preg_replace('/[^a-z0-9]+/', '_', trim($area)));
+}
+
+function rp_breakdown_sector_column_key(string $sector): string {
+    return 'breakdown_sector_' . strtolower(preg_replace('/[^a-z0-9]+/', '_', trim($sector)));
+}
+
+function rp_issuance_customize_columns(): array {
+    $columns = [
+        'identifier' => 'Table: Request ID',
+        'date' => 'Table: Request Date / Month',
+        'type' => 'Table: Request Type',
+        'area' => 'Table: Area Number',
+        'sector' => 'Table: Sector Membership',
+        'status' => 'Table: Status',
+        'channel' => 'Table: Walk-in / Online',
+        'count' => 'Table: Totals / Counts',
+        'percentage' => 'Table: Percentages / Rates',
+        'revenue' => 'Table: Revenue',
+        'breakdown_document_type' => 'Breakdown: Document Type',
+    ];
+
+    foreach (array_keys(rp_official_area_options()) as $areaLabel) {
+        $columns[rp_breakdown_area_column_key($areaLabel)] = 'Breakdown: ' . $areaLabel;
+    }
+    foreach (array_keys(rp_official_sector_options()) as $sectorLabel) {
+        $columns[rp_breakdown_sector_column_key($sectorLabel)] = 'Breakdown: ' . $sectorLabel;
+    }
+    $columns['breakdown_revenue'] = 'Breakdown: Revenue';
+    $columns['breakdown_total'] = 'Breakdown: Total';
+
+    return $columns;
+}
+
+function rp_report_customize_config(string $module): array {
+    $sharedColumns = [
+        'date' => 'Date / Month',
+        'type' => 'Request / Document Type',
+        'status' => 'Status',
+        'area' => 'Area Number',
+        'sector' => 'Sector Membership',
+        'count' => 'Counts / Totals',
+        'percentage' => 'Percentages / Rates',
+        'revenue' => 'Revenue / Amount',
+        'channel' => 'Channel / Origin',
+        'identifier' => 'Identifiers',
+        'resident' => 'Resident / Person',
+        'payment' => 'Payment Details',
+        'result' => 'Completed / Escalated / Resolved',
+    ];
+
+    $configs = [
+        'certificate_issuance' => [
+            'sections' => [
+                'summary' => 'Summary',
+                'breakdown' => 'Breakdown',
+                'charts' => 'Charts',
+                'tables' => 'Tables',
+                'channel' => 'Request Type',
+                'revenue' => 'Revenue',
+                'trend' => 'Monthly Trend',
+            ],
+            'columns' => rp_issuance_customize_columns(),
+        ],
+        'clearance_issuance' => [
+            'sections' => [
+                'summary' => 'Summary',
+                'breakdown' => 'Breakdown',
+                'charts' => 'Charts',
+                'tables' => 'Tables',
+                'channel' => 'Request Type',
+                'revenue' => 'Revenue',
+                'trend' => 'Monthly Trend',
+            ],
+            'columns' => rp_issuance_customize_columns(),
+        ],
+        'financial' => [
+            'sections' => [
+                'summary' => 'Overall Summary',
+                'type' => 'Revenue by Document Type',
+                'payment_method' => 'Payment Method Breakdown',
+                'area' => 'Revenue by Area',
+                'sector' => 'Revenue by Sector Membership',
+                'daily' => 'Daily Collection Log',
+                'or_log' => 'Official Receipt Log',
+            ],
+            'columns' => [
+                'identifier' => $sharedColumns['identifier'],
+                'date' => $sharedColumns['date'],
+                'type' => $sharedColumns['type'],
+                'area' => $sharedColumns['area'],
+                'sector' => $sharedColumns['sector'],
+                'count' => $sharedColumns['count'],
+                'percentage' => $sharedColumns['percentage'],
+                'revenue' => $sharedColumns['revenue'],
+                'payment' => $sharedColumns['payment'],
+                'resident' => $sharedColumns['resident'],
+                'channel' => 'GCash / Walk-in',
+            ],
+        ],
+        'residents' => [
+            'sections' => [
+                'summary' => 'Overall Summary',
+                'gender' => 'Gender Distribution',
+                'age' => 'Age Distribution',
+                'area' => 'Residents by Area',
+                'sector' => 'Sector Membership',
+                'monthly' => 'Monthly Registrations',
+            ],
+            'columns' => [
+                'date' => $sharedColumns['date'],
+                'area' => $sharedColumns['area'],
+                'sector' => $sharedColumns['sector'],
+                'count' => $sharedColumns['count'],
+                'percentage' => $sharedColumns['percentage'],
+                'status' => $sharedColumns['status'],
+                'type' => 'Gender / Age Group',
+            ],
+        ],
+        'appointments' => [
+            'sections' => [
+                'summary' => 'Overall Summary',
+                'status' => 'Status Breakdown',
+                'purpose' => 'Purpose Breakdown',
+                'area' => 'Requests by Area',
+                'sector' => 'Requests by Sector Membership',
+                'trend' => 'Monthly Trend',
+            ],
+            'columns' => [
+                'date' => $sharedColumns['date'],
+                'type' => 'Purpose',
+                'status' => $sharedColumns['status'],
+                'area' => $sharedColumns['area'],
+                'sector' => $sharedColumns['sector'],
+                'count' => $sharedColumns['count'],
+                'percentage' => $sharedColumns['percentage'],
+                'result' => 'Completed / Completion Rate',
+            ],
+        ],
+        'blotter' => [
+            'sections' => [
+                'summary' => 'Overall Summary',
+                'type' => 'Complaint Type Breakdown',
+                'status' => 'Status Breakdown',
+                'area' => 'Cases by Area',
+                'sector' => 'Cases by Sector Membership',
+                'trend' => 'Monthly Trend',
+            ],
+            'columns' => [
+                'date' => $sharedColumns['date'],
+                'type' => 'Complaint Type',
+                'status' => $sharedColumns['status'],
+                'area' => $sharedColumns['area'],
+                'sector' => $sharedColumns['sector'],
+                'count' => $sharedColumns['count'],
+                'percentage' => $sharedColumns['percentage'],
+                'result' => 'Resolved / Resolution Rate',
+            ],
+        ],
+        'complaints' => [
+            'sections' => [
+                'summary' => 'Overall Summary',
+                'type' => 'Complaint Type Breakdown',
+                'origin' => 'Origin',
+                'kind' => 'Subject Kind',
+                'area' => 'Complaints by Area',
+                'sector' => 'Complaints by Sector Membership',
+                'trend' => 'Monthly Trend',
+            ],
+            'columns' => [
+                'date' => $sharedColumns['date'],
+                'type' => 'Complaint Type',
+                'channel' => 'Origin',
+                'status' => 'Subject Kind',
+                'area' => $sharedColumns['area'],
+                'sector' => $sharedColumns['sector'],
+                'count' => $sharedColumns['count'],
+                'percentage' => $sharedColumns['percentage'],
+                'result' => 'Escalated / Escalation Rate',
+            ],
+        ],
+    ];
+
+    return $configs[$module] ?? ['sections' => [], 'columns' => []];
+}
+
 // ── Module routing ────────────────────────────────────────────────────────────
-$allowedModules = ['document_requests', 'financial', 'residents', 'appointments', 'blotter', 'complaints'];
-$module = strtolower(trim((string)($_GET['module'] ?? 'document_requests')));
-if (!in_array($module, $allowedModules, true)) $module = 'document_requests';
+$allowedModules = ['certificate_issuance', 'clearance_issuance', 'financial', 'residents', 'appointments', 'blotter', 'complaints'];
+$module = strtolower(trim((string)($_GET['module'] ?? 'certificate_issuance')));
+if ($module === 'document_requests') {
+    $module = 'certificate_issuance';
+}
+if (!in_array($module, $allowedModules, true)) $module = 'certificate_issuance';
 
 // ── Date range (shared) ───────────────────────────────────────────────────────
 $today      = date('Y-m-d');
@@ -337,9 +786,18 @@ $dateTo     = preg_match('/^\d{4}-\d{2}-\d{2}$/', (string)($_GET['date_to']   ??
 if ($dateTo < $dateFrom) $dateTo = $dateFrom;
 
 $baseUrl = appUrl('Admin-End/Reports/Reports.php');
-$reportFilterType = trim((string)($_GET['filter_type'] ?? ''));
-$reportFilterArea = trim((string)($_GET['filter_area'] ?? ''));
-$reportFilterSector = rp_normalize_sector_label(trim((string)($_GET['filter_sector'] ?? '')));
+$rawFilterTypeParam = $_GET['filter_type'] ?? '';
+$rawFilterAreaParam = $_GET['filter_area'] ?? '';
+$rawFilterSectorParam = $_GET['filter_sector'] ?? '';
+$rawFilterStatusParam = $_GET['filter_status'] ?? '';
+$reportFilterType = is_array($rawFilterTypeParam) ? '' : trim((string)$rawFilterTypeParam);
+$reportFilterArea = is_array($rawFilterAreaParam) ? '' : trim((string)$rawFilterAreaParam);
+$reportFilterSector = is_array($rawFilterSectorParam) ? '' : rp_normalize_sector_label(trim((string)$rawFilterSectorParam));
+$reportFilterTypes = rp_parse_query_list($rawFilterTypeParam);
+$reportFilterAreas = rp_parse_query_list($rawFilterAreaParam);
+$reportFilterSectors = rp_parse_query_list($rawFilterSectorParam, 'rp_normalize_sector_label');
+$reportFilterStatuses = rp_parse_query_list($rawFilterStatusParam, static fn(string $value): string => strtolower(trim($value)));
+$issuanceModuleConfig = rp_issuance_module_config($module);
 $officialReportAreaOptions = rp_official_area_options();
 $officialReportSectorOptions = rp_official_sector_options();
 if ($reportFilterArea !== '' && !array_key_exists($reportFilterArea, $officialReportAreaOptions)) {
@@ -348,15 +806,33 @@ if ($reportFilterArea !== '' && !array_key_exists($reportFilterArea, $officialRe
 if ($reportFilterSector !== '' && !array_key_exists($reportFilterSector, $officialReportSectorOptions)) {
     $reportFilterSector = '';
 }
+if ($reportFilterType !== '' && $reportFilterTypes === []) {
+    $reportFilterTypes[] = $reportFilterType;
+}
+if ($reportFilterArea !== '' && $reportFilterAreas === []) {
+    $reportFilterAreas[] = $reportFilterArea;
+}
+if ($reportFilterSector !== '' && $reportFilterSectors === []) {
+    $reportFilterSectors[] = $reportFilterSector;
+}
 $reportFilterOptions = [
     'type' => [],
     'area' => $officialReportAreaOptions,
     'sector' => $officialReportSectorOptions,
 ];
+$reportFilterStatusOptions = $issuanceModuleConfig !== null ? rp_request_status_options() : [];
+$reportFilterTypes = array_values(array_unique($reportFilterTypes));
+$reportFilterAreas = array_values(array_intersect($reportFilterAreas, array_keys($officialReportAreaOptions)));
+$reportFilterSectors = array_values(array_intersect($reportFilterSectors, array_keys($officialReportSectorOptions)));
+if ($issuanceModuleConfig !== null) {
+    $reportFilterTypes = array_values(array_intersect($reportFilterTypes, array_keys($issuanceModuleConfig['request_types'])));
+    $reportFilterStatuses = array_values(array_intersect($reportFilterStatuses, array_keys($reportFilterStatusOptions)));
+}
 $reportFilterLabels = [
-    'type' => in_array($module, ['blotter', 'complaints'], true) ? 'Type of Complaint' : 'Type of Request',
+    'type' => in_array($module, ['blotter', 'complaints'], true) ? 'Type of Complaint' : ($issuanceModuleConfig !== null ? 'Request Type' : 'Type of Request'),
     'area' => 'Area Number',
     'sector' => 'Sector Membership',
+    'status' => 'Statuses',
 ];
 
 // ── Prepared-by user ──────────────────────────────────────────────────────────
@@ -379,10 +855,28 @@ $barangaySealUrl = appUrl('Images/San_Jose_LOGO.jpg');
 $municipalSealUrl = appUrl('Images/Montalban_Logo.png');
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// MODULE: DOCUMENT REQUESTS
+// MODULE: ISSUANCE REPORTS
 // ═══════════════════════════════════════════════════════════════════════════════
-$dr = [];
-if ($module === 'document_requests' && rp_table_exists($conn, 'documentrequesttbl')) {
+$issuanceReport = [
+    'rows' => [],
+    'summary' => [
+        'total' => 0,
+        'completed' => 0,
+        'pending' => 0,
+        'rejected' => 0,
+        'revenue' => 0.0,
+        'walkin' => 0,
+        'online' => 0,
+    ],
+    'breakdown' => [],
+    'revenue' => [],
+    'channels' => [],
+    'trend' => [],
+];
+if ($issuanceModuleConfig !== null && rp_table_exists($conn, 'documentrequesttbl')) {
+    $reportFilterOptions['type'] = $issuanceModuleConfig['request_types'];
+    $reportFilterStatusOptions = rp_request_status_options();
+
     $df = $conn->real_escape_string($dateFrom);
     $dt = $conn->real_escape_string($dateTo);
     $requestDateExpr = rp_first_existing_datetime_expr($conn, 'documentrequesttbl', 'd', ['submitted_at', 'request_timestamp', 'created_at']);
@@ -391,127 +885,180 @@ if ($module === 'document_requests' && rp_table_exists($conn, 'documentrequesttb
     $financeRollup = $hasFinanceTable ? rp_finance_rollup_subquery($conn, 'ft') : '';
     $financeJoin = $hasFinanceTable ? "LEFT JOIN {$financeRollup} f ON f.request_id = d.request_id" : '';
     $residentJoin = $residentParts['joins'] !== '' ? $residentParts['joins'] : '';
-    $areaExpr = $residentParts['area_expr'];
-    $sectorExpr = $residentParts['sector_expr'];
+    $areaExpr = $residentParts['area_expr'] !== 'NULL' ? $residentParts['area_expr'] : "''";
+    $sectorExpr = $residentParts['sector_expr'] !== 'NULL' ? $residentParts['sector_expr'] : "''";
     $amountExpr = $hasFinanceTable && rp_column_exists($conn, 'financetransactiontbl', 'transaction_amount')
         ? "COALESCE(f.transaction_amount, 0)"
         : "0";
-    $paymentMethodExpr = $hasFinanceTable && rp_column_exists($conn, 'financetransactiontbl', 'payment_method')
-        ? "COALESCE(NULLIF(TRIM(f.payment_method), ''), 'Unspecified')"
-        : "'Unspecified'";
     $hasRequestData = $requestDateExpr !== 'NULL';
     $requestDateFilter = $hasRequestData
         ? "DATE({$requestDateExpr}) BETWEEN '{$df}' AND '{$dt}'"
         : '1 = 0';
-    $trendFilter = $hasRequestData
-        ? "{$requestDateExpr} >= DATE_SUB(CURDATE(), INTERVAL 12 MONTH)"
-        : '1 = 0';
-    $rejectedStagesExpr = "('rejected','cancelled','interview_failed','inspection_failed')";
-    $collectedStagesExpr = "('payment_verified','ready_for_claim','completed')";
-    $docTypeExpr = "COALESCE(NULLIF(TRIM(d.document_type), ''), 'Unspecified')";
-    $requestFilterClauses = [$requestDateFilter];
-    if ($reportFilterType !== '') {
-        $requestFilterClauses[] = "{$docTypeExpr} = " . rp_sql_quote($conn, $reportFilterType);
-    }
-    if ($reportFilterArea !== '' && $areaExpr !== 'NULL') {
-        $requestFilterClauses[] = "{$areaExpr} = " . rp_sql_quote($conn, $reportFilterArea);
-    }
-    if ($reportFilterSector !== '' && $sectorExpr !== 'NULL') {
-        $requestFilterClauses[] = rp_csv_contains_expr($conn, $sectorExpr, $reportFilterSector);
-    }
-    $requestFilterWhere = implode(' AND ', $requestFilterClauses);
-    $reportFilterOptions['type'] = rp_options_from_rows(rp_safe_query($conn, "
-        SELECT {$docTypeExpr} AS value
+
+    $rows = rp_safe_query($conn, "
+        SELECT
+          d.request_id,
+          {$requestDateExpr} AS request_date,
+          COALESCE(NULLIF(TRIM(d.document_type), ''), '') AS document_type,
+          COALESCE(NULLIF(TRIM(d.stage), ''), 'submitted') AS stage,
+          COALESCE(d.request_details, '') AS request_details,
+          {$areaExpr} AS area_number,
+          {$sectorExpr} AS sector_membership,
+          {$amountExpr} AS revenue_amount
         FROM documentrequesttbl d
+        {$financeJoin}
         " . ($residentJoin !== '' ? "\n        {$residentJoin}" : '') . "
         WHERE {$requestDateFilter}
-        GROUP BY {$docTypeExpr}
-        ORDER BY {$docTypeExpr} ASC
-    "), 'value', 'rp_document_type_label');
-    if ($areaExpr !== 'NULL') {
-        $reportFilterOptions['area'] = rp_options_from_rows(rp_safe_query($conn, "
-            SELECT {$areaExpr} AS value
-            FROM documentrequesttbl d
-            {$residentJoin}
-            WHERE {$requestDateFilter}
-              AND {$areaExpr} IS NOT NULL
-              AND {$areaExpr} <> ''
-            GROUP BY {$areaExpr}
-            ORDER BY {$areaExpr} ASC
-        "), 'value');
+        ORDER BY {$requestDateExpr} DESC, d.request_id DESC
+    ");
+
+    $officialAreas = array_keys($officialReportAreaOptions);
+    $officialSectors = array_keys($officialReportSectorOptions);
+    $requestTypesForOutput = $reportFilterTypes !== [] ? $reportFilterTypes : array_keys($issuanceModuleConfig['request_types']);
+    $breakdown = [];
+    $channels = [];
+    $revenueRows = [];
+    foreach ($requestTypesForOutput as $typeKey) {
+        $label = $issuanceModuleConfig['request_types'][$typeKey] ?? $typeKey;
+        $breakdown[$typeKey] = [
+            'request_type_key' => $typeKey,
+            'request_type_label' => $label,
+            'areas' => array_fill_keys($officialAreas, 0),
+            'sectors' => array_fill_keys($officialSectors, 0),
+            'revenue' => 0.0,
+            'total' => 0,
+        ];
+        $channels[$typeKey] = [
+            'request_type_key' => $typeKey,
+            'request_type_label' => $label,
+            'walkin' => 0,
+            'online' => 0,
+            'total' => 0,
+        ];
+        $revenueRows[$typeKey] = [
+            'request_type_key' => $typeKey,
+            'request_type_label' => $label,
+            'completed' => 0,
+            'pending' => 0,
+            'rejected' => 0,
+            'revenue' => 0.0,
+        ];
     }
-    if ($sectorExpr !== 'NULL') {
-        $reportFilterOptions['sector'] = rp_sector_options_from_rows(rp_safe_query($conn, "
-            SELECT {$sectorExpr} AS sector_membership
-            FROM documentrequesttbl d
-            {$residentJoin}
-            WHERE {$requestDateFilter}
-              AND {$sectorExpr} IS NOT NULL
-              AND {$sectorExpr} <> ''
-        "));
+
+    foreach ($rows as $row) {
+        $payload = rp_decode_json_assoc((string)($row['request_details'] ?? ''));
+        $rawDocumentType = trim((string)($row['document_type'] ?? ''));
+        if ($rawDocumentType === '') {
+            $rawDocumentType = trim((string)($payload['document_type'] ?? ''));
+        }
+        $requestTypeKey = rp_document_request_key($rawDocumentType);
+        if ($requestTypeKey === '' || !isset($issuanceModuleConfig['request_types'][$requestTypeKey])) {
+            continue;
+        }
+
+        $statusKey = rp_request_status_key((string)($row['stage'] ?? ''));
+        $areaNumber = trim((string)($row['area_number'] ?? ''));
+        $areaNumber = isset($officialReportAreaOptions[$areaNumber]) ? $areaNumber : '';
+        $sectorLabels = array_values(array_intersect(
+            array_unique(array_map('rp_normalize_sector_label', rp_parse_csv_values((string)($row['sector_membership'] ?? '')))),
+            $officialSectors
+        ));
+        $requestSource = rp_request_channel_label($payload);
+        $revenueAmount = (float)($row['revenue_amount'] ?? 0);
+
+        if ($reportFilterTypes !== [] && !in_array($requestTypeKey, $reportFilterTypes, true)) {
+            continue;
+        }
+        if ($reportFilterAreas !== [] && !in_array($areaNumber, $reportFilterAreas, true)) {
+            continue;
+        }
+        if ($reportFilterSectors !== [] && array_intersect($sectorLabels, $reportFilterSectors) === []) {
+            continue;
+        }
+        if ($reportFilterStatuses !== [] && !in_array($statusKey, $reportFilterStatuses, true)) {
+            continue;
+        }
+
+        $requestDateRaw = trim((string)($row['request_date'] ?? ''));
+        $requestDateLabel = $requestDateRaw !== '' ? rp_date_label(substr($requestDateRaw, 0, 10)) : 'N/A';
+        $issuanceRow = [
+            'request_id' => trim((string)($row['request_id'] ?? '')),
+            'request_date_raw' => $requestDateRaw,
+            'request_date_label' => $requestDateLabel,
+            'request_type_key' => $requestTypeKey,
+            'request_type_label' => $issuanceModuleConfig['request_types'][$requestTypeKey],
+            'status_key' => $statusKey,
+            'status_label' => $reportFilterStatusOptions[$statusKey] ?? ucfirst($statusKey),
+            'area_number' => $areaNumber,
+            'sector_membership' => $sectorLabels,
+            'sector_membership_label' => $sectorLabels !== [] ? implode(', ', $sectorLabels) : 'None',
+            'request_source' => $requestSource,
+            'revenue' => $revenueAmount,
+        ];
+        $issuanceReport['rows'][] = $issuanceRow;
+
+        $issuanceReport['summary']['total']++;
+        $issuanceReport['summary'][$statusKey]++;
+        $issuanceReport['summary']['revenue'] += $revenueAmount;
+        if ($requestSource === 'Walk-in') {
+            $issuanceReport['summary']['walkin']++;
+        } else {
+            $issuanceReport['summary']['online']++;
+        }
+
+        if (isset($breakdown[$requestTypeKey])) {
+            $breakdown[$requestTypeKey]['total']++;
+            if ($areaNumber !== '' && isset($breakdown[$requestTypeKey]['areas'][$areaNumber])) {
+                $breakdown[$requestTypeKey]['areas'][$areaNumber]++;
+            }
+            foreach ($sectorLabels as $sectorLabel) {
+                if (isset($breakdown[$requestTypeKey]['sectors'][$sectorLabel])) {
+                    $breakdown[$requestTypeKey]['sectors'][$sectorLabel]++;
+                }
+            }
+            $breakdown[$requestTypeKey]['revenue'] += $revenueAmount;
+        }
+
+        if (isset($revenueRows[$requestTypeKey])) {
+            $revenueRows[$requestTypeKey][$statusKey]++;
+            $revenueRows[$requestTypeKey]['revenue'] += $revenueAmount;
+        }
+
+        if (isset($channels[$requestTypeKey])) {
+            if ($requestSource === 'Walk-in') {
+                $channels[$requestTypeKey]['walkin']++;
+            } else {
+                $channels[$requestTypeKey]['online']++;
+            }
+            $channels[$requestTypeKey]['total']++;
+        }
+
+        if ($requestDateRaw !== '') {
+            $monthKey = date('Y-m', strtotime(substr($requestDateRaw, 0, 10)));
+            if (!isset($issuanceReport['trend'][$monthKey])) {
+                $issuanceReport['trend'][$monthKey] = [
+                    'month' => $monthKey,
+                    'total' => 0,
+                    'completed' => 0,
+                    'pending' => 0,
+                    'rejected' => 0,
+                    'revenue' => 0.0,
+                ];
+            }
+            $issuanceReport['trend'][$monthKey]['total']++;
+            $issuanceReport['trend'][$monthKey][$statusKey]++;
+            $issuanceReport['trend'][$monthKey]['revenue'] += $revenueAmount;
+        }
     }
 
-    $kpi = rp_safe_query($conn, "
-        SELECT
-          COUNT(*) AS total,
-          SUM(CASE WHEN LOWER(stage) = 'completed' THEN 1 ELSE 0 END) AS completed,
-          SUM(CASE WHEN LOWER(stage) IN {$rejectedStagesExpr} THEN 1 ELSE 0 END) AS rejected,
-          SUM(CASE WHEN LOWER(stage) <> 'completed' AND LOWER(stage) NOT IN {$rejectedStagesExpr} THEN 1 ELSE 0 END) AS active,
-          SUM(CASE WHEN LOWER(stage) IN {$collectedStagesExpr} AND {$amountExpr} > 0 THEN {$amountExpr} ELSE 0 END) AS revenue
-        FROM documentrequesttbl
-        d
-        {$financeJoin}
-        " . ($residentJoin !== '' ? "\n        {$residentJoin}" : '') . "
-        WHERE {$requestFilterWhere}
-    ");
-    $dr['kpi'] = $kpi[0] ?? [];
-
-    $dr['by_type'] = rp_safe_query($conn, "
-        SELECT
-          {$docTypeExpr} AS document_type,
-          COUNT(*) AS total,
-          SUM(CASE WHEN LOWER(stage)='completed' THEN 1 ELSE 0 END) AS completed,
-          SUM(CASE WHEN LOWER(stage) IN {$rejectedStagesExpr} THEN 1 ELSE 0 END) AS rejected,
-          SUM(CASE WHEN LOWER(stage) <> 'completed' AND LOWER(stage) NOT IN {$rejectedStagesExpr} THEN 1 ELSE 0 END) AS active,
-          SUM(CASE WHEN LOWER(stage) IN {$collectedStagesExpr} AND {$amountExpr}>0 THEN {$amountExpr} ELSE 0 END) AS revenue
-        FROM documentrequesttbl d
-        {$financeJoin}
-        " . ($residentJoin !== '' ? "\n        {$residentJoin}" : '') . "
-        WHERE {$requestFilterWhere}
-        GROUP BY {$docTypeExpr}
-        ORDER BY total DESC
-    ");
-
-    $dr['by_stage'] = rp_safe_query($conn, "
-        SELECT COALESCE(stage,'Unknown') AS stage, COUNT(*) AS total
-        FROM documentrequesttbl d
-        " . ($residentJoin !== '' ? "\n        {$residentJoin}" : '') . "
-        WHERE {$requestFilterWhere}
-        GROUP BY stage ORDER BY total DESC
-    ");
-
-    $dr['trend'] = rp_safe_query($conn, "
-        SELECT DATE_FORMAT({$requestDateExpr},'%Y-%m') AS month, COUNT(*) AS total,
-          SUM(CASE WHEN LOWER(stage)='completed' THEN 1 ELSE 0 END) AS completed
-        FROM documentrequesttbl d
-        " . ($residentJoin !== '' ? "\n        {$residentJoin}" : '') . "
-        WHERE {$trendFilter}" . ($reportFilterType !== '' ? " AND {$docTypeExpr} = " . rp_sql_quote($conn, $reportFilterType) : '') . ($reportFilterArea !== '' && $areaExpr !== 'NULL' ? " AND {$areaExpr} = " . rp_sql_quote($conn, $reportFilterArea) : '') . ($reportFilterSector !== '' && $sectorExpr !== 'NULL' ? " AND " . rp_csv_contains_expr($conn, $sectorExpr, $reportFilterSector) : '') . "
-        GROUP BY month ORDER BY month ASC
-    ");
-
-    $dr['by_payment'] = $hasFinanceTable ? rp_safe_query($conn, "
-        SELECT {$paymentMethodExpr} AS method,
-          COUNT(*) AS total,
-          SUM({$amountExpr}) AS revenue
-        FROM documentrequesttbl d
-        LEFT JOIN {$financeRollup} f ON f.request_id = d.request_id
-        " . ($residentJoin !== '' ? "\n        {$residentJoin}" : '') . "
-        WHERE {$requestFilterWhere}
-          AND LOWER(d.stage) IN {$collectedStagesExpr}
-          AND {$amountExpr} > 0
-        GROUP BY {$paymentMethodExpr}
-        ORDER BY total DESC
-    ") : [];
+    usort($issuanceReport['rows'], static function (array $a, array $b): int {
+        return strcmp((string)($b['request_date_raw'] ?? ''), (string)($a['request_date_raw'] ?? ''));
+    });
+    ksort($issuanceReport['trend']);
+    $issuanceReport['breakdown'] = array_values($breakdown);
+    $issuanceReport['channels'] = array_values($channels);
+    $issuanceReport['revenue'] = array_values($revenueRows);
+    $issuanceReport['trend'] = array_values($issuanceReport['trend']);
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -533,14 +1080,14 @@ if ($module === 'financial' && rp_table_exists($conn, 'documentrequesttbl') && r
         : '1 = 0';
     $financialCollectedFilter = "LOWER(d.stage) IN ('payment_verified', 'ready_for_claim', 'completed') AND COALESCE(f.transaction_amount, 0) > 0";
     $financialFilterClauses = [$financialCollectedFilter, $financialDateFilter];
-    if ($reportFilterType !== '') {
-        $financialFilterClauses[] = "{$docTypeExpr} = " . rp_sql_quote($conn, $reportFilterType);
+    if ($reportFilterTypes !== []) {
+        $financialFilterClauses[] = "{$docTypeExpr} IN (" . rp_sql_in_list($conn, $reportFilterTypes) . ")";
     }
-    if ($reportFilterArea !== '' && $areaExpr !== 'NULL') {
-        $financialFilterClauses[] = "{$areaExpr} = " . rp_sql_quote($conn, $reportFilterArea);
+    if ($reportFilterAreas !== [] && $areaExpr !== 'NULL') {
+        $financialFilterClauses[] = "{$areaExpr} IN (" . rp_sql_in_list($conn, $reportFilterAreas) . ")";
     }
-    if ($reportFilterSector !== '' && $sectorExpr !== 'NULL') {
-        $financialFilterClauses[] = rp_csv_contains_expr($conn, $sectorExpr, $reportFilterSector);
+    if ($reportFilterSectors !== [] && $sectorExpr !== 'NULL') {
+        $financialFilterClauses[] = rp_csv_contains_any_expr($conn, $sectorExpr, $reportFilterSectors);
     }
     $financialWhere = implode(' AND ', $financialFilterClauses);
     $reportFilterOptions['type'] = rp_options_from_rows(rp_safe_query($conn, "
@@ -621,6 +1168,49 @@ if ($module === 'financial' && rp_table_exists($conn, 'documentrequesttbl') && r
         ORDER BY total DESC
     ");
 
+    $fin['by_method'] = rp_safe_query($conn, "
+        SELECT
+          COALESCE(NULLIF(TRIM(LOWER(COALESCE(f.payment_method, ''))), ''), 'unspecified') AS method,
+          COUNT(*) AS total,
+          SUM(COALESCE(f.transaction_amount, 0)) AS amount
+        FROM documentrequesttbl d
+        INNER JOIN {$financeRollup} f ON f.request_id = d.request_id
+        " . ($residentJoin !== '' ? "\n        {$residentJoin}" : '') . "
+        WHERE {$financialWhere}
+        GROUP BY method
+        ORDER BY amount DESC, total DESC
+    ");
+
+    if ($areaExpr !== 'NULL') {
+        $fin['by_area'] = rp_safe_query($conn, "
+            SELECT
+              COALESCE({$areaExpr}, 'Unspecified') AS area,
+              COUNT(*) AS total,
+              SUM(COALESCE(f.transaction_amount, 0)) AS amount
+            FROM documentrequesttbl d
+            INNER JOIN {$financeRollup} f ON f.request_id = d.request_id
+            {$residentJoin}
+            WHERE {$financialWhere}
+            GROUP BY area
+            ORDER BY total DESC, amount DESC
+        ");
+    }
+
+    if ($sectorExpr !== 'NULL') {
+        $financialSectorRows = rp_safe_query($conn, "
+            SELECT
+              {$sectorExpr} AS sector_membership,
+              COALESCE(f.transaction_amount, 0) AS amount
+            FROM documentrequesttbl d
+            INNER JOIN {$financeRollup} f ON f.request_id = d.request_id
+            {$residentJoin}
+            WHERE {$financialWhere}
+              AND {$sectorExpr} IS NOT NULL
+              AND {$sectorExpr} <> ''
+        ");
+        $fin['by_sector'] = rp_sector_rollup_rows($financialSectorRows, 'sector_membership', 'amount');
+    }
+
     $fin['or_log'] = rp_safe_query($conn, "
         SELECT f.or_number, d.certificate_number,
           TRIM(CONCAT_WS(' ',
@@ -653,11 +1243,11 @@ if ($module === 'residents' && rp_table_exists($conn, 'residentinformationtbl'))
     $residentAreaExpr = $residentAddressJoin !== '' ? "NULLIF(TRIM(ra.area_number), '')" : 'NULL';
     $residentSectorExpr = "NULLIF(TRIM(ri.sector_membership), '')";
     $residentFilterClauses = [];
-    if ($reportFilterArea !== '' && $residentAreaExpr !== 'NULL') {
-        $residentFilterClauses[] = "{$residentAreaExpr} = " . rp_sql_quote($conn, $reportFilterArea);
+    if ($reportFilterAreas !== [] && $residentAreaExpr !== 'NULL') {
+        $residentFilterClauses[] = "{$residentAreaExpr} IN (" . rp_sql_in_list($conn, $reportFilterAreas) . ")";
     }
-    if ($reportFilterSector !== '') {
-        $residentFilterClauses[] = rp_csv_contains_expr($conn, $residentSectorExpr, $reportFilterSector);
+    if ($reportFilterSectors !== []) {
+        $residentFilterClauses[] = rp_csv_contains_any_expr($conn, $residentSectorExpr, $reportFilterSectors);
     }
     $residentFilterSql = $residentFilterClauses ? ' AND ' . implode(' AND ', $residentFilterClauses) : '';
     if ($residentAreaExpr !== 'NULL') {
@@ -774,14 +1364,14 @@ if ($module === 'appointments' && rp_table_exists($conn, 'appointmentstbl')) {
     $appointmentSectorExpr = $appointmentResidentParts['sector_expr'];
     $appointmentTypeExpr = "COALESCE(NULLIF(TRIM(a.subject), ''), NULLIF(TRIM(a.purpose), ''), 'Not specified')";
     $appointmentFilterClauses = ["DATE(a.request_timestamp) BETWEEN '{$df}' AND '{$dt}'"];
-    if ($reportFilterType !== '') {
-        $appointmentFilterClauses[] = "{$appointmentTypeExpr} = " . rp_sql_quote($conn, $reportFilterType);
+    if ($reportFilterTypes !== []) {
+        $appointmentFilterClauses[] = "{$appointmentTypeExpr} IN (" . rp_sql_in_list($conn, $reportFilterTypes) . ")";
     }
-    if ($reportFilterArea !== '' && $appointmentAreaExpr !== 'NULL') {
-        $appointmentFilterClauses[] = "{$appointmentAreaExpr} = " . rp_sql_quote($conn, $reportFilterArea);
+    if ($reportFilterAreas !== [] && $appointmentAreaExpr !== 'NULL') {
+        $appointmentFilterClauses[] = "{$appointmentAreaExpr} IN (" . rp_sql_in_list($conn, $reportFilterAreas) . ")";
     }
-    if ($reportFilterSector !== '' && $appointmentSectorExpr !== 'NULL') {
-        $appointmentFilterClauses[] = rp_csv_contains_expr($conn, $appointmentSectorExpr, $reportFilterSector);
+    if ($reportFilterSectors !== [] && $appointmentSectorExpr !== 'NULL') {
+        $appointmentFilterClauses[] = rp_csv_contains_any_expr($conn, $appointmentSectorExpr, $reportFilterSectors);
     }
     $appointmentWhere = implode(' AND ', $appointmentFilterClauses);
     $reportFilterOptions['type'] = rp_options_from_rows(rp_safe_query($conn, "
@@ -845,13 +1435,36 @@ if ($module === 'appointments' && rp_table_exists($conn, 'appointmentstbl')) {
         GROUP BY purpose ORDER BY total DESC LIMIT 20
     ");
 
+    if ($appointmentAreaExpr !== 'NULL') {
+        $appt['by_area'] = rp_safe_query($conn, "
+            SELECT COALESCE({$appointmentAreaExpr}, 'Unspecified') AS area, COUNT(*) AS total
+            FROM appointmentstbl a
+            {$appointmentJoin}
+            WHERE {$appointmentWhere}
+            GROUP BY area
+            ORDER BY total DESC
+        ");
+    }
+
+    if ($appointmentSectorExpr !== 'NULL') {
+        $appointmentSectorRows = rp_safe_query($conn, "
+            SELECT {$appointmentSectorExpr} AS sector_membership
+            FROM appointmentstbl a
+            {$appointmentJoin}
+            WHERE {$appointmentWhere}
+              AND {$appointmentSectorExpr} IS NOT NULL
+              AND {$appointmentSectorExpr} <> ''
+        ");
+        $appt['by_sector'] = rp_sector_rollup_rows($appointmentSectorRows);
+    }
+
     $appt['trend'] = rp_safe_query($conn, "
         SELECT DATE_FORMAT(request_timestamp,'%Y-%m') AS month, COUNT(*) AS total,
           SUM(CASE WHEN s.status_name='Completed' THEN 1 ELSE 0 END) AS completed
         FROM appointmentstbl a
         JOIN statuslookuptbl s ON s.status_id = a.appointment_status_id
         " . ($appointmentJoin !== '' ? "\n        {$appointmentJoin}" : '') . "
-        WHERE a.request_timestamp >= DATE_SUB(NOW(), INTERVAL 12 MONTH)" . ($reportFilterType !== '' ? " AND {$appointmentTypeExpr} = " . rp_sql_quote($conn, $reportFilterType) : '') . ($reportFilterArea !== '' && $appointmentAreaExpr !== 'NULL' ? " AND {$appointmentAreaExpr} = " . rp_sql_quote($conn, $reportFilterArea) : '') . ($reportFilterSector !== '' && $appointmentSectorExpr !== 'NULL' ? " AND " . rp_csv_contains_expr($conn, $appointmentSectorExpr, $reportFilterSector) : '') . "
+        WHERE a.request_timestamp >= DATE_SUB(NOW(), INTERVAL 12 MONTH)" . ($reportFilterTypes !== [] ? " AND {$appointmentTypeExpr} IN (" . rp_sql_in_list($conn, $reportFilterTypes) . ")" : '') . ($reportFilterAreas !== [] && $appointmentAreaExpr !== 'NULL' ? " AND {$appointmentAreaExpr} IN (" . rp_sql_in_list($conn, $reportFilterAreas) . ")" : '') . ($reportFilterSectors !== [] && $appointmentSectorExpr !== 'NULL' ? " AND " . rp_csv_contains_any_expr($conn, $appointmentSectorExpr, $reportFilterSectors) : '') . "
         GROUP BY month ORDER BY month ASC
     ");
 }
@@ -871,14 +1484,14 @@ if ($module === 'blotter' && rp_table_exists($conn, 'casereportstbl')) {
     $caseSectorExpr = $caseResidentParts['sector_expr'];
     $complaintTypeExpr = "COALESCE(NULLIF(TRIM(c.complaint_type), ''), 'Not specified')";
     $blotterFilterClauses = ["DATE(c.created_at) BETWEEN '{$df}' AND '{$dt}'"];
-    if ($reportFilterType !== '') {
-        $blotterFilterClauses[] = "{$complaintTypeExpr} = " . rp_sql_quote($conn, $reportFilterType);
+    if ($reportFilterTypes !== []) {
+        $blotterFilterClauses[] = "{$complaintTypeExpr} IN (" . rp_sql_in_list($conn, $reportFilterTypes) . ")";
     }
-    if ($reportFilterArea !== '' && $caseAreaExpr !== 'NULL') {
-        $blotterFilterClauses[] = "{$caseAreaExpr} = " . rp_sql_quote($conn, $reportFilterArea);
+    if ($reportFilterAreas !== [] && $caseAreaExpr !== 'NULL') {
+        $blotterFilterClauses[] = "{$caseAreaExpr} IN (" . rp_sql_in_list($conn, $reportFilterAreas) . ")";
     }
-    if ($reportFilterSector !== '' && $caseSectorExpr !== 'NULL') {
-        $blotterFilterClauses[] = rp_csv_contains_expr($conn, $caseSectorExpr, $reportFilterSector);
+    if ($reportFilterSectors !== [] && $caseSectorExpr !== 'NULL') {
+        $blotterFilterClauses[] = rp_csv_contains_any_expr($conn, $caseSectorExpr, $reportFilterSectors);
     }
     $blotterWhere = implode(' AND ', $blotterFilterClauses);
     $reportFilterOptions['type'] = rp_options_from_rows(rp_safe_query($conn, "
@@ -945,11 +1558,34 @@ if ($module === 'blotter' && rp_table_exists($conn, 'casereportstbl')) {
         GROUP BY s.status_name ORDER BY total DESC
     ");
 
+    if ($caseAreaExpr !== 'NULL') {
+        $blot['by_area'] = rp_safe_query($conn, "
+            SELECT COALESCE({$caseAreaExpr}, 'Unspecified') AS area, COUNT(*) AS total
+            FROM casereportstbl c
+            {$caseJoin}
+            WHERE {$blotterWhere}
+            GROUP BY area
+            ORDER BY total DESC
+        ");
+    }
+
+    if ($caseSectorExpr !== 'NULL') {
+        $blotterSectorRows = rp_safe_query($conn, "
+            SELECT {$caseSectorExpr} AS sector_membership
+            FROM casereportstbl c
+            {$caseJoin}
+            WHERE {$blotterWhere}
+              AND {$caseSectorExpr} IS NOT NULL
+              AND {$caseSectorExpr} <> ''
+        ");
+        $blot['by_sector'] = rp_sector_rollup_rows($blotterSectorRows);
+    }
+
     $blot['trend'] = rp_safe_query($conn, "
         SELECT DATE_FORMAT(c.created_at,'%Y-%m') AS month, COUNT(*) AS total
         FROM casereportstbl c
         " . ($caseJoin !== '' ? "\n        {$caseJoin}" : '') . "
-        WHERE c.created_at >= DATE_SUB(NOW(), INTERVAL 12 MONTH)" . ($reportFilterType !== '' ? " AND {$complaintTypeExpr} = " . rp_sql_quote($conn, $reportFilterType) : '') . ($reportFilterArea !== '' && $caseAreaExpr !== 'NULL' ? " AND {$caseAreaExpr} = " . rp_sql_quote($conn, $reportFilterArea) : '') . ($reportFilterSector !== '' && $caseSectorExpr !== 'NULL' ? " AND " . rp_csv_contains_expr($conn, $caseSectorExpr, $reportFilterSector) : '') . "
+        WHERE c.created_at >= DATE_SUB(NOW(), INTERVAL 12 MONTH)" . ($reportFilterTypes !== [] ? " AND {$complaintTypeExpr} IN (" . rp_sql_in_list($conn, $reportFilterTypes) . ")" : '') . ($reportFilterAreas !== [] && $caseAreaExpr !== 'NULL' ? " AND {$caseAreaExpr} IN (" . rp_sql_in_list($conn, $reportFilterAreas) . ")" : '') . ($reportFilterSectors !== [] && $caseSectorExpr !== 'NULL' ? " AND " . rp_csv_contains_any_expr($conn, $caseSectorExpr, $reportFilterSectors) : '') . "
         GROUP BY month ORDER BY month ASC
     ");
 }
@@ -973,14 +1609,14 @@ if ($module === 'complaints' && rp_table_exists($conn, 'complaintstbl')) {
         ? "COALESCE(NULLIF(TRIM(c.complaint_type), ''), 'Not specified')"
         : "'Not specified'";
     $complaintFilterClauses = ["DATE(ct.created_at) BETWEEN '{$df}' AND '{$dt}'"];
-    if ($reportFilterType !== '' && $hasCaseTable) {
-        $complaintFilterClauses[] = "{$complaintTypeExpr} = " . rp_sql_quote($conn, $reportFilterType);
+    if ($reportFilterTypes !== [] && $hasCaseTable) {
+        $complaintFilterClauses[] = "{$complaintTypeExpr} IN (" . rp_sql_in_list($conn, $reportFilterTypes) . ")";
     }
-    if ($reportFilterArea !== '' && $complaintAreaExpr !== 'NULL') {
-        $complaintFilterClauses[] = "{$complaintAreaExpr} = " . rp_sql_quote($conn, $reportFilterArea);
+    if ($reportFilterAreas !== [] && $complaintAreaExpr !== 'NULL') {
+        $complaintFilterClauses[] = "{$complaintAreaExpr} IN (" . rp_sql_in_list($conn, $reportFilterAreas) . ")";
     }
-    if ($reportFilterSector !== '' && $complaintSectorExpr !== 'NULL') {
-        $complaintFilterClauses[] = rp_csv_contains_expr($conn, $complaintSectorExpr, $reportFilterSector);
+    if ($reportFilterSectors !== [] && $complaintSectorExpr !== 'NULL') {
+        $complaintFilterClauses[] = rp_csv_contains_any_expr($conn, $complaintSectorExpr, $reportFilterSectors);
     }
     $complaintWhere = implode(' AND ', $complaintFilterClauses);
     if ($hasCaseTable) {
@@ -1041,6 +1677,21 @@ if ($module === 'complaints' && rp_table_exists($conn, 'complaintstbl')) {
         GROUP BY complaint_origin ORDER BY total DESC
     ");
 
+    if ($hasCaseTable) {
+        $comp['by_type'] = rp_safe_query($conn, "
+            SELECT {$complaintTypeExpr} AS complaint_type,
+              COUNT(*) AS total,
+              SUM(CASE WHEN escalated_to_blotter=1 THEN 1 ELSE 0 END) AS escalated
+            FROM complaintstbl ct
+            {$complaintCaseJoin}
+            " . ($complaintResidentJoin !== '' ? "\n        {$complaintResidentJoin}" : '') . "
+            WHERE {$complaintWhere}
+            GROUP BY complaint_type
+            ORDER BY total DESC
+            LIMIT 20
+        ");
+    }
+
     $comp['by_kind'] = rp_safe_query($conn, "
         SELECT COALESCE(subject_kind,'Unknown') AS kind, COUNT(*) AS total
         FROM complaintstbl ct
@@ -1050,20 +1701,46 @@ if ($module === 'complaints' && rp_table_exists($conn, 'complaintstbl')) {
         GROUP BY subject_kind ORDER BY total DESC
     ");
 
+    if ($complaintAreaExpr !== 'NULL') {
+        $comp['by_area'] = rp_safe_query($conn, "
+            SELECT COALESCE({$complaintAreaExpr}, 'Unspecified') AS area, COUNT(*) AS total
+            FROM complaintstbl ct
+            {$complaintCaseJoin}
+            {$complaintResidentJoin}
+            WHERE {$complaintWhere}
+            GROUP BY area
+            ORDER BY total DESC
+        ");
+    }
+
+    if ($complaintSectorExpr !== 'NULL') {
+        $complaintSectorRows = rp_safe_query($conn, "
+            SELECT {$complaintSectorExpr} AS sector_membership
+            FROM complaintstbl ct
+            {$complaintCaseJoin}
+            {$complaintResidentJoin}
+            WHERE {$complaintWhere}
+              AND {$complaintSectorExpr} IS NOT NULL
+              AND {$complaintSectorExpr} <> ''
+        ");
+        $comp['by_sector'] = rp_sector_rollup_rows($complaintSectorRows);
+    }
+
     $comp['trend'] = rp_safe_query($conn, "
         SELECT DATE_FORMAT(ct.created_at,'%Y-%m') AS month, COUNT(*) AS total,
           SUM(CASE WHEN escalated_to_blotter=1 THEN 1 ELSE 0 END) AS escalated
         FROM complaintstbl ct
         {$complaintCaseJoin}
         " . ($complaintResidentJoin !== '' ? "\n        {$complaintResidentJoin}" : '') . "
-        WHERE ct.created_at >= DATE_SUB(NOW(), INTERVAL 12 MONTH)" . ($reportFilterType !== '' && $hasCaseTable ? " AND {$complaintTypeExpr} = " . rp_sql_quote($conn, $reportFilterType) : '') . ($reportFilterArea !== '' && $complaintAreaExpr !== 'NULL' ? " AND {$complaintAreaExpr} = " . rp_sql_quote($conn, $reportFilterArea) : '') . ($reportFilterSector !== '' && $complaintSectorExpr !== 'NULL' ? " AND " . rp_csv_contains_expr($conn, $complaintSectorExpr, $reportFilterSector) : '') . "
+        WHERE ct.created_at >= DATE_SUB(NOW(), INTERVAL 12 MONTH)" . ($reportFilterTypes !== [] && $hasCaseTable ? " AND {$complaintTypeExpr} IN (" . rp_sql_in_list($conn, $reportFilterTypes) . ")" : '') . ($reportFilterAreas !== [] && $complaintAreaExpr !== 'NULL' ? " AND {$complaintAreaExpr} IN (" . rp_sql_in_list($conn, $reportFilterAreas) . ")" : '') . ($reportFilterSectors !== [] && $complaintSectorExpr !== 'NULL' ? " AND " . rp_csv_contains_any_expr($conn, $complaintSectorExpr, $reportFilterSectors) : '') . "
         GROUP BY month ORDER BY month ASC
     ");
 }
 
 // ── Module labels ─────────────────────────────────────────────────────────────
 $moduleLabels = [
-    'document_requests' => ['label' => 'Document Requests', 'icon' => 'fa-file-circle-check'],
+    'certificate_issuance' => ['label' => 'Certificate Issuance Report', 'icon' => 'fa-file-circle-check'],
+    'clearance_issuance' => ['label' => 'Clearance Issuance Report', 'icon' => 'fa-stamp'],
     'financial'         => ['label' => 'Financial / Collections', 'icon' => 'fa-peso-sign'],
     'residents'         => ['label' => 'Residents', 'icon' => 'fa-users'],
     'appointments'      => ['label' => 'Appointments', 'icon' => 'fa-calendar-check'],
@@ -1074,18 +1751,98 @@ $currentLabel = $moduleLabels[$module]['label'];
 $isPrintView  = ($_GET['format'] ?? '') === 'print';
 $reportLeftLogo = '../../Images/San_Jose_LOGO.jpg';
 $reportRightLogo = '../../Images/Montalban_Logo.png';
+$reportChartTypeOptions = [
+    'bar' => 'Bar Chart',
+    'pie' => 'Pie Chart',
+];
+$reportChartType = strtolower(trim((string)($_GET['chart_type'] ?? 'bar')));
+if (!isset($reportChartTypeOptions[$reportChartType])) {
+    $reportChartType = 'bar';
+}
+$reportCustomizeConfig = rp_report_customize_config($module);
+$availableReportSections = array_keys($reportCustomizeConfig['sections']);
+$availableReportColumns = array_keys($reportCustomizeConfig['columns']);
+$visibleReportSections = rp_parse_query_list($_GET['show_section'] ?? '');
+$visibleReportColumns = rp_parse_query_list($_GET['show_column'] ?? '');
+$visibleReportSections = $visibleReportSections === []
+    ? $availableReportSections
+    : array_values(array_intersect($visibleReportSections, $availableReportSections));
+$visibleReportColumns = $visibleReportColumns === []
+    ? $availableReportColumns
+    : array_values(array_intersect($visibleReportColumns, $availableReportColumns));
+if ($visibleReportSections === []) {
+    $visibleReportSections = $availableReportSections;
+}
+if ($visibleReportColumns === []) {
+    $visibleReportColumns = $availableReportColumns;
+}
+if ($issuanceModuleConfig !== null && in_array('breakdown_total', $availableReportColumns, true) && !in_array('breakdown_total', $visibleReportColumns, true)) {
+    $visibleReportColumns[] = 'breakdown_total';
+}
+$showReportSection = static fn(string $key): bool => in_array($key, $visibleReportSections, true);
+$showReportColumn = static fn(string $key): bool => in_array($key, $visibleReportColumns, true);
+$reportColumnClass = static fn(string $key): string => $showReportColumn($key) ? '' : ' rp-col-hidden';
+$reportBreakdownAreaClass = static fn(string $area): string => $showReportColumn(rp_breakdown_area_column_key($area)) ? '' : ' rp-col-hidden';
+$reportBreakdownSectorClass = static fn(string $sector): string => $showReportColumn(rp_breakdown_sector_column_key($sector)) ? '' : ' rp-col-hidden';
+$isCustomLayoutActive = count($visibleReportSections) !== count($availableReportSections)
+    || count($visibleReportColumns) !== count($availableReportColumns)
+    || $reportChartType !== 'bar';
+$hiddenLayoutCount = max(0, count($availableReportSections) - count($visibleReportSections))
+    + max(0, count($availableReportColumns) - count($visibleReportColumns))
+    + ($reportChartType !== 'bar' ? 1 : 0);
 $reportFilterOptions['area'] = $officialReportAreaOptions;
 $reportFilterOptions['sector'] = $officialReportSectorOptions;
+$reportFilterTypes = array_values(array_intersect($reportFilterTypes, array_keys($reportFilterOptions['type'])));
 $activeReportFilters = [];
-if ($reportFilterType !== '') {
-    $activeReportFilters[] = $reportFilterLabels['type'] . ': ' . ($reportFilterOptions['type'][$reportFilterType] ?? $reportFilterType);
+if ($reportFilterTypes !== []) {
+    $labels = array_values(array_map(
+        static fn(string $key): string => $reportFilterOptions['type'][$key] ?? $key,
+        $reportFilterTypes
+    ));
+    $activeReportFilters[] = $reportFilterLabels['type'] . ': ' . implode(', ', $labels);
 }
-if ($reportFilterArea !== '') {
-    $activeReportFilters[] = $reportFilterLabels['area'] . ': ' . ($reportFilterOptions['area'][$reportFilterArea] ?? $reportFilterArea);
+if ($reportFilterAreas !== []) {
+    $activeReportFilters[] = $reportFilterLabels['area'] . ': ' . implode(', ', $reportFilterAreas);
 }
-if ($reportFilterSector !== '') {
-    $activeReportFilters[] = $reportFilterLabels['sector'] . ': ' . ($reportFilterOptions['sector'][$reportFilterSector] ?? $reportFilterSector);
+if ($reportFilterSectors !== []) {
+    $activeReportFilters[] = $reportFilterLabels['sector'] . ': ' . implode(', ', $reportFilterSectors);
 }
+if ($issuanceModuleConfig !== null && $reportFilterStatuses !== []) {
+    $labels = array_values(array_map(
+        static fn(string $key): string => $reportFilterStatusOptions[$key] ?? ucfirst($key),
+        $reportFilterStatuses
+    ));
+    $activeReportFilters[] = $reportFilterLabels['status'] . ': ' . implode(', ', $labels);
+}
+$reportFilterStateQuery = ['module' => $module];
+if ($module !== 'residents') {
+    $reportFilterStateQuery['date_from'] = $dateFrom;
+    $reportFilterStateQuery['date_to'] = $dateTo;
+}
+foreach ($reportFilterTypes as $value) {
+    $reportFilterStateQuery['filter_type'][] = $value;
+}
+foreach ($reportFilterAreas as $value) {
+    $reportFilterStateQuery['filter_area'][] = $value;
+}
+foreach ($reportFilterSectors as $value) {
+    $reportFilterStateQuery['filter_sector'][] = $value;
+}
+foreach ($reportFilterStatuses as $value) {
+    $reportFilterStateQuery['filter_status'][] = $value;
+}
+$reportLayoutStateQuery = $reportFilterStateQuery;
+foreach ($visibleReportSections as $value) {
+    $reportLayoutStateQuery['show_section'][] = $value;
+}
+foreach ($visibleReportColumns as $value) {
+    $reportLayoutStateQuery['show_column'][] = $value;
+}
+if ($reportChartType !== 'bar') {
+    $reportLayoutStateQuery['chart_type'] = $reportChartType;
+}
+$reportFilterStateUrl = $baseUrl . '?' . http_build_query($reportFilterStateQuery);
+$reportLayoutStateUrl = $baseUrl . '?' . http_build_query($reportLayoutStateQuery);
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -1185,6 +1942,39 @@ if ($reportFilterSector !== '') {
     .rp-filter-modal .modal-footer {
       border-top: 1px solid #e5e7eb;
       padding: 1rem 1.25rem;
+    }
+    .rp-checklist-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 14px 18px;
+    }
+    .rp-checklist-group {
+      border: 1px solid #e5e7eb;
+      border-radius: 14px;
+      padding: 12px 14px;
+      background: #fff;
+    }
+    .rp-checklist-label {
+      display: block;
+      font-size: .86rem;
+      font-weight: 700;
+      color: #334155;
+      margin-bottom: 8px;
+    }
+    .rp-checklist-list {
+      display: grid;
+      gap: 8px;
+      max-height: 220px;
+      overflow-y: auto;
+      padding-right: 4px;
+    }
+    .rp-subsection-title {
+      font-size: .82rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: .05em;
+      color: #475569;
+      margin: 4px 0 10px;
     }
 
     /* ── Formal report document ─────────────────────────────────────────────── */
@@ -1314,15 +2104,17 @@ if ($reportFilterSector !== '') {
       border: 1px solid #adb5bd;
       font-weight: 700;
       text-align: left;
-      white-space: nowrap;
+      white-space: normal;
       font-size: 11.5px;
       text-transform: uppercase;
       letter-spacing: .02em;
+      overflow-wrap: anywhere;
     }
     .rp-table td {
       padding: 6px 10px;
       border: 1px solid #d0d7de;
       vertical-align: middle;
+      overflow-wrap: anywhere;
     }
     .rp-table tr:nth-child(even) td { background: #fafbfc; }
     .rp-table tfoot td {
@@ -1333,12 +2125,34 @@ if ($reportFilterSector !== '') {
     .rp-table .text-end { text-align: right; }
     .rp-table .text-center { text-align: center; }
     .rp-table .pct { color: #6b7280; font-size: 11px; }
+    .rp-col-hidden { display: none !important; }
 
     /* Two-column layout for side-by-side tables */
-    .rp-two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
-    .rp-three-col { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 20px; }
-    @media (max-width: 768px) {
-      .rp-two-col, .rp-three-col { grid-template-columns: 1fr; }
+    .rp-two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; align-items: start; }
+    .rp-three-col { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 20px; align-items: start; }
+    .rp-chart-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; align-items: start; }
+    .rp-chart-card {
+      border: 1px solid #dbe4ee;
+      border-radius: 14px;
+      padding: 14px 16px 16px;
+      background: #fff;
+      min-width: 0;
+      overflow: hidden;
+    }
+    .rp-chart-wrap {
+      position: relative;
+      width: 100%;
+      max-width: 100%;
+      min-height: 280px;
+    }
+    .rp-chart-wrap canvas { max-width: 100% !important; }
+    .rp-chart-note {
+      font-size: 11px;
+      color: #64748b;
+      margin-top: 8px;
+    }
+    @media (max-width: 980px) {
+      .rp-two-col, .rp-three-col, .rp-chart-grid { grid-template-columns: 1fr; }
     }
 
     /* Signature block */
@@ -1362,9 +2176,11 @@ if ($reportFilterSector !== '') {
     .rp-doc {
       border: none;
       box-shadow: none;
+      width: 100%;
       max-width: 100%;
       min-height: auto;
       padding: 0;
+      margin: 0;
     }
     .rp-doc-header,
     .rp-footer { display: none; }
@@ -1404,6 +2220,9 @@ if ($reportFilterSector !== '') {
       .rp-summary td, .rp-table th, .rp-table td { font-size: 9pt !important; padding: 4pt 7pt !important; }
       .rp-table tr { page-break-inside: avoid; }
       .rp-two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 16pt; }
+      .rp-chart-grid { display: grid; grid-template-columns: 1fr; gap: 14pt; }
+      .rp-chart-card { page-break-inside: avoid; break-inside: avoid; }
+      .rp-chart-wrap { min-height: 180pt; }
       .rp-footer { margin-top: 24pt !important; }
       .rp-sig-grid { gap: 32pt !important; }
     }
@@ -1426,13 +2245,16 @@ if ($reportFilterSector !== '') {
     .rp-summary td, .rp-table th, .rp-table td { font-size: 9pt !important; padding: 4pt 7pt !important; }
     .rp-table tr { page-break-inside: avoid; }
     .rp-two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 16pt; }
+    .rp-chart-grid { display: grid; grid-template-columns: 1fr; gap: 14pt; }
+    .rp-chart-card { page-break-inside: avoid; break-inside: avoid; }
+    .rp-chart-wrap { min-height: 180pt; }
     .rp-footer { margin-top: 24pt !important; }
     .rp-sig-grid { gap: 32pt !important; }
     <?php endif; ?>
   </style>
 </head>
 <?php if ($isPrintView): ?>
-<body onload="window.print();">
+<body onload="window.setTimeout(function(){ window.print(); }, 350);">
 <?php else: /* ── Full admin layout ── */ ?>
 <body>
 <div class="d-flex flex-column flex-md-row" style="min-height: 100vh;">
@@ -1460,6 +2282,7 @@ if ($reportFilterSector !== '') {
           $hasTypeFilter = !empty($reportFilterOptions['type']);
           $hasAreaFilter = !empty($reportFilterOptions['area']);
           $hasSectorFilter = !empty($reportFilterOptions['sector']);
+          $hasStatusFilter = !empty($reportFilterStatusOptions);
           $reportResetUrl = $baseUrl . '?module=' . rawurlencode($module);
           $screenReportFilters = [];
           if ($module !== 'residents') {
@@ -1468,19 +2291,40 @@ if ($reportFilterSector !== '') {
           } else {
             $screenReportFilters[] = 'As of: ' . date('F j, Y');
           }
-          if ($reportFilterType !== '') {
-            $screenReportFilters[] = $reportFilterLabels['type'] . ': ' . ($reportFilterOptions['type'][$reportFilterType] ?? $reportFilterType);
+          if ($reportFilterTypes !== []) {
+            $labels = array_values(array_map(
+              static fn(string $key): string => $reportFilterOptions['type'][$key] ?? $key,
+              $reportFilterTypes
+            ));
+            $screenReportFilters[] = $reportFilterLabels['type'] . ': ' . implode(', ', $labels);
           }
-          if ($reportFilterArea !== '') {
-            $screenReportFilters[] = $reportFilterLabels['area'] . ': ' . ($reportFilterOptions['area'][$reportFilterArea] ?? $reportFilterArea);
+          if ($reportFilterAreas !== []) {
+            $screenReportFilters[] = $reportFilterLabels['area'] . ': ' . implode(', ', $reportFilterAreas);
           }
-          if ($reportFilterSector !== '') {
-            $screenReportFilters[] = $reportFilterLabels['sector'] . ': ' . ($reportFilterOptions['sector'][$reportFilterSector] ?? $reportFilterSector);
+          if ($reportFilterSectors !== []) {
+            $screenReportFilters[] = $reportFilterLabels['sector'] . ': ' . implode(', ', $reportFilterSectors);
+          }
+          if ($issuanceModuleConfig !== null && $reportFilterStatuses !== []) {
+            $labels = array_values(array_map(
+              static fn(string $key): string => $reportFilterStatusOptions[$key] ?? ucfirst($key),
+              $reportFilterStatuses
+            ));
+            $screenReportFilters[] = $reportFilterLabels['status'] . ': ' . implode(', ', $labels);
+          }
+          if ($reportChartType !== 'bar') {
+            $screenReportFilters[] = 'Chart: ' . $reportChartTypeOptions[$reportChartType];
+          }
+          if ($isCustomLayoutActive) {
+            $screenReportFilters[] = 'Layout: Custom';
           }
           $selectedFilterCount = 0;
-          if ($reportFilterType !== '') $selectedFilterCount++;
-          if ($reportFilterArea !== '') $selectedFilterCount++;
-          if ($reportFilterSector !== '') $selectedFilterCount++;
+          $selectedFilterCount += count($reportFilterTypes);
+          $selectedFilterCount += count($reportFilterAreas);
+          $selectedFilterCount += count($reportFilterSectors);
+          if ($issuanceModuleConfig !== null) {
+            $selectedFilterCount += count($reportFilterStatuses);
+          }
+          $selectedCustomizationCount = $hiddenLayoutCount;
         ?>
         <div class="rp-controls-bar">
           <div class="rp-controls-summary">
@@ -1493,6 +2337,12 @@ if ($reportFilterSector !== '') {
               <i class="fas fa-filter me-1"></i>Filter
               <?php if ($selectedFilterCount > 0): ?>
               <span class="rp-filter-count ms-1"><?= $selectedFilterCount ?></span>
+              <?php endif; ?>
+            </button>
+            <button type="button" class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#reportCustomizeModal">
+              <i class="fas fa-sliders-h me-1"></i>Customize
+              <?php if ($selectedCustomizationCount > 0): ?>
+              <span class="rp-filter-count ms-1"><?= $selectedCustomizationCount ?></span>
               <?php endif; ?>
             </button>
             <a href="<?= htmlspecialchars($reportResetUrl) ?>" class="btn btn-sm btn-outline-secondary">Reset</a>
@@ -1513,7 +2363,10 @@ if ($reportFilterSector !== '') {
               </div>
               <div class="modal-body">
                 <input type="hidden" name="module" value="<?= htmlspecialchars($module) ?>">
-                <div class="rp-filter-grid">
+                <?php rp_render_hidden_input('chart_type', $reportChartType); ?>
+                <?php rp_render_hidden_inputs('show_section', $visibleReportSections); ?>
+                <?php rp_render_hidden_inputs('show_column', $visibleReportColumns); ?>
+                <div class="rp-filter-grid mb-3">
                   <?php if ($module !== 'residents'): ?>
                   <div>
                     <label class="form-label small fw-semibold mb-1">From</label>
@@ -1524,37 +2377,58 @@ if ($reportFilterSector !== '') {
                     <input type="date" name="date_to" class="form-control form-control-sm" value="<?= htmlspecialchars($dateTo) ?>">
                   </div>
                   <?php endif; ?>
+                </div>
+                <div class="rp-checklist-grid">
                   <?php if ($hasTypeFilter): ?>
-                  <div>
-                    <label class="form-label small fw-semibold mb-1"><?= htmlspecialchars($reportFilterLabels['type']) ?></label>
-                    <select name="filter_type" class="form-select form-select-sm">
-                      <option value="">All</option>
+                  <div class="rp-checklist-group">
+                    <label class="rp-checklist-label"><?= htmlspecialchars($reportFilterLabels['type']) ?></label>
+                    <div class="rp-checklist-list">
                       <?php foreach ($reportFilterOptions['type'] as $value => $label): ?>
-                      <option value="<?= htmlspecialchars($value) ?>" <?= $reportFilterType === (string)$value ? 'selected' : '' ?>><?= htmlspecialchars($label) ?></option>
+                      <label class="d-flex align-items-center gap-2">
+                        <input class="form-check-input m-0" type="checkbox" name="filter_type[]" value="<?= htmlspecialchars($value) ?>" <?= in_array((string)$value, $reportFilterTypes, true) ? 'checked' : '' ?>>
+                        <span><?= htmlspecialchars($label) ?></span>
+                      </label>
                       <?php endforeach; ?>
-                    </select>
+                    </div>
                   </div>
                   <?php endif; ?>
                   <?php if ($hasAreaFilter): ?>
-                  <div>
-                    <label class="form-label small fw-semibold mb-1"><?= htmlspecialchars($reportFilterLabels['area']) ?></label>
-                    <select name="filter_area" class="form-select form-select-sm">
-                      <option value="">All</option>
+                  <div class="rp-checklist-group">
+                    <label class="rp-checklist-label"><?= htmlspecialchars($reportFilterLabels['area']) ?></label>
+                    <div class="rp-checklist-list">
                       <?php foreach ($reportFilterOptions['area'] as $value => $label): ?>
-                      <option value="<?= htmlspecialchars($value) ?>" <?= $reportFilterArea === (string)$value ? 'selected' : '' ?>><?= htmlspecialchars($label) ?></option>
+                      <label class="d-flex align-items-center gap-2">
+                        <input class="form-check-input m-0" type="checkbox" name="filter_area[]" value="<?= htmlspecialchars($value) ?>" <?= in_array((string)$value, $reportFilterAreas, true) ? 'checked' : '' ?>>
+                        <span><?= htmlspecialchars($label) ?></span>
+                      </label>
                       <?php endforeach; ?>
-                    </select>
+                    </div>
                   </div>
                   <?php endif; ?>
                   <?php if ($hasSectorFilter): ?>
-                  <div>
-                    <label class="form-label small fw-semibold mb-1"><?= htmlspecialchars($reportFilterLabels['sector']) ?></label>
-                    <select name="filter_sector" class="form-select form-select-sm">
-                      <option value="">All</option>
+                  <div class="rp-checklist-group">
+                    <label class="rp-checklist-label"><?= htmlspecialchars($reportFilterLabels['sector']) ?></label>
+                    <div class="rp-checklist-list">
                       <?php foreach ($reportFilterOptions['sector'] as $value => $label): ?>
-                      <option value="<?= htmlspecialchars($value) ?>" <?= $reportFilterSector === (string)$value ? 'selected' : '' ?>><?= htmlspecialchars($label) ?></option>
+                      <label class="d-flex align-items-center gap-2">
+                        <input class="form-check-input m-0" type="checkbox" name="filter_sector[]" value="<?= htmlspecialchars($value) ?>" <?= in_array((string)$value, $reportFilterSectors, true) ? 'checked' : '' ?>>
+                        <span><?= htmlspecialchars($label) ?></span>
+                      </label>
                       <?php endforeach; ?>
-                    </select>
+                    </div>
+                  </div>
+                  <?php endif; ?>
+                  <?php if ($hasStatusFilter): ?>
+                  <div class="rp-checklist-group">
+                    <label class="rp-checklist-label"><?= htmlspecialchars($reportFilterLabels['status']) ?></label>
+                    <div class="rp-checklist-list">
+                      <?php foreach ($reportFilterStatusOptions as $value => $label): ?>
+                      <label class="d-flex align-items-center gap-2">
+                        <input class="form-check-input m-0" type="checkbox" name="filter_status[]" value="<?= htmlspecialchars($value) ?>" <?= in_array((string)$value, $reportFilterStatuses, true) ? 'checked' : '' ?>>
+                        <span><?= htmlspecialchars($label) ?></span>
+                      </label>
+                      <?php endforeach; ?>
+                    </div>
                   </div>
                   <?php endif; ?>
                 </div>
@@ -1563,6 +2437,76 @@ if ($reportFilterSector !== '') {
                 <a href="<?= htmlspecialchars($reportResetUrl) ?>" class="btn btn-outline-secondary me-auto">Reset</a>
                 <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancel</button>
                 <button type="submit" class="btn btn-primary"><i class="fas fa-filter me-1"></i>Apply Filters</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      </div>
+
+      <div class="modal fade rp-filter-modal" id="reportCustomizeModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-lg modal-dialog-centered">
+          <div class="modal-content">
+            <form method="GET" class="rp-filter-form">
+              <div class="modal-header">
+                <div>
+                  <h5 class="modal-title mb-0">Customize Report</h5>
+                  <p class="text-muted small mb-0 mt-1">Choose which sections and column groups should appear in <?= htmlspecialchars($currentLabel) ?>.</p>
+                </div>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+              </div>
+              <div class="modal-body">
+                <input type="hidden" name="module" value="<?= htmlspecialchars($module) ?>">
+                <?php if ($module !== 'residents'): ?>
+                <?php rp_render_hidden_input('date_from', $dateFrom); ?>
+                <?php rp_render_hidden_input('date_to', $dateTo); ?>
+                <?php endif; ?>
+                <?php rp_render_hidden_inputs('filter_type', $reportFilterTypes); ?>
+                <?php rp_render_hidden_inputs('filter_area', $reportFilterAreas); ?>
+                <?php rp_render_hidden_inputs('filter_sector', $reportFilterSectors); ?>
+                <?php rp_render_hidden_inputs('filter_status', $reportFilterStatuses); ?>
+
+                <div class="rp-checklist-grid">
+                  <div class="rp-checklist-group">
+                    <label class="rp-checklist-label">Sections</label>
+                    <div class="rp-checklist-list">
+                      <?php foreach ($reportCustomizeConfig['sections'] as $value => $label): ?>
+                      <label class="d-flex align-items-center gap-2">
+                        <input class="form-check-input m-0" type="checkbox" name="show_section[]" value="<?= htmlspecialchars($value) ?>" <?= in_array((string)$value, $visibleReportSections, true) ? 'checked' : '' ?>>
+                        <span><?= htmlspecialchars($label) ?></span>
+                      </label>
+                      <?php endforeach; ?>
+                    </div>
+                  </div>
+                  <div class="rp-checklist-group">
+                    <label class="rp-checklist-label">Column Groups</label>
+                    <div class="rp-checklist-list">
+                      <?php foreach ($reportCustomizeConfig['columns'] as $value => $label): ?>
+                      <label class="d-flex align-items-center gap-2">
+                        <input class="form-check-input m-0" type="checkbox" name="show_column[]" value="<?= htmlspecialchars($value) ?>" <?= in_array((string)$value, $visibleReportColumns, true) ? 'checked' : '' ?>>
+                        <span><?= htmlspecialchars($label) ?></span>
+                      </label>
+                      <?php endforeach; ?>
+                    </div>
+                  </div>
+                  <?php if ($issuanceModuleConfig !== null): ?>
+                  <div class="rp-checklist-group">
+                    <label class="rp-checklist-label">Chart Type</label>
+                    <div class="d-flex flex-wrap gap-3">
+                      <?php foreach ($reportChartTypeOptions as $value => $label): ?>
+                      <label class="d-flex align-items-center gap-2">
+                        <input class="form-check-input m-0" type="radio" name="chart_type" value="<?= htmlspecialchars($value) ?>" <?= $reportChartType === $value ? 'checked' : '' ?>>
+                        <span><?= htmlspecialchars($label) ?></span>
+                      </label>
+                      <?php endforeach; ?>
+                    </div>
+                  </div>
+                  <?php endif; ?>
+                </div>
+              </div>
+              <div class="modal-footer">
+                <a href="<?= htmlspecialchars($reportFilterStateUrl) ?>" class="btn btn-outline-secondary me-auto">Default Layout</a>
+                <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancel</button>
+                <button type="submit" class="btn btn-primary"><i class="fas fa-sliders-h me-1"></i>Apply Layout</button>
               </div>
             </form>
           </div>
@@ -1609,148 +2553,510 @@ if ($reportFilterSector !== '') {
 
 <?php
 // ══════════════════════════════════════════════════════════════════════════════
-// RENDER: DOCUMENT REQUESTS
+// RENDER: ISSUANCE REPORTS
 // ══════════════════════════════════════════════════════════════════════════════
-if ($module === 'document_requests'):
-  $kpi   = $dr['kpi']        ?? [];
-  $total = (int)($kpi['total'] ?? 0);
-  if ($total <= 0 && !empty($dr['by_stage'])) {
-    $total = (int)array_sum(array_map(static fn($row): int => (int)($row['total'] ?? 0), $dr['by_stage']));
+$shouldLoadIssuanceCharts = false;
+if ($issuanceModuleConfig !== null):
+  $issuanceSummary = $issuanceReport['summary'] ?? [];
+  $issuanceRows = $issuanceReport['rows'] ?? [];
+  $issuanceBreakdown = $issuanceReport['breakdown'] ?? [];
+  $issuanceRevenue = $issuanceReport['revenue'] ?? [];
+  $issuanceChannels = $issuanceReport['channels'] ?? [];
+  $issuanceTrend = $issuanceReport['trend'] ?? [];
+  $issuanceTotal = (int)($issuanceSummary['total'] ?? 0);
+  $officialAreas = array_keys($officialReportAreaOptions);
+  $officialSectors = array_keys($officialReportSectorOptions);
+  $breakdownTotals = [
+    'areas' => array_fill_keys($officialAreas, 0),
+    'sectors' => array_fill_keys($officialSectors, 0),
+    'revenue' => 0.0,
+    'total' => 0,
+  ];
+  foreach ($issuanceBreakdown as $row) {
+    foreach ($officialAreas as $areaKey) {
+      $breakdownTotals['areas'][$areaKey] += (int)($row['areas'][$areaKey] ?? 0);
+    }
+    foreach ($officialSectors as $sectorKey) {
+      $breakdownTotals['sectors'][$sectorKey] += (int)($row['sectors'][$sectorKey] ?? 0);
+    }
+    $breakdownTotals['revenue'] += (float)($row['revenue'] ?? 0);
+    $breakdownTotals['total'] += (int)($row['total'] ?? 0);
   }
+  $channelTotals = ['walkin' => 0, 'online' => 0, 'total' => 0];
+  foreach ($issuanceChannels as $row) {
+    $channelTotals['walkin'] += (int)($row['walkin'] ?? 0);
+    $channelTotals['online'] += (int)($row['online'] ?? 0);
+    $channelTotals['total'] += (int)($row['total'] ?? 0);
+  }
+  $trendTotals = ['total' => 0, 'completed' => 0, 'pending' => 0, 'rejected' => 0, 'revenue' => 0.0];
+  foreach ($issuanceTrend as $row) {
+    $trendTotals['total'] += (int)($row['total'] ?? 0);
+    $trendTotals['completed'] += (int)($row['completed'] ?? 0);
+    $trendTotals['pending'] += (int)($row['pending'] ?? 0);
+    $trendTotals['rejected'] += (int)($row['rejected'] ?? 0);
+    $trendTotals['revenue'] += (float)($row['revenue'] ?? 0);
+  }
+  $issuanceAreaTotals = [];
+  foreach ($officialAreas as $areaKey) {
+    $issuanceAreaTotals[$areaKey] = [
+      'area_label' => $areaKey,
+      'total' => 0,
+      'revenue' => 0.0,
+    ];
+  }
+  $issuanceAreaTotals['Unspecified'] = [
+    'area_label' => 'Unspecified',
+    'total' => 0,
+    'revenue' => 0.0,
+  ];
+  foreach ($issuanceRows as $row) {
+    $areaLabel = trim((string)($row['area_number'] ?? ''));
+    $areaLabel = $areaLabel !== '' ? $areaLabel : 'Unspecified';
+    if (!isset($issuanceAreaTotals[$areaLabel])) {
+      $issuanceAreaTotals[$areaLabel] = [
+        'area_label' => $areaLabel,
+        'total' => 0,
+        'revenue' => 0.0,
+      ];
+    }
+    $issuanceAreaTotals[$areaLabel]['total']++;
+    $issuanceAreaTotals[$areaLabel]['revenue'] += (float)($row['revenue'] ?? 0);
+  }
+  $issuanceAreaTotals = array_values(array_filter($issuanceAreaTotals, static function (array $row): bool {
+    return (int)($row['total'] ?? 0) > 0;
+  }));
+
+  $issuanceTypeTotals = [];
+  foreach ($issuanceRevenue as $row) {
+    $typeTotal = (int)($row['completed'] ?? 0) + (int)($row['pending'] ?? 0) + (int)($row['rejected'] ?? 0);
+    $issuanceTypeTotals[] = [
+      'request_type_label' => (string)($row['request_type_label'] ?? ''),
+      'total' => $typeTotal,
+      'revenue' => (float)($row['revenue'] ?? 0),
+    ];
+  }
+  $issuanceStatusTotals = [
+    [
+      'status_label' => 'Completed',
+      'total' => (int)($issuanceSummary['completed'] ?? 0),
+    ],
+    [
+      'status_label' => 'Pending',
+      'total' => (int)($issuanceSummary['pending'] ?? 0),
+    ],
+    [
+      'status_label' => 'Rejected',
+      'total' => (int)($issuanceSummary['rejected'] ?? 0),
+    ],
+  ];
+  $issuanceChannelSummary = [
+    [
+      'channel_label' => 'Walk-in',
+      'total' => (int)($issuanceSummary['walkin'] ?? 0),
+    ],
+    [
+      'channel_label' => 'Online',
+      'total' => (int)($issuanceSummary['online'] ?? 0),
+    ],
+  ];
+  $issuanceStatusChartData = array_values(array_filter($issuanceStatusTotals, static function (array $row): bool {
+    return (int)($row['total'] ?? 0) > 0;
+  }));
+  $issuanceChannelChartData = array_values(array_filter($issuanceChannelSummary, static function (array $row): bool {
+    return (int)($row['total'] ?? 0) > 0;
+  }));
+  $issuanceAreaChartData = array_values(array_filter($issuanceAreaTotals, static function (array $row): bool {
+    return (int)($row['total'] ?? 0) > 0;
+  }));
+  $issuanceTypeChartData = array_values(array_filter($issuanceTypeTotals, static function (array $row): bool {
+    return (int)($row['total'] ?? 0) > 0;
+  }));
+  $shouldLoadIssuanceCharts = $showReportSection('charts') && (
+    $issuanceAreaChartData !== []
+    || $issuanceTypeChartData !== []
+    || $issuanceStatusChartData !== []
+    || $issuanceChannelChartData !== []
+  );
+  $issuanceSectionLabel = static fn(string $key): string => rp_section_heading($reportCustomizeConfig['sections'] ?? [], $visibleReportSections, $key);
 ?>
-        <!-- I. Summary -->
+        <?php if ($showReportSection('summary')): ?>
         <div class="rp-section">
-          <div class="rp-section-label">I. Overall Summary</div>
+          <div class="rp-section-label"><?= htmlspecialchars($issuanceSectionLabel('summary')) ?></div>
           <table class="rp-summary">
             <tbody>
-              <tr><td>Total Document Requests Filed</td><td><?= number_format($total) ?></td></tr>
-              <tr><td>Completed</td><td><?= number_format((int)($kpi['completed'] ?? 0)) ?> &nbsp;<span class="pct">(<?= rp_pct((int)($kpi['completed']??0),$total) ?>)</span></td></tr>
-              <tr><td>Active / In-Progress</td><td><?= number_format((int)($kpi['active'] ?? 0)) ?> &nbsp;<span class="pct">(<?= rp_pct((int)($kpi['active']??0),$total) ?>)</span></td></tr>
-              <tr><td>Rejected</td><td><?= number_format((int)($kpi['rejected'] ?? 0)) ?> &nbsp;<span class="pct">(<?= rp_pct((int)($kpi['rejected']??0),$total) ?>)</span></td></tr>
-              <tr><td>Total Revenue Collected</td><td>&#8369;<?= number_format((float)($kpi['revenue'] ?? 0), 2) ?></td></tr>
+              <tr>
+                <td><?= htmlspecialchars('Total ' . ($issuanceModuleConfig['summary_label'] ?? 'Requests')) ?></td>
+                <td><?= number_format($issuanceTotal) ?></td>
+              </tr>
+              <tr>
+                <td>Completed</td>
+                <td><?= number_format((int)($issuanceSummary['completed'] ?? 0)) ?> &nbsp;<span class="pct">(<?= rp_pct((int)($issuanceSummary['completed'] ?? 0), $issuanceTotal) ?>)</span></td>
+              </tr>
+              <tr>
+                <td>Pending</td>
+                <td><?= number_format((int)($issuanceSummary['pending'] ?? 0)) ?> &nbsp;<span class="pct">(<?= rp_pct((int)($issuanceSummary['pending'] ?? 0), $issuanceTotal) ?>)</span></td>
+              </tr>
+              <tr>
+                <td>Rejected</td>
+                <td><?= number_format((int)($issuanceSummary['rejected'] ?? 0)) ?> &nbsp;<span class="pct">(<?= rp_pct((int)($issuanceSummary['rejected'] ?? 0), $issuanceTotal) ?>)</span></td>
+              </tr>
+              <tr>
+                <td>Walk-in Requests</td>
+                <td><?= number_format((int)($issuanceSummary['walkin'] ?? 0)) ?> &nbsp;<span class="pct">(<?= rp_pct((int)($issuanceSummary['walkin'] ?? 0), $issuanceTotal) ?>)</span></td>
+              </tr>
+              <tr>
+                <td>Online Requests</td>
+                <td><?= number_format((int)($issuanceSummary['online'] ?? 0)) ?> &nbsp;<span class="pct">(<?= rp_pct((int)($issuanceSummary['online'] ?? 0), $issuanceTotal) ?>)</span></td>
+              </tr>
+              <tr>
+                <td>Total Revenue Collected</td>
+                <td>&#8369;<?= number_format((float)($issuanceSummary['revenue'] ?? 0), 2) ?></td>
+              </tr>
             </tbody>
           </table>
         </div>
+        <?php endif; ?>
 
-        <!-- II. By Document Type -->
+        <?php if ($showReportSection('breakdown')): ?>
         <div class="rp-section">
-          <div class="rp-section-label">II. Breakdown by Document Type</div>
-          <?php if (empty($dr['by_type'])): ?>
-            <p class="rp-empty">No data for the selected period.</p>
+          <div class="rp-section-label"><?= htmlspecialchars($issuanceSectionLabel('breakdown')) ?></div>
+          <?php if ($issuanceBreakdown === []): ?>
+            <p class="rp-empty">No breakdown data is available for the selected filters.</p>
           <?php else: ?>
           <table class="rp-table">
             <thead>
               <tr>
-                <th>Document Type</th>
-                <th class="text-center">Total</th>
-                <th class="text-center">%</th>
-                <th class="text-center">Completed</th>
-                <th class="text-center">Active</th>
-                <th class="text-center">Rejected</th>
-                <th class="text-end">Revenue</th>
+                <th class="<?= htmlspecialchars(trim($reportColumnClass('breakdown_document_type'))) ?>">Document Type</th>
+                <?php foreach ($officialAreas as $areaKey): ?>
+                <th class="text-center<?= htmlspecialchars($reportBreakdownAreaClass($areaKey)) ?>"><?= htmlspecialchars($areaKey) ?></th>
+                <?php endforeach; ?>
+                <?php foreach ($officialSectors as $sectorKey): ?>
+                <th class="text-center<?= htmlspecialchars($reportBreakdownSectorClass($sectorKey)) ?>"><?= htmlspecialchars($sectorKey) ?></th>
+                <?php endforeach; ?>
+                <th class="text-end<?= htmlspecialchars($reportColumnClass('breakdown_revenue')) ?>">Revenue</th>
+                <th class="text-center<?= htmlspecialchars($reportColumnClass('breakdown_total')) ?>">Total</th>
               </tr>
             </thead>
             <tbody>
-              <?php foreach ($dr['by_type'] as $r): ?>
+              <?php foreach ($issuanceBreakdown as $row): ?>
               <tr>
-                <td><?= htmlspecialchars(rp_document_type_label((string)$r['document_type'])) ?></td>
-                <td class="text-center"><?= number_format((int)$r['total']) ?></td>
-                <td class="text-center pct"><?= rp_pct((int)$r['total'], $total) ?></td>
-                <td class="text-center"><?= number_format((int)$r['completed']) ?></td>
-                <td class="text-center"><?= number_format((int)$r['active']) ?></td>
-                <td class="text-center"><?= number_format((int)$r['rejected']) ?></td>
-                <td class="text-end">&#8369;<?= number_format((float)$r['revenue'], 2) ?></td>
+                <td class="<?= htmlspecialchars(trim($reportColumnClass('breakdown_document_type'))) ?>"><?= htmlspecialchars((string)($row['request_type_label'] ?? '')) ?></td>
+                <?php foreach ($officialAreas as $areaKey): ?>
+                <td class="text-center<?= htmlspecialchars($reportBreakdownAreaClass($areaKey)) ?>"><?= number_format((int)($row['areas'][$areaKey] ?? 0)) ?></td>
+                <?php endforeach; ?>
+                <?php foreach ($officialSectors as $sectorKey): ?>
+                <td class="text-center<?= htmlspecialchars($reportBreakdownSectorClass($sectorKey)) ?>"><?= number_format((int)($row['sectors'][$sectorKey] ?? 0)) ?></td>
+                <?php endforeach; ?>
+                <td class="text-end<?= htmlspecialchars($reportColumnClass('breakdown_revenue')) ?>">&#8369;<?= number_format((float)($row['revenue'] ?? 0), 2) ?></td>
+                <td class="text-center<?= htmlspecialchars($reportColumnClass('breakdown_total')) ?>"><?= number_format((int)($row['total'] ?? 0)) ?></td>
               </tr>
               <?php endforeach; ?>
             </tbody>
             <tfoot>
               <tr>
-                <td><strong>TOTAL</strong></td>
-                <td class="text-center"><?= number_format($total) ?></td>
-                <td class="text-center">100%</td>
-                <td class="text-center"><?= number_format((int)($kpi['completed']??0)) ?></td>
-                <td class="text-center"><?= number_format((int)($kpi['active']??0)) ?></td>
-                <td class="text-center"><?= number_format((int)($kpi['rejected']??0)) ?></td>
-                <td class="text-end">&#8369;<?= number_format((float)($kpi['revenue']??0),2) ?></td>
+                <td class="<?= htmlspecialchars(trim($reportColumnClass('breakdown_document_type'))) ?>"><strong>TOTAL</strong></td>
+                <?php foreach ($officialAreas as $areaKey): ?>
+                <td class="text-center<?= htmlspecialchars($reportBreakdownAreaClass($areaKey)) ?>"><?= number_format((int)($breakdownTotals['areas'][$areaKey] ?? 0)) ?></td>
+                <?php endforeach; ?>
+                <?php foreach ($officialSectors as $sectorKey): ?>
+                <td class="text-center<?= htmlspecialchars($reportBreakdownSectorClass($sectorKey)) ?>"><?= number_format((int)($breakdownTotals['sectors'][$sectorKey] ?? 0)) ?></td>
+                <?php endforeach; ?>
+                <td class="text-end<?= htmlspecialchars($reportColumnClass('breakdown_revenue')) ?>">&#8369;<?= number_format((float)($breakdownTotals['revenue'] ?? 0), 2) ?></td>
+                <td class="text-center<?= htmlspecialchars($reportColumnClass('breakdown_total')) ?>"><?= number_format((int)($breakdownTotals['total'] ?? 0)) ?></td>
               </tr>
             </tfoot>
           </table>
           <?php endif; ?>
         </div>
+        <?php endif; ?>
 
-        <!-- III. Stage Distribution + IV. Payment Methods — side by side -->
-        <div class="rp-two-col" style="margin-top:22px;">
-          <div>
-            <div class="rp-section-label">III. Stage Distribution</div>
-            <?php if (empty($dr['by_stage'])): ?>
-              <p class="rp-empty">No data.</p>
-            <?php else: ?>
-            <table class="rp-table">
-              <thead><tr><th>Stage</th><th class="text-center">Count</th><th class="text-center">%</th></tr></thead>
-              <tbody>
-                <?php foreach ($dr['by_stage'] as $r): ?>
-                <tr>
-                  <td><?= htmlspecialchars(rp_stage_label((string)$r['stage'])) ?></td>
-                  <td class="text-center"><?= number_format((int)$r['total']) ?></td>
-                  <td class="text-center pct"><?= rp_pct((int)$r['total'], $total) ?></td>
-                </tr>
-                <?php endforeach; ?>
-              </tbody>
-              <tfoot><tr><td><strong>TOTAL</strong></td><td class="text-center"><?= number_format($total) ?></td><td class="text-center">100%</td></tr></tfoot>
-            </table>
-            <?php endif; ?>
-          </div>
-          <div>
-            <div class="rp-section-label">IV. Payment Method (Collected)</div>
-            <?php if (empty($dr['by_payment'])): ?>
-              <p class="rp-empty">No collected payments in the selected period.</p>
-            <?php else:
-              $payTotal = array_sum(array_column($dr['by_payment'], 'total'));
-              $payRev   = array_sum(array_column($dr['by_payment'], 'revenue'));
-            ?>
-            <table class="rp-table">
-              <thead><tr><th>Method</th><th class="text-center">Count</th><th class="text-center">%</th><th class="text-end">Revenue</th></tr></thead>
-              <tbody>
-                <?php foreach ($dr['by_payment'] as $r): ?>
-                <tr>
-                  <td><?= htmlspecialchars(rp_payment_method_label((string)$r['method'])) ?></td>
-                  <td class="text-center"><?= number_format((int)$r['total']) ?></td>
-                  <td class="text-center pct"><?= rp_pct((int)$r['total'], (int)$payTotal) ?></td>
-                  <td class="text-end">&#8369;<?= number_format((float)$r['revenue'],2) ?></td>
-                </tr>
-                <?php endforeach; ?>
-              </tbody>
-              <tfoot><tr><td><strong>TOTAL</strong></td><td class="text-center"><?= number_format($payTotal) ?></td><td class="text-center">100%</td><td class="text-end">&#8369;<?= number_format($payRev,2) ?></td></tr></tfoot>
-            </table>
-            <?php endif; ?>
-          </div>
-        </div>
-
-        <!-- V. Monthly Trend -->
+        <?php if ($showReportSection('charts')): ?>
         <div class="rp-section">
-          <div class="rp-section-label">V. Monthly Trend (Last 12 Months)</div>
-          <?php if (empty($dr['trend'])): ?>
-            <p class="rp-empty">No trend data available.</p>
-          <?php else:
-            $tTotal = array_sum(array_column($dr['trend'], 'total'));
-            $tComp  = array_sum(array_column($dr['trend'], 'completed'));
-          ?>
+          <div class="rp-section-label"><?= htmlspecialchars($issuanceSectionLabel('charts')) ?></div>
+          <?php if ($issuanceAreaChartData === [] && $issuanceTypeChartData === [] && $issuanceStatusChartData === [] && $issuanceChannelChartData === []): ?>
+            <p class="rp-empty">No chart data is available for the selected filters.</p>
+          <?php else: ?>
+          <div class="rp-chart-grid">
+            <div class="rp-chart-card">
+              <div class="rp-subsection-title">Total Requests by Area Number</div>
+              <div class="rp-chart-wrap">
+                <canvas id="issuanceAreaTotalsChart"></canvas>
+              </div>
+              <div class="rp-chart-note"><?= htmlspecialchars($reportChartTypeOptions[$reportChartType] ?? 'Bar Chart') ?> view of request totals by area number.</div>
+            </div>
+            <div class="rp-chart-card">
+              <div class="rp-subsection-title">Total Requests by Document Type</div>
+              <div class="rp-chart-wrap">
+                <canvas id="issuanceTypeTotalsChart"></canvas>
+              </div>
+              <div class="rp-chart-note"><?= htmlspecialchars($reportChartTypeOptions[$reportChartType] ?? 'Bar Chart') ?> view of request totals by document type.</div>
+            </div>
+            <div class="rp-chart-card">
+              <div class="rp-subsection-title">Total Requests by Status</div>
+              <div class="rp-chart-wrap">
+                <canvas id="issuanceStatusTotalsChart"></canvas>
+              </div>
+              <div class="rp-chart-note"><?= htmlspecialchars($reportChartTypeOptions[$reportChartType] ?? 'Bar Chart') ?> view of request totals by status.</div>
+            </div>
+            <div class="rp-chart-card">
+              <div class="rp-subsection-title">Total Requests by Channel</div>
+              <div class="rp-chart-wrap">
+                <canvas id="issuanceChannelTotalsChart"></canvas>
+              </div>
+              <div class="rp-chart-note"><?= htmlspecialchars($reportChartTypeOptions[$reportChartType] ?? 'Bar Chart') ?> view of request totals by request channel.</div>
+            </div>
+          </div>
+          <?php endif; ?>
+        </div>
+        <?php endif; ?>
+
+        <?php if ($showReportSection('tables')): ?>
+        <div class="rp-section">
+          <div class="rp-section-label"><?= htmlspecialchars($issuanceSectionLabel('tables')) ?></div>
+          <?php if ($issuanceTotal <= 0): ?>
+            <p class="rp-empty">No requests matched the selected filters.</p>
+          <?php else: ?>
+          <div class="rp-two-col">
+            <div>
+              <div class="rp-subsection-title">Total Requests by Area Number</div>
+              <table class="rp-table">
+                <thead>
+                  <tr>
+                    <th class="<?= htmlspecialchars(trim($reportColumnClass('area'))) ?>">Area Number</th>
+                    <th class="text-center<?= htmlspecialchars($reportColumnClass('count')) ?>">Total Requests</th>
+                    <th class="text-center<?= htmlspecialchars($reportColumnClass('percentage')) ?>">%</th>
+                    <th class="text-end<?= htmlspecialchars($reportColumnClass('revenue')) ?>">Revenue</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <?php foreach ($issuanceAreaTotals as $areaRow): ?>
+                  <tr>
+                    <td class="<?= htmlspecialchars(trim($reportColumnClass('area'))) ?>"><?= htmlspecialchars((string)($areaRow['area_label'] ?? 'Unspecified')) ?></td>
+                    <td class="text-center<?= htmlspecialchars($reportColumnClass('count')) ?>"><?= number_format((int)($areaRow['total'] ?? 0)) ?></td>
+                    <td class="text-center pct<?= htmlspecialchars($reportColumnClass('percentage')) ?>"><?= rp_pct((int)($areaRow['total'] ?? 0), $issuanceTotal) ?></td>
+                    <td class="text-end<?= htmlspecialchars($reportColumnClass('revenue')) ?>">&#8369;<?= number_format((float)($areaRow['revenue'] ?? 0), 2) ?></td>
+                  </tr>
+                  <?php endforeach; ?>
+                </tbody>
+                <tfoot>
+                  <tr>
+                    <td class="<?= htmlspecialchars(trim($reportColumnClass('area'))) ?>"><strong>TOTAL</strong></td>
+                    <td class="text-center<?= htmlspecialchars($reportColumnClass('count')) ?>"><?= number_format($issuanceTotal) ?></td>
+                    <td class="text-center<?= htmlspecialchars($reportColumnClass('percentage')) ?>">100%</td>
+                    <td class="text-end<?= htmlspecialchars($reportColumnClass('revenue')) ?>">&#8369;<?= number_format((float)($issuanceSummary['revenue'] ?? 0), 2) ?></td>
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
+            <div>
+              <div class="rp-subsection-title">Total Requests by Document Type</div>
+              <table class="rp-table">
+                <thead>
+                  <tr>
+                    <th class="<?= htmlspecialchars(trim($reportColumnClass('type'))) ?>">Document Type</th>
+                    <th class="text-center<?= htmlspecialchars($reportColumnClass('count')) ?>">Total Requests</th>
+                    <th class="text-center<?= htmlspecialchars($reportColumnClass('percentage')) ?>">%</th>
+                    <th class="text-end<?= htmlspecialchars($reportColumnClass('revenue')) ?>">Revenue</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <?php foreach ($issuanceTypeTotals as $typeRow): ?>
+                  <tr>
+                    <td class="<?= htmlspecialchars(trim($reportColumnClass('type'))) ?>"><?= htmlspecialchars((string)($typeRow['request_type_label'] ?? '')) ?></td>
+                    <td class="text-center<?= htmlspecialchars($reportColumnClass('count')) ?>"><?= number_format((int)($typeRow['total'] ?? 0)) ?></td>
+                    <td class="text-center pct<?= htmlspecialchars($reportColumnClass('percentage')) ?>"><?= rp_pct((int)($typeRow['total'] ?? 0), $issuanceTotal) ?></td>
+                    <td class="text-end<?= htmlspecialchars($reportColumnClass('revenue')) ?>">&#8369;<?= number_format((float)($typeRow['revenue'] ?? 0), 2) ?></td>
+                  </tr>
+                  <?php endforeach; ?>
+                </tbody>
+                <tfoot>
+                  <tr>
+                    <td class="<?= htmlspecialchars(trim($reportColumnClass('type'))) ?>"><strong>TOTAL</strong></td>
+                    <td class="text-center<?= htmlspecialchars($reportColumnClass('count')) ?>"><?= number_format($issuanceTotal) ?></td>
+                    <td class="text-center<?= htmlspecialchars($reportColumnClass('percentage')) ?>">100%</td>
+                    <td class="text-end<?= htmlspecialchars($reportColumnClass('revenue')) ?>">&#8369;<?= number_format((float)($issuanceSummary['revenue'] ?? 0), 2) ?></td>
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
+          </div>
+
+          <div class="rp-two-col" style="margin-top:18px;">
+            <div>
+              <div class="rp-subsection-title">Total Requests by Status</div>
+              <table class="rp-table">
+                <thead>
+                  <tr>
+                    <th class="<?= htmlspecialchars(trim($reportColumnClass('status'))) ?>">Status</th>
+                    <th class="text-center<?= htmlspecialchars($reportColumnClass('count')) ?>">Total Requests</th>
+                    <th class="text-center<?= htmlspecialchars($reportColumnClass('percentage')) ?>">%</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <?php foreach ($issuanceStatusTotals as $statusRow): ?>
+                  <tr>
+                    <td class="<?= htmlspecialchars(trim($reportColumnClass('status'))) ?>"><?= htmlspecialchars((string)($statusRow['status_label'] ?? '')) ?></td>
+                    <td class="text-center<?= htmlspecialchars($reportColumnClass('count')) ?>"><?= number_format((int)($statusRow['total'] ?? 0)) ?></td>
+                    <td class="text-center pct<?= htmlspecialchars($reportColumnClass('percentage')) ?>"><?= rp_pct((int)($statusRow['total'] ?? 0), $issuanceTotal) ?></td>
+                  </tr>
+                  <?php endforeach; ?>
+                </tbody>
+                <tfoot>
+                  <tr>
+                    <td class="<?= htmlspecialchars(trim($reportColumnClass('status'))) ?>"><strong>TOTAL</strong></td>
+                    <td class="text-center<?= htmlspecialchars($reportColumnClass('count')) ?>"><?= number_format($issuanceTotal) ?></td>
+                    <td class="text-center<?= htmlspecialchars($reportColumnClass('percentage')) ?>">100%</td>
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
+            <div>
+              <div class="rp-subsection-title">Total Requests by Channel</div>
+              <table class="rp-table">
+                <thead>
+                  <tr>
+                    <th class="<?= htmlspecialchars(trim($reportColumnClass('channel'))) ?>">Channel</th>
+                    <th class="text-center<?= htmlspecialchars($reportColumnClass('count')) ?>">Total Requests</th>
+                    <th class="text-center<?= htmlspecialchars($reportColumnClass('percentage')) ?>">%</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <?php foreach ($issuanceChannelSummary as $channelRow): ?>
+                  <tr>
+                    <td class="<?= htmlspecialchars(trim($reportColumnClass('channel'))) ?>"><?= htmlspecialchars((string)($channelRow['channel_label'] ?? '')) ?></td>
+                    <td class="text-center<?= htmlspecialchars($reportColumnClass('count')) ?>"><?= number_format((int)($channelRow['total'] ?? 0)) ?></td>
+                    <td class="text-center pct<?= htmlspecialchars($reportColumnClass('percentage')) ?>"><?= rp_pct((int)($channelRow['total'] ?? 0), $issuanceTotal) ?></td>
+                  </tr>
+                  <?php endforeach; ?>
+                </tbody>
+                <tfoot>
+                  <tr>
+                    <td class="<?= htmlspecialchars(trim($reportColumnClass('channel'))) ?>"><strong>TOTAL</strong></td>
+                    <td class="text-center<?= htmlspecialchars($reportColumnClass('count')) ?>"><?= number_format($issuanceTotal) ?></td>
+                    <td class="text-center<?= htmlspecialchars($reportColumnClass('percentage')) ?>">100%</td>
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
+          </div>
+          <?php endif; ?>
+        </div>
+        <?php endif; ?>
+
+        <?php if ($showReportSection('channel')): ?>
+        <div class="rp-section">
+          <div class="rp-section-label"><?= htmlspecialchars($issuanceSectionLabel('channel')) ?></div>
           <table class="rp-table">
-            <thead><tr><th>Month</th><th class="text-center">Total Filed</th><th class="text-center">Completed</th><th class="text-center">%</th></tr></thead>
-            <tbody>
-              <?php foreach ($dr['trend'] as $r): ?>
+            <thead>
               <tr>
-                <td><?= htmlspecialchars(date('F Y', strtotime($r['month'].'-01'))) ?></td>
-                <td class="text-center"><?= number_format((int)$r['total']) ?></td>
-                <td class="text-center"><?= number_format((int)$r['completed']) ?></td>
-                <td class="text-center pct"><?= rp_pct((int)$r['completed'], (int)$r['total']) ?></td>
+                <th class="<?= htmlspecialchars(trim($reportColumnClass('type'))) ?>">Request Type</th>
+                <th class="text-center<?= htmlspecialchars($reportColumnClass('channel')) ?>">Walk-in</th>
+                <th class="text-center<?= htmlspecialchars($reportColumnClass('channel')) ?>">Online</th>
+                <th class="text-center<?= htmlspecialchars($reportColumnClass('count')) ?>">Total</th>
+              </tr>
+            </thead>
+            <tbody>
+              <?php foreach ($issuanceChannels as $row): ?>
+              <tr>
+                <td class="<?= htmlspecialchars(trim($reportColumnClass('type'))) ?>"><?= htmlspecialchars((string)($row['request_type_label'] ?? '')) ?></td>
+                <td class="text-center<?= htmlspecialchars($reportColumnClass('channel')) ?>"><?= number_format((int)($row['walkin'] ?? 0)) ?></td>
+                <td class="text-center<?= htmlspecialchars($reportColumnClass('channel')) ?>"><?= number_format((int)($row['online'] ?? 0)) ?></td>
+                <td class="text-center<?= htmlspecialchars($reportColumnClass('count')) ?>"><?= number_format((int)($row['total'] ?? 0)) ?></td>
               </tr>
               <?php endforeach; ?>
             </tbody>
-            <tfoot><tr><td><strong>TOTAL</strong></td><td class="text-center"><?= number_format($tTotal) ?></td><td class="text-center"><?= number_format($tComp) ?></td><td class="text-center pct"><?= rp_pct($tComp, $tTotal) ?></td></tr></tfoot>
+            <tfoot>
+              <tr>
+                <td class="<?= htmlspecialchars(trim($reportColumnClass('type'))) ?>"><strong>TOTAL</strong></td>
+                <td class="text-center<?= htmlspecialchars($reportColumnClass('channel')) ?>"><?= number_format((int)$channelTotals['walkin']) ?></td>
+                <td class="text-center<?= htmlspecialchars($reportColumnClass('channel')) ?>"><?= number_format((int)$channelTotals['online']) ?></td>
+                <td class="text-center<?= htmlspecialchars($reportColumnClass('count')) ?>"><?= number_format((int)$channelTotals['total']) ?></td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+        <?php endif; ?>
+
+        <?php if ($showReportSection('revenue')): ?>
+        <div class="rp-section">
+          <div class="rp-section-label"><?= htmlspecialchars($issuanceSectionLabel('revenue')) ?></div>
+          <table class="rp-table">
+            <thead>
+              <tr>
+                <th class="<?= htmlspecialchars(trim($reportColumnClass('type'))) ?>">Request Type</th>
+                <th class="text-center<?= htmlspecialchars($reportColumnClass('status')) ?>">Completed</th>
+                <th class="text-center<?= htmlspecialchars($reportColumnClass('status')) ?>">Pending</th>
+                <th class="text-center<?= htmlspecialchars($reportColumnClass('status')) ?>">Rejected</th>
+                <th class="text-end<?= htmlspecialchars($reportColumnClass('revenue')) ?>">Revenue</th>
+              </tr>
+            </thead>
+            <tbody>
+              <?php foreach ($issuanceRevenue as $row): ?>
+              <tr>
+                <td class="<?= htmlspecialchars(trim($reportColumnClass('type'))) ?>"><?= htmlspecialchars((string)($row['request_type_label'] ?? '')) ?></td>
+                <td class="text-center<?= htmlspecialchars($reportColumnClass('status')) ?>"><?= number_format((int)($row['completed'] ?? 0)) ?></td>
+                <td class="text-center<?= htmlspecialchars($reportColumnClass('status')) ?>"><?= number_format((int)($row['pending'] ?? 0)) ?></td>
+                <td class="text-center<?= htmlspecialchars($reportColumnClass('status')) ?>"><?= number_format((int)($row['rejected'] ?? 0)) ?></td>
+                <td class="text-end<?= htmlspecialchars($reportColumnClass('revenue')) ?>">&#8369;<?= number_format((float)($row['revenue'] ?? 0), 2) ?></td>
+              </tr>
+              <?php endforeach; ?>
+            </tbody>
+            <tfoot>
+              <tr>
+                <td class="<?= htmlspecialchars(trim($reportColumnClass('type'))) ?>"><strong>TOTAL</strong></td>
+                <td class="text-center<?= htmlspecialchars($reportColumnClass('status')) ?>"><?= number_format((int)($issuanceSummary['completed'] ?? 0)) ?></td>
+                <td class="text-center<?= htmlspecialchars($reportColumnClass('status')) ?>"><?= number_format((int)($issuanceSummary['pending'] ?? 0)) ?></td>
+                <td class="text-center<?= htmlspecialchars($reportColumnClass('status')) ?>"><?= number_format((int)($issuanceSummary['rejected'] ?? 0)) ?></td>
+                <td class="text-end<?= htmlspecialchars($reportColumnClass('revenue')) ?>">&#8369;<?= number_format((float)($issuanceSummary['revenue'] ?? 0), 2) ?></td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+        <?php endif; ?>
+
+        <?php if ($showReportSection('trend')): ?>
+        <div class="rp-section">
+          <div class="rp-section-label"><?= htmlspecialchars($issuanceSectionLabel('trend')) ?></div>
+          <?php if ($issuanceTrend === []): ?>
+            <p class="rp-empty">No trend data available for the selected filters.</p>
+          <?php else: ?>
+          <table class="rp-table">
+            <thead>
+              <tr>
+                <th class="<?= htmlspecialchars(trim($reportColumnClass('date'))) ?>">Month</th>
+                <th class="text-center<?= htmlspecialchars($reportColumnClass('count')) ?>">Total</th>
+                <th class="text-center<?= htmlspecialchars($reportColumnClass('status')) ?>">Completed</th>
+                <th class="text-center<?= htmlspecialchars($reportColumnClass('status')) ?>">Pending</th>
+                <th class="text-center<?= htmlspecialchars($reportColumnClass('status')) ?>">Rejected</th>
+                <th class="text-end<?= htmlspecialchars($reportColumnClass('revenue')) ?>">Revenue</th>
+              </tr>
+            </thead>
+            <tbody>
+              <?php foreach ($issuanceTrend as $row): ?>
+              <tr>
+                <td class="<?= htmlspecialchars(trim($reportColumnClass('date'))) ?>"><?= htmlspecialchars(date('F Y', strtotime((string)$row['month'] . '-01'))) ?></td>
+                <td class="text-center<?= htmlspecialchars($reportColumnClass('count')) ?>"><?= number_format((int)($row['total'] ?? 0)) ?></td>
+                <td class="text-center<?= htmlspecialchars($reportColumnClass('status')) ?>"><?= number_format((int)($row['completed'] ?? 0)) ?></td>
+                <td class="text-center<?= htmlspecialchars($reportColumnClass('status')) ?>"><?= number_format((int)($row['pending'] ?? 0)) ?></td>
+                <td class="text-center<?= htmlspecialchars($reportColumnClass('status')) ?>"><?= number_format((int)($row['rejected'] ?? 0)) ?></td>
+                <td class="text-end<?= htmlspecialchars($reportColumnClass('revenue')) ?>">&#8369;<?= number_format((float)($row['revenue'] ?? 0), 2) ?></td>
+              </tr>
+              <?php endforeach; ?>
+            </tbody>
+            <tfoot>
+              <tr>
+                <td class="<?= htmlspecialchars(trim($reportColumnClass('date'))) ?>"><strong>TOTAL</strong></td>
+                <td class="text-center<?= htmlspecialchars($reportColumnClass('count')) ?>"><?= number_format((int)$trendTotals['total']) ?></td>
+                <td class="text-center<?= htmlspecialchars($reportColumnClass('status')) ?>"><?= number_format((int)$trendTotals['completed']) ?></td>
+                <td class="text-center<?= htmlspecialchars($reportColumnClass('status')) ?>"><?= number_format((int)$trendTotals['pending']) ?></td>
+                <td class="text-center<?= htmlspecialchars($reportColumnClass('status')) ?>"><?= number_format((int)$trendTotals['rejected']) ?></td>
+                <td class="text-end<?= htmlspecialchars($reportColumnClass('revenue')) ?>">&#8369;<?= number_format((float)$trendTotals['revenue'], 2) ?></td>
+              </tr>
+            </tfoot>
           </table>
           <?php endif; ?>
         </div>
+        <?php endif; ?>
 
 <?php
 // ══════════════════════════════════════════════════════════════════════════════
@@ -1760,8 +3066,9 @@ elseif ($module === 'financial'):
   $kpi = $fin['kpi'] ?? [];
 ?>
         <!-- I. Summary -->
+        <?php if ($showReportSection('summary')): ?>
         <div class="rp-section">
-          <div class="rp-section-label">I. Collection Summary</div>
+          <div class="rp-section-label">I. Overall Summary</div>
           <table class="rp-summary">
             <tbody>
               <tr><td>Total Collected Transactions</td><td><?= number_format((int)($kpi['total_issued']??0)) ?></td></tr>
@@ -1772,10 +3079,12 @@ elseif ($module === 'financial'):
             </tbody>
           </table>
         </div>
+        <?php endif; ?>
 
         <!-- II. By Document Type -->
+        <?php if ($showReportSection('type')): ?>
         <div class="rp-section">
-          <div class="rp-section-label">II. Collections by Document Type</div>
+          <div class="rp-section-label">II. Revenue by Document Type</div>
           <?php if (empty($fin['by_type'])): ?>
             <p class="rp-empty">No data for the selected period.</p>
           <?php else:
@@ -1783,7 +3092,7 @@ elseif ($module === 'financial'):
             $typeRev   = array_sum(array_column($fin['by_type'], 'total_amount') ?: array_column($fin['by_type'], 'total'));
           ?>
           <table class="rp-table">
-            <thead><tr><th>Document Type</th><th class="text-center">Transactions</th><th class="text-center">%</th><th class="text-end">Amount Collected</th><th class="text-end">%</th></tr></thead>
+            <thead><tr><th class="<?= htmlspecialchars(trim($reportColumnClass('type'))) ?>">Document Type</th><th class="text-center<?= htmlspecialchars($reportColumnClass('count')) ?>">Transactions</th><th class="text-center<?= htmlspecialchars($reportColumnClass('percentage')) ?>">%</th><th class="text-end<?= htmlspecialchars($reportColumnClass('revenue')) ?>">Amount Collected</th><th class="text-end<?= htmlspecialchars($reportColumnClass('percentage')) ?>">%</th></tr></thead>
             <tbody>
               <?php
               $allTotal = (float)($kpi['total_collections'] ?? 0);
@@ -1792,95 +3101,191 @@ elseif ($module === 'financial'):
                 $amt = (float)$r['total'];
               ?>
               <tr>
-                <td><?= htmlspecialchars(rp_document_type_label((string)$r['document_type'])) ?></td>
-                <td class="text-center"><?= number_format($cnt) ?></td>
-                <td class="text-center pct"><?= rp_pct($cnt, (int)($kpi['total_issued']??0)) ?></td>
-                <td class="text-end">&#8369;<?= number_format($amt,2) ?></td>
-                <td class="text-end pct"><?= $allTotal > 0 ? number_format($amt/$allTotal*100,1).'%' : '—' ?></td>
+                <td class="<?= htmlspecialchars(trim($reportColumnClass('type'))) ?>"><?= htmlspecialchars(rp_document_type_label((string)$r['document_type'])) ?></td>
+                <td class="text-center<?= htmlspecialchars($reportColumnClass('count')) ?>"><?= number_format($cnt) ?></td>
+                <td class="text-center pct<?= htmlspecialchars($reportColumnClass('percentage')) ?>"><?= rp_pct($cnt, (int)($kpi['total_issued']??0)) ?></td>
+                <td class="text-end<?= htmlspecialchars($reportColumnClass('revenue')) ?>">&#8369;<?= number_format($amt,2) ?></td>
+                <td class="text-end pct<?= htmlspecialchars($reportColumnClass('percentage')) ?>"><?= $allTotal > 0 ? number_format($amt/$allTotal*100,1).'%' : '—' ?></td>
               </tr>
               <?php endforeach; ?>
             </tbody>
             <tfoot>
               <tr>
-                <td><strong>TOTAL</strong></td>
-                <td class="text-center"><?= number_format((int)($kpi['total_issued']??0)) ?></td>
-                <td class="text-center">100%</td>
-                <td class="text-end">&#8369;<?= number_format((float)($kpi['total_collections']??0),2) ?></td>
-                <td class="text-end">100%</td>
+                <td class="<?= htmlspecialchars(trim($reportColumnClass('type'))) ?>"><strong>TOTAL</strong></td>
+                <td class="text-center<?= htmlspecialchars($reportColumnClass('count')) ?>"><?= number_format((int)($kpi['total_issued']??0)) ?></td>
+                <td class="text-center<?= htmlspecialchars($reportColumnClass('percentage')) ?>">100%</td>
+                <td class="text-end<?= htmlspecialchars($reportColumnClass('revenue')) ?>">&#8369;<?= number_format((float)($kpi['total_collections']??0),2) ?></td>
+                <td class="text-end<?= htmlspecialchars($reportColumnClass('percentage')) ?>">100%</td>
               </tr>
             </tfoot>
           </table>
           <?php endif; ?>
         </div>
+        <?php endif; ?>
 
-        <!-- III. Daily Collection Log -->
+        <!-- III. Payment Method Breakdown -->
+        <?php if ($showReportSection('payment_method')): ?>
         <div class="rp-section">
-          <div class="rp-section-label">III. Daily Collection Log</div>
+          <div class="rp-section-label">III. Payment Method Breakdown</div>
+          <?php if (empty($fin['by_method'])): ?>
+            <p class="rp-empty">No payment method data for this period.</p>
+          <?php else: $methodCountTotal = array_sum(array_column($fin['by_method'], 'total')); ?>
+          <table class="rp-table">
+            <thead>
+              <tr><th class="<?= htmlspecialchars(trim($reportColumnClass('payment'))) ?>">Payment Method</th><th class="text-center<?= htmlspecialchars($reportColumnClass('count')) ?>">Transactions</th><th class="text-center<?= htmlspecialchars($reportColumnClass('percentage')) ?>">%</th><th class="text-end<?= htmlspecialchars($reportColumnClass('revenue')) ?>">Amount Collected</th></tr>
+            </thead>
+            <tbody>
+              <?php foreach ($fin['by_method'] as $r): ?>
+              <tr>
+                <td class="<?= htmlspecialchars(trim($reportColumnClass('payment'))) ?>"><?= htmlspecialchars(rp_payment_method_label((string)$r['method'])) ?></td>
+                <td class="text-center<?= htmlspecialchars($reportColumnClass('count')) ?>"><?= number_format((int)$r['total']) ?></td>
+                <td class="text-center pct<?= htmlspecialchars($reportColumnClass('percentage')) ?>"><?= rp_pct((int)$r['total'], $methodCountTotal) ?></td>
+                <td class="text-end<?= htmlspecialchars($reportColumnClass('revenue')) ?>">&#8369;<?= number_format((float)$r['amount'], 2) ?></td>
+              </tr>
+              <?php endforeach; ?>
+            </tbody>
+            <tfoot>
+              <tr>
+                <td class="<?= htmlspecialchars(trim($reportColumnClass('payment'))) ?>"><strong>TOTAL</strong></td>
+                <td class="text-center<?= htmlspecialchars($reportColumnClass('count')) ?>"><?= number_format((int)($kpi['total_issued'] ?? 0)) ?></td>
+                <td class="text-center<?= htmlspecialchars($reportColumnClass('percentage')) ?>">100%</td>
+                <td class="text-end<?= htmlspecialchars($reportColumnClass('revenue')) ?>">&#8369;<?= number_format((float)($kpi['total_collections'] ?? 0), 2) ?></td>
+              </tr>
+            </tfoot>
+          </table>
+          <?php endif; ?>
+        </div>
+        <?php endif; ?>
+
+        <!-- IV. Area + Sector Breakdown -->
+        <?php if ($showReportSection('area') || $showReportSection('sector')): ?>
+        <div class="rp-two-col" style="margin-top:22px;">
+          <?php if ($showReportSection('area')): ?>
+          <div>
+            <div class="rp-section-label">IV. Revenue by Area</div>
+            <?php if (empty($fin['by_area'])): ?>
+              <p class="rp-empty">No area-linked collection data.</p>
+            <?php else: $financialAreaTotal = array_sum(array_column($fin['by_area'], 'total')); ?>
+            <table class="rp-table">
+              <thead><tr><th>Area</th><th class="text-center">Transactions</th><th class="text-center">%</th><th class="text-end">Revenue</th></tr></thead>
+              <tbody>
+                <?php foreach ($fin['by_area'] as $r): ?>
+                <tr>
+                  <td><?= htmlspecialchars((string)$r['area']) ?></td>
+                  <td class="text-center"><?= number_format((int)$r['total']) ?></td>
+                  <td class="text-center pct"><?= rp_pct((int)$r['total'], $financialAreaTotal) ?></td>
+                  <td class="text-end">&#8369;<?= number_format((float)$r['amount'], 2) ?></td>
+                </tr>
+                <?php endforeach; ?>
+              </tbody>
+              <tfoot><tr><td><strong>TOTAL</strong></td><td class="text-center"><?= number_format($financialAreaTotal) ?></td><td class="text-center">100%</td><td class="text-end">&#8369;<?= number_format((float)($kpi['total_collections'] ?? 0), 2) ?></td></tr></tfoot>
+            </table>
+            <?php endif; ?>
+          </div>
+          <?php endif; ?>
+          <?php if ($showReportSection('sector')): ?>
+          <div>
+            <div class="rp-section-label">V. Revenue by Sector Membership</div>
+            <?php if (empty($fin['by_sector'])): ?>
+              <p class="rp-empty">No sector-linked collection data.</p>
+            <?php else: $financialSectorTotal = array_sum(array_column($fin['by_sector'], 'total')); ?>
+            <table class="rp-table">
+              <thead><tr><th>Sector</th><th class="text-center">Transactions</th><th class="text-center">%</th><th class="text-end">Revenue</th></tr></thead>
+              <tbody>
+                <?php foreach ($fin['by_sector'] as $r): ?>
+                <tr>
+                  <td><?= htmlspecialchars((string)$r['sector']) ?></td>
+                  <td class="text-center"><?= number_format((int)$r['total']) ?></td>
+                  <td class="text-center pct"><?= rp_pct((int)$r['total'], $financialSectorTotal) ?></td>
+                  <td class="text-end">&#8369;<?= number_format((float)$r['amount'], 2) ?></td>
+                </tr>
+                <?php endforeach; ?>
+              </tbody>
+              <tfoot><tr><td><strong>TOTAL</strong></td><td class="text-center"><?= number_format($financialSectorTotal) ?></td><td class="text-center">100%</td><td class="text-end">&#8369;<?= number_format(array_sum(array_column($fin['by_sector'], 'amount')), 2) ?></td></tr></tfoot>
+            </table>
+            <?php endif; ?>
+          </div>
+          <?php endif; ?>
+        </div>
+        <?php endif; ?>
+
+        <!-- VI. Daily Collection Log -->
+        <?php if ($showReportSection('daily')): ?>
+        <div class="rp-section">
+          <div class="rp-section-label">VI. Daily Collection Log</div>
           <?php if (empty($fin['daily_log'])): ?>
             <p class="rp-empty">No collections in this period.</p>
           <?php else: ?>
           <table class="rp-table">
             <thead>
-              <tr><th>Date</th><th class="text-center">Transactions</th><th class="text-end">GCash</th><th class="text-end">Walk-in</th><th class="text-end">Daily Total</th></tr>
+              <tr><th class="<?= htmlspecialchars(trim($reportColumnClass('date'))) ?>">Date</th><th class="text-center<?= htmlspecialchars($reportColumnClass('count')) ?>">Transactions</th><th class="text-end<?= htmlspecialchars($reportColumnClass('channel')) ?>">GCash</th><th class="text-end<?= htmlspecialchars($reportColumnClass('channel')) ?>">Walk-in</th><th class="text-end<?= htmlspecialchars($reportColumnClass('revenue')) ?>">Daily Total</th></tr>
             </thead>
             <tbody>
               <?php foreach ($fin['daily_log'] as $r): ?>
               <tr>
-                <td><?= htmlspecialchars(rp_date_label($r['collection_date'])) ?></td>
-                <td class="text-center"><?= number_format((int)$r['count']) ?></td>
-                <td class="text-end">&#8369;<?= number_format((float)$r['gcash'],2) ?></td>
-                <td class="text-end">&#8369;<?= number_format((float)$r['walkin'],2) ?></td>
-                <td class="text-end"><strong>&#8369;<?= number_format((float)$r['total'],2) ?></strong></td>
+                <td class="<?= htmlspecialchars(trim($reportColumnClass('date'))) ?>"><?= htmlspecialchars(rp_date_label($r['collection_date'])) ?></td>
+                <td class="text-center<?= htmlspecialchars($reportColumnClass('count')) ?>"><?= number_format((int)$r['count']) ?></td>
+                <td class="text-end<?= htmlspecialchars($reportColumnClass('channel')) ?>">&#8369;<?= number_format((float)$r['gcash'],2) ?></td>
+                <td class="text-end<?= htmlspecialchars($reportColumnClass('channel')) ?>">&#8369;<?= number_format((float)$r['walkin'],2) ?></td>
+                <td class="text-end<?= htmlspecialchars($reportColumnClass('revenue')) ?>"><strong>&#8369;<?= number_format((float)$r['total'],2) ?></strong></td>
               </tr>
               <?php endforeach; ?>
             </tbody>
             <tfoot>
               <tr>
-                <td><strong>TOTAL</strong></td>
-                <td class="text-center"><?= number_format((int)($kpi['total_issued']??0)) ?></td>
-                <td class="text-end">&#8369;<?= number_format((float)($kpi['gcash_total']??0),2) ?></td>
-                <td class="text-end">&#8369;<?= number_format((float)($kpi['walkin_total']??0),2) ?></td>
-                <td class="text-end">&#8369;<?= number_format((float)($kpi['total_collections']??0),2) ?></td>
+                <td class="<?= htmlspecialchars(trim($reportColumnClass('date'))) ?>"><strong>TOTAL</strong></td>
+                <td class="text-center<?= htmlspecialchars($reportColumnClass('count')) ?>"><?= number_format((int)($kpi['total_issued']??0)) ?></td>
+                <td class="text-end<?= htmlspecialchars($reportColumnClass('channel')) ?>">&#8369;<?= number_format((float)($kpi['gcash_total']??0),2) ?></td>
+                <td class="text-end<?= htmlspecialchars($reportColumnClass('channel')) ?>">&#8369;<?= number_format((float)($kpi['walkin_total']??0),2) ?></td>
+                <td class="text-end<?= htmlspecialchars($reportColumnClass('revenue')) ?>">&#8369;<?= number_format((float)($kpi['total_collections']??0),2) ?></td>
               </tr>
             </tfoot>
           </table>
           <?php endif; ?>
         </div>
+        <?php endif; ?>
 
-        <!-- IV. OR Number Log -->
+        <!-- VII. OR Number Log -->
+        <?php if ($showReportSection('or_log')): ?>
         <div class="rp-section">
-          <div class="rp-section-label">IV. Official Receipt (OR) Log</div>
+          <div class="rp-section-label">VII. Official Receipt (OR) Log</div>
           <?php if (empty($fin['or_log'])): ?>
             <p class="rp-empty">No OR records in this period.</p>
           <?php else: ?>
           <table class="rp-table">
             <thead>
-              <tr><th>#</th><th>OR Number</th><th>Cert. No.</th><th>Resident</th><th>Document Type</th><th>Method</th><th class="text-end">Amount</th><th>Date Verified</th></tr>
+              <tr><th class="<?= htmlspecialchars(trim($reportColumnClass('identifier'))) ?>">#</th><th class="<?= htmlspecialchars(trim($reportColumnClass('identifier'))) ?>">OR Number</th><th class="<?= htmlspecialchars(trim($reportColumnClass('identifier'))) ?>">Cert. No.</th><th class="<?= htmlspecialchars(trim($reportColumnClass('resident'))) ?>">Resident</th><th class="<?= htmlspecialchars(trim($reportColumnClass('type'))) ?>">Document Type</th><th class="<?= htmlspecialchars(trim($reportColumnClass('payment'))) ?>">Method</th><th class="text-end<?= htmlspecialchars($reportColumnClass('revenue')) ?>">Amount</th><th class="<?= htmlspecialchars(trim($reportColumnClass('date'))) ?>">Date Verified</th></tr>
             </thead>
             <tbody>
               <?php $i = 1; foreach ($fin['or_log'] as $r): ?>
               <tr>
-                <td class="pct"><?= $i++ ?></td>
-                <td><strong><?= htmlspecialchars($r['or_number']) ?></strong></td>
-                <td><?= htmlspecialchars($r['certificate_number'] ?? '—') ?></td>
-                <td><?= htmlspecialchars($r['resident_name'] ?: '—') ?></td>
-                <td><?= htmlspecialchars(rp_document_type_label((string)$r['document_type'])) ?></td>
-                <td><?= htmlspecialchars($r['payment_method']) ?></td>
-                <td class="text-end">&#8369;<?= number_format((float)$r['fee_amount'],2) ?></td>
-                <td><?= htmlspecialchars($r['finance_decision_at'] ?? '') ?></td>
+                <td class="pct<?= htmlspecialchars($reportColumnClass('identifier')) ?>"><?= $i++ ?></td>
+                <td class="<?= htmlspecialchars(trim($reportColumnClass('identifier'))) ?>"><strong><?= htmlspecialchars($r['or_number']) ?></strong></td>
+                <td class="<?= htmlspecialchars(trim($reportColumnClass('identifier'))) ?>"><?= htmlspecialchars($r['certificate_number'] ?? '—') ?></td>
+                <td class="<?= htmlspecialchars(trim($reportColumnClass('resident'))) ?>"><?= htmlspecialchars($r['resident_name'] ?: '—') ?></td>
+                <td class="<?= htmlspecialchars(trim($reportColumnClass('type'))) ?>"><?= htmlspecialchars(rp_document_type_label((string)$r['document_type'])) ?></td>
+                <td class="<?= htmlspecialchars(trim($reportColumnClass('payment'))) ?>"><?= htmlspecialchars($r['payment_method']) ?></td>
+                <td class="text-end<?= htmlspecialchars($reportColumnClass('revenue')) ?>">&#8369;<?= number_format((float)$r['fee_amount'],2) ?></td>
+                <td class="<?= htmlspecialchars(trim($reportColumnClass('date'))) ?>"><?= htmlspecialchars($r['finance_decision_at'] ?? '') ?></td>
               </tr>
               <?php endforeach; ?>
             </tbody>
             <tfoot>
               <tr>
-                <td colspan="6"><strong>TOTAL</strong></td>
-                <td class="text-end">&#8369;<?= number_format((float)($kpi['total_collections']??0),2) ?></td>
-                <td></td>
+                <td class="<?= htmlspecialchars(trim($reportColumnClass('identifier'))) ?>"><strong>TOTAL</strong></td>
+                <td class="<?= htmlspecialchars(trim($reportColumnClass('identifier'))) ?>"></td>
+                <td class="<?= htmlspecialchars(trim($reportColumnClass('identifier'))) ?>"></td>
+                <td class="<?= htmlspecialchars(trim($reportColumnClass('resident'))) ?>"></td>
+                <td class="<?= htmlspecialchars(trim($reportColumnClass('type'))) ?>"></td>
+                <td class="<?= htmlspecialchars(trim($reportColumnClass('payment'))) ?>"></td>
+                <td class="text-end<?= htmlspecialchars($reportColumnClass('revenue')) ?>">&#8369;<?= number_format((float)($kpi['total_collections']??0),2) ?></td>
+                <td class="<?= htmlspecialchars(trim($reportColumnClass('date'))) ?>"></td>
               </tr>
             </tfoot>
           </table>
           <?php endif; ?>
         </div>
+        <?php endif; ?>
 
 <?php
 // ══════════════════════════════════════════════════════════════════════════════
@@ -1892,8 +3297,9 @@ elseif ($module === 'residents'):
   $ver   = (int)($kpi['verified'] ?? 0);
 ?>
         <!-- I. Summary -->
+        <?php if ($showReportSection('summary')): ?>
         <div class="rp-section">
-          <div class="rp-section-label">I. Population Summary</div>
+          <div class="rp-section-label">I. Overall Summary</div>
           <table class="rp-summary">
             <tbody>
               <tr><td>Total Registered Residents</td><td><?= number_format($total) ?></td></tr>
@@ -1904,110 +3310,123 @@ elseif ($module === 'residents'):
             </tbody>
           </table>
         </div>
+        <?php endif; ?>
 
         <!-- II. Gender + III. Age — side by side -->
+        <?php if ($showReportSection('gender') || $showReportSection('age')): ?>
         <div class="rp-two-col" style="margin-top:22px;">
+          <?php if ($showReportSection('gender')): ?>
           <div>
             <div class="rp-section-label">II. Gender Distribution (Verified)</div>
             <?php if (empty($res['by_gender'])): ?>
               <p class="rp-empty">No data.</p>
             <?php else: ?>
             <table class="rp-table">
-              <thead><tr><th>Gender</th><th class="text-center">Count</th><th class="text-center">%</th></tr></thead>
+              <thead><tr><th class="<?= htmlspecialchars(trim($reportColumnClass('type'))) ?>">Gender</th><th class="text-center<?= htmlspecialchars($reportColumnClass('count')) ?>">Count</th><th class="text-center<?= htmlspecialchars($reportColumnClass('percentage')) ?>">%</th></tr></thead>
               <tbody>
                 <?php foreach ($res['by_gender'] as $r): ?>
                 <tr>
-                  <td><?= htmlspecialchars(ucfirst($r['gender'])) ?></td>
-                  <td class="text-center"><?= number_format((int)$r['total']) ?></td>
-                  <td class="text-center pct"><?= rp_pct((int)$r['total'], $ver) ?></td>
+                  <td class="<?= htmlspecialchars(trim($reportColumnClass('type'))) ?>"><?= htmlspecialchars(ucfirst($r['gender'])) ?></td>
+                  <td class="text-center<?= htmlspecialchars($reportColumnClass('count')) ?>"><?= number_format((int)$r['total']) ?></td>
+                  <td class="text-center pct<?= htmlspecialchars($reportColumnClass('percentage')) ?>"><?= rp_pct((int)$r['total'], $ver) ?></td>
                 </tr>
                 <?php endforeach; ?>
               </tbody>
-              <tfoot><tr><td><strong>TOTAL</strong></td><td class="text-center"><?= number_format($ver) ?></td><td class="text-center">100%</td></tr></tfoot>
+              <tfoot><tr><td class="<?= htmlspecialchars(trim($reportColumnClass('type'))) ?>"><strong>TOTAL</strong></td><td class="text-center<?= htmlspecialchars($reportColumnClass('count')) ?>"><?= number_format($ver) ?></td><td class="text-center<?= htmlspecialchars($reportColumnClass('percentage')) ?>">100%</td></tr></tfoot>
             </table>
             <?php endif; ?>
           </div>
+          <?php endif; ?>
+          <?php if ($showReportSection('age')): ?>
           <div>
             <div class="rp-section-label">III. Age Distribution (Verified)</div>
             <?php $ageTotal = array_sum($res['age_buckets']); ?>
             <table class="rp-table">
-              <thead><tr><th>Age Group</th><th class="text-center">Count</th><th class="text-center">%</th></tr></thead>
+              <thead><tr><th class="<?= htmlspecialchars(trim($reportColumnClass('type'))) ?>">Age Group</th><th class="text-center<?= htmlspecialchars($reportColumnClass('count')) ?>">Count</th><th class="text-center<?= htmlspecialchars($reportColumnClass('percentage')) ?>">%</th></tr></thead>
               <tbody>
                 <?php foreach ($res['age_buckets'] as $label => $cnt): ?>
                 <tr>
-                  <td><?= htmlspecialchars($label) ?> years</td>
-                  <td class="text-center"><?= number_format($cnt) ?></td>
-                  <td class="text-center pct"><?= rp_pct($cnt, $ageTotal) ?></td>
+                  <td class="<?= htmlspecialchars(trim($reportColumnClass('type'))) ?>"><?= htmlspecialchars($label) ?> years</td>
+                  <td class="text-center<?= htmlspecialchars($reportColumnClass('count')) ?>"><?= number_format($cnt) ?></td>
+                  <td class="text-center pct<?= htmlspecialchars($reportColumnClass('percentage')) ?>"><?= rp_pct($cnt, $ageTotal) ?></td>
                 </tr>
                 <?php endforeach; ?>
               </tbody>
-              <tfoot><tr><td><strong>TOTAL</strong></td><td class="text-center"><?= number_format($ageTotal) ?></td><td class="text-center">100%</td></tr></tfoot>
+              <tfoot><tr><td class="<?= htmlspecialchars(trim($reportColumnClass('type'))) ?>"><strong>TOTAL</strong></td><td class="text-center<?= htmlspecialchars($reportColumnClass('count')) ?>"><?= number_format($ageTotal) ?></td><td class="text-center<?= htmlspecialchars($reportColumnClass('percentage')) ?>">100%</td></tr></tfoot>
             </table>
           </div>
+          <?php endif; ?>
         </div>
+        <?php endif; ?>
 
         <!-- IV. By Area + V. Sector — side by side -->
+        <?php if ($showReportSection('area') || $showReportSection('sector')): ?>
         <div class="rp-two-col" style="margin-top:22px;">
-          <?php if (!empty($res['by_area'])): ?>
+          <?php if ($showReportSection('area') && !empty($res['by_area'])): ?>
           <div>
             <div class="rp-section-label">IV. Residents by Area (Verified)</div>
             <?php $areaTotal = array_sum(array_column($res['by_area'],'total')); ?>
             <table class="rp-table">
-              <thead><tr><th>Area</th><th class="text-center">Count</th><th class="text-center">%</th></tr></thead>
+              <thead><tr><th class="<?= htmlspecialchars(trim($reportColumnClass('area'))) ?>">Area</th><th class="text-center<?= htmlspecialchars($reportColumnClass('count')) ?>">Count</th><th class="text-center<?= htmlspecialchars($reportColumnClass('percentage')) ?>">%</th></tr></thead>
               <tbody>
                 <?php foreach ($res['by_area'] as $r): ?>
                 <tr>
-                  <td><?= htmlspecialchars($r['area']) ?></td>
-                  <td class="text-center"><?= number_format((int)$r['total']) ?></td>
-                  <td class="text-center pct"><?= rp_pct((int)$r['total'], $areaTotal) ?></td>
+                  <td class="<?= htmlspecialchars(trim($reportColumnClass('area'))) ?>"><?= htmlspecialchars($r['area']) ?></td>
+                  <td class="text-center<?= htmlspecialchars($reportColumnClass('count')) ?>"><?= number_format((int)$r['total']) ?></td>
+                  <td class="text-center pct<?= htmlspecialchars($reportColumnClass('percentage')) ?>"><?= rp_pct((int)$r['total'], $areaTotal) ?></td>
                 </tr>
                 <?php endforeach; ?>
               </tbody>
-              <tfoot><tr><td><strong>TOTAL</strong></td><td class="text-center"><?= number_format($areaTotal) ?></td><td class="text-center">100%</td></tr></tfoot>
+              <tfoot><tr><td class="<?= htmlspecialchars(trim($reportColumnClass('area'))) ?>"><strong>TOTAL</strong></td><td class="text-center<?= htmlspecialchars($reportColumnClass('count')) ?>"><?= number_format($areaTotal) ?></td><td class="text-center<?= htmlspecialchars($reportColumnClass('percentage')) ?>">100%</td></tr></tfoot>
             </table>
           </div>
           <?php endif; ?>
+          <?php if ($showReportSection('sector')): ?>
           <div>
             <div class="rp-section-label"><?= !empty($res['by_area']) ? 'V.' : 'IV.' ?> Sector Membership (Verified)</div>
             <?php if (empty($res['by_sector'])): ?>
               <p class="rp-empty">No sector data.</p>
             <?php else: $secTotal = array_sum($res['by_sector']); ?>
             <table class="rp-table">
-              <thead><tr><th>Sector</th><th class="text-center">Count</th><th class="text-center">%</th></tr></thead>
+              <thead><tr><th class="<?= htmlspecialchars(trim($reportColumnClass('sector'))) ?>">Sector</th><th class="text-center<?= htmlspecialchars($reportColumnClass('count')) ?>">Count</th><th class="text-center<?= htmlspecialchars($reportColumnClass('percentage')) ?>">%</th></tr></thead>
               <tbody>
                 <?php foreach ($res['by_sector'] as $sector => $cnt): ?>
                 <tr>
-                  <td><?= htmlspecialchars($sector) ?></td>
-                  <td class="text-center"><?= number_format($cnt) ?></td>
-                  <td class="text-center pct"><?= rp_pct($cnt, $secTotal) ?></td>
+                  <td class="<?= htmlspecialchars(trim($reportColumnClass('sector'))) ?>"><?= htmlspecialchars($sector) ?></td>
+                  <td class="text-center<?= htmlspecialchars($reportColumnClass('count')) ?>"><?= number_format($cnt) ?></td>
+                  <td class="text-center pct<?= htmlspecialchars($reportColumnClass('percentage')) ?>"><?= rp_pct($cnt, $secTotal) ?></td>
                 </tr>
                 <?php endforeach; ?>
               </tbody>
             </table>
             <?php endif; ?>
           </div>
+          <?php endif; ?>
         </div>
+        <?php endif; ?>
 
         <!-- Monthly Registrations -->
+        <?php if ($showReportSection('monthly')): ?>
         <div class="rp-section">
           <div class="rp-section-label"><?= !empty($res['by_area']) ? 'VI.' : 'V.' ?> Monthly Registrations (Last 12 Months)</div>
           <?php if (empty($res['monthly_reg'])): ?>
             <p class="rp-empty">No data.</p>
           <?php else: $regTotal = array_sum(array_column($res['monthly_reg'],'total')); ?>
           <table class="rp-table">
-            <thead><tr><th>Month</th><th class="text-center">New Registrations</th></tr></thead>
+            <thead><tr><th class="<?= htmlspecialchars(trim($reportColumnClass('date'))) ?>">Month</th><th class="text-center<?= htmlspecialchars($reportColumnClass('count')) ?>">New Registrations</th></tr></thead>
             <tbody>
               <?php foreach ($res['monthly_reg'] as $r): ?>
               <tr>
-                <td><?= htmlspecialchars(date('F Y', strtotime($r['month'].'-01'))) ?></td>
-                <td class="text-center"><?= number_format((int)$r['total']) ?></td>
+                <td class="<?= htmlspecialchars(trim($reportColumnClass('date'))) ?>"><?= htmlspecialchars(date('F Y', strtotime($r['month'].'-01'))) ?></td>
+                <td class="text-center<?= htmlspecialchars($reportColumnClass('count')) ?>"><?= number_format((int)$r['total']) ?></td>
               </tr>
               <?php endforeach; ?>
             </tbody>
-            <tfoot><tr><td><strong>TOTAL</strong></td><td class="text-center"><?= number_format($regTotal) ?></td></tr></tfoot>
+            <tfoot><tr><td class="<?= htmlspecialchars(trim($reportColumnClass('date'))) ?>"><strong>TOTAL</strong></td><td class="text-center<?= htmlspecialchars($reportColumnClass('count')) ?>"><?= number_format($regTotal) ?></td></tr></tfoot>
           </table>
           <?php endif; ?>
         </div>
+        <?php endif; ?>
 
 <?php
 // ══════════════════════════════════════════════════════════════════════════════
@@ -2018,8 +3437,9 @@ elseif ($module === 'appointments'):
   $total = (int)($kpi['total'] ?? 0);
 ?>
         <!-- I. Summary -->
+        <?php if ($showReportSection('summary')): ?>
         <div class="rp-section">
-          <div class="rp-section-label">I. Appointments Summary</div>
+          <div class="rp-section-label">I. Overall Summary</div>
           <table class="rp-summary">
             <tbody>
               <tr><td>Total Appointment Requests</td><td><?= number_format($total) ?></td></tr>
@@ -2030,54 +3450,112 @@ elseif ($module === 'appointments'):
             </tbody>
           </table>
         </div>
+        <?php endif; ?>
 
         <!-- II. By Status + III. By Purpose — side by side -->
+        <?php if ($showReportSection('status') || $showReportSection('purpose')): ?>
         <div class="rp-two-col" style="margin-top:22px;">
+          <?php if ($showReportSection('status')): ?>
           <div>
-            <div class="rp-section-label">II. By Status</div>
+            <div class="rp-section-label">II. Status Breakdown</div>
             <?php if (empty($appt['by_status'])): ?>
               <p class="rp-empty">No data.</p>
             <?php else: ?>
             <table class="rp-table">
-              <thead><tr><th>Status</th><th class="text-center">Count</th><th class="text-center">%</th></tr></thead>
+              <thead><tr><th class="<?= htmlspecialchars(trim($reportColumnClass('status'))) ?>">Status</th><th class="text-center<?= htmlspecialchars($reportColumnClass('count')) ?>">Count</th><th class="text-center<?= htmlspecialchars($reportColumnClass('percentage')) ?>">%</th></tr></thead>
               <tbody>
                 <?php foreach ($appt['by_status'] as $r): ?>
                 <tr>
-                  <td><?= htmlspecialchars($r['status']) ?></td>
-                  <td class="text-center"><?= number_format((int)$r['total']) ?></td>
-                  <td class="text-center pct"><?= rp_pct((int)$r['total'],$total) ?></td>
+                  <td class="<?= htmlspecialchars(trim($reportColumnClass('status'))) ?>"><?= htmlspecialchars($r['status']) ?></td>
+                  <td class="text-center<?= htmlspecialchars($reportColumnClass('count')) ?>"><?= number_format((int)$r['total']) ?></td>
+                  <td class="text-center pct<?= htmlspecialchars($reportColumnClass('percentage')) ?>"><?= rp_pct((int)$r['total'],$total) ?></td>
                 </tr>
                 <?php endforeach; ?>
               </tbody>
-              <tfoot><tr><td><strong>TOTAL</strong></td><td class="text-center"><?= number_format($total) ?></td><td class="text-center">100%</td></tr></tfoot>
+              <tfoot><tr><td class="<?= htmlspecialchars(trim($reportColumnClass('status'))) ?>"><strong>TOTAL</strong></td><td class="text-center<?= htmlspecialchars($reportColumnClass('count')) ?>"><?= number_format($total) ?></td><td class="text-center<?= htmlspecialchars($reportColumnClass('percentage')) ?>">100%</td></tr></tfoot>
             </table>
             <?php endif; ?>
           </div>
+          <?php endif; ?>
+          <?php if ($showReportSection('purpose')): ?>
           <div>
-            <div class="rp-section-label">III. By Purpose (Top 20)</div>
+            <div class="rp-section-label">III. Purpose Breakdown (Top 20)</div>
             <?php if (empty($appt['by_purpose'])): ?>
               <p class="rp-empty">No data.</p>
             <?php else: $purpTotal = array_sum(array_column($appt['by_purpose'],'total')); ?>
             <table class="rp-table">
-              <thead><tr><th>Purpose</th><th class="text-center">Count</th><th class="text-center">%</th></tr></thead>
+              <thead><tr><th class="<?= htmlspecialchars(trim($reportColumnClass('type'))) ?>">Purpose</th><th class="text-center<?= htmlspecialchars($reportColumnClass('count')) ?>">Count</th><th class="text-center<?= htmlspecialchars($reportColumnClass('percentage')) ?>">%</th></tr></thead>
               <tbody>
                 <?php foreach ($appt['by_purpose'] as $r): ?>
                 <tr>
-                  <td><?= htmlspecialchars($r['purpose']) ?></td>
-                  <td class="text-center"><?= number_format((int)$r['total']) ?></td>
-                  <td class="text-center pct"><?= rp_pct((int)$r['total'],$total) ?></td>
+                  <td class="<?= htmlspecialchars(trim($reportColumnClass('type'))) ?>"><?= htmlspecialchars($r['purpose']) ?></td>
+                  <td class="text-center<?= htmlspecialchars($reportColumnClass('count')) ?>"><?= number_format((int)$r['total']) ?></td>
+                  <td class="text-center pct<?= htmlspecialchars($reportColumnClass('percentage')) ?>"><?= rp_pct((int)$r['total'],$total) ?></td>
                 </tr>
                 <?php endforeach; ?>
               </tbody>
-              <tfoot><tr><td><strong>TOTAL (shown)</strong></td><td class="text-center"><?= number_format($purpTotal) ?></td><td></td></tr></tfoot>
+              <tfoot><tr><td class="<?= htmlspecialchars(trim($reportColumnClass('type'))) ?>"><strong>TOTAL (shown)</strong></td><td class="text-center<?= htmlspecialchars($reportColumnClass('count')) ?>"><?= number_format($purpTotal) ?></td><td class="<?= htmlspecialchars(trim($reportColumnClass('percentage'))) ?>"></td></tr></tfoot>
             </table>
             <?php endif; ?>
           </div>
+          <?php endif; ?>
         </div>
+        <?php endif; ?>
 
-        <!-- IV. Monthly Trend -->
+        <!-- IV. Area + Sector Breakdown -->
+        <?php if ($showReportSection('area') || $showReportSection('sector')): ?>
+        <div class="rp-two-col" style="margin-top:22px;">
+          <?php if ($showReportSection('area')): ?>
+          <div>
+            <div class="rp-section-label">IV. Requests by Area</div>
+            <?php if (empty($appt['by_area'])): ?>
+              <p class="rp-empty">No area-linked appointment data.</p>
+            <?php else: $appointmentAreaTotal = array_sum(array_column($appt['by_area'], 'total')); ?>
+            <table class="rp-table">
+              <thead><tr><th class="<?= htmlspecialchars(trim($reportColumnClass('area'))) ?>">Area</th><th class="text-center<?= htmlspecialchars($reportColumnClass('count')) ?>">Count</th><th class="text-center<?= htmlspecialchars($reportColumnClass('percentage')) ?>">%</th></tr></thead>
+              <tbody>
+                <?php foreach ($appt['by_area'] as $r): ?>
+                <tr>
+                  <td class="<?= htmlspecialchars(trim($reportColumnClass('area'))) ?>"><?= htmlspecialchars((string)$r['area']) ?></td>
+                  <td class="text-center<?= htmlspecialchars($reportColumnClass('count')) ?>"><?= number_format((int)$r['total']) ?></td>
+                  <td class="text-center pct<?= htmlspecialchars($reportColumnClass('percentage')) ?>"><?= rp_pct((int)$r['total'], $appointmentAreaTotal) ?></td>
+                </tr>
+                <?php endforeach; ?>
+              </tbody>
+              <tfoot><tr><td class="<?= htmlspecialchars(trim($reportColumnClass('area'))) ?>"><strong>TOTAL</strong></td><td class="text-center<?= htmlspecialchars($reportColumnClass('count')) ?>"><?= number_format($appointmentAreaTotal) ?></td><td class="text-center<?= htmlspecialchars($reportColumnClass('percentage')) ?>">100%</td></tr></tfoot>
+            </table>
+            <?php endif; ?>
+          </div>
+          <?php endif; ?>
+          <?php if ($showReportSection('sector')): ?>
+          <div>
+            <div class="rp-section-label">V. Requests by Sector Membership</div>
+            <?php if (empty($appt['by_sector'])): ?>
+              <p class="rp-empty">No sector-linked appointment data.</p>
+            <?php else: $appointmentSectorTotal = array_sum(array_column($appt['by_sector'], 'total')); ?>
+            <table class="rp-table">
+              <thead><tr><th class="<?= htmlspecialchars(trim($reportColumnClass('sector'))) ?>">Sector</th><th class="text-center<?= htmlspecialchars($reportColumnClass('count')) ?>">Count</th><th class="text-center<?= htmlspecialchars($reportColumnClass('percentage')) ?>">%</th></tr></thead>
+              <tbody>
+                <?php foreach ($appt['by_sector'] as $r): ?>
+                <tr>
+                  <td class="<?= htmlspecialchars(trim($reportColumnClass('sector'))) ?>"><?= htmlspecialchars((string)$r['sector']) ?></td>
+                  <td class="text-center<?= htmlspecialchars($reportColumnClass('count')) ?>"><?= number_format((int)$r['total']) ?></td>
+                  <td class="text-center pct<?= htmlspecialchars($reportColumnClass('percentage')) ?>"><?= rp_pct((int)$r['total'], $appointmentSectorTotal) ?></td>
+                </tr>
+                <?php endforeach; ?>
+              </tbody>
+              <tfoot><tr><td class="<?= htmlspecialchars(trim($reportColumnClass('sector'))) ?>"><strong>TOTAL</strong></td><td class="text-center<?= htmlspecialchars($reportColumnClass('count')) ?>"><?= number_format($appointmentSectorTotal) ?></td><td class="text-center<?= htmlspecialchars($reportColumnClass('percentage')) ?>">100%</td></tr></tfoot>
+            </table>
+            <?php endif; ?>
+          </div>
+          <?php endif; ?>
+        </div>
+        <?php endif; ?>
+
+        <!-- VI. Monthly Trend -->
+        <?php if ($showReportSection('trend')): ?>
         <div class="rp-section">
-          <div class="rp-section-label">IV. Monthly Trend (Last 12 Months)</div>
+          <div class="rp-section-label">VI. Monthly Trend (Last 12 Months)</div>
           <?php if (empty($appt['trend'])): ?>
             <p class="rp-empty">No trend data.</p>
           <?php else:
@@ -2085,21 +3563,22 @@ elseif ($module === 'appointments'):
             $tComp  = array_sum(array_column($appt['trend'],'completed'));
           ?>
           <table class="rp-table">
-            <thead><tr><th>Month</th><th class="text-center">Total</th><th class="text-center">Completed</th><th class="text-center">Completion Rate</th></tr></thead>
-            <tbody>
-              <?php foreach ($appt['trend'] as $r): ?>
+            <thead><tr><th class="<?= htmlspecialchars(trim($reportColumnClass('date'))) ?>">Month</th><th class="text-center<?= htmlspecialchars($reportColumnClass('count')) ?>">Total</th><th class="text-center<?= htmlspecialchars($reportColumnClass('result')) ?>">Completed</th><th class="text-center<?= htmlspecialchars($reportColumnClass('percentage')) ?>">Completion Rate</th></tr></thead>
+              <tbody>
+                <?php foreach ($appt['trend'] as $r): ?>
               <tr>
-                <td><?= htmlspecialchars(date('F Y', strtotime($r['month'].'-01'))) ?></td>
-                <td class="text-center"><?= number_format((int)$r['total']) ?></td>
-                <td class="text-center"><?= number_format((int)$r['completed']) ?></td>
-                <td class="text-center pct"><?= rp_pct((int)$r['completed'],(int)$r['total']) ?></td>
+                <td class="<?= htmlspecialchars(trim($reportColumnClass('date'))) ?>"><?= htmlspecialchars(date('F Y', strtotime($r['month'].'-01'))) ?></td>
+                <td class="text-center<?= htmlspecialchars($reportColumnClass('count')) ?>"><?= number_format((int)$r['total']) ?></td>
+                <td class="text-center<?= htmlspecialchars($reportColumnClass('result')) ?>"><?= number_format((int)$r['completed']) ?></td>
+                <td class="text-center pct<?= htmlspecialchars($reportColumnClass('percentage')) ?>"><?= rp_pct((int)$r['completed'],(int)$r['total']) ?></td>
               </tr>
               <?php endforeach; ?>
             </tbody>
-            <tfoot><tr><td><strong>TOTAL</strong></td><td class="text-center"><?= number_format($tTotal) ?></td><td class="text-center"><?= number_format($tComp) ?></td><td class="text-center pct"><?= rp_pct($tComp,$tTotal) ?></td></tr></tfoot>
+            <tfoot><tr><td class="<?= htmlspecialchars(trim($reportColumnClass('date'))) ?>"><strong>TOTAL</strong></td><td class="text-center<?= htmlspecialchars($reportColumnClass('count')) ?>"><?= number_format($tTotal) ?></td><td class="text-center<?= htmlspecialchars($reportColumnClass('result')) ?>"><?= number_format($tComp) ?></td><td class="text-center pct<?= htmlspecialchars($reportColumnClass('percentage')) ?>"><?= rp_pct($tComp,$tTotal) ?></td></tr></tfoot>
           </table>
           <?php endif; ?>
         </div>
+        <?php endif; ?>
 
 <?php
 // ══════════════════════════════════════════════════════════════════════════════
@@ -2110,8 +3589,9 @@ elseif ($module === 'blotter'):
   $total = (int)($kpi['total'] ?? 0);
 ?>
         <!-- I. Summary -->
+        <?php if ($showReportSection('summary')): ?>
         <div class="rp-section">
-          <div class="rp-section-label">I. Blotter & Cases Summary</div>
+          <div class="rp-section-label">I. Overall Summary</div>
           <table class="rp-summary">
             <tbody>
               <tr><td>Total Cases Filed</td><td><?= number_format($total) ?></td></tr>
@@ -2122,71 +3602,130 @@ elseif ($module === 'blotter'):
             </tbody>
           </table>
         </div>
+        <?php endif; ?>
 
         <!-- II. By Complaint Type + III. By Status — side by side -->
+        <?php if ($showReportSection('type') || $showReportSection('status')): ?>
         <div class="rp-two-col" style="margin-top:22px;">
+          <?php if ($showReportSection('type')): ?>
           <div>
-            <div class="rp-section-label">II. By Complaint Type (Top 20)</div>
+            <div class="rp-section-label">II. Complaint Type Breakdown (Top 20)</div>
             <?php if (empty($blot['by_type'])): ?>
               <p class="rp-empty">No data.</p>
             <?php else: ?>
             <table class="rp-table">
-              <thead><tr><th>Complaint Type</th><th class="text-center">Total</th><th class="text-center">Resolved</th><th class="text-center">Res. Rate</th></tr></thead>
+              <thead><tr><th class="<?= htmlspecialchars(trim($reportColumnClass('type'))) ?>">Complaint Type</th><th class="text-center<?= htmlspecialchars($reportColumnClass('count')) ?>">Total</th><th class="text-center<?= htmlspecialchars($reportColumnClass('result')) ?>">Resolved</th><th class="text-center<?= htmlspecialchars($reportColumnClass('percentage')) ?>">Res. Rate</th></tr></thead>
               <tbody>
                 <?php foreach ($blot['by_type'] as $r): ?>
                 <tr>
-                  <td><?= htmlspecialchars($r['complaint_type']) ?></td>
-                  <td class="text-center"><?= number_format((int)$r['total']) ?></td>
-                  <td class="text-center"><?= number_format((int)$r['resolved']) ?></td>
-                  <td class="text-center pct"><?= rp_pct((int)$r['resolved'],(int)$r['total']) ?></td>
+                  <td class="<?= htmlspecialchars(trim($reportColumnClass('type'))) ?>"><?= htmlspecialchars($r['complaint_type']) ?></td>
+                  <td class="text-center<?= htmlspecialchars($reportColumnClass('count')) ?>"><?= number_format((int)$r['total']) ?></td>
+                  <td class="text-center<?= htmlspecialchars($reportColumnClass('result')) ?>"><?= number_format((int)$r['resolved']) ?></td>
+                  <td class="text-center pct<?= htmlspecialchars($reportColumnClass('percentage')) ?>"><?= rp_pct((int)$r['resolved'],(int)$r['total']) ?></td>
                 </tr>
                 <?php endforeach; ?>
               </tbody>
             </table>
             <?php endif; ?>
           </div>
+          <?php endif; ?>
+          <?php if ($showReportSection('status')): ?>
           <div>
-            <div class="rp-section-label">III. By Status</div>
+            <div class="rp-section-label">III. Status Breakdown</div>
             <?php if (empty($blot['by_status'])): ?>
               <p class="rp-empty">No data.</p>
             <?php else: ?>
             <table class="rp-table">
-              <thead><tr><th>Status</th><th class="text-center">Count</th><th class="text-center">%</th></tr></thead>
+              <thead><tr><th class="<?= htmlspecialchars(trim($reportColumnClass('status'))) ?>">Status</th><th class="text-center<?= htmlspecialchars($reportColumnClass('count')) ?>">Count</th><th class="text-center<?= htmlspecialchars($reportColumnClass('percentage')) ?>">%</th></tr></thead>
               <tbody>
                 <?php foreach ($blot['by_status'] as $r): ?>
                 <tr>
-                  <td><?= htmlspecialchars($r['status']) ?></td>
-                  <td class="text-center"><?= number_format((int)$r['total']) ?></td>
-                  <td class="text-center pct"><?= rp_pct((int)$r['total'],$total) ?></td>
+                  <td class="<?= htmlspecialchars(trim($reportColumnClass('status'))) ?>"><?= htmlspecialchars($r['status']) ?></td>
+                  <td class="text-center<?= htmlspecialchars($reportColumnClass('count')) ?>"><?= number_format((int)$r['total']) ?></td>
+                  <td class="text-center pct<?= htmlspecialchars($reportColumnClass('percentage')) ?>"><?= rp_pct((int)$r['total'],$total) ?></td>
                 </tr>
                 <?php endforeach; ?>
               </tbody>
-              <tfoot><tr><td><strong>TOTAL</strong></td><td class="text-center"><?= number_format($total) ?></td><td class="text-center">100%</td></tr></tfoot>
+              <tfoot><tr><td class="<?= htmlspecialchars(trim($reportColumnClass('status'))) ?>"><strong>TOTAL</strong></td><td class="text-center<?= htmlspecialchars($reportColumnClass('count')) ?>"><?= number_format($total) ?></td><td class="text-center<?= htmlspecialchars($reportColumnClass('percentage')) ?>">100%</td></tr></tfoot>
             </table>
             <?php endif; ?>
           </div>
+          <?php endif; ?>
         </div>
+        <?php endif; ?>
 
-        <!-- IV. Monthly Trend -->
+        <!-- IV. Area + Sector Breakdown -->
+        <?php if ($showReportSection('area') || $showReportSection('sector')): ?>
+        <div class="rp-two-col" style="margin-top:22px;">
+          <?php if ($showReportSection('area')): ?>
+          <div>
+            <div class="rp-section-label">IV. Cases by Area</div>
+            <?php if (empty($blot['by_area'])): ?>
+              <p class="rp-empty">No area-linked case data.</p>
+            <?php else: $blotterAreaTotal = array_sum(array_column($blot['by_area'], 'total')); ?>
+            <table class="rp-table">
+              <thead><tr><th class="<?= htmlspecialchars(trim($reportColumnClass('area'))) ?>">Area</th><th class="text-center<?= htmlspecialchars($reportColumnClass('count')) ?>">Count</th><th class="text-center<?= htmlspecialchars($reportColumnClass('percentage')) ?>">%</th></tr></thead>
+              <tbody>
+                <?php foreach ($blot['by_area'] as $r): ?>
+                <tr>
+                  <td class="<?= htmlspecialchars(trim($reportColumnClass('area'))) ?>"><?= htmlspecialchars((string)$r['area']) ?></td>
+                  <td class="text-center<?= htmlspecialchars($reportColumnClass('count')) ?>"><?= number_format((int)$r['total']) ?></td>
+                  <td class="text-center pct<?= htmlspecialchars($reportColumnClass('percentage')) ?>"><?= rp_pct((int)$r['total'], $blotterAreaTotal) ?></td>
+                </tr>
+                <?php endforeach; ?>
+              </tbody>
+              <tfoot><tr><td class="<?= htmlspecialchars(trim($reportColumnClass('area'))) ?>"><strong>TOTAL</strong></td><td class="text-center<?= htmlspecialchars($reportColumnClass('count')) ?>"><?= number_format($blotterAreaTotal) ?></td><td class="text-center<?= htmlspecialchars($reportColumnClass('percentage')) ?>">100%</td></tr></tfoot>
+            </table>
+            <?php endif; ?>
+          </div>
+          <?php endif; ?>
+          <?php if ($showReportSection('sector')): ?>
+          <div>
+            <div class="rp-section-label">V. Cases by Sector Membership</div>
+            <?php if (empty($blot['by_sector'])): ?>
+              <p class="rp-empty">No sector-linked case data.</p>
+            <?php else: $blotterSectorTotal = array_sum(array_column($blot['by_sector'], 'total')); ?>
+            <table class="rp-table">
+              <thead><tr><th class="<?= htmlspecialchars(trim($reportColumnClass('sector'))) ?>">Sector</th><th class="text-center<?= htmlspecialchars($reportColumnClass('count')) ?>">Count</th><th class="text-center<?= htmlspecialchars($reportColumnClass('percentage')) ?>">%</th></tr></thead>
+              <tbody>
+                <?php foreach ($blot['by_sector'] as $r): ?>
+                <tr>
+                  <td class="<?= htmlspecialchars(trim($reportColumnClass('sector'))) ?>"><?= htmlspecialchars((string)$r['sector']) ?></td>
+                  <td class="text-center<?= htmlspecialchars($reportColumnClass('count')) ?>"><?= number_format((int)$r['total']) ?></td>
+                  <td class="text-center pct<?= htmlspecialchars($reportColumnClass('percentage')) ?>"><?= rp_pct((int)$r['total'], $blotterSectorTotal) ?></td>
+                </tr>
+                <?php endforeach; ?>
+              </tbody>
+              <tfoot><tr><td class="<?= htmlspecialchars(trim($reportColumnClass('sector'))) ?>"><strong>TOTAL</strong></td><td class="text-center<?= htmlspecialchars($reportColumnClass('count')) ?>"><?= number_format($blotterSectorTotal) ?></td><td class="text-center<?= htmlspecialchars($reportColumnClass('percentage')) ?>">100%</td></tr></tfoot>
+            </table>
+            <?php endif; ?>
+          </div>
+          <?php endif; ?>
+        </div>
+        <?php endif; ?>
+
+        <!-- VI. Monthly Trend -->
+        <?php if ($showReportSection('trend')): ?>
         <div class="rp-section">
-          <div class="rp-section-label">IV. Monthly Trend (Last 12 Months)</div>
+          <div class="rp-section-label">VI. Monthly Trend (Last 12 Months)</div>
           <?php if (empty($blot['trend'])): ?>
             <p class="rp-empty">No trend data.</p>
           <?php else: $tTotal = array_sum(array_column($blot['trend'],'total')); ?>
           <table class="rp-table">
-            <thead><tr><th>Month</th><th class="text-center">Cases Filed</th></tr></thead>
+            <thead><tr><th class="<?= htmlspecialchars(trim($reportColumnClass('date'))) ?>">Month</th><th class="text-center<?= htmlspecialchars($reportColumnClass('count')) ?>">Cases Filed</th></tr></thead>
             <tbody>
               <?php foreach ($blot['trend'] as $r): ?>
               <tr>
-                <td><?= htmlspecialchars(date('F Y', strtotime($r['month'].'-01'))) ?></td>
-                <td class="text-center"><?= number_format((int)$r['total']) ?></td>
+                <td class="<?= htmlspecialchars(trim($reportColumnClass('date'))) ?>"><?= htmlspecialchars(date('F Y', strtotime($r['month'].'-01'))) ?></td>
+                <td class="text-center<?= htmlspecialchars($reportColumnClass('count')) ?>"><?= number_format((int)$r['total']) ?></td>
               </tr>
               <?php endforeach; ?>
             </tbody>
-            <tfoot><tr><td><strong>TOTAL</strong></td><td class="text-center"><?= number_format($tTotal) ?></td></tr></tfoot>
+            <tfoot><tr><td class="<?= htmlspecialchars(trim($reportColumnClass('date'))) ?>"><strong>TOTAL</strong></td><td class="text-center<?= htmlspecialchars($reportColumnClass('count')) ?>"><?= number_format($tTotal) ?></td></tr></tfoot>
           </table>
           <?php endif; ?>
         </div>
+        <?php endif; ?>
 
 <?php
 // ══════════════════════════════════════════════════════════════════════════════
@@ -2197,8 +3736,9 @@ elseif ($module === 'complaints'):
   $total = (int)($kpi['total'] ?? 0);
 ?>
         <!-- I. Summary -->
+        <?php if ($showReportSection('summary')): ?>
         <div class="rp-section">
-          <div class="rp-section-label">I. Complaints Summary</div>
+          <div class="rp-section-label">I. Overall Summary</div>
           <table class="rp-summary">
             <tbody>
               <tr><td>Total Complaints Filed</td><td><?= number_format($total) ?></td></tr>
@@ -2209,54 +3749,136 @@ elseif ($module === 'complaints'):
             </tbody>
           </table>
         </div>
+        <?php endif; ?>
 
-        <!-- II. By Origin + III. By Subject Kind — side by side -->
+        <!-- II. Complaint Type Breakdown -->
+        <?php if ($showReportSection('type')): ?>
+        <div class="rp-section">
+          <div class="rp-section-label">II. Complaint Type Breakdown</div>
+          <?php if (empty($comp['by_type'])): ?>
+            <p class="rp-empty">No complaint type data for the selected filters.</p>
+          <?php else: ?>
+          <table class="rp-table">
+            <thead><tr><th class="<?= htmlspecialchars(trim($reportColumnClass('type'))) ?>">Complaint Type</th><th class="text-center<?= htmlspecialchars($reportColumnClass('count')) ?>">Count</th><th class="text-center<?= htmlspecialchars($reportColumnClass('result')) ?>">Escalated</th><th class="text-center<?= htmlspecialchars($reportColumnClass('percentage')) ?>">Esc. Rate</th></tr></thead>
+            <tbody>
+              <?php foreach ($comp['by_type'] as $r): ?>
+              <tr>
+                <td class="<?= htmlspecialchars(trim($reportColumnClass('type'))) ?>"><?= htmlspecialchars((string)$r['complaint_type']) ?></td>
+                <td class="text-center<?= htmlspecialchars($reportColumnClass('count')) ?>"><?= number_format((int)$r['total']) ?></td>
+                <td class="text-center<?= htmlspecialchars($reportColumnClass('result')) ?>"><?= number_format((int)$r['escalated']) ?></td>
+                <td class="text-center pct<?= htmlspecialchars($reportColumnClass('percentage')) ?>"><?= rp_pct((int)$r['escalated'], (int)$r['total']) ?></td>
+              </tr>
+              <?php endforeach; ?>
+            </tbody>
+          </table>
+          <?php endif; ?>
+        </div>
+        <?php endif; ?>
+
+        <!-- III. By Origin + IV. By Subject Kind — side by side -->
+        <?php if ($showReportSection('origin') || $showReportSection('kind')): ?>
         <div class="rp-two-col" style="margin-top:22px;">
+          <?php if ($showReportSection('origin')): ?>
           <div>
-            <div class="rp-section-label">II. By Origin</div>
+            <div class="rp-section-label">III. By Origin</div>
             <?php if (empty($comp['by_origin'])): ?>
               <p class="rp-empty">No data.</p>
             <?php else: ?>
             <table class="rp-table">
-              <thead><tr><th>Origin</th><th class="text-center">Count</th><th class="text-center">%</th></tr></thead>
+              <thead><tr><th class="<?= htmlspecialchars(trim($reportColumnClass('channel'))) ?>">Origin</th><th class="text-center<?= htmlspecialchars($reportColumnClass('count')) ?>">Count</th><th class="text-center<?= htmlspecialchars($reportColumnClass('percentage')) ?>">%</th></tr></thead>
               <tbody>
                 <?php foreach ($comp['by_origin'] as $r): ?>
                 <tr>
-                  <td><?= htmlspecialchars(ucwords(str_replace('_',' ',$r['origin']))) ?></td>
-                  <td class="text-center"><?= number_format((int)$r['total']) ?></td>
-                  <td class="text-center pct"><?= rp_pct((int)$r['total'],$total) ?></td>
+                  <td class="<?= htmlspecialchars(trim($reportColumnClass('channel'))) ?>"><?= htmlspecialchars(ucwords(str_replace('_',' ',$r['origin']))) ?></td>
+                  <td class="text-center<?= htmlspecialchars($reportColumnClass('count')) ?>"><?= number_format((int)$r['total']) ?></td>
+                  <td class="text-center pct<?= htmlspecialchars($reportColumnClass('percentage')) ?>"><?= rp_pct((int)$r['total'],$total) ?></td>
                 </tr>
                 <?php endforeach; ?>
               </tbody>
-              <tfoot><tr><td><strong>TOTAL</strong></td><td class="text-center"><?= number_format($total) ?></td><td class="text-center">100%</td></tr></tfoot>
+              <tfoot><tr><td class="<?= htmlspecialchars(trim($reportColumnClass('channel'))) ?>"><strong>TOTAL</strong></td><td class="text-center<?= htmlspecialchars($reportColumnClass('count')) ?>"><?= number_format($total) ?></td><td class="text-center<?= htmlspecialchars($reportColumnClass('percentage')) ?>">100%</td></tr></tfoot>
             </table>
             <?php endif; ?>
           </div>
+          <?php endif; ?>
+          <?php if ($showReportSection('kind')): ?>
           <div>
-            <div class="rp-section-label">III. By Subject Kind</div>
+            <div class="rp-section-label">IV. By Subject Kind</div>
             <?php if (empty($comp['by_kind'])): ?>
               <p class="rp-empty">No data.</p>
             <?php else: $kindTotal = array_sum(array_column($comp['by_kind'],'total')); ?>
             <table class="rp-table">
-              <thead><tr><th>Kind</th><th class="text-center">Count</th><th class="text-center">%</th></tr></thead>
+              <thead><tr><th class="<?= htmlspecialchars(trim($reportColumnClass('status'))) ?>">Kind</th><th class="text-center<?= htmlspecialchars($reportColumnClass('count')) ?>">Count</th><th class="text-center<?= htmlspecialchars($reportColumnClass('percentage')) ?>">%</th></tr></thead>
               <tbody>
                 <?php foreach ($comp['by_kind'] as $r): ?>
                 <tr>
-                  <td><?= htmlspecialchars($r['kind']) ?></td>
-                  <td class="text-center"><?= number_format((int)$r['total']) ?></td>
-                  <td class="text-center pct"><?= rp_pct((int)$r['total'],$kindTotal) ?></td>
+                  <td class="<?= htmlspecialchars(trim($reportColumnClass('status'))) ?>"><?= htmlspecialchars($r['kind']) ?></td>
+                  <td class="text-center<?= htmlspecialchars($reportColumnClass('count')) ?>"><?= number_format((int)$r['total']) ?></td>
+                  <td class="text-center pct<?= htmlspecialchars($reportColumnClass('percentage')) ?>"><?= rp_pct((int)$r['total'],$kindTotal) ?></td>
                 </tr>
                 <?php endforeach; ?>
               </tbody>
-              <tfoot><tr><td><strong>TOTAL</strong></td><td class="text-center"><?= number_format($kindTotal) ?></td><td class="text-center">100%</td></tr></tfoot>
+              <tfoot><tr><td class="<?= htmlspecialchars(trim($reportColumnClass('status'))) ?>"><strong>TOTAL</strong></td><td class="text-center<?= htmlspecialchars($reportColumnClass('count')) ?>"><?= number_format($kindTotal) ?></td><td class="text-center<?= htmlspecialchars($reportColumnClass('percentage')) ?>">100%</td></tr></tfoot>
             </table>
             <?php endif; ?>
           </div>
+          <?php endif; ?>
         </div>
+        <?php endif; ?>
 
-        <!-- IV. Monthly Trend -->
+        <!-- V. Area + Sector Breakdown -->
+        <?php if ($showReportSection('area') || $showReportSection('sector')): ?>
+        <div class="rp-two-col" style="margin-top:22px;">
+          <?php if ($showReportSection('area')): ?>
+          <div>
+            <div class="rp-section-label">V. Complaints by Area</div>
+            <?php if (empty($comp['by_area'])): ?>
+              <p class="rp-empty">No area-linked complaint data.</p>
+            <?php else: $complaintAreaTotal = array_sum(array_column($comp['by_area'], 'total')); ?>
+            <table class="rp-table">
+              <thead><tr><th class="<?= htmlspecialchars(trim($reportColumnClass('area'))) ?>">Area</th><th class="text-center<?= htmlspecialchars($reportColumnClass('count')) ?>">Count</th><th class="text-center<?= htmlspecialchars($reportColumnClass('percentage')) ?>">%</th></tr></thead>
+              <tbody>
+                <?php foreach ($comp['by_area'] as $r): ?>
+                <tr>
+                  <td class="<?= htmlspecialchars(trim($reportColumnClass('area'))) ?>"><?= htmlspecialchars((string)$r['area']) ?></td>
+                  <td class="text-center<?= htmlspecialchars($reportColumnClass('count')) ?>"><?= number_format((int)$r['total']) ?></td>
+                  <td class="text-center pct<?= htmlspecialchars($reportColumnClass('percentage')) ?>"><?= rp_pct((int)$r['total'], $complaintAreaTotal) ?></td>
+                </tr>
+                <?php endforeach; ?>
+              </tbody>
+              <tfoot><tr><td class="<?= htmlspecialchars(trim($reportColumnClass('area'))) ?>"><strong>TOTAL</strong></td><td class="text-center<?= htmlspecialchars($reportColumnClass('count')) ?>"><?= number_format($complaintAreaTotal) ?></td><td class="text-center<?= htmlspecialchars($reportColumnClass('percentage')) ?>">100%</td></tr></tfoot>
+            </table>
+            <?php endif; ?>
+          </div>
+          <?php endif; ?>
+          <?php if ($showReportSection('sector')): ?>
+          <div>
+            <div class="rp-section-label">VI. Complaints by Sector Membership</div>
+            <?php if (empty($comp['by_sector'])): ?>
+              <p class="rp-empty">No sector-linked complaint data.</p>
+            <?php else: $complaintSectorTotal = array_sum(array_column($comp['by_sector'], 'total')); ?>
+            <table class="rp-table">
+              <thead><tr><th class="<?= htmlspecialchars(trim($reportColumnClass('sector'))) ?>">Sector</th><th class="text-center<?= htmlspecialchars($reportColumnClass('count')) ?>">Count</th><th class="text-center<?= htmlspecialchars($reportColumnClass('percentage')) ?>">%</th></tr></thead>
+              <tbody>
+                <?php foreach ($comp['by_sector'] as $r): ?>
+                <tr>
+                  <td class="<?= htmlspecialchars(trim($reportColumnClass('sector'))) ?>"><?= htmlspecialchars((string)$r['sector']) ?></td>
+                  <td class="text-center<?= htmlspecialchars($reportColumnClass('count')) ?>"><?= number_format((int)$r['total']) ?></td>
+                  <td class="text-center pct<?= htmlspecialchars($reportColumnClass('percentage')) ?>"><?= rp_pct((int)$r['total'], $complaintSectorTotal) ?></td>
+                </tr>
+                <?php endforeach; ?>
+              </tbody>
+              <tfoot><tr><td class="<?= htmlspecialchars(trim($reportColumnClass('sector'))) ?>"><strong>TOTAL</strong></td><td class="text-center<?= htmlspecialchars($reportColumnClass('count')) ?>"><?= number_format($complaintSectorTotal) ?></td><td class="text-center<?= htmlspecialchars($reportColumnClass('percentage')) ?>">100%</td></tr></tfoot>
+            </table>
+            <?php endif; ?>
+          </div>
+          <?php endif; ?>
+        </div>
+        <?php endif; ?>
+
+        <!-- VII. Monthly Trend -->
+        <?php if ($showReportSection('trend')): ?>
         <div class="rp-section">
-          <div class="rp-section-label">IV. Monthly Trend (Last 12 Months)</div>
+          <div class="rp-section-label">VII. Monthly Trend (Last 12 Months)</div>
           <?php if (empty($comp['trend'])): ?>
             <p class="rp-empty">No trend data.</p>
           <?php else:
@@ -2264,21 +3886,22 @@ elseif ($module === 'complaints'):
             $tEsc   = array_sum(array_column($comp['trend'],'escalated'));
           ?>
           <table class="rp-table">
-            <thead><tr><th>Month</th><th class="text-center">Total Filed</th><th class="text-center">Escalated</th><th class="text-center">Escalation Rate</th></tr></thead>
+            <thead><tr><th class="<?= htmlspecialchars(trim($reportColumnClass('date'))) ?>">Month</th><th class="text-center<?= htmlspecialchars($reportColumnClass('count')) ?>">Total Filed</th><th class="text-center<?= htmlspecialchars($reportColumnClass('result')) ?>">Escalated</th><th class="text-center<?= htmlspecialchars($reportColumnClass('percentage')) ?>">Escalation Rate</th></tr></thead>
             <tbody>
               <?php foreach ($comp['trend'] as $r): ?>
               <tr>
-                <td><?= htmlspecialchars(date('F Y', strtotime($r['month'].'-01'))) ?></td>
-                <td class="text-center"><?= number_format((int)$r['total']) ?></td>
-                <td class="text-center"><?= number_format((int)$r['escalated']) ?></td>
-                <td class="text-center pct"><?= rp_pct((int)$r['escalated'],(int)$r['total']) ?></td>
+                <td class="<?= htmlspecialchars(trim($reportColumnClass('date'))) ?>"><?= htmlspecialchars(date('F Y', strtotime($r['month'].'-01'))) ?></td>
+                <td class="text-center<?= htmlspecialchars($reportColumnClass('count')) ?>"><?= number_format((int)$r['total']) ?></td>
+                <td class="text-center<?= htmlspecialchars($reportColumnClass('result')) ?>"><?= number_format((int)$r['escalated']) ?></td>
+                <td class="text-center pct<?= htmlspecialchars($reportColumnClass('percentage')) ?>"><?= rp_pct((int)$r['escalated'],(int)$r['total']) ?></td>
               </tr>
               <?php endforeach; ?>
             </tbody>
-            <tfoot><tr><td><strong>TOTAL</strong></td><td class="text-center"><?= number_format($tTotal) ?></td><td class="text-center"><?= number_format($tEsc) ?></td><td class="text-center pct"><?= rp_pct($tEsc,$tTotal) ?></td></tr></tfoot>
+            <tfoot><tr><td class="<?= htmlspecialchars(trim($reportColumnClass('date'))) ?>"><strong>TOTAL</strong></td><td class="text-center<?= htmlspecialchars($reportColumnClass('count')) ?>"><?= number_format($tTotal) ?></td><td class="text-center<?= htmlspecialchars($reportColumnClass('result')) ?>"><?= number_format($tEsc) ?></td><td class="text-center pct<?= htmlspecialchars($reportColumnClass('percentage')) ?>"><?= rp_pct($tEsc,$tTotal) ?></td></tr></tfoot>
           </table>
           <?php endif; ?>
         </div>
+        <?php endif; ?>
 
 <?php endif; ?>
 
@@ -2310,6 +3933,152 @@ elseif ($module === 'complaints'):
         </div>
 
 </div><!-- /.rp-doc -->
+
+<?php if ($shouldLoadIssuanceCharts): ?>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+<script>
+(() => {
+  const chartType = <?= json_encode($reportChartType, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
+  const palette = ['#DE710C', '#2563EB', '#16A34A', '#DC2626', '#7C3AED', '#0891B2', '#CA8A04', '#DB2777', '#4F46E5', '#059669'];
+  const chartSources = [
+    {
+      canvasId: 'issuanceAreaTotalsChart',
+      labels: <?= json_encode(array_map(static fn(array $row): string => (string)($row['area_label'] ?? ''), $issuanceAreaChartData), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>,
+      values: <?= json_encode(array_map(static fn(array $row): int => (int)($row['total'] ?? 0), $issuanceAreaChartData), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>,
+      title: 'Total Requests by Area Number'
+    },
+    {
+      canvasId: 'issuanceTypeTotalsChart',
+      labels: <?= json_encode(array_map(static fn(array $row): string => (string)($row['request_type_label'] ?? ''), $issuanceTypeChartData), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>,
+      values: <?= json_encode(array_map(static fn(array $row): int => (int)($row['total'] ?? 0), $issuanceTypeChartData), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>,
+      title: 'Total Requests by Document Type'
+    },
+    {
+      canvasId: 'issuanceStatusTotalsChart',
+      labels: <?= json_encode(array_map(static fn(array $row): string => (string)($row['status_label'] ?? ''), $issuanceStatusChartData), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>,
+      values: <?= json_encode(array_map(static fn(array $row): int => (int)($row['total'] ?? 0), $issuanceStatusChartData), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>,
+      title: 'Total Requests by Status'
+    },
+    {
+      canvasId: 'issuanceChannelTotalsChart',
+      labels: <?= json_encode(array_map(static fn(array $row): string => (string)($row['channel_label'] ?? ''), $issuanceChannelChartData), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>,
+      values: <?= json_encode(array_map(static fn(array $row): int => (int)($row['total'] ?? 0), $issuanceChannelChartData), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>,
+      title: 'Total Requests by Channel'
+    }
+  ];
+
+  const colorsFor = (count) => Array.from({ length: count }, (_, index) => palette[index % palette.length]);
+  const wrapLabel = (label, maxChars = 18) => {
+    const text = String(label ?? '').trim();
+    if (text === '' || text.length <= maxChars) {
+      return text;
+    }
+
+    const words = text.split(/\s+/);
+    const lines = [];
+    let current = '';
+    for (const word of words) {
+      const next = current === '' ? word : `${current} ${word}`;
+      if (next.length > maxChars && current !== '') {
+        lines.push(current);
+        current = word;
+      } else {
+        current = next;
+      }
+    }
+    if (current !== '') {
+      lines.push(current);
+    }
+    return lines.length > 1 ? lines : text;
+  };
+
+  const renderChart = (source) => {
+    const canvas = document.getElementById(source.canvasId);
+    if (!canvas || !Array.isArray(source.labels) || source.labels.length === 0 || typeof Chart === 'undefined') {
+      return;
+    }
+
+    const colors = colorsFor(source.labels.length);
+    const chartLabels = chartType === 'bar'
+      ? source.labels.map((label) => wrapLabel(label))
+      : source.labels;
+    const config = chartType === 'pie'
+      ? {
+          type: 'pie',
+          data: {
+            labels: chartLabels,
+            datasets: [{
+              label: source.title,
+              data: source.values,
+              backgroundColor: colors,
+              borderColor: '#ffffff',
+              borderWidth: 2,
+            }]
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+              legend: {
+                position: 'bottom',
+              },
+            },
+          },
+        }
+      : {
+          type: 'bar',
+          data: {
+            labels: chartLabels,
+            datasets: [{
+              label: 'Total Requests',
+              data: source.values,
+              backgroundColor: colors,
+              borderColor: colors,
+              borderWidth: 1,
+              borderRadius: 8,
+            }]
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+              x: {
+                ticks: {
+                  autoSkip: false,
+                  maxRotation: 0,
+                  minRotation: 0,
+                  font: {
+                    size: 10,
+                  },
+                },
+              },
+              y: {
+                beginAtZero: true,
+                ticks: {
+                  precision: 0,
+                },
+              },
+            },
+            plugins: {
+              legend: {
+                display: false,
+              },
+            },
+          },
+        };
+
+    new Chart(canvas.getContext('2d'), config);
+  };
+
+  const initCharts = () => chartSources.forEach(renderChart);
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initCharts, { once: true });
+  } else {
+    initCharts();
+  }
+})();
+</script>
+<?php endif; ?>
 
 <?php if ($isPrintView): ?>
 </body>
