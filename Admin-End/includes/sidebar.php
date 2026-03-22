@@ -63,6 +63,7 @@ $financeSection = strtolower(trim((string)($_GET['section'] ?? 'tracker')));
 $certificateTab = strtolower(trim((string)($_GET['tab'] ?? 'tracker')));
 $certificateDocument = strtolower(trim((string)($_GET['document'] ?? '')));
 $certificateStage = strtolower(trim((string)($_GET['stage'] ?? '')));
+$certificateEntry = strtolower(trim((string)($_GET['entry'] ?? '')));
 $certificateFilterDocument = trim((string)($_GET['filter_document'] ?? ''));
 $isIdIssuanceManualActive = $current === 'CertificateTracker.php'
     && $certificateTab === 'manual'
@@ -70,7 +71,8 @@ $isIdIssuanceManualActive = $current === 'CertificateTracker.php'
 $isIdIssuanceTrackerActive = $current === 'CertificateTracker.php'
     && !$isIdIssuanceManualActive
     && (
-        $certificateStage === 'barangay_id'
+        $certificateEntry === 'id_issuance'
+        || $certificateStage === 'barangay_id'
         || strcasecmp($certificateFilterDocument, 'Barangay ID') === 0
     );
 $isIdIssuanceActive = $isIdIssuanceTrackerActive || $isIdIssuanceManualActive;
@@ -368,7 +370,7 @@ if (!empty($_SESSION['user_id']) && isset($conn) && $conn instanceof mysqli) {
         <div class="collapse <?= $isIdIssuanceActive ? 'show' : '' ?>" id="id-issuance-collapse">
           <ul class="btn-toggle-nav list-unstyled fw-normal pb-1 small">
             <li>
-              <a href="<?= htmlspecialchars(appUrl('Admin-End/Certificates/CertificateTracker.php?stage=barangay_id&filter_document=' . rawurlencode('Barangay ID'))) ?>"
+              <a href="<?= htmlspecialchars(appUrl('Admin-End/Certificates/CertificateTracker.php?entry=id_issuance')) ?>"
                  class="link-dark rounded <?= $isIdIssuanceTrackerActive ? 'active' : '' ?>">
                 Tracker
               </a>

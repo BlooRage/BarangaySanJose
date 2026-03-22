@@ -5,16 +5,9 @@ $barangayIdAdminNavItems = [
     [
         'key' => 'applications',
         'label' => 'Applications',
-        'hint' => 'Review submitted Barangay ID requests',
+        'hint' => 'Open the full request tracker',
         'icon' => 'fa-regular fa-id-card',
-        'href' => appUrl('Admin-End/Certificates/CertificateTracker.php?stage=barangay_id&filter_document=' . rawurlencode('Barangay ID')),
-    ],
-    [
-        'key' => 'manual',
-        'label' => 'Manual Issuance',
-        'hint' => 'Encode direct or walk-in ID requests',
-        'icon' => 'fa-solid fa-file-signature',
-        'href' => appUrl('Admin-End/Certificates/CertificateTracker.php?tab=manual&document=barangay_id'),
+        'href' => appUrl('Admin-End/Certificates/CertificateTracker.php?entry=id_issuance'),
     ],
     [
         'key' => 'payments',

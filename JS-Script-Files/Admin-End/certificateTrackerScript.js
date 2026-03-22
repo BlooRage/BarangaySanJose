@@ -12,8 +12,15 @@
   const launchParams = new URLSearchParams(window.location.search);
   const launchTab = String(launchParams.get('tab') || '').toLowerCase();
   const launchManualDocument = String(launchParams.get('document') || '').toLowerCase();
-  const launchStage = String(launchParams.get('stage') || '').toLowerCase();
-  const launchFilterDocument = String(launchParams.get('filter_document') || '').trim();
+  const launchEntry = String(launchParams.get('entry') || '').toLowerCase();
+  const rawLaunchStage = String(launchParams.get('stage') || '').toLowerCase();
+  const rawLaunchFilterDocument = String(launchParams.get('filter_document') || '').trim();
+  const isIdIssuanceTrackerView = launchEntry === 'id_issuance';
+  const isLegacyBarangayIdTrackerLaunch =
+    rawLaunchStage === 'barangay_id' &&
+    rawLaunchFilterDocument.toLowerCase() === 'barangay id';
+  const launchStage = isLegacyBarangayIdTrackerLaunch ? '' : rawLaunchStage;
+  const launchFilterDocument = isLegacyBarangayIdTrackerLaunch ? '' : rawLaunchFilterDocument;
   const barangayIdTabCount = document.getElementById('barangayIdTabCount');
   const pendingTabCount = document.getElementById('pendingTabCount');
   const releaseTabCount = document.getElementById('releaseTabCount');
@@ -541,18 +548,17 @@
     const raw = String(row?.payment_proof_path || '').trim();
     if (!raw) return '';
 
-    // Prefer direct file URL for reliable preview rendering.
+    const id = String(requestId || row?.request_id || '').trim();
+    if (id) {
+      return `${appBase}/PhpFiles/Admin-End/documentRequestWorkflow.php?action=view_payment_proof&request_id=${encodeURIComponent(id)}&_ts=${Date.now()}`;
+    }
+
     const unifiedMatch = raw.replace(/\\/g, '/').match(/\/UnifiedFileAttachment\/[^\s"'<>]+/i);
     if (unifiedMatch && unifiedMatch[0]) {
       return `${appBase}${unifiedMatch[0]}`;
     }
 
-    const direct = resolvePublicUrl(raw);
-    if (direct) return direct;
-
-    const id = String(requestId || row?.request_id || '').trim();
-    if (!id) return '';
-    return `${appBase}/PhpFiles/Admin-End/documentRequestWorkflow.php?action=view_payment_proof&request_id=${encodeURIComponent(id)}`;
+    return resolvePublicUrl(raw);
   }
 
   function issuedTemplateDocxUrl(requestId) {
@@ -1682,6 +1688,39 @@
     return durationDisplay;
   }
 
+  function buildResidencyPurposeText(basePurpose, startRaw, yearsRaw, monthsRaw, fallbackDurationRaw = '') {
+    const cleanedBase = String(basePurpose || '').replace(/\s*\(\s*since\b[^)]*\)\s*$/i, '').trim();
+    const purposeBase = cleanedBase && cleanedBase.toUpperCase() !== 'PURPOSE'
+      ? cleanedBase
+      : 'RESIDENCY VERIFICATION';
+
+    const explicitYears = String(yearsRaw || '').trim();
+    const explicitMonths = String(monthsRaw || '').trim();
+    let years = explicitYears !== '' ? Math.max(0, Number.parseInt(explicitYears, 10) || 0) : null;
+    let months = explicitMonths !== '' ? Math.max(0, Number.parseInt(explicitMonths, 10) || 0) : null;
+
+    if (years === null || months === null) {
+      const parsed = parseDurationParts(fallbackDurationRaw);
+      if (parsed) {
+        if (years === null) years = parsed.years;
+        if (months === null) months = parsed.months;
+      }
+    }
+
+    let startDisplay = previewMonthYear(startRaw);
+    if (!startDisplay && years !== null && months !== null) {
+      const now = new Date();
+      const inferred = new Date(now.getFullYear(), now.getMonth(), 1);
+      inferred.setMonth(inferred.getMonth() - months);
+      inferred.setFullYear(inferred.getFullYear() - years);
+      if (!Number.isNaN(inferred.getTime())) {
+        startDisplay = inferred.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+      }
+    }
+
+    return startDisplay ? `${purposeBase} (SINCE ${startDisplay})` : purposeBase;
+  }
+
   function applicantHonorific(sexValue) {
     const sex = String(sexValue || '').trim().toLowerCase();
     if (sex.startsWith('m')) return 'MR.';
@@ -2100,7 +2139,8 @@
       childLines.push(`${childName}${childAge ? `, ${childAge} y/o` : ''}`.trim());
     }
     const requestedDocType = firstNonEmpty([payload.document_type, row.document_type, 'Certificate']);
-    const isBarangayIdDocument = normalizePreviewDocKey(requestedDocType) === 'barangayid';
+    const requestedDocKey = normalizePreviewDocKey(requestedDocType);
+    const isBarangayIdDocument = requestedDocKey === 'barangayid';
     const generalPermitPurpose = generalClearancePurposeFromDocType(requestedDocType);
     const generalPermitLocation = buildGeneralPermitLocation(
       payload,
@@ -2147,8 +2187,10 @@
       additionalDetails.push({ label: friendlyLabel(k), value });
     });
 
-    const inferredBusinessClearance = !!businessName
-      || /business\s+permit/i.test(firstNonEmpty([row.purpose, payload.request_purpose, payload.purpose]));
+    const inferredBusinessClearance = requestedDocKey === 'generic' && (
+      !!businessName
+      || /business\s+permit/i.test(firstNonEmpty([row.purpose, payload.request_purpose, payload.purpose]))
+    );
     const barangayIdDigitalState = (
       isBarangayIdDocument
       && window.BarangayIdDigital
@@ -2179,6 +2221,59 @@
         })
       : {};
 
+    const basePurposeText = generalPermitPurpose || firstNonEmpty([row.purpose, payload.purpose, payload.request_purpose, '']);
+    const residencyPurposeText = requestedDocKey === 'residency'
+      ? buildResidencyPurposeText(
+          basePurposeText,
+          firstNonEmpty([payload.barangay_residency, residentProfile.barangay_residency]),
+          firstNonEmpty([payload.years_of_residency]),
+          firstNonEmpty([payload.months_of_residency]),
+          firstNonEmpty([payload.residency_duration, residentProfile.residency_duration])
+        )
+      : basePurposeText;
+    const submissionTargetType = String(firstNonEmpty([payload.submission_target_type]) || '').trim().toLowerCase();
+    const explicitRequestOfficerLines = [
+      upperText(firstNonEmpty([payload.request_officer_line1]), ''),
+      upperText(firstNonEmpty([payload.request_officer_line2]), ''),
+      upperText(firstNonEmpty([payload.request_officer_line3]), '')
+    ];
+    const institutionRequestOfficerLines = [
+      upperText(firstNonEmpty([payload.institution_person]), ''),
+      upperText(firstNonEmpty([payload.institution_position]), ''),
+      upperText(firstNonEmpty([payload.institution_name]), '')
+    ].filter(Boolean);
+    const governmentRequestOfficerLines = [
+      upperText(firstNonEmpty([payload.government_official, payload.government_official_other]), ''),
+      upperText(firstNonEmpty([payload.government_position, payload.government_position_detail]), ''),
+      upperText(firstNonEmpty([payload.government_office, payload.government_position_group]), '')
+    ].filter(Boolean);
+    const derivedRequestOfficerLines = (() => {
+      if (submissionTargetType === 'institution' && institutionRequestOfficerLines.length) {
+        return institutionRequestOfficerLines;
+      }
+      if (submissionTargetType === 'government_official' && governmentRequestOfficerLines.length) {
+        return governmentRequestOfficerLines;
+      }
+      const explicitLines = explicitRequestOfficerLines.filter(Boolean);
+      if (explicitLines.length) {
+        return explicitLines;
+      }
+      return [];
+    })();
+    const requestOfficerLine1Text = derivedRequestOfficerLines[0] || '';
+    const requestOfficerLine2Text = derivedRequestOfficerLines[1] || '';
+    const requestOfficerLine3Text = derivedRequestOfficerLines[2] || '';
+    const requestOfficerText = derivedRequestOfficerLines.length
+      ? derivedRequestOfficerLines.join(' - ')
+      : upperText(firstNonEmpty([
+          payload.request_officer,
+          [
+            payload.government_official,
+            payload.government_position || payload.government_position_detail,
+            payload.government_office || payload.government_position_group
+          ].filter(Boolean).join(' - ')
+        ]), '');
+
     return {
       ...barangayIdDigitalState,
       docType: inferredBusinessClearance
@@ -2199,7 +2294,7 @@
         residentProfile.phone_number
       ]), ''),
       fullAddress: upperText(stripAreaFromAddress(getPersonal('Full Address', '') || residentProfile.full_address || payload.applicant_full_address || payload.full_address || payload.full_address_display || payload.address || payload.complete_address || '-'), '-'),
-      purpose: upperText(generalPermitPurpose || firstNonEmpty([row.purpose, payload.purpose, payload.request_purpose, '-']), '-'),
+      purpose: upperText(residencyPurposeText, '-'),
       businessName: upperText(stripTemplateTokens(businessName || ''), ''),
       businessType: upperText(stripTemplateTokens(firstNonEmpty([payload.business_type, payload.businessType])), ''),
       businessAddress: upperText(stripTemplateTokens(businessAddress || ''), ''),
@@ -2231,31 +2326,10 @@
         row.released_by,
         row.finance_user_name
       ]), 'HON. GLENN S. EVANGELISTA'),
-      requestOfficer: upperText(firstNonEmpty([
-        payload.request_officer,
-        [
-          payload.government_official,
-          payload.government_position || payload.government_position_detail,
-          payload.government_office || payload.government_position_group
-        ].filter(Boolean).join(' - ')
-      ]), ''),
-      requestOfficerLine1: upperText(firstNonEmpty([
-        payload.request_officer_line1,
-        payload.government_official,
-        payload.government_official_other
-      ]), ''),
-      requestOfficerLine2: upperText(firstNonEmpty([
-        payload.request_officer_line2,
-        payload.government_position,
-        payload.government_position_detail,
-        payload.institution_position
-      ]), ''),
-      requestOfficerLine3: upperText(firstNonEmpty([
-        payload.request_officer_line3,
-        payload.government_office,
-        payload.government_position_group,
-        payload.institution_name
-      ]), ''),
+      requestOfficer: requestOfficerText,
+      requestOfficerLine1: requestOfficerLine1Text,
+      requestOfficerLine2: requestOfficerLine2Text,
+      requestOfficerLine3: requestOfficerLine3Text,
       certificateNumber: upperText(firstNonEmpty([row.certificate_number, payload.certificate_number]), ''),
       requestFor: upperText(firstNonEmpty([payload.request_purpose]), ''),
       orNumber: upperText(stripTemplateTokens(firstNonEmpty([row.or_number])), ''),
@@ -2356,6 +2430,8 @@
     const applicantHonorificText = String(state.applicantHonorific || 'MR./MS.').trim() || 'MR./MS.';
     const residencySinceText = String(state.residencySinceText || '').trim();
     const signedDateText = String(state.signedDate || 'DATE').trim() || 'DATE';
+    const ftjsSignedDateText = signedDateText && signedDateText !== 'DATE' ? signedDateText : 'MM/DD/YYYY';
+    const approvedByNameText = String(state.approvedByName || 'HON. GLENN S. EVANGELISTA').trim() || 'HON. GLENN S. EVANGELISTA';
     const leftLogoUrl = `${appBase}/Images/San_Jose_LOGO.jpg`;
     const rightLogoUrl = `${appBase}/Images/Montalban_Logo.png`;
     const fallbackRightLogoUrl = `${appBase}/Images/San_Jose_LOGO.jpg`;
@@ -2432,13 +2508,21 @@
 
     if (isIndigency) {
       const indigencyPurpose = safe(purpose || requestFor, 'PURPOSE');
+      const indigencyOfficerLines = [requestOfficerLine1, requestOfficerLine2, requestOfficerLine3].filter((line) => safe(line, '') !== '');
+      const indigencyOfficerLineHtml = indigencyOfficerLines.length
+        ? indigencyOfficerLines.map((line, index) => `
+            <div><strong>${previewEditable(`requestOfficerLine${index + 1}`, safe(line, ''), index === 1 ? 'Position / Department' : `Line ${index + 1}`)}</strong></div>
+          `).join('')
+        : `
+            <div><strong>${previewEditable('requestOfficerLine1', '${REQUEST_OFFICER_LINE1}', 'Line 1')}</strong></div>
+            <div><strong>${previewEditable('requestOfficerLine2', '${REQUEST_OFFICER_LINE2}', 'Position / Department')}</strong></div>
+            <div><strong>${previewEditable('requestOfficerLine3', '${REQUEST_OFFICER_LINE3}', 'Line 3')}</strong></div>
+          `;
       const toBlock = `
         <div class="doc-to-block">
           <strong>TO</strong><strong>:</strong>
           <div class="doc-to-lines">
-            <div><strong>${previewEditable('requestOfficerLine1', safe(requestOfficerLine1, '${REQUEST_OFFICER_LINE1}'), 'Official name')}</strong></div>
-            <div><strong>${previewEditable('requestOfficerLine2', safe(requestOfficerLine2, '${REQUEST_OFFICER_LINE2}'), 'Position')}</strong></div>
-            <div><strong>${previewEditable('requestOfficerLine3', safe(requestOfficerLine3, '${REQUEST_OFFICER_LINE3}'), 'Jurisdiction')}</strong></div>
+            ${indigencyOfficerLineHtml}
           </div>
         </div>
       `;
@@ -2447,8 +2531,7 @@
         ${toBlock}
         <p>
           This is to certify that <strong>${esc(safe(fullName, '${FULL_NAME}'))}</strong>, resident of
-          <strong>${esc(safe(fullAddress, '${ADDRESS}'))}</strong><br>
-          <strong>BARANGAY SAN JOSE, RODRIGUEZ, RIZAL</strong>
+          <strong>${esc(safe(fullAddressWithBarangay, '${ADDRESS}'))}</strong>
           belongs to the one of the indigent families of this Barangay. The Income of this family is barely enough to meet their day-to-day needs.
         </p>
         <p>
@@ -2924,17 +3007,19 @@
             <div class="${footerAreaClass}">
               <div></div>
               <div class="doc-preview-ftjs-signing">
-                <div class="doc-preview-signature doc-preview-signature--ftjs">
-                  <div class="name">${esc(String(state.approvedByName || 'HON. GLENN S. EVANGELISTA').trim() || 'HON. GLENN S. EVANGELISTA')}</div>
-                  <div>Punong Barangay</div>
+                <div class="doc-preview-ftjs-block">
+                  <div class="doc-preview-ftjs-name">${esc(approvedByNameText)}</div>
+                  <div class="doc-preview-ftjs-role">Punong Barangay</div>
                 </div>
-                <div class="doc-preview-ftjs-date"><span>${esc(signedDateText)}</span></div>
+                <div class="doc-preview-ftjs-date-line"><span>${esc(ftjsSignedDateText)}</span></div>
+                <div class="doc-preview-ftjs-date-label">Date</div>
                 <div class="doc-preview-ftjs-witness-label">Witnesses by:</div>
-                <div class="doc-preview-ftjs-witness">
-                  <div class="name">MINERVA D. QUITA</div>
-                  <div>Barangay Secretary</div>
+                <div class="doc-preview-ftjs-block doc-preview-ftjs-witness">
+                  <div class="doc-preview-ftjs-name">MINERVA D. QUITA</div>
+                  <div class="doc-preview-ftjs-role">Barangay Secretary</div>
                 </div>
-                <div class="doc-preview-ftjs-date"><span>${esc(signedDateText)}</span></div>
+                <div class="doc-preview-ftjs-date-line"><span>${esc(ftjsSignedDateText)}</span></div>
+                <div class="doc-preview-ftjs-date-label">Date</div>
               </div>
               ${qrBlockHtml}
             </div>
@@ -3007,7 +3092,7 @@
   function bindApproveScrollGate() {
     resetPreviewScrollGate();
     const stageKey = String(currentViewStage || '').toLowerCase();
-    if (!viewModalNextBtn || (stageKey !== 'submitted' && stageKey !== 'fee_tagging')) return;
+    if (!viewModalNextBtn || (stageKey !== 'submitted' && stageKey !== 'fee_tagging' && stageKey !== 'for_interview')) return;
     const currentRow = itemById.get(String(currentViewRequestId || '').trim());
     if (
       isFirstTimeJobSeekerRow(currentRow)
@@ -3023,7 +3108,7 @@
     const threshold = 24;
     const update = () => {
       const activeStageKey = String(currentViewStage || '').toLowerCase();
-      if (viewMode !== 'preview' || (activeStageKey !== 'submitted' && activeStageKey !== 'fee_tagging')) return;
+      if (viewMode !== 'preview' || (activeStageKey !== 'submitted' && activeStageKey !== 'fee_tagging' && activeStageKey !== 'for_interview')) return;
       const remaining = scrollHost.scrollHeight - scrollHost.scrollTop - scrollHost.clientHeight;
       const reachedBottom = remaining <= threshold;
       viewModalNextBtn.disabled = !reachedBottom;
@@ -3053,21 +3138,27 @@
       const rid = String(currentViewRequestId || '').trim();
       loadTemplatePreview(rid, { preserveExisting: true });
       const stageKey = String(currentViewStage || '').toLowerCase();
+      const currentRow = itemById.get(rid);
       const submittedFlow = stageKey === 'submitted' || stageKey === 'fee_tagging';
+      const interviewFlow = stageKey === 'for_interview' && isFirstTimeJobSeekerRow(currentRow);
       const releaseFlow = stageKey === 'ready_for_claim';
       viewModalBackBtn?.classList.remove('d-none');
       if (viewModalBackBtn) {
-        viewModalBackBtn.textContent = submittedFlow ? 'Cancel' : 'Back';
+        viewModalBackBtn.textContent = (submittedFlow || interviewFlow) ? 'Cancel' : 'Back';
       }
       if (viewModalNextBtn) {
         if (submittedFlow) {
-          const currentRow = itemById.get(rid);
           viewModalNextBtn.textContent = isFirstTimeJobSeekerRow(currentRow)
             ? 'Approve for Interview'
             : 'Save and Approve';
           viewModalNextBtn.classList.remove('d-none', 'btn-primary');
           viewModalNextBtn.classList.add('btn-success');
           viewModalNextBtn.disabled = !isFirstTimeJobSeekerRow(currentRow);
+        } else if (interviewFlow) {
+          viewModalNextBtn.textContent = 'Save and Process';
+          viewModalNextBtn.classList.remove('d-none', 'btn-primary');
+          viewModalNextBtn.classList.add('btn-success');
+          viewModalNextBtn.disabled = false;
         } else if (releaseFlow) {
           viewModalNextBtn.textContent = 'For Release';
           viewModalNextBtn.classList.remove('d-none', 'btn-primary');
@@ -3080,7 +3171,7 @@
           viewModalNextBtn.disabled = true;
         }
       }
-      if (submittedFlow) {
+      if (submittedFlow || interviewFlow) {
         bindApproveScrollGate();
       } else {
         resetPreviewScrollGate();
@@ -3680,8 +3771,11 @@
   }
 
   function matchesDocumentTypeFilter(row) {
-    if (!currentDocumentTypeFilter) return true;
-    return String(row?.document_type || '') === currentDocumentTypeFilter;
+    const activeDocumentFilter = isIdIssuanceTrackerView && !isFinancePaymentsPage
+      ? 'Barangay ID'
+      : currentDocumentTypeFilter;
+    if (!activeDocumentFilter) return true;
+    return String(row?.document_type || '') === activeDocumentFilter;
   }
 
   function matchesSearchFilter(row) {
@@ -3790,6 +3884,14 @@
 
   function syncDocumentTypeFilterOptions(items) {
     if (!documentTypeFilter) return;
+    if (isIdIssuanceTrackerView && !isFinancePaymentsPage) {
+      currentDocumentTypeFilter = 'Barangay ID';
+      documentTypeFilter.innerHTML = '<option value="Barangay ID">Filter: Barangay ID</option>';
+      documentTypeFilter.value = 'Barangay ID';
+      documentTypeFilter.disabled = true;
+      return;
+    }
+    documentTypeFilter.disabled = false;
     const selected = currentDocumentTypeFilter;
     const unique = Array.from(new Set(
       (items || [])
@@ -4071,7 +4173,8 @@
 
   function renderFromCache() {
     const allItems = Array.isArray(cachedAllItems) ? cachedAllItems : [];
-    updateStageTabBadges(allItems);
+    const badgeItems = allItems.filter(matchesDocumentTypeFilter);
+    updateStageTabBadges(badgeItems);
     const stageItems = currentStage === 'finance'
       ? allItems.filter((it) => financeStages.has(String(it.stage || '').toLowerCase()) && hasFinanceTransaction(it))
       : allItems.filter((it) => matchesStageTabFilter(it, currentStage));
@@ -4315,7 +4418,8 @@
       personnel_approve: isFirstTimeJobSeeker ? 'Approve for Interview' : (needsFeeTagging ? 'Before You Tag Fees' : 'Before You Approve'),
       personnel_approve_confirm: 'Confirm Approval',
       personnel_reject: 'Reject Request',
-      interview_pass: 'Approve Interview',
+      interview_pass: 'Review Interview Result',
+      interview_pass_confirm: 'Confirm Interview Approval',
       interview_fail: 'Fail Interview',
       finance_verify: isWalkInFlow ? 'Record Walk-in Payment' : 'Verify Payment / Walk-in Payment',
       finance_reject: 'Reject Payment',
@@ -4359,7 +4463,11 @@
       actionPrompt.classList.remove('d-none');
     }
     if (type === 'interview_pass' && actionPrompt) {
-      actionPrompt.textContent = 'Approve the interview result and generate the First Time Job Seeker document for release.';
+      actionPrompt.textContent = 'Click View Document to review the First Time Job Seeker certificate first. After you save and process it, first-time requests will move to release while repeat requests will move to payment.';
+      actionPrompt.classList.remove('d-none');
+    }
+    if (type === 'interview_pass_confirm' && actionPrompt) {
+      actionPrompt.textContent = 'Please confirm the interview result and the document details. First-time requests will move to release, while repeat requests will move to payment.';
       actionPrompt.classList.remove('d-none');
     }
     if (type === 'interview_fail' && actionPrompt) {
@@ -4378,7 +4486,11 @@
         actionSubmitBtn.classList.remove('btn-danger', 'btn-primary');
         actionSubmitBtn.classList.add('btn-success');
       } else if (type === 'interview_pass') {
-        actionSubmitBtn.textContent = 'Pass Interview';
+        actionSubmitBtn.textContent = 'View Document';
+        actionSubmitBtn.classList.remove('btn-danger', 'btn-primary');
+        actionSubmitBtn.classList.add('btn-success');
+      } else if (type === 'interview_pass_confirm') {
+        actionSubmitBtn.textContent = 'Save and Process';
         actionSubmitBtn.classList.remove('btn-danger', 'btn-primary');
         actionSubmitBtn.classList.add('btn-success');
       } else if (type === 'interview_fail') {
@@ -4412,6 +4524,7 @@
       type === 'personnel_approve_confirm' ||
       type === 'personnel_reject' ||
       type === 'interview_pass' ||
+      type === 'interview_pass_confirm' ||
       type === 'interview_fail' ||
       type === 'mark_completed_confirm'
     ) {
@@ -4991,34 +5104,59 @@
           requestFields.push({ label: 'Purpose', value: purposeText });
         }
 
-        const officialNameText = firstNonEmpty([payload.government_official, payload.request_officer_line1]);
-        const positionText = firstNonEmpty([payload.government_position, payload.government_position_detail, payload.request_officer_line2]);
-        const jurisdictionText = firstNonEmpty([payload.government_office, payload.government_position_group, payload.request_officer_line3]);
-        if (officialNameText || positionText || jurisdictionText) {
-          consumedKeys.add('government_official');
-          consumedKeys.add('government_position');
-          consumedKeys.add('government_position_detail');
-          consumedKeys.add('government_office');
-          consumedKeys.add('government_position_group');
+        const submissionTargetTypeText = String(firstNonEmpty([payload.submission_target_type]) || '').trim().toLowerCase();
+        const institutionNameText = firstNonEmpty([payload.institution_name]);
+        const institutionPersonText = firstNonEmpty([payload.institution_person]);
+        const institutionPositionText = firstNonEmpty([payload.institution_position]);
+        if (submissionTargetTypeText === 'institution' && (institutionNameText || institutionPersonText || institutionPositionText)) {
+          consumedKeys.add('submission_target_type');
+          consumedKeys.add('institution_name');
+          consumedKeys.add('institution_person');
+          consumedKeys.add('institution_position');
           consumedKeys.add('request_officer_line1');
           consumedKeys.add('request_officer_line2');
           consumedKeys.add('request_officer_line3');
           consumedKeys.add('request_officer');
 
-          if (officialNameText) {
-            requestFields.push({ label: 'Official Name', value: officialNameText });
+          if (institutionPersonText) {
+            requestFields.push({ label: 'Person to Address', value: institutionPersonText });
           }
-          if (positionText) {
-            requestFields.push({ label: 'Position', value: positionText });
+          if (institutionPositionText) {
+            requestFields.push({ label: 'Position / Department', value: institutionPositionText });
           }
-          if (jurisdictionText) {
-            requestFields.push({ label: 'Jurisdiction', value: jurisdictionText });
+          if (institutionNameText) {
+            requestFields.push({ label: 'Institution Name', value: institutionNameText });
           }
         } else {
-          const officerText = firstNonEmpty([payload.request_officer]);
-          if (officerText) {
+          const officialNameText = firstNonEmpty([payload.government_official, payload.request_officer_line1]);
+          const positionText = firstNonEmpty([payload.government_position, payload.government_position_detail, payload.request_officer_line2]);
+          const jurisdictionText = firstNonEmpty([payload.government_office, payload.government_position_group, payload.request_officer_line3]);
+          if (officialNameText || positionText || jurisdictionText) {
+            consumedKeys.add('government_official');
+            consumedKeys.add('government_position');
+            consumedKeys.add('government_position_detail');
+            consumedKeys.add('government_office');
+            consumedKeys.add('government_position_group');
+            consumedKeys.add('request_officer_line1');
+            consumedKeys.add('request_officer_line2');
+            consumedKeys.add('request_officer_line3');
             consumedKeys.add('request_officer');
-            requestFields.push({ label: 'To Be Submitted To', value: officerText });
+
+            if (officialNameText) {
+              requestFields.push({ label: 'Official Name', value: officialNameText });
+            }
+            if (positionText) {
+              requestFields.push({ label: 'Position / Department', value: positionText });
+            }
+            if (jurisdictionText) {
+              requestFields.push({ label: 'Jurisdiction', value: jurisdictionText });
+            }
+          } else {
+            const officerText = firstNonEmpty([payload.request_officer]);
+            if (officerText) {
+              consumedKeys.add('request_officer');
+              requestFields.push({ label: 'To Be Submitted To', value: officerText });
+            }
           }
         }
 
@@ -5507,10 +5645,26 @@
       return;
     }
 
+    if ((actionType.value || '') === 'interview_pass') {
+      if (actionSubmitBtn) {
+        actionSubmitBtn.disabled = true;
+        actionSubmitBtn.textContent = 'Opening Preview...';
+      }
+      if (actionCancelBtn) {
+        actionCancelBtn.disabled = true;
+      }
+      suppressActionReturn = true;
+      openPreviewAfterActionModal = true;
+      actionModal.hide();
+      return;
+    }
+
     const currentAction = String(actionType.value || '');
     const apiAction = currentAction === 'personnel_approve_confirm'
       ? 'personnel_approve'
-      : (currentAction === 'mark_completed_confirm' ? 'mark_completed' : currentAction);
+      : (currentAction === 'interview_pass_confirm'
+          ? 'interview_pass'
+          : (currentAction === 'mark_completed_confirm' ? 'mark_completed' : currentAction));
 
     const fd = new FormData();
     fd.append('action', apiAction);
@@ -5534,7 +5688,8 @@
     if (actionIssuedWrap && !actionIssuedWrap.classList.contains('d-none') && actionIssued.files?.[0]) {
       fd.append('issued_file', actionIssued.files[0]);
     }
-    if (currentAction === 'personnel_approve_confirm' && viewPreviewState && typeof viewPreviewState === 'object') {
+    if ((currentAction === 'personnel_approve_confirm' || currentAction === 'interview_pass_confirm')
+      && viewPreviewState && typeof viewPreviewState === 'object') {
       fd.append('edited_preview', JSON.stringify(viewPreviewState));
     }
 
@@ -5650,7 +5805,9 @@
     load();
   });
 
-  const initialDocumentFilter = canonicalDocumentFilterValue(launchFilterDocument);
+  const initialDocumentFilter = isIdIssuanceTrackerView && !isFinancePaymentsPage
+    ? 'Barangay ID'
+    : canonicalDocumentFilterValue(launchFilterDocument);
   if (initialDocumentFilter) {
     currentDocumentTypeFilter = initialDocumentFilter;
     if (isFinancePaymentsPage) {
@@ -5693,14 +5850,18 @@
       const rid = String(currentViewRequestId || '').trim();
       if (!rid) return;
       const stageKey = String(currentViewStage || '').toLowerCase();
+      const currentRow = itemById.get(rid);
       if (stageKey === 'ready_for_claim') {
         openActionModal('mark_completed_confirm', rid);
+        return;
+      }
+      if (stageKey === 'for_interview' && isFirstTimeJobSeekerRow(currentRow)) {
+        openActionModal('interview_pass_confirm', rid);
         return;
       }
       if (stageKey !== 'submitted' && stageKey !== 'fee_tagging') {
         return;
       }
-      const currentRow = itemById.get(rid);
       openActionModal(isFirstTimeJobSeekerRow(currentRow) ? 'personnel_approve' : 'personnel_approve_confirm', rid);
       return;
     }

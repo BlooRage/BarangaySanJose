@@ -4,11 +4,11 @@ require_once __DIR__ . '/../includes/admin_guard.php';
 $certificateLaunchTab = strtolower(trim((string)($_GET['tab'] ?? '')));
 $certificateLaunchDocument = strtolower(trim((string)($_GET['document'] ?? '')));
 $certificateLaunchStage = strtolower(trim((string)($_GET['stage'] ?? '')));
+$certificateLaunchEntry = strtolower(trim((string)($_GET['entry'] ?? '')));
+$isIdIssuanceTrackerView = $certificateLaunchEntry === 'id_issuance';
 $barangayIdAdminNavActive = 'applications';
 
-if ($certificateLaunchTab === 'manual' && $certificateLaunchDocument === 'barangay_id') {
-  $barangayIdAdminNavActive = 'manual';
-} elseif ($certificateLaunchStage === 'release') {
+if ($certificateLaunchStage === 'release') {
   $barangayIdAdminNavActive = 'release';
 }
 ?>
@@ -349,7 +349,7 @@ if ($certificateLaunchTab === 'manual' && $certificateLaunchDocument === 'barang
     }
     #viewModal .doc-preview-paper.doc-preview-paper--indigency {
       font-family: "Times New Roman", Times, serif;
-      padding: 28px 46px 36px;
+      padding: 28px 46px 96px;
     }
     #viewModal .doc-preview-paper.doc-preview-paper--indigency .doc-preview-head-center p {
       font-size: .88rem;
@@ -387,7 +387,7 @@ if ($certificateLaunchTab === 'manual' && $certificateLaunchDocument === 'barang
       letter-spacing: 0;
     }
     #viewModal .doc-preview-paper.doc-preview-paper--indigency .doc-preview-title--indigency {
-      margin: 14px 0 20px;
+      margin: 14px 0 10px;
       text-align: center;
       font-family: Arial, Helvetica, sans-serif;
       text-transform: uppercase;
@@ -399,7 +399,7 @@ if ($certificateLaunchTab === 'manual' && $certificateLaunchDocument === 'barang
       letter-spacing: .01em;
     }
     #viewModal .doc-preview-paper.doc-preview-paper--indigency .doc-preview-title--indigency .certificate {
-      margin-top: 8px;
+      margin-top: 4px;
       font-size: 12px;
       font-weight: 800;
       letter-spacing: .01em;
@@ -411,6 +411,7 @@ if ($certificateLaunchTab === 'manual' && $certificateLaunchDocument === 'barang
     }
     #viewModal .doc-preview-paper.doc-preview-paper--indigency .doc-preview-body p {
       margin: 0 0 16px;
+      text-indent: 2.5rem;
     }
     #viewModal .doc-preview-paper.doc-preview-paper--indigency .doc-preview-body {
       font-family: Arial, Helvetica, sans-serif;
@@ -422,7 +423,7 @@ if ($certificateLaunchTab === 'manual' && $certificateLaunchDocument === 'barang
     #viewModal .doc-preview-paper.doc-preview-paper--indigency .doc-preview-signature {
       position: absolute;
       right: 66px;
-      bottom: 300px;
+      bottom: 258px;
       margin-top: 0;
       justify-items: center;
       text-align: center;
@@ -435,7 +436,7 @@ if ($certificateLaunchTab === 'manual' && $certificateLaunchDocument === 'barang
     #viewModal .doc-preview-paper.doc-preview-paper--indigency .doc-preview-issuedby {
       position: absolute;
       left: 48px;
-      bottom: 292px;
+      bottom: 250px;
       font-size: .95rem;
       line-height: 1.35;
       text-align: left;
@@ -444,7 +445,7 @@ if ($certificateLaunchTab === 'manual' && $certificateLaunchDocument === 'barang
       position: absolute;
       width: 68%;
       left: 16%;
-      bottom: 64px;
+      bottom: 10px;
       font-family: Arial, Helvetica, sans-serif;
       font-size: .78rem;
       text-align: center;
@@ -466,7 +467,7 @@ if ($certificateLaunchTab === 'manual' && $certificateLaunchDocument === 'barang
       display: grid;
       grid-template-columns: 56px 18px 1fr;
       align-items: start;
-      margin: 10px 0 18px;
+      margin: 0 0 18px;
       column-gap: 4px;
     }
     #viewModal .doc-preview-paper.doc-preview-paper--indigency .doc-to-lines {
@@ -538,13 +539,13 @@ if ($certificateLaunchTab === 'manual' && $certificateLaunchDocument === 'barang
       text-align: justify;
       margin-top: 8px;
       padding: 0 8px 0 2px;
-      flex: 1 1 auto;
+      flex: 0 0 auto;
     }
     #viewModal .doc-preview-paper.doc-preview-paper--goodmoral {
       display: flex;
       flex-direction: column;
       min-height: 1188px;
-      padding-bottom: 76px;
+      padding-bottom: 96px;
     }
     #viewModal .doc-preview-paper.doc-preview-paper--goodmoral .doc-preview-body p {
       margin: 0 0 12px;
@@ -574,7 +575,7 @@ if ($certificateLaunchTab === 'manual' && $certificateLaunchDocument === 'barang
     }
     #viewModal .doc-preview-paper.doc-preview-paper--goodmoral .doc-preview-goodmoral-meta {
       margin-top: 8px;
-      margin-bottom: 14px;
+      margin-bottom: 10px;
     }
     #viewModal .doc-preview-paper.doc-preview-paper--goodmoral .doc-preview-goodmoral-meta .doc-preview-meta-row {
       display: grid;
@@ -603,8 +604,8 @@ if ($certificateLaunchTab === 'manual' && $certificateLaunchDocument === 'barang
       grid-template-columns: minmax(220px, 1fr) minmax(260px, 1fr) 96px;
       align-items: end;
       column-gap: 18px;
-      margin-top: auto;
-      padding-top: 28px;
+      margin-top: 8px;
+      padding-top: 10px;
     }
     #viewModal .doc-preview-paper.doc-preview-paper--goodmoral .doc-preview-footer-area.doc-preview-footer-area--noqr {
       grid-template-columns: minmax(220px, 1fr) minmax(260px, 1fr);
@@ -704,20 +705,23 @@ if ($certificateLaunchTab === 'manual' && $certificateLaunchDocument === 'barang
     }
     #viewModal .doc-preview-paper.doc-preview-paper--goodmoral .doc-preview-footer {
       width: 68%;
-      left: 16%;
+      position: absolute;
+      left: 50%;
+      bottom: 10px;
+      transform: translateX(-50%);
       font-family: Arial, Helvetica, sans-serif;
       font-size: .78rem;
       text-align: center;
       font-style: italic;
       color: #111827;
-      margin: 14px auto 0;
+      margin: 0;
     }
     #viewModal .doc-preview-paper.doc-preview-paper--business {
       font-family: Arial, Helvetica, sans-serif;
       display: flex;
       flex-direction: column;
       min-height: 1188px;
-      padding: 28px 44px 34px;
+      padding: 28px 44px 96px;
     }
     #viewModal .doc-preview-paper.doc-preview-paper--business .doc-preview-hint {
       display: none;
@@ -843,8 +847,8 @@ if ($certificateLaunchTab === 'manual' && $certificateLaunchDocument === 'barang
       grid-template-columns: 1fr;
       column-gap: 0;
       align-items: end;
-      margin-top: auto;
-      padding-top: 22px;
+      margin-top: 18px;
+      padding-top: 14px;
       padding-right: 108px;
     }
     #viewModal .doc-preview-paper.doc-preview-paper--business .doc-preview-business-footer-area.doc-preview-business-footer-area--noqr {
@@ -910,7 +914,11 @@ if ($certificateLaunchTab === 'manual' && $certificateLaunchDocument === 'barang
     }
     #viewModal .doc-preview-paper.doc-preview-paper--business .doc-preview-footer {
       width: 60%;
-      margin: 18px auto 0;
+      position: absolute;
+      left: 50%;
+      bottom: 10px;
+      transform: translateX(-50%);
+      margin: 0;
       font-size: .78rem;
       text-align: center;
       font-style: italic;
@@ -934,7 +942,7 @@ if ($certificateLaunchTab === 'manual' && $certificateLaunchDocument === 'barang
       display: flex;
       flex-direction: column;
       min-height: 1188px;
-      padding: 28px 44px 34px;
+      padding: 28px 44px 96px;
     }
     #viewModal .doc-preview-paper.doc-preview-paper--tricycle .doc-preview-hint {
       display: none;
@@ -1063,20 +1071,20 @@ if ($certificateLaunchTab === 'manual' && $certificateLaunchDocument === 'barang
       grid-template-columns: minmax(220px, 1fr) minmax(270px, 1fr);
       column-gap: 34px;
       align-items: end;
-      margin-top: auto;
-      padding-top: 38px;
+      margin-top: 18px;
+      padding-top: 18px;
     }
     #viewModal .doc-preview-paper.doc-preview-paper--tricycle .doc-preview-tricycle-issuedby {
       font-size: .95rem;
       line-height: 1.3;
       text-align: left;
       align-self: end;
-      padding-bottom: 28px;
+      padding-bottom: 12px;
     }
     #viewModal .doc-preview-paper.doc-preview-paper--tricycle .doc-preview-tricycle-signing {
       display: grid;
       justify-items: center;
-      row-gap: 30px;
+      row-gap: 18px;
       text-align: center;
     }
     #viewModal .doc-preview-paper.doc-preview-paper--tricycle .doc-preview-tricycle-signature {
@@ -1095,14 +1103,15 @@ if ($certificateLaunchTab === 'manual' && $certificateLaunchDocument === 'barang
     }
     #viewModal .doc-preview-paper.doc-preview-paper--tricycle .doc-preview-footer {
       width: 64%;
-      margin: 104px auto 0;
+      position: absolute;
+      left: 50%;
+      bottom: 10px;
+      transform: translateX(-50%);
+      margin: 0;
       font-size: .78rem;
       text-align: center;
       font-style: italic;
       color: #111827;
-    }
-    #viewModal .doc-preview-paper.doc-preview-paper--tricycle .doc-preview-tricycle-footer-area--noqr + .doc-preview-footer {
-      margin-top: 28px;
     }
     #viewModal .doc-preview-paper.doc-preview-paper--tricycle .doc-preview-qr {
       left: 50%;
@@ -1122,7 +1131,7 @@ if ($certificateLaunchTab === 'manual' && $certificateLaunchDocument === 'barang
       display: flex;
       flex-direction: column;
       min-height: 1188px;
-      padding: 28px 44px 34px;
+      padding: 28px 44px 96px;
     }
     #viewModal .doc-preview-paper.doc-preview-paper--generalclearance .doc-preview-hint {
       display: none;
@@ -1268,20 +1277,20 @@ if ($certificateLaunchTab === 'manual' && $certificateLaunchDocument === 'barang
       grid-template-columns: minmax(220px, 1fr) minmax(270px, 1fr);
       column-gap: 36px;
       align-items: end;
-      margin-top: auto;
-      padding-top: 32px;
+      margin-top: 18px;
+      padding-top: 18px;
     }
     #viewModal .doc-preview-paper.doc-preview-paper--generalclearance .doc-preview-generalclearance-issuedby {
       font-size: .95rem;
       line-height: 1.3;
       text-align: left;
       align-self: end;
-      padding-bottom: 36px;
+      padding-bottom: 16px;
     }
     #viewModal .doc-preview-paper.doc-preview-paper--generalclearance .doc-preview-generalclearance-signing {
       display: grid;
       justify-items: center;
-      row-gap: 34px;
+      row-gap: 20px;
       text-align: center;
     }
     #viewModal .doc-preview-paper.doc-preview-paper--generalclearance .doc-preview-generalclearance-signature {
@@ -1300,15 +1309,16 @@ if ($certificateLaunchTab === 'manual' && $certificateLaunchDocument === 'barang
     }
     #viewModal .doc-preview-paper.doc-preview-paper--generalclearance .doc-preview-footer {
       width: 58%;
-      margin: 86px auto 0;
+      position: absolute;
+      left: 50%;
+      bottom: 10px;
+      transform: translateX(-50%);
+      margin: 0;
       font-size: .76rem;
       text-align: center;
       font-style: italic;
       color: #6b7280;
       line-height: 1.35;
-    }
-    #viewModal .doc-preview-paper.doc-preview-paper--generalclearance .doc-preview-generalclearance-footer-area--noqr + .doc-preview-footer {
-      margin-top: 34px;
     }
     #viewModal .doc-preview-paper.doc-preview-paper--generalclearance .doc-preview-qr {
       left: 50%;
@@ -1328,7 +1338,7 @@ if ($certificateLaunchTab === 'manual' && $certificateLaunchDocument === 'barang
     }
     #viewModal .doc-preview-paper.doc-preview-paper--goodmoral.doc-preview-paper--ftjs {
       min-height: 1220px;
-      padding-bottom: 68px;
+      padding-bottom: 124px;
     }
     #viewModal .doc-preview-paper.doc-preview-paper--goodmoral.doc-preview-paper--ftjs .doc-preview-goodmoral-office {
       margin-top: 10px;
@@ -1349,60 +1359,94 @@ if ($certificateLaunchTab === 'manual' && $certificateLaunchDocument === 'barang
       margin-bottom: 10px;
     }
     #viewModal .doc-preview-paper.doc-preview-paper--goodmoral.doc-preview-paper--ftjs .doc-preview-footer-area--ftjs {
-      grid-template-columns: 1fr minmax(280px, 1fr) 96px;
-      column-gap: 16px;
-      padding-top: 12px;
-    }
-    #viewModal .doc-preview-paper.doc-preview-paper--goodmoral.doc-preview-paper--ftjs .doc-preview-signature--ftjs {
-      margin-bottom: 6px;
-    }
-    #viewModal .doc-preview-paper.doc-preview-paper--goodmoral.doc-preview-paper--ftjs .doc-preview-signature--ftjs .name,
-    #viewModal .doc-preview-paper.doc-preview-paper--goodmoral.doc-preview-paper--ftjs .doc-preview-ftjs-witness .name {
-      min-width: 0;
-      width: 100%;
-      margin-top: 0;
-      padding-top: 6px;
-      border-top: 1px solid #374151;
-      font-size: 1rem;
-      font-weight: 800;
-      text-align: center;
+      display: block;
+      padding-top: 0;
     }
     #viewModal .doc-preview-paper.doc-preview-paper--goodmoral.doc-preview-paper--ftjs .doc-preview-ftjs-signing {
       display: grid;
-      justify-items: center;
-      row-gap: 6px;
-      text-align: center;
+      justify-items: stretch;
+      row-gap: 2px;
+      position: absolute;
+      right: 108px;
+      bottom: 300px;
+      width: 248px;
+      margin: 0;
       font-size: .92rem;
-      margin-top: -8px;
+      text-align: center;
+    }
+    #viewModal .doc-preview-paper.doc-preview-paper--goodmoral.doc-preview-paper--ftjs .doc-preview-ftjs-block {
+      display: grid;
+      justify-items: center;
+      row-gap: 2px;
+      width: 100%;
+    }
+    #viewModal .doc-preview-paper.doc-preview-paper--goodmoral.doc-preview-paper--ftjs .doc-preview-ftjs-name {
+      width: 100%;
+      font-size: 1rem;
+      font-weight: 800;
+      line-height: 1.2;
+      text-align: center;
+      text-decoration: underline;
+      text-decoration-thickness: 1.5px;
+      text-underline-offset: 4px;
+    }
+    #viewModal .doc-preview-paper.doc-preview-paper--goodmoral.doc-preview-paper--ftjs .doc-preview-ftjs-role {
+      font-size: .95rem;
+      line-height: 1.15;
+      font-style: italic;
+      text-align: center;
+    }
+    #viewModal .doc-preview-paper.doc-preview-paper--goodmoral.doc-preview-paper--ftjs .doc-preview-ftjs-date-line {
+      width: 100%;
+      margin-top: 6px;
+      text-align: center;
+    }
+    #viewModal .doc-preview-paper.doc-preview-paper--goodmoral.doc-preview-paper--ftjs .doc-preview-ftjs-date-line span {
+      display: inline-block;
+      min-width: 170px;
+      max-width: 100%;
+      font-weight: 700;
+      line-height: 1.1;
+      text-decoration: underline;
+      text-decoration-thickness: 1.5px;
+      text-underline-offset: 6px;
     }
     #viewModal .doc-preview-paper.doc-preview-paper--goodmoral.doc-preview-paper--ftjs .doc-preview-ftjs-witness-label,
-    #viewModal .doc-preview-paper.doc-preview-paper--goodmoral.doc-preview-paper--ftjs .doc-preview-ftjs-date {
-      font-weight: 700;
+    #viewModal .doc-preview-paper.doc-preview-paper--goodmoral.doc-preview-paper--ftjs .doc-preview-ftjs-date-label {
+      width: 100%;
       font-size: .88rem;
-    }
-    #viewModal .doc-preview-paper.doc-preview-paper--goodmoral.doc-preview-paper--ftjs .doc-preview-ftjs-date {
-      width: 96px;
-      padding-top: 6px;
-      border-top: 1px solid #374151;
       line-height: 1.1;
     }
-    #viewModal .doc-preview-paper.doc-preview-paper--goodmoral.doc-preview-paper--ftjs .doc-preview-ftjs-date span {
-      display: inline-block;
-      margin-top: 2px;
+    #viewModal .doc-preview-paper.doc-preview-paper--goodmoral.doc-preview-paper--ftjs .doc-preview-ftjs-date-label {
+      text-align: center;
     }
-    #viewModal .doc-preview-paper.doc-preview-paper--goodmoral.doc-preview-paper--ftjs .doc-preview-ftjs-witness div:last-child,
-    #viewModal .doc-preview-paper.doc-preview-paper--goodmoral.doc-preview-paper--ftjs .doc-preview-signature--ftjs div:last-child {
-      font-style: italic;
+    #viewModal .doc-preview-paper.doc-preview-paper--goodmoral.doc-preview-paper--ftjs .doc-preview-ftjs-witness-label {
+      margin: 14px 0 12px;
+      font-weight: 700;
+      font-size: .96rem;
+      text-align: center;
     }
     #viewModal .doc-preview-paper.doc-preview-paper--goodmoral.doc-preview-paper--ftjs .doc-preview-footer {
       width: 58%;
-      margin-top: 10px;
+      position: absolute;
+      left: 21%;
+      bottom: 10px;
+      margin: 0;
       font-size: .76rem;
+      text-align: center;
+    }
+    #viewModal .doc-preview-paper.doc-preview-paper--goodmoral.doc-preview-paper--ftjs .doc-preview-qr {
+      position: absolute;
+      right: 34px;
+      bottom: 56px;
+      width: 96px;
+      justify-self: auto;
+      align-self: auto;
     }
     #viewModal .doc-preview-paper.doc-preview-paper--goodmoral.doc-preview-paper--jail {
       min-height: 1188px;
       padding-top: 34px;
-      padding-bottom: 54px;
+      padding-bottom: 96px;
     }
     #viewModal .doc-preview-paper.doc-preview-paper--goodmoral.doc-preview-paper--jail .doc-preview-goodmoral-office {
       margin-top: 6px;
@@ -1464,8 +1508,8 @@ if ($certificateLaunchTab === 'manual' && $certificateLaunchDocument === 'barang
       margin-bottom: 6px;
     }
     #viewModal .doc-preview-paper.doc-preview-paper--goodmoral.doc-preview-paper--jail .doc-preview-footer-area {
-      margin-top: 28px;
-      padding-top: 18px;
+      margin-top: 18px;
+      padding-top: 12px;
       align-items: start;
     }
     #viewModal .doc-preview-paper.doc-preview-paper--goodmoral.doc-preview-paper--jail .doc-preview-issuedby {
@@ -1482,7 +1526,11 @@ if ($certificateLaunchTab === 'manual' && $certificateLaunchDocument === 'barang
     }
     #viewModal .doc-preview-paper.doc-preview-paper--goodmoral.doc-preview-paper--jail .doc-preview-footer {
       width: 72%;
-      margin-top: 18px;
+      position: absolute;
+      left: 50%;
+      bottom: 10px;
+      transform: translateX(-50%);
+      margin: 0;
       font-size: .8rem;
     }
     #viewModal .doc-preview-paper.doc-preview-paper--goodmoral .doc-preview-qr {
@@ -1601,13 +1649,13 @@ if ($certificateLaunchTab === 'manual' && $certificateLaunchDocument === 'barang
       min-width: 280px;
     }
     #viewModal .doc-preview-signature {
-      margin-top: 22px;
+      margin-top: 14px;
       display: grid;
       justify-items: end;
       color: #111827;
     }
     #viewModal .doc-preview-signature .name {
-      margin-top: 28px;
+      margin-top: 18px;
       font-weight: 700;
       border-top: 1px solid #1f2937;
       padding-top: 4px;
@@ -1996,11 +2044,10 @@ if ($certificateLaunchTab === 'manual' && $certificateLaunchDocument === 'barang
     <div id="docRequestsPanel" class="bg-white p-4 rounded-4 rounded-tl-0 shadow-sm border resident-masterlist-shell certificate-tracker-shell">
       <div class="admin-list-toolbar mb-3">
         <div class="admin-list-tabs">
-          <button type="button" class="btn btn-outline-primary btn-sm status-filter-btn stage-filter-btn active" data-stage-filter="">All</button>
-          <button type="button" class="btn btn-outline-secondary btn-sm status-filter-btn stage-filter-btn fw-semibold" data-stage-filter="barangay_id">Barangay ID <span class="tab-count" id="barangayIdTabCount">0</span></button>
-          <button type="button" class="btn btn-outline-secondary btn-sm status-filter-btn stage-filter-btn fw-semibold" data-stage-filter="pending">Pending <span class="tab-count" id="pendingTabCount">0</span></button>
-          <button type="button" class="btn btn-outline-secondary btn-sm status-filter-btn stage-filter-btn fw-semibold" data-stage-filter="release">Release <span class="tab-count" id="releaseTabCount">0</span></button>
-          <button type="button" class="btn btn-outline-secondary btn-sm status-filter-btn stage-filter-btn fw-semibold" data-stage-filter="completed">Completed</button>
+          <button type="button" class="btn btn-outline-primary btn-sm status-filter-btn stage-filter-btn active" data-stage-filter=""><?= $isIdIssuanceTrackerView ? 'ALL' : 'All' ?></button>
+          <button type="button" class="btn btn-outline-secondary btn-sm status-filter-btn stage-filter-btn fw-semibold" data-stage-filter="pending"><?= $isIdIssuanceTrackerView ? 'PENDING' : 'Pending' ?> <span class="tab-count" id="pendingTabCount">0</span></button>
+          <button type="button" class="btn btn-outline-secondary btn-sm status-filter-btn stage-filter-btn fw-semibold" data-stage-filter="release"><?= $isIdIssuanceTrackerView ? 'FOR PRINTING' : 'Release' ?> <span class="tab-count" id="releaseTabCount">0</span></button>
+          <button type="button" class="btn btn-outline-secondary btn-sm status-filter-btn stage-filter-btn fw-semibold" data-stage-filter="completed"><?= $isIdIssuanceTrackerView ? 'COMPLETED' : 'Completed' ?></button>
         </div>
 
         <div class="admin-list-actions">
