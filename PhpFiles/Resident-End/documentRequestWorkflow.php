@@ -2241,6 +2241,9 @@ if ($action === 'view_payment_proof') {
     }
 
     $mime = (string)(mime_content_type($absolute) ?: 'application/octet-stream');
+    header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
+    header('Pragma: no-cache');
+    header('Expires: 0');
     header('Content-Type: ' . $mime);
     header('Content-Disposition: inline; filename="' . basename($absolute) . '"');
     header('Content-Length: ' . filesize($absolute));

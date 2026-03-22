@@ -681,6 +681,7 @@ function dra_fetch_request_for_modal_fast(mysqli $conn, string $requestId): ?arr
         dra_select_or_null($conn, 'documentrequesttbl', 'resident_name', 'resident_name'),
         dra_select_or_null($conn, 'documentrequesttbl', 'document_type', 'document_type'),
         dra_select_or_null($conn, 'documentrequesttbl', 'purpose', 'purpose'),
+        dra_select_or_null($conn, 'documentrequesttbl', 'fee_amount', 'fee_amount'),
         dra_select_or_null($conn, 'documentrequesttbl', 'status_remarks', 'status_remarks'),
         dra_select_or_null($conn, 'documentrequesttbl', 'status_reason', 'status_reason'),
         dra_select_or_null($conn, 'documentrequesttbl', 'stage', 'stage'),
@@ -1315,6 +1316,71 @@ function dra_pick_longer_residency_duration(array $a, array $b): array {
     return dra_duration_total_months($a) >= dra_duration_total_months($b) ? $a : $b;
 }
 
+function dra_residency_start_display(string $startRaw, string $yearsRaw = '', string $monthsRaw = '', string $fallbackDurationRaw = ''): string {
+    $startRaw = trim($startRaw);
+    $startDisplay = '';
+    if ($startRaw !== '') {
+        if (preg_match('/^\d{4}-\d{2}$/', $startRaw)) {
+            try {
+                $startDisplay = (new DateTime($startRaw . '-01'))->format('F Y');
+            } catch (Throwable $ignored) {
+                $startDisplay = $startRaw;
+            }
+        } else {
+            try {
+                $startDisplay = (new DateTime($startRaw))->format('F Y');
+            } catch (Throwable $ignored) {
+                $startDisplay = $startRaw;
+            }
+        }
+    }
+
+    $years = trim($yearsRaw) !== '' ? max(0, (int)$yearsRaw) : null;
+    $months = trim($monthsRaw) !== '' ? max(0, (int)$monthsRaw) : null;
+    if ($years === null || $months === null) {
+        $parsedDuration = dra_parse_residency_duration_text($fallbackDurationRaw);
+        if (is_array($parsedDuration)) {
+            if ($years === null) {
+                $years = max(0, (int)($parsedDuration['years'] ?? 0));
+            }
+            if ($months === null) {
+                $months = max(0, (int)($parsedDuration['months'] ?? 0));
+            }
+        }
+    }
+
+    if ($startDisplay === '' && $years !== null && $months !== null) {
+        try {
+            $inferredStart = new DateTime('first day of this month');
+            $monthsToSubtract = ($years * 12) + $months;
+            if ($monthsToSubtract > 0) {
+                $inferredStart->modify('-' . $monthsToSubtract . ' months');
+            }
+            $startDisplay = $inferredStart->format('F Y');
+        } catch (Throwable $ignored) {
+            $startDisplay = '';
+        }
+    }
+
+    return trim($startDisplay);
+}
+
+function dra_residency_purpose_text(string $basePurpose, string $startRaw, string $yearsRaw = '', string $monthsRaw = '', string $fallbackDurationRaw = ''): string {
+    $purpose = trim((string)(preg_replace('/\s*\(\s*since\b[^)]*\)\s*$/i', '', $basePurpose) ?? $basePurpose));
+    if ($purpose === '' || strtoupper($purpose) === 'PURPOSE') {
+        $purpose = 'RESIDENCY VERIFICATION';
+    }
+
+    $startDisplay = dra_residency_start_display($startRaw, $yearsRaw, $monthsRaw, $fallbackDurationRaw);
+    $composed = $startDisplay !== ''
+        ? $purpose . ' (SINCE ' . $startDisplay . ')'
+        : $purpose;
+
+    return function_exists('mb_strtoupper')
+        ? (string)mb_strtoupper($composed, 'UTF-8')
+        : strtoupper($composed);
+}
+
 function dra_request_notice(array $requestRow, string $requestId, string $suffix): string {
     $docType = dra_humanize_document_type((string)($requestRow['document_type'] ?? ''));
     $rid = trim($requestId) !== '' ? trim($requestId) : trim((string)($requestRow['request_id'] ?? ''));
@@ -1331,6 +1397,86 @@ function dra_is_first_time_job_seeker(array $requestRow): bool {
     }
     $normalized = preg_replace('/[^a-z0-9]+/', '', $docType);
     return is_string($normalized) && strpos($normalized, 'firsttimejobseeker') !== false;
+}
+
+function dra_first_time_job_seeker_repeat_fee_amount(): float {
+    return 50.0;
+}
+
+function dra_has_prior_first_time_job_seeker_request(mysqli $conn, array $requestRow): bool {
+    if (!dr_table_exists($conn, 'documentrequesttbl')) {
+        return false;
+    }
+
+    $requestId = trim((string)($requestRow['request_id'] ?? ''));
+    $residentUserId = trim((string)($requestRow['resident_user_id'] ?? ''));
+    $residentId = trim((string)($requestRow['resident_id'] ?? ''));
+
+    $where = [];
+    $types = '';
+    $vals = [];
+
+    if ($residentUserId !== '' && dr_column_exists($conn, 'documentrequesttbl', 'resident_user_id')) {
+        $where[] = 'resident_user_id = ?';
+        $types .= 's';
+        $vals[] = $residentUserId;
+    }
+    if ($residentId !== '' && dr_column_exists($conn, 'documentrequesttbl', 'resident_id')) {
+        $where[] = 'resident_id = ?';
+        $types .= 's';
+        $vals[] = $residentId;
+    }
+    if (!$where) {
+        return false;
+    }
+
+    $orderCol = dr_column_exists($conn, 'documentrequesttbl', 'submitted_at')
+        ? 'submitted_at'
+        : (dr_column_exists($conn, 'documentrequesttbl', 'request_timestamp') ? 'request_timestamp' : 'request_id');
+
+    $sql = "
+        SELECT request_id, document_type
+        FROM documentrequesttbl
+        WHERE (" . implode(' OR ', $where) . ")
+    ";
+    if ($requestId !== '') {
+        $sql .= " AND request_id <> ?";
+        $types .= 's';
+        $vals[] = $requestId;
+    }
+    $sql .= " ORDER BY {$orderCol} DESC, request_id DESC LIMIT 50";
+
+    $stmt = $conn->prepare($sql);
+    if (!$stmt) {
+        return false;
+    }
+
+    $refs = [];
+    foreach ($vals as $i => $value) {
+        $refs[$i] = &$vals[$i];
+    }
+    array_unshift($refs, $types);
+    call_user_func_array([$stmt, 'bind_param'], $refs);
+    $stmt->execute();
+    $res = $stmt->get_result();
+    while ($prior = $res->fetch_assoc()) {
+        if (dra_is_first_time_job_seeker((array)$prior)) {
+            $stmt->close();
+            return true;
+        }
+    }
+    $stmt->close();
+
+    return false;
+}
+
+function dra_resolve_first_time_job_seeker_fee(mysqli $conn, array $requestRow): float {
+    if (!dra_is_first_time_job_seeker($requestRow)) {
+        return 0.0;
+    }
+    return dra_has_prior_first_time_job_seeker_request($conn, $requestRow)
+        ? dra_first_time_job_seeker_repeat_fee_amount()
+        : 0.0;
 }
 
 function dra_barangay_id_template_assets(): array {
@@ -1365,6 +1511,25 @@ function dra_has_barangay_id_template_assets(): bool {
 
 function dra_barangay_id_render_revision(): string {
     return 'r20260320bid08';
+}
+
+function dra_document_render_revision_tag(string $documentType): string {
+    if (dr_is_barangay_id_document_type($documentType) && dra_has_barangay_id_template_assets()) {
+        return dra_barangay_id_render_revision();
+    }
+
+    $docTypeToken = preg_replace('/[^a-z0-9]+/', '', strtolower(trim($documentType)));
+    if (is_string($docTypeToken) && strpos($docTypeToken, 'indigency') !== false) {
+        return 'r20260322in03';
+    }
+    if (is_string($docTypeToken) && strpos($docTypeToken, 'goodmoral') !== false) {
+        return 'r20260322gm01';
+    }
+    if (is_string($docTypeToken) && strpos($docTypeToken, 'residency') !== false) {
+        return 'r20260322rs01';
+    }
+
+    return 'r20260318ac';
 }
 
 function dra_requires_manual_issued_upload(array $requestRow): bool {
@@ -1975,10 +2140,14 @@ function dra_generate_issued_document(array $requestRow): ?string {
             if ($requestOfficerLine1 !== '' || $requestOfficerLine2 !== '' || $requestOfficerLine3 !== '') {
                 $formattedRequestOfficer = implode(' - ', array_filter([$requestOfficerLine1, $requestOfficerLine2, $requestOfficerLine3], static fn($value) => trim((string)$value) !== ''));
             } elseif ($submissionTargetType === 'institution') {
-                $attentionParts = array_values(array_filter([$institutionPerson, $institutionPosition], static fn($value) => trim((string)$value) !== ''));
-                $requestOfficerLine1 = $institutionName;
-                $requestOfficerLine2 = !empty($attentionParts) ? 'ATTN: ' . implode(', ', $attentionParts) : '';
-                $formattedRequestOfficer = implode(' - ', array_filter([$requestOfficerLine1, $requestOfficerLine2], static fn($value) => trim((string)$value) !== ''));
+                $institutionLines = array_values(array_filter(
+                    [$institutionPerson, $institutionPosition, $institutionName],
+                    static fn($value) => trim((string)$value) !== ''
+                ));
+                $requestOfficerLine1 = (string)($institutionLines[0] ?? '');
+                $requestOfficerLine2 = (string)($institutionLines[1] ?? '');
+                $requestOfficerLine3 = (string)($institutionLines[2] ?? '');
+                $formattedRequestOfficer = implode(' - ', $institutionLines);
             } elseif ($submissionTargetType === 'government_official') {
                 if ($governmentOfficial === '' && $requestOfficer !== '') {
                     $governmentOfficial = $requestOfficer;
@@ -2220,11 +2389,11 @@ function dra_generate_issued_document(array $requestRow): ?string {
         return null;
     }
 
-    $renderRevisionTag = $isBarangayId ? dra_barangay_id_render_revision() : 'r20260318ac';
+    $renderRevisionTag = dra_document_render_revision_tag($docType);
     $fileName = 'issued_' . preg_replace('/[^A-Za-z0-9_-]/', '', $requestId) . '_' . $renderRevisionTag . '_' . date('YmdHis') . '.pdf';
     $diskPath = $outDir . '/' . $fileName;
 
-    if ($isBusinessPermitClearance || $isGeneralPermitClearance || $isTricyclePermitClearance || $isRelationshipJailVisit) {
+    if ($isBusinessPermitClearance || $isGeneralPermitClearance || $isTricyclePermitClearance || $isRelationshipJailVisit || $isGoodMoral) {
         if (!class_exists('\\setasign\\Fpdi\\Fpdi')) {
             $autoloadPaths = [
                 __DIR__ . '/../../PhpFiles/PhpOffice/vendor/autoload.php',
@@ -2684,6 +2853,124 @@ function dra_generate_issued_document(array $requestRow): ?string {
                 return '/UnifiedFileAttachment/IssuedDocuments/Generated/' . $fileName;
             } catch (Throwable $e) {
                 error_log('[dra_generate_issued_document][barangay_id_template] ' . $e->getMessage());
+            }
+        }
+    }
+
+    if ($isGoodMoral) {
+        $templatePath = $baseDir . '/Resident-End/Certificates/DocumentIssuance/Certificate of Good Moral.pdf';
+        if (class_exists('\\setasign\\Fpdi\\Fpdi') && is_file($templatePath)) {
+            try {
+                $upperText = static function (string $value): string {
+                    $value = trim((string)(preg_replace('/\s+/u', ' ', $value) ?? $value));
+                    if ($value === '') {
+                        return '';
+                    }
+                    return function_exists('mb_strtoupper') ? (string)mb_strtoupper($value, 'UTF-8') : strtoupper($value);
+                };
+                $displayLocalAddress = $stripTemplateTokens($address !== '' ? $address : $applicantResidenceAddress);
+                $displayLocalAddress = (string)(preg_replace('/\s*,?\s*barangay\s+san\s+jose\s*,?\s*(?:montalban|rodriguez)\s*,?\s*rizal\s*$/i', '', $displayLocalAddress) ?? $displayLocalAddress);
+                $displayLocalAddress = (string)(preg_replace('/\s*,?\s*san\s+jose\s*,?\s*(?:montalban|rodriguez)\s*,?\s*rizal\s*$/i', '', $displayLocalAddress) ?? $displayLocalAddress);
+                $displayLocalAddress = trim((string)(preg_replace('/\s*,\s*,+/', ', ', $displayLocalAddress) ?? $displayLocalAddress), " ,");
+                $addressPrefix = $displayLocalAddress !== '' ? (rtrim($upperText($displayLocalAddress), ',') . ', ') : '';
+                $displayName = $upperText($fullName !== '' ? $fullName : 'RESIDENT');
+                $requestPurpose = $upperText((string)($payload['request_purpose'] ?? $purpose));
+                if ($requestPurpose === '') {
+                    $requestPurpose = 'LEGAL';
+                }
+
+                $pdf = new \setasign\Fpdi\Fpdi();
+                $pageCount = $pdf->setSourceFile($templatePath);
+                if ($pageCount <= 0) {
+                    throw new RuntimeException('Template PDF has no readable pages.');
+                }
+                $tpl = $pdf->importPage(1);
+                $size = $pdf->getTemplateSize($tpl);
+                $pageWidth = (float)($size['width'] ?? 215.9);
+                $pageHeight = (float)($size['height'] ?? 279.4);
+                $orientation = $pageWidth > $pageHeight ? 'L' : 'P';
+                $pdf->AddPage($orientation, [$pageWidth, $pageHeight]);
+                $pdf->useTemplate($tpl);
+                $pdf->SetAutoPageBreak(false);
+                $pdf->SetFillColor(255, 255, 255);
+                $pdf->SetTextColor(0, 0, 0);
+
+                $maskBox = static function (
+                    \setasign\Fpdi\Fpdi $pdfInstance,
+                    float $x,
+                    float $y,
+                    float $w,
+                    float $h,
+                    float $padX = 0.8,
+                    float $padY = 0.45
+                ): void {
+                    $pdfInstance->Rect(
+                        max(0.0, $x - $padX),
+                        max(0.0, $y - $padY),
+                        max(1.0, $w + ($padX * 2)),
+                        max(1.0, $h + ($padY * 2)),
+                        'F'
+                    );
+                };
+
+                // Replace the template token block with finalized Good Moral content.
+                $maskBox($pdf, 22.0, 95.0, 170.0, 100.0, 1.0, 0.8);
+                $pdf->SetFont('Arial', 'B', 9.6);
+                $pdf->SetXY(24.0, 97.0);
+                $pdf->Cell(90.0, 5.2, 'TO WHOM IT MAY CONCERN:', 0, 1, 'L');
+
+                $pdf->SetFont('Arial', '', 9.7);
+                $pdf->SetXY(28.5, 111.0);
+                $pdf->MultiCell(
+                    160.0,
+                    4.8,
+                    '      This is to certify ' . ($displayName !== '' ? $displayName : 'RESIDENT') . ', resident of ' . $addressPrefix . 'BARANGAY SAN JOSE, RODRIGUEZ, RIZAL is personally known to be as a person of GOOD MORAL CHARACTER, PEACEFUL and LAW-ABIDING CITIZEN of THE COMMUNITY.',
+                    0,
+                    'J'
+                );
+
+                $pdf->SetXY(28.5, 140.0);
+                $pdf->MultiCell(
+                    160.0,
+                    4.8,
+                    '      This further certifies that he/she is not a member, nor has joined a subversive society organization against the government.',
+                    0,
+                    'J'
+                );
+
+                $pdf->SetXY(28.5, 162.5);
+                $pdf->MultiCell(
+                    160.0,
+                    4.8,
+                    '      This certification is being issued upon the request of the above-named person to be used for his/her application of ' . $requestPurpose . ' purposes only.',
+                    0,
+                    'J'
+                );
+
+                $pdf->SetXY(28.5, 184.5);
+                $pdf->MultiCell(
+                    160.0,
+                    4.8,
+                    '      Issued this ' . $issuedAsDocx . ' at the office of the Punong Barangay, Barangay San Jose, Montalban, Rizal',
+                    0,
+                    'L'
+                );
+
+                if ($orNo !== '') {
+                    $maskBox($pdf, 52.5, 223.0, 24.0, 6.0, 0.35, 0.25);
+                    $pdf->SetFont('Arial', '', 10.2);
+                    $pdf->SetXY(53.0, 221.8);
+                    $pdf->Cell(23.0, 5.8, strtoupper($orNo), 0, 0, 'L');
+                }
+
+                if ($allowQr && is_file($qrDiskPath)) {
+                    $pdf->Image($qrDiskPath, 100.0, 247.0, 15.0, 15.0);
+                }
+
+                $pdf->Output('F', $diskPath);
+                return '/UnifiedFileAttachment/IssuedDocuments/Generated/' . $fileName;
+            } catch (Throwable $e) {
+                error_log('[dra_generate_issued_document][good_moral_fpdi] ' . $e->getMessage());
             }
         }
     }
@@ -3655,7 +3942,7 @@ function dra_generate_issued_document(array $requestRow): ?string {
             $pdf->Cell(0, 7, 'TANGGAPAN NG PUNONG BARANGAY', 0, 1, 'C');
             $pdf->SetFont($indigencyFont, 'B', 12);
             $pdf->Cell(0, 6, 'CERTIFICATE OF INDIGENCY', 0, 1, 'C');
-            $pdf->Ln(4);
+            $pdf->Ln(2);
         } elseif ($isResidency) {
             $pdf->SetFont($indigencyFont, 'B', 17);
             $pdf->Cell(0, 7, 'TANGGAPAN NG PUNONG BARANGAY', 0, 1, 'C');
@@ -4019,17 +4306,19 @@ function dra_generate_issued_document(array $requestRow): ?string {
             $governmentOfficial = $normalizeTemplateValue((string)($payload['government_official_other'] ?? ''));
         }
         if ($submissionTargetType === 'institution') {
-            $institutionParts = [$institutionName];
-            $attentionParts = array_values(array_filter([$institutionPerson, $institutionPosition], static fn($value) => trim((string)$value) !== ''));
-            if (!empty($attentionParts)) {
-                $institutionParts[] = implode(', ', $attentionParts);
-            }
-            $requestOfficer = implode(' - ', array_filter($institutionParts, static fn($value) => trim((string)$value) !== ''));
+            $institutionLines = array_values(array_filter(
+                [$institutionPerson, $institutionPosition, $institutionName],
+                static fn($value) => trim((string)$value) !== ''
+            ));
+            $requestOfficer = implode(' - ', $institutionLines);
             if ($requestOfficerLine1 === '') {
-                $requestOfficerLine1 = trim((string)$institutionName);
+                $requestOfficerLine1 = trim((string)($institutionLines[0] ?? ''));
             }
-            if ($requestOfficerLine2 === '' && !empty($attentionParts)) {
-                $requestOfficerLine2 = trim((string)implode(', ', $attentionParts));
+            if ($requestOfficerLine2 === '') {
+                $requestOfficerLine2 = trim((string)($institutionLines[1] ?? ''));
+            }
+            if ($requestOfficerLine3 === '') {
+                $requestOfficerLine3 = trim((string)($institutionLines[2] ?? ''));
             }
         } elseif ($submissionTargetType === 'government_official') {
             if ($governmentOfficial === '' && $requestOfficer !== '') {
@@ -4049,8 +4338,9 @@ function dra_generate_issued_document(array $requestRow): ?string {
         $yearsResidency = trim((string)($payload['years_of_residency'] ?? ''));
         $monthsResidency = trim((string)($payload['months_of_residency'] ?? ''));
         if ($isResidency) {
+            $requestResidentUserId = trim((string)($requestRow['resident_user_id'] ?? ''));
             $requestResidentId = trim((string)($requestRow['resident_id'] ?? ''));
-            $profile = dra_resident_profile_snapshot($conn, $requestResidentId, $requestResidentId);
+            $profile = dra_resident_profile_snapshot($conn, $requestResidentUserId, $requestResidentId);
             $fromStartYm = dra_parse_residency_start_ym((string)($profile['barangay_residency'] ?? ''));
             $fromText = dra_parse_residency_duration_text((string)($profile['residency_duration'] ?? ''));
 
@@ -4073,6 +4363,14 @@ function dra_generate_issued_document(array $requestRow): ?string {
                 $yearsResidency = (string)max(0, intdiv($totalMonths, 12));
                 $monthsResidency = (string)max(0, $totalMonths % 12);
             }
+
+            $requestPurpose = dra_residency_purpose_text(
+                $requestPurpose,
+                trim((string)($payload['barangay_residency'] ?? $profile['barangay_residency'] ?? '')),
+                $yearsResidency,
+                $monthsResidency,
+                trim((string)($payload['residency_duration'] ?? $profile['residency_duration'] ?? ''))
+            );
         }
         $residencyParts = [];
         if ($yearsResidency !== '') {
@@ -4092,6 +4390,7 @@ function dra_generate_issued_document(array $requestRow): ?string {
         $firstTimeJobSeekerHonorific = 'MR./MS.';
         $firstTimeJobSeekerResidencySince = '';
         $firstTimeJobSeekerSignedDate = 'Date';
+        $firstTimeJobSeekerSignedDateDisplay = 'MM/DD/YYYY';
         if ($isFirstTimeJobSeeker) {
             $sexValue = strtolower(trim((string)($payload['sex'] ?? $payload['gender'] ?? '')));
             if ($sexValue !== '') {
@@ -4151,11 +4450,16 @@ function dra_generate_issued_document(array $requestRow): ?string {
                     $firstTimeJobSeekerSignedDate = $signedDateRaw;
                 }
             }
+            $firstTimeJobSeekerSignedDateDisplay = trim($firstTimeJobSeekerSignedDate);
+            if ($firstTimeJobSeekerSignedDateDisplay === '' || strcasecmp($firstTimeJobSeekerSignedDateDisplay, 'Date') === 0) {
+                $firstTimeJobSeekerSignedDateDisplay = 'MM/DD/YYYY';
+            }
         }
 
         if ($isIndigency) {
+            $toBlockY = max($pdf->GetY() + 0.5, 54.0);
             $pdf->SetFont($indigencyFont, 'B', 12);
-            $pdf->SetXY(22, 78);
+            $pdf->SetXY(22, $toBlockY);
             $pdf->Cell(14, 7, 'TO', 0, 0, 'L');
             $pdf->Cell(4, 7, ':', 0, 0, 'C');
             $line1 = trim((string)$requestOfficerLine1);
@@ -4167,21 +4471,17 @@ function dra_generate_issued_document(array $requestRow): ?string {
                 $line2 = (string)($parts[1] ?? '');
                 $line3 = (string)($parts[2] ?? '');
             }
-            if ($line1 === '' && $line2 === '' && $line3 === '') {
-                $pdf->Line(39, 84, 106, 84);
-                $pdf->Line(39, 90, 106, 90);
-                $pdf->Line(39, 96, 106, 96);
-                $pdf->SetY(96);
+            $offLines = array_values(array_filter([$line1, $line2, $line3], static fn($value) => trim((string)$value) !== ''));
+            if (empty($offLines)) {
+                $pdf->Line(39, $toBlockY + 6, 106, $toBlockY + 6);
+                $pdf->Line(39, $toBlockY + 12, 106, $toBlockY + 12);
+                $pdf->Line(39, $toBlockY + 18, 106, $toBlockY + 18);
+                $pdf->SetY($toBlockY + 18);
             } else {
                 $pdf->SetFont($indigencyFont, 'B', 11);
-                $offLines = [$line1, $line2, $line3];
                 foreach ($offLines as $line) {
                     $pdf->SetX(39);
-                    if ($line === '') {
-                        $pdf->Cell(0, 7, '', 0, 1, 'L');
-                    } else {
-                        $pdf->Cell(0, 7, strtoupper($line), 0, 1, 'L');
-                    }
+                    $pdf->Cell(0, 7, strtoupper($line), 0, 1, 'L');
                 }
             }
         } else {
@@ -4189,31 +4489,24 @@ function dra_generate_issued_document(array $requestRow): ?string {
             $pdf->SetX(18);
             $pdf->Cell(0, 7, 'TO WHOM IT MAY CONCERN:', 0, 1, 'L');
         }
-        $pdf->Ln(7);
+        $pdf->Ln($isIndigency ? 3.5 : 7.0);
         $pdf->SetFont($indigencyFont, '', 12);
         if ($isIndigency) {
             $writeRichParagraph(
                 [
                     ['text' => 'This is to certify that ', 'bold' => false],
                     ['text' => $fullName, 'bold' => true],
-                    ['text' => ', resident of ' . $address, 'bold' => false],
-                ],
-                7,
-                18,
-                10,
-                $indigencyFont,
-                12
-            );
-            $writeRichParagraph(
-                [
-                    ['text' => 'Barangay San Jose, Rodriguez, Rizal', 'bold' => true],
+                    ['text' => ', resident of ', 'bold' => false],
+                    ['text' => $addressWithBarangay !== '' ? $addressWithBarangay : 'Barangay San Jose, Rodriguez, Rizal', 'bold' => true],
                     ['text' => ' belongs to the one of the indigent families of this Barangay. The Income of this family is barely enough to meet their day-to-day needs.', 'bold' => false],
                 ],
                 7,
                 18,
-                10,
+                12,
                 $indigencyFont,
-                12
+                12,
+                18.0,
+                true
             );
         } elseif ($isResidency) {
             $writeIndentedParagraph(
@@ -4275,7 +4568,7 @@ function dra_generate_issued_document(array $requestRow): ?string {
                 ],
                 7,
                 18,
-                10,
+                12,
                 $indigencyFont,
                 12,
                 18.0,
@@ -4432,9 +4725,11 @@ function dra_generate_issued_document(array $requestRow): ?string {
                 ],
                 7,
                 18,
-                10,
+                12,
                 $indigencyFont,
-                12
+                12,
+                18.0,
+                true
             );
         } elseif ($isResidency) {
             $writeRichParagraph(
@@ -4531,15 +4826,17 @@ function dra_generate_issued_document(array $requestRow): ?string {
             ],
             7,
             18,
-            10,
+            ($isIndigency ? 12 : 10),
             $indigencyFont,
             12,
             18.0,
-            $isRelationshipJailVisit
+            ($isRelationshipJailVisit || $isIndigency)
         );
+        $bodyBottomY = $pdf->GetY();
+        $metaBottomY = $bodyBottomY;
 
         if ($isGoodMoral) {
-            $metaY = 186.0;
+            $metaY = min($bodyBottomY + 10.0, 186.0);
             $labelX = 18.0;
             $labelW = 34.0;
             $lineX1 = 52.0;
@@ -4567,9 +4864,10 @@ function dra_generate_issued_document(array $requestRow): ?string {
                 $pdf->SetFont($indigencyFont, '', 11);
                 $pdf->Cell($lineX2 - $lineX1, 6, $orNo, 0, 0, 'L');
             }
+            $metaBottomY = $metaY + 6.0;
 
         } elseif ($isResidency) {
-            $metaY = 196.0;
+            $metaY = min($bodyBottomY + 10.0, 196.0);
             $labelX = 18.0;
             $labelW = 34.0;
             $lineX1 = 52.0;
@@ -4595,6 +4893,7 @@ function dra_generate_issued_document(array $requestRow): ?string {
                 $pdf->SetFont($indigencyFont, '', 11);
                 $pdf->Cell($lineX2 - $lineX1, 6, $orNo, 0, 0, 'L');
             }
+            $metaBottomY = $metaY + 6.0;
         } elseif ($isRelationshipJailVisit) {
             $metaY = min(max($pdf->GetY() + 4.0, 170.0), 186.0);
             $labelX = 18.0;
@@ -4622,8 +4921,9 @@ function dra_generate_issued_document(array $requestRow): ?string {
                 $pdf->SetFont($indigencyFont, '', 11);
                 $pdf->Cell($lineX2 - $lineX1, 6, $orNo, 0, 0, 'L');
             }
+            $metaBottomY = $metaY + 6.0;
         } elseif ($isCohabitation && !$cohabitationHasChildren) {
-            $metaY = 196.0;
+            $metaY = min($bodyBottomY + 10.0, 196.0);
             $labelX = 18.0;
             $labelW = 34.0;
             $lineX1 = 52.0;
@@ -4649,8 +4949,9 @@ function dra_generate_issued_document(array $requestRow): ?string {
                 $pdf->SetFont($indigencyFont, '', 11);
                 $pdf->Cell($lineX2 - $lineX1, 6, $orNo, 0, 0, 'L');
             }
+            $metaBottomY = $metaY + 6.0;
         } elseif ($isCohabitation && $cohabitationHasChildren) {
-            $metaY = 196.0;
+            $metaY = min($bodyBottomY + 10.0, 196.0);
             $labelX = 18.0;
             $labelW = 34.0;
             $lineX1 = 52.0;
@@ -4676,6 +4977,7 @@ function dra_generate_issued_document(array $requestRow): ?string {
                 $pdf->SetFont($indigencyFont, '', 11);
                 $pdf->Cell($lineX2 - $lineX1, 6, $orNo, 0, 0, 'L');
             }
+            $metaBottomY = $metaY + 6.0;
         }
 
         if ($isFirstTimeJobSeeker) {
@@ -4683,57 +4985,87 @@ function dra_generate_issued_document(array $requestRow): ?string {
                 $pdf->Image($qrDiskPath, $fixedQrX, $fixedQrY, $fixedQrSize, $fixedQrSize);
             }
 
-            $signBaseY = 168.0;
-            $signX = 126.0;
-            $signW = 46.0;
-            $pdf->Line($signX, $signBaseY, $signX + $signW, $signBaseY);
-            $pdf->SetFont($indigencyFont, 'B', 10);
-            $pdf->SetXY($signX, $signBaseY + 1.5);
-            $pdf->Cell($signW, 5, 'HON. GLENN S. EVANGELISTA', 0, 1, 'C');
-            $pdf->SetFont($indigencyFont, 'I', 9);
-            $pdf->SetXY($signX, $signBaseY + 6.5);
-            $pdf->Cell($signW, 4.5, 'Punong Barangay', 0, 1, 'C');
-            $pdf->Line($signX + 8, $signBaseY + 17, $signX + $signW - 8, $signBaseY + 17);
-            $pdf->SetFont($indigencyFont, 'B', 9);
-            $pdf->SetXY($signX, $signBaseY + 18.5);
-            $pdf->Cell($signW, 4, $firstTimeJobSeekerSignedDate, 0, 1, 'C');
+            $drawFtjsSignatureBlock = static function (
+                FPDF $pdfInstance,
+                float $x,
+                float $y,
+                float $w,
+                string $name,
+                string $title,
+                string $dateText
+            ) use ($indigencyFont): void {
+                $pdfInstance->SetFont($indigencyFont, 'BU', 10.5);
+                $pdfInstance->SetXY($x, $y);
+                $pdfInstance->Cell($w, 5.2, $name, 0, 1, 'C');
+                $pdfInstance->SetFont($indigencyFont, 'I', 9.6);
+                $pdfInstance->SetXY($x, $y + 5.6);
+                $pdfInstance->Cell($w, 4.5, $title, 0, 1, 'C');
+                $pdfInstance->SetFont($indigencyFont, 'U', 9.2);
+                $pdfInstance->SetXY($x, $y + 14.5);
+                $pdfInstance->Cell($w, 4.4, $dateText, 0, 1, 'C');
+                $pdfInstance->SetFont($indigencyFont, '', 9.2);
+                $pdfInstance->SetXY($x, $y + 19.0);
+                $pdfInstance->Cell($w, 4.0, 'Date', 0, 1, 'C');
+            };
 
-            $pdf->SetFont($indigencyFont, 'B', 9);
-            $pdf->SetXY($signX, $signBaseY + 24);
-            $pdf->Cell($signW, 4, 'Witnesses by:', 0, 1, 'C');
+            $signBaseY = min(max($bodyBottomY + 6.0, 148.0), 158.0);
+            $signW = 54.0;
+            $signX = 138.0;
+            $drawFtjsSignatureBlock(
+                $pdf,
+                $signX,
+                $signBaseY,
+                $signW,
+                'HON. GLENN S. EVANGELISTA',
+                'Punong Barangay',
+                $firstTimeJobSeekerSignedDateDisplay
+            );
 
-            $witnessBaseY = $signBaseY + 34;
-            $pdf->Line($signX, $witnessBaseY, $signX + $signW, $witnessBaseY);
-            $pdf->SetFont($indigencyFont, 'B', 10);
-            $pdf->SetXY($signX, $witnessBaseY + 1.5);
-            $pdf->Cell($signW, 5, 'MINERVA D. QUITA', 0, 1, 'C');
-            $pdf->SetFont($indigencyFont, 'I', 9);
-            $pdf->SetXY($signX, $witnessBaseY + 6.5);
-            $pdf->Cell($signW, 4.5, 'Barangay Secretary', 0, 1, 'C');
-            $pdf->Line($signX + 8, $witnessBaseY + 17, $signX + $signW - 8, $witnessBaseY + 17);
-            $pdf->SetFont($indigencyFont, 'B', 9);
-            $pdf->SetXY($signX, $witnessBaseY + 18.5);
-            $pdf->Cell($signW, 4, $firstTimeJobSeekerSignedDate, 0, 1, 'C');
+            $pdf->SetFont($indigencyFont, 'B', 9.6);
+            $pdf->SetXY($signX, $signBaseY + 29.5);
+            $pdf->Cell($signW, 4.2, 'Witnesses by:', 0, 1, 'C');
 
+            $witnessBaseY = $signBaseY + 39.0;
+            $drawFtjsSignatureBlock(
+                $pdf,
+                $signX,
+                $witnessBaseY,
+                $signW,
+                'MINERVA D. QUITA',
+                'Barangay Secretary',
+                $firstTimeJobSeekerSignedDateDisplay
+            );
+
+            $ftjsFooterNoteY = max(246.0, $pdf->GetPageHeight() - 16.0);
+            $ftjsFooterNoteW = 100.0;
+            $ftjsFooterNoteX = (($pdf->GetPageWidth() - $ftjsFooterNoteW) / 2.0);
             $pdf->SetFont($indigencyFont, 'I', 8);
-            $pdf->SetXY(46, 249);
-            $pdf->MultiCell(100, 4, "This certification is only valid for 1 year from the issuance.\nCheck the qr code to verify the authenticity of this document.", 0, 'C');
+            $pdf->SetXY($ftjsFooterNoteX, $ftjsFooterNoteY);
+            $pdf->MultiCell($ftjsFooterNoteW, 4, "This certification is only valid for 1 year from the issuance.\nCheck the qr code to verify the authenticity of this document.", 0, 'C');
         } else {
             // Issued by + signatory blocks aligned to the same baseline.
-            $signBaseY = ($isGoodMoral || $isResidency || $isCohabitation) ? 230.0 : 214.0;
+            if ($isIndigency) {
+                $signBaseY = min(max($bodyBottomY + 18.0, 192.0), 214.0);
+            } elseif ($isGoodMoral) {
+                $signBaseY = min(max($metaBottomY + 6.0, 184.0), 220.0);
+            } elseif ($isResidency) {
+                $signBaseY = min(max($metaBottomY + 6.0, 184.0), 220.0);
+            } elseif ($isCohabitation && !$cohabitationHasChildren) {
+                $signBaseY = min(max($metaBottomY + 6.0, 186.0), 224.0);
+            } elseif ($isCohabitation && $cohabitationHasChildren) {
+                $signBaseY = min(max($metaBottomY + 6.0, 188.0), 226.0);
+            } else {
+                $signBaseY = 214.0;
+            }
             $issuedByY = $signBaseY + 9;
             $issuedByTitleY = $signBaseY + 15;
-            $footerNoteY = 258.0;
+            $footerNoteY = max(246.0, $pdf->GetPageHeight() - 16.0);
             if ($isCohabitation && !$cohabitationHasChildren) {
-                $signBaseY = 232.0;
-                $issuedByY = 240.0;
-                $issuedByTitleY = 246.0;
-                $footerNoteY = 260.0;
+                $issuedByY = $signBaseY + 8.0;
+                $issuedByTitleY = $signBaseY + 14.0;
             } elseif ($isCohabitation && $cohabitationHasChildren) {
-                $signBaseY = 234.0;
-                $issuedByY = 242.0;
-                $issuedByTitleY = 248.0;
-                $footerNoteY = 262.0;
+                $issuedByY = $signBaseY + 8.0;
+                $issuedByTitleY = $signBaseY + 14.0;
             }
 
             // Issued by block (lower-left)
@@ -4808,8 +5140,9 @@ function dra_generate_issued_document(array $requestRow): ?string {
         $pdf->Cell(0, 6, 'Verify via QR or: ' . $verifyUrl, 0, 1, 'L');
     }
 
-    $pdf->SetY(250);
-    $pdf->Line(18, 250, 88, 250);
+    $genericSignY = min(max($pdf->GetY() + 18.0, 214.0), 250.0);
+    $pdf->SetY($genericSignY);
+    $pdf->Line(18, $genericSignY, 88, $genericSignY);
     $pdf->SetFont($fontFace, 'B', 11);
     $pdf->Cell(70, 7, 'HON. GLENN S. EVANGELISTA', 0, 1, 'L');
     $pdf->SetFont($fontFace, '', 11);
@@ -6267,6 +6600,7 @@ if ($action === 'list') {
         dra_select_or_null($conn, 'documentrequesttbl', 'resident_name', 'resident_name'),
         dra_select_or_null($conn, 'documentrequesttbl', 'document_type', 'document_type'),
         dra_select_or_null($conn, 'documentrequesttbl', 'purpose', 'purpose'),
+        dra_select_or_null($conn, 'documentrequesttbl', 'fee_amount', 'fee_amount'),
         dra_select_or_null($conn, 'documentrequesttbl', 'status_remarks', 'status_remarks'),
         dra_select_or_null($conn, 'documentrequesttbl', 'status_reason', 'status_reason'),
         dra_select_or_null($conn, 'documentrequesttbl', 'stage', 'stage'),
@@ -6412,8 +6746,21 @@ if ($action === 'list') {
             dr_sync_stage_from_status_lookup($conn, $row);
         }
         $row['stage_label'] = dr_stage_label((string)$row['stage']);
-        $row['fee_amount'] = $isBarangayIdDocument ? 0.0 : null;
-        $row['_doc_type_for_fee'] = trim((string)($row['document_type'] ?? ''));
+        $isBarangayIdDocumentRow = strcasecmp(trim((string)($row['document_type'] ?? '')), 'Barangay ID') === 0;
+        $storedFeeAmount = $row['fee_amount'] ?? null;
+        if ($isBarangayIdDocumentRow) {
+            $row['fee_amount'] = 0.0;
+            $row['_doc_type_for_fee'] = '';
+        } elseif (dra_is_first_time_job_seeker($row)) {
+            $row['fee_amount'] = dra_resolve_first_time_job_seeker_fee($conn, $row);
+            $row['_doc_type_for_fee'] = '';
+        } elseif ($storedFeeAmount !== null && $storedFeeAmount !== '' && is_numeric((string)$storedFeeAmount)) {
+            $row['fee_amount'] = (float)$storedFeeAmount;
+            $row['_doc_type_for_fee'] = '';
+        } else {
+            $row['fee_amount'] = null;
+            $row['_doc_type_for_fee'] = trim((string)($row['document_type'] ?? ''));
+        }
         if ($isFinanceList) {
             // Keep finance list response lean; detailed request payload is not needed on initial list render.
             $row['payload'] = [];
@@ -6468,7 +6815,7 @@ if ($action === 'list') {
         $docTypesForFee = [];
         foreach ($items as $row) {
             $docTypeForFee = trim((string)($row['_doc_type_for_fee'] ?? ''));
-            if (!$isBarangayIdDocument && $docTypeForFee !== '') {
+            if ($docTypeForFee !== '') {
                 $docTypesForFee[$docTypeForFee] = true;
             }
         }
@@ -6476,12 +6823,14 @@ if ($action === 'list') {
         foreach ($items as &$row) {
             $docTypeForFee = trim((string)($row['_doc_type_for_fee'] ?? ''));
             if ($docTypeForFee !== '') {
-                if (!array_key_exists($docTypeForFee, $feeByDocType)) {
-                    $feeByDocType[$docTypeForFee] = dr_get_fee_amount_for_document_type($conn, $docTypeForFee);
+                if (dra_is_first_time_job_seeker($row)) {
+                    $row['fee_amount'] = dra_resolve_first_time_job_seeker_fee($conn, $row);
+                } else {
+                    if (!array_key_exists($docTypeForFee, $feeByDocType)) {
+                        $feeByDocType[$docTypeForFee] = dr_get_fee_amount_for_document_type($conn, $docTypeForFee);
+                    }
+                    $row['fee_amount'] = $feeByDocType[$docTypeForFee];
                 }
-                $row['fee_amount'] = $feeByDocType[$docTypeForFee];
-            } else {
-                $row['fee_amount'] = null;
             }
             unset($row['_doc_type_for_fee']);
         }
@@ -6527,7 +6876,9 @@ if ($action === 'get_request') {
     }
     $row['stage_label'] = dr_stage_label((string)($row['stage'] ?? ''));
     $storedFeeAmount = $row['fee_amount'] ?? null;
-    if ($storedFeeAmount !== null && is_numeric((string)$storedFeeAmount)) {
+    if (dra_is_first_time_job_seeker($row)) {
+        $row['fee_amount'] = dra_resolve_first_time_job_seeker_fee($conn, $row);
+    } elseif ($storedFeeAmount !== null && is_numeric((string)$storedFeeAmount)) {
         $row['fee_amount'] = (float)$storedFeeAmount;
     } else {
         $row['fee_amount'] = dr_get_fee_amount_for_document_type($conn, (string)($row['document_type'] ?? ''));
@@ -6884,9 +7235,7 @@ if ($action === 'view_issued') {
         ? [DR_STAGE_READY_FOR_CLAIM, DR_STAGE_COMPLETED]
         : [DR_STAGE_PAYMENT_VERIFIED, DR_STAGE_READY_FOR_CLAIM, DR_STAGE_COMPLETED];
     $shouldHaveQr = ($verificationCode !== '' && in_array($stage, $qrEligibleStages, true));
-    $renderRevisionTag = (dr_is_barangay_id_document_type((string)($row['document_type'] ?? '')) && dra_has_barangay_id_template_assets())
-        ? dra_barangay_id_render_revision()
-        : 'r20260318ac';
+    $renderRevisionTag = dra_document_render_revision_tag((string)($row['document_type'] ?? ''));
     $issuedBaseName = strtolower(basename((string)$publicPath));
     $isGeneratedIssuedPath = strpos((string)$publicPath, '/UnifiedFileAttachment/IssuedDocuments/Generated/') === 0;
     $isCurrentRenderRevision = ($issuedBaseName !== '' && strpos($issuedBaseName, strtolower($renderRevisionTag)) !== false);
@@ -6975,7 +7324,9 @@ if ($action === 'personnel_approve') {
     }
 
     $defaultFee = dr_get_fee_amount_for_document_type($conn, (string)($row['document_type'] ?? ''));
-    if ($isFirstTimeJobSeeker || $isBarangayIdDocument) {
+    if ($isFirstTimeJobSeeker) {
+        $defaultFee = dra_resolve_first_time_job_seeker_fee($conn, $row);
+    } elseif ($isBarangayIdDocument) {
         $defaultFee = 0.0;
     }
     if (!$isFirstTimeJobSeeker && $isClearanceDoc) {
@@ -7088,42 +7439,71 @@ if ($action === 'interview_pass') {
         dr_respond_json(422, ['success' => false, 'message' => 'Request is not currently waiting for interview approval.']);
     }
 
-    $verificationCode = trim((string)($row['verification_code'] ?? ''));
-    if ($verificationCode === '') {
-        $verificationCode = strtoupper(bin2hex(random_bytes(8)));
+    $editedPreview = [];
+    $editedPreviewRaw = trim((string)($_POST['edited_preview'] ?? ''));
+    if ($editedPreviewRaw !== '') {
+        $decoded = json_decode($editedPreviewRaw, true);
+        if (is_array($decoded)) {
+            $editedPreview = $decoded;
+        }
     }
-    $qrCodePath = '/UnifiedFileAttachment/IssuedDocuments/QR/qr_' . preg_replace('/[^A-Za-z0-9_-]/', '', $requestId) . '.png';
-    $issuedPath = dra_generate_issued_document_safe(array_merge((array)$row, [
-        'verification_code' => $verificationCode,
-        'fee_amount' => 0,
-    ]));
-    if ($issuedPath === null || trim((string)$issuedPath) === '') {
-        dr_respond_json(500, ['success' => false, 'message' => 'Interview passed, but issued document generation failed.']);
+    if (!empty($editedPreview)) {
+        dra_apply_preview_edits($conn, $requestId, $row, $editedPreview);
+        $row = dr_fetch_request($conn, $requestId) ?? $row;
     }
 
-    $updated = dr_update_stage($conn, $requestId, DR_STAGE_READY_FOR_CLAIM, [
+    $resolvedFeeAmount = dra_resolve_first_time_job_seeker_fee($conn, $row);
+    $isFreeRequest = ((float)$resolvedFeeAmount <= 0.0);
+    $nextStage = $isFreeRequest ? DR_STAGE_READY_FOR_CLAIM : DR_STAGE_FOR_PAYMENT;
+    $patch = [
         'status_reason' => null,
         'personnel_user_id' => $currentUserId,
         'personnel_decision_at' => dr_now(),
-        'fee_amount' => 0,
-        'ready_at' => dr_now(),
-        'verification_code' => $verificationCode,
-        'qr_code_path' => $qrCodePath,
-        'issued_file_path' => (string)$issuedPath,
-    ]);
+        'fee_amount' => $resolvedFeeAmount,
+    ];
+
+    if ($isFreeRequest) {
+        $verificationCode = trim((string)($row['verification_code'] ?? ''));
+        if ($verificationCode === '') {
+            $verificationCode = strtoupper(bin2hex(random_bytes(8)));
+        }
+        $qrCodePath = '/UnifiedFileAttachment/IssuedDocuments/QR/qr_' . preg_replace('/[^A-Za-z0-9_-]/', '', $requestId) . '.png';
+        $issuedPath = dra_generate_issued_document_safe(array_merge((array)$row, [
+            'verification_code' => $verificationCode,
+            'fee_amount' => 0,
+        ]));
+        if ($issuedPath === null || trim((string)$issuedPath) === '') {
+            dr_respond_json(500, ['success' => false, 'message' => 'Interview passed, but issued document generation failed.']);
+        }
+        $patch['ready_at'] = dr_now();
+        $patch['verification_code'] = $verificationCode;
+        $patch['qr_code_path'] = $qrCodePath;
+        $patch['issued_file_path'] = (string)$issuedPath;
+    }
+
+    $updated = dr_update_stage($conn, $requestId, $nextStage, $patch);
 
     if (!$updated) {
         dr_respond_json(500, ['success' => false, 'message' => 'Unable to mark interview as passed.']);
     }
 
-    dra_send_notification_deferred(
-        $conn,
-        $updated,
-        'First Time Job Seeker Ready for Release',
-        dra_request_notice($updated, $requestId, 'approved after interview and is now ready for release.')
-    );
+    if ($isFreeRequest) {
+        dra_send_notification_deferred(
+            $conn,
+            $updated,
+            'First Time Job Seeker Ready for Release',
+            dra_request_notice($updated, $requestId, 'approved after interview and is now ready for release.')
+        );
+    } else {
+        dra_send_notification_deferred(
+            $conn,
+            $updated,
+            'First Time Job Seeker Approved for Payment',
+            dra_request_notice($updated, $requestId, 'approved after interview and is now waiting for payment.')
+        );
+    }
 
-    try { insertUnifiedAuditLog($conn, $currentUserId, $currentUserRole, 'Document Requests', 'document_request', $requestId, 'Interview Pass', 'stage', DR_STAGE_FOR_INTERVIEW, DR_STAGE_READY_FOR_CLAIM, (string)($row['document_type'] ?? '')); } catch (Throwable $__e) {}
+    try { insertUnifiedAuditLog($conn, $currentUserId, $currentUserRole, 'Document Requests', 'document_request', $requestId, 'Interview Pass', 'stage', DR_STAGE_FOR_INTERVIEW, $nextStage, (string)($row['document_type'] ?? '')); } catch (Throwable $__e) {}
     dr_respond_json(200, ['success' => true, 'request' => $updated]);
 }
 

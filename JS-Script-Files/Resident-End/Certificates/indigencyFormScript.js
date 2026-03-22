@@ -187,9 +187,8 @@
       const institutionText = String(institutionName?.value || "").trim();
       const personText = String(institutionPerson?.value || "").trim();
       const positionText = String(institutionPosition?.value || "").trim();
-      const attentionText = [personText, positionText].filter(Boolean).join(", ");
       if (!institutionText) return "";
-      return attentionText ? `${institutionText} - ATTN: ${attentionText}` : institutionText;
+      return [personText, positionText, institutionText].filter(Boolean).join(" - ");
     }
 
     return "";

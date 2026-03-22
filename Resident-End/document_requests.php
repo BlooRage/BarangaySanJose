@@ -963,7 +963,7 @@ require_once __DIR__ . '/includes/resident_access_guard.php';
         const id = String(btn.getAttribute('data-proof') || '');
         const row = itemById.get(id);
         if (!row || !row.payment_proof_path) return;
-        const proofUrl = `${endpoint}?action=view_payment_proof&request_id=${encodeURIComponent(id)}`;
+        const proofUrl = `${endpoint}?action=view_payment_proof&request_id=${encodeURIComponent(id)}&_ts=${Date.now()}`;
         openFileViewerModal({
           title: 'Payment Proof',
           viewUrl: proofUrl,
@@ -1217,7 +1217,7 @@ require_once __DIR__ . '/includes/resident_access_guard.php';
           const id = String(btn.getAttribute('data-proof') || '');
           const row = itemById.get(id);
           if (!row || !row.payment_proof_path) return;
-          const proofUrl = `${endpoint}?action=view_payment_proof&request_id=${encodeURIComponent(id)}`;
+          const proofUrl = `${endpoint}?action=view_payment_proof&request_id=${encodeURIComponent(id)}&_ts=${Date.now()}`;
           openFileViewerModal({
             title: 'Payment Proof',
             viewUrl: proofUrl,

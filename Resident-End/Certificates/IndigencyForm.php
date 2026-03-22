@@ -363,7 +363,7 @@ $fullAddress = htmlspecialchars(implode(', ', $fullAddressParts), ENT_QUOTES, 'U
                                 <input type="text" name="institution_person" id="institutionPerson" placeholder="Optional">
                             </div>
                             <div>
-                                <label class="top-label" for="institutionPosition">Position</label>
+                                <label class="top-label" for="institutionPosition">Position / Department</label>
                                 <input type="text" name="institution_position" id="institutionPosition" placeholder="Optional">
                             </div>
                         </div>
@@ -388,7 +388,7 @@ $fullAddress = htmlspecialchars(implode(', ', $fullAddressParts), ENT_QUOTES, 'U
             'officials' => $governmentOfficials,
         ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?>;
     </script>
-    <script src="<?= htmlspecialchars($baseUrl) ?>/JS-Script-Files/Resident-End/Certificates/indigencyFormScript.js?v=20260307-14"></script>
+    <script src="<?= htmlspecialchars($baseUrl) ?>/JS-Script-Files/Resident-End/Certificates/indigencyFormScript.js?v=20260322-01"></script>
     <script>
         window.toggleIndigencyRecipientRows = function (value) {
             var governmentRow = document.getElementById('governmentOfficialRow');
