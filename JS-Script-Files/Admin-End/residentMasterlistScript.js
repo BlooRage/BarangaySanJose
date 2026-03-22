@@ -526,6 +526,12 @@ document.addEventListener("DOMContentLoaded", () => {
         for (const field of filterKeys) {
           const allowed = activeModalFilters[field];
           if (Array.isArray(allowed) && allowed.length) {
+            if (field === "sector_membership") {
+              const memberships = parseSectorsFromCsv(res[field]).map((value) => value.toLowerCase());
+              const hasMembership = allowed.some((value) => memberships.includes(String(value || "").trim().toLowerCase()));
+              if (!hasMembership) return false;
+              continue;
+            }
             if (!allowed.includes(String(res[field]))) return false;
           }
         }

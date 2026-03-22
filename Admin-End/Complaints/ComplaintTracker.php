@@ -120,6 +120,10 @@ require_once __DIR__ . "/../includes/admin_guard.php";
                         <input type="text" id="searchInput" class="form-control" placeholder="Complaint ID, complainant, subject, complaint type">
                         <span class="input-group-text bg-white"><i class="fas fa-search"></i></span>
                     </div>
+                    <button class="btn btn-outline-secondary btn-icon admin-filter" type="button" data-bs-toggle="modal" data-bs-target="#modalComplaintFilter" id="btnComplaintFilter" title="Filter" aria-label="Filter">
+                        <i class="fas fa-filter"></i>
+                        <span class="visually-hidden">Filter</span>
+                    </button>
                     <button class="btn btn-outline-secondary btn-icon" type="button" data-bs-toggle="modal" data-bs-target="#modalTableColumns" id="btnComplaintColumns" title="Columns" aria-label="Columns">
                         <i class="fa-solid fa-sliders"></i>
                         <span class="visually-hidden">Columns</span>
@@ -171,6 +175,49 @@ require_once __DIR__ . "/../includes/admin_guard.php";
             </div>
         </div>
     </main>
+</div>
+
+<div class="modal fade" id="modalComplaintFilter" tabindex="-1" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content p-4">
+            <div class="modal-header border-0">
+                <h5 class="modal-title fw-bold">Filter Complaints</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <hr>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <label class="fw-bold small mb-2 d-block">Date Range</label>
+                    <div class="row g-2">
+                        <div class="col-6">
+                            <label class="form-label small mb-1" for="complaintFilterDateFrom">From</label>
+                            <input type="date" class="form-control" id="complaintFilterDateFrom">
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label small mb-1" for="complaintFilterDateTo">To</label>
+                            <input type="date" class="form-control" id="complaintFilterDateTo">
+                        </div>
+                    </div>
+                </div>
+                <div class="mb-3">
+                    <label class="fw-bold small mb-2">Type of Complaint</label>
+                    <div class="d-flex flex-column gap-2" id="complaintFilterTypeList"></div>
+                </div>
+                <div class="mb-3">
+                    <label class="fw-bold small mb-2">Area Number</label>
+                    <div class="d-flex flex-column gap-2" id="complaintFilterAreaList"></div>
+                </div>
+                <div class="mb-0">
+                    <label class="fw-bold small mb-2">Sector Membership</label>
+                    <div class="d-flex flex-column gap-2" id="complaintFilterSectorList"></div>
+                </div>
+            </div>
+            <div class="modal-footer border-0">
+                <button type="button" class="btn btn-outline-secondary" id="btnComplaintFilterReset">Reset</button>
+                <button type="button" class="btn btn-primary" id="btnComplaintFilterApply">Apply Filter</button>
+            </div>
+        </div>
+    </div>
 </div>
 
 <div class="modal fade" id="modalTableColumns" tabindex="-1" aria-hidden="true">
@@ -265,9 +312,8 @@ require_once __DIR__ . "/../includes/admin_guard.php";
     };
 </script>
 <script src="../../JS-Script-Files/Admin-End/tableColumnsGeneric.js?v=20260215-1"></script>
-<script src="../../JS-Script-Files/Admin-End/complaintTracker.js?v=20260311-1"></script>
+<script src="../../JS-Script-Files/Admin-End/complaintTracker.js?v=20260322-1"></script>
 </body>
 </html>
-
 
 

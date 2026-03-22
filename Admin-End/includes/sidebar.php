@@ -55,6 +55,7 @@ $isAreaManagementActive = in_array($current, $areaManagementPages);
 $isUserMgmtActive = in_array($current, $userMgmtPages);
 $isAdminMgmtActive = in_array($current, $adminMgmtPages);
 $isReportActive = in_array($current, $reportPages);
+$isStatisticsActive = ($current === 'AdminDashboard.php');
 $reportModule = strtolower(trim((string)($_GET['module'] ?? '')));
 $areaManagementTab = strtolower(trim((string)($_GET['tab'] ?? 'summary')));
 $areaManagementArea = trim((string)($_GET['area'] ?? ''));
@@ -65,6 +66,8 @@ $certificateDocument = strtolower(trim((string)($_GET['document'] ?? '')));
 $certificateStage = strtolower(trim((string)($_GET['stage'] ?? '')));
 $certificateEntry = strtolower(trim((string)($_GET['entry'] ?? '')));
 $certificateFilterDocument = trim((string)($_GET['filter_document'] ?? ''));
+$certificateFilterDocumentToken = strtolower(trim($certificateFilterDocument));
+$certificateFilterDocumentKey = preg_replace('/[^a-z0-9]+/', '', $certificateFilterDocumentToken) ?? '';
 $isIdIssuanceManualActive = $current === 'CertificateTracker.php'
     && $certificateTab === 'manual'
     && $certificateDocument === 'barangay_id';
@@ -76,8 +79,112 @@ $isIdIssuanceTrackerActive = $current === 'CertificateTracker.php'
         || strcasecmp($certificateFilterDocument, 'Barangay ID') === 0
     );
 $isIdIssuanceActive = $isIdIssuanceTrackerActive || $isIdIssuanceManualActive;
-$isCertActive = in_array($current, $certPages) && !$isIdIssuanceActive;
-$isCertificateTrackerActive = $current === 'CertificateTracker.php' && !$isIdIssuanceActive;
+$isClearanceIssuanceActive = $current === 'CertificateTracker.php'
+    && !$isIdIssuanceActive
+    && in_array($certificateFilterDocumentToken, ['__clearances__', '__clearance__', 'clearance', 'clearances'], true);
+$isClearanceBusinessPermitActive = $current === 'CertificateTracker.php'
+    && !$isIdIssuanceActive
+    && (
+        $certificateFilterDocumentToken === '__clr_business_permit__'
+        || $certificateFilterDocumentKey === 'barangayclearanceforbusinesspermit'
+        || $certificateFilterDocumentKey === 'clearanceforbusinesspermit'
+    );
+$isClearanceTricyclePermitActive = $current === 'CertificateTracker.php'
+    && !$isIdIssuanceActive
+    && (
+        $certificateFilterDocumentToken === '__clr_tricycle_permit__'
+        || $certificateFilterDocumentKey === 'barangayclearancefortricyclepermit'
+        || $certificateFilterDocumentKey === 'clearancefortricyclepermit'
+    );
+$isClearanceElectricPermitActive = $current === 'CertificateTracker.php'
+    && !$isIdIssuanceActive
+    && (
+        $certificateFilterDocumentToken === '__clr_electric_permit__'
+        || $certificateFilterDocumentKey === 'barangayclearanceforelectricalpermit'
+        || $certificateFilterDocumentKey === 'clearanceforelectricalpermit'
+        || $certificateFilterDocumentKey === 'clearanceforelectricpermit'
+    );
+$isClearanceWaterPermitActive = $current === 'CertificateTracker.php'
+    && !$isIdIssuanceActive
+    && (
+        $certificateFilterDocumentToken === '__clr_water_permit__'
+        || $certificateFilterDocumentKey === 'barangayclearanceforwaterpermit'
+        || $certificateFilterDocumentKey === 'clearanceforwaterpermit'
+    );
+$isClearanceResidentialPermitActive = $current === 'CertificateTracker.php'
+    && !$isIdIssuanceActive
+    && (
+        $certificateFilterDocumentToken === '__clr_residential_permit__'
+        || $certificateFilterDocumentKey === 'barangayclearanceforresidentialpermit'
+        || $certificateFilterDocumentKey === 'clearanceforresidentialpermit'
+    );
+$isClearanceCommercialPermitActive = $current === 'CertificateTracker.php'
+    && !$isIdIssuanceActive
+    && (
+        $certificateFilterDocumentToken === '__clr_commercial_permit__'
+        || $certificateFilterDocumentKey === 'barangayclearanceforcommercialpermit'
+        || $certificateFilterDocumentKey === 'clearanceforcommercialpermit'
+    );
+$isClearanceIssuanceSectionActive = $isClearanceIssuanceActive
+    || $isClearanceBusinessPermitActive
+    || $isClearanceTricyclePermitActive
+    || $isClearanceElectricPermitActive
+    || $isClearanceWaterPermitActive
+    || $isClearanceResidentialPermitActive
+    || $isClearanceCommercialPermitActive;
+$isBusinessMonitoringActive = $current === 'BusinessMonitoring.php'
+    || (
+        $current === 'CertificateTracker.php'
+        && !$isIdIssuanceActive
+        && (
+            in_array($certificateFilterDocumentToken, ['__business__', 'business', 'business_monitoring', 'businessclearance'], true)
+            || strcasecmp($certificateFilterDocument, 'Barangay Clearance for Business Permit') === 0
+        )
+    );
+$isCertificateIssuanceSectionActive = $current === 'CertificateTracker.php'
+    && !$isIdIssuanceActive
+    && !$isClearanceIssuanceSectionActive
+    && !$isBusinessMonitoringActive;
+$isCertificateCohabitationActive = $isCertificateIssuanceSectionActive
+    && (
+        $certificateFilterDocumentToken === '__cert_cohabitation__'
+        || $certificateFilterDocumentKey === 'certificateofcohabitation'
+    );
+$isCertificateGoodMoralActive = $isCertificateIssuanceSectionActive
+    && (
+        $certificateFilterDocumentToken === '__cert_good_moral__'
+        || $certificateFilterDocumentKey === 'certificateofgoodmoral'
+        || $certificateFilterDocumentKey === 'goodmoral'
+    );
+$isCertificateJailVisitationActive = $isCertificateIssuanceSectionActive
+    && (
+        $certificateFilterDocumentToken === '__cert_jail_visit__'
+        || in_array($certificateFilterDocumentKey, [
+            'certificateofrelationshipforjailvisitation',
+            'certificateforjailvisitation',
+            'jailvisitation',
+        ], true)
+    );
+$isCertificateFirstTimeJobSeekerActive = $isCertificateIssuanceSectionActive
+    && (
+        $certificateFilterDocumentToken === '__cert_first_time_job_seeker__'
+        || in_array($certificateFilterDocumentKey, [
+            'firsttimejobseekercertificate',
+            'certificateforfirsttimejobseeker',
+            'firsttimejobseeker',
+        ], true)
+    );
+$isCertificateResidencyActive = $isCertificateIssuanceSectionActive
+    && (
+        $certificateFilterDocumentToken === '__cert_residency__'
+        || in_array($certificateFilterDocumentKey, ['certificateofresidency', 'certificateofresidence', 'residency'], true)
+    );
+$isCertificateIndigencyActive = $isCertificateIssuanceSectionActive
+    && (
+        $certificateFilterDocumentToken === '__cert_indigency__'
+        || $certificateFilterDocumentKey === 'certificateofindigency'
+        || $certificateFilterDocumentKey === 'indigency'
+    );
 $isFinanceFeesActive = $current === 'FinancePayments.php' && $financeSection === 'fees';
 $isFinanceCashbookActive = $current === 'FinancePayments.php' && $financeSection === 'cashbook';
 $isFinanceTrackerActive = $current === 'FinancePayments.php' && !in_array($financeSection, ['fees', 'cashbook'], true);
@@ -94,6 +201,7 @@ $isContentToolsSectionActive = $current === 'Contents.php';
 
 $adminDisplayName = "Admin User";
 $adminPosition = "Administrator";
+$adminProfileImageUrl = appUrl('Images/Profile-Placeholder.png');
 
 function sb_format_position_label(string $systemRole, string $positionAccess, string $department, string $areaNumber): string
 {
@@ -130,6 +238,32 @@ function sb_format_position_label(string $systemRole, string $positionAccess, st
     }
 
     return $positionAccess;
+}
+
+if (!function_exists('sb_to_public_profile_path')) {
+    function sb_to_public_profile_path(string $path): string
+    {
+        $normalized = trim(str_replace("\\", "/", $path));
+        if ($normalized === '') {
+            return '';
+        }
+
+        $normalized = preg_replace('#/+#', '/', $normalized) ?: $normalized;
+        $normalized = ltrim($normalized, '/');
+
+        $rootPrefix = trim(appRootPath(), '/');
+        if ($rootPrefix !== '' && stripos($normalized, $rootPrefix . '/') === 0) {
+            $normalized = substr($normalized, strlen($rootPrefix) + 1);
+        }
+
+        $marker = 'UnifiedFileAttachment/';
+        $markerPos = stripos($normalized, $marker);
+        if ($markerPos !== false) {
+            $normalized = substr($normalized, $markerPos);
+        }
+
+        return $normalized !== '' ? appUrl($normalized) : '';
+    }
 }
 
 if (!empty($_SESSION['user_id']) && isset($conn) && $conn instanceof mysqli) {
@@ -173,6 +307,31 @@ if (!empty($_SESSION['user_id']) && isset($conn) && $conn instanceof mysqli) {
             );
         }
         $stmtInfo->close();
+    }
+
+    $stmtAvatar = $conn->prepare("
+        SELECT uf.file_path
+        FROM unifiedfileattachmenttbl uf
+        INNER JOIN documenttypelookuptbl dt
+          ON dt.document_type_id = uf.document_type_id
+        WHERE uf.source_type = 'OFFICIAL_PROFILE'
+          AND uf.source_id = ?
+          AND LOWER(dt.document_type_name) = LOWER('2x2 Picture')
+          AND dt.document_category = 'OfficialProfiling'
+        ORDER BY COALESCE(uf.updated_at, uf.upload_timestamp) DESC, uf.attachment_id DESC
+        LIMIT 1
+    ");
+    if ($stmtAvatar) {
+        $stmtAvatar->bind_param("s", $_SESSION['user_id']);
+        $stmtAvatar->execute();
+        $avatar = $stmtAvatar->get_result()->fetch_assoc();
+        $stmtAvatar->close();
+        if ($avatar && !empty($avatar['file_path'])) {
+            $resolvedAvatarPath = sb_to_public_profile_path((string)$avatar['file_path']);
+            if ($resolvedAvatarPath !== '') {
+                $adminProfileImageUrl = $resolvedAvatarPath;
+            }
+        }
     }
 }
 ?>
@@ -243,28 +402,31 @@ if (!empty($_SESSION['user_id']) && isset($conn) && $conn instanceof mysqli) {
     <ul class="list-unstyled ps-0 flex-grow-1 mb-0">
 
       <li class="mb-1 mt-2 text-muted small fw-semibold px-2">Home</li>
-
-      <!-- DASHBOARD -->
       <li class="mb-2">
         <a href="<?= htmlspecialchars(appUrl('Admin-End/AdminDashboard.php')) ?>"
-           class="btn btn-toggle d-flex align-items-center gap-2 rounded <?= $current == 'AdminDashboard.php' ? 'active' : '' ?>"
-           style="<?= $current == 'AdminDashboard.php' ? 'outline: none; box-shadow: none;' : '' ?>">
-          <i class="fas fa-chart-area"></i> Dashboard
+           class="btn btn-toggle d-flex align-items-center gap-2 rounded <?= $isStatisticsActive ? 'active' : '' ?>"
+           style="<?= $isStatisticsActive ? 'outline: none; box-shadow: none;' : '' ?>">
+          <i class="fas fa-house"></i> Dashboard
+        </a>
+      </li>
+
+      <li class="mb-1 mt-2 text-muted small fw-semibold px-2">Office of the Barangay</li>
+      <li class="mb-2">
+        <a href="<?= htmlspecialchars(appUrl('Admin-End/Appointments/AppointmentTracker.php')) ?>"
+           class="btn btn-toggle d-flex align-items-center gap-2 rounded <?= $isAppointmentActive ? 'active' : '' ?>"
+           style="<?= $isAppointmentActive ? 'outline: none; box-shadow: none;' : '' ?>">
+          <i class="fas fa-calendar-check"></i> Appointments
         </a>
       </li>
 
       <li class="mb-1 mt-2 text-muted small fw-semibold px-2">Resident Management</li>
-
-      <!-- RESIDENT MANAGEMENT -->
       <li class="mb-1">
         <button class="btn btn-toggle d-flex align-items-center gap-2 rounded <?= $isResidentMgmtActive ? '' : 'collapsed' ?>"
                 data-bs-toggle="collapse"
                 data-bs-target="#resident-mgmt-collapse"
-                aria-expanded="<?= $isResidentMgmtActive ? 'true' : 'false' ?>"
-                style="<?= $isResidentMgmtActive ? 'outline: none; box-shadow: none;' : '' ?>">
+                aria-expanded="<?= $isResidentMgmtActive ? 'true' : 'false' ?>">
           <i class="fas fa-user-group"></i> Resident Profiling
         </button>
-
         <div class="collapse <?= $isResidentMgmtActive ? 'show' : '' ?>" id="resident-mgmt-collapse">
           <ul class="btn-toggle-nav list-unstyled fw-normal pb-1 small">
             <li>
@@ -294,7 +456,6 @@ if (!empty($_SESSION['user_id']) && isset($conn) && $conn instanceof mysqli) {
           </ul>
         </div>
       </li>
-      <!-- HOUSEHOLD PROFILING is collapsible button with 2 sub-buttons householdprofiling.php and headofthefamilyverification.php -->
       <li class="mb-1">
         <button class="btn btn-toggle d-flex align-items-center gap-2 rounded <?= $isHouseholdProfilingActive ? '' : 'collapsed' ?>"
                 data-bs-toggle="collapse"
@@ -317,230 +478,15 @@ if (!empty($_SESSION['user_id']) && isset($conn) && $conn instanceof mysqli) {
               </a>
             </li>
           </ul>
-      </li>
-      <li class="mb-1">
-        <button class="btn btn-toggle d-flex align-items-center gap-2 rounded <?= $isAppointmentActive ? '' : 'collapsed' ?>"
-                data-bs-toggle="collapse"
-                data-bs-target="#appointment-collapse"
-                aria-expanded="<?= $isAppointmentActive ? 'true' : 'false' ?>">
-          <i class="fas fa-calendar-check"></i> Appointments
-        </button>
-
-        <div class="collapse <?= $isAppointmentActive ? 'show' : '' ?>" id="appointment-collapse">
-          <ul class="btn-toggle-nav list-unstyled fw-normal pb-1 small">
-            <li>
-              <a href="<?= htmlspecialchars(appUrl('Admin-End/Appointments/AppointmentTracker.php')) ?>"
-                 class="link-dark rounded <?= $current == 'AppointmentTracker.php' ? 'active' : '' ?>">
-                Tracker
-              </a>
-            </li>
-          </ul>
-        </div>
-      </li>
-
-      <!-- CERTIFICATE ISSUANCE (Resident Management) -->
-      <li class="mb-2">
-        <button class="btn btn-toggle d-flex align-items-center gap-2 rounded <?= $isCertActive ? '' : 'collapsed' ?>"
-                data-bs-toggle="collapse"
-                data-bs-target="#cert-collapse"
-                aria-expanded="<?= $isCertActive ? 'true' : 'false' ?>">
-          <i class="fas fa-file-circle-check"></i> Document Issuance
-        </button>
-
-        <div class="collapse <?= $isCertActive ? 'show' : '' ?>" id="cert-collapse">
-          <ul class="btn-toggle-nav list-unstyled fw-normal pb-1 small">
-            <li>
-              <a href="<?= htmlspecialchars(appUrl('Admin-End/Certificates/CertificateTracker.php')) ?>"
-                 class="link-dark rounded <?= $isCertificateTrackerActive ? 'active' : '' ?>">
-                Tracker
-              </a>
-            </li>
-          </ul>
-        </div>
-      </li>
-
-      <li class="mb-2">
-        <button class="btn btn-toggle d-flex align-items-center gap-2 rounded <?= $isIdIssuanceActive ? '' : 'collapsed' ?>"
-                data-bs-toggle="collapse"
-                data-bs-target="#id-issuance-collapse"
-                aria-expanded="<?= $isIdIssuanceActive ? 'true' : 'false' ?>">
-          <i class="fas fa-id-card"></i> ID ISSUANCE
-        </button>
-
-        <div class="collapse <?= $isIdIssuanceActive ? 'show' : '' ?>" id="id-issuance-collapse">
-          <ul class="btn-toggle-nav list-unstyled fw-normal pb-1 small">
-            <li>
-              <a href="<?= htmlspecialchars(appUrl('Admin-End/Certificates/CertificateTracker.php?entry=id_issuance')) ?>"
-                 class="link-dark rounded <?= $isIdIssuanceTrackerActive ? 'active' : '' ?>">
-                Tracker
-              </a>
-            </li>
-            <li>
-              <a href="<?= htmlspecialchars(appUrl('Admin-End/Certificates/CertificateTracker.php?tab=manual&document=barangay_id')) ?>"
-                 class="link-dark rounded <?= $isIdIssuanceManualActive ? 'active' : '' ?>">
-                Manual Issuance
-              </a>
-            </li>
-          </ul>
-        </div>
-      </li>
-
-      <li class="mb-1 mt-2 text-muted small fw-semibold px-2">Finance Department</li>
-      <li class="mb-1">
-        <button class="btn btn-toggle d-flex align-items-center gap-2 rounded <?= $isFinanceActive ? '' : 'collapsed' ?>"
-                data-bs-toggle="collapse"
-                data-bs-target="#finance-collapse"
-                aria-expanded="<?= $isFinanceActive ? 'true' : 'false' ?>">
-          <i class="fas fa-money-check-alt"></i> Finance Payments
-        </button>
-
-        <div class="collapse <?= $isFinanceActive ? 'show' : '' ?>" id="finance-collapse">
-          <ul class="btn-toggle-nav list-unstyled fw-normal pb-1 small">
-            <li>
-              <a href="<?= htmlspecialchars(appUrl('Admin-End/Certificates/FinancePayments.php')) ?>"
-                 class="link-dark rounded <?= $isFinanceTrackerActive ? 'active' : '' ?>">
-                Payment Tracker
-              </a>
-            </li>
-            <li>
-              <a href="<?= htmlspecialchars(appUrl('Admin-End/Certificates/FinancePayments.php')) ?>?section=cashbook"
-                 class="link-dark rounded <?= $isFinanceCashbookActive ? 'active' : '' ?>">
-                Cashbook
-              </a>
-            </li>
-            <li>
-              <a href="<?= htmlspecialchars(appUrl('Admin-End/Certificates/FinancePayments.php')) ?>?section=fees"
-                 class="link-dark rounded <?= $isFinanceFeesActive ? 'active' : '' ?>">
-                Fee Management
-              </a>
-            </li>
-          </ul>
-        </div>
-      </li>
-
-      <li class="mb-1 mt-2 text-muted small fw-semibold px-2">e-Blotter Management</li>
-      <li class="mb-2">
-        <a href="<?= htmlspecialchars(appUrl('Admin-End/Blotter/BlotterForm.php')) ?>"
-           class="btn btn-toggle d-flex align-items-center gap-2 rounded <?= $current == 'BlotterForm.php' ? 'active' : '' ?>"
-           style="<?= $current == 'BlotterForm.php' ? 'outline: none; box-shadow: none;' : '' ?>">
-          <i class="fas fa-file-pen"></i> Log New Incident
-        </a>
-      </li>
-      <li class="mb-1">
-        <button class="btn btn-toggle d-flex align-items-center gap-2 rounded <?= $isBlotterActive ? '' : 'collapsed' ?>"
-                data-bs-toggle="collapse"
-                data-bs-target="#blotter-tools-collapse"
-                aria-expanded="<?= $isBlotterActive ? 'true' : 'false' ?>">
-          <i class="fas fa-toolbox"></i> e-Blotter Tools
-        </button>
-
-        <div class="collapse <?= $isBlotterActive ? 'show' : '' ?>" id="blotter-tools-collapse">
-          <ul class="btn-toggle-nav list-unstyled fw-normal pb-1 small">
-            <li>
-              <a href="<?= htmlspecialchars(appUrl('Admin-End/Blotter/BlotterTracker.php')) ?>"
-                 class="link-dark rounded <?= $current == 'BlotterTracker.php' ? 'active' : '' ?>">
-                Tracker
-              </a>
-            </li>
-            <li>
-              <a href="<?= htmlspecialchars(appUrl('Admin-End/Blotter/ReviewQueue.php')) ?>"
-                 class="link-dark rounded <?= $current == 'ReviewQueue.php' ? 'active' : '' ?>">
-                Review Queue
-              </a>
-            </li>
-          </ul>
-        </div>
-      </li>
-
-      <li class="mb-1 mt-2 text-muted small fw-semibold px-2">Complaints and Grievances</li>
-      <li class="mb-2">
-        <a href="<?= htmlspecialchars(appUrl('Admin-End/Complaints/ComplaintForm.php')) ?>"
-           class="btn btn-toggle d-flex align-items-center gap-2 rounded <?= $current == 'ComplaintForm.php' ? 'active' : '' ?>"
-           style="<?= $current == 'ComplaintForm.php' ? 'outline: none; box-shadow: none;' : '' ?>">
-          <i class="fas fa-file-pen"></i> Log New Incident
-        </a>
-      </li>
-      <li class="mb-1">
-        <button class="btn btn-toggle d-flex align-items-center gap-2 rounded <?= $isComplaintActive ? '' : 'collapsed' ?>"
-                data-bs-toggle="collapse"
-                data-bs-target="#complaint-tools-collapse"
-                aria-expanded="<?= $isComplaintActive ? 'true' : 'false' ?>">
-          <i class="fas fa-comments"></i> Complaint Tools
-        </button>
-
-        <div class="collapse <?= $isComplaintActive ? 'show' : '' ?>" id="complaint-tools-collapse">
-          <ul class="btn-toggle-nav list-unstyled fw-normal pb-1 small">
-            <li>
-              <a href="<?= htmlspecialchars(appUrl('Admin-End/Complaints/ComplaintTracker.php')) ?>"
-                 class="link-dark rounded <?= $current == 'ComplaintTracker.php' ? 'active' : '' ?>">
-                Tracker
-              </a>
-            </li>
-          </ul>
-        </div>
-      </li>
-
-      <li class="mb-1 mt-2 text-muted small fw-semibold px-2">Content Management</li>
-      <li class="mb-1">
-        <button class="btn btn-toggle d-flex align-items-center gap-2 rounded <?= $isContentCreateSectionActive ? '' : 'collapsed' ?>"
-                data-bs-toggle="collapse"
-                data-bs-target="#content-create-collapse"
-                aria-expanded="<?= $isContentCreateSectionActive ? 'true' : 'false' ?>">
-          <i class="fas fa-file-pen"></i> Create
-        </button>
-
-        <div class="collapse <?= $isContentCreateSectionActive ? 'show' : '' ?>" id="content-create-collapse">
-          <ul class="btn-toggle-nav list-unstyled fw-normal pb-1 small">
-            <li>
-              <a href="<?= htmlspecialchars(appUrl('Admin-End/Contents/CreateContent.php')) ?>?type=page"
-                 class="link-dark rounded <?= ($current === 'CreateContent.php' && $contentCreateType === 'page') ? 'active' : '' ?>">
-                Page Announcement
-              </a>
-            </li>
-            <li>
-              <a href="<?= htmlspecialchars(appUrl('Admin-End/Contents/CreateContent.php')) ?>?type=delivery"
-                 class="link-dark rounded <?= ($current === 'CreateContent.php' && $contentCreateType === 'delivery') ? 'active' : '' ?>">
-                SMS and Email Announcement
-              </a>
-            </li>
-            <li>
-              <a href="<?= htmlspecialchars(appUrl('Admin-End/Contents/CreateContent.php')) ?>?type=faq"
-                 class="link-dark rounded <?= ($current === 'CreateContent.php' && $contentCreateType === 'faq') ? 'active' : '' ?>">
-                FAQs Page
-              </a>
-            </li>
-          </ul>
         </div>
       </li>
       <li class="mb-2">
-        <button class="btn btn-toggle d-flex align-items-center gap-2 rounded <?= $isContentToolsSectionActive ? '' : 'collapsed' ?>"
-                data-bs-toggle="collapse"
-                data-bs-target="#content-tools-collapse"
-                aria-expanded="<?= $isContentToolsSectionActive ? 'true' : 'false' ?>">
-          <i class="fas fa-bullhorn"></i> Content Tools
-        </button>
-
-        <div class="collapse <?= $isContentToolsSectionActive ? 'show' : '' ?>" id="content-tools-collapse">
-          <ul class="btn-toggle-nav list-unstyled fw-normal pb-1 small">
-            <li>
-              <a href="<?= htmlspecialchars(appUrl('Admin-End/Contents/Contents.php')) ?>?tool=tracker#tracker-card"
-                 class="link-dark rounded <?= ($current === 'Contents.php' && $contentToolView === 'tracker') ? 'active' : '' ?>">
-                Tracker
-              </a>
-            </li>
-          </ul>
-        </div>
-      </li>
-
-      <li class="mb-1 mt-2 text-muted small fw-semibold px-2">Area Management</li>
-      <li class="mb-1">
         <button class="btn btn-toggle d-flex align-items-center gap-2 rounded <?= $isAreaManagementActive ? '' : 'collapsed' ?>"
                 data-bs-toggle="collapse"
                 data-bs-target="#area-management-collapse"
                 aria-expanded="<?= $isAreaManagementActive ? 'true' : 'false' ?>">
           <i class="fas fa-map-location-dot"></i> Area Statistics
         </button>
-
         <div class="collapse <?= $isAreaManagementActive ? 'show' : '' ?>" id="area-management-collapse">
           <ul class="btn-toggle-nav list-unstyled fw-normal pb-1 small">
             <li>
@@ -595,15 +541,159 @@ if (!empty($_SESSION['user_id']) && isset($conn) && $conn instanceof mysqli) {
         </div>
       </li>
 
-      <li class="mb-1 mt-2 text-muted small fw-semibold px-2">Reports</li>
+      <li class="mb-1 mt-2 text-muted small fw-semibold px-2">Barangay Issuance</li>
+      <li class="mb-2">
+        <a href="<?= htmlspecialchars(appUrl('Admin-End/Certificates/CertificateTracker.php?filter_document=__certificates__')) ?>"
+           class="btn btn-toggle d-flex align-items-center gap-2 rounded <?= $isCertificateIssuanceSectionActive ? 'active' : '' ?>"
+           style="<?= $isCertificateIssuanceSectionActive ? 'outline: none; box-shadow: none;' : '' ?>">
+          <i class="fas fa-file-circle-check"></i> Certificate Issuance
+        </a>
+      </li>
+      <li class="mb-2">
+        <button class="btn btn-toggle d-flex align-items-center gap-2 rounded <?= $isIdIssuanceActive ? '' : 'collapsed' ?>"
+                data-bs-toggle="collapse"
+                data-bs-target="#id-issuance-collapse"
+                aria-expanded="<?= $isIdIssuanceActive ? 'true' : 'false' ?>">
+          <i class="fas fa-id-card"></i> ID Issuance
+        </button>
+        <div class="collapse <?= $isIdIssuanceActive ? 'show' : '' ?>" id="id-issuance-collapse">
+          <ul class="btn-toggle-nav list-unstyled fw-normal pb-1 small">
+            <li>
+              <a href="<?= htmlspecialchars(appUrl('Admin-End/Certificates/CertificateTracker.php?entry=id_issuance')) ?>"
+                 class="link-dark rounded <?= $isIdIssuanceTrackerActive ? 'active' : '' ?>">
+                Tracker
+              </a>
+            </li>
+            <li>
+              <a href="<?= htmlspecialchars(appUrl('Admin-End/Certificates/CertificateTracker.php?tab=manual&document=barangay_id')) ?>"
+                 class="link-dark rounded <?= $isIdIssuanceManualActive ? 'active' : '' ?>">
+                Manual Issuance
+              </a>
+            </li>
+          </ul>
+        </div>
+      </li>
+
+      <li class="mb-1 mt-2 text-muted small fw-semibold px-2">Barangay Monitoring</li>
+      <li class="mb-2">
+        <a href="<?= htmlspecialchars(appUrl('Admin-End/Certificates/CertificateTracker.php?filter_document=__clearances__')) ?>"
+           class="btn btn-toggle d-flex align-items-center gap-2 rounded <?= $isClearanceIssuanceSectionActive ? 'active' : '' ?>"
+           style="<?= $isClearanceIssuanceSectionActive ? 'outline: none; box-shadow: none;' : '' ?>">
+          <i class="fas fa-stamp"></i> Clearance Issuance
+        </a>
+      </li>
+      <li class="mb-2">
+        <a href="<?= htmlspecialchars(appUrl('Admin-End/BusinessMonitoring.php')) ?>"
+           class="btn btn-toggle d-flex align-items-center gap-2 rounded <?= $isBusinessMonitoringActive ? 'active' : '' ?>"
+           style="<?= $isBusinessMonitoringActive ? 'outline: none; box-shadow: none;' : '' ?>">
+          <i class="fas fa-store"></i> Business Monitoring
+        </a>
+      </li>
+
+      <li class="mb-1 mt-2 text-muted small fw-semibold px-2">Barangay Treasury</li>
+      <li class="mb-2">
+        <button class="btn btn-toggle d-flex align-items-center gap-2 rounded <?= $isFinanceActive ? '' : 'collapsed' ?>"
+                data-bs-toggle="collapse"
+                data-bs-target="#finance-collapse"
+                aria-expanded="<?= $isFinanceActive ? 'true' : 'false' ?>">
+          <i class="fas fa-money-check-alt"></i> Finance Transactions
+        </button>
+        <div class="collapse <?= $isFinanceActive ? 'show' : '' ?>" id="finance-collapse">
+          <ul class="btn-toggle-nav list-unstyled fw-normal pb-1 small">
+            <li>
+              <a href="<?= htmlspecialchars(appUrl('Admin-End/Certificates/FinancePayments.php')) ?>"
+                 class="link-dark rounded <?= $isFinanceTrackerActive ? 'active' : '' ?>">
+                Payment Tracker
+              </a>
+            </li>
+            <li>
+              <a href="<?= htmlspecialchars(appUrl('Admin-End/Certificates/FinancePayments.php')) ?>?section=cashbook"
+                 class="link-dark rounded <?= $isFinanceCashbookActive ? 'active' : '' ?>">
+                Cashbook
+              </a>
+            </li>
+            <li>
+              <a href="<?= htmlspecialchars(appUrl('Admin-End/Certificates/FinancePayments.php')) ?>?section=fees"
+                 class="link-dark rounded <?= $isFinanceFeesActive ? 'active' : '' ?>">
+                Fee Management
+              </a>
+            </li>
+          </ul>
+        </div>
+      </li>
+
+      <li class="mb-1 mt-2 text-muted small fw-semibold px-2">Barangay Peace and Order</li>
       <li class="mb-1">
+        <button class="btn btn-toggle d-flex align-items-center gap-2 rounded <?= $isComplaintActive ? '' : 'collapsed' ?>"
+                data-bs-toggle="collapse"
+                data-bs-target="#complaint-tools-collapse"
+                aria-expanded="<?= $isComplaintActive ? 'true' : 'false' ?>">
+          <i class="fas fa-comments"></i> Complaint Tools
+        </button>
+        <div class="collapse <?= $isComplaintActive ? 'show' : '' ?>" id="complaint-tools-collapse">
+          <ul class="btn-toggle-nav list-unstyled fw-normal pb-1 small">
+            <li>
+              <a href="<?= htmlspecialchars(appUrl('Admin-End/Complaints/ComplaintTracker.php')) ?>"
+                 class="link-dark rounded <?= $current == 'ComplaintTracker.php' ? 'active' : '' ?>">
+                Tracker
+              </a>
+            </li>
+            <li>
+              <a href="<?= htmlspecialchars(appUrl('Admin-End/Complaints/ComplaintForm.php')) ?>"
+                 class="link-dark rounded <?= $current == 'ComplaintForm.php' ? 'active' : '' ?>">
+                Create Complaint
+              </a>
+            </li>
+          </ul>
+        </div>
+      </li>
+      <li class="mb-2">
+        <button class="btn btn-toggle d-flex align-items-center gap-2 rounded <?= $isBlotterActive ? '' : 'collapsed' ?>"
+                data-bs-toggle="collapse"
+                data-bs-target="#blotter-tools-collapse"
+                aria-expanded="<?= $isBlotterActive ? 'true' : 'false' ?>">
+          <i class="fas fa-toolbox"></i> E-Blotter Tools
+        </button>
+        <div class="collapse <?= $isBlotterActive ? 'show' : '' ?>" id="blotter-tools-collapse">
+          <ul class="btn-toggle-nav list-unstyled fw-normal pb-1 small">
+            <li>
+              <a href="<?= htmlspecialchars(appUrl('Admin-End/Blotter/BlotterTracker.php')) ?>"
+                 class="link-dark rounded <?= $current == 'BlotterTracker.php' ? 'active' : '' ?>">
+                Tracker
+              </a>
+            </li>
+            <li>
+              <a href="<?= htmlspecialchars(appUrl('Admin-End/Blotter/ReviewQueue.php')) ?>"
+                 class="link-dark rounded <?= $current == 'ReviewQueue.php' ? 'active' : '' ?>">
+                Review Queue
+              </a>
+            </li>
+            <li>
+              <a href="<?= htmlspecialchars(appUrl('Admin-End/Blotter/BlotterForm.php')) ?>"
+                 class="link-dark rounded <?= $current == 'BlotterForm.php' ? 'active' : '' ?>">
+                Log New Incident
+              </a>
+            </li>
+          </ul>
+        </div>
+      </li>
+
+      <li class="mb-1 mt-2 text-muted small fw-semibold px-2">General Modules</li>
+      <li class="mb-1">
+        <a href="javascript:void(0)"
+           class="btn btn-toggle d-flex align-items-center justify-content-start text-start gap-2 rounded w-100 text-muted"
+           style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis; cursor: default; opacity: 0.8;"
+           aria-disabled="true">
+          <i class="fas fa-bullhorn"></i> Announcements
+        </a>
+      </li>
+      <li class="mb-2">
         <button class="btn btn-toggle d-flex align-items-center gap-2 rounded <?= $isReportActive ? '' : 'collapsed' ?>"
                 data-bs-toggle="collapse"
                 data-bs-target="#reports-collapse"
                 aria-expanded="<?= $isReportActive ? 'true' : 'false' ?>">
           <i class="fas fa-chart-bar"></i> Reports
         </button>
-
         <div class="collapse <?= $isReportActive ? 'show' : '' ?>" id="reports-collapse">
           <ul class="btn-toggle-nav list-unstyled fw-normal pb-1 small">
             <li>
@@ -646,9 +736,76 @@ if (!empty($_SESSION['user_id']) && isset($conn) && $conn instanceof mysqli) {
         </div>
       </li>
 
+      <li class="mb-1 mt-2 text-muted small fw-semibold px-2">Content Management</li>
+      <li class="mb-1">
+        <button class="btn btn-toggle d-flex align-items-center gap-2 rounded <?= $isContentCreateSectionActive ? '' : 'collapsed' ?>"
+                data-bs-toggle="collapse"
+                data-bs-target="#content-create-collapse"
+                aria-expanded="<?= $isContentCreateSectionActive ? 'true' : 'false' ?>">
+          <i class="fas fa-file-pen"></i> Create
+        </button>
+        <div class="collapse <?= $isContentCreateSectionActive ? 'show' : '' ?>" id="content-create-collapse">
+          <ul class="btn-toggle-nav list-unstyled fw-normal pb-1 small">
+            <li>
+              <a href="<?= htmlspecialchars(appUrl('Admin-End/Contents/CreateContent.php')) ?>?type=page"
+                 class="link-dark rounded <?= ($current === 'CreateContent.php' && $contentCreateType === 'page') ? 'active' : '' ?>">
+                Page Announcement
+              </a>
+            </li>
+            <li>
+              <a href="<?= htmlspecialchars(appUrl('Admin-End/Contents/CreateContent.php')) ?>?type=delivery"
+                 class="link-dark rounded <?= ($current === 'CreateContent.php' && $contentCreateType === 'delivery') ? 'active' : '' ?>">
+                SMS and Email Announcement
+              </a>
+            </li>
+            <li>
+              <a href="<?= htmlspecialchars(appUrl('Admin-End/Contents/CreateContent.php')) ?>?type=faq"
+                 class="link-dark rounded <?= ($current === 'CreateContent.php' && $contentCreateType === 'faq') ? 'active' : '' ?>">
+                FAQs Page
+              </a>
+            </li>
+          </ul>
+        </div>
+      </li>
+      <li class="mb-2">
+        <button class="btn btn-toggle d-flex align-items-center gap-2 rounded <?= $isContentToolsSectionActive ? '' : 'collapsed' ?>"
+                data-bs-toggle="collapse"
+                data-bs-target="#content-tools-collapse"
+                aria-expanded="<?= $isContentToolsSectionActive ? 'true' : 'false' ?>">
+          <i class="fas fa-folder-open"></i> Content Tools
+        </button>
+        <div class="collapse <?= $isContentToolsSectionActive ? 'show' : '' ?>" id="content-tools-collapse">
+          <ul class="btn-toggle-nav list-unstyled fw-normal pb-1 small">
+            <li>
+              <a href="<?= htmlspecialchars(appUrl('Admin-End/Contents/Contents.php')) ?>?tool=tracker#tracker-card"
+                 class="link-dark rounded <?= ($current === 'Contents.php' && $contentToolView === 'tracker') ? 'active' : '' ?>">
+                Tracker
+              </a>
+            </li>
+          </ul>
+        </div>
+      </li>
+
       <?php if ($isSuperAdminSidebar): ?>
       <li class="mb-1 mt-2 text-muted small fw-semibold px-2">Admin Management</li>
-      <!-- PERSONNEL MANAGEMENT -->
+      <li class="mb-1">
+        <button class="btn btn-toggle d-flex align-items-center gap-2 rounded <?= $isUserMgmtActive ? '' : 'collapsed' ?>"
+                data-bs-toggle="collapse"
+                data-bs-target="#usermgmt-collapse"
+                aria-expanded="<?= $isUserMgmtActive ? 'true' : 'false' ?>">
+          <i class="fas fa-users-cog"></i> User Management
+        </button>
+        <div class="collapse <?= $isUserMgmtActive ? 'show' : '' ?>" id="usermgmt-collapse">
+          <ul class="btn-toggle-nav list-unstyled fw-normal pb-1 small">
+            <li>
+              <a href="<?= htmlspecialchars(appUrl('Admin-End/UserMasterlist.php')) ?>"
+                 class="link-dark rounded <?= $current == 'UserMasterlist.php' ? 'active' : '' ?>">
+                User Masterlist
+              </a>
+            </li>
+          </ul>
+        </div>
+      </li>
       <li class="mb-1">
         <button class="btn btn-toggle d-flex align-items-center gap-2 rounded <?= $isAdminMgmtActive ? '' : 'collapsed' ?>"
                 data-bs-toggle="collapse"
@@ -656,7 +813,6 @@ if (!empty($_SESSION['user_id']) && isset($conn) && $conn instanceof mysqli) {
                 aria-expanded="<?= $isAdminMgmtActive ? 'true' : 'false' ?>">
           <i class="fas fa-user-shield"></i> Personnel Management
         </button>
-
         <div class="collapse <?= $isAdminMgmtActive ? 'show' : '' ?>" id="adminmgmt-collapse">
           <ul class="btn-toggle-nav list-unstyled fw-normal pb-1 small">
             <li>
@@ -674,36 +830,14 @@ if (!empty($_SESSION['user_id']) && isset($conn) && $conn instanceof mysqli) {
           </ul>
         </div>
       </li>
-
       <li class="mb-1">
         <a href="javascript:void(0)"
            class="btn btn-toggle d-flex align-items-center justify-content-start text-start gap-2 rounded w-100 text-muted"
            style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis; cursor: default; opacity: 0.8;"
            aria-disabled="true">
-          <i class="fas fa-right-left"></i> Official Transition Module
+          <i class="fas fa-right-left"></i> Official Transition
         </a>
       </li>
-
-      <li class="mb-1">
-        <button class="btn btn-toggle d-flex align-items-center gap-2 rounded <?= $isUserMgmtActive ? '' : 'collapsed' ?>"
-                data-bs-toggle="collapse"
-                data-bs-target="#usermgmt-collapse"
-                aria-expanded="<?= $isUserMgmtActive ? 'true' : 'false' ?>">
-          <i class="fas fa-users-cog"></i> User Management
-        </button>
-
-        <div class="collapse <?= $isUserMgmtActive ? 'show' : '' ?>" id="usermgmt-collapse">
-          <ul class="btn-toggle-nav list-unstyled fw-normal pb-1 small">
-            <li>
-              <a href="<?= htmlspecialchars(appUrl('Admin-End/UserMasterlist.php')) ?>"
-                 class="link-dark rounded <?= $current == 'UserMasterlist.php' ? 'active' : '' ?>">
-                User Masterlist
-              </a>
-            </li>
-          </ul>
-        </div>
-      </li>
-
       <li class="mb-1">
         <a href="<?= htmlspecialchars(appUrl('Admin-End/AuditLogs.php')) ?>"
            class="btn btn-toggle d-flex align-items-center gap-2 rounded <?= $current == 'AuditLogs.php' ? 'active' : '' ?>"
@@ -721,7 +855,13 @@ if (!empty($_SESSION['user_id']) && isset($conn) && $conn instanceof mysqli) {
       <div class="dropdown mb-2 w-100">
         <a href="#" class="d-flex align-items-center link-dark text-decoration-none dropdown-toggle w-100"
            data-bs-toggle="dropdown">
-          <img src="<?= htmlspecialchars(appUrl('Images/Profile-Placeholder.png')) ?>" width="40" height="40" class="rounded-circle me-2">
+          <img src="<?= htmlspecialchars($adminProfileImageUrl, ENT_QUOTES, 'UTF-8') ?>"
+               width="40"
+               height="40"
+               class="rounded-circle me-2"
+               alt="<?= htmlspecialchars($adminDisplayName, ENT_QUOTES, 'UTF-8') ?>"
+               style="object-fit: cover;"
+               onerror="this.onerror=null;this.src='<?= htmlspecialchars(appUrl('Images/Profile-Placeholder.png'), ENT_QUOTES, 'UTF-8') ?>';">
           <div class="flex-grow-1" style="min-width: 0;">
             <span class="d-block fw-bold text-truncate mb-0"><?= htmlspecialchars($adminDisplayName) ?></span>
             <small class="d-block text-muted text-truncate"><?= htmlspecialchars($adminPosition) ?></small>

@@ -48,6 +48,23 @@ function tableExists(mysqli $conn, string $tableName): bool {
     return !empty($row);
 }
 
+function columnExists(mysqli $conn, string $tableName, string $columnName): bool {
+    $stmt = $conn->prepare("
+        SELECT 1
+        FROM information_schema.COLUMNS
+        WHERE TABLE_SCHEMA = DATABASE()
+          AND TABLE_NAME = ?
+          AND COLUMN_NAME = ?
+        LIMIT 1
+    ");
+    if (!$stmt) return false;
+    $stmt->bind_param("ss", $tableName, $columnName);
+    $stmt->execute();
+    $row = $stmt->get_result()->fetch_row();
+    $stmt->close();
+    return !empty($row);
+}
+
 function getStatusId(mysqli $conn, string $statusName, string $statusType): int {
     $stmt = $conn->prepare("
         SELECT status_id
@@ -212,6 +229,34 @@ function formatFiledDateTime($dateValue, $timeValue): string {
 }
 
 if ($action === 'list') {
+    $residentSelect = '';
+    $residentJoin = '';
+    if (
+        tableExists($conn, 'residentinformationtbl')
+        && tableExists($conn, 'residentaddresstbl')
+        && columnExists($conn, 'casereportstbl', 'resident_user_id')
+    ) {
+        $residentSelect = ",
+            COALESCE(c.complaint_type, '') AS complaint_type,
+            COALESCE(ri.sector_membership, '') AS sector_membership,
+            COALESCE(ra.area_number, '') AS area_number";
+        $residentJoin = "
+        LEFT JOIN residentinformationtbl ri ON ri.user_id = c.resident_user_id
+        LEFT JOIN residentaddresstbl ra
+            ON ra.address_id = (
+                SELECT a2.address_id
+                FROM residentaddresstbl a2
+                WHERE a2.resident_id = ri.resident_id
+                ORDER BY a2.address_id DESC
+                LIMIT 1
+            )";
+    } else {
+        $residentSelect = ",
+            COALESCE(c.complaint_type, '') AS complaint_type,
+            '' AS sector_membership,
+            '' AS area_number";
+    }
+
     $sql = "
         SELECT
             c.case_id,
@@ -229,6 +274,7 @@ if ($action === 'list') {
             rp.middlename AS respondent_middlename,
             rp.lastname AS respondent_lastname,
             rp.suffix AS respondent_suffix
+            {$residentSelect}
         FROM casereportstbl c
         INNER JOIN barangayblottertbl b ON b.case_id = c.case_id
         LEFT JOIN statuslookuptbl s ON s.status_id = c.case_status_id
@@ -239,6 +285,7 @@ if ($action === 'list') {
         LEFT JOIN caseparticipantstbl rp
             ON rp.case_id = c.case_id
             AND rp.participant_role = 'Respondent'
+        {$residentJoin}
         WHERE c.report_type = 'Blotter'
         ORDER BY b.date_filed DESC, b.time_filed DESC, b.blotter_id DESC
     ";
@@ -267,7 +314,11 @@ if ($action === 'list') {
             'case_id' => $row['case_id'],
             'blotter_id' => $row['blotter_id'],
             'blotter_number' => $row['blotter_number'],
+            'date_filed_raw' => $row['date_filed'],
             'date_filed' => formatFiledDateTime($row['date_filed'], $row['time_filed']),
+            'complaint_type' => $row['complaint_type'] ?? '',
+            'area_number' => $row['area_number'] ?? '',
+            'sector_membership' => $row['sector_membership'] ?? '',
             'status_name' => $row['status_name'],
             'level_name' => $row['level_name'],
             'complainant_name' => $fullName,

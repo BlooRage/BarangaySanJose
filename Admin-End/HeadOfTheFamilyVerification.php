@@ -226,6 +226,14 @@
             <option value="Approved">Approved</option>
             <option value="Declined">Declined</option>
           </select>
+          <div class="mt-3">
+            <label class="fw-bold small mb-2">Area Number</label>
+            <div class="d-flex flex-column gap-2" id="hofAreaFilterList"></div>
+          </div>
+          <div class="mt-3">
+            <label class="fw-bold small mb-2">Sector Membership</label>
+            <div class="d-flex flex-column gap-2" id="hofSectorFilterList"></div>
+          </div>
         </div>
         <div class="modal-footer border-0">
           <button type="button" class="btn btn-outline-secondary" id="btnHofFilterReset">Reset</button>
@@ -271,6 +279,6 @@
     };
   </script>
   <script src="../JS-Script-Files/Admin-End/tableColumnsGeneric.js?v=20260215-1"></script>
-  <script src="../JS-Script-Files/Admin-End/headOfFamilyVerificationScript.js?v=20260311-1"></script>
+  <script src="../JS-Script-Files/Admin-End/headOfFamilyVerificationScript.js?v=20260322-1"></script>
 </body>
 </html>

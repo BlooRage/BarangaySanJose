@@ -14,6 +14,14 @@
     const refreshBtn = document.getElementById("btnComplaintTableRefresh");
     const filterButtons = Array.from(document.querySelectorAll(".status-filter-btn"));
     const pendingComplaintBadge = document.getElementById("pendingComplaintBadge");
+    const filterModalEl = document.getElementById("modalComplaintFilter");
+    const filterDateFromEl = document.getElementById("complaintFilterDateFrom");
+    const filterDateToEl = document.getElementById("complaintFilterDateTo");
+    const filterTypeListEl = document.getElementById("complaintFilterTypeList");
+    const filterAreaListEl = document.getElementById("complaintFilterAreaList");
+    const filterSectorListEl = document.getElementById("complaintFilterSectorList");
+    const btnComplaintFilterApply = document.getElementById("btnComplaintFilterApply");
+    const btnComplaintFilterReset = document.getElementById("btnComplaintFilterReset");
     const viewModalEl = document.getElementById("viewModal");
     const viewModal = viewModalEl ? new bootstrap.Modal(viewModalEl) : null;
     const viewModalTitle = document.getElementById("viewModalTitle");
@@ -38,9 +46,18 @@
     let filteredRows = [];
     let currentPage = 1;
     let activeFilter = "";
+    let modalFilters = {
+        dateFrom: "",
+        dateTo: "",
+        complaint_type: [],
+        area_number: [],
+        sector_membership: [],
+    };
     let currentViewCaseId = null;
     let currentDetail = null;
     let pendingComplaintAction = null;
+    const OFFICIAL_AREA_OPTIONS = ["Area 01", "Area 1A", "Area 02", "Area 03", "Area 04", "Area 05", "Area 06"];
+    const OFFICIAL_SECTOR_OPTIONS = ["PWD", "Senior Citizen", "Student", "Indigenous People", "Single Parent"];
 
     if (endorseBtn) {
         endorseBtn.textContent = "Send for Blotter Review";
@@ -52,6 +69,119 @@
 
     function badge(text, toneClass) {
         return `<span class="status-pill ${esc(toneClass || "archived")}">${esc(text || "-")}</span>`;
+    }
+
+    function parseCsvValues(value) {
+        return Array.from(new Set(
+            String(value ?? "")
+                .split(",")
+                .map((item) => item.trim())
+                .filter(Boolean)
+        ));
+    }
+
+    function normalizeSectorLabel(value) {
+        const raw = String(value ?? "").trim();
+        if (!raw) return "";
+        const normalized = raw.toLowerCase().replace(/[^a-z]/g, "");
+        const map = {
+            pwd: "PWD",
+            seniorcitizen: "Senior Citizen",
+            student: "Student",
+            indigenouspeople: "Indigenous People",
+            indigenousperson: "Indigenous People",
+            singleparent: "Single Parent",
+            soloparent: "Single Parent",
+        };
+        return map[normalized] || raw;
+    }
+
+    function parseSectorValues(value) {
+        return Array.from(new Set(
+            parseCsvValues(value)
+                .map((item) => normalizeSectorLabel(item))
+                .filter(Boolean)
+        ));
+    }
+
+    function normalizeDateValue(value) {
+        const raw = String(value || "").trim();
+        if (!raw) return "";
+        const isoMatch = raw.match(/^(\d{4}-\d{2}-\d{2})/);
+        if (isoMatch) return isoMatch[1];
+        const parsed = new Date(raw);
+        if (Number.isNaN(parsed.getTime())) return "";
+        const year = parsed.getFullYear();
+        const month = String(parsed.getMonth() + 1).padStart(2, "0");
+        const day = String(parsed.getDate()).padStart(2, "0");
+        return `${year}-${month}-${day}`;
+    }
+
+    function renderFilterChecklist(container, field, values) {
+        if (!container) return;
+        const list = Array.isArray(values) ? values : [];
+        if (!list.length) {
+            container.innerHTML = `<div class="text-muted small">No options available.</div>`;
+            return;
+        }
+        const active = new Set(Array.isArray(modalFilters[field]) ? modalFilters[field] : []);
+        container.innerHTML = list.map((value, index) => `
+            <label class="d-flex align-items-center gap-2">
+                <input class="form-check-input m-0 complaint-filter-checkbox" type="checkbox" value="${esc(value)}" data-field="${esc(field)}" id="${esc(`complaintFilter_${field}_${index}`)}" ${active.has(value) ? "checked" : ""}>
+                <span>${esc(value)}</span>
+            </label>
+        `).join("");
+    }
+
+    function syncFilterOptions() {
+        const complaintTypes = Array.from(new Set(
+            allRows.map((row) => String(row?.complaint_type || "").trim()).filter(Boolean)
+        )).sort((a, b) => a.localeCompare(b));
+        const areaNumbers = OFFICIAL_AREA_OPTIONS.slice();
+        const sectors = OFFICIAL_SECTOR_OPTIONS.slice();
+
+        modalFilters.area_number = modalFilters.area_number.filter((value) => areaNumbers.includes(String(value || "").trim()));
+        modalFilters.sector_membership = modalFilters.sector_membership
+            .map((value) => normalizeSectorLabel(value))
+            .filter((value) => sectors.includes(value));
+
+        renderFilterChecklist(filterTypeListEl, "complaint_type", complaintTypes);
+        renderFilterChecklist(filterAreaListEl, "area_number", areaNumbers);
+        renderFilterChecklist(filterSectorListEl, "sector_membership", sectors);
+        if (filterDateFromEl) filterDateFromEl.value = modalFilters.dateFrom || "";
+        if (filterDateToEl) filterDateToEl.value = modalFilters.dateTo || "";
+    }
+
+    function collectModalFilters() {
+        const next = {
+            dateFrom: String(filterDateFromEl?.value || "").trim(),
+            dateTo: String(filterDateToEl?.value || "").trim(),
+            complaint_type: [],
+            area_number: [],
+            sector_membership: [],
+        };
+        document.querySelectorAll(".complaint-filter-checkbox:checked").forEach((checkbox) => {
+            const field = String(checkbox.getAttribute("data-field") || "").trim();
+            if (!field || !Array.isArray(next[field])) return;
+            next[field].push(String(checkbox.value || "").trim());
+        });
+        return next;
+    }
+
+    function matchesModalFilters(row) {
+        const submittedDate = normalizeDateValue(row?.submitted_at_raw);
+        if (modalFilters.dateFrom && (!submittedDate || submittedDate < modalFilters.dateFrom)) return false;
+        if (modalFilters.dateTo && (!submittedDate || submittedDate > modalFilters.dateTo)) return false;
+        if (modalFilters.complaint_type.length && !modalFilters.complaint_type.includes(String(row?.complaint_type || "").trim())) return false;
+        if (modalFilters.area_number.length && !modalFilters.area_number.includes(String(row?.area_number || "").trim())) return false;
+        if (modalFilters.sector_membership.length) {
+            const memberships = parseSectorValues(row?.sector_membership);
+            const hasSector = modalFilters.sector_membership
+                .map((value) => normalizeSectorLabel(value))
+                .some((value) => memberships.includes(value));
+            if (!hasSector) return false;
+        }
+        return true;
     }
 
     function setActionButtonsState(detail) {
@@ -168,6 +298,7 @@
         filteredRows = allRows.filter((row) => {
             const matchesFilter = !activeFilter || String(row.status_key || "").trim().toLowerCase() === activeFilter;
             if (!matchesFilter) return false;
+            if (!matchesModalFilters(row)) return false;
 
             if (!term) return true;
             const haystack = [
@@ -177,6 +308,8 @@
                 row.subject_display_name,
                 row.complaint_type,
                 row.status_name,
+                row.area_number,
+                row.sector_membership,
             ].map((value) => String(value || "").toLowerCase());
             return haystack.some((value) => value.includes(term));
         });
@@ -571,6 +704,7 @@
             const data = await fetchJson(`${endpoint}?action=list`);
             allRows = Array.isArray(data.items) ? data.items : [];
             updatePendingBadge();
+            syncFilterOptions();
             applyFilters();
         } catch (error) {
             tableBody.innerHTML = emptyState(error.message || "Failed to load complaint records.");
@@ -590,6 +724,30 @@
 
     refreshBtn?.addEventListener("click", loadList);
 
+    btnComplaintFilterApply?.addEventListener("click", () => {
+        modalFilters = collectModalFilters();
+        currentPage = 1;
+        applyFilters();
+        if (filterModalEl) bootstrap.Modal.getInstance(filterModalEl)?.hide();
+    });
+
+    btnComplaintFilterReset?.addEventListener("click", () => {
+        modalFilters = {
+            dateFrom: "",
+            dateTo: "",
+            complaint_type: [],
+            area_number: [],
+            sector_membership: [],
+        };
+        if (filterDateFromEl) filterDateFromEl.value = "";
+        if (filterDateToEl) filterDateToEl.value = "";
+        document.querySelectorAll(".complaint-filter-checkbox").forEach((checkbox) => {
+            checkbox.checked = false;
+        });
+        currentPage = 1;
+        applyFilters();
+    });
+
     filterButtons.forEach((button) => {
         button.addEventListener("click", () => {
             filterButtons.forEach((btn) => {
@@ -606,4 +764,3 @@
     initComplaintActionFlow();
     loadList();
 })();
-

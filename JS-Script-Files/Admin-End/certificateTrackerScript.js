@@ -28,8 +28,21 @@
   const pendingVerificationTabCount = document.getElementById('pendingVerificationTabCount');
   const statusTabs = Array.from(document.querySelectorAll('[data-status-filter]'));
   const btnRefreshList = document.getElementById('btnRefreshList');
+  const filterButton = document.getElementById('filterButton');
+  const filterModalEl = document.getElementById('modalFilter');
+  const filterDateFrom = document.getElementById('filterDateFrom');
+  const filterDateTo = document.getElementById('filterDateTo');
+  const filterDocumentTypeList = document.getElementById('filterDocumentTypeList');
+  const filterAreaList = document.getElementById('filterAreaList');
+  const filterSectorList = document.getElementById('filterSectorList');
+  const btnApplyFilter = document.getElementById('btnApplyFilter');
+  const btnResetModalFilters = document.getElementById('btnResetModalFilters');
   const documentTypeFilter = document.getElementById('documentTypeFilter');
-  const financeFilterDocType = document.getElementById('financeFilterDocumentType');
+  const financeFilterDateFrom = document.getElementById('financeFilterDateFrom');
+  const financeFilterDateTo = document.getElementById('financeFilterDateTo');
+  const financeFilterTypeList = document.getElementById('financeFilterDocumentTypeList');
+  const financeFilterAreaList = document.getElementById('financeFilterAreaList');
+  const financeFilterSectorList = document.getElementById('financeFilterSectorList');
   const financeFilterPaymentMethod = document.getElementById('financeFilterPaymentMethod');
   const btnFinanceFilterApply = document.getElementById('btnFinanceFilterApply');
   const btnFinanceFilterReset = document.getElementById('btnFinanceFilterReset');
@@ -471,8 +484,14 @@
   let currentStage = String(window.CERT_TRACKER_DEFAULT_STAGE || '');
   let currentStatusFilter = 'all';
   let currentDocumentTypeFilter = '';
-  let financeFilterDocumentType = '';
   let financeFilterMethod = '';
+  let requestModalFilters = {
+    dateFrom: '',
+    dateTo: '',
+    document_type: [],
+    area_number: [],
+    sector_membership: []
+  };
   let cachedAllItems = [];
   let itemById = new Map();
   const detailById = new Map();
@@ -507,6 +526,12 @@
     'completed'
   ]);
   const isFinancePaymentsPage = /\/admin-end\/certificates\/financepayments(?:\.php)?\/?$/i.test(window.location.pathname);
+  const requestFilterModalEl = isFinancePaymentsPage ? document.getElementById('modalFinanceFilter') : filterModalEl;
+  const requestFilterDateFromEl = isFinancePaymentsPage ? financeFilterDateFrom : filterDateFrom;
+  const requestFilterDateToEl = isFinancePaymentsPage ? financeFilterDateTo : filterDateTo;
+  const requestFilterTypeListEl = isFinancePaymentsPage ? financeFilterTypeList : filterDocumentTypeList;
+  const requestFilterAreaListEl = isFinancePaymentsPage ? financeFilterAreaList : filterAreaList;
+  const requestFilterSectorListEl = isFinancePaymentsPage ? financeFilterSectorList : filterSectorList;
   const financeColumnsStorageKey = 'financePaymentsVisibleColumns';
   const defaultFinanceVisibleColumns = [1, 3, 4, 6, 7, 8];
 
@@ -529,6 +554,145 @@
 
   function esc(v) {
     return String(v ?? '').replace(/[&<>\"']/g, (m) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '\"': '&quot;', "'": '&#39;' }[m]));
+  }
+
+  function parseCsvValues(value) {
+    return Array.from(new Set(
+      String(value ?? '')
+        .split(',')
+        .map((item) => item.trim())
+        .filter(Boolean)
+    ));
+  }
+
+  const OFFICIAL_AREA_OPTIONS = ['Area 01', 'Area 1A', 'Area 02', 'Area 03', 'Area 04', 'Area 05', 'Area 06'];
+  const OFFICIAL_SECTOR_OPTIONS = ['PWD', 'Senior Citizen', 'Student', 'Indigenous People', 'Single Parent'];
+
+  function normalizeSectorLabel(value) {
+    const raw = String(value ?? '').trim();
+    if (!raw) return '';
+    const normalized = raw.toLowerCase().replace(/[^a-z]/g, '');
+    const map = {
+      pwd: 'PWD',
+      seniorcitizen: 'Senior Citizen',
+      student: 'Student',
+      indigenouspeople: 'Indigenous People',
+      indigenousperson: 'Indigenous People',
+      singleparent: 'Single Parent',
+      soloparent: 'Single Parent',
+    };
+    return map[normalized] || raw;
+  }
+
+  function parseSectorValues(value) {
+    return Array.from(new Set(
+      parseCsvValues(value)
+        .map((item) => normalizeSectorLabel(item))
+        .filter(Boolean)
+    ));
+  }
+
+  function normalizeDateValue(value) {
+    const parsed = parseFlexibleDate(value);
+    if (!parsed || Number.isNaN(parsed.getTime())) return '';
+    const year = parsed.getFullYear();
+    const month = String(parsed.getMonth() + 1).padStart(2, '0');
+    const day = String(parsed.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  }
+
+  function requestTypeLabel(row) {
+    const payload = row && row.payload && typeof row.payload === 'object' ? row.payload : {};
+    const previewKey = normalizePreviewDocKey(row?.document_type || '');
+    if (previewKey === 'cohabitation') {
+      const variant = String(payload?.cohabitation_variant || '').trim().toLowerCase();
+      if (['relationship_jail_visit', 'conjugal_visit'].includes(variant)) {
+        return 'Certificate for Jail Visitation';
+      }
+      return 'Certificate of Cohabitation';
+    }
+
+    const normalized = normalizeDocumentTypeDisplay(String(row?.document_type || ''));
+    if (normalized === 'First Time Job Seeker Certificate') {
+      return 'Certificate for First Time Job Seeker';
+    }
+    return normalized;
+  }
+
+  function renderRequestFilterChecklist(container, field, values) {
+    if (!container) return;
+    const list = Array.isArray(values) ? values : [];
+    if (!list.length) {
+      container.innerHTML = '<div class="text-muted small">No options available.</div>';
+      return;
+    }
+
+    const active = new Set(Array.isArray(requestModalFilters[field]) ? requestModalFilters[field] : []);
+    container.innerHTML = list.map((value, index) => `
+      <label class="d-flex align-items-center gap-2">
+        <input class="form-check-input m-0 request-filter-checkbox" type="checkbox" value="${esc(value)}" data-field="${esc(field)}" id="${esc(`requestFilter_${field}_${index}`)}" ${active.has(value) ? 'checked' : ''}>
+        <span>${esc(value)}</span>
+      </label>
+    `).join('');
+  }
+
+  function syncRequestFilterOptions(items) {
+    const rows = Array.isArray(items) ? items : [];
+    const requestTypes = Array.from(new Set(
+      rows
+        .map((row) => requestTypeLabel(row))
+        .map((value) => String(value || '').trim())
+        .filter((value) => value && value !== '-')
+    )).sort((a, b) => a.localeCompare(b));
+    const areaNumbers = OFFICIAL_AREA_OPTIONS.slice();
+    const sectors = OFFICIAL_SECTOR_OPTIONS.slice();
+
+    requestModalFilters.document_type = requestModalFilters.document_type.filter((value) => requestTypes.includes(value));
+    requestModalFilters.area_number = requestModalFilters.area_number.filter((value) => areaNumbers.includes(value));
+    requestModalFilters.sector_membership = requestModalFilters.sector_membership
+      .map((value) => normalizeSectorLabel(value))
+      .filter((value) => sectors.includes(value));
+
+    renderRequestFilterChecklist(requestFilterTypeListEl, 'document_type', requestTypes);
+    renderRequestFilterChecklist(requestFilterAreaListEl, 'area_number', areaNumbers);
+    renderRequestFilterChecklist(requestFilterSectorListEl, 'sector_membership', sectors);
+
+    if (requestFilterDateFromEl) requestFilterDateFromEl.value = requestModalFilters.dateFrom || '';
+    if (requestFilterDateToEl) requestFilterDateToEl.value = requestModalFilters.dateTo || '';
+  }
+
+  function collectRequestModalFilters() {
+    const next = {
+      dateFrom: String(requestFilterDateFromEl?.value || '').trim(),
+      dateTo: String(requestFilterDateToEl?.value || '').trim(),
+      document_type: [],
+      area_number: [],
+      sector_membership: []
+    };
+
+    document.querySelectorAll('.request-filter-checkbox:checked').forEach((checkbox) => {
+      const field = String(checkbox.getAttribute('data-field') || '').trim();
+      if (!field || !Array.isArray(next[field])) return;
+      next[field].push(String(checkbox.value || '').trim());
+    });
+
+    return next;
+  }
+
+  function matchesRequestModalFilters(row) {
+    const submittedDate = normalizeDateValue(firstNonEmpty([row?.submitted_at, row?.request_timestamp]));
+    if (requestModalFilters.dateFrom && (!submittedDate || submittedDate < requestModalFilters.dateFrom)) return false;
+    if (requestModalFilters.dateTo && (!submittedDate || submittedDate > requestModalFilters.dateTo)) return false;
+    if (requestModalFilters.document_type.length && !requestModalFilters.document_type.includes(requestTypeLabel(row))) return false;
+    if (requestModalFilters.area_number.length && !requestModalFilters.area_number.includes(String(row?.area_number || '').trim())) return false;
+    if (requestModalFilters.sector_membership.length) {
+      const memberships = parseSectorValues(row?.sector_membership);
+      const hasSector = requestModalFilters.sector_membership
+        .map((value) => normalizeSectorLabel(value))
+        .some((value) => memberships.includes(value));
+      if (!hasSector) return false;
+    }
+    return true;
   }
 
   function resolvePublicUrl(path) {
@@ -1846,6 +2010,82 @@
     const raw = String(value || '').trim();
     if (!raw) {
       return '';
+    }
+    const lowered = raw.toLowerCase();
+    if (
+      lowered === '__clearances__'
+      || lowered === '__clearance__'
+      || lowered === '__clearance_issuance__'
+      || lowered === 'clearance'
+      || lowered === 'clearances'
+    ) {
+      return '__clearances__';
+    }
+    if (lowered === '__business__' || lowered === 'business' || lowered === 'business_monitoring' || lowered === 'businessclearance') {
+      return '__business__';
+    }
+    if (lowered === '__certificates__' || lowered === '__certificate_issuance__' || lowered === 'certificate_issuance' || lowered === 'certificates') {
+      return '__certificates__';
+    }
+    const key = raw.toLowerCase().replace(/[^a-z0-9]+/g, '');
+    if (lowered === '__clr_business_permit__' || key === 'barangayclearanceforbusinesspermit' || key === 'clearanceforbusinesspermit') {
+      return '__clr_business_permit__';
+    }
+    if (lowered === '__clr_tricycle_permit__' || key === 'barangayclearancefortricyclepermit' || key === 'clearancefortricyclepermit') {
+      return '__clr_tricycle_permit__';
+    }
+    if (
+      lowered === '__clr_electric_permit__'
+      || key === 'barangayclearanceforelectricalpermit'
+      || key === 'clearanceforelectricalpermit'
+      || key === 'clearanceforelectricpermit'
+    ) {
+      return '__clr_electric_permit__';
+    }
+    if (lowered === '__clr_water_permit__' || key === 'barangayclearanceforwaterpermit' || key === 'clearanceforwaterpermit') {
+      return '__clr_water_permit__';
+    }
+    if (
+      lowered === '__clr_residential_permit__'
+      || key === 'barangayclearanceforresidentialpermit'
+      || key === 'clearanceforresidentialpermit'
+    ) {
+      return '__clr_residential_permit__';
+    }
+    if (
+      lowered === '__clr_commercial_permit__'
+      || key === 'barangayclearanceforcommercialpermit'
+      || key === 'clearanceforcommercialpermit'
+    ) {
+      return '__clr_commercial_permit__';
+    }
+    if (lowered === '__cert_cohabitation__' || key === 'certificateofcohabitation') {
+      return '__cert_cohabitation__';
+    }
+    if (lowered === '__cert_good_moral__' || key === 'certificateofgoodmoral' || key === 'goodmoral') {
+      return '__cert_good_moral__';
+    }
+    if (
+      lowered === '__cert_jail_visit__'
+      || key === 'certificateofrelationshipforjailvisitation'
+      || key === 'certificateforjailvisitation'
+      || key === 'jailvisitation'
+    ) {
+      return '__cert_jail_visit__';
+    }
+    if (
+      lowered === '__cert_first_time_job_seeker__'
+      || key === 'firsttimejobseekercertificate'
+      || key === 'certificateforfirsttimejobseeker'
+      || key === 'firsttimejobseeker'
+    ) {
+      return '__cert_first_time_job_seeker__';
+    }
+    if (lowered === '__cert_residency__' || key === 'certificateofresidency' || key === 'certificateofresidence' || key === 'residency') {
+      return '__cert_residency__';
+    }
+    if (lowered === '__cert_indigency__' || key === 'certificateofindigency' || key === 'indigency') {
+      return '__cert_indigency__';
     }
     return normalizePreviewDocKey(raw) === 'barangayid' ? 'Barangay ID' : raw;
   }
@@ -3775,6 +4015,69 @@
       ? 'Barangay ID'
       : currentDocumentTypeFilter;
     if (!activeDocumentFilter) return true;
+    const normalizedDocumentType = normalizeDocumentTypeDisplay(String(row?.document_type || ''));
+    if (activeDocumentFilter === '__clearances__') {
+      return [
+        'Barangay Clearance for Business Permit',
+        'Barangay Clearance for Tricycle Permit',
+        'Barangay Clearance for Electrical Permit',
+        'Barangay Clearance for Water Permit',
+        'Barangay Clearance for Residential Permit',
+        'Barangay Clearance for Commercial Permit',
+      ].includes(normalizedDocumentType);
+    }
+    if (activeDocumentFilter === '__business__') {
+      return normalizePreviewDocKey(row?.document_type || '') === 'businessclearance';
+    }
+    if (activeDocumentFilter === '__certificates__') {
+      const previewKey = normalizePreviewDocKey(row?.document_type || '');
+      if (previewKey === 'cohabitation') {
+        return true;
+      }
+      return ['goodmoral', 'firsttimejobseeker', 'residency', 'indigency'].includes(previewKey);
+    }
+    if (activeDocumentFilter === '__clr_business_permit__') {
+      return normalizedDocumentType === 'Barangay Clearance for Business Permit';
+    }
+    if (activeDocumentFilter === '__clr_tricycle_permit__') {
+      return normalizedDocumentType === 'Barangay Clearance for Tricycle Permit';
+    }
+    if (activeDocumentFilter === '__clr_electric_permit__') {
+      return normalizedDocumentType === 'Barangay Clearance for Electrical Permit';
+    }
+    if (activeDocumentFilter === '__clr_water_permit__') {
+      return normalizedDocumentType === 'Barangay Clearance for Water Permit';
+    }
+    if (activeDocumentFilter === '__clr_residential_permit__') {
+      return normalizedDocumentType === 'Barangay Clearance for Residential Permit';
+    }
+    if (activeDocumentFilter === '__clr_commercial_permit__') {
+      return normalizedDocumentType === 'Barangay Clearance for Commercial Permit';
+    }
+    if (activeDocumentFilter === '__cert_cohabitation__') {
+      const payload = row && row.payload && typeof row.payload === 'object' ? row.payload : {};
+      const variant = String(payload?.cohabitation_variant || '').trim().toLowerCase();
+      return normalizePreviewDocKey(row?.document_type || '') === 'cohabitation'
+        && !['relationship_jail_visit', 'conjugal_visit'].includes(variant);
+    }
+    if (activeDocumentFilter === '__cert_good_moral__') {
+      return normalizePreviewDocKey(row?.document_type || '') === 'goodmoral';
+    }
+    if (activeDocumentFilter === '__cert_jail_visit__') {
+      const payload = row && row.payload && typeof row.payload === 'object' ? row.payload : {};
+      const variant = String(payload?.cohabitation_variant || '').trim().toLowerCase();
+      return normalizePreviewDocKey(row?.document_type || '') === 'cohabitation'
+        && ['relationship_jail_visit', 'conjugal_visit'].includes(variant);
+    }
+    if (activeDocumentFilter === '__cert_first_time_job_seeker__') {
+      return normalizePreviewDocKey(row?.document_type || '') === 'firsttimejobseeker';
+    }
+    if (activeDocumentFilter === '__cert_residency__') {
+      return normalizePreviewDocKey(row?.document_type || '') === 'residency';
+    }
+    if (activeDocumentFilter === '__cert_indigency__') {
+      return normalizePreviewDocKey(row?.document_type || '') === 'indigency';
+    }
     return String(row?.document_type || '') === activeDocumentFilter;
   }
 
@@ -3795,6 +4098,9 @@
       row?.payment_reference,
       row?.resident_name,
       row?.full_name,
+      requestTypeLabel(row),
+      row?.area_number,
+      row?.sector_membership,
       payload?.last_name,
       payload?.first_name,
       payload?.middle_name,
@@ -3805,9 +4111,6 @@
 
   function matchesFinanceAdvancedFilters(row) {
     if (!isFinancePaymentsPage) return true;
-    if (financeFilterDocumentType && String(row?.document_type || '') !== financeFilterDocumentType) {
-      return false;
-    }
     if (financeFilterMethod) {
       const method = String(row?.payment_method || '').toLowerCase();
       if (method !== financeFilterMethod) {
@@ -3916,27 +4219,13 @@
 
   function syncFinanceFilterOptions(items) {
     if (!isFinancePaymentsPage) return;
-    if (!financeFilterDocType || !financeFilterPaymentMethod) return;
-
-    const docs = Array.from(new Set(
-      (items || [])
-        .map((it) => String(it?.document_type || '').trim())
-        .filter((v) => v !== '')
-    )).sort((a, b) => a.localeCompare(b));
+    if (!financeFilterPaymentMethod) return;
 
     const methods = Array.from(new Set(
       (items || [])
         .map((it) => String(it?.payment_method || '').trim().toLowerCase())
         .filter((v) => v !== '')
     ));
-
-    financeFilterDocType.innerHTML = '<option value="">All documents</option>';
-    docs.forEach((doc) => {
-      const opt = document.createElement('option');
-      opt.value = doc;
-      opt.textContent = doc;
-      financeFilterDocType.appendChild(opt);
-    });
 
     const defaultMethodOptions = [
       { value: '', label: 'All payment methods' },
@@ -3953,12 +4242,20 @@
         financeFilterPaymentMethod.appendChild(opt);
       });
 
-    financeFilterDocType.value = docs.includes(financeFilterDocumentType) ? financeFilterDocumentType : '';
-    financeFilterDocumentType = financeFilterDocType.value;
-
     const methodAllowed = ['gcash', 'barangay'].includes(financeFilterMethod) && methods.includes(financeFilterMethod);
     financeFilterPaymentMethod.value = methodAllowed ? financeFilterMethod : '';
     financeFilterMethod = financeFilterPaymentMethod.value;
+  }
+
+  function getRequestFilterSourceItems(allItems) {
+    const rows = Array.isArray(allItems) ? allItems : [];
+    const stageItems = currentStage === 'finance'
+      ? rows.filter((it) => financeStages.has(String(it.stage || '').toLowerCase()) && hasFinanceTransaction(it))
+      : rows.filter((it) => matchesStageTabFilter(it, currentStage));
+
+    return stageItems
+      .filter(matchesStatusFilter)
+      .filter(matchesDocumentTypeFilter);
   }
 
   function getFinanceVisibleColumns() {
@@ -4180,12 +4477,15 @@
       : allItems.filter((it) => matchesStageTabFilter(it, currentStage));
     updateFinanceStatusTabBadges(stageItems);
     syncDocumentTypeFilterOptions(stageItems);
-    syncFinanceFilterOptions(stageItems);
+    const requestFilterSourceItems = getRequestFilterSourceItems(allItems);
+    syncFinanceFilterOptions(requestFilterSourceItems);
+    syncRequestFilterOptions(requestFilterSourceItems);
 
     const items = stageItems
       .filter(matchesStatusFilter)
       .filter(matchesFinanceAdvancedFilters)
       .filter(matchesDocumentTypeFilter)
+      .filter(matchesRequestModalFilters)
       .filter(matchesSearchFilter);
 
     itemById = new Map(items.map((it) => [String(it.request_id), it]));
@@ -5796,8 +6096,31 @@
     load();
   });
 
+  requestFilterModalEl?.addEventListener('show.bs.modal', () => {
+    syncRequestFilterOptions(getRequestFilterSourceItems(cachedAllItems));
+  });
+
+  btnApplyFilter?.addEventListener('click', () => {
+    requestModalFilters = collectRequestModalFilters();
+    const modalInstance = filterModalEl ? bootstrap.Modal.getInstance(filterModalEl) : null;
+    modalInstance?.hide();
+    load();
+  });
+
+  btnResetModalFilters?.addEventListener('click', () => {
+    requestModalFilters = {
+      dateFrom: '',
+      dateTo: '',
+      document_type: [],
+      area_number: [],
+      sector_membership: []
+    };
+    syncRequestFilterOptions(getRequestFilterSourceItems(cachedAllItems));
+    load();
+  });
+
   btnFinanceFilterApply?.addEventListener('click', () => {
-    financeFilterDocumentType = String(financeFilterDocType?.value || '');
+    requestModalFilters = collectRequestModalFilters();
     financeFilterMethod = String(financeFilterPaymentMethod?.value || '').toLowerCase();
     const modalEl = document.getElementById('modalFinanceFilter');
     const modalInstance = modalEl ? bootstrap.Modal.getInstance(modalEl) : null;
@@ -5810,16 +6133,19 @@
     : canonicalDocumentFilterValue(launchFilterDocument);
   if (initialDocumentFilter) {
     currentDocumentTypeFilter = initialDocumentFilter;
-    if (isFinancePaymentsPage) {
-      financeFilterDocumentType = initialDocumentFilter;
-    }
   }
 
   btnFinanceFilterReset?.addEventListener('click', () => {
-    financeFilterDocumentType = '';
     financeFilterMethod = '';
-    if (financeFilterDocType) financeFilterDocType.value = '';
+    requestModalFilters = {
+      dateFrom: '',
+      dateTo: '',
+      document_type: [],
+      area_number: [],
+      sector_membership: []
+    };
     if (financeFilterPaymentMethod) financeFilterPaymentMethod.value = '';
+    syncRequestFilterOptions(getRequestFilterSourceItems(cachedAllItems));
     load();
   });
 

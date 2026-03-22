@@ -6569,18 +6569,38 @@ if ($action === 'list') {
     $extraJoins = [];
     $issuanceTable = (!$liteList) ? dr_preferred_issuance_table($conn) : null;
     $hasIssuanceTable = $issuanceTable !== null;
-    $hasResidentInfoTable = (!$liteList) && dr_table_exists($conn, 'residentinformationtbl');
+    $hasResidentInfoTable = dr_table_exists($conn, 'residentinformationtbl');
     if ($hasIssuanceTable) {
         $extraSelects[] = "i.certificate_type AS _issuance_certificate_type";
         $extraSelects[] = "i.certificate_number AS _issuance_certificate_number";
         $extraSelects[] = "i.verification_code AS _issuance_verification_code";
         $extraJoins[] = "LEFT JOIN {$issuanceTable} i ON i.request_id = d.request_id";
     }
-    if ($hasResidentInfoTable && !$isFinanceList) {
+    if ($hasResidentInfoTable) {
         $extraSelects[] = "TRIM(CONCAT_WS(' ', NULLIF(riu.firstname, ''), NULLIF(riu.middlename, ''), NULLIF(riu.lastname, ''), NULLIF(riu.suffix, ''))) AS _resident_name_by_user";
         $extraSelects[] = "TRIM(CONCAT_WS(' ', NULLIF(rir.firstname, ''), NULLIF(rir.middlename, ''), NULLIF(rir.lastname, ''), NULLIF(rir.suffix, ''))) AS _resident_name_by_resident";
+        $extraSelects[] = "NULLIF(riu.sector_membership, '') AS _sector_membership_by_user";
+        $extraSelects[] = "NULLIF(rir.sector_membership, '') AS _sector_membership_by_resident";
         $extraJoins[] = "LEFT JOIN residentinformationtbl riu ON riu.user_id = d.resident_user_id";
         $extraJoins[] = "LEFT JOIN residentinformationtbl rir ON rir.resident_id = d.resident_id";
+        if (dr_table_exists($conn, 'residentaddresstbl')) {
+            $extraSelects[] = "NULLIF(rau.area_number, '') AS _area_number_by_user";
+            $extraSelects[] = "NULLIF(rar.area_number, '') AS _area_number_by_resident";
+            $extraJoins[] = "LEFT JOIN residentaddresstbl rau ON rau.address_id = (
+                SELECT a2.address_id
+                FROM residentaddresstbl a2
+                WHERE a2.resident_id = riu.resident_id
+                ORDER BY a2.address_id DESC
+                LIMIT 1
+            )";
+            $extraJoins[] = "LEFT JOIN residentaddresstbl rar ON rar.address_id = (
+                SELECT a2.address_id
+                FROM residentaddresstbl a2
+                WHERE a2.resident_id = d.resident_id
+                ORDER BY a2.address_id DESC
+                LIMIT 1
+            )";
+        }
     }
     if ((!$liteList) && dr_table_exists($conn, 'officialinformationtbl')) {
         $extraSelects[] = "TRIM(CONCAT_WS(' ', NULLIF(oir.firstname, ''), NULLIF(oir.middlename, ''), NULLIF(oir.lastname, ''), NULLIF(oir.suffix, ''))) AS _reviewed_by_name";
@@ -6732,7 +6752,7 @@ if ($action === 'list') {
             }
         }
 
-        if (!$isFinanceList && trim((string)($row['resident_name'] ?? '')) === '') {
+        if (trim((string)($row['resident_name'] ?? '')) === '') {
             $resolvedResidentName = trim((string)($row['_resident_name_by_user'] ?? ''));
             if ($resolvedResidentName === '') {
                 $resolvedResidentName = trim((string)($row['_resident_name_by_resident'] ?? ''));
@@ -6740,6 +6760,18 @@ if ($action === 'list') {
             if ($resolvedResidentName !== '') {
                 $row['resident_name'] = $resolvedResidentName;
                 $row['full_name'] = $resolvedResidentName;
+            }
+        }
+        if (trim((string)($row['sector_membership'] ?? '')) === '') {
+            $row['sector_membership'] = trim((string)($row['_sector_membership_by_user'] ?? ''));
+            if (trim((string)($row['sector_membership'] ?? '')) === '') {
+                $row['sector_membership'] = trim((string)($row['_sector_membership_by_resident'] ?? ''));
+            }
+        }
+        if (trim((string)($row['area_number'] ?? '')) === '') {
+            $row['area_number'] = trim((string)($row['_area_number_by_user'] ?? ''));
+            if (trim((string)($row['area_number'] ?? '')) === '') {
+                $row['area_number'] = trim((string)($row['_area_number_by_resident'] ?? ''));
             }
         }
 
@@ -6807,6 +6839,11 @@ if ($action === 'list') {
             $row['_issuance_verification_code'],
             $row['_resident_name_by_user'],
             $row['_resident_name_by_resident']
+            ,
+            $row['_sector_membership_by_user'],
+            $row['_sector_membership_by_resident'],
+            $row['_area_number_by_user'],
+            $row['_area_number_by_resident']
         );
         $items[] = $row;
     }

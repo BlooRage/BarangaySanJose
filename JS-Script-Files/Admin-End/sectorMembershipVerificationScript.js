@@ -7,12 +7,26 @@
   const state = {
     apps: [],
     filter: "ALL",
+    modalFilters: {
+      dateFrom: "",
+      dateTo: "",
+      sector_key: [],
+      area_number: [],
+    },
     search: "",
     currentPage: 1,
     entriesPerPage: 20,
     active: null, // currently opened application row
   };
   const pendingBadge = el("pendingSectorBadge");
+  const filterDateFromEl = el("sectorFilterDateFrom");
+  const filterDateToEl = el("sectorFilterDateTo");
+  const filterMembershipListEl = el("sectorFilterMembershipList");
+  const filterAreaListEl = el("sectorFilterAreaList");
+  const btnSectorFilterApply = el("btnSectorFilterApply");
+  const btnSectorFilterReset = el("btnSectorFilterReset");
+  const OFFICIAL_AREA_OPTIONS = ["Area 01", "Area 1A", "Area 02", "Area 03", "Area 04", "Area 05", "Area 06"];
+  const OFFICIAL_SECTOR_OPTIONS = ["PWD", "Senior Citizen", "Student", "Indigenous People", "Single Parent"];
 
   const entriesPerPageInput = el("sectorEntriesPerPageInput");
   const paginationEl = el("sectorPagination");
@@ -73,6 +87,73 @@
     const m = today.getMonth() - d.getMonth();
     if (m < 0 || (m === 0 && today.getDate() < d.getDate())) age -= 1;
     return String(age);
+  };
+
+  const normalizeDateValue = (value) => {
+    const raw = String(value || "").trim();
+    if (!raw) return "";
+    const isoMatch = raw.match(/^(\d{4}-\d{2}-\d{2})/);
+    if (isoMatch) return isoMatch[1];
+    const parsed = new Date(raw);
+    if (Number.isNaN(parsed.getTime())) return "";
+    const year = parsed.getFullYear();
+    const month = String(parsed.getMonth() + 1).padStart(2, "0");
+    const day = String(parsed.getDate()).padStart(2, "0");
+    return `${year}-${month}-${day}`;
+  };
+
+  const latestUploadDate = (app) => {
+    const docs = Array.isArray(app?.documents) ? app.documents : [];
+    const dates = docs.map((doc) => normalizeDateValue(doc?.upload_timestamp)).filter(Boolean).sort();
+    return dates[dates.length - 1] || "";
+  };
+
+  const renderFilterChecklist = (container, field, values) => {
+    if (!container) return;
+    const list = Array.isArray(values) ? values : [];
+    if (!list.length) {
+      container.innerHTML = `<div class="text-muted small">No options available.</div>`;
+      return;
+    }
+    const active = new Set(Array.isArray(state.modalFilters?.[field]) ? state.modalFilters[field] : []);
+    container.innerHTML = list.map((value, index) => `
+      <label class="d-flex align-items-center gap-2">
+        <input class="form-check-input m-0 sector-filter-checkbox" type="checkbox" value="${String(value).replace(/"/g, "&quot;")}" data-field="${field}" id="sectorFilter_${field}_${index}" ${active.has(value) ? "checked" : ""}>
+        <span>${value}</span>
+      </label>
+    `).join("");
+  };
+
+  const syncModalFilterOptions = () => {
+    const sectorOptions = OFFICIAL_SECTOR_OPTIONS.slice();
+    const areaOptions = OFFICIAL_AREA_OPTIONS.slice();
+
+    state.modalFilters.sector_key = state.modalFilters.sector_key
+      .map((value) => sectorMap[normalizeSectorKey(value)] || String(value || "").trim())
+      .filter((value) => sectorOptions.includes(value));
+    state.modalFilters.area_number = state.modalFilters.area_number
+      .map((value) => String(value || "").trim())
+      .filter((value) => areaOptions.includes(value));
+
+    renderFilterChecklist(filterMembershipListEl, "sector_key", sectorOptions);
+    renderFilterChecklist(filterAreaListEl, "area_number", areaOptions);
+    if (filterDateFromEl) filterDateFromEl.value = state.modalFilters.dateFrom || "";
+    if (filterDateToEl) filterDateToEl.value = state.modalFilters.dateTo || "";
+  };
+
+  const collectModalFilters = () => {
+    const next = {
+      dateFrom: String(filterDateFromEl?.value || "").trim(),
+      dateTo: String(filterDateToEl?.value || "").trim(),
+      sector_key: [],
+      area_number: [],
+    };
+    document.querySelectorAll(".sector-filter-checkbox:checked").forEach((checkbox) => {
+      const field = String(checkbox.getAttribute("data-field") || "").trim();
+      if (!field || !Array.isArray(next[field])) return;
+      next[field].push(String(checkbox.value || "").trim());
+    });
+    return next;
   };
 
   const fmtStatus = (s) => {
@@ -171,8 +252,13 @@
     return (apps || []).filter((a) => {
       const status = fmtStatus(a.verify_status);
       if (f !== "ALL" && status !== f) return false;
-      if (!q) return true;
+      const uploadedDate = latestUploadDate(a);
+      if (state.modalFilters.dateFrom && (!uploadedDate || uploadedDate < state.modalFilters.dateFrom)) return false;
+      if (state.modalFilters.dateTo && (!uploadedDate || uploadedDate > state.modalFilters.dateTo)) return false;
       const sectorLabel = markerToSectorLabel(extractMarker(a.marker || a.remarks));
+      if (state.modalFilters.sector_key.length && !state.modalFilters.sector_key.includes(sectorLabel)) return false;
+      if (state.modalFilters.area_number.length && !state.modalFilters.area_number.includes(String(a.area_number || "").trim())) return false;
+      if (!q) return true;
       const statusText = `${sectorLabel} ${status}`.toLowerCase();
       return (
         String(a.resident_id || "").toLowerCase().includes(q) ||
@@ -607,6 +693,7 @@
 
     state.apps = Array.isArray(data.data) ? data.data : [];
     updatePendingCount();
+    syncModalFilterOptions();
     renderTable();
   };
 
@@ -693,6 +780,29 @@
       });
     });
 
+    btnSectorFilterApply?.addEventListener("click", () => {
+      state.modalFilters = collectModalFilters();
+      state.currentPage = 1;
+      renderTable();
+      bootstrap.Modal.getInstance(el("modalFilter"))?.hide();
+    });
+
+    btnSectorFilterReset?.addEventListener("click", () => {
+      state.modalFilters = {
+        dateFrom: "",
+        dateTo: "",
+        sector_key: [],
+        area_number: [],
+      };
+      if (filterDateFromEl) filterDateFromEl.value = "";
+      if (filterDateToEl) filterDateToEl.value = "";
+      document.querySelectorAll(".sector-filter-checkbox").forEach((checkbox) => {
+        checkbox.checked = false;
+      });
+      state.currentPage = 1;
+      renderTable();
+    });
+
     if (btnRefreshTable) {
       btnRefreshTable.addEventListener("click", () => {
         triggerRefresh().catch(() => {});
@@ -706,4 +816,3 @@
     startAutoRefresh();
   });
 })();
-

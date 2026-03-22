@@ -290,6 +290,30 @@ if (isset($conn) && $conn instanceof mysqli) {
                                 </div>
                             </div>
 
+                            <div class="mb-3">
+                                <label class="fw-bold small mb-1">Area Number</label>
+                                <div>
+                                    <?php foreach (['Area 01', 'Area 1A', 'Area 02', 'Area 03', 'Area 04', 'Area 05', 'Area 06'] as $areaOption): ?>
+                                    <div class="form-check">
+                                        <input class="form-check-input filter-checkbox" type="checkbox" value="<?= htmlspecialchars($areaOption) ?>" data-field="area_number" id="filterResident<?= preg_replace('/[^A-Za-z0-9]/', '', $areaOption) ?>">
+                                        <label class="form-check-label small" for="filterResident<?= preg_replace('/[^A-Za-z0-9]/', '', $areaOption) ?>"><?= htmlspecialchars($areaOption) ?></label>
+                                    </div>
+                                    <?php endforeach; ?>
+                                </div>
+                            </div>
+
+                            <div class="mb-1">
+                                <label class="fw-bold small mb-1">Sector Membership</label>
+                                <div>
+                                    <?php foreach (['PWD', 'Senior Citizen', 'Student', 'Indigenous People', 'Single Parent'] as $sectorOption): ?>
+                                    <div class="form-check">
+                                        <input class="form-check-input filter-checkbox" type="checkbox" value="<?= htmlspecialchars($sectorOption) ?>" data-field="sector_membership" id="filterResidentSector<?= preg_replace('/[^A-Za-z0-9]/', '', $sectorOption) ?>">
+                                        <label class="form-check-label small" for="filterResidentSector<?= preg_replace('/[^A-Za-z0-9]/', '', $sectorOption) ?>"><?= htmlspecialchars($sectorOption) ?></label>
+                                    </div>
+                                    <?php endforeach; ?>
+                                </div>
+                            </div>
+
                         </div>
 
                         <div class="modal-footer border-0">

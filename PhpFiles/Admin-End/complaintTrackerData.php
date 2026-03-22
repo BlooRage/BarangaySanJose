@@ -53,6 +53,26 @@ function tableExists(mysqli $conn, string $tableName): bool
     return !empty($row);
 }
 
+function columnExists(mysqli $conn, string $tableName, string $columnName): bool
+{
+    $stmt = $conn->prepare("
+        SELECT 1
+        FROM information_schema.COLUMNS
+        WHERE TABLE_SCHEMA = DATABASE()
+          AND TABLE_NAME = ?
+          AND COLUMN_NAME = ?
+        LIMIT 1
+    ");
+    if (!$stmt) {
+        return false;
+    }
+    $stmt->bind_param("ss", $tableName, $columnName);
+    $stmt->execute();
+    $row = $stmt->get_result()->fetch_row();
+    $stmt->close();
+    return !empty($row);
+}
+
 function getStatusId(mysqli $conn, string $statusName, string $statusType): int
 {
     $stmt = $conn->prepare("
@@ -368,6 +388,28 @@ if ($action === '') {
 }
 
 if ($action === 'list') {
+    $residentSelect = '';
+    $residentJoin = '';
+    if (
+        tableExists($conn, 'residentinformationtbl')
+        && tableExists($conn, 'residentaddresstbl')
+        && columnExists($conn, 'casereportstbl', 'resident_user_id')
+    ) {
+        $residentSelect = ",
+            COALESCE(ri.sector_membership, '') AS sector_membership,
+            COALESCE(ra.area_number, '') AS area_number";
+        $residentJoin = "
+        LEFT JOIN residentinformationtbl ri ON ri.user_id = c.resident_user_id
+        LEFT JOIN residentaddresstbl ra
+            ON ra.address_id = (
+                SELECT a2.address_id
+                FROM residentaddresstbl a2
+                WHERE a2.resident_id = ri.resident_id
+                ORDER BY a2.address_id DESC
+                LIMIT 1
+            )";
+    }
+
     $sql = "
         SELECT
             c.case_id,
@@ -386,6 +428,7 @@ if ($action === 'list') {
             cp.middlename,
             cp.lastname,
             cp.suffix
+            {$residentSelect}
         FROM casereportstbl c
         INNER JOIN complaintstbl ct ON ct.case_id = c.case_id
         LEFT JOIN statuslookuptbl s ON s.status_id = c.case_status_id
@@ -411,6 +454,7 @@ if ($action === 'list') {
             GROUP BY case_id
         ) cp
             ON cp.case_id = c.case_id
+        {$residentJoin}
         WHERE c.report_type = 'Complaint'
         ORDER BY c.report_timestamp DESC, c.case_id DESC
     ";
@@ -442,8 +486,11 @@ if ($action === 'list') {
         $items[] = [
             'case_id' => (string)$row['case_id'],
             'complaint_id' => $row['complaint_id'] ?? '',
+            'submitted_at_raw' => (string)($row['submitted_at_raw'] ?? ''),
             'submitted_at' => formatDisplayTimestamp($row['submitted_at_raw'] ?? ''),
             'complaint_type' => $row['complaint_type'] ?? '',
+            'area_number' => $row['area_number'] ?? '',
+            'sector_membership' => $row['sector_membership'] ?? '',
             'status_name' => $statusName !== '' ? $statusName : 'Pending',
             'status_key' => $statusKey,
             'level_name' => $row['level_name'] ?? 'Complaint Only',
@@ -831,5 +878,3 @@ if ($action === 'update_case_outcome') {
 }
 
 respond(false, [], 'Unsupported action.');
-
-

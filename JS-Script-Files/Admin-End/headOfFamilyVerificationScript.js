@@ -6,6 +6,8 @@ document.addEventListener("DOMContentLoaded", () => {
   const statusFilterSelect = document.getElementById("hofStatusFilterSelect");
   const btnFilterApply = document.getElementById("btnHofFilterApply");
   const btnFilterReset = document.getElementById("btnHofFilterReset");
+  const areaFilterList = document.getElementById("hofAreaFilterList");
+  const sectorFilterList = document.getElementById("hofSectorFilterList");
   const pendingBadge = document.getElementById("pendingHofBadge");
   const entriesPerPageInput = document.getElementById("hofEntriesPerPageInput");
   const paginationEl = document.getElementById("hofPagination");
@@ -22,6 +24,8 @@ document.addEventListener("DOMContentLoaded", () => {
 
   let rowsRaw = [];
   let activeStatus = "ALL";
+  let activeAreaFilters = [];
+  let activeSectorFilters = [];
   let currentPage = 1;
   let entriesPerPage = Math.max(1, Number.parseInt(entriesPerPageInput?.value || "20", 10) || 20);
 
@@ -29,6 +33,8 @@ document.addEventListener("DOMContentLoaded", () => {
   const AUTO_REFRESH_SECONDS = 15;
   let autoRefreshSecondsLeft = AUTO_REFRESH_SECONDS;
   let autoRefreshInterval = null;
+  const OFFICIAL_AREA_OPTIONS = ["Area 01", "Area 1A", "Area 02", "Area 03", "Area 04", "Area 05", "Area 06"];
+  const OFFICIAL_SECTOR_OPTIONS = ["PWD", "Senior Citizen", "Student", "Indigenous People", "Single Parent"];
 
   const setRefreshLoading = (on) => {
     if (!refreshBtn) return;
@@ -39,6 +45,64 @@ document.addEventListener("DOMContentLoaded", () => {
   const safe = (v) => {
     const s = String(v ?? "").trim();
     return s !== "" ? s : "-";
+  };
+
+  const parseCsvValues = (value) => Array.from(new Set(
+    String(value ?? "")
+      .split(",")
+      .map((item) => item.trim())
+      .filter(Boolean)
+  ));
+
+  const normalizeSectorLabel = (value) => {
+    const raw = String(value ?? "").trim();
+    if (!raw) return "";
+    const normalized = raw.toLowerCase().replace(/[^a-z]/g, "");
+    const map = {
+      pwd: "PWD",
+      seniorcitizen: "Senior Citizen",
+      student: "Student",
+      indigenouspeople: "Indigenous People",
+      indigenousperson: "Indigenous People",
+      singleparent: "Single Parent",
+      soloparent: "Single Parent",
+    };
+    return map[normalized] || raw;
+  };
+
+  const parseSectorValues = (value) => Array.from(new Set(
+    parseCsvValues(value)
+      .map((item) => normalizeSectorLabel(item))
+      .filter(Boolean)
+  ));
+
+  const renderChecklist = (container, field, values, activeValues) => {
+    if (!container) return;
+    const list = Array.isArray(values) ? values : [];
+    if (!list.length) {
+      container.innerHTML = `<div class="text-muted small">No options available.</div>`;
+      return;
+    }
+    const active = new Set(Array.isArray(activeValues) ? activeValues : []);
+    container.innerHTML = list.map((value, index) => `
+      <label class="d-flex align-items-center gap-2">
+        <input class="form-check-input m-0 hof-filter-checkbox" type="checkbox" value="${String(value).replace(/"/g, "&quot;")}" data-field="${field}" id="hofFilter_${field}_${index}" ${active.has(value) ? "checked" : ""}>
+        <span>${value}</span>
+      </label>
+    `).join("");
+  };
+
+  const syncFilterOptions = () => {
+    const areas = OFFICIAL_AREA_OPTIONS.slice();
+    const sectors = OFFICIAL_SECTOR_OPTIONS.slice();
+
+    activeAreaFilters = activeAreaFilters.filter((value) => areas.includes(String(value || "").trim()));
+    activeSectorFilters = activeSectorFilters
+      .map((value) => normalizeSectorLabel(value))
+      .filter((value) => sectors.includes(value));
+
+    renderChecklist(areaFilterList, "area_number", areas, activeAreaFilters);
+    renderChecklist(sectorFilterList, "sector_membership", sectors, activeSectorFilters);
   };
 
   const statusPill = (status) => {
@@ -91,6 +155,20 @@ document.addEventListener("DOMContentLoaded", () => {
 
     if (activeStatus !== "ALL") {
       rows = rows.filter((r) => String(r.verification_status || "Pending") === activeStatus);
+    }
+
+    if (activeAreaFilters.length) {
+      rows = rows.filter((r) => activeAreaFilters.includes(String(r.area_number || "").trim()));
+    }
+
+    if (activeSectorFilters.length) {
+      rows = rows.filter((r) => {
+        const households = Array.isArray(r?.households) ? r.households : [];
+        const memberships = households.flatMap((household) => parseSectorValues(household?.sector_membership));
+        return activeSectorFilters
+          .map((value) => normalizeSectorLabel(value))
+          .some((value) => memberships.includes(value));
+      });
     }
 
     if (q) {
@@ -178,6 +256,7 @@ document.addEventListener("DOMContentLoaded", () => {
       const data = await res.json().catch(() => ([]));
       if (!res.ok || !Array.isArray(data)) throw new Error("Failed to load head applications.");
       rowsRaw = data;
+      syncFilterOptions();
       updatePendingBadge();
       renderTable();
     } catch (err) {
@@ -376,12 +455,19 @@ document.addEventListener("DOMContentLoaded", () => {
   btnConfirmApprove?.addEventListener("click", approveGroup);
   btnFilterApply?.addEventListener("click", () => {
     activeStatus = statusFilterSelect?.value || "ALL";
+    activeAreaFilters = Array.from(document.querySelectorAll('.hof-filter-checkbox[data-field="area_number"]:checked')).map((checkbox) => String(checkbox.value || "").trim());
+    activeSectorFilters = Array.from(document.querySelectorAll('.hof-filter-checkbox[data-field="sector_membership"]:checked')).map((checkbox) => normalizeSectorLabel(String(checkbox.value || "").trim()));
     currentPage = 1;
     activateStatusButton(activeStatus);
     renderTable();
   });
   btnFilterReset?.addEventListener("click", () => {
     activeStatus = "ALL";
+    activeAreaFilters = [];
+    activeSectorFilters = [];
+    document.querySelectorAll(".hof-filter-checkbox").forEach((checkbox) => {
+      checkbox.checked = false;
+    });
     currentPage = 1;
     activateStatusButton(activeStatus);
     renderTable();

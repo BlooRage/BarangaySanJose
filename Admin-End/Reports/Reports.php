@@ -176,6 +176,154 @@ function rp_finance_rollup_subquery(mysqli $conn, string $sourceAlias = 'ft'): s
     ";
 }
 
+function rp_join_latest_address_sql(string $residentIdExpr, string $alias): string {
+    return "
+        LEFT JOIN residentaddresstbl {$alias}
+            ON {$alias}.address_id = (
+                SELECT a2.address_id
+                FROM residentaddresstbl a2
+                WHERE a2.resident_id = {$residentIdExpr}
+                ORDER BY a2.address_id DESC
+                LIMIT 1
+            )
+    ";
+}
+
+function rp_document_request_resident_parts(mysqli $conn, string $requestAlias = 'd', string $prefix = 'drf'): array {
+    $joins = [];
+    $sectorCandidates = [];
+    $areaCandidates = [];
+
+    if (!rp_table_exists($conn, 'residentinformationtbl')) {
+        return ['joins' => '', 'sector_expr' => 'NULL', 'area_expr' => 'NULL'];
+    }
+
+    if (rp_column_exists($conn, 'documentrequesttbl', 'resident_user_id')) {
+        $infoAlias = $prefix . 'iu';
+        $joins[] = "LEFT JOIN residentinformationtbl {$infoAlias} ON {$infoAlias}.user_id = {$requestAlias}.resident_user_id";
+        $sectorCandidates[] = "NULLIF(TRIM({$infoAlias}.sector_membership), '')";
+        if (rp_table_exists($conn, 'residentaddresstbl')) {
+            $addrAlias = $prefix . 'au';
+            $joins[] = trim(rp_join_latest_address_sql("{$infoAlias}.resident_id", $addrAlias));
+            $areaCandidates[] = "NULLIF(TRIM({$addrAlias}.area_number), '')";
+        }
+    }
+
+    if (rp_column_exists($conn, 'documentrequesttbl', 'resident_id')) {
+        $infoAlias = $prefix . 'ir';
+        $joins[] = "LEFT JOIN residentinformationtbl {$infoAlias} ON {$infoAlias}.resident_id = {$requestAlias}.resident_id";
+        $sectorCandidates[] = "NULLIF(TRIM({$infoAlias}.sector_membership), '')";
+        if (rp_table_exists($conn, 'residentaddresstbl')) {
+            $addrAlias = $prefix . 'ar';
+            $joins[] = trim(rp_join_latest_address_sql("{$requestAlias}.resident_id", $addrAlias));
+            $areaCandidates[] = "NULLIF(TRIM({$addrAlias}.area_number), '')";
+        }
+    }
+
+    return [
+        'joins' => implode("\n        ", array_filter($joins)),
+        'sector_expr' => $sectorCandidates ? 'COALESCE(' . implode(', ', $sectorCandidates) . ')' : 'NULL',
+        'area_expr' => $areaCandidates ? 'COALESCE(' . implode(', ', $areaCandidates) . ')' : 'NULL',
+    ];
+}
+
+function rp_user_resident_parts(mysqli $conn, string $userIdExpr, string $prefix = 'rf'): array {
+    if (!rp_table_exists($conn, 'residentinformationtbl')) {
+        return ['joins' => '', 'sector_expr' => 'NULL', 'area_expr' => 'NULL'];
+    }
+
+    $infoAlias = $prefix . 'i';
+    $joins = ["LEFT JOIN residentinformationtbl {$infoAlias} ON {$infoAlias}.user_id = {$userIdExpr}"];
+    $sectorExpr = "NULLIF(TRIM({$infoAlias}.sector_membership), '')";
+    $areaExpr = 'NULL';
+
+    if (rp_table_exists($conn, 'residentaddresstbl')) {
+        $addrAlias = $prefix . 'a';
+        $joins[] = trim(rp_join_latest_address_sql("{$infoAlias}.resident_id", $addrAlias));
+        $areaExpr = "NULLIF(TRIM({$addrAlias}.area_number), '')";
+    }
+
+    return [
+        'joins' => implode("\n        ", $joins),
+        'sector_expr' => $sectorExpr,
+        'area_expr' => $areaExpr,
+    ];
+}
+
+function rp_parse_csv_values(string $value): array {
+    return array_values(array_filter(array_map(
+        static fn(string $item): string => trim($item),
+        explode(',', $value)
+    ), static fn(string $item): bool => $item !== ''));
+}
+
+function rp_official_area_options(): array {
+    $areas = ['Area 01', 'Area 1A', 'Area 02', 'Area 03', 'Area 04', 'Area 05', 'Area 06'];
+    return array_combine($areas, $areas) ?: [];
+}
+
+function rp_normalize_sector_label(string $value): string {
+    $raw = trim($value);
+    if ($raw === '') {
+        return '';
+    }
+
+    $normalized = strtolower(preg_replace('/[^a-z]/', '', $raw));
+    $map = [
+        'pwd' => 'PWD',
+        'seniorcitizen' => 'Senior Citizen',
+        'student' => 'Student',
+        'indigenouspeople' => 'Indigenous People',
+        'indigenousperson' => 'Indigenous People',
+        'singleparent' => 'Single Parent',
+        'soloparent' => 'Single Parent',
+    ];
+
+    return $map[$normalized] ?? $raw;
+}
+
+function rp_official_sector_options(): array {
+    $sectors = ['PWD', 'Senior Citizen', 'Student', 'Indigenous People', 'Single Parent'];
+    return array_combine($sectors, $sectors) ?: [];
+}
+
+function rp_options_from_rows(array $rows, string $valueKey, ?callable $labelFormatter = null): array {
+    $options = [];
+    foreach ($rows as $row) {
+        $value = trim((string)($row[$valueKey] ?? ''));
+        if ($value === '') {
+            continue;
+        }
+        $options[$value] = $labelFormatter ? (string)$labelFormatter($value) : $value;
+    }
+    asort($options, SORT_NATURAL | SORT_FLAG_CASE);
+    return $options;
+}
+
+function rp_sector_options_from_rows(array $rows, string $valueKey = 'sector_membership'): array {
+    $options = [];
+    foreach ($rows as $row) {
+        foreach (rp_parse_csv_values((string)($row[$valueKey] ?? '')) as $value) {
+            $value = rp_normalize_sector_label($value);
+            if ($value === '') {
+                continue;
+            }
+            $options[$value] = $value;
+        }
+    }
+    asort($options, SORT_NATURAL | SORT_FLAG_CASE);
+    return $options;
+}
+
+function rp_sql_quote(mysqli $conn, string $value): string {
+    return "'" . $conn->real_escape_string($value) . "'";
+}
+
+function rp_csv_contains_expr(mysqli $conn, string $columnExpr, string $value): string {
+    $normalizedValue = strtolower(str_replace(' ', '', rp_normalize_sector_label($value)));
+    return "FIND_IN_SET(" . rp_sql_quote($conn, $normalizedValue) . ", REPLACE(REPLACE(LOWER(COALESCE({$columnExpr}, '')), ', ', ','), ' ', '')) > 0";
+}
+
 // ── Module routing ────────────────────────────────────────────────────────────
 $allowedModules = ['document_requests', 'financial', 'residents', 'appointments', 'blotter', 'complaints'];
 $module = strtolower(trim((string)($_GET['module'] ?? 'document_requests')));
@@ -188,7 +336,28 @@ $dateFrom   = preg_match('/^\d{4}-\d{2}-\d{2}$/', (string)($_GET['date_from'] ??
 $dateTo     = preg_match('/^\d{4}-\d{2}-\d{2}$/', (string)($_GET['date_to']   ?? '')) ? $_GET['date_to']   : $today;
 if ($dateTo < $dateFrom) $dateTo = $dateFrom;
 
-$baseUrl = htmlspecialchars(appUrl('Admin-End/Reports/Reports.php'));
+$baseUrl = appUrl('Admin-End/Reports/Reports.php');
+$reportFilterType = trim((string)($_GET['filter_type'] ?? ''));
+$reportFilterArea = trim((string)($_GET['filter_area'] ?? ''));
+$reportFilterSector = rp_normalize_sector_label(trim((string)($_GET['filter_sector'] ?? '')));
+$officialReportAreaOptions = rp_official_area_options();
+$officialReportSectorOptions = rp_official_sector_options();
+if ($reportFilterArea !== '' && !array_key_exists($reportFilterArea, $officialReportAreaOptions)) {
+    $reportFilterArea = '';
+}
+if ($reportFilterSector !== '' && !array_key_exists($reportFilterSector, $officialReportSectorOptions)) {
+    $reportFilterSector = '';
+}
+$reportFilterOptions = [
+    'type' => [],
+    'area' => $officialReportAreaOptions,
+    'sector' => $officialReportSectorOptions,
+];
+$reportFilterLabels = [
+    'type' => in_array($module, ['blotter', 'complaints'], true) ? 'Type of Complaint' : 'Type of Request',
+    'area' => 'Area Number',
+    'sector' => 'Sector Membership',
+];
 
 // ── Prepared-by user ──────────────────────────────────────────────────────────
 $preparedByName = 'System User';
@@ -218,8 +387,12 @@ if ($module === 'document_requests' && rp_table_exists($conn, 'documentrequesttb
     $dt = $conn->real_escape_string($dateTo);
     $requestDateExpr = rp_first_existing_datetime_expr($conn, 'documentrequesttbl', 'd', ['submitted_at', 'request_timestamp', 'created_at']);
     $hasFinanceTable = rp_table_exists($conn, 'financetransactiontbl');
+    $residentParts = rp_document_request_resident_parts($conn, 'd', 'dr');
     $financeRollup = $hasFinanceTable ? rp_finance_rollup_subquery($conn, 'ft') : '';
     $financeJoin = $hasFinanceTable ? "LEFT JOIN {$financeRollup} f ON f.request_id = d.request_id" : '';
+    $residentJoin = $residentParts['joins'] !== '' ? $residentParts['joins'] : '';
+    $areaExpr = $residentParts['area_expr'];
+    $sectorExpr = $residentParts['sector_expr'];
     $amountExpr = $hasFinanceTable && rp_column_exists($conn, 'financetransactiontbl', 'transaction_amount')
         ? "COALESCE(f.transaction_amount, 0)"
         : "0";
@@ -236,6 +409,47 @@ if ($module === 'document_requests' && rp_table_exists($conn, 'documentrequesttb
     $rejectedStagesExpr = "('rejected','cancelled','interview_failed','inspection_failed')";
     $collectedStagesExpr = "('payment_verified','ready_for_claim','completed')";
     $docTypeExpr = "COALESCE(NULLIF(TRIM(d.document_type), ''), 'Unspecified')";
+    $requestFilterClauses = [$requestDateFilter];
+    if ($reportFilterType !== '') {
+        $requestFilterClauses[] = "{$docTypeExpr} = " . rp_sql_quote($conn, $reportFilterType);
+    }
+    if ($reportFilterArea !== '' && $areaExpr !== 'NULL') {
+        $requestFilterClauses[] = "{$areaExpr} = " . rp_sql_quote($conn, $reportFilterArea);
+    }
+    if ($reportFilterSector !== '' && $sectorExpr !== 'NULL') {
+        $requestFilterClauses[] = rp_csv_contains_expr($conn, $sectorExpr, $reportFilterSector);
+    }
+    $requestFilterWhere = implode(' AND ', $requestFilterClauses);
+    $reportFilterOptions['type'] = rp_options_from_rows(rp_safe_query($conn, "
+        SELECT {$docTypeExpr} AS value
+        FROM documentrequesttbl d
+        " . ($residentJoin !== '' ? "\n        {$residentJoin}" : '') . "
+        WHERE {$requestDateFilter}
+        GROUP BY {$docTypeExpr}
+        ORDER BY {$docTypeExpr} ASC
+    "), 'value', 'rp_document_type_label');
+    if ($areaExpr !== 'NULL') {
+        $reportFilterOptions['area'] = rp_options_from_rows(rp_safe_query($conn, "
+            SELECT {$areaExpr} AS value
+            FROM documentrequesttbl d
+            {$residentJoin}
+            WHERE {$requestDateFilter}
+              AND {$areaExpr} IS NOT NULL
+              AND {$areaExpr} <> ''
+            GROUP BY {$areaExpr}
+            ORDER BY {$areaExpr} ASC
+        "), 'value');
+    }
+    if ($sectorExpr !== 'NULL') {
+        $reportFilterOptions['sector'] = rp_sector_options_from_rows(rp_safe_query($conn, "
+            SELECT {$sectorExpr} AS sector_membership
+            FROM documentrequesttbl d
+            {$residentJoin}
+            WHERE {$requestDateFilter}
+              AND {$sectorExpr} IS NOT NULL
+              AND {$sectorExpr} <> ''
+        "));
+    }
 
     $kpi = rp_safe_query($conn, "
         SELECT
@@ -247,7 +461,8 @@ if ($module === 'document_requests' && rp_table_exists($conn, 'documentrequesttb
         FROM documentrequesttbl
         d
         {$financeJoin}
-        WHERE {$requestDateFilter}
+        " . ($residentJoin !== '' ? "\n        {$residentJoin}" : '') . "
+        WHERE {$requestFilterWhere}
     ");
     $dr['kpi'] = $kpi[0] ?? [];
 
@@ -261,7 +476,8 @@ if ($module === 'document_requests' && rp_table_exists($conn, 'documentrequesttb
           SUM(CASE WHEN LOWER(stage) IN {$collectedStagesExpr} AND {$amountExpr}>0 THEN {$amountExpr} ELSE 0 END) AS revenue
         FROM documentrequesttbl d
         {$financeJoin}
-        WHERE {$requestDateFilter}
+        " . ($residentJoin !== '' ? "\n        {$residentJoin}" : '') . "
+        WHERE {$requestFilterWhere}
         GROUP BY {$docTypeExpr}
         ORDER BY total DESC
     ");
@@ -269,7 +485,8 @@ if ($module === 'document_requests' && rp_table_exists($conn, 'documentrequesttb
     $dr['by_stage'] = rp_safe_query($conn, "
         SELECT COALESCE(stage,'Unknown') AS stage, COUNT(*) AS total
         FROM documentrequesttbl d
-        WHERE {$requestDateFilter}
+        " . ($residentJoin !== '' ? "\n        {$residentJoin}" : '') . "
+        WHERE {$requestFilterWhere}
         GROUP BY stage ORDER BY total DESC
     ");
 
@@ -277,7 +494,8 @@ if ($module === 'document_requests' && rp_table_exists($conn, 'documentrequesttb
         SELECT DATE_FORMAT({$requestDateExpr},'%Y-%m') AS month, COUNT(*) AS total,
           SUM(CASE WHEN LOWER(stage)='completed' THEN 1 ELSE 0 END) AS completed
         FROM documentrequesttbl d
-        WHERE {$trendFilter}
+        " . ($residentJoin !== '' ? "\n        {$residentJoin}" : '') . "
+        WHERE {$trendFilter}" . ($reportFilterType !== '' ? " AND {$docTypeExpr} = " . rp_sql_quote($conn, $reportFilterType) : '') . ($reportFilterArea !== '' && $areaExpr !== 'NULL' ? " AND {$areaExpr} = " . rp_sql_quote($conn, $reportFilterArea) : '') . ($reportFilterSector !== '' && $sectorExpr !== 'NULL' ? " AND " . rp_csv_contains_expr($conn, $sectorExpr, $reportFilterSector) : '') . "
         GROUP BY month ORDER BY month ASC
     ");
 
@@ -287,7 +505,8 @@ if ($module === 'document_requests' && rp_table_exists($conn, 'documentrequesttb
           SUM({$amountExpr}) AS revenue
         FROM documentrequesttbl d
         LEFT JOIN {$financeRollup} f ON f.request_id = d.request_id
-        WHERE {$requestDateFilter}
+        " . ($residentJoin !== '' ? "\n        {$residentJoin}" : '') . "
+        WHERE {$requestFilterWhere}
           AND LOWER(d.stage) IN {$collectedStagesExpr}
           AND {$amountExpr} > 0
         GROUP BY {$paymentMethodExpr}
@@ -302,12 +521,64 @@ $fin = [];
 if ($module === 'financial' && rp_table_exists($conn, 'documentrequesttbl') && rp_table_exists($conn, 'financetransactiontbl')) {
     $df = $conn->real_escape_string($dateFrom);
     $dt = $conn->real_escape_string($dateTo);
+    $residentParts = rp_document_request_resident_parts($conn, 'd', 'fin');
     $financeRollup = rp_finance_rollup_subquery($conn, 'ft');
+    $residentJoin = $residentParts['joins'] !== '' ? $residentParts['joins'] : '';
+    $areaExpr = $residentParts['area_expr'];
+    $sectorExpr = $residentParts['sector_expr'];
+    $docTypeExpr = "COALESCE(NULLIF(TRIM(d.document_type), ''), 'Unspecified')";
     $financeDateExpr = "NULLIF(f.finance_event_at, '0000-00-00 00:00:00')";
     $financialDateFilter = $financeDateExpr !== 'NULL'
         ? "DATE({$financeDateExpr}) BETWEEN '{$df}' AND '{$dt}'"
         : '1 = 0';
     $financialCollectedFilter = "LOWER(d.stage) IN ('payment_verified', 'ready_for_claim', 'completed') AND COALESCE(f.transaction_amount, 0) > 0";
+    $financialFilterClauses = [$financialCollectedFilter, $financialDateFilter];
+    if ($reportFilterType !== '') {
+        $financialFilterClauses[] = "{$docTypeExpr} = " . rp_sql_quote($conn, $reportFilterType);
+    }
+    if ($reportFilterArea !== '' && $areaExpr !== 'NULL') {
+        $financialFilterClauses[] = "{$areaExpr} = " . rp_sql_quote($conn, $reportFilterArea);
+    }
+    if ($reportFilterSector !== '' && $sectorExpr !== 'NULL') {
+        $financialFilterClauses[] = rp_csv_contains_expr($conn, $sectorExpr, $reportFilterSector);
+    }
+    $financialWhere = implode(' AND ', $financialFilterClauses);
+    $reportFilterOptions['type'] = rp_options_from_rows(rp_safe_query($conn, "
+        SELECT {$docTypeExpr} AS value
+        FROM documentrequesttbl d
+        INNER JOIN {$financeRollup} f ON f.request_id = d.request_id
+        " . ($residentJoin !== '' ? "\n        {$residentJoin}" : '') . "
+        WHERE {$financialCollectedFilter}
+          AND {$financialDateFilter}
+        GROUP BY {$docTypeExpr}
+        ORDER BY {$docTypeExpr} ASC
+    "), 'value', 'rp_document_type_label');
+    if ($areaExpr !== 'NULL') {
+        $reportFilterOptions['area'] = rp_options_from_rows(rp_safe_query($conn, "
+            SELECT {$areaExpr} AS value
+            FROM documentrequesttbl d
+            INNER JOIN {$financeRollup} f ON f.request_id = d.request_id
+            {$residentJoin}
+            WHERE {$financialCollectedFilter}
+              AND {$financialDateFilter}
+              AND {$areaExpr} IS NOT NULL
+              AND {$areaExpr} <> ''
+            GROUP BY {$areaExpr}
+            ORDER BY {$areaExpr} ASC
+        "), 'value');
+    }
+    if ($sectorExpr !== 'NULL') {
+        $reportFilterOptions['sector'] = rp_sector_options_from_rows(rp_safe_query($conn, "
+            SELECT {$sectorExpr} AS sector_membership
+            FROM documentrequesttbl d
+            INNER JOIN {$financeRollup} f ON f.request_id = d.request_id
+            {$residentJoin}
+            WHERE {$financialCollectedFilter}
+              AND {$financialDateFilter}
+              AND {$sectorExpr} IS NOT NULL
+              AND {$sectorExpr} <> ''
+        "));
+    }
 
     $fin['kpi'] = rp_safe_query($conn, "
         SELECT
@@ -318,8 +589,8 @@ if ($module === 'financial' && rp_table_exists($conn, 'documentrequesttbl') && r
           SUM(CASE WHEN COALESCE(f.or_number, '') <> '' THEN 1 ELSE 0 END) AS or_count
         FROM documentrequesttbl d
         INNER JOIN {$financeRollup} f ON f.request_id = d.request_id
-        WHERE {$financialCollectedFilter}
-          AND {$financialDateFilter}
+        " . ($residentJoin !== '' ? "\n        {$residentJoin}" : '') . "
+        WHERE {$financialWhere}
     ");
     $fin['kpi'] = $fin['kpi'][0] ?? [];
 
@@ -332,21 +603,21 @@ if ($module === 'financial' && rp_table_exists($conn, 'documentrequesttbl') && r
           SUM(CASE WHEN LOWER(COALESCE(f.payment_method, '')) IN ('barangay', 'walk_in', 'walkin', 'cash') THEN COALESCE(f.transaction_amount, 0) ELSE 0 END) AS walkin
         FROM documentrequesttbl d
         INNER JOIN {$financeRollup} f ON f.request_id = d.request_id
-        WHERE {$financialCollectedFilter}
-          AND {$financialDateFilter}
+        " . ($residentJoin !== '' ? "\n        {$residentJoin}" : '') . "
+        WHERE {$financialWhere}
         GROUP BY collection_date ORDER BY collection_date ASC
     ");
 
     $fin['by_type'] = rp_safe_query($conn, "
         SELECT
-          COALESCE(NULLIF(TRIM(d.document_type), ''), 'Unspecified') AS document_type,
+          {$docTypeExpr} AS document_type,
           COUNT(*) AS count,
           SUM(COALESCE(f.transaction_amount, 0)) AS total
         FROM documentrequesttbl d
         INNER JOIN {$financeRollup} f ON f.request_id = d.request_id
-        WHERE {$financialCollectedFilter}
-          AND {$financialDateFilter}
-        GROUP BY COALESCE(NULLIF(TRIM(d.document_type), ''), 'Unspecified')
+        " . ($residentJoin !== '' ? "\n        {$residentJoin}" : '') . "
+        WHERE {$financialWhere}
+        GROUP BY {$docTypeExpr}
         ORDER BY total DESC
     ");
 
@@ -363,9 +634,9 @@ if ($module === 'financial' && rp_table_exists($conn, 'documentrequesttbl') && r
           {$financeDateExpr} AS finance_decision_at
         FROM documentrequesttbl d
         INNER JOIN {$financeRollup} f ON f.request_id = d.request_id
-        WHERE {$financialCollectedFilter}
+        " . ($residentJoin !== '' ? "\n        {$residentJoin}" : '') . "
+        WHERE {$financialWhere}
           AND COALESCE(f.or_number, '') <> ''
-          AND {$financialDateFilter}
         ORDER BY {$financeDateExpr} ASC
         LIMIT 500
     ");
@@ -376,6 +647,37 @@ if ($module === 'financial' && rp_table_exists($conn, 'documentrequesttbl') && r
 // ═══════════════════════════════════════════════════════════════════════════════
 $res = [];
 if ($module === 'residents' && rp_table_exists($conn, 'residentinformationtbl')) {
+    $residentAddressJoin = rp_table_exists($conn, 'residentaddresstbl')
+        ? trim(rp_join_latest_address_sql('ri.resident_id', 'ra'))
+        : '';
+    $residentAreaExpr = $residentAddressJoin !== '' ? "NULLIF(TRIM(ra.area_number), '')" : 'NULL';
+    $residentSectorExpr = "NULLIF(TRIM(ri.sector_membership), '')";
+    $residentFilterClauses = [];
+    if ($reportFilterArea !== '' && $residentAreaExpr !== 'NULL') {
+        $residentFilterClauses[] = "{$residentAreaExpr} = " . rp_sql_quote($conn, $reportFilterArea);
+    }
+    if ($reportFilterSector !== '') {
+        $residentFilterClauses[] = rp_csv_contains_expr($conn, $residentSectorExpr, $reportFilterSector);
+    }
+    $residentFilterSql = $residentFilterClauses ? ' AND ' . implode(' AND ', $residentFilterClauses) : '';
+    if ($residentAreaExpr !== 'NULL') {
+        $reportFilterOptions['area'] = rp_options_from_rows(rp_safe_query($conn, "
+            SELECT {$residentAreaExpr} AS value
+            FROM residentinformationtbl ri
+            {$residentAddressJoin}
+            WHERE {$residentAreaExpr} IS NOT NULL
+              AND {$residentAreaExpr} <> ''
+            GROUP BY {$residentAreaExpr}
+            ORDER BY {$residentAreaExpr} ASC
+        "), 'value');
+    }
+    $reportFilterOptions['sector'] = rp_sector_options_from_rows(rp_safe_query($conn, "
+        SELECT {$residentSectorExpr} AS sector_membership
+        FROM residentinformationtbl ri
+        WHERE {$residentSectorExpr} IS NOT NULL
+          AND {$residentSectorExpr} <> ''
+    "));
+
     $res['kpi'] = rp_safe_query($conn, "
         SELECT
           COUNT(*) AS total,
@@ -385,21 +687,26 @@ if ($module === 'residents' && rp_table_exists($conn, 'residentinformationtbl'))
           SUM(CASE WHEN s.status_name='ArchivedResident'   THEN 1 ELSE 0 END) AS archived
         FROM residentinformationtbl ri
         JOIN statuslookuptbl s ON s.status_id = ri.status_id_resident
+        " . ($residentAddressJoin !== '' ? "\n        {$residentAddressJoin}" : '') . "
+        WHERE 1=1 {$residentFilterSql}
     ");
     $res['kpi'] = $res['kpi'][0] ?? [];
 
     $res['by_gender'] = rp_safe_query($conn, "
-        SELECT COALESCE(LOWER(sex),'unspecified') AS gender, COUNT(*) AS total
+        SELECT COALESCE(LOWER(ri.sex),'unspecified') AS gender, COUNT(*) AS total
         FROM residentinformationtbl ri
         JOIN statuslookuptbl s ON s.status_id = ri.status_id_resident
         WHERE s.status_name = 'VerifiedResident'
+        {$residentFilterSql}
         GROUP BY gender ORDER BY total DESC
     ");
 
     $allBirthdays = rp_safe_query($conn, "
-        SELECT birthdate FROM residentinformationtbl ri
+        SELECT ri.birthdate AS birthdate FROM residentinformationtbl ri
         JOIN statuslookuptbl s ON s.status_id = ri.status_id_resident
-        WHERE s.status_name='VerifiedResident' AND birthdate IS NOT NULL AND birthdate != ''
+        " . ($residentAddressJoin !== '' ? "\n        {$residentAddressJoin}" : '') . "
+        WHERE s.status_name='VerifiedResident' AND ri.birthdate IS NOT NULL AND ri.birthdate != ''
+        {$residentFilterSql}
     ");
     $ageBuckets = ['0-17' => 0, '18-30' => 0, '31-59' => 0, '60+' => 0];
     $now = new DateTimeImmutable();
@@ -414,21 +721,24 @@ if ($module === 'residents' && rp_table_exists($conn, 'residentinformationtbl'))
     }
     $res['age_buckets'] = $ageBuckets;
 
-    if (rp_table_exists($conn, 'residentaddresstbl')) {
+    if ($residentAddressJoin !== '') {
         $res['by_area'] = rp_safe_query($conn, "
-            SELECT COALESCE(NULLIF(TRIM(ra.area_number),''),'Unspecified') AS area, COUNT(DISTINCT ri.resident_id) AS total
+            SELECT COALESCE({$residentAreaExpr},'Unspecified') AS area, COUNT(DISTINCT ri.resident_id) AS total
             FROM residentinformationtbl ri
             JOIN statuslookuptbl s ON s.status_id = ri.status_id_resident
-            LEFT JOIN residentaddresstbl ra ON ra.resident_id = ri.resident_id
+            {$residentAddressJoin}
             WHERE s.status_name = 'VerifiedResident'
+            {$residentFilterSql}
             GROUP BY area ORDER BY total DESC
         ");
     }
 
     $sectorRows = rp_safe_query($conn, "
-        SELECT sector_membership FROM residentinformationtbl ri
+        SELECT {$residentSectorExpr} AS sector_membership FROM residentinformationtbl ri
         JOIN statuslookuptbl s ON s.status_id = ri.status_id_resident
-        WHERE s.status_name='VerifiedResident' AND sector_membership IS NOT NULL AND sector_membership != ''
+        " . ($residentAddressJoin !== '' ? "\n        {$residentAddressJoin}" : '') . "
+        WHERE s.status_name='VerifiedResident' AND {$residentSectorExpr} IS NOT NULL AND {$residentSectorExpr} <> ''
+        {$residentFilterSql}
     ");
     $sectors = [];
     foreach ($sectorRows as $r) {
@@ -440,9 +750,11 @@ if ($module === 'residents' && rp_table_exists($conn, 'residentinformationtbl'))
     $res['by_sector'] = $sectors;
 
     $res['monthly_reg'] = rp_safe_query($conn, "
-        SELECT DATE_FORMAT(created_at,'%Y-%m') AS month, COUNT(*) AS total
-        FROM residentinformationtbl
-        WHERE created_at >= DATE_SUB(NOW(), INTERVAL 12 MONTH)
+        SELECT DATE_FORMAT(ri.created_at,'%Y-%m') AS month, COUNT(*) AS total
+        FROM residentinformationtbl ri
+        " . ($residentAddressJoin !== '' ? "\n        {$residentAddressJoin}" : '') . "
+        WHERE ri.created_at >= DATE_SUB(NOW(), INTERVAL 12 MONTH)
+        {$residentFilterSql}
         GROUP BY month ORDER BY month ASC
     ");
 }
@@ -454,6 +766,54 @@ $appt = [];
 if ($module === 'appointments' && rp_table_exists($conn, 'appointmentstbl')) {
     $df = $conn->real_escape_string($dateFrom);
     $dt = $conn->real_escape_string($dateTo);
+    $appointmentResidentParts = rp_column_exists($conn, 'appointmentstbl', 'user_id_resident')
+        ? rp_user_resident_parts($conn, 'a.user_id_resident', 'apt')
+        : ['joins' => '', 'sector_expr' => 'NULL', 'area_expr' => 'NULL'];
+    $appointmentJoin = $appointmentResidentParts['joins'] !== '' ? $appointmentResidentParts['joins'] : '';
+    $appointmentAreaExpr = $appointmentResidentParts['area_expr'];
+    $appointmentSectorExpr = $appointmentResidentParts['sector_expr'];
+    $appointmentTypeExpr = "COALESCE(NULLIF(TRIM(a.subject), ''), NULLIF(TRIM(a.purpose), ''), 'Not specified')";
+    $appointmentFilterClauses = ["DATE(a.request_timestamp) BETWEEN '{$df}' AND '{$dt}'"];
+    if ($reportFilterType !== '') {
+        $appointmentFilterClauses[] = "{$appointmentTypeExpr} = " . rp_sql_quote($conn, $reportFilterType);
+    }
+    if ($reportFilterArea !== '' && $appointmentAreaExpr !== 'NULL') {
+        $appointmentFilterClauses[] = "{$appointmentAreaExpr} = " . rp_sql_quote($conn, $reportFilterArea);
+    }
+    if ($reportFilterSector !== '' && $appointmentSectorExpr !== 'NULL') {
+        $appointmentFilterClauses[] = rp_csv_contains_expr($conn, $appointmentSectorExpr, $reportFilterSector);
+    }
+    $appointmentWhere = implode(' AND ', $appointmentFilterClauses);
+    $reportFilterOptions['type'] = rp_options_from_rows(rp_safe_query($conn, "
+        SELECT {$appointmentTypeExpr} AS value
+        FROM appointmentstbl a
+        " . ($appointmentJoin !== '' ? "\n        {$appointmentJoin}" : '') . "
+        WHERE DATE(a.request_timestamp) BETWEEN '{$df}' AND '{$dt}'
+        GROUP BY {$appointmentTypeExpr}
+        ORDER BY {$appointmentTypeExpr} ASC
+    "), 'value');
+    if ($appointmentAreaExpr !== 'NULL') {
+        $reportFilterOptions['area'] = rp_options_from_rows(rp_safe_query($conn, "
+            SELECT {$appointmentAreaExpr} AS value
+            FROM appointmentstbl a
+            {$appointmentJoin}
+            WHERE DATE(a.request_timestamp) BETWEEN '{$df}' AND '{$dt}'
+              AND {$appointmentAreaExpr} IS NOT NULL
+              AND {$appointmentAreaExpr} <> ''
+            GROUP BY {$appointmentAreaExpr}
+            ORDER BY {$appointmentAreaExpr} ASC
+        "), 'value');
+    }
+    if ($appointmentSectorExpr !== 'NULL') {
+        $reportFilterOptions['sector'] = rp_sector_options_from_rows(rp_safe_query($conn, "
+            SELECT {$appointmentSectorExpr} AS sector_membership
+            FROM appointmentstbl a
+            {$appointmentJoin}
+            WHERE DATE(a.request_timestamp) BETWEEN '{$df}' AND '{$dt}'
+              AND {$appointmentSectorExpr} IS NOT NULL
+              AND {$appointmentSectorExpr} <> ''
+        "));
+    }
 
     $appt['kpi'] = rp_safe_query($conn, "
         SELECT COUNT(*) AS total,
@@ -463,7 +823,8 @@ if ($module === 'appointments' && rp_table_exists($conn, 'appointmentstbl')) {
           SUM(CASE WHEN s.status_name = 'Pending' THEN 1 ELSE 0 END) AS pending
         FROM appointmentstbl a
         JOIN statuslookuptbl s ON s.status_id = a.appointment_status_id
-        WHERE DATE(a.request_timestamp) BETWEEN '{$df}' AND '{$dt}'
+        " . ($appointmentJoin !== '' ? "\n        {$appointmentJoin}" : '') . "
+        WHERE {$appointmentWhere}
     ");
     $appt['kpi'] = $appt['kpi'][0] ?? [];
 
@@ -471,14 +832,16 @@ if ($module === 'appointments' && rp_table_exists($conn, 'appointmentstbl')) {
         SELECT s.status_name AS status, COUNT(*) AS total
         FROM appointmentstbl a
         JOIN statuslookuptbl s ON s.status_id = a.appointment_status_id
-        WHERE DATE(a.request_timestamp) BETWEEN '{$df}' AND '{$dt}'
+        " . ($appointmentJoin !== '' ? "\n        {$appointmentJoin}" : '') . "
+        WHERE {$appointmentWhere}
         GROUP BY s.status_name ORDER BY total DESC
     ");
 
     $appt['by_purpose'] = rp_safe_query($conn, "
         SELECT COALESCE(NULLIF(TRIM(purpose),''),'Not specified') AS purpose, COUNT(*) AS total
-        FROM appointmentstbl
-        WHERE DATE(request_timestamp) BETWEEN '{$df}' AND '{$dt}'
+        FROM appointmentstbl a
+        " . ($appointmentJoin !== '' ? "\n        {$appointmentJoin}" : '') . "
+        WHERE {$appointmentWhere}
         GROUP BY purpose ORDER BY total DESC LIMIT 20
     ");
 
@@ -487,7 +850,8 @@ if ($module === 'appointments' && rp_table_exists($conn, 'appointmentstbl')) {
           SUM(CASE WHEN s.status_name='Completed' THEN 1 ELSE 0 END) AS completed
         FROM appointmentstbl a
         JOIN statuslookuptbl s ON s.status_id = a.appointment_status_id
-        WHERE a.request_timestamp >= DATE_SUB(NOW(), INTERVAL 12 MONTH)
+        " . ($appointmentJoin !== '' ? "\n        {$appointmentJoin}" : '') . "
+        WHERE a.request_timestamp >= DATE_SUB(NOW(), INTERVAL 12 MONTH)" . ($reportFilterType !== '' ? " AND {$appointmentTypeExpr} = " . rp_sql_quote($conn, $reportFilterType) : '') . ($reportFilterArea !== '' && $appointmentAreaExpr !== 'NULL' ? " AND {$appointmentAreaExpr} = " . rp_sql_quote($conn, $reportFilterArea) : '') . ($reportFilterSector !== '' && $appointmentSectorExpr !== 'NULL' ? " AND " . rp_csv_contains_expr($conn, $appointmentSectorExpr, $reportFilterSector) : '') . "
         GROUP BY month ORDER BY month ASC
     ");
 }
@@ -499,6 +863,54 @@ $blot = [];
 if ($module === 'blotter' && rp_table_exists($conn, 'casereportstbl')) {
     $df = $conn->real_escape_string($dateFrom);
     $dt = $conn->real_escape_string($dateTo);
+    $caseResidentParts = rp_column_exists($conn, 'casereportstbl', 'resident_user_id')
+        ? rp_user_resident_parts($conn, 'c.resident_user_id', 'blt')
+        : ['joins' => '', 'sector_expr' => 'NULL', 'area_expr' => 'NULL'];
+    $caseJoin = $caseResidentParts['joins'] !== '' ? $caseResidentParts['joins'] : '';
+    $caseAreaExpr = $caseResidentParts['area_expr'];
+    $caseSectorExpr = $caseResidentParts['sector_expr'];
+    $complaintTypeExpr = "COALESCE(NULLIF(TRIM(c.complaint_type), ''), 'Not specified')";
+    $blotterFilterClauses = ["DATE(c.created_at) BETWEEN '{$df}' AND '{$dt}'"];
+    if ($reportFilterType !== '') {
+        $blotterFilterClauses[] = "{$complaintTypeExpr} = " . rp_sql_quote($conn, $reportFilterType);
+    }
+    if ($reportFilterArea !== '' && $caseAreaExpr !== 'NULL') {
+        $blotterFilterClauses[] = "{$caseAreaExpr} = " . rp_sql_quote($conn, $reportFilterArea);
+    }
+    if ($reportFilterSector !== '' && $caseSectorExpr !== 'NULL') {
+        $blotterFilterClauses[] = rp_csv_contains_expr($conn, $caseSectorExpr, $reportFilterSector);
+    }
+    $blotterWhere = implode(' AND ', $blotterFilterClauses);
+    $reportFilterOptions['type'] = rp_options_from_rows(rp_safe_query($conn, "
+        SELECT {$complaintTypeExpr} AS value
+        FROM casereportstbl c
+        " . ($caseJoin !== '' ? "\n        {$caseJoin}" : '') . "
+        WHERE DATE(c.created_at) BETWEEN '{$df}' AND '{$dt}'
+        GROUP BY {$complaintTypeExpr}
+        ORDER BY {$complaintTypeExpr} ASC
+    "), 'value');
+    if ($caseAreaExpr !== 'NULL') {
+        $reportFilterOptions['area'] = rp_options_from_rows(rp_safe_query($conn, "
+            SELECT {$caseAreaExpr} AS value
+            FROM casereportstbl c
+            {$caseJoin}
+            WHERE DATE(c.created_at) BETWEEN '{$df}' AND '{$dt}'
+              AND {$caseAreaExpr} IS NOT NULL
+              AND {$caseAreaExpr} <> ''
+            GROUP BY {$caseAreaExpr}
+            ORDER BY {$caseAreaExpr} ASC
+        "), 'value');
+    }
+    if ($caseSectorExpr !== 'NULL') {
+        $reportFilterOptions['sector'] = rp_sector_options_from_rows(rp_safe_query($conn, "
+            SELECT {$caseSectorExpr} AS sector_membership
+            FROM casereportstbl c
+            {$caseJoin}
+            WHERE DATE(c.created_at) BETWEEN '{$df}' AND '{$dt}'
+              AND {$caseSectorExpr} IS NOT NULL
+              AND {$caseSectorExpr} <> ''
+        "));
+    }
 
     $blot['kpi'] = rp_safe_query($conn, "
         SELECT COUNT(*) AS total,
@@ -508,17 +920,19 @@ if ($module === 'blotter' && rp_table_exists($conn, 'casereportstbl')) {
           SUM(CASE WHEN report_type='Complaint' THEN 1 ELSE 0 END) AS complaint_count
         FROM casereportstbl c
         JOIN statuslookuptbl s ON s.status_id = c.case_status_id
-        WHERE DATE(c.created_at) BETWEEN '{$df}' AND '{$dt}'
+        " . ($caseJoin !== '' ? "\n        {$caseJoin}" : '') . "
+        WHERE {$blotterWhere}
     ");
     $blot['kpi'] = $blot['kpi'][0] ?? [];
 
     $blot['by_type'] = rp_safe_query($conn, "
-        SELECT COALESCE(complaint_type,'Not specified') AS complaint_type,
+        SELECT {$complaintTypeExpr} AS complaint_type,
           COUNT(*) AS total,
           SUM(CASE WHEN LOWER(s.status_name) IN ('resolved','closed','settled') THEN 1 ELSE 0 END) AS resolved
         FROM casereportstbl c
         JOIN statuslookuptbl s ON s.status_id = c.case_status_id
-        WHERE DATE(c.created_at) BETWEEN '{$df}' AND '{$dt}'
+        " . ($caseJoin !== '' ? "\n        {$caseJoin}" : '') . "
+        WHERE {$blotterWhere}
         GROUP BY complaint_type ORDER BY total DESC LIMIT 20
     ");
 
@@ -526,14 +940,16 @@ if ($module === 'blotter' && rp_table_exists($conn, 'casereportstbl')) {
         SELECT s.status_name AS status, COUNT(*) AS total
         FROM casereportstbl c
         JOIN statuslookuptbl s ON s.status_id = c.case_status_id
-        WHERE DATE(c.created_at) BETWEEN '{$df}' AND '{$dt}'
+        " . ($caseJoin !== '' ? "\n        {$caseJoin}" : '') . "
+        WHERE {$blotterWhere}
         GROUP BY s.status_name ORDER BY total DESC
     ");
 
     $blot['trend'] = rp_safe_query($conn, "
-        SELECT DATE_FORMAT(created_at,'%Y-%m') AS month, COUNT(*) AS total
-        FROM casereportstbl
-        WHERE created_at >= DATE_SUB(NOW(), INTERVAL 12 MONTH)
+        SELECT DATE_FORMAT(c.created_at,'%Y-%m') AS month, COUNT(*) AS total
+        FROM casereportstbl c
+        " . ($caseJoin !== '' ? "\n        {$caseJoin}" : '') . "
+        WHERE c.created_at >= DATE_SUB(NOW(), INTERVAL 12 MONTH)" . ($reportFilterType !== '' ? " AND {$complaintTypeExpr} = " . rp_sql_quote($conn, $reportFilterType) : '') . ($reportFilterArea !== '' && $caseAreaExpr !== 'NULL' ? " AND {$caseAreaExpr} = " . rp_sql_quote($conn, $reportFilterArea) : '') . ($reportFilterSector !== '' && $caseSectorExpr !== 'NULL' ? " AND " . rp_csv_contains_expr($conn, $caseSectorExpr, $reportFilterSector) : '') . "
         GROUP BY month ORDER BY month ASC
     ");
 }
@@ -545,6 +961,63 @@ $comp = [];
 if ($module === 'complaints' && rp_table_exists($conn, 'complaintstbl')) {
     $df = $conn->real_escape_string($dateFrom);
     $dt = $conn->real_escape_string($dateTo);
+    $hasCaseTable = rp_table_exists($conn, 'casereportstbl');
+    $complaintCaseJoin = $hasCaseTable ? "LEFT JOIN casereportstbl c ON c.case_id = ct.case_id" : '';
+    $complaintResidentParts = ($hasCaseTable && rp_column_exists($conn, 'casereportstbl', 'resident_user_id'))
+        ? rp_user_resident_parts($conn, 'c.resident_user_id', 'cmp')
+        : ['joins' => '', 'sector_expr' => 'NULL', 'area_expr' => 'NULL'];
+    $complaintResidentJoin = $complaintResidentParts['joins'] !== '' ? $complaintResidentParts['joins'] : '';
+    $complaintAreaExpr = $complaintResidentParts['area_expr'];
+    $complaintSectorExpr = $complaintResidentParts['sector_expr'];
+    $complaintTypeExpr = $hasCaseTable
+        ? "COALESCE(NULLIF(TRIM(c.complaint_type), ''), 'Not specified')"
+        : "'Not specified'";
+    $complaintFilterClauses = ["DATE(ct.created_at) BETWEEN '{$df}' AND '{$dt}'"];
+    if ($reportFilterType !== '' && $hasCaseTable) {
+        $complaintFilterClauses[] = "{$complaintTypeExpr} = " . rp_sql_quote($conn, $reportFilterType);
+    }
+    if ($reportFilterArea !== '' && $complaintAreaExpr !== 'NULL') {
+        $complaintFilterClauses[] = "{$complaintAreaExpr} = " . rp_sql_quote($conn, $reportFilterArea);
+    }
+    if ($reportFilterSector !== '' && $complaintSectorExpr !== 'NULL') {
+        $complaintFilterClauses[] = rp_csv_contains_expr($conn, $complaintSectorExpr, $reportFilterSector);
+    }
+    $complaintWhere = implode(' AND ', $complaintFilterClauses);
+    if ($hasCaseTable) {
+        $reportFilterOptions['type'] = rp_options_from_rows(rp_safe_query($conn, "
+            SELECT {$complaintTypeExpr} AS value
+            FROM complaintstbl ct
+            {$complaintCaseJoin}
+            " . ($complaintResidentJoin !== '' ? "\n        {$complaintResidentJoin}" : '') . "
+            WHERE DATE(ct.created_at) BETWEEN '{$df}' AND '{$dt}'
+            GROUP BY {$complaintTypeExpr}
+            ORDER BY {$complaintTypeExpr} ASC
+        "), 'value');
+    }
+    if ($complaintAreaExpr !== 'NULL') {
+        $reportFilterOptions['area'] = rp_options_from_rows(rp_safe_query($conn, "
+            SELECT {$complaintAreaExpr} AS value
+            FROM complaintstbl ct
+            {$complaintCaseJoin}
+            {$complaintResidentJoin}
+            WHERE DATE(ct.created_at) BETWEEN '{$df}' AND '{$dt}'
+              AND {$complaintAreaExpr} IS NOT NULL
+              AND {$complaintAreaExpr} <> ''
+            GROUP BY {$complaintAreaExpr}
+            ORDER BY {$complaintAreaExpr} ASC
+        "), 'value');
+    }
+    if ($complaintSectorExpr !== 'NULL') {
+        $reportFilterOptions['sector'] = rp_sector_options_from_rows(rp_safe_query($conn, "
+            SELECT {$complaintSectorExpr} AS sector_membership
+            FROM complaintstbl ct
+            {$complaintCaseJoin}
+            {$complaintResidentJoin}
+            WHERE DATE(ct.created_at) BETWEEN '{$df}' AND '{$dt}'
+              AND {$complaintSectorExpr} IS NOT NULL
+              AND {$complaintSectorExpr} <> ''
+        "));
+    }
 
     $comp['kpi'] = rp_safe_query($conn, "
         SELECT COUNT(*) AS total,
@@ -552,30 +1025,38 @@ if ($module === 'complaints' && rp_table_exists($conn, 'complaintstbl')) {
           SUM(CASE WHEN escalated_to_blotter=0 OR escalated_to_blotter IS NULL THEN 1 ELSE 0 END) AS unescalated,
           SUM(CASE WHEN complaint_origin='walk_in' OR complaint_origin='Walk-in' THEN 1 ELSE 0 END) AS walkin,
           SUM(CASE WHEN complaint_origin='online' OR complaint_origin='Online' THEN 1 ELSE 0 END) AS online_count
-        FROM complaintstbl
-        WHERE DATE(created_at) BETWEEN '{$df}' AND '{$dt}'
+        FROM complaintstbl ct
+        {$complaintCaseJoin}
+        " . ($complaintResidentJoin !== '' ? "\n        {$complaintResidentJoin}" : '') . "
+        WHERE {$complaintWhere}
     ");
     $comp['kpi'] = $comp['kpi'][0] ?? [];
 
     $comp['by_origin'] = rp_safe_query($conn, "
         SELECT COALESCE(complaint_origin,'Unknown') AS origin, COUNT(*) AS total
-        FROM complaintstbl
-        WHERE DATE(created_at) BETWEEN '{$df}' AND '{$dt}'
+        FROM complaintstbl ct
+        {$complaintCaseJoin}
+        " . ($complaintResidentJoin !== '' ? "\n        {$complaintResidentJoin}" : '') . "
+        WHERE {$complaintWhere}
         GROUP BY complaint_origin ORDER BY total DESC
     ");
 
     $comp['by_kind'] = rp_safe_query($conn, "
         SELECT COALESCE(subject_kind,'Unknown') AS kind, COUNT(*) AS total
-        FROM complaintstbl
-        WHERE DATE(created_at) BETWEEN '{$df}' AND '{$dt}'
+        FROM complaintstbl ct
+        {$complaintCaseJoin}
+        " . ($complaintResidentJoin !== '' ? "\n        {$complaintResidentJoin}" : '') . "
+        WHERE {$complaintWhere}
         GROUP BY subject_kind ORDER BY total DESC
     ");
 
     $comp['trend'] = rp_safe_query($conn, "
-        SELECT DATE_FORMAT(created_at,'%Y-%m') AS month, COUNT(*) AS total,
+        SELECT DATE_FORMAT(ct.created_at,'%Y-%m') AS month, COUNT(*) AS total,
           SUM(CASE WHEN escalated_to_blotter=1 THEN 1 ELSE 0 END) AS escalated
-        FROM complaintstbl
-        WHERE created_at >= DATE_SUB(NOW(), INTERVAL 12 MONTH)
+        FROM complaintstbl ct
+        {$complaintCaseJoin}
+        " . ($complaintResidentJoin !== '' ? "\n        {$complaintResidentJoin}" : '') . "
+        WHERE ct.created_at >= DATE_SUB(NOW(), INTERVAL 12 MONTH)" . ($reportFilterType !== '' && $hasCaseTable ? " AND {$complaintTypeExpr} = " . rp_sql_quote($conn, $reportFilterType) : '') . ($reportFilterArea !== '' && $complaintAreaExpr !== 'NULL' ? " AND {$complaintAreaExpr} = " . rp_sql_quote($conn, $reportFilterArea) : '') . ($reportFilterSector !== '' && $complaintSectorExpr !== 'NULL' ? " AND " . rp_csv_contains_expr($conn, $complaintSectorExpr, $reportFilterSector) : '') . "
         GROUP BY month ORDER BY month ASC
     ");
 }
@@ -591,6 +1072,20 @@ $moduleLabels = [
 ];
 $currentLabel = $moduleLabels[$module]['label'];
 $isPrintView  = ($_GET['format'] ?? '') === 'print';
+$reportLeftLogo = '../../Images/San_Jose_LOGO.jpg';
+$reportRightLogo = '../../Images/Montalban_Logo.png';
+$reportFilterOptions['area'] = $officialReportAreaOptions;
+$reportFilterOptions['sector'] = $officialReportSectorOptions;
+$activeReportFilters = [];
+if ($reportFilterType !== '') {
+    $activeReportFilters[] = $reportFilterLabels['type'] . ': ' . ($reportFilterOptions['type'][$reportFilterType] ?? $reportFilterType);
+}
+if ($reportFilterArea !== '') {
+    $activeReportFilters[] = $reportFilterLabels['area'] . ': ' . ($reportFilterOptions['area'][$reportFilterArea] ?? $reportFilterArea);
+}
+if ($reportFilterSector !== '') {
+    $activeReportFilters[] = $reportFilterLabels['sector'] . ': ' . ($reportFilterOptions['sector'][$reportFilterSector] ?? $reportFilterSector);
+}
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -611,6 +1106,86 @@ $isPrintView  = ($_GET['format'] ?? '') === 'print';
     .reports-shell { max-width: 1200px; margin: 0 auto; }
     .module-nav .nav-link { font-size: .875rem; white-space: nowrap; }
     .module-nav .nav-link.active { background: #DE710C; color: #fff !important; border-color: #DE710C; }
+    .rp-filter-form {
+      display: grid;
+      gap: 14px;
+    }
+    .rp-controls { margin-bottom: 24px; }
+    .rp-controls-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 14px;
+      flex-wrap: wrap;
+      margin-bottom: 12px;
+    }
+    .rp-controls-summary {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      align-items: center;
+      color: #475569;
+      font-size: .9rem;
+    }
+    .rp-filter-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 10px;
+      border-radius: 999px;
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      color: #334155;
+      font-size: .82rem;
+      line-height: 1.2;
+    }
+    .rp-controls-actions {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+    .rp-filter-count {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-width: 1.35rem;
+      height: 1.35rem;
+      padding: 0 .35rem;
+      border-radius: 999px;
+      background: #2563eb;
+      color: #fff;
+      font-size: .75rem;
+      font-weight: 700;
+    }
+    .rp-filter-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 14px;
+      align-items: end;
+    }
+    .rp-filter-actions {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+    .rp-filter-modal .modal-content {
+      border: none;
+      border-radius: 18px;
+      box-shadow: 0 18px 40px rgba(15, 23, 42, 0.14);
+    }
+    .rp-filter-modal .modal-header {
+      border-bottom: 1px solid #e5e7eb;
+      padding: 1rem 1.25rem;
+    }
+    .rp-filter-modal .modal-body {
+      padding: 1.25rem;
+    }
+    .rp-filter-modal .modal-footer {
+      border-top: 1px solid #e5e7eb;
+      padding: 1rem 1.25rem;
+    }
 
     /* ── Formal report document ─────────────────────────────────────────────── */
     .rp-doc {
@@ -631,57 +1206,61 @@ $isPrintView  = ($_GET['format'] ?? '') === 'print';
     /* Header */
     .rp-doc-header {
       text-align: center;
-      border-bottom: 1.5px solid #4b5563;
-      padding-bottom: 18px;
+      padding-bottom: 0;
       margin-bottom: 24px;
     }
-    .rp-brand-grid {
+    .rp-letterhead {
+      display: grid;
+      grid-template-columns: 110px 1fr 110px;
+      align-items: center;
+      gap: 14px;
+      margin-bottom: 0;
+    }
+    .rp-letterhead-logo {
+      width: 98px;
+      height: 98px;
+      object-fit: contain;
+      justify-self: center;
       display: block;
+    }
+    .rp-letterhead-center {
       text-align: center;
+      color: #000;
+      line-height: 1.18;
+      font-family: "Times New Roman", Times, serif;
     }
-    .rp-brand-copy {
-      text-align: center;
-      max-width: 620px;
-      margin: 0 auto;
-    }
-    .rp-brand-topline {
-      font-size: 11.4px;
-      text-transform: uppercase;
-      letter-spacing: .04em;
-      color: #374151;
-      line-height: 1.35;
-    }
-    .rp-brand-main {
-      font-size: 28px;
-      font-weight: 900;
-      text-transform: uppercase;
-      letter-spacing: .05em;
-      color: #111827;
-      margin-top: 14px;
-    }
-    .rp-brand-rule {
-      width: 240px;
-      max-width: 70%;
-      border-top: 2px solid #9ca3af;
-      margin: 10px auto 14px;
-    }
-    .rp-brand-subline {
-      font-size: 12.4px;
+    .rp-letterhead-center p {
+      margin: 0;
+      font-size: 15px;
       font-weight: 700;
       text-transform: uppercase;
-      letter-spacing: .04em;
-      color: #DE710C;
-      margin-top: 0;
+    }
+    .rp-letterhead-rep {
+      font-size: 18px !important;
+    }
+    .rp-letterhead-barangay {
+      font-size: 28px !important;
+      margin-top: 8px !important;
+      letter-spacing: .03em;
+    }
+    .rp-letterhead-line {
+      border-bottom: 2px solid #9ca3af;
+      margin-top: 10px;
     }
     .rp-doc-header .rp-report-title {
       font-size: 15px;
       font-weight: 800;
       text-transform: uppercase;
-      letter-spacing: .05em;
+      letter-spacing: .04em;
       color: #9a3412;
-      margin-top: 14px;
+      margin-top: 16px;
     }
     .rp-doc-header .rp-period { font-size: 12px; color: #4b5563; margin-top: 4px; }
+    .rp-filter-summary {
+      margin-top: 6px;
+      font-size: 11px;
+      color: #4b5563;
+    }
     .rp-report-meta {
       margin-top: 8px;
       font-size: 11px;
@@ -778,6 +1357,20 @@ $isPrintView  = ($_GET['format'] ?? '') === 'print';
     /* Empty state */
     .rp-empty { color: #9ca3af; font-style: italic; padding: 12px 0; font-size: 12px; }
 
+    <?php if (!$isPrintView): ?>
+    /* Screen preview: show the report content directly without formal paper framing. */
+    .rp-doc {
+      border: none;
+      box-shadow: none;
+      max-width: 100%;
+      min-height: auto;
+      padding: 0;
+    }
+    .rp-doc-header,
+    .rp-footer { display: none; }
+    .rp-doc > .rp-section:first-of-type { margin-top: 0; }
+    <?php endif; ?>
+
     /* Print from admin view — strip layout chrome */
     @media print {
       #dashboard-sidebar, #admin-mobile-header, .module-nav,
@@ -796,12 +1389,15 @@ $isPrintView  = ($_GET['format'] ?? '') === 'print';
         font-size: 10pt !important;
         min-height: auto !important;
       }
-      .rp-doc-header { padding-bottom: 10pt !important; margin-bottom: 14pt !important; }
-      .rp-brand-grid { display: block !important; }
-      .rp-brand-copy { max-width: 100% !important; }
-      .rp-brand-main { font-size: 19pt !important; margin-top: 10pt !important; }
-      .rp-brand-rule { width: 180pt !important; margin: 8pt auto 10pt !important; }
-      .rp-brand-subline { font-size: 9pt !important; }
+      .rp-doc-header,
+      .rp-footer { display: block !important; }
+      .rp-doc-header { padding-bottom: 0 !important; margin-bottom: 14pt !important; }
+      .rp-letterhead { grid-template-columns: 84pt 1fr 84pt !important; gap: 10pt !important; }
+      .rp-letterhead-logo { width: 74pt !important; height: 74pt !important; }
+      .rp-letterhead-center p { font-size: 11pt !important; }
+      .rp-letterhead-rep { font-size: 13pt !important; }
+      .rp-letterhead-barangay { font-size: 22pt !important; margin-top: 5pt !important; }
+      .rp-letterhead-line { margin-top: 8pt !important; }
       .rp-doc-header .rp-report-title { font-size: 11pt !important; }
       .rp-section { margin-top: 14pt !important; page-break-inside: avoid; }
       .rp-section-label { font-size: 9pt !important; padding: 3pt 8pt !important; }
@@ -817,12 +1413,13 @@ $isPrintView  = ($_GET['format'] ?? '') === 'print';
     html, body { margin: 0; padding: 0; background: #fff; font-family: Arial, Helvetica, sans-serif; }
     .rp-doc { border: 1.25pt solid #2f2f2f !important; border-radius: 0 !important; padding: 18pt 18pt 22pt !important;
               box-shadow: none !important; max-width: 100% !important; font-size: 10pt !important; min-height: auto !important; }
-    .rp-doc-header { padding-bottom: 10pt !important; margin-bottom: 14pt !important; }
-    .rp-brand-grid { display: block !important; }
-    .rp-brand-copy { max-width: 100% !important; }
-    .rp-brand-main { font-size: 19pt !important; margin-top: 10pt !important; }
-    .rp-brand-rule { width: 180pt !important; margin: 8pt auto 10pt !important; }
-    .rp-brand-subline { font-size: 9pt !important; }
+    .rp-doc-header { padding-bottom: 0 !important; margin-bottom: 14pt !important; }
+    .rp-letterhead { grid-template-columns: 84pt 1fr 84pt !important; gap: 10pt !important; }
+    .rp-letterhead-logo { width: 74pt !important; height: 74pt !important; }
+    .rp-letterhead-center p { font-size: 11pt !important; }
+    .rp-letterhead-rep { font-size: 13pt !important; }
+    .rp-letterhead-barangay { font-size: 22pt !important; margin-top: 5pt !important; }
+    .rp-letterhead-line { margin-top: 8pt !important; }
     .rp-doc-header .rp-report-title { font-size: 11pt !important; }
     .rp-section { margin-top: 14pt !important; page-break-inside: avoid; }
     .rp-section-label { font-size: 9pt !important; padding: 3pt 8pt !important; }
@@ -857,37 +1454,120 @@ $isPrintView  = ($_GET['format'] ?? '') === 'print';
 
     <div class="bg-white p-4 rounded-4 shadow-sm border reports-shell">
 
-      <!-- ── Controls: module nav + date filter ─────────────────────────── -->
+      <!-- ── Controls: date filter ──────────────────────────────────────── -->
       <div class="rp-controls">
-        <div class="module-nav mb-3 overflow-auto">
-          <ul class="nav nav-pills flex-nowrap gap-1">
-            <?php foreach ($moduleLabels as $key => $ml): ?>
-            <li class="nav-item">
-              <a class="nav-link <?= $module === $key ? 'active' : 'btn-outline-secondary border' ?>"
-                 href="<?= $baseUrl ?>?module=<?= $key ?>&date_from=<?= htmlspecialchars($dateFrom) ?>&date_to=<?= htmlspecialchars($dateTo) ?>">
-                <i class="fas <?= $ml['icon'] ?> me-1"></i><?= htmlspecialchars($ml['label']) ?>
-              </a>
-            </li>
+        <?php
+          $hasTypeFilter = !empty($reportFilterOptions['type']);
+          $hasAreaFilter = !empty($reportFilterOptions['area']);
+          $hasSectorFilter = !empty($reportFilterOptions['sector']);
+          $reportResetUrl = $baseUrl . '?module=' . rawurlencode($module);
+          $screenReportFilters = [];
+          if ($module !== 'residents') {
+            $screenReportFilters[] = 'From: ' . rp_date_label($dateFrom);
+            $screenReportFilters[] = 'To: ' . rp_date_label($dateTo);
+          } else {
+            $screenReportFilters[] = 'As of: ' . date('F j, Y');
+          }
+          if ($reportFilterType !== '') {
+            $screenReportFilters[] = $reportFilterLabels['type'] . ': ' . ($reportFilterOptions['type'][$reportFilterType] ?? $reportFilterType);
+          }
+          if ($reportFilterArea !== '') {
+            $screenReportFilters[] = $reportFilterLabels['area'] . ': ' . ($reportFilterOptions['area'][$reportFilterArea] ?? $reportFilterArea);
+          }
+          if ($reportFilterSector !== '') {
+            $screenReportFilters[] = $reportFilterLabels['sector'] . ': ' . ($reportFilterOptions['sector'][$reportFilterSector] ?? $reportFilterSector);
+          }
+          $selectedFilterCount = 0;
+          if ($reportFilterType !== '') $selectedFilterCount++;
+          if ($reportFilterArea !== '') $selectedFilterCount++;
+          if ($reportFilterSector !== '') $selectedFilterCount++;
+        ?>
+        <div class="rp-controls-bar">
+          <div class="rp-controls-summary">
+            <?php foreach ($screenReportFilters as $summaryItem): ?>
+            <span class="rp-filter-chip"><?= htmlspecialchars($summaryItem) ?></span>
             <?php endforeach; ?>
-          </ul>
+          </div>
+          <div class="rp-controls-actions d-print-none">
+            <button type="button" class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#reportFilterModal">
+              <i class="fas fa-filter me-1"></i>Filter
+              <?php if ($selectedFilterCount > 0): ?>
+              <span class="rp-filter-count ms-1"><?= $selectedFilterCount ?></span>
+              <?php endif; ?>
+            </button>
+            <a href="<?= htmlspecialchars($reportResetUrl) ?>" class="btn btn-sm btn-outline-secondary">Reset</a>
+          </div>
         </div>
-
-        <?php if ($module !== 'residents'): ?>
-        <form method="GET" class="d-flex align-items-end gap-2 flex-wrap mb-4">
-          <input type="hidden" name="module" value="<?= htmlspecialchars($module) ?>">
-          <div>
-            <label class="form-label small fw-semibold mb-1">From</label>
-            <input type="date" name="date_from" class="form-control form-control-sm" value="<?= htmlspecialchars($dateFrom) ?>">
-          </div>
-          <div>
-            <label class="form-label small fw-semibold mb-1">To</label>
-            <input type="date" name="date_to" class="form-control form-control-sm" value="<?= htmlspecialchars($dateTo) ?>">
-          </div>
-          <button type="submit" class="btn btn-sm btn-primary"><i class="fas fa-filter me-1"></i>Apply</button>
-          <a href="<?= $baseUrl ?>?module=<?= htmlspecialchars($module) ?>" class="btn btn-sm btn-outline-secondary">Reset</a>
-        </form>
-        <?php endif; ?>
       </div><!-- /.rp-controls -->
+
+      <div class="modal fade rp-filter-modal" id="reportFilterModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-lg modal-dialog-centered">
+          <div class="modal-content">
+            <form method="GET" class="rp-filter-form">
+              <div class="modal-header">
+                <div>
+                  <h5 class="modal-title mb-0">Report Filters</h5>
+                  <p class="text-muted small mb-0 mt-1">Adjust the report date range and filter values for <?= htmlspecialchars($currentLabel) ?>.</p>
+                </div>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+              </div>
+              <div class="modal-body">
+                <input type="hidden" name="module" value="<?= htmlspecialchars($module) ?>">
+                <div class="rp-filter-grid">
+                  <?php if ($module !== 'residents'): ?>
+                  <div>
+                    <label class="form-label small fw-semibold mb-1">From</label>
+                    <input type="date" name="date_from" class="form-control form-control-sm" value="<?= htmlspecialchars($dateFrom) ?>">
+                  </div>
+                  <div>
+                    <label class="form-label small fw-semibold mb-1">To</label>
+                    <input type="date" name="date_to" class="form-control form-control-sm" value="<?= htmlspecialchars($dateTo) ?>">
+                  </div>
+                  <?php endif; ?>
+                  <?php if ($hasTypeFilter): ?>
+                  <div>
+                    <label class="form-label small fw-semibold mb-1"><?= htmlspecialchars($reportFilterLabels['type']) ?></label>
+                    <select name="filter_type" class="form-select form-select-sm">
+                      <option value="">All</option>
+                      <?php foreach ($reportFilterOptions['type'] as $value => $label): ?>
+                      <option value="<?= htmlspecialchars($value) ?>" <?= $reportFilterType === (string)$value ? 'selected' : '' ?>><?= htmlspecialchars($label) ?></option>
+                      <?php endforeach; ?>
+                    </select>
+                  </div>
+                  <?php endif; ?>
+                  <?php if ($hasAreaFilter): ?>
+                  <div>
+                    <label class="form-label small fw-semibold mb-1"><?= htmlspecialchars($reportFilterLabels['area']) ?></label>
+                    <select name="filter_area" class="form-select form-select-sm">
+                      <option value="">All</option>
+                      <?php foreach ($reportFilterOptions['area'] as $value => $label): ?>
+                      <option value="<?= htmlspecialchars($value) ?>" <?= $reportFilterArea === (string)$value ? 'selected' : '' ?>><?= htmlspecialchars($label) ?></option>
+                      <?php endforeach; ?>
+                    </select>
+                  </div>
+                  <?php endif; ?>
+                  <?php if ($hasSectorFilter): ?>
+                  <div>
+                    <label class="form-label small fw-semibold mb-1"><?= htmlspecialchars($reportFilterLabels['sector']) ?></label>
+                    <select name="filter_sector" class="form-select form-select-sm">
+                      <option value="">All</option>
+                      <?php foreach ($reportFilterOptions['sector'] as $value => $label): ?>
+                      <option value="<?= htmlspecialchars($value) ?>" <?= $reportFilterSector === (string)$value ? 'selected' : '' ?>><?= htmlspecialchars($label) ?></option>
+                      <?php endforeach; ?>
+                    </select>
+                  </div>
+                  <?php endif; ?>
+                </div>
+              </div>
+              <div class="modal-footer">
+                <a href="<?= htmlspecialchars($reportResetUrl) ?>" class="btn btn-outline-secondary me-auto">Reset</a>
+                <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancel</button>
+                <button type="submit" class="btn btn-primary"><i class="fas fa-filter me-1"></i>Apply Filters</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      </div>
 
       <!-- ═══════════════════════════════════════════ REPORT DOCUMENT -->
       <div id="reportPrintArea">
@@ -896,16 +1576,17 @@ $isPrintView  = ($_GET['format'] ?? '') === 'print';
 
         <!-- Document header -->
         <div class="rp-doc-header">
-          <div class="rp-brand-grid">
-            <div class="rp-brand-copy">
-              <div class="rp-brand-topline">Republika ng Pilipinas</div>
-              <div class="rp-brand-topline">Lalawigan ng Rizal</div>
-              <div class="rp-brand-topline">Bayan ng Rodriguez</div>
-              <div class="rp-brand-main">Barangay San Jose</div>
-              <div class="rp-brand-rule"></div>
-              <div class="rp-brand-subline">Office of the Punong Barangay</div>
+          <div class="rp-letterhead">
+            <img class="rp-letterhead-logo" src="<?= htmlspecialchars($reportLeftLogo) ?>" alt="Barangay San Jose Logo">
+            <div class="rp-letterhead-center">
+              <p class="rp-letterhead-rep">REPUBLIKA NG PILIPINAS</p>
+              <p>LALAWIGAN NG RIZAL</p>
+              <p>BAYAN NG RODRIGUEZ</p>
+              <p class="rp-letterhead-barangay">BARANGAY SAN JOSE</p>
             </div>
+            <img class="rp-letterhead-logo" src="<?= htmlspecialchars($reportRightLogo) ?>" alt="Montalban Logo" onerror="this.onerror=null;this.src='<?= htmlspecialchars($reportLeftLogo) ?>';">
           </div>
+          <div class="rp-letterhead-line"></div>
           <div class="rp-report-title"><?= htmlspecialchars(strtoupper($currentLabel)) ?> Statistical Report</div>
           <?php if ($module !== 'residents'): ?>
           <div class="rp-period">
@@ -915,6 +1596,11 @@ $isPrintView  = ($_GET['format'] ?? '') === 'print';
           </div>
           <?php else: ?>
           <div class="rp-period">As of <strong><?= date('F j, Y') ?></strong></div>
+          <?php endif; ?>
+          <?php if (!empty($activeReportFilters)): ?>
+          <div class="rp-filter-summary">
+            Filters: <strong><?= htmlspecialchars(implode(' | ', $activeReportFilters)) ?></strong>
+          </div>
           <?php endif; ?>
           <div class="rp-report-meta">
             Generated: <?= date('F j, Y \a\t g:i A') ?> &nbsp;·&nbsp; Prepared by: <?= htmlspecialchars($preparedByName) ?>

@@ -1,0 +1,410 @@
+<?php
+declare(strict_types=1);
+
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
+
+require_once __DIR__ . '/../General/connection.php';
+require_once __DIR__ . '/../General/security.php';
+require_once __DIR__ . '/../General/documentRequestWorkflow.php';
+
+requireRoleSession(['SuperAdmin', 'Official', 'Officials', 'Personnel', 'Personnels', 'Admin', 'Employee']);
+
+header('Content-Type: application/json; charset=utf-8');
+
+function bm_select_or_null(mysqli $conn, string $table, string $column, string $alias, string $tableAlias = 'd'): string
+{
+    return dr_column_exists($conn, $table, $column)
+        ? $tableAlias . '.' . $column . ' AS ' . $alias
+        : 'NULL AS ' . $alias;
+}
+
+function bm_non_empty(array $values): string
+{
+    foreach ($values as $value) {
+        $text = trim(preg_replace('/\s+/', ' ', (string)$value) ?? '');
+        if ($text !== '') {
+            return $text;
+        }
+    }
+
+    return '';
+}
+
+function bm_decode_payload(array $row): array
+{
+    $payload = json_decode((string)($row['request_details'] ?? '{}'), true);
+    return is_array($payload) ? $payload : [];
+}
+
+function bm_normalize_public_file_path(string $rawPath): string
+{
+    $pathText = trim($rawPath);
+    if ($pathText === '') {
+        return '';
+    }
+
+    $match = [];
+    if (preg_match('/\/UnifiedFileAttachment\/[^\s"\']+/i', $pathText, $match)) {
+        return (string)($match[0] ?? '');
+    }
+
+    return str_starts_with($pathText, '/UnifiedFileAttachment/') ? $pathText : '';
+}
+
+function bm_extract_submitted_documents(array $payload): array
+{
+    $docs = [];
+    $seen = [];
+    $fieldMap = [
+        'business_reg_file_path' => [
+            'label' => bm_business_registration_label((string)($payload['business_reg_type'] ?? '')),
+        ],
+        'proof_address_file_path' => [
+            'label' => bm_proof_of_business_address_label((string)($payload['proof_address_type'] ?? '')),
+        ],
+        'business_photo_file_path' => [
+            'label' => 'Establishment Photo',
+        ],
+        'renewal_business_reg_file_path' => [
+            'label' => bm_business_registration_label((string)($payload['renewal_business_reg_type'] ?? ''), true),
+        ],
+        'renewal_proof_address_file_path' => [
+            'label' => bm_proof_of_business_address_label((string)($payload['renewal_proof_address_type'] ?? ''), true),
+        ],
+    ];
+
+    foreach ($fieldMap as $field => $config) {
+        $normalizedPath = bm_normalize_public_file_path((string)($payload[$field] ?? ''));
+        if ($normalizedPath === '') {
+            continue;
+        }
+        $publicUrl = appUrl($normalizedPath);
+        if (isset($seen[$publicUrl])) {
+            continue;
+        }
+        $seen[$publicUrl] = true;
+
+        $docs[] = [
+            'label' => (string)($config['label'] ?? 'Submitted Document'),
+            'path' => $normalizedPath,
+            'url' => $publicUrl,
+            'name' => basename($normalizedPath),
+        ];
+    }
+
+    return $docs;
+}
+
+function bm_business_registration_label(string $type, bool $updated = false): string
+{
+    $label = match (strtolower(trim($type))) {
+        'dti' => 'DTI Certificate',
+        'sec' => 'SEC Certificate',
+        default => 'Business Registration',
+    };
+
+    return $updated ? 'Updated ' . $label : $label;
+}
+
+function bm_proof_of_business_address_label(string $type, bool $updated = false): string
+{
+    $label = match (strtolower(trim($type))) {
+        'lease' => 'Contract of Lease',
+        'tct' => 'Transfer Certificate of Title',
+        'tax_declaration' => 'Tax Declaration',
+        default => 'Proof of Business Address',
+    };
+
+    return $updated ? 'Updated ' . $label : $label;
+}
+
+function bm_person_name(array $payload, string $prefix): string
+{
+    $first = trim((string)($payload[$prefix . 'fn'] ?? ''));
+    $middle = trim((string)($payload[$prefix . 'mn'] ?? ''));
+    $last = trim((string)($payload[$prefix . 'ln'] ?? ''));
+    $suffix = trim((string)($payload[$prefix . 'suffix'] ?? ''));
+
+    return trim(implode(' ', array_filter([$first, $middle, $last, $suffix], static fn($value) => $value !== '')));
+}
+
+function bm_format_timestamp(string $value): string
+{
+    $text = trim($value);
+    if ($text === '') {
+        return '';
+    }
+
+    try {
+        $date = new DateTime($text);
+        return $date->format('M d, Y h:i A');
+    } catch (Throwable $e) {
+        return $text;
+    }
+}
+
+function bm_status_bucket(string $stage): string
+{
+    $value = strtolower(trim($stage));
+    if ($value === '') {
+        return 'pending';
+    }
+    if (strpos($value, 'rejected') !== false || strpos($value, 'failed') !== false || $value === DR_STAGE_CANCELLED) {
+        return 'denied';
+    }
+    if (in_array($value, [DR_STAGE_PAYMENT_VERIFIED, DR_STAGE_READY_FOR_CLAIM, DR_STAGE_COMPLETED], true)) {
+        return 'verified';
+    }
+
+    return 'pending';
+}
+
+function bm_is_business_monitoring_request(array $row, array $payload): bool
+{
+    $docType = bm_non_empty([
+        $row['document_type'] ?? '',
+        $payload['document_type'] ?? '',
+    ]);
+    $docKey = dr_canonical_document_type_key(dr_normalize_document_type($docType));
+    $purpose = strtolower(bm_non_empty([
+        $row['purpose'] ?? '',
+        $payload['request_purpose'] ?? '',
+        $payload['purpose'] ?? '',
+    ]));
+    $businessName = bm_non_empty([
+        $payload['business_name'] ?? '',
+        $payload['businessName'] ?? '',
+        $payload['business_trade_name'] ?? '',
+        $payload['trade_name'] ?? '',
+        $payload['establishment_name'] ?? '',
+    ]);
+    $plateNumber = bm_non_empty([
+        $payload['_preview_plate_number'] ?? '',
+        $payload['plate_number'] ?? '',
+        $payload['business_plate_number'] ?? '',
+        $payload['vehicle_plate_number'] ?? '',
+    ]);
+
+    if (in_array($docKey, [
+        'barangayclearanceforbusinesspermit',
+        'clearanceforbusinesspermit',
+        'barangaybusinessclearance',
+        'businessclearance',
+    ], true)) {
+        return true;
+    }
+
+    if ($businessName !== '' && strpos($purpose, 'business permit') !== false) {
+        return true;
+    }
+
+    return false;
+}
+
+if (!dr_table_exists($conn, 'documentrequesttbl')) {
+    dr_respond_json(200, ['success' => true, 'items' => []]);
+}
+
+$baseSelects = [
+    'd.request_id AS request_id',
+    bm_select_or_null($conn, 'documentrequesttbl', 'resident_user_id', 'resident_user_id'),
+    bm_select_or_null($conn, 'documentrequesttbl', 'resident_id', 'resident_id'),
+    bm_select_or_null($conn, 'documentrequesttbl', 'resident_name', 'resident_name'),
+    bm_select_or_null($conn, 'documentrequesttbl', 'document_type', 'document_type'),
+    bm_select_or_null($conn, 'documentrequesttbl', 'purpose', 'purpose'),
+    bm_select_or_null($conn, 'documentrequesttbl', 'stage', 'stage'),
+    bm_select_or_null($conn, 'documentrequesttbl', 'submitted_at', 'submitted_at'),
+    bm_select_or_null($conn, 'documentrequesttbl', 'request_timestamp', 'request_timestamp'),
+    dr_column_exists($conn, 'documentrequesttbl', 'request_details')
+        ? 'd.request_details AS request_details'
+        : 'NULL AS request_details',
+];
+
+if (dr_column_exists($conn, 'documentrequesttbl', 'status_id_request')) {
+    $baseSelects[] = 'd.status_id_request AS status_id_request';
+}
+if (dr_column_exists($conn, 'documentrequesttbl', 'status_id')) {
+    $baseSelects[] = 'd.status_id AS status_id';
+}
+
+$extraSelects = [];
+$extraJoins = [];
+if (dr_table_exists($conn, 'residentinformationtbl')) {
+    if (dr_column_exists($conn, 'documentrequesttbl', 'resident_user_id')) {
+        $extraSelects[] = "TRIM(CONCAT_WS(' ', NULLIF(riu.firstname, ''), NULLIF(riu.middlename, ''), NULLIF(riu.lastname, ''), NULLIF(riu.suffix, ''))) AS _resident_name_by_user";
+        $extraSelects[] = "NULLIF(riu.sector_membership, '') AS _sector_membership_by_user";
+        $extraJoins[] = 'LEFT JOIN residentinformationtbl riu ON riu.user_id = d.resident_user_id';
+    }
+    if (dr_column_exists($conn, 'documentrequesttbl', 'resident_id')) {
+        $extraSelects[] = "TRIM(CONCAT_WS(' ', NULLIF(rir.firstname, ''), NULLIF(rir.middlename, ''), NULLIF(rir.lastname, ''), NULLIF(rir.suffix, ''))) AS _resident_name_by_resident";
+        $extraSelects[] = "NULLIF(rir.sector_membership, '') AS _sector_membership_by_resident";
+        $extraJoins[] = 'LEFT JOIN residentinformationtbl rir ON rir.resident_id = d.resident_id';
+    }
+}
+if (dr_table_exists($conn, 'residentaddresstbl')) {
+    if (dr_column_exists($conn, 'documentrequesttbl', 'resident_user_id') && dr_table_exists($conn, 'residentinformationtbl')) {
+        $extraSelects[] = "NULLIF(rau.area_number, '') AS _area_number_by_user";
+        $extraJoins[] = "LEFT JOIN residentaddresstbl rau ON rau.address_id = (
+            SELECT a2.address_id
+            FROM residentaddresstbl a2
+            WHERE a2.resident_id = riu.resident_id
+            ORDER BY a2.address_id DESC
+            LIMIT 1
+        )";
+    }
+    if (dr_column_exists($conn, 'documentrequesttbl', 'resident_id')) {
+        $extraSelects[] = "NULLIF(rar.area_number, '') AS _area_number_by_resident";
+        $extraJoins[] = "LEFT JOIN residentaddresstbl rar ON rar.address_id = (
+            SELECT a2.address_id
+            FROM residentaddresstbl a2
+            WHERE a2.resident_id = d.resident_id
+            ORDER BY a2.address_id DESC
+            LIMIT 1
+        )";
+    }
+}
+
+$whereParts = [];
+if (dr_column_exists($conn, 'documentrequesttbl', 'document_type')) {
+    $whereParts[] = "LOWER(COALESCE(d.document_type, '')) LIKE '%business%'";
+}
+if (dr_column_exists($conn, 'documentrequesttbl', 'purpose')) {
+    $whereParts[] = "LOWER(COALESCE(d.purpose, '')) LIKE 'business permit%'";
+}
+if (dr_column_exists($conn, 'documentrequesttbl', 'request_details')) {
+    $whereParts[] = "d.request_details LIKE '%business_name%'";
+}
+
+$orderCol = dr_column_exists($conn, 'documentrequesttbl', 'submitted_at')
+    ? 'submitted_at'
+    : (dr_column_exists($conn, 'documentrequesttbl', 'request_timestamp') ? 'request_timestamp' : 'request_id');
+
+$sql = "
+    SELECT
+        " . implode(",\n        ", $baseSelects)
+        . ($extraSelects ? ",\n        " . implode(",\n        ", $extraSelects) : '') . "
+    FROM documentrequesttbl d
+    " . ($extraJoins ? implode("\n    ", $extraJoins) : '') . "
+";
+
+if ($whereParts) {
+    $sql .= "\nWHERE (" . implode(' OR ', $whereParts) . ")\n";
+}
+
+$sql .= "ORDER BY d.{$orderCol} DESC, d.request_id DESC";
+
+$stmt = $conn->prepare($sql);
+if (!$stmt) {
+    dr_respond_json(500, ['success' => false, 'message' => 'Failed to prepare business monitoring query.']);
+}
+
+$stmt->execute();
+$result = $stmt->get_result();
+$items = [];
+
+while ($row = $result->fetch_assoc()) {
+    $payload = bm_decode_payload($row);
+    if (!bm_is_business_monitoring_request($row, $payload)) {
+        continue;
+    }
+
+    if (trim((string)($row['stage'] ?? '')) === '') {
+        dr_sync_stage_from_status_lookup($conn, $row);
+    }
+
+    $documentType = bm_non_empty([
+        $row['document_type'] ?? '',
+        $payload['document_type'] ?? '',
+        'Barangay Clearance for Business Permit',
+    ]);
+    $submittedAtRaw = bm_non_empty([
+        $row['submitted_at'] ?? '',
+        $row['request_timestamp'] ?? '',
+    ]);
+    $applicantName = bm_non_empty([
+        $row['resident_name'] ?? '',
+        $row['_resident_name_by_user'] ?? '',
+        $row['_resident_name_by_resident'] ?? '',
+        $payload['resident_name'] ?? '',
+    ]);
+    $ownerType = bm_non_empty([
+        $payload['owner_type'] ?? '',
+    ]);
+    $ownerName = $ownerType === 'Renter'
+        ? bm_non_empty([
+            bm_person_name($payload, 'ro_'),
+            $payload['owner_name'] ?? '',
+        ])
+        : $applicantName;
+    $businessName = bm_non_empty([
+        $payload['business_name'] ?? '',
+        $payload['businessName'] ?? '',
+        $payload['business_trade_name'] ?? '',
+        $payload['trade_name'] ?? '',
+        $payload['establishment_name'] ?? '',
+    ]);
+    $plateNumber = bm_non_empty([
+        $payload['_preview_plate_number'] ?? '',
+        $payload['plate_number'] ?? '',
+        $payload['business_plate_number'] ?? '',
+        $payload['vehicle_plate_number'] ?? '',
+    ]);
+    $businessType = bm_non_empty([
+        $payload['business_type'] ?? '',
+        $payload['businessType'] ?? '',
+    ]);
+    $businessAddress = bm_non_empty([
+        $payload['business_full_address'] ?? '',
+        $payload['business_address'] ?? '',
+        $payload['location'] ?? '',
+    ]);
+    $applicationType = bm_non_empty([
+        dr_request_application_type($row, $payload),
+        $payload['application_type'] ?? '',
+    ]);
+    $areaNumber = bm_non_empty([
+        $payload['full_area_number'] ?? '',
+        $payload['area_number'] ?? '',
+        $row['_area_number_by_user'] ?? '',
+        $row['_area_number_by_resident'] ?? '',
+    ]);
+    $sectorMembership = bm_non_empty([
+        $row['_sector_membership_by_user'] ?? '',
+        $row['_sector_membership_by_resident'] ?? '',
+    ]);
+    $stage = trim((string)($row['stage'] ?? ''));
+
+    $items[] = [
+        'request_id' => trim((string)($row['request_id'] ?? '')),
+        'resident_id' => trim((string)($row['resident_id'] ?? '')),
+        'resident_user_id' => trim((string)($row['resident_user_id'] ?? '')),
+        'document_type' => $documentType,
+        'purpose' => bm_non_empty([
+            $row['purpose'] ?? '',
+            $payload['request_purpose'] ?? '',
+            $payload['purpose'] ?? '',
+        ]),
+        'submitted_at' => $submittedAtRaw,
+        'submitted_at_display' => bm_format_timestamp($submittedAtRaw),
+        'plate_number' => $plateNumber,
+        'business_name' => $businessName,
+        'business_type' => $businessType,
+        'application_type' => $applicationType,
+        'applicant_name' => $applicantName,
+        'owner_type' => $ownerType,
+        'owner_name' => $ownerName,
+        'business_address' => $businessAddress,
+        'area_number' => $areaNumber,
+        'sector_membership' => $sectorMembership,
+        'submitted_documents' => bm_extract_submitted_documents($payload),
+        'stage' => $stage,
+        'stage_label' => dr_stage_label($stage),
+        'status_bucket' => bm_status_bucket($stage),
+    ];
+}
+
+$stmt->close();
+
+dr_respond_json(200, ['success' => true, 'items' => $items]);

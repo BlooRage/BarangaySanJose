@@ -2055,7 +2055,7 @@ if ($certificateLaunchStage === 'release') {
             <input type="text" id="searchInput" class="form-control" placeholder="Request ID, resident ID, name, address">
             <span class="input-group-text bg-white"><i class="fas fa-search"></i></span>
           </div>
-          <button class="btn btn-outline-secondary btn-icon admin-filter" type="button" id="filterButton" title="Filter" aria-label="Filter">
+          <button class="btn btn-outline-secondary btn-icon admin-filter" type="button" data-bs-toggle="modal" data-bs-target="#modalFilter" id="filterButton" title="Filter" aria-label="Filter">
             <i class="fas fa-filter"></i>
             <span class="visually-hidden">Filter</span>
           </button>
@@ -2563,12 +2563,27 @@ if ($certificateLaunchStage === 'release') {
       <hr>
       <div class="modal-body">
         <div class="mb-3">
-          <label class="fw-bold small mb-2">Status</label>
-          <div id="filterStatusList"></div>
+          <label class="fw-bold small mb-2">Date Range</label>
+          <div class="row g-2">
+            <div class="col-6">
+              <input type="date" class="form-control" id="filterDateFrom" aria-label="From date">
+            </div>
+            <div class="col-6">
+              <input type="date" class="form-control" id="filterDateTo" aria-label="To date">
+            </div>
+          </div>
+        </div>
+        <div class="mb-3">
+          <label class="fw-bold small mb-2">Type of Request</label>
+          <div id="filterDocumentTypeList" class="d-grid gap-2"></div>
+        </div>
+        <div class="mb-3">
+          <label class="fw-bold small mb-2">Area Number</label>
+          <div id="filterAreaList" class="d-grid gap-2"></div>
         </div>
         <div class="mb-1">
-          <label class="fw-bold small mb-2">Area</label>
-          <div id="filterAreaList"></div>
+          <label class="fw-bold small mb-2">Sector Membership</label>
+          <div id="filterSectorList" class="d-grid gap-2"></div>
         </div>
       </div>
       <div class="modal-footer border-0">
@@ -2848,6 +2863,6 @@ if ($certificateLaunchStage === 'release') {
 </script>
 <script src="../../JS-Script-Files/Admin-End/tableColumnsGeneric.js?v=20260215-1"></script>
 <script src="../../JS-Script-Files/Shared/barangayIdDigital.js?v=20260321-04"></script>
-<script src="../../JS-Script-Files/Admin-End/certificateTrackerScript.js?v=20260321-11"></script>
+<script src="../../JS-Script-Files/Admin-End/certificateTrackerScript.js?v=20260322-12"></script>
 </body>
 </html>

@@ -1065,10 +1065,27 @@ if ($financeSection === 'fees') {
       <hr class="my-2">
       <div class="modal-body">
         <div class="mb-3">
-          <label for="financeFilterDocumentType" class="form-label fw-semibold">Document Type</label>
-          <select id="financeFilterDocumentType" class="form-select">
-            <option value="">All documents</option>
-          </select>
+          <label class="form-label fw-semibold">Date Range</label>
+          <div class="row g-2">
+            <div class="col-6">
+              <input type="date" id="financeFilterDateFrom" class="form-control" aria-label="From date">
+            </div>
+            <div class="col-6">
+              <input type="date" id="financeFilterDateTo" class="form-control" aria-label="To date">
+            </div>
+          </div>
+        </div>
+        <div class="mb-3">
+          <label class="form-label fw-semibold">Type of Request</label>
+          <div id="financeFilterDocumentTypeList" class="d-grid gap-2"></div>
+        </div>
+        <div class="mb-3">
+          <label class="form-label fw-semibold">Area Number</label>
+          <div id="financeFilterAreaList" class="d-grid gap-2"></div>
+        </div>
+        <div class="mb-3">
+          <label class="form-label fw-semibold">Sector Membership</label>
+          <div id="financeFilterSectorList" class="d-grid gap-2"></div>
         </div>
         <div>
           <label for="financeFilterPaymentMethod" class="form-label fw-semibold">Payment Method</label>
@@ -1240,7 +1257,7 @@ if ($financeSection === 'fees') {
 window.CERT_TRACKER_DEFAULT_STAGE = 'finance';
 </script>
 <script src="../../JS-Script-Files/Shared/barangayIdDigital.js?v=20260321-04"></script>
-<script src="../../JS-Script-Files/Admin-End/certificateTrackerScript.js?v=20260321-11"></script>
+<script src="../../JS-Script-Files/Admin-End/certificateTrackerScript.js?v=20260322-12"></script>
 <?php else: ?>
 <script>
 (function () {

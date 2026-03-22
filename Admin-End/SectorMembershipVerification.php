@@ -294,10 +294,32 @@ include 'includes/sidebar.php';
           <button class="btn btn-outline-secondary btn-sm filter-btn" data-filter="Verified" data-bs-dismiss="modal">Verified</button>
           <button class="btn btn-outline-secondary btn-sm filter-btn" data-filter="Rejected" data-bs-dismiss="modal">Rejected</button>
         </div>
-        <div class="small text-muted mt-3">Selecting a filter applies immediately.</div>
+        <div class="small text-muted mt-3">Status applies immediately. The filters below apply when you click Apply Filter.</div>
+        <div class="mt-3">
+          <label class="fw-bold small mb-2 d-block">Date Range</label>
+          <div class="row g-2">
+            <div class="col-6">
+              <label class="form-label small mb-1" for="sectorFilterDateFrom">From</label>
+              <input type="date" class="form-control" id="sectorFilterDateFrom">
+            </div>
+            <div class="col-6">
+              <label class="form-label small mb-1" for="sectorFilterDateTo">To</label>
+              <input type="date" class="form-control" id="sectorFilterDateTo">
+            </div>
+          </div>
+        </div>
+        <div class="mt-3">
+          <label class="fw-bold small mb-2">Sector Membership</label>
+          <div class="d-flex flex-column gap-2" id="sectorFilterMembershipList"></div>
+        </div>
+        <div class="mt-3">
+          <label class="fw-bold small mb-2">Area Number</label>
+          <div class="d-flex flex-column gap-2" id="sectorFilterAreaList"></div>
+        </div>
       </div>
       <div class="modal-footer border-0">
-        <button type="button" class="btn btn-primary" data-bs-dismiss="modal">Done</button>
+        <button type="button" class="btn btn-outline-secondary" id="btnSectorFilterReset">Reset</button>
+        <button type="button" class="btn btn-primary" id="btnSectorFilterApply">Apply Filter</button>
       </div>
     </div>
   </div>
@@ -332,6 +354,6 @@ include 'includes/sidebar.php';
   };
 </script>
 <script src="../JS-Script-Files/Admin-End/tableColumnsGeneric.js?v=20260215-1"></script>
-<script src="../JS-Script-Files/Admin-End/sectorMembershipVerificationScript.js?v=20260316-01"></script>
+<script src="../JS-Script-Files/Admin-End/sectorMembershipVerificationScript.js?v=20260322-1"></script>
 </body>
 </html>
