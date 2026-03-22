@@ -14,7 +14,25 @@ require_once __DIR__ . '/includes/resident_access_guard.php';
   <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons/font/bootstrap-icons.css" rel="stylesheet" />
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
   <link rel="stylesheet" href="../CSS-Styles/Resident-End-CSS/residentDashboard.css">
+  <link rel="stylesheet" href="../CSS-Styles/Admin-End-CSS/ResidentMasterlistStyle.css?v=20260321-2">
   <style>
+    #div-sidebarWrapper {
+      width: 280px;
+      min-width: 0;
+      min-height: 100vh;
+      height: 100vh;
+      overflow: hidden;
+    }
+    #img-sidebarAvatar {
+      width: 90px;
+      height: 90px;
+    }
+    @media (min-width: 769px) {
+      #div-sidebarWrapper {
+        width: 280px;
+        min-height: 100vh;
+      }
+    }
     .tracker-shell { border-color: #f1e1cf !important; }
     .tracker-title {
       font-family: 'Charis SIL Bold', serif;
@@ -23,74 +41,179 @@ require_once __DIR__ . '/includes/resident_access_guard.php';
       line-height: 1.1;
       margin: 0 0 0.65rem 0;
     }
-    .toolbar {
-      display: flex;
-      align-items: center;
+    .tracker-shell .admin-list-tabs {
       gap: 12px;
-      flex-wrap: nowrap;
-      overflow-x: auto;
-      margin-bottom: 1rem;
+      overflow: visible;
     }
-    .toolbar .tabs,
-    .toolbar .actions {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      flex: 0 0 auto;
-      white-space: nowrap;
-    }
-    .toolbar .actions {
-      margin-left: auto;
-      flex-wrap: nowrap;
-    }
-    .toolbar .actions .input-group {
-      min-width: 260px;
-      max-width: 420px;
-      flex: 1 1 auto;
-    }
-    .tracker-tab.btn {
-      border-radius: 999px;
-      padding: 0.35rem 0.85rem;
-      font-weight: 600;
-      border-color: #e3e6ea;
-      color: #495057;
-      background: #fff;
-    }
-    .tracker-tab.btn.active {
-      border-color: rgba(254, 153, 60, 0.7);
-      color: #a04f00;
-      background: linear-gradient(180deg, #fff6ec 0%, #ffe9d1 100%);
-    }
-    .btn-icon {
-      width: 38px;
-      height: 38px;
-      padding: 0;
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
+    .tracker-shell .status-filter-btn {
       border-radius: 10px;
+      border-width: 1px;
+      overflow: visible;
     }
-    .refresh-btn {
+    .tracker-shell .btn-icon.admin-filter,
+    .tracker-shell .btn-icon.admin-columns,
+    .tracker-shell .btn-icon.admin-refresh {
+      outline: none;
+      box-shadow: none;
+    }
+    .tracker-shell .btn-icon.admin-filter {
+      border-color: rgba(108, 117, 125, 0.28);
+      color: #495057;
+      background: linear-gradient(180deg, #fbfcfd 0%, #f3f6f8 100%);
+      font-weight: 700;
+      letter-spacing: 0.2px;
+      transition: transform 120ms ease, box-shadow 120ms ease, background-color 120ms ease, border-color 120ms ease;
+    }
+    .tracker-shell .btn-icon.admin-filter:hover {
+      border-color: rgba(73, 80, 87, 0.45);
+      color: #343a40;
+      background: linear-gradient(180deg, #f8fafb 0%, #edf1f4 100%);
+      box-shadow: 0 10px 18px rgba(73, 80, 87, 0.10);
+      transform: translateY(-1px);
+    }
+    .tracker-shell .btn-icon.admin-filter:active {
+      transform: translateY(0);
+      box-shadow: 0 6px 12px rgba(73, 80, 87, 0.10);
+    }
+    .tracker-shell .btn-icon.admin-filter:focus,
+    .tracker-shell .btn-icon.admin-filter:focus-visible {
+      outline: none;
+      border-color: rgba(108, 117, 125, 0.28);
+      box-shadow: 0 0 0 .2rem rgba(108, 117, 125, 0.18);
+    }
+    .tracker-shell .btn-icon.admin-columns {
+      border-color: rgba(13, 110, 253, 0.25);
+      color: #0d47a1;
+      background: linear-gradient(180deg, #f4f8ff 0%, #eef5ff 100%);
+      font-weight: 700;
+      letter-spacing: 0.2px;
+      transition: transform 120ms ease, box-shadow 120ms ease, background-color 120ms ease, border-color 120ms ease;
+    }
+    .tracker-shell .btn-icon.admin-columns:hover {
+      border-color: rgba(13, 110, 253, 0.45);
+      color: #0a3a84;
+      background: linear-gradient(180deg, #eff6ff 0%, #e7f0ff 100%);
+      box-shadow: 0 10px 18px rgba(13, 110, 253, 0.10);
+      transform: translateY(-1px);
+    }
+    .tracker-shell .btn-icon.admin-columns:active {
+      transform: translateY(0);
+      box-shadow: 0 6px 12px rgba(13, 110, 253, 0.10);
+    }
+    .tracker-shell .btn-icon.admin-columns:focus,
+    .tracker-shell .btn-icon.admin-columns:focus-visible {
+      outline: none;
+      border-color: rgba(13, 110, 253, 0.25);
+      box-shadow: 0 0 0 .2rem rgba(13, 110, 253, 0.18);
+    }
+    .tracker-shell .btn-icon.admin-refresh {
       border-color: rgba(254, 153, 60, 0.45);
       color: #b85b00;
       background: linear-gradient(180deg, #fffaf4 0%, #fff3e4 100%);
-    }
-    .refresh-btn.is-loading i { animation: spin 900ms linear infinite; }
-    @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
-    .status-pill {
-      display: inline-flex;
-      align-items: center;
-      gap: 0.35rem;
-      border-radius: 999px;
-      padding: 0.34rem 0.78rem;
-      font-size: 0.82rem;
       font-weight: 700;
-      white-space: nowrap;
-      border: 1px solid transparent;
+      letter-spacing: 0.2px;
+      transition: transform 120ms ease, box-shadow 120ms ease, background-color 120ms ease, border-color 120ms ease;
     }
-    .status-pill.pending { color: #9a3412; background: #ffedd5; border-color: #fdba74; }
-    .status-pill.approved { color: #166534; background: #dcfce7; border-color: #86efac; }
-    .status-pill.archived { color: #991b1b; background: #fee2e2; border-color: #fca5a5; }
+    .tracker-shell .btn-icon.admin-refresh:hover {
+      border-color: rgba(254, 153, 60, 0.7);
+      color: #a04f00;
+      background: linear-gradient(180deg, #fff6ec 0%, #ffe9d1 100%);
+      box-shadow: 0 10px 18px rgba(222, 113, 12, 0.14);
+      transform: translateY(-1px);
+    }
+    .tracker-shell .btn-icon.admin-refresh:active {
+      transform: translateY(0);
+      box-shadow: 0 6px 12px rgba(222, 113, 12, 0.12);
+    }
+    .tracker-shell .btn-icon.admin-refresh:focus,
+    .tracker-shell .btn-icon.admin-refresh:focus-visible {
+      outline: none;
+      border-color: rgba(254, 153, 60, 0.45);
+      box-shadow: 0 0 0 .2rem rgba(254, 153, 60, 0.25);
+    }
+    .tracker-shell .btn-icon.admin-refresh.is-loading i {
+      animation: adminSpin 900ms linear infinite;
+    }
+    .tracker-shell.resident-masterlist-shell .status-filter-btn[data-filter="ALL"],
+    .tracker-shell.resident-masterlist-shell .status-filter-btn[data-filter=""] {
+      color: #0d6efd;
+      border-color: #0d6efd;
+      background: #fff;
+    }
+    .tracker-shell.resident-masterlist-shell .status-filter-btn:not([data-filter="ALL"]):not([data-filter=""]) {
+      color: #495057;
+      border-color: #495057;
+      background: #fff;
+    }
+    .tracker-shell.resident-masterlist-shell .status-filter-btn:not([data-filter="ALL"]):not([data-filter=""]):hover,
+    .tracker-shell.resident-masterlist-shell .status-filter-btn:not([data-filter="ALL"]):not([data-filter=""]):focus-visible {
+      color: #343a40;
+      border-color: #343a40;
+      background: #f8f9fa;
+    }
+    .tracker-shell.resident-masterlist-shell .status-filter-btn[data-filter="ALL"].active,
+    .tracker-shell.resident-masterlist-shell .status-filter-btn[data-filter=""].active {
+      color: #fff !important;
+      background-color: #0d6efd !important;
+      border-color: #0d6efd !important;
+      font-weight: 700;
+    }
+    .tracker-shell.resident-masterlist-shell .status-filter-btn:not([data-filter="ALL"]):not([data-filter=""]).active {
+      color: #fff !important;
+      background-color: #495057 !important;
+      border-color: #495057 !important;
+      font-weight: 700;
+    }
+    .tracker-shell .status-pill.denied {
+      color: #8f2932;
+      background: #e8cfd3;
+      border: 2px solid #e0bcc2;
+    }
+    .tracker-table-responsive {
+      display: block;
+    }
+    #complaintTable {
+      table-layout: fixed;
+      min-width: 980px;
+    }
+    #complaintTable th:first-child,
+    #complaintTable td:first-child {
+      width: 20%;
+      white-space: nowrap;
+    }
+    #complaintTable th:nth-child(2),
+    #complaintTable td:nth-child(2) {
+      width: 18%;
+      white-space: normal;
+    }
+    #complaintTable th:nth-child(3),
+    #complaintTable td:nth-child(3) {
+      width: 26%;
+      white-space: normal;
+    }
+    #complaintTable th:nth-child(4),
+    #complaintTable td:nth-child(4) {
+      width: 16%;
+      white-space: nowrap;
+    }
+    #complaintTable th:nth-child(5),
+    #complaintTable td:nth-child(5) {
+      width: 12%;
+      white-space: normal;
+    }
+    #complaintTable th:nth-child(6),
+    #complaintTable td:nth-child(6) {
+      width: 12%;
+      white-space: nowrap;
+    }
+    .tracker-shell #complaintPagination .page-link {
+      color: #495057;
+    }
+    .tracker-shell #complaintPagination .page-item.active .page-link {
+      background-color: #0d6efd;
+      border-color: #0d6efd;
+      color: #fff;
+    }
     .tracker-card {
       border: 1px solid #eceff3;
       border-radius: 12px;
@@ -191,33 +314,33 @@ require_once __DIR__ . '/includes/resident_access_guard.php';
       word-break: break-word;
     }
     @media (max-width: 991.98px) {
-      .toolbar {
+      .tracker-shell .admin-list-toolbar {
         flex-direction: column;
         align-items: stretch;
         gap: 10px;
       }
-      .toolbar .tabs,
-      .toolbar .actions {
+      .tracker-shell .admin-list-tabs,
+      .tracker-shell .admin-list-actions {
         width: 100%;
       }
-      .toolbar .tabs {
+      .tracker-shell .admin-list-tabs {
         overflow-x: auto;
         padding-bottom: 4px;
       }
-      .toolbar .actions {
+      .tracker-shell .admin-list-actions {
         margin-left: 0;
         justify-content: flex-start;
         overflow-x: auto;
         padding-bottom: 2px;
       }
-      .toolbar .actions .input-group {
+      .tracker-shell .admin-search {
         min-width: 0;
         max-width: none;
         width: 100%;
       }
     }
     @media (max-width: 767.98px) {
-      .table-responsive { display: none; }
+      .tracker-table-responsive { display: none; }
       #complaintCards { display: block; }
       #complaintViewModal .modal-dialog {
         width: calc(100vw - 1rem);
@@ -238,31 +361,34 @@ require_once __DIR__ . '/includes/resident_access_guard.php';
       <h2 class="tracker-title">Complaint Tracker</h2>
       <hr class="mt-0 mb-3">
 
-      <div class="bg-white p-4 rounded-4 shadow-sm border tracker-shell">
-        <div class="toolbar">
-          <div class="tabs">
-            <button type="button" class="btn tracker-tab active" data-tab="all">All</button>
-            <button type="button" class="btn tracker-tab" data-tab="pending">Pending</button>
-            <button type="button" class="btn tracker-tab" data-tab="approved">Resolved</button>
-            <button type="button" class="btn tracker-tab" data-tab="archived">Closed</button>
+      <div class="bg-white p-4 rounded-4 shadow-sm border tracker-shell resident-masterlist-shell">
+        <div class="admin-list-toolbar mb-3 pt-2 flex-wrap">
+          <div class="admin-list-tabs">
+            <button type="button" class="btn btn-outline-primary btn-sm status-filter-btn tracker-tab active" data-tab="all" data-filter="ALL">All</button>
+            <button type="button" class="btn btn-outline-secondary btn-sm status-filter-btn tracker-tab fw-semibold" data-tab="pending" data-filter="Pending">Pending</button>
+            <button type="button" class="btn btn-outline-secondary btn-sm status-filter-btn tracker-tab fw-semibold" data-tab="approved" data-filter="Resolved">Resolved</button>
+            <button type="button" class="btn btn-outline-secondary btn-sm status-filter-btn tracker-tab fw-semibold" data-tab="archived" data-filter="Closed">Closed</button>
           </div>
-          <div class="actions">
-            <div class="input-group">
+          <div class="admin-list-actions">
+            <div class="input-group admin-search">
               <input id="complaintSearch" class="form-control" placeholder="Search complaints..." />
               <span class="input-group-text bg-white"><i class="fas fa-search"></i></span>
             </div>
-            <button id="complaintFilterBtn" class="btn btn-outline-secondary btn-icon" type="button" title="Filter" aria-label="Filter" data-bs-toggle="modal" data-bs-target="#complaintFilterModal">
+            <button id="complaintFilterBtn" class="btn btn-outline-secondary btn-icon admin-filter" type="button" title="Filter" aria-label="Filter" data-bs-toggle="modal" data-bs-target="#complaintFilterModal">
               <i class="fas fa-filter"></i>
             </button>
-            <button id="complaintRefreshBtn" class="btn refresh-btn btn-icon" type="button" title="Refresh complaint tracker" aria-label="Refresh complaint tracker">
+            <button id="complaintColumnsBtn" class="btn btn-outline-secondary btn-icon admin-columns" type="button" title="Columns" aria-label="Columns" data-bs-toggle="modal" data-bs-target="#complaintColumnsModal">
+              <i class="fa-solid fa-sliders"></i>
+            </button>
+            <button id="complaintRefreshBtn" class="btn btn-outline-secondary btn-icon admin-refresh" type="button" title="Refresh complaint tracker" aria-label="Refresh complaint tracker">
               <i class="fa-solid fa-arrows-rotate"></i>
             </button>
           </div>
         </div>
 
-        <div class="table-responsive">
-          <table class="table table-hover align-middle mb-0">
-            <thead class="table-light">
+        <div class="table-responsive compact-admin-table-shell tracker-table-responsive">
+          <table id="complaintTable" class="table align-middle compact-admin-table mb-0">
+            <thead>
               <tr>
                 <th>Complaint ID</th>
                 <th>Type</th>
@@ -276,6 +402,16 @@ require_once __DIR__ . '/includes/resident_access_guard.php';
               <tr><td colspan="6" class="text-center text-muted py-4">Loading complaints...</td></tr>
             </tbody>
           </table>
+        </div>
+
+        <div class="resident-table-footer mt-3 d-flex flex-wrap justify-content-between align-items-center gap-3 tracker-table-responsive">
+          <div class="d-flex align-items-center gap-2">
+            <label for="complaintEntriesPerPageInput" class="small text-muted mb-0">Entries</label>
+            <input id="complaintEntriesPerPageInput" type="number" min="1" step="1" value="20" class="form-control form-control-sm resident-entries-input" />
+          </div>
+          <nav aria-label="Complaint pagination">
+            <ul class="pagination pagination-sm mb-0" id="complaintPagination"></ul>
+          </nav>
         </div>
 
         <div id="complaintCards" class="mt-2">
@@ -321,6 +457,23 @@ require_once __DIR__ . '/includes/resident_access_guard.php';
     </div>
   </div>
 
+  <div class="modal fade" id="complaintColumnsModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title">Columns</h5>
+        </div>
+        <div class="modal-body">
+          <div class="row g-2" id="complaintColumnsList"></div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline-secondary" id="complaintColumnsReset">Reset</button>
+          <button type="button" class="btn btn-primary" data-bs-dismiss="modal">Done</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <div class="modal fade" id="complaintViewModal" tabindex="-1" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
     <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable">
       <div class="modal-content">
@@ -344,6 +497,8 @@ require_once __DIR__ . '/includes/resident_access_guard.php';
     let allComplaints = [];
     let activeTab = "all";
     let complaintViewModal = null;
+    let complaintCurrentPage = 1;
+    let complaintEntriesPerPage = 20;
 
     function escapeHtml(value) {
       return String(value ?? "")
@@ -383,8 +538,57 @@ require_once __DIR__ . '/includes/resident_access_guard.php';
     function statusBadgeClass(value) {
       const normalized = String(value || "").toLowerCase();
       if (normalized.includes("resolve")) return "approved";
-      if (normalized.includes("drop") || normalized.includes("endorse")) return "archived";
+      if (normalized.includes("drop")) return "denied";
+      if (normalized.includes("endorse") || normalized.includes("close")) return "archived";
       return "pending";
+    }
+
+    function paginateRows(rows, currentPage, perPage) {
+      const safePerPage = Math.max(1, Number.parseInt(perPage, 10) || 20);
+      const totalPages = Math.max(1, Math.ceil(rows.length / safePerPage));
+      const page = Math.min(Math.max(1, currentPage), totalPages);
+      const start = (page - 1) * safePerPage;
+      return {
+        page,
+        totalPages,
+        items: rows.slice(start, start + safePerPage)
+      };
+    }
+
+    function renderComplaintPagination(totalPages) {
+      const pagination = document.getElementById("complaintPagination");
+      if (!pagination) return;
+      if (totalPages <= 1) {
+        pagination.innerHTML = "";
+        return;
+      }
+
+      const items = [];
+      items.push(`
+        <li class="page-item ${complaintCurrentPage <= 1 ? "disabled" : ""}">
+          <button type="button" class="page-link" data-page="${complaintCurrentPage - 1}">Prev</button>
+        </li>
+      `);
+      for (let page = 1; page <= totalPages; page += 1) {
+        items.push(`
+          <li class="page-item ${page === complaintCurrentPage ? "active" : ""}">
+            <button type="button" class="page-link" data-page="${page}">${page}</button>
+          </li>
+        `);
+      }
+      items.push(`
+        <li class="page-item ${complaintCurrentPage >= totalPages ? "disabled" : ""}">
+          <button type="button" class="page-link" data-page="${complaintCurrentPage + 1}">Next</button>
+        </li>
+      `);
+      pagination.innerHTML = items.join("");
+      pagination.querySelectorAll("button[data-page]").forEach((button) => {
+        button.addEventListener("click", () => {
+          if (button.closest(".page-item")?.classList.contains("disabled")) return;
+          complaintCurrentPage = Number.parseInt(button.getAttribute("data-page") || "1", 10) || 1;
+          renderComplaints();
+        });
+      });
     }
 
     function formField(label, value, options = {}) {
@@ -533,25 +737,28 @@ require_once __DIR__ . '/includes/resident_access_guard.php';
       const rows = getFilteredComplaints();
       const tbody = document.getElementById("complaintTbody");
       const cards = document.getElementById("complaintCards");
+      const paged = paginateRows(rows, complaintCurrentPage, complaintEntriesPerPage);
+      complaintCurrentPage = paged.page;
 
       if (!rows.length) {
         tbody.innerHTML = `<tr><td colspan="6" class="text-center text-muted py-4">No complaints found.</td></tr>`;
         cards.innerHTML = `<div class="text-center text-muted py-4">No complaints found.</div>`;
+        renderComplaintPagination(1);
         return;
       }
 
-      tbody.innerHTML = rows.map((item) => `
+      tbody.innerHTML = paged.items.map((item) => `
         <tr>
           <td><strong>${escapeHtml(item.complaint_id || "-")}</strong><div class="small text-muted mt-1">Case ${escapeHtml(item.case_id || "-")}</div></td>
           <td>${escapeHtml(item.complaint_type || "-")}</td>
           <td>${escapeHtml(item.subject_display_name || "-")}<div class="small text-muted mt-1">${escapeHtml(item.incident_place || "No location noted")}</div></td>
           <td>${escapeHtml(formatDate(item.incident_date))}</td>
           <td><span class="status-pill ${escapeHtml(statusBadgeClass(item.status_name))}">${escapeHtml(item.status_name || "Pending")}</span><div class="small text-muted mt-1">${escapeHtml(item.level_name || "Complaint Only")}</div></td>
-          <td><button type="button" class="btn btn-sm btn-outline-secondary complaint-view-btn" data-id="${escapeHtml(item.complaint_id)}">View</button></td>
+          <td><button type="button" class="btn btn-sm btn-outline-secondary complaint-view-btn" data-id="${escapeHtml(item.complaint_id)}" data-view-id="${escapeHtml(item.complaint_id)}">View</button></td>
         </tr>
       `).join("");
 
-      cards.innerHTML = rows.map((item) => `
+      cards.innerHTML = paged.items.map((item) => `
         <article class="tracker-card">
           <div class="tracker-label">Complaint</div>
           <div class="tracker-value fw-semibold">${escapeHtml(item.complaint_id || "-")}</div>
@@ -561,10 +768,11 @@ require_once __DIR__ . '/includes/resident_access_guard.php';
           <div class="tracker-value">${escapeHtml(item.subject_display_name || "-")}</div>
           <div class="tracker-label mt-2">Status</div>
           <div class="tracker-value"><span class="status-pill ${escapeHtml(statusBadgeClass(item.status_name))}">${escapeHtml(item.status_name || "Pending")}</span></div>
-          <button type="button" class="btn btn-sm btn-outline-secondary mt-3 complaint-view-btn" data-id="${escapeHtml(item.complaint_id)}">View</button>
+          <button type="button" class="btn btn-sm btn-outline-secondary mt-3 complaint-view-btn" data-id="${escapeHtml(item.complaint_id)}" data-view-id="${escapeHtml(item.complaint_id)}">View</button>
         </article>
       `).join("");
 
+      renderComplaintPagination(paged.totalPages);
       bindViewButtons();
     }
 
@@ -586,6 +794,7 @@ require_once __DIR__ . '/includes/resident_access_guard.php';
           throw new Error(data?.message || "Unable to load complaints.");
         }
         allComplaints = Array.isArray(data.items) ? data.items : [];
+        complaintCurrentPage = 1;
         renderComplaints();
       } catch (err) {
         const message = escapeHtml(err?.message || "Unable to load complaints.");
@@ -606,15 +815,37 @@ require_once __DIR__ . '/includes/resident_access_guard.php';
         });
       });
 
-      document.getElementById("complaintSearch").addEventListener("input", renderComplaints);
-      document.getElementById("complaintStatusFilter").addEventListener("change", renderComplaints);
-      document.getElementById("complaintDateFrom").addEventListener("change", renderComplaints);
-      document.getElementById("complaintDateTo").addEventListener("change", renderComplaints);
-      document.getElementById("complaintFilterApply").addEventListener("click", renderComplaints);
+      document.getElementById("complaintSearch").addEventListener("input", () => {
+        complaintCurrentPage = 1;
+        renderComplaints();
+      });
+      document.getElementById("complaintStatusFilter").addEventListener("change", () => {
+        complaintCurrentPage = 1;
+        renderComplaints();
+      });
+      document.getElementById("complaintDateFrom").addEventListener("change", () => {
+        complaintCurrentPage = 1;
+        renderComplaints();
+      });
+      document.getElementById("complaintDateTo").addEventListener("change", () => {
+        complaintCurrentPage = 1;
+        renderComplaints();
+      });
+      document.getElementById("complaintFilterApply").addEventListener("click", () => {
+        complaintCurrentPage = 1;
+        renderComplaints();
+      });
       document.getElementById("complaintFilterReset").addEventListener("click", () => {
         document.getElementById("complaintStatusFilter").value = "";
         document.getElementById("complaintDateFrom").value = "";
         document.getElementById("complaintDateTo").value = "";
+        complaintCurrentPage = 1;
+        renderComplaints();
+      });
+      document.getElementById("complaintEntriesPerPageInput").addEventListener("change", (event) => {
+        complaintEntriesPerPage = Math.max(1, Number.parseInt(event.target.value || "20", 10) || 20);
+        event.target.value = String(complaintEntriesPerPage);
+        complaintCurrentPage = 1;
         renderComplaints();
       });
       document.getElementById("complaintRefreshBtn").addEventListener("click", loadComplaints);
@@ -623,5 +854,16 @@ require_once __DIR__ . '/includes/resident_access_guard.php';
     });
   </script>
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+  <script>
+    window.ADMIN_TABLE_COLUMNS_CONFIG = {
+      tableSelector: "#complaintTable",
+      modalId: "complaintColumnsModal",
+      listId: "complaintColumnsList",
+      resetBtnId: "complaintColumnsReset",
+      storageKey: "resident_cols_complaint_tracker_v1",
+      defaultHiddenIdxs: []
+    };
+  </script>
+  <script src="../JS-Script-Files/Admin-End/tableColumnsGeneric.js"></script>
 </body>
 </html>

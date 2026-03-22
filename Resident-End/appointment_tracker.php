@@ -14,7 +14,25 @@ require_once __DIR__ . '/includes/resident_access_guard.php';
   <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons/font/bootstrap-icons.css" rel="stylesheet" />
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
   <link rel="stylesheet" href="../CSS-Styles/Resident-End-CSS/residentDashboard.css">
+  <link rel="stylesheet" href="../CSS-Styles/Admin-End-CSS/ResidentMasterlistStyle.css?v=20260321-2">
   <style>
+    #div-sidebarWrapper {
+      width: 280px;
+      min-width: 0;
+      min-height: 100vh;
+      height: 100vh;
+      overflow: hidden;
+    }
+    #img-sidebarAvatar {
+      width: 90px;
+      height: 90px;
+    }
+    @media (min-width: 769px) {
+      #div-sidebarWrapper {
+        width: 280px;
+        min-height: 100vh;
+      }
+    }
     .tracker-shell { border-color: #f1e1cf !important; }
     .tracker-title {
       font-family: 'Charis SIL Bold', serif;
@@ -23,75 +41,191 @@ require_once __DIR__ . '/includes/resident_access_guard.php';
       line-height: 1.1;
       margin: 0 0 0.65rem 0;
     }
-    .toolbar {
-      display: flex;
-      align-items: center;
+    .tracker-shell .admin-list-tabs {
       gap: 12px;
-      flex-wrap: nowrap;
-      overflow-x: auto;
-      margin-bottom: 1rem;
+      overflow: visible;
     }
-    .toolbar .tabs,
-    .toolbar .actions {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      flex: 0 0 auto;
-      white-space: nowrap;
-    }
-    .toolbar .actions {
-      margin-left: auto;
-      flex-wrap: nowrap;
-    }
-    .toolbar .actions .input-group {
-      min-width: 260px;
-      max-width: 420px;
-      flex: 1 1 auto;
-    }
-    .tracker-tab.btn {
-      border-radius: 999px;
-      padding: 0.35rem 0.85rem;
-      font-weight: 600;
-      border-color: #e3e6ea;
-      color: #495057;
-      background: #fff;
-    }
-    .tracker-tab.btn.active {
-      border-color: rgba(254, 153, 60, 0.7);
-      color: #a04f00;
-      background: linear-gradient(180deg, #fff6ec 0%, #ffe9d1 100%);
-    }
-    .btn-icon {
-      width: 38px;
-      height: 38px;
-      padding: 0;
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
+    .tracker-shell .status-filter-btn {
       border-radius: 10px;
+      border-width: 1px;
+      overflow: visible;
     }
-    .refresh-btn {
+    .tracker-shell .btn-icon.admin-filter,
+    .tracker-shell .btn-icon.admin-columns,
+    .tracker-shell .btn-icon.admin-refresh {
+      outline: none;
+      box-shadow: none;
+    }
+    .tracker-shell .btn-icon.admin-filter {
+      border-color: rgba(108, 117, 125, 0.28);
+      color: #495057;
+      background: linear-gradient(180deg, #fbfcfd 0%, #f3f6f8 100%);
+      font-weight: 700;
+      letter-spacing: 0.2px;
+      transition: transform 120ms ease, box-shadow 120ms ease, background-color 120ms ease, border-color 120ms ease;
+    }
+    .tracker-shell .btn-icon.admin-filter:hover {
+      border-color: rgba(73, 80, 87, 0.45);
+      color: #343a40;
+      background: linear-gradient(180deg, #f8fafb 0%, #edf1f4 100%);
+      box-shadow: 0 10px 18px rgba(73, 80, 87, 0.10);
+      transform: translateY(-1px);
+    }
+    .tracker-shell .btn-icon.admin-filter:active {
+      transform: translateY(0);
+      box-shadow: 0 6px 12px rgba(73, 80, 87, 0.10);
+    }
+    .tracker-shell .btn-icon.admin-filter:focus,
+    .tracker-shell .btn-icon.admin-filter:focus-visible {
+      outline: none;
+      border-color: rgba(108, 117, 125, 0.28);
+      box-shadow: 0 0 0 .2rem rgba(108, 117, 125, 0.18);
+    }
+    .tracker-shell .btn-icon.admin-columns {
+      border-color: rgba(13, 110, 253, 0.25);
+      color: #0d47a1;
+      background: linear-gradient(180deg, #f4f8ff 0%, #eef5ff 100%);
+      font-weight: 700;
+      letter-spacing: 0.2px;
+      transition: transform 120ms ease, box-shadow 120ms ease, background-color 120ms ease, border-color 120ms ease;
+    }
+    .tracker-shell .btn-icon.admin-columns:hover {
+      border-color: rgba(13, 110, 253, 0.45);
+      color: #0a3a84;
+      background: linear-gradient(180deg, #eff6ff 0%, #e7f0ff 100%);
+      box-shadow: 0 10px 18px rgba(13, 110, 253, 0.10);
+      transform: translateY(-1px);
+    }
+    .tracker-shell .btn-icon.admin-columns:active {
+      transform: translateY(0);
+      box-shadow: 0 6px 12px rgba(13, 110, 253, 0.10);
+    }
+    .tracker-shell .btn-icon.admin-columns:focus,
+    .tracker-shell .btn-icon.admin-columns:focus-visible {
+      outline: none;
+      border-color: rgba(13, 110, 253, 0.25);
+      box-shadow: 0 0 0 .2rem rgba(13, 110, 253, 0.18);
+    }
+    .tracker-shell .btn-icon.admin-refresh {
       border-color: rgba(254, 153, 60, 0.45);
       color: #b85b00;
       background: linear-gradient(180deg, #fffaf4 0%, #fff3e4 100%);
-    }
-    .refresh-btn.is-loading i { animation: spin 900ms linear infinite; }
-    @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
-    .status-pill {
-      display: inline-flex;
-      align-items: center;
-      gap: 0.35rem;
-      border-radius: 999px;
-      padding: 0.34rem 0.78rem;
-      font-size: 0.82rem;
       font-weight: 700;
-      white-space: nowrap;
-      border: 1px solid transparent;
+      letter-spacing: 0.2px;
+      transition: transform 120ms ease, box-shadow 120ms ease, background-color 120ms ease, border-color 120ms ease;
     }
-    .status-pill.pending { color: #9a3412; background: #ffedd5; border-color: #fdba74; }
-    .status-pill.approved { color: #166534; background: #dcfce7; border-color: #86efac; }
-    .status-pill.archived { color: #991b1b; background: #fee2e2; border-color: #fca5a5; }
-    .status-pill.info { color: #1d4ed8; background: #dbeafe; border-color: #93c5fd; }
+    .tracker-shell .btn-icon.admin-refresh:hover {
+      border-color: rgba(254, 153, 60, 0.7);
+      color: #a04f00;
+      background: linear-gradient(180deg, #fff6ec 0%, #ffe9d1 100%);
+      box-shadow: 0 10px 18px rgba(222, 113, 12, 0.14);
+      transform: translateY(-1px);
+    }
+    .tracker-shell .btn-icon.admin-refresh:active {
+      transform: translateY(0);
+      box-shadow: 0 6px 12px rgba(222, 113, 12, 0.12);
+    }
+    .tracker-shell .btn-icon.admin-refresh:focus,
+    .tracker-shell .btn-icon.admin-refresh:focus-visible {
+      outline: none;
+      border-color: rgba(254, 153, 60, 0.45);
+      box-shadow: 0 0 0 .2rem rgba(254, 153, 60, 0.25);
+    }
+    .tracker-shell .btn-icon.admin-refresh.is-loading i {
+      animation: adminSpin 900ms linear infinite;
+    }
+    .tracker-shell.resident-masterlist-shell .status-filter-btn[data-filter="ALL"],
+    .tracker-shell.resident-masterlist-shell .status-filter-btn[data-filter=""] {
+      color: #0d6efd;
+      border-color: #0d6efd;
+      background: #fff;
+    }
+    .tracker-shell.resident-masterlist-shell .status-filter-btn:not([data-filter="ALL"]):not([data-filter=""]) {
+      color: #495057;
+      border-color: #495057;
+      background: #fff;
+    }
+    .tracker-shell.resident-masterlist-shell .status-filter-btn:not([data-filter="ALL"]):not([data-filter=""]):hover,
+    .tracker-shell.resident-masterlist-shell .status-filter-btn:not([data-filter="ALL"]):not([data-filter=""]):focus-visible {
+      color: #343a40;
+      border-color: #343a40;
+      background: #f8f9fa;
+    }
+    .tracker-shell.resident-masterlist-shell .status-filter-btn[data-filter="ALL"].active,
+    .tracker-shell.resident-masterlist-shell .status-filter-btn[data-filter=""].active {
+      color: #fff !important;
+      background-color: #0d6efd !important;
+      border-color: #0d6efd !important;
+      font-weight: 700;
+    }
+    .tracker-shell.resident-masterlist-shell .status-filter-btn:not([data-filter="ALL"]):not([data-filter=""]).active {
+      color: #fff !important;
+      background-color: #495057 !important;
+      border-color: #495057 !important;
+      font-weight: 700;
+    }
+    .tracker-shell .status-pill.info,
+    .tracker-shell .status-pill.rescheduled,
+    #appointmentViewModal .status-pill.info,
+    #appointmentViewModal .status-pill.rescheduled {
+      color: #1d4ed8;
+      background: #dbeafe;
+      border: 2px solid #bfdbfe;
+    }
+    .tracker-shell .status-pill.denied,
+    .tracker-shell .status-pill.archived,
+    #appointmentViewModal .status-pill.denied,
+    #appointmentViewModal .status-pill.archived {
+      color: #8f2932;
+      background: #e8cfd3;
+      border: 2px solid #e0bcc2;
+    }
+    .tracker-table-responsive {
+      display: block;
+    }
+    #appointmentTable {
+      table-layout: fixed;
+      min-width: 980px;
+    }
+    #appointmentTable th:first-child,
+    #appointmentTable td:first-child {
+      width: 15%;
+      white-space: nowrap;
+    }
+    #appointmentTable th:nth-child(2),
+    #appointmentTable td:nth-child(2) {
+      width: 18%;
+      white-space: nowrap;
+    }
+    #appointmentTable th:nth-child(3),
+    #appointmentTable td:nth-child(3),
+    #appointmentTable th:nth-child(4),
+    #appointmentTable td:nth-child(4) {
+      width: 21%;
+      white-space: nowrap;
+    }
+    #appointmentTable th:nth-child(5),
+    #appointmentTable td:nth-child(5) {
+      width: 14%;
+      white-space: nowrap;
+    }
+    #appointmentTable th:nth-child(6),
+    #appointmentTable td:nth-child(6) {
+      width: 11%;
+      white-space: nowrap;
+      text-align: left;
+    }
+    #appointmentTable td:nth-child(6) {
+      padding-left: 1rem;
+    }
+    .tracker-shell #appointmentPagination .page-link {
+      color: #495057;
+    }
+    .tracker-shell #appointmentPagination .page-item.active .page-link {
+      background-color: #0d6efd;
+      border-color: #0d6efd;
+      color: #fff;
+    }
     .tracker-card {
       border: 1px solid #eceff3;
       border-radius: 12px;
@@ -114,33 +248,33 @@ require_once __DIR__ . '/includes/resident_access_guard.php';
     }
     #appointmentCards { display: none; }
     @media (max-width: 991.98px) {
-      .toolbar {
+      .tracker-shell .admin-list-toolbar {
         flex-direction: column;
         align-items: stretch;
         gap: 10px;
       }
-      .toolbar .tabs,
-      .toolbar .actions {
+      .tracker-shell .admin-list-tabs,
+      .tracker-shell .admin-list-actions {
         width: 100%;
       }
-      .toolbar .tabs {
+      .tracker-shell .admin-list-tabs {
         overflow-x: auto;
         padding-bottom: 4px;
       }
-      .toolbar .actions {
+      .tracker-shell .admin-list-actions {
         margin-left: 0;
         justify-content: flex-start;
         overflow-x: auto;
         padding-bottom: 2px;
       }
-      .toolbar .actions .input-group {
+      .tracker-shell .admin-search {
         min-width: 0;
         max-width: none;
         width: 100%;
       }
     }
     @media (max-width: 767.98px) {
-      .table-responsive { display: none; }
+      .tracker-table-responsive { display: none; }
       #appointmentCards { display: block; }
     }
   </style>
@@ -153,31 +287,34 @@ require_once __DIR__ . '/includes/resident_access_guard.php';
       <h2 class="tracker-title">Appointment Tracker</h2>
       <hr class="mt-0 mb-3">
 
-      <div class="bg-white p-4 rounded-4 shadow-sm border tracker-shell">
-        <div class="toolbar">
-          <div class="tabs">
-            <button type="button" class="btn tracker-tab active" data-tab="all">All</button>
-            <button type="button" class="btn tracker-tab" data-tab="pending">Pending</button>
-            <button type="button" class="btn tracker-tab" data-tab="approved">Approved</button>
-            <button type="button" class="btn tracker-tab" data-tab="archived">Denied</button>
+      <div class="bg-white p-4 rounded-4 shadow-sm border tracker-shell resident-masterlist-shell">
+        <div class="admin-list-toolbar mb-3 pt-2 flex-wrap">
+          <div class="admin-list-tabs">
+            <button type="button" class="btn btn-outline-primary btn-sm status-filter-btn tracker-tab active" data-tab="all" data-filter="ALL">All</button>
+            <button type="button" class="btn btn-outline-secondary btn-sm status-filter-btn tracker-tab fw-semibold" data-tab="pending" data-filter="Pending">Pending</button>
+            <button type="button" class="btn btn-outline-secondary btn-sm status-filter-btn tracker-tab fw-semibold" data-tab="approved" data-filter="Approved">Approved</button>
+            <button type="button" class="btn btn-outline-secondary btn-sm status-filter-btn tracker-tab fw-semibold" data-tab="archived" data-filter="Denied">Denied</button>
           </div>
-          <div class="actions">
-            <div class="input-group">
+          <div class="admin-list-actions">
+            <div class="input-group admin-search">
               <input id="appointmentSearch" class="form-control" placeholder="Search appointments..." />
               <span class="input-group-text bg-white"><i class="fas fa-search"></i></span>
             </div>
-            <button id="appointmentFilterBtn" class="btn btn-outline-secondary btn-icon" type="button" title="Filter" aria-label="Filter" data-bs-toggle="modal" data-bs-target="#appointmentFilterModal">
+            <button id="appointmentFilterBtn" class="btn btn-outline-secondary btn-icon admin-filter" type="button" title="Filter" aria-label="Filter" data-bs-toggle="modal" data-bs-target="#appointmentFilterModal">
               <i class="fas fa-filter"></i>
             </button>
-            <button id="appointmentRefreshBtn" class="btn refresh-btn btn-icon" type="button" title="Refresh appointment tracker" aria-label="Refresh appointment tracker">
+            <button id="appointmentColumnsBtn" class="btn btn-outline-secondary btn-icon admin-columns" type="button" title="Columns" aria-label="Columns" data-bs-toggle="modal" data-bs-target="#appointmentColumnsModal">
+              <i class="fa-solid fa-sliders"></i>
+            </button>
+            <button id="appointmentRefreshBtn" class="btn btn-outline-secondary btn-icon admin-refresh" type="button" title="Refresh appointment tracker" aria-label="Refresh appointment tracker">
               <i class="fa-solid fa-arrows-rotate"></i>
             </button>
           </div>
         </div>
 
-        <div class="table-responsive">
-          <table class="table table-hover align-middle mb-0">
-            <thead class="table-light">
+        <div class="table-responsive compact-admin-table-shell tracker-table-responsive">
+          <table id="appointmentTable" class="table align-middle compact-admin-table mb-0">
+            <thead>
               <tr>
                 <th>Appointment ID</th>
                 <th>Subject</th>
@@ -191,6 +328,16 @@ require_once __DIR__ . '/includes/resident_access_guard.php';
               <tr><td colspan="6" class="text-center text-muted py-4">Loading appointments...</td></tr>
             </tbody>
           </table>
+        </div>
+
+        <div class="resident-table-footer mt-3 d-flex flex-wrap justify-content-between align-items-center gap-3 tracker-table-responsive">
+          <div class="d-flex align-items-center gap-2">
+            <label for="appointmentEntriesPerPageInput" class="small text-muted mb-0">Entries</label>
+            <input id="appointmentEntriesPerPageInput" type="number" min="1" step="1" value="20" class="form-control form-control-sm resident-entries-input" />
+          </div>
+          <nav aria-label="Appointment pagination">
+            <ul class="pagination pagination-sm mb-0" id="appointmentPagination"></ul>
+          </nav>
         </div>
 
         <div id="appointmentCards" class="mt-2">
@@ -236,6 +383,23 @@ require_once __DIR__ . '/includes/resident_access_guard.php';
     </div>
   </div>
 
+  <div class="modal fade" id="appointmentColumnsModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title">Columns</h5>
+        </div>
+        <div class="modal-body">
+          <div class="row g-2" id="appointmentColumnsList"></div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline-secondary" id="appointmentColumnsReset">Reset</button>
+          <button type="button" class="btn btn-primary" data-bs-dismiss="modal">Done</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <div class="modal fade" id="appointmentViewModal" tabindex="-1" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
     <div class="modal-dialog modal-lg modal-dialog-centered">
       <div class="modal-content">
@@ -268,6 +432,8 @@ require_once __DIR__ . '/includes/resident_access_guard.php';
     let allAppointments = [];
     let activeTab = "all";
     let appointmentViewModal = null;
+    let appointmentCurrentPage = 1;
+    let appointmentEntriesPerPage = 20;
 
     function escapeHtml(value) {
       return String(value ?? "")
@@ -295,9 +461,57 @@ require_once __DIR__ . '/includes/resident_access_guard.php';
     function statusBadgeClass(value) {
       const normalized = String(value || "").toLowerCase();
       if (normalized.includes("approve") || normalized.includes("complete")) return "approved";
-      if (normalized.includes("resched")) return "info";
-      if (normalized.includes("deny") || normalized.includes("reject")) return "archived";
+      if (normalized.includes("resched")) return "rescheduled";
+      if (normalized.includes("deny") || normalized.includes("denied") || normalized.includes("reject")) return "denied";
       return "pending";
+    }
+
+    function paginateRows(rows, currentPage, perPage) {
+      const safePerPage = Math.max(1, Number.parseInt(perPage, 10) || 20);
+      const totalPages = Math.max(1, Math.ceil(rows.length / safePerPage));
+      const page = Math.min(Math.max(1, currentPage), totalPages);
+      const start = (page - 1) * safePerPage;
+      return {
+        page,
+        totalPages,
+        items: rows.slice(start, start + safePerPage)
+      };
+    }
+
+    function renderAppointmentPagination(totalPages) {
+      const pagination = document.getElementById("appointmentPagination");
+      if (!pagination) return;
+      if (totalPages <= 1) {
+        pagination.innerHTML = "";
+        return;
+      }
+
+      const items = [];
+      items.push(`
+        <li class="page-item ${appointmentCurrentPage <= 1 ? "disabled" : ""}">
+          <button type="button" class="page-link" data-page="${appointmentCurrentPage - 1}">Prev</button>
+        </li>
+      `);
+      for (let page = 1; page <= totalPages; page += 1) {
+        items.push(`
+          <li class="page-item ${page === appointmentCurrentPage ? "active" : ""}">
+            <button type="button" class="page-link" data-page="${page}">${page}</button>
+          </li>
+        `);
+      }
+      items.push(`
+        <li class="page-item ${appointmentCurrentPage >= totalPages ? "disabled" : ""}">
+          <button type="button" class="page-link" data-page="${appointmentCurrentPage + 1}">Next</button>
+        </li>
+      `);
+      pagination.innerHTML = items.join("");
+      pagination.querySelectorAll("button[data-page]").forEach((button) => {
+        button.addEventListener("click", () => {
+          if (button.closest(".page-item")?.classList.contains("disabled")) return;
+          appointmentCurrentPage = Number.parseInt(button.getAttribute("data-page") || "1", 10) || 1;
+          renderAppointments();
+        });
+      });
     }
 
     function getFilteredAppointments() {
@@ -360,38 +574,44 @@ require_once __DIR__ . '/includes/resident_access_guard.php';
       const rows = getFilteredAppointments();
       const tbody = document.getElementById("appointmentTbody");
       const cards = document.getElementById("appointmentCards");
+      const paged = paginateRows(rows, appointmentCurrentPage, appointmentEntriesPerPage);
+      appointmentCurrentPage = paged.page;
 
       if (!rows.length) {
         tbody.innerHTML = `<tr><td colspan="6" class="text-center text-muted py-4">No appointments found.</td></tr>`;
         cards.innerHTML = `<div class="text-center text-muted py-4">No appointments found.</div>`;
+        renderAppointmentPagination(1);
         return;
       }
 
-      tbody.innerHTML = rows.map((item) => `
+      tbody.innerHTML = paged.items.map((item) => `
         <tr>
           <td><strong>${escapeHtml(item.appointment_id || "-")}</strong></td>
-          <td>${escapeHtml(item.subject || "-")}<div class="small text-muted mt-1">${escapeHtml(item.purpose || "No purpose noted")}</div></td>
+          <td>${escapeHtml(item.subject || "-")}</td>
           <td>${escapeHtml(formatDateTime(item.preferred_schedule_timestamp, "To be scheduled"))}</td>
           <td>${escapeHtml(formatDateTime(item.confirmed_schedule_timestamp, "Awaiting confirmation"))}</td>
           <td><span class="status-pill ${escapeHtml(statusBadgeClass(item.status_name))}">${escapeHtml(item.status_name || "Pending")}</span></td>
-          <td><button type="button" class="btn btn-sm btn-outline-secondary appointment-view-btn" data-id="${escapeHtml(item.appointment_id)}">View</button></td>
+          <td><button type="button" class="btn btn-sm btn-outline-secondary appointment-view-btn" data-id="${escapeHtml(item.appointment_id)}" data-view-id="${escapeHtml(item.appointment_id)}">View</button></td>
         </tr>
       `).join("");
 
-      cards.innerHTML = rows.map((item) => `
+      cards.innerHTML = paged.items.map((item) => `
         <article class="tracker-card">
           <div class="tracker-label">Appointment</div>
           <div class="tracker-value fw-semibold">${escapeHtml(item.appointment_id || "-")}</div>
           <div class="tracker-label mt-2">Subject</div>
           <div class="tracker-value">${escapeHtml(item.subject || "-")}</div>
+          <div class="tracker-label mt-2">Purpose</div>
+          <div class="tracker-value">${escapeHtml(item.purpose || "No purpose noted")}</div>
           <div class="tracker-label mt-2">Preferred Schedule</div>
           <div class="tracker-value">${escapeHtml(formatDateTime(item.preferred_schedule_timestamp, "To be scheduled"))}</div>
           <div class="tracker-label mt-2">Status</div>
           <div class="tracker-value"><span class="status-pill ${escapeHtml(statusBadgeClass(item.status_name))}">${escapeHtml(item.status_name || "Pending")}</span></div>
-          <button type="button" class="btn btn-sm btn-outline-secondary mt-3 appointment-view-btn" data-id="${escapeHtml(item.appointment_id)}">View</button>
+          <button type="button" class="btn btn-sm btn-outline-secondary mt-3 appointment-view-btn" data-id="${escapeHtml(item.appointment_id)}" data-view-id="${escapeHtml(item.appointment_id)}">View</button>
         </article>
       `).join("");
 
+      renderAppointmentPagination(paged.totalPages);
       bindViewButtons();
     }
 
@@ -413,6 +633,7 @@ require_once __DIR__ . '/includes/resident_access_guard.php';
           throw new Error(data?.message || "Unable to load appointments.");
         }
         allAppointments = Array.isArray(data.items) ? data.items : [];
+        appointmentCurrentPage = 1;
         renderAppointments();
       } catch (err) {
         const message = escapeHtml(err?.message || "Unable to load appointments.");
@@ -434,14 +655,37 @@ require_once __DIR__ . '/includes/resident_access_guard.php';
       });
 
       document.getElementById("appointmentSearch").addEventListener("input", renderAppointments);
-      document.getElementById("appointmentStatusFilter").addEventListener("change", renderAppointments);
-      document.getElementById("appointmentDateFrom").addEventListener("change", renderAppointments);
-      document.getElementById("appointmentDateTo").addEventListener("change", renderAppointments);
-      document.getElementById("appointmentFilterApply").addEventListener("click", renderAppointments);
+      document.getElementById("appointmentSearch").addEventListener("input", () => {
+        appointmentCurrentPage = 1;
+        renderAppointments();
+      });
+      document.getElementById("appointmentStatusFilter").addEventListener("change", () => {
+        appointmentCurrentPage = 1;
+        renderAppointments();
+      });
+      document.getElementById("appointmentDateFrom").addEventListener("change", () => {
+        appointmentCurrentPage = 1;
+        renderAppointments();
+      });
+      document.getElementById("appointmentDateTo").addEventListener("change", () => {
+        appointmentCurrentPage = 1;
+        renderAppointments();
+      });
+      document.getElementById("appointmentFilterApply").addEventListener("click", () => {
+        appointmentCurrentPage = 1;
+        renderAppointments();
+      });
       document.getElementById("appointmentFilterReset").addEventListener("click", () => {
         document.getElementById("appointmentStatusFilter").value = "";
         document.getElementById("appointmentDateFrom").value = "";
         document.getElementById("appointmentDateTo").value = "";
+        appointmentCurrentPage = 1;
+        renderAppointments();
+      });
+      document.getElementById("appointmentEntriesPerPageInput").addEventListener("change", (event) => {
+        appointmentEntriesPerPage = Math.max(1, Number.parseInt(event.target.value || "20", 10) || 20);
+        event.target.value = String(appointmentEntriesPerPage);
+        appointmentCurrentPage = 1;
         renderAppointments();
       });
       document.getElementById("appointmentRefreshBtn").addEventListener("click", loadAppointments);
@@ -450,5 +694,16 @@ require_once __DIR__ . '/includes/resident_access_guard.php';
     });
   </script>
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+  <script>
+    window.ADMIN_TABLE_COLUMNS_CONFIG = {
+      tableSelector: "#appointmentTable",
+      modalId: "appointmentColumnsModal",
+      listId: "appointmentColumnsList",
+      resetBtnId: "appointmentColumnsReset",
+      storageKey: "resident_cols_appointment_tracker_v1",
+      defaultHiddenIdxs: []
+    };
+  </script>
+  <script src="../JS-Script-Files/Admin-End/tableColumnsGeneric.js"></script>
 </body>
 </html>
