@@ -362,7 +362,7 @@ if (!empty($_SESSION['user_id']) && isset($conn) && $conn instanceof mysqli) {
                 data-bs-toggle="collapse"
                 data-bs-target="#id-issuance-collapse"
                 aria-expanded="<?= $isIdIssuanceActive ? 'true' : 'false' ?>">
-          <i class="fas fa-id-card"></i> ID ISSUANCE
+          <i class="fas fa-id-card"></i> Barangay ID Issuance
         </button>
 
         <div class="collapse <?= $isIdIssuanceActive ? 'show' : '' ?>" id="id-issuance-collapse">

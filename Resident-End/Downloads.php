@@ -163,6 +163,21 @@ if (isset($conn) && $conn instanceof mysqli) {
             border-radius: 1rem;
             box-shadow: 0 0.125rem 0.25rem rgba(15, 23, 42, 0.04);
         }
+        .resident-masterlist-shell .table-responsive {
+            overflow-x: auto;
+            overflow-y: visible;
+            -webkit-overflow-scrolling: touch;
+        }
+        .compact-admin-table-shell::-webkit-scrollbar {
+            height: 8px;
+        }
+        .compact-admin-table-shell::-webkit-scrollbar-thumb {
+            background: rgba(108, 117, 125, 0.45);
+            border-radius: 999px;
+        }
+        .compact-admin-table-shell::-webkit-scrollbar-track {
+            background: transparent;
+        }
         .admin-list-toolbar {
             display: flex;
             align-items: center;
@@ -200,30 +215,32 @@ if (isset($conn) && $conn instanceof mysqli) {
             padding: 0 8px;
             font-size: 0.85rem;
         }
-        .table-responsive {
-            overflow-x: auto;
+        .compact-admin-table {
+            width: 100%;
         }
-        .audit-table {
-            min-width: 920px;
-            --bs-table-hover-bg: #fff8f1;
-            --bs-table-accent-bg: transparent;
+        .compact-admin-table thead th {
+            padding: 0.52rem 0.85rem;
+            font-size: 0.95rem;
+            font-weight: 700;
+            color: #111827;
+            background: #f7f8fa;
+            border-bottom: 1px solid #e5e7eb;
+            white-space: normal;
+            line-height: 1.2;
         }
-        .audit-table thead th {
-            background: #f8f9fb;
-            color: #495057;
-            font-size: 0.82rem;
-            text-transform: uppercase;
-            letter-spacing: 0.03em;
-            border-bottom-color: #e3e6ea;
-            white-space: nowrap;
-        }
-        .audit-table tbody td {
+        .compact-admin-table tbody td {
+            padding: 0.38rem 0.85rem;
+            font-size: 0.94rem;
+            color: #1f2937;
+            border-bottom: 1px solid #eceff3;
             vertical-align: middle;
-            border-color: #edf0f3;
-            background: #fff !important;
+            background: #fff;
         }
-        .audit-table tbody tr:hover td {
-            background: #fff8f1 !important;
+        .compact-admin-table tbody tr:last-child td {
+            border-bottom: 0;
+        }
+        .compact-admin-table tbody tr:hover td {
+            background: #fcfcfd;
         }
         .doc-title {
             font-weight: 700;
@@ -237,21 +254,51 @@ if (isset($conn) && $conn instanceof mysqli) {
             font-weight: 700;
             color: #7c3f00;
         }
+        .compact-admin-table .compact-table-actions,
         .download-actions {
-            display: flex;
-            gap: 8px;
-            flex-wrap: wrap;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.35rem;
+            flex-wrap: nowrap;
         }
-        .btn-download {
-            background: #de710c;
-            border-color: #de710c;
-            color: #fff;
-            font-weight: 700;
+        .compact-admin-table tbody .btn.btn-sm,
+        .compact-admin-table .compact-table-btn,
+        .compact-table-btn {
+            padding: 0.22rem 0.5rem;
+            font-size: 0.76rem;
+            line-height: 1.15;
         }
-        .btn-download:hover {
-            background: #c76309;
-            border-color: #c76309;
+        .compact-admin-table .compact-table-btn.btn-view-download,
+        .compact-admin-table .compact-table-btn.btn-outline-secondary,
+        .compact-table-btn.btn-view-download,
+        .compact-table-btn.btn-outline-secondary {
             color: #fff;
+            border-color: #0d6efd;
+            background: #0d6efd;
+            font-weight: 400 !important;
+            letter-spacing: 0.15px;
+        }
+        .compact-admin-table .compact-table-btn.btn-view-download:hover,
+        .compact-admin-table .compact-table-btn.btn-outline-secondary:hover,
+        .compact-table-btn.btn-view-download:hover,
+        .compact-table-btn.btn-outline-secondary:hover {
+            color: #fff;
+            border-color: #0b5ed7;
+            background: #0b5ed7;
+        }
+        .compact-admin-table .compact-table-btn.btn-download,
+        .compact-table-btn.btn-download {
+            color: #212529;
+            border-color: #ffc107;
+            background: #ffc107;
+            font-weight: 400 !important;
+            letter-spacing: 0.15px;
+        }
+        .compact-admin-table .compact-table-btn.btn-download:hover,
+        .compact-table-btn.btn-download:hover {
+            color: #212529;
+            border-color: #e0a800;
+            background: #e0a800;
         }
         .downloads-status-pill {
             display: inline-flex;
@@ -265,6 +312,26 @@ if (isset($conn) && $conn instanceof mysqli) {
             font-size: 0.83rem;
             font-weight: 700;
             white-space: nowrap;
+        }
+        .downloads-table {
+            table-layout: auto;
+            min-width: 100%;
+        }
+        .downloads-table th,
+        .downloads-table td {
+            white-space: normal;
+        }
+        .downloads-table th:first-child,
+        .downloads-table td:first-child,
+        .downloads-table th:nth-child(7),
+        .downloads-table td:nth-child(7),
+        .downloads-table th:nth-child(8),
+        .downloads-table td:nth-child(8) {
+            white-space: nowrap;
+        }
+        .downloads-table th:last-child,
+        .downloads-table td:last-child {
+            min-width: 150px;
         }
         #downloadCards {
             display: none;
@@ -357,11 +424,11 @@ if (isset($conn) && $conn instanceof mysqli) {
             }
         }
         @media (max-width: 480px) {
-            .audit-table {
-                min-width: 760px;
+            .downloads-table {
+                min-width: 820px;
             }
-            .audit-table td,
-            .audit-table th {
+            .downloads-table td,
+            .downloads-table th {
                 font-size: 0.875rem;
             }
             .downloads-summary {
@@ -444,7 +511,7 @@ if (isset($conn) && $conn instanceof mysqli) {
                 Download your approved and released document requests here. Only documents that are ready and have an issued file available will appear in this list.
             </p>
 
-            <section class="downloads-card p-4 audit-shell">
+            <section class="downloads-card p-4 resident-masterlist-shell">
                 <?php if ($queryError !== ''): ?>
                     <div class="alert alert-warning mb-0"><?= htmlspecialchars($queryError) ?></div>
                 <?php elseif (!$downloadItems): ?>
@@ -457,7 +524,7 @@ if (isset($conn) && $conn instanceof mysqli) {
                     <div class="admin-list-toolbar mb-3">
                         <div>
                             <h2 class="h5 mb-1 fw-bold">Released Documents</h2>
-                            <p class="text-muted small mb-0">This table follows the same transaction-style layout used in your resident history pages.</p>
+                            <p class="text-muted small mb-0">This table now follows the same compact layout used in the resident masterlist.</p>
                         </div>
                         <div class="admin-list-actions">
                             <div class="downloads-summary">
@@ -467,10 +534,10 @@ if (isset($conn) && $conn instanceof mysqli) {
                         </div>
                     </div>
 
-                    <div class="table-responsive">
-                        <table class="table table-hover align-middle mb-0 audit-table">
+                    <div class="table-responsive compact-admin-table-shell">
+                        <table class="table align-middle mb-0 compact-admin-table downloads-table">
                             <thead>
-                                <tr>
+                                <tr class="table-light">
                                     <th>Request ID</th>
                                     <th>Document</th>
                                     <th>Purpose</th>
@@ -501,11 +568,11 @@ if (isset($conn) && $conn instanceof mysqli) {
                                         <td><?= htmlspecialchars((string)$item['valid_until']) ?></td>
                                         <td><span class="downloads-status-pill"><i class="fa-solid fa-circle-check"></i> Ready</span></td>
                                         <td>
-                                            <div class="download-actions">
-                                                <a class="btn btn-sm btn-outline-secondary" href="<?= htmlspecialchars($viewUrl) ?>" target="_blank" rel="noopener">
+                                            <div class="compact-table-actions">
+                                                <a class="btn btn-sm compact-table-btn btn-view-download" href="<?= htmlspecialchars($viewUrl) ?>" target="_blank" rel="noopener">
                                                     <i class="fa-regular fa-eye me-1"></i>View
                                                 </a>
-                                                <a class="btn btn-sm btn-download" href="<?= htmlspecialchars($downloadUrl) ?>">
+                                                <a class="btn btn-sm compact-table-btn btn-download" href="<?= htmlspecialchars($downloadUrl) ?>">
                                                     <i class="fa-solid fa-download me-1"></i>Download
                                                 </a>
                                             </div>
@@ -554,10 +621,10 @@ if (isset($conn) && $conn instanceof mysqli) {
                                     </div>
                                 </div>
                                 <div class="download-actions mt-3">
-                                    <a class="btn btn-sm btn-outline-secondary" href="<?= htmlspecialchars($viewUrl) ?>" target="_blank" rel="noopener">
+                                    <a class="btn btn-sm compact-table-btn btn-view-download" href="<?= htmlspecialchars($viewUrl) ?>" target="_blank" rel="noopener">
                                         <i class="fa-regular fa-eye me-1"></i>View
                                     </a>
-                                    <a class="btn btn-sm btn-download" href="<?= htmlspecialchars($downloadUrl) ?>">
+                                    <a class="btn btn-sm compact-table-btn btn-download" href="<?= htmlspecialchars($downloadUrl) ?>">
                                         <i class="fa-solid fa-download me-1"></i>Download
                                     </a>
                                 </div>

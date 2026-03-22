@@ -444,48 +444,57 @@ function ann_decode_faq_items(?string $json): array
       overflow-x: hidden;
     }
 
-    .announcement-shell .table-responsive {
-      display: block;
-      width: 100%;
-      max-width: 100%;
-      overflow-x: auto;
-      overflow-y: visible;
-      -webkit-overflow-scrolling: touch;
-    }
-
-    .announcement-shell #table-appData {
-      width: max-content;
-      min-width: 100%;
-    }
-
-    .announcement-shell #table-appData thead th,
-    .announcement-shell #table-appData tbody td {
-      min-width: 160px;
-    }
-
-    .announcement-shell #table-reviewQueueData {
-      width: max-content;
-      min-width: 100%;
-    }
-
-    .announcement-shell #table-reviewQueueData thead th,
-    .announcement-shell #table-reviewQueueData tbody td {
-      min-width: 160px;
-    }
-
-    .announcement-shell #table-appData th,
-    .announcement-shell #table-appData td,
-    .announcement-shell #table-reviewQueueData th,
-    .announcement-shell #table-reviewQueueData td {
-      white-space: nowrap;
-    }
-
     #review-queue-card,
     #tracker-card {
       width: 100%;
       max-width: 100%;
       min-width: 0;
       overflow: hidden;
+    }
+
+    .announcement-shell .compact-admin-table--content {
+      width: max-content;
+      min-width: 100%;
+      table-layout: auto;
+    }
+
+    .announcement-shell .compact-admin-table--content thead th,
+    .announcement-shell .compact-admin-table--content tbody td {
+      min-width: 160px;
+      white-space: nowrap;
+    }
+
+    .announcement-shell .compact-admin-table--content th:last-child,
+    .announcement-shell .compact-admin-table--content td:last-child {
+      min-width: 180px;
+    }
+
+    .announcement-shell .compact-admin-table--content .btn.btn-sm {
+      font-weight: 500;
+    }
+
+    .announcement-shell .compact-admin-table--content .btn-primary.btn-sm {
+      color: #fff;
+      background-color: #0d6efd;
+      border-color: #0d6efd;
+    }
+
+    .announcement-shell .compact-admin-table--content .btn-warning.btn-sm {
+      color: #212529;
+      background-color: #ffc107;
+      border-color: #ffc107;
+    }
+
+    .announcement-shell .compact-admin-table--content .btn-success.btn-sm {
+      color: #fff;
+      background-color: #198754;
+      border-color: #198754;
+    }
+
+    .announcement-shell .compact-admin-table--content .btn-danger.btn-sm {
+      color: #fff;
+      background-color: #dc3545;
+      border-color: #dc3545;
     }
   </style>
 </head>
@@ -509,7 +518,7 @@ function ann_decode_faq_items(?string $json): array
               <p class="small text-muted mb-0 review-queue-description">Shows pending content submitted by admin, official, and personnel accounts.</p>
             </div>
 
-            <div class="admin-list-actions admin-list-actions--linear review-queue-actions">
+            <div class="admin-list-actions review-queue-actions">
               <form class="announcement-search-form" method="get" action="<?= htmlspecialchars(appUrl('/Admin-End/Contents/Contents.php')) ?>">
                 <input type="hidden" name="channel" value="<?= htmlspecialchars($deliveryChannel) ?>">
                 <input type="hidden" name="status" value="<?= htmlspecialchars($statusFilter) ?>">
@@ -521,25 +530,25 @@ function ann_decode_faq_items(?string $json): array
                 </div>
               </form>
 
-              <button class="btn btn-outline-secondary btn-linear-control" type="button" data-bs-toggle="modal" data-bs-target="#modalReviewQueueFilter" title="Filter review queue" aria-label="Filter review queue">
+              <button class="btn btn-outline-secondary btn-icon admin-filter" type="button" data-bs-toggle="modal" data-bs-target="#modalReviewQueueFilter" title="Filter review queue" aria-label="Filter review queue">
                 <i class="fas fa-filter"></i>
                 <span class="visually-hidden">Filter review queue</span>
               </button>
-              <button class="btn btn-outline-secondary btn-linear-control" type="button" data-bs-toggle="modal" data-bs-target="#modalReviewQueueColumns" title="Review queue columns" aria-label="Review queue columns">
+              <button class="btn btn-outline-secondary btn-icon admin-columns" type="button" data-bs-toggle="modal" data-bs-target="#modalReviewQueueColumns" title="Review queue columns" aria-label="Review queue columns">
                 <i class="fa-solid fa-sliders"></i>
                 <span class="visually-hidden">Review queue columns</span>
               </button>
-              <a class="btn btn-outline-secondary btn-linear-control" id="btnReviewQueueRefresh" href="<?= htmlspecialchars(buildReviewQueueUrl($deliveryChannel, $statusFilter, $searchTerm, $queueChannelFilter, $queueSearchTerm)) ?>" title="Refresh review queue" aria-label="Refresh review queue">
+              <a class="btn btn-outline-secondary btn-icon admin-refresh" id="btnReviewQueueRefresh" href="<?= htmlspecialchars(buildReviewQueueUrl($deliveryChannel, $statusFilter, $searchTerm, $queueChannelFilter, $queueSearchTerm)) ?>" title="Refresh review queue" aria-label="Refresh review queue">
                 <i class="fa-solid fa-arrows-rotate"></i>
                 <span class="visually-hidden">Refresh review queue</span>
               </a>
             </div>
           </div>
 
-          <div class="table-responsive">
-            <table id="table-reviewQueueData" class="table align-middle mb-0">
-              <thead class="table-light">
-                <tr>
+          <div class="table-responsive compact-admin-table-shell">
+            <table id="table-reviewQueueData" class="table align-middle mb-0 compact-admin-table compact-admin-table--wide compact-admin-table--content compact-admin-table--content-review">
+              <thead>
+                <tr class="table-light">
                   <th>Title</th>
                   <th>Content Type</th>
                   <th>Audience</th>
@@ -647,7 +656,7 @@ function ann_decode_faq_items(?string $json): array
           </div>
 
           <div class="admin-list-toolbar-end">
-            <div class="admin-list-actions admin-list-actions--linear">
+            <div class="admin-list-actions">
               <form class="announcement-search-form" method="get" action="<?= htmlspecialchars(appUrl('/Admin-End/Contents/Contents.php')) ?>">
                 <input type="hidden" name="channel" value="<?= htmlspecialchars($deliveryChannel) ?>">
                 <input type="hidden" name="status" value="<?= htmlspecialchars($statusFilter) ?>">
@@ -657,15 +666,15 @@ function ann_decode_faq_items(?string $json): array
                 </div>
               </form>
 
-              <button class="btn btn-outline-secondary btn-linear-control" type="button" data-bs-toggle="modal" data-bs-target="#modalFilter" id="filterButton" title="Filter" aria-label="Filter">
+              <button class="btn btn-outline-secondary btn-icon admin-filter" type="button" data-bs-toggle="modal" data-bs-target="#modalFilter" id="filterButton" title="Filter" aria-label="Filter">
                 <i class="fas fa-filter"></i>
                 <span class="visually-hidden">Filter</span>
               </button>
-              <button class="btn btn-outline-secondary btn-linear-control" type="button" data-bs-toggle="modal" data-bs-target="#modalTableColumns" id="btnAnnouncementsColumns" title="Columns" aria-label="Columns">
+              <button class="btn btn-outline-secondary btn-icon admin-columns" type="button" data-bs-toggle="modal" data-bs-target="#modalTableColumns" id="btnAnnouncementsColumns" title="Columns" aria-label="Columns">
                 <i class="fa-solid fa-sliders"></i>
                 <span class="visually-hidden">Columns</span>
               </button>
-              <a class="btn btn-outline-secondary btn-linear-control" id="btnAnnouncementsTableRefresh" href="<?= htmlspecialchars(buildAnnouncementsUrl($deliveryChannel, $statusFilter)) ?>" title="Refresh table" aria-label="Refresh table">
+              <a class="btn btn-outline-secondary btn-icon admin-refresh" id="btnAnnouncementsTableRefresh" href="<?= htmlspecialchars(buildAnnouncementsUrl($deliveryChannel, $statusFilter)) ?>" title="Refresh table" aria-label="Refresh table">
                 <i class="fa-solid fa-arrows-rotate"></i>
                 <span class="visually-hidden">Refresh</span>
               </a>
@@ -673,10 +682,10 @@ function ann_decode_faq_items(?string $json): array
           </div>
         </div>
 
-        <div class="table-responsive">
-          <table id="table-appData" class="table align-middle mb-0">
-            <thead class="table-light">
-              <tr>
+        <div class="table-responsive compact-admin-table-shell">
+          <table id="table-appData" class="table align-middle mb-0 compact-admin-table compact-admin-table--wide compact-admin-table--content">
+            <thead>
+              <tr class="table-light">
                 <th>Title</th>
                 <th>Content Type</th>
                 <th>Audience</th>
