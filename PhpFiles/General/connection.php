@@ -4,6 +4,42 @@ require_once __DIR__ . '/runtimeConfig.php';
 // Use Asia/Manila (UTC+08:00) for PHP date/time functions.
 date_default_timezone_set('Asia/Manila');
 
+if (!function_exists('db_request_expects_json')) {
+    function db_request_expects_json(): bool
+    {
+        $accept = strtolower(trim((string)($_SERVER['HTTP_ACCEPT'] ?? '')));
+        if ($accept !== '' && strpos($accept, 'application/json') !== false) {
+            return true;
+        }
+
+        $requestedWith = strtolower(trim((string)($_SERVER['HTTP_X_REQUESTED_WITH'] ?? '')));
+        if ($requestedWith === 'xmlhttprequest') {
+            return true;
+        }
+
+        return false;
+    }
+}
+
+if (!function_exists('db_fail_response')) {
+    function db_fail_response(int $statusCode, string $publicMessage, string $logMessage): void
+    {
+        error_log($logMessage);
+        http_response_code($statusCode);
+
+        if (db_request_expects_json()) {
+            header('Content-Type: application/json; charset=utf-8');
+            echo json_encode([
+                'success' => false,
+                'message' => $publicMessage,
+            ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+            exit;
+        }
+
+        exit($publicMessage);
+    }
+}
+
 $defaultDbHost = 'srv1986.hstgr.io';
 $defaultDbHostLocal = 'srv1986.hstgr.io';
 $defaultDbHostHosted = 'localhost';
@@ -79,9 +115,11 @@ $pass = (string)runtime_env('DB_PASS', runtime_config('db.pass', $defaultDbPass)
 $dbname = trim((string)runtime_env('DB_NAME', runtime_config('db.name', $defaultDbName)));
 
 if ($host === '' || $user === '' || $dbname === '') {
-    error_log('Database configuration is incomplete. Set DB_HOST, DB_USER, DB_PASS, and DB_NAME via environment or config.runtime.local.php.');
-    http_response_code(500);
-    exit('Service temporarily unavailable.');
+    db_fail_response(
+        500,
+        'Service temporarily unavailable.',
+        'Database configuration is incomplete. Set DB_HOST, DB_USER, DB_PASS, and DB_NAME via environment or config.runtime.local.php.'
+    );
 }
 
 mysqli_report(MYSQLI_REPORT_OFF);
@@ -116,9 +154,11 @@ foreach ($hostCandidates as $candidateHost) {
 
 if (!($conn instanceof mysqli) || $conn->connect_error) {
     $attemptSummary = $attemptErrors !== [] ? implode(' | ', $attemptErrors) : $connectError;
-    error_log('Database connection failed after trying hosts [' . implode(', ', $hostCandidates) . ']: ' . $attemptSummary);
-    http_response_code(500);
-    exit('Service temporarily unavailable.');
+    db_fail_response(
+        500,
+        'Service temporarily unavailable.',
+        'Database connection failed after trying hosts [' . implode(', ', $hostCandidates) . ']: ' . $attemptSummary
+    );
 }
 
 // Prefer UTF-8 for all queries/results.

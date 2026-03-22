@@ -177,9 +177,10 @@ require_once __DIR__ . '/includes/resident_access_guard.php';
       gap: 12px;
     }
     #viewModal .tracker-form-section {
-      border: 1px solid #e78924;
+      border: 1px solid #e9ecef;
+      border-color: #e78924;
       border-radius: 12px;
-      background: #fff;
+      background: #ffffff;
       padding: 12px;
       margin-top: 0;
       display: grid;
@@ -189,12 +190,33 @@ require_once __DIR__ . '/includes/resident_access_guard.php';
       margin: 0;
       font-size: 1rem;
       font-weight: 700;
-      color: #111827;
+      color: #212529;
+      border-bottom: 1px dashed #e9ecef;
+      padding-bottom: 6px;
+    }
+    #viewModal .tracker-form-subsection {
+      display: grid;
+      gap: 10px;
+      padding: 12px;
+      border: 1px solid #edf1f5;
+      border-radius: 10px;
+      background: linear-gradient(180deg, #ffffff 0%, #fbfcfe 100%);
+    }
+    #viewModal .tracker-form-subsection + .tracker-form-subsection {
+      margin-top: 4px;
+    }
+    #viewModal .tracker-form-subsection-title {
+      margin: 0;
+      font-size: 0.82rem;
+      font-weight: 800;
+      letter-spacing: 0.02em;
+      text-transform: uppercase;
+      color: #4b5563;
     }
     #viewModal .tracker-form-grid {
       display: grid;
       grid-template-columns: repeat(2, minmax(0, 1fr));
-      gap: 12px;
+      gap: 14px 12px;
     }
     #viewModal .tracker-form-grid.cols-1 {
       grid-template-columns: 1fr;
@@ -206,25 +228,27 @@ require_once __DIR__ . '/includes/resident_access_guard.php';
       grid-template-columns: repeat(4, minmax(0, 1fr));
     }
     #viewModal .tracker-form-field {
-      display: grid;
+      display: flex;
+      flex-direction: column;
       gap: 6px;
-      background: #f8fafc;
-      border: 1px solid #e5e7eb;
-      border-radius: 10px;
-      padding: 10px 12px;
     }
     #viewModal .tracker-form-label {
       margin: 0;
       line-height: 1.2;
-      font-size: .78rem;
+      font-size: 0.76rem;
       color: #6b7280;
-      font-weight: 600;
-      text-transform: capitalize;
+      font-weight: 700;
     }
     #viewModal .tracker-form-value {
+      min-height: 38px;
+      border: 1px solid #dbe0e6;
+      border-radius: 8px;
+      background: #f8fafc;
+      padding: 8px 10px;
+      font-size: 0.92rem;
       line-height: 1.45;
       color: #111827;
-      font-weight: 600;
+      font-weight: 500;
       word-break: break-word;
     }
     #viewModal .view-form-section {
@@ -642,6 +666,36 @@ require_once __DIR__ . '/includes/resident_access_guard.php';
   function friendlyLabel(key) {
     const raw = String(key || '').trim();
     if (!raw) return '';
+    const map = {
+      document_type: 'Document Type',
+      request_purpose: 'Request Purpose',
+      o_ln: 'Owner Last Name',
+      o_fn: 'Owner First Name',
+      o_mn: 'Owner Middle Name',
+      o_phone: 'Owner Phone',
+      owner_full_address: 'Owner Full Address',
+      application_type: 'Application Type',
+      business_name: 'Business Name',
+      b_name: 'Business Name',
+      business_same_address: 'Same as Owner Address',
+      business_barangay: 'Business Barangay',
+      business_city: 'Business City',
+      business_province: 'Business Province',
+      business_full_address: 'Business Full Address',
+      initial_operation_date: 'Initial Operation Date',
+      business_contact_number: 'Business Contact Number',
+      b_contact_1: 'Business Contact Number',
+      business_type: 'Business Type',
+      owner_type: 'Owner Type',
+      business_reg_type: 'Business Registration Type',
+      renewal_business_reg_type: 'Business Registration Type',
+      full_address: 'Full Address',
+      full_address_display: 'Full Address',
+      birthdate: 'Birthdate',
+      birthplace: 'Birthplace',
+      location: 'Location'
+    };
+    if (map[raw]) return map[raw];
     return raw.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
   }
 
@@ -745,24 +799,24 @@ require_once __DIR__ . '/includes/resident_access_guard.php';
         ? JSON.stringify(value)
         : String(value ?? '').trim();
       if (isEmptyFieldValue(text)) return;
-      submittedFields.push({ label: friendlyLabel(k), value: text });
+      submittedFields.push({ key: k, label: friendlyLabel(k), value: text });
     });
 
     const requestDetailsRaw = String(row.request_details ?? '').trim();
     if (!submittedFields.length && requestDetailsRaw && requestDetailsRaw !== '{}' && requestDetailsRaw !== '[]') {
-      submittedFields.push({ label: 'Request Details', value: requestDetailsRaw });
+      submittedFields.push({ key: 'request_details', label: 'Request Details', value: requestDetailsRaw });
     }
 
     if (!submittedFields.length) {
       [
-        ['Purpose', row.purpose],
-        ['Status', row.stage_label || row.stage],
-        ['Submitted At', row.submitted_at],
-        ['Status Remarks', row.status_remarks]
-      ].forEach(([label, value]) => {
+        ['purpose', 'Purpose', row.purpose],
+        ['status', 'Status', row.stage_label || row.stage],
+        ['submitted_at', 'Submitted At', row.submitted_at],
+        ['status_remarks', 'Status Remarks', row.status_remarks]
+      ].forEach(([key, label, value]) => {
         const text = String(value ?? '').trim();
         if (!isEmptyFieldValue(text)) {
-          submittedFields.push({ label, value: text });
+          submittedFields.push({ key, label, value: text });
         }
       });
     }
@@ -770,23 +824,70 @@ require_once __DIR__ . '/includes/resident_access_guard.php';
     return submittedFields;
   }
 
+  function renderGroupedFieldSections(sections) {
+    const blocks = (Array.isArray(sections) ? sections : []).map((section) => {
+      const grid = renderFieldGrid(section.fields || [], section.maxCols || 4);
+      if (!grid) return '';
+      return `
+        <div class="tracker-form-subsection">
+          <h6 class="tracker-form-subsection-title">${escapeHtml(section.title || 'Details')}</h6>
+          ${grid}
+        </div>
+      `;
+    }).filter(Boolean);
+
+    return blocks.join('');
+  }
+
+  function buildSubmittedFieldSections(fields) {
+    const order = ['request', 'owner', 'contact', 'owner_address', 'business', 'business_address', 'other'];
+    const config = {
+      request: { title: 'Request Details', maxCols: 4, fields: [] },
+      owner: { title: 'Owner Information', maxCols: 4, fields: [] },
+      contact: { title: 'Contact Details', maxCols: 4, fields: [] },
+      owner_address: { title: 'Owner Address', maxCols: 2, fields: [] },
+      business: { title: 'Business Information', maxCols: 4, fields: [] },
+      business_address: { title: 'Business Address', maxCols: 3, fields: [] },
+      other: { title: 'Other Details', maxCols: 4, fields: [] }
+    };
+
+    const categoryOf = (field) => {
+      const key = String(field?.key || '').trim().toLowerCase();
+      const label = String(field?.label || '').trim().toLowerCase();
+      const source = `${key} ${label}`;
+
+      if (/(document_type|request_purpose|application_type|purpose|request_details|status|submitted_at|status_remarks)/.test(source)) return 'request';
+      if (/(business_name|business_type|business_reg_type|renewal_business_reg_type|owner_type|initial_operation_date)/.test(source)) return 'business';
+      if (/(business_same_address|business_barangay|business_city|business_province|business_full_address|location)/.test(source)) return 'business_address';
+      if (/(owner_full_address|full_address|birthplace)/.test(source)) return 'owner_address';
+      if (/(phone|contact|email)/.test(source)) return 'contact';
+      if (/(^o_|owner|name|birthdate|age|sex|gender|civil_status|civil status|occupation|nationality|religion)/.test(source)) return 'owner';
+      return 'other';
+    };
+
+    (Array.isArray(fields) ? fields : []).forEach((field) => {
+      const bucket = categoryOf(field);
+      config[bucket].fields.push({ label: field.label, value: field.value, raw: field.raw });
+    });
+
+    return order.map((key) => config[key]).filter((section) => section.fields.length);
+  }
+
   function buildRequestViewHtml(row, payload) {
-    const summarySection = formSection('Request Summary', `
-      <div class="view-form-section">
-        ${viewFormRow([
-          viewFormField('Request ID', row.request_id || '-'),
-          viewFormField('Document', row.document_type || '-'),
-        ], 2)}
-        ${viewFormRow([
-          viewFormField('Purpose', row.purpose || '-', { span: 2 }),
-          viewFormField('Fee', feeTextOf(row), { span: 2 }),
-        ], 4)}
-        ${viewFormRow([
-          viewFormField('Status', row.stage_label || row.stage || '-', { span: 2 }),
-          viewFormField('Submitted At', row.submitted_at || '-', { span: 3 }),
-        ], 5)}
-      </div>
-    `);
+    const summarySection = formSection('Request Summary', [
+      renderFieldGrid([
+        { label: 'Request ID', value: row.request_id || '-' },
+        { label: 'Document', value: row.document_type || '-' },
+      ], 2),
+      renderFieldGrid([
+        { label: 'Purpose', value: row.purpose || '-' },
+        { label: 'Fee', value: feeTextOf(row) },
+      ], 2),
+      renderFieldGrid([
+        { label: 'Status', value: row.stage_label || row.stage || '-' },
+        { label: 'Submitted At', value: row.submitted_at || '-' },
+      ], 2),
+    ].join(''));
 
     const documentType = String(row.document_type || payload.document_type || '').toLowerCase();
     const variant = String(payload.cohabitation_variant || '').toLowerCase();
@@ -838,14 +939,12 @@ require_once __DIR__ . '/includes/resident_access_guard.php';
     }
 
     const submittedFields = buildGenericSubmittedFields(row, payload);
-    const submittedGrid = renderFieldGrid(submittedFields.map((f) => ({
-      label: f.label,
-      value: f.value,
-    })), 4);
+    const submittedSections = buildSubmittedFieldSections(submittedFields);
+    const submittedContent = renderGroupedFieldSections(submittedSections);
 
     return [
       summarySection,
-      formSection('Submitted Form Details', submittedGrid || '<div class="text-muted">No submitted details.</div>'),
+      formSection('Submitted Form Details', submittedContent || '<div class="text-muted">No submitted details.</div>'),
     ].join('');
   }
 
