@@ -168,6 +168,25 @@ if ($certificateLaunchStage === 'release') {
       border-bottom: 1px dashed #e9ecef;
       padding-bottom: 6px;
     }
+    #viewModal .tracker-form-subsection {
+      display: grid;
+      gap: 10px;
+      padding: 12px;
+      border: 1px solid #edf1f5;
+      border-radius: 14px;
+      background: linear-gradient(180deg, #ffffff 0%, #fbfcfe 100%);
+    }
+    #viewModal .tracker-form-subsection + .tracker-form-subsection {
+      margin-top: 4px;
+    }
+    #viewModal .tracker-form-subsection-title {
+      margin: 0;
+      font-size: 0.82rem;
+      font-weight: 800;
+      letter-spacing: 0.02em;
+      text-transform: uppercase;
+      color: #334155;
+    }
     #viewModal .tracker-form-grid {
       display: grid;
       grid-template-columns: repeat(2, minmax(0, 1fr));

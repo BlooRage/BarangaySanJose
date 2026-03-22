@@ -791,9 +791,13 @@ require_once __DIR__ . '/includes/resident_access_guard.php';
 
   function buildGenericSubmittedFields(row, payload) {
     const submittedFields = [];
+    const documentTypeText = String(row?.document_type || payload?.document_type || '').toLowerCase();
+    const hidePersonalBirthFields = documentTypeText.includes('business permit');
     Object.keys(payload || {}).forEach((key) => {
       const k = String(key || '').trim();
       if (!k || shouldHidePayloadKey(k)) return;
+      const normalizedKey = k.toLowerCase();
+      if (hidePersonalBirthFields && (normalizedKey === 'birthdate' || normalizedKey === 'birthplace')) return;
       const value = payload[k];
       const text = Array.isArray(value) || (value && typeof value === 'object')
         ? JSON.stringify(value)
