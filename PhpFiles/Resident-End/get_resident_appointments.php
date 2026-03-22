@@ -92,6 +92,12 @@ if (!rat_table_exists($conn, 'appointmentstbl')) {
 
 $residentUserId = (string)$_SESSION['user_id'];
 $appointmentColumns = rat_table_columns($conn, 'appointmentstbl');
+$residentUserColumn = isset($appointmentColumns['user_id_resident']) ? 'a.user_id_resident' : 'NULL';
+$nameSelect = isset($appointmentColumns['name']) ? 'a.name' : "''";
+$contactNumberSelect = isset($appointmentColumns['contact_number']) ? 'a.contact_number' : "''";
+$subjectSelect = isset($appointmentColumns['subject']) ? 'a.subject' : "'Appointment'";
+$subjectOtherSelect = isset($appointmentColumns['subject_other']) ? 'a.subject_other' : "''";
+$purposeSelect = isset($appointmentColumns['purpose']) ? 'a.purpose' : "''";
 $preferredScheduleSelect = isset($appointmentColumns['preferred_schedule_timestamp'])
     ? 'a.preferred_schedule_timestamp'
     : (isset($appointmentColumns['schedule_timestamp']) ? 'a.schedule_timestamp' : 'NULL');
@@ -107,59 +113,40 @@ $remarksSelect = isset($appointmentColumns['appointment_remarks'])
 $residentNotesSelect = isset($appointmentColumns['resident_notes'])
     ? 'a.resident_notes'
     : 'NULL';
-$assignedOfficialJoin = isset($appointmentColumns['user_id_official_assigned'])
-    ? "
-        LEFT JOIN useraccountstbl official_user
-            ON official_user.user_id = a.user_id_official_assigned
-        LEFT JOIN residentinformationtbl official_resident
-            ON official_resident.user_id = official_user.user_id
-    "
-    : '';
-$assignedOfficialSelect = isset($appointmentColumns['user_id_official_assigned'])
-    ? "
-        COALESCE(
-            NULLIF(TRIM(CONCAT(
-                COALESCE(official_resident.firstname, ''),
-                CASE
-                    WHEN COALESCE(official_resident.firstname, '') <> ''
-                     AND COALESCE(official_resident.lastname, '') <> '' THEN ' '
-                    ELSE ''
-                END,
-                COALESCE(official_resident.lastname, '')
-            )), ''),
-            official_user.username,
-            a.user_id_official_assigned
-        ) AS official_name
-    "
-    : "'-' AS official_name";
 $statusJoin = rat_table_exists($conn, 'statuslookuptbl')
     ? "LEFT JOIN statuslookuptbl s ON a.appointment_status_id = s.status_id"
     : '';
 $statusSelect = rat_table_exists($conn, 'statuslookuptbl')
     ? "COALESCE(s.status_name, 'Pending') AS status_name"
     : "'Pending' AS status_name";
+$requestTimestampSelect = isset($appointmentColumns['request_timestamp']) ? 'a.request_timestamp' : 'NULL';
+$orderByTimestamp = isset($appointmentColumns['request_timestamp']) ? 'a.request_timestamp DESC, ' : '';
+
+if (!isset($appointmentColumns['user_id_resident'])) {
+    echo json_encode(['success' => true, 'items' => []]);
+    exit;
+}
 
 $sql = "
     SELECT
         a.appointment_id,
-        a.name,
-        a.contact_number,
-        a.subject,
-        a.subject_other,
-        a.purpose,
+        {$nameSelect} AS name,
+        {$contactNumberSelect} AS contact_number,
+        {$subjectSelect} AS subject,
+        {$subjectOtherSelect} AS subject_other,
+        {$purposeSelect} AS purpose,
         {$preferredScheduleSelect} AS preferred_schedule_timestamp,
         {$confirmedScheduleSelect} AS confirmed_schedule_timestamp,
         {$reviewTimestampSelect} AS review_timestamp,
-        a.request_timestamp,
+        {$requestTimestampSelect} AS request_timestamp,
         {$remarksSelect} AS appointment_remarks,
         {$residentNotesSelect} AS resident_notes,
         {$statusSelect},
-        {$assignedOfficialSelect}
+        '-' AS official_name
     FROM appointmentstbl a
     {$statusJoin}
-    {$assignedOfficialJoin}
-    WHERE a.user_id_resident = ?
-    ORDER BY a.request_timestamp DESC, a.appointment_id DESC
+    WHERE {$residentUserColumn} = ?
+    ORDER BY {$orderByTimestamp} a.appointment_id DESC
 ";
 
 $stmt = $conn->prepare($sql);

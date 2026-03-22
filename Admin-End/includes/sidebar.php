@@ -478,6 +478,199 @@ if (!empty($_SESSION['user_id']) && isset($conn) && $conn instanceof mysqli) {
               </a>
             </li>
           </ul>
+      </li>
+      <li class="mb-1">
+        <button class="btn btn-toggle d-flex align-items-center gap-2 rounded <?= $isAppointmentActive ? '' : 'collapsed' ?>"
+                data-bs-toggle="collapse"
+                data-bs-target="#appointment-collapse"
+                aria-expanded="<?= $isAppointmentActive ? 'true' : 'false' ?>">
+          <i class="fas fa-calendar-check"></i> Appointments
+        </button>
+
+        <div class="collapse <?= $isAppointmentActive ? 'show' : '' ?>" id="appointment-collapse">
+          <ul class="btn-toggle-nav list-unstyled fw-normal pb-1 small">
+            <li>
+              <a href="<?= htmlspecialchars(appUrl('Admin-End/Appointments/AppointmentTracker.php')) ?>"
+                 class="link-dark rounded <?= $current == 'AppointmentTracker.php' ? 'active' : '' ?>">
+                Tracker
+              </a>
+            </li>
+          </ul>
+        </div>
+      </li>
+
+      <!-- CERTIFICATE ISSUANCE (Resident Management) -->
+      <li class="mb-2">
+        <button class="btn btn-toggle d-flex align-items-center gap-2 rounded <?= $isCertActive ? '' : 'collapsed' ?>"
+                data-bs-toggle="collapse"
+                data-bs-target="#cert-collapse"
+                aria-expanded="<?= $isCertActive ? 'true' : 'false' ?>">
+          <i class="fas fa-file-circle-check"></i> Document Issuance
+        </button>
+
+        <div class="collapse <?= $isCertActive ? 'show' : '' ?>" id="cert-collapse">
+          <ul class="btn-toggle-nav list-unstyled fw-normal pb-1 small">
+            <li>
+              <a href="<?= htmlspecialchars(appUrl('Admin-End/Certificates/CertificateTracker.php')) ?>"
+                 class="link-dark rounded <?= $isCertificateTrackerActive ? 'active' : '' ?>">
+                Tracker
+              </a>
+            </li>
+          </ul>
+        </div>
+      </li>
+
+      <li class="mb-2">
+        <button class="btn btn-toggle d-flex align-items-center gap-2 rounded <?= $isIdIssuanceActive ? '' : 'collapsed' ?>"
+                data-bs-toggle="collapse"
+                data-bs-target="#id-issuance-collapse"
+                aria-expanded="<?= $isIdIssuanceActive ? 'true' : 'false' ?>">
+          <i class="fas fa-id-card"></i> ID ISSUANCE
+        </button>
+
+        <div class="collapse <?= $isIdIssuanceActive ? 'show' : '' ?>" id="id-issuance-collapse">
+          <ul class="btn-toggle-nav list-unstyled fw-normal pb-1 small">
+            <li>
+              <a href="<?= htmlspecialchars(appUrl('Admin-End/Certificates/CertificateTracker.php?entry=id_issuance')) ?>"
+                 class="link-dark rounded <?= $isIdIssuanceTrackerActive ? 'active' : '' ?>">
+                Tracker
+              </a>
+            </li>
+            <li>
+              <a href="<?= htmlspecialchars(appUrl('Admin-End/Certificates/CertificateTracker.php?tab=manual&document=barangay_id')) ?>"
+                 class="link-dark rounded <?= $isIdIssuanceManualActive ? 'active' : '' ?>">
+                Manual Issuance
+              </a>
+            </li>
+          </ul>
+        </div>
+      </li>
+
+      <li class="mb-1 mt-2 text-muted small fw-semibold px-2">Finance Department</li>
+      <li class="mb-1">
+        <button class="btn btn-toggle d-flex align-items-center gap-2 rounded <?= $isFinanceActive ? '' : 'collapsed' ?>"
+                data-bs-toggle="collapse"
+                data-bs-target="#finance-collapse"
+                aria-expanded="<?= $isFinanceActive ? 'true' : 'false' ?>">
+          <i class="fas fa-money-check-alt"></i> Finance Payments
+        </button>
+
+        <div class="collapse <?= $isFinanceActive ? 'show' : '' ?>" id="finance-collapse">
+          <ul class="btn-toggle-nav list-unstyled fw-normal pb-1 small">
+            <li>
+              <a href="<?= htmlspecialchars(appUrl('Admin-End/Certificates/FinancePayments.php')) ?>"
+                 class="link-dark rounded <?= $isFinanceTrackerActive ? 'active' : '' ?>">
+                Payment Tracker
+              </a>
+            </li>
+            <li>
+              <a href="<?= htmlspecialchars(appUrl('Admin-End/Certificates/FinancePayments.php')) ?>?section=cashbook"
+                 class="link-dark rounded <?= $isFinanceCashbookActive ? 'active' : '' ?>">
+                Cashbook
+              </a>
+            </li>
+            <li>
+              <a href="<?= htmlspecialchars(appUrl('Admin-End/Certificates/FinancePayments.php')) ?>?section=fees"
+                 class="link-dark rounded <?= $isFinanceFeesActive ? 'active' : '' ?>">
+                Fee Management
+              </a>
+            </li>
+          </ul>
+        </div>
+      </li>
+
+      <li class="mb-1 mt-2 text-muted small fw-semibold px-2">e-Blotter Management</li>
+      <li class="mb-2">
+        <a href="<?= htmlspecialchars(appUrl('Admin-End/Blotter/BlotterForm.php')) ?>"
+           class="btn btn-toggle d-flex align-items-center gap-2 rounded <?= $current == 'BlotterForm.php' ? 'active' : '' ?>"
+           style="<?= $current == 'BlotterForm.php' ? 'outline: none; box-shadow: none;' : '' ?>">
+          <i class="fas fa-file-pen"></i> Log New Incident
+        </a>
+      </li>
+      <li class="mb-1">
+        <button class="btn btn-toggle d-flex align-items-center gap-2 rounded <?= $isBlotterActive ? '' : 'collapsed' ?>"
+                data-bs-toggle="collapse"
+                data-bs-target="#blotter-tools-collapse"
+                aria-expanded="<?= $isBlotterActive ? 'true' : 'false' ?>">
+          <i class="fas fa-toolbox"></i> e-Blotter Tools
+        </button>
+
+        <div class="collapse <?= $isBlotterActive ? 'show' : '' ?>" id="blotter-tools-collapse">
+          <ul class="btn-toggle-nav list-unstyled fw-normal pb-1 small">
+            <li>
+              <a href="<?= htmlspecialchars(appUrl('Admin-End/Blotter/BlotterTracker.php')) ?>"
+                 class="link-dark rounded <?= $current == 'BlotterTracker.php' ? 'active' : '' ?>">
+                Tracker
+              </a>
+            </li>
+            <li>
+              <a href="<?= htmlspecialchars(appUrl('Admin-End/Blotter/ReviewQueue.php')) ?>"
+                 class="link-dark rounded <?= $current == 'ReviewQueue.php' ? 'active' : '' ?>">
+                Review Queue
+              </a>
+            </li>
+          </ul>
+        </div>
+      </li>
+
+      <li class="mb-1 mt-2 text-muted small fw-semibold px-2">Complaints and Grievances</li>
+      <li class="mb-2">
+        <a href="<?= htmlspecialchars(appUrl('Admin-End/Complaints/ComplaintForm.php')) ?>"
+           class="btn btn-toggle d-flex align-items-center gap-2 rounded <?= $current == 'ComplaintForm.php' ? 'active' : '' ?>"
+           style="<?= $current == 'ComplaintForm.php' ? 'outline: none; box-shadow: none;' : '' ?>">
+          <i class="fas fa-file-pen"></i> Log New Incident
+        </a>
+      </li>
+      <li class="mb-1">
+        <button class="btn btn-toggle d-flex align-items-center gap-2 rounded <?= $isComplaintActive ? '' : 'collapsed' ?>"
+                data-bs-toggle="collapse"
+                data-bs-target="#complaint-tools-collapse"
+                aria-expanded="<?= $isComplaintActive ? 'true' : 'false' ?>">
+          <i class="fas fa-comments"></i> Complaint Tools
+        </button>
+
+        <div class="collapse <?= $isComplaintActive ? 'show' : '' ?>" id="complaint-tools-collapse">
+          <ul class="btn-toggle-nav list-unstyled fw-normal pb-1 small">
+            <li>
+              <a href="<?= htmlspecialchars(appUrl('Admin-End/Complaints/ComplaintTracker.php')) ?>"
+                 class="link-dark rounded <?= $current == 'ComplaintTracker.php' ? 'active' : '' ?>">
+                Tracker
+              </a>
+            </li>
+          </ul>
+        </div>
+      </li>
+
+      <li class="mb-1 mt-2 text-muted small fw-semibold px-2">Content Management</li>
+      <li class="mb-1">
+        <button class="btn btn-toggle d-flex align-items-center gap-2 rounded <?= $isContentCreateSectionActive ? '' : 'collapsed' ?>"
+                data-bs-toggle="collapse"
+                data-bs-target="#content-create-collapse"
+                aria-expanded="<?= $isContentCreateSectionActive ? 'true' : 'false' ?>">
+          <i class="fas fa-file-pen"></i> Create
+        </button>
+
+        <div class="collapse <?= $isContentCreateSectionActive ? 'show' : '' ?>" id="content-create-collapse">
+          <ul class="btn-toggle-nav list-unstyled fw-normal pb-1 small">
+            <li>
+              <a href="<?= htmlspecialchars(appUrl('Admin-End/Contents/CreateContent.php')) ?>?type=page"
+                 class="link-dark rounded <?= ($current === 'CreateContent.php' && $contentCreateType === 'page') ? 'active' : '' ?>">
+                Page Announcement
+              </a>
+            </li>
+            <li>
+              <a href="<?= htmlspecialchars(appUrl('Admin-End/Contents/CreateContent.php')) ?>?type=delivery"
+                 class="link-dark rounded <?= ($current === 'CreateContent.php' && $contentCreateType === 'delivery') ? 'active' : '' ?>">
+                SMS and Email Announcement
+              </a>
+            </li>
+            <li>
+              <a href="<?= htmlspecialchars(appUrl('Admin-End/Contents/CreateContent.php')) ?>?type=faq"
+                 class="link-dark rounded <?= ($current === 'CreateContent.php' && $contentCreateType === 'faq') ? 'active' : '' ?>">
+                FAQs Page
+              </a>
+            </li>
+          </ul>
         </div>
       </li>
       <li class="mb-2">

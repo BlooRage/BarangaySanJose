@@ -669,15 +669,15 @@ require_once __DIR__ . '/includes/resident_access_guard.php';
     const map = {
       document_type: 'Document Type',
       request_purpose: 'Request Purpose',
-      o_ln: 'Owner Last Name',
-      o_fn: 'Owner First Name',
-      o_mn: 'Owner Middle Name',
-      o_phone: 'Owner Phone',
-      owner_full_address: 'Owner Full Address',
+      o_ln: 'Applicant Last Name',
+      o_fn: 'Applicant First Name',
+      o_mn: 'Applicant Middle Name',
+      o_phone: 'Applicant Phone',
+      owner_full_address: 'Applicant Full Address',
       application_type: 'Application Type',
       business_name: 'Business Name',
       b_name: 'Business Name',
-      business_same_address: 'Same as Owner Address',
+      business_same_address: 'Same as Applicant Address',
       business_barangay: 'Business Barangay',
       business_city: 'Business City',
       business_province: 'Business Province',
@@ -843,9 +843,9 @@ require_once __DIR__ . '/includes/resident_access_guard.php';
     const order = ['request', 'owner', 'contact', 'owner_address', 'business', 'business_address', 'other'];
     const config = {
       request: { title: 'Request Details', maxCols: 4, fields: [] },
-      owner: { title: 'Owner Information', maxCols: 4, fields: [] },
+      owner: { title: 'Applicant Information', maxCols: 4, fields: [] },
       contact: { title: 'Contact Details', maxCols: 4, fields: [] },
-      owner_address: { title: 'Owner Address', maxCols: 2, fields: [] },
+      owner_address: { title: 'Applicant Address', maxCols: 2, fields: [] },
       business: { title: 'Business Information', maxCols: 4, fields: [] },
       business_address: { title: 'Business Address', maxCols: 3, fields: [] },
       other: { title: 'Other Details', maxCols: 4, fields: [] }
