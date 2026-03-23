@@ -129,7 +129,7 @@ $sharedMeta = [
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
   <link href="../../summernote-0.9.0-dist/summernote-lite.min.css?v=20260307-2" rel="stylesheet">
   <link rel="stylesheet" href="../../CSS-Styles/Admin-End-CSS/AdminDashboardStyle.css">
-  <link rel="stylesheet" href="../../CSS-Styles/Admin-End-CSS/ContentManagementStyle.css?v=20260318-36">
+  <link rel="stylesheet" href="../../CSS-Styles/Admin-End-CSS/ContentManagementStyle.css?v=20260323-38">
 </head>
 <body>
   <div class="d-flex flex-column flex-md-row" style="min-height: 100vh;">
@@ -223,6 +223,7 @@ $sharedMeta = [
 
                   <div id="customAudienceFields" class="row g-3 d-none">
                     <div class="col-12">
+<<<<<<< Updated upstream
                       <label class="form-label mb-1">Area</label>
                       <p class="announcement-editor-helper mb-2">Choose the area that should receive this announcement.</p>
                       <div class="row g-2">
@@ -248,6 +249,37 @@ $sharedMeta = [
                             </label>
                           </div>
                         <?php endforeach; ?>
+=======
+                      <div class="announcement-audience-group">
+                        <div class="announcement-audience-group-head">
+                          <label class="form-label mb-1">Select Area</label>
+                          <p class="announcement-editor-helper mb-0">Choose one or more areas that should receive this announcement.</p>
+                        </div>
+                        <div class="announcement-checkbox-grid announcement-checkbox-grid--area" data-custom-audience-group="area">
+                          <?php foreach ($audienceAreaOptions as $areaOption): ?>
+                          <label class="announcement-checkbox-card announcement-checkbox-card--area">
+                            <input class="form-check-input" type="checkbox" name="area[]" value="<?= htmlspecialchars($areaOption, ENT_QUOTES, 'UTF-8') ?>" disabled>
+                            <span><?= htmlspecialchars($areaOption, ENT_QUOTES, 'UTF-8') ?></span>
+                          </label>
+                          <?php endforeach; ?>
+                        </div>
+                      </div>
+                    </div>
+                    <div class="col-12">
+                      <div class="announcement-audience-group">
+                        <div class="announcement-audience-group-head">
+                          <label class="form-label mb-1">Role Group</label>
+                          <p class="announcement-editor-helper mb-0">Filter recipients by role when this update is only for a specific group.</p>
+                        </div>
+                        <div class="announcement-checkbox-grid announcement-checkbox-grid--role" data-custom-audience-group="role_group">
+                          <?php foreach (['Officials', 'Personnel', 'Residents'] as $roleGroupOption): ?>
+                          <label class="announcement-checkbox-card announcement-checkbox-card--role">
+                            <input class="form-check-input" type="checkbox" name="role_group[]" value="<?= htmlspecialchars($roleGroupOption, ENT_QUOTES, 'UTF-8') ?>" disabled>
+                            <span><?= htmlspecialchars($roleGroupOption, ENT_QUOTES, 'UTF-8') ?></span>
+                          </label>
+                          <?php endforeach; ?>
+                        </div>
+>>>>>>> Stashed changes
                       </div>
                     </div>
                   </div>
@@ -790,10 +822,10 @@ $sharedMeta = [
         customAudienceFields.querySelectorAll("input, select, textarea").forEach((field) => {
           field.disabled = !useCustomAudience;
           if (!useCustomAudience) {
-            if (field.tagName === "SELECT") {
-              field.selectedIndex = 0;
-            } else if (field.type === "checkbox" || field.type === "radio") {
+            if (field.type === "checkbox" || field.type === "radio") {
               field.checked = false;
+            } else if (field.tagName === "SELECT") {
+              field.selectedIndex = 0;
             } else {
               field.value = "";
             }

@@ -3,6 +3,7 @@ require_once __DIR__ . "/../General/connection.php";
 require_once __DIR__ . "/../General/security.php";
 require_once __DIR__ . "/contentStore.php";
 require_once __DIR__ . "/announcementDelivery.php";
+require_once __DIR__ . "/announcementAudience.php";
 
 requireRoleSession(['SuperAdmin', 'Official', 'Officials', 'Personnel', 'Personnels', 'Admin', 'Employee'], false);
 
@@ -14,7 +15,11 @@ verifyCsrfToken(false);
 
 function ann_action_redirect(string $channel, string $status, string $q, string $queueQ, string $queueChannel, string $type, string $message): void
 {
+  global $typeFilter, $queueType;
   $query = ['channel' => $channel, 'status' => $status];
+  if ($typeFilter !== 'all') {
+    $query['type_filter'] = $typeFilter;
+  }
   if ($q !== '') {
     $query['q'] = $q;
   }
@@ -23,6 +28,9 @@ function ann_action_redirect(string $channel, string $status, string $q, string 
   }
   if ($queueChannel !== 'all') {
     $query['queue_channel'] = $queueChannel;
+  }
+  if ($queueType !== 'all') {
+    $query['queue_type'] = $queueType;
   }
   $_SESSION['announcement_flash'] = ['type' => $type, 'message' => $message];
   header("Location: " . appUrl('/Admin-End/Contents/Contents.php') . "?" . http_build_query($query));
@@ -110,18 +118,26 @@ $action = strtolower(trim((string)($_POST['action'] ?? '')));
 $announcementId = trim((string)($_POST['announcement_id'] ?? ''));
 $channel = strtolower(trim((string)($_POST['channel'] ?? 'all')));
 $status = strtolower(trim((string)($_POST['status'] ?? 'all')));
+$typeFilter = strtolower(trim((string)($_POST['type_filter'] ?? 'all')));
 $q = trim((string)($_POST['q'] ?? ''));
 $queueQ = trim((string)($_POST['queue_q'] ?? ''));
 $queueChannel = strtolower(trim((string)($_POST['queue_channel'] ?? 'all')));
+$queueType = strtolower(trim((string)($_POST['queue_type'] ?? 'all')));
 
 if (!in_array($channel, ['all', 'website', 'public', 'public_news', 'sms', 'email'], true)) {
   $channel = 'all';
 }
-if (!in_array($status, ['all', 'approved', 'pending', 'draft'], true)) {
+if (!in_array($status, ['all', 'approved', 'denied', 'pending', 'draft'], true)) {
   $status = 'all';
+}
+if (!in_array($typeFilter, ['all', 'page', 'delivery', 'faq'], true)) {
+  $typeFilter = 'all';
 }
 if (!in_array($queueChannel, ['all', 'website', 'public', 'public_news', 'sms', 'email'], true)) {
   $queueChannel = 'all';
+}
+if (!in_array($queueType, ['all', 'page', 'delivery', 'faq'], true)) {
+  $queueType = 'all';
 }
 if ($announcementId === '' || !in_array($action, ['approve', 'deny', 'delete', 'update', 'submit_review'], true)) {
   ann_action_redirect($channel, $status, $q, $queueQ, $queueChannel, 'warning', 'Invalid content action.');
@@ -215,6 +231,7 @@ foreach ($rows as $idx => $item) {
     }
 
     $title = trim((string)($_POST['title'] ?? ''));
+<<<<<<< Updated upstream
     $audience = trim((string)($_POST['audience'] ?? ''));
     $audienceScope = strtolower(trim((string)($_POST['audience_scope'] ?? ((string)($item['audience_scope'] ?? 'all')))));
     if (!in_array($audienceScope, ['all', 'custom'], true)) {
@@ -232,11 +249,19 @@ foreach ($rows as $idx => $item) {
     })));
     $area = implode(', ', $areas);
     $roleGroup = implode(', ', $roleGroups);
+=======
+>>>>>>> Stashed changes
     $contentHtml = trim((string)($_POST['content_html'] ?? ''));
     $publicNewsTitle = trim((string)($_POST['public_news_title'] ?? ''));
     $publicNewsContentHtml = trim((string)($_POST['public_news_content_html'] ?? ''));
     $publicTitle = trim((string)($_POST['public_title'] ?? ''));
     $publicContentHtml = trim((string)($_POST['public_content_html'] ?? ''));
+    $audienceScope = strtolower(trim((string)($_POST['audience_scope'] ?? (string)($item['audience_scope'] ?? 'all'))));
+    if (!in_array($audienceScope, ['all', 'custom'], true)) {
+      $audienceScope = 'all';
+    }
+    $areas = ann_audience_unique_strings((array)($_POST['area'] ?? ann_audience_parse_csv_values((string)($item['area'] ?? ''))));
+    $roleGroups = ann_audience_unique_strings((array)($_POST['role_group'] ?? ann_audience_parse_csv_values((string)($item['role_group'] ?? ''))));
     $publishDate = trim((string)($_POST['publish_date'] ?? '-'));
     $smsMessageInput = trim((string)($_POST['sms_message'] ?? ''));
     $emailSubjectInput = trim((string)($_POST['email_subject'] ?? ''));
@@ -252,6 +277,7 @@ foreach ($rows as $idx => $item) {
       return in_array((string)$ch, ['website', 'public', 'public_news', 'sms', 'email'], true);
     })));
 
+<<<<<<< Updated upstream
     if ($audienceScope === 'custom') {
       $parts = [];
       if ($areas) {
@@ -263,7 +289,23 @@ foreach ($rows as $idx => $item) {
       $audience = $parts ? implode(', ', $parts) : 'Custom Audience';
     } elseif ($audience === '') {
       $audience = 'All Residents';
+=======
+    if ($audienceScope === 'custom' && !$areas && !$roleGroups) {
+      ann_action_redirect($channel, $status, $q, $queueQ, $queueChannel, 'warning', 'Choose at least one area or role group for a custom audience.');
+>>>>>>> Stashed changes
     }
+
+    $audienceConfig = ann_audience_config([
+      'audience_scope' => $audienceScope,
+      'areas' => $areas,
+      'role_groups' => $roleGroups,
+    ]);
+    $audienceScope = $audienceConfig['scope'];
+    $areas = $audienceConfig['areas'];
+    $roleGroups = $audienceConfig['role_groups'];
+    $area = implode(', ', $areas);
+    $roleGroup = implode(', ', $roleGroups);
+    $audience = ann_audience_build_label($audienceScope, $areas, $roleGroups);
 
     $hasAnnouncementPlacement = false;
     $hasNewsPlacement = false;
@@ -367,8 +409,13 @@ foreach ($rows as $idx => $item) {
     $rows[$idx]['title'] = $title;
     $rows[$idx]['audience'] = $audience;
     $rows[$idx]['audience_scope'] = $audienceScope;
+<<<<<<< Updated upstream
     $rows[$idx]['area'] = $audienceScope === 'custom' ? $area : '';
     $rows[$idx]['role_group'] = $audienceScope === 'custom' ? $roleGroup : '';
+=======
+    $rows[$idx]['area'] = $area;
+    $rows[$idx]['role_group'] = $roleGroup;
+>>>>>>> Stashed changes
     $rows[$idx]['channels'] = $channels;
     $rows[$idx]['content_html'] = $contentHtml;
     $rows[$idx]['public_news_title'] = $publicNewsTitle;
