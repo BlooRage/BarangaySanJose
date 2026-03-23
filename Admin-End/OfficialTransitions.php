@@ -1,8 +1,219 @@
 <?php
 require_once "../PhpFiles/General/connection.php";
+require_once "../PhpFiles/General/adminModulePermissions.php";
+require_once "../PhpFiles/General/audit.php";
 require_once "includes/admin_guard.php";
 
 requireRoleSession(['SuperAdmin'], false);
+amp_ensure_permission_storage($conn);
+
+if (!function_exists('ot_filter_catalog_for_regular_officials')) {
+    function ot_filter_catalog_for_regular_officials(array $catalog): array
+    {
+        $filtered = [];
+        foreach ($catalog as $section) {
+            $items = [];
+            foreach (($section['items'] ?? []) as $item) {
+                if (!empty($item['children'])) {
+                    $children = [];
+                    foreach (($item['children'] ?? []) as $child) {
+                        if (!empty($child['admin_only']) || empty($child['path'])) {
+                            continue;
+                        }
+                        $children[] = $child;
+                    }
+                    if ($children) {
+                        $item['children'] = $children;
+                        unset($item['path']);
+                        $items[] = $item;
+                    }
+                    continue;
+                }
+
+                if (!empty($item['admin_only']) || empty($item['path'])) {
+                    continue;
+                }
+                $items[] = $item;
+            }
+
+            if ($items) {
+                $section['items'] = $items;
+                $filtered[] = $section;
+            }
+        }
+
+        return $filtered;
+    }
+}
+
+if (!function_exists('ot_replace_module_permissions')) {
+    function ot_replace_module_permissions(mysqli $conn, string $officialId, string $userId, array $permissionKeys, string $grantedByUserId): void
+    {
+        $deleteStmt = $conn->prepare("DELETE FROM officialmodulepermissionstbl WHERE official_id = ?");
+        if ($deleteStmt) {
+            $deleteStmt->bind_param('s', $officialId);
+            $deleteStmt->execute();
+            $deleteStmt->close();
+        }
+
+        if (!$permissionKeys) {
+            return;
+        }
+
+        $insertStmt = $conn->prepare("
+            INSERT INTO officialmodulepermissionstbl
+                (official_id, user_id, permission_key, is_allowed, granted_by_user_id)
+            VALUES
+                (?, ?, ?, 1, ?)
+        ");
+        if (!$insertStmt) {
+            throw new RuntimeException('Failed to save module permissions.');
+        }
+
+        foreach ($permissionKeys as $permissionKey) {
+            $insertStmt->bind_param('ssss', $officialId, $userId, $permissionKey, $grantedByUserId);
+            $insertStmt->execute();
+        }
+        $insertStmt->close();
+    }
+}
+
+if (!function_exists('ot_upsert_access_profile')) {
+    function ot_upsert_access_profile(mysqli $conn, string $officialId, string $userId): void
+    {
+        $stmt = $conn->prepare("
+            INSERT INTO officialaccessprofiletbl (official_id, user_id, permissions_initialized)
+            VALUES (?, ?, 1)
+            ON DUPLICATE KEY UPDATE
+                user_id = VALUES(user_id),
+                permissions_initialized = 1,
+                updated_at = CURRENT_TIMESTAMP
+        ");
+        if (!$stmt) {
+            throw new RuntimeException('Failed to save access profile metadata.');
+        }
+        $stmt->bind_param('ss', $officialId, $userId);
+        $stmt->execute();
+        $stmt->close();
+    }
+}
+
+$transitionTool = trim((string)($_GET['tool'] ?? 'tracker'));
+if (!in_array($transitionTool, ['tracker', 'kagawad_permissions'], true)) {
+    $transitionTool = 'tracker';
+}
+
+$officialTransitionFlash = null;
+if (!empty($_SESSION['official_transition_flash']) && is_array($_SESSION['official_transition_flash'])) {
+    $officialTransitionFlash = $_SESSION['official_transition_flash'];
+    unset($_SESSION['official_transition_flash']);
+}
+
+if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST' && (string)($_POST['action'] ?? '') === 'save_kagawad_permissions') {
+    $officialId = trim((string)($_POST['official_id'] ?? ''));
+    $actorUserId = (string)($_SESSION['user_id'] ?? '');
+
+    try {
+        if ($officialId === '') {
+            throw new RuntimeException('Invalid kagawad record.');
+        }
+
+        $stmt = $conn->prepare("
+            SELECT
+                bc.seat_name,
+                oi.official_id,
+                oi.user_id,
+                oi.firstname,
+                oi.lastname,
+                oi.middlename,
+                oi.suffix,
+                oi.role_access AS info_role_access,
+                COALESCE(oi.position_access, oi.role_access) AS position_access,
+                oi.department,
+                oi.term_end,
+                ua.role_access AS account_role_access,
+                COALESCE(sa.status_name, '') AS account_status
+            FROM barangaycounciltbl bc
+            INNER JOIN officialinformationtbl oi ON oi.official_id = bc.current_official_id
+            INNER JOIN useraccountstbl ua ON ua.user_id COLLATE utf8mb4_general_ci = oi.user_id COLLATE utf8mb4_general_ci
+            LEFT JOIN statuslookuptbl sa ON sa.status_id = ua.status_id_account
+            WHERE bc.is_active = 1
+              AND bc.seat_group = 'Sangguniang Barangay'
+              AND bc.seat_name LIKE 'Kagawad%'
+              AND oi.official_id = ?
+            LIMIT 1
+        ");
+        if (!$stmt) {
+            throw new RuntimeException('Failed to load kagawad record.');
+        }
+        $stmt->bind_param('s', $officialId);
+        $stmt->execute();
+        $targetRow = $stmt->get_result()->fetch_assoc();
+        $stmt->close();
+
+        if (!$targetRow) {
+            throw new RuntimeException('Kagawad record not found.');
+        }
+
+        $requestedPermissionKeys = $_POST['permission_keys'] ?? [];
+        if (!is_array($requestedPermissionKeys)) {
+            $requestedPermissionKeys = [];
+        }
+
+        $validKeys = array_fill_keys(amp_get_default_admin_permission_keys(), true);
+        $permissionMap = [];
+        foreach ($requestedPermissionKeys as $permissionKey) {
+            $permissionKey = trim((string)$permissionKey);
+            if ($permissionKey !== '' && isset($validKeys[$permissionKey])) {
+                $permissionMap[$permissionKey] = true;
+            }
+        }
+
+        $conn->begin_transaction();
+        ot_replace_module_permissions($conn, (string)$targetRow['official_id'], (string)$targetRow['user_id'], array_keys($permissionMap), $actorUserId);
+        ot_upsert_access_profile($conn, (string)$targetRow['official_id'], (string)$targetRow['user_id']);
+        $conn->commit();
+
+        if (function_exists('insertUnifiedAuditLog')) {
+            $targetName = trim(
+                (string)($targetRow['firstname'] ?? '') . ' ' .
+                ((string)($targetRow['middlename'] ?? '') !== '' ? (string)($targetRow['middlename'] ?? '') . ' ' : '') .
+                (string)($targetRow['lastname'] ?? '') .
+                ((string)($targetRow['suffix'] ?? '') !== '' ? ' ' . (string)($targetRow['suffix'] ?? '') : '')
+            );
+            insertUnifiedAuditLog(
+                $conn,
+                $actorUserId,
+                (string)($_SESSION['role'] ?? 'SuperAdmin'),
+                'OfficialTransitions',
+                'official',
+                (string)$targetRow['official_id'],
+                'save_kagawad_permissions',
+                'module_permissions',
+                null,
+                implode(', ', array_keys($permissionMap)),
+                'Kagawad: ' . ($targetName !== '' ? $targetName : (string)$targetRow['seat_name'])
+            );
+        }
+
+        $_SESSION['official_transition_flash'] = [
+            'type' => 'success',
+            'message' => 'Kagawad permissions updated successfully.',
+        ];
+    } catch (Throwable $e) {
+        try {
+            $conn->rollback();
+        } catch (Throwable $ignored) {
+        }
+        $_SESSION['official_transition_flash'] = [
+            'type' => 'danger',
+            'message' => $e->getMessage(),
+        ];
+    }
+
+    header('Location: OfficialTransitions.php?tool=kagawad_permissions');
+    exit;
+}
 
 // ── Council seats (source of truth for the transition module) ────────────────
 $councilSeats = [];
@@ -37,6 +248,23 @@ foreach ($councilSeats as $cs) {
     $councilSeatsByGroup[$cs['seat_group']][] = $cs;
 }
 
+$batchPreviewSeats = [
+    'BarangayElection' => [],
+    'SKElection' => [],
+];
+foreach ($councilSeats as $cs) {
+    $selectionMethod = (string)($cs['selection_method'] ?? '');
+    $seatGroup = (string)($cs['seat_group'] ?? '');
+    if ($selectionMethod !== 'Elected') {
+        continue;
+    }
+    if ($seatGroup === 'Sangguniang Barangay') {
+        $batchPreviewSeats['BarangayElection'][] = $cs;
+    } elseif ($seatGroup === 'Sangguniang Kabataan') {
+        $batchPreviewSeats['SKElection'][] = $cs;
+    }
+}
+
 // Active officials still needed for Quick Actions / Restore / Credentials
 $activeOfficials = [];
 $aoRes = $conn->query("
@@ -44,6 +272,7 @@ $aoRes = $conn->query("
            COALESCE(oi.position_access, oi.role_access) AS position,
            oi.department, oi.area_number,
            oi.acting_for_id,
+           ua.email, ua.phone_number,
            COALESCE(se.status_name,'') AS employment_status
     FROM officialinformationtbl oi
     LEFT JOIN statuslookuptbl se ON se.status_id = oi.status_id_employment
@@ -57,26 +286,7 @@ if ($aoRes instanceof mysqli_result) {
     $aoRes->close();
 }
 
-// ── Stats ─────────────────────────────────────────────────────────────────────
-$statOpen = $statPending = $statCompleted = 0;
-
 $hasTransTbl = $conn->query("SHOW TABLES LIKE 'officialtransitionstbl'")->num_rows > 0;
-if ($hasTransTbl) {
-    $statRes = $conn->query("
-        SELECT
-            SUM(status IN ('Open','CandidateEncoding')) AS cnt_open,
-            SUM(status = 'PendingDecision')             AS cnt_pending,
-            SUM(status = 'Completed' AND YEAR(completed_at) = YEAR(CURDATE())) AS cnt_completed
-        FROM officialtransitionstbl
-    ");
-    if ($statRes instanceof mysqli_result) {
-        $statRow = $statRes->fetch_assoc();
-        $statOpen      = (int)($statRow['cnt_open']      ?? 0);
-        $statPending   = (int)($statRow['cnt_pending']   ?? 0);
-        $statCompleted = (int)($statRow['cnt_completed'] ?? 0);
-        $statRes->close();
-    }
-}
 
 // ── Election schedules ────────────────────────────────────────────────────────
 $electionSchedules = [];
@@ -110,6 +320,76 @@ $departmentOptions = [
     'Barangay Peace and Order',
 ];
 $areaOptions = ['Barangay Wide','Area 01','Area 1A','Area 02','Area 03','Area 04','Area 05','Area 06'];
+
+$defaultOfficialPermissionKeys = amp_get_default_admin_permission_keys();
+$kagawadPermissionCatalog = ot_filter_catalog_for_regular_officials(amp_get_permission_catalog());
+
+$kagawadOfficials = [];
+if ($hasCouncilTbl) {
+    $kgStmt = $conn->prepare("
+        SELECT
+            bc.council_id,
+            bc.seat_name,
+            bc.sort_order,
+            bc.current_official_id,
+            oi.official_id,
+            oi.user_id,
+            oi.firstname,
+            oi.lastname,
+            oi.middlename,
+            oi.suffix,
+            oi.role_access AS info_role_access,
+            COALESCE(oi.position_access, oi.role_access) AS position_access,
+            oi.department,
+            oi.area_number,
+            oi.term_end,
+            ua.email,
+            ua.phone_number,
+            ua.role_access AS account_role_access,
+            COALESCE(sa.status_name, '') AS account_status
+        FROM barangaycounciltbl bc
+        LEFT JOIN officialinformationtbl oi ON oi.official_id = bc.current_official_id
+        LEFT JOIN useraccountstbl ua ON ua.user_id COLLATE utf8mb4_general_ci = oi.user_id COLLATE utf8mb4_general_ci
+        LEFT JOIN statuslookuptbl sa ON sa.status_id = ua.status_id_account
+        WHERE bc.is_active = 1
+          AND bc.seat_group = 'Sangguniang Barangay'
+          AND bc.seat_name LIKE 'Kagawad%'
+        ORDER BY bc.sort_order, bc.council_id
+    ");
+    if ($kgStmt) {
+        $kgStmt->execute();
+        $kgRes = $kgStmt->get_result();
+        while ($row = $kgRes->fetch_assoc()) {
+            $officialId = trim((string)($row['official_id'] ?? ''));
+            $permissionMap = $officialId !== '' ? amp_get_effective_permission_keys_for_row($conn, $row) : [];
+            $fullName = trim(
+                (string)($row['firstname'] ?? '') . ' ' .
+                ((string)($row['middlename'] ?? '') !== '' ? (string)($row['middlename'] ?? '') . ' ' : '') .
+                (string)($row['lastname'] ?? '') .
+                ((string)($row['suffix'] ?? '') !== '' ? ' ' . (string)($row['suffix'] ?? '') : '')
+            );
+
+            $kagawadOfficials[] = [
+                'council_id' => (int)($row['council_id'] ?? 0),
+                'seat_name' => (string)($row['seat_name'] ?? ''),
+                'official_id' => $officialId,
+                'user_id' => (string)($row['user_id'] ?? ''),
+                'full_name' => $fullName !== '' ? $fullName : 'Vacant',
+                'position_access' => (string)($row['position_access'] ?? ''),
+                'department' => (string)($row['department'] ?? ''),
+                'area_number' => (string)($row['area_number'] ?? ''),
+                'term_end' => (string)($row['term_end'] ?? ''),
+                'email' => (string)($row['email'] ?? ''),
+                'phone_number' => (string)($row['phone_number'] ?? ''),
+                'account_status' => (string)($row['account_status'] ?? ''),
+                'permission_keys' => array_keys($permissionMap),
+                'permission_count' => count($permissionMap),
+                'has_official' => $officialId !== '',
+            ];
+        }
+        $kgStmt->close();
+    }
+}
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -125,13 +405,6 @@ $areaOptions = ['Barangay Wide','Area 01','Area 1A','Area 02','Area 03','Area 04
   <link rel="stylesheet" href="../CSS-Styles/Admin-End-CSS/ResidentMasterlistStyle.css?v=20260319-1">
   <style>
     #main-display { min-width: 0; }
-
-    /* ── Stat cards ── */
-    .ot-stat-card { border-left: 4px solid; border-radius: .5rem; }
-    .ot-stat-card.open     { border-color: #0d6efd; }
-    .ot-stat-card.pending  { border-color: #ffc107; }
-    .ot-stat-card.done     { border-color: #198754; }
-    .ot-stat-card .stat-num { font-size: 2rem; font-weight: 700; line-height: 1; }
 
     /* ── Election schedule timeline pills ── */
     .notif-pill { font-size: .72rem; white-space: nowrap; }
@@ -157,9 +430,72 @@ $areaOptions = ['Barangay Wide','Area 01','Area 1A','Area 02','Area 03','Area 04
     .candidate-item { border: 1px solid #dee2e6; border-radius: .4rem; }
     .candidate-item.selected { border-color: #198754; background: #f0fff4; }
     .candidate-type-badge { font-size: .7rem; }
+    .linked-search-item { cursor: pointer; }
+    .linked-search-item:hover,
+    .linked-search-item:focus { background: #f8f9fa; }
 
     /* ── Quick actions ── */
     .quick-action-btn { text-align: left; }
+
+    /* ── Module sub-navigation ── */
+    .ot-subnav {
+      display: flex;
+      gap: .75rem;
+      flex-wrap: wrap;
+      margin-bottom: 1.5rem;
+    }
+    .ot-subnav-link {
+      display: inline-flex;
+      align-items: center;
+      gap: .5rem;
+      padding: .7rem 1rem;
+      border: 1px solid #d6dbe1;
+      border-radius: .8rem;
+      background: #fff;
+      color: #334155;
+      text-decoration: none;
+      font-weight: 600;
+      font-size: .92rem;
+    }
+    .ot-subnav-link:hover,
+    .ot-subnav-link:focus-visible {
+      border-color: #0d6efd;
+      color: #0d6efd;
+    }
+    .ot-subnav-link.active {
+      border-color: #0d6efd;
+      background: #eaf2ff;
+      color: #0d6efd;
+      box-shadow: inset 0 0 0 1px rgba(13, 110, 253, .12);
+    }
+
+    /* ── Kagawad permissions ── */
+    .kagawad-permission-card + .kagawad-permission-card { margin-top: 1rem; }
+    .kagawad-permission-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: .85rem 1rem;
+    }
+    .kagawad-permission-group {
+      border: 1px solid #eef1f4;
+      border-radius: .85rem;
+      background: #fcfcfd;
+      padding: .95rem 1rem;
+    }
+    .kagawad-permission-group-title {
+      font-size: .92rem;
+      font-weight: 700;
+      color: #334155;
+      margin-bottom: .65rem;
+    }
+    .kagawad-permission-items {
+      display: grid;
+      gap: .45rem;
+    }
+    .kagawad-permission-items .form-check-label {
+      font-size: .88rem;
+      color: #475569;
+    }
   </style>
 </head>
 <body>
@@ -175,9 +511,10 @@ $areaOptions = ['Barangay Wide','Area 01','Area 1A','Area 02','Area 03','Area 04
           Official Transition Module
         </h2>
         <p class="text-muted mb-0" style="font-size:.9rem;">
-          Manage election cycles, position handovers, candidates, and access for barangay officials.
+          Manage election cycles, position handovers, and access setup for barangay officials.
         </p>
       </div>
+      <?php if ($transitionTool === 'tracker'): ?>
       <div class="d-flex gap-2 flex-wrap">
         <button class="btn btn-outline-secondary btn-sm" id="btnOtQuickActions"
                 data-bs-toggle="modal" data-bs-target="#modalQuickActions">
@@ -192,40 +529,30 @@ $areaOptions = ['Barangay Wide','Area 01','Area 1A','Area 02','Area 03','Area 04
           <i class="fas fa-plus me-1"></i> New Transition
         </button>
       </div>
+      <?php endif; ?>
     </div>
     <hr class="mb-4">
 
-    <!-- ══════════════════════════════════════════════════════════ STAT CARDS -->
-    <div class="row g-3 mb-4">
-      <div class="col-12 col-sm-4">
-        <div class="bg-white p-3 rounded-3 shadow-sm ot-stat-card open d-flex align-items-center gap-3">
-          <div class="text-primary"><i class="fas fa-folder-open fa-2x"></i></div>
-          <div>
-            <div class="stat-num text-primary" id="statOpen"><?= $statOpen ?></div>
-            <div class="text-muted small">Open Transitions</div>
-          </div>
-        </div>
-      </div>
-      <div class="col-12 col-sm-4">
-        <div class="bg-white p-3 rounded-3 shadow-sm ot-stat-card pending d-flex align-items-center gap-3">
-          <div class="text-warning"><i class="fas fa-clock fa-2x"></i></div>
-          <div>
-            <div class="stat-num text-warning" id="statPending"><?= $statPending ?></div>
-            <div class="text-muted small">Pending Decision</div>
-          </div>
-        </div>
-      </div>
-      <div class="col-12 col-sm-4">
-        <div class="bg-white p-3 rounded-3 shadow-sm ot-stat-card done d-flex align-items-center gap-3">
-          <div class="text-success"><i class="fas fa-check-circle fa-2x"></i></div>
-          <div>
-            <div class="stat-num text-success" id="statCompleted"><?= $statCompleted ?></div>
-            <div class="text-muted small">Completed (This Year)</div>
-          </div>
-        </div>
-      </div>
+    <div class="ot-subnav">
+      <a href="OfficialTransitions.php?tool=tracker"
+         class="ot-subnav-link <?= $transitionTool === 'tracker' ? 'active' : '' ?>">
+        <i class="fas fa-list-check"></i>
+        <span>Tracker</span>
+      </a>
+      <a href="OfficialTransitions.php?tool=kagawad_permissions"
+         class="ot-subnav-link <?= $transitionTool === 'kagawad_permissions' ? 'active' : '' ?>">
+        <i class="fas fa-user-check"></i>
+        <span>Kagawad Permissions</span>
+      </a>
     </div>
 
+    <?php if (!empty($officialTransitionFlash['message'])): ?>
+      <div class="alert alert-<?= htmlspecialchars((string)($officialTransitionFlash['type'] ?? 'info'), ENT_QUOTES, 'UTF-8') ?> mb-4">
+        <?= htmlspecialchars((string)$officialTransitionFlash['message'], ENT_QUOTES, 'UTF-8') ?>
+      </div>
+    <?php endif; ?>
+
+    <?php if ($transitionTool === 'tracker'): ?>
     <!-- ══════════════════════════════════════════════════════════ ELECTION SCHEDULES -->
     <div class="bg-white rounded-3 shadow-sm border mb-4">
       <div class="d-flex align-items-center justify-content-between p-3 border-bottom">
@@ -241,6 +568,14 @@ $areaOptions = ['Barangay Wide','Area 01','Area 1A','Area 02','Area 03','Area 04
         <?php if (empty($electionSchedules)): ?>
           <p class="text-muted mb-0 small text-center py-2">No election dates scheduled.</p>
         <?php else: ?>
+          <?php
+            $notifPillClass = static function (int $sent): string {
+                return $sent ? 'sent' : 'pending';
+            };
+            $notifPillLabel = static function (int $sent, bool $isPast, string $label): string {
+                return $sent ? 'Sent' : ($isPast ? 'Missed' : $label);
+            };
+          ?>
           <div class="table-responsive">
             <table class="table table-sm align-middle mb-0" id="electionScheduleTable">
               <thead class="table-light">
@@ -263,12 +598,6 @@ $areaOptions = ['Barangay Wide','Area 01','Area 1A','Area 02','Area 03','Area 04
                     $daysUntil = (int)round((strtotime($ed) - time()) / 86400);
                     $isPast = $daysUntil < 0;
                     $edFmt  = date('M d, Y', strtotime($ed));
-                    function pillClass(int $sent): string {
-                        return $sent ? 'sent' : 'pending';
-                    }
-                    function pillLabel(int $sent, bool $isPast, string $label): string {
-                        return $sent ? 'Sent' : ($isPast ? 'Missed' : $label);
-                    }
                   ?>
                   <tr>
                     <td class="fw-semibold"><?= $label ?></td>
@@ -283,16 +612,23 @@ $areaOptions = ['Barangay Wide','Area 01','Area 1A','Area 02','Area 03','Area 04
                       <?php endif; ?>
                     </td>
                     <td><?= (int)$es['position_count'] ?> pos / <?= (int)$es['completed_count'] ?> done</td>
-                    <td><span class="badge notif-pill <?= pillClass((int)$es['n3']) ?>"><?= pillLabel((int)$es['n3'], $isPast, 'Pending') ?></span></td>
-                    <td><span class="badge notif-pill <?= pillClass((int)$es['n1']) ?>"><?= pillLabel((int)$es['n1'], $isPast, 'Pending') ?></span></td>
-                    <td><span class="badge notif-pill <?= pillClass((int)$es['n7']) ?>"><?= pillLabel((int)$es['n7'], $isPast, 'Pending') ?></span></td>
-                    <td><span class="badge notif-pill <?= pillClass((int)$es['np']) ?>"><?= pillLabel((int)$es['np'], $daysUntil > 0, 'Pending') ?></span></td>
+                    <td><span class="badge notif-pill <?= $notifPillClass((int)$es['n3']) ?>"><?= $notifPillLabel((int)$es['n3'], $isPast, 'Pending') ?></span></td>
+                    <td><span class="badge notif-pill <?= $notifPillClass((int)$es['n1']) ?>"><?= $notifPillLabel((int)$es['n1'], $isPast, 'Pending') ?></span></td>
+                    <td><span class="badge notif-pill <?= $notifPillClass((int)$es['n7']) ?>"><?= $notifPillLabel((int)$es['n7'], $isPast, 'Pending') ?></span></td>
+                    <td><span class="badge notif-pill <?= $notifPillClass((int)$es['np']) ?>"><?= $notifPillLabel((int)$es['np'], $daysUntil > 0, 'Pending') ?></span></td>
                     <td>
+                      <div class="d-flex gap-1 justify-content-end">
                       <button class="btn btn-xs btn-outline-secondary py-0 px-2"
                               onclick="otResendNotif(<?= htmlspecialchars(json_encode($es['batch_label']), ENT_QUOTES, 'UTF-8') ?>, <?= htmlspecialchars(json_encode($ed), ENT_QUOTES, 'UTF-8') ?>)"
                               title="Manually trigger pending notifications">
                         <i class="fas fa-redo fa-xs"></i>
                       </button>
+                      <button class="btn btn-xs btn-outline-danger py-0 px-2"
+                              onclick="otDeleteSchedule(<?= htmlspecialchars(json_encode($es['batch_label']), ENT_QUOTES, 'UTF-8') ?>, <?= htmlspecialchars(json_encode($ed), ENT_QUOTES, 'UTF-8') ?>)"
+                              title="Delete this schedule and its linked transitions">
+                        <i class="fas fa-trash fa-xs"></i>
+                      </button>
+                      </div>
                     </td>
                   </tr>
                 <?php endforeach; ?>
@@ -302,7 +638,146 @@ $areaOptions = ['Barangay Wide','Area 01','Area 1A','Area 02','Area 03','Area 04
         <?php endif; ?>
       </div>
     </div>
+    <?php else: ?>
+    <div class="bg-white rounded-3 shadow-sm border mb-4">
+      <div class="p-3 p-md-4 border-bottom">
+        <div class="fw-semibold mb-1">Kagawad Default Access</div>
+        <div class="text-muted small">
+          Right now, the system default is role-based, not position-based:
+          <strong>regular officials/Admins</strong> start with all non-admin-only sidebar permissions,
+          while <strong>SuperAdmin</strong> gets every module. This screen lets you override that default per kagawad.
+        </div>
+      </div>
+      <div class="p-3 p-md-4">
+        <?php
+          $availablePermissionCount = count($defaultOfficialPermissionKeys);
+          $assignedKagawads = array_values(array_filter($kagawadOfficials, static fn ($row) => !empty($row['has_official'])));
+        ?>
+        <div class="row g-3 mb-3">
+          <div class="col-12 col-md-4">
+            <div class="border rounded-3 p-3 h-100 bg-light">
+              <div class="small text-muted">Current Kagawads</div>
+              <div class="fs-4 fw-bold"><?= count($assignedKagawads) ?></div>
+            </div>
+          </div>
+          <div class="col-12 col-md-4">
+            <div class="border rounded-3 p-3 h-100 bg-light">
+              <div class="small text-muted">Available Checklist Items</div>
+              <div class="fs-4 fw-bold"><?= $availablePermissionCount ?></div>
+            </div>
+          </div>
+          <div class="col-12 col-md-4">
+            <div class="border rounded-3 p-3 h-100 bg-light">
+              <div class="small text-muted">Default Behavior</div>
+              <div class="fw-semibold">All non-admin-only modules</div>
+            </div>
+          </div>
+        </div>
 
+        <?php if (empty($kagawadOfficials)): ?>
+          <div class="text-muted small text-center py-4">No kagawad seats were found in the council records yet.</div>
+        <?php else: ?>
+          <?php foreach ($kagawadOfficials as $index => $kagawad): ?>
+            <div class="border rounded-3 p-3 p-md-4 kagawad-permission-card">
+              <div class="d-flex justify-content-between align-items-start flex-wrap gap-3 mb-3">
+                <div>
+                  <div class="fw-bold fs-5"><?= htmlspecialchars((string)$kagawad['seat_name'], ENT_QUOTES, 'UTF-8') ?></div>
+                  <div class="text-muted">
+                    <?= htmlspecialchars((string)$kagawad['full_name'], ENT_QUOTES, 'UTF-8') ?>
+                    <?php if (!empty($kagawad['official_id'])): ?>
+                      <span class="badge bg-light text-dark border ms-2"><?= htmlspecialchars((string)$kagawad['official_id'], ENT_QUOTES, 'UTF-8') ?></span>
+                    <?php endif; ?>
+                  </div>
+                  <div class="small text-muted mt-1">
+                    <?= htmlspecialchars((string)($kagawad['department'] ?: 'Office of the Barangay'), ENT_QUOTES, 'UTF-8') ?>
+                    <?php if (!empty($kagawad['email'])): ?>
+                      • <?= htmlspecialchars((string)$kagawad['email'], ENT_QUOTES, 'UTF-8') ?>
+                    <?php endif; ?>
+                    <?php if (!empty($kagawad['phone_number'])): ?>
+                      • +63<?= htmlspecialchars((string)$kagawad['phone_number'], ENT_QUOTES, 'UTF-8') ?>
+                    <?php endif; ?>
+                  </div>
+                </div>
+                <div class="text-md-end">
+                  <div class="small text-muted">Checked Modules</div>
+                  <div class="fw-bold"><?= (int)$kagawad['permission_count'] ?></div>
+                  <div class="small text-muted"><?= htmlspecialchars((string)($kagawad['account_status'] ?: 'Unknown'), ENT_QUOTES, 'UTF-8') ?></div>
+                </div>
+              </div>
+
+              <?php if (empty($kagawad['has_official'])): ?>
+                <div class="alert alert-light border mb-0">This seat is currently vacant, so there is no kagawad account to configure yet.</div>
+              <?php else: ?>
+                <form method="post" action="OfficialTransitions.php?tool=kagawad_permissions">
+                  <input type="hidden" name="action" value="save_kagawad_permissions">
+                  <input type="hidden" name="official_id" value="<?= htmlspecialchars((string)$kagawad['official_id'], ENT_QUOTES, 'UTF-8') ?>">
+
+                  <div class="kagawad-permission-grid mb-3">
+                    <?php foreach ($kagawadPermissionCatalog as $section): ?>
+                      <div class="kagawad-permission-group">
+                        <div class="kagawad-permission-group-title"><?= htmlspecialchars((string)$section['section'], ENT_QUOTES, 'UTF-8') ?></div>
+                        <div class="kagawad-permission-items">
+                          <?php foreach (($section['items'] ?? []) as $item): ?>
+                            <?php if (!empty($item['children'])): ?>
+                              <?php foreach (($item['children'] ?? []) as $child): ?>
+                                <?php
+                                  $childKey = (string)($child['key'] ?? '');
+                                  $isChecked = in_array($childKey, $kagawad['permission_keys'], true);
+                                  $label = trim((string)($item['label'] ?? '') . ' - ' . (string)($child['label'] ?? ''));
+                                ?>
+                                <div class="form-check">
+                                  <input class="form-check-input"
+                                         type="checkbox"
+                                         name="permission_keys[]"
+                                         value="<?= htmlspecialchars($childKey, ENT_QUOTES, 'UTF-8') ?>"
+                                         id="kgPerm<?= $index ?><?= htmlspecialchars($childKey, ENT_QUOTES, 'UTF-8') ?>"
+                                         <?= $isChecked ? 'checked' : '' ?>>
+                                  <label class="form-check-label" for="kgPerm<?= $index ?><?= htmlspecialchars($childKey, ENT_QUOTES, 'UTF-8') ?>">
+                                    <?= htmlspecialchars($label, ENT_QUOTES, 'UTF-8') ?>
+                                  </label>
+                                </div>
+                              <?php endforeach; ?>
+                            <?php else: ?>
+                              <?php
+                                $itemKey = (string)($item['key'] ?? '');
+                                $isChecked = in_array($itemKey, $kagawad['permission_keys'], true);
+                              ?>
+                              <div class="form-check">
+                                <input class="form-check-input"
+                                       type="checkbox"
+                                       name="permission_keys[]"
+                                       value="<?= htmlspecialchars($itemKey, ENT_QUOTES, 'UTF-8') ?>"
+                                       id="kgPerm<?= $index ?><?= htmlspecialchars($itemKey, ENT_QUOTES, 'UTF-8') ?>"
+                                       <?= $isChecked ? 'checked' : '' ?>>
+                                <label class="form-check-label" for="kgPerm<?= $index ?><?= htmlspecialchars($itemKey, ENT_QUOTES, 'UTF-8') ?>">
+                                  <?= htmlspecialchars((string)$item['label'], ENT_QUOTES, 'UTF-8') ?>
+                                </label>
+                              </div>
+                            <?php endif; ?>
+                          <?php endforeach; ?>
+                        </div>
+                      </div>
+                    <?php endforeach; ?>
+                  </div>
+
+                  <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+                    <div class="small text-muted">
+                      Leaving the checklist empty will remove all saved module access for this kagawad.
+                    </div>
+                    <button type="submit" class="btn btn-primary btn-sm">
+                      <i class="fas fa-save me-1"></i> Save Kagawad Permissions
+                    </button>
+                  </div>
+                </form>
+              <?php endif; ?>
+            </div>
+          <?php endforeach; ?>
+        <?php endif; ?>
+      </div>
+    </div>
+    <?php endif; ?>
+
+    <?php if ($transitionTool === 'tracker'): ?>
     <!-- ══════════════════════════════════════════════════════════ TRANSITIONS TABLE -->
     <div class="bg-white rounded-3 shadow-sm border">
       <!-- Toolbar -->
@@ -344,14 +819,13 @@ $areaOptions = ['Barangay Wide','Area 01','Area 1A','Area 02','Area 03','Area 04
               <th>Outgoing Official</th>
               <th>Batch / Election</th>
               <th>Effective Date</th>
-              <th>Candidates</th>
               <th>Status</th>
               <th>Actions</th>
             </tr>
           </thead>
           <tbody id="otTableBody">
             <tr>
-              <td colspan="9" class="text-center text-muted py-4">
+              <td colspan="8" class="text-center text-muted py-4">
                 <i class="fas fa-spinner fa-spin me-2"></i> Loading…
               </td>
             </tr>
@@ -360,6 +834,7 @@ $areaOptions = ['Barangay Wide','Area 01','Area 1A','Area 02','Area 03','Area 04
         <div id="otTablePagination" class="d-flex justify-content-end mt-2"></div>
       </div>
     </div>
+    <?php endif; ?>
 
   </main><!-- /main -->
 </div><!-- /flex wrapper -->
@@ -510,64 +985,32 @@ $areaOptions = ['Barangay Wide','Area 01','Area 1A','Area 02','Area 03','Area 04
             </div>
           </div>
 
-          <p class="fw-semibold mb-2">Select which council seats are up for election:</p>
+          <p class="fw-semibold mb-2">Included council seats:</p>
           <div class="alert alert-info py-2 small mb-3">
             <i class="fas fa-info-circle me-1"></i>
-            Check the seats whose current holders are transitioning out. The system will auto-identify who is outgoing per seat.
+            The system will automatically include the elected seats covered by the selected batch type. Outgoing officials are detected per seat automatically.
           </div>
-          <?php if (empty($councilSeats)): ?>
+          <?php if (empty($batchPreviewSeats['BarangayElection']) && empty($batchPreviewSeats['SKElection'])): ?>
             <div class="alert alert-warning small">No council seats found. Run the migration first.</div>
           <?php else: ?>
-          <div class="table-responsive">
+          <div id="nbAutoSeatPreviewEmpty" class="alert alert-light border small mb-0">
+            Select a batch type to preview the seats that will be included.
+          </div>
+          <div class="table-responsive d-none" id="nbAutoSeatPreviewWrap">
             <table class="table table-sm align-middle">
               <thead class="table-light">
                 <tr>
-                  <th><input type="checkbox" id="nbSelectAll" title="Select all"> All</th>
                   <th>Seat</th>
                   <th>Selection</th>
+                  <th>Group</th>
                   <th>Current Holder</th>
                   <th>Account</th>
                 </tr>
               </thead>
-              <tbody>
-                <?php foreach ($councilSeats as $cs): ?>
-                  <?php
-                    $holderName = trim($cs['current_official_name'] ?? '');
-                    $acctStatus = $cs['account_status'] ?? '';
-                    $acctBadge  = match(true) {
-                        stripos($acctStatus, 'Active')    !== false => 'bg-success',
-                        stripos($acctStatus, 'Inactive')  !== false => 'bg-secondary',
-                        stripos($acctStatus, 'Suspended') !== false => 'bg-warning text-dark',
-                        default                                      => 'bg-light text-dark',
-                    };
-                  ?>
-                  <tr>
-                    <td>
-                      <input type="checkbox" class="nb-official-check" name="officials[]"
-                             value="<?= (int)$cs['council_id'] ?>">
-                    </td>
-                    <td class="fw-semibold"><?= htmlspecialchars($cs['seat_name'], ENT_QUOTES, 'UTF-8') ?></td>
-                    <td>
-                      <span class="badge <?= $cs['selection_method'] === 'Elected' ? 'bg-primary' : 'bg-secondary' ?>">
-                        <?= htmlspecialchars($cs['selection_method'], ENT_QUOTES, 'UTF-8') ?>
-                      </span>
-                    </td>
-                    <td>
-                      <?php if ($holderName !== ''): ?>
-                        <?= htmlspecialchars($holderName, ENT_QUOTES, 'UTF-8') ?>
-                      <?php else: ?>
-                        <span class="text-muted fst-italic">Vacant</span>
-                      <?php endif; ?>
-                    </td>
-                    <td>
-                      <?php if ($acctStatus !== ''): ?>
-                        <span class="badge <?= $acctBadge ?>"><?= htmlspecialchars($acctStatus, ENT_QUOTES, 'UTF-8') ?></span>
-                      <?php else: ?>
-                        <span class="text-muted">—</span>
-                      <?php endif; ?>
-                    </td>
-                  </tr>
-                <?php endforeach; ?>
+              <tbody id="nbAutoSeatPreviewBody">
+                <tr>
+                  <td colspan="5" class="text-center text-muted py-4">Select a batch type to preview the seats that will be included.</td>
+                </tr>
               </tbody>
             </table>
           </div>
@@ -622,15 +1065,15 @@ $areaOptions = ['Barangay Wide','Area 01','Area 1A','Area 02','Area 03','Area 04
 </div>
 
 <!-- ══════════════════════════════════════════════════════════════════════════
-     MODAL: Manage Candidates
+     MODAL: Official Access Setup
 ══════════════════════════════════════════════════════════════════════════ -->
 <div class="modal fade" id="modalCandidates" tabindex="-1" aria-hidden="true">
-  <div class="modal-dialog modal-lg">
+  <div class="modal-dialog modal-xl modal-dialog-scrollable">
     <div class="modal-content">
       <div class="modal-header">
         <h5 class="modal-title">
           <i class="fas fa-users me-2 text-primary"></i>
-          Candidates — <span id="candidatesModalPositionLabel" class="text-muted fw-normal"></span>
+          Official Access Setup — <span id="candidatesModalPositionLabel" class="text-muted fw-normal"></span>
         </h5>
         <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
       </div>
@@ -645,44 +1088,101 @@ $areaOptions = ['Barangay Wide','Area 01','Area 1A','Area 02','Area 03','Area 04
           — <span id="outgoingOfficialPosition"></span>
         </div>
 
-        <!-- Candidate list -->
+        <!-- Current saved official preview -->
         <div id="candidatesList" class="mb-3">
           <div class="text-center text-muted py-3"><i class="fas fa-spinner fa-spin me-2"></i> Loading…</div>
         </div>
 
-        <!-- Add candidate form -->
+        <!-- Add official -->
         <div id="addCandidateSection" class="border rounded p-3">
-          <p class="fw-semibold mb-2 small">Add Candidate</p>
+          <p class="fw-semibold mb-2 small">Official Information</p>
           <div class="row g-2">
             <div class="col-12 col-md-5">
-              <input type="text" class="form-control form-control-sm" id="newCandidateName"
-                     placeholder="Full name *">
-            </div>
-            <div class="col-12 col-md-4">
-              <input type="text" class="form-control form-control-sm" id="newCandidateContact"
-                     placeholder="Contact number">
-            </div>
-            <div class="col-12 col-md-3">
-              <select class="form-select form-select-sm" id="newCandidateType">
-                <option value="New">New Person</option>
-                <option value="ReturningOfficial">Returning Official</option>
-                <option value="ActiveOfficial">Active Official (Position Change)</option>
-                <option value="Resident">Resident</option>
+              <label for="formerOfficialMode" class="form-label small fw-semibold mb-1">Former Official?</label>
+              <select class="form-select form-select-sm" id="formerOfficialMode">
+                <option value="" selected>— Select option —</option>
+                <option value="new">No, this is a new official</option>
+                <option value="former">Yes, search former official</option>
               </select>
+              <div class="small text-muted mt-2">Choose Yes only if this person previously served and you want to reactivate the old account.</div>
             </div>
-            <div class="col-12 col-md-8" id="linkedIdWrap" style="display:none;">
-              <select class="form-select form-select-sm" id="newCandidateLinkedId">
-                <option value="">— Link to existing record —</option>
-              </select>
+            <div class="col-12" id="linkedIdWrap" style="display:none;">
+              <label for="linkedOfficialSearch" class="form-label small fw-semibold mb-1" id="linkedIdLabel">Search Former Officials</label>
+              <div class="small text-muted mb-2">If this person previously served, search them here to auto-fill the details and reactivate the old account.</div>
+              <input type="hidden" id="newCandidateLinkedId" value="">
+              <input type="text" class="form-control form-control-sm" id="linkedOfficialSearch"
+                     placeholder="Search former official by name, ID, or position">
+              <div id="linkedOfficialSelected" class="small text-success fw-semibold mt-2 d-none"></div>
+              <div id="linkedOfficialSearchResults" class="border rounded mt-2 bg-white d-none" style="max-height: 220px; overflow-y: auto;"></div>
             </div>
+          </div>
+
+          <div id="newOfficialFieldsWrap" style="display:none;">
+            <div class="small text-danger fw-semibold mb-3">* Required fields</div>
+
+            <div class="border rounded p-3 mb-3">
+              <div class="fw-semibold text-muted mb-3">Identity</div>
+              <div class="row g-2">
+                <div class="col-12 col-md-3">
+                  <label for="newCandidateLastName" class="form-label small fw-semibold mb-1">Last Name <span class="text-danger">*</span></label>
+                  <input type="text" class="form-control form-control-sm" id="newCandidateLastName"
+                         placeholder="Last name">
+                </div>
+                <div class="col-12 col-md-3">
+                  <label for="newCandidateFirstName" class="form-label small fw-semibold mb-1">First Name <span class="text-danger">*</span></label>
+                  <input type="text" class="form-control form-control-sm" id="newCandidateFirstName"
+                         placeholder="First name">
+                </div>
+                <div class="col-12 col-md-3">
+                  <label for="newCandidateMiddleName" class="form-label small fw-semibold mb-1">Middle Name</label>
+                  <input type="text" class="form-control form-control-sm" id="newCandidateMiddleName"
+                         placeholder="Middle name">
+                </div>
+                <div class="col-12 col-md-3">
+                  <label for="newCandidateSuffix" class="form-label small fw-semibold mb-1">Suffix</label>
+                  <select class="form-select form-select-sm" id="newCandidateSuffix">
+                    <option value="">None</option>
+                    <option value="Jr.">Jr.</option>
+                    <option value="Sr.">Sr.</option>
+                    <option value="II">II</option>
+                    <option value="III">III</option>
+                    <option value="IV">IV</option>
+                    <option value="V">V</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+
+            <div class="border rounded p-3 mb-3">
+              <div class="fw-semibold text-muted mb-3">Contact</div>
+              <div class="row g-2">
+                <div class="col-12 col-md-6">
+                  <label for="newCandidateEmail" class="form-label small fw-semibold mb-1">Email <span class="text-danger">*</span></label>
+                  <input type="email" class="form-control form-control-sm" id="newCandidateEmail"
+                         placeholder="name@example.com">
+                </div>
+                <div class="col-12 col-md-6">
+                  <label for="newCandidateMobile" class="form-label small fw-semibold mb-1">Mobile Number <span class="text-danger">*</span></label>
+                  <div class="input-group input-group-sm">
+                    <span class="input-group-text">+63</span>
+                    <input type="text" class="form-control" id="newCandidateMobile"
+                           inputmode="numeric" maxlength="10" placeholder="9XXXXXXXXX">
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="row g-2">
             <div class="col-12">
+              <label for="newCandidateNotes" class="form-label small fw-semibold mb-1">Notes</label>
               <input type="text" class="form-control form-control-sm" id="newCandidateNotes"
                      placeholder="Notes (optional)">
             </div>
             <div class="col-12">
-              <button class="btn btn-sm btn-outline-primary w-100" id="btnAddCandidate">
-                <i class="fas fa-plus me-1"></i> Add Candidate
-              </button>
+              <div class="small text-muted">
+                This position accepts one official only. The information here will be saved when you click <span class="fw-semibold">Continue to Finalize</span>.
+              </div>
             </div>
           </div>
         </div>
@@ -690,7 +1190,7 @@ $areaOptions = ['Barangay Wide','Area 01','Area 1A','Area 02','Area 03','Area 04
       <div class="modal-footer justify-content-between">
         <button class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">Close</button>
         <button class="btn btn-warning btn-sm" id="btnMarkPendingDecision">
-          <i class="fas fa-gavel me-1"></i> Ready for Decision
+          <i class="fas fa-key me-1"></i> Continue to Finalize
         </button>
       </div>
     </div>
@@ -705,8 +1205,8 @@ $areaOptions = ['Barangay Wide','Area 01','Area 1A','Area 02','Area 03','Area 04
     <div class="modal-content">
       <div class="modal-header">
         <h5 class="modal-title">
-          <i class="fas fa-trophy me-2 text-warning"></i>
-          Select Winner & Complete Transition
+          <i class="fas fa-key me-2 text-warning"></i>
+          Finalize Access & Complete Transition
         </h5>
         <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
       </div>
@@ -715,38 +1215,27 @@ $areaOptions = ['Barangay Wide','Area 01','Area 1A','Area 02','Area 03','Area 04
 
         <div class="alert alert-info py-2 small mb-3">
           <i class="fas fa-info-circle me-1"></i>
-          Select the winning candidate, then choose what happens next. This action will update the outgoing official's status and initiate onboarding for the winner.
+          Review the encoded official for this position. The access action below is set automatically from the information you entered in the first modal.
         </div>
 
-        <!-- Candidates for winner selection -->
+        <!-- Encoded official preview -->
         <div id="winnerCandidatesList" class="mb-4">
           <div class="text-center text-muted py-3"><i class="fas fa-spinner fa-spin me-2"></i> Loading…</div>
         </div>
 
-        <!-- Outcome selector -->
+        <!-- Auto-selected access action -->
         <div id="winnerOutcomeSection">
-          <label class="form-label fw-semibold">Transition Outcome <span class="text-danger">*</span></label>
-          <select class="form-select" id="winnerOutcome">
-            <option value="">— Select outcome —</option>
-            <option value="ReElected">Re-Elected (same person wins, no account change)</option>
-            <option value="NewPerson">New Person (create invite & new account)</option>
-            <option value="Reactivated">Returning Official (reactivate existing account)</option>
-            <option value="PositionChange">Position Change (winner is an existing active official)</option>
-            <option value="ActingReplacement">Acting / Temporary Replacement</option>
-            <option value="NoSuccessor">No Successor (position abolished or unfilled)</option>
-          </select>
-
-          <!-- Conditional: Acting until date -->
-          <div id="actingUntilWrap" class="mt-3 d-none">
-            <label class="form-label fw-semibold">Acting Until Date</label>
-            <input type="date" class="form-control" id="actingUntilDate">
+          <input type="hidden" id="winnerOutcome" value="">
+          <label class="form-label fw-semibold">Access Action</label>
+          <div id="winnerOutcomeSummary" class="border rounded p-3 bg-light text-muted">
+            The system will determine the access action after the official information is loaded.
           </div>
         </div>
       </div>
       <div class="modal-footer justify-content-between">
         <button class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
         <button class="btn btn-success" id="btnCompleteTransition">
-          <i class="fas fa-check-circle me-1"></i> Complete Transition
+          <i class="fas fa-check-circle me-1"></i> Complete Access Setup
         </button>
       </div>
     </div>
@@ -898,7 +1387,10 @@ $areaOptions = ['Barangay Wide','Area 01','Area 1A','Area 02','Area 03','Area 04
   };
 </script>
 
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-<script src="../JS-Script-Files/Admin-End/officialTransitionsScript.js?v=20260323-1"></script>
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+  <script>
+    window.OT_BATCH_SEAT_PREVIEW = <?= json_encode($batchPreviewSeats, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?>;
+  </script>
+  <script src="../JS-Script-Files/Admin-End/officialTransitionsScript.js?v=20260323-2"></script>
 </body>
 </html>

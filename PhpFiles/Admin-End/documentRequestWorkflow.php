@@ -1260,7 +1260,7 @@ function dra_barangay_id_template_assets(): array {
     $baseDir = realpath(__DIR__ . '/../../');
     if ($baseDir === false) {
         return $resolved;
-    }a
+    }
 
     $front = $baseDir . '/Resident-End/Certificates/BarangayID/FRONT_EMPTY.png';
     $back = $baseDir . '/Resident-End/Certificates/BarangayID/BACK_EMPTY.png';
@@ -6320,6 +6320,7 @@ if ($action === 'list') {
             dr_sync_stage_from_status_lookup($conn, $row);
         }
         $row['stage_label'] = dr_stage_label((string)$row['stage']);
+        $isBarangayIdDocument = strcasecmp(trim((string)($row['document_type'] ?? '')), 'Barangay ID') === 0;
         $row['fee_amount'] = $isBarangayIdDocument ? 0.0 : null;
         $row['_doc_type_for_fee'] = trim((string)($row['document_type'] ?? ''));
         if ($isFinanceList) {

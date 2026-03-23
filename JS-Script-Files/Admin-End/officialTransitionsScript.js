@@ -49,9 +49,9 @@
   function statusBadge(status) {
     const map = {
       Open:              ['badge-ot-open',      'Open'],
-      CandidateEncoding: ['badge-ot-encoding',  'Encoding'],
-      PendingDecision:   ['badge-ot-pending',   'Pending Decision'],
-      Decided:           ['badge-ot-decided',   'Decided'],
+      CandidateEncoding: ['badge-ot-encoding',  'Access Setup'],
+      PendingDecision:   ['badge-ot-pending',   'Pending Access'],
+      Decided:           ['badge-ot-decided',   'Access Ready'],
       Completed:         ['badge-ot-completed', 'Completed'],
       Cancelled:         ['badge-ot-cancelled', 'Cancelled'],
     };
@@ -83,7 +83,7 @@
   async function loadTransitions() {
     const tbody = document.getElementById('otTableBody');
     if (!tbody) return;
-    tbody.innerHTML = '<tr><td colspan="9" class="text-center text-muted py-4"><i class="fas fa-spinner fa-spin me-2"></i> Loading…</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="8" class="text-center text-muted py-4"><i class="fas fa-spinner fa-spin me-2"></i> Loading…</td></tr>';
 
     const q    = document.getElementById('otSearch')?.value.trim()     || '';
     const type = document.getElementById('otTypeFilter')?.value.trim() || '';
@@ -97,11 +97,11 @@
     });
 
     if (!data.success) {
-      tbody.innerHTML = `<tr><td colspan="9" class="text-center text-danger py-4">${data.message || 'Failed to load.'}</td></tr>`;
+      tbody.innerHTML = `<tr><td colspan="8" class="text-center text-danger py-4">${data.message || 'Failed to load.'}</td></tr>`;
       return;
     }
     if (data.notice) {
-      tbody.innerHTML = `<tr><td colspan="9" class="text-center py-5">
+      tbody.innerHTML = `<tr><td colspan="8" class="text-center py-5">
         <div class="text-muted mb-2"><i class="fas fa-database fa-2x"></i></div>
         <div class="fw-semibold">Database migration not yet applied.</div>
         <div class="text-muted small mt-1">Run <code>20260323_create_official_transitions_schema.sql</code> on your database to activate this module.</div>
@@ -111,7 +111,7 @@
 
     const rows = data.data || [];
     if (!rows.length) {
-      tbody.innerHTML = '<tr><td colspan="9" class="text-center text-muted py-4">No transitions found.</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="8" class="text-center text-muted py-4">No transitions found.</td></tr>';
       renderPagination(0);
       return;
     }
@@ -132,11 +132,6 @@
           <td>${outgoing}</td>
           <td>${batch}</td>
           <td>${effDate}</td>
-          <td class="text-center">
-            <button class="btn btn-xs btn-outline-secondary py-0 px-2" onclick="otOpenCandidates('${esc(r.transition_id)}')">
-              ${r.candidate_count || 0} <i class="fas fa-users fa-xs ms-1"></i>
-            </button>
-          </td>
           <td>${statusBadge(r.status)}</td>
           <td>${actions}</td>
         </tr>`;
@@ -150,11 +145,11 @@
     const s   = r.status;
     const btns = [];
 
-    if (s === 'PendingDecision' || s === 'Decided') {
-      btns.push(`<button class="btn btn-xs btn-success py-0 px-2" onclick="otOpenWinner('${esc(tid)}')" title="Select winner"><i class="fas fa-trophy"></i></button>`);
+    if (['Open', 'CandidateEncoding', 'PendingDecision', 'Decided'].includes(s)) {
+      btns.push(`<button class="btn btn-xs btn-outline-primary py-0 px-2" onclick="otOpenCandidates('${esc(tid)}')" title="Fill position"><i class="fas fa-user-plus me-1"></i>Fill Position</button>`);
     }
-    if (['Open','CandidateEncoding'].includes(s)) {
-      btns.push(`<button class="btn btn-xs btn-outline-primary py-0 px-2" onclick="otOpenCandidates('${esc(tid)}')" title="Manage candidates"><i class="fas fa-users"></i></button>`);
+    if (s === 'PendingDecision' || s === 'Decided') {
+      btns.push(`<button class="btn btn-xs btn-success py-0 px-2" onclick="otOpenWinner('${esc(tid)}')" title="Finalize access"><i class="fas fa-key"></i></button>`);
     }
     if (s !== 'Completed' && s !== 'Cancelled') {
       btns.push(`<button class="btn btn-xs btn-outline-danger py-0 px-2" onclick="otCancelTransition('${esc(tid)}')" title="Cancel"><i class="fas fa-times"></i></button>`);
@@ -320,14 +315,62 @@
   // ══════════════════════════════════════════════════════════════════════════
   // NEW BATCH MODAL
   // ══════════════════════════════════════════════════════════════════════════
-  document.getElementById('nbSelectAll')?.addEventListener('change', function () {
-    document.querySelectorAll('.nb-official-check').forEach(cb => cb.checked = this.checked);
-  });
+  const batchSeatPreview = window.OT_BATCH_SEAT_PREVIEW || {};
+
+  function batchSeatStatusBadge(status) {
+    const text = String(status || '').trim();
+    if (!text) return '<span class="text-muted">—</span>';
+    let cls = 'bg-light text-dark';
+    if (/active/i.test(text)) cls = 'bg-success';
+    else if (/inactive/i.test(text)) cls = 'bg-secondary';
+    else if (/suspend/i.test(text)) cls = 'bg-warning text-dark';
+    return `<span class="badge ${cls}">${esc(text)}</span>`;
+  }
+
+  function renderBatchSeatPreview() {
+    const type = document.getElementById('nbType')?.value || '';
+    const emptyEl = document.getElementById('nbAutoSeatPreviewEmpty');
+    const wrapEl = document.getElementById('nbAutoSeatPreviewWrap');
+    const bodyEl = document.getElementById('nbAutoSeatPreviewBody');
+    if (!emptyEl || !wrapEl || !bodyEl) return;
+
+    if (!type) {
+      emptyEl.classList.remove('d-none');
+      emptyEl.textContent = 'Select a batch type to preview the seats that will be included.';
+      wrapEl.classList.add('d-none');
+      bodyEl.innerHTML = '<tr><td colspan="5" class="text-center text-muted py-4">Select a batch type to preview the seats that will be included.</td></tr>';
+      return;
+    }
+
+    const seats = Array.isArray(batchSeatPreview[type]) ? batchSeatPreview[type] : [];
+    if (!seats.length) {
+      emptyEl.classList.remove('d-none');
+      emptyEl.textContent = 'No elected seats are configured for the selected batch type yet.';
+      wrapEl.classList.add('d-none');
+      bodyEl.innerHTML = '<tr><td colspan="5" class="text-center text-muted py-4">No seats available for this batch type.</td></tr>';
+      return;
+    }
+
+    emptyEl.classList.add('d-none');
+    wrapEl.classList.remove('d-none');
+    bodyEl.innerHTML = seats.map((seat) => {
+      const holder = String(seat.current_official_name || '').trim();
+      return `
+        <tr>
+          <td class="fw-semibold">${esc(seat.seat_name || '—')}</td>
+          <td><span class="badge bg-primary">${esc(seat.selection_method || 'Elected')}</span></td>
+          <td>${esc(seat.seat_group || '—')}</td>
+          <td>${holder ? esc(holder) : '<span class="text-muted fst-italic">Vacant</span>'}</td>
+          <td>${batchSeatStatusBadge(seat.account_status)}</td>
+        </tr>
+      `;
+    }).join('');
+  }
+
+  document.getElementById('nbType')?.addEventListener('change', renderBatchSeatPreview);
 
   document.getElementById('formNewBatch')?.addEventListener('submit', async (e) => {
     e.preventDefault();
-    const checked = [...document.querySelectorAll('.nb-official-check:checked')];
-    if (!checked.length) { showToast('Select at least one official.', 'warning'); return; }
 
     const btn = document.getElementById('btnSubmitNewBatch');
     btn.disabled = true;
@@ -350,7 +393,6 @@
     body.append('batch_label', fd.get('batch_label') || '');
     body.append('batch_type', fd.get('batch_type') || '');
     body.append('election_date', fd.get('election_date') || '');
-    checked.forEach(cb => body.append('officials[]', cb.value));
 
     const res = await fetch(API, { method: 'POST', body, headers: { 'Content-Type': 'application/x-www-form-urlencoded' } });
     const data = await res.json();
@@ -362,12 +404,14 @@
       showToast(data.message || 'Batch created.');
       getModal('modalNewBatch')?.hide();
       e.target.reset();
-      document.querySelectorAll('.nb-official-check').forEach(cb => cb.checked = false);
+      renderBatchSeatPreview();
       location.reload(); // reload to refresh election schedule section
     } else {
       showToast(data.message || 'Failed.', 'error');
     }
   });
+
+  document.getElementById('modalNewBatch')?.addEventListener('shown.bs.modal', renderBatchSeatPreview);
 
   // ══════════════════════════════════════════════════════════════════════════
   // ADD ELECTION DATE
@@ -395,6 +439,16 @@
   // ══════════════════════════════════════════════════════════════════════════
   window.otOpenCandidates = function (transitionId) {
     document.getElementById('candidatesTransitionId').value = transitionId;
+    if (lastNameEl) lastNameEl.value = '';
+    if (firstNameEl) firstNameEl.value = '';
+    if (middleNameEl) middleNameEl.value = '';
+    if (suffixEl) suffixEl.value = '';
+    if (emailEl) emailEl.value = '';
+    if (mobileEl) mobileEl.value = '';
+    if (linkedOfficialCache) linkedOfficialCache.clear();
+    setFormerOfficialMode('');
+    const notesEl = document.getElementById('newCandidateNotes');
+    if (notesEl) notesEl.value = '';
     getModal('modalCandidates')?.show();
     loadCandidates(transitionId);
   };
@@ -406,7 +460,7 @@
     listEl.innerHTML = '<div class="text-center text-muted py-3"><i class="fas fa-spinner fa-spin me-2"></i></div>';
 
     const data = await apiFetch({ action: 'fetch_candidates', transition_id: transitionId });
-    if (!data.success) { listEl.innerHTML = '<p class="text-danger">Failed to load candidates.</p>'; return; }
+    if (!data.success) { listEl.innerHTML = '<p class="text-danger">Failed to load official records.</p>'; return; }
 
     const t   = data.transition || {};
     const pos = t.position || transitionId;
@@ -421,106 +475,298 @@
       outInfo.classList.add('d-none');
     }
 
-    const candidates = data.candidates || [];
-    if (!candidates.length) {
-      listEl.innerHTML = '<p class="text-muted small text-center py-2">No candidates encoded yet.</p>';
+    const currentOfficial = (data.candidates || [])[0] || null;
+    if (!currentOfficial) {
+      listEl.innerHTML = '<p class="text-muted small text-center py-2 mb-0">No official information is saved yet for this position. Fill out the form below, then click Continue to Finalize.</p>';
       return;
     }
 
-    listEl.innerHTML = candidates.map(c => {
-      const typePill = candidateTypePill(c.candidate_type);
-      const selected = c.is_selected == 1;
-      return `
-        <div class="candidate-item p-2 mb-2 d-flex align-items-start justify-content-between ${selected ? 'selected' : ''}">
-          <div>
-            <span class="fw-semibold">${esc(c.candidate_name)}</span>
-            ${typePill}
-            ${selected ? '<span class="badge bg-success ms-1">Winner</span>' : ''}
-            ${c.candidate_contact ? `<div class="text-muted small">${esc(c.candidate_contact)}</div>` : ''}
-            ${c.notes ? `<div class="text-muted small fst-italic">${esc(c.notes)}</div>` : ''}
-          </div>
-          <button class="btn btn-xs btn-outline-danger py-0 px-1 ms-2" onclick="otRemoveCandidate(${c.upcoming_id},'${esc(transitionId)}')" title="Remove">
-            <i class="fas fa-times fa-xs"></i>
-          </button>
-        </div>`;
-    }).join('');
+    await applyEncodedOfficialToForm(currentOfficial);
+
+    const typePill = candidateTypePill(currentOfficial.linked_official_id ? 'ReturningOfficial' : 'New');
+    const displayName = formatAccessEntryName(currentOfficial);
+    const emailLine = String(currentOfficial.candidate_email || '').trim();
+    const mobileLine = formatMobileDisplay(currentOfficial.candidate_mobile || currentOfficial.candidate_contact || '');
+    listEl.innerHTML = `
+      <div class="border rounded p-3 bg-light">
+        <div class="fw-semibold text-muted small mb-2">Currently Saved Official</div>
+        <div class="fw-semibold">${esc(displayName)} ${typePill}</div>
+        ${emailLine ? `<div class="text-muted small">${esc(emailLine)}</div>` : ''}
+        ${mobileLine ? `<div class="text-muted small">${esc(mobileLine)}</div>` : ''}
+        ${currentOfficial.notes ? `<div class="text-muted small fst-italic mt-1">${esc(currentOfficial.notes)}</div>` : ''}
+        <div class="small text-muted mt-2">Editing the form below will replace this saved official when you continue to finalize.</div>
+      </div>`;
   }
 
   function candidateTypePill(type) {
     const map = {
-      New:             ['bg-primary text-white', 'New'],
-      ReturningOfficial:['bg-info text-dark',    'Returning'],
-      ActiveOfficial:  ['bg-warning text-dark',  'Active Official'],
-      Resident:        ['bg-secondary text-white','Resident'],
+      New:             ['bg-primary text-white', 'New Official'],
+      ReturningOfficial:['bg-info text-dark',    'Former Official Match'],
+      ActiveOfficial:  ['bg-warning text-dark',  'Existing Official'],
+      Resident:        ['bg-secondary text-white','Resident Record'],
     };
     const [cls, label] = map[type] || ['bg-light text-dark', type];
     return `<span class="badge ${cls} candidate-type-badge ms-1">${label}</span>`;
   }
 
-  // Candidate type → show linked-id picker
-  const newCandTypeEl = document.getElementById('newCandidateType');
-  const linkedIdWrap  = document.getElementById('linkedIdWrap');
-  const linkedIdSel   = document.getElementById('newCandidateLinkedId');
+  function formatAccessEntryName(entry) {
+    const lastName = String(entry?.candidate_last_name || '').trim();
+    const firstName = String(entry?.candidate_first_name || '').trim();
+    const middleName = String(entry?.candidate_middle_name || '').trim();
+    const suffix = String(entry?.candidate_suffix || '').trim();
+    if (!lastName && !firstName) {
+      return String(entry?.candidate_name || '—').trim() || '—';
+    }
 
-  newCandTypeEl?.addEventListener('change', () => {
-    const v = newCandTypeEl.value;
-    const needsLink = ['ReturningOfficial','ActiveOfficial'].includes(v);
-    linkedIdWrap.style.display = needsLink ? '' : 'none';
-    if (needsLink) populateLinkedOfficialSelect(v);
-  });
-
-  function populateLinkedOfficialSelect(type) {
-    linkedIdSel.innerHTML = '<option value="">— Select official —</option>';
-    const officials = window.OT_DATA?.activeOfficials || [];
-    // For ReturningOfficial we'd need inactive officials; for simplicity show all
-    officials.forEach(o => {
-      const name = `${o.lastname}, ${o.firstname} — ${o.position || ''}`;
-      const opt  = document.createElement('option');
-      opt.value = o.official_id;
-      opt.textContent = name;
-      linkedIdSel.appendChild(opt);
-    });
+    let name = `${lastName}, ${firstName}`.trim();
+    if (middleName) name += ` ${middleName}`;
+    if (suffix) name += ` ${suffix}`;
+    return name.trim();
   }
 
-  document.getElementById('btnAddCandidate')?.addEventListener('click', async () => {
-    const transitionId = document.getElementById('candidatesTransitionId').value;
-    const name         = document.getElementById('newCandidateName').value.trim();
-    const contact      = document.getElementById('newCandidateContact').value.trim();
-    const type         = document.getElementById('newCandidateType').value;
-    const notes        = document.getElementById('newCandidateNotes').value.trim();
-    const linkedId     = linkedIdSel?.value || '';
+  function normalizeMobileDigits(value) {
+    const digits = String(value || '').replace(/[^0-9]/g, '');
+    if (!digits) return '';
+    if (digits.length === 10 && digits.startsWith('9')) return digits;
+    if (digits.length >= 12 && digits.startsWith('639')) return digits.slice(-10);
+    if (digits.length >= 11 && digits.startsWith('09')) return digits.slice(-10);
+    return digits.slice(-10);
+  }
 
-    if (!name) { showToast('Candidate name is required.', 'warning'); return; }
+  function formatMobileDisplay(value) {
+    const normalized = normalizeMobileDigits(value);
+    if (!normalized) return '';
+    return `+63 ${normalized}`;
+  }
+
+  function isValidPhilippineMobile(value) {
+    const normalized = normalizeMobileDigits(value);
+    return normalized.length === 10 && normalized.startsWith('9');
+  }
+
+  const linkedIdWrap  = document.getElementById('linkedIdWrap');
+  const linkedIdInput = document.getElementById('newCandidateLinkedId');
+  const linkedIdLabel = document.getElementById('linkedIdLabel');
+  const linkedSearchInput = document.getElementById('linkedOfficialSearch');
+  const linkedSearchResults = document.getElementById('linkedOfficialSearchResults');
+  const linkedSelectedEl = document.getElementById('linkedOfficialSelected');
+  const formerOfficialModeEl = document.getElementById('formerOfficialMode');
+  const newOfficialFieldsWrap = document.getElementById('newOfficialFieldsWrap');
+  const lastNameEl    = document.getElementById('newCandidateLastName');
+  const firstNameEl   = document.getElementById('newCandidateFirstName');
+  const middleNameEl  = document.getElementById('newCandidateMiddleName');
+  const suffixEl      = document.getElementById('newCandidateSuffix');
+  const emailEl       = document.getElementById('newCandidateEmail');
+  const mobileEl      = document.getElementById('newCandidateMobile');
+  const linkedOfficialCache = new Map();
+  let linkedSearchTimer = null;
+
+  function setAccessFormFromOfficial(officialId) {
+    const official = linkedOfficialCache.get(String(officialId || ''))
+      || (window.OT_DATA?.activeOfficials || []).find((row) => String(row.official_id || '') === String(officialId || ''));
+    if (!official) return;
+
+    if (lastNameEl) lastNameEl.value = String(official.lastname || '').trim();
+    if (firstNameEl) firstNameEl.value = String(official.firstname || '').trim();
+    if (middleNameEl) middleNameEl.value = String(official.middlename || '').trim();
+    if (suffixEl) suffixEl.value = String(official.suffix || '').trim();
+    if (emailEl) emailEl.value = String(official.email || '').trim();
+
+    const normalizedMobile = normalizeMobileDigits(official.phone_number || official.candidate_mobile || official.candidate_contact || '');
+    if (mobileEl && normalizedMobile) mobileEl.value = normalizedMobile.slice(-10);
+  }
+
+  function linkedOfficialDisplayName(official) {
+    return `${official.lastname || ''}, ${official.firstname || ''}${official.position ? ` — ${official.position}` : ''}`
+      .replace(/^,\s*/, '')
+      .trim();
+  }
+
+  function clearLinkedOfficialUi() {
+    if (linkedIdInput) linkedIdInput.value = '';
+    if (linkedSearchInput) linkedSearchInput.value = '';
+    if (linkedSelectedEl) {
+      linkedSelectedEl.textContent = '';
+      linkedSelectedEl.classList.add('d-none');
+    }
+    if (linkedSearchResults) {
+      linkedSearchResults.innerHTML = '';
+      linkedSearchResults.classList.add('d-none');
+    }
+  }
+
+  function setFormerOfficialMode(mode = '') {
+    if (formerOfficialModeEl) formerOfficialModeEl.value = mode;
+    const isFormer = mode === 'former';
+    const isNew = mode === 'new';
+    if (linkedIdWrap) linkedIdWrap.style.display = isFormer ? '' : 'none';
+    if (newOfficialFieldsWrap) newOfficialFieldsWrap.style.display = isNew ? '' : 'none';
+    if (!isFormer) {
+      clearLinkedOfficialUi();
+    }
+  }
+
+  function renderLinkedOfficialResults(officials, type, query = '') {
+    if (!linkedSearchResults) return;
+
+    if (!officials.length) {
+      const emptyLabel = type === 'ReturningOfficial'
+        ? (query ? 'No matching former official found.' : 'No returning former officials found.')
+        : (query ? 'No matching active official found.' : 'No active official found.');
+      linkedSearchResults.innerHTML = `<div class="p-2 small text-muted">${esc(emptyLabel)}</div>`;
+      linkedSearchResults.classList.remove('d-none');
+      return;
+    }
+
+    linkedSearchResults.innerHTML = officials.map((official) => {
+      const displayName = linkedOfficialDisplayName(official);
+      const detailBits = [official.official_id, official.department, official.account_status].filter(Boolean);
+      return `
+        <button type="button" class="linked-search-item w-100 text-start border-0 bg-transparent p-2 border-bottom"
+                data-official-id="${esc(official.official_id)}">
+          <div class="fw-semibold">${esc(displayName)}</div>
+          ${detailBits.length ? `<div class="small text-muted">${esc(detailBits.join(' • '))}</div>` : ''}
+        </button>
+      `;
+    }).join('');
+    linkedSearchResults.classList.remove('d-none');
+  }
+
+  function selectLinkedOfficial(officialId) {
+    const official = linkedOfficialCache.get(String(officialId || ''));
+    if (!official) return;
+
+    if (linkedIdInput) linkedIdInput.value = String(officialId);
+    if (linkedSearchInput) linkedSearchInput.value = linkedOfficialDisplayName(official);
+    if (linkedSelectedEl) {
+      linkedSelectedEl.textContent = `Former official selected: ${linkedOfficialDisplayName(official)}`;
+      linkedSelectedEl.classList.remove('d-none');
+    }
+    if (linkedSearchResults) linkedSearchResults.classList.add('d-none');
+    setAccessFormFromOfficial(officialId);
+  }
+
+  async function applyEncodedOfficialToForm(entry) {
+    if (lastNameEl) lastNameEl.value = String(entry.candidate_last_name || '').trim();
+    if (firstNameEl) firstNameEl.value = String(entry.candidate_first_name || '').trim();
+    if (middleNameEl) middleNameEl.value = String(entry.candidate_middle_name || '').trim();
+    if (suffixEl) suffixEl.value = String(entry.candidate_suffix || '').trim();
+    if (emailEl) emailEl.value = String(entry.candidate_email || '').trim();
+    if (mobileEl) mobileEl.value = normalizeMobileDigits(entry.candidate_mobile || entry.candidate_contact || '');
+    document.getElementById('newCandidateNotes').value = String(entry.notes || '').trim();
+
+    const linkedOfficialId = String(entry.linked_official_id || '').trim();
+    if (linkedOfficialId) {
+      setFormerOfficialMode('former');
+      await populateLinkedOfficialSelect();
+      selectLinkedOfficial(linkedOfficialId);
+    } else {
+      setFormerOfficialMode('new');
+    }
+  }
+
+  async function populateLinkedOfficialSelect(query = '') {
+    linkedOfficialCache.clear();
+
+    const data = await apiFetch({ action: 'fetch_inactive_officials', q: query });
+    const officials = (data.data || []).filter((row) => Number(row.can_return || 0) === 1);
+
+    if (linkedIdLabel) linkedIdLabel.textContent = 'Search Former Officials';
+    if (linkedSearchInput) linkedSearchInput.placeholder = 'Search former official by name, ID, or position';
+
+    officials.forEach((o) => {
+      const officialId = String(o.official_id || '').trim();
+      if (!officialId) return;
+      linkedOfficialCache.set(officialId, o);
+    });
+    renderLinkedOfficialResults(officials, 'ReturningOfficial', query);
+    return officials;
+  }
+
+  linkedSearchInput?.addEventListener('input', () => {
+    if ((formerOfficialModeEl?.value || '') !== 'former') return;
+    if (linkedIdInput) linkedIdInput.value = '';
+    if (linkedSelectedEl) {
+      linkedSelectedEl.textContent = '';
+      linkedSelectedEl.classList.add('d-none');
+    }
+    clearTimeout(linkedSearchTimer);
+    linkedSearchTimer = setTimeout(() => {
+      populateLinkedOfficialSelect(linkedSearchInput.value.trim());
+    }, 250);
+  });
+
+  linkedSearchInput?.addEventListener('focus', () => {
+    if ((formerOfficialModeEl?.value || '') !== 'former') return;
+    populateLinkedOfficialSelect(linkedSearchInput.value.trim());
+  });
+
+  formerOfficialModeEl?.addEventListener('change', () => {
+    const mode = formerOfficialModeEl.value || '';
+    setFormerOfficialMode(mode);
+    if (mode === 'former') {
+      populateLinkedOfficialSelect();
+      linkedSearchInput?.focus();
+    }
+  });
+
+  linkedSearchResults?.addEventListener('click', (event) => {
+    const option = event.target.closest('[data-official-id]');
+    if (!option) return;
+    selectLinkedOfficial(option.getAttribute('data-official-id') || '');
+  });
+
+  async function saveCurrentOfficialInformation({ showSuccessToast = false } = {}) {
+    const transitionId = document.getElementById('candidatesTransitionId').value;
+    const notes        = document.getElementById('newCandidateNotes').value.trim();
+    const linkedId     = linkedIdInput?.value || '';
+    const selectedMode = formerOfficialModeEl?.value || '';
+    const isFormerOfficial = selectedMode === 'former';
+    const type         = linkedId ? 'ReturningOfficial' : 'New';
+    const lastName     = lastNameEl?.value.trim() || '';
+    const firstName    = firstNameEl?.value.trim() || '';
+    const middleName   = middleNameEl?.value.trim() || '';
+    const suffix       = suffixEl?.value.trim() || '';
+    const email        = emailEl?.value.trim() || '';
+    const mobile       = normalizeMobileDigits(mobileEl?.value || '');
+
+    if (!selectedMode) { showToast('Choose first whether this is a former official or a new official.', 'warning'); formerOfficialModeEl?.focus(); return null; }
+    if (isFormerOfficial && !linkedId) { showToast('Search and select the former official first, or choose No if this is a new official.', 'warning'); linkedSearchInput?.focus(); return null; }
+    if (!lastName || !firstName) { showToast('Last name and first name are required.', 'warning'); return null; }
+    if (!emailEl?.checkValidity() || !email) { showToast('Enter a valid email address.', 'warning'); emailEl?.focus(); return null; }
+    if (!isValidPhilippineMobile(mobile)) { showToast('Mobile number must be a valid 10-digit Philippine mobile number.', 'warning'); mobileEl?.focus(); return null; }
 
     const params = {
       action: 'add_candidate',
-      transition_id:     transitionId,
-      candidate_name:    name,
-      candidate_contact: contact,
-      candidate_type:    type,
+      transition_id:         transitionId,
+      candidate_type:        type,
+      candidate_first_name:  firstName,
+      candidate_last_name:   lastName,
+      candidate_middle_name: middleName,
+      candidate_suffix:      suffix,
+      candidate_email:       email,
+      candidate_mobile:      mobile,
       notes,
     };
     if (linkedId) params.linked_official_id = linkedId;
 
     const data = await apiFetch(params, 'POST');
     if (data.success) {
-      showToast('Candidate added.');
-      document.getElementById('newCandidateName').value    = '';
-      document.getElementById('newCandidateContact').value = '';
-      document.getElementById('newCandidateNotes').value   = '';
-      linkedIdSel && (linkedIdSel.value = '');
-      loadCandidates(transitionId);
-      loadTransitions();
+      if (showSuccessToast) {
+        showToast(data.message || 'Official information saved.');
+      }
+      return data;
     } else {
       showToast(data.message || 'Failed.', 'error');
+      return null;
     }
-  });
+  }
 
   window.otRemoveCandidate = async function (upcomingId, transitionId) {
-    if (!confirm('Remove this candidate?')) return;
+    if (!confirm('Remove this official from the list?')) return;
     const data = await apiFetch({ action: 'remove_candidate', upcoming_id: upcomingId }, 'POST');
     if (data.success) {
-      showToast('Candidate removed.');
+      showToast('Official removed.');
       loadCandidates(transitionId);
       loadTransitions();
     } else {
@@ -530,13 +776,35 @@
 
   document.getElementById('btnMarkPendingDecision')?.addEventListener('click', async () => {
     const transitionId = document.getElementById('candidatesTransitionId').value;
+    const btn = document.getElementById('btnMarkPendingDecision');
+    if (!transitionId || !btn) return;
+
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i> Saving…';
+
+    const saveData = await saveCurrentOfficialInformation();
+    if (!saveData) {
+      btn.disabled = false;
+      btn.innerHTML = '<i class="fas fa-key me-1"></i> Continue to Finalize';
+      return;
+    }
+
     const data = await apiFetch({ action: 'mark_pending_decision', transition_id: transitionId }, 'POST');
+    btn.disabled = false;
+    btn.innerHTML = '<i class="fas fa-key me-1"></i> Continue to Finalize';
+
     if (data.success) {
-      showToast('Marked as ready for decision.');
+      showToast('Official information saved. Continue with the final access action.');
       getModal('modalCandidates')?.hide();
       loadTransitions();
       updateStats();
+      setTimeout(() => {
+        if (typeof window.otOpenWinner === 'function') {
+          window.otOpenWinner(transitionId);
+        }
+      }, 180);
     } else {
+      loadCandidates(transitionId);
       showToast(data.message || 'Failed.', 'error');
     }
   });
@@ -544,10 +812,30 @@
   // ══════════════════════════════════════════════════════════════════════════
   // SELECT WINNER MODAL
   // ══════════════════════════════════════════════════════════════════════════
+  function getAutoOutcomeMeta(currentOfficial) {
+    const isFormerOfficial = Boolean(String(currentOfficial?.linked_official_id || '').trim());
+    if (isFormerOfficial) {
+      return {
+        outcome: 'Reactivated',
+        label: 'Returning Former Official',
+        description: 'The selected former official account will be reactivated and assigned back to this position.',
+      };
+    }
+
+    return {
+      outcome: 'NewPerson',
+      label: 'First-time Official',
+      description: 'A new official invite/onboarding flow will be started for this person.',
+    };
+  }
+
   window.otOpenWinner = function (transitionId) {
     document.getElementById('winnerTransitionId').value = transitionId;
     document.getElementById('winnerOutcome').value      = '';
-    document.getElementById('actingUntilWrap').classList.add('d-none');
+    const summaryEl = document.getElementById('winnerOutcomeSummary');
+    if (summaryEl) {
+      summaryEl.innerHTML = 'The system will determine the access action after the official information is loaded.';
+    }
     getModal('modalSelectWinner')?.show();
     loadWinnerCandidates(transitionId);
   };
@@ -555,42 +843,53 @@
   async function loadWinnerCandidates(transitionId) {
     const listEl = document.getElementById('winnerCandidatesList');
     listEl.innerHTML = '<div class="text-center text-muted py-3"><i class="fas fa-spinner fa-spin me-2"></i></div>';
+    listEl.dataset.selectedCandidateId = '';
 
     const data = await apiFetch({ action: 'fetch_candidates', transition_id: transitionId });
-    const candidates = data.candidates || [];
+    const currentOfficial = (data.candidates || [])[0] || null;
 
-    if (!candidates.length) {
-      listEl.innerHTML = '<p class="text-muted small text-center">No candidates. Add candidates first.</p>';
+    if (!currentOfficial) {
+      listEl.innerHTML = '<p class="text-muted small text-center">No official information is saved yet. Go back and complete the form first.</p>';
       return;
     }
 
-    listEl.innerHTML = `
-      <p class="fw-semibold small mb-2">Select the winner:</p>
-      ${candidates.map(c => `
-        <div class="form-check candidate-item p-2 mb-2">
-          <input class="form-check-input" type="radio" name="winnerCandidate" id="wc${c.upcoming_id}" value="${c.upcoming_id}">
-          <label class="form-check-label w-100" for="wc${c.upcoming_id}">
-            <span class="fw-semibold">${esc(c.candidate_name)}</span>
-            ${candidateTypePill(c.candidate_type)}
-            ${c.candidate_contact ? `<small class="text-muted d-block">${esc(c.candidate_contact)}</small>` : ''}
-            ${c.notes ? `<small class="text-muted fst-italic d-block">${esc(c.notes)}</small>` : ''}
-          </label>
-        </div>`).join('')}`;
-  }
+    listEl.dataset.selectedCandidateId = String(currentOfficial.upcoming_id || '');
 
-  document.getElementById('winnerOutcome')?.addEventListener('change', function () {
-    const actingWrap = document.getElementById('actingUntilWrap');
-    actingWrap.classList.toggle('d-none', this.value !== 'ActingReplacement');
-  });
+    const outcomeMeta = getAutoOutcomeMeta(currentOfficial);
+    const mappedOutcome = outcomeMeta.outcome;
+    const winnerOutcomeEl = document.getElementById('winnerOutcome');
+    const winnerOutcomeSummaryEl = document.getElementById('winnerOutcomeSummary');
+    if (winnerOutcomeEl) {
+      winnerOutcomeEl.value = mappedOutcome;
+    }
+    if (winnerOutcomeSummaryEl) {
+      winnerOutcomeSummaryEl.innerHTML = `
+        <div class="fw-semibold text-dark">${esc(outcomeMeta.label)}</div>
+        <div class="small text-muted mt-1">${esc(outcomeMeta.description)}</div>
+      `;
+    }
+
+    const emailLine = String(currentOfficial.candidate_email || '').trim();
+    const mobileLine = formatMobileDisplay(currentOfficial.candidate_mobile || currentOfficial.candidate_contact || '');
+    listEl.innerHTML = `
+      <div class="border rounded p-3 bg-light">
+        <div class="fw-semibold small text-muted mb-2">Encoded Official</div>
+        <div class="fw-semibold">${esc(formatAccessEntryName(currentOfficial))} ${candidateTypePill(currentOfficial.linked_official_id ? 'ReturningOfficial' : 'New')}</div>
+        ${emailLine ? `<small class="text-muted d-block">${esc(emailLine)}</small>` : ''}
+        ${mobileLine ? `<small class="text-muted d-block">${esc(mobileLine)}</small>` : ''}
+        ${currentOfficial.notes ? `<small class="text-muted fst-italic d-block mt-1">${esc(currentOfficial.notes)}</small>` : ''}
+      </div>`;
+  }
 
   document.getElementById('btnCompleteTransition')?.addEventListener('click', async () => {
     const transitionId = document.getElementById('winnerTransitionId').value;
     const outcome      = document.getElementById('winnerOutcome').value;
-    const actingUntil  = document.getElementById('actingUntilDate').value;
+    const listEl       = document.getElementById('winnerCandidatesList');
     const selectedRadio= document.querySelector('input[name="winnerCandidate"]:checked');
+    const selectedCandidateId = listEl?.dataset.selectedCandidateId || selectedRadio?.value || 0;
 
-    if (!outcome) { showToast('Select an outcome.', 'warning'); return; }
-    if (outcome !== 'NoSuccessor' && !selectedRadio) { showToast('Select a winner.', 'warning'); return; }
+    if (!outcome) { showToast('The access action could not be determined. Re-open the first modal and complete the official information.', 'warning'); return; }
+    if (!selectedCandidateId) { showToast('Complete the official information first.', 'warning'); return; }
 
     const btn = document.getElementById('btnCompleteTransition');
     btn.disabled = true;
@@ -599,16 +898,15 @@
     const data = await apiFetch({
       action:               'complete_transition',
       transition_id:        transitionId,
-      selected_candidate_id: selectedRadio?.value || 0,
+      selected_candidate_id: selectedCandidateId,
       outcome,
-      acting_until_date:    actingUntil,
     }, 'POST');
 
     btn.disabled = false;
-    btn.innerHTML = '<i class="fas fa-check-circle me-1"></i> Complete Transition';
+    btn.innerHTML = '<i class="fas fa-check-circle me-1"></i> Complete Access Setup';
 
     if (data.success) {
-      showToast(data.message || 'Transition completed.');
+      showToast(data.message || 'Access setup completed.');
       getModal('modalSelectWinner')?.hide();
       loadTransitions();
       updateStats();
@@ -805,6 +1103,17 @@
     const data = await apiFetch({ action: 'resend_notification', batch_label: batchLabel, election_date: electionDate }, 'POST');
     if (data.success) {
       showToast(data.message || 'Flags reset.');
+      location.reload();
+    } else {
+      showToast(data.message || 'Failed.', 'error');
+    }
+  };
+
+  window.otDeleteSchedule = async function (batchLabel, electionDate) {
+    if (!confirm(`Delete schedule "${batchLabel}" on ${electionDate}?\n\nThis will remove the schedule and all linked transition rows for that batch.`)) return;
+    const data = await apiFetch({ action: 'delete_schedule', batch_label: batchLabel, election_date: electionDate }, 'POST');
+    if (data.success) {
+      showToast(data.message || 'Schedule deleted.');
       location.reload();
     } else {
       showToast(data.message || 'Failed.', 'error');

@@ -121,6 +121,40 @@ function otTableExists(mysqli $conn, string $table): bool {
     return $res instanceof mysqli_result && $res->num_rows > 0;
 }
 
+function otColumnExists(mysqli $conn, string $table, string $column): bool {
+    $safeTable = $conn->real_escape_string($table);
+    $safeColumn = $conn->real_escape_string($column);
+    $res = $conn->query("SHOW COLUMNS FROM `{$safeTable}` LIKE '{$safeColumn}'");
+    return $res instanceof mysqli_result && $res->num_rows > 0;
+}
+
+function otEnsureUpcomingOfficialFields(mysqli $conn): void {
+    static $done = false;
+    if ($done || !otTableExists($conn, 'upcomingofficialstbl')) {
+        return;
+    }
+    $done = true;
+
+    $columnDefinitions = [
+        'candidate_first_name' => "ALTER TABLE upcomingofficialstbl ADD COLUMN candidate_first_name VARCHAR(100) DEFAULT NULL AFTER candidate_name",
+        'candidate_last_name' => "ALTER TABLE upcomingofficialstbl ADD COLUMN candidate_last_name VARCHAR(100) DEFAULT NULL AFTER candidate_first_name",
+        'candidate_middle_name' => "ALTER TABLE upcomingofficialstbl ADD COLUMN candidate_middle_name VARCHAR(100) DEFAULT NULL AFTER candidate_last_name",
+        'candidate_suffix' => "ALTER TABLE upcomingofficialstbl ADD COLUMN candidate_suffix VARCHAR(20) DEFAULT NULL AFTER candidate_middle_name",
+        'candidate_email' => "ALTER TABLE upcomingofficialstbl ADD COLUMN candidate_email VARCHAR(150) DEFAULT NULL AFTER candidate_suffix",
+        'candidate_mobile' => "ALTER TABLE upcomingofficialstbl ADD COLUMN candidate_mobile VARCHAR(30) DEFAULT NULL AFTER candidate_email",
+    ];
+
+    foreach ($columnDefinitions as $column => $sql) {
+        if (!otColumnExists($conn, 'upcomingofficialstbl', $column)) {
+            $conn->query($sql);
+        }
+    }
+}
+
+if (otTableExists($conn, 'upcomingofficialstbl')) {
+    otEnsureUpcomingOfficialFields($conn);
+}
+
 // ════════════════════════════════════════════════════════════════════════════
 // FETCH: council seats (for New Transition / New Batch modals)
 // ════════════════════════════════════════════════════════════════════════════
@@ -203,8 +237,7 @@ if ($action === 'fetch_transitions') {
     $sql = "
         SELECT t.*,
                CONCAT(oi.lastname, ', ', oi.firstname, IFNULL(CONCAT(' ', oi.middlename),''), IFNULL(CONCAT(' ', oi.suffix),'')) AS outgoing_name,
-               COALESCE(oi.position_access, oi.role_access) AS outgoing_position,
-               (SELECT COUNT(*) FROM upcomingofficialstbl u WHERE u.transition_id = t.transition_id) AS candidate_count
+               COALESCE(oi.position_access, oi.role_access) AS outgoing_position
         FROM officialtransitionstbl t
         LEFT JOIN officialinformationtbl oi ON oi.official_id = t.outgoing_official_id
         {$whereClause}
@@ -253,9 +286,15 @@ if ($action === 'fetch_inactive_officials') {
     $q = trim((string)($_GET['q'] ?? ''));
     $sql = "
         SELECT oi.official_id,
+               oi.firstname,
+               oi.lastname,
+               oi.middlename,
+               oi.suffix,
                CONCAT(oi.lastname, ', ', oi.firstname) AS full_name,
                COALESCE(oi.position_access, oi.role_access) AS position,
                oi.department,
+               ua.email,
+               ua.phone_number,
                COALESCE(sa.status_name,'') AS account_status,
                COALESCE(se.status_name,'') AS employment_status,
                oi.transition_out_type,
@@ -395,37 +434,54 @@ if ($action === 'new_batch') {
     $batchLabel   = trim((string)($_POST['batch_label']   ?? ''));
     $batchType    = trim((string)($_POST['batch_type']    ?? ''));
     $electionDate = trim((string)($_POST['election_date'] ?? ''));
-    $officials    = $_POST['officials'] ?? [];
 
     if ($batchLabel === '')   otError('Batch label is required.');
     if ($batchType === '')    otError('Batch type is required.');
     if ($electionDate === '') otError('Election date is required.');
-    if (empty($officials))   otError('Select at least one official.');
 
-    // $officials is now an array of council_id values (not official IDs)
+    $seatGroup = match ($batchType) {
+        'BarangayElection' => 'Sangguniang Barangay',
+        'SKElection' => 'Sangguniang Kabataan',
+        default => null,
+    };
+    if ($seatGroup === null) {
+        otError('Invalid batch type.');
+    }
+
+    $seatListStmt = $conn->prepare("
+        SELECT bc.council_id, bc.seat_name, bc.current_official_id,
+               oi.department, oi.area_number
+        FROM barangaycounciltbl bc
+        LEFT JOIN officialinformationtbl oi ON oi.official_id = bc.current_official_id
+        WHERE bc.is_active = 1
+          AND bc.selection_method = 'Elected'
+          AND bc.seat_group = ?
+        ORDER BY bc.sort_order, bc.council_id
+    ");
+    if (!$seatListStmt) {
+        otError('Failed to load eligible council seats.');
+    }
+    $seatListStmt->bind_param('s', $seatGroup);
+    $seatListStmt->execute();
+    $seatListRes = $seatListStmt->get_result();
+    $eligibleSeats = [];
+    while ($seatRow = $seatListRes->fetch_assoc()) {
+        $eligibleSeats[] = $seatRow;
+    }
+    $seatListStmt->close();
+
+    if (empty($eligibleSeats)) {
+        otError('No eligible elected seats were found for the selected batch type.');
+    }
+
     $created = [];
     $conn->begin_transaction();
     try {
-        foreach ($officials as $rawCouncilId) {
-            $councilId = (int)$rawCouncilId;
-            if ($councilId <= 0) continue;
-
-            // Load seat from barangaycounciltbl
-            $seatStmt = $conn->prepare("
-                SELECT bc.seat_name, bc.current_official_id,
-                       oi.department, oi.area_number
-                FROM barangaycounciltbl bc
-                LEFT JOIN officialinformationtbl oi ON oi.official_id = bc.current_official_id
-                WHERE bc.council_id = ? AND bc.is_active = 1
-                LIMIT 1
-            ");
-            if (!$seatStmt) throw new Exception('Seat query failed.');
-            $seatStmt->bind_param('i', $councilId);
-            $seatStmt->execute();
-            $seat = $seatStmt->get_result()->fetch_assoc();
-            $seatStmt->close();
-            if (!$seat) continue;
-
+        foreach ($eligibleSeats as $seat) {
+            $councilId  = (int)($seat['council_id'] ?? 0);
+            if ($councilId <= 0) {
+                continue;
+            }
             $transId    = otGenerateTransitionId($conn);
             $position   = (string)($seat['seat_name']           ?? '');
             $outgoingId = (string)($seat['current_official_id'] ?? '');
@@ -501,59 +557,195 @@ if ($action === 'update_election_date') {
 }
 
 // ════════════════════════════════════════════════════════════════════════════
-// POST: add candidate
+// POST: delete election schedule batch
+// ════════════════════════════════════════════════════════════════════════════
+if ($action === 'delete_schedule') {
+    if (!otTableExists($conn, 'officialtransitionstbl')) {
+        otError('Database migration has not been applied yet.', 503);
+    }
+
+    $batchLabel   = trim((string)($_POST['batch_label']   ?? ''));
+    $electionDate = trim((string)($_POST['election_date'] ?? ''));
+
+    if ($batchLabel === '')   otError('Batch label is required.');
+    if ($electionDate === '') otError('Election date is required.');
+
+    $countStmt = $conn->prepare("
+        SELECT COUNT(*) AS cnt
+        FROM officialtransitionstbl
+        WHERE batch_label = ?
+          AND election_date = ?
+    ");
+    if (!$countStmt) otError('Failed to load schedule.');
+    $countStmt->bind_param('ss', $batchLabel, $electionDate);
+    $countStmt->execute();
+    $existingCount = (int)($countStmt->get_result()->fetch_assoc()['cnt'] ?? 0);
+    $countStmt->close();
+
+    if ($existingCount <= 0) {
+        otError('Schedule not found.');
+    }
+
+    $deleteStmt = $conn->prepare("
+        DELETE FROM officialtransitionstbl
+        WHERE batch_label = ?
+          AND election_date = ?
+    ");
+    if (!$deleteStmt) otError('Delete failed.');
+    $deleteStmt->bind_param('ss', $batchLabel, $electionDate);
+    $deleteStmt->execute();
+    $deleted = $deleteStmt->affected_rows;
+    $deleteStmt->close();
+
+    insertUnifiedAuditLog($conn, $actorId, $actorRole,
+        'OfficialTransitions', 'batch', $batchLabel,
+        'delete_schedule', 'election_date', $electionDate, null,
+        "Deleted {$deleted} transition(s) linked to schedule {$batchLabel}."
+    );
+
+    otJson(['success' => true, 'message' => "Deleted {$deleted} transition(s) from the schedule."]);
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// POST: save encoded official information
 // ════════════════════════════════════════════════════════════════════════════
 if ($action === 'add_candidate') {
-    $transitionId    = trim((string)($_POST['transition_id']     ?? ''));
-    $candidateName   = trim((string)($_POST['candidate_name']    ?? ''));
-    $candidateType   = trim((string)($_POST['candidate_type']    ?? 'New'));
-    $candidateContact= trim((string)($_POST['candidate_contact'] ?? ''));
-    $linkedOfficialId= trim((string)($_POST['linked_official_id']  ?? ''));
-    $linkedResidentId= trim((string)($_POST['linked_resident_id']  ?? ''));
-    $notes           = trim((string)($_POST['notes']             ?? ''));
+    otEnsureUpcomingOfficialFields($conn);
+
+    $transitionId      = trim((string)($_POST['transition_id']       ?? ''));
+    $linkedOfficialId  = trim((string)($_POST['linked_official_id']  ?? ''));
+    $linkedResidentId  = trim((string)($_POST['linked_resident_id']  ?? ''));
+    $notes             = trim((string)($_POST['notes']               ?? ''));
+    $candidateFirstName= trim((string)($_POST['candidate_first_name']?? ''));
+    $candidateLastName = trim((string)($_POST['candidate_last_name'] ?? ''));
+    $candidateMiddle   = trim((string)($_POST['candidate_middle_name'] ?? ''));
+    $candidateSuffix   = trim((string)($_POST['candidate_suffix']    ?? ''));
+    $candidateEmail    = trim((string)($_POST['candidate_email']     ?? ''));
+    $candidateMobile   = preg_replace('/[^0-9]/', '', (string)($_POST['candidate_mobile'] ?? ''));
 
     if ($transitionId  === '') otError('Missing transition_id.');
-    if ($candidateName === '') otError('Candidate name is required.');
+    if ($candidateLastName === '' || $candidateFirstName === '') {
+        otError('Last name and first name are required.');
+    }
+    if ($candidateEmail === '' || !filter_var($candidateEmail, FILTER_VALIDATE_EMAIL)) {
+        otError('A valid email address is required.');
+    }
+    if ($candidateMobile === '' || strlen($candidateMobile) !== 10 || $candidateMobile[0] !== '9') {
+        otError('Mobile number must be a valid 10-digit Philippine mobile number.');
+    }
 
-    $validTypes = ['New','ReturningOfficial','ActiveOfficial','Resident'];
-    if (!in_array($candidateType, $validTypes, true)) $candidateType = 'New';
+    $candidateType = $linkedOfficialId !== '' ? 'ReturningOfficial' : 'New';
 
-    $stmt = $conn->prepare("
-        INSERT INTO upcomingofficialstbl
-            (transition_id, candidate_type, candidate_name, candidate_contact,
-             linked_official_id, linked_resident_id, notes, encoded_by)
-        VALUES (?, ?, ?, NULLIF(?,''), NULLIF(?,''), NULLIF(?,''), NULLIF(?,''), ?)
+    $candidateName = trim($candidateLastName . ', ' . $candidateFirstName);
+    if ($candidateMiddle !== '') {
+        $candidateName .= ' ' . $candidateMiddle;
+    }
+    if ($candidateSuffix !== '') {
+        $candidateName .= ' ' . $candidateSuffix;
+    }
+    $candidateContact = '+63' . $candidateMobile;
+
+    $existingId = 0;
+    $existingStmt = $conn->prepare("
+        SELECT upcoming_id
+        FROM upcomingofficialstbl
+        WHERE transition_id = ?
+        ORDER BY is_selected DESC, upcoming_id ASC
+        LIMIT 1
     ");
-    if (!$stmt) otError('Insert failed: ' . $conn->error);
-    $stmt->bind_param('ssssssss',
-        $transitionId, $candidateType, $candidateName, $candidateContact,
-        $linkedOfficialId, $linkedResidentId, $notes, $actorId
-    );
-    if (!$stmt->execute()) otError('Failed to add candidate: ' . $stmt->error);
-    $newId = $conn->insert_id;
-    $stmt->close();
+    if ($existingStmt) {
+        $existingStmt->bind_param('s', $transitionId);
+        $existingStmt->execute();
+        $existingId = (int)($existingStmt->get_result()->fetch_assoc()['upcoming_id'] ?? 0);
+        $existingStmt->close();
+    }
+
+    if ($existingId > 0) {
+        $stmt = $conn->prepare("
+            UPDATE upcomingofficialstbl
+            SET candidate_type = ?,
+                candidate_name = ?,
+                candidate_contact = NULLIF(?, ''),
+                linked_official_id = NULLIF(?, ''),
+                linked_resident_id = NULLIF(?, ''),
+                notes = NULLIF(?, ''),
+                encoded_by = ?,
+                candidate_first_name = NULLIF(?, ''),
+                candidate_last_name = NULLIF(?, ''),
+                candidate_middle_name = NULLIF(?, ''),
+                candidate_suffix = NULLIF(?, ''),
+                candidate_email = NULLIF(?, ''),
+                candidate_mobile = NULLIF(?, ''),
+                is_selected = 1
+            WHERE upcoming_id = ?
+            LIMIT 1
+        ");
+        if (!$stmt) otError('Update failed: ' . $conn->error);
+        $stmt->bind_param('sssssssssssssi',
+            $candidateType, $candidateName, $candidateContact,
+            $linkedOfficialId, $linkedResidentId, $notes, $actorId,
+            $candidateFirstName, $candidateLastName, $candidateMiddle,
+            $candidateSuffix, $candidateEmail, $candidateMobile, $existingId
+        );
+        if (!$stmt->execute()) otError('Failed to save official information: ' . $stmt->error);
+        $stmt->close();
+        $newId = $existingId;
+        $message = 'Official information updated.';
+        $auditAction = 'update_candidate';
+        $oldValue = 'Existing encoded official';
+    } else {
+        $stmt = $conn->prepare("
+            INSERT INTO upcomingofficialstbl
+                (transition_id, candidate_type, candidate_name, candidate_contact,
+                 linked_official_id, linked_resident_id, notes, encoded_by,
+                 candidate_first_name, candidate_last_name, candidate_middle_name,
+                 candidate_suffix, candidate_email, candidate_mobile, is_selected)
+            VALUES (?, ?, ?, NULLIF(?,''), NULLIF(?,''), NULLIF(?,''), NULLIF(?,''), ?,
+                    NULLIF(?,''), NULLIF(?,''), NULLIF(?,''), NULLIF(?,''), NULLIF(?,''), NULLIF(?,''), 1)
+        ");
+        if (!$stmt) otError('Insert failed: ' . $conn->error);
+        $stmt->bind_param('ssssssssssssss',
+            $transitionId, $candidateType, $candidateName, $candidateContact,
+            $linkedOfficialId, $linkedResidentId, $notes, $actorId,
+            $candidateFirstName, $candidateLastName, $candidateMiddle,
+            $candidateSuffix, $candidateEmail, $candidateMobile
+        );
+        if (!$stmt->execute()) otError('Failed to save official information: ' . $stmt->error);
+        $newId = $conn->insert_id;
+        $stmt->close();
+        $message = 'Official information saved.';
+        $auditAction = 'add_candidate';
+        $oldValue = null;
+    }
+
+    $cleanupStmt = $conn->prepare("DELETE FROM upcomingofficialstbl WHERE transition_id = ? AND upcoming_id <> ?");
+    if ($cleanupStmt) {
+        $cleanupStmt->bind_param('si', $transitionId, $newId);
+        $cleanupStmt->execute();
+        $cleanupStmt->close();
+    }
 
     // Update transition status to CandidateEncoding if still Open
     $conn->query("UPDATE officialtransitionstbl SET status='CandidateEncoding' WHERE transition_id='{$conn->real_escape_string($transitionId)}' AND status='Open'");
 
     insertUnifiedAuditLog($conn, $actorId, $actorRole,
         'OfficialTransitions', 'candidate', (string)$newId,
-        'add_candidate', 'candidate_name', null, $candidateName,
+        $auditAction, 'candidate_name', $oldValue, $candidateName,
         "Transition: {$transitionId} | Type: {$candidateType}"
     );
 
-    otJson(['success' => true, 'message' => 'Candidate added.', 'upcoming_id' => $newId]);
+    otJson(['success' => true, 'message' => $message, 'upcoming_id' => $newId]);
 }
 
 // ════════════════════════════════════════════════════════════════════════════
-// POST: remove candidate
+// POST: remove access entry
 // ════════════════════════════════════════════════════════════════════════════
 if ($action === 'remove_candidate') {
     $upcomingId = (int)($_POST['upcoming_id'] ?? 0);
-    if ($upcomingId <= 0) otError('Invalid candidate ID.');
+    if ($upcomingId <= 0) otError('Invalid access entry ID.');
 
     $row = $conn->query("SELECT candidate_name, transition_id FROM upcomingofficialstbl WHERE upcoming_id = {$upcomingId} LIMIT 1")->fetch_assoc();
-    if (!$row) otError('Candidate not found.');
+    if (!$row) otError('Official record not found.');
 
     $conn->query("DELETE FROM upcomingofficialstbl WHERE upcoming_id = {$upcomingId}");
 
@@ -563,7 +755,7 @@ if ($action === 'remove_candidate') {
         "Transition: {$row['transition_id']}"
     );
 
-    otJson(['success' => true, 'message' => 'Candidate removed.']);
+    otJson(['success' => true, 'message' => 'Official removed.']);
 }
 
 // ════════════════════════════════════════════════════════════════════════════
@@ -574,7 +766,7 @@ if ($action === 'mark_pending_decision') {
     if ($transitionId === '') otError('Missing transition_id.');
 
     $count = (int)$conn->query("SELECT COUNT(*) AS c FROM upcomingofficialstbl WHERE transition_id='{$conn->real_escape_string($transitionId)}'")->fetch_assoc()['c'];
-    if ($count === 0) otError('Add at least one candidate before marking ready for decision.');
+    if ($count === 0) otError('Complete the official information before continuing.');
 
     $stmt = $conn->prepare("UPDATE officialtransitionstbl SET status='PendingDecision' WHERE transition_id=? AND status IN ('CandidateEncoding','Open')");
     if (!$stmt) otError('Update failed.');
@@ -802,7 +994,7 @@ if ($action === 'complete_transition') {
         }
 
         // ── Mark selected candidate ───────────────────────────────────────────
-        if ($candidateId > 0) {
+        if ($candidateId > 0 && $outcome !== 'NoSuccessor') {
             $conn->query("UPDATE upcomingofficialstbl SET is_selected = 0 WHERE transition_id = '{$conn->real_escape_string($transitionId)}'");
             $conn->query("UPDATE upcomingofficialstbl SET is_selected = 1 WHERE upcoming_id = {$candidateId}");
         }

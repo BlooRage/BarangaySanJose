@@ -4,9 +4,11 @@ require_once "../General/connection.php";
 require_once "../General/security.php";
 require_once "../General/audit.php";
 require_once "../General/officialInviteCommon.php";
+require_once "../General/adminModulePermissions.php";
 
 requireRoleSession(['SuperAdmin']);
 oi_ensure_invite_table($conn);
+amp_ensure_permission_storage($conn);
 
 header('Content-Type: application/json; charset=utf-8');
 
@@ -16,6 +18,10 @@ function normalizeRole(string $role): string {
     if ($k === 'personnels' || $k === 'personnel') return 'Personnel';
     if ($k === 'superadmin') return 'SuperAdmin';
     return trim($role);
+}
+
+function rowDisplayRole(string $role): string {
+    return amp_storage_role_to_display_role($role);
 }
 
 function permissionStateFromAccountStatus(string $statusName): string {
@@ -44,30 +50,113 @@ function profileApprovalStateFromInvite(?string $inviteStatus, string $role): st
     return 'PendingApproval';
 }
 
-function getStatusIdByNames(mysqli $conn, string $statusType, array $preferredNames): ?int {
-    if (!$preferredNames) return null;
-    $all = [];
-    $stmt = $conn->prepare("SELECT status_id, status_name FROM statuslookuptbl WHERE status_type = ?");
-    if (!$stmt) return null;
-    $stmt->bind_param("s", $statusType);
-    $stmt->execute();
-    $res = $stmt->get_result();
-    while ($r = $res->fetch_assoc()) {
-        $all[strtolower(trim((string)($r['status_name'] ?? '')))] = (int)($r['status_id'] ?? 0);
+function officialsPermissionSummary(array $permissionMap, int $maxLabels = 3): string {
+    if (!$permissionMap) {
+        return 'No modules';
     }
-    $stmt->close();
-    foreach ($preferredNames as $name) {
-        $key = strtolower(trim((string)$name));
-        if ($key !== '' && isset($all[$key]) && $all[$key] > 0) {
-            return (int)$all[$key];
+
+    $labels = [];
+    foreach (array_keys($permissionMap) as $key) {
+        $meta = amp_get_permission_meta($key);
+        if (!$meta) {
+            continue;
         }
+        $label = trim((string)($meta['parent_label'] ?? ''));
+        $childLabel = trim((string)($meta['label'] ?? ''));
+        $labels[] = $label !== '' ? ($label . ' - ' . $childLabel) : $childLabel;
     }
-    return null;
+
+    sort($labels);
+    $labels = array_values(array_unique(array_filter($labels, static fn ($value) => trim((string)$value) !== '')));
+    $count = count($labels);
+    if ($count === 0) {
+        return 'No modules';
+    }
+
+    $visible = array_slice($labels, 0, $maxLabels);
+    $summary = implode(', ', $visible);
+    if ($count > $maxLabels) {
+        $summary .= ' +' . ($count - $maxLabels);
+    }
+
+    return $summary;
+}
+
+function getStatusIdByNames(mysqli $conn, string $statusType, array $preferredNames): ?int {
+    return amp_get_status_id_by_names($conn, $statusType, $preferredNames);
+}
+
+function loadOfficialAccountOrFail(mysqli $conn, string $userId): array {
+    $row = amp_get_official_account_by_user_id($conn, $userId);
+    if (!$row) {
+        throw new Exception('Official not found.');
+    }
+    return $row;
+}
+
+function ensureActorCanModifyTarget(string $actorUserId, string $actorProtectedCode, array $targetAccount): void {
+    $targetProtectedCode = amp_get_protected_code($targetAccount);
+    $targetUserId = (string)($targetAccount['user_id'] ?? '');
+
+    if ($targetProtectedCode === 'IT_SUPERADMIN' && $actorUserId !== $targetUserId) {
+        throw new Exception('The protected IT SuperAdmin account cannot be modified by other users.');
+    }
+
+    if ($actorProtectedCode === 'BARANGAY_CAPTAIN' && $targetProtectedCode === 'IT_SUPERADMIN' && $actorUserId !== $targetUserId) {
+        throw new Exception('The Barangay Captain cannot remove or change the protected IT SuperAdmin account.');
+    }
+}
+
+function replaceOfficialModulePermissions(mysqli $conn, string $officialId, string $userId, array $permissionKeys, string $grantedByUserId): void {
+    $deleteStmt = $conn->prepare("DELETE FROM officialmodulepermissionstbl WHERE official_id = ?");
+    if ($deleteStmt) {
+        $deleteStmt->bind_param('s', $officialId);
+        $deleteStmt->execute();
+        $deleteStmt->close();
+    }
+
+    if (!$permissionKeys) {
+        return;
+    }
+
+    $insertStmt = $conn->prepare("
+        INSERT INTO officialmodulepermissionstbl
+            (official_id, user_id, permission_key, is_allowed, granted_by_user_id)
+        VALUES
+            (?, ?, ?, 1, ?)
+    ");
+    if (!$insertStmt) {
+        throw new Exception('Failed to save module permissions.');
+    }
+
+    foreach ($permissionKeys as $permissionKey) {
+        $insertStmt->bind_param('ssss', $officialId, $userId, $permissionKey, $grantedByUserId);
+        $insertStmt->execute();
+    }
+    $insertStmt->close();
+}
+
+function upsertOfficialAccessProfile(mysqli $conn, string $officialId, string $userId): void {
+    $stmt = $conn->prepare("
+        INSERT INTO officialaccessprofiletbl (official_id, user_id, permissions_initialized)
+        VALUES (?, ?, 1)
+        ON DUPLICATE KEY UPDATE
+            user_id = VALUES(user_id),
+            permissions_initialized = 1,
+            updated_at = CURRENT_TIMESTAMP
+    ");
+    if (!$stmt) {
+        throw new Exception('Failed to save access profile metadata.');
+    }
+    $stmt->bind_param('ss', $officialId, $userId);
+    $stmt->execute();
+    $stmt->close();
 }
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
     try {
         $actorRole = (string)($_SESSION['role'] ?? '');
+        $actorUserId = (string)($_SESSION['user_id'] ?? '');
         if ($actorRole !== 'SuperAdmin') {
             http_response_code(403);
             echo json_encode(['success' => false, 'message' => 'Only SuperAdmin can revoke or restore permissions.']);
@@ -85,6 +174,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
         if ($statusActiveId === null || $statusInactiveId === null) {
             throw new Exception('Required UserAccount statuses (Active/Inactive) are missing.');
         }
+
+        $actorAccount = $actorUserId !== '' ? amp_get_official_account_by_user_id($conn, $actorUserId) : null;
+        $actorProtectedCode = $actorAccount ? amp_get_protected_code($actorAccount) : '';
 
         $targetStmt = $conn->prepare("
             SELECT oi.official_id, oi.user_id, ua.status_id_account, ua.role_access,
@@ -114,10 +206,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
         if ($userId === '') {
             throw new Exception('Target account is invalid.');
         }
+        $targetAccount = loadOfficialAccountOrFail($conn, $userId);
+        $targetProtectedCode = amp_get_protected_code($targetAccount);
+        $targetDisplayRole = rowDisplayRole((string)($targetAccount['account_role_access'] ?? ''));
+        $oldPermissionMap = amp_get_effective_permission_keys_for_row($conn, $targetAccount);
+        $oldPermissionSummary = officialsPermissionSummary($oldPermissionMap);
+        ensureActorCanModifyTarget($actorUserId, $actorProtectedCode, $targetAccount);
 
         $nextStatusId = null;
         $auditAction = '';
         if ($action === 'revoke_permission') {
+            if ($targetDisplayRole === 'SuperAdmin' && amp_count_active_superadmins_excluding($conn, $userId) <= 0) {
+                throw new Exception('At least one active SuperAdmin account must remain.');
+            }
             $nextStatusId = $statusInactiveId;
             $auditAction = 'OFFICIAL_PERMISSION_REVOKE';
         } elseif ($action === 'restore_permission') {
@@ -168,7 +269,145 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                 'updated' => true
             ]);
             exit;
+        } elseif ($action === 'update_access_profile') {
+            $displayRole = trim((string)($_POST['display_role'] ?? 'Admin'));
+            $accessExpiresOn = trim((string)($_POST['access_expires_on'] ?? ''));
+            $requestedPermissionKeys = $_POST['permission_keys'] ?? [];
+            if (!is_array($requestedPermissionKeys)) {
+                $requestedPermissionKeys = [];
+            }
+
+            if (!in_array($displayRole, ['Admin', 'SuperAdmin'], true)) {
+                throw new Exception('Invalid display role.');
+            }
+
+            if ($targetProtectedCode !== '' && $displayRole !== 'SuperAdmin') {
+                throw new Exception('Protected accounts must remain SuperAdmin.');
+            }
+
+            $validPermissionKeys = array_fill_keys(amp_get_all_leaf_permission_keys(), true);
+            $permissionMap = [];
+            foreach ($requestedPermissionKeys as $permissionKey) {
+                $permissionKey = trim((string)$permissionKey);
+                if ($permissionKey !== '' && isset($validPermissionKeys[$permissionKey])) {
+                    $permissionMap[$permissionKey] = true;
+                }
+            }
+
+            if ($displayRole !== 'SuperAdmin') {
+                foreach (array_keys($permissionMap) as $permissionKey) {
+                    if (amp_is_admin_only_permission($permissionKey)) {
+                        throw new Exception('Admin-only modules require the SuperAdmin display role.');
+                    }
+                }
+            }
+
+            if ($targetProtectedCode === 'IT_SUPERADMIN') {
+                foreach (amp_get_it_superadmin_locked_permission_keys() as $permissionKey) {
+                    $permissionMap[$permissionKey] = true;
+                }
+            }
+
+            if ($accessExpiresOn !== '') {
+                $dt = DateTimeImmutable::createFromFormat('Y-m-d', $accessExpiresOn);
+                if (!$dt || $dt->format('Y-m-d') !== $accessExpiresOn) {
+                    throw new Exception('Access expiration must be a valid date.');
+                }
+            }
+
+            $nextStorageRole = $displayRole === 'SuperAdmin'
+                ? 'SuperAdmin'
+                : amp_storage_role_for_admin_display(
+                    (string)($targetAccount['position_access'] ?? ''),
+                    (string)($targetAccount['account_role_access'] ?? '')
+                );
+
+            if ($targetDisplayRole === 'SuperAdmin' && $nextStorageRole !== 'SuperAdmin' && amp_count_active_superadmins_excluding($conn, $userId) <= 0) {
+                throw new Exception('At least one active SuperAdmin account must remain.');
+            }
+
+            $today = new DateTimeImmutable('today');
+            $expiresImmediately = false;
+            if ($accessExpiresOn !== '') {
+                try {
+                    $expiryDate = new DateTimeImmutable($accessExpiresOn);
+                    $expiresImmediately = $expiryDate < $today;
+                } catch (Throwable) {
+                    $expiresImmediately = false;
+                }
+            }
+
+            if ($expiresImmediately && $targetDisplayRole === 'SuperAdmin' && amp_count_active_superadmins_excluding($conn, $userId) <= 0) {
+                throw new Exception('At least one active SuperAdmin account must remain.');
+            }
+
+            $conn->begin_transaction();
+            try {
+                $upOi = $conn->prepare("
+                    UPDATE officialinformationtbl
+                    SET role_access = ?,
+                        term_end = NULLIF(?, ''),
+                        last_updated = CURRENT_TIMESTAMP
+                    WHERE official_id = ?
+                    LIMIT 1
+                ");
+                if (!$upOi) {
+                    throw new Exception('Failed to update official access profile.');
+                }
+                $upOi->bind_param('sss', $nextStorageRole, $accessExpiresOn, $officialId);
+                $upOi->execute();
+                $upOi->close();
+
+                $upUa = $conn->prepare("UPDATE useraccountstbl SET role_access = ?, updated_at = NOW() WHERE user_id = ? LIMIT 1");
+                if (!$upUa) {
+                    throw new Exception('Failed to sync account role.');
+                }
+                $upUa->bind_param('ss', $nextStorageRole, $userId);
+                $upUa->execute();
+                $upUa->close();
+
+                if ($expiresImmediately) {
+                    $upStatus = $conn->prepare("UPDATE useraccountstbl SET status_id_account = ?, updated_at = NOW() WHERE user_id = ? LIMIT 1");
+                    if ($upStatus) {
+                        $upStatus->bind_param('is', $statusInactiveId, $userId);
+                        $upStatus->execute();
+                        $upStatus->close();
+                    }
+                }
+
+                replaceOfficialModulePermissions($conn, $officialId, $userId, array_keys($permissionMap), $actorUserId);
+                upsertOfficialAccessProfile($conn, $officialId, $userId);
+                $conn->commit();
+            } catch (Throwable $e) {
+                $conn->rollback();
+                throw $e;
+            }
+
+            insertUnifiedAuditLog(
+                $conn,
+                $actorUserId,
+                $actorRole,
+                'Officials Management',
+                'OfficialAccessProfile',
+                $officialId,
+                'OFFICIAL_ACCESS_PROFILE_UPDATE',
+                'display_role / term_end / module_permissions',
+                $targetDisplayRole . ' / ' . (string)($targetAccount['term_end'] ?? '') . ' / ' . $oldPermissionSummary,
+                $displayRole . ' / ' . $accessExpiresOn . ' / ' . officialsPermissionSummary($permissionMap),
+                'Updated official access profile and module checklist.',
+                null
+            );
+
+            echo json_encode([
+                'success' => true,
+                'message' => 'Official access profile updated successfully.',
+                'updated' => true,
+            ]);
+            exit;
         } elseif ($action === 'promote') {
+            if ($targetProtectedCode !== '') {
+                throw new Exception('Protected accounts cannot be reassigned through promotion.');
+            }
             $newPosition = trim((string)($_POST['new_position'] ?? ''));
             $areaNumber  = trim((string)($_POST['area_number'] ?? ''));
             if ($newPosition === '') {
@@ -250,6 +489,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
             ]);
             exit;
         } elseif ($action === 'change_department') {
+            if ($targetProtectedCode !== '') {
+                throw new Exception('Protected accounts cannot be reassigned through department changes.');
+            }
             $newDepartment = trim((string)($_POST['new_department'] ?? ''));
             $newDeptPosition = trim((string)($_POST['new_position'] ?? ''));
             $areaNumber    = trim((string)($_POST['area_number'] ?? ''));
@@ -367,7 +609,10 @@ if (!isset($_GET['fetch_officials_management'])) {
 
 try {
     $q = trim((string)($_GET['q'] ?? ''));
-    $roleFilter = normalizeRole((string)($_GET['role'] ?? 'ALL'));
+    $roleFilter = trim((string)($_GET['role'] ?? 'ALL'));
+    if (!in_array($roleFilter, ['ALL', 'Admin', 'SuperAdmin'], true)) {
+        $roleFilter = 'ALL';
+    }
     $permissionFilter = trim((string)($_GET['permission'] ?? 'ALL'));
     $limit = (int)($_GET['limit'] ?? 500);
     if ($limit <= 0) $limit = 500;
@@ -399,6 +644,7 @@ try {
             {$positionField} AS position_access,
             {$areaField},
             oi.department,
+            oi.term_end,
             oi.date_hired,
             COALESCE(se.status_name, CONCAT('Status #', oi.status_id_employment)) AS employment_status,
             ua.email,
@@ -456,12 +702,14 @@ try {
     $res = $stmt->get_result();
 
     $rows = [];
+    $actorUserId = (string)($_SESSION['user_id'] ?? '');
     while ($row = $res->fetch_assoc()) {
         $role = normalizeRole((string)($row['account_role_access'] ?? $row['info_role_access'] ?? ''));
         if (!in_array($role, ['Official', 'Personnel', 'SuperAdmin'], true)) {
             continue;
         }
-        if ($roleFilter !== 'ALL' && $role !== $roleFilter) {
+        $displayRole = rowDisplayRole((string)($row['account_role_access'] ?? $row['info_role_access'] ?? ''));
+        if ($roleFilter !== 'ALL' && $displayRole !== $roleFilter) {
             continue;
         }
 
@@ -472,21 +720,34 @@ try {
             ((string)($row['suffix'] ?? '') !== '' ? ' ' . (string)$row['suffix'] : '')
         );
 
+        $permissionMap = amp_get_effective_permission_keys_for_row($conn, $row);
+        $protectedCode = amp_get_protected_code($row);
+        $canEditAccess = !($protectedCode === 'IT_SUPERADMIN' && $actorUserId !== (string)($row['user_id'] ?? ''));
+
         $rows[] = [
             'official_id' => (string)($row['official_id'] ?? ''),
             'user_id' => (string)($row['user_id'] ?? ''),
             'full_name' => $fullName !== '' ? $fullName : '—',
             'role_access' => $role,
+            'display_role' => $displayRole,
             'position_access' => (string)($row['position_access'] ?? ''),
             'area_number' => (string)($row['area_number'] ?? ''),
             'department' => (string)($row['department'] ?? ''),
             'employment_status' => (string)($row['employment_status'] ?? ''),
+            'access_expires_on' => (string)($row['term_end'] ?? ''),
             'date_hired' => (string)($row['date_hired'] ?? ''),
             'email' => (string)($row['email'] ?? ''),
             'phone_number' => (string)($row['phone_number'] ?? ''),
             'account_status' => (string)($row['account_status'] ?? ''),
             'permission_state' => permissionStateFromAccountStatus((string)($row['account_status'] ?? '')),
             'profile_approval_state' => profileApprovalStateFromInvite((string)($row['invite_status'] ?? ''), $role),
+            'protected_code' => $protectedCode,
+            'protected_label' => amp_get_protected_label($protectedCode),
+            'module_count' => count($permissionMap),
+            'module_summary' => officialsPermissionSummary($permissionMap),
+            'permission_keys' => array_keys($permissionMap),
+            'locked_permission_keys' => $protectedCode === 'IT_SUPERADMIN' ? amp_get_it_superadmin_locked_permission_keys() : [],
+            'can_edit_access' => $canEditAccess,
         ];
     }
     $stmt->close();
@@ -502,9 +763,8 @@ try {
         'data' => $rows,
         'can_manage_actions' => ((string)($_SESSION['role'] ?? '') === 'SuperAdmin'),
         'role_counts' => [
-            'SuperAdmin' => count(array_filter($rows, fn($r) => ($r['role_access'] ?? '') === 'SuperAdmin')),
-            'Official' => count(array_filter($rows, fn($r) => ($r['role_access'] ?? '') === 'Official')),
-            'Personnel' => count(array_filter($rows, fn($r) => ($r['role_access'] ?? '') === 'Personnel')),
+            'SuperAdmin' => count(array_filter($rows, fn($r) => ($r['display_role'] ?? '') === 'SuperAdmin')),
+            'Admin' => count(array_filter($rows, fn($r) => ($r['display_role'] ?? '') === 'Admin')),
         ],
         'permission_counts' => [
             'Active' => count(array_filter($rows, fn($r) => ($r['permission_state'] ?? 'Active') === 'Active')),

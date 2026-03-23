@@ -1,6 +1,7 @@
 <?php
 require_once "../PhpFiles/General/connection.php";
 require_once "includes/admin_guard.php";
+require_once "../PhpFiles/General/adminModulePermissions.php";
 
 requireRoleSession(['SuperAdmin'], false);
 
@@ -75,6 +76,7 @@ $officialsMgmtPositionsByDepartment = [
   'Baranagay Monitoring'         => ['Department Public Assistance Desk', 'Department Secretary', 'Department OIC (Officer In Charge)'],
   'Barangay Treasurers Office'   => ['Department Public Assistance Desk', 'Department Secretary', 'Department OIC (Officer In Charge)'],
 ];
+$officialsMgmtPermissionCatalog = amp_get_permission_catalog();
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -105,7 +107,7 @@ $officialsMgmtPositionsByDepartment = [
       -webkit-overflow-scrolling: touch;
     }
     .officials-masterlist-shell .officials-masterlist-table {
-      min-width: 1200px;
+      min-width: 1350px;
     }
     .officials-masterlist-shell .officials-masterlist-table th {
       white-space: nowrap;
@@ -134,6 +136,123 @@ $officialsMgmtPositionsByDepartment = [
       border-color: #495057 !important;
       font-weight: 700;
     }
+    .officials-module-summary {
+      max-width: 280px;
+      white-space: normal;
+      line-height: 1.35;
+    }
+    .officials-protected-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 0.35rem 0.7rem;
+      border-radius: 999px;
+      background: #fff4db;
+      color: #9a6700;
+      font-size: 0.78rem;
+      font-weight: 700;
+    }
+    .officials-access-shell {
+      border: 1px solid #ece9e1;
+      border-radius: 14px;
+      padding: 14px;
+      background: #fcfcfd;
+    }
+    .officials-access-meta {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 12px;
+    }
+    .officials-access-label {
+      font-size: 0.78rem;
+      font-weight: 700;
+      color: #6b7280;
+      margin-bottom: 4px;
+    }
+    .officials-access-value {
+      border: 1px solid #e5e7eb;
+      border-radius: 10px;
+      background: #fff;
+      min-height: 44px;
+      padding: 10px 12px;
+      font-weight: 600;
+      color: #111827;
+    }
+    .officials-access-groups {
+      display: grid;
+      gap: 14px;
+      max-height: 48vh;
+      overflow-y: auto;
+      padding-right: 4px;
+    }
+    .officials-access-group {
+      border: 1px solid #ececec;
+      border-radius: 14px;
+      background: #fff;
+      overflow: hidden;
+    }
+    .officials-access-group-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 12px 14px;
+      border-bottom: 1px solid #f1f1f1;
+      background: #faf7f2;
+    }
+    .officials-access-group-title {
+      font-weight: 700;
+      color: #2f3640;
+    }
+    .officials-access-group-actions {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+    .officials-access-items {
+      display: grid;
+      gap: 8px;
+      padding: 12px 14px 14px;
+    }
+    .officials-access-item {
+      border: 1px solid #edf0f4;
+      border-radius: 12px;
+      padding: 10px 12px;
+      background: #fff;
+    }
+    .officials-access-item.is-child {
+      margin-left: 18px;
+      background: #fcfcfd;
+    }
+    .officials-access-item label {
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      cursor: pointer;
+      width: 100%;
+    }
+    .officials-access-item input[type="checkbox"] {
+      margin-top: 0.15rem;
+      flex: 0 0 auto;
+    }
+    .officials-access-item-main {
+      font-weight: 700;
+      color: #111827;
+      line-height: 1.3;
+    }
+    .officials-access-item-sub {
+      display: block;
+      margin-top: 2px;
+      color: #6b7280;
+      font-size: 0.8rem;
+      line-height: 1.3;
+    }
+    .officials-access-item.is-disabled {
+      opacity: 0.6;
+    }
+    .officials-access-search {
+      max-width: 280px;
+    }
   </style>
 </head>
 <body>
@@ -142,7 +261,7 @@ $officialsMgmtPositionsByDepartment = [
 
     <main class="flex-grow-1 p-3 p-md-4 p-xl-5 bg-light" id="main-display">
       <h2 class="mb-4" style="font-family: 'Charis SIL Bold'; color: #DE710C; ">
-        Officials Management
+        Officials Access List
       </h2>
       <hr><br>
 
@@ -151,8 +270,7 @@ $officialsMgmtPositionsByDepartment = [
           <div class="admin-list-tabs">
             <button class="btn btn-outline-primary btn-sm status-filter-btn active" data-filter="ALL">&nbsp;&nbsp;All&nbsp;&nbsp;</button>
             <button class="btn btn-outline-secondary btn-sm status-filter-btn fw-semibold" data-filter="SuperAdmin">&nbsp;&nbsp;SuperAdmin&nbsp;&nbsp;</button>
-            <button class="btn btn-outline-secondary btn-sm status-filter-btn fw-semibold" data-filter="Official">&nbsp;&nbsp;Official&nbsp;&nbsp;</button>
-            <button class="btn btn-outline-secondary btn-sm status-filter-btn fw-semibold" data-filter="Personnel">&nbsp;&nbsp;Personnel&nbsp;&nbsp;</button>
+            <button class="btn btn-outline-secondary btn-sm status-filter-btn fw-semibold" data-filter="Admin">&nbsp;&nbsp;Admin&nbsp;&nbsp;</button>
             <button class="btn btn-outline-secondary btn-sm status-filter-btn fw-semibold" data-permission-filter="Active">&nbsp;&nbsp;Active&nbsp;&nbsp;</button>
             <button class="btn btn-outline-secondary btn-sm status-filter-btn fw-semibold has-notif" data-permission-filter="Revoked">
               &nbsp;&nbsp;Revoked&nbsp;&nbsp;
@@ -186,13 +304,13 @@ $officialsMgmtPositionsByDepartment = [
                 <th>Official ID</th>
                 <th>User ID</th>
                 <th>Name</th>
-                <th>Role</th>
+                <th>Access Role</th>
                 <th>Position Access</th>
                 <th>Department</th>
-                <th>Employment Status</th>
-                <th>Date Hired</th>
+                <th>Access Until</th>
+                <th>Protected</th>
                 <th>Account Status</th>
-                <th>Permissions</th>
+                <th>Modules</th>
                 <th>Profile Approval</th>
                 <th>Action</th>
               </tr>
@@ -229,8 +347,7 @@ $officialsMgmtPositionsByDepartment = [
             <select id="officialsMgmtRoleFilter" class="form-select">
               <option value="ALL">All</option>
               <option value="SuperAdmin">SuperAdmin</option>
-              <option value="Official">Official</option>
-              <option value="Personnel">Personnel</option>
+              <option value="Admin">Admin</option>
             </select>
           </div>
           <div>
@@ -290,6 +407,64 @@ $officialsMgmtPositionsByDepartment = [
         <div class="modal-footer">
           <button type="button" class="btn btn-outline-secondary" id="btnOfficialsMgmtColumnsReset">Reset</button>
           <button type="button" class="btn btn-primary" data-bs-dismiss="modal">Done</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal fade" id="modalOfficialsMgmtAccess" tabindex="-1" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
+    <div class="modal-dialog modal-dialog-centered modal-xl modal-dialog-scrollable">
+      <div class="modal-content p-3">
+        <div class="modal-header border-0">
+          <h5 class="modal-title fw-bold">Manage Official Access</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body d-grid gap-3">
+          <input type="hidden" id="officialsMgmtAccessOfficialId">
+
+          <div class="officials-access-shell">
+            <div class="officials-access-meta">
+              <div>
+                <div class="officials-access-label">Official</div>
+                <div class="officials-access-value" id="officialsMgmtAccessSummary">-</div>
+              </div>
+              <div>
+                <label for="officialsMgmtAccessRole" class="officials-access-label">Display Role</label>
+                <select id="officialsMgmtAccessRole" class="form-select">
+                  <option value="Admin">Admin</option>
+                  <option value="SuperAdmin">SuperAdmin</option>
+                </select>
+              </div>
+              <div>
+                <label for="officialsMgmtAccessExpiry" class="officials-access-label">Access Expires On</label>
+                <input type="date" id="officialsMgmtAccessExpiry" class="form-control">
+              </div>
+              <div>
+                <div class="officials-access-label">Current Modules</div>
+                <div class="officials-access-value" id="officialsMgmtAccessModulesSummary">-</div>
+              </div>
+            </div>
+          </div>
+
+          <div id="officialsMgmtAccessProtectedNotice" class="alert alert-warning d-none mb-0"></div>
+
+          <div class="officials-access-shell">
+            <div class="d-flex align-items-center justify-content-between gap-3 flex-wrap mb-3">
+              <div>
+                <div class="fw-bold">Module Checklist</div>
+                <div class="small text-muted">This checklist mirrors the sidebar labels. Checked items stay visible and accessible.</div>
+              </div>
+              <div class="input-group officials-access-search">
+                <input id="officialsMgmtPermissionSearch" class="form-control" placeholder="Search module labels">
+                <span class="input-group-text bg-white"><i class="fas fa-search"></i></span>
+              </div>
+            </div>
+            <div id="officialsMgmtPermissionGroups" class="officials-access-groups"></div>
+          </div>
+        </div>
+        <div class="modal-footer border-0">
+          <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button type="button" class="btn btn-primary" id="btnOfficialsMgmtAccessSubmit">Save Access</button>
         </div>
       </div>
     </div>
@@ -400,10 +575,11 @@ $officialsMgmtPositionsByDepartment = [
       positionsByRole: <?= json_encode($officialsMgmtPositionsByRole, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?>,
       positionsByDepartment: <?= json_encode($officialsMgmtPositionsByDepartment, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?>,
       areaRequiredPositions: <?= json_encode(array_values($officialsMgmtAreaRequiredPositions), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?>,
-      areaOptions: <?= json_encode(array_values($officialsMgmtAreaOptions), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?>
+      areaOptions: <?= json_encode(array_values($officialsMgmtAreaOptions), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?>,
+      permissionCatalog: <?= json_encode($officialsMgmtPermissionCatalog, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?>
     };
   </script>
   <script src="../JS-Script-Files/Admin-End/tableColumnsGeneric.js?v=20260215-1"></script>
-  <script src="../JS-Script-Files/Admin-End/officialsManagementScript.js?v=20260317-2"></script>
+  <script src="../JS-Script-Files/Admin-End/officialsManagementScript.js?v=20260323-1"></script>
 </body>
 </html>

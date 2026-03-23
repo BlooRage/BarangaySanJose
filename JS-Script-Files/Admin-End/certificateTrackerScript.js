@@ -1330,6 +1330,12 @@
     if (key.includes('barangayid')) {
       return 'Barangay ID';
     }
+    if (key.includes('residentialbuildingpermit')) {
+      return 'Barangay Clearance for Residential Building Permit';
+    }
+    if (key.includes('commercialbuildingpermit')) {
+      return 'Barangay Clearance for Commercial Building Permit';
+    }
     if (key.includes('electricalpermit')) {
       return 'Barangay Clearance for Electrical Permit';
     }
@@ -1339,14 +1345,8 @@
     if (key.includes('residentialpermit')) {
       return 'Barangay Clearance for Residential Permit';
     }
-    if (key.includes('residentialbuildingpermit')) {
-      return 'Barangay Clearance for Residential Building Permit';
-    }
     if (key.includes('commercialpermit')) {
       return 'Barangay Clearance for Commercial Permit';
-    }
-    if (key.includes('commercialbuildingpermit')) {
-      return 'Barangay Clearance for Commercial Building Permit';
     }
     if (key.includes('businesspermit') || key.includes('businessclearance') || key.includes('clearanceforbusinesspermit')) {
       return 'Barangay Clearance for Business Permit';
@@ -3979,7 +3979,7 @@
         <td>${esc(row.resident_id || '-')}</td>
         <td>${esc(fullName)}</td>
         <td>${documentTypeBadgeBlue(row)}</td>
-        <td>
+        <td class="col-purpose-cell">
           <div class="cell-purpose">${esc(purpose)}</div>
         </td>
         <td>${badge(isFinancePaymentsPage ? statusKey : row.stage, esc(isFinancePaymentsPage ? financeStatusLabel : stageLabel))}${reason}</td>
@@ -4172,7 +4172,9 @@
         'Barangay Clearance for Electrical Permit',
         'Barangay Clearance for Water Permit',
         'Barangay Clearance for Residential Permit',
+        'Barangay Clearance for Residential Building Permit',
         'Barangay Clearance for Commercial Permit',
+        'Barangay Clearance for Commercial Building Permit',
       ].includes(normalizedDocumentType);
     }
     if (activeDocumentFilter === '__business__') {
@@ -4183,7 +4185,7 @@
       if (previewKey === 'cohabitation') {
         return true;
       }
-      return ['goodmoral', 'firsttimejobseeker', 'residency', 'indigency'].includes(previewKey);
+      return ['goodmoral', 'firsttimejobseeker', 'residency', 'indigency', 'identity'].includes(previewKey);
     }
     if (activeDocumentFilter === '__clr_business_permit__') {
       return normalizedDocumentType === 'Barangay Clearance for Business Permit';

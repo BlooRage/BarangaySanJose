@@ -23,6 +23,11 @@ if (session_status() === PHP_SESSION_NONE) {
 if (!function_exists('appUrl')) {
     require_once __DIR__ . '/../../PhpFiles/General/security.php';
 }
+require_once __DIR__ . '/../../PhpFiles/General/adminModulePermissions.php';
+
+if ((!isset($conn) || !($conn instanceof mysqli)) && file_exists(__DIR__ . '/../../PhpFiles/General/connection.php')) {
+    require_once __DIR__ . '/../../PhpFiles/General/connection.php';
+}
 
 $scriptName = str_replace("\\", "/", (string)($_SERVER['SCRIPT_NAME'] ?? ''));
 $adminSegmentPos = strpos($scriptName, '/Admin-End/');
@@ -205,6 +210,86 @@ if ($contentToolView !== 'tracker') {
 }
 $isContentCreateSectionActive = $current === 'CreateContent.php';
 $isContentToolsSectionActive = $current === 'Contents.php';
+
+$sbAllowedPermissions = [];
+if (isset($conn) && $conn instanceof mysqli && !empty($_SESSION['user_id'])) {
+    amp_ensure_permission_storage($conn);
+    $sbAllowedPermissions = amp_get_allowed_permission_keys(
+        $conn,
+        (string)$_SESSION['user_id'],
+        (string)($_SESSION['role'] ?? '')
+    );
+} elseif ($isSuperAdminSidebar) {
+    $sbAllowedPermissions = array_fill_keys(amp_get_all_leaf_permission_keys(), true);
+}
+
+$sbCan = static function (string $key) use (&$sbAllowedPermissions): bool {
+    return amp_permission_key_allowed($sbAllowedPermissions, $key);
+};
+$sbHasAny = static function (array $keys) use (&$sbAllowedPermissions): bool {
+    return amp_permission_keys_have_any($sbAllowedPermissions, $keys);
+};
+
+$sbResidentProfilingKeys = [
+    'resident_masterlist',
+    'resident_edit_requests',
+    'resident_archive',
+    'resident_sector_membership_verification',
+];
+$sbHouseholdProfilingKeys = [
+    'household_profiling_main',
+    'head_of_family_verification',
+];
+$sbAreaStatisticsKeys = [
+    'area_statistics_summary',
+    'area_profile_area_01',
+    'area_profile_area_1a',
+    'area_profile_area_02',
+    'area_profile_area_03',
+    'area_profile_area_04',
+    'area_profile_area_05',
+    'area_profile_area_06',
+];
+$sbIdIssuanceKeys = [
+    'id_issuance_tracker',
+    'id_issuance_manual',
+];
+$sbFinanceKeys = [
+    'finance_payment_tracker',
+    'finance_cashbook',
+    'finance_fee_management',
+];
+$sbBlotterKeys = [
+    'blotter_log_new_incident',
+    'blotter_tracker',
+    'blotter_review_queue',
+];
+$sbComplaintKeys = [
+    'complaint_log_new_incident',
+    'complaint_tracker',
+];
+$sbAnnouncementKeys = [
+    'announcements_page',
+    'announcements_delivery',
+    'announcements_faq',
+    'announcements_tracker',
+];
+$sbReportKeys = [
+    'reports_certificate_issuance',
+    'reports_clearance_issuance',
+    'reports_financial',
+    'reports_residents',
+    'reports_appointments',
+    'reports_blotter',
+    'reports_complaints',
+];
+$sbAdminKeys = [
+    'user_masterlist',
+    'officials_management',
+    'personnel_invite',
+    'official_transition',
+    'audit_logs',
+];
 
 $adminDisplayName = "Admin User";
 $adminPosition = "Administrator";
@@ -408,6 +493,7 @@ if (!empty($_SESSION['user_id']) && isset($conn) && $conn instanceof mysqli) {
   <div class="sidebar-body d-flex flex-column flex-grow-1">
     <ul class="list-unstyled ps-0 flex-grow-1 mb-0">
 
+      <?php if ($sbCan('dashboard')): ?>
       <li class="mb-1 mt-2 text-muted small fw-semibold px-2">Home</li>
       <li class="mb-2">
         <a href="<?= htmlspecialchars(appUrl('Admin-End/AdminDashboard.php')) ?>"
@@ -416,7 +502,9 @@ if (!empty($_SESSION['user_id']) && isset($conn) && $conn instanceof mysqli) {
           <i class="fas fa-house"></i> Dashboard
         </a>
       </li>
+      <?php endif; ?>
 
+      <?php if ($sbCan('appointments')): ?>
       <li class="mb-1 mt-2 text-muted small fw-semibold px-2">Office of the Barangay</li>
       <li class="mb-2">
         <a href="<?= htmlspecialchars(appUrl('Admin-End/Appointments/AppointmentTracker.php')) ?>"
@@ -425,8 +513,11 @@ if (!empty($_SESSION['user_id']) && isset($conn) && $conn instanceof mysqli) {
           <i class="fas fa-calendar-check"></i> Appointments
         </a>
       </li>
+      <?php endif; ?>
 
+      <?php if ($sbHasAny(array_merge($sbResidentProfilingKeys, $sbHouseholdProfilingKeys, $sbAreaStatisticsKeys))): ?>
       <li class="mb-1 mt-2 text-muted small fw-semibold px-2">Resident Management</li>
+      <?php if ($sbHasAny($sbResidentProfilingKeys)): ?>
       <li class="mb-1">
         <button class="btn btn-toggle d-flex align-items-center gap-2 rounded <?= $isResidentMgmtActive ? '' : 'collapsed' ?>"
                 data-bs-toggle="collapse"
@@ -436,33 +527,43 @@ if (!empty($_SESSION['user_id']) && isset($conn) && $conn instanceof mysqli) {
         </button>
         <div class="collapse <?= $isResidentMgmtActive ? 'show' : '' ?>" id="resident-mgmt-collapse">
           <ul class="btn-toggle-nav list-unstyled fw-normal pb-1 small">
+            <?php if ($sbCan('resident_masterlist')): ?>
             <li>
               <a href="<?= htmlspecialchars(appUrl('Admin-End/ResidentMasterlist.php')) ?>"
                  class="link-dark rounded <?= $current == 'ResidentMasterlist.php' ? 'active' : '' ?>">
                 Masterlist
               </a>
             </li>
+            <?php endif; ?>
+            <?php if ($sbCan('resident_edit_requests')): ?>
             <li>
               <a href="<?= htmlspecialchars(appUrl('Admin-End/EditRequests.php')) ?>"
                  class="link-dark rounded <?= $current == 'EditRequests.php' ? 'active' : '' ?>">
                 Edit Requests
               </a>
             </li>
+            <?php endif; ?>
+            <?php if ($sbCan('resident_archive')): ?>
             <li>
               <a href="<?= htmlspecialchars(appUrl('Admin-End/ResidentArchive.php')) ?>"
                  class="link-dark rounded <?= $current == 'ResidentArchive.php' ? 'active' : '' ?>">
                 Resident Archive
               </a>
             </li>
+            <?php endif; ?>
+            <?php if ($sbCan('resident_sector_membership_verification')): ?>
             <li>
               <a href="<?= htmlspecialchars(appUrl('Admin-End/SectorMembershipVerification.php')) ?>"
                  class="link-dark rounded <?= $current == 'SectorMembershipVerification.php' ? 'active' : '' ?>">
                 Sector Membership Verification
               </a>
             </li>
+            <?php endif; ?>
           </ul>
         </div>
       </li>
+      <?php endif; ?>
+      <?php if ($sbHasAny($sbHouseholdProfilingKeys)): ?>
       <li class="mb-1">
         <button class="btn btn-toggle d-flex align-items-center gap-2 rounded <?= $isHouseholdProfilingActive ? '' : 'collapsed' ?>"
                 data-bs-toggle="collapse"
@@ -472,22 +573,28 @@ if (!empty($_SESSION['user_id']) && isset($conn) && $conn instanceof mysqli) {
         </button>
         <div class="collapse <?= $isHouseholdProfilingActive ? 'show' : '' ?>" id="household-profiling-collapse">
           <ul class="btn-toggle-nav list-unstyled fw-normal pb-1 small">
+            <?php if ($sbCan('household_profiling_main')): ?>
             <li>
               <a href="<?= htmlspecialchars(appUrl('Admin-End/HouseholdProfiling.php')) ?>"
                  class="link-dark rounded <?= $current == 'HouseholdProfiling.php' ? 'active' : '' ?>">
                 Household Profiling
               </a>
             </li>
+            <?php endif; ?>
+            <?php if ($sbCan('head_of_family_verification')): ?>
             <li>
               <a href="<?= htmlspecialchars(appUrl('Admin-End/HeadOfTheFamilyVerification.php')) ?>"
                  class="link-dark rounded <?= $current == 'HeadOfTheFamilyVerification.php' ? 'active' : '' ?>">
                 Head of the Family Verification
               </a>
             </li>
+            <?php endif; ?>
           </ul>
         </div>
       </li>
+      <?php endif; ?>
 
+      <?php if ($sbHasAny($sbAreaStatisticsKeys)): ?>
       <li class="mb-2">
         <button class="btn btn-toggle d-flex align-items-center gap-2 rounded <?= $isAreaManagementActive ? '' : 'collapsed' ?>"
                 data-bs-toggle="collapse"
@@ -497,58 +604,79 @@ if (!empty($_SESSION['user_id']) && isset($conn) && $conn instanceof mysqli) {
         </button>
         <div class="collapse <?= $isAreaManagementActive ? 'show' : '' ?>" id="area-management-collapse">
           <ul class="btn-toggle-nav list-unstyled fw-normal pb-1 small">
+            <?php if ($sbCan('area_statistics_summary')): ?>
             <li>
               <a href="<?= htmlspecialchars(appUrl('Admin-End/AreaManagement/AreaStatistics.php?tab=summary')) ?>"
                  class="link-dark rounded <?= ($current == 'AreaStatistics.php' && $areaManagementTab === 'summary') ? 'active' : '' ?>">
                 Summary
               </a>
             </li>
+            <?php endif; ?>
+            <?php if ($sbCan('area_profile_area_01')): ?>
             <li>
               <a href="<?= htmlspecialchars(appUrl('Admin-End/AreaManagement/AreaProfile.php?area=' . rawurlencode('Area 01'))) ?>"
                  class="link-dark rounded <?= ($current == 'AreaProfile.php' && $areaManagementArea === 'Area 01') ? 'active' : '' ?>">
                 Area 01
               </a>
             </li>
+            <?php endif; ?>
+            <?php if ($sbCan('area_profile_area_1a')): ?>
             <li>
               <a href="<?= htmlspecialchars(appUrl('Admin-End/AreaManagement/AreaProfile.php?area=' . rawurlencode('Area 1A'))) ?>"
                  class="link-dark rounded <?= ($current == 'AreaProfile.php' && $areaManagementArea === 'Area 1A') ? 'active' : '' ?>">
                 Area 1A
               </a>
             </li>
+            <?php endif; ?>
+            <?php if ($sbCan('area_profile_area_02')): ?>
             <li>
               <a href="<?= htmlspecialchars(appUrl('Admin-End/AreaManagement/AreaProfile.php?area=' . rawurlencode('Area 02'))) ?>"
                  class="link-dark rounded <?= ($current == 'AreaProfile.php' && $areaManagementArea === 'Area 02') ? 'active' : '' ?>">
                 Area 02
               </a>
             </li>
+            <?php endif; ?>
+            <?php if ($sbCan('area_profile_area_03')): ?>
             <li>
               <a href="<?= htmlspecialchars(appUrl('Admin-End/AreaManagement/AreaProfile.php?area=' . rawurlencode('Area 03'))) ?>"
                  class="link-dark rounded <?= ($current == 'AreaProfile.php' && $areaManagementArea === 'Area 03') ? 'active' : '' ?>">
                 Area 03
               </a>
             </li>
+            <?php endif; ?>
+            <?php if ($sbCan('area_profile_area_04')): ?>
             <li>
               <a href="<?= htmlspecialchars(appUrl('Admin-End/AreaManagement/AreaProfile.php?area=' . rawurlencode('Area 04'))) ?>"
                  class="link-dark rounded <?= ($current == 'AreaProfile.php' && $areaManagementArea === 'Area 04') ? 'active' : '' ?>">
                 Area 04
               </a>
             </li>
+            <?php endif; ?>
+            <?php if ($sbCan('area_profile_area_05')): ?>
             <li>
               <a href="<?= htmlspecialchars(appUrl('Admin-End/AreaManagement/AreaProfile.php?area=' . rawurlencode('Area 05'))) ?>"
                  class="link-dark rounded <?= ($current == 'AreaProfile.php' && $areaManagementArea === 'Area 05') ? 'active' : '' ?>">
                 Area 05
               </a>
             </li>
+            <?php endif; ?>
+            <?php if ($sbCan('area_profile_area_06')): ?>
             <li>
               <a href="<?= htmlspecialchars(appUrl('Admin-End/AreaManagement/AreaProfile.php?area=' . rawurlencode('Area 06'))) ?>"
                  class="link-dark rounded <?= ($current == 'AreaProfile.php' && $areaManagementArea === 'Area 06') ? 'active' : '' ?>">
                 Area 06
               </a>
             </li>
+            <?php endif; ?>
           </ul>
         </div>
       </li>
+      <?php endif; ?>
+      <?php endif; ?>
+
+      <?php if ($sbCan('certificate_issuance') || $sbHasAny($sbIdIssuanceKeys)): ?>
       <li class="mb-1 mt-2 text-muted small fw-semibold px-2">Barangay Issuance</li>
+      <?php if ($sbCan('certificate_issuance')): ?>
       <li class="mb-2">
         <a href="<?= htmlspecialchars(appUrl('Admin-End/Certificates/CertificateTracker.php?filter_document=__certificates__')) ?>"
            class="btn btn-toggle d-flex align-items-center gap-2 rounded <?= $isCertificateIssuanceSectionActive ? 'active' : '' ?>"
@@ -556,6 +684,8 @@ if (!empty($_SESSION['user_id']) && isset($conn) && $conn instanceof mysqli) {
           <i class="fas fa-file-circle-check"></i> Certificate Issuance
         </a>
       </li>
+      <?php endif; ?>
+      <?php if ($sbHasAny($sbIdIssuanceKeys)): ?>
       <li class="mb-2">
         <button class="btn btn-toggle d-flex align-items-center gap-2 rounded <?= $isIdIssuanceActive ? '' : 'collapsed' ?>"
                 data-bs-toggle="collapse"
@@ -566,23 +696,31 @@ if (!empty($_SESSION['user_id']) && isset($conn) && $conn instanceof mysqli) {
 
         <div class="collapse <?= $isIdIssuanceActive ? 'show' : '' ?>" id="id-issuance-collapse">
           <ul class="btn-toggle-nav list-unstyled fw-normal pb-1 small">
+            <?php if ($sbCan('id_issuance_tracker')): ?>
             <li>
               <a href="<?= htmlspecialchars(appUrl('Admin-End/Certificates/CertificateTracker.php?entry=id_issuance')) ?>"
                  class="link-dark rounded <?= $isIdIssuanceTrackerActive ? 'active' : '' ?>">
                 Tracker
               </a>
             </li>
+            <?php endif; ?>
+            <?php if ($sbCan('id_issuance_manual')): ?>
             <li>
               <a href="<?= htmlspecialchars(appUrl('Admin-End/Certificates/CertificateTracker.php?tab=manual&document=barangay_id')) ?>"
                  class="link-dark rounded <?= $isIdIssuanceManualActive ? 'active' : '' ?>">
                 Manual Issuance
               </a>
             </li>
+            <?php endif; ?>
           </ul>
         </div>
       </li>
+      <?php endif; ?>
+      <?php endif; ?>
 
+      <?php if ($sbCan('clearance_issuance') || $sbCan('business_monitoring')): ?>
       <li class="mb-1 mt-2 text-muted small fw-semibold px-2">Barangay Monitoring</li>
+      <?php if ($sbCan('clearance_issuance')): ?>
       <li class="mb-2">
         <a href="<?= htmlspecialchars(appUrl('Admin-End/Certificates/CertificateTracker.php?filter_document=__clearances__')) ?>"
            class="btn btn-toggle d-flex align-items-center gap-2 rounded <?= $isClearanceIssuanceSectionActive ? 'active' : '' ?>"
@@ -590,6 +728,8 @@ if (!empty($_SESSION['user_id']) && isset($conn) && $conn instanceof mysqli) {
           <i class="fas fa-stamp"></i> Clearance Issuance
         </a>
       </li>
+      <?php endif; ?>
+      <?php if ($sbCan('business_monitoring')): ?>
       <li class="mb-2">
         <a href="<?= htmlspecialchars(appUrl('Admin-End/BusinessMonitoring.php')) ?>"
            class="btn btn-toggle d-flex align-items-center gap-2 rounded <?= $isBusinessMonitoringActive ? 'active' : '' ?>"
@@ -597,7 +737,10 @@ if (!empty($_SESSION['user_id']) && isset($conn) && $conn instanceof mysqli) {
           <i class="fas fa-store"></i> Business Monitoring
         </a>
       </li>
+      <?php endif; ?>
+      <?php endif; ?>
 
+      <?php if ($sbHasAny($sbFinanceKeys)): ?>
       <li class="mb-1 mt-2 text-muted small fw-semibold px-2">Barangay Treasury</li>
       <li class="mb-2">
         <button class="btn btn-toggle d-flex align-items-center gap-2 rounded <?= $isFinanceActive ? '' : 'collapsed' ?>"
@@ -608,29 +751,38 @@ if (!empty($_SESSION['user_id']) && isset($conn) && $conn instanceof mysqli) {
         </button>
         <div class="collapse <?= $isFinanceActive ? 'show' : '' ?>" id="finance-collapse">
           <ul class="btn-toggle-nav list-unstyled fw-normal pb-1 small">
+            <?php if ($sbCan('finance_payment_tracker')): ?>
             <li>
               <a href="<?= htmlspecialchars(appUrl('Admin-End/Certificates/FinancePayments.php')) ?>"
                  class="link-dark rounded <?= $isFinanceTrackerActive ? 'active' : '' ?>">
                 Payment Tracker
               </a>
             </li>
+            <?php endif; ?>
+            <?php if ($sbCan('finance_cashbook')): ?>
             <li>
               <a href="<?= htmlspecialchars(appUrl('Admin-End/Certificates/FinancePayments.php')) ?>?section=cashbook"
                  class="link-dark rounded <?= $isFinanceCashbookActive ? 'active' : '' ?>">
                 Cashbook
               </a>
             </li>
+            <?php endif; ?>
+            <?php if ($sbCan('finance_fee_management')): ?>
             <li>
               <a href="<?= htmlspecialchars(appUrl('Admin-End/Certificates/FinancePayments.php')) ?>?section=fees"
                  class="link-dark rounded <?= $isFinanceFeesActive ? 'active' : '' ?>">
                 Fee Management
               </a>
             </li>
+            <?php endif; ?>
           </ul>
         </div>
       </li>
+      <?php endif; ?>
 
+      <?php if ($sbHasAny($sbBlotterKeys)): ?>
       <li class="mb-1 mt-2 text-muted small fw-semibold px-2">e-Blotter Management</li>
+      <?php if ($sbCan('blotter_log_new_incident')): ?>
       <li class="mb-2">
         <a href="<?= htmlspecialchars(appUrl('Admin-End/Blotter/BlotterForm.php')) ?>"
            class="btn btn-toggle d-flex align-items-center gap-2 rounded <?= $current == 'BlotterForm.php' ? 'active' : '' ?>"
@@ -638,6 +790,8 @@ if (!empty($_SESSION['user_id']) && isset($conn) && $conn instanceof mysqli) {
           <i class="fas fa-file-pen"></i> Log New Incident
         </a>
       </li>
+      <?php endif; ?>
+      <?php if ($sbCan('blotter_tracker') || $sbCan('blotter_review_queue')): ?>
       <li class="mb-1">
         <button class="btn btn-toggle d-flex align-items-center gap-2 rounded <?= $isBlotterActive ? '' : 'collapsed' ?>"
                 data-bs-toggle="collapse"
@@ -648,23 +802,31 @@ if (!empty($_SESSION['user_id']) && isset($conn) && $conn instanceof mysqli) {
 
         <div class="collapse <?= $isBlotterActive ? 'show' : '' ?>" id="blotter-tools-collapse">
           <ul class="btn-toggle-nav list-unstyled fw-normal pb-1 small">
+            <?php if ($sbCan('blotter_tracker')): ?>
             <li>
               <a href="<?= htmlspecialchars(appUrl('Admin-End/Blotter/BlotterTracker.php')) ?>"
                  class="link-dark rounded <?= $current == 'BlotterTracker.php' ? 'active' : '' ?>">
                 Tracker
               </a>
             </li>
+            <?php endif; ?>
+            <?php if ($sbCan('blotter_review_queue')): ?>
             <li>
               <a href="<?= htmlspecialchars(appUrl('Admin-End/Blotter/ReviewQueue.php')) ?>"
                  class="link-dark rounded <?= $current == 'ReviewQueue.php' ? 'active' : '' ?>">
                 Review Queue
               </a>
             </li>
+            <?php endif; ?>
           </ul>
         </div>
       </li>
+      <?php endif; ?>
+      <?php endif; ?>
 
+      <?php if ($sbHasAny($sbComplaintKeys)): ?>
       <li class="mb-1 mt-2 text-muted small fw-semibold px-2">Complaints and Grievances</li>
+      <?php if ($sbCan('complaint_log_new_incident')): ?>
       <li class="mb-2">
         <a href="<?= htmlspecialchars(appUrl('Admin-End/Complaints/ComplaintForm.php')) ?>"
            class="btn btn-toggle d-flex align-items-center gap-2 rounded <?= $current == 'ComplaintForm.php' ? 'active' : '' ?>"
@@ -672,6 +834,8 @@ if (!empty($_SESSION['user_id']) && isset($conn) && $conn instanceof mysqli) {
           <i class="fas fa-file-pen"></i> Log New Incident
         </a>
       </li>
+      <?php endif; ?>
+      <?php if ($sbCan('complaint_tracker')): ?>
       <li class="mb-1">
         <button class="btn btn-toggle d-flex align-items-center gap-2 rounded <?= $isComplaintActive ? '' : 'collapsed' ?>"
                 data-bs-toggle="collapse"
@@ -691,64 +855,12 @@ if (!empty($_SESSION['user_id']) && isset($conn) && $conn instanceof mysqli) {
           </ul>
         </div>
       </li>
+      <?php endif; ?>
+      <?php endif; ?>
 
-      <li class="mb-1 mt-2 text-muted small fw-semibold px-2">Barangay Peace and Order</li>
-      <li class="mb-1">
-        <button class="btn btn-toggle d-flex align-items-center gap-2 rounded <?= $isComplaintActive ? '' : 'collapsed' ?>"
-                data-bs-toggle="collapse"
-                data-bs-target="#complaint-tools-collapse"
-                aria-expanded="<?= $isComplaintActive ? 'true' : 'false' ?>">
-          <i class="fas fa-comments"></i> Complaint Tools
-        </button>
-        <div class="collapse <?= $isComplaintActive ? 'show' : '' ?>" id="complaint-tools-collapse">
-          <ul class="btn-toggle-nav list-unstyled fw-normal pb-1 small">
-            <li>
-              <a href="<?= htmlspecialchars(appUrl('Admin-End/Complaints/ComplaintTracker.php')) ?>"
-                 class="link-dark rounded <?= $current == 'ComplaintTracker.php' ? 'active' : '' ?>">
-                Tracker
-              </a>
-            </li>
-            <li>
-              <a href="<?= htmlspecialchars(appUrl('Admin-End/Complaints/ComplaintForm.php')) ?>"
-                 class="link-dark rounded <?= $current == 'ComplaintForm.php' ? 'active' : '' ?>">
-                Create Complaint
-              </a>
-            </li>
-          </ul>
-        </div>
-      </li>
-      <li class="mb-2">
-        <button class="btn btn-toggle d-flex align-items-center gap-2 rounded <?= $isBlotterActive ? '' : 'collapsed' ?>"
-                data-bs-toggle="collapse"
-                data-bs-target="#blotter-tools-collapse"
-                aria-expanded="<?= $isBlotterActive ? 'true' : 'false' ?>">
-          <i class="fas fa-toolbox"></i> E-Blotter Tools
-        </button>
-        <div class="collapse <?= $isBlotterActive ? 'show' : '' ?>" id="blotter-tools-collapse">
-          <ul class="btn-toggle-nav list-unstyled fw-normal pb-1 small">
-            <li>
-              <a href="<?= htmlspecialchars(appUrl('Admin-End/Blotter/BlotterTracker.php')) ?>"
-                 class="link-dark rounded <?= $current == 'BlotterTracker.php' ? 'active' : '' ?>">
-                Tracker
-              </a>
-            </li>
-            <li>
-              <a href="<?= htmlspecialchars(appUrl('Admin-End/Blotter/ReviewQueue.php')) ?>"
-                 class="link-dark rounded <?= $current == 'ReviewQueue.php' ? 'active' : '' ?>">
-                Review Queue
-              </a>
-            </li>
-            <li>
-              <a href="<?= htmlspecialchars(appUrl('Admin-End/Blotter/BlotterForm.php')) ?>"
-                 class="link-dark rounded <?= $current == 'BlotterForm.php' ? 'active' : '' ?>">
-                Log New Incident
-              </a>
-            </li>
-          </ul>
-        </div>
-      </li>
-
+      <?php if ($sbHasAny(array_merge($sbAnnouncementKeys, $sbReportKeys))): ?>
       <li class="mb-1 mt-2 text-muted small fw-semibold px-2">General Modules</li>
+      <?php if ($sbHasAny($sbAnnouncementKeys)): ?>
       <li class="mb-2">
         <button class="btn btn-toggle d-flex align-items-center gap-2 rounded <?= $isContentMgmtActive ? '' : 'collapsed' ?>"
                 data-bs-toggle="collapse"
@@ -758,33 +870,43 @@ if (!empty($_SESSION['user_id']) && isset($conn) && $conn instanceof mysqli) {
         </button>
         <div class="collapse <?= $isContentMgmtActive ? 'show' : '' ?>" id="announcements-collapse">
           <ul class="btn-toggle-nav list-unstyled fw-normal pb-1 small">
+            <?php if ($sbCan('announcements_page')): ?>
             <li>
               <a href="<?= htmlspecialchars(appUrl('Admin-End/Contents/CreateContent.php')) ?>?type=page"
                  class="link-dark rounded <?= ($current === 'CreateContent.php' && $contentCreateType === 'page') ? 'active' : '' ?>">
                 Page Announcement
               </a>
             </li>
+            <?php endif; ?>
+            <?php if ($sbCan('announcements_delivery')): ?>
             <li>
               <a href="<?= htmlspecialchars(appUrl('Admin-End/Contents/CreateContent.php')) ?>?type=delivery"
                  class="link-dark rounded <?= ($current === 'CreateContent.php' && $contentCreateType === 'delivery') ? 'active' : '' ?>">
                 SMS and Email
               </a>
             </li>
+            <?php endif; ?>
+            <?php if ($sbCan('announcements_faq')): ?>
             <li>
               <a href="<?= htmlspecialchars(appUrl('Admin-End/Contents/CreateContent.php')) ?>?type=faq"
                  class="link-dark rounded <?= ($current === 'CreateContent.php' && $contentCreateType === 'faq') ? 'active' : '' ?>">
                 FAQs
               </a>
             </li>
+            <?php endif; ?>
+            <?php if ($sbCan('announcements_tracker')): ?>
             <li>
               <a href="<?= htmlspecialchars(appUrl('Admin-End/Contents/Contents.php')) ?>?tool=tracker#tracker-card"
                  class="link-dark rounded <?= ($current === 'Contents.php' && $contentToolView === 'tracker') ? 'active' : '' ?>">
                 Tracker
               </a>
             </li>
+            <?php endif; ?>
           </ul>
         </div>
       </li>
+      <?php endif; ?>
+      <?php if ($sbHasAny($sbReportKeys)): ?>
       <li class="mb-2">
         <button class="btn btn-toggle d-flex align-items-center gap-2 rounded <?= $isReportActive ? '' : 'collapsed' ?>"
                 data-bs-toggle="collapse"
@@ -794,54 +916,71 @@ if (!empty($_SESSION['user_id']) && isset($conn) && $conn instanceof mysqli) {
         </button>
         <div class="collapse <?= $isReportActive ? 'show' : '' ?>" id="reports-collapse">
           <ul class="btn-toggle-nav list-unstyled fw-normal pb-1 small">
+            <?php if ($sbCan('reports_certificate_issuance')): ?>
             <li>
               <a href="<?= htmlspecialchars(appUrl('Admin-End/Reports/Reports.php')) ?>?module=certificate_issuance"
                  class="link-dark rounded <?= ($current === 'Reports.php' && $reportModule === 'certificate_issuance') ? 'active' : '' ?>">
                 Certificate Issuance
               </a>
             </li>
+            <?php endif; ?>
+            <?php if ($sbCan('reports_clearance_issuance')): ?>
             <li>
               <a href="<?= htmlspecialchars(appUrl('Admin-End/Reports/Reports.php')) ?>?module=clearance_issuance"
                  class="link-dark rounded <?= ($current === 'Reports.php' && $reportModule === 'clearance_issuance') ? 'active' : '' ?>">
                 Clearance Issuance
               </a>
             </li>
+            <?php endif; ?>
+            <?php if ($sbCan('reports_financial')): ?>
             <li>
               <a href="<?= htmlspecialchars(appUrl('Admin-End/Reports/Reports.php')) ?>?module=financial"
                  class="link-dark rounded <?= ($current === 'Reports.php' && $reportModule === 'financial') ? 'active' : '' ?>">
                 Financial
               </a>
             </li>
+            <?php endif; ?>
+            <?php if ($sbCan('reports_residents')): ?>
             <li>
               <a href="<?= htmlspecialchars(appUrl('Admin-End/Reports/Reports.php')) ?>?module=residents"
                  class="link-dark rounded <?= ($current === 'Reports.php' && $reportModule === 'residents') ? 'active' : '' ?>">
                 Residents
               </a>
             </li>
+            <?php endif; ?>
+            <?php if ($sbCan('reports_appointments')): ?>
             <li>
               <a href="<?= htmlspecialchars(appUrl('Admin-End/Reports/Reports.php')) ?>?module=appointments"
                  class="link-dark rounded <?= ($current === 'Reports.php' && $reportModule === 'appointments') ? 'active' : '' ?>">
                 Appointments
               </a>
             </li>
+            <?php endif; ?>
+            <?php if ($sbCan('reports_blotter')): ?>
             <li>
               <a href="<?= htmlspecialchars(appUrl('Admin-End/Reports/Reports.php')) ?>?module=blotter"
                  class="link-dark rounded <?= ($current === 'Reports.php' && $reportModule === 'blotter') ? 'active' : '' ?>">
                 Blotter
               </a>
             </li>
+            <?php endif; ?>
+            <?php if ($sbCan('reports_complaints')): ?>
             <li>
               <a href="<?= htmlspecialchars(appUrl('Admin-End/Reports/Reports.php')) ?>?module=complaints"
                  class="link-dark rounded <?= ($current === 'Reports.php' && $reportModule === 'complaints') ? 'active' : '' ?>">
                 Complaints
               </a>
             </li>
+            <?php endif; ?>
           </ul>
         </div>
       </li>
+      <?php endif; ?>
+      <?php endif; ?>
 
-      <?php if ($isSuperAdminSidebar): ?>
+      <?php if ($isSuperAdminSidebar && $sbHasAny($sbAdminKeys)): ?>
       <li class="mb-1 mt-2 text-muted small fw-semibold px-2">Admin Management</li>
+      <?php if ($sbCan('user_masterlist')): ?>
       <li class="mb-1">
         <button class="btn btn-toggle d-flex align-items-center gap-2 rounded <?= $isUserMgmtActive ? '' : 'collapsed' ?>"
                 data-bs-toggle="collapse"
@@ -860,6 +999,8 @@ if (!empty($_SESSION['user_id']) && isset($conn) && $conn instanceof mysqli) {
           </ul>
         </div>
       </li>
+      <?php endif; ?>
+      <?php if ($sbCan('officials_management') || $sbCan('personnel_invite')): ?>
       <li class="mb-1">
         <button class="btn btn-toggle d-flex align-items-center gap-2 rounded <?= $isAdminMgmtActive ? '' : 'collapsed' ?>"
                 data-bs-toggle="collapse"
@@ -869,21 +1010,27 @@ if (!empty($_SESSION['user_id']) && isset($conn) && $conn instanceof mysqli) {
         </button>
         <div class="collapse <?= $isAdminMgmtActive ? 'show' : '' ?>" id="adminmgmt-collapse">
           <ul class="btn-toggle-nav list-unstyled fw-normal pb-1 small">
+            <?php if ($sbCan('officials_management')): ?>
             <li>
               <a href="<?= htmlspecialchars(appUrl('Admin-End/OfficialsManagement.php')) ?>"
                  class="link-dark rounded <?= $current == 'OfficialsManagement.php' ? 'active' : '' ?>">
                 Officials Management
               </a>
             </li>
+            <?php endif; ?>
+            <?php if ($sbCan('personnel_invite')): ?>
             <li>
               <a href="<?= htmlspecialchars(appUrl('Admin-End/OfficialInvites.php')) ?>"
                  class="link-dark rounded <?= $current == 'OfficialInvites.php' ? 'active' : '' ?>">
                 Personnel Invite
               </a>
             </li>
+            <?php endif; ?>
           </ul>
         </div>
       </li>
+      <?php endif; ?>
+      <?php if ($sbCan('official_transition')): ?>
       <li class="mb-1">
         <a href="<?= htmlspecialchars(appUrl('Admin-End/OfficialTransitions.php')) ?>"
            class="btn btn-toggle d-flex align-items-center gap-2 rounded <?= $isOfficialTransitionActive ? 'active' : '' ?>"
@@ -891,6 +1038,8 @@ if (!empty($_SESSION['user_id']) && isset($conn) && $conn instanceof mysqli) {
           <i class="fas fa-right-left"></i> Official Transition
         </a>
       </li>
+      <?php endif; ?>
+      <?php if ($sbCan('audit_logs')): ?>
       <li class="mb-1">
         <a href="<?= htmlspecialchars(appUrl('Admin-End/AuditLogs.php')) ?>"
            class="btn btn-toggle d-flex align-items-center gap-2 rounded <?= $current == 'AuditLogs.php' ? 'active' : '' ?>"
@@ -898,6 +1047,7 @@ if (!empty($_SESSION['user_id']) && isset($conn) && $conn instanceof mysqli) {
           <i class="fas fa-clipboard-list"></i> Audit Logs
         </a>
       </li>
+      <?php endif; ?>
       <?php endif; ?>
 
     </ul>

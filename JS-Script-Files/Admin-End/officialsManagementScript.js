@@ -1,5 +1,7 @@
 (() => {
   const el = (id) => document.getElementById(id);
+  const opts = window.OFFICIALS_MGMT_OPTIONS || {};
+  const permissionCatalog = Array.isArray(opts.permissionCatalog) ? opts.permissionCatalog : [];
 
   const state = {
     rowsRaw: [],
@@ -14,6 +16,12 @@
     canManageActions: false,
     pagination: { currentPage: 1, entriesPerPage: 20 },
     auto: { secondsLeft: 15, interval: null, inFlight: false },
+    accessModal: {
+      row: null,
+      permissionMap: {},
+      lockedKeys: new Set(),
+      search: "",
+    },
   };
 
   const tbody = el("officialsMgmtTbody");
@@ -33,6 +41,17 @@
   const approvalFilterSelect = el("officialsMgmtApprovalFilter");
   const btnFilterApply = el("btnOfficialsMgmtFilterApply");
   const btnFilterReset = el("btnOfficialsMgmtFilterReset");
+
+  const accessModalEl = el("modalOfficialsMgmtAccess");
+  const accessOfficialIdInput = el("officialsMgmtAccessOfficialId");
+  const accessSummaryEl = el("officialsMgmtAccessSummary");
+  const accessRoleSelect = el("officialsMgmtAccessRole");
+  const accessExpiryInput = el("officialsMgmtAccessExpiry");
+  const accessModulesSummaryEl = el("officialsMgmtAccessModulesSummary");
+  const accessProtectedNoticeEl = el("officialsMgmtAccessProtectedNotice");
+  const accessPermissionSearch = el("officialsMgmtPermissionSearch");
+  const accessPermissionGroups = el("officialsMgmtPermissionGroups");
+  const accessSubmitBtn = el("btnOfficialsMgmtAccessSubmit");
 
   const safe = (value) => {
     const normalized = String(value ?? "").trim();
@@ -71,6 +90,47 @@
   const statusPillHtml = (text, type) =>
     `<span class="status-pill ${statusPillClass(text, type)}">${escapeHtml(safe(text))}</span>`;
 
+  const protectedBadgeHtml = (label) =>
+    label ? `<span class="officials-protected-badge"><i class="fas fa-shield-alt"></i>${escapeHtml(label)}</span>` : '<span class="text-muted small">—</span>';
+
+  const formatDate = (raw) => {
+    const value = String(raw || "").trim();
+    if (!value) return "No expiry";
+    const parsed = new Date(`${value}T00:00:00`);
+    if (Number.isNaN(parsed.getTime())) return value;
+    return parsed.toLocaleDateString("en-PH", { year: "numeric", month: "short", day: "numeric" });
+  };
+
+  const buildPermissionMetaMap = () => {
+    const map = {};
+    permissionCatalog.forEach((section) => {
+      (section.items || []).forEach((item) => {
+        if (Array.isArray(item.children) && item.children.length) {
+          item.children.forEach((child) => {
+            map[child.key] = {
+              ...child,
+              section: section.section || "",
+              parentLabel: item.label || "",
+              parentKey: item.key || "",
+              adminOnly: Boolean(child.admin_only || item.admin_only),
+            };
+          });
+          return;
+        }
+        map[item.key] = {
+          ...item,
+          section: section.section || "",
+          parentLabel: "",
+          parentKey: "",
+          adminOnly: Boolean(item.admin_only),
+        };
+      });
+    });
+    return map;
+  };
+
+  const permissionMetaMap = buildPermissionMetaMap();
+
   const getUniqueValues = (key) => {
     const values = new Set();
     state.rowsRaw.forEach((row) => {
@@ -82,7 +142,7 @@
 
   const populateSelect = (selectEl, values, allLabel, currentValue) => {
     if (!selectEl) return;
-    const options = ['<option value="ALL">' + escapeHtml(allLabel) + "</option>"];
+    const options = [`<option value="ALL">${escapeHtml(allLabel)}</option>`];
     values.forEach((value) => {
       options.push(`<option value="${escapeHtml(value)}">${escapeHtml(value)}</option>`);
     });
@@ -134,7 +194,7 @@
   const applyFilters = () => {
     const q = state.search.toLowerCase();
     state.rows = state.rowsRaw.filter((row) => {
-      if (state.role !== "ALL" && String(row.role_access || "") !== state.role) return false;
+      if (state.role !== "ALL" && String(row.display_role || "") !== state.role) return false;
       if (state.permission !== "ALL" && String(row.permission_state || "") !== state.permission) return false;
       if (state.department !== "ALL" && String(row.department || "") !== state.department) return false;
       if (state.employmentStatus !== "ALL" && String(row.employment_status || "") !== state.employmentStatus) return false;
@@ -146,16 +206,18 @@
         row.official_id,
         row.user_id,
         row.full_name,
-        row.role_access,
+        row.display_role,
         row.position_access,
         row.department,
         row.employment_status,
-        row.date_hired,
         row.account_status,
         row.permission_state,
         row.profile_approval_state,
         row.email,
         row.phone_number,
+        row.access_expires_on,
+        row.module_summary,
+        row.protected_label,
       ].join(" ").toLowerCase();
 
       return searchBag.includes(q);
@@ -214,10 +276,17 @@
       return '<span class="text-muted small">SuperAdmin only</span>';
     }
 
+    if (!row.can_edit_access) {
+      return '<span class="text-muted small">Protected Account</span>';
+    }
+
     const id = escapeHtml(safe(row.official_id));
     const approvalState = String(row.profile_approval_state || "");
     const isRevoked = String(row.permission_state || "") === "Revoked";
     let items = "";
+
+    items += `<li><button class="dropdown-item officials-action-btn" data-action="manage_access" data-official-id="${id}"><i class="fas fa-list-check me-2"></i>Manage Access</button></li>`;
+    items += `<li><hr class="dropdown-divider"></li>`;
 
     if (approvalState === "PendingApproval") {
       items += `<li><button class="dropdown-item text-success officials-action-btn" data-action="approve_profile" data-official-id="${id}"><i class="fas fa-check me-2"></i>Approve Profile</button></li>`;
@@ -266,19 +335,18 @@
 
     tbody.innerHTML = pageRows.map((row) => {
       const approvalState = String(row.profile_approval_state || "PendingApproval");
-
       return `
         <tr>
           <td>${escapeHtml(safe(row.official_id))}</td>
           <td>${escapeHtml(safe(row.user_id))}</td>
           <td>${escapeHtml(safe(row.full_name))}</td>
-          <td>${escapeHtml(safe(row.role_access))}</td>
+          <td>${escapeHtml(safe(row.display_role))}</td>
           <td>${escapeHtml(safe(row.position_access))}</td>
           <td>${escapeHtml(safe(row.department))}</td>
-          <td>${escapeHtml(safe(row.employment_status))}</td>
-          <td>${escapeHtml(safe(row.date_hired))}</td>
+          <td>${escapeHtml(formatDate(row.access_expires_on))}</td>
+          <td>${protectedBadgeHtml(row.protected_label)}</td>
           <td>${statusPillHtml(row.account_status, "accountStatus")}</td>
-          <td>${statusPillHtml(row.permission_state, "permission")}</td>
+          <td><div class="officials-module-summary">${escapeHtml(safe(row.module_summary))}</div></td>
           <td>${statusPillHtml(approvalState, "profileApproval")}</td>
           <td>${actionButtonHtml(row)}</td>
         </tr>
@@ -288,7 +356,6 @@
     renderPagination();
     wireActionButtons();
 
-    // Re-initialize dropdowns with fixed strategy so they escape overflow:hidden / overflow-x:auto containers
     document.querySelectorAll("#table-officialsMgmt .dropdown-toggle").forEach((btn) => {
       new bootstrap.Dropdown(btn, { popperConfig: { strategy: "fixed" } });
     });
@@ -328,7 +395,6 @@
     const row = state.rowsRaw.find((r) => String(r.official_id) === String(officialId));
     if (!row) return;
 
-    const opts = window.OFFICIALS_MGMT_OPTIONS || {};
     const positionsByDepartment = opts.positionsByDepartment || {};
     const areaRequiredPositions = opts.areaRequiredPositions || [];
 
@@ -346,10 +412,7 @@
     const areaSelect = el("officialsMgmtPromoteArea");
 
     if (positionSelect) {
-      // Only show positions within the same department, excluding the current one
-      const deptPositions = (positionsByDepartment[row.department] || [])
-        .filter((pos) => pos !== row.position_access);
-
+      const deptPositions = (positionsByDepartment[row.department] || []).filter((pos) => pos !== row.position_access);
       positionSelect.innerHTML = '<option value="">Select new position</option>';
       deptPositions.forEach((pos) => {
         const opt = document.createElement("option");
@@ -361,9 +424,7 @@
       positionSelect.onchange = () => {
         const selectedPos = positionSelect.value;
         if (pathEl) {
-          pathEl.textContent = selectedPos
-            ? `${row.position_access} → ${selectedPos}`
-            : "Select a position to see promotion path";
+          pathEl.textContent = selectedPos ? `${row.position_access} → ${selectedPos}` : "Select a position to see promotion path";
         }
         if (areaWrap) areaWrap.classList.toggle("d-none", !areaRequiredPositions.includes(selectedPos));
         if (areaSelect && !areaRequiredPositions.includes(selectedPos)) areaSelect.value = "";
@@ -381,7 +442,6 @@
     const row = state.rowsRaw.find((r) => String(r.official_id) === String(officialId));
     if (!row) return;
 
-    const opts = window.OFFICIALS_MGMT_OPTIONS || {};
     const positionsByDepartment = opts.positionsByDepartment || {};
     const areaRequiredPositions = opts.areaRequiredPositions || [];
 
@@ -399,14 +459,12 @@
     const areaWrap = el("officialsMgmtDepartmentAreaWrap");
     const areaSelect = el("officialsMgmtDepartmentArea");
 
-    // Show/hide area based on selected position
     const syncArea = () => {
       const selectedPos = newPositionSelect?.value || "";
       if (areaWrap) areaWrap.classList.toggle("d-none", !areaRequiredPositions.includes(selectedPos));
       if (areaSelect && !areaRequiredPositions.includes(selectedPos)) areaSelect.value = "";
     };
 
-    // Rebuild position options for a given department, optionally pre-selecting one
     const populatePositions = (department, preselectPosition) => {
       if (!newPositionSelect) return;
       const positions = positionsByDepartment[department] || [];
@@ -422,21 +480,307 @@
     };
 
     if (newPositionSelect) newPositionSelect.onchange = syncArea;
-
-    // When department changes, refresh positions and clear selection
     if (deptSelect) deptSelect.onchange = () => populatePositions(deptSelect.value, "");
 
-    // Set initial state
     if (deptSelect) deptSelect.value = row.department || "";
     populatePositions(row.department || "", row.position_access || "");
-
-    // Pre-fill area after positions are set
     if (areaSelect) areaSelect.value = row.area_number || "";
 
     const previewEl = el("officialsMgmtDepartmentPreview");
     if (previewEl) previewEl.textContent = `Changing department for: ${row.full_name}`;
 
     bootstrap.Modal.getOrCreateInstance(document.getElementById("modalOfficialsMgmtDepartment")).show();
+  };
+
+  const syncAccessPermissionConstraints = () => {
+    const row = state.accessModal.row;
+    if (!row) return;
+
+    const displayRole = String(accessRoleSelect?.value || "Admin");
+    if (displayRole !== "SuperAdmin") {
+      Object.values(permissionMetaMap).forEach((meta) => {
+        if (meta.adminOnly && !state.accessModal.lockedKeys.has(meta.key)) {
+          delete state.accessModal.permissionMap[meta.key];
+        }
+      });
+    }
+
+    state.accessModal.lockedKeys.forEach((key) => {
+      state.accessModal.permissionMap[key] = true;
+    });
+  };
+
+  const getChildKeys = (item) =>
+    Array.isArray(item.children) && item.children.length ? item.children.map((child) => String(child.key || "").trim()).filter(Boolean) : [];
+
+  const sectionHasVisibleItems = (section, term) => {
+    const normalizedTerm = term.toLowerCase();
+    if (!normalizedTerm) return true;
+
+    return (section.items || []).some((item) => {
+      const itemLabel = String(item.label || "").toLowerCase();
+      if (itemLabel.includes(normalizedTerm)) return true;
+      const children = item.children || [];
+      return children.some((child) => String(child.label || "").toLowerCase().includes(normalizedTerm));
+    });
+  };
+
+  const renderAccessPermissionGroups = () => {
+    if (!accessPermissionGroups) return;
+    const row = state.accessModal.row;
+    if (!row) {
+      accessPermissionGroups.innerHTML = "";
+      return;
+    }
+
+    syncAccessPermissionConstraints();
+    const term = String(state.accessModal.search || "").trim().toLowerCase();
+
+    const html = permissionCatalog
+      .filter((section) => sectionHasVisibleItems(section, term))
+      .map((section, sectionIndex) => {
+        const sectionLeafKeys = [];
+
+        const itemsHtml = (section.items || []).map((item, itemIndex) => {
+          const children = item.children || [];
+          if (children.length) {
+            const childKeys = getChildKeys(item);
+            childKeys.forEach((key) => sectionLeafKeys.push(key));
+
+            const visibleChildren = children.filter((child) => {
+              const childLabel = String(child.label || "").toLowerCase();
+              return !term || childLabel.includes(term) || String(item.label || "").toLowerCase().includes(term);
+            });
+            if (!visibleChildren.length && !(String(item.label || "").toLowerCase().includes(term))) {
+              return "";
+            }
+
+            const selectedChildren = childKeys.filter((key) => Boolean(state.accessModal.permissionMap[key]));
+            const parentChecked = childKeys.length > 0 && selectedChildren.length === childKeys.length;
+            const parentPartial = selectedChildren.length > 0 && selectedChildren.length < childKeys.length;
+
+            const childHtml = visibleChildren.map((child, childIndex) => {
+              const key = String(child.key || "").trim();
+              const checked = Boolean(state.accessModal.permissionMap[key]);
+              const isLocked = state.accessModal.lockedKeys.has(key);
+              const isAdminOnly = Boolean(child.admin_only || item.admin_only);
+              const disabled = isLocked || (!row.can_edit_access) || (isAdminOnly && String(accessRoleSelect?.value || "Admin") !== "SuperAdmin");
+              return `
+                <div class="officials-access-item is-child ${disabled ? "is-disabled" : ""}" data-item-text="${escapeHtml(`${item.label} ${child.label}`.toLowerCase())}">
+                  <label>
+                    <input type="checkbox"
+                           class="officials-access-child"
+                           data-key="${escapeHtml(key)}"
+                           data-parent-key="${escapeHtml(String(item.key || ""))}"
+                           data-admin-only="${isAdminOnly ? "1" : "0"}"
+                           ${checked ? "checked" : ""}
+                           ${disabled ? "disabled" : ""}>
+                    <span>
+                      <span class="officials-access-item-main">${escapeHtml(child.label || key)}</span>
+                      <span class="officials-access-item-sub">${escapeHtml(section.section || "")}</span>
+                    </span>
+                  </label>
+                </div>
+              `;
+            }).join("");
+
+            return `
+              <div class="officials-access-item ${!row.can_edit_access ? "is-disabled" : ""}">
+                <label>
+                  <input type="checkbox"
+                         class="officials-access-parent"
+                         data-parent-key="${escapeHtml(String(item.key || ""))}"
+                         data-child-keys="${escapeHtml(childKeys.join(","))}"
+                         ${parentChecked ? "checked" : ""}
+                         ${parentPartial ? 'data-partial="1"' : ""}
+                         ${!row.can_edit_access ? "disabled" : ""}>
+                  <span>
+                    <span class="officials-access-item-main">${escapeHtml(item.label || item.key)}</span>
+                    <span class="officials-access-item-sub">Toggle all child modules in this group.</span>
+                  </span>
+                </label>
+              </div>
+              ${childHtml}
+            `;
+          }
+
+          const key = String(item.key || "").trim();
+          const meta = permissionMetaMap[key] || {};
+          const isLocked = state.accessModal.lockedKeys.has(key);
+          const isAdminOnly = Boolean(meta.adminOnly || item.admin_only);
+          const disabled = isLocked || (!row.can_edit_access) || (isAdminOnly && String(accessRoleSelect?.value || "Admin") !== "SuperAdmin");
+          const checked = Boolean(state.accessModal.permissionMap[key]);
+          const itemText = `${item.label || ""} ${section.section || ""}`.toLowerCase();
+          if (term && !itemText.includes(term)) {
+            return "";
+          }
+          sectionLeafKeys.push(key);
+          return `
+            <div class="officials-access-item ${disabled ? "is-disabled" : ""}" data-item-text="${escapeHtml(itemText)}">
+              <label>
+                <input type="checkbox"
+                       class="officials-access-child"
+                       data-key="${escapeHtml(key)}"
+                       data-admin-only="${isAdminOnly ? "1" : "0"}"
+                       ${checked ? "checked" : ""}
+                       ${disabled ? "disabled" : ""}>
+                <span>
+                  <span class="officials-access-item-main">${escapeHtml(item.label || key)}</span>
+                  <span class="officials-access-item-sub">${escapeHtml(section.section || "")}</span>
+                </span>
+              </label>
+            </div>
+          `;
+        }).join("");
+
+        if (!itemsHtml.trim()) {
+          return "";
+        }
+
+        return `
+          <div class="officials-access-group" data-section-index="${sectionIndex}">
+            <div class="officials-access-group-head">
+              <div class="officials-access-group-title">${escapeHtml(section.section || "Modules")}</div>
+              <div class="officials-access-group-actions">
+                <button type="button" class="btn btn-sm btn-outline-secondary officials-access-section-toggle" data-mode="on" data-section-keys="${escapeHtml(sectionLeafKeys.join(","))}" ${!row.can_edit_access ? "disabled" : ""}>Check all</button>
+                <button type="button" class="btn btn-sm btn-outline-secondary officials-access-section-toggle" data-mode="off" data-section-keys="${escapeHtml(sectionLeafKeys.join(","))}" ${!row.can_edit_access ? "disabled" : ""}>Clear</button>
+              </div>
+            </div>
+            <div class="officials-access-items">${itemsHtml}</div>
+          </div>
+        `;
+      })
+      .join("");
+
+    accessPermissionGroups.innerHTML = html || '<div class="text-muted small px-2 py-3">No module labels match that search.</div>';
+
+    accessPermissionGroups.querySelectorAll(".officials-access-parent[data-partial='1']").forEach((input) => {
+      input.indeterminate = true;
+    });
+
+    bindAccessPermissionEvents();
+  };
+
+  const bindAccessPermissionEvents = () => {
+    if (!accessPermissionGroups) return;
+
+    accessPermissionGroups.querySelectorAll(".officials-access-child").forEach((checkbox) => {
+      checkbox.addEventListener("change", () => {
+        const key = String(checkbox.getAttribute("data-key") || "").trim();
+        if (!key) return;
+        if (checkbox.checked) {
+          state.accessModal.permissionMap[key] = true;
+        } else {
+          delete state.accessModal.permissionMap[key];
+        }
+        renderAccessPermissionGroups();
+      });
+    });
+
+    accessPermissionGroups.querySelectorAll(".officials-access-parent").forEach((checkbox) => {
+      checkbox.addEventListener("change", () => {
+        const childKeys = String(checkbox.getAttribute("data-child-keys") || "")
+          .split(",")
+          .map((value) => value.trim())
+          .filter(Boolean);
+
+        childKeys.forEach((key) => {
+          if (state.accessModal.lockedKeys.has(key)) {
+            state.accessModal.permissionMap[key] = true;
+            return;
+          }
+          if (checkbox.checked) {
+            state.accessModal.permissionMap[key] = true;
+          } else {
+            delete state.accessModal.permissionMap[key];
+          }
+        });
+
+        renderAccessPermissionGroups();
+      });
+    });
+
+    accessPermissionGroups.querySelectorAll(".officials-access-section-toggle").forEach((button) => {
+      button.addEventListener("click", () => {
+        const mode = String(button.getAttribute("data-mode") || "on");
+        const keys = String(button.getAttribute("data-section-keys") || "")
+          .split(",")
+          .map((value) => value.trim())
+          .filter(Boolean);
+
+        keys.forEach((key) => {
+          if (state.accessModal.lockedKeys.has(key)) {
+            state.accessModal.permissionMap[key] = true;
+            return;
+          }
+
+          const meta = permissionMetaMap[key] || {};
+          if (mode === "on") {
+            if (meta.adminOnly && String(accessRoleSelect?.value || "Admin") !== "SuperAdmin") {
+              return;
+            }
+            state.accessModal.permissionMap[key] = true;
+          } else {
+            delete state.accessModal.permissionMap[key];
+          }
+        });
+
+        renderAccessPermissionGroups();
+      });
+    });
+  };
+
+  const openAccessModal = (officialId) => {
+    const row = state.rowsRaw.find((entry) => String(entry.official_id) === String(officialId));
+    if (!row) return;
+
+    state.accessModal.row = row;
+    state.accessModal.permissionMap = {};
+    (Array.isArray(row.permission_keys) ? row.permission_keys : []).forEach((key) => {
+      state.accessModal.permissionMap[String(key)] = true;
+    });
+    state.accessModal.lockedKeys = new Set(Array.isArray(row.locked_permission_keys) ? row.locked_permission_keys : []);
+    state.accessModal.search = "";
+
+    if (accessOfficialIdInput) accessOfficialIdInput.value = row.official_id || "";
+    if (accessSummaryEl) accessSummaryEl.textContent = `${row.full_name} — ${row.position_access} (${row.department})`;
+    if (accessRoleSelect) {
+      accessRoleSelect.value = row.display_role || "Admin";
+      accessRoleSelect.disabled = row.protected_code !== "";
+    }
+    if (accessExpiryInput) {
+      accessExpiryInput.value = String(row.access_expires_on || "").trim();
+      accessExpiryInput.disabled = !row.can_edit_access;
+    }
+    if (accessModulesSummaryEl) accessModulesSummaryEl.textContent = `${row.module_count || 0} enabled — ${row.module_summary || "No modules"}`;
+    if (accessPermissionSearch) accessPermissionSearch.value = "";
+
+    if (accessProtectedNoticeEl) {
+      const notices = [];
+      if (row.protected_label) {
+        notices.push(`${row.protected_label} account`);
+      }
+      if (!row.can_edit_access) {
+        notices.push("This account is locked from access changes by the current SuperAdmin.");
+      } else if (row.protected_code === "IT_SUPERADMIN") {
+        notices.push("Protected core admin modules stay enabled for this IT SuperAdmin account.");
+      } else if (row.protected_code === "BARANGAY_CAPTAIN") {
+        notices.push("The Barangay Captain must remain a SuperAdmin while assigned to that position.");
+      }
+
+      if (notices.length) {
+        accessProtectedNoticeEl.classList.remove("d-none");
+        accessProtectedNoticeEl.textContent = notices.join(" ");
+      } else {
+        accessProtectedNoticeEl.classList.add("d-none");
+        accessProtectedNoticeEl.textContent = "";
+      }
+    }
+
+    if (accessSubmitBtn) accessSubmitBtn.disabled = !row.can_edit_access;
+
+    renderAccessPermissionGroups();
+    bootstrap.Modal.getOrCreateInstance(accessModalEl).show();
   };
 
   const wireActionButtons = () => {
@@ -446,6 +790,10 @@
         const officialId = String(btn.getAttribute("data-official-id") || "");
         if (!action || !officialId) return;
 
+        if (action === "manage_access") {
+          openAccessModal(officialId);
+          return;
+        }
         if (action === "promote") {
           openPromoteModal(officialId);
           return;
@@ -478,6 +826,40 @@
         }
       });
     });
+  };
+
+  const saveAccessProfile = async () => {
+    const row = state.accessModal.row;
+    if (!row) return;
+
+    const officialId = String(accessOfficialIdInput?.value || "");
+    const displayRole = String(accessRoleSelect?.value || "Admin");
+    const accessExpiresOn = String(accessExpiryInput?.value || "").trim();
+    if (!officialId) {
+      window.alert("Missing official record.");
+      return;
+    }
+
+    syncAccessPermissionConstraints();
+    const permissionKeys = Object.keys(state.accessModal.permissionMap);
+
+    const body = new FormData();
+    body.append("action", "update_access_profile");
+    body.append("official_id", officialId);
+    body.append("display_role", displayRole);
+    body.append("access_expires_on", accessExpiresOn);
+    permissionKeys.forEach((key) => body.append("permission_keys[]", key));
+
+    const res = await fetch("../PhpFiles/Admin-End/officialsManagement.php", {
+      method: "POST",
+      body,
+      headers: { Accept: "application/json" },
+    });
+    const data = await res.json().catch(() => null);
+    if (!res.ok || !data?.success) {
+      throw new Error(data?.message || "Unable to update access profile.");
+    }
+    return data;
   };
 
   const load = async () => {
@@ -582,6 +964,28 @@
 
     btnFilterApply?.addEventListener("click", applyModalFilters);
     btnFilterReset?.addEventListener("click", resetModalFilters);
+
+    accessRoleSelect?.addEventListener("change", () => {
+      renderAccessPermissionGroups();
+    });
+
+    accessPermissionSearch?.addEventListener("input", () => {
+      state.accessModal.search = accessPermissionSearch.value || "";
+      renderAccessPermissionGroups();
+    });
+
+    accessSubmitBtn?.addEventListener("click", async () => {
+      try {
+        accessSubmitBtn.disabled = true;
+        await saveAccessProfile();
+        bootstrap.Modal.getInstance(accessModalEl)?.hide();
+        await load();
+      } catch (error) {
+        window.alert(error?.message || "Unable to update access profile.");
+      } finally {
+        accessSubmitBtn.disabled = false;
+      }
+    });
 
     const promoteSubmitBtn = el("btnOfficialsMgmtPromoteSubmit");
     if (promoteSubmitBtn) {
