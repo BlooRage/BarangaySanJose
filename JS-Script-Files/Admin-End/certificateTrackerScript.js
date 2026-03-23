@@ -1452,17 +1452,39 @@
     if (!clean.length) return '';
 
     const normalizeLabel = (label) => String(label || '').toLowerCase().replace(/\s+/g, ' ').trim();
+    const subsection = (title, rows) => {
+      const content = (Array.isArray(rows) ? rows : []).filter(Boolean).join('');
+      if (!content) return '';
+      return `
+        <div class="tracker-form-subsection">
+          <h6 class="tracker-form-subsection-title">${esc(title)}</h6>
+          ${content}
+        </div>
+      `;
+    };
     const takeFirst = (arr, predicate) => {
       const idx = arr.findIndex((f) => f && predicate(normalizeLabel(f.label)));
       if (idx === -1) return null;
       return arr.splice(idx, 1)[0];
+    };
+    const takeAll = (arr, predicate) => {
+      const picked = [];
+      for (let i = arr.length - 1; i >= 0; i -= 1) {
+        const field = arr[i];
+        if (!field || !predicate(normalizeLabel(field.label))) continue;
+        picked.unshift(arr[i]);
+        arr.splice(i, 1);
+      }
+      return picked;
     };
 
     const remaining = clean.slice();
 
     const applicationType = takeFirst(remaining, (l) => l === 'application type');
     const paymentMethod = takeFirst(remaining, (l) => l === 'payment method');
+    const gcashTransactionNumber = takeFirst(remaining, (l) => l === 'gcash transaction number');
     const purpose = takeFirst(remaining, (l) => l === 'purpose' || l.includes('purpose'));
+    const applicantAge = takeFirst(remaining, (l) => l === 'applicant age');
 
     const ownerLastName = takeFirst(remaining, (l) =>
       l === 'owner last name' || l.includes('owner last name') || l === 'applicant last name' || l.includes('applicant last name')
@@ -1550,6 +1572,35 @@
     const vehicleMake = takeFirst(remaining, (l) => l === 'vehicle make');
     const vehicleNamedToOwner = takeFirst(remaining, (l) => l === 'vehicle named to owner');
     const vehicleFranchise = takeFirst(remaining, (l) => l === 'vehicle franchise');
+    const cohabitantFirstName = takeFirst(remaining, (l) => /(partner|cohabitant|detainee) first( name)?$/.test(l));
+    const cohabitantMiddleName = takeFirst(remaining, (l) => /(partner|cohabitant|detainee) middle( name)?$/.test(l));
+    const cohabitantLastName = takeFirst(remaining, (l) => /(partner|cohabitant|detainee) last( name)?$/.test(l));
+    const cohabitantSuffix = takeFirst(remaining, (l) => /(partner|cohabitant|detainee) suffix/.test(l));
+    const cohabitantBirthdate = takeFirst(remaining, (l) => /(partner|cohabitant|detainee) birthdate/.test(l) || /(partner|cohabitant|detainee) dob/.test(l));
+    const cohabitantAge = takeFirst(remaining, (l) => /(partner|cohabitant|detainee) age/.test(l));
+    const cohabitantCivilStatus = takeFirst(remaining, (l) => /(partner|cohabitant|detainee) civil status/.test(l));
+    const cohabitantNationality = takeFirst(remaining, (l) => /(partner|cohabitant|detainee) nationality/.test(l));
+    const cohabitantRelationship = takeFirst(remaining, (l) => l.includes('relationship'));
+    const cohabitantIdType = takeFirst(remaining, (l) => /(partner|cohabitant|detainee) id type/.test(l));
+    const cohabitantIdNumber = takeFirst(remaining, (l) => /(partner|cohabitant|detainee) id number/.test(l));
+    const cohabitantAddress = takeFirst(remaining, (l) => /(partner|cohabitant|detainee).*(address|residence)/.test(l));
+    const cohabitantUnitNumber = takeFirst(remaining, (l) => /cohabitant unit number$/.test(l));
+    const cohabitantHouseNumber = takeFirst(remaining, (l) => /cohabitant house number$/.test(l));
+    const cohabitantStreetName = takeFirst(remaining, (l) => /cohabitant street name$/.test(l));
+    const cohabitantSubdivision = takeFirst(remaining, (l) => /cohabitant subdivision$/.test(l) || /cohabitant subdivision lot$/.test(l));
+    const cohabitantLotNumber = takeFirst(remaining, (l) => /cohabitant lot number$/.test(l));
+    const cohabitantBlockNumber = takeFirst(remaining, (l) => /cohabitant block number$/.test(l));
+    const cohabitantPhaseNumber = takeFirst(remaining, (l) => /cohabitant phase number$/.test(l));
+    const cohabitantBarangay = takeFirst(remaining, (l) => /cohabitant barangay$/.test(l));
+    const cohabitantCity = takeFirst(remaining, (l) => /cohabitant city$/.test(l));
+    const cohabitantProvince = takeFirst(remaining, (l) => /cohabitant province$/.test(l));
+    const cohabitantPostalCode = takeFirst(remaining, (l) => /cohabitant postal code$/.test(l));
+    const cohabitationStart = takeFirst(remaining, (l) => l.includes('living together since') || l.includes('cohabitation start date'));
+    const cohabitationDuration = takeFirst(remaining, (l) => l === 'cohabitation duration');
+    const cohabitationDurationValue = takeFirst(remaining, (l) => l === 'cohabitation duration value');
+    const cohabitationDurationUnit = takeFirst(remaining, (l) => l === 'cohabitation duration unit');
+    const cohabitationAddress = takeFirst(remaining, (l) => l.includes('cohabitation') && (l.includes('address') || l.includes('residence')));
+    const childFields = takeAll(remaining, (l) => l.includes('child') || l.includes('children'));
 
     const blocks = [];
     const hasBusinessSpecificLayout = !!(
@@ -1592,79 +1643,177 @@
       || proofAddressType
       || proofAddressNumber
     );
+    const hasCohabitationLayout = !!(
+      cohabitantFirstName
+      || cohabitantMiddleName
+      || cohabitantLastName
+      || cohabitantSuffix
+      || cohabitantBirthdate
+      || cohabitantAge
+      || cohabitantCivilStatus
+      || cohabitantNationality
+      || cohabitantRelationship
+      || cohabitantIdType
+      || cohabitantIdNumber
+      || cohabitantAddress
+      || cohabitationStart
+      || cohabitationDuration
+      || cohabitationDurationValue
+      || cohabitationDurationUnit
+      || cohabitationAddress
+    );
 
-    if (hasBusinessSpecificLayout) {
+    if (hasCohabitationLayout) {
+      blocks.push(
+        subsection('Request Details', [
+          renderFieldGrid([{ ...purpose, wide: true }].filter(Boolean), 1),
+          renderFieldGrid([applicationType, paymentMethod].filter(Boolean), 2),
+          renderFieldGrid([gcashTransactionNumber].filter(Boolean), 1)
+        ]),
+        subsection('Cohabitant Information', [
+          renderFieldGrid([cohabitantFirstName, cohabitantMiddleName, cohabitantLastName, cohabitantSuffix].filter(Boolean), 4),
+          renderFieldGrid([cohabitantBirthdate, cohabitantAge, cohabitantCivilStatus, cohabitantNationality].filter(Boolean), 4),
+          renderFieldGrid([cohabitantRelationship].filter(Boolean), 1),
+          renderFieldGrid([cohabitantIdType, cohabitantIdNumber].filter(Boolean), 2),
+          renderFieldGrid([cohabitantAddress].filter(Boolean), 1),
+          renderFieldGrid([cohabitantUnitNumber, cohabitantHouseNumber, cohabitantStreetName].filter(Boolean), 3),
+          renderFieldGrid([cohabitantLotNumber, cohabitantBlockNumber, cohabitantPhaseNumber].filter(Boolean), 3),
+          renderFieldGrid([cohabitantSubdivision, cohabitantBarangay, cohabitantCity, cohabitantProvince].filter(Boolean), 4),
+          renderFieldGrid([cohabitantPostalCode].filter(Boolean), 1)
+        ]),
+        subsection('Cohabitation Information', [
+          renderFieldGrid([cohabitationStart, cohabitationDuration, cohabitationDurationValue, cohabitationDurationUnit].filter(Boolean), 2),
+          renderFieldGrid([cohabitationAddress].filter(Boolean), 1)
+        ])
+      );
+      if (childFields.length) {
+        const childGroups = new Map();
+        childFields.forEach((field) => {
+          const label = String(field?.label || '').trim();
+          const match = label.match(/child\s+(\d+)\s+(name|age)/i);
+          if (!match) return;
+          const childNumber = match[1];
+          const childPart = match[2].toLowerCase();
+          if (!childGroups.has(childNumber)) {
+            childGroups.set(childNumber, {});
+          }
+          childGroups.get(childNumber)[childPart] = field;
+        });
+
+        const childRows = Array.from(childGroups.entries())
+          .sort((a, b) => Number.parseInt(a[0], 10) - Number.parseInt(b[0], 10))
+          .map(([, parts]) => renderFieldGrid([parts.name, parts.age].filter(Boolean), 2))
+          .filter(Boolean);
+
+        const unmatchedChildFields = childFields.filter((field) => {
+          const label = String(field?.label || '').trim();
+          return !/child\s+\d+\s+(name|age)/i.test(label);
+        });
+        if (unmatchedChildFields.length) {
+          childRows.push(renderFieldGrid(unmatchedChildFields.map((field) => ({ ...field, wide: true })), 1));
+        }
+
+        blocks.push(subsection('Children Information', childRows));
+      }
+    } else if (hasTricycleSpecificLayout) {
+      blocks.push(
+        subsection('Request Details', [
+          renderFieldGrid([{ ...applicationType, wide: true }, { ...purpose, wide: true }].filter((f) => f?.value), 1),
+          renderFieldGrid([{ ...franchisee, wide: true }].filter(Boolean), 1)
+        ]),
+        subsection('Vehicle Information', [
+          renderFieldGrid([plateNumber, bodyNumber].filter(Boolean), 2),
+          renderFieldGrid([chassisNumber, motorNumber].filter(Boolean), 2),
+          renderFieldGrid([orNumber, crNumber].filter(Boolean), 2),
+          renderFieldGrid([vehicleMake, vehicleNamedToOwner].filter(Boolean), 2),
+          renderFieldGrid([{ ...vehicleFranchise, wide: true }].filter(Boolean), 1),
+          renderFieldGrid([prevPlateNum].filter(Boolean), 1)
+        ])
+      );
+    } else if (hasBusinessSpecificLayout) {
       const assembledPrevFullName = firstNonEmpty([
         prevFullName?.value,
         [prevLastName?.value, prevFirstName?.value, prevMiddleName?.value, prevSuffix?.value].filter(Boolean).join(' ').trim()
       ]);
-      const businessRows = [
-        renderFieldGrid([{ ...applicationType, wide: true }].filter(Boolean), 1),
-        renderFieldGrid([{ ...purpose, wide: true }].filter(Boolean), 1),
-        renderFieldGrid([ownerLastName, ownerFirstName, ownerMiddleName, ownerPhone].filter(Boolean), 4),
-        renderFieldGrid([businessName, businessContactNumber].filter(Boolean), 2),
-        renderFieldGrid([{ ...businessAddressSystem, wide: true }].filter(Boolean), 1),
-        renderFieldGrid([businessStreetNumber, businessStreetName, businessSubdivision].filter(Boolean), 3),
-        renderFieldGrid([businessBarangay, businessCity, businessProvince].filter(Boolean), 3),
-        renderFieldGrid([{ ...businessFullAddress, wide: true }].filter(Boolean), 1),
-        renderFieldGrid([{ ...initialOperationDate, wide: true }].filter(Boolean), 1),
-        renderFieldGrid([owner, businessRegistrationType].filter(Boolean), 2),
-        renderFieldGrid([{ ...birthplace, wide: true }].filter(Boolean), 1),
-        renderFieldGrid([
-          assembledPrevFullName ? { label: 'Prev Full Name', value: assembledPrevFullName } : null,
-          prevBusinessApprovalType,
-          prevPlateNum
-        ].filter(Boolean), 3)
-      ];
-      blocks.push(...businessRows.filter(Boolean));
-    } else if (hasTricycleSpecificLayout) {
-      const tricycleRows = [
-        renderFieldGrid([{ ...applicationType, wide: true }].filter(Boolean), 1),
-        renderFieldGrid([{ ...franchisee, wide: true }].filter(Boolean), 1),
-        renderFieldGrid([plateNumber, bodyNumber].filter(Boolean), 2),
-        renderFieldGrid([chassisNumber, motorNumber].filter(Boolean), 2),
-        renderFieldGrid([orNumber, crNumber].filter(Boolean), 2),
-        renderFieldGrid([vehicleMake, vehicleNamedToOwner].filter(Boolean), 2),
-        renderFieldGrid([{ ...vehicleFranchise, wide: true }].filter(Boolean), 1)
-      ];
-      blocks.push(...tricycleRows.filter(Boolean));
+      blocks.push(
+        subsection('Request Details', [
+          renderFieldGrid([
+            { label: 'Application Type', value: applicationType?.value || '' },
+            { label: 'Purpose', value: purpose?.value || '' }
+          ].filter((f) => f.value), 2)
+        ]),
+        subsection('Applicant Information', [
+          renderFieldGrid([ownerLastName, ownerFirstName, ownerMiddleName].filter(Boolean), 3)
+        ]),
+        subsection('Contact Details', [
+          renderFieldGrid([ownerPhone].filter(Boolean), 1),
+          renderFieldGrid([businessContactNumber].filter(Boolean), 1)
+        ]),
+        subsection('Business Information', [
+          renderFieldGrid([businessName, owner, businessRegistrationType].filter(Boolean), 3),
+          renderFieldGrid([initialOperationDate].filter(Boolean), 1),
+          renderFieldGrid([
+            assembledPrevFullName ? { label: 'Prev Full Name', value: assembledPrevFullName } : null,
+            prevBusinessApprovalType,
+            prevPlateNum
+          ].filter(Boolean), 3)
+        ]),
+        subsection('Business Address', [
+          renderFieldGrid([{ ...businessAddressSystem, wide: true }].filter(Boolean), 1),
+          renderFieldGrid([businessStreetNumber, businessStreetName, businessSubdivision].filter(Boolean), 3),
+          renderFieldGrid([businessBarangay, businessCity, businessProvince].filter(Boolean), 3),
+          renderFieldGrid([{ ...businessFullAddress, wide: true }].filter(Boolean), 1)
+        ])
+      );
     } else if (hasGeneralPermitLayout) {
-      const permitRows = [
-        renderFieldGrid(purpose ? [{ ...purpose, wide: true }] : [], 1),
-        renderFieldGrid([ownerLastName, ownerFirstName, ownerMiddleName].filter(Boolean), 3),
-        renderFieldGrid([ownerPhone, ownerFullAddress].filter(Boolean), 2),
-        renderFieldGrid([proofAddressType, proofAddressNumber].filter(Boolean), 2),
-        renderFieldGrid(lotAddressSystem ? [{ ...lotAddressSystem, wide: true }] : [], 1),
-        renderFieldGrid([lotStreetNumber, lotStreetName].filter(Boolean), 2),
-        renderFieldGrid([lotBarangay, lotCity, lotProvince].filter(Boolean), 3),
-        renderFieldGrid(location ? [{ ...location, wide: true }] : [], 1),
-        renderFieldGrid(projectLocation ? [{ ...projectLocation, wide: true }] : [], 1),
-        renderFieldGrid(lotFullAddress ? [{ ...lotFullAddress, wide: true }] : [], 1)
-      ];
-      blocks.push(...permitRows.filter(Boolean));
+      blocks.push(
+        subsection('Request Details', [
+          renderFieldGrid([{ ...purpose, wide: true }].filter(Boolean), 1)
+        ]),
+        subsection('Applicant Information', [
+          renderFieldGrid([ownerLastName, ownerFirstName, ownerMiddleName].filter(Boolean), 3)
+        ]),
+        subsection('Contact Details', [
+          renderFieldGrid([ownerPhone].filter(Boolean), 1)
+        ]),
+        subsection('Applicant Address', [
+          renderFieldGrid([ownerFullAddress].filter(Boolean), 1)
+        ]),
+        subsection('Property / Location Details', [
+          renderFieldGrid([proofAddressType, proofAddressNumber].filter(Boolean), 2),
+          renderFieldGrid(lotAddressSystem ? [{ ...lotAddressSystem, wide: true }] : [], 1),
+          renderFieldGrid([lotStreetNumber, lotStreetName].filter(Boolean), 2),
+          renderFieldGrid([lotBarangay, lotCity, lotProvince].filter(Boolean), 3),
+          renderFieldGrid(location ? [{ ...location, wide: true }] : [], 1),
+          renderFieldGrid(projectLocation ? [{ ...projectLocation, wide: true }] : [], 1),
+          renderFieldGrid(lotFullAddress ? [{ ...lotFullAddress, wide: true }] : [], 1)
+        ])
+      );
     } else {
-      if (purpose) {
-        blocks.push(renderFieldGrid([{ ...purpose, wide: true }], 1));
-      }
-
-      const nameRow = [ownerLastName, ownerFirstName, ownerMiddleName].filter(Boolean);
-      if (nameRow.length) {
-        blocks.push(renderFieldGrid(nameRow, 3));
-      }
-
-      const contactRow = [ownerPhone, ownerFullAddress].filter(Boolean);
-      if (contactRow.length) {
-        blocks.push(renderFieldGrid(contactRow, 2));
-      }
-
-      const fallbackRow = [proofAddressType, proofAddressNumber].filter(Boolean);
-      if (fallbackRow.length) {
-        blocks.push(renderFieldGrid(fallbackRow, 2));
-      }
+      blocks.push(
+        subsection('Request Details', [
+          purpose ? renderFieldGrid([{ ...purpose, wide: true }], 1) : '',
+          renderFieldGrid([applicationType, paymentMethod].filter(Boolean), 2)
+        ]),
+        subsection('Applicant Information', [
+          renderFieldGrid([ownerLastName, ownerFirstName, ownerMiddleName].filter(Boolean), 3)
+        ]),
+        subsection('Contact Details', [
+          renderFieldGrid([ownerPhone].filter(Boolean), 1)
+        ]),
+        subsection('Applicant Address', [
+          renderFieldGrid([ownerFullAddress].filter(Boolean), 1)
+        ]),
+        subsection('Other Details', [
+          renderFieldGrid([proofAddressType, proofAddressNumber].filter(Boolean), 2)
+        ])
+      );
     }
 
     if (remaining.length) {
-      blocks.push(renderFieldGrid(remaining.map((f) => ({ ...f, wide: true })), 1));
+      blocks.push(subsection('Other Details', [
+        renderFieldGrid(remaining.map((f) => ({ ...f, wide: true })), 1)
+      ]));
     }
 
     return `<div class="d-grid gap-3">${blocks.filter(Boolean).join('')}</div>`;
@@ -5329,6 +5478,9 @@
           const residentProfile = row.resident_profile && typeof row.resident_profile === 'object'
             ? row.resident_profile
             : {};
+          const isBusinessPermitRequest = String(row?.document_type || payload?.document_type || '')
+            .toLowerCase()
+            .includes('business permit');
           const isRelationshipJailVisit = String(payload?.cohabitation_variant || '').trim() === 'relationship_jail_visit'
             || String(payload?.cohabitation_variant || '').trim() === 'conjugal_visit';
           const consumedKeys = new Set();
@@ -5363,18 +5515,25 @@
           { label: 'Suffix', value: firstNonEmpty([collectFirst('suffix_name', 'suffix'), collectResidentFirst('suffix')]) },
           { label: 'Contact Number', value: firstNonEmpty([collectFirst('contact_number', 'phone_number'), collectResidentFirst('contact_number')]) },
           { label: 'Full Address', value: firstNonEmpty([collectFirst('full_address', 'full_address_display', 'address', 'complete_address'), collectResidentFirst('full_address')]) },
-          { label: 'Birthdate', value: firstNonEmpty([collectFirst('birthdate', 'date_of_birth', 'child_dob'), collectResidentFirst('birthdate')]) },
           { label: 'Age', value: firstNonEmpty([collectFirst('age'), collectResidentFirst('age')]) },
           { label: 'Sex', value: firstNonEmpty([collectFirst('sex', 'gender', 'child_sex'), collectResidentFirst('sex')]) },
           { label: 'Civil Status', value: firstNonEmpty([collectFirst('civil_status'), collectResidentFirst('civil_status')]) },
           { label: 'Religion', value: firstNonEmpty([collectFirst('religion'), collectResidentFirst('religion')]) },
           { label: 'Occupation', value: firstNonEmpty([collectFirst('occupation'), collectResidentFirst('occupation')]) }
         ];
+        if (!isBusinessPermitRequest) {
+          personalFields.splice(6, 0, {
+            label: 'Birthdate',
+            value: firstNonEmpty([collectFirst('birthdate', 'date_of_birth', 'child_dob'), collectResidentFirst('birthdate')])
+          });
+        }
 
         const technicalKeys = new Set([
           'action', 'csrf_token', 'redirect', 'document_type', 'suffix_name_display', 'suffix_display',
           'child_sex_display', 'cohabitant_region_select', 'cohabitant_province_select',
           'cohabitant_city_select', 'cohabitant_barangay_select', 'cohabitantSameAddress',
+          'cohabitationAgree', 'cohabitation_agree',
+          'preview_full_name', 'cohabitant_full_name',
           'full_unit_number', 'full_house_lot_number', 'full_street_block_name', 'full_subdivision',
           'full_barangay', 'full_area_number', 'cohabitant_full_unit_number',
           'cohabitant_full_house_lot_number', 'cohabitant_full_street_block_name',
@@ -5392,6 +5551,17 @@
           'business_photo_file_path', 'renewal_valid_id_file_path', 'renewal_business_reg_file_path',
           'renewal_proof_address_file_path'
         ]);
+        if (isBusinessPermitRequest) {
+          technicalKeys.add('birthplace');
+          technicalKeys.add('place_of_birth');
+          technicalKeys.add('birthdate');
+          technicalKeys.add('date_of_birth');
+        }
+        if (String(payload?.cohabitation_variant || '').trim() !== '') {
+          technicalKeys.add('birthdate');
+          technicalKeys.add('date_of_birth');
+          technicalKeys.add('child_dob');
+        }
 
         const requestFields = [];
         const purposeText = firstNonEmpty([row.purpose, payload.purpose, payload.request_purpose]);
