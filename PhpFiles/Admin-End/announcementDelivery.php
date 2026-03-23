@@ -3,6 +3,7 @@ require_once __DIR__ . '/../General/connection.php';
 require_once __DIR__ . '/../General/sendSMS.php';
 require_once __DIR__ . '/../EmailHandlers/emailSender.php';
 require_once __DIR__ . '/../General/runtimeConfig.php';
+require_once __DIR__ . '/announcementAudience.php';
 
 function ann_delivery_missing_mail_fields(array $emailConfig): array
 {
@@ -79,46 +80,6 @@ function ann_delivery_compose_fields(array $announcement, ?string $preferredEmai
   ];
 }
 
-function ann_delivery_normalize_group(string $group): string
-{
-  $group = strtolower(trim($group));
-  if ($group === 'officials' || $group === 'official') return 'official';
-  if ($group === 'employees' || $group === 'employee' || $group === 'personnel' || $group === 'personnels') return 'employee';
-  if ($group === 'residents' || $group === 'resident') return 'resident';
-  return $group;
-}
-
-function ann_delivery_normalize_area(?string $area): string
-{
-  $area = strtolower(trim((string)$area));
-  if ($area === '') {
-    return '';
-  }
-
-  $area = preg_replace('/\s+/', ' ', $area);
-  if ($area === 'barangay wide' || $area === 'barangaywide') {
-    return 'barangaywide';
-  }
-
-  if (preg_match('/^area\s*0*(\d+)\s*([a-z]?)$/', $area, $matches)) {
-    $number = (string)((int)$matches[1]);
-    $suffix = strtolower((string)($matches[2] ?? ''));
-    return 'area' . $number . $suffix;
-  }
-
-  return preg_replace('/[^a-z0-9]+/', '', $area);
-}
-
-function ann_delivery_parse_csv_values(?string $value): array
-{
-  $parts = preg_split('/\s*,\s*/', trim((string)$value)) ?: [];
-  return array_values(array_filter(array_map(static function ($item): string {
-    return trim((string)$item);
-  }, $parts), static function (string $item): bool {
-    return $item !== '';
-  }));
-}
-
 function ann_delivery_is_verified_resident_status(?string $statusName): bool
 {
   $statusKey = strtolower(str_replace([' ', '_', '-'], '', (string)$statusName));
@@ -127,15 +88,9 @@ function ann_delivery_is_verified_resident_status(?string $statusName): bool
 
 function ann_delivery_target_groups(array $announcement): array
 {
-  $audienceScope = strtolower(trim((string)($announcement['audience_scope'] ?? 'all')));
-  $roleGroups = array_values(array_filter(array_map(static function ($group): string {
-    return ann_delivery_normalize_group($group);
-  }, ann_delivery_parse_csv_values((string)($announcement['role_group'] ?? ''))), static function (string $group): bool {
-    return $group !== '';
-  }));
-
-  if ($audienceScope === 'custom' && $roleGroups) {
-    return array_values(array_unique($roleGroups));
+  $config = ann_audience_config($announcement);
+  if ($config['scope'] === 'custom' && $config['normalized_groups']) {
+    return $config['normalized_groups'];
   }
 
   $audience = strtolower((string)($announcement['audience'] ?? 'all residents'));
@@ -167,7 +122,7 @@ function ann_delivery_has_usable_email(?string $email): bool
 
 function ann_delivery_staff_group_matches(?string $accountRole, ?string $infoRole, string $targetGroup): bool
 {
-  $roles = [ann_delivery_normalize_group((string)$accountRole), ann_delivery_normalize_group((string)$infoRole)];
+  $roles = [ann_audience_normalize_group((string)$accountRole), ann_audience_normalize_group((string)$infoRole)];
 
   foreach ($roles as $role) {
     if ($targetGroup === 'official' && in_array($role, ['official', 'admin', 'superadmin'], true)) {
@@ -204,7 +159,7 @@ function ann_delivery_fetch_resident_recipients(mysqli $conn, string $areaFilter
     if (!ann_delivery_is_verified_resident_status($row['status_name'] ?? null)) {
       continue;
     }
-    if ($areaFilter !== '' && ann_delivery_normalize_area($row['area_number'] ?? '') !== $areaFilter) {
+    if ($areaFilter !== '' && ann_audience_normalize_area($row['area_number'] ?? '') !== $areaFilter) {
       continue;
     }
     $recipients[] = [
@@ -230,7 +185,7 @@ function ann_delivery_fetch_staff_recipients(mysqli $conn, string $targetGroup, 
     if (!ann_delivery_staff_group_matches($row['account_role_access'] ?? '', $row['info_role_access'] ?? '', $targetGroup)) {
       continue;
     }
-    if ($areaFilter !== '' && ann_delivery_normalize_area($row['area_number'] ?? '') !== $areaFilter) {
+    if ($areaFilter !== '' && ann_audience_normalize_area($row['area_number'] ?? '') !== $areaFilter) {
       continue;
     }
     $recipients[] = [
@@ -246,13 +201,9 @@ function ann_delivery_fetch_staff_recipients(mysqli $conn, string $targetGroup, 
 function ann_delivery_fetch_recipients(mysqli $conn, array $announcement): array
 {
   $groups = ann_delivery_target_groups($announcement);
-  $audienceScope = strtolower(trim((string)($announcement['audience_scope'] ?? 'all')));
-  $areaFilters = $audienceScope === 'custom'
-    ? array_values(array_filter(array_map(static function ($area): string {
-        return ann_delivery_normalize_area($area);
-      }, ann_delivery_parse_csv_values((string)($announcement['area'] ?? ''))), static function (string $area): bool {
-        return $area !== '';
-      }))
+  $config = ann_audience_config($announcement);
+  $areaFilters = ($config['scope'] === 'custom' && !$config['is_barangay_wide'])
+    ? $config['normalized_areas']
     : [];
   $recipients = [];
 

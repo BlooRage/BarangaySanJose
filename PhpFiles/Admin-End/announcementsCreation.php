@@ -3,6 +3,7 @@ require_once __DIR__ . "/../General/connection.php";
 require_once __DIR__ . "/../../Admin-End/includes/admin_guard.php";
 require_once __DIR__ . "/contentStore.php";
 require_once __DIR__ . "/announcementDelivery.php";
+require_once __DIR__ . "/announcementAudience.php";
 
 if ($_SERVER["REQUEST_METHOD"] !== "POST") {
   header("Location: " . appUrl('/Admin-End/Contents/Contents.php'));
@@ -168,17 +169,12 @@ $placements = array_values(array_unique(array_filter((array)($_POST["placements"
 $channels = array_values(array_unique(array_filter((array)($_POST["channels"] ?? []), function ($ch) {
   return in_array((string)$ch, ["website", "public", "public_news", "sms", "email"], true);
 })));
-$audienceScope = trim((string)($_POST["audience_scope"] ?? "all"));
-$areas = array_values(array_unique(array_filter(array_map(static function ($value): string {
-  return trim((string)$value);
-}, (array)($_POST["area"] ?? [])), static function (string $value): bool {
-  return $value !== '';
-})));
-$roleGroups = array_values(array_unique(array_filter(array_map(static function ($value): string {
-  return trim((string)$value);
-}, (array)($_POST["role_group"] ?? [])), static function (string $value): bool {
-  return $value !== '';
-})));
+$audienceScope = strtolower(trim((string)($_POST["audience_scope"] ?? "all")));
+if (!in_array($audienceScope, ['all', 'custom'], true)) {
+  $audienceScope = 'all';
+}
+$areas = ann_audience_unique_strings((array)($_POST["area"] ?? []));
+$roleGroups = ann_audience_unique_strings((array)($_POST["role_group"] ?? []));
 $area = implode(', ', $areas);
 $roleGroup = implode(', ', $roleGroups);
 $submitAction = trim((string)($_POST["submit_action"] ?? "draft"));
@@ -305,6 +301,21 @@ if ($contentType === 'page') {
   }
 }
 
+if ($audienceScope === 'custom' && !$areas && !$roleGroups) {
+  ann_redirect_with_flash($redirectUrl, "warning", "Choose at least one area or role group for a custom audience.");
+}
+
+$audienceConfig = ann_audience_config([
+  'audience_scope' => $audienceScope,
+  'areas' => $areas,
+  'role_groups' => $roleGroups,
+]);
+$areas = $audienceConfig['areas'];
+$roleGroups = $audienceConfig['role_groups'];
+$area = implode(', ', $areas);
+$roleGroup = implode(', ', $roleGroups);
+$audienceScope = $audienceConfig['scope'];
+
 $sessionRole = strtolower(trim((string)($_SESSION["role"] ?? "")));
 $isSuperAdmin = $sessionRole === "superadmin";
 $status = "draft";
@@ -314,17 +325,7 @@ if ($submitAction === "pending" && !$isSuperAdmin) {
 if ($submitAction === "approved" && $isSuperAdmin) {
   $status = "approved";
 }
-$audience = "All Residents";
-if ($audienceScope === "custom") {
-  $parts = [];
-  if ($areas) {
-    $parts[] = implode(', ', $areas);
-  }
-  if ($roleGroups) {
-    $parts[] = implode(', ', $roleGroups);
-  }
-  $audience = $parts ? implode(", ", $parts) : "Custom Audience";
-}
+$audience = ann_audience_build_label($audienceScope, $areas, $roleGroups);
 
 $publishDate = "-";
 if ($scheduleDate !== "") {

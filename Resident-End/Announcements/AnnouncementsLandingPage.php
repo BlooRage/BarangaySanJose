@@ -17,9 +17,11 @@ if (!isset($baseUrl)) {
 $allowUnregistered = false;
 require_once __DIR__ . "/../includes/resident_access_guard.php";
 require_once __DIR__ . "/../../PhpFiles/Admin-End/contentStore.php";
+require_once __DIR__ . "/../../PhpFiles/Admin-End/announcementAudience.php";
 
 $items = announcements_load_all();
 $websiteAnnouncements = [];
+$viewerContext = ann_audience_fetch_resident_context($conn, (string)($_SESSION['user_id'] ?? ''));
 
 foreach ($items as $item) {
   $channels = array_values(array_filter((array)($item['channels'] ?? []), function ($ch) {
@@ -31,6 +33,9 @@ foreach ($items as $item) {
   }
   // Resident feed only receives approved website announcements.
   if ($status !== 'approved') {
+    continue;
+  }
+  if (!ann_audience_matches_viewer($item, $viewerContext)) {
     continue;
   }
 

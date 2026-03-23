@@ -1,5 +1,6 @@
 <?php
 require_once __DIR__ . '/../Admin-End/contentStore.php';
+require_once __DIR__ . '/../Admin-End/announcementAudience.php';
 
 header('Content-Type: application/json; charset=UTF-8');
 
@@ -13,6 +14,9 @@ foreach ($items as $item) {
 
     $status = strtolower((string)($item['status'] ?? 'draft'));
     if (!in_array('public_news', $channels, true) || $status !== 'approved') {
+        continue;
+    }
+    if (!ann_audience_is_publicly_visible($item)) {
         continue;
     }
 

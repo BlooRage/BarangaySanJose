@@ -2,6 +2,7 @@
 $allowUnregistered = false;
 require_once __DIR__ . "/includes/resident_access_guard.php";
 require_once __DIR__ . "/../PhpFiles/Admin-End/contentStore.php";
+require_once __DIR__ . "/../PhpFiles/Admin-End/announcementAudience.php";
 
 $isResidentNotVerified = false;
 $showNotVerifiedModal = false;
@@ -38,6 +39,7 @@ if (isset($_SESSION['show_not_verified_modal'])) {
 
 $residentAnnouncements = [];
 $announcementItems = announcements_load_all();
+$viewerContext = ann_audience_fetch_resident_context($conn, (string)($_SESSION['user_id'] ?? ''));
 usort($announcementItems, static function (array $a, array $b): int {
   $aDate = (string)($a['publish_date'] ?? $a['created_at'] ?? '');
   $bDate = (string)($b['publish_date'] ?? $b['created_at'] ?? '');
@@ -51,6 +53,9 @@ foreach ($announcementItems as $item) {
   }));
   $status = strtolower((string)($item['status'] ?? 'draft'));
   if ($status !== 'approved' || !in_array('website', $channels, true)) {
+    continue;
+  }
+  if (!ann_audience_matches_viewer($item, $viewerContext)) {
     continue;
   }
 

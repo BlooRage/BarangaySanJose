@@ -238,6 +238,34 @@
             return plain.length > maxLength ? plain.slice(0, maxLength).trimEnd() + '...' : plain;
         }
 
+        function renderFeaturedNews(item, refs) {
+            const headlineEl = refs.headlineEl;
+            const dateEl = refs.dateEl;
+            const bodyEl = refs.bodyEl;
+            const imageWrapperEl = refs.imageWrapperEl;
+
+            if (!item) {
+                headlineEl.textContent = "Latest Barangay News";
+                dateEl.textContent = "-";
+                bodyEl.innerHTML = "<p>No public news available yet.</p>";
+                imageWrapperEl.style.display = "none";
+                return;
+            }
+
+            headlineEl.textContent = item.title || "Latest Barangay News";
+            dateEl.textContent = item.posted_date ? "Posted: " + item.posted_date : "-";
+            bodyEl.innerHTML = item.content_html && String(item.content_html).trim() !== ""
+                ? item.content_html
+                : "<p>No public news content available yet.</p>";
+
+            if (item.image_url) {
+                imageWrapperEl.style.display = "";
+                imageWrapperEl.innerHTML = '<img src="' + escapeHtml(item.image_url) + '" alt="' + escapeHtml(item.title || "Public news image") + '" class="img-fluid rounded-4 w-100">';
+            } else {
+                imageWrapperEl.style.display = "none";
+            }
+        }
+
         (function () {
             const headlineEl = document.getElementById("publicNewsHeadline");
             const dateEl = document.getElementById("publicNewsDate");
@@ -262,23 +290,12 @@
                     const items = payload && Array.isArray(payload.items) ? payload.items : [];
                     const item = payload && payload.item ? payload.item : (items[0] || null);
                     if (!item) {
-                        imageWrapperEl.style.display = "none";
+                        renderFeaturedNews(null, { headlineEl, dateEl, bodyEl, imageWrapperEl });
                         moreNewsSectionEl.style.display = "none";
                         return;
                     }
 
-                    headlineEl.textContent = item.title || "Latest Barangay News";
-                    dateEl.textContent = item.posted_date ? "Posted: " + item.posted_date : "-";
-                    bodyEl.innerHTML = item.content_html && String(item.content_html).trim() !== ""
-                        ? item.content_html
-                        : "<p>No public news content available yet.</p>";
-
-                    if (item.image_url) {
-                        imageWrapperEl.style.display = "";
-                        imageWrapperEl.innerHTML = '<img src="' + escapeHtml(item.image_url) + '" alt="' + escapeHtml(item.title || "Public news image") + '" class="img-fluid rounded-4 w-100">';
-                    } else {
-                        imageWrapperEl.style.display = "none";
-                    }
+                    renderFeaturedNews(item, { headlineEl, dateEl, bodyEl, imageWrapperEl });
 
                     const moreItems = items.slice(1);
                     if (!moreItems.length) {
@@ -294,7 +311,8 @@
                             : '';
                         const divider = idx < moreItems.length - 1 ? '<div class="moreNewsCardDivider"></div>' : '';
                         return ''
-                            + '<article class="moreNewsCard">'
+                            + '<article class="moreNewsCard' + (idx === 0 ? ' is-active' : '') + '" tabindex="0" role="button"'
+                            + ' data-news-index="' + String(idx + 1) + '">'
                             + '  <div class="moreNewsCardInner">'
                             +       imageHtml
                             + '    <div class="moreNewsCardContent">'
@@ -306,11 +324,32 @@
                             +      divider
                             + '</article>';
                     }).join('');
+
+                    moreNewsListEl.querySelectorAll(".moreNewsCard").forEach(function (cardEl) {
+                        function activateCard() {
+                            const index = parseInt(cardEl.getAttribute("data-news-index") || "", 10);
+                            const selectedItem = Number.isNaN(index) ? null : items[index];
+                            if (!selectedItem) {
+                                return;
+                            }
+                            renderFeaturedNews(selectedItem, { headlineEl, dateEl, bodyEl, imageWrapperEl });
+                            moreNewsListEl.querySelectorAll(".moreNewsCard").forEach(function (el) {
+                                el.classList.toggle("is-active", el === cardEl);
+                            });
+                            window.scrollTo({ top: headlineEl.getBoundingClientRect().top + window.scrollY - 120, behavior: "smooth" });
+                        }
+
+                        cardEl.addEventListener("click", activateCard);
+                        cardEl.addEventListener("keydown", function (event) {
+                            if (event.key === "Enter" || event.key === " ") {
+                                event.preventDefault();
+                                activateCard();
+                            }
+                        });
+                    });
                 })
                 .catch(function () {
-                    headlineEl.textContent = "Latest Barangay News";
-                    dateEl.textContent = "-";
-                    imageWrapperEl.style.display = "none";
+                    renderFeaturedNews(null, { headlineEl, dateEl, bodyEl, imageWrapperEl });
                     moreNewsSectionEl.style.display = "none";
                 });
             }

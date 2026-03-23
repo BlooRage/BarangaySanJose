@@ -119,6 +119,25 @@
 
 .moreNewsCard {
    margin: 0;
+   border-radius: 18px;
+   padding: 18px;
+   cursor: pointer;
+   transition: background-color 0.22s ease, transform 0.22s ease, box-shadow 0.22s ease;
+}
+
+.moreNewsCard:hover {
+   background: rgba(255, 153, 51, 0.06);
+   transform: translateY(-2px);
+}
+
+.moreNewsCard:focus,
+.moreNewsCard:focus-visible {
+   outline: 0;
+   box-shadow: 0 0 0 3px rgba(255, 153, 51, 0.18);
+}
+
+.moreNewsCard.is-active {
+   background: linear-gradient(180deg, rgba(255, 153, 51, 0.12), rgba(255, 153, 51, 0.04));
 }
 
 .moreNewsCardInner {
@@ -338,6 +357,9 @@
    .moreNewsCardInner {
       grid-template-columns: 1fr;
       gap: 16px;
+   }
+   .moreNewsCard {
+      padding: 16px 14px;
    }
    .moreNewsCardImage img {
       min-height: 180px;

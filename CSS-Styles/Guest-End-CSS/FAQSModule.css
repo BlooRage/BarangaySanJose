@@ -98,12 +98,12 @@
     display: flex;
     justify-content: center;
     align-items: center;
-    width: 48px;
-    height: 48px;
-    background-color: var(--primary-color); 
-    color: var(--secondary-color); 
-    border-radius: 5px;
-    font-size: 1em;
+    width: 22px;
+    height: 22px;
+    background-color: transparent;
+    color: var(--primary-color);
+    border-radius: 0;
+    font-size: 1.35rem;
     flex-shrink: 0; 
 }
  .iconWrapper img {
@@ -113,6 +113,10 @@
 
 .iconWrapper i {
     transition: transform 0.3s ease;
+}
+
+.accordionButton:not(.collapsed) .iconWrapper i {
+    transform: rotate(180deg);
 }
 
 .accordionBody {
@@ -133,7 +137,8 @@
     box-shadow: none;
 }
 .accordionButton:not(.collapsed) .iconWrapper {
-    background-color: var(--accent-color); 
+    background-color: transparent;
+    color: var(--accent-color);
 }
 
 @media (max-width: 768px) {
@@ -151,8 +156,8 @@
         font-size: 0.95rem;
     }
     .iconWrapper {
-        width: 35px;
-        height: 35px;
+        width: 18px;
+        height: 18px;
         margin-right: 10px;
     }
     .accordionBody {
