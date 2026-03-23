@@ -323,11 +323,6 @@ foreach ($storedAnnouncements as $item) {
     'audience_scope' => (string)($item['audience_scope'] ?? 'all'),
     'area' => (string)($item['area'] ?? ''),
     'role_group' => (string)($item['role_group'] ?? ''),
-<<<<<<< Updated upstream
-    'area_list' => ann_content_parse_csv_values((string)($item['area'] ?? '')),
-    'role_group_list' => ann_content_parse_csv_values((string)($item['role_group'] ?? '')),
-=======
->>>>>>> Stashed changes
     'channels' => $channels,
     'placements' => ann_placements_from_channels($channels),
     'status' => $status,
@@ -449,11 +444,6 @@ foreach ($announcementRows as $row) {
     'audience_scope' => (string)($row['audience_scope'] ?? 'all'),
     'area' => (string)($row['area'] ?? ''),
     'role_group' => (string)($row['role_group'] ?? ''),
-<<<<<<< Updated upstream
-    'area_list' => array_values((array)($row['area_list'] ?? [])),
-    'role_group_list' => array_values((array)($row['role_group_list'] ?? [])),
-=======
->>>>>>> Stashed changes
     'channels' => array_values((array)$row['channels']),
     'placements' => array_values((array)($row['placements'] ?? [])),
     'status' => (string)$row['status'],
@@ -718,8 +708,6 @@ function ann_decode_faq_items(?string $json): array
       </h2>
       <hr><br>
 
-<<<<<<< Updated upstream
-=======
       <?php if ($isSuperAdmin): ?>
         <div id="review-queue-card" class="announcement-shell edit-requests-shell bg-white p-4 pt-3 rounded-4 shadow-sm border mb-4">
           <div class="review-queue-top d-flex flex-wrap align-items-start justify-content-between gap-3 mb-2">
@@ -846,8 +834,6 @@ function ann_decode_faq_items(?string $json): array
           </div>
         </div>
       <?php endif; ?>
-
->>>>>>> Stashed changes
       <div id="tracker-card" class="announcement-shell edit-requests-shell bg-white p-4 pt-3 rounded-4 shadow-sm border">
 
         <div class="admin-list-toolbar mb-3 pt-2">
@@ -1194,8 +1180,6 @@ function ann_decode_faq_items(?string $json): array
     </div>
   </div>
 
-<<<<<<< Updated upstream
-=======
   <div class="modal fade content-filter-modal" id="modalReviewQueueFilter" tabindex="-1" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
     <div class="modal-dialog modal-dialog-centered">
       <form class="modal-content p-4" method="get" action="<?= htmlspecialchars(appUrl('/Admin-End/Contents/Contents.php')) ?>">
@@ -1294,7 +1278,6 @@ function ann_decode_faq_items(?string $json): array
     </div>
   </div>
 
->>>>>>> Stashed changes
   <div class="modal fade" id="modalViewAnnouncement" tabindex="-1" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
     <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable announcement-details-dialog">
       <div class="modal-content announcement-details-content border-0 rounded-2 p-4">
@@ -1408,10 +1391,6 @@ function ann_decode_faq_items(?string $json): array
               <input type="text" class="form-control" id="editAnnouncementTypeDisplay" value="-" readonly>
             </div>
             <div class="mb-3" id="editAudienceGroup">
-<<<<<<< Updated upstream
-              <input type="hidden" id="editAnnouncementAudienceInput" name="audience" value="All Residents">
-=======
->>>>>>> Stashed changes
               <label class="form-label d-block">Audience</label>
               <div class="form-check mb-2">
                 <input class="form-check-input" type="radio" name="audience_scope" id="editAudienceAll" value="all" checked>
@@ -1423,33 +1402,6 @@ function ann_decode_faq_items(?string $json): array
               </div>
               <div id="editCustomAudienceFields" class="row g-3 d-none">
                 <div class="col-12">
-<<<<<<< Updated upstream
-                  <label class="form-label mb-1">Area</label>
-                  <p class="announcement-editor-helper mb-2">Choose the area that should receive this announcement.</p>
-                  <div class="row g-2">
-                    <?php foreach ($audienceAreaOptions as $areaOption): ?>
-                      <div class="col-12 col-sm-6">
-                        <label class="form-check border rounded-3 px-3 py-2 h-100 bg-white">
-                          <input class="form-check-input" type="checkbox" name="area[]" value="<?= htmlspecialchars($areaOption, ENT_QUOTES, 'UTF-8') ?>" disabled>
-                          <span class="form-check-label"><?= htmlspecialchars($areaOption, ENT_QUOTES, 'UTF-8') ?></span>
-                        </label>
-                      </div>
-                    <?php endforeach; ?>
-                  </div>
-                </div>
-                <div class="col-12">
-                  <label class="form-label mb-1">Role Group</label>
-                  <p class="announcement-editor-helper mb-2">Filter recipients by role when this update is only for a specific group.</p>
-                  <div class="row g-2">
-                    <?php foreach ($audienceRoleGroupOptions as $roleGroupOption): ?>
-                      <div class="col-12 col-sm-6">
-                        <label class="form-check border rounded-3 px-3 py-2 h-100 bg-white">
-                          <input class="form-check-input" type="checkbox" name="role_group[]" value="<?= htmlspecialchars($roleGroupOption, ENT_QUOTES, 'UTF-8') ?>" disabled>
-                          <span class="form-check-label"><?= htmlspecialchars($roleGroupOption, ENT_QUOTES, 'UTF-8') ?></span>
-                        </label>
-                      </div>
-                    <?php endforeach; ?>
-=======
                   <div class="announcement-audience-group">
                     <div class="announcement-audience-group-head">
                       <label class="form-label mb-1">Select Area</label>
@@ -1479,7 +1431,6 @@ function ann_decode_faq_items(?string $json): array
                       </label>
                       <?php endforeach; ?>
                     </div>
->>>>>>> Stashed changes
                   </div>
                 </div>
               </div>
@@ -1855,10 +1806,7 @@ function ann_decode_faq_items(?string $json): array
       const editPublicAnnouncementContentInput = document.getElementById("editPublicAnnouncementContent");
       const editAnnouncementTypeDisplay = document.getElementById("editAnnouncementTypeDisplay");
       const editAudienceGroup = document.getElementById("editAudienceGroup");
-<<<<<<< Updated upstream
       const editAnnouncementAudienceInput = document.getElementById("editAnnouncementAudienceInput");
-=======
->>>>>>> Stashed changes
       const editAudienceAll = document.getElementById("editAudienceAll");
       const editAudienceCustom = document.getElementById("editAudienceCustom");
       const editCustomAudienceFields = document.getElementById("editCustomAudienceFields");
@@ -2417,20 +2365,6 @@ function ann_decode_faq_items(?string $json): array
 
         document.getElementById("editAnnouncementIdInput").value = data.id || "";
         applyEditContentTypeMode(data);
-<<<<<<< Updated upstream
-        if (editAudienceCustom) editAudienceCustom.checked = String(data.audience_scope || "all").toLowerCase() === "custom";
-        if (editAudienceAll) editAudienceAll.checked = !editAudienceCustom?.checked;
-        toggleEditAudienceFields();
-        const areaList = Array.isArray(data.area_list) ? data.area_list : [];
-        const roleGroupList = Array.isArray(data.role_group_list) ? data.role_group_list : [];
-        document.querySelectorAll('#editCustomAudienceFields input[name="area[]"]').forEach((checkbox) => {
-          checkbox.checked = areaList.includes(String(checkbox.value || "").trim());
-        });
-        document.querySelectorAll('#editCustomAudienceFields input[name="role_group[]"]').forEach((checkbox) => {
-          checkbox.checked = roleGroupList.includes(String(checkbox.value || "").trim());
-        });
-        syncEditAudienceSummary();
-=======
         const audienceScope = String(data.audience_scope || "all").toLowerCase() === "custom" ? "custom" : "all";
         if (editAudienceAll) editAudienceAll.checked = audienceScope !== "custom";
         if (editAudienceCustom) editAudienceCustom.checked = audienceScope === "custom";
@@ -2445,7 +2379,6 @@ function ann_decode_faq_items(?string $json): array
           });
         }
         toggleEditAudienceFields();
->>>>>>> Stashed changes
         document.getElementById("editAnnouncementPublishDateInput").value = data.publish_date && data.publish_date !== "-" ? data.publish_date : "";
         if (editSmsMessageInput) editSmsMessageInput.value = data.sms_message || "";
         if (editEmailSubjectInput) editEmailSubjectInput.value = data.email_subject || "";

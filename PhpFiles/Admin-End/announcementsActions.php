@@ -231,26 +231,6 @@ foreach ($rows as $idx => $item) {
     }
 
     $title = trim((string)($_POST['title'] ?? ''));
-<<<<<<< Updated upstream
-    $audience = trim((string)($_POST['audience'] ?? ''));
-    $audienceScope = strtolower(trim((string)($_POST['audience_scope'] ?? ((string)($item['audience_scope'] ?? 'all')))));
-    if (!in_array($audienceScope, ['all', 'custom'], true)) {
-      $audienceScope = 'all';
-    }
-    $areas = array_values(array_unique(array_filter(array_map(static function ($value): string {
-      return trim((string)$value);
-    }, (array)($_POST['area'] ?? [])), static function (string $value): bool {
-      return $value !== '';
-    })));
-    $roleGroups = array_values(array_unique(array_filter(array_map(static function ($value): string {
-      return trim((string)$value);
-    }, (array)($_POST['role_group'] ?? [])), static function (string $value): bool {
-      return $value !== '';
-    })));
-    $area = implode(', ', $areas);
-    $roleGroup = implode(', ', $roleGroups);
-=======
->>>>>>> Stashed changes
     $contentHtml = trim((string)($_POST['content_html'] ?? ''));
     $publicNewsTitle = trim((string)($_POST['public_news_title'] ?? ''));
     $publicNewsContentHtml = trim((string)($_POST['public_news_content_html'] ?? ''));
@@ -277,22 +257,8 @@ foreach ($rows as $idx => $item) {
       return in_array((string)$ch, ['website', 'public', 'public_news', 'sms', 'email'], true);
     })));
 
-<<<<<<< Updated upstream
-    if ($audienceScope === 'custom') {
-      $parts = [];
-      if ($areas) {
-        $parts[] = implode(', ', $areas);
-      }
-      if ($roleGroups) {
-        $parts[] = implode(', ', $roleGroups);
-      }
-      $audience = $parts ? implode(', ', $parts) : 'Custom Audience';
-    } elseif ($audience === '') {
-      $audience = 'All Residents';
-=======
     if ($audienceScope === 'custom' && !$areas && !$roleGroups) {
       ann_action_redirect($channel, $status, $q, $queueQ, $queueChannel, 'warning', 'Choose at least one area or role group for a custom audience.');
->>>>>>> Stashed changes
     }
 
     $audienceConfig = ann_audience_config([
@@ -409,13 +375,8 @@ foreach ($rows as $idx => $item) {
     $rows[$idx]['title'] = $title;
     $rows[$idx]['audience'] = $audience;
     $rows[$idx]['audience_scope'] = $audienceScope;
-<<<<<<< Updated upstream
-    $rows[$idx]['area'] = $audienceScope === 'custom' ? $area : '';
-    $rows[$idx]['role_group'] = $audienceScope === 'custom' ? $roleGroup : '';
-=======
     $rows[$idx]['area'] = $area;
     $rows[$idx]['role_group'] = $roleGroup;
->>>>>>> Stashed changes
     $rows[$idx]['channels'] = $channels;
     $rows[$idx]['content_html'] = $contentHtml;
     $rows[$idx]['public_news_title'] = $publicNewsTitle;
