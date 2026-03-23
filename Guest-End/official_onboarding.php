@@ -248,6 +248,11 @@ function oi_has_address(?array $row): bool
 {
     if (!$row) return false;
     $mode = strtolower(trim((string)($row['address_mode'] ?? 'street')));
+    if ($mode === 'house') {
+        $mode = 'street';
+    } elseif ($mode === 'lot_block') {
+        $mode = 'block_lot';
+    }
     $hasCore = oi_non_empty((string)($row['barangay'] ?? ''))
         && oi_non_empty((string)($row['municipality_city'] ?? ''))
         && oi_non_empty((string)($row['province'] ?? ''));
@@ -754,9 +759,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 if (!oi_official_info_exists($conn, $loggedUserId)) {
                     throw new RuntimeException('Complete information and emergency contact first.');
                 }
-                $addressMode = strtolower(trim((string)($_POST['address_mode'] ?? 'street')));
-                if (!in_array($addressMode, ['street', 'block_lot'], true)) {
+                $addressModeRaw = strtolower(trim((string)($_POST['address_mode'] ?? '')));
+                if (in_array($addressModeRaw, ['street', 'house'], true)) {
                     $addressMode = 'street';
+                } elseif (in_array($addressModeRaw, ['block_lot', 'lot_block'], true)) {
+                    $addressMode = 'block_lot';
+                } else {
+                    $addressMode = '';
                 }
                 $houseNumber = trim((string)($_POST['house_number'] ?? ''));
                 $streetName = trim((string)($_POST['street_name'] ?? ''));
@@ -765,6 +774,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $barangay = trim((string)($_POST['barangay'] ?? ''));
                 $municipalityCity = trim((string)($_POST['municipality_city'] ?? ''));
                 $province = trim((string)($_POST['province'] ?? ''));
+                if ($addressMode === '') {
+                    throw new RuntimeException('Select an address system first.');
+                }
                 $missingCore = ($barangay === '' || $municipalityCity === '' || $province === '');
                 $missingStreet = ($addressMode === 'street' && ($houseNumber === '' || $streetName === ''));
                 $missingBlockLot = ($addressMode === 'block_lot' && ($blockNumber === '' || $lotNumber === ''));
@@ -1166,6 +1178,25 @@ if ($mode === 'password') {
             font-size: 0.9rem;
             margin-bottom: 0.25rem;
         }
+        .address-system-panel {
+            border: 1px solid #e5e7eb;
+            border-radius: 12px;
+            padding: 0.9rem;
+            background: #ffffff;
+        }
+        .address-system-panel-title {
+            font-size: 0.88rem;
+            font-weight: 700;
+            color: #667085;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+            margin-bottom: 0.75rem;
+        }
+        .readonly-highlight {
+            background-color: #f3f4f6 !important;
+            color: #6b7280 !important;
+            border-color: #d1d5db !important;
+        }
         @media (max-width: 991.98px) {
             #navbarBrand {
                 font-size: clamp(1.05rem, 4.2vw, 1.45rem) !important;
@@ -1506,48 +1537,81 @@ if ($mode === 'password') {
                 <p class="text-muted">Complete your address.</p>
                 <form method="post" class="row g-3">
                     <input type="hidden" name="action" value="save_official_address">
-                    <?php $addressMode = strtolower(trim((string)($officialInfo['address_mode'] ?? 'street'))); ?>
+                    <?php
+                    $addressMode = strtolower(trim((string)($officialInfo['address_mode'] ?? '')));
+                    if ($addressMode === 'house') {
+                        $addressMode = 'street';
+                    } elseif ($addressMode === 'lot_block') {
+                        $addressMode = 'block_lot';
+                    }
+                    if (!in_array($addressMode, ['street', 'block_lot'], true)) {
+                        $addressMode = '';
+                    }
+                    ?>
                     <div class="col-12">
                         <div class="address-ui-card">
                             <div class="address-ui-title">Address Details</div>
                             <div class="address-ui-caption">Select an address system first, then complete the required fields.</div>
                             <div class="row g-3">
                                 <div class="col-md-12">
-                                    <label class="form-label">Address System</label>
+                                    <label class="form-label">Address System <span class="text-danger">*</span></label>
                                     <select class="form-select" name="address_mode" id="officialAddressMode" required>
-                                        <option value="street" <?= $addressMode === 'block_lot' ? '' : 'selected' ?>>Street System</option>
-                                        <option value="block_lot" <?= $addressMode === 'block_lot' ? 'selected' : '' ?>>Block / Lot System</option>
+                                        <option value="" <?= $addressMode === '' ? 'selected' : '' ?>>Select</option>
+                                        <option value="street" <?= $addressMode === 'street' ? 'selected' : '' ?>>House Numbering System</option>
+                                        <option value="block_lot" <?= $addressMode === 'block_lot' ? 'selected' : '' ?>>Lot/Block System</option>
                                     </select>
                                 </div>
 
-                                <div class="col-md-6" id="officialHouseWrap">
-                                    <label class="form-label">House Number</label>
-                                    <input class="form-control" id="officialHouseNumber" name="house_number" maxlength="50" pattern="[A-Za-z0-9#/-][A-Za-z0-9#/- ]*" value="<?= htmlspecialchars((string)($officialInfo['house_number'] ?? ''), ENT_QUOTES, 'UTF-8') ?>">
+                                <div class="col-12 d-none" id="officialHouseSystemWrap">
+                                    <div class="address-system-panel">
+                                        <div class="address-system-panel-title">House Numbering System</div>
+                                        <div class="row g-3">
+                                            <div class="col-md-6" id="officialHouseWrap">
+                                                <label class="form-label">House Number <span class="text-danger">*</span></label>
+                                                <input class="form-control" id="officialHouseNumber" name="house_number" maxlength="50" pattern="[A-Za-z0-9#/-][A-Za-z0-9#/- ]*" value="<?= htmlspecialchars((string)($officialInfo['house_number'] ?? ''), ENT_QUOTES, 'UTF-8') ?>">
+                                            </div>
+                                            <div class="col-md-6" id="officialStreetWrap">
+                                                <label class="form-label">Street Name <span class="text-danger">*</span></label>
+                                                <input class="form-control" id="officialStreetName" name="street_name" maxlength="150" value="<?= htmlspecialchars((string)($officialInfo['street_name'] ?? ''), ENT_QUOTES, 'UTF-8') ?>">
+                                            </div>
+                                        </div>
+                                    </div>
                                 </div>
-                                <div class="col-md-6 d-none" id="officialLotWrap">
-                                    <label class="form-label">Lot Number</label>
-                                    <input class="form-control" id="officialLotNumber" name="lot_number" maxlength="50" pattern="[A-Za-z0-9#/-][A-Za-z0-9#/- ]*" value="<?= htmlspecialchars((string)($officialInfo['lot_number'] ?? ''), ENT_QUOTES, 'UTF-8') ?>">
-                                </div>
-                                <div class="col-md-4 d-none" id="officialBlockWrap">
-                                    <label class="form-label">Block Number</label>
-                                    <input class="form-control" id="officialBlockNumber" name="block_number" maxlength="50" pattern="[A-Za-z0-9#/-][A-Za-z0-9#/- ]*" value="<?= htmlspecialchars((string)($officialInfo['block_number'] ?? ''), ENT_QUOTES, 'UTF-8') ?>">
-                                </div>
-                                <div class="col-md-6" id="officialStreetWrap">
-                                    <label class="form-label">Street Name</label>
-                                    <input class="form-control" id="officialStreetName" name="street_name" maxlength="150" value="<?= htmlspecialchars((string)($officialInfo['street_name'] ?? ''), ENT_QUOTES, 'UTF-8') ?>">
+
+                                <div class="col-12 d-none" id="officialLotBlockSystemWrap">
+                                    <div class="address-system-panel">
+                                        <div class="address-system-panel-title">Lot/Block System</div>
+                                        <div class="row g-3">
+                                            <div class="col-md-4 d-none" id="officialLotWrap">
+                                                <label class="form-label">Lot <span class="text-danger">*</span></label>
+                                                <input class="form-control" id="officialLotNumber" name="lot_number" maxlength="50" pattern="[A-Za-z0-9#/-][A-Za-z0-9#/- ]*" value="<?= htmlspecialchars((string)($officialInfo['lot_number'] ?? ''), ENT_QUOTES, 'UTF-8') ?>">
+                                            </div>
+                                            <div class="col-md-4 d-none" id="officialBlockWrap">
+                                                <label class="form-label">Block <span class="text-danger">*</span></label>
+                                                <input class="form-control" id="officialBlockNumber" name="block_number" maxlength="50" pattern="[A-Za-z0-9#/-][A-Za-z0-9#/- ]*" value="<?= htmlspecialchars((string)($officialInfo['block_number'] ?? ''), ENT_QUOTES, 'UTF-8') ?>">
+                                            </div>
+                                            <div class="col-md-4 d-none" id="officialLotStreetWrap">
+                                                <label class="form-label">Street Name</label>
+                                                <input class="form-control" id="officialLotStreetName" maxlength="150" value="<?= htmlspecialchars((string)($officialInfo['street_name'] ?? ''), ENT_QUOTES, 'UTF-8') ?>" disabled>
+                                            </div>
+                                        </div>
+                                    </div>
                                 </div>
 
                                 <div class="col-md-4">
                                     <label class="form-label">Barangay</label>
-                                    <input class="form-control" name="barangay" maxlength="150" value="<?= htmlspecialchars((string)($officialInfo['barangay'] ?? 'Barangay San Jose'), ENT_QUOTES, 'UTF-8') ?>" required>
+                                    <input class="form-control readonly-highlight" value="<?= htmlspecialchars((string)($officialInfo['barangay'] ?? 'Barangay San Jose'), ENT_QUOTES, 'UTF-8') ?>" readonly>
+                                    <input type="hidden" name="barangay" value="<?= htmlspecialchars((string)($officialInfo['barangay'] ?? 'Barangay San Jose'), ENT_QUOTES, 'UTF-8') ?>">
                                 </div>
                                 <div class="col-md-4">
-                                    <label class="form-label">City</label>
-                                    <input class="form-control" name="municipality_city" maxlength="150" value="<?= htmlspecialchars((string)($officialInfo['municipality_city'] ?? 'Rodriguez (Montalban)'), ENT_QUOTES, 'UTF-8') ?>" required>
+                                    <label class="form-label">Municipality / City</label>
+                                    <input class="form-control readonly-highlight" value="<?= htmlspecialchars((string)($officialInfo['municipality_city'] ?? 'Rodriguez'), ENT_QUOTES, 'UTF-8') ?>" readonly>
+                                    <input type="hidden" name="municipality_city" value="<?= htmlspecialchars((string)($officialInfo['municipality_city'] ?? 'Rodriguez'), ENT_QUOTES, 'UTF-8') ?>">
                                 </div>
                                 <div class="col-md-4">
                                     <label class="form-label">Province</label>
-                                    <input class="form-control" name="province" maxlength="150" value="<?= htmlspecialchars((string)($officialInfo['province'] ?? 'Rizal'), ENT_QUOTES, 'UTF-8') ?>" required>
+                                    <input class="form-control readonly-highlight" value="<?= htmlspecialchars((string)($officialInfo['province'] ?? 'Rizal'), ENT_QUOTES, 'UTF-8') ?>" readonly>
+                                    <input type="hidden" name="province" value="<?= htmlspecialchars((string)($officialInfo['province'] ?? 'Rizal'), ENT_QUOTES, 'UTF-8') ?>">
                                 </div>
                             </div>
                         </div>
@@ -1594,8 +1658,11 @@ document.addEventListener("DOMContentLoaded", () => {
   const modeEl = document.getElementById("officialAddressMode");
   const houseEl = document.getElementById("officialHouseNumber");
   const streetEl = document.getElementById("officialStreetName");
+  const houseSystemWrap = document.getElementById("officialHouseSystemWrap");
+  const lotBlockSystemWrap = document.getElementById("officialLotBlockSystemWrap");
   const houseWrap = document.getElementById("officialHouseWrap");
   const streetWrap = document.getElementById("officialStreetWrap");
+  const lotStreetWrap = document.getElementById("officialLotStreetWrap");
   const blockWrap = document.getElementById("officialBlockWrap");
   const lotWrap = document.getElementById("officialLotWrap");
   const blockEl = document.getElementById("officialBlockNumber");
@@ -1603,14 +1670,18 @@ document.addEventListener("DOMContentLoaded", () => {
 
   const syncAddressMode = () => {
     if (!modeEl) return;
-    const mode = String(modeEl.value || "street").toLowerCase();
+    const mode = String(modeEl.value || "").toLowerCase();
     const isBlockLot = mode === "block_lot";
-    if (houseWrap) houseWrap.classList.toggle("d-none", isBlockLot);
-    if (streetWrap) streetWrap.classList.toggle("d-none", isBlockLot);
+    const isStreet = mode === "street";
+    if (houseSystemWrap) houseSystemWrap.classList.toggle("d-none", !isStreet);
+    if (lotBlockSystemWrap) lotBlockSystemWrap.classList.toggle("d-none", !isBlockLot);
+    if (houseWrap) houseWrap.classList.toggle("d-none", !isStreet);
+    if (streetWrap) streetWrap.classList.toggle("d-none", !isStreet);
+    if (lotStreetWrap) lotStreetWrap.classList.toggle("d-none", !isBlockLot);
     if (blockWrap) blockWrap.classList.toggle("d-none", !isBlockLot);
     if (lotWrap) lotWrap.classList.toggle("d-none", !isBlockLot);
-    if (houseEl) houseEl.required = !isBlockLot;
-    if (streetEl) streetEl.required = !isBlockLot;
+    if (houseEl) houseEl.required = isStreet;
+    if (streetEl) streetEl.required = isStreet;
     if (blockEl) blockEl.required = isBlockLot;
     if (lotEl) lotEl.required = isBlockLot;
   };
