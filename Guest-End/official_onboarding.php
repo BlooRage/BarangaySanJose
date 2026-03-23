@@ -1555,7 +1555,7 @@ if ($mode === 'password') {
                             <div class="row g-3">
                                 <div class="col-md-12">
                                     <label class="form-label">Address System <span class="text-danger">*</span></label>
-                                    <select class="form-select" name="address_mode" id="officialAddressMode" required>
+                                    <select class="form-select" name="address_mode" id="officialAddressMode" required onchange="window.toggleOfficialAddressMode && window.toggleOfficialAddressMode(this.value)">
                                         <option value="" <?= $addressMode === '' ? 'selected' : '' ?>>Select</option>
                                         <option value="street" <?= $addressMode === 'street' ? 'selected' : '' ?>>House Numbering System</option>
                                         <option value="block_lot" <?= $addressMode === 'block_lot' ? 'selected' : '' ?>>Lot/Block System</option>
@@ -1620,6 +1620,40 @@ if ($mode === 'password') {
                         <button class="btn btn-primary" type="submit">Save and Continue</button>
                     </div>
                 </form>
+                <script>
+                window.toggleOfficialAddressMode = function (rawMode) {
+                    const mode = String(rawMode || '').toLowerCase();
+                    const isStreet = mode === 'street';
+                    const isBlockLot = mode === 'block_lot';
+
+                    const houseSystemWrap = document.getElementById('officialHouseSystemWrap');
+                    const lotBlockSystemWrap = document.getElementById('officialLotBlockSystemWrap');
+                    const houseWrap = document.getElementById('officialHouseWrap');
+                    const streetWrap = document.getElementById('officialStreetWrap');
+                    const lotWrap = document.getElementById('officialLotWrap');
+                    const blockWrap = document.getElementById('officialBlockWrap');
+                    const lotStreetWrap = document.getElementById('officialLotStreetWrap');
+                    const houseEl = document.getElementById('officialHouseNumber');
+                    const streetEl = document.getElementById('officialStreetName');
+                    const lotEl = document.getElementById('officialLotNumber');
+                    const blockEl = document.getElementById('officialBlockNumber');
+
+                    houseSystemWrap?.classList.toggle('d-none', !isStreet);
+                    lotBlockSystemWrap?.classList.toggle('d-none', !isBlockLot);
+                    houseWrap?.classList.toggle('d-none', !isStreet);
+                    streetWrap?.classList.toggle('d-none', !isStreet);
+                    lotWrap?.classList.toggle('d-none', !isBlockLot);
+                    blockWrap?.classList.toggle('d-none', !isBlockLot);
+                    lotStreetWrap?.classList.toggle('d-none', !isBlockLot);
+
+                    if (houseEl) houseEl.required = isStreet;
+                    if (streetEl) streetEl.required = isStreet;
+                    if (lotEl) lotEl.required = isBlockLot;
+                    if (blockEl) blockEl.required = isBlockLot;
+                };
+
+                window.toggleOfficialAddressMode(document.getElementById('officialAddressMode')?.value || '');
+                </script>
             <?php elseif ($mode === 'resume' && $resumeStep === 'document_upload'): ?>
                 <?php if (strtolower(trim((string)($sessionInvite['status'] ?? ''))) === 'rejectedapproval'): ?>
                     <div class="alert alert-danger">
