@@ -136,8 +136,9 @@ class EmailSender
             if ($subject === '') throw new \RuntimeException("Missing 'subject'.");
             $this->mail->Subject = $subject;
 
-            // Template by type
-            if (empty($options['template']) && !empty($options['type'])) {
+            // Only auto-pick a type template when the caller did not already
+            // provide explicit template or HTML content.
+            if (empty($options['template']) && empty($options['bodyHtml']) && !empty($options['type'])) {
                 $t = $options['type'];
                 if (!isset($this->templateMap[$t])) throw new \RuntimeException("Unknown email type: {$t}");
                 $options['template'] = $this->templateMap[$t];

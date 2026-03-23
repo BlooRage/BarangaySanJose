@@ -129,15 +129,16 @@ function oi_send_email_otp(string $email, string $otp): bool
 {
     $smtpConfig = require __DIR__ . "/../PhpFiles/General/mailConfigurations.php";
     $sender = new EmailSender($smtpConfig);
-    $html = '<p>Your Barangay San Jose onboarding OTP is:</p>'
-        . '<p style="font-size:28px;font-weight:bold;letter-spacing:4px;">' . htmlspecialchars($otp, ENT_QUOTES, 'UTF-8') . '</p>'
-        . '<p>This code will expire in 5 minutes.</p>';
     return $sender->send([
-        'type' => 'one_time',
         'to' => $email,
         'subject' => 'Official Account Onboarding OTP',
-        'bodyHtml' => $html,
-        'bodyText' => "Your onboarding OTP is {$otp}. This code expires in 5 minutes.",
+        'from_name' => 'Barangay San Jose Access',
+        'template' => 'emails/officialOnboardingOtp.php',
+        'data' => [
+            'otp' => $otp,
+            'expiresNote' => 'This OTP expires in 5 minutes.',
+        ],
+        'bodyText' => "Your Barangay San Jose onboarding OTP is {$otp}. This code expires in 5 minutes.",
     ]);
 }
 

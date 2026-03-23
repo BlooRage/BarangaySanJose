@@ -91,6 +91,25 @@ function appConfiguredRootPath(): string
     return $cached = '';
 }
 
+function appHasConfiguredRootContext(): bool
+{
+    static $cached = null;
+    if ($cached !== null) {
+        return $cached;
+    }
+
+    if (appConfiguredBaseUrlRaw() !== '') {
+        return $cached = true;
+    }
+
+    if (getenv('APP_ROOT_PATH') !== false) {
+        return $cached = true;
+    }
+
+    $config = runtime_config_all();
+    return $cached = isset($config['app']) && is_array($config['app']) && array_key_exists('root_path', $config['app']);
+}
+
 function appRequestHeader(string $key): string
 {
     $value = $_SERVER[$key] ?? '';
@@ -263,7 +282,7 @@ function appRootPath(): string
     }
 
     $configured = appConfiguredRootPath();
-    if ($configured !== '') {
+    if ($configured !== '' || appHasConfiguredRootContext()) {
         return $cached = $configured;
     }
 
