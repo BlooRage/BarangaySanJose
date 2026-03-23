@@ -6287,6 +6287,25 @@
     const manualOccupation = document.getElementById('manualOccupation');
     const manualReligion = document.getElementById('manualReligion');
     const manualFullAddress = document.getElementById('manualFullAddress');
+    const manualBarangayIdPhotoModalEl = document.getElementById('manualBarangayIdPhotoModal');
+    const manualBarangayIdPhotoModal = manualBarangayIdPhotoModalEl ? getOrCreateModalInstance(manualBarangayIdPhotoModalEl) : null;
+    const manualBarangayIdPhotoStatus = document.getElementById('manualBarangayIdPhotoStatus');
+    const manualBarangayIdPhotoFooterCopy = document.getElementById('manualBarangayIdPhotoFooterCopy');
+    const manualBarangayIdCameraStage = document.getElementById('manualBarangayIdCameraStage');
+    const manualBarangayIdCropStage = document.getElementById('manualBarangayIdCropStage');
+    const manualBarangayIdCameraVideo = document.getElementById('manualBarangayIdCameraVideo');
+    const manualBarangayIdCameraEmpty = document.getElementById('manualBarangayIdCameraEmpty');
+    const manualBarangayIdCameraWorkspace = document.getElementById('manualBarangayIdCameraWorkspace');
+    const manualBarangayIdCropWorkspace = document.getElementById('manualBarangayIdCropWorkspace');
+    const manualBarangayIdCropImage = document.getElementById('manualBarangayIdCropImage');
+    const manualBarangayIdCropFrame = document.getElementById('manualBarangayIdCropFrame');
+    const manualBarangayIdCropEmpty = document.getElementById('manualBarangayIdCropEmpty');
+    const manualBarangayIdZoomRange = document.getElementById('manualBarangayIdZoomRange');
+    const manualBarangayIdUseLinkedPhotoBtn = document.getElementById('manualBarangayIdUseLinkedPhotoBtn');
+    const manualBarangayIdStartCameraBtn = document.getElementById('manualBarangayIdStartCameraBtn');
+    const manualBarangayIdRetakePhotoBtn = document.getElementById('manualBarangayIdRetakePhotoBtn');
+    const manualBarangayIdCapturePhotoBtn = document.getElementById('manualBarangayIdCapturePhotoBtn');
+    const manualBarangayIdSavePhotoBtn = document.getElementById('manualBarangayIdSavePhotoBtn');
 
     const manualDocumentConfigs = [
       { id: 'barangay_id', group: 'ID', label: 'Barangay ID', documentType: 'Barangay ID', kind: 'barangay_id', free: true },
@@ -6311,6 +6330,33 @@
     let manualSelectedResident = null;
     let manualPreviewSignature = '';
     let manualResidentSearchToken = 0;
+    let manualBarangayIdPhotoMode = 'none';
+    let manualBarangayIdPhotoCustomDataUrl = '';
+    let manualBarangayIdPhotoResidentUrl = '';
+    let manualBarangayIdPhotoResidentPath = '';
+    let manualBarangayIdPhotoStream = null;
+    let manualBarangayIdCropSourceUrl = '';
+    let manualBarangayIdCropState = {
+      x: 0,
+      y: 0,
+      scale: 1,
+      minScale: 1,
+      maxScale: 4,
+      baseScale: 1,
+      imageWidth: 0,
+      imageHeight: 0,
+      frameLeft: 0,
+      frameTop: 0,
+      frameSize: 0,
+    };
+    let manualBarangayIdDragState = {
+      active: false,
+      startX: 0,
+      startY: 0,
+      originX: 0,
+      originY: 0,
+      pointerId: null,
+    };
 
     function manualSetAlert(message = '', tone = 'warning') {
       if (!manualFormAlert) return;
@@ -6343,6 +6389,423 @@
 
     function manualEscapeAttr(value) {
       return String(value ?? '').replace(/"/g, '&quot;');
+    }
+
+    function manualBarangayIdPhotoButton(label, action, tone = 'outline-primary', icon = 'fa-camera') {
+      return `
+        <button type="button" class="btn btn-${tone}" data-manual-photo-action="${manualEscapeAttr(action)}">
+          <i class="fas ${manualEscapeAttr(icon)} me-1"></i>${esc(label)}
+        </button>
+      `;
+    }
+
+    function manualResolveBarangayIdPhotoPreviewUrl(value) {
+      const raw = String(value || '').trim();
+      if (!raw) return '';
+      if (/^(data|blob):/i.test(raw)) return raw;
+      return resolvePublicUrl(raw);
+    }
+
+    function manualCurrentBarangayIdPhoto() {
+      if (manualBarangayIdPhotoMode === 'custom' && manualBarangayIdPhotoCustomDataUrl) {
+        return {
+          mode: 'custom',
+          previewUrl: manualBarangayIdPhotoCustomDataUrl,
+          dataUrl: manualBarangayIdPhotoCustomDataUrl,
+          path: '',
+          label: 'Captured and cropped photo ready',
+        };
+      }
+      if (manualBarangayIdPhotoMode === 'resident' && (manualBarangayIdPhotoResidentUrl || manualBarangayIdPhotoResidentPath)) {
+        return {
+          mode: 'resident',
+          previewUrl: manualResolveBarangayIdPhotoPreviewUrl(manualBarangayIdPhotoResidentUrl || manualBarangayIdPhotoResidentPath),
+          dataUrl: '',
+          path: manualBarangayIdPhotoResidentPath,
+          label: 'Using linked resident photo',
+        };
+      }
+      return {
+        mode: 'none',
+        previewUrl: '',
+        dataUrl: '',
+        path: '',
+        label: 'No photo selected yet',
+      };
+    }
+
+    function manualSetBarangayIdPhotoStatus(message = '', tone = 'info') {
+      if (!manualBarangayIdPhotoStatus) return;
+      const toneClasses = ['alert-info', 'alert-warning', 'alert-danger', 'alert-success'];
+      manualBarangayIdPhotoStatus.classList.remove(...toneClasses);
+      if (!message) {
+        manualBarangayIdPhotoStatus.classList.add('d-none');
+        manualBarangayIdPhotoStatus.textContent = '';
+        return;
+      }
+      const className = {
+        info: 'alert-info',
+        warning: 'alert-warning',
+        danger: 'alert-danger',
+        success: 'alert-success',
+      }[tone] || 'alert-info';
+      manualBarangayIdPhotoStatus.classList.add(className);
+      manualBarangayIdPhotoStatus.textContent = String(message);
+      manualBarangayIdPhotoStatus.classList.remove('d-none');
+    }
+
+    function manualStopBarangayIdCamera() {
+      if (manualBarangayIdPhotoStream) {
+        manualBarangayIdPhotoStream.getTracks().forEach((track) => track.stop());
+      }
+      manualBarangayIdPhotoStream = null;
+      if (manualBarangayIdCameraVideo) {
+        manualBarangayIdCameraVideo.srcObject = null;
+      }
+      if (manualBarangayIdCapturePhotoBtn) {
+        manualBarangayIdCapturePhotoBtn.disabled = true;
+      }
+    }
+
+    function manualBarangayIdHasResidentPhoto() {
+      return !!(manualBarangayIdPhotoResidentUrl || manualBarangayIdPhotoResidentPath);
+    }
+
+    function manualSyncBarangayIdPhotoResidentSource() {
+      manualBarangayIdPhotoResidentUrl = String(manualSelectedResident?.id_picture_url || '').trim();
+      manualBarangayIdPhotoResidentPath = String(manualSelectedResident?.id_picture_path || '').trim();
+      if (manualBarangayIdPhotoMode === 'resident' && !manualBarangayIdHasResidentPhoto()) {
+        manualBarangayIdPhotoMode = 'none';
+      }
+      if (manualBarangayIdPhotoMode !== 'custom' && manualBarangayIdPhotoMode !== 'resident' && !manualBarangayIdHasResidentPhoto()) {
+        manualBarangayIdPhotoMode = 'none';
+      }
+      manualUpdateBarangayIdPhotoField();
+    }
+
+    function manualResetBarangayIdPhotoState() {
+      manualStopBarangayIdCamera();
+      manualBarangayIdPhotoMode = 'none';
+      manualBarangayIdPhotoCustomDataUrl = '';
+      manualBarangayIdPhotoResidentUrl = '';
+      manualBarangayIdPhotoResidentPath = '';
+      manualBarangayIdCropSourceUrl = '';
+      manualBarangayIdCropState = {
+        x: 0,
+        y: 0,
+        scale: 1,
+        minScale: 1,
+        maxScale: 4,
+        baseScale: 1,
+        imageWidth: 0,
+        imageHeight: 0,
+        frameLeft: 0,
+        frameTop: 0,
+        frameSize: 0,
+      };
+      manualBarangayIdDragState = {
+        active: false,
+        startX: 0,
+        startY: 0,
+        originX: 0,
+        originY: 0,
+        pointerId: null,
+      };
+      if (manualBarangayIdZoomRange) {
+        manualBarangayIdZoomRange.value = '100';
+        manualBarangayIdZoomRange.disabled = true;
+      }
+      if (manualBarangayIdCropImage) {
+        manualBarangayIdCropImage.removeAttribute('src');
+        manualBarangayIdCropImage.style.transform = '';
+      }
+      if (manualBarangayIdSavePhotoBtn) {
+        manualBarangayIdSavePhotoBtn.disabled = true;
+      }
+      manualBarangayIdCropWorkspace?.classList.remove('is-dragging');
+      manualSetBarangayIdPhotoStatus('', 'info');
+      manualUpdateBarangayIdPhotoField();
+    }
+
+    function manualUpdateBarangayIdPhotoField() {
+      const photoField = manualDynamicFields?.querySelector('[data-manual-photo-field="barangay_id"]');
+      if (!photoField) return;
+      const preview = manualCurrentBarangayIdPhoto();
+      const previewBox = photoField.querySelector('[data-manual-photo-preview]');
+      const chip = photoField.querySelector('[data-manual-photo-chip]');
+      const actions = photoField.querySelector('[data-manual-photo-actions]');
+      const note = photoField.querySelector('[data-manual-photo-note]');
+
+      if (previewBox) {
+        if (preview.previewUrl) {
+          previewBox.innerHTML = `<img src="${manualEscapeAttr(preview.previewUrl)}" alt="Barangay ID photo preview">`;
+        } else {
+          previewBox.innerHTML = '<div class="manual-photo-preview-placeholder">No Barangay ID photo saved yet. Take a photo, then crop and save it here.</div>';
+        }
+      }
+      if (chip) {
+        chip.innerHTML = preview.mode === 'custom'
+          ? '<i class="fas fa-circle-check"></i>Captured photo ready'
+          : (preview.mode === 'resident'
+              ? '<i class="fas fa-id-badge"></i>Linked resident photo ready'
+              : '<i class="fas fa-camera"></i>Photo required for Barangay ID');
+      }
+      if (note) {
+        note.textContent = preview.mode === 'custom'
+          ? 'This captured photo will be used for the Barangay ID preview and saved with the request.'
+          : (preview.mode === 'resident'
+              ? 'The linked resident photo is currently active. Taking a new photo will replace it for this request.'
+              : 'Capture the resident through the webcam, then crop and save a square photo for the Barangay ID.');
+      }
+      if (actions) {
+        const buttons = [
+          manualBarangayIdPhotoButton(preview.mode === 'custom' ? 'Retake Photo' : 'Take Photo', 'take', 'outline-primary', 'fa-camera'),
+        ];
+        if (preview.previewUrl) {
+          buttons.push(manualBarangayIdPhotoButton('View / Adjust', 'adjust', 'outline-secondary', 'fa-crop-simple'));
+        }
+        if (manualBarangayIdHasResidentPhoto() && manualBarangayIdPhotoMode !== 'resident') {
+          buttons.push(manualBarangayIdPhotoButton('Use Linked Photo', 'linked', 'outline-secondary', 'fa-id-card'));
+        }
+        if (preview.previewUrl) {
+          buttons.push(manualBarangayIdPhotoButton('Remove Photo', 'remove', 'outline-danger', 'fa-trash'));
+        }
+        actions.innerHTML = buttons.join('');
+      }
+    }
+
+    function manualSwitchBarangayIdPhotoStage(stage) {
+      const isCrop = stage === 'crop';
+      manualBarangayIdCameraStage?.classList.toggle('d-none', isCrop);
+      manualBarangayIdCropStage?.classList.toggle('d-none', !isCrop);
+      if (manualBarangayIdStartCameraBtn) {
+        manualBarangayIdStartCameraBtn.classList.toggle('d-none', isCrop);
+      }
+      if (manualBarangayIdUseLinkedPhotoBtn) {
+        manualBarangayIdUseLinkedPhotoBtn.classList.toggle('d-none', isCrop || !manualBarangayIdHasResidentPhoto());
+      }
+      if (manualBarangayIdCapturePhotoBtn) {
+        manualBarangayIdCapturePhotoBtn.classList.toggle('d-none', isCrop);
+      }
+      if (manualBarangayIdRetakePhotoBtn) {
+        manualBarangayIdRetakePhotoBtn.classList.toggle('d-none', !isCrop);
+      }
+      if (manualBarangayIdSavePhotoBtn) {
+        manualBarangayIdSavePhotoBtn.classList.toggle('d-none', !isCrop);
+      }
+      if (manualBarangayIdPhotoFooterCopy) {
+        manualBarangayIdPhotoFooterCopy.textContent = isCrop
+          ? 'Drag the image behind the square guide and use the zoom slider until the face is framed well, then save the crop.'
+          : 'Allow camera access when prompted. Captured photos stay inside the Barangay ID request flow and will be cropped to a square before saving.';
+      }
+    }
+
+    async function manualStartBarangayIdCamera() {
+      if (!navigator.mediaDevices?.getUserMedia) {
+        manualSetBarangayIdPhotoStatus('This browser does not support camera access for manual Barangay ID capture.', 'danger');
+        return;
+      }
+      manualStopBarangayIdCamera();
+      manualSwitchBarangayIdPhotoStage('camera');
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: {
+            facingMode: 'user',
+            width: { ideal: 1280 },
+            height: { ideal: 720 },
+          },
+          audio: false,
+        });
+        manualBarangayIdPhotoStream = stream;
+        if (manualBarangayIdCameraVideo) {
+          manualBarangayIdCameraVideo.srcObject = stream;
+          await manualBarangayIdCameraVideo.play();
+        }
+        manualBarangayIdCameraEmpty?.classList.add('d-none');
+        if (manualBarangayIdCapturePhotoBtn) {
+          manualBarangayIdCapturePhotoBtn.disabled = false;
+        }
+        manualSetBarangayIdPhotoStatus('Camera ready. Position the resident inside the square guide, then capture the photo.', 'info');
+      } catch (error) {
+        manualStopBarangayIdCamera();
+        manualBarangayIdCameraEmpty?.classList.remove('d-none');
+        manualSetBarangayIdPhotoStatus(error?.message || 'Camera access was blocked. Allow camera access, then try again.', 'danger');
+      }
+    }
+
+    function manualComputeBarangayIdCropFrame() {
+      if (!manualBarangayIdCropWorkspace || !manualBarangayIdCropFrame) return null;
+      const workspaceRect = manualBarangayIdCropWorkspace.getBoundingClientRect();
+      const frameRect = manualBarangayIdCropFrame.getBoundingClientRect();
+      const frame = {
+        left: frameRect.left - workspaceRect.left,
+        top: frameRect.top - workspaceRect.top,
+        size: frameRect.width,
+      };
+      manualBarangayIdCropState.frameLeft = frame.left;
+      manualBarangayIdCropState.frameTop = frame.top;
+      manualBarangayIdCropState.frameSize = frame.size;
+      return frame;
+    }
+
+    function manualClampBarangayIdCropPosition() {
+      const frame = manualComputeBarangayIdCropFrame();
+      if (!frame) return;
+      const displayWidth = manualBarangayIdCropState.imageWidth * manualBarangayIdCropState.scale;
+      const displayHeight = manualBarangayIdCropState.imageHeight * manualBarangayIdCropState.scale;
+      const minX = frame.left + frame.size - displayWidth;
+      const maxX = frame.left;
+      const minY = frame.top + frame.size - displayHeight;
+      const maxY = frame.top;
+      manualBarangayIdCropState.x = Math.min(maxX, Math.max(minX, manualBarangayIdCropState.x));
+      manualBarangayIdCropState.y = Math.min(maxY, Math.max(minY, manualBarangayIdCropState.y));
+    }
+
+    function manualApplyBarangayIdCropTransform() {
+      if (!manualBarangayIdCropImage) return;
+      manualClampBarangayIdCropPosition();
+      manualBarangayIdCropImage.style.transform = `translate(${manualBarangayIdCropState.x}px, ${manualBarangayIdCropState.y}px) scale(${manualBarangayIdCropState.scale})`;
+    }
+
+    function manualSeedBarangayIdCropState() {
+      if (!manualBarangayIdCropWorkspace || !manualBarangayIdCropImage || !manualBarangayIdCropImage.naturalWidth || !manualBarangayIdCropImage.naturalHeight) {
+        return;
+      }
+      const workspaceRect = manualBarangayIdCropWorkspace.getBoundingClientRect();
+      const frame = manualComputeBarangayIdCropFrame();
+      if (!frame) return;
+      const imageWidth = manualBarangayIdCropImage.naturalWidth;
+      const imageHeight = manualBarangayIdCropImage.naturalHeight;
+      const baseScale = Math.max(frame.size / imageWidth, frame.size / imageHeight);
+      manualBarangayIdCropState = {
+        ...manualBarangayIdCropState,
+        x: (workspaceRect.width - imageWidth * baseScale) / 2,
+        y: (workspaceRect.height - imageHeight * baseScale) / 2,
+        scale: baseScale,
+        minScale: baseScale,
+        maxScale: baseScale * 4,
+        baseScale,
+        imageWidth,
+        imageHeight,
+      };
+      if (manualBarangayIdZoomRange) {
+        manualBarangayIdZoomRange.value = '100';
+      }
+      manualApplyBarangayIdCropTransform();
+    }
+
+    function manualLoadBarangayIdCropSource(sourceUrl) {
+      if (!manualBarangayIdCropImage) return;
+      manualBarangayIdCropSourceUrl = manualResolveBarangayIdPhotoPreviewUrl(sourceUrl);
+      if (manualBarangayIdSavePhotoBtn) {
+        manualBarangayIdSavePhotoBtn.disabled = true;
+      }
+      if (manualBarangayIdZoomRange) {
+        manualBarangayIdZoomRange.disabled = true;
+      }
+      if (!manualBarangayIdCropSourceUrl) {
+        manualBarangayIdCropEmpty?.classList.remove('d-none');
+        manualBarangayIdCropImage.removeAttribute('src');
+        return;
+      }
+      manualBarangayIdCropEmpty?.classList.add('d-none');
+      if (manualBarangayIdCropImage.src === manualBarangayIdCropSourceUrl) {
+        manualBarangayIdCropImage.removeAttribute('src');
+        requestAnimationFrame(() => {
+          manualBarangayIdCropImage.src = manualBarangayIdCropSourceUrl;
+        });
+        return;
+      }
+      manualBarangayIdCropImage.src = manualBarangayIdCropSourceUrl;
+    }
+
+    function manualStartBarangayIdCropFromSource(sourceUrl, statusMessage = 'Adjust the photo inside the square frame, then save the crop.') {
+      const resolvedSource = manualResolveBarangayIdPhotoPreviewUrl(sourceUrl);
+      if (!resolvedSource) {
+        manualSetBarangayIdPhotoStatus('No photo source is available yet. Capture a photo first or use the linked resident photo.', 'warning');
+        return;
+      }
+      manualBarangayIdPhotoModal?.show();
+      manualSwitchBarangayIdPhotoStage('crop');
+      manualLoadBarangayIdCropSource(resolvedSource);
+      manualStopBarangayIdCamera();
+      manualSetBarangayIdPhotoStatus(statusMessage, 'info');
+    }
+
+    function manualOpenBarangayIdPhotoModal(mode = 'camera') {
+      if (!manualBarangayIdPhotoModal) return;
+      if (mode === 'crop') {
+        const current = manualCurrentBarangayIdPhoto();
+        if (!current.previewUrl) {
+          manualSetBarangayIdPhotoStatus('Capture a photo first before opening the crop view.', 'warning');
+          return;
+        }
+        manualStartBarangayIdCropFromSource(current.previewUrl);
+        return;
+      }
+      manualBarangayIdPhotoModal.show();
+      manualSwitchBarangayIdPhotoStage('camera');
+      manualStartBarangayIdCamera();
+    }
+
+    function manualCaptureBarangayIdPhoto() {
+      if (!manualBarangayIdCameraVideo || !manualBarangayIdCameraVideo.videoWidth || !manualBarangayIdCameraVideo.videoHeight) {
+        manualSetBarangayIdPhotoStatus('Camera preview is not ready yet. Start the camera first.', 'warning');
+        return;
+      }
+      const canvas = document.createElement('canvas');
+      canvas.width = manualBarangayIdCameraVideo.videoWidth;
+      canvas.height = manualBarangayIdCameraVideo.videoHeight;
+      const context = canvas.getContext('2d');
+      if (!context) {
+        manualSetBarangayIdPhotoStatus('Unable to capture the camera frame on this device.', 'danger');
+        return;
+      }
+      context.drawImage(manualBarangayIdCameraVideo, 0, 0, canvas.width, canvas.height);
+      manualLoadBarangayIdCropSource(canvas.toDataURL('image/png'));
+      manualSwitchBarangayIdPhotoStage('crop');
+      manualStopBarangayIdCamera();
+      manualSetBarangayIdPhotoStatus('Photo captured. Drag and zoom it inside the square frame, then save the crop.', 'success');
+    }
+
+    function manualSaveBarangayIdCrop() {
+      if (!manualBarangayIdCropImage || !manualBarangayIdCropImage.naturalWidth) {
+        manualSetBarangayIdPhotoStatus('Capture or load a photo first before saving the crop.', 'warning');
+        return;
+      }
+      const frame = manualComputeBarangayIdCropFrame();
+      if (!frame) {
+        manualSetBarangayIdPhotoStatus('Unable to compute the crop frame. Resize the window and try again.', 'danger');
+        return;
+      }
+      const cropCanvas = document.createElement('canvas');
+      cropCanvas.width = 512;
+      cropCanvas.height = 512;
+      const context = cropCanvas.getContext('2d');
+      if (!context) {
+        manualSetBarangayIdPhotoStatus('Unable to save the cropped photo on this browser.', 'danger');
+        return;
+      }
+      const sourceX = (frame.left - manualBarangayIdCropState.x) / manualBarangayIdCropState.scale;
+      const sourceY = (frame.top - manualBarangayIdCropState.y) / manualBarangayIdCropState.scale;
+      const sourceSize = frame.size / manualBarangayIdCropState.scale;
+      context.drawImage(
+        manualBarangayIdCropImage,
+        sourceX,
+        sourceY,
+        sourceSize,
+        sourceSize,
+        0,
+        0,
+        cropCanvas.width,
+        cropCanvas.height
+      );
+      manualBarangayIdPhotoCustomDataUrl = cropCanvas.toDataURL('image/png');
+      manualBarangayIdPhotoMode = 'custom';
+      manualUpdateBarangayIdPhotoField();
+      manualMarkPreviewStale(true);
+      manualBarangayIdPhotoModal?.hide();
+      manualSetAlert('Barangay ID photo saved. Preview the ID again before submitting the manual request.', 'success');
     }
 
     function manualResidentDisplayName(record) {
@@ -6564,7 +7027,8 @@
             { name: 'emergency_contact', label: 'Emergency Contact Number', type: 'text', required: true, col: 'col-md-6' },
             { name: 'emergency_address', label: 'Emergency Address', type: 'textarea', required: true, col: 'col-md-6', rows: 2 },
             { name: 'barangay_id_number', label: 'Barangay ID Number', type: 'text', col: 'col-md-6', placeholder: 'Auto-generated if left blank' },
-            { name: 'barangay_id_valid_until', label: 'Valid Until', type: 'text', col: 'col-md-6', placeholder: 'Auto-generated if left blank' }
+            { name: 'barangay_id_valid_until', label: 'Valid Until', type: 'text', col: 'col-md-6', placeholder: 'Auto-generated if left blank' },
+            { name: 'barangay_id_photo_capture', label: 'Barangay ID Photo', type: 'photo_capture', required: true, col: 'col-12' }
           ];
         case 'residency':
           return [
@@ -6622,6 +7086,35 @@
       const placeholder = field.placeholder ? `placeholder="${manualEscapeAttr(field.placeholder)}"` : '';
       const valueAttr = field.value ? `value="${manualEscapeAttr(field.value)}"` : '';
       const label = `${esc(field.label)}${field.required ? ' <span class="text-danger">*</span>' : ''}`;
+
+      if (field.type === 'photo_capture') {
+        return `
+          <div class="${col}">
+            <div class="manual-photo-field" data-manual-photo-field="barangay_id">
+              <div class="manual-photo-field-header">
+                <div>
+                  <h6>${field.label}</h6>
+                  <p>Take the resident photo using the computer camera, then adjust the square crop before saving it for the Barangay ID.</p>
+                </div>
+                <span class="manual-photo-chip" data-manual-photo-chip><i class="fas fa-camera"></i>Photo required for Barangay ID</span>
+              </div>
+              <div class="d-flex flex-wrap gap-3 align-items-start">
+                <div class="manual-photo-preview-box" data-manual-photo-preview>
+                  <div class="manual-photo-preview-placeholder">No Barangay ID photo saved yet. Take a photo, then crop and save it here.</div>
+                </div>
+                <div class="manual-photo-meta">
+                  <div class="manual-photo-actions" data-manual-photo-actions>
+                    ${manualBarangayIdPhotoButton('Take Photo', 'take', 'outline-primary', 'fa-camera')}
+                  </div>
+                  <p class="manual-photo-note" data-manual-photo-note>
+                    Capture the resident through the webcam, then crop and save a square photo for the Barangay ID.
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+        `;
+      }
 
       if (field.type === 'textarea') {
         return `
@@ -6759,6 +7252,7 @@
         manualDynamicFields.innerHTML = fields.map(manualFieldHtml).join('');
       }
       manualApplyResidentDynamicFields();
+      manualUpdateBarangayIdPhotoField();
       manualApplySuggestedPurpose();
       manualRenderFeeCatalog();
       manualUpdateSummary();
@@ -6776,13 +7270,20 @@
         manualResidentId.value = '';
         manualResidentUserId.value = '';
         manualSelectedResidentCard?.classList.add('d-none');
+        manualSelectedResidentName.textContent = 'Registered resident';
+        manualSelectedResidentMeta.textContent = '';
+        manualSyncBarangayIdPhotoResidentSource();
       }
       manualMarkPreviewStale(true);
       manualUpdateSummary();
     }
 
     function manualApplyResidentDynamicFields() {
-      if (!manualDynamicFields || !manualSelectedResident) return;
+      if (!manualDynamicFields) return;
+      if (!manualSelectedResident) {
+        manualSyncBarangayIdPhotoResidentSource();
+        return;
+      }
       const resident = manualSelectedResident;
       const fieldValues = {
         emergency_last: resident.emergency_last_name,
@@ -6798,12 +7299,26 @@
           input.value = String(value || '').trim();
         }
       });
+      manualSyncBarangayIdPhotoResidentSource();
     }
 
     function manualFillFormFromResident(record) {
       const resident = manualNormalizeResident(record);
       if (!resident) return;
+      const previousResidentKey = [
+        String(manualSelectedResident?.resident_id || '').trim(),
+        String(manualSelectedResident?.resident_user_id || '').trim(),
+      ].join('|');
+      const nextResidentKey = [
+        String(resident.resident_id || '').trim(),
+        String(resident.resident_user_id || '').trim(),
+      ].join('|');
+      const residentChanged = nextResidentKey !== '' && nextResidentKey !== previousResidentKey;
       manualSelectedResident = resident;
+      if (residentChanged) {
+        manualBarangayIdPhotoCustomDataUrl = '';
+        manualBarangayIdPhotoMode = 'resident';
+      }
       manualResidentId.value = resident.resident_id || '';
       manualResidentUserId.value = resident.resident_user_id || '';
       manualLastName.value = resident.last_name || '';
@@ -6919,6 +7434,16 @@
         address: fullAddress,
       };
 
+      if (config.kind === 'barangay_id') {
+        const photo = manualCurrentBarangayIdPhoto();
+        if (photo.previewUrl) {
+          payload.id_picture_url = photo.previewUrl;
+        }
+        if (photo.path) {
+          payload.id_picture_path = photo.path;
+        }
+      }
+
       manualDynamicFields?.querySelectorAll('[data-manual-field]').forEach((field) => {
         const key = String(field.getAttribute('data-manual-field') || '').trim();
         if (!key) return;
@@ -6949,7 +7474,14 @@
         throw new Error('Complete the required form fields first.');
       }
 
+      const photo = manualCurrentBarangayIdPhoto();
+      if (config.kind === 'barangay_id' && !photo.previewUrl) {
+        throw new Error('Barangay ID photo is required. Take a photo, then Crop and Save before previewing.');
+      }
       const payload = manualBuildPayload();
+      const photoDataUrl = config.kind === 'barangay_id' && photo.mode === 'custom'
+        ? String(photo.dataUrl || '').trim()
+        : '';
       const feeRows = manualCurrentFeeRows();
       const expectedStage = manualExpectedStage(config, feeRows);
       const previewRow = {
@@ -6970,7 +7502,10 @@
         feeRows,
         resident_id: previewRow.resident_id,
         resident_user_id: previewRow.resident_user_id,
-        document_type: config.documentType
+        document_type: config.documentType,
+        photo_key: photo.mode === 'custom'
+          ? photoDataUrl
+          : `${photo.mode}:${String(photo.path || photo.previewUrl || '').trim()}`
       });
 
       return {
@@ -6979,21 +7514,26 @@
         feeRows,
         previewRow,
         residentProfile,
+        photoDataUrl,
         signature
       };
     }
 
     function manualResetForm() {
+      manualBarangayIdPhotoModal?.hide();
       manualForm.reset();
       manualResidentSearchResults = [];
       manualSelectedResident = null;
       manualResidentId.value = '';
       manualResidentUserId.value = '';
+      manualSelectedResidentName.textContent = 'Registered resident';
+      manualSelectedResidentMeta.textContent = '';
       manualResidentResults.innerHTML = '';
       manualResidentResultsWrap?.classList.add('d-none');
       manualResidentSearchHint?.classList.remove('d-none');
       manualSelectedResidentCard?.classList.add('d-none');
       manualPreviewSignature = '';
+      manualResetBarangayIdPhotoState();
       if (manualSubmitBtn) {
         manualSubmitBtn.disabled = true;
       }
@@ -7043,6 +7583,9 @@
       manualResidentId.value = '';
       manualResidentUserId.value = '';
       manualSelectedResidentCard?.classList.add('d-none');
+      manualSelectedResidentName.textContent = 'Registered resident';
+      manualSelectedResidentMeta.textContent = '';
+      manualSyncBarangayIdPhotoResidentSource();
       manualMarkPreviewStale(true);
       manualUpdateSummary();
       manualSetAlert('Resident link cleared. You can keep encoding this as a walk-in request or search again.', 'info');
@@ -7078,6 +7621,54 @@
       manualMarkPreviewStale(true);
     });
 
+    manualDynamicFields?.addEventListener('click', (event) => {
+      const trigger = event.target.closest('[data-manual-photo-action]');
+      if (!trigger) return;
+      const action = String(trigger.getAttribute('data-manual-photo-action') || '').trim();
+      if (!action) return;
+      event.preventDefault();
+
+      if (action === 'take') {
+        manualOpenBarangayIdPhotoModal('camera');
+        return;
+      }
+      if (action === 'adjust') {
+        manualOpenBarangayIdPhotoModal('crop');
+        return;
+      }
+      if (action === 'linked') {
+        if (!manualBarangayIdHasResidentPhoto()) {
+          manualSetAlert('No linked resident photo is available yet for this record.', 'warning');
+          return;
+        }
+        manualStartBarangayIdCropFromSource(
+          manualBarangayIdPhotoResidentUrl || manualBarangayIdPhotoResidentPath,
+          'Adjust the linked resident photo inside the square frame, then save the crop.'
+        );
+        return;
+      }
+      if (action === 'remove') {
+        const current = manualCurrentBarangayIdPhoto();
+        if (current.mode === 'custom') {
+          manualBarangayIdPhotoCustomDataUrl = '';
+          manualBarangayIdPhotoMode = manualBarangayIdHasResidentPhoto() ? 'resident' : 'none';
+          manualUpdateBarangayIdPhotoField();
+          manualMarkPreviewStale(true);
+          manualSetAlert(
+            manualBarangayIdPhotoMode === 'resident'
+              ? 'Captured photo removed. The linked resident photo is active again.'
+              : 'Captured photo removed. Take a new photo before previewing the Barangay ID again.',
+            'info'
+          );
+          return;
+        }
+        manualBarangayIdPhotoMode = 'none';
+        manualUpdateBarangayIdPhotoField();
+        manualMarkPreviewStale(true);
+        manualSetAlert('Linked resident photo removed. Capture a new photo or use the linked photo again before previewing the Barangay ID.', 'info');
+      }
+    });
+
     manualFeeList?.addEventListener('input', () => {
       manualUpdateFeeTotal();
       manualMarkPreviewStale(true);
@@ -7103,6 +7694,132 @@
     ].forEach((field) => {
       field?.addEventListener('input', () => manualMarkPreviewStale(true));
       field?.addEventListener('change', () => manualMarkPreviewStale(true));
+    });
+
+    manualBarangayIdStartCameraBtn?.addEventListener('click', () => {
+      manualStartBarangayIdCamera();
+    });
+
+    manualBarangayIdCapturePhotoBtn?.addEventListener('click', () => {
+      manualCaptureBarangayIdPhoto();
+    });
+
+    manualBarangayIdRetakePhotoBtn?.addEventListener('click', () => {
+      manualOpenBarangayIdPhotoModal('camera');
+    });
+
+    manualBarangayIdUseLinkedPhotoBtn?.addEventListener('click', () => {
+      if (!manualBarangayIdHasResidentPhoto()) {
+        manualSetBarangayIdPhotoStatus('No linked resident photo is available yet for this record.', 'warning');
+        return;
+      }
+      manualStartBarangayIdCropFromSource(
+        manualBarangayIdPhotoResidentUrl || manualBarangayIdPhotoResidentPath,
+        'Adjust the linked resident photo inside the square frame, then save the crop.'
+      );
+    });
+
+    manualBarangayIdSavePhotoBtn?.addEventListener('click', () => {
+      manualSaveBarangayIdCrop();
+    });
+
+    manualBarangayIdCropImage?.addEventListener('load', () => {
+      manualBarangayIdCropEmpty?.classList.add('d-none');
+      if (manualBarangayIdZoomRange) {
+        manualBarangayIdZoomRange.disabled = false;
+      }
+      if (manualBarangayIdSavePhotoBtn) {
+        manualBarangayIdSavePhotoBtn.disabled = false;
+      }
+      requestAnimationFrame(() => {
+        manualSeedBarangayIdCropState();
+      });
+    });
+
+    manualBarangayIdCropImage?.addEventListener('error', () => {
+      manualBarangayIdCropEmpty?.classList.remove('d-none');
+      if (manualBarangayIdZoomRange) {
+        manualBarangayIdZoomRange.disabled = true;
+      }
+      if (manualBarangayIdSavePhotoBtn) {
+        manualBarangayIdSavePhotoBtn.disabled = true;
+      }
+      manualSetBarangayIdPhotoStatus('The selected photo could not be loaded for cropping. Try again.', 'danger');
+    });
+
+    manualBarangayIdZoomRange?.addEventListener('input', (event) => {
+      const frame = manualComputeBarangayIdCropFrame();
+      if (!frame || !manualBarangayIdCropState.baseScale) return;
+      const multiplier = Math.max(1, Number(event.target?.value || 100) / 100);
+      const nextScale = Math.min(
+        manualBarangayIdCropState.maxScale,
+        Math.max(manualBarangayIdCropState.minScale, manualBarangayIdCropState.baseScale * multiplier)
+      );
+      const focusX = frame.left + frame.size / 2;
+      const focusY = frame.top + frame.size / 2;
+      const imageFocusX = (focusX - manualBarangayIdCropState.x) / manualBarangayIdCropState.scale;
+      const imageFocusY = (focusY - manualBarangayIdCropState.y) / manualBarangayIdCropState.scale;
+      manualBarangayIdCropState.scale = nextScale;
+      manualBarangayIdCropState.x = focusX - imageFocusX * nextScale;
+      manualBarangayIdCropState.y = focusY - imageFocusY * nextScale;
+      manualApplyBarangayIdCropTransform();
+    });
+
+    manualBarangayIdCropWorkspace?.addEventListener('pointerdown', (event) => {
+      if (!manualBarangayIdCropSourceUrl || !manualBarangayIdCropImage?.naturalWidth) return;
+      event.preventDefault();
+      manualBarangayIdDragState = {
+        active: true,
+        startX: event.clientX,
+        startY: event.clientY,
+        originX: manualBarangayIdCropState.x,
+        originY: manualBarangayIdCropState.y,
+        pointerId: event.pointerId,
+      };
+      manualBarangayIdCropWorkspace.classList.add('is-dragging');
+      manualBarangayIdCropWorkspace.setPointerCapture?.(event.pointerId);
+    });
+
+    manualBarangayIdCropWorkspace?.addEventListener('pointermove', (event) => {
+      if (!manualBarangayIdDragState.active) return;
+      if (manualBarangayIdDragState.pointerId !== null && event.pointerId !== manualBarangayIdDragState.pointerId) return;
+      event.preventDefault();
+      manualBarangayIdCropState.x = manualBarangayIdDragState.originX + (event.clientX - manualBarangayIdDragState.startX);
+      manualBarangayIdCropState.y = manualBarangayIdDragState.originY + (event.clientY - manualBarangayIdDragState.startY);
+      manualApplyBarangayIdCropTransform();
+    });
+
+    const manualEndBarangayIdCropDrag = (event) => {
+      if (!manualBarangayIdDragState.active) return;
+      if (manualBarangayIdDragState.pointerId !== null && event?.pointerId !== undefined && event.pointerId !== manualBarangayIdDragState.pointerId) {
+        return;
+      }
+      manualBarangayIdDragState = {
+        active: false,
+        startX: 0,
+        startY: 0,
+        originX: manualBarangayIdCropState.x,
+        originY: manualBarangayIdCropState.y,
+        pointerId: null,
+      };
+      manualBarangayIdCropWorkspace?.classList.remove('is-dragging');
+      if (event?.pointerId !== undefined) {
+        try {
+          manualBarangayIdCropWorkspace?.releasePointerCapture?.(event.pointerId);
+        } catch (_) {
+          // Pointer capture may already be released.
+        }
+      }
+    };
+
+    manualBarangayIdCropWorkspace?.addEventListener('pointerup', manualEndBarangayIdCropDrag);
+    manualBarangayIdCropWorkspace?.addEventListener('pointercancel', manualEndBarangayIdCropDrag);
+    manualBarangayIdCropWorkspace?.addEventListener('lostpointercapture', manualEndBarangayIdCropDrag);
+
+    manualBarangayIdPhotoModalEl?.addEventListener('hidden.bs.modal', () => {
+      manualStopBarangayIdCamera();
+      manualSetBarangayIdPhotoStatus('', 'info');
+      manualEndBarangayIdCropDrag();
     });
 
     manualPreviewBtn?.addEventListener('click', () => {
@@ -7179,8 +7896,15 @@
 
         const body = new FormData();
         body.append('action', 'create_manual_request');
-        body.append('payload', JSON.stringify(bundle.payload));
+        const submitPayload = { ...bundle.payload };
+        if (/^data:/i.test(String(submitPayload.id_picture_url || '').trim())) {
+          delete submitPayload.id_picture_url;
+        }
+        body.append('payload', JSON.stringify(submitPayload));
         body.append('fees', JSON.stringify(bundle.feeRows));
+        if (bundle.photoDataUrl) {
+          body.append('id_picture_data_url', bundle.photoDataUrl);
+        }
         if (bundle.payload.resident_id) {
           body.append('resident_id', String(bundle.payload.resident_id));
         }

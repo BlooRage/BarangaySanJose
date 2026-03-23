@@ -9,7 +9,7 @@ if (!in_array($deliveryChannel, ['all', 'website', 'public', 'public_news', 'sms
 }
 
 $toolView = strtolower(trim((string)($_GET['tool'] ?? 'tracker')));
-if (!in_array($toolView, ['tracker', 'review_queue'], true)) {
+if ($toolView !== 'tracker') {
   $toolView = 'tracker';
 }
 
@@ -48,6 +48,56 @@ $statusLabels = [
   'draft' => 'Draft',
   'denied' => 'Denied'
 ];
+
+$audienceAreaOptions = [
+  'Barangay Wide',
+  'Area 01',
+  'Area 1A',
+  'Area 02',
+  'Area 03',
+  'Area 04',
+  'Area 05',
+  'Area 06',
+];
+$residentAreaRes = $conn->query("
+  SELECT DISTINCT area_number
+  FROM residentaddresstbl
+  WHERE area_number IS NOT NULL AND TRIM(area_number) <> ''
+  ORDER BY area_number ASC
+");
+if ($residentAreaRes instanceof mysqli_result) {
+  while ($row = $residentAreaRes->fetch_assoc()) {
+    $value = trim((string)($row['area_number'] ?? ''));
+    if ($value !== '' && !in_array($value, $audienceAreaOptions, true)) {
+      $audienceAreaOptions[] = $value;
+    }
+  }
+}
+$officialAreaRes = $conn->query("
+  SELECT DISTINCT area_number
+  FROM officialinformationtbl
+  WHERE area_number IS NOT NULL AND TRIM(area_number) <> ''
+  ORDER BY area_number ASC
+");
+if ($officialAreaRes instanceof mysqli_result) {
+  while ($row = $officialAreaRes->fetch_assoc()) {
+    $value = trim((string)($row['area_number'] ?? ''));
+    if ($value !== '' && !in_array($value, $audienceAreaOptions, true)) {
+      $audienceAreaOptions[] = $value;
+    }
+  }
+}
+$audienceRoleGroupOptions = ['Officials', 'Employees', 'Residents'];
+
+function ann_content_parse_csv_values(?string $value): array
+{
+  $parts = preg_split('/\s*,\s*/', trim((string)$value)) ?: [];
+  return array_values(array_filter(array_map(static function ($item): string {
+    return trim((string)$item);
+  }, $parts), static function (string $item): bool {
+    return $item !== '';
+  }));
+}
 
 function ann_creator_display_from_user_id(mysqli $conn, string $userId, string $fallback): string
 {
@@ -223,6 +273,11 @@ foreach ($storedAnnouncements as $item) {
     'title' => (string)($item['title'] ?? ''),
     'content_type' => (string)($item['content_type'] ?? 'page'),
     'audience' => (string)($item['audience'] ?? 'All Residents'),
+    'audience_scope' => (string)($item['audience_scope'] ?? 'all'),
+    'area' => (string)($item['area'] ?? ''),
+    'role_group' => (string)($item['role_group'] ?? ''),
+    'area_list' => ann_content_parse_csv_values((string)($item['area'] ?? '')),
+    'role_group_list' => ann_content_parse_csv_values((string)($item['role_group'] ?? '')),
     'channels' => $channels,
     'placements' => ann_placements_from_channels($channels),
     'status' => $status,
@@ -331,6 +386,11 @@ foreach ($announcementRows as $row) {
     'title' => (string)$row['title'],
     'content_type' => (string)($row['content_type'] ?? 'page'),
     'audience' => (string)$row['audience'],
+    'audience_scope' => (string)($row['audience_scope'] ?? 'all'),
+    'area' => (string)($row['area'] ?? ''),
+    'role_group' => (string)($row['role_group'] ?? ''),
+    'area_list' => array_values((array)($row['area_list'] ?? [])),
+    'role_group_list' => array_values((array)($row['role_group_list'] ?? [])),
     'channels' => array_values((array)$row['channels']),
     'placements' => array_values((array)($row['placements'] ?? [])),
     'status' => (string)$row['status'],
@@ -444,7 +504,6 @@ function ann_decode_faq_items(?string $json): array
       overflow-x: hidden;
     }
 
-    #review-queue-card,
     #tracker-card {
       width: 100%;
       max-width: 100%;
@@ -507,127 +566,6 @@ function ann_decode_faq_items(?string $json): array
         Content Tools
       </h2>
       <hr><br>
-
-      <?php if ($isSuperAdmin): ?>
-        <div id="review-queue-card" class="announcement-shell edit-requests-shell bg-white p-4 pt-3 rounded-4 shadow-sm border mb-4">
-          <div class="review-queue-top d-flex flex-wrap align-items-start justify-content-between gap-3 mb-2">
-            <div class="review-queue-title-wrap">
-              <div class="d-flex flex-wrap align-items-center gap-2 mb-1">
-                <h5 class="mb-0 fw-bold review-queue-heading">Review Queue</h5>
-              </div>
-              <p class="small text-muted mb-0 review-queue-description">Shows pending content submitted by admin, official, and personnel accounts.</p>
-            </div>
-
-            <div class="admin-list-actions review-queue-actions">
-              <form class="announcement-search-form" method="get" action="<?= htmlspecialchars(appUrl('/Admin-End/Contents/Contents.php')) ?>">
-                <input type="hidden" name="channel" value="<?= htmlspecialchars($deliveryChannel) ?>">
-                <input type="hidden" name="status" value="<?= htmlspecialchars($statusFilter) ?>">
-                <input type="hidden" name="q" value="<?= htmlspecialchars($searchTerm) ?>">
-                <input type="hidden" name="queue_channel" value="<?= htmlspecialchars($queueChannelFilter) ?>">
-                <div class="input-group admin-search">
-                  <input type="text" name="queue_q" class="form-control" placeholder="Search title, audience, creator" value="<?= htmlspecialchars($queueSearchTerm) ?>">
-                  <span class="input-group-text bg-white"><i class="fas fa-search"></i></span>
-                </div>
-              </form>
-
-              <button class="btn btn-outline-secondary btn-icon admin-filter" type="button" data-bs-toggle="modal" data-bs-target="#modalReviewQueueFilter" title="Filter review queue" aria-label="Filter review queue">
-                <i class="fas fa-filter"></i>
-                <span class="visually-hidden">Filter review queue</span>
-              </button>
-              <button class="btn btn-outline-secondary btn-icon admin-columns" type="button" data-bs-toggle="modal" data-bs-target="#modalReviewQueueColumns" title="Review queue columns" aria-label="Review queue columns">
-                <i class="fa-solid fa-sliders"></i>
-                <span class="visually-hidden">Review queue columns</span>
-              </button>
-              <a class="btn btn-outline-secondary btn-icon admin-refresh" id="btnReviewQueueRefresh" href="<?= htmlspecialchars(buildReviewQueueUrl($deliveryChannel, $statusFilter, $searchTerm, $queueChannelFilter, $queueSearchTerm)) ?>" title="Refresh review queue" aria-label="Refresh review queue">
-                <i class="fa-solid fa-arrows-rotate"></i>
-                <span class="visually-hidden">Refresh review queue</span>
-              </a>
-            </div>
-          </div>
-
-          <div class="table-responsive compact-admin-table-shell">
-            <table id="table-reviewQueueData" class="table align-middle mb-0 compact-admin-table compact-admin-table--wide compact-admin-table--content compact-admin-table--content-review">
-              <thead>
-                <tr class="table-light">
-                  <th>Title</th>
-                  <th>Content Type</th>
-                  <th>Audience</th>
-                  <th>Channels</th>
-                  <th>Created By</th>
-                  <th class="text-end">Review Action</th>
-                </tr>
-              </thead>
-              <tbody>
-                <?php if (!$reviewQueueRows): ?>
-                  <tr>
-                    <td colspan="7" class="text-center text-muted py-4">No pending content in the review queue.</td>
-                  </tr>
-                <?php else: ?>
-                  <?php foreach ($reviewQueueRows as $item): ?>
-                    <?php
-                      $orderedQueueChannels = announcement_ordered_channels((array)$item['channels']);
-                      $queueChannelsText = implode(', ', array_map(function ($ch) use ($channelLabels) {
-                        return $channelLabels[$ch] ?? strtoupper($ch);
-                      }, $orderedQueueChannels));
-                    ?>
-                    <tr>
-                      <td><?= htmlspecialchars($item['title']) ?></td>
-                      <td><?= htmlspecialchars($typeLabels[$item['content_type']] ?? 'Page Announcement') ?></td>
-                      <td><?= htmlspecialchars($item['audience']) ?></td>
-                      <td><?= htmlspecialchars($queueChannelsText) ?></td>
-                      <td><?= htmlspecialchars($item['created_by']) ?></td>
-                      <td class="text-end">
-                        <div class="announcement-primary-actions justify-content-end">
-                            <button
-                            class="btn btn-primary btn-sm text-white btn-view-announcement"
-                            type="button"
-                            data-bs-toggle="modal"
-                            data-bs-target="#modalViewAnnouncement"
-                            data-id="<?= htmlspecialchars($item['id']) ?>">
-                            View
-                          </button>
-                          <form method="post" action="../../PhpFiles/Admin-End/announcementsActions.php" class="d-inline">
-                            <?= csrfTokenField() ?>
-                            <input type="hidden" name="action" value="approve">
-                            <input type="hidden" name="announcement_id" value="<?= htmlspecialchars($item['id']) ?>">
-                            <input type="hidden" name="channel" value="<?= htmlspecialchars($deliveryChannel) ?>">
-                            <input type="hidden" name="status" value="<?= htmlspecialchars($statusFilter) ?>">
-                            <input type="hidden" name="q" value="<?= htmlspecialchars($searchTerm) ?>">
-                            <input type="hidden" name="queue_channel" value="<?= htmlspecialchars($queueChannelFilter) ?>">
-                            <input type="hidden" name="queue_q" value="<?= htmlspecialchars($queueSearchTerm) ?>">
-                            <button class="btn btn-success btn-sm" type="submit">Approve</button>
-                          </form>
-                          <form method="post" action="../../PhpFiles/Admin-End/announcementsActions.php" class="d-inline">
-                            <?= csrfTokenField() ?>
-                            <input type="hidden" name="action" value="deny">
-                            <input type="hidden" name="announcement_id" value="<?= htmlspecialchars($item['id']) ?>">
-                            <input type="hidden" name="channel" value="<?= htmlspecialchars($deliveryChannel) ?>">
-                            <input type="hidden" name="status" value="<?= htmlspecialchars($statusFilter) ?>">
-                            <input type="hidden" name="q" value="<?= htmlspecialchars($searchTerm) ?>">
-                            <input type="hidden" name="queue_channel" value="<?= htmlspecialchars($queueChannelFilter) ?>">
-                            <input type="hidden" name="queue_q" value="<?= htmlspecialchars($queueSearchTerm) ?>">
-                            <button class="btn btn-danger btn-sm" type="submit">Deny</button>
-                          </form>
-                        </div>
-                      </td>
-                    </tr>
-                  <?php endforeach; ?>
-                <?php endif; ?>
-              </tbody>
-            </table>
-          </div>
-
-          <div class="resident-table-footer mt-3 d-flex flex-wrap justify-content-between align-items-center gap-3">
-            <div class="d-flex align-items-center gap-2">
-              <label class="small text-muted mb-0">Entries</label>
-              <span class="small fw-semibold"><?= (int)count($reviewQueueRows) ?></span>
-              <span class="badge rounded-pill bg-warning-subtle text-warning-emphasis">
-                Showing <?= (int)count($reviewQueueRows) ?> of <?= (int)count($reviewQueueBaseRows) ?> pending
-              </span>
-            </div>
-          </div>
-        </div>
-      <?php endif; ?>
 
       <div id="tracker-card" class="announcement-shell edit-requests-shell bg-white p-4 pt-3 rounded-4 shadow-sm border">
 
@@ -746,7 +684,7 @@ function ann_decode_faq_items(?string $json): array
                                 type="button"
                                 disabled
                                 aria-disabled="true"
-                                title="Pending content in the review queue cannot be edited here.">
+                                title="Pending content cannot be edited until it is reviewed.">
                                 Edit
                               </button>
                             <?php else: ?>
@@ -762,7 +700,26 @@ function ann_decode_faq_items(?string $json): array
                           <?php endif; ?>
                         </div>
                         <?php if ($status === 'pending' && $isSuperAdmin && !$isSuperAdminCreated): ?>
-                          <div class="announcement-review-actions"></div>
+                          <div class="announcement-review-actions">
+                            <form method="post" action="../../PhpFiles/Admin-End/announcementsActions.php" class="d-inline">
+                              <?= csrfTokenField() ?>
+                              <input type="hidden" name="action" value="approve">
+                              <input type="hidden" name="announcement_id" value="<?= htmlspecialchars($item['id']) ?>">
+                              <input type="hidden" name="channel" value="<?= htmlspecialchars($deliveryChannel) ?>">
+                              <input type="hidden" name="status" value="<?= htmlspecialchars($statusFilter) ?>">
+                              <input type="hidden" name="q" value="<?= htmlspecialchars($searchTerm) ?>">
+                              <button class="btn btn-success btn-sm" type="submit">Approve</button>
+                            </form>
+                            <form method="post" action="../../PhpFiles/Admin-End/announcementsActions.php" class="d-inline">
+                              <?= csrfTokenField() ?>
+                              <input type="hidden" name="action" value="deny">
+                              <input type="hidden" name="announcement_id" value="<?= htmlspecialchars($item['id']) ?>">
+                              <input type="hidden" name="channel" value="<?= htmlspecialchars($deliveryChannel) ?>">
+                              <input type="hidden" name="status" value="<?= htmlspecialchars($statusFilter) ?>">
+                              <input type="hidden" name="q" value="<?= htmlspecialchars($searchTerm) ?>">
+                              <button class="btn btn-danger btn-sm" type="submit">Deny</button>
+                            </form>
+                          </div>
                         <?php endif; ?>
                       </div>
                     </td>
@@ -923,79 +880,6 @@ function ann_decode_faq_items(?string $json): array
     </div>
   </div>
 
-  <div class="modal fade" id="modalReviewQueueFilter" tabindex="-1" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
-    <div class="modal-dialog modal-dialog-centered">
-      <form class="modal-content p-4" method="get" action="<?= htmlspecialchars(appUrl('/Admin-End/Contents/Contents.php')) ?>">
-        <input type="hidden" name="channel" value="<?= htmlspecialchars($deliveryChannel) ?>">
-        <input type="hidden" name="status" value="<?= htmlspecialchars($statusFilter) ?>">
-        <input type="hidden" name="q" value="<?= htmlspecialchars($searchTerm) ?>">
-        <input type="hidden" name="queue_q" value="<?= htmlspecialchars($queueSearchTerm) ?>">
-
-        <div class="modal-header border-0">
-          <h5 class="modal-title fw-bold">Filter Review Queue</h5>
-          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-        </div>
-
-        <hr>
-
-        <div class="modal-body">
-          <div class="mb-2">
-            <label class="fw-bold small mb-2">Delivery Channel</label>
-            <div class="d-flex flex-column gap-2">
-              <label class="d-flex align-items-center gap-2">
-                <input class="form-check-input m-0" type="radio" name="queue_channel" value="all" <?= $queueChannelFilter === 'all' ? 'checked' : '' ?>>
-                <span>All Channels</span>
-              </label>
-                <label class="d-flex align-items-center gap-2">
-                  <input class="form-check-input m-0" type="radio" name="queue_channel" value="website" <?= $queueChannelFilter === 'website' ? 'checked' : '' ?>>
-                  <span>Account Page</span>
-                </label>
-                <label class="d-flex align-items-center gap-2">
-                  <input class="form-check-input m-0" type="radio" name="queue_channel" value="public" <?= $queueChannelFilter === 'public' ? 'checked' : '' ?>>
-                  <span>Guest Page</span>
-                </label>
-                <label class="d-flex align-items-center gap-2">
-                  <input class="form-check-input m-0" type="radio" name="queue_channel" value="public_news" <?= $queueChannelFilter === 'public_news' ? 'checked' : '' ?>>
-                  <span>Public News</span>
-                </label>
-                <label class="d-flex align-items-center gap-2">
-                  <input class="form-check-input m-0" type="radio" name="queue_channel" value="sms" <?= $queueChannelFilter === 'sms' ? 'checked' : '' ?>>
-                <span>SMS</span>
-              </label>
-              <label class="d-flex align-items-center gap-2">
-                <input class="form-check-input m-0" type="radio" name="queue_channel" value="email" <?= $queueChannelFilter === 'email' ? 'checked' : '' ?>>
-                <span>Email</span>
-              </label>
-            </div>
-          </div>
-        </div>
-
-        <div class="modal-footer border-0">
-          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
-          <button type="submit" class="btn btn-primary">Apply Filter</button>
-          <a href="<?= htmlspecialchars(buildReviewQueueUrl($deliveryChannel, $statusFilter, $searchTerm, 'all', '')) ?>" class="btn btn-warning"><i class="fas fa-undo"></i>&nbsp;Reset</a>
-        </div>
-      </form>
-    </div>
-  </div>
-
-  <div class="modal fade" id="modalReviewQueueColumns" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog modal-dialog-centered modal-lg">
-      <div class="modal-content">
-        <div class="modal-header">
-          <h5 class="modal-title">Review Queue Columns</h5>
-        </div>
-        <div class="modal-body">
-          <div class="row g-2" id="reviewQueueColumnsList"></div>
-        </div>
-        <div class="modal-footer">
-          <button type="button" class="btn btn-outline-secondary" id="btnReviewQueueColumnsReset">Reset</button>
-          <button type="button" class="btn btn-primary" data-bs-dismiss="modal">Done</button>
-        </div>
-      </div>
-    </div>
-  </div>
-
   <div class="modal fade" id="modalViewAnnouncement" tabindex="-1" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
     <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable announcement-details-dialog">
       <div class="modal-content announcement-details-content border-0 rounded-2 p-4">
@@ -1107,8 +991,46 @@ function ann_decode_faq_items(?string $json): array
               <input type="text" class="form-control" id="editAnnouncementTypeDisplay" value="-" readonly>
             </div>
             <div class="mb-3" id="editAudienceGroup">
-              <label for="editAnnouncementAudienceInput" class="form-label">Audience</label>
-              <input type="text" class="form-control" id="editAnnouncementAudienceInput" name="audience" required>
+              <input type="hidden" id="editAnnouncementAudienceInput" name="audience" value="All Residents">
+              <label class="form-label d-block">Audience</label>
+              <div class="form-check mb-2">
+                <input class="form-check-input" type="radio" name="audience_scope" id="editAudienceAll" value="all" checked>
+                <label class="form-check-label" for="editAudienceAll">All Residents</label>
+              </div>
+              <div class="form-check mb-3">
+                <input class="form-check-input" type="radio" name="audience_scope" id="editAudienceCustom" value="custom">
+                <label class="form-check-label" for="editAudienceCustom">Custom Audience</label>
+              </div>
+              <div id="editCustomAudienceFields" class="row g-3 d-none">
+                <div class="col-12">
+                  <label class="form-label mb-1">Area</label>
+                  <p class="announcement-editor-helper mb-2">Choose the area that should receive this announcement.</p>
+                  <div class="row g-2">
+                    <?php foreach ($audienceAreaOptions as $areaOption): ?>
+                      <div class="col-12 col-sm-6">
+                        <label class="form-check border rounded-3 px-3 py-2 h-100 bg-white">
+                          <input class="form-check-input" type="checkbox" name="area[]" value="<?= htmlspecialchars($areaOption, ENT_QUOTES, 'UTF-8') ?>" disabled>
+                          <span class="form-check-label"><?= htmlspecialchars($areaOption, ENT_QUOTES, 'UTF-8') ?></span>
+                        </label>
+                      </div>
+                    <?php endforeach; ?>
+                  </div>
+                </div>
+                <div class="col-12">
+                  <label class="form-label mb-1">Role Group</label>
+                  <p class="announcement-editor-helper mb-2">Filter recipients by role when this update is only for a specific group.</p>
+                  <div class="row g-2">
+                    <?php foreach ($audienceRoleGroupOptions as $roleGroupOption): ?>
+                      <div class="col-12 col-sm-6">
+                        <label class="form-check border rounded-3 px-3 py-2 h-100 bg-white">
+                          <input class="form-check-input" type="checkbox" name="role_group[]" value="<?= htmlspecialchars($roleGroupOption, ENT_QUOTES, 'UTF-8') ?>" disabled>
+                          <span class="form-check-label"><?= htmlspecialchars($roleGroupOption, ENT_QUOTES, 'UTF-8') ?></span>
+                        </label>
+                      </div>
+                    <?php endforeach; ?>
+                  </div>
+                </div>
+              </div>
             </div>
             <div class="mb-3" id="editPagePlacementGroup">
               <label class="form-label d-block">Page Placement</label>
@@ -1481,6 +1403,10 @@ function ann_decode_faq_items(?string $json): array
       const editPublicAnnouncementContentInput = document.getElementById("editPublicAnnouncementContent");
       const editAnnouncementTypeDisplay = document.getElementById("editAnnouncementTypeDisplay");
       const editAudienceGroup = document.getElementById("editAudienceGroup");
+      const editAnnouncementAudienceInput = document.getElementById("editAnnouncementAudienceInput");
+      const editAudienceAll = document.getElementById("editAudienceAll");
+      const editAudienceCustom = document.getElementById("editAudienceCustom");
+      const editCustomAudienceFields = document.getElementById("editCustomAudienceFields");
       const editPagePlacementGroup = document.getElementById("editPagePlacementGroup");
       const editAdditionalDeliveryGroup = document.getElementById("editAdditionalDeliveryGroup");
       const editAdditionalDeliveryLabel = document.getElementById("editAdditionalDeliveryLabel");
@@ -1680,6 +1606,51 @@ function ann_decode_faq_items(?string $json): array
         }
       }
 
+      function syncEditAudienceSummary() {
+        if (!editAnnouncementAudienceInput) {
+          return;
+        }
+        if (!editAudienceCustom?.checked) {
+          editAnnouncementAudienceInput.value = "All Residents";
+          return;
+        }
+        const areas = Array.from(document.querySelectorAll('#editCustomAudienceFields input[name="area[]"]:checked'))
+          .map((checkbox) => String(checkbox.value || "").trim())
+          .filter((value) => value !== "");
+        const roleGroups = Array.from(document.querySelectorAll('#editCustomAudienceFields input[name="role_group[]"]:checked'))
+          .map((checkbox) => String(checkbox.value || "").trim())
+          .filter((value) => value !== "");
+        const parts = [];
+        if (areas.length) {
+          parts.push(areas.join(", "));
+        }
+        if (roleGroups.length) {
+          parts.push(roleGroups.join(", "));
+        }
+        editAnnouncementAudienceInput.value = parts.length ? parts.join(", ") : "Custom Audience";
+      }
+
+      function toggleEditAudienceFields() {
+        if (!editCustomAudienceFields || !editAudienceAll || !editAudienceCustom) {
+          return;
+        }
+        const useCustomAudience = editAudienceCustom.checked;
+        editCustomAudienceFields.classList.toggle("d-none", !useCustomAudience);
+        editCustomAudienceFields.querySelectorAll("input, select, textarea").forEach((field) => {
+          field.disabled = !useCustomAudience;
+          if (!useCustomAudience) {
+            if (field.tagName === "SELECT") {
+              field.selectedIndex = 0;
+            } else if (field.type === "checkbox" || field.type === "radio") {
+              field.checked = false;
+            } else {
+              field.value = "";
+            }
+          }
+        });
+        syncEditAudienceSummary();
+      }
+
       function updateEditPlacementState() {
         if (currentEditContentType !== "page") {
           if (editSharedContentFields) editSharedContentFields.classList.remove("d-none");
@@ -1739,7 +1710,7 @@ function ann_decode_faq_items(?string $json): array
 
       function applyModalFooterLayout(modalEl) {
         if (!modalEl) return;
-        if (["modalFilter", "modalReviewQueueFilter", "modalTableColumns", "modalReviewQueueColumns"].includes(modalEl.id)) {
+        if (["modalFilter", "modalTableColumns"].includes(modalEl.id)) {
           return;
         }
         const footer = modalEl.querySelector(".modal-footer");
@@ -1969,7 +1940,18 @@ function ann_decode_faq_items(?string $json): array
 
         document.getElementById("editAnnouncementIdInput").value = data.id || "";
         applyEditContentTypeMode(data);
-        document.getElementById("editAnnouncementAudienceInput").value = data.audience || "";
+        if (editAudienceCustom) editAudienceCustom.checked = String(data.audience_scope || "all").toLowerCase() === "custom";
+        if (editAudienceAll) editAudienceAll.checked = !editAudienceCustom?.checked;
+        toggleEditAudienceFields();
+        const areaList = Array.isArray(data.area_list) ? data.area_list : [];
+        const roleGroupList = Array.isArray(data.role_group_list) ? data.role_group_list : [];
+        document.querySelectorAll('#editCustomAudienceFields input[name="area[]"]').forEach((checkbox) => {
+          checkbox.checked = areaList.includes(String(checkbox.value || "").trim());
+        });
+        document.querySelectorAll('#editCustomAudienceFields input[name="role_group[]"]').forEach((checkbox) => {
+          checkbox.checked = roleGroupList.includes(String(checkbox.value || "").trim());
+        });
+        syncEditAudienceSummary();
         document.getElementById("editAnnouncementPublishDateInput").value = data.publish_date && data.publish_date !== "-" ? data.publish_date : "";
         if (editSmsMessageInput) editSmsMessageInput.value = data.sms_message || "";
         if (editEmailSubjectInput) editEmailSubjectInput.value = data.email_subject || "";
@@ -2050,6 +2032,7 @@ function ann_decode_faq_items(?string $json): array
       if (editForm) {
         editForm.addEventListener("submit", function (event) {
           syncEditAnnouncementContent();
+          syncEditAudienceSummary();
           const statusInput = document.getElementById("editAnnouncementStatusInput");
           if (statusInput) {
             if (editSubmitMode === "submit_review") {
@@ -2376,6 +2359,14 @@ function ann_decode_faq_items(?string $json): array
         openDeniedDraftNotice(id);
       });
 
+      document.querySelectorAll('#editAudienceGroup input[name="audience_scope"]').forEach((el) => {
+        el.addEventListener("change", toggleEditAudienceFields);
+      });
+      document.querySelectorAll('#editCustomAudienceFields input[type="checkbox"]').forEach((el) => {
+        el.addEventListener("change", syncEditAudienceSummary);
+      });
+      toggleEditAudienceFields();
+
       [
         "modalViewAnnouncement",
         "modalDeleteAnnouncement",
@@ -2388,9 +2379,7 @@ function ann_decode_faq_items(?string $json): array
         "modalSuperAdminApprovedCloseConfirm",
         "modalSuperAdminRepostConfirm",
         "modalFilter",
-        "modalReviewQueueFilter",
         "modalTableColumns",
-        "modalReviewQueueColumns",
         "modalAnnouncementFlash"
       ].forEach((id) => {
         const modalEl = document.getElementById(id);
@@ -2477,82 +2466,6 @@ function ann_decode_faq_items(?string $json): array
     })();
 
     (function () {
-      const table = document.getElementById("table-reviewQueueData");
-      const modal = document.getElementById("modalReviewQueueColumns");
-      const list = document.getElementById("reviewQueueColumnsList");
-      const resetBtn = document.getElementById("btnReviewQueueColumnsReset");
-      if (!table || !modal || !list || !resetBtn) return;
-
-      const storageKey = "admin_cols_review_queue_v1";
-      const headers = Array.from(table.querySelectorAll("thead th")).map((th) => th.textContent.trim());
-
-      function loadHidden() {
-        try {
-          const parsed = JSON.parse(localStorage.getItem(storageKey) || "[]");
-          return Array.isArray(parsed) ? parsed : [];
-        } catch (e) {
-          return [];
-        }
-      }
-
-      function saveHidden(hiddenIdxs) {
-        localStorage.setItem(storageKey, JSON.stringify(hiddenIdxs));
-      }
-
-      function applyHidden(hiddenIdxs) {
-        const hiddenSet = new Set(hiddenIdxs);
-        const rows = table.querySelectorAll("tr");
-        rows.forEach((row) => {
-          Array.from(row.children).forEach((cell, idx) => {
-            cell.style.display = hiddenSet.has(idx) ? "none" : "";
-          });
-        });
-      }
-
-      function renderList() {
-        const hidden = loadHidden();
-        list.innerHTML = "";
-        headers.forEach((label, idx) => {
-          const col = document.createElement("div");
-          col.className = "col-12 col-md-6";
-          const wrap = document.createElement("label");
-          wrap.className = "d-flex align-items-center gap-2 border rounded p-2";
-          const cb = document.createElement("input");
-          cb.type = "checkbox";
-          cb.className = "form-check-input m-0";
-          cb.checked = !hidden.includes(idx);
-          cb.addEventListener("change", () => {
-            const current = new Set(loadHidden());
-            if (cb.checked) {
-              current.delete(idx);
-            } else {
-              current.add(idx);
-            }
-            const next = Array.from(current.values()).sort((a, b) => a - b);
-            saveHidden(next);
-            applyHidden(next);
-          });
-          const text = document.createElement("span");
-          text.textContent = label;
-          wrap.appendChild(cb);
-          wrap.appendChild(text);
-          col.appendChild(wrap);
-          list.appendChild(col);
-        });
-      }
-
-      modal.addEventListener("show.bs.modal", renderList);
-      resetBtn.addEventListener("click", () => {
-        saveHidden([]);
-        applyHidden([]);
-        renderList();
-      });
-
-      window.applyReviewQueueHiddenColumns = () => applyHidden(loadHidden());
-      applyHidden(loadHidden());
-    })();
-
-    (function () {
       const flashModalEl = document.getElementById("modalAnnouncementFlash");
       if (!flashModalEl) return;
       const flashModal = new bootstrap.Modal(flashModalEl);
@@ -2561,9 +2474,7 @@ function ann_decode_faq_items(?string $json): array
 
     (function () {
       const announcementsRefreshBtn = document.getElementById("btnAnnouncementsTableRefresh");
-      const reviewQueueRefreshBtn = document.getElementById("btnReviewQueueRefresh");
       const announcementsTableBody = document.getElementById("tableBody");
-      const reviewQueueBody = document.querySelector("#table-reviewQueueData tbody");
       const visibleCountBadge = document.getElementById("announcementsVisibleCountBadge");
       const AUTO_REFRESH_SECONDS = 15;
       let autoRefreshSecondsLeft = AUTO_REFRESH_SECONDS;
@@ -2571,7 +2482,7 @@ function ann_decode_faq_items(?string $json): array
       let autoRefreshInFlight = false;
 
       function setRefreshLoading(on) {
-        [announcementsRefreshBtn, reviewQueueRefreshBtn].forEach((button) => {
+        [announcementsRefreshBtn].forEach((button) => {
           if (!button) return;
           button.classList.toggle("is-loading", !!on);
           button.setAttribute("aria-busy", on ? "true" : "false");
@@ -2579,7 +2490,7 @@ function ann_decode_faq_items(?string $json): array
       }
 
       async function refreshAnnouncementTables() {
-        if (autoRefreshInFlight || !announcementsTableBody || !reviewQueueBody) return;
+        if (autoRefreshInFlight || !announcementsTableBody) return;
         autoRefreshInFlight = true;
         autoRefreshSecondsLeft = AUTO_REFRESH_SECONDS;
         setRefreshLoading(true);
@@ -2594,14 +2505,12 @@ function ann_decode_faq_items(?string $json): array
           }
           const doc = new DOMParser().parseFromString(html, "text/html");
           const nextAnnouncementsBody = doc.getElementById("tableBody");
-          const nextReviewQueueBody = doc.querySelector("#table-reviewQueueData tbody");
           const nextAnnouncementData = doc.getElementById("announcementDataPayload");
-          if (!nextAnnouncementsBody || !nextReviewQueueBody || !nextAnnouncementData) {
+          if (!nextAnnouncementsBody || !nextAnnouncementData) {
             throw new Error("Refreshed announcement data was incomplete.");
           }
 
           announcementsTableBody.innerHTML = nextAnnouncementsBody.innerHTML;
-          reviewQueueBody.innerHTML = nextReviewQueueBody.innerHTML;
           ANNOUNCEMENT_DATA = JSON.parse(nextAnnouncementData.textContent || "{}");
 
           const nextVisibleCountBadge = doc.getElementById("announcementsVisibleCountBadge");
@@ -2611,9 +2520,6 @@ function ann_decode_faq_items(?string $json): array
 
           if (typeof window.renderAnnouncementsPage === "function") {
             window.renderAnnouncementsPage();
-          }
-          if (typeof window.applyReviewQueueHiddenColumns === "function") {
-            window.applyReviewQueueHiddenColumns();
           }
         } catch (error) {
           console.error("Unable to refresh announcement tables:", error);
@@ -2631,7 +2537,6 @@ function ann_decode_faq_items(?string $json): array
       }
 
       announcementsRefreshBtn?.addEventListener("click", triggerRefresh);
-      reviewQueueRefreshBtn?.addEventListener("click", triggerRefresh);
 
       autoRefreshInterval = window.setInterval(() => {
         if (autoRefreshInFlight) return;
@@ -2645,10 +2550,6 @@ function ann_decode_faq_items(?string $json): array
   <script src="../../JS-Script-Files/Admin-End/tableColumnsGeneric.js?v=20260215-1"></script>
 </body>
 </html>
-
-
-
-
 
 
 

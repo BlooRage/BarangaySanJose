@@ -92,6 +92,7 @@ if ($officialAreaRes instanceof mysqli_result) {
     }
   }
 }
+$audienceRoleGroupOptions = ['Officials', 'Employees', 'Residents'];
 $sharedMeta = [
   'page' => [
     'title_label' => 'Title',
@@ -224,22 +225,30 @@ $sharedMeta = [
                     <div class="col-12">
                       <label class="form-label mb-1">Area</label>
                       <p class="announcement-editor-helper mb-2">Choose the area that should receive this announcement.</p>
-                      <select class="form-select" name="area" disabled>
-                        <option value="">Select Area</option>
+                      <div class="row g-2">
                         <?php foreach ($audienceAreaOptions as $areaOption): ?>
-                          <option><?= htmlspecialchars($areaOption, ENT_QUOTES, 'UTF-8') ?></option>
+                          <div class="col-12 col-sm-6 col-xl-4">
+                            <label class="form-check border rounded-3 px-3 py-2 h-100 bg-white">
+                              <input class="form-check-input" type="checkbox" name="area[]" value="<?= htmlspecialchars($areaOption, ENT_QUOTES, 'UTF-8') ?>" disabled>
+                              <span class="form-check-label"><?= htmlspecialchars($areaOption, ENT_QUOTES, 'UTF-8') ?></span>
+                            </label>
+                          </div>
                         <?php endforeach; ?>
-                      </select>
+                      </div>
                     </div>
                     <div class="col-12">
                       <label class="form-label mb-1">Role Group</label>
                       <p class="announcement-editor-helper mb-2">Filter recipients by role when this update is only for a specific group.</p>
-                      <select class="form-select" name="role_group" disabled>
-                        <option value="">Select Group</option>
-                        <option>Officials</option>
-                        <option>Employees</option>
-                        <option>Residents</option>
-                      </select>
+                      <div class="row g-2">
+                        <?php foreach ($audienceRoleGroupOptions as $roleGroupOption): ?>
+                          <div class="col-12 col-sm-6 col-xl-4">
+                            <label class="form-check border rounded-3 px-3 py-2 h-100 bg-white">
+                              <input class="form-check-input" type="checkbox" name="role_group[]" value="<?= htmlspecialchars($roleGroupOption, ENT_QUOTES, 'UTF-8') ?>" disabled>
+                              <span class="form-check-label"><?= htmlspecialchars($roleGroupOption, ENT_QUOTES, 'UTF-8') ?></span>
+                            </label>
+                          </div>
+                        <?php endforeach; ?>
+                      </div>
                     </div>
                   </div>
 
@@ -1055,7 +1064,6 @@ $sharedMeta = [
   </script>
 </body>
 </html>
-
 
 
 

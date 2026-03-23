@@ -1960,6 +1960,195 @@ if ($certificateLaunchStage === 'release') {
       font-size: .88rem;
       background: #f8fafc;
     }
+    .manual-photo-field {
+      border: 1px dashed #cbd5e1;
+      border-radius: 18px;
+      background: linear-gradient(180deg, #ffffff 0%, #eff6ff 100%);
+      padding: 16px;
+    }
+    .manual-photo-field-header {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 14px;
+      flex-wrap: wrap;
+      margin-bottom: 14px;
+    }
+    .manual-photo-field-header h6 {
+      margin: 0 0 4px;
+      color: #111827;
+      font-weight: 700;
+    }
+    .manual-photo-field-header p {
+      margin: 0;
+      color: #64748b;
+      font-size: .84rem;
+      line-height: 1.45;
+    }
+    .manual-photo-preview-box {
+      width: min(220px, 100%);
+      aspect-ratio: 1 / 1;
+      border-radius: 20px;
+      background: #0f172a;
+      border: 1px solid rgba(148, 163, 184, 0.35);
+      overflow: hidden;
+      position: relative;
+      display: grid;
+      place-items: center;
+      box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.06);
+    }
+    .manual-photo-preview-box img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+    }
+    .manual-photo-preview-placeholder {
+      padding: 18px;
+      text-align: center;
+      color: #cbd5e1;
+      font-size: .85rem;
+      line-height: 1.45;
+    }
+    .manual-photo-meta {
+      display: grid;
+      gap: 10px;
+      align-content: start;
+      min-width: min(320px, 100%);
+      flex: 1 1 260px;
+    }
+    .manual-photo-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 12px;
+      border-radius: 999px;
+      background: #eff6ff;
+      border: 1px solid #bfdbfe;
+      color: #1d4ed8;
+      font-size: .8rem;
+      font-weight: 700;
+      width: fit-content;
+      max-width: 100%;
+    }
+    .manual-photo-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+    .manual-photo-note {
+      margin: 0;
+      color: #475569;
+      font-size: .83rem;
+      line-height: 1.5;
+    }
+    .manual-photo-modal .modal-dialog {
+      max-width: 980px;
+    }
+    .manual-photo-stage-copy {
+      color: #64748b;
+      font-size: .9rem;
+      margin-bottom: 14px;
+      line-height: 1.5;
+    }
+    .manual-photo-workspace {
+      --manual-photo-frame-size: min(58vw, 340px);
+      position: relative;
+      min-height: 460px;
+      border-radius: 26px;
+      background:
+        radial-gradient(circle at top, rgba(37, 99, 235, 0.16), transparent 42%),
+        linear-gradient(180deg, #0f172a 0%, #020617 100%);
+      overflow: hidden;
+      border: 1px solid rgba(148, 163, 184, 0.18);
+    }
+    .manual-photo-workspace video,
+    .manual-photo-workspace img {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+    }
+    .manual-photo-workspace img {
+      width: auto;
+      height: auto;
+      max-width: none;
+      max-height: none;
+      user-select: none;
+      -webkit-user-drag: none;
+      touch-action: none;
+      transform-origin: 0 0;
+      cursor: grab;
+    }
+    .manual-photo-workspace.is-dragging img {
+      cursor: grabbing;
+    }
+    .manual-photo-frame {
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      width: var(--manual-photo-frame-size);
+      height: var(--manual-photo-frame-size);
+      transform: translate(-50%, -50%);
+      border-radius: 28px;
+      border: 2px solid rgba(255, 255, 255, 0.96);
+      box-shadow: 0 0 0 9999px rgba(2, 6, 23, 0.64);
+      pointer-events: none;
+    }
+    .manual-photo-frame::before,
+    .manual-photo-frame::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+    }
+    .manual-photo-frame::before {
+      border-radius: 28px;
+      box-shadow:
+        inset 0 0 0 1px rgba(255, 255, 255, 0.45),
+        inset 0 0 0 999px rgba(255, 255, 255, 0.02);
+    }
+    .manual-photo-frame::after {
+      background:
+        linear-gradient(to right, transparent 33.1%, rgba(255,255,255,0.3) 33.1%, rgba(255,255,255,0.3) 33.6%, transparent 33.6%, transparent 66.4%, rgba(255,255,255,0.3) 66.4%, rgba(255,255,255,0.3) 66.9%, transparent 66.9%),
+        linear-gradient(to bottom, transparent 33.1%, rgba(255,255,255,0.3) 33.1%, rgba(255,255,255,0.3) 33.6%, transparent 33.6%, transparent 66.4%, rgba(255,255,255,0.3) 66.4%, rgba(255,255,255,0.3) 66.9%, transparent 66.9%);
+      border-radius: 28px;
+      opacity: 0.9;
+    }
+    .manual-photo-empty-state {
+      position: absolute;
+      inset: 0;
+      display: grid;
+      place-items: center;
+      padding: 24px;
+      text-align: center;
+      color: #cbd5e1;
+      font-size: .92rem;
+      line-height: 1.55;
+    }
+    .manual-photo-controls {
+      display: grid;
+      gap: 8px;
+      margin-top: 14px;
+    }
+    .manual-photo-controls label {
+      font-size: .82rem;
+      font-weight: 700;
+      color: #334155;
+      margin: 0;
+    }
+    .manual-photo-controls input[type="range"] {
+      width: 100%;
+    }
+    .manual-photo-footer-copy {
+      color: #64748b;
+      font-size: .82rem;
+      line-height: 1.45;
+      margin-right: auto;
+      max-width: 420px;
+    }
 
     #residentProfileModal #div-modalSizing {
       max-width: 1200px;
@@ -1982,6 +2171,10 @@ if ($certificateLaunchStage === 'release') {
       }
       .manual-issuance-steps {
         grid-template-columns: 1fr;
+      }
+      .manual-photo-workspace {
+        --manual-photo-frame-size: min(72vw, 290px);
+        min-height: 360px;
       }
       .manual-resident-result {
         flex-direction: column;
@@ -2495,6 +2688,63 @@ if ($certificateLaunchStage === 'release') {
   </main>
 </div>
 
+<div class="modal fade manual-photo-modal" id="manualBarangayIdPhotoModal" tabindex="-1" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
+  <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header">
+        <div>
+          <h5 class="modal-title mb-1">Barangay ID Photo</h5>
+          <p class="text-muted small mb-0">Take a resident photo, adjust it inside the square guide, then crop and save it for the Barangay ID.</p>
+        </div>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <div id="manualBarangayIdPhotoStatus" class="alert alert-info py-2 small d-none"></div>
+
+        <div id="manualBarangayIdCameraStage">
+          <p class="manual-photo-stage-copy">
+            Position the resident inside the square frame. The saved Barangay ID photo will use the centered square crop only.
+          </p>
+          <div class="manual-photo-workspace" id="manualBarangayIdCameraWorkspace">
+            <video id="manualBarangayIdCameraVideo" playsinline autoplay muted></video>
+            <div id="manualBarangayIdCameraEmpty" class="manual-photo-empty-state">
+              Start the camera to capture the resident photo. If a linked resident photo already exists, you can also load and adjust that photo here.
+            </div>
+            <div class="manual-photo-frame"></div>
+          </div>
+        </div>
+
+        <div id="manualBarangayIdCropStage" class="d-none">
+          <p class="manual-photo-stage-copy">
+            Drag the photo and use the zoom slider until the resident fits well inside the visible square. The darkened area will not be included.
+          </p>
+          <div class="manual-photo-workspace" id="manualBarangayIdCropWorkspace">
+            <img id="manualBarangayIdCropImage" alt="Barangay ID crop preview">
+            <div id="manualBarangayIdCropEmpty" class="manual-photo-empty-state d-none">
+              Capture a photo first so it can be cropped and saved.
+            </div>
+            <div class="manual-photo-frame" id="manualBarangayIdCropFrame"></div>
+          </div>
+          <div class="manual-photo-controls">
+            <label for="manualBarangayIdZoomRange">Zoom</label>
+            <input type="range" id="manualBarangayIdZoomRange" min="100" max="400" step="1" value="100">
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer d-flex flex-wrap gap-2">
+        <div class="manual-photo-footer-copy" id="manualBarangayIdPhotoFooterCopy">
+          Allow camera access when prompted. Captured photos stay inside the Barangay ID request flow and will be cropped to a square before saving.
+        </div>
+        <button type="button" class="btn btn-outline-secondary" id="manualBarangayIdUseLinkedPhotoBtn">Use Linked Photo</button>
+        <button type="button" class="btn btn-outline-secondary" id="manualBarangayIdStartCameraBtn">Start Camera</button>
+        <button type="button" class="btn btn-outline-secondary d-none" id="manualBarangayIdRetakePhotoBtn">Retake</button>
+        <button type="button" class="btn btn-primary" id="manualBarangayIdCapturePhotoBtn" disabled>Capture Photo</button>
+        <button type="button" class="btn btn-success d-none" id="manualBarangayIdSavePhotoBtn">Crop and Save</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <div class="modal fade" id="actionModal" tabindex="-1" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
   <div class="modal-dialog modal-dialog-centered">
     <form class="modal-content p-3" id="actionForm" enctype="multipart/form-data">
@@ -2863,6 +3113,6 @@ if ($certificateLaunchStage === 'release') {
 </script>
 <script src="../../JS-Script-Files/Admin-End/tableColumnsGeneric.js?v=20260215-1"></script>
 <script src="../../JS-Script-Files/Shared/barangayIdDigital.js?v=20260321-04"></script>
-<script src="../../JS-Script-Files/Admin-End/certificateTrackerScript.js?v=20260322-12"></script>
+<script src="../../JS-Script-Files/Admin-End/certificateTrackerScript.js?v=20260323-13"></script>
 </body>
 </html>
