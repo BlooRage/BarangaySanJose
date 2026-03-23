@@ -1562,15 +1562,15 @@ if ($mode === 'password') {
                                     </select>
                                 </div>
 
-                                <div class="col-12 d-none" id="officialHouseSystemWrap">
+                                <div class="col-12<?= $addressMode === 'street' ? '' : ' d-none' ?>" id="officialHouseSystemWrap">
                                     <div class="address-system-panel">
                                         <div class="address-system-panel-title">House Numbering System</div>
                                         <div class="row g-3">
-                                            <div class="col-md-6" id="officialHouseWrap">
+                                            <div class="col-md-6<?= $addressMode === 'street' ? '' : ' d-none' ?>" id="officialHouseWrap">
                                                 <label class="form-label">House Number <span class="text-danger">*</span></label>
                                                 <input class="form-control" id="officialHouseNumber" name="house_number" maxlength="50" pattern="[A-Za-z0-9#/-][A-Za-z0-9#/- ]*" value="<?= htmlspecialchars((string)($officialInfo['house_number'] ?? ''), ENT_QUOTES, 'UTF-8') ?>">
                                             </div>
-                                            <div class="col-md-6" id="officialStreetWrap">
+                                            <div class="col-md-6<?= $addressMode === 'street' ? '' : ' d-none' ?>" id="officialStreetWrap">
                                                 <label class="form-label">Street Name <span class="text-danger">*</span></label>
                                                 <input class="form-control" id="officialStreetName" name="street_name" maxlength="150" value="<?= htmlspecialchars((string)($officialInfo['street_name'] ?? ''), ENT_QUOTES, 'UTF-8') ?>">
                                             </div>
@@ -1578,19 +1578,19 @@ if ($mode === 'password') {
                                     </div>
                                 </div>
 
-                                <div class="col-12 d-none" id="officialLotBlockSystemWrap">
+                                <div class="col-12<?= $addressMode === 'block_lot' ? '' : ' d-none' ?>" id="officialLotBlockSystemWrap">
                                     <div class="address-system-panel">
                                         <div class="address-system-panel-title">Lot/Block System</div>
                                         <div class="row g-3">
-                                            <div class="col-md-4 d-none" id="officialLotWrap">
+                                            <div class="col-md-4<?= $addressMode === 'block_lot' ? '' : ' d-none' ?>" id="officialLotWrap">
                                                 <label class="form-label">Lot <span class="text-danger">*</span></label>
                                                 <input class="form-control" id="officialLotNumber" name="lot_number" maxlength="50" pattern="[A-Za-z0-9#/-][A-Za-z0-9#/- ]*" value="<?= htmlspecialchars((string)($officialInfo['lot_number'] ?? ''), ENT_QUOTES, 'UTF-8') ?>">
                                             </div>
-                                            <div class="col-md-4 d-none" id="officialBlockWrap">
+                                            <div class="col-md-4<?= $addressMode === 'block_lot' ? '' : ' d-none' ?>" id="officialBlockWrap">
                                                 <label class="form-label">Block <span class="text-danger">*</span></label>
                                                 <input class="form-control" id="officialBlockNumber" name="block_number" maxlength="50" pattern="[A-Za-z0-9#/-][A-Za-z0-9#/- ]*" value="<?= htmlspecialchars((string)($officialInfo['block_number'] ?? ''), ENT_QUOTES, 'UTF-8') ?>">
                                             </div>
-                                            <div class="col-md-4 d-none" id="officialLotStreetWrap">
+                                            <div class="col-md-4<?= $addressMode === 'block_lot' ? '' : ' d-none' ?>" id="officialLotStreetWrap">
                                                 <label class="form-label">Street Name</label>
                                                 <input class="form-control" id="officialLotStreetName" maxlength="150" value="<?= htmlspecialchars((string)($officialInfo['street_name'] ?? ''), ENT_QUOTES, 'UTF-8') ?>" disabled>
                                             </div>
