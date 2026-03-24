@@ -783,6 +783,13 @@ function dra_fetch_request_for_modal_fast(mysqli $conn, string $requestId): ?arr
     $row['personnel_name'] = trim((string)($row['_personnel_name'] ?? ''));
     $row['finance_user_name'] = trim((string)($row['_finance_user_name'] ?? ''));
     $isBarangayIdDocument = strcasecmp(trim((string)($row['document_type'] ?? '')), 'Barangay ID') === 0;
+    if ($isBarangayIdDocument) {
+        $normalizedStage = strtolower(trim((string)($row['stage'] ?? '')));
+        if (in_array($normalizedStage, [DR_STAGE_FOR_PAYMENT, DR_STAGE_PAYMENT_SUBMITTED, DR_STAGE_PAYMENT_REJECTED, DR_STAGE_PAYMENT_VERIFIED], true)) {
+            $row['stage'] = DR_STAGE_READY_FOR_CLAIM;
+            $row['stage_label'] = dr_stage_label(DR_STAGE_READY_FOR_CLAIM);
+        }
+    }
     $row['amount'] = $isBarangayIdDocument ? 0.0 : (isset($row['_tx_amount']) ? (float)$row['_tx_amount'] : null);
     $row['payment_method'] = (string)($row['_tx_payment_method'] ?? '');
     $row['payment_proof_path'] = (string)($row['_tx_payment_proof_path'] ?? '');
@@ -997,8 +1004,8 @@ function dra_strip_area_from_address(string $address): string {
     }
 
     // Remove ", Area X" or "Area X," fragments while keeping the rest intact.
-    $value = preg_replace('/\s*,\s*Area\s+[A-Za-z0-9-]+\s*(?=,|$)/i', '', $value) ?? $value;
-    $value = preg_replace('/(^|,\s*)Area\s+[A-Za-z0-9-]+\s*,\s*/i', '$1', $value) ?? $value;
+    $value = preg_replace('/\s*,\s*Area(?:\s+Area)*\s+[A-Za-z0-9-]+\s*(?=,|$)/i', '', $value) ?? $value;
+    $value = preg_replace('/(^|,\s*)Area(?:\s+Area)*\s+[A-Za-z0-9-]+\s*,\s*/i', '$1', $value) ?? $value;
     $value = preg_replace('/\s*,\s*San\s+Jose\s*,\s*Rodriguez\s*,\s*Rizal\s*$/i', '', $value) ?? $value;
     $value = preg_replace('/\s*,\s*Barangay\s+San\s+Jose\s*,\s*Rodriguez(?:\s*\(Montalban\))?\s*,\s*Rizal\s*$/i', '', $value) ?? $value;
     $value = preg_replace('/\s*,\s*Barangay\s+San\s+Jose\s*,\s*Montalban\s*,\s*Rizal\s*$/i', '', $value) ?? $value;
@@ -1012,10 +1019,10 @@ function dra_compose_barangay_address(string $address, string $locality = 'Baran
     $suffix = trim($locality);
     $clean = dra_strip_area_from_address($address);
     $clean = trim((string)(preg_replace('/\s+/u', ' ', $clean) ?? $clean), " \t\n\r\0\x0B,");
-    if ($clean === '' || $clean === '-') {
-        return $suffix !== '' ? $suffix : '-';
+    if ($suffix !== '') {
+        return $suffix;
     }
-    return $suffix !== '' ? ($clean . ', ' . $suffix) : $clean;
+    return $clean !== '' ? $clean : '-';
 }
 
 function dra_join_address_parts(array $parts): string {
@@ -1293,29 +1300,103 @@ function dra_requires_manual_issued_upload(array $requestRow): bool {
     return dr_is_barangay_id_document_type($docType) && !dra_has_barangay_id_template_assets();
 }
 
+function dra_normalize_business_approval_types($value): array {
+    $rawValues = is_array($value) ? $value : explode(',', (string)$value);
+    $normalized = [];
+    foreach ($rawValues as $entry) {
+        $token = strtolower(trim((string)$entry));
+        if ($token === '') {
+            continue;
+        }
+        $token = (string)(preg_replace('/[^a-z0-9]+/', '_', $token) ?? $token);
+        $token = trim($token, '_');
+        if (($token === 'not_banned' || strpos($token, 'not_among_those_business') !== false) && !in_array('not_banned', $normalized, true)) {
+            $normalized[] = 'not_banned';
+            continue;
+        }
+        if (($token === 'no_objection' || strpos($token, 'interposes_no_objection') !== false) && !in_array('no_objection', $normalized, true)) {
+            $normalized[] = 'no_objection';
+            continue;
+        }
+        if (($token === 'temporary_clearance' || strpos($token, 'temporary_barangay_clearance') !== false) && !in_array('temporary_clearance', $normalized, true)) {
+            $normalized[] = 'temporary_clearance';
+        }
+    }
+    return $normalized;
+}
+
 function dra_normalize_business_approval_type(string $value): string {
-    $token = strtolower(trim($value));
-    if ($token === '') {
-        return '';
-    }
-    $token = (string)(preg_replace('/[^a-z0-9]+/', '_', $token) ?? $token);
-    $token = trim($token, '_');
-    if ($token === 'not_banned' || strpos($token, 'not_among_those_business') !== false) {
-        return 'not_banned';
-    }
-    if ($token === 'no_objection' || strpos($token, 'interposes_no_objection') !== false) {
-        return 'no_objection';
-    }
-    if ($token === 'temporary_clearance' || strpos($token, 'temporary_barangay_clearance') !== false) {
-        return 'temporary_clearance';
-    }
-    return '';
+    $types = dra_normalize_business_approval_types($value);
+    return $types[0] ?? '';
 }
 
 function dra_decode_request_payload(array $requestRow): array {
     $raw = (string)($requestRow['request_details'] ?? $requestRow['payload_json'] ?? '{}');
     $payload = json_decode($raw, true);
     return is_array($payload) ? $payload : [];
+}
+
+function dra_barangay_id_generated_number(array $payload, string $requestId, DateTimeInterface $issuedDateObj): string
+{
+    $override = trim((string)($payload['barangay_id_number'] ?? $payload['resident_id_number'] ?? $payload['resident_id_no'] ?? ''));
+    if ($override !== '') {
+        return strtoupper($override);
+    }
+
+    $digits = preg_replace('/\D+/', '', $requestId) ?? '';
+    $serial = substr(str_pad($digits, 4, '0', STR_PAD_LEFT), -4);
+    return 'A' . $issuedDateObj->format('Y') . '-' . $serial;
+}
+
+function dra_barangay_id_generated_valid_until(array $payload, DateTimeInterface $issuedDateObj): string
+{
+    $override = trim((string)($payload['barangay_id_valid_until'] ?? $payload['valid_until'] ?? ''));
+    if ($override !== '') {
+        return strtoupper($override);
+    }
+
+    $validUntil = DateTimeImmutable::createFromInterface($issuedDateObj)->modify('+2 years');
+    return strtoupper($validUntil->format('m/d/Y'));
+}
+
+function dra_persist_request_payload(mysqli $conn, string $requestId, array &$requestRow, array $payload): void
+{
+    if ($requestId === '' || !dr_column_exists($conn, 'documentrequesttbl', 'request_details')) {
+        return;
+    }
+
+    $encoded = dr_safe_json($payload);
+    $stmt = $conn->prepare("UPDATE documentrequesttbl SET request_details = ? WHERE request_id = ? LIMIT 1");
+    if (!$stmt) {
+        return;
+    }
+
+    $stmt->bind_param('ss', $encoded, $requestId);
+    $stmt->execute();
+    $stmt->close();
+    $requestRow['request_details'] = $encoded;
+}
+
+function dra_ensure_barangay_id_generated_fields(mysqli $conn, string $requestId, array &$requestRow, array &$payload, DateTimeInterface $issuedDateObj): void
+{
+    if ($requestId === '') {
+        return;
+    }
+
+    $cardNumberExists = trim((string)($payload['barangay_id_number'] ?? $payload['resident_id_number'] ?? $payload['resident_id_no'] ?? '')) !== '';
+    $validUntilExists = trim((string)($payload['barangay_id_valid_until'] ?? $payload['valid_until'] ?? '')) !== '';
+    if ($cardNumberExists && $validUntilExists) {
+        return;
+    }
+
+    if (!$cardNumberExists) {
+        $payload['barangay_id_number'] = dra_barangay_id_generated_number($payload, $requestId, $issuedDateObj);
+    }
+    if (!$validUntilExists) {
+        $payload['barangay_id_valid_until'] = dra_barangay_id_generated_valid_until($payload, $issuedDateObj);
+    }
+
+    dra_persist_request_payload($conn, $requestId, $requestRow, $payload);
 }
 
 function dra_apply_preview_edits(mysqli $conn, string $requestId, array &$requestRow, array $edited): void {
@@ -1337,7 +1418,7 @@ function dra_apply_preview_edits(mysqli $conn, string $requestId, array &$reques
     $cohabitantName = trim((string)($edited['cohabitantName'] ?? ''));
     $cohabitantRelationship = trim((string)($edited['cohabitantRelationship'] ?? ''));
     $detentionFacility = trim((string)($edited['detentionFacility'] ?? ''));
-    $businessApprovalType = dra_normalize_business_approval_type((string)($edited['businessApprovalType'] ?? ''));
+    $businessApprovalTypes = dra_normalize_business_approval_types((string)($edited['businessApprovalType'] ?? ''));
     $plateNumber = trim((string)($edited['plateNumber'] ?? ''));
     $cohabitationDuration = trim((string)($edited['cohabitationDuration'] ?? ''));
     $cohabitationStartDate = trim((string)($edited['cohabitationStartDate'] ?? ''));
@@ -1390,8 +1471,8 @@ function dra_apply_preview_edits(mysqli $conn, string $requestId, array &$reques
     if ($detentionFacility !== '') {
         $payload['_preview_detention_facility'] = $detentionFacility;
     }
-    if ($businessApprovalType !== '') {
-        $payload['_preview_business_approval_type'] = $businessApprovalType;
+    if (!empty($businessApprovalTypes)) {
+        $payload['_preview_business_approval_type'] = implode(',', $businessApprovalTypes);
     }
     if ($plateNumber !== '') {
         $payload['_preview_plate_number'] = strtoupper($plateNumber);
@@ -1403,16 +1484,7 @@ function dra_apply_preview_edits(mysqli $conn, string $requestId, array &$reques
         $payload['cohabitation_start_date'] = $cohabitationStartDate;
     }
 
-    $encoded = dr_safe_json($payload);
-    if (dr_column_exists($conn, 'documentrequesttbl', 'request_details')) {
-        $stmt = $conn->prepare("UPDATE documentrequesttbl SET request_details = ? WHERE request_id = ? LIMIT 1");
-        if ($stmt) {
-            $stmt->bind_param('ss', $encoded, $requestId);
-            $stmt->execute();
-            $stmt->close();
-            $requestRow['request_details'] = $encoded;
-        }
-    }
+    dra_persist_request_payload($conn, $requestId, $requestRow, $payload);
 }
 
 function dra_overlay_preview_edits(array &$requestRow, array $edited): void {
@@ -1441,7 +1513,7 @@ function dra_overlay_preview_edits(array &$requestRow, array $edited): void {
     $cohabitantName = trim((string)($edited['cohabitantName'] ?? ''));
     $cohabitantRelationship = trim((string)($edited['cohabitantRelationship'] ?? ''));
     $detentionFacility = trim((string)($edited['detentionFacility'] ?? ''));
-    $businessApprovalType = dra_normalize_business_approval_type((string)($edited['businessApprovalType'] ?? ''));
+    $businessApprovalTypes = dra_normalize_business_approval_types((string)($edited['businessApprovalType'] ?? ''));
     $plateNumber = trim((string)($edited['plateNumber'] ?? ''));
     $cohabitationDuration = trim((string)($edited['cohabitationDuration'] ?? ''));
     $cohabitationStartDate = trim((string)($edited['cohabitationStartDate'] ?? ''));
@@ -1513,8 +1585,8 @@ function dra_overlay_preview_edits(array &$requestRow, array $edited): void {
     if ($detentionFacility !== '') {
         $payload['_preview_detention_facility'] = $detentionFacility;
     }
-    if ($businessApprovalType !== '') {
-        $payload['_preview_business_approval_type'] = $businessApprovalType;
+    if (!empty($businessApprovalTypes)) {
+        $payload['_preview_business_approval_type'] = implode(',', $businessApprovalTypes);
     }
     if ($plateNumber !== '') {
         $payload['_preview_plate_number'] = strtoupper($plateNumber);
@@ -1598,6 +1670,9 @@ function dra_generate_issued_document(array $requestRow): ?string {
     $issuedOfficeSentence = 'Issued this ' . $issuedAsDocx . ' at the office of the Punong Barangay, Barangay San Jose, Montalban, Rizal';
     $issuedOfficeSentenceWrapped = 'Issued this ' . $issuedAsDocx . ' at the office of the Punong Barangay, Barangay' . "\n" . 'San Jose, Montalban, Rizal';
     $payload = dra_decode_request_payload($requestRow);
+    if ($isBarangayId) {
+        dra_ensure_barangay_id_generated_fields($conn, $requestId, $requestRow, $payload, $issuedDateObj);
+    }
 
     $fullName = trim((string)($payload['_preview_full_name'] ?? ''));
     if ($fullName === '') {
@@ -2371,23 +2446,11 @@ function dra_generate_issued_document(array $requestRow): ?string {
                     $core = trim(implode(' ', array_values(array_filter([$first, $middleInitial, $suffix], static fn($value) => trim((string)$value) !== ''))));
                     return $upperText(trim($last . ($core !== '' ? ', ' . $core : '')));
                 };
-                $composeCardNumber = static function () use ($payload, $requestId, $issuedDateObj, $upperText): string {
-                    $override = trim((string)($payload['barangay_id_number'] ?? $payload['resident_id_number'] ?? $payload['resident_id_no'] ?? ''));
-                    if ($override !== '') {
-                        return $upperText($override);
-                    }
-                    $digits = preg_replace('/\D+/', '', $requestId) ?? '';
-                    $serial = substr(str_pad($digits, 4, '0', STR_PAD_LEFT), -4);
-                    return 'A' . $issuedDateObj->format('Y') . '-' . $serial;
+                $composeCardNumber = static function () use ($payload, $requestId, $issuedDateObj): string {
+                    return dra_barangay_id_generated_number($payload, $requestId, $issuedDateObj);
                 };
-                $composeValidUntil = static function () use ($payload, $issuedDateObj, $upperText): string {
-                    $override = trim((string)($payload['barangay_id_valid_until'] ?? $payload['valid_until'] ?? ''));
-                    if ($override !== '') {
-                        return $upperText($override);
-                    }
-                    $validUntil = clone $issuedDateObj;
-                    $validUntil->modify('+2 years');
-                    return $upperText($validUntil->format('m/d/Y'));
+                $composeValidUntil = static function () use ($payload, $issuedDateObj): string {
+                    return dra_barangay_id_generated_valid_until($payload, $issuedDateObj);
                 };
                 $resolveFpdfImageType = static function (string $diskPath): string {
                     $diskPath = trim($diskPath);
@@ -2448,7 +2511,7 @@ function dra_generate_issued_document(array $requestRow): ?string {
                     $residentProfile['full_address'] ?? null,
                     $applicantResidenceAddress,
                 ]);
-                $frontAddress = $upperText($addressSource);
+                $frontAddress = $upperText(dra_compose_barangay_address($addressSource));
 
                 $birthdateText = $upperText($formatDate(dra_manual_first_non_empty([
                     $payload['birthdate'] ?? null,
@@ -3271,7 +3334,7 @@ function dra_generate_issued_document(array $requestRow): ?string {
         if (class_exists('\\setasign\\Fpdi\\Fpdi') && is_file($templatePath)) {
             try {
                 $businessName = $stripTemplateTokens((string)($payload['business_name'] ?? ''));
-                $businessApprovalType = dra_normalize_business_approval_type((string)($payload['_preview_business_approval_type'] ?? $payload['business_approval_type'] ?? ''));
+                $businessApprovalTypes = dra_normalize_business_approval_types((string)($payload['_preview_business_approval_type'] ?? $payload['business_approval_type'] ?? ''));
                 $plateNumber = strtoupper($stripTemplateTokens((string)($payload['_preview_plate_number'] ?? $payload['plate_number'] ?? $payload['business_plate_number'] ?? '')));
                 $businessAddress = $stripTemplateTokens((string)($payload['business_full_address'] ?? $payload['location'] ?? ''));
                 if ($businessAddress === '') {
@@ -3370,7 +3433,7 @@ function dra_generate_issued_document(array $requestRow): ?string {
                     $pdf->SetLineWidth(0.65);
                     $pdf->Line(21.0, $lineY + 0.2, 25.4, $lineY + 0.2);
                     $pdf->Line(30.1, $lineY + 0.2, 34.5, $lineY + 0.2);
-                    if ($businessApprovalType === $approvalMarker['key']) {
+                    if (in_array((string)$approvalMarker['key'], $businessApprovalTypes, true)) {
                         $pdf->SetFont('ZapfDingbats', '', 16.0);
                         $pdf->SetXY(24.9, $lineY - 6.0);
                         $pdf->Cell(6.0, 6.0, chr(51), 0, 0, 'C');
@@ -6058,6 +6121,15 @@ if ($action === 'create_manual_request') {
             $updated = dr_update_stage($conn, $requestId, DR_STAGE_READY_FOR_CLAIM, [
                 'issued_file_path' => trim($issuedPath),
             ]) ?? $updated;
+        } elseif (dr_is_barangay_id_document_type((string)($updated['document_type'] ?? $documentType))) {
+            $baseDir = realpath(__DIR__ . '/../../');
+            if ($baseDir === false) {
+                $baseDir = dirname(__DIR__, 2);
+            }
+            dr_respond_json(500, [
+                'success' => false,
+                'message' => 'The Barangay ID request was moved to ready for claim, but the digital ID file could not be generated. ' . dra_issued_document_diagnostics($baseDir, (array)$updated),
+            ]);
         }
     }
 
@@ -6274,6 +6346,14 @@ if ($action === 'list') {
         $row['released_by'] = trim((string)($row['_released_by_name'] ?? ''));
         $row['personnel_name'] = trim((string)($row['_personnel_name'] ?? ''));
         $row['finance_user_name'] = trim((string)($row['_finance_user_name'] ?? ''));
+        $isBarangayIdDocument = strcasecmp(trim((string)($row['document_type'] ?? '')), 'Barangay ID') === 0;
+        if ($isBarangayIdDocument) {
+            $normalizedStage = strtolower(trim((string)($row['stage'] ?? '')));
+            if (in_array($normalizedStage, [DR_STAGE_FOR_PAYMENT, DR_STAGE_PAYMENT_SUBMITTED, DR_STAGE_PAYMENT_REJECTED, DR_STAGE_PAYMENT_VERIFIED], true)) {
+                $row['stage'] = DR_STAGE_READY_FOR_CLAIM;
+                $row['stage_label'] = dr_stage_label(DR_STAGE_READY_FOR_CLAIM);
+            }
+        }
 
         // Populate finance data from joined columns (avoids per-row finance query).
         $row['amount'] = isset($row['_tx_amount']) ? (float)$row['_tx_amount'] : null;
@@ -6632,7 +6712,7 @@ if ($action === 'view_issued_card') {
         html, body { margin: 0; padding: 0; background: #f3f4f6; font-family: Arial, Helvetica, sans-serif; }
         .barangay-id-issued-shell { padding: 18px; }
       </style>';
-    echo '<script src="' . htmlspecialchars($baseUrl . '/JS-Script-Files/Shared/barangayIdDigital.js?v=20260320-26', ENT_QUOTES, 'UTF-8') . '"></script>';
+    echo '<script src="' . htmlspecialchars($baseUrl . '/JS-Script-Files/Shared/barangayIdDigital.js?v=20260324-01', ENT_QUOTES, 'UTF-8') . '"></script>';
     echo '</head><body>';
     echo '<div id="digitalBarangayIdAdminWrap" class="barangay-id-issued-shell"></div>';
     echo '<script>';
@@ -6643,6 +6723,7 @@ if ($action === 'view_issued_card') {
     echo 'const row = ' . json_encode($row, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) . ' || {};';
     echo 'const payload = ' . json_encode($payload, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) . ' || {};';
     echo 'const residentProfile = ' . json_encode($residentProfile, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) . ' || {};';
+    echo 'try {';
     echo 'const state = window.BarangayIdDigital.createState({';
     echo '  appBase,';
     echo '  row,';
@@ -6654,6 +6735,9 @@ if ($action === 'view_issued_card') {
     echo '  fallbackProfileImageUrl: appBase + "/Images/Profile-Placeholder.png"';
     echo '});';
     echo 'wrap.innerHTML = window.BarangayIdDigital.render(state, { showIntro: false, frontLabel: "Front Template", backLabel: "Back Template" });';
+    echo '} catch (error) {';
+    echo 'wrap.innerHTML = "<div style=\"max-width:720px;margin:24px auto;padding:16px 18px;border:1px solid #fecaca;border-radius:12px;background:#fff1f2;color:#991b1b;font:600 14px/1.4 Arial,Helvetica,sans-serif;\">Unable to render the digital Barangay ID preview.<br><span style=\"font-weight:500;\">"+ String(error && error.message ? error.message : error) +"</span></div>";';
+    echo '}';
     echo '})();';
     echo '</script>';
     echo '</body></html>';
@@ -6855,6 +6939,15 @@ if ($action === 'personnel_approve') {
             $updated = dr_update_stage($conn, $requestId, (string)($updated['stage'] ?? $nextStage), [
                 'issued_file_path' => (string)$issuedPath,
             ]) ?? $updated;
+        } elseif (dr_is_barangay_id_document_type((string)($updated['document_type'] ?? $row['document_type'] ?? ''))) {
+            $baseDir = realpath(__DIR__ . '/../../');
+            if ($baseDir === false) {
+                $baseDir = dirname(__DIR__, 2);
+            }
+            dr_respond_json(500, [
+                'success' => false,
+                'message' => 'The Barangay ID request was approved for release, but the digital ID file could not be generated. ' . dra_issued_document_diagnostics($baseDir, (array)$updated),
+            ]);
         }
     }
 
@@ -7000,6 +7093,9 @@ if ($action === 'interview_fail') {
 }
 
 if ($action === 'finance_verify') {
+    if (dr_is_barangay_id_document_type((string)($row['document_type'] ?? ''))) {
+        dr_respond_json(422, ['success' => false, 'message' => 'Barangay ID is free and does not go through finance verification.']);
+    }
     $currentStage = strtolower(trim((string)($row['stage'] ?? '')));
     if (!in_array($currentStage, [DR_STAGE_FOR_PAYMENT, DR_STAGE_PAYMENT_SUBMITTED, DR_STAGE_PAYMENT_REJECTED], true)) {
         dr_respond_json(422, ['success' => false, 'message' => 'Request is not eligible for finance verification.']);
@@ -7148,6 +7244,9 @@ if ($action === 'finance_verify') {
 }
 
 if ($action === 'finance_reject') {
+    if (dr_is_barangay_id_document_type((string)($row['document_type'] ?? ''))) {
+        dr_respond_json(422, ['success' => false, 'message' => 'Barangay ID is free and does not go through finance review.']);
+    }
     $reason = trim((string)($_POST['reason'] ?? ''));
     if ($reason === '') {
         dr_respond_json(422, ['success' => false, 'message' => 'Rejection reason is required.']);

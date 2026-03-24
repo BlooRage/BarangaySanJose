@@ -378,6 +378,54 @@ if ($certificateLaunchStage === 'release') {
       flex: 1 1 0;
       white-space: nowrap;
     }
+    #actionModal #actionBusinessApprovalWrap {
+      text-align: left;
+    }
+    #actionModal #actionBusinessApprovalOptions {
+      gap: 12px;
+    }
+    #actionModal .action-business-approval-card {
+      display: flex;
+      align-items: flex-start;
+      gap: 14px;
+      border: 1px solid #d6dbe4;
+      border-radius: 14px;
+      padding: 14px 16px;
+      cursor: pointer;
+      background: #fff;
+      transition: border-color .15s ease, box-shadow .15s ease, background-color .15s ease;
+    }
+    #actionModal .action-business-approval-card:hover {
+      border-color: #9cbcf7;
+      box-shadow: 0 0 0 3px rgba(37, 99, 235, .08);
+    }
+    #actionModal .action-business-approval-option {
+      margin: 2px 0 0 0;
+      flex: 0 0 auto;
+      width: 1.2rem;
+      height: 1.2rem;
+    }
+    #actionModal .action-business-approval-copy {
+      flex: 1 1 auto;
+      font-size: 0.98rem;
+      line-height: 1.55;
+      color: #111827;
+      text-align: left;
+    }
+    #actionModal .action-business-approval-card:has(.action-business-approval-option:checked) {
+      border-color: #3b82f6;
+      background: #f8fbff;
+      box-shadow: 0 0 0 3px rgba(59, 130, 246, .12);
+    }
+    #actionModal .action-business-approval-card:has(.action-business-approval-option:disabled) {
+      background: #f8fafc;
+      color: #94a3b8;
+      cursor: not-allowed;
+      opacity: .8;
+    }
+    #actionModal .action-business-approval-card:has(.action-business-approval-option:disabled) .action-business-approval-copy {
+      color: #94a3b8;
+    }
     #viewModal .doc-preview-shell {
       display: grid;
       place-items: center;
@@ -2355,7 +2403,7 @@ if ($certificateLaunchStage === 'release') {
         <div>
           <h5 class="fw-bold mb-1">Manual / Walk-in Document Issuance</h5>
           <p class="text-muted mb-0">
-            Encode handwritten applications here, preview the final document before submission, then send the request into the existing finance and release workflow. QR verification still applies to issued files.
+            Encode handwritten applications here, preview the final document before submission, then send the request into the release workflow. Paid documents still pass through finance, while free documents such as Barangay ID go straight to release. QR verification still applies to issued files.
           </p>
         </div>
         <div class="manual-issuance-badge">
@@ -2382,8 +2430,8 @@ if ($certificateLaunchStage === 'release') {
         </div>
         <div class="manual-step">
           <div class="manual-step-index">4</div>
-          <div class="manual-step-title">Finance Payment</div>
-          <p class="manual-step-copy">Paid requests continue to finance for walk-in payment recording using the same request pipeline.</p>
+          <div class="manual-step-title">Payment Routing</div>
+          <p class="manual-step-copy">Only paid requests continue to finance for walk-in payment recording. Free requests such as Barangay ID skip finance and proceed directly to release.</p>
         </div>
         <div class="manual-step">
           <div class="manual-step-index">5</div>
@@ -2544,7 +2592,7 @@ if ($certificateLaunchStage === 'release') {
             <div class="manual-issuance-card d-none" id="manualFeeWrap">
               <div class="manual-issuance-card-title">
                 <h6>Tagged Clearance Fees</h6>
-                <span>These tagged fees will be carried into the finance step for walk-in payment recording.</span>
+                <span>Tagged fees are only used for paid requests that continue to the finance step for walk-in payment recording.</span>
               </div>
               <div id="manualFeeList" class="manual-fee-list"></div>
               <div class="manual-fee-total">
@@ -2590,7 +2638,7 @@ if ($certificateLaunchStage === 'release') {
               </div>
             </div>
             <p class="manual-summary-note">
-              Registered residents stay linked to their masterlist record, while walk-in residents can still be encoded and issued here without an online account. Paid requests continue to finance, and issued files still carry the QR verification flow used by the existing generator.
+              Registered residents stay linked to their masterlist record, while walk-in residents can still be encoded and issued here without an online account. Paid requests continue to finance; free requests such as Barangay ID move directly to release. Issued files still carry the QR verification flow used by the existing generator.
             </p>
           </div>
         </div>
@@ -2864,12 +2912,21 @@ if ($certificateLaunchStage === 'release') {
 
         <div id="actionBusinessApprovalWrap" class="d-none mb-3">
           <label class="form-label">Type of Approval</label>
-          <select id="actionBusinessApproval" name="business_approval_type" class="form-select">
-            <option value="">Select approval type</option>
-            <option value="not_banned">Not among those business or trade activities being banned to be established in this Barangay</option>
-            <option value="no_objection">Interposes no objection for the issuance of the corresponding Business Permit being applied for.</option>
-            <option value="temporary_clearance">Recommendations only the issuance of &quot;Temporary Barangay Clearance&quot; subject for revocation anytime provided that the requirements under existing Barangay Ordinance, Rules and Regulations should be complied with, otherwise this Barangay should take the necessary actions within legal bounds to stop its continued operations.</option>
-          </select>
+          <input id="actionBusinessApproval" name="business_approval_type" type="hidden">
+          <div id="actionBusinessApprovalOptions" class="d-grid gap-2">
+            <label class="action-business-approval-card">
+              <input class="action-business-approval-option" type="checkbox" value="not_banned">
+              <span class="action-business-approval-copy">Not among those business or trade activities being banned to be established in this Barangay</span>
+            </label>
+            <label class="action-business-approval-card">
+              <input class="action-business-approval-option" type="checkbox" value="no_objection">
+              <span class="action-business-approval-copy">Interposes no objection for the issuance of the corresponding Business Permit being applied for.</span>
+            </label>
+            <label class="action-business-approval-card">
+              <input class="action-business-approval-option" type="checkbox" value="temporary_clearance">
+              <span class="action-business-approval-copy">Recommendations only the issuance of &quot;Temporary Barangay Clearance&quot; subject for revocation anytime provided that the requirements under existing Barangay Ordinance, Rules and Regulations should be complied with, otherwise this Barangay should take the necessary actions within legal bounds to stop its continued operations.</span>
+            </label>
+          </div>
         </div>
 
         <div id="actionPlateWrap" class="d-none mb-3">
@@ -2990,6 +3047,81 @@ if ($certificateLaunchStage === 'release') {
     </div>
   </div>
 </div>
+
+<div class="modal fade" id="idPrintProcessModal" tabindex="-1" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
+  <div class="modal-dialog modal-xl modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Print Barangay ID</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <div class="d-grid gap-3">
+          <div id="idPrintProcessPreview" class="w-100 text-center"></div>
+          <hr class="my-0">
+          <p id="idPrintProcessStep" class="fw-semibold mb-1">Step 1 of 3</p>
+          <p id="idPrintProcessCopy" class="text-muted mb-0">Print the front side of the Barangay ID first.</p>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" id="idPrintProcessReturnBtn" class="btn btn-secondary me-auto">Return</button>
+        <button type="button" id="idPrintProcessReprintBtn" class="btn btn-outline-dark">Reprint</button>
+        <button type="button" id="idPrintProcessPrimaryBtn" class="btn btn-primary">Print Front</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<style>
+  #paymentProofWrap iframe {
+    width: 100%;
+    height: 70vh;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    background: #fff;
+  }
+  #paymentProofWrap img {
+    max-width: 100%;
+    max-height: 70vh;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    background: #fff;
+  }
+  #paymentProofWrap .doc-viewer-loading {
+    min-height: 70vh;
+    display: grid;
+    place-items: center;
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+    background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+    color: #475569;
+    padding: 24px;
+  }
+  #paymentProofWrap .doc-viewer-loading__inner {
+    display: grid;
+    gap: 12px;
+    justify-items: center;
+  }
+  #paymentProofWrap .doc-viewer-loading__spinner {
+    width: 36px;
+    height: 36px;
+    border-radius: 999px;
+    border: 3px solid #dbeafe;
+    border-top-color: #2563eb;
+    animation: doc-viewer-spin .8s linear infinite;
+  }
+  #paymentProofWrap .doc-viewer-loading__label {
+    font-size: .95rem;
+    font-weight: 600;
+  }
+  #idPrintProcessPreview .barangay-id-card {
+    width: min(100%, 720px);
+    margin-inline: auto;
+  }
+  @keyframes doc-viewer-spin {
+    to { transform: rotate(360deg); }
+  }
+</style>
 
 <div class="modal fade" id="submittedFileModal" tabindex="-1" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
   <div class="modal-dialog modal-xl modal-dialog-centered">
@@ -3123,6 +3255,7 @@ if ($certificateLaunchStage === 'release') {
       <div class="modal-footer justify-content-between">
         <span class="text-muted small">Check the fees that apply, adjust amounts as needed, then confirm.</span>
         <div class="d-flex gap-2">
+          <button type="button" class="btn btn-outline-secondary d-none" id="feeTaggingReturnBtn">Return</button>
           <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
           <button type="button" class="btn btn-primary" id="feeTaggingSubmitBtn">Confirm Fees &amp; Send to Payment</button>
         </div>
@@ -3185,6 +3318,7 @@ if ($certificateLaunchStage === 'release') {
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
 <script>
   window.ADMIN_TABLE_COLUMNS_CONFIG = {
     tableSelector: "#table-certificateTracker",
@@ -3196,7 +3330,7 @@ if ($certificateLaunchStage === 'release') {
   };
 </script>
 <script src="../../JS-Script-Files/Admin-End/tableColumnsGeneric.js?v=20260215-1"></script>
-<script src="../../JS-Script-Files/Shared/barangayIdDigital.js?v=20260321-04"></script>
+<script src="../../JS-Script-Files/Shared/barangayIdDigital.js?v=20260324-01"></script>
 <script src="../../JS-Script-Files/Admin-End/certificateTrackerScript.js?v=20260323-14"></script>
 </body>
 </html>

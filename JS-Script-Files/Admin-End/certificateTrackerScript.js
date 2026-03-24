@@ -64,6 +64,7 @@
   let feeTypeCatalogPromise = null;
   let feeTaggingLoadToken = 0;
   let feeCatalogModalBound = false;
+  let feeTaggingReturnState = null;
 
   async function fetchFeeTypeCatalog(options = {}) {
     const force = !!options.force;
@@ -335,7 +336,12 @@
     html += `<thead class="table-light"><tr><th style="width:30px"><input type="checkbox" id="feeTagSelectAll" title="Select/deselect all"></th><th>Fee Name</th><th style="width:130px">Amount (₱)</th><th style="width:40px"></th></tr></thead><tbody id="feeTaggingRows">`;
 
     const activeFeeTypes = Array.isArray(feeTypes)
-      ? feeTypes.filter((ft) => Number(ft?.is_active) === 1)
+      ? feeTypes.filter((ft) => {
+          const feeName = String(ft?.fee_name || '').trim();
+          if (!feeName) return false;
+          const status = String(ft?.status || '').trim().toLowerCase();
+          return status === '' || status === 'approved';
+        })
       : [];
 
     activeFeeTypes.forEach((ft) => {
@@ -444,6 +450,8 @@
   const actionIssued = document.getElementById('actionIssued');
   const actionBusinessApprovalWrap = document.getElementById('actionBusinessApprovalWrap');
   const actionBusinessApproval = document.getElementById('actionBusinessApproval');
+  const actionBusinessApprovalOptionsWrap = document.getElementById('actionBusinessApprovalOptions');
+  const actionBusinessApprovalOptions = Array.from(document.querySelectorAll('.action-business-approval-option'));
   const actionPlateWrap = document.getElementById('actionPlateWrap');
   const actionPlate = document.getElementById('actionPlate');
   const actionPrompt = document.getElementById('actionPrompt');
@@ -469,6 +477,14 @@
   const paymentProofReturnBtn = document.getElementById('paymentProofReturnBtn');
   const paymentProofReleaseBtn = document.getElementById('paymentProofReleaseBtn');
   const paymentProofCloseBtn = document.getElementById('paymentProofCloseBtn');
+  const idPrintProcessModalEl = document.getElementById('idPrintProcessModal');
+  const idPrintProcessModal = idPrintProcessModalEl ? new bootstrap.Modal(idPrintProcessModalEl) : null;
+  const idPrintProcessPreview = document.getElementById('idPrintProcessPreview');
+  const idPrintProcessStep = document.getElementById('idPrintProcessStep');
+  const idPrintProcessCopy = document.getElementById('idPrintProcessCopy');
+  const idPrintProcessReturnBtn = document.getElementById('idPrintProcessReturnBtn');
+  const idPrintProcessReprintBtn = document.getElementById('idPrintProcessReprintBtn');
+  const idPrintProcessPrimaryBtn = document.getElementById('idPrintProcessPrimaryBtn');
   const submittedFileModalEl = document.getElementById('submittedFileModal');
   const submittedFileModal = submittedFileModalEl ? new bootstrap.Modal(submittedFileModalEl) : null;
   const submittedFileWrap = document.getElementById('submittedFileWrap');
@@ -510,6 +526,11 @@
   let paymentProofPrintUrl = '';
   let paymentProofReleaseRequestId = '';
   let paymentProofModalState = null;
+  let idPrintProcessPhase = 'front';
+  let idPrintProcessPendingOpen = false;
+  let idPrintProcessContext = null;
+  let idPrintProcessReopenViewer = false;
+  let paymentProofBarangayIdReopen = null;
   let pendingPaymentProofAction = null;
   let submittedFileReturnTarget = '';
   let preserveViewStateOnNextHide = false;
@@ -984,6 +1005,7 @@
       'payment_rejected',
       'payment_verified'
     ]);
+    const isBarangayId = normalizePreviewDocKey(row?.document_type || '') === 'barangayid';
 
     let stage = stageRaw || stageLabel;
     if (financeLikeStages.has(stageLabel)) {
@@ -1005,14 +1027,21 @@
       }
     }
 
+    if (isBarangayId && paymentFlowStages.has(stage)) {
+      return 'ready_for_claim';
+    }
+
     return stage;
   }
 
   function actionButtons(row) {
     const viewBtn = `<button class="btn btn-sm btn-outline-secondary me-1" data-view-id="${esc(row.request_id)}">View</button>`;
     const stageKey = resolveWorkflowStage(row);
+    const issuedLabel = normalizePreviewDocKey(row?.document_type || '') === 'barangayid'
+      ? 'View ID'
+      : 'View Document';
     const viewIssuedBtn = (!isFinancePaymentsPage && stageKey !== 'completed' && canOpenIssuedDocument(row))
-      ? `<button class="btn btn-sm btn-outline-success me-1" data-issued-id="${esc(row.request_id)}">View Document</button>`
+      ? `<button class="btn btn-sm btn-outline-success me-1" data-issued-id="${esc(row.request_id)}">${issuedLabel}</button>`
       : '';
     if (isFinancePaymentsPage) {
       const financeKey = statusBucket(row);
@@ -1155,8 +1184,8 @@
   function stripAreaFromAddress(address) {
     let value = String(address || '').trim();
     if (!value) return '';
-    value = value.replace(/\s*,\s*Area\s+[A-Za-z0-9-]+\s*(?=,|$)/gi, '');
-    value = value.replace(/(^|,\s*)Area\s+[A-Za-z0-9-]+\s*,\s*/gi, '$1');
+    value = value.replace(/\s*,\s*Area(?:\s+Area)*\s+[A-Za-z0-9-]+\s*(?=,|$)/gi, '');
+    value = value.replace(/(^|,\s*)Area(?:\s+Area)*\s+[A-Za-z0-9-]+\s*,\s*/gi, '$1');
     value = value.replace(/\s*,\s*San\s+Jose\s*,\s*Rodriguez\s*,\s*Rizal\s*$/i, '');
     value = value.replace(/\s*,\s*Barangay\s+San\s+Jose\s*,\s*Rodriguez(?:\s*\(Montalban\))?\s*,\s*Rizal\s*$/i, '');
     value = value.replace(/\s*,\s*Barangay\s+San\s+Jose\s*,\s*Montalban\s*,\s*Rizal\s*$/i, '');
@@ -1172,10 +1201,8 @@
   function composeBarangayAddress(address, locality = 'BARANGAY SAN JOSE, RODRIGUEZ, RIZAL') {
     const suffix = String(locality || '').trim();
     const cleaned = stripAreaFromAddress(String(address || '').trim()).replace(/^[,\s]+|[,\s]+$/g, '');
-    if (!cleaned || cleaned === '-') {
-      return suffix || '-';
-    }
-    return suffix ? `${cleaned}, ${suffix}` : cleaned;
+    if (suffix) return suffix;
+    return cleaned || '-';
   }
 
   function buildCohabitantAddress(payload, applicantAddress = '') {
@@ -2237,17 +2264,96 @@
   }
 
   function normalizeBusinessApprovalType(value) {
-    const token = String(value || '')
-      .trim()
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, '_')
-      .replace(/^_+|_+$/g, '');
-    if (!token) return '';
-    if (token === 'not_banned' || token.includes('not_among_those_business')) return 'not_banned';
-    if (token === 'no_objection' || token.includes('interposes_no_objection')) return 'no_objection';
-    if (token === 'temporary_clearance' || token.includes('temporary_barangay_clearance')) return 'temporary_clearance';
-    return '';
+    return normalizeBusinessApprovalTypes(value)[0] || '';
   }
+
+  function normalizeBusinessApprovalTypes(value) {
+    const rawValues = Array.isArray(value)
+      ? value
+      : String(value || '').split(',');
+    const normalized = [];
+    for (const entry of rawValues) {
+      const token = String(entry || '')
+        .trim()
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '_')
+        .replace(/^_+|_+$/g, '');
+      if (!token) continue;
+      if ((token === 'not_banned' || token.includes('not_among_those_business')) && !normalized.includes('not_banned')) {
+        normalized.push('not_banned');
+        continue;
+      }
+      if ((token === 'no_objection' || token.includes('interposes_no_objection')) && !normalized.includes('no_objection')) {
+        normalized.push('no_objection');
+        continue;
+      }
+      if ((token === 'temporary_clearance' || token.includes('temporary_barangay_clearance')) && !normalized.includes('temporary_clearance')) {
+        normalized.push('temporary_clearance');
+      }
+    }
+    return normalized;
+  }
+
+  function encodeBusinessApprovalTypes(value) {
+    return normalizeBusinessApprovalTypes(value).join(',');
+  }
+
+  function syncBusinessApprovalSelection(rawValue = '') {
+    const selectedValues = new Set(normalizeBusinessApprovalTypes(rawValue));
+    const hasTemporaryClearance = selectedValues.has('temporary_clearance');
+    const hasPrimaryApproval = selectedValues.has('not_banned') || selectedValues.has('no_objection');
+
+    actionBusinessApprovalOptions.forEach((option) => {
+      const value = String(option.value || '').trim();
+      option.checked = selectedValues.has(value);
+      if (value === 'temporary_clearance') {
+        option.disabled = hasPrimaryApproval;
+        if (hasPrimaryApproval) option.checked = false;
+        return;
+      }
+      option.disabled = hasTemporaryClearance;
+      if (hasTemporaryClearance) option.checked = false;
+    });
+
+    const normalized = actionBusinessApprovalOptions
+      .filter((option) => option.checked)
+      .map((option) => option.value);
+
+    if (actionBusinessApproval) {
+      actionBusinessApproval.value = encodeBusinessApprovalTypes(normalized);
+    }
+  }
+
+  function readBusinessApprovalSelection() {
+    return encodeBusinessApprovalTypes(
+      actionBusinessApprovalOptions
+        .filter((option) => option.checked)
+        .map((option) => option.value)
+    );
+  }
+
+  function handleBusinessApprovalOptionChange(changedOption) {
+    if (!changedOption) return;
+    const currentValue = String(changedOption.value || '').trim();
+    if (!currentValue) return;
+    if (changedOption.checked && currentValue === 'temporary_clearance') {
+      actionBusinessApprovalOptions
+        .filter((option) => option.value === 'not_banned' || option.value === 'no_objection')
+        .forEach((option) => { option.checked = false; });
+    }
+    if (changedOption.checked && (currentValue === 'not_banned' || currentValue === 'no_objection')) {
+      actionBusinessApprovalOptions
+        .filter((option) => option.value === 'temporary_clearance')
+        .forEach((option) => { option.checked = false; });
+    }
+    syncBusinessApprovalSelection(readBusinessApprovalSelection());
+  }
+
+  actionBusinessApprovalOptions.forEach((option) => {
+    option.addEventListener('change', () => {
+      handleBusinessApprovalOptionChange(option);
+    });
+  });
 
   function isFirstTimeJobSeekerRow(row) {
     return normalizePreviewDocKey(row?.document_type || '') === 'firsttimejobseeker';
@@ -2422,7 +2528,7 @@
       payload.business_plate_number,
       payload.vehicle_plate_number
     ]);
-    const businessApprovalType = normalizeBusinessApprovalType(firstNonEmpty([
+    const businessApprovalType = encodeBusinessApprovalTypes(firstNonEmpty([
       payload._preview_business_approval_type,
       payload.business_approval_type,
       payload.businessApprovalType
@@ -2799,9 +2905,8 @@
     const cohabitantRelationship = String(state.cohabitantRelationship || '').trim();
     const detentionFacility = String(state.detentionFacility || '').trim();
     const businessName = String(state.businessName || '').trim();
-    const businessType = String(state.businessType || '').trim();
     const businessAddress = String(state.businessAddress || state.location || '').trim();
-    const businessApprovalType = normalizeBusinessApprovalType(state.businessApprovalType || '');
+    const businessApprovalTypes = normalizeBusinessApprovalTypes(state.businessApprovalType || '');
     const plateNumber = String(state.plateNumber || '').trim();
     const operatorName = String(state.operatorName || fullName || '').trim();
     const operatorAddress = String(state.operatorAddress || '').trim();
@@ -2848,7 +2953,7 @@
       return previewEditable(key, text, '_____');
     };
     const businessCheckMark = (type) => {
-      const selected = businessApprovalType === type;
+      const selected = businessApprovalTypes.includes(type);
       return `
         <span class="doc-preview-business-check-mark${selected ? ' doc-preview-business-check-mark--selected' : ''}">
           <span class="doc-preview-business-check-line"></span>
@@ -3105,7 +3210,6 @@
         <p class="doc-preview-business-intro">This is to certify that the business or trade activity below</p>
         <div class="doc-preview-business-fields">
           <div class="doc-preview-business-field"><strong>${previewEditable('businessName', businessName, '${BUSINESS_NAME}')}</strong></div>
-          <div class="doc-preview-business-field"><strong>${previewEditable('businessType', businessType, '${BUSINESS_TYPE}')}</strong></div>
           <div class="doc-preview-business-field"><strong>${previewEditable('businessAddress', businessAddress, '${BUSINESS_ADDRESS}', 'doc-editable-multiline')}</strong></div>
           <div class="doc-preview-business-field"><strong>${previewEditable('operatorName', operatorName, '${OPERATOR_NAME}')}</strong></div>
           <div class="doc-preview-business-field"><strong>${previewEditable('operatorAddress', operatorAddress, '${OPERATOR_ADDRESS}', 'doc-editable-multiline')}</strong></div>
@@ -3853,7 +3957,248 @@
     }
   });
 
-  paymentProofPrintBtn?.addEventListener('click', () => {
+  async function printBarangayIdCards(which = 'both', sourceRoot = paymentProofWrap) {
+    const cards = Array.from(sourceRoot?.querySelectorAll('.barangay-id-card') || []);
+    if (!cards.length) return false;
+    const renderer = window.html2canvas;
+    if (typeof renderer !== 'function') {
+      alert('Image print support is not available right now. Please reload the page and try again.');
+      return true;
+    }
+
+    const hasSinglePreviewCard = cards.length === 1;
+    const selectedCards = which === 'front'
+      ? cards.slice(0, 1)
+      : which === 'back'
+        ? (hasSinglePreviewCard ? cards.slice(0, 1) : cards.slice(1, 2))
+        : cards;
+    if (!selectedCards.length) return true;
+
+    const printWindow = window.open('', '_blank', 'width=1200,height=900');
+    if (!printWindow) return true;
+
+    const buttons = [
+      paymentProofPrintBtn,
+      idPrintProcessReturnBtn,
+      idPrintProcessReprintBtn,
+      idPrintProcessPrimaryBtn
+    ].filter(Boolean);
+    try {
+      buttons.forEach((btn) => { btn.disabled = true; });
+      printWindow.document.open();
+      printWindow.document.write(`
+        <!doctype html>
+        <html lang="en">
+          <head>
+            <meta charset="utf-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1">
+            <title>Preparing ID Print</title>
+            <style>
+              body {
+                margin: 0;
+                min-height: 100vh;
+                display: grid;
+                place-items: center;
+                font-family: Arial, Helvetica, sans-serif;
+                background: #fff;
+                color: #334155;
+              }
+            </style>
+          </head>
+          <body>Preparing ID print...</body>
+        </html>
+      `);
+      printWindow.document.close();
+
+      const imageUrls = [];
+      for (const card of selectedCards) {
+        const canvas = await renderer(card, {
+          backgroundColor: '#ffffff',
+          scale: Math.max(2, Math.min(4, window.devicePixelRatio || 2)),
+          useCORS: true,
+          logging: false
+        });
+        imageUrls.push(canvas.toDataURL('image/png'));
+      }
+
+      const imageMarkup = imageUrls.map((src, index) => `
+        <figure class="id-print-sheet">
+          <img src="${src}" alt="Barangay ID ${which === 'back' ? 'back' : which === 'front' ? 'front' : index === 0 ? 'front' : 'back'}">
+        </figure>
+      `).join('');
+
+      printWindow.document.open();
+      printWindow.document.write(`
+        <!doctype html>
+        <html lang="en">
+          <head>
+            <meta charset="utf-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1">
+            <title>Print Digital Barangay ID</title>
+            <style>
+              @page {
+                size: 85.6mm 54mm;
+                margin: 0;
+              }
+              html,
+              body {
+                margin: 0;
+                padding: 0;
+                width: 85.6mm;
+                min-width: 85.6mm;
+                background: #fff;
+                font-family: Arial, Helvetica, sans-serif;
+              }
+              .print-grid {
+                display: grid;
+                gap: 0;
+                justify-content: start;
+              }
+              .id-print-sheet {
+                margin: 0;
+                width: 85.6mm;
+                height: 54mm;
+                break-inside: avoid;
+                break-after: page;
+                page-break-after: always;
+              }
+              .id-print-sheet img {
+                display: block;
+                width: 85.6mm;
+                height: 54mm;
+                image-rendering: high-quality;
+              }
+              @media print {
+                html,
+                body {
+                  width: 85.6mm;
+                  min-width: 85.6mm;
+                }
+                .id-print-sheet:last-child {
+                  break-after: auto;
+                  page-break-after: auto;
+                }
+              }
+            </style>
+          </head>
+          <body>
+            <main class="print-grid">${imageMarkup}</main>
+          </body>
+        </html>
+      `);
+      printWindow.document.close();
+      const runPrint = () => {
+        try {
+          printWindow.focus();
+          printWindow.print();
+        } catch (_) {}
+      };
+      printWindow.addEventListener('load', () => setTimeout(runPrint, 350), { once: true });
+      setTimeout(runPrint, 1400);
+    } catch (error) {
+      console.error('Failed to rasterize Barangay ID for printing:', error);
+      alert('Unable to prepare the ID as an image for printing.');
+    } finally {
+      buttons.forEach((btn) => { btn.disabled = false; });
+    }
+    return true;
+  }
+
+  function queueReleaseFromPaymentProof(requestId) {
+    const normalizedRequestId = String(requestId || '').trim();
+    if (!normalizedRequestId) {
+      alert('Unable to release this Barangay ID because the request ID is missing.');
+      return;
+    }
+    pendingPaymentProofAction = {
+      type: 'mark_completed_confirm',
+      requestId: normalizedRequestId,
+      returnTarget: 'paymentProof'
+    };
+    if (idPrintProcessModal) {
+      idPrintProcessModal.hide();
+    }
+    if (paymentProofModal) {
+      paymentProofModal.hide();
+    }
+  }
+
+  function idPrintProcessPhaseLabel() {
+    return idPrintProcessPhase === 'back' ? 'back' : 'front';
+  }
+
+  function renderIdPrintProcessPreview() {
+    if (!idPrintProcessPreview) return;
+    const cardHtml = idPrintProcessPhase === 'back'
+      ? String(idPrintProcessContext?.backHtml || '').trim()
+      : String(idPrintProcessContext?.frontHtml || '').trim();
+    idPrintProcessPreview.innerHTML = cardHtml || '';
+  }
+
+  function showIdPrintProcessModal({ autoPrint = false } = {}) {
+    renderIdPrintProcessPhase();
+    renderIdPrintProcessPreview();
+    idPrintProcessModal?.show();
+    if (autoPrint) {
+      window.setTimeout(() => {
+        printBarangayIdCards(idPrintProcessPhaseLabel(), idPrintProcessPreview);
+      }, 180);
+    }
+  }
+
+  function renderIdPrintProcessPhase() {
+    if (!idPrintProcessStep || !idPrintProcessCopy || !idPrintProcessPrimaryBtn || !idPrintProcessReturnBtn || !idPrintProcessReprintBtn) return;
+    idPrintProcessPrimaryBtn.classList.remove('btn-success');
+    idPrintProcessPrimaryBtn.classList.add('btn-primary');
+    switch (idPrintProcessPhase) {
+      case 'front':
+        idPrintProcessStep.textContent = 'Step 1 of 3';
+        idPrintProcessCopy.textContent = 'This is the front side of the Barangay ID. Print it first, then continue to the back side.';
+        idPrintProcessReturnBtn.textContent = 'Return';
+        idPrintProcessReprintBtn.textContent = 'Reprint';
+        idPrintProcessPrimaryBtn.textContent = 'Next';
+        break;
+      case 'back':
+        idPrintProcessStep.textContent = 'Step 2 of 3';
+        idPrintProcessCopy.textContent = 'This is the back side of the Barangay ID. Print it, then release the ID when both sides are ready.';
+        idPrintProcessReturnBtn.textContent = 'Return';
+        idPrintProcessReprintBtn.textContent = 'Reprint';
+        idPrintProcessPrimaryBtn.textContent = 'Release ID';
+        idPrintProcessPrimaryBtn.classList.remove('btn-primary');
+        idPrintProcessPrimaryBtn.classList.add('btn-success');
+        break;
+      default:
+        idPrintProcessPhase = 'front';
+        renderIdPrintProcessPhase();
+        break;
+    }
+  }
+
+  paymentProofPrintBtn?.addEventListener('click', async () => {
+    if (paymentProofWrap?.querySelector('.barangay-id-digital')) {
+      const cards = Array.from(paymentProofWrap.querySelectorAll('.barangay-id-card'));
+      if (!cards.length) {
+        alert('Unable to prepare the Barangay ID preview for printing.');
+        return;
+      }
+      idPrintProcessContext = {
+        requestId: String(paymentProofReleaseRequestId || '').trim(),
+        frontHtml: cards[0]?.outerHTML || '',
+        backHtml: cards[1]?.outerHTML || '',
+        docUrl: String(paymentProofModalState?.docUrl || '').trim(),
+        title: String(paymentProofModalState?.title || 'Digital Barangay ID').trim() || 'Digital Barangay ID',
+        returnTarget: String(paymentProofModalState?.returnTarget || '').trim(),
+        options: { ...(paymentProofModalState?.options || {}) }
+      };
+      idPrintProcessPhase = 'front';
+      idPrintProcessPendingOpen = true;
+      paymentProofModal?.hide();
+      return;
+    }
+    if (await printBarangayIdCards('both')) {
+      return;
+    }
+
     const url = String(paymentProofPrintUrl || '').trim();
     if (!url) return;
     const frame = paymentProofWrap?.querySelector('iframe');
@@ -3880,6 +4225,83 @@
     setTimeout(tryPrint, 1200);
   });
 
+  idPrintProcessReturnBtn?.addEventListener('click', () => {
+    if (idPrintProcessPhase === 'back') {
+      idPrintProcessPhase = 'front';
+      showIdPrintProcessModal();
+      return;
+    }
+    idPrintProcessReopenViewer = true;
+    idPrintProcessModal?.hide();
+  });
+
+  idPrintProcessReprintBtn?.addEventListener('click', async () => {
+    await printBarangayIdCards(idPrintProcessPhaseLabel(), idPrintProcessPreview);
+  });
+
+  idPrintProcessPrimaryBtn?.addEventListener('click', async () => {
+    switch (idPrintProcessPhase) {
+      case 'front':
+        idPrintProcessPhase = 'back';
+        renderIdPrintProcessPhase();
+        renderIdPrintProcessPreview();
+        await printBarangayIdCards('back', idPrintProcessPreview);
+        return;
+      case 'back':
+        queueReleaseFromPaymentProof(paymentProofReleaseRequestId);
+        return;
+      default:
+        idPrintProcessPhase = 'front';
+        showIdPrintProcessModal();
+    }
+  });
+
+  idPrintProcessModalEl?.addEventListener('hidden.bs.modal', () => {
+    const reopenViewer = idPrintProcessReopenViewer;
+    const reopenHandler = reopenViewer && typeof paymentProofBarangayIdReopen === 'function'
+      ? paymentProofBarangayIdReopen
+      : null;
+    const queuedAction = pendingPaymentProofAction ? { ...pendingPaymentProofAction } : null;
+    const queuedReturnState = queuedAction && idPrintProcessContext ? {
+      docUrl: String(idPrintProcessContext.docUrl || '').trim(),
+      title: String(idPrintProcessContext.title || 'Digital Barangay ID').trim() || 'Digital Barangay ID',
+      returnTarget: String(idPrintProcessContext.returnTarget || '').trim(),
+      options: { ...(idPrintProcessContext.options || {}) }
+    } : null;
+    idPrintProcessPhase = 'front';
+    idPrintProcessPendingOpen = false;
+    idPrintProcessContext = null;
+    idPrintProcessReopenViewer = false;
+    if (idPrintProcessPreview) {
+      idPrintProcessPreview.innerHTML = '';
+    }
+    renderIdPrintProcessPhase();
+    if (idPrintProcessPrimaryBtn) {
+      idPrintProcessPrimaryBtn.disabled = false;
+    }
+    if (idPrintProcessReturnBtn) {
+      idPrintProcessReturnBtn.disabled = false;
+    }
+    if (idPrintProcessReprintBtn) {
+      idPrintProcessReprintBtn.disabled = false;
+    }
+    if (reopenHandler) {
+      window.setTimeout(() => {
+        reopenHandler();
+      }, 0);
+      return;
+    }
+    if (queuedAction) {
+      pendingPaymentProofAction = null;
+      window.setTimeout(() => {
+        openActionModal(queuedAction.type, queuedAction.requestId, {
+          returnTarget: queuedAction.returnTarget,
+          reopenState: queuedReturnState
+        });
+      }, 0);
+    }
+  });
+
   paymentProofModalEl?.addEventListener('hidden.bs.modal', () => {
     const queuedAction = pendingPaymentProofAction ? { ...pendingPaymentProofAction } : null;
     const queuedReturnState = queuedAction && paymentProofModalState ? {
@@ -3894,6 +4316,9 @@
     paymentProofReleaseRequestId = '';
     paymentProofModalState = null;
     pendingPaymentProofAction = null;
+    if (idPrintProcessModal && !idPrintProcessPendingOpen) {
+      idPrintProcessModal.hide();
+    }
     if (paymentProofReturnBtn) {
       paymentProofReturnBtn.classList.add('d-none');
       paymentProofReturnBtn.disabled = false;
@@ -3910,6 +4335,7 @@
     }
     if (paymentProofPrintBtn) {
       paymentProofPrintBtn.classList.add('d-none');
+      paymentProofPrintBtn.textContent = 'Print';
     }
     if (paymentProofReleaseBtn) {
       paymentProofReleaseBtn.classList.add('d-none');
@@ -3919,6 +4345,14 @@
     if (paymentProofWrap) {
       paymentProofWrap.innerHTML = '';
     }
+    if (idPrintProcessPendingOpen) {
+      idPrintProcessPendingOpen = false;
+      window.setTimeout(() => {
+        showIdPrintProcessModal({ autoPrint: true });
+      }, 0);
+      return;
+    }
+    paymentProofBarangayIdReopen = null;
     if (queuedAction) {
       openActionModal(queuedAction.type, queuedAction.requestId, {
         returnTarget: queuedAction.returnTarget,
@@ -4040,11 +4474,22 @@
       // keep extension-based fallback
     }
 
-    if (!isImageAsset) {
-      paymentProofWrap.innerHTML = `<iframe src="${bustedUrl}" style="width:100%;height:70vh;border:1px solid #ddd;border-radius:8px;"></iframe>`;
-    } else {
-      paymentProofWrap.innerHTML = `<img src="${bustedUrl}" alt="Document Preview" style="max-width:100%;max-height:70vh;border:1px solid #ddd;border-radius:8px;">`;
-    }
+    const renderModalContent = () => {
+      if (!paymentProofWrap) return;
+      if (!isImageAsset) {
+        paymentProofWrap.innerHTML = `<iframe src="${bustedUrl}" loading="lazy" title="Document Preview"></iframe>`;
+      } else {
+        paymentProofWrap.innerHTML = `<img src="${bustedUrl}" alt="Document Preview" loading="lazy">`;
+      }
+    };
+    paymentProofWrap.innerHTML = `
+      <div class="doc-viewer-loading">
+        <div class="doc-viewer-loading__inner">
+          <div class="doc-viewer-loading__spinner" aria-hidden="true"></div>
+          <div class="doc-viewer-loading__label">Loading document preview...</div>
+        </div>
+      </div>
+    `;
     if (paymentProofPrintBtn) {
       const allowPrint = !!(options && options.allowPrint);
       paymentProofPrintBtn.classList.toggle('d-none', !(allowPrint && isLikelyPdf && !proofOnly && !isIssuedDocument));
@@ -4057,6 +4502,89 @@
       paymentProofReleaseBtn.disabled = false;
       paymentProofReleaseBtn.textContent = 'Release';
     }
+    paymentProofModal.show();
+    window.requestAnimationFrame(() => {
+      window.setTimeout(renderModalContent, 40);
+    });
+  }
+
+  function openBarangayIdCardModal(row, docUrl, title = 'Digital Barangay ID', returnTarget = '', options = {}) {
+    if (!row || !paymentProofModal || !paymentProofWrap) return;
+    const requestId = String(row.request_id || '').trim();
+    const payload = row.payload && typeof row.payload === 'object' ? row.payload : {};
+    const residentProfile = row.resident_profile && typeof row.resident_profile === 'object'
+      ? row.resident_profile
+      : {};
+    if (!requestId || !window.BarangayIdDigital || typeof window.BarangayIdDigital.render !== 'function') {
+      openDocumentModal(docUrl, title, returnTarget, options);
+      return;
+    }
+
+    paymentProofModalState = {
+      docUrl: String(docUrl || '').trim(),
+      title: String(title || 'Digital Barangay ID').trim() || 'Digital Barangay ID',
+      returnTarget: String(returnTarget || '').trim(),
+      options: { ...(options || {}) }
+    };
+    paymentProofReturnTarget = String(returnTarget || '').trim();
+    if (paymentProofTitle) {
+      paymentProofTitle.textContent = 'Digital Barangay ID';
+    }
+    if (paymentProofReturnBtn) {
+      paymentProofReturnBtn.classList.toggle('d-none', paymentProofReturnTarget === '');
+      paymentProofReturnBtn.disabled = false;
+    }
+    if (paymentProofOpenNew) {
+      paymentProofOpenNew.classList.add('d-none');
+      paymentProofOpenNew.removeAttribute('href');
+    }
+    if (paymentProofCloseBtn) {
+      paymentProofCloseBtn.classList.remove('d-none');
+    }
+    if (paymentProofPrintBtn) {
+      paymentProofPrintBtn.classList.add('d-none');
+    }
+    if (paymentProofReleaseBtn) {
+      paymentProofReleaseBtn.classList.add('d-none');
+    }
+    if (paymentProofPrintBtn) {
+      paymentProofPrintBtn.classList.toggle('d-none', !(options && options.allowPrint));
+      paymentProofPrintBtn.textContent = 'Print ID';
+    }
+    paymentProofBarangayIdReopen = () => {
+      openBarangayIdCardModal(row, docUrl, title, returnTarget, options);
+    };
+
+    const qrPreviewUrl = barangayIdQrPreviewUrl(row, payload);
+    const sexValue = barangayIdResidentSex(row, payload, residentProfile);
+    const state = window.BarangayIdDigital.createState({
+      appBase,
+      row: {
+        ...row,
+        qr_code_path: qrPreviewUrl,
+        sex: sexValue || row?.sex || ''
+      },
+      payload: {
+        ...payload,
+        qr_code_path: qrPreviewUrl,
+        sex: sexValue || payload.sex || payload.gender || '',
+        gender: sexValue || payload.gender || payload.sex || '',
+        card_sex: sexValue || payload.card_sex || ''
+      },
+      residentProfile: {
+        ...residentProfile,
+        sex: sexValue || residentProfile.sex || ''
+      },
+      frontTemplateUrl: `${appBase}/Resident-End/Certificates/BarangayID/FRONT_EMPTY.png?v=20260324-01`,
+      backTemplateUrl: `${appBase}/Resident-End/Certificates/BarangayID/BACK_EMPTY.png?v=20260324-01`,
+      templateVariant: 'empty',
+      fallbackProfileImageUrl: `${appBase}/Images/Profile-Placeholder.png`,
+    });
+    paymentProofWrap.innerHTML = window.BarangayIdDigital.render(state, {
+      showIntro: false,
+      frontLabel: 'Front Template',
+      backLabel: 'Back Template',
+    });
     paymentProofModal.show();
   }
 
@@ -4696,6 +5224,10 @@
       actionBusinessApproval.required = false;
       actionBusinessApproval.value = '';
     }
+    actionBusinessApprovalOptions.forEach((option) => {
+      option.checked = false;
+      option.disabled = false;
+    });
     if (actionPlate) {
       actionPlate.required = false;
       actionPlate.value = '';
@@ -4762,9 +5294,10 @@
       actionBusinessApprovalWrap.classList.remove('d-none');
     }
     if (actionBusinessApproval) {
-      actionBusinessApproval.required = true;
-      actionBusinessApproval.value = selectedValue || '';
+      actionBusinessApproval.required = false;
+      actionBusinessApproval.value = encodeBusinessApprovalTypes(selectedValue || '');
     }
+    syncBusinessApprovalSelection(selectedValue || '');
     if (actionPlateWrap) {
       actionPlateWrap.classList.remove('d-none');
     }
@@ -4847,12 +5380,14 @@
     }
     const actionDocKey = String(actionForm?.dataset?.docKey || '');
     const isBusinessClearanceApproval = type === 'personnel_approve' && !isFirstTimeJobSeeker && actionDocKey === 'businessclearance';
-    const existingBusinessApprovalType = normalizeBusinessApprovalType(firstNonEmpty([
+    const existingBusinessApprovalType = encodeBusinessApprovalTypes(firstNonEmpty([
+      options?.businessApprovalType,
       viewPreviewState?.businessApprovalType,
       row?.payload?._preview_business_approval_type,
       row?.payload?.business_approval_type
     ]));
     const existingPlateNumber = firstNonEmpty([
+      options?.plateNumber,
       viewPreviewState?.plateNumber,
       row?.payload?._preview_plate_number,
       row?.payload?.plate_number,
@@ -5065,6 +5600,14 @@
     }
     const submitBtn = document.getElementById('feeTaggingSubmitBtn');
     if (submitBtn) submitBtn.textContent = openPreviewOnSave ? 'Confirm Fees & Continue' : 'Save Fees';
+    const returnBtn = document.getElementById('feeTaggingReturnBtn');
+    feeTaggingReturnState = options && typeof options.returnState === 'object' && String(options.returnState.kind || '').trim() === 'action'
+      ? { ...options.returnState }
+      : null;
+    if (returnBtn) {
+      returnBtn.classList.toggle('d-none', !feeTaggingReturnState);
+      returnBtn.disabled = false;
+    }
 
     const feeTagBody = document.getElementById('feeTaggingBody');
     const feeTagRequestId = document.getElementById('feeTaggingRequestId');
@@ -5096,6 +5639,23 @@
       if (feeTagBody) feeTagBody.innerHTML = renderFeeTaggingErrorState(e?.message || 'Failed to load fee tagging data.');
       if (submitBtn) submitBtn.disabled = true;
     }
+  }
+
+  function reopenFeeTaggingReturnState() {
+    const state = feeTaggingReturnState && typeof feeTaggingReturnState === 'object'
+      ? { ...feeTaggingReturnState }
+      : null;
+    feeTaggingReturnState = null;
+    if (!state) return;
+
+    if (state.kind === 'action') {
+      openActionModal(String(state.actionType || 'personnel_approve'), String(state.requestId || ''), {
+        businessApprovalType: String(state.businessApprovalType || '').trim(),
+        plateNumber: String(state.plateNumber || '').trim()
+      });
+      return;
+    }
+
   }
 
   function updateFeeTagTotal() {
@@ -5148,6 +5708,7 @@
       });
       const feeTagModal = document.getElementById('feeTaggingModal');
       if (feeTagModal) bootstrap.Modal.getInstance(feeTagModal)?.hide();
+      feeTaggingReturnState = null;
       if (openPreviewOnSave) {
         await new Promise((resolve) => window.setTimeout(resolve, 180));
         const opened = await openRequestPreviewFromList(requestId);
@@ -5168,6 +5729,23 @@
       }
     }
   }
+
+  document.getElementById('feeTaggingReturnBtn')?.addEventListener('click', () => {
+    const feeTagModal = document.getElementById('feeTaggingModal');
+    if (!feeTagModal) return;
+    bootstrap.Modal.getInstance(feeTagModal)?.hide();
+    window.setTimeout(() => {
+      reopenFeeTaggingReturnState();
+    }, 160);
+  });
+
+  document.getElementById('feeTaggingModal')?.addEventListener('hidden.bs.modal', () => {
+    const returnBtn = document.getElementById('feeTaggingReturnBtn');
+    if (returnBtn) {
+      returnBtn.classList.add('d-none');
+      returnBtn.disabled = false;
+    }
+  });
 
   // ── Finance Fee Catalog CRUD ─────────────────────────────────────────────────
 
@@ -5414,13 +5992,23 @@
             const issuedDocReady = canOpenIssuedDocument(row);
             const issuedDocUrl = issuedDocumentUrl(String(row.request_id || ''), row);
             const issuedStageKey = resolveWorkflowStage(row);
+            const isBarangayIdIssuedDoc = normalizePreviewDocKey(row?.document_type || '') === 'barangayid';
             viewModalDocBtn.classList.remove('d-none');
-            viewModalDocBtn.textContent = issuedDocReady ? 'View Issued Document' : 'View Document';
+            viewModalDocBtn.textContent = issuedDocReady
+              ? (isBarangayIdIssuedDoc ? 'View ID' : 'View Issued Document')
+              : 'View Document';
             viewModalDocBtn.onclick = () => {
               if (issuedDocReady && issuedDocUrl) {
                 if (viewModalEl && viewModalEl.classList.contains('show') && viewModal) {
                   preserveViewStateOnNextHide = true;
                   viewModal.hide();
+                }
+                if (isBarangayIdIssuedDoc) {
+                  openBarangayIdCardModal(row, issuedDocUrl, issuedDocumentTitle(row), 'view', {
+                    allowPrint: issuedStageKey === 'ready_for_claim',
+                    releaseRequestId: issuedStageKey === 'ready_for_claim' ? String(row.request_id || '') : ''
+                  });
+                  return;
                 }
                 openDocumentModal(issuedDocUrl, issuedDocumentTitle(row), 'view', {
                   allowPrint: issuedStageKey === 'ready_for_claim',
@@ -5889,6 +6477,10 @@
               preserveViewStateOnNextHide = true;
               viewModal.hide();
             }
+            if (normalizePreviewDocKey(row?.document_type || '') === 'barangayid') {
+              openBarangayIdCardModal(row, docUrl, docTitle, 'view');
+              return;
+            }
             openDocumentModal(docUrl, docTitle, 'view');
           });
         });
@@ -5953,6 +6545,13 @@
         const stageKey = resolveWorkflowStage(row);
         const allowPrint = stageKey === 'ready_for_claim';
         const issuedUrl = issuedDocumentUrl(id, row);
+        if (normalizePreviewDocKey(row?.document_type || '') === 'barangayid') {
+          openBarangayIdCardModal(row, issuedUrl, issuedDocumentTitle(row), '', {
+            allowPrint,
+            releaseRequestId: allowPrint ? id : ''
+          });
+          return;
+        }
         openDocumentModal(issuedUrl, issuedDocumentTitle(row), '', {
           allowPrint,
           releaseRequestId: allowPrint ? id : ''
@@ -6020,10 +6619,10 @@
     const currentRow = itemById.get(currentRequestId);
     const currentNeedsFeeTagging = requestNeedsFeeTagging(currentRow);
     if (currentActionValue === 'personnel_approve' && currentDocKey === 'businessclearance' && businessApprovalStep === 'select') {
-      const selectedApprovalType = normalizeBusinessApprovalType(actionBusinessApproval?.value || '');
+      const selectedApprovalType = readBusinessApprovalSelection();
       const selectedPlateNumber = String(actionPlate?.value || '').trim().toUpperCase();
       if (!selectedApprovalType) {
-        modalError.textContent = 'Please select the type of approval first.';
+        modalError.textContent = 'Please select at least one approval type first.';
         modalError.classList.remove('d-none');
         return;
       }
@@ -6045,7 +6644,16 @@
       suppressActionReturn = true;
       actionModal.hide();
       window.setTimeout(() => {
-        openFeeTaggingModal(currentRequestId, { openPreviewOnSave: true });
+        openFeeTaggingModal(currentRequestId, {
+          openPreviewOnSave: true,
+          returnState: {
+            kind: 'action',
+            actionType: 'personnel_approve',
+            requestId: currentRequestId,
+            businessApprovalType: selectedApprovalType,
+            plateNumber: selectedPlateNumber
+          }
+        });
       }, 160);
       return;
     }
@@ -6053,14 +6661,14 @@
     if ((actionType.value || '') === 'personnel_approve' && String(actionForm?.dataset?.docKey || '') !== 'firsttimejobseeker') {
       const rid = currentRequestId;
       if (String(actionForm?.dataset?.docKey || '') === 'businessclearance') {
-        const selectedApprovalType = normalizeBusinessApprovalType(
+        const selectedApprovalType = encodeBusinessApprovalTypes(
           actionForm?.dataset?.businessApprovalType || actionBusinessApproval?.value || ''
         );
         const selectedPlateNumber = String(
           actionForm?.dataset?.businessPlateNumber || actionPlate?.value || ''
         ).trim().toUpperCase();
         if (!selectedApprovalType) {
-          modalError.textContent = 'Please select the type of approval first.';
+          modalError.textContent = 'Please select at least one approval type first.';
           modalError.classList.remove('d-none');
           return;
         }
@@ -6092,7 +6700,16 @@
         suppressActionReturn = true;
         actionModal.hide();
         window.setTimeout(() => {
-          openFeeTaggingModal(rid, { openPreviewOnSave: true });
+          openFeeTaggingModal(rid, {
+            openPreviewOnSave: true,
+            returnState: {
+              kind: 'action',
+              actionType: 'personnel_approve',
+              requestId: rid,
+              businessApprovalType: selectedApprovalType,
+              plateNumber: selectedPlateNumber
+            }
+          });
         }, 160);
         return;
       }

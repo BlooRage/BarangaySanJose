@@ -67,13 +67,29 @@
     const raw = String(address || '').trim();
     if (!raw) return '';
     return raw
-      .replace(/\bArea\s+\d+\b/gi, '')
-      .replace(/\bArea\b/gi, '')
+      .replace(/\s*,\s*Area(?:\s+Area)*\s+[A-Za-z0-9-]+\s*(?=,|$)/gi, '')
+      .replace(/(^|,\s*)Area(?:\s+Area)*\s+[A-Za-z0-9-]+\s*,\s*/gi, '$1')
       .replace(/\s+,/g, ',')
       .replace(/,\s*,/g, ', ')
       .replace(/\s{2,}/g, ' ')
       .replace(/^,\s*|\s*,\s*$/g, '')
       .trim();
+  }
+
+  function issuedResidenceAddress(address, locality = 'Barangay San Jose, Rodriguez, Rizal') {
+    const suffix = String(locality || '').trim();
+    const cleaned = stripAreaFromAddress(address);
+    if (cleaned && suffix) {
+      const normalizedCleaned = cleaned.toLowerCase();
+      const normalizedSuffix = suffix.toLowerCase();
+      if (normalizedCleaned.includes(normalizedSuffix)) {
+        return cleaned;
+      }
+      return `${cleaned}, ${suffix}`.replace(/,\s*,/g, ', ').trim();
+    }
+    if (cleaned) return cleaned;
+    if (suffix) return suffix;
+    return cleaned || '';
   }
 
   function formatDisplayDate(value) {
@@ -214,6 +230,15 @@
         border: 1px solid rgba(122, 97, 70, 0.18);
         container-type: inline-size;
         container-name: barangay-id-card;
+        --bid-label-size: clamp(9px, 0.28rem + 0.58vw, 13px);
+        --bid-field-size: clamp(9.5px, 0.34rem + 0.72vw, 13.5px);
+        --bid-name-size: clamp(11.5px, 0.42rem + 0.95vw, 17.5px);
+        --bid-address-size: clamp(8.8px, 0.3rem + 0.62vw, 12.6px);
+        --bid-meta-size: clamp(9px, 0.3rem + 0.68vw, 12.8px);
+        --bid-cardno-size: clamp(10px, 0.34rem + 0.84vw, 15.4px);
+        --bid-cardno-back-size: clamp(10.4px, 0.36rem + 0.92vw, 16.4px);
+        --bid-emergency-size: clamp(8.8px, 0.31rem + 0.66vw, 12.4px);
+        --bid-note-size: clamp(7.2px, 0.24rem + 0.44vw, 9.8px);
       }
       .barangay-id-card__bg {
         position: absolute;
@@ -250,25 +275,27 @@
         white-space: nowrap;
         overflow: hidden;
         text-overflow: ellipsis;
-        font-size: clamp(8px, 1.15cqw, 12px);
+        font-size: var(--bid-label-size);
       }
       .barangay-id-card__field {
         color: #111;
         font-family: Arial, Helvetica, sans-serif;
         font-weight: 700;
         line-height: 1.08;
+        text-align: left;
         white-space: nowrap;
         overflow: hidden;
         text-overflow: ellipsis;
         text-transform: uppercase;
+        font-size: var(--bid-field-size);
       }
       .barangay-id-card__field--name {
-        font-size: clamp(10px, 1.5cqw, 16px);
+        font-size: var(--bid-name-size);
         letter-spacing: 0.01em;
       }
       .barangay-id-card__field--address,
       .barangay-id-card__field--birthplace {
-        font-size: clamp(8px, 1.18cqw, 12px);
+        font-size: var(--bid-address-size);
       }
       .barangay-id-card__field--address-wrap {
         white-space: normal;
@@ -284,20 +311,24 @@
         overflow-wrap: anywhere;
       }
       .barangay-id-card__field--meta {
-        font-size: clamp(8.5px, 1.2cqw, 12px);
+        font-size: var(--bid-meta-size);
       }
       .barangay-id-card__field--cardno {
-        font-size: clamp(9px, 1.32cqw, 14px);
+        font-size: var(--bid-cardno-size);
         color: #c62828;
         font-weight: 800;
         letter-spacing: 0.04em;
         text-shadow: 0 0 0 rgba(0, 0, 0, 0.01);
       }
       .barangay-id-card__field--cardno-front {
-        font-size: clamp(9.5px, 1.36cqw, 14.6px);
+        font-size: var(--bid-cardno-size);
       }
       .barangay-id-card__field--cardno-back {
-        font-size: clamp(10px, 1.46cqw, 15.8px);
+        font-size: var(--bid-cardno-back-size);
+      }
+      .barangay-id-card__field--emergency {
+        font-size: var(--bid-emergency-size);
+        line-height: 1.04;
       }
       .barangay-id-card__photo {
         overflow: hidden;
@@ -338,7 +369,7 @@
         align-items: center;
         justify-content: center;
         color: #5c5c5c;
-        font-size: clamp(8px, 1.18cqw, 12px);
+        font-size: var(--bid-address-size);
         font-style: italic;
         font-weight: 700;
         letter-spacing: 0.04em;
@@ -351,8 +382,34 @@
         font-style: italic;
         font-weight: 500;
         line-height: 1.24;
-        font-size: clamp(6.6px, 0.95cqw, 9.4px);
+        font-size: var(--bid-note-size);
         text-align: center;
+      }
+      @container barangay-id-card (max-width: 500px) {
+        .barangay-id-card {
+          --bid-label-size: clamp(8px, 2.1cqw, 11px);
+          --bid-field-size: clamp(8.6px, 2.35cqw, 12px);
+          --bid-name-size: clamp(10px, 2.8cqw, 14px);
+          --bid-address-size: clamp(7.8px, 2.05cqw, 10.8px);
+          --bid-meta-size: clamp(8px, 2.1cqw, 11px);
+          --bid-cardno-size: clamp(8.6px, 2.35cqw, 12.4px);
+          --bid-cardno-back-size: clamp(9px, 2.5cqw, 13px);
+          --bid-emergency-size: clamp(7.9px, 2.05cqw, 10.8px);
+          --bid-note-size: clamp(6.8px, 1.7cqw, 8.8px);
+        }
+      }
+      @container barangay-id-card (min-width: 760px) {
+        .barangay-id-card {
+          --bid-label-size: clamp(10px, 0.3rem + 0.48vw, 13.6px);
+          --bid-field-size: clamp(10px, 0.36rem + 0.6vw, 14px);
+          --bid-name-size: clamp(12.5px, 0.46rem + 0.84vw, 18.4px);
+          --bid-address-size: clamp(9.4px, 0.32rem + 0.5vw, 13px);
+          --bid-meta-size: clamp(9.4px, 0.32rem + 0.56vw, 13.2px);
+          --bid-cardno-size: clamp(10.6px, 0.38rem + 0.68vw, 15.8px);
+          --bid-cardno-back-size: clamp(11px, 0.4rem + 0.74vw, 16.8px);
+          --bid-emergency-size: clamp(9.5px, 0.33rem + 0.54vw, 13px);
+          --bid-note-size: clamp(7.4px, 0.24rem + 0.36vw, 10px);
+        }
       }
       .barangay-id-digital__actions {
         display: flex;
@@ -409,12 +466,12 @@
       firstNonEmpty([payload.suffix_name, payload.suffix, residentProfile.suffix])
     ) || upper(firstNonEmpty([payload.resident_name, row.resident_name]), 'RESIDENT');
 
-    const fullAddress = upper(firstNonEmpty([
+    const fullAddress = upper(issuedResidenceAddress(firstNonEmpty([
       payload.full_address,
       payload.full_address_display,
       payload.address,
       residentProfile.full_address
-    ]));
+    ])));
     const birthdate = upper(formatDisplayDate(firstNonEmpty([
       payload.birthdate,
       payload.date_of_birth,
@@ -571,18 +628,18 @@
 
     const backFieldsHtml = usesEmptyTemplate ? `
       <div class="barangay-id-card__field barangay-id-card__field--cardno barangay-id-card__field--cardno-back" style="left:${positionX(63)};top:${positionY(3.6)};width:${widthPct(19.8)};text-align:right;">${esc(state.cardNumber || '-')}</div>
-      <div class="barangay-id-card__field barangay-id-card__field--name" style="left:${positionX(7)};top:${positionY(17)};width:${widthPct(35)};font-size:clamp(9.2px,1.24cqw,13.4px);text-align:left;">${esc(state.cardEmergencyName || '-')}</div>
-      <div class="barangay-id-card__field barangay-id-card__field--address barangay-id-card__field--address-wrap" style="left:${positionX(7)};top:${positionY(22.08)};width:${widthPct(35)};font-size:clamp(8px,1.02cqw,10.8px);">${esc(state.cardEmergencyAddress || '-')}</div>
-      <div class="barangay-id-card__field barangay-id-card__field--meta" style="left:${positionX(7)};top:${positionY(28.5)};width:${widthPct(19.0)};font-size:clamp(8.2px,1.06cqw,11.2px);">${esc(state.cardEmergencyContact || state.cardContactNumber || '-')}</div>
+      <div class="barangay-id-card__field barangay-id-card__field--name barangay-id-card__field--emergency" style="left:${positionX(7)};top:${positionY(17)};width:${widthPct(35)};text-align:left;">${esc(state.cardEmergencyName || '-')}</div>
+      <div class="barangay-id-card__field barangay-id-card__field--address barangay-id-card__field--address-wrap barangay-id-card__field--emergency" style="left:${positionX(7)};top:${positionY(22.08)};width:${widthPct(35)};">${esc(state.cardEmergencyAddress || '-')}</div>
+      <div class="barangay-id-card__field barangay-id-card__field--meta barangay-id-card__field--emergency" style="left:${positionX(7)};top:${positionY(28.5)};width:${widthPct(19.0)};">${esc(state.cardEmergencyContact || state.cardContactNumber || '-')}</div>
       ${qrHtml}
     ` : `
       <div class="barangay-id-card__field barangay-id-card__field--cardno barangay-id-card__field--cardno-back" style="left:${positionX(59.5)};top:${positionY(3.3)};width:${widthPct(21.5)};text-align:right;">${esc(state.cardNumber || '-')}</div>
       <div class="barangay-id-card__label" style="left:${positionX(6.9)};top:${positionY(17.5)};width:${widthPct(10)};">Name</div>
-      <div class="barangay-id-card__field barangay-id-card__field--name" style="left:${positionX(6.9)};top:${positionY(19.7)};width:${widthPct(33)};text-align:left;">${esc(state.cardEmergencyName || '-')}</div>
+      <div class="barangay-id-card__field barangay-id-card__field--name barangay-id-card__field--emergency" style="left:${positionX(6.9)};top:${positionY(19.7)};width:${widthPct(33)};text-align:left;">${esc(state.cardEmergencyName || '-')}</div>
       <div class="barangay-id-card__label" style="left:${positionX(6.9)};top:${positionY(23.8)};width:${widthPct(12)};">Address</div>
-      <div class="barangay-id-card__field barangay-id-card__field--address" style="left:${positionX(6.9)};top:${positionY(26.0)};width:${widthPct(39.6)};">${esc(state.cardEmergencyAddress || '-')}</div>
+      <div class="barangay-id-card__field barangay-id-card__field--address barangay-id-card__field--emergency" style="left:${positionX(6.9)};top:${positionY(26.0)};width:${widthPct(39.6)};">${esc(state.cardEmergencyAddress || '-')}</div>
       <div class="barangay-id-card__label" style="left:${positionX(6.9)};top:${positionY(30.0)};width:${widthPct(12)};">Contact</div>
-      <div class="barangay-id-card__field barangay-id-card__field--meta" style="left:${positionX(6.9)};top:${positionY(32.2)};width:${widthPct(22)};">${esc(state.cardEmergencyContact || state.cardContactNumber || '-')}</div>
+      <div class="barangay-id-card__field barangay-id-card__field--meta barangay-id-card__field--emergency" style="left:${positionX(6.9)};top:${positionY(32.2)};width:${widthPct(22)};">${esc(state.cardEmergencyContact || state.cardContactNumber || '-')}</div>
       <div class="barangay-id-card__note" style="left:${positionX(7.3)};top:${positionY(36.6)};width:${widthPct(40.5)};">${esc(state.validityNotice || '')}</div>
       ${qrHtml}
     `;
