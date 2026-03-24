@@ -1019,9 +1019,6 @@
       if (financeKey === 'pending_verification') {
         return `${viewBtn}<button class="btn btn-sm btn-success" data-inline-action="finance_verify_gcash" data-id="${esc(row.request_id)}">Verify Payment</button>`;
       }
-      if (financeKey === 'unpaid') {
-        return viewBtn;
-      }
       return viewBtn;
     }
     return `${viewBtn}${viewIssuedBtn}`;
@@ -8308,7 +8305,7 @@
           <td>₱${Number(ft.default_amount).toFixed(2)}</td>
           <td><span class="badge ${ft.status === 'approved' ? 'bg-success' : 'bg-secondary'}">${ft.status === 'approved' ? 'Active' : esc(ft.status)}</span></td>
           <td class="text-end">
-            <button class="btn btn-sm btn-outline-warning py-0 px-2"
+            <button class="btn btn-sm btn-warning py-0 px-2"
               onclick="fcrSelectEditFee(${ft.fee_type_id},${JSON.stringify(ft.fee_name)},${ft.default_amount})">
               Request Edit
             </button>

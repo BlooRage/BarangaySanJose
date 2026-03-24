@@ -65,6 +65,17 @@ if ($certificateLaunchStage === 'release') {
       line-height: 1;
       box-shadow: none;
     }
+    #feeChangeSubTabs .nav-link {
+      color: #0d6efd !important;
+    }
+    #feeChangeSubTabs .nav-link.active,
+    #feeChangeSubTabs .nav-link.active:focus,
+    #feeChangeSubTabs .nav-link.active:hover,
+    #feeChangeSubTabs .nav-link.active i,
+    #feeChangeSubTabs .nav-link.active:focus i,
+    #feeChangeSubTabs .nav-link.active:hover i {
+      color: #fff !important;
+    }
     .certificate-tracker-shell .admin-list-actions .form-select,
     .certificate-tracker-shell .admin-list-actions .input-group-text,
     .certificate-tracker-shell .admin-list-actions .form-control {
