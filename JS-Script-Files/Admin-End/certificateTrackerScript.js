@@ -8428,8 +8428,88 @@
         </tr>`).join('');
     }
 
-    window.fcrCancelRequest = async function(id) {
-      if (!confirm('Cancel this fee change request?')) return;
+    function renderFcrList(rows) {
+      const tbody = document.getElementById('fcrListBody');
+      if (!tbody) return;
+      if (!rows.length) {
+        tbody.innerHTML = '<tr><td colspan="7" class="text-muted text-center py-3">No requests submitted yet.</td></tr>';
+        return;
+      }
+
+      const statusBadge = s => {
+        const token = String(s || '').trim().toLowerCase();
+        const map = {
+          pending: 'pending',
+          approved: 'approved',
+          rejected: 'denied',
+          cancelled: 'archived',
+          canceled: 'archived'
+        };
+        const labelMap = {
+          pending: 'Pending',
+          approved: 'Approved',
+          rejected: 'Rejected',
+          cancelled: 'Cancelled',
+          canceled: 'Cancelled'
+        };
+        const pillClass = map[token] || 'archived';
+        const label = labelMap[token] || token.replace(/_/g, ' ') || 'Unknown';
+        return `<span class="status-pill ${pillClass}">${esc(label)}</span>`;
+      };
+
+      tbody.innerHTML = rows.map(r => `
+        <tr>
+          <td><span class="badge bg-secondary">${r.change_type === 'new_type' ? 'New Type' : 'Price Edit'}</span></td>
+          <td class="fw-semibold">${esc(r.fee_name)}</td>
+          <td>&#8369;${Number(r.proposed_amount || r.default_amount).toFixed(2)}</td>
+          <td class="small text-muted">${esc(r.notes || '-')}</td>
+          <td>${statusBadge(r.status)}</td>
+          <td class="small text-muted">${esc(r.updated_at || r.created_at || '')}</td>
+          <td class="text-end">
+            ${String(r.status || '').trim().toLowerCase() === 'pending'
+              ? `<div class="compact-table-actions justify-content-end"><button class="btn btn-sm compact-table-btn btn-danger" onclick="fcrOpenCancelModal(${r.fee_type_id})">Cancel</button></div>`
+              : '-'}
+          </td>
+        </tr>`).join('');
+    }
+
+    const fcrCancelModalEl = document.getElementById('fcrCancelModal');
+    const fcrCancelModalError = document.getElementById('fcrCancelModalError');
+    const fcrCancelModalConfirmBtn = document.getElementById('fcrCancelModalConfirmBtn');
+    const fcrCancelModalBackBtn = document.getElementById('fcrCancelModalBackBtn');
+    const fcrCancelModal = (fcrCancelModalEl && typeof bootstrap !== 'undefined' && bootstrap.Modal)
+      ? new bootstrap.Modal(fcrCancelModalEl)
+      : null;
+    let pendingFcrCancelId = null;
+
+    function setFcrCancelModalError(message) {
+      if (!fcrCancelModalError) return;
+      fcrCancelModalError.textContent = message || '';
+      fcrCancelModalError.classList.toggle('d-none', !message);
+    }
+
+    function setFcrCancelModalBusy(isBusy) {
+      if (fcrCancelModalConfirmBtn) {
+        fcrCancelModalConfirmBtn.disabled = isBusy;
+        fcrCancelModalConfirmBtn.innerHTML = isBusy
+          ? '<i class="fas fa-spinner fa-spin me-1"></i>Cancelling...'
+          : 'Cancel Request';
+      }
+      if (fcrCancelModalBackBtn) {
+        fcrCancelModalBackBtn.disabled = isBusy;
+      }
+    }
+
+    window.fcrOpenCancelModal = function(id) {
+      pendingFcrCancelId = id;
+      setFcrCancelModalError('');
+      setFcrCancelModalBusy(false);
+      if (fcrCancelModal) {
+        fcrCancelModal.show();
+      }
+    };
+
+    async function fcrCancelRequest(id) {
       try {
         const fd = new FormData();
         fd.append('action', 'cancel_fee_change_request');
@@ -8437,9 +8517,30 @@
         const res  = await fetch(API, { method: 'POST', body: fd });
         const data = await res.json();
         if (!data.success) throw new Error(data.message || 'Cancel failed.');
+        if (fcrCancelModal) {
+          fcrCancelModal.hide();
+        }
+        pendingFcrCancelId = null;
         loadFcrList();
-      } catch (e) { alert(e.message); }
-    };
+      } catch (e) {
+        setFcrCancelModalError(e.message || 'Cancel failed.');
+      } finally {
+        setFcrCancelModalBusy(false);
+      }
+    }
+
+    fcrCancelModalConfirmBtn?.addEventListener('click', () => {
+      if (!pendingFcrCancelId) return;
+      setFcrCancelModalError('');
+      setFcrCancelModalBusy(true);
+      fcrCancelRequest(pendingFcrCancelId);
+    });
+
+    fcrCancelModalEl?.addEventListener('hidden.bs.modal', () => {
+      pendingFcrCancelId = null;
+      setFcrCancelModalError('');
+      setFcrCancelModalBusy(false);
+    });
 
     document.getElementById('fcrListRefreshBtn').addEventListener('click', loadFcrList);
   })();

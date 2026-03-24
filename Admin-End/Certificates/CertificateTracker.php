@@ -94,6 +94,40 @@ if ($certificateLaunchStage === 'release') {
       overflow-y: visible;
       -webkit-overflow-scrolling: touch;
     }
+    .certificate-tracker-shell .fee-catalog-table-shell {
+      border: 1px solid #eceff3;
+      border-radius: 8px;
+      background: #fff;
+      overflow: hidden;
+      padding-bottom: 0;
+    }
+    .certificate-tracker-shell .fee-catalog-table {
+      margin-bottom: 0;
+      border-collapse: separate;
+      border-spacing: 0;
+      width: 100%;
+    }
+    .certificate-tracker-shell .fee-catalog-table thead th {
+      padding: 0.68rem 0.9rem;
+      font-size: 0.96rem;
+    }
+    .certificate-tracker-shell .fee-catalog-table tbody td {
+      padding: 0.56rem 0.9rem;
+      font-size: 0.96rem;
+      vertical-align: middle;
+    }
+    .certificate-tracker-shell .compact-admin-table .compact-table-btn.btn-danger {
+      color: #fff;
+      border-color: #dc3545;
+      background: #dc3545;
+      font-weight: 400 !important;
+      letter-spacing: 0.15px;
+    }
+    .certificate-tracker-shell .compact-admin-table .compact-table-btn.btn-danger:hover {
+      color: #fff;
+      border-color: #bb2d3b;
+      background: #bb2d3b;
+    }
     #table-certificateTracker {
       table-layout: auto;
       width: 100%;
@@ -2626,8 +2660,8 @@ if ($certificateLaunchStage === 'release') {
                 <i class="fa-solid fa-arrows-rotate"></i>
               </button>
             </div>
-            <div class="table-responsive">
-              <table class="table table-sm table-hover align-middle">
+            <div class="table-responsive fee-catalog-table-shell">
+              <table class="table table-sm table-hover align-middle fee-catalog-table">
                 <thead class="table-light">
                   <tr>
                     <th>Fee Name</th>
@@ -2694,10 +2728,10 @@ if ($certificateLaunchStage === 'release') {
             <i class="fa-solid fa-arrows-rotate"></i>
           </button>
         </div>
-        <div class="table-responsive">
-          <table class="table table-sm align-middle">
-            <thead class="table-light">
-              <tr>
+        <div class="table-responsive compact-admin-table-shell">
+          <table class="table align-middle mb-0 compact-admin-table compact-admin-table--wide">
+            <thead>
+              <tr class="table-light">
                 <th>Type</th>
                 <th>Fee Name</th>
                 <th>Proposed Amount</th>
@@ -2770,6 +2804,26 @@ if ($certificateLaunchStage === 'release') {
         <button type="button" class="btn btn-outline-secondary d-none" id="manualBarangayIdRetakePhotoBtn">Retake</button>
         <button type="button" class="btn btn-primary" id="manualBarangayIdCapturePhotoBtn" disabled>Capture Photo</button>
         <button type="button" class="btn btn-success d-none" id="manualBarangayIdSavePhotoBtn">Crop and Save</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="fcrCancelModal" tabindex="-1" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content p-3">
+      <div class="modal-header justify-content-center border-0 pb-0">
+        <h5 class="modal-title fw-bold text-center w-100">Cancel Fee Change Request</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <hr class="my-2">
+      <div class="modal-body text-center">
+        <p class="mb-3">Are you sure you want to cancel this fee change request?</p>
+        <div id="fcrCancelModalError" class="alert alert-danger d-none py-2 small mb-0"></div>
+      </div>
+      <div class="modal-footer action-split border-0 pt-0">
+        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal" id="fcrCancelModalBackBtn">Back</button>
+        <button type="button" class="btn btn-danger" id="fcrCancelModalConfirmBtn">Cancel Request</button>
       </div>
     </div>
   </div>
