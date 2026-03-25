@@ -83,11 +83,11 @@ body {
 }
 
 .login-image {
-    background-image: url('../../Images/LoginSignIn.png');
+    background-image: var(--cms-login-image-url, url('../../Images/LoginSignIn.png'));
 }
 
 .signup-image {
-    background-image: url('../../Images/LoginRegister.png');
+    background-image: var(--cms-register-image-url, url('../../Images/LoginRegister.png'));
 }
 
 /* ===== Form Wrapper & Forms ===== */

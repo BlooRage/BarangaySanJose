@@ -591,6 +591,34 @@ if (!function_exists('amp_ensure_permission_storage')) {
                 UNIQUE KEY uniq_access_profile_user (user_id)
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
         ");
+
+        $conn->query("
+            CREATE TABLE IF NOT EXISTS officialseatmodulepermissionstbl (
+                seat_permission_id INT NOT NULL AUTO_INCREMENT,
+                council_id INT NOT NULL,
+                permission_key VARCHAR(120) NOT NULL,
+                is_allowed TINYINT(1) NOT NULL DEFAULT 1,
+                granted_by_user_id VARCHAR(20) DEFAULT NULL,
+                created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                PRIMARY KEY (seat_permission_id),
+                UNIQUE KEY uniq_seat_permission (council_id, permission_key),
+                KEY idx_seat_permission_key (permission_key),
+                KEY idx_seat_permission_allowed (is_allowed)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
+        ");
+
+        $conn->query("
+            CREATE TABLE IF NOT EXISTS officialseataccessprofiletbl (
+                seat_access_profile_id INT NOT NULL AUTO_INCREMENT,
+                council_id INT NOT NULL,
+                permissions_initialized TINYINT(1) NOT NULL DEFAULT 0,
+                created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                PRIMARY KEY (seat_access_profile_id),
+                UNIQUE KEY uniq_seat_access_profile_council (council_id)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
+        ");
     }
 }
 
@@ -696,6 +724,171 @@ if (!function_exists('amp_has_saved_access_profile')) {
     }
 }
 
+if (!function_exists('amp_replace_official_module_permissions')) {
+    function amp_replace_official_module_permissions(mysqli $conn, string $officialId, string $userId, array $permissionKeys, string $grantedByUserId): void
+    {
+        amp_ensure_permission_storage($conn);
+
+        $officialId = trim($officialId);
+        if ($officialId === '') {
+            throw new RuntimeException('Official ID is required to save module permissions.');
+        }
+
+        $deleteStmt = $conn->prepare("DELETE FROM officialmodulepermissionstbl WHERE official_id = ?");
+        if ($deleteStmt) {
+            $deleteStmt->bind_param('s', $officialId);
+            $deleteStmt->execute();
+            $deleteStmt->close();
+        }
+
+        if (!$permissionKeys) {
+            return;
+        }
+
+        $insertStmt = $conn->prepare("
+            INSERT INTO officialmodulepermissionstbl
+                (official_id, user_id, permission_key, is_allowed, granted_by_user_id)
+            VALUES
+                (?, NULLIF(?, ''), ?, 1, NULLIF(?, ''))
+        ");
+        if (!$insertStmt) {
+            throw new RuntimeException('Failed to save official module permissions.');
+        }
+
+        foreach ($permissionKeys as $permissionKey) {
+            $permissionKey = trim((string)$permissionKey);
+            if ($permissionKey === '') {
+                continue;
+            }
+            $insertStmt->bind_param('ssss', $officialId, $userId, $permissionKey, $grantedByUserId);
+            $insertStmt->execute();
+        }
+        $insertStmt->close();
+    }
+}
+
+if (!function_exists('amp_upsert_official_access_profile')) {
+    function amp_upsert_official_access_profile(mysqli $conn, string $officialId, string $userId): void
+    {
+        amp_ensure_permission_storage($conn);
+
+        $officialId = trim($officialId);
+        if ($officialId === '') {
+            throw new RuntimeException('Official ID is required to save access profile metadata.');
+        }
+
+        $stmt = $conn->prepare("
+            INSERT INTO officialaccessprofiletbl (official_id, user_id, permissions_initialized)
+            VALUES (?, NULLIF(?, ''), 1)
+            ON DUPLICATE KEY UPDATE
+                user_id = VALUES(user_id),
+                permissions_initialized = 1,
+                updated_at = CURRENT_TIMESTAMP
+        ");
+        if (!$stmt) {
+            throw new RuntimeException('Failed to save official access profile metadata.');
+        }
+        $stmt->bind_param('ss', $officialId, $userId);
+        $stmt->execute();
+        $stmt->close();
+    }
+}
+
+if (!function_exists('amp_has_saved_seat_access_profile')) {
+    function amp_has_saved_seat_access_profile(mysqli $conn, int $councilId): bool
+    {
+        amp_ensure_permission_storage($conn);
+
+        if ($councilId <= 0) {
+            return false;
+        }
+
+        $stmt = $conn->prepare("
+            SELECT 1
+            FROM officialseataccessprofiletbl
+            WHERE council_id = ?
+              AND permissions_initialized = 1
+            LIMIT 1
+        ");
+        if (!$stmt) {
+            return false;
+        }
+        $stmt->bind_param('i', $councilId);
+        $stmt->execute();
+        $row = $stmt->get_result()->fetch_row();
+        $stmt->close();
+
+        return $row !== null;
+    }
+}
+
+if (!function_exists('amp_replace_seat_module_permissions')) {
+    function amp_replace_seat_module_permissions(mysqli $conn, int $councilId, array $permissionKeys, string $grantedByUserId): void
+    {
+        amp_ensure_permission_storage($conn);
+
+        if ($councilId <= 0) {
+            throw new RuntimeException('Council seat is required to save seat module permissions.');
+        }
+
+        $deleteStmt = $conn->prepare("DELETE FROM officialseatmodulepermissionstbl WHERE council_id = ?");
+        if ($deleteStmt) {
+            $deleteStmt->bind_param('i', $councilId);
+            $deleteStmt->execute();
+            $deleteStmt->close();
+        }
+
+        if (!$permissionKeys) {
+            return;
+        }
+
+        $insertStmt = $conn->prepare("
+            INSERT INTO officialseatmodulepermissionstbl
+                (council_id, permission_key, is_allowed, granted_by_user_id)
+            VALUES
+                (?, ?, 1, NULLIF(?, ''))
+        ");
+        if (!$insertStmt) {
+            throw new RuntimeException('Failed to save seat module permissions.');
+        }
+
+        foreach ($permissionKeys as $permissionKey) {
+            $permissionKey = trim((string)$permissionKey);
+            if ($permissionKey === '') {
+                continue;
+            }
+            $insertStmt->bind_param('iss', $councilId, $permissionKey, $grantedByUserId);
+            $insertStmt->execute();
+        }
+        $insertStmt->close();
+    }
+}
+
+if (!function_exists('amp_upsert_seat_access_profile')) {
+    function amp_upsert_seat_access_profile(mysqli $conn, int $councilId): void
+    {
+        amp_ensure_permission_storage($conn);
+
+        if ($councilId <= 0) {
+            throw new RuntimeException('Council seat is required to save seat access profile metadata.');
+        }
+
+        $stmt = $conn->prepare("
+            INSERT INTO officialseataccessprofiletbl (council_id, permissions_initialized)
+            VALUES (?, 1)
+            ON DUPLICATE KEY UPDATE
+                permissions_initialized = 1,
+                updated_at = CURRENT_TIMESTAMP
+        ");
+        if (!$stmt) {
+            throw new RuntimeException('Failed to save seat access profile metadata.');
+        }
+        $stmt->bind_param('i', $councilId);
+        $stmt->execute();
+        $stmt->close();
+    }
+}
+
 if (!function_exists('amp_get_protected_code')) {
     function amp_get_protected_code(array $row): string
     {
@@ -786,6 +979,70 @@ if (!function_exists('amp_get_effective_permission_keys_for_row')) {
     }
 }
 
+if (!function_exists('amp_get_effective_permission_keys_for_council')) {
+    function amp_get_effective_permission_keys_for_council(mysqli $conn, int $councilId, string $displayRole = 'Official'): array
+    {
+        amp_ensure_permission_storage($conn);
+
+        $permissions = [];
+
+        if ($councilId > 0) {
+            $stmt = $conn->prepare("
+                SELECT permission_key
+                FROM officialseatmodulepermissionstbl
+                WHERE council_id = ?
+                  AND is_allowed = 1
+            ");
+            if ($stmt) {
+                $stmt->bind_param('i', $councilId);
+                $stmt->execute();
+                $res = $stmt->get_result();
+                while ($permRow = $res->fetch_assoc()) {
+                    $key = trim((string)($permRow['permission_key'] ?? ''));
+                    if ($key !== '') {
+                        $permissions[$key] = true;
+                    }
+                }
+                $stmt->close();
+            }
+        }
+
+        if (!$permissions && !amp_has_saved_seat_access_profile($conn, $councilId)) {
+            $defaultKeys = amp_storage_role_to_display_role($displayRole) === 'SuperAdmin'
+                ? amp_get_all_leaf_permission_keys()
+                : amp_get_default_admin_permission_keys();
+            foreach ($defaultKeys as $key) {
+                $permissions[$key] = true;
+            }
+        }
+
+        if (amp_storage_role_to_display_role($displayRole) !== 'SuperAdmin') {
+            foreach (array_keys($permissions) as $key) {
+                if (amp_is_admin_only_permission($key)) {
+                    unset($permissions[$key]);
+                }
+            }
+        }
+
+        return $permissions;
+    }
+}
+
+if (!function_exists('amp_apply_seat_permissions_to_official')) {
+    function amp_apply_seat_permissions_to_official(mysqli $conn, int $councilId, string $officialId, string $userId, string $grantedByUserId, string $displayRole = 'Official'): void
+    {
+        amp_ensure_permission_storage($conn);
+
+        if ($councilId <= 0 || !amp_has_saved_seat_access_profile($conn, $councilId)) {
+            return;
+        }
+
+        $permissionKeys = array_keys(amp_get_effective_permission_keys_for_council($conn, $councilId, $displayRole));
+        amp_replace_official_module_permissions($conn, $officialId, $userId, $permissionKeys, $grantedByUserId);
+        amp_upsert_official_access_profile($conn, $officialId, $userId);
+    }
+}
+
 if (!function_exists('amp_get_allowed_permission_keys')) {
     function amp_get_allowed_permission_keys(mysqli $conn, string $userId, string $sessionRole = ''): array
     {
@@ -863,6 +1120,7 @@ if (!function_exists('amp_resolve_request_permission_key')) {
             'ReviewQueue.php' => 'blotter_review_queue',
             'ComplaintTracker.php' => 'complaint_tracker',
             'ComplaintForm.php' => 'complaint_log_new_incident',
+            'ContentManagement.php' => 'announcements_tracker',
             'Contents.php' => 'announcements_tracker',
             'CreateContent.php' => match (strtolower(trim((string)($_GET['type'] ?? 'page')))) {
                 'delivery' => 'announcements_delivery',

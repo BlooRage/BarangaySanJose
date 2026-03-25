@@ -56,6 +56,10 @@ function appConfiguredBaseUrlRaw(): string
         return $cached;
     }
 
+    if (appRequestIsLocalhost()) {
+        return $cached = '';
+    }
+
     $configured = trim((string)runtime_env('APP_BASE_URL', runtime_config('app.base_url', '')));
     return $cached = rtrim($configured, '/');
 }
@@ -70,6 +74,16 @@ function appNormalizeRootPath(string $path): string
     return '/' . trim($path, '/');
 }
 
+function appPreferredProjectRootPath(): string
+{
+    static $cached = null;
+    if ($cached !== null) {
+        return $cached;
+    }
+
+    return $cached = appRequestIsLocalhost() ? '/BarangaySanJose' : '';
+}
+
 function appConfiguredRootPath(): string
 {
     static $cached = null;
@@ -79,16 +93,30 @@ function appConfiguredRootPath(): string
 
     $explicit = trim((string)runtime_env('APP_ROOT_PATH', runtime_config('app.root_path', '')));
     if ($explicit !== '') {
-        return $cached = appNormalizeRootPath($explicit);
+        $normalized = appNormalizeRootPath($explicit);
+        if (appRequestIsLocalhost()) {
+            return $cached = appPreferredProjectRootPath();
+        }
+        if ($normalized === '/BarangaySanJose') {
+            return $cached = '';
+        }
+        return $cached = $normalized;
     }
 
     $configuredBaseUrl = appConfiguredBaseUrlRaw();
     if ($configuredBaseUrl !== '') {
         $path = (string)(parse_url($configuredBaseUrl, PHP_URL_PATH) ?? '');
-        return $cached = appNormalizeRootPath($path);
+        $normalized = appNormalizeRootPath($path);
+        if (appRequestIsLocalhost()) {
+            return $cached = appPreferredProjectRootPath();
+        }
+        if ($normalized === '/BarangaySanJose') {
+            return $cached = '';
+        }
+        return $cached = $normalized;
     }
 
-    return $cached = '';
+    return $cached = appPreferredProjectRootPath();
 }
 
 function appHasConfiguredRootContext(): bool
@@ -140,6 +168,10 @@ function appForceHttpsConfigured(): bool
     static $cached = null;
     if ($cached !== null) {
         return $cached;
+    }
+
+    if (appRequestIsLocalhost()) {
+        return $cached = false;
     }
 
     return $cached = runtime_bool(runtime_env('APP_FORCE_HTTPS', runtime_config('app.force_https', null)), false);
@@ -286,12 +318,19 @@ function appRootPath(): string
         return $cached = $configured;
     }
 
+    if (appRequestIsLocalhost()) {
+        return $cached = appPreferredProjectRootPath();
+    }
+
     $scriptName = str_replace('\\', '/', (string)($_SERVER['SCRIPT_NAME'] ?? ''));
     $markers = ['/PhpFiles/', '/Resident-End/', '/Admin-End/', '/Guest-End/'];
     foreach ($markers as $marker) {
         $pos = strpos($scriptName, $marker);
         if ($pos !== false) {
             $prefix = rtrim(substr($scriptName, 0, $pos), '/');
+            if ($prefix === '/BarangaySanJose') {
+                return $cached = '';
+            }
             if ($prefix === '' || $prefix === '/') {
                 return $cached = '';
             }

@@ -5,6 +5,44 @@ require_once "../PhpFiles/General/adminModulePermissions.php";
 
 requireRoleSession(['SuperAdmin'], false);
 
+$managementMode = strtolower(trim((string)($managementMode ?? 'official')));
+if (!in_array($managementMode, ['official', 'personnel'], true)) {
+  $managementMode = 'official';
+}
+$isPersonnelManagement = $managementMode === 'personnel';
+$managementShowLifecycleTabs = !$isPersonnelManagement;
+
+$managementEntitySingular = $isPersonnelManagement ? 'Personnel' : 'Official';
+$managementEntityPlural = $isPersonnelManagement ? 'Personnel' : 'Officials';
+$managementPageTitle = $isPersonnelManagement ? 'Personnel Tracker' : 'Official Management';
+$managementDescription = $isPersonnelManagement
+  ? 'Track all personnel records in one list, including SuperAdmin accounts. Access changes stay inside the checklist modal.'
+  : 'Track current and past barangay officials. Current officials are shown by default, and access changes stay inside the checklist modal.';
+$managementCurrentLabel = $isPersonnelManagement ? 'Current Personnel' : 'Current Officials';
+$managementPastLabel = $isPersonnelManagement ? 'Past Personnel' : 'Past Officials';
+$managementSearchPlaceholder = $isPersonnelManagement
+  ? 'Search personnel ID / user ID / name / department'
+  : 'Search official ID / user ID / name / department';
+$managementIdLabel = $isPersonnelManagement ? 'Personnel ID' : 'Official ID';
+$managementFilterTitle = $isPersonnelManagement ? 'Filter Personnel Tracker' : 'Filter Official Management';
+$managementAccessTitle = $isPersonnelManagement ? 'Manage Personnel Access' : 'Manage Official Access';
+$managementPromoteTitle = $isPersonnelManagement ? 'Promote Personnel' : 'Promote Official';
+$managementSubjectLabel = $managementEntitySingular;
+$managementPromotionPathLabel = $isPersonnelManagement ? 'Position Change Path' : 'Promotion Path';
+$managementPromotionHelper = $isPersonnelManagement
+  ? "This update changes the personnel's system role, position access, and assignment details."
+  : "Promotion updates the official's system role, position access, and assignment details.";
+$managementColumnsStorageKey = $isPersonnelManagement
+  ? 'admin_cols_personnel_management_v2'
+  : 'admin_cols_officials_management_v2';
+$managementDefaultHiddenColumnIdxs = [1, 3, 8];
+$managementFilterRoleOptions = $isPersonnelManagement
+  ? ['ALL' => 'All', 'Admin' => 'Admin', 'SuperAdmin' => 'SuperAdmin']
+  : ['ALL' => 'All', 'Admin' => 'Admin', 'SuperAdmin' => 'SuperAdmin'];
+$managementAccessRoleOptions = $isPersonnelManagement
+  ? ['Admin' => 'Admin', 'SuperAdmin' => 'SuperAdmin']
+  : ['Admin' => 'Admin', 'SuperAdmin' => 'SuperAdmin'];
+
 $officialsMgmtDepartmentOptions = [
   'Office of the Barangay',
   'Barangay Certificate Issuance',
@@ -56,7 +94,7 @@ if ($areaResult instanceof mysqli_result) {
 }
 sort($officialsMgmtAreaOptions);
 
-$officialsMgmtPositionsByRole = [
+$basePositionsByRole = [
   'SuperAdmin' => ['IT Administrator', 'Barangay Chairman'],
   'Official' => ['Barangay Official', 'Barangay Secretary'],
   'Personnel' => [
@@ -66,16 +104,34 @@ $officialsMgmtPositionsByRole = [
     'Barangay Police',
     'Desk Officer',
     'Area OIC',
+    'Barangay Treasurer',
   ],
 ];
-$officialsMgmtAreaRequiredPositions = ['Barangay Secretary', 'Barangay Police', 'Desk Officer', 'Area OIC'];
-$officialsMgmtPositionsByDepartment = [
-  'Office of the Barangay'       => ['IT Administrator', 'Barangay Chairman', 'Barangay Official', 'Barangay Secretary'],
-  'Barangay Peace and Order'     => ['Barangay Police', 'Desk Officer', 'Area OIC', 'Department OIC (Officer In Charge)'],
-  'Barangay Certificate Issuance'=> ['Department Public Assistance Desk', 'Department Secretary', 'Department OIC (Officer In Charge)'],
-  'Baranagay Monitoring'         => ['Department Public Assistance Desk', 'Department Secretary', 'Department OIC (Officer In Charge)'],
-  'Barangay Treasurers Office'   => ['Department Public Assistance Desk', 'Department Secretary', 'Department OIC (Officer In Charge)'],
-];
+
+if ($isPersonnelManagement) {
+  $officialsMgmtPositionsByRole = [
+    'SuperAdmin' => ['IT Administrator'],
+    'Personnel' => $basePositionsByRole['Personnel'],
+  ];
+  $officialsMgmtAreaRequiredPositions = ['Barangay Police', 'Desk Officer', 'Area OIC'];
+  $officialsMgmtPositionsByDepartment = [];
+  foreach ($officialsMgmtDepartmentOptions as $departmentOption) {
+    $officialsMgmtPositionsByDepartment[$departmentOption] = $basePositionsByRole['Personnel'];
+  }
+  $officialsMgmtPositionsByDepartment['Office of the Barangay'] = array_values(array_unique(array_merge(
+    ['IT Administrator'],
+    $basePositionsByRole['Personnel']
+  )));
+} else {
+  $officialsMgmtPositionsByRole = [
+    'SuperAdmin' => $basePositionsByRole['SuperAdmin'],
+    'Official' => $basePositionsByRole['Official'],
+  ];
+  $officialsMgmtAreaRequiredPositions = ['Barangay Secretary'];
+  $officialsMgmtPositionsByDepartment = [
+    'Office of the Barangay' => array_merge($basePositionsByRole['SuperAdmin'], $basePositionsByRole['Official']),
+  ];
+}
 $officialsMgmtPermissionCatalog = amp_get_permission_catalog();
 ?>
 <!DOCTYPE html>
@@ -84,7 +140,7 @@ $officialsMgmtPermissionCatalog = amp_get_permission_catalog();
   <meta charset="UTF-8" />
   <link rel="icon" href="../Images/favicon_sanjose.png?v=20260211">
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Officials Management</title>
+  <title><?= htmlspecialchars($managementPageTitle, ENT_QUOTES, 'UTF-8') ?></title>
 
   <script src="https://kit.fontawesome.com/3482e00999.js" crossorigin="anonymous"></script>
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
@@ -119,18 +175,22 @@ $officialsMgmtPermissionCatalog = amp_get_permission_catalog();
       overflow: hidden;
       text-overflow: ellipsis;
     }
-    .resident-masterlist-shell .status-filter-btn[data-permission-filter] {
+    .resident-masterlist-shell .status-filter-btn[data-permission-filter],
+    .resident-masterlist-shell .status-filter-btn[data-lifecycle-filter] {
       color: #495057;
       border-color: #495057;
       background: #fff;
     }
     .resident-masterlist-shell .status-filter-btn[data-permission-filter]:hover,
-    .resident-masterlist-shell .status-filter-btn[data-permission-filter]:focus-visible {
+    .resident-masterlist-shell .status-filter-btn[data-permission-filter]:focus-visible,
+    .resident-masterlist-shell .status-filter-btn[data-lifecycle-filter]:hover,
+    .resident-masterlist-shell .status-filter-btn[data-lifecycle-filter]:focus-visible {
       color: #343a40;
       border-color: #343a40;
       background: #f8f9fa;
     }
-    .resident-masterlist-shell .status-filter-btn[data-permission-filter].active {
+    .resident-masterlist-shell .status-filter-btn[data-permission-filter].active,
+    .resident-masterlist-shell .status-filter-btn[data-lifecycle-filter].active {
       color: #fff !important;
       background-color: #495057 !important;
       border-color: #495057 !important;
@@ -260,26 +320,27 @@ $officialsMgmtPermissionCatalog = amp_get_permission_catalog();
     <?php include "includes/sidebar.php"; ?>
 
     <main class="flex-grow-1 p-3 p-md-4 p-xl-5 bg-light" id="main-display">
-      <h2 class="mb-4" style="font-family: 'Charis SIL Bold'; color: #DE710C; ">
-        Officials Access List
-      </h2>
+      <div class="mb-4">
+        <h2 class="mb-2" style="font-family: 'Charis SIL Bold'; color: #DE710C; ">
+          <?= htmlspecialchars($managementPageTitle, ENT_QUOTES, 'UTF-8') ?>
+        </h2>
+        <p class="text-muted mb-0">
+          <?= htmlspecialchars($managementDescription, ENT_QUOTES, 'UTF-8') ?>
+        </p>
+      </div>
       <hr><br>
 
       <div id="div-tableContainer" class="bg-white p-4 rounded-4 shadow-sm border resident-masterlist-shell officials-masterlist-shell">
         <div class="admin-list-toolbar mb-3 pt-2 flex-wrap">
+          <?php if ($managementShowLifecycleTabs): ?>
           <div class="admin-list-tabs">
-            <button class="btn btn-outline-primary btn-sm status-filter-btn active" data-filter="ALL">&nbsp;&nbsp;All&nbsp;&nbsp;</button>
-            <button class="btn btn-outline-secondary btn-sm status-filter-btn fw-semibold" data-filter="SuperAdmin">&nbsp;&nbsp;SuperAdmin&nbsp;&nbsp;</button>
-            <button class="btn btn-outline-secondary btn-sm status-filter-btn fw-semibold" data-filter="Admin">&nbsp;&nbsp;Admin&nbsp;&nbsp;</button>
-            <button class="btn btn-outline-secondary btn-sm status-filter-btn fw-semibold" data-permission-filter="Active">&nbsp;&nbsp;Active&nbsp;&nbsp;</button>
-            <button class="btn btn-outline-secondary btn-sm status-filter-btn fw-semibold has-notif" data-permission-filter="Revoked">
-              &nbsp;&nbsp;Revoked&nbsp;&nbsp;
-              <span id="revokedOfficialsBadge" class="pending-count-badge d-none">0</span>
-            </button>
+            <button class="btn btn-outline-primary btn-sm status-filter-btn active" data-lifecycle-filter="current">&nbsp;&nbsp;<?= htmlspecialchars($managementCurrentLabel, ENT_QUOTES, 'UTF-8') ?>&nbsp;&nbsp;</button>
+            <button class="btn btn-outline-secondary btn-sm status-filter-btn fw-semibold" data-lifecycle-filter="past">&nbsp;&nbsp;<?= htmlspecialchars($managementPastLabel, ENT_QUOTES, 'UTF-8') ?>&nbsp;&nbsp;</button>
           </div>
+          <?php endif; ?>
           <div class="admin-list-actions d-flex flex-row flex-nowrap align-items-center gap-2 ms-auto">
             <div class="input-group admin-search">
-              <input id="officialsMgmtSearch" class="form-control" placeholder="Search official ID / user ID / name / department" />
+              <input id="officialsMgmtSearch" class="form-control" placeholder="<?= htmlspecialchars($managementSearchPlaceholder, ENT_QUOTES, 'UTF-8') ?>" />
               <span class="input-group-text bg-white"><i class="fas fa-search"></i></span>
             </div>
             <button id="btnOfficialsMgmtFilter" class="btn btn-outline-secondary btn-icon admin-filter" type="button" title="Filter" aria-label="Filter" data-bs-toggle="modal" data-bs-target="#modalOfficialsMgmtFilter">
@@ -301,14 +362,13 @@ $officialsMgmtPermissionCatalog = amp_get_permission_catalog();
           <table id="table-officialsMgmt" class="table table-hover align-middle mb-0 officials-masterlist-table compact-admin-table compact-admin-table--wide">
             <thead class="table-light">
               <tr>
-                <th>Official ID</th>
+                <th><?= htmlspecialchars($managementIdLabel, ENT_QUOTES, 'UTF-8') ?></th>
                 <th>User ID</th>
                 <th>Name</th>
-                <th>Access Role</th>
+                <th>Access Level</th>
                 <th>Position Access</th>
                 <th>Department</th>
                 <th>Access Until</th>
-                <th>Protected</th>
                 <th>Account Status</th>
                 <th>Modules</th>
                 <th>Profile Approval</th>
@@ -316,7 +376,7 @@ $officialsMgmtPermissionCatalog = amp_get_permission_catalog();
               </tr>
             </thead>
             <tbody id="officialsMgmtTbody">
-              <tr><td colspan="12" class="text-center text-muted py-4">Loading...</td></tr>
+              <tr><td colspan="11" class="text-center text-muted py-4">Loading...</td></tr>
             </tbody>
           </table>
         </div>
@@ -338,16 +398,16 @@ $officialsMgmtPermissionCatalog = amp_get_permission_catalog();
     <div class="modal-dialog modal-dialog-centered">
       <div class="modal-content p-3">
         <div class="modal-header border-0">
-          <h5 class="modal-title fw-bold">Filter Officials</h5>
+          <h5 class="modal-title fw-bold"><?= htmlspecialchars($managementFilterTitle, ENT_QUOTES, 'UTF-8') ?></h5>
           <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
         </div>
         <div class="modal-body d-grid gap-3">
           <div>
-            <label for="officialsMgmtRoleFilter" class="form-label small fw-bold mb-1">Role</label>
+            <label for="officialsMgmtRoleFilter" class="form-label small fw-bold mb-1">Access Level</label>
             <select id="officialsMgmtRoleFilter" class="form-select">
-              <option value="ALL">All</option>
-              <option value="SuperAdmin">SuperAdmin</option>
-              <option value="Admin">Admin</option>
+              <?php foreach ($managementFilterRoleOptions as $roleValue => $roleLabel): ?>
+              <option value="<?= htmlspecialchars($roleValue, ENT_QUOTES, 'UTF-8') ?>"><?= htmlspecialchars($roleLabel, ENT_QUOTES, 'UTF-8') ?></option>
+              <?php endforeach; ?>
             </select>
           </div>
           <div>
@@ -416,7 +476,7 @@ $officialsMgmtPermissionCatalog = amp_get_permission_catalog();
     <div class="modal-dialog modal-dialog-centered modal-xl modal-dialog-scrollable">
       <div class="modal-content p-3">
         <div class="modal-header border-0">
-          <h5 class="modal-title fw-bold">Manage Official Access</h5>
+          <h5 class="modal-title fw-bold"><?= htmlspecialchars($managementAccessTitle, ENT_QUOTES, 'UTF-8') ?></h5>
           <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
         </div>
         <div class="modal-body d-grid gap-3">
@@ -425,14 +485,15 @@ $officialsMgmtPermissionCatalog = amp_get_permission_catalog();
           <div class="officials-access-shell">
             <div class="officials-access-meta">
               <div>
-                <div class="officials-access-label">Official</div>
+                <div class="officials-access-label"><?= htmlspecialchars($managementSubjectLabel, ENT_QUOTES, 'UTF-8') ?></div>
                 <div class="officials-access-value" id="officialsMgmtAccessSummary">-</div>
               </div>
               <div>
                 <label for="officialsMgmtAccessRole" class="officials-access-label">Display Role</label>
                 <select id="officialsMgmtAccessRole" class="form-select">
-                  <option value="Admin">Admin</option>
-                  <option value="SuperAdmin">SuperAdmin</option>
+                  <?php foreach ($managementAccessRoleOptions as $roleValue => $roleLabel): ?>
+                  <option value="<?= htmlspecialchars($roleValue, ENT_QUOTES, 'UTF-8') ?>"><?= htmlspecialchars($roleLabel, ENT_QUOTES, 'UTF-8') ?></option>
+                  <?php endforeach; ?>
                 </select>
               </div>
               <div>
@@ -474,17 +535,17 @@ $officialsMgmtPermissionCatalog = amp_get_permission_catalog();
     <div class="modal-dialog modal-dialog-centered">
       <div class="modal-content p-3">
         <div class="modal-header border-0">
-          <h5 class="modal-title fw-bold">Promote Official</h5>
+          <h5 class="modal-title fw-bold"><?= htmlspecialchars($managementPromoteTitle, ENT_QUOTES, 'UTF-8') ?></h5>
           <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
         </div>
         <div class="modal-body d-grid gap-3">
           <input type="hidden" id="officialsMgmtPromoteOfficialId">
           <div>
-            <label class="form-label small fw-bold mb-1">Official</label>
+            <label class="form-label small fw-bold mb-1"><?= htmlspecialchars($managementSubjectLabel, ENT_QUOTES, 'UTF-8') ?></label>
             <div id="officialsMgmtPromoteSummary" class="form-control bg-light">-</div>
           </div>
           <div>
-            <label class="form-label small fw-bold mb-1">Promotion Path</label>
+            <label class="form-label small fw-bold mb-1"><?= htmlspecialchars($managementPromotionPathLabel, ENT_QUOTES, 'UTF-8') ?></label>
             <div id="officialsMgmtPromotePath" class="form-control bg-light">-</div>
           </div>
           <div>
@@ -500,7 +561,7 @@ $officialsMgmtPermissionCatalog = amp_get_permission_catalog();
               <?php endforeach; ?>
             </select>
           </div>
-          <div class="small text-muted">Promotion updates the official's system role, position access, and assignment details.</div>
+          <div class="small text-muted"><?= htmlspecialchars($managementPromotionHelper, ENT_QUOTES, 'UTF-8') ?></div>
         </div>
         <div class="modal-footer border-0">
           <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
@@ -520,7 +581,7 @@ $officialsMgmtPermissionCatalog = amp_get_permission_catalog();
         <div class="modal-body d-grid gap-3">
           <input type="hidden" id="officialsMgmtDepartmentOfficialId">
           <div>
-            <label class="form-label small fw-bold mb-1">Official</label>
+            <label class="form-label small fw-bold mb-1"><?= htmlspecialchars($managementSubjectLabel, ENT_QUOTES, 'UTF-8') ?></label>
             <div id="officialsMgmtDepartmentSummary" class="form-control bg-light">-</div>
           </div>
           <div>
@@ -568,9 +629,19 @@ $officialsMgmtPermissionCatalog = amp_get_permission_catalog();
       modalId: "modalOfficialsMgmtColumns",
       listId: "officialsMgmtColumnsList",
       resetBtnId: "btnOfficialsMgmtColumnsReset",
-      storageKey: "admin_cols_officials_management_v1"
+      storageKey: <?= json_encode($managementColumnsStorageKey, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?>,
+      defaultHiddenIdxs: <?= json_encode($managementDefaultHiddenColumnIdxs, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?>
     };
     window.OFFICIALS_MGMT_OPTIONS = {
+      managementMode: <?= json_encode($managementMode, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?>,
+      showLifecycleTabs: <?= json_encode($managementShowLifecycleTabs) ?>,
+      entitySingular: <?= json_encode($managementEntitySingular, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?>,
+      entityPluralLower: <?= json_encode(strtolower($managementEntityPlural), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?>,
+      apiUrl: "../PhpFiles/Admin-End/officialsManagement.php",
+      emptyCurrentMessage: <?= json_encode($managementShowLifecycleTabs ? ('No current ' . strtolower($managementEntityPlural) . ' found.') : ('No ' . strtolower($managementEntityPlural) . ' found.'), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?>,
+      emptyPastMessage: <?= json_encode('No past ' . strtolower($managementEntityPlural) . ' found.', JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?>,
+      loadFailureMessage: <?= json_encode('Failed to load ' . strtolower($managementEntityPlural) . '.', JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?>,
+      loadUnavailableMessage: <?= json_encode('Unable to load ' . strtolower($managementEntityPlural) . '.', JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?>,
       departments: <?= json_encode(array_values($officialsMgmtDepartmentOptions), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?>,
       positionsByRole: <?= json_encode($officialsMgmtPositionsByRole, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?>,
       positionsByDepartment: <?= json_encode($officialsMgmtPositionsByDepartment, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?>,
@@ -580,6 +651,6 @@ $officialsMgmtPermissionCatalog = amp_get_permission_catalog();
     };
   </script>
   <script src="../JS-Script-Files/Admin-End/tableColumnsGeneric.js?v=20260215-1"></script>
-  <script src="../JS-Script-Files/Admin-End/officialsManagementScript.js?v=20260323-1"></script>
+  <script src="../JS-Script-Files/Admin-End/officialsManagementScript.js?v=20260324-4"></script>
 </body>
 </html>

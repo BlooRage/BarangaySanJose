@@ -1,0 +1,2187 @@
+<?php
+require_once __DIR__ . '/../includes/admin_guard.php';
+require_once __DIR__ . '/../../PhpFiles/General/siteContent.php';
+
+cms_content_ensure_schema($conn);
+
+$allowedPermissions = [];
+if (isset($conn) && $conn instanceof mysqli) {
+    $allowedPermissions = amp_get_allowed_permission_keys(
+        $conn,
+        (string)($_SESSION['user_id'] ?? ''),
+        (string)($_SESSION['role'] ?? '')
+    );
+}
+
+$canManageAnnouncements = amp_permission_keys_have_any($allowedPermissions, [
+    'announcements_page',
+    'announcements_delivery',
+    'announcements_faq',
+    'announcements_tracker',
+]);
+$canViewReports = amp_permission_keys_have_any($allowedPermissions, [
+    'reports_certificate_issuance',
+    'reports_clearance_issuance',
+    'reports_financial',
+    'reports_residents',
+    'reports_appointments',
+    'reports_blotter',
+    'reports_complaints',
+]);
+
+$currentUserId = trim((string)($_SESSION['user_id'] ?? ''));
+$currentRole = trim((string)($_SESSION['role'] ?? ''));
+$currentUserLabel = cms_content_current_user_display($conn, $currentUserId, $currentUserId);
+$canReviewContent = cms_content_can_review($conn, $currentUserId, $currentRole);
+
+$contentToolsUrl = appUrl('Admin-End/Contents/Contents.php') . '?tool=tracker#tracker-card';
+$createAnnouncementUrl = appUrl('Admin-End/Contents/CreateContent.php') . '?type=page';
+$faqToolUrl = appUrl('Admin-End/Contents/CreateContent.php') . '?type=faq';
+$reportsUrl = appUrl('Admin-End/Reports/Reports.php') . '?module=certificate_issuance';
+
+$sharedRules = [
+    'Any image file may be uploaded regardless of ratio, but it should be cropped using the current live ratio of that section before saving.',
+    'Banner titles, banner messages, and rich text sections use Summernote.',
+    'Every content update shows a live preview before it can be submitted.',
+    'Submitting, approving, denying, and auto-approving always require confirmation.',
+    'SuperAdmin and the appointed Barangay Secretary can approve or deny requests, and they can auto-approve their own changes.',
+];
+
+$sharedFlow = [
+    'User edits text or image content.',
+    'System shows a preview of the updated design.',
+    'User confirms and submits the change request.',
+    'SuperAdmin or the appointed Barangay Secretary reviews the request.',
+    'Approver confirms the approve or deny action before the change is finalized.',
+];
+
+$contentModules = [
+    'requests' => [
+        'label' => 'Content Change Request',
+        'title' => 'Content Change Request',
+        'icon' => 'fa-code-compare',
+        'status' => 'Live Module',
+        'summary' => 'Track drafts, pending reviews, approvals, denials, and auto-approved updates for CMS pages.',
+    ],
+    'home' => [
+        'label' => 'Home Page',
+        'title' => 'Home Page',
+        'icon' => 'fa-house',
+        'status' => 'Live Editor',
+        'summary' => 'Edit the home banner, About section, mission and vision, and history copy.',
+    ],
+    'government' => [
+        'label' => 'Government',
+        'title' => 'Government Page',
+        'icon' => 'fa-landmark',
+        'status' => 'Live Editor',
+        'summary' => 'Manage the government banner, Punong Barangay section, officials, and area listings.',
+    ],
+    'services' => [
+        'label' => 'Services',
+        'title' => 'Services Page',
+        'icon' => 'fa-briefcase',
+        'status' => 'Live Editor',
+        'summary' => 'Update the services banner and the description of each service card.',
+    ],
+    'faq' => [
+        'label' => 'FAQ',
+        'title' => 'FAQ Page',
+        'icon' => 'fa-circle-question',
+        'status' => 'Live Editor',
+        'summary' => 'Edit the FAQ page banner while keeping the current FAQ item flow intact.',
+    ],
+    'contact' => [
+        'label' => 'Contact',
+        'title' => 'Contact Page',
+        'icon' => 'fa-phone-volume',
+        'status' => 'Live Editor',
+        'summary' => 'Update the contact banner, emergency section, and area hotline tiles.',
+    ],
+    'login' => [
+        'label' => 'Login',
+        'title' => 'Login Page',
+        'icon' => 'fa-right-to-bracket',
+        'status' => 'Live Editor',
+        'summary' => 'Manage the public login image and register image panels.',
+    ],
+];
+
+$hiddenEditorModules = [
+    'announcements' => [
+        'label' => 'News Page',
+        'title' => 'News Page',
+        'icon' => 'fa-newspaper',
+        'status' => 'Live Editor',
+        'summary' => 'Edit the public news page banner image, title, and message while the news feed stays connected to the Announcements module.',
+    ],
+];
+
+$editorMeta = [
+    'announcements' => [
+        'subtitle' => 'This editor controls the public News page banner. News posts and sidebar announcements continue to use the Announcements module.',
+        'notes' => [
+            'Use the Announcements tools for public news posts, public announcements, SMS, email, and FAQ items.',
+        ],
+        'quick_links' => [
+            ['label' => 'Open Content Tools', 'href' => $canManageAnnouncements ? $contentToolsUrl : ''],
+            ['label' => 'Create Announcement', 'href' => $canManageAnnouncements ? $createAnnouncementUrl : ''],
+        ],
+    ],
+    'home' => [
+        'subtitle' => 'The Meet the Council section automatically uses the approved Government page officials and Punong Barangay profile.',
+        'notes' => [
+            'The council preview below is derived from the approved Government page content.',
+            'History images stay on their current design and only the history message is editable here.',
+        ],
+        'quick_links' => [
+            ['label' => 'Open Request Queue', 'href' => appUrl('Admin-End/Contents/ContentManagement.php') . '?module=requests'],
+        ],
+    ],
+    'government' => [
+        'subtitle' => 'Government page changes also drive the Home page council section after approval.',
+        'notes' => [
+            'Official images are editable here so the Home page council preview stays in sync with the Government page.',
+        ],
+        'quick_links' => [
+            ['label' => 'Open Request Queue', 'href' => appUrl('Admin-End/Contents/ContentManagement.php') . '?module=requests'],
+        ],
+    ],
+    'services' => [
+        'subtitle' => 'Service titles stay aligned to the current public cards while each description is editable.',
+        'notes' => [],
+        'quick_links' => [
+            ['label' => 'Open Request Queue', 'href' => appUrl('Admin-End/Contents/ContentManagement.php') . '?module=requests'],
+        ],
+    ],
+    'faq' => [
+        'subtitle' => 'Banner changes are handled here. The public FAQ entries still come from the existing FAQ flow.',
+        'notes' => [
+            'Use the FAQ tool when you need to add or update the actual questions and answers.',
+        ],
+        'quick_links' => [
+            ['label' => 'Open FAQ Tool', 'href' => $canManageAnnouncements ? $faqToolUrl : ''],
+            ['label' => 'Open Request Queue', 'href' => appUrl('Admin-End/Contents/ContentManagement.php') . '?module=requests'],
+        ],
+    ],
+    'contact' => [
+        'subtitle' => 'Add or remove hotline tiles as needed and preview the layout before submitting.',
+        'notes' => [
+            'Area hotlines support additional tiles whenever you need to expand the section.',
+        ],
+        'quick_links' => [
+            ['label' => 'Open Request Queue', 'href' => appUrl('Admin-End/Contents/ContentManagement.php') . '?module=requests'],
+        ],
+    ],
+    'login' => [
+        'subtitle' => 'The login panel and signup panel images are managed here and update the public login screen.',
+        'notes' => [],
+        'quick_links' => [
+            ['label' => 'Open Request Queue', 'href' => appUrl('Admin-End/Contents/ContentManagement.php') . '?module=requests'],
+        ],
+    ],
+];
+
+$generalModules = [
+    [
+        'title' => 'Announcements',
+        'status' => 'Live Module',
+        'icon' => 'fa-bullhorn',
+        'summary' => 'Manage the public news feed, announcements, SMS and email delivery, FAQ items, and the news page banner.',
+        'meta' => 'News Feed, Public Announcements, SMS and Email, FAQs, Tracker',
+        'details' => [
+            [
+                'title' => 'News Page Banner Fields',
+                'items' => [
+                    'Banner Image',
+                    'Banner Title',
+                    'Banner Message',
+                ],
+            ],
+        ],
+        'note' => 'Use the News Page editor for the banner and the Announcements tools for the actual news feed content.',
+        'primary_label' => 'Edit News Page',
+        'primary_href' => appUrl('Admin-End/Contents/ContentManagement.php') . '?module=announcements',
+        'secondary_label' => 'Open Content Tools',
+        'secondary_href' => $canManageAnnouncements ? $contentToolsUrl : '',
+    ],
+    [
+        'title' => 'Reports',
+        'status' => 'Live Module',
+        'icon' => 'fa-chart-column',
+        'summary' => 'Open the reporting workspace for certificate, clearance, finance, resident, appointment, blotter, and complaint modules.',
+        'meta' => 'Certificate, Clearance, Financial, Residents, Appointments, Blotter, Complaints',
+        'details' => [],
+        'note' => '',
+        'primary_label' => 'Open Reports',
+        'primary_href' => $canViewReports ? $reportsUrl : '',
+        'secondary_label' => '',
+        'secondary_href' => '',
+    ],
+];
+
+$allModuleMeta = $contentModules + $hiddenEditorModules;
+$selectedModuleKey = strtolower(trim((string)($_GET['module'] ?? 'requests')));
+if (!isset($allModuleMeta[$selectedModuleKey])) {
+    $selectedModuleKey = 'requests';
+}
+$selectedModule = $allModuleMeta[$selectedModuleKey];
+
+$allRequests = cms_content_requests($conn);
+$myRequests = array_values(array_filter($allRequests, static function (array $request) use ($currentUserId): bool {
+    return cms_content_request_is_owned_by($request, $currentUserId);
+}));
+$reviewQueue = array_values(array_filter($allRequests, static function (array $request) use ($canReviewContent): bool {
+    return $canReviewContent && strtolower((string)($request['status'] ?? 'draft')) === 'pending';
+}));
+$draftCount = count(array_filter($myRequests, static fn(array $request): bool => strtolower((string)($request['status'] ?? '')) === 'draft'));
+$myPendingCount = count(array_filter($myRequests, static fn(array $request): bool => strtolower((string)($request['status'] ?? '')) === 'pending'));
+$myApprovedCount = count(array_filter($myRequests, static fn(array $request): bool => strtolower((string)($request['status'] ?? '')) === 'approved'));
+$myDeniedCount = count(array_filter($myRequests, static fn(array $request): bool => strtolower((string)($request['status'] ?? '')) === 'denied'));
+$pendingReviewCount = count($reviewQueue);
+$approvedHistoryRequests = array_values(array_filter($allRequests, static fn(array $request): bool => strtolower((string)($request['status'] ?? '')) === 'approved'));
+usort($approvedHistoryRequests, static function (array $left, array $right): int {
+    return cms_content_request_sort_timestamp($right) <=> cms_content_request_sort_timestamp($left);
+});
+
+$approvedRequestsByPage = [];
+foreach ($approvedHistoryRequests as $request) {
+    $pageKey = (string)($request['page_key'] ?? '');
+    if ($pageKey === '') {
+        continue;
+    }
+    $approvedRequestsByPage[$pageKey][] = $request;
+}
+
+$requestVersionMeta = [];
+foreach ($approvedRequestsByPage as $pageKey => $requests) {
+    $livePayloadForPage = cms_content_page($conn, $pageKey);
+    $liveRequestId = '';
+
+    foreach ($requests as $request) {
+        if (cms_content_payloads_match($pageKey, $livePayloadForPage, (array)($request['content'] ?? []))) {
+            $liveRequestId = (string)($request['request_id'] ?? '');
+            break;
+        }
+    }
+
+    foreach ($requests as $index => $request) {
+        $currentRequestId = (string)($request['request_id'] ?? '');
+        $previousRequestId = (string)($requests[$index + 1]['request_id'] ?? '');
+        $isLiveVersion = $liveRequestId !== '' && $currentRequestId === $liveRequestId;
+
+        $requestVersionMeta[$currentRequestId] = [
+            'is_live' => $isLiveVersion,
+            'previous_request_id' => $previousRequestId,
+            'can_revert_to_this' => !$isLiveVersion,
+            'can_revert_to_previous' => $isLiveVersion && $previousRequestId !== '',
+        ];
+    }
+}
+
+$flash = $_SESSION['cms_content_flash'] ?? null;
+unset($_SESSION['cms_content_flash']);
+
+$selectedRequestId = trim((string)($_GET['request_id'] ?? ''));
+$editorRequest = null;
+$editorPayload = [];
+$livePayload = [];
+$editorReadOnly = false;
+$editorReadOnlyMessage = '';
+
+if (in_array($selectedModuleKey, cms_content_editable_page_keys(), true)) {
+    $livePayload = $selectedModuleKey === 'home'
+        ? cms_content_page_with_context($conn, $selectedModuleKey)
+        : cms_content_page($conn, $selectedModuleKey);
+    $editorPayload = $livePayload;
+
+    if ($selectedRequestId !== '') {
+        $request = cms_content_request($conn, $selectedRequestId);
+        if (
+            $request
+            && (string)($request['page_key'] ?? '') === $selectedModuleKey
+            && cms_content_request_is_viewable_by($request, $currentUserId, $canReviewContent)
+        ) {
+            $editorRequest = $request;
+            $editorPayload = cms_content_payload_with_context($conn, $selectedModuleKey, (array)($request['content'] ?? []));
+            if (!cms_content_request_is_editable_by($request, $currentUserId)) {
+                $editorReadOnly = true;
+                $editorStatus = strtolower(trim((string)($request['status'] ?? 'draft')));
+                $editorReadOnlyMessage = match ($editorStatus) {
+                    'pending' => 'This request is already pending review. You can preview it here, and authorized reviewers can approve or deny it from the request queue.',
+                    'approved' => 'This approved request is read-only. Start a new edit from the current live content when you need another change.',
+                    default => 'This request is read-only.',
+                };
+            }
+        }
+    }
+}
+
+$editorReviewAvailable = $editorRequest && $canReviewContent && strtolower((string)($editorRequest['status'] ?? 'draft')) === 'pending';
+
+$pageDefinitions = cms_content_page_definitions();
+$announcementRatio = (array)($pageDefinitions['announcements']['image_fields']['banner_image']['ratio'] ?? [4500, 1281]);
+$homeBannerRatio = (array)($pageDefinitions['home']['image_fields']['banner_image']['ratio'] ?? [1500, 800]);
+$homeAboutRatio = (array)($pageDefinitions['home']['image_fields']['about_image']['ratio'] ?? [1125, 1575]);
+$governmentBannerRatio = (array)($pageDefinitions['government']['image_fields']['banner_image']['ratio'] ?? [1440, 410]);
+$governmentPunongRatio = (array)($pageDefinitions['government']['image_fields']['punong_barangay_image']['ratio'] ?? [4000, 6000]);
+$governmentOfficialRatio = (array)($pageDefinitions['government']['image_fields']['officials[*].image']['ratio'] ?? [4000, 6000]);
+$servicesBannerRatio = (array)($pageDefinitions['services']['image_fields']['banner_image']['ratio'] ?? [4500, 1281]);
+$faqBannerRatio = (array)($pageDefinitions['faq']['image_fields']['banner_image']['ratio'] ?? [1440, 410]);
+$contactBannerRatio = (array)($pageDefinitions['contact']['image_fields']['banner_image']['ratio'] ?? [4499, 1281]);
+$loginImageRatio = (array)($pageDefinitions['login']['image_fields']['login_image']['ratio'] ?? [1587, 2245]);
+$registerImageRatio = (array)($pageDefinitions['login']['image_fields']['register_image']['ratio'] ?? [1587, 2245]);
+
+function cms_nav_url(string $moduleKey, string $requestId = ''): string
+{
+    $query = ['module' => $moduleKey];
+    if ($requestId !== '') {
+        $query['request_id'] = $requestId;
+    }
+    return appUrl('Admin-End/Contents/ContentManagement.php') . '?' . http_build_query($query);
+}
+
+function cms_status_class(string $status): string
+{
+    return match (strtolower(trim($status))) {
+        'live module', 'live editor' => 'is-live',
+        'navigation' => 'is-nav',
+        default => 'is-spec',
+    };
+}
+
+function cms_request_status_class(string $status): string
+{
+    return match (strtolower(trim($status))) {
+        'pending' => 'is-pending',
+        'approved' => 'is-approved',
+        'denied' => 'is-denied',
+        default => 'is-draft',
+    };
+}
+
+function cms_format_datetime(?string $value): string
+{
+    $value = trim((string)$value);
+    if ($value === '') {
+        return 'Not yet';
+    }
+
+    $timestamp = strtotime($value);
+    if ($timestamp === false) {
+        return $value;
+    }
+
+    return date('F d, Y g:i A', $timestamp);
+}
+
+function cms_render_text_field(string $fieldKey, string $label, string $value = '', string $placeholder = '', string $help = '', bool $itemField = false): string
+{
+    $attribute = $itemField ? 'data-cms-item-field' : 'data-cms-field';
+    ob_start();
+    ?>
+    <article class="cms-editor-card">
+      <label class="form-label fw-semibold mb-2"><?= htmlspecialchars($label) ?></label>
+      <?php if ($help !== ''): ?>
+        <p class="cms-field-help"><?= htmlspecialchars($help) ?></p>
+      <?php endif; ?>
+      <input
+        type="text"
+        class="form-control cms-editor-input"
+        value="<?= htmlspecialchars($value, ENT_QUOTES, 'UTF-8') ?>"
+        placeholder="<?= htmlspecialchars($placeholder, ENT_QUOTES, 'UTF-8') ?>"
+        <?= $attribute ?>="<?= htmlspecialchars($fieldKey, ENT_QUOTES, 'UTF-8') ?>">
+    </article>
+    <?php
+    return (string)ob_get_clean();
+}
+
+function cms_render_textarea_field(string $fieldKey, string $label, string $value = '', string $placeholder = '', string $help = '', int $rows = 3, bool $itemField = false): string
+{
+    $attribute = $itemField ? 'data-cms-item-field' : 'data-cms-field';
+    ob_start();
+    ?>
+    <article class="cms-editor-card">
+      <label class="form-label fw-semibold mb-2"><?= htmlspecialchars($label) ?></label>
+      <?php if ($help !== ''): ?>
+        <p class="cms-field-help"><?= htmlspecialchars($help) ?></p>
+      <?php endif; ?>
+      <textarea
+        class="form-control cms-editor-input"
+        rows="<?= (int)$rows ?>"
+        placeholder="<?= htmlspecialchars($placeholder, ENT_QUOTES, 'UTF-8') ?>"
+        <?= $attribute ?>="<?= htmlspecialchars($fieldKey, ENT_QUOTES, 'UTF-8') ?>"><?= htmlspecialchars($value, ENT_QUOTES, 'UTF-8') ?></textarea>
+    </article>
+    <?php
+    return (string)ob_get_clean();
+}
+
+function cms_render_richtext_field(string $fieldKey, string $label, string $value = '', string $placeholder = '', string $help = '', bool $itemField = false, string $editorHeight = '240'): string
+{
+    $attribute = $itemField ? 'data-cms-item-field' : 'data-cms-field';
+    ob_start();
+    ?>
+    <article class="cms-editor-card">
+      <label class="form-label fw-semibold mb-2"><?= htmlspecialchars($label) ?></label>
+      <?php if ($help !== ''): ?>
+        <p class="cms-field-help"><?= htmlspecialchars($help) ?></p>
+      <?php endif; ?>
+      <div
+        class="cms-richtext-editor"
+        data-cms-editor-host
+        data-placeholder="<?= htmlspecialchars($placeholder, ENT_QUOTES, 'UTF-8') ?>"
+        data-editor-height="<?= htmlspecialchars($editorHeight, ENT_QUOTES, 'UTF-8') ?>"
+        data-initial-html="<?= htmlspecialchars($value, ENT_QUOTES, 'UTF-8') ?>"></div>
+      <input type="hidden" <?= $attribute ?>="<?= htmlspecialchars($fieldKey, ENT_QUOTES, 'UTF-8') ?>" value="<?= htmlspecialchars($value, ENT_QUOTES, 'UTF-8') ?>">
+    </article>
+    <?php
+    return (string)ob_get_clean();
+}
+
+function cms_render_image_field(string $fieldKey, string $label, string $value, array $ratio, string $help = '', bool $itemField = false): string
+{
+    $attribute = $itemField ? 'data-cms-item-field' : 'data-cms-field';
+    $ratioWidth = (int)($ratio[0] ?? 1);
+    $ratioHeight = (int)($ratio[1] ?? 1);
+    $previewUrl = cms_content_public_asset_url($value);
+    ob_start();
+    ?>
+    <article class="cms-editor-card">
+      <div class="d-flex flex-wrap justify-content-between align-items-start gap-2 mb-2">
+        <div>
+          <h5 class="cms-editor-card-title mb-1"><?= htmlspecialchars($label) ?></h5>
+          <?php if ($help !== ''): ?>
+            <p class="cms-field-help mb-0"><?= htmlspecialchars($help) ?></p>
+          <?php endif; ?>
+        </div>
+        <span class="cms-ratio-badge"><?= $ratioWidth ?>:<?= $ratioHeight ?></span>
+      </div>
+      <div
+        class="cms-image-picker"
+        data-cms-image-picker
+        data-ratio-width="<?= $ratioWidth ?>"
+        data-ratio-height="<?= $ratioHeight ?>">
+        <div class="cms-image-preview-shell">
+          <?php if ($previewUrl !== ''): ?>
+            <img src="<?= htmlspecialchars($previewUrl, ENT_QUOTES, 'UTF-8') ?>" alt="<?= htmlspecialchars($label, ENT_QUOTES, 'UTF-8') ?>" class="cms-image-preview" data-cms-image-preview>
+          <?php else: ?>
+            <div class="cms-image-preview-placeholder" data-cms-image-placeholder>Upload and crop an image for this section.</div>
+            <img src="" alt="<?= htmlspecialchars($label, ENT_QUOTES, 'UTF-8') ?>" class="cms-image-preview d-none" data-cms-image-preview>
+          <?php endif; ?>
+        </div>
+        <div class="cms-image-picker-actions">
+          <button type="button" class="btn btn-outline-primary btn-sm fw-semibold" data-cms-image-select>
+            <i class="fa-solid fa-image me-2"></i>Upload and Crop
+          </button>
+          <span class="cms-access-note">Fixed live ratio: <?= $ratioWidth ?>:<?= $ratioHeight ?></span>
+        </div>
+        <input type="file" accept="image/*" class="d-none" data-cms-image-input>
+        <input type="hidden" <?= $attribute ?>="<?= htmlspecialchars($fieldKey, ENT_QUOTES, 'UTF-8') ?>" value="<?= htmlspecialchars($value, ENT_QUOTES, 'UTF-8') ?>">
+      </div>
+    </article>
+    <?php
+    return (string)ob_get_clean();
+}
+
+function cms_render_official_item(array $item, array $ratio): string
+{
+    ob_start();
+    ?>
+    <article class="cms-repeater-item" data-cms-repeater-item>
+      <div class="cms-repeater-item-head">
+        <h5 class="cms-repeater-title mb-0">Official</h5>
+        <button type="button" class="btn btn-outline-danger btn-sm fw-semibold" data-cms-repeater-remove>
+          <i class="fa-solid fa-trash-can me-1"></i>Remove
+        </button>
+      </div>
+      <div class="row g-3">
+        <div class="col-12 col-lg-5">
+          <?= cms_render_image_field('image', 'Official Image', (string)($item['image'] ?? ''), $ratio, 'Used on the Government page and the Home page council section.', true) ?>
+        </div>
+        <div class="col-12 col-lg-7">
+          <div class="row g-3">
+            <div class="col-12">
+              <?= cms_render_text_field('name_html', 'Official Name', (string)($item['name_html'] ?? ''), 'Enter official name', '', true) ?>
+            </div>
+            <div class="col-12">
+              <?= cms_render_text_field('position_html', 'Official Position', (string)($item['position_html'] ?? ''), 'Enter official position', '', true) ?>
+            </div>
+          </div>
+        </div>
+      </div>
+    </article>
+    <?php
+    return (string)ob_get_clean();
+}
+
+function cms_render_area_item(array $item): string
+{
+    ob_start();
+    ?>
+    <article class="cms-repeater-item" data-cms-repeater-item>
+      <div class="cms-repeater-item-head">
+        <h5 class="cms-repeater-title mb-0">Area</h5>
+        <button type="button" class="btn btn-outline-danger btn-sm fw-semibold" data-cms-repeater-remove>
+          <i class="fa-solid fa-trash-can me-1"></i>Remove
+        </button>
+      </div>
+      <div class="row g-3">
+        <div class="col-12 col-lg-4">
+          <?= cms_render_text_field('title_html', 'Area Number / Title', (string)($item['title_html'] ?? ''), 'Area 01', '', true) ?>
+        </div>
+        <div class="col-12 col-lg-8">
+          <?= cms_render_textarea_field('description_html', 'Area Locations / Description', (string)($item['description_html'] ?? ''), 'Enter locations or description', '', 3, true) ?>
+        </div>
+      </div>
+    </article>
+    <?php
+    return (string)ob_get_clean();
+}
+
+function cms_render_service_item(array $item): string
+{
+    $title = (string)($item['title_html'] ?? '');
+    $description = (string)($item['description_html'] ?? '');
+    ob_start();
+    ?>
+    <article class="cms-repeater-item cms-repeater-item--static" data-cms-repeater-item>
+      <div class="cms-repeater-item-head">
+        <h5 class="cms-repeater-title mb-0"><?= htmlspecialchars($title) ?></h5>
+      </div>
+      <input type="hidden" data-cms-item-field="title_html" value="<?= htmlspecialchars($title, ENT_QUOTES, 'UTF-8') ?>">
+      <?= cms_render_richtext_field('description_html', 'Service Description', $description, 'Write the service description here...', '', true, '180') ?>
+    </article>
+    <?php
+    return (string)ob_get_clean();
+}
+
+function cms_render_emergency_item(array $item): string
+{
+    ob_start();
+    ?>
+    <article class="cms-repeater-item" data-cms-repeater-item>
+      <div class="cms-repeater-item-head">
+        <h5 class="cms-repeater-title mb-0">Emergency Hotline</h5>
+        <button type="button" class="btn btn-outline-danger btn-sm fw-semibold" data-cms-repeater-remove>
+          <i class="fa-solid fa-trash-can me-1"></i>Remove
+        </button>
+      </div>
+      <div class="row g-3">
+        <div class="col-12 col-lg-5">
+          <?= cms_render_text_field('title_html', 'Area Title', (string)($item['title_html'] ?? ''), 'Area 01', '', true) ?>
+        </div>
+        <div class="col-12 col-lg-7">
+          <?= cms_render_text_field('number_html', 'Hotline Number', (string)($item['number_html'] ?? ''), '+63 900 000 0000', '', true) ?>
+        </div>
+      </div>
+    </article>
+    <?php
+    return (string)ob_get_clean();
+}
+
+function cms_render_contact_tile_item(array $item): string
+{
+    ob_start();
+    ?>
+    <article class="cms-repeater-item" data-cms-repeater-item>
+      <div class="cms-repeater-item-head">
+        <h5 class="cms-repeater-title mb-0">Area Hotline Tile</h5>
+        <button type="button" class="btn btn-outline-danger btn-sm fw-semibold" data-cms-repeater-remove>
+          <i class="fa-solid fa-trash-can me-1"></i>Remove
+        </button>
+      </div>
+      <div class="row g-3">
+        <div class="col-12 col-lg-4">
+          <?= cms_render_text_field('title_html', 'Tile Title', (string)($item['title_html'] ?? ''), 'AREA 01', '', true) ?>
+        </div>
+        <div class="col-12 col-lg-4">
+          <?= cms_render_textarea_field('location_html', 'Description / Location', (string)($item['location_html'] ?? ''), 'Enter location details', '', 2, true) ?>
+        </div>
+        <div class="col-12 col-lg-4">
+          <?= cms_render_text_field('number_html', 'Hotline Number', (string)($item['number_html'] ?? ''), '+63 900 000 0000', '', true) ?>
+        </div>
+      </div>
+    </article>
+    <?php
+    return (string)ob_get_clean();
+}
+
+function cms_render_request_card(array $request, bool $canReviewContent, array $versionMeta = []): string
+{
+    $status = strtolower(trim((string)($request['status'] ?? 'draft')));
+    $requestId = (string)($request['request_id'] ?? '');
+    $pageKey = (string)($request['page_key'] ?? 'home');
+    $reviewNote = trim((string)($request['review_note'] ?? ''));
+    $isLiveVersion = (bool)($versionMeta['is_live'] ?? false);
+    $canRevertToThis = $canReviewContent && $status === 'approved' && (bool)($versionMeta['can_revert_to_this'] ?? false);
+    $canRevertToPrevious = $canReviewContent && $status === 'approved' && (bool)($versionMeta['can_revert_to_previous'] ?? false);
+    ob_start();
+    ?>
+    <article class="cms-request-card">
+      <div class="cms-request-card-head">
+        <div>
+          <div class="d-flex flex-wrap align-items-center gap-2">
+            <h4 class="cms-request-title mb-0"><?= htmlspecialchars((string)($request['page_label'] ?? cms_content_page_label($pageKey))) ?></h4>
+            <span class="cms-request-status <?= htmlspecialchars(cms_request_status_class($status)) ?>">
+              <?= htmlspecialchars(ucfirst($status)) ?>
+            </span>
+            <?php if ($isLiveVersion): ?>
+              <span class="cms-request-status is-live-version">Current Live Version</span>
+            <?php endif; ?>
+          </div>
+          <p class="cms-request-meta mb-0">
+            Request ID: <?= htmlspecialchars($requestId) ?> |
+            Created by: <?= htmlspecialchars((string)($request['created_by_label'] ?? '-')) ?>
+          </p>
+        </div>
+        <a href="<?= htmlspecialchars(cms_nav_url($pageKey, $requestId)) ?>" class="btn btn-outline-primary btn-sm fw-semibold">
+          Open
+        </a>
+      </div>
+      <div class="cms-request-grid">
+        <div>
+          <span class="cms-request-label">Last Updated</span>
+          <div class="cms-request-value"><?= htmlspecialchars(cms_format_datetime((string)($request['updated_at'] ?? ''))) ?></div>
+        </div>
+        <div>
+          <span class="cms-request-label">Submitted</span>
+          <div class="cms-request-value"><?= htmlspecialchars(cms_format_datetime((string)($request['submitted_at'] ?? ''))) ?></div>
+        </div>
+        <div>
+          <span class="cms-request-label">Reviewed</span>
+          <div class="cms-request-value"><?= htmlspecialchars(cms_format_datetime((string)($request['reviewed_at'] ?? ''))) ?></div>
+        </div>
+      </div>
+      <?php if ($reviewNote !== ''): ?>
+        <div class="cms-request-note">
+          <strong>Review Note:</strong> <?= htmlspecialchars($reviewNote) ?>
+        </div>
+      <?php endif; ?>
+      <?php if ($canReviewContent && $status === 'pending'): ?>
+        <div class="cms-request-actions">
+          <form method="post" action="../../PhpFiles/Admin-End/siteContentActions.php" class="d-inline" data-confirm="Approve and publish this content request?">
+            <?= csrfTokenField() ?>
+            <input type="hidden" name="action" value="approve_request">
+            <input type="hidden" name="request_id" value="<?= htmlspecialchars($requestId, ENT_QUOTES, 'UTF-8') ?>">
+            <button type="submit" class="btn btn-success btn-sm fw-semibold">Approve</button>
+          </form>
+          <form method="post" action="../../PhpFiles/Admin-End/siteContentActions.php" class="d-inline" data-confirm="Deny this content request?">
+            <?= csrfTokenField() ?>
+            <input type="hidden" name="action" value="deny_request">
+            <input type="hidden" name="request_id" value="<?= htmlspecialchars($requestId, ENT_QUOTES, 'UTF-8') ?>">
+            <button type="submit" class="btn btn-outline-danger btn-sm fw-semibold">Deny</button>
+          </form>
+        </div>
+      <?php endif; ?>
+      <?php if ($canRevertToThis || $canRevertToPrevious): ?>
+        <div class="cms-request-actions">
+          <?php if ($canRevertToThis): ?>
+            <form method="post" action="../../PhpFiles/Admin-End/siteContentActions.php" class="d-inline" data-confirm="Revert the live page to this approved version?">
+              <?= csrfTokenField() ?>
+              <input type="hidden" name="action" value="revert_to_this_version">
+              <input type="hidden" name="request_id" value="<?= htmlspecialchars($requestId, ENT_QUOTES, 'UTF-8') ?>">
+              <button type="submit" class="btn btn-outline-warning btn-sm fw-semibold">Revert to This Version</button>
+            </form>
+          <?php endif; ?>
+          <?php if ($canRevertToPrevious): ?>
+            <form method="post" action="../../PhpFiles/Admin-End/siteContentActions.php" class="d-inline" data-confirm="Revert the live page to the previous approved version?">
+              <?= csrfTokenField() ?>
+              <input type="hidden" name="action" value="revert_to_previous_version">
+              <input type="hidden" name="request_id" value="<?= htmlspecialchars($requestId, ENT_QUOTES, 'UTF-8') ?>">
+              <button type="submit" class="btn btn-outline-warning btn-sm fw-semibold">Revert to Previous Version</button>
+            </form>
+          <?php endif; ?>
+        </div>
+      <?php endif; ?>
+    </article>
+    <?php
+    return (string)ob_get_clean();
+}
+
+$previewAssetBase = rtrim(appUrl('/'), '/') . '/';
+$previewRuntimeJs = appUrl('JS-Script-Files/siteContentRuntime.js');
+$previewCssAssets = [
+    'bootstrap' => 'https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/css/bootstrap.min.css',
+    'guest' => appUrl('CSS-Styles/Guest-End-CSS/GuestPage.css'),
+    'home' => appUrl('CSS-Styles/Guest-End-CSS/HomePage.css'),
+    'news' => appUrl('CSS-Styles/Guest-End-CSS/NewsModule.css'),
+    'faq' => appUrl('CSS-Styles/Guest-End-CSS/FAQSModule.css'),
+    'contact' => appUrl('CSS-Styles/Guest-End-CSS/ContactModule.css'),
+    'login' => appUrl('CSS-Styles/Guest-End-CSS/LoginModule.css'),
+    'navbar' => appUrl('CSS-Styles/NavbarFooterStyle.css'),
+];
+?>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <link rel="icon" href="../../Images/favicon_sanjose.png?v=20260211">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Content Management System</title>
+
+  <script src="https://kit.fontawesome.com/3482e00999.js" crossorigin="anonymous"></script>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="../../summernote-0.9.0-dist/summernote-lite.min.css?v=20260307-2" rel="stylesheet">
+  <link rel="stylesheet" href="../../CSS-Styles/Admin-End-CSS/AdminDashboardStyle.css">
+  <link rel="stylesheet" href="../../CSS-Styles/Admin-End-CSS/ContentNavigator.css?v=20260325-2">
+</head>
+<body>
+  <div class="d-flex flex-column flex-md-row" style="min-height: 100vh;">
+    <?php include __DIR__ . '/../includes/sidebar.php'; ?>
+
+    <main id="main-display" class="flex-grow-1 p-3 p-md-4 p-xl-5 cms-page-bg">
+      <section class="cms-hero-card mb-4">
+        <div class="cms-hero-copy">
+          <div class="cms-kicker">Content Management System</div>
+          <div class="d-flex flex-wrap align-items-center gap-2">
+            <h2 class="cms-page-title mb-0">Content Management System</h2>
+            <span class="cms-status-pill <?= htmlspecialchars(cms_status_class((string)($selectedModule['status'] ?? 'Navigation'))) ?>">
+              <?= htmlspecialchars((string)($selectedModule['status'] ?? 'Navigation')) ?>
+            </span>
+          </div>
+          <p class="cms-page-subtitle mb-0">
+            Build the content request, preview, and approval flow for the public pages from one CMS workspace.
+          </p>
+        </div>
+        <div class="cms-hero-actions">
+          <?php if ($canManageAnnouncements): ?>
+            <a href="<?= htmlspecialchars($contentToolsUrl) ?>" class="btn btn-warning text-white fw-semibold">
+              <i class="fa-solid fa-layer-group me-2"></i>Open Content Tools
+            </a>
+          <?php endif; ?>
+          <a href="<?= htmlspecialchars(cms_nav_url('requests')) ?>" class="btn btn-outline-light fw-semibold">
+            <i class="fa-solid fa-code-compare me-2"></i>Open Request Queue
+          </a>
+        </div>
+      </section>
+
+      <?php if (is_array($flash) && !empty($flash['message'])): ?>
+        <div class="alert alert-<?= htmlspecialchars((string)($flash['type'] ?? 'info')) ?> shadow-sm border-0 mb-4">
+          <?= htmlspecialchars((string)$flash['message']) ?>
+        </div>
+      <?php endif; ?>
+
+      <section class="cms-rule-strip mb-4">
+        <?php foreach ($sharedRules as $rule): ?>
+          <div class="cms-rule-chip">
+            <i class="fa-solid fa-check"></i>
+            <span><?= htmlspecialchars($rule) ?></span>
+          </div>
+        <?php endforeach; ?>
+      </section>
+
+      <section class="cms-section-card mb-4">
+        <div class="cms-section-heading">
+          <h3 class="cms-section-title mb-0">General Modules</h3>
+        </div>
+        <div class="row g-3">
+          <?php foreach ($generalModules as $moduleCard): ?>
+            <div class="col-12 col-xl-6">
+              <article class="cms-module-card cms-module-card--live h-100">
+                <div class="cms-module-card-head">
+                  <div class="cms-module-icon">
+                    <i class="fa-solid <?= htmlspecialchars((string)$moduleCard['icon']) ?>"></i>
+                  </div>
+                  <div>
+                    <div class="d-flex flex-wrap align-items-center gap-2">
+                      <h4 class="cms-module-title mb-0"><?= htmlspecialchars((string)$moduleCard['title']) ?></h4>
+                      <span class="cms-status-pill <?= htmlspecialchars(cms_status_class((string)$moduleCard['status'])) ?>">
+                        <?= htmlspecialchars((string)$moduleCard['status']) ?>
+                      </span>
+                    </div>
+                    <p class="cms-module-summary mb-0"><?= htmlspecialchars((string)$moduleCard['summary']) ?></p>
+                  </div>
+                </div>
+                <div class="cms-module-meta"><?= htmlspecialchars((string)$moduleCard['meta']) ?></div>
+                <?php if (!empty($moduleCard['details'])): ?>
+                  <div class="cms-module-detail-stack">
+                    <?php foreach ((array)$moduleCard['details'] as $detailBlock): ?>
+                      <div class="cms-module-detail-card">
+                        <h5 class="cms-module-detail-title"><?= htmlspecialchars((string)($detailBlock['title'] ?? '')) ?></h5>
+                        <ul class="cms-module-detail-list">
+                          <?php foreach ((array)($detailBlock['items'] ?? []) as $detailItem): ?>
+                            <li><?= htmlspecialchars((string)$detailItem) ?></li>
+                          <?php endforeach; ?>
+                        </ul>
+                      </div>
+                    <?php endforeach; ?>
+                  </div>
+                <?php endif; ?>
+                <?php if (!empty($moduleCard['note'])): ?>
+                  <p class="cms-module-note mb-0"><?= htmlspecialchars((string)$moduleCard['note']) ?></p>
+                <?php endif; ?>
+                <div class="cms-module-actions">
+                  <?php if ($moduleCard['primary_href'] !== ''): ?>
+                    <a href="<?= htmlspecialchars((string)$moduleCard['primary_href']) ?>" class="btn btn-outline-primary btn-sm fw-semibold">
+                      <?= htmlspecialchars((string)$moduleCard['primary_label']) ?>
+                    </a>
+                  <?php else: ?>
+                    <span class="cms-access-note">Access depends on current module permissions.</span>
+                  <?php endif; ?>
+                  <?php if ($moduleCard['secondary_href'] !== '' && $moduleCard['secondary_label'] !== ''): ?>
+                    <a href="<?= htmlspecialchars((string)$moduleCard['secondary_href']) ?>" class="btn btn-link btn-sm fw-semibold text-decoration-none">
+                      <?= htmlspecialchars((string)$moduleCard['secondary_label']) ?>
+                    </a>
+                  <?php endif; ?>
+                </div>
+              </article>
+            </div>
+          <?php endforeach; ?>
+        </div>
+      </section>
+
+      <section class="cms-section-card mb-4">
+        <div class="cms-section-heading">
+          <h3 class="cms-section-title mb-0">Content Management Module</h3>
+        </div>
+        <div class="cms-nav-grid">
+          <?php foreach ($contentModules as $moduleKey => $module): ?>
+            <a href="<?= htmlspecialchars(cms_nav_url($moduleKey)) ?>" class="cms-nav-link <?= $selectedModuleKey === $moduleKey ? 'is-active' : '' ?>">
+              <span class="cms-nav-link-icon">
+                <i class="fa-solid <?= htmlspecialchars((string)$module['icon']) ?>"></i>
+              </span>
+              <span class="cms-nav-link-copy">
+                <span class="cms-nav-link-title"><?= htmlspecialchars((string)$module['label']) ?></span>
+                <span class="cms-nav-link-meta"><?= htmlspecialchars((string)$module['summary']) ?></span>
+              </span>
+              <span class="cms-nav-link-status <?= htmlspecialchars(cms_status_class((string)$module['status'])) ?>">
+                <?= htmlspecialchars((string)$module['status']) ?>
+              </span>
+            </a>
+          <?php endforeach; ?>
+        </div>
+      </section>
+
+      <?php if ($selectedModuleKey === 'requests'): ?>
+        <section class="cms-section-card mb-4">
+          <div class="cms-detail-header">
+            <div class="cms-detail-icon">
+              <i class="fa-solid <?= htmlspecialchars((string)$selectedModule['icon']) ?>"></i>
+            </div>
+            <div class="cms-detail-copy">
+              <div class="d-flex flex-wrap align-items-center gap-2 mb-2">
+                <h3 class="cms-section-title mb-0"><?= htmlspecialchars((string)$selectedModule['title']) ?></h3>
+                <span class="cms-status-pill <?= htmlspecialchars(cms_status_class((string)$selectedModule['status'])) ?>">
+                  <?= htmlspecialchars((string)$selectedModule['status']) ?>
+                </span>
+              </div>
+              <p class="cms-detail-summary mb-0"><?= htmlspecialchars((string)$selectedModule['summary']) ?></p>
+            </div>
+          </div>
+
+          <div class="cms-stat-grid mb-4">
+            <article class="cms-stat-card">
+              <span class="cms-stat-label">My Drafts</span>
+              <span class="cms-stat-value"><?= (int)$draftCount ?></span>
+            </article>
+            <article class="cms-stat-card">
+              <span class="cms-stat-label">My Pending</span>
+              <span class="cms-stat-value"><?= (int)$myPendingCount ?></span>
+            </article>
+            <article class="cms-stat-card">
+              <span class="cms-stat-label">My Approved</span>
+              <span class="cms-stat-value"><?= (int)$myApprovedCount ?></span>
+            </article>
+            <article class="cms-stat-card">
+              <span class="cms-stat-label">My Denied</span>
+              <span class="cms-stat-value"><?= (int)$myDeniedCount ?></span>
+            </article>
+            <?php if ($canReviewContent): ?>
+              <article class="cms-stat-card cms-stat-card--accent">
+                <span class="cms-stat-label">Pending Review</span>
+                <span class="cms-stat-value"><?= (int)$pendingReviewCount ?></span>
+              </article>
+            <?php endif; ?>
+          </div>
+
+          <div class="row g-4">
+            <div class="col-12 col-xl-7">
+              <article class="cms-detail-panel mb-4">
+                <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+                  <h4 class="cms-detail-panel-title mb-0">My Content Requests</h4>
+                  <a href="<?= htmlspecialchars(cms_nav_url('home')) ?>" class="btn btn-outline-primary btn-sm fw-semibold">Start New Page Edit</a>
+                </div>
+                <?php if ($myRequests): ?>
+                  <div class="cms-request-stack">
+                    <?php foreach ($myRequests as $request): ?>
+                      <?= cms_render_request_card($request, $canReviewContent, $requestVersionMeta[(string)($request['request_id'] ?? '')] ?? []) ?>
+                    <?php endforeach; ?>
+                  </div>
+                <?php else: ?>
+                  <p class="cms-empty-state mb-0">No CMS requests yet. Start from any page editor to save a draft or submit changes.</p>
+                <?php endif; ?>
+              </article>
+
+              <?php if ($canReviewContent): ?>
+                <article class="cms-detail-panel mb-4">
+                  <h4 class="cms-detail-panel-title">Approved Version History</h4>
+                  <?php if ($approvedHistoryRequests): ?>
+                    <div class="cms-request-stack">
+                      <?php foreach ($approvedHistoryRequests as $request): ?>
+                        <?= cms_render_request_card($request, true, $requestVersionMeta[(string)($request['request_id'] ?? '')] ?? []) ?>
+                      <?php endforeach; ?>
+                    </div>
+                  <?php else: ?>
+                    <p class="cms-empty-state mb-0">No approved content versions are available yet.</p>
+                  <?php endif; ?>
+                </article>
+              <?php endif; ?>
+
+              <?php if ($canReviewContent): ?>
+                <article class="cms-detail-panel">
+                  <h4 class="cms-detail-panel-title">Review Queue</h4>
+                  <?php if ($reviewQueue): ?>
+                    <div class="cms-request-stack">
+                      <?php foreach ($reviewQueue as $request): ?>
+                        <?= cms_render_request_card($request, true, $requestVersionMeta[(string)($request['request_id'] ?? '')] ?? []) ?>
+                      <?php endforeach; ?>
+                    </div>
+                  <?php else: ?>
+                    <p class="cms-empty-state mb-0">No pending content requests to review right now.</p>
+                  <?php endif; ?>
+                </article>
+              <?php endif; ?>
+            </div>
+
+            <div class="col-12 col-xl-5">
+              <article class="cms-detail-panel mb-4">
+                <h4 class="cms-detail-panel-title">Shared Workflow</h4>
+                <ol class="cms-flow-list">
+                  <?php foreach ($sharedFlow as $step): ?>
+                    <li><?= htmlspecialchars($step) ?></li>
+                  <?php endforeach; ?>
+                </ol>
+              </article>
+
+              <article class="cms-detail-panel">
+                <h4 class="cms-detail-panel-title">Review Permissions</h4>
+                <ul class="cms-detail-list">
+                  <li>SuperAdmin can approve, deny, and auto-approve changes.</li>
+                  <li>The appointed Barangay Secretary can also approve, deny, and auto-approve changes.</li>
+                  <li>Creators can continue editing draft and denied requests from the page editor.</li>
+                  <li>Pending requests remain read-only until they are reviewed.</li>
+                </ul>
+              </article>
+            </div>
+          </div>
+        </section>
+      <?php else: ?>
+        <?php
+        $moduleNotes = (array)($editorMeta[$selectedModuleKey]['notes'] ?? []);
+        $moduleLinks = (array)($editorMeta[$selectedModuleKey]['quick_links'] ?? []);
+        $selectedRequestStatus = strtolower(trim((string)($editorRequest['status'] ?? '')));
+        ?>
+        <section class="cms-section-card">
+          <div class="cms-detail-header">
+            <div class="cms-detail-icon">
+              <i class="fa-solid <?= htmlspecialchars((string)$selectedModule['icon']) ?>"></i>
+            </div>
+            <div class="cms-detail-copy">
+              <div class="d-flex flex-wrap align-items-center gap-2 mb-2">
+                <h3 class="cms-section-title mb-0"><?= htmlspecialchars((string)$selectedModule['title']) ?></h3>
+                <span class="cms-status-pill <?= htmlspecialchars(cms_status_class((string)$selectedModule['status'])) ?>">
+                  <?= htmlspecialchars((string)$selectedModule['status']) ?>
+                </span>
+                <?php if ($editorRequest): ?>
+                  <span class="cms-request-status <?= htmlspecialchars(cms_request_status_class($selectedRequestStatus)) ?>">
+                    <?= htmlspecialchars(ucfirst($selectedRequestStatus)) ?> Request
+                  </span>
+                <?php endif; ?>
+              </div>
+              <p class="cms-detail-summary mb-1"><?= htmlspecialchars((string)($editorMeta[$selectedModuleKey]['subtitle'] ?? $selectedModule['summary'])) ?></p>
+              <?php if ($editorRequest): ?>
+                <p class="cms-request-meta mb-0">
+                  Request ID: <?= htmlspecialchars((string)$editorRequest['request_id']) ?> |
+                  Created by: <?= htmlspecialchars((string)($editorRequest['created_by_label'] ?? '-')) ?>
+                </p>
+              <?php endif; ?>
+            </div>
+          </div>
+
+          <?php if ($editorReadOnlyMessage !== ''): ?>
+            <div class="alert alert-warning border-0 shadow-sm mb-4">
+              <?= htmlspecialchars($editorReadOnlyMessage) ?>
+            </div>
+          <?php endif; ?>
+
+          <div class="row g-4">
+            <div class="col-12 col-xxl-7">
+              <form id="cmsEditorForm" method="post" action="../../PhpFiles/Admin-End/siteContentActions.php" class="cms-editor-form">
+                <?= csrfTokenField() ?>
+                <input type="hidden" name="action" id="cmsActionInput" value="save_draft">
+                <input type="hidden" name="page_key" value="<?= htmlspecialchars($selectedModuleKey, ENT_QUOTES, 'UTF-8') ?>">
+                <input type="hidden" name="request_id" value="<?= htmlspecialchars((string)($editorRequest['request_id'] ?? ''), ENT_QUOTES, 'UTF-8') ?>">
+                <input type="hidden" name="redirect_module" value="<?= htmlspecialchars($selectedModuleKey, ENT_QUOTES, 'UTF-8') ?>">
+                <input type="hidden" name="payload_json" id="cmsPayloadInput" value="">
+
+                <?php if ($selectedModuleKey === 'announcements'): ?>
+                  <div class="row g-3">
+                    <div class="col-12">
+                      <?= cms_render_image_field('banner_image', 'Banner Image', (string)($editorPayload['banner_image'] ?? ''), $announcementRatio, 'Crop to the current News page banner ratio before saving.') ?>
+                    </div>
+                    <div class="col-12">
+                      <?= cms_render_richtext_field('banner_title_html', 'Banner Title', (string)($editorPayload['banner_title_html'] ?? ''), 'Write the News page title here...', '', false, '170') ?>
+                    </div>
+                    <div class="col-12">
+                      <?= cms_render_richtext_field('banner_message_html', 'Banner Message', (string)($editorPayload['banner_message_html'] ?? ''), 'Write the News page message here...', '', false, '200') ?>
+                    </div>
+                  </div>
+                <?php elseif ($selectedModuleKey === 'home'): ?>
+                  <div class="row g-3">
+                    <div class="col-12">
+                      <?= cms_render_image_field('banner_image', 'Banner Image', (string)($editorPayload['banner_image'] ?? ''), $homeBannerRatio, 'Crop to the current Home page banner ratio before saving.') ?>
+                    </div>
+                    <div class="col-12">
+                      <?= cms_render_richtext_field('about_message_html', 'About Message', (string)($editorPayload['about_message_html'] ?? ''), 'Write the About Us message here...') ?>
+                    </div>
+                    <div class="col-12">
+                      <?= cms_render_image_field('about_image', 'About Us Image', (string)($editorPayload['about_image'] ?? ''), $homeAboutRatio, 'Crop to match the current About Us portrait ratio.') ?>
+                    </div>
+                    <div class="col-12 col-xl-6">
+                      <?= cms_render_richtext_field('mission_message_html', 'Mission Message', (string)($editorPayload['mission_message_html'] ?? ''), 'Write the mission message here...', '', false, '220') ?>
+                    </div>
+                    <div class="col-12 col-xl-6">
+                      <?= cms_render_richtext_field('vision_message_html', 'Vision Message', (string)($editorPayload['vision_message_html'] ?? ''), 'Write the vision message here...', '', false, '220') ?>
+                    </div>
+                    <div class="col-12">
+                      <?= cms_render_richtext_field('history_message_html', 'Our History', (string)($editorPayload['history_message_html'] ?? ''), 'Write the history section here...') ?>
+                    </div>
+                    <div class="col-12">
+                      <article class="cms-editor-card">
+                        <h5 class="cms-editor-card-title mb-2">Meet the Council</h5>
+                        <p class="cms-field-help mb-0">Images and names in this section are based on the approved Government page and are shown in the preview automatically.</p>
+                      </article>
+                    </div>
+                  </div>
+                <?php elseif ($selectedModuleKey === 'government'): ?>
+                  <div class="row g-3">
+                    <div class="col-12">
+                      <?= cms_render_image_field('banner_image', 'Banner Image', (string)($editorPayload['banner_image'] ?? ''), $governmentBannerRatio, 'Crop to the current Government page banner ratio before saving.') ?>
+                    </div>
+                    <div class="col-12 col-xl-6">
+                      <?= cms_render_richtext_field('banner_title_html', 'Banner Title', (string)($editorPayload['banner_title_html'] ?? ''), 'Write the banner title here...', '', false, '170') ?>
+                    </div>
+                    <div class="col-12 col-xl-6">
+                      <?= cms_render_richtext_field('banner_message_html', 'Banner Message', (string)($editorPayload['banner_message_html'] ?? ''), 'Write the banner message here...', '', false, '170') ?>
+                    </div>
+                    <div class="col-12 col-xl-5">
+                      <?= cms_render_image_field('punong_barangay_image', 'Punong Barangay Image', (string)($editorPayload['punong_barangay_image'] ?? ''), $governmentPunongRatio, 'Crop to the current Punong Barangay portrait ratio.') ?>
+                    </div>
+                    <div class="col-12 col-xl-7">
+                      <div class="row g-3">
+                        <div class="col-12">
+                          <?= cms_render_text_field('punong_barangay_name_html', 'Punong Barangay Name', (string)($editorPayload['punong_barangay_name_html'] ?? ''), 'Enter the Punong Barangay name') ?>
+                        </div>
+                        <div class="col-12">
+                          <?= cms_render_text_field('punong_barangay_position_html', 'Punong Barangay Position', (string)($editorPayload['punong_barangay_position_html'] ?? ''), 'Enter the Punong Barangay position') ?>
+                        </div>
+                        <div class="col-12">
+                          <?= cms_render_richtext_field('punong_barangay_welcome_message_html', 'Welcome Message', (string)($editorPayload['punong_barangay_welcome_message_html'] ?? ''), 'Write the welcome message here...') ?>
+                        </div>
+                      </div>
+                    </div>
+                    <div class="col-12">
+                      <section class="cms-editor-group">
+                        <div class="cms-editor-group-head">
+                          <div>
+                            <h4 class="cms-detail-panel-title mb-1">Barangay Officials</h4>
+                            <p class="cms-field-help mb-0">Edit official images, names, and positions. These also drive the Home page council section after approval.</p>
+                          </div>
+                          <button type="button" class="btn btn-outline-primary btn-sm fw-semibold" data-cms-repeater-add-target="government-officials">
+                            <i class="fa-solid fa-plus me-1"></i>Add Official
+                          </button>
+                        </div>
+                        <div class="cms-repeater-stack" data-cms-repeater="officials" id="government-officials">
+                          <?php foreach ((array)($editorPayload['officials'] ?? []) as $official): ?>
+                            <?= cms_render_official_item((array)$official, $governmentOfficialRatio) ?>
+                          <?php endforeach; ?>
+                        </div>
+                        <template id="cms-template-government-officials"><?= cms_render_official_item(['name_html' => '', 'position_html' => '', 'image' => ''], $governmentOfficialRatio) ?></template>
+                      </section>
+                    </div>
+                    <div class="col-12">
+                      <section class="cms-editor-group">
+                        <div class="cms-editor-group-head">
+                          <div>
+                            <h4 class="cms-detail-panel-title mb-1">Area Listings</h4>
+                            <p class="cms-field-help mb-0">Edit the area number or title together with the location or description shown on the Government page.</p>
+                          </div>
+                          <button type="button" class="btn btn-outline-primary btn-sm fw-semibold" data-cms-repeater-add-target="government-areas">
+                            <i class="fa-solid fa-plus me-1"></i>Add Area
+                          </button>
+                        </div>
+                        <div class="cms-repeater-stack" data-cms-repeater="areas" id="government-areas">
+                          <?php foreach ((array)($editorPayload['areas'] ?? []) as $area): ?>
+                            <?= cms_render_area_item((array)$area) ?>
+                          <?php endforeach; ?>
+                        </div>
+                        <template id="cms-template-government-areas"><?= cms_render_area_item(['title_html' => '', 'description_html' => '']) ?></template>
+                      </section>
+                    </div>
+                  </div>
+                <?php elseif ($selectedModuleKey === 'services'): ?>
+                  <div class="row g-3">
+                    <div class="col-12">
+                      <?= cms_render_image_field('banner_image', 'Banner Image', (string)($editorPayload['banner_image'] ?? ''), $servicesBannerRatio, 'Crop to the current Services page banner ratio before saving.') ?>
+                    </div>
+                    <div class="col-12 col-xl-6">
+                      <?= cms_render_richtext_field('banner_title_html', 'Banner Title', (string)($editorPayload['banner_title_html'] ?? ''), 'Write the banner title here...', '', false, '170') ?>
+                    </div>
+                    <div class="col-12 col-xl-6">
+                      <?= cms_render_richtext_field('banner_message_html', 'Banner Message', (string)($editorPayload['banner_message_html'] ?? ''), 'Write the banner message here...', '', false, '170') ?>
+                    </div>
+                    <div class="col-12">
+                      <section class="cms-editor-group">
+                        <div class="cms-editor-group-head">
+                          <div>
+                            <h4 class="cms-detail-panel-title mb-1">Service Descriptions</h4>
+                            <p class="cms-field-help mb-0">Each service keeps its current card title while the description remains editable.</p>
+                          </div>
+                        </div>
+                        <div class="cms-repeater-stack" data-cms-repeater="services">
+                          <?php foreach ((array)($editorPayload['services'] ?? []) as $service): ?>
+                            <?= cms_render_service_item((array)$service) ?>
+                          <?php endforeach; ?>
+                        </div>
+                      </section>
+                    </div>
+                  </div>
+                <?php elseif ($selectedModuleKey === 'faq'): ?>
+                  <div class="row g-3">
+                    <div class="col-12">
+                      <?= cms_render_image_field('banner_image', 'Banner Image', (string)($editorPayload['banner_image'] ?? ''), $faqBannerRatio, 'Crop to the current FAQ page banner ratio before saving.') ?>
+                    </div>
+                    <div class="col-12 col-xl-6">
+                      <?= cms_render_richtext_field('banner_title_html', 'Banner Title', (string)($editorPayload['banner_title_html'] ?? ''), 'Write the FAQ banner title here...', '', false, '170') ?>
+                    </div>
+                    <div class="col-12 col-xl-6">
+                      <?= cms_render_richtext_field('banner_message_html', 'Banner Message', (string)($editorPayload['banner_message_html'] ?? ''), 'Write the FAQ banner message here...', '', false, '170') ?>
+                    </div>
+                    <div class="col-12">
+                      <article class="cms-editor-card">
+                        <h5 class="cms-editor-card-title mb-2">Existing FAQ Flow</h5>
+                        <p class="cms-field-help mb-0">FAQ questions and answers continue to use the existing working flow in the Announcements tools. This editor only updates the FAQ page banner content.</p>
+                      </article>
+                    </div>
+                  </div>
+                <?php elseif ($selectedModuleKey === 'contact'): ?>
+                  <div class="row g-3">
+                    <div class="col-12">
+                      <?= cms_render_image_field('banner_image', 'Banner Image', (string)($editorPayload['banner_image'] ?? ''), $contactBannerRatio, 'Crop to the current Contact page banner ratio before saving.') ?>
+                    </div>
+                    <div class="col-12 col-xl-6">
+                      <?= cms_render_richtext_field('banner_title_html', 'Banner Title', (string)($editorPayload['banner_title_html'] ?? ''), 'Write the Contact banner title here...', '', false, '170') ?>
+                    </div>
+                    <div class="col-12 col-xl-6">
+                      <?= cms_render_richtext_field('banner_message_html', 'Banner Message', (string)($editorPayload['banner_message_html'] ?? ''), 'Write the Contact banner message here...', '', false, '170') ?>
+                    </div>
+                    <div class="col-12 col-xl-6">
+                      <?= cms_render_richtext_field('emergency_title_html', 'Emergency Hotlines Title', (string)($editorPayload['emergency_title_html'] ?? ''), 'Write the emergency title here...', '', false, '180') ?>
+                    </div>
+                    <div class="col-12 col-xl-6">
+                      <?= cms_render_richtext_field('emergency_description_html', 'Emergency Hotlines Description', (string)($editorPayload['emergency_description_html'] ?? ''), 'Write the emergency description here...', '', false, '180') ?>
+                    </div>
+                    <div class="col-12">
+                      <section class="cms-editor-group">
+                        <div class="cms-editor-group-head">
+                          <div>
+                            <h4 class="cms-detail-panel-title mb-1">Per Area Emergency Hotlines</h4>
+                            <p class="cms-field-help mb-0">Edit the quick emergency hotline list shown below the emergency section heading.</p>
+                          </div>
+                          <button type="button" class="btn btn-outline-primary btn-sm fw-semibold" data-cms-repeater-add-target="contact-emergency">
+                            <i class="fa-solid fa-plus me-1"></i>Add Hotline
+                          </button>
+                        </div>
+                        <div class="cms-repeater-stack" data-cms-repeater="emergency_hotlines" id="contact-emergency">
+                          <?php foreach ((array)($editorPayload['emergency_hotlines'] ?? []) as $item): ?>
+                            <?= cms_render_emergency_item((array)$item) ?>
+                          <?php endforeach; ?>
+                        </div>
+                        <template id="cms-template-contact-emergency"><?= cms_render_emergency_item(['title_html' => '', 'number_html' => '']) ?></template>
+                      </section>
+                    </div>
+                    <div class="col-12">
+                      <section class="cms-editor-group">
+                        <div class="cms-editor-group-head">
+                          <div>
+                            <h4 class="cms-detail-panel-title mb-1">Area Hotline Tiles</h4>
+                            <p class="cms-field-help mb-0">Add, remove, and update hotline tiles for each location.</p>
+                          </div>
+                          <button type="button" class="btn btn-outline-primary btn-sm fw-semibold" data-cms-repeater-add-target="contact-area-hotlines">
+                            <i class="fa-solid fa-plus me-1"></i>Add Tile
+                          </button>
+                        </div>
+                        <div class="cms-repeater-stack" data-cms-repeater="area_hotlines" id="contact-area-hotlines">
+                          <?php foreach ((array)($editorPayload['area_hotlines'] ?? []) as $item): ?>
+                            <?= cms_render_contact_tile_item((array)$item) ?>
+                          <?php endforeach; ?>
+                        </div>
+                        <template id="cms-template-contact-area-hotlines"><?= cms_render_contact_tile_item(['title_html' => '', 'location_html' => '', 'number_html' => '']) ?></template>
+                      </section>
+                    </div>
+                  </div>
+                <?php elseif ($selectedModuleKey === 'login'): ?>
+                  <div class="row g-3">
+                    <div class="col-12 col-xl-6">
+                      <?= cms_render_image_field('login_image', 'Login Image', (string)($editorPayload['login_image'] ?? ''), $loginImageRatio, 'Crop to the current login-side portrait ratio.') ?>
+                    </div>
+                    <div class="col-12 col-xl-6">
+                      <?= cms_render_image_field('register_image', 'Register Image', (string)($editorPayload['register_image'] ?? ''), $registerImageRatio, 'Crop to the current register-side portrait ratio.') ?>
+                    </div>
+                  </div>
+                <?php endif; ?>
+
+                <div class="cms-editor-actions mt-4">
+                  <?php if (!$editorReadOnly): ?>
+                    <button type="button" class="btn btn-outline-primary fw-semibold" data-submit-action="save_draft" data-confirm="Save these content changes as a draft?">
+                      Save Draft
+                    </button>
+                    <button type="button" class="btn btn-primary fw-semibold" data-submit-action="submit_request" data-confirm="Submit these content changes for review?">
+                      Submit Changes
+                    </button>
+                    <?php if ($canReviewContent): ?>
+                      <button type="button" class="btn btn-success fw-semibold" data-submit-action="auto_approve" data-confirm="Auto-approve and publish these content changes now?">
+                        Auto-Approve and Publish
+                      </button>
+                    <?php endif; ?>
+                  <?php else: ?>
+                    <span class="cms-access-note">This request is read-only from the page editor.</span>
+                  <?php endif; ?>
+                </div>
+              </form>
+            </div>
+
+            <div class="col-12 col-xxl-5">
+              <article class="cms-detail-panel cms-preview-panel mb-4">
+                <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+                  <div>
+                    <h4 class="cms-detail-panel-title mb-1">Live Preview</h4>
+                    <p class="cms-field-help mb-0">The preview updates as you edit, so users can review the design before submitting.</p>
+                  </div>
+                  <span class="cms-preview-pill">Preview</span>
+                </div>
+                <iframe
+                  id="cmsPreviewFrame"
+                  class="cms-preview-frame"
+                  title="CMS Page Preview"
+                  loading="lazy"></iframe>
+              </article>
+
+              <?php if ($editorReviewAvailable): ?>
+                <article class="cms-detail-panel mb-4">
+                  <h4 class="cms-detail-panel-title">Review Actions</h4>
+                  <div class="cms-detail-actions">
+                    <form method="post" action="../../PhpFiles/Admin-End/siteContentActions.php" data-confirm="Approve and publish this content request?">
+                      <?= csrfTokenField() ?>
+                      <input type="hidden" name="action" value="approve_request">
+                      <input type="hidden" name="request_id" value="<?= htmlspecialchars((string)$editorRequest['request_id'], ENT_QUOTES, 'UTF-8') ?>">
+                      <button type="submit" class="btn btn-success btn-sm fw-semibold">Approve</button>
+                    </form>
+                    <form method="post" action="../../PhpFiles/Admin-End/siteContentActions.php" data-confirm="Deny this content request?">
+                      <?= csrfTokenField() ?>
+                      <input type="hidden" name="action" value="deny_request">
+                      <input type="hidden" name="request_id" value="<?= htmlspecialchars((string)$editorRequest['request_id'], ENT_QUOTES, 'UTF-8') ?>">
+                      <button type="submit" class="btn btn-outline-danger btn-sm fw-semibold">Deny</button>
+                    </form>
+                  </div>
+                </article>
+              <?php endif; ?>
+
+              <article class="cms-detail-panel mb-4">
+                <h4 class="cms-detail-panel-title">Shared Workflow</h4>
+                <ol class="cms-flow-list">
+                  <?php foreach ($sharedFlow as $step): ?>
+                    <li><?= htmlspecialchars($step) ?></li>
+                  <?php endforeach; ?>
+                </ol>
+              </article>
+
+              <?php if ($moduleLinks): ?>
+                <article class="cms-detail-panel mb-4">
+                  <h4 class="cms-detail-panel-title">Quick Links</h4>
+                  <div class="cms-detail-actions">
+                    <?php foreach ($moduleLinks as $link): ?>
+                      <?php if (!empty($link['href'])): ?>
+                        <a href="<?= htmlspecialchars((string)$link['href']) ?>" class="btn btn-outline-primary btn-sm fw-semibold">
+                          <?= htmlspecialchars((string)$link['label']) ?>
+                        </a>
+                      <?php endif; ?>
+                    <?php endforeach; ?>
+                  </div>
+                </article>
+              <?php endif; ?>
+
+              <?php if ($moduleNotes): ?>
+                <article class="cms-detail-panel">
+                  <h4 class="cms-detail-panel-title">Module Notes</h4>
+                  <ul class="cms-detail-list">
+                    <?php foreach ($moduleNotes as $note): ?>
+                      <li><?= htmlspecialchars((string)$note) ?></li>
+                    <?php endforeach; ?>
+                  </ul>
+                </article>
+              <?php endif; ?>
+            </div>
+          </div>
+        </section>
+      <?php endif; ?>
+    </main>
+  </div>
+
+  <div class="modal fade" id="cmsImageCropModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable">
+      <div class="modal-content border-0 shadow-lg">
+        <div class="modal-header">
+          <div>
+            <h5 class="modal-title mb-1">Crop Image</h5>
+            <p class="text-muted small mb-0">Drag the image and adjust the zoom so it fits the fixed live ratio.</p>
+          </div>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+          <div class="cms-crop-shell">
+            <div class="cms-crop-canvas-shell">
+              <div class="cms-crop-frame" id="cmsCropFrame">
+                <img id="cmsCropImage" alt="Crop preview">
+              </div>
+            </div>
+            <div class="cms-crop-controls">
+              <div class="cms-crop-control-card">
+                <label for="cmsCropZoom" class="form-label fw-semibold">Zoom</label>
+                <input type="range" class="form-range" id="cmsCropZoom" min="1" max="4" step="0.01" value="1">
+              </div>
+              <div class="cms-crop-control-card">
+                <h6 class="fw-semibold mb-2">Current Ratio</h6>
+                <div class="cms-ratio-badge" id="cmsCropRatioLabel">1:1</div>
+              </div>
+              <div class="cms-crop-control-card">
+                <h6 class="fw-semibold mb-2">Tip</h6>
+                <p class="text-muted small mb-0">The full image can be any size. The saved version will use only the cropped area inside this fixed frame.</p>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button type="button" class="btn btn-primary" id="cmsCropSaveBtn">Save Crop</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="d-none">
+    <template id="cms-preview-template-announcements">
+      <main class="cms-preview-doc">
+        <div class="banner">
+          <img src="" alt="News Banner" class="bannerImage" data-cms-announcements="banner-image">
+          <div class="bannerText">
+            <h1 data-cms-announcements="banner-title">News and Announcements</h1>
+            <p data-cms-announcements="banner-message"></p>
+          </div>
+        </div>
+        <span class="pageDivider"></span>
+        <main class="mainContentWrapper">
+          <div class="container newsOuter py-5">
+            <div class="row g-5">
+              <div class="col-md-8 newsArticleGroup">
+                <h2 class="articleHeadline">Latest Barangay News</h2>
+                <p class="announcementDate mb-3">Preview only</p>
+                <div class="articleBody">
+                  <p>News articles and announcements continue to come from the Announcements module after the banner update is approved.</p>
+                </div>
+              </div>
+              <div class="col-md-4 newsSidebarGroup">
+                <div class="sidebarSection announcementsGroup">
+                  <h3 class="sidebarTitle">ANNOUNCEMENTS</h3>
+                  <div class="announcementItem">
+                    <p class="announcementText">Sidebar announcement preview</p>
+                    <div class="announcementPreviewText">The actual announcement feed remains connected to the current content tools.</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </main>
+      </main>
+    </template>
+
+    <template id="cms-preview-template-home">
+      <main class="cms-preview-doc">
+        <div class="homeBanner">
+          <img src="" alt="Home Banner" class="homeBannerImage" data-cms-home="banner-image">
+        </div>
+        <section class="aboutSection">
+          <div class="container">
+            <div class="row gx-4">
+              <div class="col-12">
+                <h1 class="sectionTitle text-center">About Us</h1>
+              </div>
+            </div>
+            <div class="row align-items-center gx-4 aboutContentRow">
+              <div class="col-md-4">
+                <img src="" id="imgPortrait" alt="About Us" class="img-fluid mx-auto d-block" data-cms-home="about-image">
+              </div>
+              <div class="col-md-8" data-cms-home="about-message"></div>
+            </div>
+            <div class="row gx-4 missionVisionRow">
+              <div class="col-md-6">
+                <h2 class="sectionTitle text-center">Mission</h2>
+                <div data-cms-home="mission-message"></div>
+              </div>
+              <div class="col-md-6">
+                <h2 class="sectionTitle text-center">Vision</h2>
+                <div data-cms-home="vision-message"></div>
+              </div>
+            </div>
+          </div>
+        </section>
+        <section class="historySection text-center">
+          <h1 class="my-5">Our History</h1>
+          <div class="container mt-5">
+            <div class="row align-items-center gx-4">
+              <div class="col-md-6 text-start" data-cms-home="history-message"></div>
+              <div class="col-md-6">
+                <img src="<?= htmlspecialchars(cms_content_public_asset_url('Images/Our_History_1.jpg'), ENT_QUOTES, 'UTF-8') ?>" alt="History" id="imgLandscape" class="img-fluid mx-auto d-block">
+                <br>
+                <img src="<?= htmlspecialchars(cms_content_public_asset_url('Images/Our_History_2.jpg'), ENT_QUOTES, 'UTF-8') ?>" alt="History" id="imgLandscape" class="img-fluid mx-auto d-block">
+              </div>
+            </div>
+          </div>
+        </section>
+        <section class="meetTheCouncil text-center">
+          <h1 class="my-5">Meet The Council</h1>
+          <div class="container">
+            <div class="council-window">
+              <div class="council-track" data-cms-home="council-list"></div>
+            </div>
+          </div>
+        </section>
+      </main>
+    </template>
+
+    <template id="cms-preview-template-government">
+      <main class="cms-preview-doc">
+        <div class="banner">
+          <img src="" alt="Government Banner" class="bannerImage" data-cms-government="banner-image">
+          <div class="bannerText">
+            <h1 data-cms-government="banner-title">Government</h1>
+            <p data-cms-government="banner-message"></p>
+          </div>
+        </div>
+        <span class="pageDivider"></span>
+        <section class="brgyCaptainSection">
+          <div class="container align-items-center">
+            <div class="row align-items-center mx-5">
+              <div class="col-md-4">
+                <img src="" alt="Punong Barangay" id="kapDesign" class="img-fluid mx-auto d-block" data-cms-government="punong-image">
+              </div>
+              <div class="col-md-8">
+                <h2 data-cms-government="punong-name"></h2>
+                <h4 style="color:#000000;" data-cms-government="punong-position"></h4>
+                <br>
+                <div data-cms-government="punong-message"></div>
+              </div>
+            </div>
+          </div>
+        </section>
+        <span class="labelDivider">Barangay Officials</span>
+        <section class="brgyOfficialSection">
+          <div class="container text-center">
+            <div class="row row-cols-1 row-cols-sm-2 row-cols-lg-3 g-3" data-cms-government-list="officials"></div>
+          </div>
+        </section>
+        <span class="labelDivider">Barangay Vicinity</span>
+        <section class="deptSection">
+          <div class="container">
+            <div class="row row-cols-1 row-cols-sm-2 row-cols-lg-3 g-3 text-start vicinityGrid" data-cms-government-list="areas"></div>
+          </div>
+        </section>
+      </main>
+    </template>
+
+    <template id="cms-preview-template-services">
+      <main class="cms-preview-doc">
+        <div class="banner">
+          <img src="" alt="Services Banner" class="bannerImage" data-cms-services="banner-image">
+          <div class="bannerText">
+            <h1 data-cms-services="banner-title">Services</h1>
+            <p data-cms-services="banner-message"></p>
+          </div>
+        </div>
+        <span class="pageDivider"></span>
+        <section class="servicesSection">
+          <div class="container">
+            <div class="row row-cols-1 row-cols-sm-2 row-cols-lg-3 g-3 text-start justify-content-center" data-cms-services-list="items"></div>
+          </div>
+        </section>
+      </main>
+    </template>
+
+    <template id="cms-preview-template-faq">
+      <main class="cms-preview-doc">
+        <div class="banner">
+          <img src="" alt="FAQ Banner" class="bannerImage" data-cms-faq="banner-image">
+          <div class="bannerText">
+            <h1 data-cms-faq="banner-title">Frequently Asked Questions</h1>
+            <p data-cms-faq="banner-message"></p>
+          </div>
+        </div>
+        <span class="pageDivider"></span>
+        <main class="mainContent">
+          <div class="container faqGridGroup py-5">
+            <div class="row g-4">
+              <div class="col-md-6">
+                <div class="accordionItemGroup">
+                  <h2 class="accordionHeader">
+                    <button class="accordionButton" type="button">
+                      <span class="iconWrapper"><i class="fa-solid fa-caret-down"></i></span>
+                      <h5 class="questionTitle">Sample FAQ Preview</h5>
+                    </button>
+                  </h2>
+                  <div class="accordionBody">
+                    <p>The current FAQ items continue to use the existing working flow. This preview focuses on the banner section you are editing here.</p>
+                  </div>
+                </div>
+              </div>
+              <div class="col-md-6">
+                <div class="accordionItemGroup">
+                  <div class="accordionBody">
+                    <p>Once approved, the updated banner appears above the live FAQ list.</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </main>
+      </main>
+    </template>
+
+    <template id="cms-preview-template-contact">
+      <main class="cms-preview-doc">
+        <div class="banner">
+          <img src="" alt="Contact Banner" class="bannerImage" data-cms-contact="banner-image">
+          <div class="bannerText">
+            <h1 data-cms-contact="banner-title">Contact</h1>
+            <p data-cms-contact="banner-message"></p>
+          </div>
+        </div>
+        <span class="pageDivider"></span>
+        <main class="mainContentWrapper">
+          <section class="contactContentArea contactCentered">
+            <div class="contactSectionGroup bherSection">
+              <h2 class="sectionTitle" data-cms-contact="emergency-title"></h2>
+              <p class="sectionText" data-cms-contact="emergency-description"></p>
+              <div class="row g-4 contactContactRow contactContactRow--tight" data-cms-contact-list="emergency-hotlines"></div>
+            </div>
+          </section>
+          <span class="labelDivider areaHotlinesDivider">Area Hotlines</span>
+          <div class="container contactGridGroup py-5">
+            <div class="row g-4 contactGridRow" data-cms-contact-list="area-hotlines"></div>
+          </div>
+        </main>
+      </main>
+    </template>
+
+    <template id="cms-preview-template-login">
+      <main class="cms-preview-doc">
+        <div class="login-signup-container" data-cms-login-root>
+          <div class="auth-image login-image"></div>
+          <div class="form-wrapper">
+            <form class="form-box active">
+              <h1 class="mb-1 fs-2 text-center"><strong>Welcome Back!</strong></h1>
+              <p class="text-center fs-6 text-muted intro-message">Please enter your credentials.</p>
+              <h4 class="mb-3 fs-4 text-center"><strong>Login</strong></h4>
+              <input type="text" class="fs-6 form-control mb-3" placeholder="Email / Phone">
+              <div class="input-group mb-3">
+                <input type="password" class="form-control" placeholder="Password">
+                <span class="input-group-text"><i class="bi bi-eye"></i></span>
+              </div>
+              <button type="button" class="btn btn-primary w-100">Login</button>
+            </form>
+          </div>
+        </div>
+      </main>
+    </template>
+  </div>
+
+  <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+  <script src="../../summernote-0.9.0-dist/summernote-lite.min.js?v=20260307-2"></script>
+  <script src="../../JS-Script-Files/siteContentRuntime.js?v=20260325-1"></script>
+  <script>
+    (function () {
+      const selectedPageKey = <?= json_encode(in_array($selectedModuleKey, cms_content_editable_page_keys(), true) ? $selectedModuleKey : '') ?>;
+      const previewAssetBase = <?= json_encode($previewAssetBase) ?>;
+      const previewRuntimeJs = <?= json_encode($previewRuntimeJs) ?>;
+      const previewCssAssets = <?= json_encode($previewCssAssets) ?>;
+      const previewFrame = document.getElementById("cmsPreviewFrame");
+      const editorForm = document.getElementById("cmsEditorForm");
+      const payloadInput = document.getElementById("cmsPayloadInput");
+      const actionInput = document.getElementById("cmsActionInput");
+      const cropModalEl = document.getElementById("cmsImageCropModal");
+      const cropFrameEl = document.getElementById("cmsCropFrame");
+      const cropImageEl = document.getElementById("cmsCropImage");
+      const cropZoomEl = document.getElementById("cmsCropZoom");
+      const cropRatioLabelEl = document.getElementById("cmsCropRatioLabel");
+      const cropSaveBtn = document.getElementById("cmsCropSaveBtn");
+      const cropModal = cropModalEl ? new bootstrap.Modal(cropModalEl) : null;
+      const MAX_IMAGE_SIZE_BYTES = 25 * 1024 * 1024;
+      let previewTimer = null;
+      let cropTargetPicker = null;
+      let cropSourceImage = null;
+      let cropState = {
+        ratioWidth: 1,
+        ratioHeight: 1,
+        baseScale: 1,
+        zoom: 1,
+        translateX: 0,
+        translateY: 0,
+        dragActive: false,
+        dragStartX: 0,
+        dragStartY: 0,
+        dragOriginX: 0,
+        dragOriginY: 0
+      };
+
+      function escapeHtml(value) {
+        return String(value == null ? "" : value)
+          .replace(/&/g, "&amp;")
+          .replace(/</g, "&lt;")
+          .replace(/>/g, "&gt;")
+          .replace(/"/g, "&quot;")
+          .replace(/'/g, "&#039;");
+      }
+
+      function buildPreviewDocument(pageKey, payload) {
+        const template = document.getElementById("cms-preview-template-" + pageKey);
+        if (!template) {
+          return "";
+        }
+        const payloadJson = JSON.stringify(payload).replace(/<\//g, "<\\/");
+
+        const cssLinks = [previewCssAssets.bootstrap];
+        switch (pageKey) {
+          case "home":
+            cssLinks.push(previewCssAssets.home);
+            break;
+          case "announcements":
+            cssLinks.push(previewCssAssets.guest, previewCssAssets.news);
+            break;
+          case "government":
+          case "services":
+            cssLinks.push(previewCssAssets.guest);
+            break;
+          case "faq":
+            cssLinks.push(previewCssAssets.guest, previewCssAssets.faq);
+            break;
+          case "contact":
+            cssLinks.push(previewCssAssets.guest, previewCssAssets.contact);
+            break;
+          case "login":
+            cssLinks.push(previewCssAssets.login);
+            break;
+        }
+
+        const headMarkup = cssLinks.map(function (href) {
+          return '<link rel="stylesheet" href="' + escapeHtml(href) + '">';
+        }).join("");
+
+        return [
+          "<!DOCTYPE html>",
+          '<html lang="en">',
+          "<head>",
+          '<meta charset="UTF-8">',
+          '<meta name="viewport" content="width=device-width, initial-scale=1.0">',
+          headMarkup,
+          "<style>",
+          "body{margin:0;background:#ffffff;overflow:auto;}",
+          ".cms-preview-doc{min-height:100vh;}",
+          ".cms-preview-doc *{pointer-events:none !important;}",
+          ".cms-runtime-richtext p:last-child{margin-bottom:0;}",
+          ".login-signup-container{margin:32px auto;}",
+          ".bannerText h1,.bannerText p{color:#ffffff !important;}",
+          "</style>",
+          "</head>",
+          '<body data-cms-page="' + escapeHtml(pageKey) + '" data-cms-asset-base="' + escapeHtml(previewAssetBase) + '">',
+          template.innerHTML,
+          "<script>",
+          "window.CMS_PREVIEW_PAYLOAD = " + payloadJson + ";",
+          "<\/script>",
+          '<script src="' + escapeHtml(previewRuntimeJs) + '"><\/script>',
+          "</body>",
+          "</html>"
+        ].join("");
+      }
+
+      function getFieldValue(field) {
+        if (!field) {
+          return "";
+        }
+        if (field.tagName === "TEXTAREA" || field.tagName === "INPUT") {
+          return field.value;
+        }
+        return "";
+      }
+
+      function collectRepeaterItems(container) {
+        return Array.from(container.querySelectorAll("[data-cms-repeater-item]")).map(function (item) {
+          const row = {};
+          item.querySelectorAll("[data-cms-item-field]").forEach(function (field) {
+            row[field.dataset.cmsItemField] = getFieldValue(field);
+          });
+          return row;
+        });
+      }
+
+      function serializePayload() {
+        const payload = {};
+        if (!editorForm) {
+          return payload;
+        }
+
+        editorForm.querySelectorAll("[data-cms-field]").forEach(function (field) {
+          payload[field.dataset.cmsField] = getFieldValue(field);
+        });
+
+        editorForm.querySelectorAll("[data-cms-repeater]").forEach(function (container) {
+          payload[container.dataset.cmsRepeater] = collectRepeaterItems(container);
+        });
+
+        return payload;
+      }
+
+      function schedulePreviewUpdate() {
+        if (!previewFrame || !selectedPageKey) {
+          return;
+        }
+        window.clearTimeout(previewTimer);
+        previewTimer = window.setTimeout(function () {
+          const payload = serializePayload();
+          if (payloadInput) {
+            payloadInput.value = JSON.stringify(payload);
+          }
+          previewFrame.srcdoc = buildPreviewDocument(selectedPageKey, payload);
+        }, 180);
+      }
+
+      function applyToolbarTooltips() {
+        const tooltips = [
+          [".note-btn[data-event='fontname']", "Font Style"],
+          [".note-btn[data-event='fontsize']", "Font Size"],
+          [".note-btn[data-event='color']", "Text Color"],
+          [".note-btn[data-event='bold']", "Bold"],
+          [".note-btn[data-event='italic']", "Italic"],
+          [".note-btn[data-event='underline']", "Underline"],
+          [".note-btn[data-event='strikethrough']", "Strikethrough"],
+          [".note-btn[data-event='ul']", "Bullet List"],
+          [".note-btn[data-event='ol']", "Numbered List"],
+          [".note-btn[data-event='justifyLeft']", "Align Left"],
+          [".note-btn[data-event='justifyCenter']", "Align Center"],
+          [".note-btn[data-event='justifyRight']", "Align Right"],
+          [".note-btn[data-event='justifyFull']", "Justify"],
+          [".note-btn[data-event='link']", "Insert Link"],
+          [".note-btn[data-event='picture']", "Insert Image"],
+          [".note-btn[data-event='removeFormat']", "Clear Formatting"]
+        ];
+
+        tooltips.forEach(function (entry) {
+          document.querySelectorAll(".note-toolbar " + entry[0]).forEach(function (el) {
+            el.setAttribute("title", entry[1]);
+            el.setAttribute("aria-label", entry[1]);
+          });
+        });
+      }
+
+      async function uploadEditorImage(file) {
+        const formData = new FormData();
+        formData.append("image", file);
+
+        const response = await fetch("../../PhpFiles/Admin-End/uploadAnnouncementEditorImage.php", {
+          method: "POST",
+          body: formData
+        });
+        const payload = await response.json();
+        const imageUrl = payload.url || payload.location || "";
+        if (!response.ok || (!payload.success && !imageUrl) || !imageUrl) {
+          throw new Error(payload.message || "Image upload failed.");
+        }
+        return imageUrl;
+      }
+
+      function initEditor(host) {
+        if (!host || host.dataset.initialized === "true") {
+          return;
+        }
+
+        const hiddenInput = host.nextElementSibling;
+        if (!hiddenInput) {
+          return;
+        }
+
+        const editorInstance = window.jQuery ? window.jQuery(host) : null;
+        if (!editorInstance || typeof editorInstance.summernote !== "function") {
+          return;
+        }
+
+        const placeholder = host.dataset.placeholder || "Write here...";
+        const editorHeight = Number(host.dataset.editorHeight || 240);
+        const initialHtml = host.dataset.initialHtml || hiddenInput.value || "";
+        const fullToolbar = [
+          ["style", ["style"]],
+          ["font", ["bold", "italic", "underline", "clear"]],
+          ["fontname", ["fontname"]],
+          ["fontsize", ["fontsize"]],
+          ["color", ["color"]],
+          ["para", ["ul", "ol", "paragraph"]],
+          ["height", ["height"]],
+          ["insert", ["link", "picture"]],
+          ["view", ["codeview"]]
+        ];
+
+        editorInstance.summernote({
+          placeholder: placeholder,
+          height: editorHeight,
+          minHeight: Math.max(160, editorHeight - 20),
+          dialogsInBody: true,
+          toolbar: fullToolbar,
+          callbacks: {
+            onInit: function () {
+              editorInstance.summernote("code", initialHtml);
+              hiddenInput.value = editorInstance.summernote("code");
+              schedulePreviewUpdate();
+            },
+            onChange: function (contents) {
+              hiddenInput.value = contents;
+              schedulePreviewUpdate();
+            },
+            onImageUpload: async function (files) {
+              for (const file of files) {
+                if (!file) {
+                  continue;
+                }
+                if (file.size > MAX_IMAGE_SIZE_BYTES) {
+                  window.alert("Image must be 25MB or less.");
+                  continue;
+                }
+                try {
+                  const imageUrl = await uploadEditorImage(file);
+                  editorInstance.summernote("insertImage", imageUrl);
+                } catch (error) {
+                  window.alert(error.message || "Unable to upload image.");
+                }
+              }
+              hiddenInput.value = editorInstance.summernote("code");
+              schedulePreviewUpdate();
+            }
+          }
+        });
+
+        host.dataset.initialized = "true";
+        applyToolbarTooltips();
+      }
+
+      function initEditors(root) {
+        (root || document).querySelectorAll("[data-cms-editor-host]").forEach(initEditor);
+      }
+
+      function updateImagePreview(picker, value) {
+        if (!picker) {
+          return;
+        }
+        const previewImage = picker.querySelector("[data-cms-image-preview]");
+        const placeholder = picker.querySelector("[data-cms-image-placeholder]");
+        const hiddenInput = picker.querySelector("[data-cms-field], [data-cms-item-field]");
+        if (hiddenInput) {
+          hiddenInput.value = value || "";
+        }
+
+        if (previewImage && value) {
+          previewImage.src = value;
+          previewImage.classList.remove("d-none");
+        }
+        if (placeholder) {
+          placeholder.classList.toggle("d-none", !!value);
+        }
+        schedulePreviewUpdate();
+      }
+
+      function clampCropTranslation() {
+        if (!cropSourceImage || !cropFrameEl) {
+          return;
+        }
+
+        const frameRect = cropFrameEl.getBoundingClientRect();
+        if (!frameRect.width || !frameRect.height) {
+          return;
+        }
+
+        const scale = cropState.baseScale * cropState.zoom;
+        const displayWidth = cropSourceImage.naturalWidth * scale;
+        const displayHeight = cropSourceImage.naturalHeight * scale;
+        const minX = Math.min(0, frameRect.width - displayWidth);
+        const minY = Math.min(0, frameRect.height - displayHeight);
+
+        cropState.translateX = Math.max(minX, Math.min(0, cropState.translateX));
+        cropState.translateY = Math.max(minY, Math.min(0, cropState.translateY));
+      }
+
+      function applyCropTransform() {
+        if (!cropSourceImage || !cropFrameEl || !cropImageEl) {
+          return;
+        }
+
+        clampCropTranslation();
+        const scale = cropState.baseScale * cropState.zoom;
+        cropImageEl.style.width = (cropSourceImage.naturalWidth * scale) + "px";
+        cropImageEl.style.height = (cropSourceImage.naturalHeight * scale) + "px";
+        cropImageEl.style.transform = "translate(" + cropState.translateX + "px, " + cropState.translateY + "px)";
+      }
+
+      function initCropFrameFromImage() {
+        if (!cropSourceImage || !cropFrameEl) {
+          return;
+        }
+
+        const frameRect = cropFrameEl.getBoundingClientRect();
+        if (!frameRect.width || !frameRect.height) {
+          return;
+        }
+
+        cropState.baseScale = Math.max(
+          frameRect.width / cropSourceImage.naturalWidth,
+          frameRect.height / cropSourceImage.naturalHeight
+        );
+        cropState.zoom = 1;
+        cropState.translateX = (frameRect.width - (cropSourceImage.naturalWidth * cropState.baseScale)) / 2;
+        cropState.translateY = (frameRect.height - (cropSourceImage.naturalHeight * cropState.baseScale)) / 2;
+        if (cropZoomEl) {
+          cropZoomEl.value = "1";
+        }
+        applyCropTransform();
+      }
+
+      function openCropModalForPicker(picker, file) {
+        if (!cropModal || !picker || !file) {
+          return;
+        }
+        if (file.size > MAX_IMAGE_SIZE_BYTES) {
+          window.alert("Image must be 25MB or less.");
+          return;
+        }
+
+        const reader = new FileReader();
+        reader.onload = function (event) {
+          const result = String(event.target && event.target.result ? event.target.result : "");
+          if (!result) {
+            window.alert("Unable to read the selected image.");
+            return;
+          }
+
+          const image = new Image();
+          image.onload = function () {
+            cropTargetPicker = picker;
+            cropSourceImage = image;
+            cropState.ratioWidth = Number(picker.dataset.ratioWidth || 1);
+            cropState.ratioHeight = Number(picker.dataset.ratioHeight || 1);
+            cropImageEl.src = result;
+            cropFrameEl.style.aspectRatio = cropState.ratioWidth + " / " + cropState.ratioHeight;
+            if (cropRatioLabelEl) {
+              cropRatioLabelEl.textContent = cropState.ratioWidth + ":" + cropState.ratioHeight;
+            }
+            cropModal.show();
+          };
+          image.src = result;
+        };
+        reader.readAsDataURL(file);
+      }
+
+      function buildCropCanvas() {
+        if (!cropSourceImage || !cropFrameEl) {
+          return null;
+        }
+
+        const scale = cropState.baseScale * cropState.zoom;
+        if (!scale) {
+          return null;
+        }
+
+        const frameRect = cropFrameEl.getBoundingClientRect();
+        const outputMaxSide = 1800;
+        const ratioScale = outputMaxSide / Math.max(cropState.ratioWidth, cropState.ratioHeight);
+        const canvasWidth = Math.max(1, Math.round(cropState.ratioWidth * ratioScale));
+        const canvasHeight = Math.max(1, Math.round(cropState.ratioHeight * ratioScale));
+        const canvas = document.createElement("canvas");
+        canvas.width = canvasWidth;
+        canvas.height = canvasHeight;
+        const context = canvas.getContext("2d");
+        if (!context) {
+          return null;
+        }
+
+        const sourceX = Math.max(0, (-cropState.translateX) / scale);
+        const sourceY = Math.max(0, (-cropState.translateY) / scale);
+        const sourceWidth = Math.min(cropSourceImage.naturalWidth, frameRect.width / scale);
+        const sourceHeight = Math.min(cropSourceImage.naturalHeight, frameRect.height / scale);
+
+        context.drawImage(
+          cropSourceImage,
+          sourceX,
+          sourceY,
+          sourceWidth,
+          sourceHeight,
+          0,
+          0,
+          canvas.width,
+          canvas.height
+        );
+
+        return canvas;
+      }
+
+      if (cropModalEl) {
+        cropModalEl.addEventListener("shown.bs.modal", function () {
+          window.requestAnimationFrame(initCropFrameFromImage);
+        });
+      }
+
+      if (cropZoomEl) {
+        cropZoomEl.addEventListener("input", function () {
+          cropState.zoom = Number(cropZoomEl.value || 1);
+          applyCropTransform();
+        });
+      }
+
+      if (cropFrameEl) {
+        const onPointerMove = function (event) {
+          if (!cropState.dragActive) {
+            return;
+          }
+          cropState.translateX = cropState.dragOriginX + (event.clientX - cropState.dragStartX);
+          cropState.translateY = cropState.dragOriginY + (event.clientY - cropState.dragStartY);
+          applyCropTransform();
+        };
+
+        const endDrag = function () {
+          cropState.dragActive = false;
+          cropFrameEl.classList.remove("is-dragging");
+        };
+
+        cropFrameEl.addEventListener("pointerdown", function (event) {
+          if (!cropSourceImage) {
+            return;
+          }
+          cropState.dragActive = true;
+          cropState.dragStartX = event.clientX;
+          cropState.dragStartY = event.clientY;
+          cropState.dragOriginX = cropState.translateX;
+          cropState.dragOriginY = cropState.translateY;
+          cropFrameEl.classList.add("is-dragging");
+        });
+
+        window.addEventListener("pointermove", onPointerMove);
+        window.addEventListener("pointerup", endDrag);
+        window.addEventListener("pointercancel", endDrag);
+      }
+
+      if (cropSaveBtn) {
+        cropSaveBtn.addEventListener("click", function () {
+          const canvas = buildCropCanvas();
+          if (!canvas || !cropTargetPicker) {
+            window.alert("Unable to save the cropped image.");
+            return;
+          }
+
+          updateImagePreview(cropTargetPicker, canvas.toDataURL("image/png"));
+          cropModal.hide();
+        });
+      }
+
+      document.addEventListener("change", function (event) {
+        const fileInput = event.target.closest("[data-cms-image-input]");
+        if (!fileInput) {
+          return;
+        }
+        const picker = fileInput.closest("[data-cms-image-picker]");
+        const file = fileInput.files && fileInput.files[0] ? fileInput.files[0] : null;
+        if (picker && file) {
+          openCropModalForPicker(picker, file);
+        }
+        fileInput.value = "";
+      });
+
+      document.addEventListener("click", function (event) {
+        const imageButton = event.target.closest("[data-cms-image-select]");
+        if (imageButton) {
+          const picker = imageButton.closest("[data-cms-image-picker]");
+          const input = picker ? picker.querySelector("[data-cms-image-input]") : null;
+          if (input) {
+            input.click();
+          }
+          return;
+        }
+
+        const addButton = event.target.closest("[data-cms-repeater-add-target]");
+        if (addButton) {
+          const targetId = addButton.dataset.cmsRepeaterAddTarget;
+          const target = targetId ? document.getElementById(targetId) : null;
+          const template = document.getElementById("cms-template-" + targetId);
+          if (target && template) {
+            target.insertAdjacentHTML("beforeend", template.innerHTML);
+            initEditors(target);
+            schedulePreviewUpdate();
+          }
+          return;
+        }
+
+        const removeButton = event.target.closest("[data-cms-repeater-remove]");
+        if (removeButton) {
+          const item = removeButton.closest("[data-cms-repeater-item]");
+          const container = item ? item.parentElement : null;
+          if (!item || !container) {
+            return;
+          }
+          if (container.querySelectorAll("[data-cms-repeater-item]").length <= 1) {
+            window.alert("At least one item needs to stay in this section.");
+            return;
+          }
+          item.remove();
+          schedulePreviewUpdate();
+          return;
+        }
+
+        const submitButton = event.target.closest("[data-submit-action]");
+        if (submitButton && editorForm && actionInput) {
+          const confirmMessage = submitButton.dataset.confirm || "Continue with this action?";
+          if (!window.confirm(confirmMessage)) {
+            return;
+          }
+          actionInput.value = submitButton.dataset.submitAction || "save_draft";
+          if (payloadInput) {
+            payloadInput.value = JSON.stringify(serializePayload());
+          }
+          editorForm.submit();
+          return;
+        }
+      });
+
+      document.addEventListener("input", function (event) {
+        if (event.target.matches("[data-cms-field], [data-cms-item-field]")) {
+          schedulePreviewUpdate();
+        }
+      });
+
+      document.querySelectorAll("form[data-confirm]").forEach(function (form) {
+        form.addEventListener("submit", function (event) {
+          const confirmMessage = form.dataset.confirm || "Continue with this action?";
+          if (!window.confirm(confirmMessage)) {
+            event.preventDefault();
+          }
+        });
+      });
+
+      initEditors(document);
+      schedulePreviewUpdate();
+    })();
+  </script>
+</body>
+</html>

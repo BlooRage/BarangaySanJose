@@ -139,6 +139,7 @@ function dr_ensure_document_request_extensions(mysqli $conn): void {
         "document_validity DATETIME DEFAULT NULL AFTER release_timestamp",
         "qr_code_path VARCHAR(255) DEFAULT NULL AFTER document_validity",
         "issued_file_path VARCHAR(255) DEFAULT NULL AFTER qr_code_path",
+        "invoice_file_path VARCHAR(255) DEFAULT NULL AFTER issued_file_path",
     ];
 
     foreach ($columnsToEnsure as $definition) {
@@ -363,6 +364,7 @@ function dr_ensure_table(mysqli $conn): void {
             document_validity DATETIME DEFAULT NULL,
             qr_code_path VARCHAR(255) DEFAULT NULL,
             issued_file_path VARCHAR(255) DEFAULT NULL,
+            invoice_file_path VARCHAR(255) DEFAULT NULL,
             INDEX idx_docreq_resident_user (resident_user_id),
             INDEX idx_docreq_attachment_id (attachment_id),
             INDEX idx_docreq_status_request (status_id_request)
@@ -387,6 +389,7 @@ function dr_ensure_table(mysqli $conn): void {
         "document_validity DATETIME DEFAULT NULL AFTER release_timestamp",
         "qr_code_path VARCHAR(255) DEFAULT NULL AFTER document_validity",
         "issued_file_path VARCHAR(255) DEFAULT NULL AFTER qr_code_path",
+        "invoice_file_path VARCHAR(255) DEFAULT NULL AFTER issued_file_path",
     ];
 
     foreach ($columnsToEnsure as $definition) {
@@ -1417,6 +1420,7 @@ function dr_update_stage(mysqli $conn, string $requestId, string $stage, array $
     $allowedColumns = [
         'status_remarks',
         'issued_file_path',
+        'invoice_file_path',
         'qr_code_path',
         'personnel_user_id',
         'personnel_decision_at',

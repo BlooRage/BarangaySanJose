@@ -53,7 +53,7 @@ $positionsByRole = [
         'Area OIC',
     ],
 ];
-$areaRequiredPositions = ['Barangay Secretary', 'Barangay Police', 'Desk Officer', 'Area OIC'];
+$areaRequiredPositions = ['Barangay Police', 'Desk Officer', 'Area OIC'];
 $employmentStatusOptions = [
     'Regular',
     'Full-Time',
@@ -64,6 +64,7 @@ $employmentStatusOptions = [
     'Contract/Fixed-term',
     'Probationary',
 ];
+$personnelPositionAccessOptions = $positionsByRole['Personnel'];
 $empRes = $conn->prepare("
     SELECT DISTINCT status_name
     FROM statuslookuptbl
@@ -84,6 +85,10 @@ if ($empRes) {
     $empRes->close();
 }
 sort($employmentStatusOptions);
+$personnelEmploymentStatusOptions = array_values(array_filter(
+    $employmentStatusOptions,
+    static fn (string $status): bool => strcasecmp(trim($status), 'Regular Government Officials') !== 0
+));
 $deptRes = $conn->query("
     SELECT DISTINCT department
     FROM officialinformationtbl
@@ -205,21 +210,21 @@ function send_invite_email(array $invite, string $rawToken): bool {
         . ' '
         . (string)($invite['lastname'] ?? '')
     );
-    $role = (string)($invite['role_access'] ?? 'Official');
+    $role = (string)($invite['role_access'] ?? 'Personnel');
 
     return $sender->send([
         'type' => 'onboarding_access',
         'to' => (string)$invite['invite_email'],
-        'subject' => 'Barangay San Jose Official Account Invite',
+        'subject' => 'Barangay San Jose Personnel Account Invite',
         'data' => [
-            'headline' => 'Official Account Onboarding Access',
-            'recipientName' => $fullName !== '' ? $fullName : 'Official',
+            'headline' => 'Personnel Account Onboarding Access',
+            'recipientName' => $fullName !== '' ? $fullName : 'Personnel',
             'roleName' => $role,
             'actionUrl' => $link,
             'buttonText' => 'START ONBOARDING',
             'expiresNote' => 'This invite link expires in 48 hours.',
         ],
-        'bodyText' => "You were invited to onboard your Barangay San Jose account as {$role}.\nSTRICTLY ONE-TIME ACCESS.\nOpen: {$link}",
+        'bodyText' => "You were invited to onboard your Barangay San Jose personnel account as {$role}.\nSTRICTLY ONE-TIME ACCESS.\nOpen: {$link}",
     ]);
 }
 
@@ -269,15 +274,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $suffix = trim((string)($_POST['suffix'] ?? ''));
         $email = strtolower(trim((string)($_POST['email'] ?? '')));
         $phone10 = oi_normalize_phone10((string)($_POST['phone_number'] ?? ''));
-        $roleAccess = trim((string)($_POST['role_access'] ?? ''));
+        $roleAccess = 'Personnel';
         $positionAccess = trim((string)($_POST['position_access'] ?? ''));
         $department = trim((string)($_POST['department'] ?? ''));
         $employmentStatus = trim((string)($_POST['employment_status'] ?? ''));
         $areaNumber = trim((string)($_POST['area_number'] ?? ''));
         $actorPassword = (string)($_POST['actor_password'] ?? '');
 
-        if ($lastName === '' || $firstName === '' || $email === '' || $roleAccess === '' || $department === '' || $employmentStatus === '') {
-            set_invite_flash('danger', 'Last name, first name, email, role, department, and employment status are required.');
+        if ($lastName === '' || $firstName === '' || $email === '' || $department === '' || $employmentStatus === '') {
+            set_invite_flash('danger', 'Last name, first name, email, department, and employment status are required.');
             redirect_self();
         }
         if (!preg_match('/^[A-Za-z][A-Za-z .\'-]{0,99}$/', $lastName) || !preg_match('/^[A-Za-z][A-Za-z .\'-]{0,99}$/', $firstName)) {
@@ -300,16 +305,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             set_invite_flash('danger', 'Invalid mobile number. Use 9XXXXXXXXX.');
             redirect_self();
         }
-        if ($roleAccess === 'Officials') {
-            $roleAccess = 'Official';
-        } elseif ($roleAccess === 'Personnels') {
-            $roleAccess = 'Personnel';
-        }
-        if (!in_array($roleAccess, ['Official', 'Personnel', 'SuperAdmin'], true)) {
-            set_invite_flash('danger', 'Role must be Official, Personnel, or SuperAdmin.');
-            redirect_self();
-        }
-        if (!in_array($positionAccess, $positionAccessOptions, true)) {
+        if (!in_array($positionAccess, $personnelPositionAccessOptions, true)) {
             set_invite_flash('danger', 'Please select a valid position access.');
             redirect_self();
         }
@@ -322,15 +318,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             set_invite_flash('danger', "Selected position access is not allowed for {$roleAccess}.");
             redirect_self();
         }
-        if (in_array($roleAccess, ['SuperAdmin', 'Official'], true)) {
-            $department = 'Office of the Barangay';
-        }
         if (!in_array($department, $departmentOptions, true)) {
             set_invite_flash('danger', 'Please select a valid department.');
-            redirect_self();
-        }
-        if (($roleAccess === 'SuperAdmin' || $roleAccess === 'Official') && $department !== 'Office of the Barangay') {
-            set_invite_flash('danger', 'Department must be Office of the Barangay for this role.');
             redirect_self();
         }
 
@@ -345,12 +334,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if (!$needsArea && $areaNumber === '' && $department === 'Office of the Barangay') {
             $areaNumber = 'Barangay Wide';
         }
-        if (in_array($roleAccess, ['Official', 'Personnel'], true) && $positionAccess === '') {
-            set_invite_flash('danger', 'Position access is required for Official and Personnel.');
+        if ($positionAccess === '') {
+            set_invite_flash('danger', 'Position access is required for Personnel.');
             redirect_self();
-        }
-        if ($roleAccess === 'SuperAdmin' && $positionAccess === '') {
-            $positionAccess = 'System Administrator';
         }
 
         verify_sender_password_for_invite_or_fail($conn, $actorUserId, $actorPassword);
@@ -428,14 +414,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         $invite = fetch_invite_by_id($conn, $inviteId);
         $emailSent = $invite ? send_invite_email($invite, $token['raw']) : false;
-        $smsSent = sendSMS('0' . $phone10, 'Barangay San Jose: You were invited as an official account. Please check your email for your account invite link.');
+        $smsSent = sendSMS('0' . $phone10, 'Barangay San Jose: You were invited as a personnel account. Please check your email for your account invite link.');
 
         insertUnifiedAuditLog(
             $conn,
             $actorUserId,
             $actorRole,
-            'Official Invites',
-            'OfficialInvite',
+            'Personnel Management',
+            'PersonnelInvite',
             (string)$inviteId,
             'OFFICIAL_INVITE_CREATE',
             'invite_email',
@@ -524,6 +510,7 @@ $rows = [];
 $q = $conn->query("
     SELECT invite_id, invite_code, invite_email, invite_phone, firstname, middlename, lastname, suffix, role_access, position_access, department, employment_status, area_number, status, onboarding_step, expires_at, created_at, updated_at
     FROM officialinvitetbl
+    WHERE LOWER(TRIM(role_access)) IN ('personnel', 'personnels')
     ORDER BY invite_id DESC
     LIMIT 100
 ");
@@ -575,7 +562,7 @@ function oi_status_pill_class(string $value, string $type = 'generic'): string {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Official Invites</title>
+    <title>Personnel Invite</title>
     <script src="https://kit.fontawesome.com/3482e00999.js" crossorigin="anonymous"></script>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css">
     <link rel="stylesheet" href="../CSS-Styles/Admin-End-CSS/AdminDashboardStyle.css">
@@ -645,7 +632,7 @@ function oi_status_pill_class(string $value, string $type = 'generic'): string {
 
     <main id="main-display" class="flex-grow-1 p-3 p-md-4 p-xl-5 bg-light">
         <h2 class="mb-4" style="font-family: 'Charis SIL Bold'; color: #DE710C; ">
-            Official Invites
+            Personnel Invite
         </h2>
         <hr>
         <br>
@@ -666,12 +653,13 @@ function oi_status_pill_class(string $value, string $type = 'generic'): string {
         <div class="card shadow-sm mb-4 invite-form-shell">
             <div class="card-body">
                 <div class="invite-form-header">
-                    <h5 class="card-title mb-1">Send Invite</h5>
-                    <div class="invite-help">Create official/personnel/superadmin access by entering identity and work assignment details.</div>
+                    <h5 class="card-title mb-1">Send Personnel Invite</h5>
+                    <div class="invite-help">Create personnel access by entering identity and work assignment details.</div>
                 </div>
                 <form method="post" id="createInviteForm">
                     <input type="hidden" name="action" value="create_invite">
                     <input type="hidden" name="actor_password" id="inviteActorPasswordHidden" value="">
+                    <input type="hidden" name="role_access" value="Personnel">
                     <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($csrfToken, ENT_QUOTES, 'UTF-8') ?>">
                     <p class="small text-muted mb-3"><span class="invite-required">*</span> Required fields</p>
 
@@ -727,23 +715,19 @@ function oi_status_pill_class(string $value, string $type = 'generic'): string {
                         <div class="invite-section-title">Access Assignment</div>
                         <div class="row g-3">
                             <div class="col-md-6">
-                                <label class="form-label">Role <span class="invite-required">*</span></label>
-                                <select class="form-select" name="role_access" id="roleAccessSelect" required>
-                                    <option value="" selected disabled>Select Role</option>
-                                    <option value="Official">Official</option>
-                                    <option value="Personnel">Personnel</option>
-                                    <option value="SuperAdmin">SuperAdmin</option>
-                                </select>
+                                <label class="form-label">Role</label>
+                                <input class="form-control" value="Personnel" readonly>
+                                <div class="invite-help">Personnel Invite can create personnel accounts only.</div>
                             </div>
                             <div class="col-md-6">
                                 <label class="form-label">Position Access <span class="invite-required">*</span></label>
                                 <select class="form-select" name="position_access" id="positionAccessSelect" required>
                                     <option value="">Select Position Access</option>
-                                    <?php foreach ($positionAccessOptions as $position): ?>
+                                    <?php foreach ($personnelPositionAccessOptions as $position): ?>
                                         <option value="<?= htmlspecialchars((string)$position, ENT_QUOTES, 'UTF-8') ?>"><?= htmlspecialchars((string)$position, ENT_QUOTES, 'UTF-8') ?></option>
                                     <?php endforeach; ?>
                                 </select>
-                                <div class="invite-help">Required for Official and Personnel roles.</div>
+                                <div class="invite-help">Required for Personnel accounts.</div>
                             </div>
                             <div class="col-md-6">
                                 <label class="form-label">Department <span class="invite-required">*</span></label>
@@ -753,13 +737,13 @@ function oi_status_pill_class(string $value, string $type = 'generic'): string {
                                         <option value="<?= htmlspecialchars((string)$dept, ENT_QUOTES, 'UTF-8') ?>"><?= htmlspecialchars((string)$dept, ENT_QUOTES, 'UTF-8') ?></option>
                                     <?php endforeach; ?>
                                 </select>
-                                <div class="invite-help" id="departmentHelp">For Office of the Barangay, coverage is the whole Barangay San Jose.</div>
+                                <div class="invite-help" id="departmentHelp">Assign the personnel account to the department where this person will work.</div>
                             </div>
                             <div class="col-md-6">
                                 <label class="form-label">Employment Status <span class="invite-required">*</span></label>
                                 <select class="form-select" name="employment_status" required>
                                     <option value="">Select Employment Status</option>
-                                    <?php foreach ($employmentStatusOptions as $emp): ?>
+                                    <?php foreach ($personnelEmploymentStatusOptions as $emp): ?>
                                         <option value="<?= htmlspecialchars((string)$emp, ENT_QUOTES, 'UTF-8') ?>"><?= htmlspecialchars((string)$emp, ENT_QUOTES, 'UTF-8') ?></option>
                                     <?php endforeach; ?>
                                 </select>
@@ -772,14 +756,14 @@ function oi_status_pill_class(string $value, string $type = 'generic'): string {
                                         <option value="<?= htmlspecialchars((string)$area, ENT_QUOTES, 'UTF-8') ?>"><?= htmlspecialchars((string)$area, ENT_QUOTES, 'UTF-8') ?></option>
                                     <?php endforeach; ?>
                                 </select>
-                                <div class="invite-help">Required for area-scoped positions (e.g., Barangay Secretary, Barangay Police, Desk Officer, Area OIC).</div>
+                                <div class="invite-help">Required for area-scoped personnel positions (e.g., Barangay Police, Desk Officer, Area OIC).</div>
                             </div>
                         </div>
                     </div>
 
                     <div class="invite-submit-row">
                         <div class="invite-submit-note">An email invite and SMS notification will be sent after submit.</div>
-                        <button type="button" class="btn btn-primary px-4" id="openInviteAuthorizationModal">Send Invite</button>
+                        <button type="button" class="btn btn-primary px-4" id="openInviteAuthorizationModal">Send Personnel Invite</button>
                     </div>
                 </form>
             </div>
@@ -787,8 +771,8 @@ function oi_status_pill_class(string $value, string $type = 'generic'): string {
 
         <div id="div-tableContainer" class="shadow-sm mb-4 p-4 invite-history-shell resident-masterlist-shell">
             <div class="invite-form-header">
-                <h5 class="card-title mb-1">Recent Invites</h5>
-                <div class="invite-help">Latest 100 invite records with onboarding state and remaining actions.</div>
+                <h5 class="card-title mb-1">Recent Personnel Invites</h5>
+                <div class="invite-help">Latest 100 personnel invite records with onboarding state and remaining actions.</div>
             </div>
                 <div class="table-responsive compact-admin-table-shell">
                     <table class="table table-sm align-middle mb-0 invite-history-table compact-admin-table compact-admin-table--wide">
@@ -931,64 +915,15 @@ function oi_status_pill_class(string $value, string $type = 'generic'): string {
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 <script>
   (function () {
-    const roleSelect = document.getElementById('roleAccessSelect');
     const positionSelect = document.getElementById('positionAccessSelect');
     const departmentSelect = document.getElementById('departmentSelect');
     const departmentHelp = document.getElementById('departmentHelp');
     const areaGroup = document.getElementById('areaNumberGroup');
     const areaSelect = document.getElementById('areaNumberSelect');
-    if (!roleSelect || !positionSelect || !departmentSelect || !areaGroup || !areaSelect) return;
+    if (!positionSelect || !departmentSelect || !departmentHelp || !areaGroup || !areaSelect) return;
 
-    const positionsByRole = {
-      SuperAdmin: ['IT Administrator', 'Barangay Chairman'],
-      Official: ['Barangay Official', 'Barangay Secretary'],
-      Personnel: ['Department Public Assistance Desk', 'Department Secretary', 'Department OIC (Officer In Charge)', 'Barangay Police', 'Desk Officer', 'Area OIC']
-    };
-    const areaRequiredPositions = new Set(['Barangay Secretary', 'Barangay Police', 'Desk Officer', 'Area OIC']);
-    const departmentOptions = <?=
-      json_encode(array_values($departmentOptions), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES)
-    ?>;
-
-    const refillOptions = function (selectEl, values, placeholder) {
-      const current = selectEl.value;
-      selectEl.innerHTML = '';
-      const head = document.createElement('option');
-      head.value = '';
-      head.textContent = placeholder;
-      selectEl.appendChild(head);
-      values.forEach(function (v) {
-        const opt = document.createElement('option');
-        opt.value = v;
-        opt.textContent = v;
-        if (v === current) opt.selected = true;
-        selectEl.appendChild(opt);
-      });
-      if (Array.from(selectEl.options).some(o => o.value === current)) {
-        selectEl.value = current;
-      } else {
-        selectEl.value = '';
-      }
-    };
-
-    const syncRoleConditions = function () {
-      const role = roleSelect.value;
-      const positions = positionsByRole[role] || [];
-      refillOptions(positionSelect, positions, 'Select Position Access');
-
-      if (role === 'SuperAdmin' || role === 'Official') {
-        departmentSelect.innerHTML = '';
-        const only = document.createElement('option');
-        only.value = 'Office of the Barangay';
-        only.textContent = 'Office of the Barangay';
-        departmentSelect.appendChild(only);
-        departmentSelect.value = 'Office of the Barangay';
-        departmentHelp.textContent = 'Coverage: whole Barangay San Jose.';
-      } else {
-        refillOptions(departmentSelect, departmentOptions, 'Select Department');
-        departmentHelp.textContent = 'For Office of the Barangay, coverage is the whole Barangay San Jose.';
-      }
-      syncAreaRequirement();
-    };
+    const areaRequiredPositions = new Set(['Barangay Police', 'Desk Officer', 'Area OIC']);
+    departmentHelp.textContent = 'Assign the personnel account to the department where this person will work.';
 
     const syncAreaRequirement = function () {
       const position = positionSelect.value;
@@ -998,16 +933,12 @@ function oi_status_pill_class(string $value, string $type = 'generic'): string {
         needsArea = true;
       }
       areaSelect.required = needsArea;
-      if (!needsArea && areaSelect.value === '' && department === 'Office of the Barangay') {
-        areaSelect.value = 'Barangay Wide';
-      }
+      areaGroup.style.display = needsArea ? '' : 'none';
     };
 
-    roleSelect.addEventListener('change', syncRoleConditions);
-    syncAreaRequirement();
     positionSelect.addEventListener('change', syncAreaRequirement);
     departmentSelect.addEventListener('change', syncAreaRequirement);
-    syncRoleConditions();
+    syncAreaRequirement();
   })();
 
   (function () {
@@ -1025,7 +956,7 @@ function oi_status_pill_class(string $value, string $type = 'generic'): string {
     const suffix = form ? form.querySelector('select[name="suffix"]') : null;
     const email = form ? form.querySelector('input[name="email"]') : null;
     const phone = form ? form.querySelector('input[name="phone_number"]') : null;
-    const role = form ? form.querySelector('select[name="role_access"]') : null;
+    const role = form ? form.querySelector('[name="role_access"]') : null;
     const modalEl = document.getElementById('inviteAuthorizationModal');
     const sendingModalEl = document.getElementById('inviteSendingModal');
     if (!form || !openBtn || !confirmBtn || !hiddenPwd || !modalPwd || !modalEl || !summary || !precheckError || !sendingModalEl || typeof bootstrap === 'undefined') return;
@@ -1088,12 +1019,12 @@ function oi_status_pill_class(string $value, string $type = 'generic'): string {
         const emailVal = email ? email.value.trim() : '';
         const phoneVal = phone ? phone.value.trim() : '';
         const roleVal = role ? role.value.trim() : '';
-        const roleText = roleVal === 'SuperAdmin' ? 'superadmin' : (roleVal || 'selected role').toLowerCase();
+        const roleText = roleVal === 'SuperAdmin' ? 'superadmin' : (roleVal || 'Personnel').toLowerCase();
         openAuthorizationModal({
-          title: 'Confirm Invite Authorization',
+          title: 'Confirm Personnel Invite Authorization',
           summary:
             'You are about to give <strong>' + (fullName || 'this user') + '</strong> with email <strong>' + (emailVal || 'N/A') + '</strong> and phone <strong>+63' + (phoneVal || 'N/A') + '</strong> access to become a <strong>' + roleText + '</strong>.',
-          confirmText: 'Confirm & Send Invite',
+          confirmText: 'Confirm & Send Personnel Invite',
           danger: false,
           onConfirm: function (pwd) {
             hiddenPwd.value = pwd;

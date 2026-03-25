@@ -11,6 +11,12 @@ require_once __DIR__ . "/../PhpFiles/Login/redirectDestination.php";
 $appRoot = appRootPath();
 $guestBaseHref = ($appRoot === '' ? '' : $appRoot) . '/Guest-End/';
 
+$inviteToken = trim((string)($_GET['invite'] ?? ''));
+if ($inviteToken !== '') {
+  header("Location: " . appUrl('/official-onboarding?invite=' . urlencode($inviteToken)));
+  exit;
+}
+
 // Prevent redirect loops when a stale session has user_id but missing role.
 if (!empty($_SESSION['user_id']) && !empty($_SESSION['role'])) {
   header("Location: " . resolveUnifiedProfileRedirect($conn, (string)$_SESSION['user_id'], (string)$_SESSION['role']));
@@ -48,7 +54,7 @@ if (!empty($_SESSION['user_id']) && empty($_SESSION['role'])) {
     <script src="../JS-Script-Files/modalHandler.js?v=20260320-01" defer></script>
   </head>
 
-  <body>
+  <body data-cms-page="login" data-cms-endpoint="../PhpFiles/GET/getSiteContent.php" data-cms-asset-base="../">
     <div class="navbarWrapper">    <nav class="navbar navbar-expand-xl align-items-center navbar-light bg-white shadow-sm">
       <div class="container-fluid align-items-center px-4">
         <a id="navbarBrand" class="navbar-brand" href="<?= htmlspecialchars(appUrl('/'), ENT_QUOTES, 'UTF-8') ?>">
@@ -75,7 +81,7 @@ if (!empty($_SESSION['user_id']) && empty($_SESSION['role'])) {
     </nav>    </div>
 
     <main>
-      <div class="login-signup-container">
+      <div class="login-signup-container" data-cms-login-root>
         <div class="auth-image login-image" id="authImage"></div>
 
         <div class="form-wrapper">
@@ -296,6 +302,7 @@ if (!empty($_SESSION['user_id']) && empty($_SESSION['role'])) {
         </div>
       </div>
     </main>
+    <script src="../JS-Script-Files/siteContentRuntime.js" defer></script>
 
     <!-- ✅ NEW: SUCCESS MODAL (Bootstrap) -->
     <div class="modal fade" id="accountVerifiedModal" tabindex="-1" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">

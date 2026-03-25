@@ -18,7 +18,7 @@
     <link rel="stylesheet" href="../CSS-Styles/Guest-End-CSS/GuestPage.css">
     <link rel="stylesheet" href="../CSS-Styles/NavbarFooterStyle.css">
 </head>
-<body>
+<body data-cms-page="government" data-cms-endpoint="../PhpFiles/GET/getSiteContent.php" data-cms-asset-base="../">
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/js/bootstrap.bundle.min.js" integrity="sha384-FKyoEForCGlyvwx9Hj09JcYn3nv7wiPVlz7YYwJrWVcXK/BmnVDxM+D2scQbITxI" crossorigin="anonymous"></script>
     <script
         src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
@@ -66,10 +66,10 @@
     </div>
 
     <div class="banner">
-        <img src="../Images/Government_Banner.png" alt="Govt Banner" class="bannerImage">
+        <img src="../Images/Government_Banner.png" alt="Govt Banner" class="bannerImage" data-cms-government="banner-image">
         <div class="bannerText">
-            <h1>Government</h1>
-            <p>Barangay San Jose continues to serve the people with dedication, fairness, and responsibility. We deliver programs that protect safety, support needs, and keep the community together. Expect transparent, responsive service every day.
+            <h1 data-cms-government="banner-title">Government</h1>
+            <p data-cms-government="banner-message">Barangay San Jose continues to serve the people with dedication, fairness, and responsibility. We deliver programs that protect safety, support needs, and keep the community together. Expect transparent, responsive service every day.
             <p>
         </div>
     </div>
@@ -80,15 +80,17 @@
         <div class="container align-items-center">
             <div class="row align-items-center mx-5">
                 <div class="col-md-4">
-                    <img src="../Images/Officials/Hon Kap Glen_MAC8515 copy 2.jpg" alt="About" id ="kapDesign" class="img-fluid mx-auto d-block">
+                    <img src="../Images/Officials/Hon Kap Glen_MAC8515 copy 2.jpg" alt="About" id ="kapDesign" class="img-fluid mx-auto d-block" data-cms-government="punong-image">
                 </div>
                 <div class="col-md-8">
-                    <h2>Glenn S. Evangelista</h2>
-                    <h4 style="color: #000000;">Barangay Captain</h4>
+                    <h2 data-cms-government="punong-name">Glenn S. Evangelista</h2>
+                    <h4 style="color: #000000;" data-cms-government="punong-position">Barangay Captain</h4>
                     <br>
-                    <p>Welcome to the official website of Barangay San Jose. This platform represents the barangay’s commitment to embracing digital systems to improve public service delivery and strengthen community engagement. In an increasingly digital world, the use of technology allows the barangay to provide faster, more organized, and more accessible services to its residents.</p>
-                    <p>Through this website, our residents can conveniently access important information, submit requests, and stay updated on barangay announcements and activities. Digital systems help reduce paperwork, shorten processing time, and ensure that records are properly managed and secured. These improvements are essential in serving a growing community and responding efficiently to its needs.</p>
-                    <p>This initiative reflects the barangay’s dedication to transparency, efficiency, and inclusive governance. By integrating digital solutions into everyday operations, Barangay San Jose aims to make public services more accessible to everyone and to build a more connected and responsive community.<p>
+                    <div data-cms-government="punong-message">
+                        <p>Welcome to the official website of Barangay San Jose. This platform represents the barangay’s commitment to embracing digital systems to improve public service delivery and strengthen community engagement. In an increasingly digital world, the use of technology allows the barangay to provide faster, more organized, and more accessible services to its residents.</p>
+                        <p>Through this website, our residents can conveniently access important information, submit requests, and stay updated on barangay announcements and activities. Digital systems help reduce paperwork, shorten processing time, and ensure that records are properly managed and secured. These improvements are essential in serving a growing community and responding efficiently to its needs.</p>
+                        <p>This initiative reflects the barangay’s dedication to transparency, efficiency, and inclusive governance. By integrating digital solutions into everyday operations, Barangay San Jose aims to make public services more accessible to everyone and to build a more connected and responsive community.</p>
+                    </div>
                 </div>
             </div>
         </div>
@@ -98,7 +100,7 @@
 
     <section class="brgyOfficialSection">
         <div class="container text-center">
-            <div class="row row-cols-1 row-cols-sm-2 row-cols-lg-3 g-3">
+            <div class="row row-cols-1 row-cols-sm-2 row-cols-lg-3 g-3" data-cms-government-list="officials">
                 <div class="col">
                     <div class="p-3">
                         <figure class="figure">
@@ -214,7 +216,7 @@
                     Loading boundary from OpenStreetMap…
                 </div>
             </div>
-            <div class="row row-cols-1 row-cols-sm-2 row-cols-lg-3 g-3 text-start vicinityGrid">
+            <div class="row row-cols-1 row-cols-sm-2 row-cols-lg-3 g-3 text-start vicinityGrid" data-cms-government-list="areas">
                 <div class="col">
                     <div class="p-4 deptBox vicinityCard">
                         <h3>Area 01</h3>
@@ -295,6 +297,7 @@
 
     
     
+    <script src="../JS-Script-Files/siteContentRuntime.js" defer></script>
     <script>
         let topBtn = document.getElementById("goToTop");
         
@@ -415,7 +418,6 @@
         });
     </script></body>
 </html>
-
 
 
 

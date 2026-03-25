@@ -2208,6 +2208,48 @@ if ($action === 'view_issued') {
     exit;
 }
 
+if ($action === 'download_invoice') {
+    $requestId = trim((string)($_GET['request_id'] ?? ''));
+    if ($requestId === '') {
+        http_response_code(422);
+        exit('Missing request ID.');
+    }
+
+    $row = dr_fetch_request($conn, $requestId);
+    if (!$row || (string)$row['resident_user_id'] !== $residentForeignId) {
+        http_response_code(404);
+        exit('Request not found.');
+    }
+
+    $invoicePublicPath = trim((string)($row['invoice_file_path'] ?? ''));
+    if ($invoicePublicPath === '') {
+        http_response_code(404);
+        exit('Invoice not available for this request.');
+    }
+
+    $baseDir = realpath(__DIR__ . '/../../');
+    if ($baseDir === false) {
+        http_response_code(500);
+        exit('Path resolution failed.');
+    }
+
+    $relative = '/' . ltrim(dr_strip_legacy_base($invoicePublicPath), '/');
+    $absolute = realpath($baseDir . $relative);
+
+    if ($absolute === false || !is_file($absolute) || strpos($absolute, $baseDir . '/UnifiedFileAttachment/') !== 0) {
+        http_response_code(404);
+        exit('Invoice file not found.');
+    }
+
+    $safeId   = preg_replace('/[^A-Za-z0-9_-]/', '', $requestId);
+    $filename = 'Invoice_' . $safeId . '.pdf';
+    header('Content-Type: application/pdf');
+    header('Content-Disposition: attachment; filename="' . $filename . '"');
+    header('Content-Length: ' . filesize($absolute));
+    readfile($absolute);
+    exit;
+}
+
 if ($action === 'view_payment_proof') {
     $requestId = trim((string)($_GET['request_id'] ?? ''));
     if ($requestId === '') {

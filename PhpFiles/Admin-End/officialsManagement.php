@@ -24,6 +24,57 @@ function rowDisplayRole(string $role): string {
     return amp_storage_role_to_display_role($role);
 }
 
+function requestedManagementMode(string $rawMode): string {
+    $mode = strtolower(trim($rawMode));
+    return in_array($mode, ['official', 'personnel'], true) ? $mode : 'official';
+}
+
+function managementAudienceFromPosition(string $positionAccess, string $fallbackRole = ''): string {
+    $position = trim($positionAccess);
+    $role = normalizeRole($fallbackRole);
+
+    $officialPositions = ['Barangay Chairman', 'Barangay Official', 'Barangay Secretary'];
+    $personnelPositions = [
+        'Department Public Assistance Desk',
+        'Department Secretary',
+        'Department OIC (Officer In Charge)',
+        'Barangay Police',
+        'Desk Officer',
+        'Area OIC',
+        'Barangay Treasurer',
+    ];
+
+    if (strcasecmp($position, 'IT Administrator') === 0) {
+        return 'personnel';
+    }
+    if (in_array($position, $officialPositions, true)) {
+        return 'official';
+    }
+    if (in_array($position, $personnelPositions, true)) {
+        return 'personnel';
+    }
+    if ($role === 'Personnel') {
+        return 'personnel';
+    }
+    if (in_array($role, ['Official', 'SuperAdmin'], true)) {
+        return 'official';
+    }
+
+    return 'unknown';
+}
+
+function managementAudienceFromRow(array $row): string {
+    $protectedCode = amp_get_protected_code($row);
+    if ($protectedCode === 'BARANGAY_CAPTAIN') {
+        return 'official';
+    }
+
+    return managementAudienceFromPosition(
+        (string)($row['position_access'] ?? $row['position'] ?? ''),
+        (string)($row['account_role_access'] ?? $row['info_role_access'] ?? $row['role_access'] ?? '')
+    );
+}
+
 function permissionStateFromAccountStatus(string $statusName): string {
     $k = strtolower(trim($statusName));
     if (
@@ -89,7 +140,7 @@ function getStatusIdByNames(mysqli $conn, string $statusType, array $preferredNa
 function loadOfficialAccountOrFail(mysqli $conn, string $userId): array {
     $row = amp_get_official_account_by_user_id($conn, $userId);
     if (!$row) {
-        throw new Exception('Official not found.');
+        throw new Exception('Account record not found.');
     }
     return $row;
 }
@@ -97,6 +148,10 @@ function loadOfficialAccountOrFail(mysqli $conn, string $userId): array {
 function ensureActorCanModifyTarget(string $actorUserId, string $actorProtectedCode, array $targetAccount): void {
     $targetProtectedCode = amp_get_protected_code($targetAccount);
     $targetUserId = (string)($targetAccount['user_id'] ?? '');
+
+    if ($targetProtectedCode === 'BARANGAY_CAPTAIN') {
+        throw new Exception('The Barangay Captain account is managed through official transitions.');
+    }
 
     if ($targetProtectedCode === 'IT_SUPERADMIN' && $actorUserId !== $targetUserId) {
         throw new Exception('The protected IT SuperAdmin account cannot be modified by other users.');
@@ -164,9 +219,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
         }
 
         $action = trim((string)($_POST['action'] ?? ''));
+        $requestedMode = requestedManagementMode((string)($_POST['mode'] ?? 'official'));
+        $auditModuleName = $requestedMode === 'personnel' ? 'Personnel Management' : 'Officials Management';
         $officialId = trim((string)($_POST['official_id'] ?? ''));
         if ($officialId === '') {
-            throw new Exception('Invalid official record.');
+            throw new Exception('Invalid account record.');
         }
 
         $statusActiveId = getStatusIdByNames($conn, 'UserAccount', ['Active']);
@@ -194,19 +251,26 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
             WHERE oi.official_id = ?
             LIMIT 1
         ");
-        if (!$targetStmt) throw new Exception('Failed to load official account.');
+        if (!$targetStmt) throw new Exception('Failed to load account record.');
         $targetStmt->bind_param("s", $officialId);
         $targetStmt->execute();
         $target = $targetStmt->get_result()->fetch_assoc();
         $targetStmt->close();
         if (!$target) {
-            throw new Exception('Official not found.');
+            throw new Exception('Account record not found.');
         }
         $userId = (string)($target['user_id'] ?? '');
         if ($userId === '') {
             throw new Exception('Target account is invalid.');
         }
         $targetAccount = loadOfficialAccountOrFail($conn, $userId);
+        $targetAudience = managementAudienceFromRow($targetAccount);
+        if ($requestedMode === 'personnel' && $targetAudience !== 'personnel') {
+            throw new Exception('This record is not available in Personnel Tracker.');
+        }
+        if ($requestedMode === 'official' && $targetAudience !== 'official') {
+            throw new Exception('This record is not available in Official Management.');
+        }
         $targetProtectedCode = amp_get_protected_code($targetAccount);
         $targetDisplayRole = rowDisplayRole((string)($targetAccount['account_role_access'] ?? ''));
         $oldPermissionMap = amp_get_effective_permission_keys_for_row($conn, $targetAccount);
@@ -252,7 +316,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                 $conn,
                 (string)($_SESSION['user_id'] ?? ''),
                 $actorRole,
-                'Officials Management',
+                $auditModuleName,
                 'OfficialProfileApproval',
                 $officialId,
                 $action === 'approve_profile' ? 'OFFICIAL_PROFILE_APPROVE' : 'OFFICIAL_PROFILE_REJECT',
@@ -277,10 +341,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                 $requestedPermissionKeys = [];
             }
 
+            if ($targetProtectedCode === 'BARANGAY_CAPTAIN') {
+                throw new Exception('The Barangay Captain access level is managed through official transitions.');
+            }
+
             if (!in_array($displayRole, ['Admin', 'SuperAdmin'], true)) {
                 throw new Exception('Invalid display role.');
             }
-
             if ($targetProtectedCode !== '' && $displayRole !== 'SuperAdmin') {
                 throw new Exception('Protected accounts must remain SuperAdmin.');
             }
@@ -387,20 +454,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                 $conn,
                 $actorUserId,
                 $actorRole,
-                'Officials Management',
+                $auditModuleName,
                 'OfficialAccessProfile',
                 $officialId,
                 'OFFICIAL_ACCESS_PROFILE_UPDATE',
                 'display_role / term_end / module_permissions',
                 $targetDisplayRole . ' / ' . (string)($targetAccount['term_end'] ?? '') . ' / ' . $oldPermissionSummary,
                 $displayRole . ' / ' . $accessExpiresOn . ' / ' . officialsPermissionSummary($permissionMap),
-                'Updated official access profile and module checklist.',
+                'Updated access profile and module checklist.',
                 null
             );
 
             echo json_encode([
                 'success' => true,
-                'message' => 'Official access profile updated successfully.',
+                'message' => 'Access profile updated successfully.',
                 'updated' => true,
             ]);
             exit;
@@ -424,6 +491,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                     'Barangay Police',
                     'Desk Officer',
                     'Area OIC',
+                    'Barangay Treasurer',
                 ],
             ];
             $newRole = null;
@@ -435,6 +503,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
             }
             if ($newRole === null) {
                 throw new Exception('Invalid position selected.');
+            }
+            $newAudience = managementAudienceFromPosition($newPosition, $newRole);
+            if ($requestedMode === 'personnel' && $newAudience !== 'personnel') {
+                throw new Exception('Personnel Tracker can only assign personnel positions.');
+            }
+            if ($requestedMode === 'official' && $newAudience !== 'official') {
+                throw new Exception('Official Management can only assign official positions.');
             }
 
             $posColExists  = false;
@@ -471,7 +546,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                 $conn,
                 (string)($_SESSION['user_id'] ?? ''),
                 $actorRole,
-                'Officials Management',
+                $auditModuleName,
                 'OfficialAccount',
                 $officialId,
                 'OFFICIAL_PROMOTE',
@@ -484,7 +559,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
 
             echo json_encode([
                 'success' => true,
-                'message' => "Official promoted to {$newRole} — {$newPosition} successfully.",
+                'message' => "Position updated to {$newPosition} successfully.",
                 'updated' => true,
             ]);
             exit;
@@ -500,6 +575,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
             }
             if ($newDeptPosition === '') {
                 throw new Exception('Position is required.');
+            }
+            $newAudience = managementAudienceFromPosition($newDeptPosition, '');
+            if ($requestedMode === 'personnel' && $newAudience !== 'personnel') {
+                throw new Exception('Personnel Tracker can only assign personnel positions.');
+            }
+            if ($requestedMode === 'official' && $newAudience !== 'official') {
+                throw new Exception('Official Management can only assign official positions.');
             }
 
             $posColExists2  = false;
@@ -543,7 +625,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                 $conn,
                 (string)($_SESSION['user_id'] ?? ''),
                 $actorRole,
-                'Officials Management',
+                $auditModuleName,
                 'OfficialAccount',
                 $officialId,
                 'OFFICIAL_DEPT_CHANGE',
@@ -575,14 +657,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
             $conn,
             (string)($_SESSION['user_id'] ?? ''),
             $actorRole,
-            'Officials Management',
+            $auditModuleName,
             'OfficialAccount',
             $officialId,
             $auditAction,
             'status_id_account',
             (string)($target['status_id_account'] ?? ''),
             (string)$nextStatusId,
-            $action === 'revoke_permission' ? 'Official permissions revoked (account set inactive).' : 'Official permissions restored (account set active).',
+            $action === 'revoke_permission' ? 'Account permissions revoked (account set inactive).' : 'Account permissions restored (account set active).',
             null
         );
 
@@ -609,6 +691,7 @@ if (!isset($_GET['fetch_officials_management'])) {
 
 try {
     $q = trim((string)($_GET['q'] ?? ''));
+    $requestedMode = requestedManagementMode((string)($_GET['mode'] ?? 'official'));
     $roleFilter = trim((string)($_GET['role'] ?? 'ALL'));
     if (!in_array($roleFilter, ['ALL', 'Admin', 'SuperAdmin'], true)) {
         $roleFilter = 'ALL';
@@ -708,6 +791,18 @@ try {
         if (!in_array($role, ['Official', 'Personnel', 'SuperAdmin'], true)) {
             continue;
         }
+        $protectedCode = amp_get_protected_code($row);
+        $positionAccess = trim((string)($row['position_access'] ?? ''));
+        $audience = managementAudienceFromRow($row);
+        if ($requestedMode === 'personnel' && $audience !== 'personnel') {
+            continue;
+        }
+        if ($requestedMode === 'personnel' && $actorUserId !== '' && strcasecmp((string)($row['user_id'] ?? ''), $actorUserId) === 0) {
+            continue;
+        }
+        if ($requestedMode === 'official' && $audience !== 'official') {
+            continue;
+        }
         $displayRole = rowDisplayRole((string)($row['account_role_access'] ?? $row['info_role_access'] ?? ''));
         if ($roleFilter !== 'ALL' && $displayRole !== $roleFilter) {
             continue;
@@ -721,16 +816,18 @@ try {
         );
 
         $permissionMap = amp_get_effective_permission_keys_for_row($conn, $row);
-        $protectedCode = amp_get_protected_code($row);
-        $canEditAccess = !($protectedCode === 'IT_SUPERADMIN' && $actorUserId !== (string)($row['user_id'] ?? ''));
+        $canEditAccess = !(
+            $protectedCode === 'BARANGAY_CAPTAIN'
+            || ($protectedCode === 'IT_SUPERADMIN' && $actorUserId !== (string)($row['user_id'] ?? ''))
+        );
 
         $rows[] = [
             'official_id' => (string)($row['official_id'] ?? ''),
             'user_id' => (string)($row['user_id'] ?? ''),
             'full_name' => $fullName !== '' ? $fullName : '—',
-            'role_access' => $role,
+            'role_access' => $audience === 'personnel' ? 'Personnel' : 'Official',
             'display_role' => $displayRole,
-            'position_access' => (string)($row['position_access'] ?? ''),
+            'position_access' => $positionAccess,
             'area_number' => (string)($row['area_number'] ?? ''),
             'department' => (string)($row['department'] ?? ''),
             'employment_status' => (string)($row['employment_status'] ?? ''),

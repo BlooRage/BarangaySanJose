@@ -13,7 +13,7 @@
     <link rel="stylesheet" href="../CSS-Styles/Guest-End-CSS/GuestPage.css">
     <link rel="stylesheet" href="../CSS-Styles/NavbarFooterStyle.css">
 </head>
-<body>
+<body data-cms-page="faq" data-cms-endpoint="../PhpFiles/GET/getSiteContent.php" data-cms-asset-base="../">
     <button onclick="topFunction()" id="goToTop" title="Go to top"><i class="fa-solid fa-arrow-up"></i>&nbsp;&nbsp;Go to top</button>
     <div class="navbarWrapper"><nav class="navbar navbar-expand-xl align-items-center navbar-light bg-white shadow-sm">
             <div class="container-fluid align-items-center px-4">
@@ -53,10 +53,10 @@
     </div>
 
     <div class="banner">
-        <img src="../Images/FAQ_Banner.png" alt="Govt Banner" class="bannerImage">
+        <img src="../Images/FAQ_Banner.png" alt="Govt Banner" class="bannerImage" data-cms-faq="banner-image">
         <div class="bannerText">
-            <h1>Frequently Asked Questions</h1>
-            <p>Find straightforward answers about barangay certificates, ID applications, appointments, and other services. We keep responses short so you can quickly move on to filing requests or reaching out to the office.</p>
+            <h1 data-cms-faq="banner-title">Frequently Asked Questions</h1>
+            <p data-cms-faq="banner-message">Find straightforward answers about barangay certificates, ID applications, appointments, and other services. We keep responses short so you can quickly move on to filing requests or reaching out to the office.</p>
         </div>
     </div>
 
@@ -108,6 +108,7 @@
         </footer>
     </div>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/js/bootstrap.bundle.min.js" integrity="sha384-FKyoEForCGlyvwx9Hj09JcYn3nv7wiPVlz7YYwJrWVcXK/BmnVDxM+D2scQbITxI" crossorigin="anonymous"></script>
+    <script src="../JS-Script-Files/siteContentRuntime.js" defer></script>
     <script>
         function escapeHtml(value) {
             return String(value ?? "").replace(/[&<>"']/g, function (char) {
@@ -246,7 +247,6 @@
         });
     </script></body>
 </html>
-
 
 
 

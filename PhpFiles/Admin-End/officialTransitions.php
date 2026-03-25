@@ -5,8 +5,13 @@ session_start();
 require_once __DIR__ . '/../General/connection.php';
 require_once __DIR__ . '/../General/security.php';
 require_once __DIR__ . '/../General/audit.php';
+require_once __DIR__ . '/../General/adminModulePermissions.php';
+require_once __DIR__ . '/../General/officialInviteCommon.php';
+require_once __DIR__ . '/../General/uniqueIDGenerate.php';
 
 requireRoleSession(['SuperAdmin']);
+oi_ensure_invite_table($conn);
+amp_ensure_permission_storage($conn);
 
 header('Content-Type: application/json; charset=utf-8');
 
@@ -69,31 +74,73 @@ function otGetOfficialUser(mysqli $conn, string $officialId): ?array {
 }
 
 function otSendEmail(string $email, string $subject, string $body): void {
-    if (!filter_var($email, FILTER_VALIDATE_EMAIL)) return;
+    if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+        return;
+    }
     try {
-        $autoloadPath = __DIR__ . '/../../composer-email-handler/vendor/autoload.php';
-        if (!file_exists($autoloadPath)) return;
-        require_once $autoloadPath;
-        if (!class_exists('EmailSender')) return;
+        require_once __DIR__ . '/../EmailHandlers/emailSender.php';
+        if (!class_exists('EmailSender')) {
+            return;
+        }
         $mailConfig = require __DIR__ . '/../General/mailConfigurations.php';
         $sender = new EmailSender($mailConfig);
         $sender->send([
-            'to'      => $email,
+            'to' => $email,
             'subject' => $subject,
-            'body'    => nl2br(htmlspecialchars($body, ENT_QUOTES, 'UTF-8')),
+            'bodyHtml' => nl2br(htmlspecialchars($body, ENT_QUOTES, 'UTF-8')),
+            'bodyText' => $body,
         ]);
     } catch (\Throwable) { /* best-effort */ }
 }
 
-function otSendSMS(string $phone, string $message): void {
+function otSendOnboardingInviteEmail(string $email, string $fullName, string $roleName, string $inviteLink): bool
+{
+    if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+        return false;
+    }
+
+    try {
+        require_once __DIR__ . '/../EmailHandlers/emailSender.php';
+        if (!class_exists('EmailSender')) {
+            return false;
+        }
+        $mailConfig = require __DIR__ . '/../General/mailConfigurations.php';
+        $sender = new EmailSender($mailConfig);
+        return $sender->send([
+            'type' => 'onboarding_access',
+            'to' => $email,
+            'subject' => 'Barangay San Jose Official Account Invite',
+            'data' => [
+                'headline' => 'Official Account Onboarding Access',
+                'recipientName' => $fullName !== '' ? $fullName : 'Official',
+                'roleName' => $roleName !== '' ? $roleName : 'Official',
+                'actionUrl' => $inviteLink,
+                'buttonText' => 'START ONBOARDING',
+                'expiresNote' => 'This invite link expires in 48 hours.',
+            ],
+            'bodyText' => "You were invited to onboard your Barangay San Jose account as {$roleName}.\nSTRICTLY ONE-TIME ACCESS.\nOpen: {$inviteLink}",
+        ]);
+    } catch (\Throwable) {
+        return false;
+    }
+}
+
+function otSendSMS(string $phone, string $message): bool {
     $phone = preg_replace('/[^0-9]/', '', $phone);
-    if ($phone === '') return;
+    if ($phone === '') {
+        return false;
+    }
     try {
         $smsPath = __DIR__ . '/../General/sendSMS.php';
-        if (!file_exists($smsPath)) return;
+        if (!file_exists($smsPath)) {
+            return false;
+        }
         require_once $smsPath;
-        if (function_exists('sendSMS')) @sendSMS($phone, $message);
+        if (function_exists('sendSMS')) {
+            return (bool)@sendSMS($phone, $message);
+        }
     } catch (\Throwable) { /* best-effort */ }
+    return false;
 }
 
 function otNotifyUser(mysqli $conn, string $userId, string $subject, string $message): void {
@@ -128,6 +175,25 @@ function otColumnExists(mysqli $conn, string $table, string $column): bool {
     return $res instanceof mysqli_result && $res->num_rows > 0;
 }
 
+function otEnsureTransitionFields(mysqli $conn): void {
+    static $done = false;
+    if ($done || !otTableExists($conn, 'officialtransitionstbl')) {
+        return;
+    }
+    $done = true;
+
+    $columnDefinitions = [
+        'proclamation_date' => "ALTER TABLE officialtransitionstbl ADD COLUMN proclamation_date DATE DEFAULT NULL AFTER batch_label",
+        'next_election_date' => "ALTER TABLE officialtransitionstbl ADD COLUMN next_election_date DATE DEFAULT NULL AFTER proclamation_date",
+    ];
+
+    foreach ($columnDefinitions as $column => $sql) {
+        if (!otColumnExists($conn, 'officialtransitionstbl', $column)) {
+            $conn->query($sql);
+        }
+    }
+}
+
 function otEnsureUpcomingOfficialFields(mysqli $conn): void {
     static $done = false;
     if ($done || !otTableExists($conn, 'upcomingofficialstbl')) {
@@ -151,8 +217,497 @@ function otEnsureUpcomingOfficialFields(mysqli $conn): void {
     }
 }
 
+function otIgnoredTransitionSeatNames(): array {
+    return [
+        'SK Chairperson',
+        'Lupong Tagapamayapa Member',
+        'Barangay Tanod',
+        'Barangay Health Worker (BHW)',
+        'Day Care Worker',
+    ];
+}
+
+function otIsManagedTransitionSeat(string $seatName): bool {
+    static $ignored = null;
+    if ($ignored === null) {
+        $ignored = array_map(
+            static fn (string $value): string => strtolower(trim($value)),
+            otIgnoredTransitionSeatNames()
+        );
+    }
+
+    $normalized = strtolower(trim($seatName));
+    return $normalized !== '' && !in_array($normalized, $ignored, true);
+}
+
+function otIgnoredTransitionSeatSql(mysqli $conn, string $field): string {
+    $values = array_map(
+        static fn (string $value): string => "'" . $conn->real_escape_string(strtolower(trim($value))) . "'",
+        otIgnoredTransitionSeatNames()
+    );
+    return 'LOWER(TRIM(' . $field . ')) NOT IN (' . implode(', ', $values) . ')';
+}
+
+function otHasConfiguredTermSchedule(mysqli $conn): bool {
+    static $cached = null;
+    if ($cached !== null) {
+        return $cached;
+    }
+    if (!otTableExists($conn, 'officialtransitionstbl')) {
+        $cached = false;
+        return $cached;
+    }
+
+    $ignoredPositionSql = otIgnoredTransitionSeatSql($conn, 'position');
+    $res = $conn->query("
+        SELECT 1
+        FROM officialtransitionstbl
+        WHERE batch_label IS NOT NULL
+          AND COALESCE(next_election_date, election_date) IS NOT NULL
+          AND {$ignoredPositionSql}
+        LIMIT 1
+    ");
+    $cached = $res instanceof mysqli_result && $res->num_rows > 0;
+    if ($res instanceof mysqli_result) {
+        $res->close();
+    }
+    return $cached;
+}
+
 if (otTableExists($conn, 'upcomingofficialstbl')) {
     otEnsureUpcomingOfficialFields($conn);
+}
+if (otTableExists($conn, 'officialtransitionstbl')) {
+    otEnsureTransitionFields($conn);
+}
+
+function otNormalizeDateOrNull(string $value): ?string {
+    $value = trim($value);
+    if ($value === '') {
+        return null;
+    }
+    $dt = DateTimeImmutable::createFromFormat('Y-m-d', $value);
+    if (!$dt || $dt->format('Y-m-d') !== $value) {
+        return null;
+    }
+    return $value;
+}
+
+function otResolveEffectiveDate(array $transition): string {
+    $candidateDates = [
+        (string)($transition['proclamation_date'] ?? ''),
+        (string)($transition['effective_date'] ?? ''),
+        date('Y-m-d'),
+    ];
+    foreach ($candidateDates as $candidateDate) {
+        $normalized = otNormalizeDateOrNull($candidateDate);
+        if ($normalized !== null) {
+            return $normalized;
+        }
+    }
+    return date('Y-m-d');
+}
+
+function otResolveTermEndDate(array $transition): ?string {
+    $candidateDates = [
+        (string)($transition['next_election_date'] ?? ''),
+        (string)($transition['election_date'] ?? ''),
+    ];
+    foreach ($candidateDates as $candidateDate) {
+        $normalized = otNormalizeDateOrNull($candidateDate);
+        if ($normalized !== null) {
+            return $normalized;
+        }
+    }
+    return null;
+}
+
+function otNormalizeAreaNumber(string $areaNumber): string {
+    $value = trim($areaNumber);
+    return $value !== '' ? $value : 'Barangay Wide';
+}
+
+function otAreaNumberToAreaAccess(string $areaNumber): string {
+    return match (strtolower(trim($areaNumber))) {
+        'area 01' => 'Area01',
+        'area 1a' => 'Area1A',
+        'area 02' => 'Area02',
+        'area 03' => 'Area03',
+        'area 04' => 'Area04',
+        'area 05' => 'Area05',
+        'area 06' => 'Area06',
+        default => 'BarangayWide',
+    };
+}
+
+function otGetStatusIdByPreferredNames(mysqli $conn, array $statusTypes, array $preferredNames): ?int {
+    foreach ($statusTypes as $statusType) {
+        foreach ($preferredNames as $statusName) {
+            $statusName = trim((string)$statusName);
+            if ($statusName === '') {
+                continue;
+            }
+            $statusId = otGetStatusId($conn, (string)$statusType, $statusName);
+            if ($statusId !== null) {
+                return $statusId;
+            }
+        }
+    }
+    return null;
+}
+
+function otAssertContactIsAvailable(mysqli $conn, string $email, string $phone10, string $excludeUserId = ''): void {
+    $email = strtolower(trim($email));
+    $phone10 = oi_normalize_phone10($phone10);
+    $excludeUserId = trim($excludeUserId);
+
+    if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+        throw new RuntimeException('A valid email address is required.');
+    }
+    if (!oi_is_valid_phone10($phone10)) {
+        throw new RuntimeException('Mobile number must be a valid 10-digit Philippine mobile number.');
+    }
+
+    if ($excludeUserId !== '') {
+        $stmt = $conn->prepare("
+            SELECT user_id
+            FROM useraccountstbl
+            WHERE (email = ? OR phone_number = ?)
+              AND user_id <> ?
+            LIMIT 1
+        ");
+        if (!$stmt) {
+            throw new RuntimeException('Unable to validate email and mobile number.');
+        }
+        $stmt->bind_param('sss', $email, $phone10, $excludeUserId);
+    } else {
+        $stmt = $conn->prepare("
+            SELECT user_id
+            FROM useraccountstbl
+            WHERE email = ? OR phone_number = ?
+            LIMIT 1
+        ");
+        if (!$stmt) {
+            throw new RuntimeException('Unable to validate email and mobile number.');
+        }
+        $stmt->bind_param('ss', $email, $phone10);
+    }
+
+    $stmt->execute();
+    $row = $stmt->get_result()->fetch_assoc();
+    $stmt->close();
+    if ($row) {
+        throw new RuntimeException('Email or mobile number is already tied to another account.');
+    }
+}
+
+function otResolveIncomingAccessProfile(array $transition): array {
+    $position = trim((string)($transition['position'] ?? ''));
+    $positionLower = strtolower($position);
+    $department = trim((string)($transition['department'] ?? ''));
+    $areaNumber = otNormalizeAreaNumber((string)($transition['area_number'] ?? ''));
+    $selectionMethod = in_array((string)($transition['transition_type'] ?? ''), ['BarangayElection', 'SKElection'], true)
+        ? 'Elected'
+        : 'Appointed';
+
+    $accountRole = 'Official';
+    $officialRole = 'Official';
+    $positionAccess = $position !== '' ? $position : 'Barangay Official';
+
+    if (str_contains($positionLower, 'punong barangay') || str_contains($positionLower, 'barangay captain') || $positionLower === 'barangay chairman') {
+        $accountRole = 'SuperAdmin';
+        $officialRole = 'SuperAdmin';
+        $positionAccess = 'Barangay Chairman';
+        $department = $department !== '' ? $department : 'Office of the Barangay';
+        $areaNumber = 'Barangay Wide';
+    } elseif (str_contains($positionLower, 'kagawad')) {
+        $accountRole = 'Official';
+        $officialRole = 'Official';
+        $positionAccess = 'Barangay Official';
+        $department = $department !== '' ? $department : 'Office of the Barangay';
+        $areaNumber = 'Barangay Wide';
+    } elseif ($positionLower === 'barangay secretary') {
+        $accountRole = 'Official';
+        $officialRole = 'Secretary';
+        $positionAccess = 'Barangay Secretary';
+        $department = $department !== '' ? $department : 'Office of the Barangay';
+        $areaNumber = 'Barangay Wide';
+    } elseif ($positionLower === 'barangay treasurer') {
+        $accountRole = 'Personnel';
+        $officialRole = 'Finance';
+        $positionAccess = 'Barangay Treasurer';
+        $department = $department !== '' ? $department : 'Barangay Treasurers Office';
+        $areaNumber = 'Barangay Wide';
+    } elseif (str_contains($positionLower, 'lupong')) {
+        $accountRole = 'Official';
+        $officialRole = 'Official';
+        $positionAccess = 'Lupong Tagapamayapa Member';
+        $department = $department !== '' ? $department : 'Barangay Peace and Order';
+        $areaNumber = 'Barangay Wide';
+    } elseif (str_contains($positionLower, 'tanod')) {
+        $accountRole = 'Personnel';
+        $officialRole = 'BarangayPolice';
+        $positionAccess = 'Barangay Police';
+        $department = $department !== '' ? $department : 'Barangay Peace and Order';
+        $areaNumber = 'Barangay Wide';
+    } elseif (str_contains($positionLower, 'health worker')) {
+        $accountRole = 'Personnel';
+        $officialRole = 'Monitoring';
+        $positionAccess = 'Barangay Health Worker (BHW)';
+        $department = $department !== '' ? $department : 'Barangay Monitoring';
+        $areaNumber = 'Barangay Wide';
+    } elseif (str_contains($positionLower, 'day care')) {
+        $accountRole = 'Personnel';
+        $officialRole = 'Monitoring';
+        $positionAccess = 'Day Care Worker';
+        $department = $department !== '' ? $department : 'Office of the Barangay';
+        $areaNumber = 'Barangay Wide';
+    } elseif (str_contains($positionLower, 'sk chair')) {
+        $accountRole = 'Official';
+        $officialRole = 'Official';
+        $positionAccess = 'SK Chairperson';
+        $department = $department !== '' ? $department : 'Office of the Barangay';
+        $areaNumber = 'Barangay Wide';
+    } else {
+        $department = $department !== '' ? $department : 'Office of the Barangay';
+    }
+
+    return [
+        'account_role' => $accountRole,
+        'official_role' => $officialRole,
+        'position_access' => $positionAccess,
+        'department' => $department,
+        'area_number' => $areaNumber,
+        'area_access' => otAreaNumberToAreaAccess($areaNumber),
+        'selection_method' => $selectionMethod,
+        'employment_status' => $selectionMethod === 'Elected' ? 'Regular Government Officials' : 'Regular',
+    ];
+}
+
+function otCreateOfficialInvite(mysqli $conn, array $invitePayload, string $actorUserId): array {
+    $email = strtolower(trim((string)($invitePayload['email'] ?? '')));
+    $phone10 = oi_normalize_phone10((string)($invitePayload['phone_number'] ?? ''));
+    $firstname = trim((string)($invitePayload['firstname'] ?? ''));
+    $middlename = trim((string)($invitePayload['middlename'] ?? ''));
+    $lastname = trim((string)($invitePayload['lastname'] ?? ''));
+    $suffix = trim((string)($invitePayload['suffix'] ?? ''));
+    $roleAccess = trim((string)($invitePayload['role_access'] ?? 'Official'));
+    $positionAccess = trim((string)($invitePayload['position_access'] ?? ''));
+    $department = trim((string)($invitePayload['department'] ?? ''));
+    $employmentStatus = trim((string)($invitePayload['employment_status'] ?? 'Regular'));
+    $areaNumber = otNormalizeAreaNumber((string)($invitePayload['area_number'] ?? ''));
+    $userId = trim((string)($invitePayload['user_id'] ?? ''));
+
+    $token = oi_generate_invite_token();
+    $inviteCode = oi_generate_invite_code($conn, $areaNumber);
+    $expiresAt = (new DateTimeImmutable('+48 hours'))->format('Y-m-d H:i:s');
+
+    if ($userId !== '') {
+        $revokeStmt = $conn->prepare("
+            UPDATE officialinvitetbl
+            SET status = 'Revoked',
+                revoked_at = NOW(),
+                updated_at = NOW()
+            WHERE user_id = ?
+              AND status IN ('Pending', 'InProgress')
+        ");
+        if ($revokeStmt) {
+            $revokeStmt->bind_param('s', $userId);
+            $revokeStmt->execute();
+            $revokeStmt->close();
+        }
+    }
+
+    $stmt = $conn->prepare("
+        INSERT INTO officialinvitetbl
+            (invite_code, invite_token_hash, invite_email, invite_phone, firstname, middlename, lastname, suffix,
+             role_access, position_access, department, employment_status, area_number, status, onboarding_step,
+             invited_by_user_id, user_id, expires_at)
+        VALUES
+            (?, ?, ?, ?, ?, NULLIF(?, ''), ?, NULLIF(?, ''),
+             ?, NULLIF(?, ''), ?, NULLIF(?, ''), ?, 'Pending', 'password',
+             ?, NULLIF(?, ''), ?)
+    ");
+    if (!$stmt) {
+        throw new RuntimeException('Failed to create onboarding invite.');
+    }
+    $stmt->bind_param(
+        'ssssssssssssssss',
+        $inviteCode,
+        $token['hash'],
+        $email,
+        $phone10,
+        $firstname,
+        $middlename,
+        $lastname,
+        $suffix,
+        $roleAccess,
+        $positionAccess,
+        $department,
+        $employmentStatus,
+        $areaNumber,
+        $actorUserId,
+        $userId,
+        $expiresAt
+    );
+    if (!$stmt->execute()) {
+        $error = $stmt->error;
+        $stmt->close();
+        throw new RuntimeException('Failed to create onboarding invite: ' . $error);
+    }
+    $inviteId = (int)$stmt->insert_id;
+    $stmt->close();
+
+    $inviteLink = appBaseUrl() . appUrl('/official-onboarding?invite=' . urlencode($token['raw']));
+    $fullName = trim($firstname . ' ' . ($middlename !== '' ? $middlename . ' ' : '') . $lastname . ($suffix !== '' ? ' ' . $suffix : ''));
+    $subject = 'Barangay San Jose Official Onboarding Access';
+    $body = "Dear " . ($fullName !== '' ? $fullName : 'Official') . ",\n\n"
+        . "Your account access for Barangay San Jose is ready.\n"
+        . "Position: " . ($positionAccess !== '' ? $positionAccess : $roleAccess) . "\n"
+        . "Department: " . ($department !== '' ? $department : 'Office of the Barangay') . "\n\n"
+        . "Open this one-time onboarding access link:\n{$inviteLink}\n\n"
+        . "This link expires in 48 hours.\n\n"
+        . "Barangay San Jose";
+
+    $emailSent = otSendOnboardingInviteEmail(
+        $email,
+        $fullName,
+        $positionAccess !== '' ? $positionAccess : $roleAccess,
+        $inviteLink
+    );
+    $smsSent = otSendSMS($phone10, 'Barangay San Jose: Your official onboarding access is ready. Please check your email for the one-time invite link.');
+
+    return [
+        'invite_id' => $inviteId,
+        'invite_link' => $inviteLink,
+        'email_sent' => $emailSent,
+        'sms_sent' => $smsSent,
+    ];
+}
+
+function otCreateIncomingOfficialShell(mysqli $conn, array $transition, array $candidate, string $actorUserId, string $activeStatusId): array {
+    $email = strtolower(trim((string)($candidate['candidate_email'] ?? '')));
+    $phone10 = oi_normalize_phone10((string)($candidate['candidate_mobile'] ?? $candidate['candidate_contact'] ?? ''));
+    otAssertContactIsAvailable($conn, $email, $phone10);
+
+    $assignment = otResolveIncomingAccessProfile($transition);
+    $employmentStatusId = otGetStatusIdByPreferredNames(
+        $conn,
+        ['Official/Personnel Management', 'Employment', 'OfficialEmployment', 'UserAccount'],
+        [$assignment['employment_status'], 'Regular', 'Active']
+    );
+    if ($employmentStatusId === null) {
+        throw new RuntimeException('Employment status is missing in the lookup table.');
+    }
+
+    $userId = GenerateUserID($conn, $assignment['account_role']);
+    if (!$userId) {
+        throw new RuntimeException('Failed to generate a user ID for the incoming official.');
+    }
+
+    $passwordHash = password_hash(bin2hex(random_bytes(16)), PASSWORD_DEFAULT);
+    $accountStmt = $conn->prepare("
+        INSERT INTO useraccountstbl
+            (user_id, phone_number, phoneNum_verify, email, email_verify, password_hash, status_id_account, role_access, account_created, last_login, updated_at)
+        VALUES
+            (?, ?, 0, ?, 0, ?, ?, ?, NOW(), NOW(), NOW())
+    ");
+    if (!$accountStmt) {
+        throw new RuntimeException('Failed to prepare incoming official account creation.');
+    }
+    $accountStmt->bind_param(
+        'ssssss',
+        $userId,
+        $phone10,
+        $email,
+        $passwordHash,
+        $activeStatusId,
+        $assignment['account_role']
+    );
+    if (!$accountStmt->execute()) {
+        $error = $accountStmt->error;
+        $accountStmt->close();
+        throw new RuntimeException('Failed to create the incoming official account: ' . $error);
+    }
+    $accountStmt->close();
+
+    $effectiveDate = otResolveEffectiveDate($transition);
+    $termEndDate = otResolveTermEndDate($transition) ?? '';
+    $batchLabel = trim((string)($transition['batch_label'] ?? ''));
+    $officialStmt = $conn->prepare("
+        INSERT INTO officialinformationtbl
+            (user_id, lastname, firstname, middlename, suffix, birthdate, sex, civil_status, contact_number, email,
+             area_access, department, selection_method, term_start, term_end, batch_label, area_number,
+             role_access, position_access, status_id_employment, date_hired)
+        VALUES
+            (?, ?, ?, NULLIF(?, ''), NULLIF(?, ''), '1900-01-01', 'Other', 'Single', ?, ?,
+             ?, ?, NULLIF(?, ''), ?, NULLIF(?, ''), NULLIF(?, ''), NULLIF(?, ''),
+             ?, NULLIF(?, ''), ?, ?)
+    ");
+    if (!$officialStmt) {
+        throw new RuntimeException('Failed to prepare the incoming official profile.');
+    }
+    $lastname = trim((string)($candidate['candidate_last_name'] ?? ''));
+    $firstname = trim((string)($candidate['candidate_first_name'] ?? ''));
+    $middlename = trim((string)($candidate['candidate_middle_name'] ?? ''));
+    $suffix = trim((string)($candidate['candidate_suffix'] ?? ''));
+    $selectionMethod = (string)$assignment['selection_method'];
+    $officialStmt->bind_param(
+        'ssssssssssssssssis',
+        $userId,
+        $lastname,
+        $firstname,
+        $middlename,
+        $suffix,
+        $phone10,
+        $email,
+        $assignment['area_access'],
+        $assignment['department'],
+        $selectionMethod,
+        $effectiveDate,
+        $termEndDate,
+        $batchLabel,
+        $assignment['area_number'],
+        $assignment['official_role'],
+        $assignment['position_access'],
+        $employmentStatusId,
+        $effectiveDate
+    );
+    if (!$officialStmt->execute()) {
+        $error = $officialStmt->error;
+        $officialStmt->close();
+        throw new RuntimeException('Failed to create the incoming official profile: ' . $error);
+    }
+    $officialId = (string)$conn->insert_id;
+    $officialStmt->close();
+
+    $invite = otCreateOfficialInvite($conn, [
+        'email' => $email,
+        'phone_number' => $phone10,
+        'firstname' => $firstname,
+        'middlename' => $middlename,
+        'lastname' => $lastname,
+        'suffix' => $suffix,
+        'role_access' => $assignment['account_role'],
+        'position_access' => $assignment['position_access'],
+        'department' => $assignment['department'],
+        'employment_status' => $assignment['employment_status'],
+        'area_number' => $assignment['area_number'],
+        'user_id' => $userId,
+    ], $actorUserId);
+
+    return [
+        'official_id' => $officialId,
+        'user_id' => $userId,
+        'invite_id' => (int)($invite['invite_id'] ?? 0),
+        'invite_link' => (string)($invite['invite_link'] ?? ''),
+        'email_sent' => (bool)($invite['email_sent'] ?? false),
+        'sms_sent' => (bool)($invite['sms_sent'] ?? false),
+        'email' => $email,
+        'phone_number' => $phone10,
+        'position_access' => $assignment['position_access'],
+        'department' => $assignment['department'],
+    ];
 }
 
 // ════════════════════════════════════════════════════════════════════════════
@@ -162,6 +717,7 @@ if ($action === 'fetch_council_seats') {
     if (!otTableExists($conn, 'barangaycounciltbl')) {
         otJson(['success' => true, 'seats' => []]);
     }
+    $hasConfiguredTermSchedule = otHasConfiguredTermSchedule($conn);
 
     $res = $conn->query("
         SELECT
@@ -191,7 +747,19 @@ if ($action === 'fetch_council_seats') {
 
     $seats = [];
     if ($res instanceof mysqli_result) {
-        while ($row = $res->fetch_assoc()) $seats[] = $row;
+        while ($row = $res->fetch_assoc()) {
+            if (!otIsManagedTransitionSeat((string)($row['seat_name'] ?? ''))) {
+                continue;
+            }
+            if (!$hasConfiguredTermSchedule) {
+                $row['current_official_id'] = '';
+                $row['current_official_name'] = '';
+                $row['account_status'] = '';
+                $row['term_start'] = '';
+                $row['term_end'] = '';
+            }
+            $seats[] = $row;
+        }
         $res->close();
     }
 
@@ -205,7 +773,6 @@ if ($action === 'fetch_transitions') {
     if (!otTableExists($conn, 'officialtransitionstbl')) {
         otJson(['success' => true, 'data' => [], 'total' => 0, 'notice' => 'Migration not yet applied.']);
     }
-    $tab    = trim((string)($_GET['tab']    ?? 'active'));
     $q      = trim((string)($_GET['q']      ?? ''));
     $type   = trim((string)($_GET['type']   ?? ''));
     $limit  = min(max((int)($_GET['limit'] ?? 100), 1), 500);
@@ -215,11 +782,8 @@ if ($action === 'fetch_transitions') {
     $params = [];
     $types  = '';
 
-    if ($tab === 'history') {
-        $where[] = "t.status IN ('Completed','Cancelled')";
-    } else {
-        $where[] = "t.status NOT IN ('Completed','Cancelled')";
-    }
+    $where[] = "t.status NOT IN ('Completed','Cancelled')";
+    $where[] = otIgnoredTransitionSeatSql($conn, 't.position');
     if ($q !== '') {
         $like = '%' . $q . '%';
         $where[] = "(t.transition_id LIKE ? OR t.position LIKE ? OR t.batch_label LIKE ? OR CONCAT(oi.lastname,' ',oi.firstname) LIKE ?)";
@@ -236,12 +800,16 @@ if ($action === 'fetch_transitions') {
 
     $sql = "
         SELECT t.*,
+               COALESCE(t.proclamation_date, t.effective_date) AS proclamation_date,
+               COALESCE(t.next_election_date, t.election_date) AS next_election_date,
+               bc.sort_order,
                CONCAT(oi.lastname, ', ', oi.firstname, IFNULL(CONCAT(' ', oi.middlename),''), IFNULL(CONCAT(' ', oi.suffix),'')) AS outgoing_name,
                COALESCE(oi.position_access, oi.role_access) AS outgoing_position
         FROM officialtransitionstbl t
         LEFT JOIN officialinformationtbl oi ON oi.official_id = t.outgoing_official_id
+        LEFT JOIN barangaycounciltbl bc ON bc.council_id = t.council_id
         {$whereClause}
-        ORDER BY t.created_at DESC
+        ORDER BY COALESCE(bc.sort_order, 9999) ASC, t.created_at DESC
         LIMIT ? OFFSET ?
     ";
     $params[] = $limit;
@@ -370,11 +938,22 @@ if ($action === 'new_transition') {
     $effectiveDate= trim((string)($_POST['effective_date']   ?? ''));
     $reason       = trim((string)($_POST['reason']           ?? ''));
     $batchLabel   = trim((string)($_POST['batch_label']      ?? ''));
-    $electionDate = trim((string)($_POST['election_date']    ?? ''));
+    $proclamationDate = trim((string)($_POST['proclamation_date'] ?? ''));
+    $nextElectionDate = trim((string)($_POST['next_election_date'] ?? ''));
+    if ($nextElectionDate === '') {
+        $nextElectionDate = trim((string)($_POST['election_date'] ?? ''));
+    }
 
     if ($councilId <= 0)  otError('Council seat is required.');
     if ($transType === '') otError('Transition type is required.');
     if ($transType === 'Removal' && $reason === '') otError('Reason is required for Removal.');
+    if (in_array($transType, ['BarangayElection', 'SKElection'], true)) {
+        if ($proclamationDate === '') otError('Proclamation date is required for election transitions.');
+        if ($nextElectionDate === '') otError('Next election date is required for election transitions.');
+        $effectiveDate = $proclamationDate;
+    }
+
+    $hasConfiguredTermSchedule = otHasConfiguredTermSchedule($conn);
 
     // Load seat info (position, current holder, selection method)
     $seatStmt = $conn->prepare("
@@ -393,22 +972,25 @@ if ($action === 'new_transition') {
     if (!$seat) otError('Council seat not found or inactive.');
 
     $position   = (string)($seat['seat_name']             ?? '');
-    $outgoingId = (string)($seat['current_official_id']   ?? '');
-    $department = (string)($seat['department']            ?? '');
-    $areaN      = (string)($seat['area_number']           ?? '');
+    if (!otIsManagedTransitionSeat($position)) {
+        otError('This seat is not managed in Official Transition.');
+    }
+    $outgoingId = $hasConfiguredTermSchedule ? (string)($seat['current_official_id'] ?? '') : '';
+    $department = $hasConfiguredTermSchedule ? (string)($seat['department'] ?? '') : '';
+    $areaN      = $hasConfiguredTermSchedule ? (string)($seat['area_number'] ?? '') : '';
 
     $transId = otGenerateTransitionId($conn);
 
     $stmt = $conn->prepare("
         INSERT INTO officialtransitionstbl
-            (transition_id, council_id, batch_label, election_date, transition_type, position,
+            (transition_id, council_id, batch_label, proclamation_date, next_election_date, election_date, transition_type, position,
              department, area_number, outgoing_official_id, effective_date, reason, status, created_by)
-        VALUES (?, NULLIF(?,0), NULLIF(?,''), NULLIF(?,''), ?, ?,
+        VALUES (?, NULLIF(?,0), NULLIF(?,''), NULLIF(?,''), NULLIF(?,''), NULLIF(?,''), ?, ?,
                 NULLIF(?,''), NULLIF(?,''), NULLIF(?,''), NULLIF(?,''), NULLIF(?,''), 'Open', ?)
     ");
     if (!$stmt) otError('Insert failed: ' . $conn->error);
-    $stmt->bind_param('sissssssssss',
-        $transId, $councilId, $batchLabel, $electionDate,
+    $stmt->bind_param('sissssssssssss',
+        $transId, $councilId, $batchLabel, $proclamationDate, $nextElectionDate, $nextElectionDate,
         $transType, $position, $department, $areaN,
         $outgoingId, $effectiveDate, $reason, $actorId
     );
@@ -431,47 +1013,44 @@ if ($action === 'new_batch') {
     if (!otTableExists($conn, 'officialtransitionstbl')) {
         otError('Database migration has not been applied yet.', 503);
     }
-    $batchLabel   = trim((string)($_POST['batch_label']   ?? ''));
-    $batchType    = trim((string)($_POST['batch_type']    ?? ''));
-    $electionDate = trim((string)($_POST['election_date'] ?? ''));
-
-    if ($batchLabel === '')   otError('Batch label is required.');
-    if ($batchType === '')    otError('Batch type is required.');
-    if ($electionDate === '') otError('Election date is required.');
-
-    $seatGroup = match ($batchType) {
-        'BarangayElection' => 'Sangguniang Barangay',
-        'SKElection' => 'Sangguniang Kabataan',
-        default => null,
-    };
-    if ($seatGroup === null) {
-        otError('Invalid batch type.');
+    $batchLabel = trim((string)($_POST['batch_label'] ?? ''));
+    $proclamationDate = trim((string)($_POST['proclamation_date'] ?? ''));
+    $nextElectionDate = trim((string)($_POST['next_election_date'] ?? ''));
+    if ($nextElectionDate === '') {
+        $nextElectionDate = trim((string)($_POST['election_date'] ?? ''));
     }
+
+    if ($batchLabel === '') otError('Batch label is required.');
+    if ($proclamationDate === '') otError('Proclamation date is required.');
+    if ($nextElectionDate === '') otError('Next election date is required.');
+
+    $hasConfiguredTermSchedule = otHasConfiguredTermSchedule($conn);
 
     $seatListStmt = $conn->prepare("
         SELECT bc.council_id, bc.seat_name, bc.current_official_id,
-               oi.department, oi.area_number
+               oi.department, oi.area_number, bc.seat_group
         FROM barangaycounciltbl bc
         LEFT JOIN officialinformationtbl oi ON oi.official_id = bc.current_official_id
         WHERE bc.is_active = 1
           AND bc.selection_method = 'Elected'
-          AND bc.seat_group = ?
         ORDER BY bc.sort_order, bc.council_id
     ");
     if (!$seatListStmt) {
         otError('Failed to load eligible council seats.');
     }
-    $seatListStmt->bind_param('s', $seatGroup);
     $seatListStmt->execute();
     $seatListRes = $seatListStmt->get_result();
     $eligibleSeats = [];
     while ($seatRow = $seatListRes->fetch_assoc()) {
+        if (!otIsManagedTransitionSeat((string)($seatRow['seat_name'] ?? ''))) {
+            continue;
+        }
         $eligibleSeats[] = $seatRow;
     }
     $seatListStmt->close();
 
     if (empty($eligibleSeats)) {
-        otError('No eligible elected seats were found for the selected batch type.');
+        otError('No eligible elected seats were found for the batch.');
     }
 
     $created = [];
@@ -484,20 +1063,23 @@ if ($action === 'new_batch') {
             }
             $transId    = otGenerateTransitionId($conn);
             $position   = (string)($seat['seat_name']           ?? '');
-            $outgoingId = (string)($seat['current_official_id'] ?? '');
-            $dept       = (string)($seat['department']          ?? '');
-            $area       = (string)($seat['area_number']         ?? '');
+            $outgoingId = $hasConfiguredTermSchedule ? (string)($seat['current_official_id'] ?? '') : '';
+            $dept       = $hasConfiguredTermSchedule ? (string)($seat['department'] ?? '') : '';
+            $area       = $hasConfiguredTermSchedule ? (string)($seat['area_number'] ?? '') : '';
+            $transitionType = ((string)($seat['seat_group'] ?? '') === 'Sangguniang Kabataan')
+                ? 'SKElection'
+                : 'BarangayElection';
 
             $stmt = $conn->prepare("
                 INSERT INTO officialtransitionstbl
-                    (transition_id, council_id, batch_label, election_date, transition_type, position,
-                     department, area_number, outgoing_official_id, effective_date, status, created_by)
-                VALUES (?, ?, ?, ?, ?, ?, NULLIF(?,''), NULLIF(?,''), NULLIF(?,''), ?, 'Open', ?)
+                    (transition_id, council_id, batch_label, proclamation_date, next_election_date, election_date,
+                     transition_type, position, department, area_number, outgoing_official_id, effective_date, status, created_by)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, NULLIF(?,''), NULLIF(?,''), NULLIF(?,''), ?, 'Open', ?)
             ");
             if (!$stmt) throw new Exception('Insert failed: ' . $conn->error);
-            $stmt->bind_param('sisssssssss',
-                $transId, $councilId, $batchLabel, $electionDate, $batchType,
-                $position, $dept, $area, $outgoingId, $electionDate, $actorId
+            $stmt->bind_param('sisssssssssss',
+                $transId, $councilId, $batchLabel, $proclamationDate, $nextElectionDate, $nextElectionDate,
+                $transitionType, $position, $dept, $area, $outgoingId, $proclamationDate, $actorId
             );
             if (!$stmt->execute()) throw new Exception('Failed: ' . $stmt->error);
             $stmt->close();
@@ -513,7 +1095,7 @@ if ($action === 'new_batch') {
     insertUnifiedAuditLog($conn, $actorId, $actorRole,
         'OfficialTransitions', 'batch', $batchLabel,
         'create_batch', 'count', null, (string)count($created),
-        "Election: {$electionDate} | Type: {$batchType}"
+        "Proclamation: {$proclamationDate} | Next election: {$nextElectionDate}"
     );
 
     otJson(['success' => true, 'message' => count($created) . ' transitions created for batch.', 'created' => $created]);
@@ -523,15 +1105,57 @@ if ($action === 'new_batch') {
 // POST: update election date for batch
 // ════════════════════════════════════════════════════════════════════════════
 if ($action === 'update_election_date') {
-    $batchLabel   = trim((string)($_POST['batch_label']   ?? ''));
-    $electionDate = trim((string)($_POST['election_date'] ?? ''));
+    $batchLabel = trim((string)($_POST['original_batch_label'] ?? $_POST['batch_label'] ?? ''));
+    $proclamationDate = trim((string)($_POST['proclamation_date'] ?? ''));
+    $nextElectionDate = trim((string)($_POST['next_election_date'] ?? ''));
+    if ($nextElectionDate === '') {
+        $nextElectionDate = trim((string)($_POST['election_date'] ?? ''));
+    }
 
-    if ($batchLabel === '')   otError('Batch label is required.');
-    if ($electionDate === '') otError('Election date is required.');
+    if ($batchLabel === '') otError('Batch label is required.');
+    if ($nextElectionDate === '') otError('Next election date is required.');
+
+    $existingStmt = $conn->prepare("
+        SELECT
+            COALESCE(MAX(proclamation_date), MAX(effective_date)) AS proclamation_date,
+            COALESCE(MAX(next_election_date), MAX(election_date)) AS next_election_date
+        FROM officialtransitionstbl
+        WHERE batch_label = ?
+    ");
+    if (!$existingStmt) otError('Failed to load existing term schedule.');
+    $existingStmt->bind_param('s', $batchLabel);
+    $existingStmt->execute();
+    $existingRes = $existingStmt->get_result();
+    $existingSchedule = $existingRes ? $existingRes->fetch_assoc() : null;
+    $existingStmt->close();
+
+    if (!$existingSchedule || (
+        trim((string)($existingSchedule['proclamation_date'] ?? '')) === '' &&
+        trim((string)($existingSchedule['next_election_date'] ?? '')) === ''
+    )) {
+        otError('Term schedule not found.');
+    }
+
+    $existingProclamationDate = trim((string)($existingSchedule['proclamation_date'] ?? ''));
+    $existingNextElectionDate = trim((string)($existingSchedule['next_election_date'] ?? ''));
+    $proclamationDate = $existingProclamationDate !== '' ? $existingProclamationDate : $proclamationDate;
+
+    if ($proclamationDate === '') otError('Proclamation date is required.');
+
+    if ($existingNextElectionDate !== '') {
+        $existingYear = date('Y', strtotime($existingNextElectionDate));
+        $newYear = date('Y', strtotime($nextElectionDate));
+        if ($existingYear !== $newYear) {
+            otError('Only the month and day can be changed for the next election date.');
+        }
+    }
 
     $stmt = $conn->prepare("
         UPDATE officialtransitionstbl
-        SET election_date = ?,
+        SET proclamation_date = ?,
+            next_election_date = ?,
+            election_date = ?,
+            effective_date = CASE WHEN effective_date IS NULL THEN ? ELSE effective_date END,
             notify_3mo_sent = 0, notify_3mo_sent_at = NULL,
             notify_1mo_sent = 0, notify_1mo_sent_at = NULL,
             deactivated_7d_before = 0, deactivated_7d_before_at = NULL,
@@ -543,17 +1167,17 @@ if ($action === 'update_election_date') {
           AND notify_post_sent = 0
     ");
     if (!$stmt) otError('Update failed.');
-    $stmt->bind_param('ss', $electionDate, $batchLabel);
+    $stmt->bind_param('sssss', $proclamationDate, $nextElectionDate, $nextElectionDate, $proclamationDate, $batchLabel);
     $stmt->execute();
     $affected = $stmt->affected_rows;
     $stmt->close();
 
     insertUnifiedAuditLog($conn, $actorId, $actorRole,
         'OfficialTransitions', 'batch', $batchLabel,
-        'update_election_date', 'election_date', null, $electionDate, null
+        'update_election_date', 'next_election_date', null, $nextElectionDate, 'Updated batch proclamation and next election dates.'
     );
 
-    otJson(['success' => true, 'message' => "Election date updated for {$affected} transition(s)."]);
+    otJson(['success' => true, 'message' => "Batch dates updated for {$affected} transition(s)."]);
 }
 
 // ════════════════════════════════════════════════════════════════════════════
@@ -809,6 +1433,11 @@ if ($action === 'complete_transition') {
 
     $outgoingId = (string)($transition['outgoing_official_id'] ?? '');
     $outgoing   = $outgoingId !== '' ? otGetOfficialUser($conn, $outgoingId) : null;
+    $effectiveDate = otResolveEffectiveDate($transition);
+    $termEndDate = otResolveTermEndDate($transition);
+    $termEndDateSql = $termEndDate ?? '';
+    $batchLabel = trim((string)($transition['batch_label'] ?? ''));
+    $completionMessage = 'Transition completed successfully.';
 
     // ── Load selected candidate (required for most outcomes) ─────────────────
     $candidate = null;
@@ -820,6 +1449,9 @@ if ($action === 'complete_transition') {
             $candidate = $cStmt->get_result()->fetch_assoc();
             $cStmt->close();
         }
+    }
+    if (!in_array($outcome, ['ReElected', 'NoSuccessor'], true) && !$candidate) {
+        otError('Selected official information was not found for this transition.');
     }
 
     // ── Position uniqueness check (skip for ReElected & NoSuccessor) ─────────
@@ -851,6 +1483,9 @@ if ($action === 'complete_transition') {
     $inactiveStatusId = otGetStatusId($conn, 'UserAccount', 'Inactive');
     $activeStatusId   = otGetStatusId($conn, 'UserAccount', 'Active');
     $suspendedStatusId= otGetStatusId($conn, 'UserAccount', 'Suspended');
+    if ($outcome !== 'NoSuccessor' && $activeStatusId === null) {
+        otError('Active status not found in lookup table.');
+    }
 
     $conn->begin_transaction();
     try {
@@ -872,8 +1507,23 @@ if ($action === 'complete_transition') {
             $newEmpStatus = $empStatusMap[$transType] ?? 'Term Ended';
 
             if ($outcome === 'ReElected') {
-                // No status change — just refresh term dates
-                $conn->query("UPDATE officialinformationtbl SET term_start = CURDATE(), last_updated = CURRENT_TIMESTAMP WHERE official_id = '{$conn->real_escape_string($outgoingId)}'");
+                $reElectStmt = $conn->prepare("
+                    UPDATE officialinformationtbl
+                    SET term_start = ?,
+                        term_end = NULLIF(?, ''),
+                        transition_out_type = NULL,
+                        transition_out_date = NULL,
+                        transition_out_reason = NULL,
+                        batch_label = NULLIF(?, ''),
+                        last_updated = CURRENT_TIMESTAMP
+                    WHERE official_id = ?
+                    LIMIT 1
+                ");
+                if ($reElectStmt) {
+                    $reElectStmt->bind_param('ssss', $effectiveDate, $termEndDateSql, $batchLabel, $outgoingId);
+                    $reElectStmt->execute();
+                    $reElectStmt->close();
+                }
                 $newEmpStatus = 'Re-Elected';
             } elseif ($outcome === 'ActingReplacement') {
                 // Suspend (not deactivate) original
@@ -894,24 +1544,25 @@ if ($action === 'complete_transition') {
             }
 
             // Record transition-out info on the official's record
-            $empStatusId = otGetStatusId($conn, 'Employment', $newEmpStatus);
-            $batchLabel  = (string)($transition['batch_label'] ?? '');
+            $empStatusId = otGetStatusIdByPreferredNames($conn, ['Employment', 'Official/Personnel Management'], [$newEmpStatus]);
             $transReason = (string)($transition['reason'] ?? '');
-            $outDate     = (string)($transition['effective_date'] ?? date('Y-m-d'));
-            $upOi = $conn->prepare("
-                UPDATE officialinformationtbl
-                SET transition_out_type   = ?,
-                    transition_out_date   = ?,
-                    transition_out_reason = NULLIF(?,''),
-                    batch_label           = NULLIF(?,''),
-                    status_id_employment  = COALESCE(?, status_id_employment),
-                    last_updated          = CURRENT_TIMESTAMP
-                WHERE official_id = ?
-            ");
-            if ($upOi) {
-                $upOi->bind_param('ssssis', $newEmpStatus, $outDate, $transReason, $batchLabel, $empStatusId, $outgoingId);
-                $upOi->execute();
-                $upOi->close();
+            $outDate     = $effectiveDate;
+            if ($outcome !== 'ReElected') {
+                $upOi = $conn->prepare("
+                    UPDATE officialinformationtbl
+                    SET transition_out_type   = ?,
+                        transition_out_date   = ?,
+                        transition_out_reason = NULLIF(?,''),
+                        batch_label           = NULLIF(?,''),
+                        status_id_employment  = COALESCE(?, status_id_employment),
+                        last_updated          = CURRENT_TIMESTAMP
+                    WHERE official_id = ?
+                ");
+                if ($upOi) {
+                    $upOi->bind_param('ssssis', $newEmpStatus, $outDate, $transReason, $batchLabel, $empStatusId, $outgoingId);
+                    $upOi->execute();
+                    $upOi->close();
+                }
             }
 
             // Notify outgoing official
@@ -932,35 +1583,145 @@ if ($action === 'complete_transition') {
 
         // ── Process incoming (winner) ─────────────────────────────────────────
         $incomingOfficialId = null;
+        $incomingUserId = '';
+        $linkedInviteId = 0;
+        $completionInviteLink = '';
+        $completionInviteEmailSent = null;
+        $completionInviteSmsSent = null;
 
         if ($outcome === 'Reactivated' && $candidate) {
             $linkedId = (string)($candidate['linked_official_id'] ?? '');
-            if ($linkedId !== '' && $activeStatusId) {
+            if ($linkedId !== '' && $activeStatusId !== null) {
                 $retOfficial = otGetOfficialUser($conn, $linkedId);
                 if ($retOfficial) {
                     $retUserId = (string)($retOfficial['user_id'] ?? '');
-                    $upStmt = $conn->prepare("UPDATE useraccountstbl SET status_id_account = ?, updated_at = NOW() WHERE user_id = ? LIMIT 1");
-                    if ($upStmt) { $upStmt->bind_param('is', $activeStatusId, $retUserId); $upStmt->execute(); $upStmt->close(); }
-                    // Update position on their record
-                    $newPos = (string)($transition['position'] ?? '');
-                    $conn->query("UPDATE officialinformationtbl SET position_access = '{$conn->real_escape_string($newPos)}', transition_out_type = NULL, transition_out_date = NULL, transition_out_reason = NULL, term_start = CURDATE(), can_return = 1, last_updated = CURRENT_TIMESTAMP WHERE official_id = '{$conn->real_escape_string($linkedId)}'");
-                    $incomingOfficialId = $linkedId;
-                    // Notify returning official
-                    $retName = trim(($retOfficial['firstname'] ?? '') . ' ' . ($retOfficial['lastname'] ?? ''));
-                    otNotifyUser($conn, $retUserId,
-                        'System Access Restored — Welcome Back',
-                        "Dear {$retName},\n\nYour Barangay San Jose system account has been restored for your new term as {$transition['position']}. Please contact the IT Administrator if you need to update your credentials.\n\nBarangay San Jose"
+                    $candidateEmail = strtolower(trim((string)($candidate['candidate_email'] ?? ($retOfficial['email'] ?? ''))));
+                    $candidatePhone = oi_normalize_phone10((string)($candidate['candidate_mobile'] ?? $retOfficial['phone_number'] ?? ''));
+                    otAssertContactIsAvailable($conn, $candidateEmail, $candidatePhone, $retUserId);
+
+                    $assignment = otResolveIncomingAccessProfile($transition);
+                    $employmentStatusId = otGetStatusIdByPreferredNames(
+                        $conn,
+                        ['Official/Personnel Management', 'Employment', 'OfficialEmployment', 'UserAccount'],
+                        [$assignment['employment_status'], 'Regular', 'Active']
                     );
+
+                    $upStmt = $conn->prepare("
+                        UPDATE useraccountstbl
+                        SET status_id_account = ?,
+                            email = ?,
+                            phone_number = ?,
+                            role_access = ?,
+                            updated_at = NOW()
+                        WHERE user_id = ?
+                        LIMIT 1
+                    ");
+                    if ($upStmt) {
+                        $activeStatusValue = (string)$activeStatusId;
+                        $upStmt->bind_param('sssss', $activeStatusValue, $candidateEmail, $candidatePhone, $assignment['account_role'], $retUserId);
+                        $upStmt->execute();
+                        $upStmt->close();
+                    }
+
+                    $upProfile = $conn->prepare("
+                        UPDATE officialinformationtbl
+                        SET role_access = ?,
+                            position_access = ?,
+                            department = ?,
+                            area_number = ?,
+                            selection_method = ?,
+                            transition_out_type = NULL,
+                            transition_out_date = NULL,
+                            transition_out_reason = NULL,
+                            term_start = ?,
+                            term_end = NULLIF(?, ''),
+                            batch_label = NULLIF(?, ''),
+                            can_return = 1,
+                            status_id_employment = COALESCE(?, status_id_employment),
+                            last_updated = CURRENT_TIMESTAMP
+                        WHERE official_id = ?
+                        LIMIT 1
+                    ");
+                    if ($upProfile) {
+                        $upProfile->bind_param(
+                            'ssssssssis',
+                            $assignment['official_role'],
+                            $assignment['position_access'],
+                            $assignment['department'],
+                            $assignment['area_number'],
+                            $assignment['selection_method'],
+                            $effectiveDate,
+                            $termEndDateSql,
+                            $batchLabel,
+                            $employmentStatusId,
+                            $linkedId
+                        );
+                        $upProfile->execute();
+                        $upProfile->close();
+                    }
+
+                    $invite = otCreateOfficialInvite($conn, [
+                        'email' => $candidateEmail,
+                        'phone_number' => $candidatePhone,
+                        'firstname' => (string)($retOfficial['firstname'] ?? ''),
+                        'middlename' => (string)($retOfficial['middlename'] ?? ''),
+                        'lastname' => (string)($retOfficial['lastname'] ?? ''),
+                        'suffix' => (string)($retOfficial['suffix'] ?? ''),
+                        'role_access' => $assignment['account_role'],
+                        'position_access' => $assignment['position_access'],
+                        'department' => $assignment['department'],
+                        'employment_status' => $assignment['employment_status'],
+                        'area_number' => $assignment['area_number'],
+                        'user_id' => $retUserId,
+                    ], $actorId);
+                    $linkedInviteId = (int)($invite['invite_id'] ?? 0);
+                    $completionInviteLink = (string)($invite['invite_link'] ?? '');
+                    $completionInviteEmailSent = (bool)($invite['email_sent'] ?? false);
+                    $completionInviteSmsSent = (bool)($invite['sms_sent'] ?? false);
+                    $incomingOfficialId = $linkedId;
+                    $incomingUserId = $retUserId;
+                    $completionMessage = 'Transition completed. The reactivated official account was updated.';
                 }
             }
         } elseif ($outcome === 'PositionChange' && $candidate) {
             $linkedId = (string)($candidate['linked_official_id'] ?? '');
             if ($linkedId !== '') {
-                $newPos = (string)($transition['position'] ?? '');
-                $conn->query("UPDATE officialinformationtbl SET position_access = '{$conn->real_escape_string($newPos)}', term_start = CURDATE(), last_updated = CURRENT_TIMESTAMP WHERE official_id = '{$conn->real_escape_string($linkedId)}'");
+                $previousOfficialData = otGetOfficialUser($conn, $linkedId);
+                $assignment = otResolveIncomingAccessProfile($transition);
+                $positionStmt = $conn->prepare("
+                    UPDATE officialinformationtbl
+                    SET role_access = ?,
+                        position_access = ?,
+                        department = ?,
+                        area_number = ?,
+                        selection_method = ?,
+                        term_start = ?,
+                        term_end = NULLIF(?, ''),
+                        batch_label = NULLIF(?, ''),
+                        last_updated = CURRENT_TIMESTAMP
+                    WHERE official_id = ?
+                    LIMIT 1
+                ");
+                if ($positionStmt) {
+                    $positionStmt->bind_param(
+                        'sssssssss',
+                        $assignment['official_role'],
+                        $assignment['position_access'],
+                        $assignment['department'],
+                        $assignment['area_number'],
+                        $assignment['selection_method'],
+                        $effectiveDate,
+                        $termEndDateSql,
+                        $batchLabel,
+                        $linkedId
+                    );
+                    $positionStmt->execute();
+                    $positionStmt->close();
+                }
                 $incomingOfficialId = $linkedId;
+                $incomingUserId = (string)($previousOfficialData['user_id'] ?? '');
                 // Auto-open a new transition for the vacated position
-                $vacOfficialData = otGetOfficialUser($conn, $linkedId);
+                $vacOfficialData = $previousOfficialData;
                 if ($vacOfficialData) {
                     $vacTransId  = otGenerateTransitionId($conn);
                     $vacPosition = (string)($vacOfficialData['position'] ?? '');
@@ -976,27 +1737,61 @@ if ($action === 'complete_transition') {
             }
         } elseif ($outcome === 'ActingReplacement' && $candidate) {
             $linkedId = (string)($candidate['linked_official_id'] ?? '');
-            if ($linkedId !== '' && $activeStatusId) {
+            if ($linkedId !== '' && $activeStatusId !== null) {
                 $actOfficial = otGetOfficialUser($conn, $linkedId);
                 if ($actOfficial) {
                     $actUserId = (string)($actOfficial['user_id'] ?? '');
                     $upStmt = $conn->prepare("UPDATE useraccountstbl SET status_id_account = ?, updated_at = NOW() WHERE user_id = ? LIMIT 1");
-                    if ($upStmt) { $upStmt->bind_param('is', $activeStatusId, $actUserId); $upStmt->execute(); $upStmt->close(); }
+                    if ($upStmt) {
+                        $activeStatusValue = (string)$activeStatusId;
+                        $upStmt->bind_param('ss', $activeStatusValue, $actUserId);
+                        $upStmt->execute();
+                        $upStmt->close();
+                    }
                     // Mark acting relationship on the acting official
                     $conn->query("UPDATE officialinformationtbl SET acting_for_id = '{$conn->real_escape_string($outgoingId)}', acting_until_date = " . ($actingUntil !== '' ? "'{$conn->real_escape_string($actingUntil)}'" : 'NULL') . ", last_updated = CURRENT_TIMESTAMP WHERE official_id = '{$conn->real_escape_string($linkedId)}'");
                     $incomingOfficialId = $linkedId;
+                    $incomingUserId = $actUserId;
                 }
             }
         } elseif ($outcome === 'NewPerson' && $candidate) {
-            // Invite flow — link_invite_id will be set when the invite is created externally
-            // Mark candidate with the transition for later linkage
-            $conn->query("UPDATE upcomingofficialstbl SET is_selected = 1 WHERE upcoming_id = {$candidateId}");
+            $newIncoming = otCreateIncomingOfficialShell($conn, $transition, $candidate, $actorId, (string)$activeStatusId);
+            $incomingOfficialId = (string)($newIncoming['official_id'] ?? '');
+            $incomingUserId = (string)($newIncoming['user_id'] ?? '');
+            $linkedInviteId = (int)($newIncoming['invite_id'] ?? 0);
+            $completionInviteLink = (string)($newIncoming['invite_link'] ?? '');
+            $completionInviteEmailSent = (bool)($newIncoming['email_sent'] ?? false);
+            $completionInviteSmsSent = (bool)($newIncoming['sms_sent'] ?? false);
+            $completionMessage = 'Transition completed. Onboarding access was prepared for the proclaimed official.';
+        } elseif ($outcome === 'ReElected') {
+            $incomingOfficialId = $outgoingId;
+            $incomingUserId = (string)($outgoing['user_id'] ?? '');
+        }
+
+        if ($completionInviteEmailSent !== null || $completionInviteSmsSent !== null) {
+            $deliveryParts = [];
+            if ($completionInviteEmailSent !== null) {
+                $deliveryParts[] = $completionInviteEmailSent ? 'email sent' : 'email not sent';
+            }
+            if ($completionInviteSmsSent !== null) {
+                $deliveryParts[] = $completionInviteSmsSent ? 'SMS sent' : 'SMS not sent';
+            }
+            if ($deliveryParts) {
+                $completionMessage .= ' Delivery status: ' . implode(', ', $deliveryParts) . '.';
+            }
         }
 
         // ── Mark selected candidate ───────────────────────────────────────────
         if ($candidateId > 0 && $outcome !== 'NoSuccessor') {
             $conn->query("UPDATE upcomingofficialstbl SET is_selected = 0 WHERE transition_id = '{$conn->real_escape_string($transitionId)}'");
-            $conn->query("UPDATE upcomingofficialstbl SET is_selected = 1 WHERE upcoming_id = {$candidateId}");
+            $candidateUpdateParts = ["is_selected = 1"];
+            if ($incomingOfficialId !== null && $incomingOfficialId !== '') {
+                $candidateUpdateParts[] = "linked_official_id = '{$conn->real_escape_string((string)$incomingOfficialId)}'";
+            }
+            if ($linkedInviteId > 0) {
+                $candidateUpdateParts[] = "linked_invite_id = {$linkedInviteId}";
+            }
+            $conn->query("UPDATE upcomingofficialstbl SET " . implode(', ', $candidateUpdateParts) . " WHERE upcoming_id = {$candidateId}");
         }
 
         // ── Update transition record ──────────────────────────────────────────
@@ -1026,19 +1821,23 @@ if ($action === 'complete_transition') {
         // ── Update barangaycounciltbl seat ────────────────────────────────────
         $councilId = (int)($transition['council_id'] ?? 0);
         if ($councilId > 0 && otTableExists($conn, 'barangaycounciltbl')) {
-            $effDate = (string)($transition['effective_date'] ?? date('Y-m-d'));
             if ($outcome === 'NoSuccessor') {
                 // Seat becomes vacant
                 $conn->query("UPDATE barangaycounciltbl SET current_official_id = NULL, term_start = NULL, term_end = NULL, updated_at = NOW() WHERE council_id = {$councilId}");
             } elseif ($outcome === 'ReElected') {
-                // Same person — refresh term start only
-                $conn->query("UPDATE barangaycounciltbl SET term_start = '{$conn->real_escape_string($effDate)}', updated_at = NOW() WHERE council_id = {$councilId}");
+                $termEndSql = $termEndDate !== null ? "'" . $conn->real_escape_string($termEndDate) . "'" : 'NULL';
+                $conn->query("UPDATE barangaycounciltbl SET term_start = '{$conn->real_escape_string($effectiveDate)}', term_end = {$termEndSql}, updated_at = NOW() WHERE council_id = {$councilId}");
             } elseif ($incomingOfficialId !== null && $incomingOfficialId !== '') {
                 // New holder takes the seat
                 $safeIncoming = $conn->real_escape_string($incomingOfficialId);
-                $conn->query("UPDATE barangaycounciltbl SET current_official_id = '{$safeIncoming}', term_start = '{$conn->real_escape_string($effDate)}', term_end = NULL, updated_at = NOW() WHERE council_id = {$councilId}");
+                $termEndSql = $termEndDate !== null ? "'" . $conn->real_escape_string($termEndDate) . "'" : 'NULL';
+                $conn->query("UPDATE barangaycounciltbl SET current_official_id = '{$safeIncoming}', term_start = '{$conn->real_escape_string($effectiveDate)}', term_end = {$termEndSql}, updated_at = NOW() WHERE council_id = {$councilId}");
             }
             // ActingReplacement: keep original in current_official_id (they're only suspended, not replaced)
+        }
+
+        if ($councilId > 0 && $incomingOfficialId !== null && $incomingOfficialId !== '' && $incomingUserId !== '') {
+            amp_apply_seat_permissions_to_official($conn, $councilId, (string)$incomingOfficialId, $incomingUserId, $actorId, 'Official');
         }
 
         $conn->commit();
@@ -1053,7 +1852,13 @@ if ($action === 'complete_transition') {
         "Outgoing: {$outgoingId} | Candidate: {$candidateId}"
     );
 
-    otJson(['success' => true, 'message' => 'Transition completed successfully.']);
+    otJson([
+        'success' => true,
+        'message' => $completionMessage,
+        'invite_link' => $completionInviteLink,
+        'invite_email_sent' => $completionInviteEmailSent,
+        'invite_sms_sent' => $completionInviteSmsSent,
+    ]);
 }
 
 // ════════════════════════════════════════════════════════════════════════════

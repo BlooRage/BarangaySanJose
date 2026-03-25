@@ -1,5 +1,5 @@
 /**
- * Official Transition Module — JS
+ * Official Transition — JS
  */
 (function () {
   'use strict';
@@ -44,6 +44,12 @@
     });
     return res.json();
   }
+
+  const pageTool = document.body?.dataset.otTool || 'current_term';
+  const autoStart = document.body?.dataset.otAutostart || '';
+  const emptyQueueMessage = pageTool === 'create_new_term'
+    ? 'No term encoding records yet. Create the term first, then encode the elected winners and appointed officials.'
+    : 'No transitions found.';
 
   // ── Status badge ──────────────────────────────────────────────────────────
   function statusBadge(status) {
@@ -111,14 +117,32 @@
 
     const rows = data.data || [];
     if (!rows.length) {
-      tbody.innerHTML = '<tr><td colspan="8" class="text-center text-muted py-4">No transitions found.</td></tr>';
+      tbody.innerHTML = `<tr><td colspan="8" class="text-center text-muted py-4">${emptyQueueMessage}</td></tr>`;
       renderPagination(0);
       return;
     }
 
     tbody.innerHTML = rows.map(r => {
-      const outgoing  = r.outgoing_name    || '<span class="text-muted">—</span>';
-      const batch     = r.batch_label      ? `<span class="badge bg-secondary">${esc(r.batch_label)}</span>` : '<span class="text-muted small">—</span>';
+      const outgoingParts = [
+        r.outgoing_position
+          ? `<div class="small text-muted">${esc(r.outgoing_position)}</div>`
+          : '',
+        r.outgoing_name
+          ? `<div>${esc(r.outgoing_name)}</div>`
+          : '',
+      ].filter(Boolean);
+      const outgoing = outgoingParts.join('');
+      const batch = r.batch_label
+        ? `<div><span class="badge bg-secondary">${esc(r.batch_label)}</span></div>${
+            r.proclamation_date || r.next_election_date
+              ? `<div class="small text-muted mt-1">${
+                  r.proclamation_date ? `Proclaimed: ${fmtDate(r.proclamation_date)}` : ''
+                }${r.proclamation_date && r.next_election_date ? '<br>' : ''}${
+                  r.next_election_date ? `Next election: ${fmtDate(r.next_election_date)}` : ''
+                }</div>`
+              : ''
+          }`
+        : '<span class="text-muted small">—</span>';
       const effDate   = r.effective_date   ? fmtDate(r.effective_date) : '<span class="text-muted">—</span>';
       const actingTag = r.is_acting == 1   ? ' <span class="badge bg-info text-dark ms-1">Acting</span>' : '';
 
@@ -146,7 +170,7 @@
     const btns = [];
 
     if (['Open', 'CandidateEncoding', 'PendingDecision', 'Decided'].includes(s)) {
-      btns.push(`<button class="btn btn-xs btn-outline-primary py-0 px-2" onclick="otOpenCandidates('${esc(tid)}')" title="Fill position"><i class="fas fa-user-plus me-1"></i>Fill Position</button>`);
+      btns.push(`<button class="btn btn-xs btn-outline-primary py-0 px-2" onclick="otOpenCandidates('${esc(tid)}')" title="Set access handover"><i class="fas fa-user-plus me-1"></i>Set Access</button>`);
     }
     if (s === 'PendingDecision' || s === 'Decided') {
       btns.push(`<button class="btn btn-xs btn-success py-0 px-2" onclick="otOpenWinner('${esc(tid)}')" title="Finalize access"><i class="fas fa-key"></i></button>`);
@@ -208,9 +232,12 @@
   const ntCouncilId  = document.getElementById('ntCouncilId');
   const ntType       = document.getElementById('ntType');
   const ntBatchWrap  = document.getElementById('ntBatchLabelWrap');
-  const ntElectWrap  = document.getElementById('ntElectionDateWrap');
+  const ntProclamationWrap = document.getElementById('ntProclamationDateWrap');
+  const ntNextElectionWrap = document.getElementById('ntNextElectionDateWrap');
   const ntReasonLbl  = document.getElementById('ntReasonLabel');
   const ntSeatWrap   = document.getElementById('ntSeatInfoWrap');
+  const ntProclamationDate = document.getElementById('ntProclamationDate');
+  const ntEffectiveDate = document.getElementById('ntEffectiveDate');
 
   // Transition type options per selection_method
   const ELECTED_TYPES = [
@@ -273,7 +300,8 @@
     // Reset dependent fields
     if (ntType) ntType.value = '';
     if (ntBatchWrap) ntBatchWrap.style.display = 'none';
-    if (ntElectWrap) ntElectWrap.style.display = 'none';
+    if (ntProclamationWrap) ntProclamationWrap.style.display = 'none';
+    if (ntNextElectionWrap) ntNextElectionWrap.style.display = 'none';
     if (ntReasonLbl) ntReasonLbl.textContent = 'Reason';
   });
 
@@ -282,8 +310,15 @@
     const isElection = ['BarangayElection','SKElection'].includes(v);
     const isRemoval  = v === 'Removal';
     if (ntBatchWrap) ntBatchWrap.style.display = isElection ? '' : 'none';
-    if (ntElectWrap) ntElectWrap.style.display = isElection ? '' : 'none';
+    if (ntProclamationWrap) ntProclamationWrap.style.display = isElection ? '' : 'none';
+    if (ntNextElectionWrap) ntNextElectionWrap.style.display = isElection ? '' : 'none';
     if (ntReasonLbl) ntReasonLbl.textContent   = isRemoval ? 'Reason *' : 'Reason';
+  });
+
+  ntProclamationDate?.addEventListener('change', () => {
+    if (ntEffectiveDate && ntType && ['BarangayElection', 'SKElection'].includes(ntType.value)) {
+      ntEffectiveDate.value = ntProclamationDate.value || '';
+    }
   });
 
   document.getElementById('formNewTransition')?.addEventListener('submit', async (e) => {
@@ -315,7 +350,7 @@
   // ══════════════════════════════════════════════════════════════════════════
   // NEW BATCH MODAL
   // ══════════════════════════════════════════════════════════════════════════
-  const batchSeatPreview = window.OT_BATCH_SEAT_PREVIEW || {};
+  const batchSeatPreview = Array.isArray(window.OT_BATCH_SEAT_PREVIEW) ? window.OT_BATCH_SEAT_PREVIEW : [];
 
   function batchSeatStatusBadge(status) {
     const text = String(status || '').trim();
@@ -328,26 +363,17 @@
   }
 
   function renderBatchSeatPreview() {
-    const type = document.getElementById('nbType')?.value || '';
     const emptyEl = document.getElementById('nbAutoSeatPreviewEmpty');
     const wrapEl = document.getElementById('nbAutoSeatPreviewWrap');
     const bodyEl = document.getElementById('nbAutoSeatPreviewBody');
     if (!emptyEl || !wrapEl || !bodyEl) return;
 
-    if (!type) {
-      emptyEl.classList.remove('d-none');
-      emptyEl.textContent = 'Select a batch type to preview the seats that will be included.';
-      wrapEl.classList.add('d-none');
-      bodyEl.innerHTML = '<tr><td colspan="5" class="text-center text-muted py-4">Select a batch type to preview the seats that will be included.</td></tr>';
-      return;
-    }
-
-    const seats = Array.isArray(batchSeatPreview[type]) ? batchSeatPreview[type] : [];
+    const seats = batchSeatPreview;
     if (!seats.length) {
       emptyEl.classList.remove('d-none');
-      emptyEl.textContent = 'No elected seats are configured for the selected batch type yet.';
+      emptyEl.textContent = 'No elected seats are configured in the council records yet.';
       wrapEl.classList.add('d-none');
-      bodyEl.innerHTML = '<tr><td colspan="5" class="text-center text-muted py-4">No seats available for this batch type.</td></tr>';
+      bodyEl.innerHTML = '<tr><td colspan="5" class="text-center text-muted py-4">No elected seats are available for this batch.</td></tr>';
       return;
     }
 
@@ -366,8 +392,6 @@
       `;
     }).join('');
   }
-
-  document.getElementById('nbType')?.addEventListener('change', renderBatchSeatPreview);
 
   document.getElementById('formNewBatch')?.addEventListener('submit', async (e) => {
     e.preventDefault();
@@ -391,21 +415,21 @@
     const body = new URLSearchParams();
     body.append('action', 'new_batch');
     body.append('batch_label', fd.get('batch_label') || '');
-    body.append('batch_type', fd.get('batch_type') || '');
-    body.append('election_date', fd.get('election_date') || '');
+    body.append('proclamation_date', fd.get('proclamation_date') || '');
+    body.append('next_election_date', fd.get('next_election_date') || '');
 
     const res = await fetch(API, { method: 'POST', body, headers: { 'Content-Type': 'application/x-www-form-urlencoded' } });
     const data = await res.json();
 
     btn.disabled = false;
-    btn.innerHTML = '<i class="fas fa-layer-group me-1"></i> Create Batch';
+    btn.innerHTML = '<i class="fas fa-layer-group me-1"></i> Create Term';
 
     if (data.success) {
-      showToast(data.message || 'Batch created.');
+      showToast(data.message || 'Term created.');
       getModal('modalNewBatch')?.hide();
       e.target.reset();
       renderBatchSeatPreview();
-      location.reload(); // reload to refresh election schedule section
+      window.location.href = 'OfficialTransitions.php?tool=current_term';
     } else {
       showToast(data.message || 'Failed.', 'error');
     }
@@ -416,8 +440,77 @@
   // ══════════════════════════════════════════════════════════════════════════
   // ADD ELECTION DATE
   // ══════════════════════════════════════════════════════════════════════════
-  document.getElementById('formAddElection')?.addEventListener('submit', async (e) => {
+  const editSchedule = window.OT_EDIT_SCHEDULE && typeof window.OT_EDIT_SCHEDULE === 'object'
+    ? window.OT_EDIT_SCHEDULE
+    : null;
+  const formAddElection = document.getElementById('formAddElection');
+  const aeBatchLabel = document.getElementById('aeBatchLabel');
+  const aeOriginalBatchLabel = document.getElementById('aeOriginalBatchLabel');
+  const aeProclamationDate = document.getElementById('aeProclamationDate');
+  const aeProclamationDateHidden = document.getElementById('aeProclamationDateHidden');
+  const aeNextElectionDate = document.getElementById('aeNextElectionDate');
+  const aeNextElectionHelp = document.getElementById('aeNextElectionHelp');
+  const aeNoEditableScheduleAlert = document.getElementById('aeNoEditableScheduleAlert');
+  const btnSubmitEditTermDetails = document.getElementById('btnSubmitEditTermDetails');
+
+  function configureEditTermForm() {
+    if (!formAddElection || !aeBatchLabel || !aeProclamationDate || !aeNextElectionDate) return;
+
+    const batchLabel = String(editSchedule?.batch_label || '').trim();
+    const proclamationDate = String(editSchedule?.proclamation_date || '').trim();
+    const nextElectionDate = String(editSchedule?.next_election_date || '').trim();
+
+    aeBatchLabel.value = batchLabel;
+    aeProclamationDate.value = proclamationDate;
+    aeNextElectionDate.value = nextElectionDate;
+    if (aeOriginalBatchLabel) aeOriginalBatchLabel.value = batchLabel;
+    if (aeProclamationDateHidden) aeProclamationDateHidden.value = proclamationDate;
+
+    if (!batchLabel || !nextElectionDate) {
+      aeNextElectionDate.disabled = true;
+      aeNextElectionDate.removeAttribute('min');
+      aeNextElectionDate.removeAttribute('max');
+      delete aeNextElectionDate.dataset.lockedYear;
+      delete aeNextElectionDate.dataset.originalValue;
+      aeNoEditableScheduleAlert?.classList.remove('d-none');
+      if (btnSubmitEditTermDetails) btnSubmitEditTermDetails.disabled = true;
+      return;
+    }
+
+    aeNextElectionDate.disabled = false;
+    aeNoEditableScheduleAlert?.classList.add('d-none');
+    if (btnSubmitEditTermDetails) btnSubmitEditTermDetails.disabled = false;
+
+    const lockedYear = nextElectionDate.slice(0, 4);
+    aeNextElectionDate.min = `${lockedYear}-01-01`;
+    aeNextElectionDate.max = `${lockedYear}-12-31`;
+    aeNextElectionDate.dataset.lockedYear = lockedYear;
+    aeNextElectionDate.dataset.originalValue = nextElectionDate;
+    if (aeNextElectionHelp) {
+      aeNextElectionHelp.textContent = `You can adjust the month and day, but the election year stays locked to ${lockedYear}.`;
+    }
+  }
+
+  function enforceEditTermYearLock() {
+    if (!aeNextElectionDate) return true;
+    const lockedYear = aeNextElectionDate.dataset.lockedYear || '';
+    const value = aeNextElectionDate.value || '';
+    if (!lockedYear || !value) return true;
+    if (!value.startsWith(`${lockedYear}-`)) {
+      showToast(`Next election year is locked to ${lockedYear}.`, 'warning');
+      aeNextElectionDate.value = aeNextElectionDate.dataset.originalValue || '';
+      return false;
+    }
+    aeNextElectionDate.dataset.originalValue = value;
+    return true;
+  }
+
+  document.getElementById('modalAddElection')?.addEventListener('show.bs.modal', configureEditTermForm);
+  aeNextElectionDate?.addEventListener('change', enforceEditTermYearLock);
+
+  formAddElection?.addEventListener('submit', async (e) => {
     e.preventDefault();
+    if (!enforceEditTermYearLock()) return;
     const fd = new FormData(e.target);
     fd.append('action', 'update_election_date');
     const params = {};
@@ -477,7 +570,7 @@
 
     const currentOfficial = (data.candidates || [])[0] || null;
     if (!currentOfficial) {
-      listEl.innerHTML = '<p class="text-muted small text-center py-2 mb-0">No official information is saved yet for this position. Fill out the form below, then click Continue to Finalize.</p>';
+      listEl.innerHTML = '<p class="text-muted small text-center py-2 mb-0">No incoming official information is saved yet for this position. Fill out the form below, then click Continue to Access Review.</p>';
       return;
     }
 
@@ -494,7 +587,7 @@
         ${emailLine ? `<div class="text-muted small">${esc(emailLine)}</div>` : ''}
         ${mobileLine ? `<div class="text-muted small">${esc(mobileLine)}</div>` : ''}
         ${currentOfficial.notes ? `<div class="text-muted small fst-italic mt-1">${esc(currentOfficial.notes)}</div>` : ''}
-        <div class="small text-muted mt-2">Editing the form below will replace this saved official when you continue to finalize.</div>
+        <div class="small text-muted mt-2">Editing the form below will replace this saved official when you continue to access review.</div>
       </div>`;
   }
 
@@ -785,13 +878,13 @@
     const saveData = await saveCurrentOfficialInformation();
     if (!saveData) {
       btn.disabled = false;
-      btn.innerHTML = '<i class="fas fa-key me-1"></i> Continue to Finalize';
+      btn.innerHTML = '<i class="fas fa-key me-1"></i> Continue to Access Review';
       return;
     }
 
     const data = await apiFetch({ action: 'mark_pending_decision', transition_id: transitionId }, 'POST');
     btn.disabled = false;
-    btn.innerHTML = '<i class="fas fa-key me-1"></i> Continue to Finalize';
+    btn.innerHTML = '<i class="fas fa-key me-1"></i> Continue to Access Review';
 
     if (data.success) {
       showToast('Official information saved. Continue with the final access action.');
@@ -818,14 +911,14 @@
       return {
         outcome: 'Reactivated',
         label: 'Returning Former Official',
-        description: 'The selected former official account will be reactivated and assigned back to this position.',
+        description: 'The matched account will be reactivated, the saved contact details will be updated, and a fresh onboarding access link will be sent.',
       };
     }
 
     return {
       outcome: 'NewPerson',
       label: 'First-time Official',
-      description: 'A new official invite/onboarding flow will be started for this person.',
+      description: 'A new official account shell will be prepared for this person and their onboarding access will be sent immediately.',
     };
   }
 
@@ -849,7 +942,7 @@
     const currentOfficial = (data.candidates || [])[0] || null;
 
     if (!currentOfficial) {
-      listEl.innerHTML = '<p class="text-muted small text-center">No official information is saved yet. Go back and complete the form first.</p>';
+      listEl.innerHTML = '<p class="text-muted small text-center">No official information is saved yet. Go back and complete the access setup first.</p>';
       return;
     }
 
@@ -873,7 +966,7 @@
     const mobileLine = formatMobileDisplay(currentOfficial.candidate_mobile || currentOfficial.candidate_contact || '');
     listEl.innerHTML = `
       <div class="border rounded p-3 bg-light">
-        <div class="fw-semibold small text-muted mb-2">Encoded Official</div>
+        <div class="fw-semibold small text-muted mb-2">Saved Official Record</div>
         <div class="fw-semibold">${esc(formatAccessEntryName(currentOfficial))} ${candidateTypePill(currentOfficial.linked_official_id ? 'ReturningOfficial' : 'New')}</div>
         ${emailLine ? `<small class="text-muted d-block">${esc(emailLine)}</small>` : ''}
         ${mobileLine ? `<small class="text-muted d-block">${esc(mobileLine)}</small>` : ''}
@@ -903,10 +996,13 @@
     }, 'POST');
 
     btn.disabled = false;
-    btn.innerHTML = '<i class="fas fa-check-circle me-1"></i> Complete Access Setup';
+    btn.innerHTML = '<i class="fas fa-check-circle me-1"></i> Complete and Notify';
 
     if (data.success) {
       showToast(data.message || 'Access setup completed.');
+      if (data.invite_link && data.invite_email_sent === false) {
+        window.prompt('Invite email was not sent automatically. Copy the onboarding link and send it manually:', String(data.invite_link));
+      }
       getModal('modalSelectWinner')?.hide();
       loadTransitions();
       updateStats();
@@ -954,12 +1050,34 @@
 
   document.getElementById('btnQaChangePosition')?.addEventListener('click', () => {
     getModal('modalQuickActions')?.hide();
-    showToast('Use New Transition → Appointment/Reappointment for a direct position change.', 'warning');
+    showToast('Use New Official Handover → Appointment/Reappointment for a direct position change.', 'warning');
   });
 
   // ── Restore Access ─────────────────────────────────────────────────────────
+  function inactiveOfficialsRows(officials) {
+    return officials.map(o => {
+      const transitionOut = [o.transition_out_type, o.transition_out_date ? fmtDate(o.transition_out_date) : '']
+        .filter(Boolean)
+        .join(' • ');
+      return `
+        <tr>
+          <td>${esc(o.full_name)}</td>
+          <td>${esc(o.position || '—')}</td>
+          <td><span class="badge bg-secondary">${esc(o.account_status || 'Inactive')}</span></td>
+          <td>${transitionOut ? esc(transitionOut) : '<span class="text-muted small">—</span>'}</td>
+          <td>${o.can_return == 1 ? '<span class="text-success"><i class="fas fa-check"></i></span>' : '<span class="text-danger"><i class="fas fa-times"></i></span>'}</td>
+          <td>
+            <button class="btn btn-xs btn-success py-0 px-2" onclick="otRestoreOfficial('${esc(o.official_id)}','${esc(o.full_name)}')">
+              <i class="fas fa-unlock me-1"></i> Restore
+            </button>
+          </td>
+        </tr>`;
+    }).join('');
+  }
+
   async function loadInactiveOfficials(q = '') {
     const listEl = document.getElementById('restoreOfficialsList');
+    if (!listEl) return;
     listEl.innerHTML = '<div class="text-center text-muted py-3"><i class="fas fa-spinner fa-spin me-2"></i></div>';
     const data = await apiFetch({ action: 'fetch_inactive_officials', q });
     const officials = data.data || [];
@@ -970,21 +1088,25 @@
     }
 
     listEl.innerHTML = `<div class="table-responsive"><table class="table table-sm align-middle mb-0">
-      <thead class="table-light"><tr><th>Name</th><th>Position</th><th>Status</th><th>Can Return</th><th></th></tr></thead>
+      <thead class="table-light"><tr><th>Name</th><th>Position</th><th>Status</th><th>Transition Out</th><th>Can Return</th><th></th></tr></thead>
       <tbody>
-        ${officials.map(o => `
-          <tr>
-            <td>${esc(o.full_name)}</td>
-            <td>${esc(o.position || '—')}</td>
-            <td><span class="badge bg-secondary">${esc(o.account_status)}</span></td>
-            <td>${o.can_return == 1 ? '<span class="text-success"><i class="fas fa-check"></i></span>' : '<span class="text-danger"><i class="fas fa-times"></i></span>'}</td>
-            <td>
-              <button class="btn btn-xs btn-success py-0 px-2" onclick="otRestoreOfficial('${esc(o.official_id)}','${esc(o.full_name)}')">
-                <i class="fas fa-unlock me-1"></i> Restore
-              </button>
-            </td>
-          </tr>`).join('')}
+        ${inactiveOfficialsRows(officials)}
       </tbody></table></div>`;
+  }
+
+  async function loadPastOfficials(q = '') {
+    const bodyEl = document.getElementById('otPastOfficialsBody');
+    if (!bodyEl) return;
+    bodyEl.innerHTML = '<tr><td colspan="6" class="text-center text-muted py-4"><i class="fas fa-spinner fa-spin me-2"></i> Loading…</td></tr>';
+    const data = await apiFetch({ action: 'fetch_inactive_officials', q });
+    const officials = data.data || [];
+
+    if (!officials.length) {
+      bodyEl.innerHTML = '<tr><td colspan="6" class="text-center text-muted py-4">No past officials found.</td></tr>';
+      return;
+    }
+
+    bodyEl.innerHTML = inactiveOfficialsRows(officials);
   }
 
   let restoreTimer;
@@ -993,12 +1115,19 @@
     restoreTimer = setTimeout(() => loadInactiveOfficials(this.value.trim()), 350);
   });
 
+  let pastOfficialsTimer;
+  document.getElementById('otPastOfficialsSearch')?.addEventListener('input', function () {
+    clearTimeout(pastOfficialsTimer);
+    pastOfficialsTimer = setTimeout(() => loadPastOfficials(this.value.trim()), 350);
+  });
+
   window.otRestoreOfficial = async function (officialId, name) {
     if (!confirm(`Restore access for ${name}?`)) return;
     const data = await apiFetch({ action: 'restore_access', official_id: officialId }, 'POST');
     if (data.success) {
       showToast(data.message || 'Access restored.');
       loadInactiveOfficials();
+      loadPastOfficials(document.getElementById('otPastOfficialsSearch')?.value.trim() || '');
       loadTransitions();
     } else {
       showToast(data.message || 'Failed.', 'error');
@@ -1152,5 +1281,11 @@
   // INIT
   // ══════════════════════════════════════════════════════════════════════════
   loadTransitions();
+  loadPastOfficials();
+  if (pageTool === 'create_new_term' && autoStart === 'new-batch') {
+    window.setTimeout(() => {
+      getModal('modalNewBatch')?.show();
+    }, 180);
+  }
 
 })();

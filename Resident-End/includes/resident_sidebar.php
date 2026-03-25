@@ -286,6 +286,10 @@ if ($residentId !== '' && isset($conn) && $conn instanceof mysqli) {
            class="a-sidebarLink <?= activeLink('Downloads.php', $current) ?>">
           <i class="fa-solid fa-download"></i>Downloads
         </a>
+        <a href="<?= htmlspecialchars($baseUrl, ENT_QUOTES, 'UTF-8') ?>/Resident-End/OfficialReceipts"
+           class="a-sidebarLink <?= activeLink('OfficialReceipts.php', $current) ?>">
+          <i class="fa-solid fa-receipt"></i>Official Receipts
+        </a>
         <button class="btn btn-toggle d-flex align-items-center gap-2 rounded <?= $isTransactionsActive ? '' : 'collapsed' ?>"
                 data-bs-toggle="collapse"
                 data-bs-target="#resident-transactions-collapse"

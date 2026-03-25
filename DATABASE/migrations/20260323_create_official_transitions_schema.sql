@@ -27,6 +27,8 @@ ALTER TABLE `officialinformationtbl`
 CREATE TABLE IF NOT EXISTS `officialtransitionstbl` (
   `transition_id`           VARCHAR(25)   NOT NULL,
   `batch_label`             VARCHAR(200)  DEFAULT NULL,
+  `proclamation_date`       DATE          DEFAULT NULL,
+  `next_election_date`      DATE          DEFAULT NULL,
   `election_date`           DATE          DEFAULT NULL,
 
   -- Notification / action flags
@@ -123,6 +125,38 @@ CREATE TABLE IF NOT EXISTS `upcomingofficialstbl` (
     ON DELETE CASCADE ON UPDATE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
+-- ============================================================
+-- Step 4: seat-based module access templates
+-- One template per council seat so future office holders
+-- inherit the correct module access immediately.
+-- ============================================================
+
+CREATE TABLE IF NOT EXISTS `officialseatmodulepermissionstbl` (
+  `seat_permission_id`      INT           NOT NULL AUTO_INCREMENT,
+  `council_id`              INT           NOT NULL,
+  `permission_key`          VARCHAR(120)  NOT NULL,
+  `is_allowed`              TINYINT(1)    NOT NULL DEFAULT 1,
+  `granted_by_user_id`      VARCHAR(20)   DEFAULT NULL,
+  `created_at`              TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updated_at`              TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+
+  PRIMARY KEY (`seat_permission_id`),
+  UNIQUE KEY `uniq_seat_permission`      (`council_id`, `permission_key`),
+  KEY `idx_seat_permission_key`          (`permission_key`),
+  KEY `idx_seat_permission_allowed`      (`is_allowed`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+CREATE TABLE IF NOT EXISTS `officialseataccessprofiletbl` (
+  `seat_access_profile_id`  INT           NOT NULL AUTO_INCREMENT,
+  `council_id`              INT           NOT NULL,
+  `permissions_initialized` TINYINT(1)    NOT NULL DEFAULT 0,
+  `created_at`              TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updated_at`              TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+
+  PRIMARY KEY (`seat_access_profile_id`),
+  UNIQUE KEY `uniq_seat_access_profile_council` (`council_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
 SET FOREIGN_KEY_CHECKS = 1;
 
 -- ============================================================
@@ -141,7 +175,7 @@ SET FOREIGN_KEY_CHECKS = 1;
 --
 -- officialtransitionstbl:
 --   One row = one position-level transition event.
---   batch_label + election_date group related transitions into a batch; no separate batch
+--   batch_label + next_election_date group related transitions into a batch; no separate batch
 --   table is needed — the cron script deduplicates by (batch_label, election_date).
 --   transition_type values: BarangayElection | SKElection | Appointment | Reappointment |
 --                           Resignation | Removal | Retirement.
@@ -157,3 +191,8 @@ SET FOREIGN_KEY_CHECKS = 1;
 --   and mark the transition Completed automatically.
 --   linked_official_id references officialinformationtbl for ReturningOfficial /
 --   ActiveOfficial candidates, enabling account reactivation without duplicate creation.
+--
+-- officialseatmodulepermissionstbl + officialseataccessprofiletbl:
+--   Stores one reusable access template per council seat. When a transition is completed,
+--   the saved template is copied to the new or returning official so dashboard access
+--   matches the seat immediately.

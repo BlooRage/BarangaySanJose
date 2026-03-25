@@ -61,6 +61,9 @@ if (isset($conn) && $conn instanceof mysqli) {
         ? 'stage'
         : "''";
     $issuedFileCol = downloads_column_exists($conn, 'documentrequesttbl', 'issued_file_path');
+    $invoiceFileCol = downloads_column_exists($conn, 'documentrequesttbl', 'invoice_file_path')
+        ? 'invoice_file_path'
+        : "NULL";
     $detailsCol = downloads_column_exists($conn, 'documentrequesttbl', 'request_details')
         ? 'request_details'
         : "'{}'";
@@ -75,7 +78,8 @@ if (isset($conn) && $conn instanceof mysqli) {
                 {$requestTimestampCol} AS request_timestamp,
                 {$releaseTimestampCol} AS release_timestamp,
                 {$validityCol} AS document_validity,
-                issued_file_path
+                issued_file_path,
+                {$invoiceFileCol} AS invoice_file_path
             FROM documentrequesttbl
             WHERE resident_user_id = ?
               AND issued_file_path IS NOT NULL
@@ -103,6 +107,7 @@ if (isset($conn) && $conn instanceof mysqli) {
                 }
 
                 $purpose = trim((string)($payload['request_purpose'] ?? $payload['purpose'] ?? ''));
+                $invoicePath = trim((string)($row['invoice_file_path'] ?? ''));
                 $downloadItems[] = [
                     'request_id' => (string)($row['request_id'] ?? ''),
                     'document_type' => $documentType,
@@ -110,6 +115,7 @@ if (isset($conn) && $conn instanceof mysqli) {
                     'submitted_at' => downloads_format_datetime((string)($row['request_timestamp'] ?? '')),
                     'released_at' => downloads_format_datetime((string)($row['release_timestamp'] ?? '')),
                     'valid_until' => downloads_format_datetime((string)($row['document_validity'] ?? '')),
+                    'invoice_path' => $invoicePath,
                 ];
             }
             $stmt->close();
@@ -299,6 +305,20 @@ if (isset($conn) && $conn instanceof mysqli) {
             color: #212529;
             border-color: #e0a800;
             background: #e0a800;
+        }
+        .compact-admin-table .compact-table-btn.btn-invoice,
+        .compact-table-btn.btn-invoice {
+            color: #fff;
+            border-color: #198754;
+            background: #198754;
+            font-weight: 400 !important;
+            letter-spacing: 0.15px;
+        }
+        .compact-admin-table .compact-table-btn.btn-invoice:hover,
+        .compact-table-btn.btn-invoice:hover {
+            color: #fff;
+            border-color: #157347;
+            background: #157347;
         }
         .downloads-status-pill {
             display: inline-flex;
@@ -575,6 +595,11 @@ if (isset($conn) && $conn instanceof mysqli) {
                                                 <a class="btn btn-sm compact-table-btn btn-download" href="<?= htmlspecialchars($downloadUrl) ?>">
                                                     <i class="fa-solid fa-download me-1"></i>Download
                                                 </a>
+                                                <?php if ((string)$item['invoice_path'] !== ''): ?>
+                                                <a class="btn btn-sm compact-table-btn btn-invoice" href="<?= htmlspecialchars($workflowEndpoint . '?action=download_invoice&request_id=' . rawurlencode($requestId)) ?>">
+                                                    <i class="fa-solid fa-receipt me-1"></i>Invoice
+                                                </a>
+                                                <?php endif; ?>
                                             </div>
                                         </td>
                                     </tr>
@@ -627,6 +652,11 @@ if (isset($conn) && $conn instanceof mysqli) {
                                     <a class="btn btn-sm compact-table-btn btn-download" href="<?= htmlspecialchars($downloadUrl) ?>">
                                         <i class="fa-solid fa-download me-1"></i>Download
                                     </a>
+                                    <?php if ((string)$item['invoice_path'] !== ''): ?>
+                                    <a class="btn btn-sm compact-table-btn btn-invoice" href="<?= htmlspecialchars($workflowEndpoint . '?action=download_invoice&request_id=' . rawurlencode($requestId)) ?>">
+                                        <i class="fa-solid fa-receipt me-1"></i>Invoice
+                                    </a>
+                                    <?php endif; ?>
                                 </div>
                             </article>
                         <?php endforeach; ?>

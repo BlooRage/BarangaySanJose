@@ -12,7 +12,7 @@
     <link rel="stylesheet" href="CSS-Styles/NavbarFooterStyle.css">
     <link rel="stylesheet" href="CSS-Styles/Guest-End-CSS/HomePage.css">
 </head>
-<body>
+<body data-cms-page="home" data-cms-endpoint="PhpFiles/GET/getSiteContent.php" data-cms-asset-base="./">
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/js/bootstrap.bundle.min.js" integrity="sha384-FKyoEForCGlyvwx9Hj09JcYn3nv7wiPVlz7YYwJrWVcXK/BmnVDxM+D2scQbITxI" crossorigin="anonymous"></script>
 
     <button onclick="topFunction()" id="goToTop" title="Go to top"><i class="fa-solid fa-arrow-up"></i>&nbsp;&nbsp;Go to top</button>
@@ -55,7 +55,7 @@
     </div>
 
     <div class="homeBanner">
-        <img src="Images/Home_Banner.png" alt="Home Banner" class="homeBannerImage">
+        <img src="Images/Home_Banner.png" alt="Home Banner" class="homeBannerImage" data-cms-home="banner-image">
     </div>
 
     <section class="aboutSection">
@@ -67,9 +67,9 @@
             </div>
             <div class="row align-items-center gx-4 aboutContentRow">
                 <div class="col-md-4">
-                    <img src="Images/About_US.jpg" id="imgPortrait" alt="About" class="img-fluid mx-auto d-block">
+                    <img src="Images/About_US.jpg" id="imgPortrait" alt="About" class="img-fluid mx-auto d-block" data-cms-home="about-image">
                 </div>
-                <div class="col-md-8">
+                <div class="col-md-8" data-cms-home="about-message">
                     <p>Ipinapakita nito ang matibay na paninindigan ng Barangay San Jose sa maayos, tapat, at makabagong pamamahala bilang simula ng tunay na pagbabago. Through responsible leadership and innovation, ang barangay ay nagsisilbing gabay at sandigan ng komunidad tungo sa mas maayos na kinabukasan, kung saan ang bawat desisyon ay may malinaw na layuning maghatid ng pag-asa at serbisyo sa mamamayan.</p>
                     <p>By strengthening systems and aligning programs with the social and economic realities of the community, Barangay San Jose ensures that public service is not only efficient but also compassionate and inclusive. Sa patuloy na pakikinig sa boses ng mamamayan at pag-angkop sa kanilang pangangailangan, nagiging daan ang pamahalaang barangay sa mas patas na oportunidad at mas maayos na kalidad ng pamumuhay.</p>
                     <p>Through shared responsibility and collective action, Barangay San Jose envisions a resilient, empowered, and united community. Sa pagtutulungan ng pamunuan at ng mga residente, binubuo ang isang komunidad na may tiwala, pagkakaisa, at lakas ng loob na harapin ang mga hamon—isang bagong simula patungo sa pangmatagalang kaunlaran para sa kasalukuyan at sa mga susunod na henerasyon.</p>
@@ -78,11 +78,15 @@
             <div class="row gx-4 missionVisionRow">
                 <div class="col-md-6">
                     <h2 class="sectionTitle text-center">Mission</h2>
-                    <p>The mission of Barangay San Jose centers on serving residents with integrity and responsibility. The barangay commits to fair and equal access to public services and deliver timely assistance for documents, concerns, and community needs. The mission emphasizes peace, order, and public safety. Leaders act with transparency in every decision. Public welfare remains the priority of every program. Service to the people defines every action of the barangay.</p>
+                    <div data-cms-home="mission-message">
+                        <p>The mission of Barangay San Jose centers on serving residents with integrity and responsibility. The barangay commits to fair and equal access to public services and deliver timely assistance for documents, concerns, and community needs. The mission emphasizes peace, order, and public safety. Leaders act with transparency in every decision. Public welfare remains the priority of every program. Service to the people defines every action of the barangay.</p>
+                    </div>
                 </div>
                 <div class="col-md-6">
                     <h2 class="sectionTitle text-center">Vision</h2>
-                    <p>Barangay San Jose envisions a safe, orderly, and united community. The barangay aims to build strong cooperation among residents and leaders. A peaceful environment supports daily living and local progress. Transparent governance strengthens public trust. Organized services support long term community stability. Residents remain informed and involved in local matters. Development aligns with community values and needs. The vision reflects a future built on service and unity.</p>
+                    <div data-cms-home="vision-message">
+                        <p>Barangay San Jose envisions a safe, orderly, and united community. The barangay aims to build strong cooperation among residents and leaders. A peaceful environment supports daily living and local progress. Transparent governance strengthens public trust. Organized services support long term community stability. Residents remain informed and involved in local matters. Development aligns with community values and needs. The vision reflects a future built on service and unity.</p>
+                    </div>
                 </div>
             </div>
         </div>
@@ -92,7 +96,7 @@
         <h1 class="my-5">Our History</h1>
         <div class="container mt-5">
             <div class="row align-items-center gx-4">
-                <div class="col-md-6 text-start">
+                <div class="col-md-6 text-start" data-cms-home="history-message">
                     <p>Barangay San Jose began as a rural settlement formed by early families who relied on farming and shared labor. The community developed through cooperation, kinship, and mutual support among residents. Local elders guided decisions to maintain order and resolve concerns. These early practices shaped a strong sense of unity and responsibility. Community life centered on shared values and collective effort.</p>
                     <p>Barangay San Jose later gained formal recognition under the municipality of Rodriguez, Rizal. Local governance structures formed to manage public records, basic services, and community order. Barangay officials coordinated programs and addressed disputes to support daily needs. The establishment of a barangay office strengthened service delivery. Public service became more organized and accessible to residents.</p>
                     <p>As Rodriguez (formerly known as Montalban) continued to grow, Barangay San Jose also expanded in population and development. Services adapted to meet changing social and administrative needs. Infrastructure, programs, and leadership roles improved to support community welfare. The barangay maintained its service oriented role amid growth. Today, Barangay San Jose continues to uphold its history of service, cooperation, and local governance.</p>
@@ -114,7 +118,7 @@
                     <span class="carousel-control-prev-icon rounded" aria-hidden="true"></span>
                 </button>
                 <div class="council-window">
-                    <div class="council-track">
+                    <div class="council-track" data-cms-home="council-list">
                         <figure class="figure council-card">
                             <img src="Images/Officials/SK Chairman Joy_MAC9288 copy3.jpg" id="carouselImg" class="img-fluid mx-5">
                             <figcaption class="figure-caption">
@@ -218,6 +222,7 @@
         </footer>
     </div>
     
+    <script src="JS-Script-Files/siteContentRuntime.js" defer></script>
     <script>
         let topBtn = document.getElementById("goToTop");
         let navbar = document.getElementById("mainNavbar");
@@ -331,7 +336,6 @@
         });
     </script></body>
 </html>
-
 
 
 

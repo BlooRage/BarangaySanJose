@@ -206,6 +206,113 @@ function dra_send_notification_deferred(mysqli $conn, array $request, string $su
     });
 }
 
+function dra_send_invoice_deferred(mysqli $conn, array $request, float $amount, string $orNumber): void
+{
+    // Only generate invoices for paid requests.
+    if ($amount <= 0.0 || $orNumber === '') {
+        return;
+    }
+    register_shutdown_function(static function () use ($conn, $request, $amount, $orNumber): void {
+        try {
+            $baseDir = realpath(__DIR__ . '/../../') ?: dirname(__DIR__, 2);
+            require_once $baseDir . '/PhpFiles/General/invoiceGenerator.php';
+
+            $requestWithPayment = array_merge($request, [
+                'amount'   => $amount,
+                'or_number' => $orNumber,
+            ]);
+
+            $relPath = dr_generate_invoice_pdf($requestWithPayment, $baseDir);
+            if ($relPath === null || $relPath === '') {
+                return;
+            }
+
+            // Persist the invoice path.
+            $safeRelPath = $conn->real_escape_string($relPath);
+            $safeReqId   = $conn->real_escape_string(trim((string)($request['request_id'] ?? '')));
+            if ($safeReqId !== '') {
+                $conn->query(
+                    "UPDATE documentrequesttbl SET invoice_file_path = '{$safeRelPath}' WHERE request_id = '{$safeReqId}'"
+                );
+            }
+
+            // Send invoice email with PDF attachment.
+            $absPath = $baseDir . $relPath;
+            dra_send_invoice_email($conn, $requestWithPayment, $amount, $orNumber, $absPath);
+
+        } catch (Throwable $e) {
+            error_log('[invoiceGenerator] deferred invoice failed: ' . $e->getMessage());
+        }
+    });
+}
+
+function dra_send_invoice_email(mysqli $conn, array $request, float $amount, string $orNumber, string $absInvoicePath): void
+{
+    $residentUserId = trim((string)($request['resident_user_id'] ?? $request['user_id'] ?? ''));
+    if ($residentUserId === '') {
+        return;
+    }
+
+    $stmt = $conn->prepare("SELECT email FROM useraccountstbl WHERE user_id = ? LIMIT 1");
+    if (!$stmt) {
+        return;
+    }
+    $stmt->bind_param('s', $residentUserId);
+    $stmt->execute();
+    $acct = $stmt->get_result()->fetch_assoc();
+    $stmt->close();
+
+    $email = trim((string)($acct['email'] ?? ''));
+    if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+        return;
+    }
+
+    $requestId   = trim((string)($request['request_id'] ?? ''));
+    $docType     = trim((string)($request['document_type'] ?? 'Document Request'));
+    $purpose     = trim((string)($request['purpose'] ?? ''));
+    $certNumber  = trim((string)($request['certificate_number'] ?? ''));
+    $residentName = trim((string)($request['resident_name'] ?? ''));
+    $paymentMethod = trim((string)($request['payment_method'] ?? ''));
+    $paymentDateRaw = trim((string)($request['finance_decision_at']
+        ?? $request['payment_submitted_at']
+        ?? $request['payment_timestamp']
+        ?? ''));
+    $paymentTs   = $paymentDateRaw !== '' ? @strtotime($paymentDateRaw) : false;
+    $paymentDate = $paymentTs !== false ? date('F j, Y', $paymentTs) : date('F j, Y');
+    $methodLabel = match (strtolower($paymentMethod)) {
+        'barangay'            => 'Walk-in (Barangay Hall)',
+        'gcash'               => 'GCash',
+        'online', 'e-payment' => 'Online / E-Payment',
+        default               => ucfirst($paymentMethod !== '' ? $paymentMethod : 'Cash'),
+    };
+
+    try {
+        $mailConfig = require __DIR__ . '/../General/mailConfigurations.php';
+        require_once __DIR__ . '/../EmailHandlers/emailSender.php';
+        $sender = new EmailSender($mailConfig);
+        $sender->send([
+            'type'        => 'invoice',
+            'to'          => $email,
+            'subject'     => 'Official Receipt – ' . $docType . ' (OR: ' . $orNumber . ')',
+            'attachments' => is_file($absInvoicePath) ? [$absInvoicePath] : [],
+            'data'        => [
+                'subject'            => 'Official Receipt – ' . $docType,
+                'or_number'          => $orNumber,
+                'resident_name'      => $residentName,
+                'document_type'      => $docType,
+                'purpose'            => $purpose,
+                'amount'             => 'PHP ' . number_format($amount, 2),
+                'payment_method'     => $methodLabel,
+                'payment_date'       => $paymentDate,
+                'certificate_number' => $certNumber,
+                'request_id'         => $requestId,
+            ],
+        ]);
+    } catch (Throwable $e) {
+        error_log('[dra_send_invoice_email] failed: ' . $e->getMessage());
+    }
+}
+
 function dra_strip_unreplaced_docx_qr_placeholder(string $docxDiskPath): void {
     if (!is_file($docxDiskPath) || !class_exists('ZipArchive')) {
         return;
@@ -7169,6 +7276,7 @@ if ($action === 'finance_verify') {
             'Payment Verified - Release Preparation Pending',
             dra_request_notice($updated, $requestId, 'payment verified. OR: ' . $orNumber . '. The request is now awaiting final ID preparation for release.')
         );
+        dra_send_invoice_deferred($conn, $updated, (float)$resolvedAmount, $orNumber);
 
         try { insertUnifiedAuditLog($conn, $currentUserId, $currentUserRole, 'Document Requests', 'document_request', $requestId, 'Finance Verify', 'stage', $currentStage, DR_STAGE_PAYMENT_VERIFIED, 'OR: ' . $orNumber . ' | ₱' . number_format((float)$resolvedAmount, 2)); } catch (Throwable $__e) {}
         dr_respond_json(200, ['success' => true, 'request' => $updated]);
@@ -7238,6 +7346,7 @@ if ($action === 'finance_verify') {
         'Payment Verified - Document Ready',
         dra_request_notice($updated, $requestId, 'payment verified. OR: ' . $orNumber . '. Certificate no: ' . $certificateNumber . '. The document is now for release.')
     );
+    dra_send_invoice_deferred($conn, $updated, (float)$resolvedAmount, $orNumber);
 
     try { insertUnifiedAuditLog($conn, $currentUserId, $currentUserRole, 'Document Requests', 'document_request', $requestId, 'Finance Verify', 'stage', $currentStage, DR_STAGE_READY_FOR_CLAIM, 'OR: ' . $orNumber . ' | Cert: ' . $certificateNumber . ' | ₱' . number_format((float)$resolvedAmount, 2)); } catch (Throwable $__e) {}
     dr_respond_json(200, ['success' => true, 'request' => $updated]);

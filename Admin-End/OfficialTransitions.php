@@ -2,6 +2,7 @@
 require_once "../PhpFiles/General/connection.php";
 require_once "../PhpFiles/General/adminModulePermissions.php";
 require_once "../PhpFiles/General/audit.php";
+require_once "../PhpFiles/General/officialTransitionSettings.php";
 require_once "includes/admin_guard.php";
 
 requireRoleSession(['SuperAdmin'], false);
@@ -49,59 +50,120 @@ if (!function_exists('ot_filter_catalog_for_regular_officials')) {
 if (!function_exists('ot_replace_module_permissions')) {
     function ot_replace_module_permissions(mysqli $conn, string $officialId, string $userId, array $permissionKeys, string $grantedByUserId): void
     {
-        $deleteStmt = $conn->prepare("DELETE FROM officialmodulepermissionstbl WHERE official_id = ?");
-        if ($deleteStmt) {
-            $deleteStmt->bind_param('s', $officialId);
-            $deleteStmt->execute();
-            $deleteStmt->close();
-        }
-
-        if (!$permissionKeys) {
-            return;
-        }
-
-        $insertStmt = $conn->prepare("
-            INSERT INTO officialmodulepermissionstbl
-                (official_id, user_id, permission_key, is_allowed, granted_by_user_id)
-            VALUES
-                (?, ?, ?, 1, ?)
-        ");
-        if (!$insertStmt) {
-            throw new RuntimeException('Failed to save module permissions.');
-        }
-
-        foreach ($permissionKeys as $permissionKey) {
-            $insertStmt->bind_param('ssss', $officialId, $userId, $permissionKey, $grantedByUserId);
-            $insertStmt->execute();
-        }
-        $insertStmt->close();
+        amp_replace_official_module_permissions($conn, $officialId, $userId, $permissionKeys, $grantedByUserId);
     }
 }
 
 if (!function_exists('ot_upsert_access_profile')) {
     function ot_upsert_access_profile(mysqli $conn, string $officialId, string $userId): void
     {
-        $stmt = $conn->prepare("
-            INSERT INTO officialaccessprofiletbl (official_id, user_id, permissions_initialized)
-            VALUES (?, ?, 1)
-            ON DUPLICATE KEY UPDATE
-                user_id = VALUES(user_id),
-                permissions_initialized = 1,
-                updated_at = CURRENT_TIMESTAMP
-        ");
-        if (!$stmt) {
-            throw new RuntimeException('Failed to save access profile metadata.');
-        }
-        $stmt->bind_param('ss', $officialId, $userId);
-        $stmt->execute();
-        $stmt->close();
+        amp_upsert_official_access_profile($conn, $officialId, $userId);
     }
 }
 
-$transitionTool = trim((string)($_GET['tool'] ?? 'tracker'));
-if (!in_array($transitionTool, ['tracker', 'kagawad_permissions'], true)) {
-    $transitionTool = 'tracker';
+if (!function_exists('ot_transition_column_exists')) {
+    function ot_transition_column_exists(mysqli $conn, string $table, string $column): bool
+    {
+        $tableEsc = $conn->real_escape_string($table);
+        $columnEsc = $conn->real_escape_string($column);
+        $res = $conn->query("SHOW COLUMNS FROM `{$tableEsc}` LIKE '{$columnEsc}'");
+        return $res instanceof mysqli_result && $res->num_rows > 0;
+    }
 }
+
+if (!function_exists('ot_ensure_transition_schema')) {
+    function ot_ensure_transition_schema(mysqli $conn): void
+    {
+        static $done = false;
+        if ($done) {
+            return;
+        }
+        $done = true;
+
+        $hasTransitionsTable = $conn->query("SHOW TABLES LIKE 'officialtransitionstbl'");
+        if (!($hasTransitionsTable instanceof mysqli_result) || $hasTransitionsTable->num_rows === 0) {
+            return;
+        }
+
+        $columnDefinitions = [
+            'proclamation_date' => "ALTER TABLE officialtransitionstbl ADD COLUMN proclamation_date DATE DEFAULT NULL AFTER batch_label",
+            'next_election_date' => "ALTER TABLE officialtransitionstbl ADD COLUMN next_election_date DATE DEFAULT NULL AFTER proclamation_date",
+        ];
+
+        foreach ($columnDefinitions as $column => $sql) {
+            if (!ot_transition_column_exists($conn, 'officialtransitionstbl', $column)) {
+                $conn->query($sql);
+            }
+        }
+    }
+}
+
+if (!function_exists('ot_ignored_transition_seat_names')) {
+    function ot_ignored_transition_seat_names(): array
+    {
+        return [
+            'SK Chairperson',
+            'Lupong Tagapamayapa Member',
+            'Barangay Tanod',
+            'Barangay Health Worker (BHW)',
+            'Day Care Worker',
+        ];
+    }
+}
+
+if (!function_exists('ot_is_managed_transition_seat')) {
+    function ot_is_managed_transition_seat(string $seatName): bool
+    {
+        static $ignored = null;
+        if ($ignored === null) {
+            $ignored = array_map(
+                static fn (string $value): string => strtolower(trim($value)),
+                ot_ignored_transition_seat_names()
+            );
+        }
+
+        $normalized = strtolower(trim($seatName));
+        return $normalized !== '' && !in_array($normalized, $ignored, true);
+    }
+}
+
+if (!function_exists('ot_ignored_transition_seat_sql')) {
+    function ot_ignored_transition_seat_sql(mysqli $conn, string $field): string
+    {
+        $values = array_map(
+            static fn (string $value): string => "'" . $conn->real_escape_string(strtolower(trim($value))) . "'",
+            ot_ignored_transition_seat_names()
+        );
+        return 'LOWER(TRIM(' . $field . ')) NOT IN (' . implode(', ', $values) . ')';
+    }
+}
+
+ot_ensure_transition_schema($conn);
+
+$transitionTool = trim((string)($_GET['tool'] ?? 'current_term'));
+if ($transitionTool === '' || in_array($transitionTool, ['tracker', 'new_set', 'past_officials', 'official_permissions', 'kagawad_permissions'], true)) {
+    $transitionTool = 'current_term';
+}
+if (!in_array($transitionTool, ['current_term', 'create_new_term', 'settings'], true)) {
+    $transitionTool = 'current_term';
+}
+
+$autoOpenNewTermModal = false;
+$transitionPageDescription = 'View the current official term, its assigned seats, and the access handovers already in progress.';
+if ($transitionTool === 'create_new_term') {
+    $transitionPageDescription = 'Create the next official term, generate elected seat handovers, and re-encode the incoming elected winners and appointed officials.';
+} elseif ($transitionTool === 'settings') {
+    $transitionPageDescription = 'Adjust the reminder and access-revocation timing used by the Official Transition module.';
+}
+$transitionQueueTitle = $transitionTool === 'create_new_term'
+    ? 'New Term Re-encoding Queue'
+    : 'Current Term Handover Queue';
+$transitionQueueDescription = $transitionTool === 'create_new_term'
+    ? 'After creating the term, use this queue to encode elected winners and any appointed officials that still need access setup.'
+    : 'Monitor the outgoing and incoming access handovers that belong to the currently active term.';
+$scheduleSectionTitle = $transitionTool === 'create_new_term'
+    ? 'Term Schedule Templates'
+    : 'Official Term-End Schedules';
 
 $officialTransitionFlash = null;
 if (!empty($_SESSION['official_transition_flash']) && is_array($_SESSION['official_transition_flash'])) {
@@ -109,18 +171,88 @@ if (!empty($_SESSION['official_transition_flash']) && is_array($_SESSION['offici
     unset($_SESSION['official_transition_flash']);
 }
 
-if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST' && (string)($_POST['action'] ?? '') === 'save_kagawad_permissions') {
-    $officialId = trim((string)($_POST['official_id'] ?? ''));
+$transitionSettingDefinitions = ot_transition_settings_definitions();
+$transitionSettings = ot_transition_settings_load($conn);
+$transitionSettingLabels = [
+    'it_admin' => ot_transition_settings_days_label((int)$transitionSettings['it_admin_update_notice_days'], 'IT Reminder'),
+    'outgoing' => ot_transition_settings_days_label((int)$transitionSettings['outgoing_notice_days'], 'Outgoing Notice'),
+    'revoke' => ot_transition_settings_days_label((int)$transitionSettings['access_revoke_days'], 'Access Revocation'),
+    'post' => ot_transition_settings_days_label((int)$transitionSettings['post_election_followup_days'], 'Post-Election Follow-up'),
+];
+
+if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST' && (string)($_POST['action'] ?? '') === 'save_notification_settings') {
     $actorUserId = (string)($_SESSION['user_id'] ?? '');
 
     try {
-        if ($officialId === '') {
-            throw new RuntimeException('Invalid kagawad record.');
+        $settingsToSave = [];
+        foreach ($transitionSettingDefinitions as $key => $definition) {
+            $rawValue = trim((string)($_POST[$key] ?? ''));
+            if ($rawValue === '' || filter_var($rawValue, FILTER_VALIDATE_INT) === false) {
+                throw new RuntimeException('All notification timing values must be whole numbers.');
+            }
+
+            $value = (int)$rawValue;
+            $min = (int)($definition['min'] ?? 0);
+            $max = (int)($definition['max'] ?? 365);
+            if ($value < $min || $value > $max) {
+                throw new RuntimeException(sprintf('%s must be between %d and %d days.', (string)($definition['label'] ?? $key), $min, $max));
+            }
+            $settingsToSave[$key] = $value;
+        }
+
+        if ($settingsToSave['it_admin_update_notice_days'] < $settingsToSave['outgoing_notice_days']) {
+            throw new RuntimeException('The IT administrator reminder should happen on or before the outgoing notice window.');
+        }
+        if ($settingsToSave['outgoing_notice_days'] < $settingsToSave['access_revoke_days']) {
+            throw new RuntimeException('Outgoing notice must be scheduled on or before the privilege revocation day.');
+        }
+
+        ot_transition_settings_upsert($conn, $settingsToSave, $actorUserId);
+
+        insertUnifiedAuditLog(
+            $conn,
+            $actorUserId,
+            (string)($_SESSION['role'] ?? 'SuperAdmin'),
+            'OfficialTransitions',
+            'settings',
+            'notification_timing',
+            'save_notification_settings',
+            'values',
+            null,
+            json_encode($settingsToSave, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
+            'Updated official transition notification timing settings.'
+        );
+
+        $_SESSION['official_transition_flash'] = [
+            'type' => 'success',
+            'message' => 'Official transition settings updated.',
+        ];
+    } catch (Throwable $e) {
+        $_SESSION['official_transition_flash'] = [
+            'type' => 'danger',
+            'message' => $e->getMessage(),
+        ];
+    }
+
+    header('Location: OfficialTransitions.php?tool=settings');
+    exit;
+}
+
+if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST' && in_array((string)($_POST['action'] ?? ''), ['save_kagawad_permissions', 'save_official_permissions'], true)) {
+    $councilId = (int)($_POST['council_id'] ?? 0);
+    $actorUserId = (string)($_SESSION['user_id'] ?? '');
+
+    try {
+        if ($councilId <= 0) {
+            throw new RuntimeException('Invalid council seat.');
         }
 
         $stmt = $conn->prepare("
             SELECT
+                bc.council_id,
                 bc.seat_name,
+                bc.seat_group,
+                bc.current_official_id,
                 oi.official_id,
                 oi.user_id,
                 oi.firstname,
@@ -134,25 +266,24 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST' && (string)($_POST['action'
                 ua.role_access AS account_role_access,
                 COALESCE(sa.status_name, '') AS account_status
             FROM barangaycounciltbl bc
-            INNER JOIN officialinformationtbl oi ON oi.official_id = bc.current_official_id
-            INNER JOIN useraccountstbl ua ON ua.user_id COLLATE utf8mb4_general_ci = oi.user_id COLLATE utf8mb4_general_ci
+            LEFT JOIN officialinformationtbl oi ON oi.official_id = bc.current_official_id
+            LEFT JOIN useraccountstbl ua ON ua.user_id COLLATE utf8mb4_general_ci = oi.user_id COLLATE utf8mb4_general_ci
             LEFT JOIN statuslookuptbl sa ON sa.status_id = ua.status_id_account
             WHERE bc.is_active = 1
-              AND bc.seat_group = 'Sangguniang Barangay'
-              AND bc.seat_name LIKE 'Kagawad%'
-              AND oi.official_id = ?
+              AND bc.council_id = ?
+              AND bc.seat_name NOT LIKE 'Punong Barangay%'
             LIMIT 1
         ");
         if (!$stmt) {
-            throw new RuntimeException('Failed to load kagawad record.');
+            throw new RuntimeException('Failed to load official record.');
         }
-        $stmt->bind_param('s', $officialId);
+        $stmt->bind_param('i', $councilId);
         $stmt->execute();
         $targetRow = $stmt->get_result()->fetch_assoc();
         $stmt->close();
 
         if (!$targetRow) {
-            throw new RuntimeException('Kagawad record not found.');
+            throw new RuntimeException('Council seat not found.');
         }
 
         $requestedPermissionKeys = $_POST['permission_keys'] ?? [];
@@ -170,8 +301,15 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST' && (string)($_POST['action'
         }
 
         $conn->begin_transaction();
-        ot_replace_module_permissions($conn, (string)$targetRow['official_id'], (string)$targetRow['user_id'], array_keys($permissionMap), $actorUserId);
-        ot_upsert_access_profile($conn, (string)$targetRow['official_id'], (string)$targetRow['user_id']);
+        amp_replace_seat_module_permissions($conn, $councilId, array_keys($permissionMap), $actorUserId);
+        amp_upsert_seat_access_profile($conn, $councilId);
+
+        $currentOfficialId = trim((string)($targetRow['official_id'] ?? ''));
+        $currentUserId = trim((string)($targetRow['user_id'] ?? ''));
+        $currentRole = (string)($targetRow['account_role_access'] ?? $targetRow['info_role_access'] ?? 'Official');
+        if ($currentOfficialId !== '' && $currentUserId !== '') {
+            amp_apply_seat_permissions_to_official($conn, $councilId, $currentOfficialId, $currentUserId, $actorUserId, $currentRole);
+        }
         $conn->commit();
 
         if (function_exists('insertUnifiedAuditLog')) {
@@ -186,19 +324,21 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST' && (string)($_POST['action'
                 $actorUserId,
                 (string)($_SESSION['role'] ?? 'SuperAdmin'),
                 'OfficialTransitions',
-                'official',
-                (string)$targetRow['official_id'],
-                'save_kagawad_permissions',
+                'council_seat',
+                (string)$targetRow['council_id'],
+                'save_official_permissions',
                 'module_permissions',
                 null,
                 implode(', ', array_keys($permissionMap)),
-                'Kagawad: ' . ($targetName !== '' ? $targetName : (string)$targetRow['seat_name'])
+                'Seat: ' . (string)$targetRow['seat_name'] . ($targetName !== '' ? ' | Current holder: ' . $targetName : ' | Current holder: Vacant')
             );
         }
 
         $_SESSION['official_transition_flash'] = [
             'type' => 'success',
-            'message' => 'Kagawad permissions updated successfully.',
+            'message' => trim((string)($targetRow['official_id'] ?? '')) !== ''
+                ? 'Seat module template updated and synced to the current holder.'
+                : 'Seat module template updated. It will apply when this seat is filled.',
         ];
     } catch (Throwable $e) {
         try {
@@ -211,7 +351,7 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST' && (string)($_POST['action'
         ];
     }
 
-    header('Location: OfficialTransitions.php?tool=kagawad_permissions');
+    header('Location: OfficialTransitions.php?tool=current_term');
     exit;
 }
 
@@ -223,6 +363,9 @@ if ($hasCouncilTbl) {
         SELECT bc.council_id, bc.seat_name, bc.selection_method, bc.seat_group,
                bc.sort_order, bc.term_start, bc.term_end,
                bc.current_official_id,
+               COALESCE(oi.position_access, oi.role_access) AS current_position_access,
+               oi.department,
+               oi.area_number,
                CONCAT(oi.lastname, ', ', oi.firstname,
                       IFNULL(CONCAT(' ', oi.middlename),''),
                       IFNULL(CONCAT(' ', oi.suffix),''))  AS current_official_name,
@@ -241,29 +384,27 @@ if ($hasCouncilTbl) {
         $csRes->close();
     }
 }
+$councilSeats = array_values(array_filter(
+    $councilSeats,
+    static fn (array $seat): bool => ot_is_managed_transition_seat((string)($seat['seat_name'] ?? ''))
+));
 
-// Group seats by seat_group for the modal dropdowns
+$otFormatDateLabel = static function (?string $value): string {
+    $value = trim((string)$value);
+    if ($value === '' || $value === '0000-00-00') {
+        return '—';
+    }
+    $ts = strtotime($value);
+    return $ts ? date('M d, Y', $ts) : '—';
+};
 $councilSeatsByGroup = [];
-foreach ($councilSeats as $cs) {
-    $councilSeatsByGroup[$cs['seat_group']][] = $cs;
-}
-
-$batchPreviewSeats = [
-    'BarangayElection' => [],
-    'SKElection' => [],
-];
-foreach ($councilSeats as $cs) {
-    $selectionMethod = (string)($cs['selection_method'] ?? '');
-    $seatGroup = (string)($cs['seat_group'] ?? '');
-    if ($selectionMethod !== 'Elected') {
-        continue;
-    }
-    if ($seatGroup === 'Sangguniang Barangay') {
-        $batchPreviewSeats['BarangayElection'][] = $cs;
-    } elseif ($seatGroup === 'Sangguniang Kabataan') {
-        $batchPreviewSeats['SKElection'][] = $cs;
-    }
-}
+$appointedPreviewSeats = [];
+$currentTermSeatCount = 0;
+$currentTermFilledCount = 0;
+$currentTermVacantCount = 0;
+$currentTermElectedCount = 0;
+$currentTermAppointedCount = 0;
+$batchPreviewSeats = [];
 
 // Active officials still needed for Quick Actions / Restore / Credentials
 $activeOfficials = [];
@@ -291,8 +432,12 @@ $hasTransTbl = $conn->query("SHOW TABLES LIKE 'officialtransitionstbl'")->num_ro
 // ── Election schedules ────────────────────────────────────────────────────────
 $electionSchedules = [];
 if ($hasTransTbl) {
+    $ignoredPositionSql = ot_ignored_transition_seat_sql($conn, 'position');
     $elRes = $conn->query("
-        SELECT batch_label, election_date,
+        SELECT
+               batch_label,
+               COALESCE(MAX(proclamation_date), MAX(effective_date)) AS proclamation_date,
+               COALESCE(MAX(next_election_date), MAX(election_date)) AS next_election_date,
                MAX(notify_3mo_sent)       AS n3,
                MAX(notify_1mo_sent)       AS n1,
                MAX(deactivated_7d_before) AS n7,
@@ -300,9 +445,14 @@ if ($hasTransTbl) {
                COUNT(*)                   AS position_count,
                SUM(status='Completed')    AS completed_count
         FROM officialtransitionstbl
-        WHERE election_date IS NOT NULL AND batch_label IS NOT NULL
-        GROUP BY batch_label, election_date
-        ORDER BY election_date DESC
+        WHERE (next_election_date IS NOT NULL OR election_date IS NOT NULL)
+          AND batch_label IS NOT NULL
+          AND {$ignoredPositionSql}
+        GROUP BY
+            batch_label,
+            COALESCE(next_election_date, election_date),
+            COALESCE(proclamation_date, effective_date)
+        ORDER BY COALESCE(next_election_date, election_date) DESC
     ");
     if ($elRes instanceof mysqli_result) {
         while ($r = $elRes->fetch_assoc()) {
@@ -310,6 +460,73 @@ if ($hasTransTbl) {
         }
         $elRes->close();
     }
+}
+
+$currentTermEditableSchedule = null;
+$closestUpcomingTs = null;
+$todayTs = strtotime(date('Y-m-d'));
+foreach ($electionSchedules as $schedule) {
+    $scheduleDate = trim((string)($schedule['next_election_date'] ?? ''));
+    $scheduleTs = $scheduleDate !== '' ? strtotime($scheduleDate) : false;
+    if ($scheduleTs === false || $scheduleTs < $todayTs) {
+        continue;
+    }
+    if ($closestUpcomingTs === null || $scheduleTs < $closestUpcomingTs) {
+        $closestUpcomingTs = $scheduleTs;
+        $currentTermEditableSchedule = $schedule;
+    }
+}
+if ($currentTermEditableSchedule === null && !empty($electionSchedules)) {
+    $currentTermEditableSchedule = $electionSchedules[0];
+}
+$newTermEditableSchedule = $electionSchedules[0] ?? null;
+$termEditSchedule = $transitionTool === 'create_new_term'
+    ? $newTermEditableSchedule
+    : $currentTermEditableSchedule;
+$hasConfiguredTermSchedule = !empty($electionSchedules);
+
+if (!$hasConfiguredTermSchedule) {
+    foreach ($councilSeats as &$seat) {
+        $seat['current_official_id'] = '';
+        $seat['current_position_access'] = '';
+        $seat['department'] = '';
+        $seat['area_number'] = '';
+        $seat['current_official_name'] = '';
+        $seat['account_status'] = '';
+        $seat['term_start'] = '';
+        $seat['term_end'] = '';
+    }
+    unset($seat);
+    $activeOfficials = [];
+}
+
+foreach ($councilSeats as $cs) {
+    $councilSeatsByGroup[$cs['seat_group']][] = $cs;
+}
+
+$appointedPreviewSeats = array_values(array_filter(
+    $councilSeats,
+    static fn (array $seat): bool => strcasecmp((string)($seat['selection_method'] ?? ''), 'Elected') !== 0
+));
+
+$currentTermSeatCount = count($councilSeats);
+$currentTermFilledCount = count(array_filter(
+    $councilSeats,
+    static fn (array $seat): bool => trim((string)($seat['current_official_id'] ?? '')) !== ''
+));
+$currentTermVacantCount = max($currentTermSeatCount - $currentTermFilledCount, 0);
+$currentTermElectedCount = count(array_filter(
+    $councilSeats,
+    static fn (array $seat): bool => strcasecmp((string)($seat['selection_method'] ?? ''), 'Elected') === 0
+));
+$currentTermAppointedCount = max($currentTermSeatCount - $currentTermElectedCount, 0);
+
+foreach ($councilSeats as $cs) {
+    $selectionMethod = (string)($cs['selection_method'] ?? '');
+    if ($selectionMethod !== 'Elected') {
+        continue;
+    }
+    $batchPreviewSeats[] = $cs;
 }
 
 $departmentOptions = [
@@ -322,14 +539,16 @@ $departmentOptions = [
 $areaOptions = ['Barangay Wide','Area 01','Area 1A','Area 02','Area 03','Area 04','Area 05','Area 06'];
 
 $defaultOfficialPermissionKeys = amp_get_default_admin_permission_keys();
-$kagawadPermissionCatalog = ot_filter_catalog_for_regular_officials(amp_get_permission_catalog());
+$officialPermissionCatalog = ot_filter_catalog_for_regular_officials(amp_get_permission_catalog());
 
-$kagawadOfficials = [];
+$seatAccessOfficials = [];
 if ($hasCouncilTbl) {
     $kgStmt = $conn->prepare("
         SELECT
             bc.council_id,
             bc.seat_name,
+            bc.seat_group,
+            bc.selection_method,
             bc.sort_order,
             bc.current_official_id,
             oi.official_id,
@@ -352,16 +571,20 @@ if ($hasCouncilTbl) {
         LEFT JOIN useraccountstbl ua ON ua.user_id COLLATE utf8mb4_general_ci = oi.user_id COLLATE utf8mb4_general_ci
         LEFT JOIN statuslookuptbl sa ON sa.status_id = ua.status_id_account
         WHERE bc.is_active = 1
-          AND bc.seat_group = 'Sangguniang Barangay'
-          AND bc.seat_name LIKE 'Kagawad%'
+          AND bc.seat_name NOT LIKE 'Punong Barangay%'
         ORDER BY bc.sort_order, bc.council_id
     ");
     if ($kgStmt) {
         $kgStmt->execute();
         $kgRes = $kgStmt->get_result();
         while ($row = $kgRes->fetch_assoc()) {
-            $officialId = trim((string)($row['official_id'] ?? ''));
-            $permissionMap = $officialId !== '' ? amp_get_effective_permission_keys_for_row($conn, $row) : [];
+            if (!ot_is_managed_transition_seat((string)($row['seat_name'] ?? ''))) {
+                continue;
+            }
+            $officialId = $hasConfiguredTermSchedule ? trim((string)($row['official_id'] ?? '')) : '';
+            $councilId = (int)($row['council_id'] ?? 0);
+            $seatRole = (string)($row['account_role_access'] ?? $row['info_role_access'] ?? 'Official');
+            $permissionMap = amp_get_effective_permission_keys_for_council($conn, $councilId, $seatRole);
             $fullName = trim(
                 (string)($row['firstname'] ?? '') . ' ' .
                 ((string)($row['middlename'] ?? '') !== '' ? (string)($row['middlename'] ?? '') . ' ' : '') .
@@ -369,22 +592,25 @@ if ($hasCouncilTbl) {
                 ((string)($row['suffix'] ?? '') !== '' ? ' ' . (string)($row['suffix'] ?? '') : '')
             );
 
-            $kagawadOfficials[] = [
+            $seatAccessOfficials[] = [
                 'council_id' => (int)($row['council_id'] ?? 0),
                 'seat_name' => (string)($row['seat_name'] ?? ''),
+                'seat_group' => (string)($row['seat_group'] ?? ''),
+                'selection_method' => (string)($row['selection_method'] ?? ''),
                 'official_id' => $officialId,
-                'user_id' => (string)($row['user_id'] ?? ''),
-                'full_name' => $fullName !== '' ? $fullName : 'Vacant',
-                'position_access' => (string)($row['position_access'] ?? ''),
-                'department' => (string)($row['department'] ?? ''),
-                'area_number' => (string)($row['area_number'] ?? ''),
-                'term_end' => (string)($row['term_end'] ?? ''),
-                'email' => (string)($row['email'] ?? ''),
-                'phone_number' => (string)($row['phone_number'] ?? ''),
-                'account_status' => (string)($row['account_status'] ?? ''),
+                'user_id' => $hasConfiguredTermSchedule ? (string)($row['user_id'] ?? '') : '',
+                'full_name' => ($hasConfiguredTermSchedule && $fullName !== '') ? $fullName : 'Vacant',
+                'position_access' => $hasConfiguredTermSchedule ? (string)($row['position_access'] ?? '') : '',
+                'department' => $hasConfiguredTermSchedule ? (string)($row['department'] ?? '') : '',
+                'area_number' => $hasConfiguredTermSchedule ? (string)($row['area_number'] ?? '') : '',
+                'term_end' => $hasConfiguredTermSchedule ? (string)($row['term_end'] ?? '') : '',
+                'email' => $hasConfiguredTermSchedule ? (string)($row['email'] ?? '') : '',
+                'phone_number' => $hasConfiguredTermSchedule ? (string)($row['phone_number'] ?? '') : '',
+                'account_status' => $hasConfiguredTermSchedule ? (string)($row['account_status'] ?? '') : '',
+                'has_saved_template' => amp_has_saved_seat_access_profile($conn, $councilId),
                 'permission_keys' => array_keys($permissionMap),
                 'permission_count' => count($permissionMap),
-                'has_official' => $officialId !== '',
+                'has_official' => $hasConfiguredTermSchedule && $officialId !== '',
             ];
         }
         $kgStmt->close();
@@ -397,7 +623,7 @@ if ($hasCouncilTbl) {
   <meta charset="UTF-8" />
   <link rel="icon" href="../Images/favicon_sanjose.png?v=20260211">
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Official Transition Module</title>
+  <title>Official Transition</title>
 
   <script src="https://kit.fontawesome.com/3482e00999.js" crossorigin="anonymous"></script>
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
@@ -417,6 +643,114 @@ if ($hasCouncilTbl) {
     .ot-table { min-width: 1100px; }
     .ot-table th { white-space: nowrap; font-size: .82rem; }
     .ot-table td { vertical-align: middle; font-size: .84rem; white-space: nowrap; max-width: 200px; overflow: hidden; text-overflow: ellipsis; }
+    .ot-overview-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+      gap: 1rem;
+    }
+    .ot-overview-card {
+      background: #fff;
+      border: 1px solid #dbe4f0;
+      border-radius: 1rem;
+      padding: 1rem 1.1rem;
+      box-shadow: 0 .35rem .9rem rgba(15, 23, 42, .05);
+    }
+    .ot-overview-label {
+      font-size: .78rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: .04em;
+      color: #64748b;
+      margin-bottom: .4rem;
+    }
+    .ot-overview-value {
+      font-size: 1.8rem;
+      font-weight: 700;
+      color: #0f172a;
+      line-height: 1;
+    }
+    .ot-overview-note {
+      margin-top: .45rem;
+      font-size: .82rem;
+      color: #64748b;
+    }
+    .ot-roster-table td,
+    .ot-seat-preview-table td {
+      white-space: normal;
+      vertical-align: middle;
+    }
+    .ot-workflow-steps {
+      display: grid;
+      gap: .85rem;
+    }
+    .ot-workflow-step {
+      display: flex;
+      gap: .85rem;
+      align-items: flex-start;
+      padding: .9rem 1rem;
+      border: 1px solid #e5e7eb;
+      border-radius: .95rem;
+      background: #fcfcfd;
+    }
+    .ot-workflow-step-index {
+      flex: 0 0 auto;
+      width: 2rem;
+      height: 2rem;
+      border-radius: 999px;
+      background: #eaf2ff;
+      color: #0d6efd;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 700;
+      font-size: .95rem;
+    }
+    .ot-table-toolbar {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: .75rem;
+      flex-wrap: wrap;
+      width: 100%;
+    }
+    .ot-table-toolbar .input-group {
+      flex: 1 1 420px;
+      min-width: 280px;
+      max-width: 720px;
+    }
+    .ot-table-toolbar-controls {
+      display: flex;
+      align-items: center;
+      gap: .75rem;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+      flex: 0 0 auto;
+    }
+    .ot-table-toolbar-controls .form-select {
+      width: 180px;
+    }
+    .ot-table-toolbar-controls .btn {
+      flex: 0 0 auto;
+    }
+    @media (max-width: 767.98px) {
+      .ot-table-toolbar {
+        justify-content: stretch;
+        align-items: stretch;
+      }
+      .ot-table-toolbar .input-group {
+        flex-basis: 100%;
+        min-width: 0;
+        max-width: none;
+      }
+      .ot-table-toolbar-controls {
+        width: 100%;
+        justify-content: stretch;
+      }
+      .ot-table-toolbar-controls .form-select,
+      .ot-table-toolbar-controls .btn {
+        width: 100%;
+      }
+    }
 
     /* ── Status badges ── */
     .badge-ot-open       { background:#cfe2ff; color:#0a58ca; }
@@ -469,7 +803,7 @@ if ($hasCouncilTbl) {
       box-shadow: inset 0 0 0 1px rgba(13, 110, 253, .12);
     }
 
-    /* ── Kagawad permissions ── */
+    /* ── Official access cards ── */
     .kagawad-permission-card + .kagawad-permission-card { margin-top: 1rem; }
     .kagawad-permission-grid {
       display: grid;
@@ -498,7 +832,8 @@ if ($hasCouncilTbl) {
     }
   </style>
 </head>
-<body>
+<body data-ot-tool="<?= htmlspecialchars($transitionTool, ENT_QUOTES, 'UTF-8') ?>"
+      data-ot-autostart="<?= $autoOpenNewTermModal ? 'new-batch' : '' ?>">
 <div class="d-flex flex-column flex-md-row" style="min-height:100vh;">
   <?php include "includes/sidebar.php"; ?>
 
@@ -508,65 +843,169 @@ if ($hasCouncilTbl) {
     <div class="d-flex align-items-start justify-content-between flex-wrap gap-2 mb-3">
       <div>
         <h2 style="font-family:'Charis SIL Bold';color:#DE710C;">
-          Official Transition Module
+          Official Transition
         </h2>
         <p class="text-muted mb-0" style="font-size:.9rem;">
-          Manage election cycles, position handovers, and access setup for barangay officials.
+          <?= htmlspecialchars($transitionPageDescription, ENT_QUOTES, 'UTF-8') ?>
         </p>
       </div>
-      <?php if ($transitionTool === 'tracker'): ?>
+      <?php if ($transitionTool === 'current_term'): ?>
       <div class="d-flex gap-2 flex-wrap">
         <button class="btn btn-outline-secondary btn-sm" id="btnOtQuickActions"
-                data-bs-toggle="modal" data-bs-target="#modalQuickActions">
-          <i class="fas fa-bolt me-1"></i> Quick Actions
+                data-bs-toggle="modal" data-bs-target="#modalQuickActions"
+                <?= !$hasConfiguredTermSchedule ? 'disabled' : '' ?>>
+          <i class="fas fa-bolt me-1"></i> Access Actions
         </button>
-        <button class="btn btn-outline-primary btn-sm" id="btnNewBatch"
-                data-bs-toggle="modal" data-bs-target="#modalNewBatch">
-          <i class="fas fa-layer-group me-1"></i> New Batch
-        </button>
+        <a class="btn btn-outline-primary btn-sm" href="OfficialTransitions.php?tool=create_new_term">
+          <i class="fas fa-layer-group me-1"></i> Create New Term
+        </a>
         <button class="btn btn-primary btn-sm" id="btnNewTransition"
-                data-bs-toggle="modal" data-bs-target="#modalNewTransition">
-          <i class="fas fa-plus me-1"></i> New Transition
+                data-bs-toggle="modal" data-bs-target="#modalNewTransition"
+                <?= !$hasConfiguredTermSchedule ? 'disabled' : '' ?>>
+          <i class="fas fa-plus me-1"></i> New Official Handover
         </button>
       </div>
       <?php endif; ?>
     </div>
     <hr class="mb-4">
 
-    <div class="ot-subnav">
-      <a href="OfficialTransitions.php?tool=tracker"
-         class="ot-subnav-link <?= $transitionTool === 'tracker' ? 'active' : '' ?>">
-        <i class="fas fa-list-check"></i>
-        <span>Tracker</span>
-      </a>
-      <a href="OfficialTransitions.php?tool=kagawad_permissions"
-         class="ot-subnav-link <?= $transitionTool === 'kagawad_permissions' ? 'active' : '' ?>">
-        <i class="fas fa-user-check"></i>
-        <span>Kagawad Permissions</span>
-      </a>
-    </div>
-
     <?php if (!empty($officialTransitionFlash['message'])): ?>
       <div class="alert alert-<?= htmlspecialchars((string)($officialTransitionFlash['type'] ?? 'info'), ENT_QUOTES, 'UTF-8') ?> mb-4">
         <?= htmlspecialchars((string)$officialTransitionFlash['message'], ENT_QUOTES, 'UTF-8') ?>
       </div>
     <?php endif; ?>
+    <?php if ($transitionTool === 'current_term' && !$hasConfiguredTermSchedule): ?>
+      <div class="alert alert-warning mb-4">
+        No term is configured yet. Current officials are treated as inactive until a term is created.
+      </div>
+    <?php endif; ?>
 
-    <?php if ($transitionTool === 'tracker'): ?>
-    <!-- ══════════════════════════════════════════════════════════ ELECTION SCHEDULES -->
+    <?php if ($transitionTool === 'settings'): ?>
+    <div class="row g-4 mb-4">
+      <div class="col-md-6 col-xl-3">
+        <div class="ot-overview-card h-100">
+          <div class="ot-overview-label">IT Reminder</div>
+          <div class="ot-overview-value"><?= (int)$transitionSettings['it_admin_update_notice_days'] ?></div>
+          <div class="ot-overview-note">Days before election to remind the IT Administrator to review the term schedule.</div>
+        </div>
+      </div>
+      <div class="col-md-6 col-xl-3">
+        <div class="ot-overview-card h-100">
+          <div class="ot-overview-label">Outgoing Notice</div>
+          <div class="ot-overview-value"><?= (int)$transitionSettings['outgoing_notice_days'] ?></div>
+          <div class="ot-overview-note">Days before election to notify outgoing officials that their access will be revoked.</div>
+        </div>
+      </div>
+      <div class="col-md-6 col-xl-3">
+        <div class="ot-overview-card h-100">
+          <div class="ot-overview-label">Access Revocation</div>
+          <div class="ot-overview-value"><?= (int)$transitionSettings['access_revoke_days'] ?></div>
+          <div class="ot-overview-note">Days before election when outgoing official privileges are revoked automatically.</div>
+        </div>
+      </div>
+      <div class="col-md-6 col-xl-3">
+        <div class="ot-overview-card h-100">
+          <div class="ot-overview-label">Post-Election Follow-up</div>
+          <div class="ot-overview-value"><?= (int)$transitionSettings['post_election_followup_days'] ?></div>
+          <div class="ot-overview-note">Days after election to remind the IT Administrator to review unresolved transitions.</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="bg-white rounded-3 shadow-sm border mb-4">
+      <div class="p-3 border-bottom">
+        <div class="fw-semibold">Notification Timing Settings</div>
+        <div class="small text-muted">Set how early reminders are sent before the election date and when outgoing access is revoked.</div>
+      </div>
+      <form method="post" class="p-3">
+        <input type="hidden" name="action" value="save_notification_settings">
+        <div class="row g-4">
+          <?php foreach ($transitionSettingDefinitions as $settingKey => $settingDefinition): ?>
+            <?php
+              $settingValue = (int)($transitionSettings[$settingKey] ?? $settingDefinition['default'] ?? 0);
+              $settingMin = (int)($settingDefinition['min'] ?? 0);
+              $settingMax = (int)($settingDefinition['max'] ?? 365);
+            ?>
+            <div class="col-12 col-lg-6">
+              <label class="form-label fw-semibold" for="<?= htmlspecialchars($settingKey, ENT_QUOTES, 'UTF-8') ?>">
+                <?= htmlspecialchars((string)($settingDefinition['label'] ?? $settingKey), ENT_QUOTES, 'UTF-8') ?>
+              </label>
+              <div class="input-group">
+                <input
+                  type="number"
+                  class="form-control"
+                  id="<?= htmlspecialchars($settingKey, ENT_QUOTES, 'UTF-8') ?>"
+                  name="<?= htmlspecialchars($settingKey, ENT_QUOTES, 'UTF-8') ?>"
+                  min="<?= $settingMin ?>"
+                  max="<?= $settingMax ?>"
+                  step="1"
+                  value="<?= $settingValue ?>"
+                  required
+                >
+                <span class="input-group-text">days</span>
+              </div>
+              <div class="form-text">
+                <?= htmlspecialchars((string)($settingDefinition['description'] ?? ''), ENT_QUOTES, 'UTF-8') ?>
+              </div>
+            </div>
+          <?php endforeach; ?>
+        </div>
+        <div class="alert alert-info small mt-4 mb-0">
+          Recommended order: IT reminder should be the earliest window, outgoing notice should come before access revocation, and access revocation must stay at 1 day or more before election day.
+        </div>
+        <div class="d-flex justify-content-end mt-4">
+          <button type="submit" class="btn btn-primary">
+            <i class="fas fa-save me-1"></i> Save Settings
+          </button>
+        </div>
+      </form>
+    </div>
+    <?php endif; ?>
+
+    <?php if ($transitionTool === 'current_term'): ?>
+    <div class="ot-overview-grid mb-4">
+      <div class="ot-overview-card">
+        <div class="ot-overview-label">Council Seats</div>
+        <div class="ot-overview-value"><?= (int)$currentTermSeatCount ?></div>
+        <div class="ot-overview-note">Active seats in the current council structure.</div>
+      </div>
+      <div class="ot-overview-card">
+        <div class="ot-overview-label">Seats Filled</div>
+        <div class="ot-overview-value"><?= (int)$currentTermFilledCount ?></div>
+        <div class="ot-overview-note">Seats that already have an assigned current official.</div>
+      </div>
+      <div class="ot-overview-card">
+        <div class="ot-overview-label">Vacant Seats</div>
+        <div class="ot-overview-value"><?= (int)$currentTermVacantCount ?></div>
+        <div class="ot-overview-note">Seats that still need a current term official.</div>
+      </div>
+      <div class="ot-overview-card">
+        <div class="ot-overview-label">Elected Seats</div>
+        <div class="ot-overview-value"><?= (int)$currentTermElectedCount ?></div>
+        <div class="ot-overview-note">Seats that normally change through election-based term turnover.</div>
+      </div>
+      <div class="ot-overview-card">
+        <div class="ot-overview-label">Appointed Seats</div>
+        <div class="ot-overview-value"><?= (int)$currentTermAppointedCount ?></div>
+        <div class="ot-overview-note">Seats that are encoded through appointment or reappointment.</div>
+      </div>
+    </div>
+
+    <!-- ══════════════════════════════════════════════════════════ TERM DETAILS -->
     <div class="bg-white rounded-3 shadow-sm border mb-4">
       <div class="d-flex align-items-center justify-content-between p-3 border-bottom">
         <div class="d-flex align-items-center gap-2">
           <i class="fas fa-calendar-alt text-primary"></i>
-          <span class="fw-semibold">Election Schedules</span>
+          <span class="fw-semibold"><?= htmlspecialchars($scheduleSectionTitle, ENT_QUOTES, 'UTF-8') ?></span>
         </div>
-        <button class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#modalAddElection">
-          <i class="fas fa-plus me-1"></i> Add Election Date
+        <button class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#modalAddElection"
+                <?= $termEditSchedule === null ? 'disabled' : '' ?>>
+          <i class="fas fa-edit me-1"></i> Edit Term Details
         </button>
       </div>
       <div class="p-3">
         <?php if (empty($electionSchedules)): ?>
-          <p class="text-muted mb-0 small text-center py-2">No election dates scheduled.</p>
+          <p class="text-muted mb-0 small text-center py-2">No term transition dates scheduled.</p>
         <?php else: ?>
           <?php
             $notifPillClass = static function (int $sent): string {
@@ -580,34 +1019,38 @@ if ($hasCouncilTbl) {
             <table class="table table-sm align-middle mb-0" id="electionScheduleTable">
               <thead class="table-light">
                 <tr>
-                  <th>Batch / Label</th>
-                  <th>Election Date</th>
+                  <th>Term / Label</th>
+                  <th>Proclamation Date</th>
+                  <th>Next Election Date</th>
                   <th>Positions</th>
-                  <th>3-Month Notice</th>
-                  <th>1-Month Notice</th>
-                  <th>7-Day Deactivation</th>
-                  <th>Post-Election Notice</th>
+                  <th><?= htmlspecialchars($transitionSettingLabels['it_admin'], ENT_QUOTES, 'UTF-8') ?></th>
+                  <th><?= htmlspecialchars($transitionSettingLabels['outgoing'], ENT_QUOTES, 'UTF-8') ?></th>
+                  <th><?= htmlspecialchars($transitionSettingLabels['revoke'], ENT_QUOTES, 'UTF-8') ?></th>
+                  <th><?= htmlspecialchars($transitionSettingLabels['post'], ENT_QUOTES, 'UTF-8') ?></th>
                   <th></th>
                 </tr>
               </thead>
               <tbody>
                 <?php foreach ($electionSchedules as $es): ?>
                   <?php
-                    $ed    = $es['election_date'];
+                    $proclamationDate = (string)($es['proclamation_date'] ?? '');
+                    $nextElectionDate = (string)($es['next_election_date'] ?? '');
                     $label = htmlspecialchars($es['batch_label'] ?? '', ENT_QUOTES, 'UTF-8');
-                    $daysUntil = (int)round((strtotime($ed) - time()) / 86400);
+                    $daysUntil = $nextElectionDate !== '' ? (int)round((strtotime($nextElectionDate) - time()) / 86400) : 0;
                     $isPast = $daysUntil < 0;
-                    $edFmt  = date('M d, Y', strtotime($ed));
+                    $proclamationFmt = $proclamationDate !== '' ? date('M d, Y', strtotime($proclamationDate)) : '—';
+                    $nextElectionFmt = $nextElectionDate !== '' ? date('M d, Y', strtotime($nextElectionDate)) : '—';
                   ?>
                   <tr>
                     <td class="fw-semibold"><?= $label ?></td>
+                    <td><?= htmlspecialchars($proclamationFmt, ENT_QUOTES, 'UTF-8') ?></td>
                     <td>
-                      <?= $edFmt ?>
-                      <?php if ($daysUntil > 0): ?>
+                      <?= htmlspecialchars($nextElectionFmt, ENT_QUOTES, 'UTF-8') ?>
+                      <?php if ($nextElectionDate !== '' && $daysUntil > 0): ?>
                         <span class="badge bg-secondary ms-1"><?= $daysUntil ?>d away</span>
-                      <?php elseif ($daysUntil === 0): ?>
+                      <?php elseif ($nextElectionDate !== '' && $daysUntil === 0): ?>
                         <span class="badge bg-warning text-dark ms-1">Today</span>
-                      <?php else: ?>
+                      <?php elseif ($nextElectionDate !== ''): ?>
                         <span class="badge bg-light text-muted ms-1"><?= abs($daysUntil) ?>d ago</span>
                       <?php endif; ?>
                     </td>
@@ -619,12 +1062,12 @@ if ($hasCouncilTbl) {
                     <td>
                       <div class="d-flex gap-1 justify-content-end">
                       <button class="btn btn-xs btn-outline-secondary py-0 px-2"
-                              onclick="otResendNotif(<?= htmlspecialchars(json_encode($es['batch_label']), ENT_QUOTES, 'UTF-8') ?>, <?= htmlspecialchars(json_encode($ed), ENT_QUOTES, 'UTF-8') ?>)"
+                              onclick="otResendNotif(<?= htmlspecialchars(json_encode($es['batch_label']), ENT_QUOTES, 'UTF-8') ?>, <?= htmlspecialchars(json_encode($nextElectionDate), ENT_QUOTES, 'UTF-8') ?>)"
                               title="Manually trigger pending notifications">
                         <i class="fas fa-redo fa-xs"></i>
                       </button>
                       <button class="btn btn-xs btn-outline-danger py-0 px-2"
-                              onclick="otDeleteSchedule(<?= htmlspecialchars(json_encode($es['batch_label']), ENT_QUOTES, 'UTF-8') ?>, <?= htmlspecialchars(json_encode($ed), ENT_QUOTES, 'UTF-8') ?>)"
+                              onclick="otDeleteSchedule(<?= htmlspecialchars(json_encode($es['batch_label']), ENT_QUOTES, 'UTF-8') ?>, <?= htmlspecialchars(json_encode($nextElectionDate), ENT_QUOTES, 'UTF-8') ?>)"
                               title="Delete this schedule and its linked transitions">
                         <i class="fas fa-trash fa-xs"></i>
                       </button>
@@ -638,173 +1081,392 @@ if ($hasCouncilTbl) {
         <?php endif; ?>
       </div>
     </div>
-    <?php else: ?>
+
     <div class="bg-white rounded-3 shadow-sm border mb-4">
-      <div class="p-3 p-md-4 border-bottom">
-        <div class="fw-semibold mb-1">Kagawad Default Access</div>
-        <div class="text-muted small">
-          Right now, the system default is role-based, not position-based:
-          <strong>regular officials/Admins</strong> start with all non-admin-only sidebar permissions,
-          while <strong>SuperAdmin</strong> gets every module. This screen lets you override that default per kagawad.
+      <div class="d-flex align-items-center justify-content-between flex-wrap gap-3 p-3 border-bottom">
+        <div>
+          <div class="fw-semibold">Current Term Officials</div>
+          <div class="small text-muted">View the official currently assigned to each active council seat.</div>
         </div>
       </div>
-      <div class="p-3 p-md-4">
-        <?php
-          $availablePermissionCount = count($defaultOfficialPermissionKeys);
-          $assignedKagawads = array_values(array_filter($kagawadOfficials, static fn ($row) => !empty($row['has_official'])));
-        ?>
-        <div class="row g-3 mb-3">
-          <div class="col-12 col-md-4">
-            <div class="border rounded-3 p-3 h-100 bg-light">
-              <div class="small text-muted">Current Kagawads</div>
-              <div class="fs-4 fw-bold"><?= count($assignedKagawads) ?></div>
+      <div class="p-3">
+        <?php if (empty($councilSeats)): ?>
+          <div class="text-center text-muted py-4">No active council seats were found for the current term.</div>
+        <?php else: ?>
+          <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0 ot-roster-table">
+              <thead class="table-light">
+                <tr>
+                  <th>Seat</th>
+                  <th>Selection</th>
+                  <th>Current Official</th>
+                  <th>Access Profile</th>
+                  <th>Department</th>
+                  <th>Account Status</th>
+                  <th>Term Dates</th>
+                </tr>
+              </thead>
+              <tbody>
+                <?php foreach ($councilSeats as $seat): ?>
+                  <?php
+                    $holderName = trim((string)($seat['current_official_name'] ?? ''));
+                    $selectionMethod = trim((string)($seat['selection_method'] ?? ''));
+                    $selectionClass = strcasecmp($selectionMethod, 'Elected') === 0
+                        ? 'bg-primary-subtle text-primary-emphasis border border-primary-subtle'
+                        : 'bg-secondary-subtle text-secondary-emphasis border border-secondary-subtle';
+                    $accountStatus = trim((string)($seat['account_status'] ?? ''));
+                    $accountClass = 'bg-light text-dark';
+                    if (stripos($accountStatus, 'active') !== false || stripos($accountStatus, 'acting') !== false) {
+                        $accountClass = 'bg-success';
+                    } elseif (stripos($accountStatus, 'suspend') !== false) {
+                        $accountClass = 'bg-warning text-dark';
+                    } elseif (stripos($accountStatus, 'inactive') !== false || stripos($accountStatus, 'disabled') !== false || stripos($accountStatus, 'revoked') !== false) {
+                        $accountClass = 'bg-secondary';
+                    }
+                    $termStartLabel = $otFormatDateLabel((string)($seat['term_start'] ?? ''));
+                    $termEndLabel = $otFormatDateLabel((string)($seat['term_end'] ?? ''));
+                    $positionAccess = trim((string)($seat['current_position_access'] ?? ''));
+                    $departmentLabel = trim((string)($seat['department'] ?? ''));
+                  ?>
+                  <tr>
+                    <td class="fw-semibold"><?= htmlspecialchars((string)($seat['seat_name'] ?? '—'), ENT_QUOTES, 'UTF-8') ?></td>
+                    <td>
+                      <span class="badge <?= htmlspecialchars($selectionClass, ENT_QUOTES, 'UTF-8') ?>">
+                        <?= htmlspecialchars($selectionMethod !== '' ? $selectionMethod : '—', ENT_QUOTES, 'UTF-8') ?>
+                      </span>
+                    </td>
+                    <td>
+                      <?php if ($holderName !== ''): ?>
+                        <?= htmlspecialchars($holderName, ENT_QUOTES, 'UTF-8') ?>
+                      <?php else: ?>
+                        <span class="text-muted fst-italic">Vacant</span>
+                      <?php endif; ?>
+                    </td>
+                    <td><?= htmlspecialchars($positionAccess !== '' ? $positionAccess : '—', ENT_QUOTES, 'UTF-8') ?></td>
+                    <td><?= htmlspecialchars($departmentLabel !== '' ? $departmentLabel : '—', ENT_QUOTES, 'UTF-8') ?></td>
+                    <td>
+                      <?php if ($accountStatus !== ''): ?>
+                        <span class="badge <?= htmlspecialchars($accountClass, ENT_QUOTES, 'UTF-8') ?>">
+                          <?= htmlspecialchars($accountStatus, ENT_QUOTES, 'UTF-8') ?>
+                        </span>
+                      <?php else: ?>
+                        <span class="text-muted">—</span>
+                      <?php endif; ?>
+                    </td>
+                    <td>
+                      <div><?= htmlspecialchars($termStartLabel, ENT_QUOTES, 'UTF-8') ?></div>
+                      <div class="small text-muted">to <?= htmlspecialchars($termEndLabel, ENT_QUOTES, 'UTF-8') ?></div>
+                    </td>
+                  </tr>
+                <?php endforeach; ?>
+              </tbody>
+            </table>
+          </div>
+        <?php endif; ?>
+      </div>
+    </div>
+    <?php elseif ($transitionTool === 'create_new_term'): ?>
+    <div class="row g-4 mb-4">
+      <div class="col-xl-7">
+        <div class="bg-white rounded-3 shadow-sm border h-100">
+          <div class="p-3 border-bottom d-flex align-items-start justify-content-between flex-wrap gap-3">
+            <div>
+              <div class="fw-semibold">Create New Term Workflow</div>
+              <div class="small text-muted">Use this page to prepare the next term and encode the incoming officials who will receive access.</div>
+            </div>
+            <div class="d-flex gap-2 flex-wrap">
+              <button class="btn btn-primary btn-sm" id="btnNewBatch"
+                      data-bs-toggle="modal" data-bs-target="#modalNewBatch">
+                <i class="fas fa-layer-group me-1"></i> Create New Term
+              </button>
+              <button class="btn btn-outline-primary btn-sm" id="btnNewTransition"
+                      data-bs-toggle="modal" data-bs-target="#modalNewTransition">
+                <i class="fas fa-user-plus me-1"></i> Encode Appointed Official
+              </button>
             </div>
           </div>
-          <div class="col-12 col-md-4">
-            <div class="border rounded-3 p-3 h-100 bg-light">
-              <div class="small text-muted">Available Checklist Items</div>
-              <div class="fs-4 fw-bold"><?= $availablePermissionCount ?></div>
-            </div>
-          </div>
-          <div class="col-12 col-md-4">
-            <div class="border rounded-3 p-3 h-100 bg-light">
-              <div class="small text-muted">Default Behavior</div>
-              <div class="fw-semibold">All non-admin-only modules</div>
+          <div class="p-3">
+            <div class="ot-workflow-steps">
+              <div class="ot-workflow-step">
+                <span class="ot-workflow-step-index">1</span>
+                <div>
+                  <div class="fw-semibold">Create the term record</div>
+                  <div class="small text-muted">Set the term label, proclamation date, and next election date for the incoming term.</div>
+                </div>
+              </div>
+              <div class="ot-workflow-step">
+                <span class="ot-workflow-step-index">2</span>
+                <div>
+                  <div class="fw-semibold">Encode elected winners</div>
+                  <div class="small text-muted">The system will auto-generate handover rows for the elected seats below. Open each row and encode the winner’s official details.</div>
+                </div>
+              </div>
+              <div class="ot-workflow-step">
+                <span class="ot-workflow-step-index">3</span>
+                <div>
+                  <div class="fw-semibold">Encode appointed officials</div>
+                  <div class="small text-muted">Use <span class="fw-semibold">Encode Appointed Official</span> for appointment and reappointment seats that are not auto-generated by the new term record.</div>
+                </div>
+              </div>
             </div>
           </div>
         </div>
-
-        <?php if (empty($kagawadOfficials)): ?>
-          <div class="text-muted small text-center py-4">No kagawad seats were found in the council records yet.</div>
-        <?php else: ?>
-          <?php foreach ($kagawadOfficials as $index => $kagawad): ?>
-            <div class="border rounded-3 p-3 p-md-4 kagawad-permission-card">
-              <div class="d-flex justify-content-between align-items-start flex-wrap gap-3 mb-3">
-                <div>
-                  <div class="fw-bold fs-5"><?= htmlspecialchars((string)$kagawad['seat_name'], ENT_QUOTES, 'UTF-8') ?></div>
-                  <div class="text-muted">
-                    <?= htmlspecialchars((string)$kagawad['full_name'], ENT_QUOTES, 'UTF-8') ?>
-                    <?php if (!empty($kagawad['official_id'])): ?>
-                      <span class="badge bg-light text-dark border ms-2"><?= htmlspecialchars((string)$kagawad['official_id'], ENT_QUOTES, 'UTF-8') ?></span>
-                    <?php endif; ?>
-                  </div>
-                  <div class="small text-muted mt-1">
-                    <?= htmlspecialchars((string)($kagawad['department'] ?: 'Office of the Barangay'), ENT_QUOTES, 'UTF-8') ?>
-                    <?php if (!empty($kagawad['email'])): ?>
-                      • <?= htmlspecialchars((string)$kagawad['email'], ENT_QUOTES, 'UTF-8') ?>
-                    <?php endif; ?>
-                    <?php if (!empty($kagawad['phone_number'])): ?>
-                      • +63<?= htmlspecialchars((string)$kagawad['phone_number'], ENT_QUOTES, 'UTF-8') ?>
-                    <?php endif; ?>
-                  </div>
-                </div>
-                <div class="text-md-end">
-                  <div class="small text-muted">Checked Modules</div>
-                  <div class="fw-bold"><?= (int)$kagawad['permission_count'] ?></div>
-                  <div class="small text-muted"><?= htmlspecialchars((string)($kagawad['account_status'] ?: 'Unknown'), ENT_QUOTES, 'UTF-8') ?></div>
-                </div>
+      </div>
+      <div class="col-xl-5">
+        <div class="bg-white rounded-3 shadow-sm border h-100">
+          <div class="p-3 border-bottom">
+            <div class="fw-semibold">New Term Snapshot</div>
+            <div class="small text-muted">What gets created automatically and what still needs manual encoding.</div>
+          </div>
+          <div class="p-3">
+            <div class="ot-overview-grid">
+              <div class="ot-overview-card">
+                <div class="ot-overview-label">Auto-generated Seats</div>
+                <div class="ot-overview-value"><?= (int)count($batchPreviewSeats) ?></div>
+                <div class="ot-overview-note">Elected seats that will receive transition rows when the term is created.</div>
               </div>
-
-              <?php if (empty($kagawad['has_official'])): ?>
-                <div class="alert alert-light border mb-0">This seat is currently vacant, so there is no kagawad account to configure yet.</div>
-              <?php else: ?>
-                <form method="post" action="OfficialTransitions.php?tool=kagawad_permissions">
-                  <input type="hidden" name="action" value="save_kagawad_permissions">
-                  <input type="hidden" name="official_id" value="<?= htmlspecialchars((string)$kagawad['official_id'], ENT_QUOTES, 'UTF-8') ?>">
-
-                  <div class="kagawad-permission-grid mb-3">
-                    <?php foreach ($kagawadPermissionCatalog as $section): ?>
-                      <div class="kagawad-permission-group">
-                        <div class="kagawad-permission-group-title"><?= htmlspecialchars((string)$section['section'], ENT_QUOTES, 'UTF-8') ?></div>
-                        <div class="kagawad-permission-items">
-                          <?php foreach (($section['items'] ?? []) as $item): ?>
-                            <?php if (!empty($item['children'])): ?>
-                              <?php foreach (($item['children'] ?? []) as $child): ?>
-                                <?php
-                                  $childKey = (string)($child['key'] ?? '');
-                                  $isChecked = in_array($childKey, $kagawad['permission_keys'], true);
-                                  $label = trim((string)($item['label'] ?? '') . ' - ' . (string)($child['label'] ?? ''));
-                                ?>
-                                <div class="form-check">
-                                  <input class="form-check-input"
-                                         type="checkbox"
-                                         name="permission_keys[]"
-                                         value="<?= htmlspecialchars($childKey, ENT_QUOTES, 'UTF-8') ?>"
-                                         id="kgPerm<?= $index ?><?= htmlspecialchars($childKey, ENT_QUOTES, 'UTF-8') ?>"
-                                         <?= $isChecked ? 'checked' : '' ?>>
-                                  <label class="form-check-label" for="kgPerm<?= $index ?><?= htmlspecialchars($childKey, ENT_QUOTES, 'UTF-8') ?>">
-                                    <?= htmlspecialchars($label, ENT_QUOTES, 'UTF-8') ?>
-                                  </label>
-                                </div>
-                              <?php endforeach; ?>
-                            <?php else: ?>
-                              <?php
-                                $itemKey = (string)($item['key'] ?? '');
-                                $isChecked = in_array($itemKey, $kagawad['permission_keys'], true);
-                              ?>
-                              <div class="form-check">
-                                <input class="form-check-input"
-                                       type="checkbox"
-                                       name="permission_keys[]"
-                                       value="<?= htmlspecialchars($itemKey, ENT_QUOTES, 'UTF-8') ?>"
-                                       id="kgPerm<?= $index ?><?= htmlspecialchars($itemKey, ENT_QUOTES, 'UTF-8') ?>"
-                                       <?= $isChecked ? 'checked' : '' ?>>
-                                <label class="form-check-label" for="kgPerm<?= $index ?><?= htmlspecialchars($itemKey, ENT_QUOTES, 'UTF-8') ?>">
-                                  <?= htmlspecialchars((string)$item['label'], ENT_QUOTES, 'UTF-8') ?>
-                                </label>
-                              </div>
-                            <?php endif; ?>
-                          <?php endforeach; ?>
-                        </div>
-                      </div>
-                    <?php endforeach; ?>
-                  </div>
-
-                  <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
-                    <div class="small text-muted">
-                      Leaving the checklist empty will remove all saved module access for this kagawad.
-                    </div>
-                    <button type="submit" class="btn btn-primary btn-sm">
-                      <i class="fas fa-save me-1"></i> Save Kagawad Permissions
-                    </button>
-                  </div>
-                </form>
-              <?php endif; ?>
+              <div class="ot-overview-card">
+                <div class="ot-overview-label">Manual Seats</div>
+                <div class="ot-overview-value"><?= (int)count($appointedPreviewSeats) ?></div>
+                <div class="ot-overview-note">Appointed or reappointed seats to encode manually afterward.</div>
+              </div>
             </div>
-          <?php endforeach; ?>
+            <div class="alert alert-info small mt-3 mb-0">
+              <i class="fas fa-info-circle me-1"></i>
+              Create New Term handles the elected winners queue. Appointed officials still go through the handover form using <span class="fw-semibold">Appointment</span> or <span class="fw-semibold">Reappointment</span>.
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="row g-4 mb-4">
+      <div class="col-xl-7">
+        <div class="bg-white rounded-3 shadow-sm border h-100">
+          <div class="p-3 border-bottom">
+            <div class="fw-semibold">Elected Seats To Generate</div>
+            <div class="small text-muted">These seats are included automatically when you create the next term.</div>
+          </div>
+          <div class="p-3">
+            <?php if (empty($batchPreviewSeats)): ?>
+              <div class="text-center text-muted py-4">No elected seats are configured in the active council structure yet.</div>
+            <?php else: ?>
+              <div class="table-responsive">
+                <table class="table table-hover align-middle mb-0 ot-seat-preview-table">
+                  <thead class="table-light">
+                    <tr>
+                      <th>Seat</th>
+                      <th>Current Holder</th>
+                      <th>Account</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <?php foreach ($batchPreviewSeats as $seat): ?>
+                      <?php
+                        $holderName = trim((string)($seat['current_official_name'] ?? ''));
+                        $accountStatus = trim((string)($seat['account_status'] ?? ''));
+                        $accountClass = 'bg-light text-dark';
+                        if (stripos($accountStatus, 'active') !== false || stripos($accountStatus, 'acting') !== false) {
+                            $accountClass = 'bg-success';
+                        } elseif (stripos($accountStatus, 'suspend') !== false) {
+                            $accountClass = 'bg-warning text-dark';
+                        } elseif (stripos($accountStatus, 'inactive') !== false || stripos($accountStatus, 'disabled') !== false || stripos($accountStatus, 'revoked') !== false) {
+                            $accountClass = 'bg-secondary';
+                        }
+                      ?>
+                      <tr>
+                        <td class="fw-semibold"><?= htmlspecialchars((string)($seat['seat_name'] ?? '—'), ENT_QUOTES, 'UTF-8') ?></td>
+                        <td>
+                          <?php if ($holderName !== ''): ?>
+                            <?= htmlspecialchars($holderName, ENT_QUOTES, 'UTF-8') ?>
+                          <?php else: ?>
+                            <span class="text-muted fst-italic">Vacant</span>
+                          <?php endif; ?>
+                        </td>
+                        <td>
+                          <?php if ($accountStatus !== ''): ?>
+                            <span class="badge <?= htmlspecialchars($accountClass, ENT_QUOTES, 'UTF-8') ?>">
+                              <?= htmlspecialchars($accountStatus, ENT_QUOTES, 'UTF-8') ?>
+                            </span>
+                          <?php else: ?>
+                            <span class="text-muted">—</span>
+                          <?php endif; ?>
+                        </td>
+                      </tr>
+                    <?php endforeach; ?>
+                  </tbody>
+                </table>
+              </div>
+            <?php endif; ?>
+          </div>
+        </div>
+      </div>
+      <div class="col-xl-5">
+        <div class="bg-white rounded-3 shadow-sm border h-100">
+          <div class="p-3 border-bottom">
+            <div class="fw-semibold">Appointed Seats To Encode Manually</div>
+            <div class="small text-muted">These seats stay manual and should be encoded through Appointment or Reappointment.</div>
+          </div>
+          <div class="p-3">
+            <?php if (empty($appointedPreviewSeats)): ?>
+              <div class="text-center text-muted py-4">No appointed seats were found in the active council structure.</div>
+            <?php else: ?>
+              <div class="table-responsive">
+                <table class="table table-hover align-middle mb-0 ot-seat-preview-table">
+                  <thead class="table-light">
+                    <tr>
+                      <th>Seat</th>
+                      <th>Current Holder</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <?php foreach ($appointedPreviewSeats as $seat): ?>
+                      <?php $holderName = trim((string)($seat['current_official_name'] ?? '')); ?>
+                      <tr>
+                        <td class="fw-semibold"><?= htmlspecialchars((string)($seat['seat_name'] ?? '—'), ENT_QUOTES, 'UTF-8') ?></td>
+                        <td>
+                          <?php if ($holderName !== ''): ?>
+                            <?= htmlspecialchars($holderName, ENT_QUOTES, 'UTF-8') ?>
+                          <?php else: ?>
+                            <span class="text-muted fst-italic">Vacant</span>
+                          <?php endif; ?>
+                        </td>
+                      </tr>
+                    <?php endforeach; ?>
+                  </tbody>
+                </table>
+              </div>
+            <?php endif; ?>
+          </div>
+        </div>
+      </div>
+    </div>
+    <?php endif; ?>
+
+    <?php if ($transitionTool === 'create_new_term'): ?>
+    <!-- ══════════════════════════════════════════════════════════ TERM DETAILS -->
+    <div class="bg-white rounded-3 shadow-sm border mb-4">
+      <div class="d-flex align-items-center justify-content-between p-3 border-bottom">
+        <div class="d-flex align-items-center gap-2">
+          <i class="fas fa-calendar-alt text-primary"></i>
+          <span class="fw-semibold"><?= htmlspecialchars($scheduleSectionTitle, ENT_QUOTES, 'UTF-8') ?></span>
+        </div>
+        <button class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#modalNewBatch">
+          <i class="fas fa-plus me-1"></i> Add Term Details
+        </button>
+      </div>
+      <div class="p-3">
+        <?php if (empty($electionSchedules)): ?>
+          <p class="text-muted mb-0 small text-center py-2">No term transition dates scheduled.</p>
+        <?php else: ?>
+          <?php
+            $notifPillClass = static function (int $sent): string {
+                return $sent ? 'sent' : 'pending';
+            };
+            $notifPillLabel = static function (int $sent, bool $isPast, string $label): string {
+                return $sent ? 'Sent' : ($isPast ? 'Missed' : $label);
+            };
+          ?>
+          <div class="table-responsive">
+            <table class="table table-sm align-middle mb-0" id="electionScheduleTable">
+              <thead class="table-light">
+                <tr>
+                  <th>Term / Label</th>
+                  <th>Proclamation Date</th>
+                  <th>Next Election Date</th>
+                  <th>Positions</th>
+                  <th><?= htmlspecialchars($transitionSettingLabels['it_admin'], ENT_QUOTES, 'UTF-8') ?></th>
+                  <th><?= htmlspecialchars($transitionSettingLabels['outgoing'], ENT_QUOTES, 'UTF-8') ?></th>
+                  <th><?= htmlspecialchars($transitionSettingLabels['revoke'], ENT_QUOTES, 'UTF-8') ?></th>
+                  <th><?= htmlspecialchars($transitionSettingLabels['post'], ENT_QUOTES, 'UTF-8') ?></th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody>
+                <?php foreach ($electionSchedules as $es): ?>
+                  <?php
+                    $proclamationDate = (string)($es['proclamation_date'] ?? '');
+                    $nextElectionDate = (string)($es['next_election_date'] ?? '');
+                    $label = htmlspecialchars($es['batch_label'] ?? '', ENT_QUOTES, 'UTF-8');
+                    $daysUntil = $nextElectionDate !== '' ? (int)round((strtotime($nextElectionDate) - time()) / 86400) : 0;
+                    $isPast = $daysUntil < 0;
+                    $proclamationFmt = $proclamationDate !== '' ? date('M d, Y', strtotime($proclamationDate)) : '—';
+                    $nextElectionFmt = $nextElectionDate !== '' ? date('M d, Y', strtotime($nextElectionDate)) : '—';
+                  ?>
+                  <tr>
+                    <td class="fw-semibold"><?= $label ?></td>
+                    <td><?= htmlspecialchars($proclamationFmt, ENT_QUOTES, 'UTF-8') ?></td>
+                    <td>
+                      <?= htmlspecialchars($nextElectionFmt, ENT_QUOTES, 'UTF-8') ?>
+                      <?php if ($nextElectionDate !== '' && $daysUntil > 0): ?>
+                        <span class="badge bg-secondary ms-1"><?= $daysUntil ?>d away</span>
+                      <?php elseif ($nextElectionDate !== '' && $daysUntil === 0): ?>
+                        <span class="badge bg-warning text-dark ms-1">Today</span>
+                      <?php elseif ($nextElectionDate !== ''): ?>
+                        <span class="badge bg-light text-muted ms-1"><?= abs($daysUntil) ?>d ago</span>
+                      <?php endif; ?>
+                    </td>
+                    <td><?= (int)$es['position_count'] ?> pos / <?= (int)$es['completed_count'] ?> done</td>
+                    <td><span class="badge notif-pill <?= $notifPillClass((int)$es['n3']) ?>"><?= $notifPillLabel((int)$es['n3'], $isPast, 'Pending') ?></span></td>
+                    <td><span class="badge notif-pill <?= $notifPillClass((int)$es['n1']) ?>"><?= $notifPillLabel((int)$es['n1'], $isPast, 'Pending') ?></span></td>
+                    <td><span class="badge notif-pill <?= $notifPillClass((int)$es['n7']) ?>"><?= $notifPillLabel((int)$es['n7'], $isPast, 'Pending') ?></span></td>
+                    <td><span class="badge notif-pill <?= $notifPillClass((int)$es['np']) ?>"><?= $notifPillLabel((int)$es['np'], $daysUntil > 0, 'Pending') ?></span></td>
+                    <td>
+                      <div class="d-flex gap-1 justify-content-end">
+                      <button class="btn btn-xs btn-outline-secondary py-0 px-2"
+                              onclick="otResendNotif(<?= htmlspecialchars(json_encode($es['batch_label']), ENT_QUOTES, 'UTF-8') ?>, <?= htmlspecialchars(json_encode($nextElectionDate), ENT_QUOTES, 'UTF-8') ?>)"
+                              title="Manually trigger pending notifications">
+                        <i class="fas fa-redo fa-xs"></i>
+                      </button>
+                      <button class="btn btn-xs btn-outline-danger py-0 px-2"
+                              onclick="otDeleteSchedule(<?= htmlspecialchars(json_encode($es['batch_label']), ENT_QUOTES, 'UTF-8') ?>, <?= htmlspecialchars(json_encode($nextElectionDate), ENT_QUOTES, 'UTF-8') ?>)"
+                              title="Delete this schedule and its linked transitions">
+                        <i class="fas fa-trash fa-xs"></i>
+                      </button>
+                      </div>
+                    </td>
+                  </tr>
+                <?php endforeach; ?>
+              </tbody>
+            </table>
+          </div>
         <?php endif; ?>
       </div>
     </div>
     <?php endif; ?>
 
-    <?php if ($transitionTool === 'tracker'): ?>
+    <?php if ($transitionTool === 'create_new_term'): ?>
     <!-- ══════════════════════════════════════════════════════════ TRANSITIONS TABLE -->
     <div class="bg-white rounded-3 shadow-sm border">
       <!-- Toolbar -->
-      <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 p-3 border-bottom">
-        <div class="d-flex gap-1 flex-wrap" id="otTabBtns">
-          <button class="btn btn-sm btn-outline-primary active" data-ot-tab="active">Active</button>
-          <button class="btn btn-sm btn-outline-secondary" data-ot-tab="history">History</button>
-        </div>
-        <div class="d-flex gap-2 align-items-center flex-wrap ms-auto">
-          <div class="input-group" style="max-width:280px;">
-            <input type="text" class="form-control form-control-sm" id="otSearch"
-                   placeholder="Search position, official, batch…">
-            <span class="input-group-text bg-white"><i class="fas fa-search fa-xs"></i></span>
+      <div class="p-3 border-bottom">
+        <div class="d-flex align-items-start justify-content-between flex-wrap gap-3">
+          <div>
+            <div class="fw-semibold"><?= htmlspecialchars($transitionQueueTitle, ENT_QUOTES, 'UTF-8') ?></div>
+            <div class="small text-muted"><?= htmlspecialchars($transitionQueueDescription, ENT_QUOTES, 'UTF-8') ?></div>
           </div>
-          <select class="form-select form-select-sm" id="otTypeFilter" style="max-width:180px;">
-            <option value="">All types</option>
-            <option value="BarangayElection">Barangay Election</option>
-            <option value="SKElection">SK Election</option>
-            <option value="Appointment">Appointment</option>
-            <option value="Reappointment">Reappointment</option>
-            <option value="Resignation">Resignation</option>
-            <option value="Removal">Removal</option>
-            <option value="Retirement">Retirement</option>
-          </select>
-          <button class="btn btn-sm btn-outline-secondary" id="btnOtRefresh" title="Refresh">
-            <i class="fas fa-arrows-rotate"></i>
-          </button>
+          <div class="ot-table-toolbar">
+            <div class="input-group">
+              <input type="text" class="form-control form-control-sm" id="otSearch"
+                     placeholder="Search position, official, term…">
+              <span class="input-group-text bg-white"><i class="fas fa-search fa-xs"></i></span>
+            </div>
+            <div class="ot-table-toolbar-controls">
+              <select class="form-select form-select-sm" id="otTypeFilter">
+                <option value="">All types</option>
+                <option value="BarangayElection">Barangay Election</option>
+                <option value="SKElection">SK Election</option>
+                <option value="Appointment">Appointment</option>
+                <option value="Reappointment">Reappointment</option>
+                <option value="Resignation">Resignation</option>
+                <option value="Removal">Removal</option>
+                <option value="Retirement">Retirement</option>
+              </select>
+              <button class="btn btn-sm btn-outline-secondary" id="btnOtRefresh" title="Refresh">
+                <i class="fas fa-arrows-rotate"></i>
+              </button>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -817,7 +1479,7 @@ if ($hasCouncilTbl) {
               <th>Type</th>
               <th>Position</th>
               <th>Outgoing Official</th>
-              <th>Batch / Election</th>
+              <th>Term / Election</th>
               <th>Effective Date</th>
               <th>Status</th>
               <th>Actions</th>
@@ -841,14 +1503,14 @@ if ($hasCouncilTbl) {
 
 
 <!-- ══════════════════════════════════════════════════════════════════════════
-     MODAL: New Individual Transition
+     MODAL: New Official Handover
 ══════════════════════════════════════════════════════════════════════════ -->
 <div class="modal fade" id="modalNewTransition" tabindex="-1" aria-labelledby="modalNewTransitionLabel" aria-hidden="true">
   <div class="modal-dialog modal-lg">
     <div class="modal-content">
       <div class="modal-header">
         <h5 class="modal-title" id="modalNewTransitionLabel">
-          <i class="fas fa-plus-circle me-2 text-primary"></i> New Transition
+          <i class="fas fa-plus-circle me-2 text-primary"></i> New Official Handover
         </h5>
         <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
       </div>
@@ -898,7 +1560,7 @@ if ($hasCouncilTbl) {
                 <div class="d-flex gap-3 flex-wrap">
                   <div><span class="text-muted">Position:</span> <strong id="ntSeatName"></strong></div>
                   <div><span class="text-muted">Selection:</span> <strong id="ntSeatMethod"></strong></div>
-                  <div><span class="text-muted">Current holder:</span> <strong id="ntSeatHolder"></strong>
+                  <div><span class="text-muted">Outgoing official:</span> <strong id="ntSeatHolder"></strong>
                     <span id="ntSeatHolderStatus" class="badge ms-1"></span>
                   </div>
                 </div>
@@ -923,12 +1585,17 @@ if ($hasCouncilTbl) {
             <div class="col-12 col-md-6" id="ntBatchLabelWrap" style="display:none;">
               <label class="form-label fw-semibold">Batch Label</label>
               <input type="text" class="form-control" name="batch_label" id="ntBatchLabel"
-                     placeholder="e.g. 2025 Barangay Election">
+                     placeholder="e.g. 2025 Election Batch">
             </div>
-            <!-- Election Date (election types only) -->
-            <div class="col-12 col-md-6" id="ntElectionDateWrap" style="display:none;">
-              <label class="form-label fw-semibold">Election Date</label>
-              <input type="date" class="form-control" name="election_date" id="ntElectionDate">
+            <!-- Proclamation Date (election types only) -->
+            <div class="col-12 col-md-6" id="ntProclamationDateWrap" style="display:none;">
+              <label class="form-label fw-semibold">Proclamation Date</label>
+              <input type="date" class="form-control" name="proclamation_date" id="ntProclamationDate">
+            </div>
+            <!-- Next Election Date (election types only) -->
+            <div class="col-12 col-md-6" id="ntNextElectionDateWrap" style="display:none;">
+              <label class="form-label fw-semibold">Next Election Date</label>
+              <input type="date" class="form-control" name="next_election_date" id="ntNextElectionDate">
             </div>
 
             <!-- Reason -->
@@ -943,7 +1610,7 @@ if ($hasCouncilTbl) {
         <div class="modal-footer">
           <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
           <button type="submit" class="btn btn-primary" id="btnSubmitNewTransition">
-            <i class="fas fa-save me-1"></i> Create Transition
+            <i class="fas fa-save me-1"></i> Create Official Handover
           </button>
         </div>
       </form>
@@ -952,14 +1619,14 @@ if ($hasCouncilTbl) {
 </div>
 
 <!-- ══════════════════════════════════════════════════════════════════════════
-     MODAL: New Batch Transition
+     MODAL: Create New Term
 ══════════════════════════════════════════════════════════════════════════ -->
 <div class="modal fade" id="modalNewBatch" tabindex="-1" aria-labelledby="modalNewBatchLabel" aria-hidden="true">
   <div class="modal-dialog modal-xl">
     <div class="modal-content">
       <div class="modal-header">
         <h5 class="modal-title" id="modalNewBatchLabel">
-          <i class="fas fa-layer-group me-2 text-primary"></i> New Batch Transition
+          <i class="fas fa-layer-group me-2 text-primary"></i> Create New Term
         </h5>
         <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
       </div>
@@ -967,36 +1634,32 @@ if ($hasCouncilTbl) {
         <div class="modal-body">
           <div class="row g-3 mb-4">
             <div class="col-12 col-md-4">
-              <label class="form-label fw-semibold">Batch Label <span class="text-danger">*</span></label>
+              <label class="form-label fw-semibold">Term Label <span class="text-danger">*</span></label>
               <input type="text" class="form-control" name="batch_label" id="nbLabel" required
-                     placeholder="e.g. 2025 Barangay Election">
+                     placeholder="e.g. 2025-2028 Barangay Term">
             </div>
             <div class="col-12 col-md-4">
-              <label class="form-label fw-semibold">Batch Type <span class="text-danger">*</span></label>
-              <select class="form-select" name="batch_type" id="nbType" required>
-                <option value="">— Select —</option>
-                <option value="BarangayElection">Barangay Election (Term End)</option>
-                <option value="SKElection">SK Election (Term End)</option>
-              </select>
+              <label class="form-label fw-semibold">Proclamation Date <span class="text-danger">*</span></label>
+              <input type="date" class="form-control" name="proclamation_date" id="nbProclamationDate" required>
             </div>
             <div class="col-12 col-md-4">
-              <label class="form-label fw-semibold">Election Date <span class="text-danger">*</span></label>
-              <input type="date" class="form-control" name="election_date" id="nbElectionDate" required>
+              <label class="form-label fw-semibold">Next Election Date <span class="text-danger">*</span></label>
+              <input type="date" class="form-control" name="next_election_date" id="nbNextElectionDate" required>
             </div>
           </div>
 
           <p class="fw-semibold mb-2">Included council seats:</p>
           <div class="alert alert-info py-2 small mb-3">
             <i class="fas fa-info-circle me-1"></i>
-            The system will automatically include the elected seats covered by the selected batch type. Outgoing officials are detected per seat automatically.
+            The system will automatically include every elected seat in the active council structure. Outgoing officials are detected per seat automatically for the new term.
           </div>
-          <?php if (empty($batchPreviewSeats['BarangayElection']) && empty($batchPreviewSeats['SKElection'])): ?>
+          <?php if (empty($batchPreviewSeats)): ?>
             <div class="alert alert-warning small">No council seats found. Run the migration first.</div>
           <?php else: ?>
           <div id="nbAutoSeatPreviewEmpty" class="alert alert-light border small mb-0">
-            Select a batch type to preview the seats that will be included.
+            The elected seats for this batch are shown below.
           </div>
-          <div class="table-responsive d-none" id="nbAutoSeatPreviewWrap">
+          <div class="table-responsive" id="nbAutoSeatPreviewWrap">
             <table class="table table-sm align-middle">
               <thead class="table-light">
                 <tr>
@@ -1009,7 +1672,7 @@ if ($hasCouncilTbl) {
               </thead>
               <tbody id="nbAutoSeatPreviewBody">
                 <tr>
-                  <td colspan="5" class="text-center text-muted py-4">Select a batch type to preview the seats that will be included.</td>
+                  <td colspan="5" class="text-center text-muted py-4">Loading elected seats…</td>
                 </tr>
               </tbody>
             </table>
@@ -1019,7 +1682,7 @@ if ($hasCouncilTbl) {
         <div class="modal-footer">
           <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
           <button type="submit" class="btn btn-primary" id="btnSubmitNewBatch">
-            <i class="fas fa-layer-group me-1"></i> Create Batch
+            <i class="fas fa-layer-group me-1"></i> Create Term
           </button>
         </div>
       </form>
@@ -1034,29 +1697,42 @@ if ($hasCouncilTbl) {
   <div class="modal-dialog">
     <div class="modal-content">
       <div class="modal-header">
-        <h5 class="modal-title"><i class="fas fa-calendar-plus me-2 text-primary"></i> Add / Update Election Date</h5>
+        <h5 class="modal-title"><i class="fas fa-calendar-plus me-2 text-primary"></i> Edit Term Details</h5>
         <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
       </div>
       <form id="formAddElection" novalidate>
         <div class="modal-body">
+          <input type="hidden" name="original_batch_label" id="aeOriginalBatchLabel">
+          <input type="hidden" name="proclamation_date" id="aeProclamationDateHidden">
           <div class="mb-3">
-            <label class="form-label fw-semibold">Batch Label <span class="text-danger">*</span></label>
-            <input type="text" class="form-control" name="batch_label" id="aeBatchLabel" required
-                   placeholder="e.g. 2025 Barangay Election">
+            <label class="form-label fw-semibold">Term Label <span class="text-danger">*</span></label>
+            <input type="text" class="form-control" id="aeBatchLabel" disabled
+                   placeholder="e.g. 2025-2028 Barangay Term">
+            <div class="form-text text-muted">This is locked after the term is created.</div>
           </div>
           <div class="mb-3">
-            <label class="form-label fw-semibold">Election Date <span class="text-danger">*</span></label>
-            <input type="date" class="form-control" name="election_date" id="aeElectionDate" required>
+            <label class="form-label fw-semibold">Proclamation Date <span class="text-danger">*</span></label>
+            <input type="date" class="form-control" id="aeProclamationDate" disabled>
+            <div class="form-text text-muted">This stays fixed to preserve the original term record.</div>
+          </div>
+          <div class="mb-3">
+            <label class="form-label fw-semibold">Next Election Date <span class="text-danger">*</span></label>
+            <input type="date" class="form-control" name="next_election_date" id="aeNextElectionDate" required>
+            <div class="form-text text-muted" id="aeNextElectionHelp">You can adjust the month and day, but the election year stays locked.</div>
+          </div>
+          <div class="alert alert-info py-2 small d-none" id="aeNoEditableScheduleAlert">
+            <i class="fas fa-info-circle me-1"></i>
+            Create a term first before editing its details.
           </div>
           <div class="alert alert-warning py-2 small">
             <i class="fas fa-exclamation-triangle me-1"></i>
-            If you are updating an existing batch date, all unprocessed notification flags for that batch will be reset.
+            If you are updating an existing term schedule, all unprocessed notification flags for that term will be reset.
           </div>
         </div>
         <div class="modal-footer">
           <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
-          <button type="submit" class="btn btn-primary">
-            <i class="fas fa-save me-1"></i> Save Election Date
+          <button type="submit" class="btn btn-primary" id="btnSubmitEditTermDetails">
+            <i class="fas fa-save me-1"></i> Save Term Details
           </button>
         </div>
       </form>
@@ -1095,7 +1771,7 @@ if ($hasCouncilTbl) {
 
         <!-- Add official -->
         <div id="addCandidateSection" class="border rounded p-3">
-          <p class="fw-semibold mb-2 small">Official Information</p>
+          <p class="fw-semibold mb-2 small">Incoming Official Information</p>
           <div class="row g-2">
             <div class="col-12 col-md-5">
               <label for="formerOfficialMode" class="form-label small fw-semibold mb-1">Former Official?</label>
@@ -1181,7 +1857,7 @@ if ($hasCouncilTbl) {
             </div>
             <div class="col-12">
               <div class="small text-muted">
-                This position accepts one official only. The information here will be saved when you click <span class="fw-semibold">Continue to Finalize</span>.
+                This position accepts one official only. The information here will be saved when you click <span class="fw-semibold">Continue to Access Review</span>.
               </div>
             </div>
           </div>
@@ -1190,7 +1866,7 @@ if ($hasCouncilTbl) {
       <div class="modal-footer justify-content-between">
         <button class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">Close</button>
         <button class="btn btn-warning btn-sm" id="btnMarkPendingDecision">
-          <i class="fas fa-key me-1"></i> Continue to Finalize
+          <i class="fas fa-key me-1"></i> Continue to Access Review
         </button>
       </div>
     </div>
@@ -1206,7 +1882,7 @@ if ($hasCouncilTbl) {
       <div class="modal-header">
         <h5 class="modal-title">
           <i class="fas fa-key me-2 text-warning"></i>
-          Finalize Access & Complete Transition
+          Finalize Access, Assign Account, and Notify
         </h5>
         <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
       </div>
@@ -1215,7 +1891,7 @@ if ($hasCouncilTbl) {
 
         <div class="alert alert-info py-2 small mb-3">
           <i class="fas fa-info-circle me-1"></i>
-          Review the encoded official for this position. The access action below is set automatically from the information you entered in the first modal.
+          Review the saved official access record for this position. When you finish here, the system will process the account immediately and send onboarding access when needed.
         </div>
 
         <!-- Encoded official preview -->
@@ -1235,7 +1911,7 @@ if ($hasCouncilTbl) {
       <div class="modal-footer justify-content-between">
         <button class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
         <button class="btn btn-success" id="btnCompleteTransition">
-          <i class="fas fa-check-circle me-1"></i> Complete Access Setup
+          <i class="fas fa-check-circle me-1"></i> Complete and Notify
         </button>
       </div>
     </div>
@@ -1390,7 +2066,8 @@ if ($hasCouncilTbl) {
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
   <script>
     window.OT_BATCH_SEAT_PREVIEW = <?= json_encode($batchPreviewSeats, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?>;
+    window.OT_EDIT_SCHEDULE = <?= json_encode($termEditSchedule, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?>;
   </script>
-  <script src="../JS-Script-Files/Admin-End/officialTransitionsScript.js?v=20260323-2"></script>
+  <script src="../JS-Script-Files/Admin-End/officialTransitionsScript.js?v=20260325-2"></script>
 </body>
 </html>

@@ -2,11 +2,21 @@
   const el = (id) => document.getElementById(id);
   const opts = window.OFFICIALS_MGMT_OPTIONS || {};
   const permissionCatalog = Array.isArray(opts.permissionCatalog) ? opts.permissionCatalog : [];
+  const apiUrl = String(opts.apiUrl || "../PhpFiles/Admin-End/officialsManagement.php");
+  const managementMode = String(opts.managementMode || "official");
+  const showLifecycleTabs = Boolean(opts.showLifecycleTabs ?? (managementMode !== "personnel"));
+  const entitySingular = String(opts.entitySingular || "Official");
+  const entityPluralLower = String(opts.entityPluralLower || "officials");
+  const emptyCurrentMessage = String(opts.emptyCurrentMessage || `No current ${entityPluralLower} found.`);
+  const emptyPastMessage = String(opts.emptyPastMessage || `No past ${entityPluralLower} found.`);
+  const loadFailureMessage = String(opts.loadFailureMessage || `Failed to load ${entityPluralLower}.`);
+  const loadUnavailableMessage = String(opts.loadUnavailableMessage || `Unable to load ${entityPluralLower}.`);
 
   const state = {
     rowsRaw: [],
     rows: [],
     search: "",
+    lifecycle: "current",
     role: "ALL",
     permission: "ALL",
     department: "ALL",
@@ -31,6 +41,7 @@
   const refreshBtn = el("btnOfficialsMgmtRefresh");
   const revokedBadge = el("revokedOfficialsBadge");
   const searchInput = el("officialsMgmtSearch");
+  const lifecycleButtons = Array.from(document.querySelectorAll(".status-filter-btn[data-lifecycle-filter]"));
   const roleButtons = Array.from(document.querySelectorAll(".status-filter-btn[data-filter]"));
   const permissionButtons = Array.from(document.querySelectorAll(".status-filter-btn[data-permission-filter]"));
   const roleFilterSelect = el("officialsMgmtRoleFilter");
@@ -90,9 +101,6 @@
   const statusPillHtml = (text, type) =>
     `<span class="status-pill ${statusPillClass(text, type)}">${escapeHtml(safe(text))}</span>`;
 
-  const protectedBadgeHtml = (label) =>
-    label ? `<span class="officials-protected-badge"><i class="fas fa-shield-alt"></i>${escapeHtml(label)}</span>` : '<span class="text-muted small">—</span>';
-
   const formatDate = (raw) => {
     const value = String(raw || "").trim();
     if (!value) return "No expiry";
@@ -150,7 +158,20 @@
     selectEl.value = values.includes(currentValue) ? currentValue : "ALL";
   };
 
+  const isPastOfficial = (row) => {
+    const permissionState = String(row?.permission_state ?? "").trim().toLowerCase();
+    const accountStatus = String(row?.account_status ?? "").trim().toLowerCase();
+    const employmentStatus = String(row?.employment_status ?? "").trim().toLowerCase();
+
+    return permissionState === "revoked"
+      || /inactive|revoked|suspended|disabled/.test(accountStatus)
+      || /term ended|resigned|removed|retired/.test(employmentStatus);
+  };
+
   const syncQuickFilterButtons = () => {
+    lifecycleButtons.forEach((btn) => {
+      btn.classList.toggle("active", String(btn.dataset.lifecycleFilter || "current") === state.lifecycle);
+    });
     roleButtons.forEach((btn) => {
       btn.classList.toggle("active", String(btn.dataset.filter || "ALL") === state.role);
     });
@@ -194,6 +215,11 @@
   const applyFilters = () => {
     const q = state.search.toLowerCase();
     state.rows = state.rowsRaw.filter((row) => {
+      if (showLifecycleTabs) {
+        const isPast = isPastOfficial(row);
+        if (state.lifecycle === "current" && isPast) return false;
+        if (state.lifecycle === "past" && !isPast) return false;
+      }
       if (state.role !== "ALL" && String(row.display_role || "") !== state.role) return false;
       if (state.permission !== "ALL" && String(row.permission_state || "") !== state.permission) return false;
       if (state.department !== "ALL" && String(row.department || "") !== state.department) return false;
@@ -328,7 +354,10 @@
     const pageRows = state.rows.slice(start, start + state.pagination.entriesPerPage);
 
     if (!pageRows.length) {
-      tbody.innerHTML = '<tr><td colspan="12" class="text-center text-muted py-4">No officials found.</td></tr>';
+      const emptyMessage = showLifecycleTabs
+        ? (state.lifecycle === "past" ? emptyPastMessage : emptyCurrentMessage)
+        : emptyCurrentMessage;
+      tbody.innerHTML = `<tr><td colspan="11" class="text-center text-muted py-4">${emptyMessage}</td></tr>`;
       renderPagination();
       return;
     }
@@ -344,7 +373,6 @@
           <td>${escapeHtml(safe(row.position_access))}</td>
           <td>${escapeHtml(safe(row.department))}</td>
           <td>${escapeHtml(formatDate(row.access_expires_on))}</td>
-          <td>${protectedBadgeHtml(row.protected_label)}</td>
           <td>${statusPillHtml(row.account_status, "accountStatus")}</td>
           <td><div class="officials-module-summary">${escapeHtml(safe(row.module_summary))}</div></td>
           <td>${statusPillHtml(approvalState, "profileApproval")}</td>
@@ -376,8 +404,9 @@
     const body = new FormData();
     body.append("action", action);
     body.append("official_id", officialId);
+    body.append("mode", managementMode);
 
-    const res = await fetch("../PhpFiles/Admin-End/officialsManagement.php", {
+    const res = await fetch(apiUrl, {
       method: "POST",
       body,
       headers: { Accept: "application/json" },
@@ -836,7 +865,7 @@
     const displayRole = String(accessRoleSelect?.value || "Admin");
     const accessExpiresOn = String(accessExpiryInput?.value || "").trim();
     if (!officialId) {
-      window.alert("Missing official record.");
+      window.alert(`Missing ${entitySingular.toLowerCase()} record.`);
       return;
     }
 
@@ -846,11 +875,12 @@
     const body = new FormData();
     body.append("action", "update_access_profile");
     body.append("official_id", officialId);
+    body.append("mode", managementMode);
     body.append("display_role", displayRole);
     body.append("access_expires_on", accessExpiresOn);
     permissionKeys.forEach((key) => body.append("permission_keys[]", key));
 
-    const res = await fetch("../PhpFiles/Admin-End/officialsManagement.php", {
+    const res = await fetch(apiUrl, {
       method: "POST",
       body,
       headers: { Accept: "application/json" },
@@ -870,14 +900,15 @@
     try {
       const params = new URLSearchParams();
       params.set("fetch_officials_management", "1");
+      params.set("mode", managementMode);
       params.set("limit", "1000");
 
-      const res = await fetch(`../PhpFiles/Admin-End/officialsManagement.php?${params.toString()}`, {
+      const res = await fetch(`${apiUrl}?${params.toString()}`, {
         headers: { Accept: "application/json" },
       });
       const data = await res.json().catch(() => null);
       if (!res.ok || !data?.success) {
-        throw new Error(data?.message || "Failed to load officials.");
+        throw new Error(data?.message || loadFailureMessage);
       }
 
       state.rowsRaw = Array.isArray(data.data) ? data.data : [];
@@ -887,7 +918,7 @@
       renderTable();
     } catch (error) {
       if (tbody) {
-        tbody.innerHTML = `<tr><td colspan="12" class="text-center text-danger py-4">${escapeHtml(safe(error?.message || "Unable to load officials."))}</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="11" class="text-center text-danger py-4">${escapeHtml(safe(error?.message || loadUnavailableMessage))}</td></tr>`;
       }
     } finally {
       state.auto.inFlight = false;
@@ -930,6 +961,17 @@
         renderTable();
       });
     });
+
+    if (showLifecycleTabs) {
+      lifecycleButtons.forEach((btn) => {
+        btn.addEventListener("click", () => {
+          state.lifecycle = String(btn.dataset.lifecycleFilter || "current");
+          state.pagination.currentPage = 1;
+          syncQuickFilterButtons();
+          renderTable();
+        });
+      });
+    }
 
     permissionButtons.forEach((btn) => {
       btn.addEventListener("click", () => {
@@ -1014,10 +1056,11 @@
           const body = new FormData();
           body.append("action", "promote");
           body.append("official_id", officialId);
+          body.append("mode", managementMode);
           body.append("new_position", newPosition);
           body.append("area_number", areaNumber);
 
-          const res = await fetch("../PhpFiles/Admin-End/officialsManagement.php", {
+          const res = await fetch(apiUrl, {
             method: "POST",
             body,
             headers: { Accept: "application/json" },
@@ -1028,7 +1071,7 @@
           bootstrap.Modal.getInstance(document.getElementById("modalOfficialsMgmtPromote"))?.hide();
           await load();
         } catch (error) {
-          window.alert(error?.message || "Unable to promote official.");
+          window.alert(error?.message || `Unable to update ${entitySingular.toLowerCase()} position.`);
         } finally {
           promoteSubmitBtn.disabled = false;
         }
@@ -1068,11 +1111,12 @@
           const body = new FormData();
           body.append("action", "change_department");
           body.append("official_id", officialId);
+          body.append("mode", managementMode);
           body.append("new_department", newDepartment);
           body.append("new_position", newPosition);
           body.append("area_number", areaNumber);
 
-          const res = await fetch("../PhpFiles/Admin-End/officialsManagement.php", {
+          const res = await fetch(apiUrl, {
             method: "POST",
             body,
             headers: { Accept: "application/json" },

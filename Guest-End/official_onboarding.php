@@ -471,68 +471,176 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $roleAccess = in_array((string)$invite['role_access'], ['Official', 'Officials', 'Personnel', 'Personnels', 'SuperAdmin', 'Admin', 'Employee'], true)
                 ? (string)$invite['role_access']
                 : 'Official';
+            $linkedUserId = trim((string)($invite['user_id'] ?? ''));
 
-            $dup = $conn->prepare("SELECT user_id FROM useraccountstbl WHERE email = ? OR phone_number = ? LIMIT 1");
-            if ($dup) {
-                $dup->bind_param("ss", $email, $phone10);
-                $dup->execute();
-                $hit = $dup->get_result()->fetch_assoc();
-                $dup->close();
-                if ($hit) {
-                    $errors[] = 'Email or phone already exists in another account.';
+            if ($linkedUserId !== '') {
+                $dup = $conn->prepare("SELECT user_id FROM useraccountstbl WHERE (email = ? OR phone_number = ?) AND user_id <> ? LIMIT 1");
+                if ($dup) {
+                    $dup->bind_param("sss", $email, $phone10, $linkedUserId);
+                    $dup->execute();
+                    $hit = $dup->get_result()->fetch_assoc();
+                    $dup->close();
+                    if ($hit) {
+                        $errors[] = 'Email or phone already exists in another account.';
+                    }
                 }
-            }
 
-            if (empty($errors)) {
-                $activeStatusId = oi_get_or_create_status_id($conn, 'Active', ['UserAccount']);
-                if ($activeStatusId === null) {
-                    $errors[] = 'UserAccount Active status is missing.';
-                } else {
-                    $conn->begin_transaction();
-                    try {
-                        $userId = GenerateUserID($conn, $roleAccess);
-                        if (!$userId) {
-                            throw new RuntimeException('Failed to generate user ID.');
+                if (empty($errors)) {
+                    $linkedAccount = oi_get_account($conn, $linkedUserId);
+                    if (!$linkedAccount) {
+                        $errors[] = 'Linked account could not be found.';
+                    } else {
+                        $linkedOfficialInfo = oi_get_official_info($conn, $linkedUserId);
+                        $profileComplete = oi_has_info_and_contact($linkedOfficialInfo)
+                            && oi_has_address($linkedOfficialInfo)
+                            && oi_has_uploaded_2x2($conn, $linkedUserId);
+
+                        $conn->begin_transaction();
+                        try {
+                            $passwordHash = password_hash($password, PASSWORD_DEFAULT);
+                            $upUser = $conn->prepare("
+                                UPDATE useraccountstbl
+                                SET phone_number = ?,
+                                    email = ?,
+                                    password_hash = ?,
+                                    role_access = ?,
+                                    updated_at = NOW()
+                                WHERE user_id = ?
+                                LIMIT 1
+                            ");
+                            if (!$upUser) {
+                                throw new RuntimeException('Failed to prepare account update.');
+                            }
+                            $upUser->bind_param("sssss", $phone10, $email, $passwordHash, $roleAccess, $linkedUserId);
+                            if (!$upUser->execute()) {
+                                $upUser->close();
+                                throw new RuntimeException('Failed to update account.');
+                            }
+                            $upUser->close();
+
+                            $upOfficial = $conn->prepare("
+                                UPDATE officialinformationtbl
+                                SET contact_number = ?,
+                                    email = ?,
+                                    last_updated = CURRENT_TIMESTAMP
+                                WHERE user_id = ?
+                                LIMIT 1
+                            ");
+                            if ($upOfficial) {
+                                $upOfficial->bind_param("sss", $phone10, $email, $linkedUserId);
+                                $upOfficial->execute();
+                                $upOfficial->close();
+                            }
+
+                            $inviteId = (int)$invite['invite_id'];
+                            if ($profileComplete) {
+                                $upInvite = $conn->prepare("
+                                    UPDATE officialinvitetbl
+                                    SET token_used_at = NOW(),
+                                        password_set_at = NOW(),
+                                        onboarding_step = 'completed',
+                                        status = 'Completed',
+                                        accepted_at = COALESCE(accepted_at, NOW()),
+                                        updated_at = NOW()
+                                    WHERE invite_id = ?
+                                    LIMIT 1
+                                ");
+                            } else {
+                                $upInvite = $conn->prepare("
+                                    UPDATE officialinvitetbl
+                                    SET token_used_at = NOW(),
+                                        password_set_at = NOW(),
+                                        onboarding_step = 'email_verify',
+                                        status = 'InProgress',
+                                        updated_at = NOW()
+                                    WHERE invite_id = ?
+                                    LIMIT 1
+                                ");
+                            }
+                            if (!$upInvite) {
+                                throw new RuntimeException('Failed to update invite.');
+                            }
+                            $upInvite->bind_param("i", $inviteId);
+                            $upInvite->execute();
+                            $upInvite->close();
+
+                            $conn->commit();
+                            session_regenerate_id(true);
+                            $_SESSION['user_id'] = $linkedUserId;
+                            $_SESSION['role'] = $roleAccess;
+                            $_SESSION['logged_in'] = true;
+                            $_SESSION['last_activity'] = time();
+                            header('Location: ' . appUrl('/official-onboarding'));
+                            exit;
+                        } catch (Throwable $e) {
+                            $conn->rollback();
+                            $errors[] = 'Failed to continue onboarding. Please try again.';
                         }
+                    }
+                }
+            } else {
+                $dup = $conn->prepare("SELECT user_id FROM useraccountstbl WHERE email = ? OR phone_number = ? LIMIT 1");
+                if ($dup) {
+                    $dup->bind_param("ss", $email, $phone10);
+                    $dup->execute();
+                    $hit = $dup->get_result()->fetch_assoc();
+                    $dup->close();
+                    if ($hit) {
+                        $errors[] = 'Email or phone already exists in another account.';
+                    }
+                }
 
-                        $passwordHash = password_hash($password, PASSWORD_DEFAULT);
-                        $ins = $conn->prepare("
-                            INSERT INTO useraccountstbl
-                                (user_id, phone_number, phoneNum_verify, email, email_verify, password_hash, role_access, account_created, status_id_account)
-                            VALUES
-                                (?, ?, 0, ?, 0, ?, ?, NOW(), ?)
-                        ");
-                        if (!$ins) throw new RuntimeException('Failed to prepare account creation.');
-                        $ins->bind_param("sssssi", $userId, $phone10, $email, $passwordHash, $roleAccess, $activeStatusId);
-                        if (!$ins->execute()) {
+                if (empty($errors)) {
+                    $activeStatusId = oi_get_or_create_status_id($conn, 'Active', ['UserAccount']);
+                    if ($activeStatusId === null) {
+                        $errors[] = 'UserAccount Active status is missing.';
+                    } else {
+                        $conn->begin_transaction();
+                        try {
+                            $userId = GenerateUserID($conn, $roleAccess);
+                            if (!$userId) {
+                                throw new RuntimeException('Failed to generate user ID.');
+                            }
+
+                            $passwordHash = password_hash($password, PASSWORD_DEFAULT);
+                            $ins = $conn->prepare("
+                                INSERT INTO useraccountstbl
+                                    (user_id, phone_number, phoneNum_verify, email, email_verify, password_hash, role_access, account_created, status_id_account)
+                                VALUES
+                                    (?, ?, 0, ?, 0, ?, ?, NOW(), ?)
+                            ");
+                            if (!$ins) throw new RuntimeException('Failed to prepare account creation.');
+                            $ins->bind_param("sssssi", $userId, $phone10, $email, $passwordHash, $roleAccess, $activeStatusId);
+                            if (!$ins->execute()) {
+                                $ins->close();
+                                throw new RuntimeException('Failed to create account.');
+                            }
                             $ins->close();
-                            throw new RuntimeException('Failed to create account.');
+
+                            $up = $conn->prepare("
+                                UPDATE officialinvitetbl
+                                SET user_id = ?, token_used_at = NOW(), password_set_at = NOW(), onboarding_step = 'email_verify', status = 'InProgress'
+                                WHERE invite_id = ?
+                                LIMIT 1
+                            ");
+                            if (!$up) throw new RuntimeException('Failed to update invite.');
+                            $inviteId = (int)$invite['invite_id'];
+                            $up->bind_param("si", $userId, $inviteId);
+                            $up->execute();
+                            $up->close();
+
+                            $conn->commit();
+                            session_regenerate_id(true);
+                            $_SESSION['user_id'] = $userId;
+                            $_SESSION['role'] = $roleAccess;
+                            $_SESSION['logged_in'] = true;
+                            $_SESSION['last_activity'] = time();
+                            header('Location: ' . appUrl('/official-onboarding'));
+                            exit;
+                        } catch (Throwable $e) {
+                            $conn->rollback();
+                            $errors[] = 'Failed to create account. Please try again.';
                         }
-                        $ins->close();
-
-                        $up = $conn->prepare("
-                            UPDATE officialinvitetbl
-                            SET user_id = ?, token_used_at = NOW(), password_set_at = NOW(), onboarding_step = 'email_verify', status = 'InProgress'
-                            WHERE invite_id = ?
-                            LIMIT 1
-                        ");
-                        if (!$up) throw new RuntimeException('Failed to update invite.');
-                        $inviteId = (int)$invite['invite_id'];
-                        $up->bind_param("si", $userId, $inviteId);
-                        $up->execute();
-                        $up->close();
-
-                        $conn->commit();
-                        session_regenerate_id(true);
-                        $_SESSION['user_id'] = $userId;
-                        $_SESSION['role'] = $roleAccess;
-                        $_SESSION['logged_in'] = true;
-                        $_SESSION['last_activity'] = time();
-                        header('Location: ' . appUrl('/official-onboarding'));
-                        exit;
-                    } catch (Throwable $e) {
-                        $conn->rollback();
-                        $errors[] = 'Failed to create account. Please try again.';
                     }
                 }
             }
@@ -980,7 +1088,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 $mode = 'invalid';
 if ($loggedUserId !== '' && $sessionInvite && $account && in_array($loggedRole, ['Official', 'Officials', 'Personnel', 'Personnels', 'SuperAdmin', 'Admin', 'Employee'], true)) {
     $mode = 'resume';
-} elseif ($tokenInvite && empty($tokenInvite['token_used_at']) && empty($tokenInvite['user_id'])) {
+} elseif ($tokenInvite && empty($tokenInvite['token_used_at'])) {
     $mode = 'password';
 }
 

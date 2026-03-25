@@ -26,6 +26,7 @@ class EmailSender
         'onboarding_access' => 'emails/onboardingAccess.php',
         'announcement' => 'emails/announcement.php',
         'transaction'  => 'emails/transactionNotification.php',
+        'invoice'      => 'emails/invoiceEmail.php',
     ];
 
     private array $typeSenders = [];
@@ -104,6 +105,15 @@ class EmailSender
             $this->mail->clearAllRecipients();
             $this->mail->clearAttachments();
             $this->mail->clearReplyTos();
+
+            // Optional file attachments.
+            if (!empty($options['attachments']) && is_array($options['attachments'])) {
+                foreach ($options['attachments'] as $attachPath) {
+                    if (is_string($attachPath) && is_file($attachPath)) {
+                        $this->mail->addAttachment($attachPath);
+                    }
+                }
+            }
 
             // Auto sender by type
             $type = $options['type'] ?? null;

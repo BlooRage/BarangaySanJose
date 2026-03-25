@@ -2,9 +2,9 @@
 $current = basename($_SERVER['PHP_SELF']);
 
 // Group pages by section
-$residentMgmtPages = ['ResidentMasterlist.php', 'ResidentArchive.php', 'EditRequests.php', 'SectorMembershipVerification.php'];
+$residentMgmtPages = ['ResidentMasterlist.php', 'ResidentArchive.php', 'EditRequests.php', 'SectorMembershipVerification.php', 'AddResident.php'];
 $householdProfilingPages = ['HouseholdProfiling.php', 'HeadOfTheFamilyVerification.php'];
-$appointmentPages = ['AppointmentTracker.php'];
+$appointmentPages = ['AppointmentTracker.php', 'AppointmentRequestVerification.php'];
 $certPages = ['CertificateTracker.php'];
 $financePages = ['FinancePayments.php'];
 $blotterPages = ['BlotterForm.php', 'BlotterTracker.php', 'ReviewQueue.php'];
@@ -13,8 +13,21 @@ $contentMgmtPages = ['Contents.php', 'CreateContent.php'];
 $areaManagementPages = ['AreaStatistics.php', 'AreaProfile.php'];
 $reportPages = ['Reports.php'];
 $userMgmtPages = ['UserMasterlist.php'];
-$adminMgmtPages = ['OfficialsManagement.php', 'OfficialInvites.php'];
+$personnelMgmtPages = ['PersonnelTracker.php', 'OfficialInvites.php'];
+$adminMgmtPages = ['UserMasterlist.php', 'PersonnelTracker.php', 'OfficialInvites.php', 'AuditLogs.php'];
+$barangayOfficialMgmtPages = ['OfficialsManagement.php', 'OfficialTransitions.php'];
 $officialTransitionPages = ['OfficialTransitions.php'];
+
+$officialTransitionTool = trim((string)($_GET['tool'] ?? 'current_term'));
+if ($officialTransitionTool === '' || in_array($officialTransitionTool, ['tracker', 'new_set', 'past_officials', 'official_permissions', 'kagawad_permissions'], true)) {
+    $officialTransitionTool = 'current_term';
+} elseif ($officialTransitionTool === 'create_new_term') {
+    $officialTransitionTool = 'create_new_term';
+} elseif ($officialTransitionTool === 'settings') {
+    $officialTransitionTool = 'settings';
+} else {
+    $officialTransitionTool = 'current_term';
+}
 
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
@@ -60,9 +73,12 @@ $isContentMgmtActive = in_array($current, $contentMgmtPages);
 $isAreaManagementActive = in_array($current, $areaManagementPages);
 $isUserMgmtActive = in_array($current, $userMgmtPages);
 $isAdminMgmtActive = in_array($current, $adminMgmtPages);
+$isPersonnelMgmtActive = in_array($current, $personnelMgmtPages);
+$isBarangayOfficialMgmtActive = in_array($current, $barangayOfficialMgmtPages);
 $isOfficialTransitionActive = in_array($current, $officialTransitionPages);
 $isReportActive = in_array($current, $reportPages);
 $isStatisticsActive = ($current === 'AdminDashboard.php');
+$isAdminProfileActive = ($current === 'admin_profile.php');
 $reportModule = strtolower(trim((string)($_GET['module'] ?? '')));
 if ($reportModule === 'document_requests') {
     $reportModule = 'certificate_issuance';
@@ -208,8 +224,13 @@ $contentToolView = strtolower(trim((string)($_GET['tool'] ?? 'tracker')));
 if ($contentToolView !== 'tracker') {
     $contentToolView = 'tracker';
 }
+$contentManagementModule = strtolower(trim((string)($_GET['module'] ?? 'requests')));
+if (!in_array($contentManagementModule, ['requests', 'announcements', 'home', 'government', 'services', 'faq', 'contact', 'login'], true)) {
+    $contentManagementModule = 'requests';
+}
 $isContentCreateSectionActive = $current === 'CreateContent.php';
 $isContentToolsSectionActive = $current === 'Contents.php';
+$isContentNavigatorActive = $current === 'ContentManagement.php';
 
 $sbAllowedPermissions = [];
 if (isset($conn) && $conn instanceof mysqli && !empty($_SESSION['user_id'])) {
@@ -530,7 +551,7 @@ if (!empty($_SESSION['user_id']) && isset($conn) && $conn instanceof mysqli) {
             <?php if ($sbCan('resident_masterlist')): ?>
             <li>
               <a href="<?= htmlspecialchars(appUrl('Admin-End/ResidentMasterlist.php')) ?>"
-                 class="link-dark rounded <?= $current == 'ResidentMasterlist.php' ? 'active' : '' ?>">
+                 class="link-dark rounded <?= in_array($current, ['ResidentMasterlist.php', 'AddResident.php'], true) ? 'active' : '' ?>">
                 Masterlist
               </a>
             </li>
@@ -858,6 +879,63 @@ if (!empty($_SESSION['user_id']) && isset($conn) && $conn instanceof mysqli) {
       <?php endif; ?>
       <?php endif; ?>
 
+      <?php if ($sbCan('announcements_tracker')): ?>
+      <li class="mb-1 mt-2 text-muted small fw-semibold px-2">Content Management</li>
+      <li class="mb-2">
+        <button class="btn btn-toggle d-flex align-items-center gap-2 rounded <?= $isContentNavigatorActive ? '' : 'collapsed' ?>"
+                data-bs-toggle="collapse"
+                data-bs-target="#content-management-collapse"
+                aria-expanded="<?= $isContentNavigatorActive ? 'true' : 'false' ?>">
+          <i class="fas fa-sitemap"></i> Content Management
+        </button>
+        <div class="collapse <?= $isContentNavigatorActive ? 'show' : '' ?>" id="content-management-collapse">
+          <ul class="btn-toggle-nav list-unstyled fw-normal pb-1 small">
+            <li>
+              <a href="<?= htmlspecialchars(appUrl('Admin-End/Contents/ContentManagement.php')) ?>?module=requests"
+                 class="link-dark rounded <?= ($current === 'ContentManagement.php' && $contentManagementModule === 'requests') ? 'active' : '' ?>">
+                Content Change Request
+              </a>
+            </li>
+            <li>
+              <a href="<?= htmlspecialchars(appUrl('Admin-End/Contents/ContentManagement.php')) ?>?module=home"
+                 class="link-dark rounded <?= ($current === 'ContentManagement.php' && $contentManagementModule === 'home') ? 'active' : '' ?>">
+                Home Page
+              </a>
+            </li>
+            <li>
+              <a href="<?= htmlspecialchars(appUrl('Admin-End/Contents/ContentManagement.php')) ?>?module=government"
+                 class="link-dark rounded <?= ($current === 'ContentManagement.php' && $contentManagementModule === 'government') ? 'active' : '' ?>">
+                Government
+              </a>
+            </li>
+            <li>
+              <a href="<?= htmlspecialchars(appUrl('Admin-End/Contents/ContentManagement.php')) ?>?module=services"
+                 class="link-dark rounded <?= ($current === 'ContentManagement.php' && $contentManagementModule === 'services') ? 'active' : '' ?>">
+                Services
+              </a>
+            </li>
+            <li>
+              <a href="<?= htmlspecialchars(appUrl('Admin-End/Contents/ContentManagement.php')) ?>?module=faq"
+                 class="link-dark rounded <?= ($current === 'ContentManagement.php' && $contentManagementModule === 'faq') ? 'active' : '' ?>">
+                FAQ
+              </a>
+            </li>
+            <li>
+              <a href="<?= htmlspecialchars(appUrl('Admin-End/Contents/ContentManagement.php')) ?>?module=contact"
+                 class="link-dark rounded <?= ($current === 'ContentManagement.php' && $contentManagementModule === 'contact') ? 'active' : '' ?>">
+                Contact
+              </a>
+            </li>
+            <li>
+              <a href="<?= htmlspecialchars(appUrl('Admin-End/Contents/ContentManagement.php')) ?>?module=login"
+                 class="link-dark rounded <?= ($current === 'ContentManagement.php' && $contentManagementModule === 'login') ? 'active' : '' ?>">
+                Login
+              </a>
+            </li>
+          </ul>
+        </div>
+      </li>
+      <?php endif; ?>
       <?php if ($sbHasAny(array_merge($sbAnnouncementKeys, $sbReportKeys))): ?>
       <li class="mb-1 mt-2 text-muted small fw-semibold px-2">General Modules</li>
       <?php if ($sbHasAny($sbAnnouncementKeys)): ?>
@@ -982,61 +1060,37 @@ if (!empty($_SESSION['user_id']) && isset($conn) && $conn instanceof mysqli) {
       <li class="mb-1 mt-2 text-muted small fw-semibold px-2">Admin Management</li>
       <?php if ($sbCan('user_masterlist')): ?>
       <li class="mb-1">
-        <button class="btn btn-toggle d-flex align-items-center gap-2 rounded <?= $isUserMgmtActive ? '' : 'collapsed' ?>"
-                data-bs-toggle="collapse"
-                data-bs-target="#usermgmt-collapse"
-                aria-expanded="<?= $isUserMgmtActive ? 'true' : 'false' ?>">
+        <a href="<?= htmlspecialchars(appUrl('Admin-End/UserMasterlist.php')) ?>"
+           class="btn btn-toggle d-flex align-items-center gap-2 rounded <?= $current == 'UserMasterlist.php' ? 'active' : '' ?>"
+           style="<?= $current == 'UserMasterlist.php' ? 'outline: none; box-shadow: none;' : '' ?>">
           <i class="fas fa-users-cog"></i> User Management
-        </button>
-        <div class="collapse <?= $isUserMgmtActive ? 'show' : '' ?>" id="usermgmt-collapse">
-          <ul class="btn-toggle-nav list-unstyled fw-normal pb-1 small">
-            <li>
-              <a href="<?= htmlspecialchars(appUrl('Admin-End/UserMasterlist.php')) ?>"
-                 class="link-dark rounded <?= $current == 'UserMasterlist.php' ? 'active' : '' ?>">
-                User Masterlist
-              </a>
-            </li>
-          </ul>
-        </div>
+        </a>
       </li>
       <?php endif; ?>
-      <?php if ($sbCan('officials_management') || $sbCan('personnel_invite')): ?>
+      <?php if ($sbCan('personnel_invite')): ?>
       <li class="mb-1">
-        <button class="btn btn-toggle d-flex align-items-center gap-2 rounded <?= $isAdminMgmtActive ? '' : 'collapsed' ?>"
+        <button class="btn btn-toggle d-flex align-items-center gap-2 rounded <?= $isPersonnelMgmtActive ? 'active' : '' ?> <?= $isPersonnelMgmtActive ? '' : 'collapsed' ?>"
                 data-bs-toggle="collapse"
-                data-bs-target="#adminmgmt-collapse"
-                aria-expanded="<?= $isAdminMgmtActive ? 'true' : 'false' ?>">
-          <i class="fas fa-user-shield"></i> Personnel Management
+                data-bs-target="#personnelmanagement-collapse"
+                aria-expanded="<?= $isPersonnelMgmtActive ? 'true' : 'false' ?>">
+          <i class="fas fa-user-tie"></i> Personnel Management
         </button>
-        <div class="collapse <?= $isAdminMgmtActive ? 'show' : '' ?>" id="adminmgmt-collapse">
+        <div class="collapse <?= $isPersonnelMgmtActive ? 'show' : '' ?>" id="personnelmanagement-collapse">
           <ul class="btn-toggle-nav list-unstyled fw-normal pb-1 small">
-            <?php if ($sbCan('officials_management')): ?>
             <li>
-              <a href="<?= htmlspecialchars(appUrl('Admin-End/OfficialsManagement.php')) ?>"
-                 class="link-dark rounded <?= $current == 'OfficialsManagement.php' ? 'active' : '' ?>">
-                Officials Management
+              <a href="<?= htmlspecialchars(appUrl('Admin-End/PersonnelTracker.php')) ?>"
+                 class="link-dark rounded <?= $current == 'PersonnelTracker.php' ? 'active' : '' ?>">
+                Tracker
               </a>
             </li>
-            <?php endif; ?>
-            <?php if ($sbCan('personnel_invite')): ?>
             <li>
               <a href="<?= htmlspecialchars(appUrl('Admin-End/OfficialInvites.php')) ?>"
                  class="link-dark rounded <?= $current == 'OfficialInvites.php' ? 'active' : '' ?>">
                 Personnel Invite
               </a>
             </li>
-            <?php endif; ?>
           </ul>
         </div>
-      </li>
-      <?php endif; ?>
-      <?php if ($sbCan('official_transition')): ?>
-      <li class="mb-1">
-        <a href="<?= htmlspecialchars(appUrl('Admin-End/OfficialTransitions.php')) ?>"
-           class="btn btn-toggle d-flex align-items-center gap-2 rounded <?= $isOfficialTransitionActive ? 'active' : '' ?>"
-           style="<?= $isOfficialTransitionActive ? 'outline: none; box-shadow: none;' : '' ?>">
-          <i class="fas fa-right-left"></i> Official Transition
-        </a>
       </li>
       <?php endif; ?>
       <?php if ($sbCan('audit_logs')): ?>
@@ -1047,6 +1101,50 @@ if (!empty($_SESSION['user_id']) && isset($conn) && $conn instanceof mysqli) {
           <i class="fas fa-clipboard-list"></i> Audit Logs
         </a>
       </li>
+      <?php endif; ?>
+      <?php if ($sbCan('officials_management') || $sbCan('official_transition')): ?>
+      <li class="mb-1 mt-3 text-muted small fw-semibold px-2">Barangay Official Management</li>
+      <?php if ($sbCan('officials_management')): ?>
+      <li class="mb-1">
+        <a href="<?= htmlspecialchars(appUrl('Admin-End/OfficialsManagement.php')) ?>"
+           class="btn btn-toggle d-flex align-items-center gap-2 rounded <?= $current == 'OfficialsManagement.php' ? 'active' : '' ?>"
+           style="<?= $current == 'OfficialsManagement.php' ? 'outline: none; box-shadow: none;' : '' ?>">
+          <i class="fas fa-user-shield"></i> Official Management
+        </a>
+      </li>
+      <?php endif; ?>
+      <?php if ($sbCan('official_transition')): ?>
+      <li class="mb-1">
+        <button class="btn btn-toggle d-flex align-items-center gap-2 rounded <?= $isOfficialTransitionActive ? '' : 'collapsed' ?>"
+                data-bs-toggle="collapse"
+                data-bs-target="#officialtransition-collapse"
+                aria-expanded="<?= $isOfficialTransitionActive ? 'true' : 'false' ?>">
+          <i class="fas fa-right-left"></i> Official Transition
+        </button>
+        <div class="collapse <?= $isOfficialTransitionActive ? 'show' : '' ?>" id="officialtransition-collapse">
+          <ul class="btn-toggle-nav list-unstyled fw-normal pb-1 small">
+            <li>
+              <a href="<?= htmlspecialchars(appUrl('Admin-End/OfficialTransitions.php?tool=current_term')) ?>"
+                 class="link-dark rounded <?= $current == 'OfficialTransitions.php' && $officialTransitionTool === 'current_term' ? 'active' : '' ?>">
+                Current Term
+              </a>
+            </li>
+            <li>
+              <a href="<?= htmlspecialchars(appUrl('Admin-End/OfficialTransitions.php?tool=create_new_term')) ?>"
+                 class="link-dark rounded <?= $current == 'OfficialTransitions.php' && $officialTransitionTool === 'create_new_term' ? 'active' : '' ?>">
+                Create New Term
+              </a>
+            </li>
+            <li>
+              <a href="<?= htmlspecialchars(appUrl('Admin-End/OfficialTransitions.php?tool=settings')) ?>"
+                 class="link-dark rounded <?= $current == 'OfficialTransitions.php' && $officialTransitionTool === 'settings' ? 'active' : '' ?>">
+                Settings
+              </a>
+            </li>
+          </ul>
+        </div>
+      </li>
+      <?php endif; ?>
       <?php endif; ?>
       <?php endif; ?>
 
@@ -1071,7 +1169,7 @@ if (!empty($_SESSION['user_id']) && isset($conn) && $conn instanceof mysqli) {
           </div>
         </a>
         <ul class="dropdown-menu text-small shadow">
-          <li><a class="dropdown-item" href="<?= htmlspecialchars(appUrl('Admin-End/admin_profile.php')) ?>">Profile</a></li>
+          <li><a class="dropdown-item <?= $isAdminProfileActive ? 'active' : '' ?>" href="<?= htmlspecialchars(appUrl('Admin-End/admin_profile.php')) ?>">Profile</a></li>
           <li><a class="dropdown-item" href="<?= htmlspecialchars(appUrl('PhpFiles/Login/logout.php')) ?>">Sign out</a></li>
         </ul>
       </div>

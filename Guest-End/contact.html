@@ -13,7 +13,7 @@
     <link rel="stylesheet" href="../CSS-Styles/Guest-End-CSS/GuestPage.css">
     <link rel="stylesheet" href="../CSS-Styles/NavbarFooterStyle.css">
 </head>
-<body>
+<body data-cms-page="contact" data-cms-endpoint="../PhpFiles/GET/getSiteContent.php" data-cms-asset-base="../">
     <button onclick="topFunction()" id="goToTop" title="Go to top"><i class="fa-solid fa-arrow-up"></i>&nbsp;&nbsp;Go to top</button>
     <div class="navbarWrapper"><nav class="navbar navbar-expand-xl align-items-center navbar-light bg-white shadow-sm">
             <div class="container-fluid align-items-center px-4">
@@ -53,10 +53,10 @@
     </div>
 
     <div class="banner">
-        <img src="../Images/Contact_Banner.jpg" alt="Govt Banner" class="bannerImage">
+        <img src="../Images/Contact_Banner.jpg" alt="Govt Banner" class="bannerImage" data-cms-contact="banner-image">
         <div class="bannerText">
-            <h1>Contact</h1>
-            <p>Barangay San Jose is committed to providing accessible and reliable channels of communication for all residents.</p>
+            <h1 data-cms-contact="banner-title">Contact</h1>
+            <p data-cms-contact="banner-message">Barangay San Jose is committed to providing accessible and reliable channels of communication for all residents.</p>
         </div>
     </div>
 
@@ -69,10 +69,10 @@
             </div>
 
             <div class="contactSectionGroup bherSection">
-                <h2 class="sectionTitle">Barangay Health Emergency Response Team</h2>
-                <p class="sectionText">Listed below are the official Barangay Health Response Team emergency hotlines for each area. These contact numbers are provided to ensure immediate response to health-related emergencies and urgent situations within the community.</p>
+                <h2 class="sectionTitle" data-cms-contact="emergency-title">Barangay Health Emergency Response Team</h2>
+                <p class="sectionText" data-cms-contact="emergency-description">Listed below are the official Barangay Health Response Team emergency hotlines for each area. These contact numbers are provided to ensure immediate response to health-related emergencies and urgent situations within the community.</p>
 
-                <div class="row g-4 contactContactRow contactContactRow--tight">
+                <div class="row g-4 contactContactRow contactContactRow--tight" data-cms-contact-list="emergency-hotlines">
                     <div class="col-6 col-md-2">
                         <p class="areaTitle">Area 01</p>
                         <a href="tel:9631644357" class="phoneNumber">+63 963 164 4357</a>
@@ -101,7 +101,7 @@
         <span class="labelDivider areaHotlinesDivider">Area Hotlines</span>
 
         <div class="container contactGridGroup py-5">
-            <div class="row g-4 contactGridRow">
+            <div class="row g-4 contactGridRow" data-cms-contact-list="area-hotlines">
                 <div class="col-12 col-md-6 col-lg-4">
                     <div class="contactItem contactCard deptBox">
                         <p class="contactAreaName">COMMAND CENTER</p>
@@ -193,6 +193,7 @@
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/js/bootstrap.bundle.min.js" integrity="sha384-FKyoEForCGlyvwx9Hj09JcYn3nv7wiPVlz7YYwJrWVcXK/BmnVDxM+D2scQbITxI" crossorigin="anonymous"></script>
+    <script src="../JS-Script-Files/siteContentRuntime.js" defer></script>
     <script>
         let topBtn = document.getElementById("goToTop");
 
@@ -232,7 +233,6 @@
         });
     </script></body>
 </html>
-
 
 
 
