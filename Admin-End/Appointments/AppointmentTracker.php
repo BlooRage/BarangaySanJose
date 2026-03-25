@@ -480,6 +480,26 @@ foreach ($appointmentRows as $row) {
             word-break: break-word;
         }
 
+        .appointment-action-compare {
+            width: 100%;
+            margin: 0;
+        }
+
+        .appointment-action-compare th,
+        .appointment-action-compare td {
+            vertical-align: middle;
+            text-align: left;
+        }
+
+        #reviewActionFooter {
+            gap: 1rem !important;
+        }
+
+        #reviewActionFooter .btn {
+            min-width: 118px;
+            padding-inline: 1.25rem;
+        }
+
         #viewModal .tracker-form-section > .tracker-form-grid + .tracker-form-grid,
         #viewModal .tracker-form-section > .tracker-form-grid + .tracker-form-field,
         #viewModal .tracker-form-section > .tracker-form-field + .tracker-form-grid,
@@ -770,28 +790,28 @@ foreach ($appointmentRows as $row) {
                                 </div>
                                 <div class="tracker-form-field">
                                     <label class="tracker-form-label" for="reviewConfirmedTime">Confirmed Time</label>
-                                    <input class="form-control" type="time" name="confirmed_time" id="reviewConfirmedTime" min="09:01" max="16:59">
+                                    <input class="form-control" type="time" name="confirmed_time" id="reviewConfirmedTime" min="09:00" max="17:00">
                                 </div>
                             </div>
 
                             <div class="tracker-form-grid cols-1">
                                 <div class="tracker-form-field">
-                                    <label class="tracker-form-label" for="reviewAppointmentRemarks">Review Remarks</label>
-                                    <textarea class="form-control" name="appointment_remarks" id="reviewAppointmentRemarks" rows="3" placeholder="Add approval, denial, or reschedule notes"></textarea>
+                                    <div class="text-danger small d-none" id="reviewScheduleError">
+                                        Rescheduled time must be within office hours, from 9:00 AM to 5:00 PM.
+                                    </div>
                                 </div>
-                            </div>
-
-                            <div class="d-flex flex-wrap gap-2 justify-content-end">
-                                <button type="button" class="btn btn-outline-danger" data-review-action="deny_appointment">Deny</button>
-                                <button type="button" class="btn btn-outline-warning" data-review-action="reschedule_appointment">Reschedule</button>
-                                <button type="button" class="btn btn-success" data-review-action="approve_appointment">Approve</button>
                             </div>
                         </form>
                     </section>
                 </div>
             </div>
-            <div class="modal-footer">
+            <div class="modal-footer justify-content-between flex-wrap gap-2">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                <div class="d-flex flex-wrap gap-2 d-none" id="reviewActionFooter">
+                    <button type="button" class="btn btn-danger" data-review-action="deny_appointment">Deny</button>
+                    <button type="button" class="btn btn-warning" data-review-action="reschedule_appointment">Reschedule</button>
+                    <button type="button" class="btn btn-success" data-review-action="approve_appointment">Approve</button>
+                </div>
             </div>
         </div>
     </div>
@@ -806,10 +826,40 @@ foreach ($appointmentRows as $row) {
             </div>
             <div class="modal-body">
                 <p class="mb-2" id="appointmentActionConfirmMessage">This action cannot be undone.</p>
-                <p class="mb-0 text-muted small">Once you continue, the appointment status will be finalized and can no longer be changed.</p>
+                <div class="tracker-form-field d-none" id="appointmentActionSchedulePreviewField">
+                    <div class="tracker-form-value p-0 overflow-hidden">
+                        <div class="table-responsive">
+                            <table class="table table-sm appointment-action-compare mb-0">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th scope="col"></th>
+                                        <th scope="col">Preferred</th>
+                                        <th scope="col">Confirmed</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr>
+                                        <th scope="row">Date</th>
+                                        <td id="appointmentActionPreferredDate">-</td>
+                                        <td id="appointmentActionConfirmedDate">-</td>
+                                    </tr>
+                                    <tr>
+                                        <th scope="row">Time</th>
+                                        <td id="appointmentActionPreferredTime">-</td>
+                                        <td id="appointmentActionConfirmedTime">-</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+                <div class="tracker-form-field d-none" id="appointmentActionRemarksField">
+                    <label class="tracker-form-label" for="reviewAppointmentRemarks">Review Remarks</label>
+                    <textarea class="form-control" name="appointment_remarks" id="reviewAppointmentRemarks" rows="3" form="appointmentReviewForm" placeholder="Add denial remarks"></textarea>
+                </div>
             </div>
             <div class="modal-footer">
-                <button type="button" class="btn btn-outline-secondary" id="appointmentActionReturnBtn">Return</button>
+                <button type="button" class="btn btn-secondary" id="appointmentActionReturnBtn">Return</button>
                 <button type="button" class="btn btn-primary" id="appointmentActionConfirmBtn">Continue</button>
             </div>
         </div>
@@ -845,8 +895,10 @@ foreach ($appointmentRows as $row) {
         const reviewOfficialUserId = document.getElementById("reviewOfficialUserId");
         const reviewConfirmedDate = document.getElementById("reviewConfirmedDate");
         const reviewConfirmedTime = document.getElementById("reviewConfirmedTime");
+        const reviewScheduleError = document.getElementById("reviewScheduleError");
         const reviewRemarks = document.getElementById("reviewAppointmentRemarks");
         const reviewActionButtons = Array.from(document.querySelectorAll("[data-review-action]"));
+        const reviewActionFooter = document.getElementById("reviewActionFooter");
         const reviewLockedMessage = document.getElementById("reviewLockedMessage");
         const feedbackModalEl = document.getElementById("appointmentFeedbackModal");
         const feedbackModalTitle = document.getElementById("appointmentFeedbackModalTitle");
@@ -855,6 +907,12 @@ foreach ($appointmentRows as $row) {
         const confirmModalEl = document.getElementById("appointmentActionConfirmModal");
         const confirmModalTitle = document.getElementById("appointmentActionConfirmTitle");
         const confirmModalMessage = document.getElementById("appointmentActionConfirmMessage");
+        const confirmSchedulePreviewField = document.getElementById("appointmentActionSchedulePreviewField");
+        const confirmPreferredDate = document.getElementById("appointmentActionPreferredDate");
+        const confirmPreferredTime = document.getElementById("appointmentActionPreferredTime");
+        const confirmConfirmedDate = document.getElementById("appointmentActionConfirmedDate");
+        const confirmConfirmedTime = document.getElementById("appointmentActionConfirmedTime");
+        const confirmRemarksField = document.getElementById("appointmentActionRemarksField");
         const confirmModalReturnBtn = document.getElementById("appointmentActionReturnBtn");
         const confirmModalConfirmBtn = document.getElementById("appointmentActionConfirmBtn");
         const viewModalInstance = modal ? bootstrap.Modal.getOrCreateInstance(modal) : null;
@@ -873,6 +931,61 @@ foreach ($appointmentRows as $row) {
             if (!refreshBtn) return;
             refreshBtn.classList.toggle("is-loading", !!on);
             refreshBtn.disabled = !!on;
+        }
+
+        function formatReviewDate(value) {
+            const text = String(value || "").trim();
+            if (!text) return "-";
+            const parsed = new Date(`${text}T00:00:00`);
+            if (Number.isNaN(parsed.getTime())) {
+                return text;
+            }
+            return new Intl.DateTimeFormat("en-US", {
+                month: "short",
+                day: "2-digit",
+                year: "numeric"
+            }).format(parsed);
+        }
+
+        function formatReviewTime(value) {
+            const text = String(value || "").trim();
+            if (!text) return "-";
+            const parsed = new Date(`2000-01-01T${text}`);
+            if (Number.isNaN(parsed.getTime())) {
+                return text;
+            }
+            return new Intl.DateTimeFormat("en-US", {
+                hour: "2-digit",
+                minute: "2-digit",
+                hour12: true
+            }).format(parsed);
+        }
+
+        function isRescheduleChanged() {
+            const currentDate = String(reviewConfirmedDate?.value || "").trim();
+            const currentTime = String(reviewConfirmedTime?.value || "").trim();
+            const originalDate = String(modal?.dataset.originalReviewDate || "").trim();
+            const originalTime = String(modal?.dataset.originalReviewTime || "").trim();
+            return currentDate !== "" && currentTime !== "" && (currentDate !== originalDate || currentTime !== originalTime);
+        }
+
+        function isWithinOfficeHours(value) {
+            const time = String(value || "").trim();
+            return time !== "" && time >= "09:00" && time <= "17:00";
+        }
+
+        function syncReviewActionStates() {
+            const isPending = String(modal?.dataset.reviewStatusKey || "").trim() === "pending";
+            const hasOfficeHoursError = String(reviewConfirmedTime?.value || "").trim() !== "" && !isWithinOfficeHours(reviewConfirmedTime?.value || "");
+            reviewScheduleError?.classList.toggle("d-none", !isPending || !hasOfficeHoursError);
+            reviewActionButtons.forEach((actionButton) => {
+                const action = String(actionButton.dataset.reviewAction || "").trim();
+                if (action === "reschedule_appointment") {
+                    actionButton.disabled = !isPending || !isRescheduleChanged() || hasOfficeHoursError;
+                    return;
+                }
+                actionButton.disabled = !isPending;
+            });
         }
 
         function updatePendingBadge() {
@@ -1047,6 +1160,11 @@ foreach ($appointmentRows as $row) {
             if (reviewAppointmentId) {
                 reviewAppointmentId.value = String(button.dataset.appointmentId || "").trim();
             }
+            if (modal) {
+                modal.dataset.preferredAppointmentDate = String(button.dataset.preferredAppointmentDate || "").trim();
+                modal.dataset.preferredAppointmentTime = String(button.dataset.preferredAppointmentTime || "").trim();
+                modal.dataset.reviewStatusKey = String(button.dataset.statusKey || "").trim();
+            }
             if (reviewOfficialUserId) {
                 reviewOfficialUserId.value = String(button.dataset.officialUserId || "").trim();
             }
@@ -1057,6 +1175,9 @@ foreach ($appointmentRows as $row) {
                 const stampToUse = confirmedStamp || preferredStamp;
                 if (stampToUse) {
                     reviewConfirmedDate.value = stampToUse.slice(0, 10);
+                    if (modal) {
+                        modal.dataset.originalReviewDate = stampToUse.slice(0, 10);
+                    }
                 }
             }
             if (reviewConfirmedTime) {
@@ -1066,6 +1187,9 @@ foreach ($appointmentRows as $row) {
                 const stampToUse = confirmedStamp || preferredStamp;
                 if (stampToUse.length >= 16) {
                     reviewConfirmedTime.value = stampToUse.slice(11, 16);
+                    if (modal) {
+                        modal.dataset.originalReviewTime = stampToUse.slice(11, 16);
+                    }
                 }
             }
             if (reviewRemarks) {
@@ -1075,10 +1199,12 @@ foreach ($appointmentRows as $row) {
 
             const isPending = String(button.dataset.statusKey || "").trim() === "pending";
             reviewLockedMessage?.classList.toggle("d-none", isPending);
-            reviewActionButtons.forEach((actionButton) => {
-                actionButton.classList.toggle("d-none", !isPending);
-            });
+            reviewActionFooter?.classList.toggle("d-none", !isPending);
+            syncReviewActionStates();
         });
+
+        reviewConfirmedDate?.addEventListener("input", syncReviewActionStates);
+        reviewConfirmedTime?.addEventListener("input", syncReviewActionStates);
 
         reviewActionButtons.forEach((button) => {
             button.addEventListener("click", (event) => {
@@ -1098,10 +1224,36 @@ foreach ($appointmentRows as $row) {
                         return;
                     }
                 }
+                if (action === "reschedule_appointment" && !isWithinOfficeHours(reviewConfirmedTime?.value || "")) {
+                    reviewScheduleError?.classList.remove("d-none");
+                    window.alert("Rescheduled time must be within office hours, from 9:00 AM to 5:00 PM.");
+                    return;
+                }
 
                 pendingReviewAction = action;
                 if (reviewActionInput) {
                     reviewActionInput.value = action;
+                }
+
+                confirmSchedulePreviewField?.classList.toggle("d-none", action !== "reschedule_appointment");
+                if (action === "reschedule_appointment") {
+                    if (confirmPreferredDate) {
+                        confirmPreferredDate.textContent = String(modal?.dataset.preferredAppointmentDate || "").trim() || "-";
+                    }
+                    if (confirmPreferredTime) {
+                        confirmPreferredTime.textContent = String(modal?.dataset.preferredAppointmentTime || "").trim() || "-";
+                    }
+                    if (confirmConfirmedDate) {
+                        confirmConfirmedDate.textContent = formatReviewDate(reviewConfirmedDate?.value || "");
+                    }
+                    if (confirmConfirmedTime) {
+                        confirmConfirmedTime.textContent = formatReviewTime(reviewConfirmedTime?.value || "");
+                    }
+                }
+
+                confirmRemarksField?.classList.toggle("d-none", action !== "deny_appointment");
+                if (reviewRemarks && action !== "deny_appointment") {
+                    reviewRemarks.value = "";
                 }
 
                 if (confirmModalTitle) {
@@ -1113,7 +1265,7 @@ foreach ($appointmentRows as $row) {
                     confirmModalMessage.textContent = action === "approve_appointment"
                         ? "You are about to approve this appointment. This action cannot be undone."
                         : (action === "reschedule_appointment"
-                            ? "You are about to reschedule this appointment. This action cannot be undone."
+                            ? "Review the selected date and time before continuing with this reschedule."
                             : "You are about to deny this appointment. This action cannot be undone.");
                 }
 

@@ -68,6 +68,12 @@
   const OFFICIAL_AREA_OPTIONS = ['Area 01', 'Area 1A', 'Area 02', 'Area 03', 'Area 04', 'Area 05', 'Area 06'];
   const OFFICIAL_SECTOR_OPTIONS = ['PWD', 'Senior Citizen', 'Student', 'Indigenous People', 'Single Parent'];
 
+  function setRefreshLoading(on) {
+    if (!refreshBtn) return;
+    refreshBtn.classList.toggle('is-loading', !!on);
+    refreshBtn.disabled = !!on;
+  }
+
   function esc(v) {
     return String(v ?? '').replace(/[&<>\"']/g, (m) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '\"': '&quot;', "'": '&#39;' }[m]));
   }
@@ -481,6 +487,7 @@ fields.push({ label: 'Address', value: participant?.address || '-', fullWidth: t
   async function loadList() {
     if (!tableBody) return;
     tableBody.innerHTML = `<tr><td colspan="8" class="text-center text-muted py-4">Loading blotter records...</td></tr>`;
+    setRefreshLoading(true);
     try {
       const data = await fetchJson(`${endpoint}?action=list`);
       allRows = Array.isArray(data.items) ? data.items : [];
@@ -489,6 +496,8 @@ fields.push({ label: 'Address', value: participant?.address || '-', fullWidth: t
       applyFilters();
     } catch (err) {
       tableBody.innerHTML = `<tr><td colspan="8" class="text-center text-danger py-4">${esc(err.message || err)}</td></tr>`;
+    } finally {
+      setRefreshLoading(false);
     }
   }
 
@@ -1078,3 +1087,4 @@ fields.push({ label: 'Address', value: participant?.address || '-', fullWidth: t
   initCaseActionFlow();
   loadList();
 })();
+

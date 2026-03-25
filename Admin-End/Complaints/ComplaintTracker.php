@@ -90,6 +90,7 @@ require_once __DIR__ . "/../includes/admin_guard.php";
             line-height: 1.45;
         }
 
+
     </style>
 </head>
 
@@ -124,11 +125,11 @@ require_once __DIR__ . "/../includes/admin_guard.php";
                         <i class="fas fa-filter"></i>
                         <span class="visually-hidden">Filter</span>
                     </button>
-                    <button class="btn btn-outline-secondary btn-icon" type="button" data-bs-toggle="modal" data-bs-target="#modalTableColumns" id="btnComplaintColumns" title="Columns" aria-label="Columns">
+                    <button class="btn btn-outline-secondary btn-icon admin-columns" type="button" data-bs-toggle="modal" data-bs-target="#modalTableColumns" id="btnComplaintColumns" title="Columns" aria-label="Columns">
                         <i class="fa-solid fa-sliders"></i>
                         <span class="visually-hidden">Columns</span>
                     </button>
-                    <button class="btn btn-outline-secondary btn-icon" type="button" id="btnComplaintTableRefresh" title="Refresh table" aria-label="Refresh table">
+                    <button class="btn btn-outline-secondary btn-icon admin-refresh" type="button" id="btnComplaintTableRefresh" title="Refresh table" aria-label="Refresh table">
                         <i class="fa-solid fa-arrows-rotate"></i>
                         <span class="visually-hidden">Refresh</span>
                     </button>
@@ -151,7 +152,7 @@ require_once __DIR__ . "/../includes/admin_guard.php";
                     </thead>
                     <tbody id="tableBody">
                         <tr>
-                            <td colspan="8" class="text-start text-muted py-4">Complaint tracking will appear here once the admin data endpoint is connected.</td>
+                            <td colspan="8" class="text-center text-muted py-4">Complaint tracking will appear here once the admin data endpoint is connected.</td>
                         </tr>
                     </tbody>
                 </table>
@@ -250,12 +251,12 @@ require_once __DIR__ . "/../includes/admin_guard.php";
                 </div>
             </div>
             <div class="modal-footer d-flex justify-content-between flex-wrap gap-2">
-                <div class="d-flex flex-wrap gap-2" id="complaintActionButtons">
-                    <button type="button" class="btn btn-success" id="btnComplaintResolve">Mark Resolved</button>
-                    <button type="button" class="btn btn-primary" id="btnComplaintEndorse">Endorse to Blotter</button>
-                    <button type="button" class="btn btn-danger" id="btnComplaintDrop">Drop Complaint</button>
-                </div>
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                <div class="d-flex flex-wrap gap-3 ms-auto justify-content-end" id="complaintActionButtons">
+                    <button type="button" class="btn btn-danger" id="btnComplaintDrop">Drop Complaint</button>
+                    <button type="button" class="btn btn-primary" id="btnComplaintEndorse">Endorse to Blotter</button>
+                    <button type="button" class="btn btn-success" id="btnComplaintResolve">Mark Resolved</button>
+                </div>
             </div>
         </div>
     </div>
@@ -315,5 +316,7 @@ require_once __DIR__ . "/../includes/admin_guard.php";
 <script src="../../JS-Script-Files/Admin-End/complaintTracker.js?v=20260322-1"></script>
 </body>
 </html>
+
+
 
 

@@ -188,8 +188,8 @@ function am_validate_schedule(string $date, string $time): string
         throw new Exception('Confirmed appointment date must be after today and within the current year.');
     }
 
-    if ($time < '09:01' || $time > '16:59') {
-        throw new Exception('Confirmed appointment time must be between 9:01 AM and 4:59 PM.');
+    if ($time < '09:00' || $time > '17:00') {
+        throw new Exception('Confirmed appointment time must be within office hours, from 9:00 AM to 5:00 PM.');
     }
 
     return $schedule->format('Y-m-d H:i:s');
@@ -247,6 +247,10 @@ if ($needsSchedule) {
     } catch (Throwable $e) {
         am_redirect_with_message('error', $e->getMessage(), ['appointment_id' => $appointmentId]);
     }
+}
+
+if ($action !== 'deny_appointment') {
+    $remarks = '';
 }
 
 $statusName = 'Pending';

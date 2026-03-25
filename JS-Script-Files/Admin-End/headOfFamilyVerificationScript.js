@@ -1,4 +1,90 @@
 document.addEventListener("DOMContentLoaded", () => {
+  const normalizeSubdivisionLabel = (value) => {
+    const text = String(value || "").trim();
+    if (!text) return "";
+    const cleaned = text
+      .replace(/\bsubdivision\b/gi, "")
+      .replace(/\bsubd\.?\b/gi, "")
+      .replace(/\s+/g, " ")
+      .trim();
+    return cleaned ? `${cleaned} Subdivision` : "";
+  };
+
+  const normalizePhaseLabel = (value) => {
+    const text = String(value || "").trim();
+    if (!text) return "";
+    const cleaned = text.replace(/^\s*(phase|ph)\.?\s*/i, "").replace(/\s+/g, " ").trim();
+    return cleaned ? `Phase ${cleaned}` : "";
+  };
+
+  const normalizeStreetLabel = (value) => {
+    const text = String(value || "").trim();
+    if (!text) return "";
+    return /\bst(?:reet)?\.?$/i.test(text) ? text : `${text} Street`;
+  };
+
+  const normalizeLotLabel = (value) => {
+    const text = String(value || "").trim().replace(/^\s*lot\s*/i, "").replace(/\s+/g, " ").trim();
+    return text ? `Lot ${text}` : "";
+  };
+
+  const normalizeBlockLabel = (value) => {
+    const text = String(value || "")
+      .trim()
+      .replace(/^\s*block\s*/i, "")
+      .replace(/^\s*blk\.?\s*/i, "")
+      .replace(/\s+/g, " ")
+      .trim();
+    return text ? `Block ${text}` : "";
+  };
+
+  const isLotBlockAddress = (details) => {
+    const houseNumber = String(details?.house_number || "").trim();
+    const phaseNumber = String(details?.phase_number || "").trim();
+    const streetName = String(details?.street_name || "").trim();
+    return /^\s*lot\b/i.test(houseNumber)
+      || /^\s*(block|blk\.?)\b/i.test(phaseNumber)
+      || /^\s*(block|blk\.?)\b/i.test(streetName)
+      || (houseNumber !== "" && phaseNumber !== "" && streetName === "");
+  };
+
+  const buildAddressSummary = (details) => {
+    if (!details) return "";
+
+    if (isLotBlockAddress(details)) {
+      const primary = [
+        normalizeLotLabel(details.house_number),
+        normalizeBlockLabel(details.phase_number),
+      ].filter(Boolean).join(" ");
+
+      const trailing = [];
+      const streetName = String(details.street_name || "").trim();
+      if (streetName) {
+        if (/^\s*(phase|ph)\b/i.test(streetName) || /^\s*\d+[a-z]?\s*$/i.test(streetName)) {
+          trailing.push(normalizePhaseLabel(streetName));
+        } else {
+          trailing.push(streetName);
+        }
+      }
+      const subdivision = normalizeSubdivisionLabel(details.subdivision);
+      if (subdivision) trailing.push(subdivision);
+
+      return [primary, trailing.join(", ")].filter(Boolean).join(", ");
+    }
+
+    const streetLine = [
+      String(details.house_number || "").trim(),
+      normalizeStreetLabel(details.street_name),
+    ].filter(Boolean).join(" ");
+
+    return [
+      details.unit_number ? `Unit ${details.unit_number}` : "",
+      streetLine,
+      normalizePhaseLabel(details.phase_number),
+      normalizeSubdivisionLabel(details.subdivision),
+    ].filter(Boolean).join(", ");
+  };
+
   const tbody = document.getElementById("hofTbody");
   const searchInput = document.getElementById("hofSearch");
   const refreshBtn = document.getElementById("btnHofRefresh");
@@ -21,6 +107,9 @@ document.addEventListener("DOMContentLoaded", () => {
   const viewAddressEl = document.getElementById("hofViewAddress");
   const viewAddressMetaEl = document.getElementById("hofViewAddressMeta");
   const viewApplicantsEl = document.getElementById("hofViewApplicants");
+  const declineModalEl = document.getElementById("modalDeclineHead");
+  const declineAddressDisplay = document.getElementById("declineAddressDisplay");
+  const btnConfirmDecline = document.getElementById("btnConfirmDeclineHead");
 
   let rowsRaw = [];
   let activeStatus = "ALL";
@@ -30,6 +119,7 @@ document.addEventListener("DOMContentLoaded", () => {
   let entriesPerPage = Math.max(1, Number.parseInt(entriesPerPageInput?.value || "20", 10) || 20);
 
   let inFlight = false;
+  let pendingDeclineGroupKey = "";
   const AUTO_REFRESH_SECONDS = 15;
   let autoRefreshSecondsLeft = AUTO_REFRESH_SECONDS;
   let autoRefreshInterval = null;
@@ -225,7 +315,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
       tr.querySelector(".btn-view")?.addEventListener("click", () => openViewModal(row));
       tr.querySelector(".btn-approve")?.addEventListener("click", () => openApproveModal(row));
-      tr.querySelector(".btn-decline")?.addEventListener("click", () => declineGroup(row));
+      tr.querySelector(".btn-decline")?.addEventListener("click", () => openDeclineModal(row));
       tbody.appendChild(tr);
     });
   };
@@ -313,14 +403,7 @@ document.addEventListener("DOMContentLoaded", () => {
     if (viewAddressEl) viewAddressEl.textContent = safe(row.address_display);
     if (viewAddressMetaEl) {
       const details = row.address_details || {};
-      const parts = [
-        details.unit_number ? `Unit ${details.unit_number}` : "",
-        details.house_number ? `House ${details.house_number}` : "",
-        details.street_name ? details.street_name : "",
-        details.phase_number ? details.phase_number : "",
-        details.subdivision ? details.subdivision : "",
-        details.area_number ? `Area ${details.area_number}` : ""
-      ].filter(Boolean);
+      const parts = [buildAddressSummary(details)].filter(Boolean);
       const meta = [
         details.house_type ? `House Type: ${details.house_type}` : "",
         details.house_ownership ? `Ownership: ${details.house_ownership}` : "",
@@ -430,29 +513,61 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   };
 
-  const declineGroup = async (row) => {
-    if (!row?.group_key) return;
-    const ok = window.confirm("Decline this head-of-family application?");
-    if (!ok) return;
+  const openDeclineModal = (row) => {
+    if (!row?.group_key || !declineModalEl || !window.bootstrap?.Modal) return;
+    pendingDeclineGroupKey = String(row.group_key || "").trim();
+    if (declineAddressDisplay) {
+      declineAddressDisplay.textContent = safe(row.address_display || row.address_id);
+    }
+    if (btnConfirmDecline) {
+      btnConfirmDecline.disabled = false;
+    }
+    bootstrap.Modal.getOrCreateInstance(declineModalEl, { backdrop: "static", keyboard: false }).show();
+  };
+
+  const declineGroup = async () => {
+    const groupKey = String(pendingDeclineGroupKey || "").trim();
+    if (!groupKey) return;
+    if (btnConfirmDecline) {
+      btnConfirmDecline.disabled = true;
+    }
     try {
       const res = await fetch("../PhpFiles/Admin-End/headOfFamilyApplications.php", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           action: "decline_head_group",
-          group_key: row.group_key
+          group_key: groupKey
         })
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok || !data.success) throw new Error(data.message || "Failed to decline application.");
+      const modal = declineModalEl ? bootstrap.Modal.getInstance(declineModalEl) : null;
+      if (modal) modal.hide();
+      pendingDeclineGroupKey = "";
       triggerRefresh();
     } catch (err) {
       alert(err?.message || "Failed to decline application.");
+    } finally {
+      if (btnConfirmDecline) {
+        btnConfirmDecline.disabled = false;
+      }
     }
   };
 
+  declineModalEl?.addEventListener("hidden.bs.modal", () => {
+    pendingDeclineGroupKey = "";
+    if (declineAddressDisplay) {
+      declineAddressDisplay.textContent = "-";
+    }
+    if (btnConfirmDecline) {
+      btnConfirmDecline.disabled = false;
+    }
+  });
+
   refreshBtn?.addEventListener("click", triggerRefresh);
   btnConfirmApprove?.addEventListener("click", approveGroup);
+  btnConfirmDecline?.addEventListener("click", declineGroup);
   btnFilterApply?.addEventListener("click", () => {
     activeStatus = statusFilterSelect?.value || "ALL";
     activeAreaFilters = Array.from(document.querySelectorAll('.hof-filter-checkbox[data-field="area_number"]:checked')).map((checkbox) => String(checkbox.value || "").trim());

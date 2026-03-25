@@ -59,6 +59,12 @@
     const OFFICIAL_AREA_OPTIONS = ["Area 01", "Area 1A", "Area 02", "Area 03", "Area 04", "Area 05", "Area 06"];
     const OFFICIAL_SECTOR_OPTIONS = ["PWD", "Senior Citizen", "Student", "Indigenous People", "Single Parent"];
 
+    function setRefreshLoading(on) {
+        if (!refreshBtn) return;
+        refreshBtn.classList.toggle("is-loading", !!on);
+        refreshBtn.disabled = !!on;
+    }
+
     if (endorseBtn) {
         endorseBtn.textContent = "Send for Blotter Review";
     }
@@ -578,7 +584,7 @@
         if (viewModalTitle) {
             viewModalTitle.textContent = "Complaint Details";
         }
-        viewDetailsBody.innerHTML = '<div class="text-muted">Loading complaint details...</div>';
+        viewDetailsBody.innerHTML = '<div class="text-muted text-center">Loading complaint details...</div>';
         setActionButtonsState(null);
         viewModal.show();
 
@@ -699,6 +705,7 @@
     async function loadList() {
         if (!tableBody) return;
         tableBody.innerHTML = emptyState("Loading complaint records...");
+        setRefreshLoading(true);
 
         try {
             const data = await fetchJson(`${endpoint}?action=list`);
@@ -708,6 +715,8 @@
             applyFilters();
         } catch (error) {
             tableBody.innerHTML = emptyState(error.message || "Failed to load complaint records.");
+        } finally {
+            setRefreshLoading(false);
         }
     }
 

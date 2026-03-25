@@ -1091,6 +1091,138 @@ function dra_resolve_resident_2x2_picture_path(mysqli $conn, string $residentId)
     return $path;
 }
 
+function dra_clean_text($value): string {
+    return trim((string)$value);
+}
+
+function dra_normalize_subdivision_label($value): string {
+    $value = dra_clean_text($value);
+    if ($value === '') {
+        return '';
+    }
+    $value = preg_replace('/\bsubdivision\b/i', '', $value);
+    $value = preg_replace('/\bsubd\.?\b/i', '', $value);
+    $value = trim(preg_replace('/\s+/', ' ', (string)$value));
+    return $value === '' ? '' : $value . ' Subdivision';
+}
+
+function dra_normalize_phase_label($value): string {
+    $value = dra_clean_text($value);
+    if ($value === '') {
+        return '';
+    }
+    $value = preg_replace('/^\s*(phase|ph)\.?\s*/i', '', $value);
+    $value = trim(preg_replace('/\s+/', ' ', (string)$value));
+    return $value === '' ? '' : 'Phase ' . $value;
+}
+
+function dra_normalize_street_label($value): string {
+    $value = dra_clean_text($value);
+    if ($value === '') {
+        return '';
+    }
+    if (!preg_match('/\bst(?:reet)?\.?$/i', $value)) {
+        $value .= ' Street';
+    }
+    return trim(preg_replace('/\s+/', ' ', $value));
+}
+
+function dra_normalize_lot_label($value): string {
+    $value = dra_clean_text($value);
+    if ($value === '') {
+        return '';
+    }
+    $value = preg_replace('/^\s*lot\s*/i', '', $value);
+    $value = trim(preg_replace('/\s+/', ' ', (string)$value));
+    return $value === '' ? '' : 'Lot ' . $value;
+}
+
+function dra_normalize_block_label($value): string {
+    $value = dra_clean_text($value);
+    if ($value === '') {
+        return '';
+    }
+    $value = preg_replace('/^\s*block\s*/i', '', $value);
+    $value = preg_replace('/^\s*blk\.?\s*/i', '', $value);
+    $value = trim(preg_replace('/\s+/', ' ', (string)$value));
+    return $value === '' ? '' : 'Block ' . $value;
+}
+
+function dra_is_lot_block_address(array $address): bool {
+    $streetNumber = dra_clean_text($address['street_number'] ?? '');
+    $phaseNumber = dra_clean_text($address['phase_number'] ?? '');
+    $streetName = dra_clean_text($address['street_name'] ?? '');
+
+    if ($streetNumber !== '' && preg_match('/^\s*lot\b/i', $streetNumber)) {
+        return true;
+    }
+    if ($phaseNumber !== '' && preg_match('/^\s*(block|blk\.?)\b/i', $phaseNumber)) {
+        return true;
+    }
+    if ($streetName !== '' && preg_match('/^\s*(block|blk\.?)\b/i', $streetName)) {
+        return true;
+    }
+
+    return $streetNumber !== '' && $phaseNumber !== '' && $streetName === '';
+}
+
+function dra_compose_resident_full_address(array $address, array $suffixParts = []): string {
+    $unitNumber = dra_clean_text($address['unit_number'] ?? '');
+    $streetNumber = dra_clean_text($address['street_number'] ?? '');
+    $streetName = dra_clean_text($address['street_name'] ?? '');
+    $phaseNumber = dra_clean_text($address['phase_number'] ?? '');
+    $subdivision = dra_normalize_subdivision_label($address['subdivision'] ?? '');
+
+    $parts = [];
+
+    if ($unitNumber !== '') {
+        $parts[] = 'Unit ' . $unitNumber;
+    }
+
+    if (dra_is_lot_block_address($address)) {
+        $primary = array_values(array_filter([
+            dra_normalize_lot_label($streetNumber),
+            dra_normalize_block_label($phaseNumber),
+        ], static fn($value) => $value !== ''));
+
+        if ($primary !== []) {
+            $parts[] = implode(' ', $primary);
+        }
+
+        if ($streetName !== '') {
+            if (preg_match('/^\s*(phase|ph)\b/i', $streetName) || preg_match('/^\s*\d+[a-z]?\s*$/i', $streetName)) {
+                $parts[] = dra_normalize_phase_label($streetName);
+            } else {
+                $parts[] = $streetName;
+            }
+        }
+    } else {
+        $streetLine = trim(implode(' ', array_filter([
+            $streetNumber,
+            dra_normalize_street_label($streetName),
+        ], static fn($value) => $value !== '')));
+        if ($streetLine !== '') {
+            $parts[] = $streetLine;
+        }
+        if ($phaseNumber !== '') {
+            $parts[] = dra_normalize_phase_label($phaseNumber);
+        }
+    }
+
+    if ($subdivision !== '') {
+        $parts[] = $subdivision;
+    }
+
+    foreach ($suffixParts as $part) {
+        $part = dra_clean_text($part);
+        if ($part !== '') {
+            $parts[] = $part;
+        }
+    }
+
+    return implode(', ', array_values(array_filter($parts, static fn($value) => trim((string)$value) !== '')));
+}
+
 function dra_h(string $v): string {
     return htmlspecialchars($v, ENT_QUOTES, 'UTF-8');
 }
@@ -5492,24 +5624,13 @@ function dra_resident_profile_snapshot(mysqli $conn, string $residentUserId, str
         }
     }
 
-    $unit = trim((string)($row['unit_number'] ?? ''));
-    $streetNumber = trim((string)($row['street_number'] ?? ''));
-    $streetName = trim((string)($row['street_name'] ?? ''));
-    $phase = trim((string)($row['phase_number'] ?? ''));
-    $subdivision = trim((string)($row['subdivision'] ?? ''));
-    $area = trim((string)($row['area_number'] ?? ''));
-    $areaNormalized = trim((string)(preg_replace('/^area\b\.?\s*/i', '', $area) ?? $area));
-    $fullAddressParts = [];
-    if ($unit !== '') $fullAddressParts[] = 'Unit ' . $unit;
-    $streetLine = trim($streetNumber . ' ' . $streetName);
-    if ($streetLine !== '') $fullAddressParts[] = $streetLine;
-    if ($phase !== '') $fullAddressParts[] = 'Phase ' . $phase;
-    if ($subdivision !== '') $fullAddressParts[] = $subdivision . ' Subdivision';
-    if ($areaNormalized !== '') $fullAddressParts[] = 'Area ' . $areaNormalized;
-    $fullAddressParts[] = 'San Jose';
-    $fullAddressParts[] = 'Rodriguez';
-    $fullAddressParts[] = 'Rizal';
-    $fullAddress = implode(', ', array_values(array_filter($fullAddressParts, static fn($v) => trim((string)$v) !== '')));
+    $fullAddress = dra_compose_resident_full_address([
+        'unit_number' => (string)($row['unit_number'] ?? ''),
+        'street_number' => (string)($row['street_number'] ?? ''),
+        'street_name' => (string)($row['street_name'] ?? ''),
+        'phase_number' => (string)($row['phase_number'] ?? ''),
+        'subdivision' => (string)($row['subdivision'] ?? ''),
+    ], ['San Jose', 'Rodriguez', 'Rizal']);
 
     $occupationDetail = trim((string)($row['occupation_detail'] ?? ''));
     $occupation = ((int)($row['occupation'] ?? 0) === 1)
@@ -5877,33 +5998,6 @@ if ($action === 'search_manual_residents') {
             ? ($occupationDetail !== '' ? $occupationDetail : 'Employed')
             : 'Unemployed';
 
-        $addressBits = [];
-        $unitNumber = trim((string)($row['unit_number'] ?? ''));
-        $streetNumber = trim((string)($row['street_number'] ?? ''));
-        $streetName = trim((string)($row['street_name'] ?? ''));
-        $phaseNumber = trim((string)($row['phase_number'] ?? ''));
-        $subdivision = trim((string)($row['subdivision'] ?? ''));
-        $areaNumber = trim((string)($row['area_number'] ?? ''));
-        if ($unitNumber !== '') {
-            $addressBits[] = 'Unit ' . $unitNumber;
-        }
-        $streetLine = trim($streetNumber . ' ' . $streetName);
-        if ($streetLine !== '') {
-            $addressBits[] = $streetLine;
-        }
-        if ($phaseNumber !== '') {
-            $addressBits[] = 'Phase ' . $phaseNumber;
-        }
-        if ($subdivision !== '') {
-            $addressBits[] = $subdivision;
-        }
-        if ($areaNumber !== '') {
-            $addressBits[] = stripos($areaNumber, 'area') === 0 ? $areaNumber : ('Area ' . $areaNumber);
-        }
-        $addressBits[] = 'Barangay San Jose';
-        $addressBits[] = 'Montalban';
-        $addressBits[] = 'Rizal';
-
         $fullName = trim(implode(' ', array_values(array_filter([
             (string)($row['firstname'] ?? ''),
             (string)($row['middlename'] ?? ''),
@@ -5927,7 +6021,13 @@ if ($action === 'search_manual_residents') {
             'religion' => (string)($row['religion'] ?? ''),
             'occupation' => $occupation,
             'contact_number' => (string)($row['phone_number'] ?? ''),
-            'full_address' => implode(', ', array_values(array_filter($addressBits, static fn($value) => trim((string)$value) !== ''))),
+            'full_address' => dra_compose_resident_full_address([
+                'unit_number' => (string)($row['unit_number'] ?? ''),
+                'street_number' => (string)($row['street_number'] ?? ''),
+                'street_name' => (string)($row['street_name'] ?? ''),
+                'phase_number' => (string)($row['phase_number'] ?? ''),
+                'subdivision' => (string)($row['subdivision'] ?? ''),
+            ], ['Barangay San Jose', 'Rodriguez', 'Rizal']),
             'emergency_first_name' => (string)($row['emergency_first_name'] ?? ''),
             'emergency_middle_name' => (string)($row['emergency_middle_name'] ?? ''),
             'emergency_last_name' => (string)($row['emergency_last_name'] ?? ''),

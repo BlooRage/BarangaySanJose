@@ -30,6 +30,130 @@ function normalize_street($value) {
     return normalize_simple($value);
 }
 
+function hof_clean_text($value): string {
+    return trim((string)$value);
+}
+
+function hof_normalize_subdivision_label($value): string {
+    $value = hof_clean_text($value);
+    if ($value === '') {
+        return '';
+    }
+    $value = preg_replace('/\bsubdivision\b/i', '', $value);
+    $value = preg_replace('/\bsubd\.?\b/i', '', $value);
+    $value = trim(preg_replace('/\s+/', ' ', (string)$value));
+    return $value === '' ? '' : $value . ' Subdivision';
+}
+
+function hof_normalize_phase_label($value): string {
+    $value = hof_clean_text($value);
+    if ($value === '') {
+        return '';
+    }
+    $value = preg_replace('/^\s*(phase|ph)\.?\s*/i', '', $value);
+    $value = trim(preg_replace('/\s+/', ' ', (string)$value));
+    return $value === '' ? '' : 'Phase ' . $value;
+}
+
+function hof_normalize_street_label($value): string {
+    $value = hof_clean_text($value);
+    if ($value === '') {
+        return '';
+    }
+    if (!preg_match('/\bst(?:reet)?\.?$/i', $value)) {
+        $value .= ' Street';
+    }
+    return trim(preg_replace('/\s+/', ' ', $value));
+}
+
+function hof_normalize_lot_label($value): string {
+    $value = hof_clean_text($value);
+    if ($value === '') {
+        return '';
+    }
+    $value = preg_replace('/^\s*lot\s*/i', '', $value);
+    $value = trim(preg_replace('/\s+/', ' ', (string)$value));
+    return $value === '' ? '' : 'Lot ' . $value;
+}
+
+function hof_normalize_block_label($value): string {
+    $value = hof_clean_text($value);
+    if ($value === '') {
+        return '';
+    }
+    $value = preg_replace('/^\s*block\s*/i', '', $value);
+    $value = preg_replace('/^\s*blk\.?\s*/i', '', $value);
+    $value = trim(preg_replace('/\s+/', ' ', (string)$value));
+    return $value === '' ? '' : 'Block ' . $value;
+}
+
+function hof_is_lot_block_address(array $row): bool {
+    $houseNumber = hof_clean_text($row['house_number'] ?? '');
+    $phaseNumber = hof_clean_text($row['phase_number'] ?? '');
+    $streetName = hof_clean_text($row['street_name'] ?? '');
+
+    if ($houseNumber !== '' && preg_match('/^\s*lot\b/i', $houseNumber)) {
+        return true;
+    }
+    if ($phaseNumber !== '' && preg_match('/^\s*(block|blk\.?)\b/i', $phaseNumber)) {
+        return true;
+    }
+    if ($streetName !== '' && preg_match('/^\s*(block|blk\.?)\b/i', $streetName)) {
+        return true;
+    }
+
+    return $houseNumber !== '' && $phaseNumber !== '' && $streetName === '';
+}
+
+function hof_build_address_display(array $row): string {
+    $houseNumber = hof_clean_text($row['house_number'] ?? '');
+    $streetName = hof_clean_text($row['street_name'] ?? '');
+    $phaseNumber = hof_clean_text($row['phase_number'] ?? '');
+    $subdivision = hof_normalize_subdivision_label($row['subdivision'] ?? '');
+
+    if (hof_is_lot_block_address($row)) {
+        $leadParts = array_values(array_filter([
+            hof_normalize_lot_label($houseNumber),
+            hof_normalize_block_label($phaseNumber),
+        ], static fn($value) => $value !== ''));
+
+        $tailParts = [];
+        if ($streetName !== '') {
+            if (preg_match('/^\s*(phase|ph)\b/i', $streetName) || preg_match('/^\s*\d+[a-z]?\s*$/i', $streetName)) {
+                $tailParts[] = hof_normalize_phase_label($streetName);
+            } else {
+                $tailParts[] = $streetName;
+            }
+        }
+        if ($subdivision !== '') {
+            $tailParts[] = $subdivision;
+        }
+
+        $addressParts = [];
+        if ($leadParts !== []) {
+            $addressParts[] = implode(' ', $leadParts);
+        }
+        if ($tailParts !== []) {
+            $addressParts[] = implode(', ', $tailParts);
+        }
+
+        return $addressParts ? implode(', ', $addressParts) : '-';
+    }
+
+    $streetLine = trim(implode(' ', array_filter([
+        $houseNumber,
+        hof_normalize_street_label($streetName),
+    ], static fn($value) => $value !== '')));
+
+    $addressParts = array_values(array_filter([
+        $streetLine,
+        $phaseNumber !== '' ? hof_normalize_phase_label($phaseNumber) : '',
+        $subdivision,
+    ], static fn($value) => $value !== ''));
+
+    return $addressParts ? implode(', ', $addressParts) : '-';
+}
+
 function ensure_head_verification_table(mysqli $conn): void {
     $sql = "
         CREATE TABLE IF NOT EXISTS householdheadverificationtbl (
@@ -205,13 +329,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if ($addressId === null) $addressId = (string)($row['address_id'] ?? '');
         if ($areaNumber === null) $areaNumber = (string)($row['area_number'] ?? '');
         if ($addressDisplay === null) {
-            $parts = [];
-            if (!empty($row['house_number'])) $parts[] = $row['house_number'];
-            if (!empty($row['street_name'])) $parts[] = $row['street_name'] . ' Street';
-            if (!empty($row['phase_number'])) $parts[] = $row['phase_number'];
-            if (!empty($row['subdivision'])) $parts[] = $row['subdivision'];
-            if (!empty($row['area_number'])) $parts[] = $row['area_number'];
-            $addressDisplay = $parts ? implode(', ', $parts) : null;
+            $addressDisplay = hof_build_address_display($row);
         }
     }
     $groupResidentIds = array_values(array_unique($groupResidentIds));
@@ -298,13 +416,7 @@ if (isset($_GET['fetch'])) {
             ($row['lastname'] ?? '') .
             (!empty($row['suffix']) ? ' ' . $row['suffix'] : '')
         );
-        $addressParts = [];
-        if ($row['house_number']) $addressParts[] = $row['house_number'];
-        if ($row['street_name']) $addressParts[] = $row['street_name'] . ' Street';
-        if ($row['phase_number']) $addressParts[] = $row['phase_number'];
-        if ($row['subdivision']) $addressParts[] = $row['subdivision'];
-        if ($row['area_number']) $addressParts[] = $row['area_number'];
-        $addressDisplay = $addressParts ? implode(', ', $addressParts) : '-';
+        $addressDisplay = hof_build_address_display($row);
 
         if (!isset($groups[$key])) {
             $decision = $decisions[$key] ?? null;
