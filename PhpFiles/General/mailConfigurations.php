@@ -20,13 +20,12 @@ if (!function_exists('mail_config_value')) {
     }
 }
 
-// Hosted fallback values mirror the currently active mailbox.
-// Environment variables and runtime config still take precedence.
-$defaultMailHost = 'smtp.hostinger.com';
-$defaultMailUsername = 'official@barangaysanjose-montalban.com';
-$defaultMailPassword = 'SanJose.Brgy@2025!';
+// Mail credentials must come from environment variables or runtime config.
+$defaultMailHost = '';
+$defaultMailUsername = '';
+$defaultMailPassword = '';
 $defaultMailPort = 465;
-$defaultMailFromEmail = 'official@barangaysanjose-montalban.com';
+$defaultMailFromEmail = '';
 $defaultMailFromName = 'Barangay San Jose';
 
 $mailHost = trim((string)runtime_env('MAIL_HOST', runtime_config('mail.host', $defaultMailHost)));

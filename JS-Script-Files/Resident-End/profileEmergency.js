@@ -1,4 +1,5 @@
 document.addEventListener("DOMContentLoaded", () => {
+    const csrfToken = String(window.RESIDENT_CSRF_TOKEN || "").trim();
     const saveBtn = document.getElementById("btnSaveEmergency");
     if (!saveBtn) return;
 
@@ -262,7 +263,10 @@ document.addEventListener("DOMContentLoaded", () => {
         try {
             const res = await fetch("../PhpFiles/Resident-End/resident_emergency_update.php", {
                 method: "POST",
-                headers: { "Content-Type": "application/json" },
+                headers: {
+                    "Content-Type": "application/json",
+                    ...(csrfToken ? { "X-CSRF-TOKEN": csrfToken } : {}),
+                },
                 body: JSON.stringify(payload),
             });
             const data = await res.json().catch(() => ({}));

@@ -1,4 +1,5 @@
 document.addEventListener("DOMContentLoaded", () => {
+    const csrfToken = String(window.RESIDENT_CSRF_TOKEN || "").trim();
     const normalizePhone = (value) => {
         const digits = (value || "").replace(/\D/g, "");
         if (digits.startsWith("63") && digits.length === 12) {
@@ -94,7 +95,10 @@ document.addEventListener("DOMContentLoaded", () => {
             try {
                 const res = await fetch("../PhpFiles/SMSHandlers/household_invite_send.php", {
                     method: "POST",
-                    headers: { "Content-Type": "application/json" },
+                    headers: {
+                        "Content-Type": "application/json",
+                        ...(csrfToken ? { "X-CSRF-TOKEN": csrfToken } : {}),
+                    },
                     body: JSON.stringify({ phone_numbers: phoneNumbers }),
                 });
                 const data = await res.json().catch(() => ({}));

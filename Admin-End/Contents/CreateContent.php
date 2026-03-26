@@ -140,9 +140,6 @@ $sharedMeta = [
           <h2 class="mb-1" style="font-family: 'Charis SIL Bold'; color: #DE710C;"><?= htmlspecialchars($meta['title']) ?></h2>
           <p class="text-muted mb-0"><?= htmlspecialchars($meta['description']) ?></p>
         </div>
-        <a href="<?= htmlspecialchars(appUrl('/Admin-End/Contents/Contents.php')) ?><?= $deliveryChannel !== 'all' ? '?channel=' . urlencode($deliveryChannel) : '' ?>" class="btn btn-outline-secondary btn-sm">
-          <i class="fa-solid fa-arrow-left me-1"></i> Go to Content Tools
-        </a>
       </div>
       <hr><br>
       <section class="announcement-create-guide mb-4">
@@ -414,9 +411,6 @@ $sharedMeta = [
             <?php else: ?>
               <button type="submit" name="submit_action" value="pending" class="btn btn-primary text-white">Submit for Review</button>
             <?php endif; ?>
-          </div>
-          <div class="announcement-modal-footer-end">
-            <a href="<?= htmlspecialchars(appUrl('/Admin-End/Contents/Contents.php')) ?><?= $deliveryChannel !== 'all' ? '?channel=' . urlencode($deliveryChannel) : '' ?>" class="btn btn-outline-secondary">Close</a>
           </div>
         </div>
       </form>

@@ -7,16 +7,14 @@ document.addEventListener("DOMContentLoaded", () => {
   const displayModeAddresses = document.getElementById("displayModeAddresses");
   const displayModeHeads = document.getElementById("displayModeHeads");
   const btnRefreshTable = document.getElementById("btnHouseholdRefresh");
-  const countdownEl = document.getElementById("householdAutoRefreshCountdown");
 
   let allAddresses = [];
   let activeAreaFilters = [];
   let activeHouseholdCountFilter = "";
   let activeDisplayMode = "addresses";
 
-  const AUTO_REFRESH_SECONDS = 15;
-  let autoRefreshSecondsLeft = AUTO_REFRESH_SECONDS;
-  let autoRefreshInterval = null;
+  const AUTO_REFRESH_MS = 30000;
+  let autoRefreshTimeout = null;
   let autoRefreshInFlight = false;
 
   const setRefreshLoading = (on) => {
@@ -99,18 +97,19 @@ document.addEventListener("DOMContentLoaded", () => {
   fetchHeads();
   syncDisplayModeControls();
 
-  const renderCountdown = () => {
-    if (!countdownEl) return;
-    countdownEl.textContent = autoRefreshSecondsLeft > 0 ? `Auto refresh in ${autoRefreshSecondsLeft}s` : "";
-  };
-
-  const resetCountdown = () => {
-    autoRefreshSecondsLeft = AUTO_REFRESH_SECONDS;
-    renderCountdown();
+  const scheduleAutoRefresh = () => {
+    if (autoRefreshTimeout) clearTimeout(autoRefreshTimeout);
+    autoRefreshTimeout = setTimeout(() => {
+      if (autoRefreshInFlight) {
+        scheduleAutoRefresh();
+        return;
+      }
+      triggerRefresh();
+    }, AUTO_REFRESH_MS);
   };
 
   const triggerRefresh = () => {
-    resetCountdown();
+    scheduleAutoRefresh();
     fetchHeads(searchInput ? searchInput.value.trim() : "");
   };
 
@@ -118,21 +117,7 @@ document.addEventListener("DOMContentLoaded", () => {
     btnRefreshTable.addEventListener("click", triggerRefresh);
   }
 
-  const startAutoRefresh = () => {
-    renderCountdown();
-    if (autoRefreshInterval) clearInterval(autoRefreshInterval);
-    autoRefreshInterval = setInterval(() => {
-      if (autoRefreshInFlight) return;
-      autoRefreshSecondsLeft -= 1;
-      if (autoRefreshSecondsLeft <= 0) {
-        triggerRefresh();
-        return;
-      }
-      renderCountdown();
-    }, 1000);
-  };
-
-  startAutoRefresh();
+  scheduleAutoRefresh();
 
   // ========================
   // TABLE RENDER

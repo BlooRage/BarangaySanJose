@@ -499,11 +499,10 @@ foreach ($appointmentRows as $r) {
       const btnFilterApply = document.getElementById("btnAppointmentFilterApply");
       const btnFilterReset = document.getElementById("btnAppointmentFilterReset");
       const refreshBtn = document.getElementById("btnAppointmentRefresh");
-      const AUTO_REFRESH_SECONDS = 15;
+      const AUTO_REFRESH_MS = 30000;
       let activeFilter = "ALL";
       let currentPage = 1;
-      let autoRefreshSecondsLeft = AUTO_REFRESH_SECONDS;
-      let autoRefreshInterval = null;
+      let autoRefreshTimeout = null;
       let autoRefreshInFlight = false;
 
       const getRows = () => Array.from(tbody.querySelectorAll("tr")).filter((row) => row.querySelector("td"));
@@ -638,7 +637,6 @@ foreach ($appointmentRows as $r) {
       const refreshTableOnly = async () => {
         if (autoRefreshInFlight) return;
         autoRefreshInFlight = true;
-        autoRefreshSecondsLeft = AUTO_REFRESH_SECONDS;
         setRefreshLoading(true);
         try {
           const response = await fetch(window.location.href, {
@@ -667,18 +665,19 @@ foreach ($appointmentRows as $r) {
       };
 
       const triggerRefresh = () => {
+        scheduleAutoRefresh();
         refreshTableOnly().catch(() => {});
       };
 
-      const startAutoRefresh = () => {
-        if (autoRefreshInterval) window.clearInterval(autoRefreshInterval);
-        autoRefreshInterval = window.setInterval(() => {
-          if (autoRefreshInFlight) return;
-          autoRefreshSecondsLeft -= 1;
-          if (autoRefreshSecondsLeft <= 0) {
-            triggerRefresh();
+      const scheduleAutoRefresh = () => {
+        if (autoRefreshTimeout) window.clearTimeout(autoRefreshTimeout);
+        autoRefreshTimeout = window.setTimeout(() => {
+          if (autoRefreshInFlight) {
+            scheduleAutoRefresh();
+            return;
           }
-        }, 1000);
+          triggerRefresh();
+        }, AUTO_REFRESH_MS);
       };
 
       refreshBtn?.addEventListener("click", triggerRefresh);
@@ -696,7 +695,7 @@ foreach ($appointmentRows as $r) {
       updatePendingBadge();
       activateStatusButton(activeFilter);
       render();
-      startAutoRefresh();
+      scheduleAutoRefresh();
     })();
   </script>
 </body>

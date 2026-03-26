@@ -32,6 +32,7 @@ $stmt->bind_param("s", $user_id);
 $stmt->execute();
 $res = $stmt->get_result();
 $user = $res->fetch_assoc();
+$user = $user ? (pii_decrypt_useraccount_row($user) ?? $user) : null;
 
 if (!$user) {
   echo json_encode(['success' => false, 'error' => 'Account not found.']);

@@ -12,7 +12,6 @@
       to: "",   // YYYY-MM-DD
     },
     auto: {
-      secondsLeft: 15,
       interval: null,
       inFlight: false,
     },
@@ -289,37 +288,22 @@
     }
   };
 
-  // ========================
-  // AUTO REFRESH + MANUAL REFRESH (15s)
-  // ========================
-  const renderCountdown = () => {
-    const c = el("auditAutoRefreshCountdown");
-    if (!c) return;
-    c.textContent = state.auto.secondsLeft > 0 ? `Auto refresh in ${state.auto.secondsLeft}s` : "";
-  };
-
-  const resetCountdown = () => {
-    state.auto.secondsLeft = 15;
-    renderCountdown();
-  };
+  const AUTO_REFRESH_MS = 30000;
 
   const triggerRefresh = async () => {
-    resetCountdown();
+    scheduleAutoRefresh();
     await load();
   };
 
-  const startAutoRefresh = () => {
-    renderCountdown();
-    if (state.auto.interval) window.clearInterval(state.auto.interval);
-    state.auto.interval = window.setInterval(() => {
-      if (state.auto.inFlight) return;
-      state.auto.secondsLeft -= 1;
-      if (state.auto.secondsLeft <= 0) {
-        triggerRefresh().catch(() => {});
+  const scheduleAutoRefresh = () => {
+    if (state.auto.interval) window.clearTimeout(state.auto.interval);
+    state.auto.interval = window.setTimeout(() => {
+      if (state.auto.inFlight) {
+        scheduleAutoRefresh();
         return;
       }
-      renderCountdown();
-    }, 1000);
+      triggerRefresh().catch(() => {});
+    }, AUTO_REFRESH_MS);
   };
 
   const wire = () => {
@@ -421,6 +405,6 @@
     wire();
     renderHeader();
     load();
-    startAutoRefresh();
+    scheduleAutoRefresh();
   });
 })();

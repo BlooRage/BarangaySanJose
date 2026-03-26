@@ -39,6 +39,7 @@ $canSendHouseholdInvite = $isHeadOfFamily && $isResidentVerified;
 $editStatusKey = $residentStatusKey !== '' ? $residentStatusKey : 'notverified';
 $canEditProfile = !in_array($editStatusKey, ['notverified', 'pendingverification'], true);
 $editBlockMessage = 'Your account must be verified before you can edit your profile, address, or emergency contact.';
+$residentCsrfToken = ensureCsrfToken();
 $profileImageFlash = ['type' => '', 'message' => ''];
 
 if (!empty($_SESSION['resident_profile_image_flash']) && is_array($_SESSION['resident_profile_image_flash'])) {
@@ -183,6 +184,7 @@ function getDocumentTypeIdByCategory(mysqli $conn, string $name, string $categor
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && (string)($_POST['action'] ?? '') === 'update_profile_image') {
     try {
+        verifyCsrfToken(false);
         $userId = (string)($_SESSION['user_id'] ?? '');
         if ($userId === '') throw new RuntimeException('Session expired. Please login again.');
         if ($residentId === '') throw new RuntimeException('Resident profile not found.');
@@ -342,6 +344,7 @@ if ($residentId !== '' && isset($conn) && $conn instanceof mysqli) {
       window.RESIDENT_PROFILE_EDIT_BLOCK_MESSAGE = <?= json_encode($editBlockMessage, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) ?>;
       window.RESIDENT_PROFILE_AGE = <?= $computedAge !== '' ? (int)$computedAge : 'null' ?>;
       window.RESIDENT_PROFILE_SEX = <?= json_encode((string)($residentinformationtbl['sex'] ?? ''), JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) ?>;
+      window.RESIDENT_CSRF_TOKEN = <?= json_encode($residentCsrfToken, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) ?>;
     </script>
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
@@ -1873,6 +1876,7 @@ if ($residentId !== '' && isset($conn) && $conn instanceof mysqli) {
                 <form method="post" enctype="multipart/form-data">
                     <div class="modal-body">
                         <input type="hidden" name="action" value="update_profile_image">
+                        <?= csrfTokenField() ?>
                         <div class="alert alert-info small mb-3">
                             <div class="fw-bold mb-1">Upload Requirements</div>
                             <ul class="mb-0 ps-3">

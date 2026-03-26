@@ -2919,9 +2919,8 @@ function ann_decode_faq_items(?string $json): array
       const announcementsRefreshBtn = document.getElementById("btnAnnouncementsTableRefresh");
       const announcementsTableBody = document.getElementById("tableBody");
       const visibleCountBadge = document.getElementById("announcementsVisibleCountBadge");
-      const AUTO_REFRESH_SECONDS = 15;
-      let autoRefreshSecondsLeft = AUTO_REFRESH_SECONDS;
-      let autoRefreshInterval = null;
+      const AUTO_REFRESH_MS = 30000;
+      let autoRefreshTimeout = null;
       let autoRefreshInFlight = false;
 
       function setRefreshLoading(on) {
@@ -2935,7 +2934,6 @@ function ann_decode_faq_items(?string $json): array
       async function refreshAnnouncementTables() {
         if (autoRefreshInFlight || !announcementsTableBody) return;
         autoRefreshInFlight = true;
-        autoRefreshSecondsLeft = AUTO_REFRESH_SECONDS;
         setRefreshLoading(true);
         try {
           const response = await fetch(window.location.href, {
@@ -2976,18 +2974,24 @@ function ann_decode_faq_items(?string $json): array
         if (event) {
           event.preventDefault();
         }
+        scheduleAutoRefresh();
         refreshAnnouncementTables().catch(() => {});
       }
 
       announcementsRefreshBtn?.addEventListener("click", triggerRefresh);
 
-      autoRefreshInterval = window.setInterval(() => {
-        if (autoRefreshInFlight) return;
-        autoRefreshSecondsLeft -= 1;
-        if (autoRefreshSecondsLeft <= 0) {
-          refreshAnnouncementTables().catch(() => {});
-        }
-      }, 1000);
+      function scheduleAutoRefresh() {
+        if (autoRefreshTimeout) window.clearTimeout(autoRefreshTimeout);
+        autoRefreshTimeout = window.setTimeout(() => {
+          if (autoRefreshInFlight) {
+            scheduleAutoRefresh();
+            return;
+          }
+          triggerRefresh();
+        }, AUTO_REFRESH_MS);
+      }
+
+      scheduleAutoRefresh();
     })();
   </script>
   <script src="../../JS-Script-Files/Admin-End/tableColumnsGeneric.js?v=20260215-1"></script>

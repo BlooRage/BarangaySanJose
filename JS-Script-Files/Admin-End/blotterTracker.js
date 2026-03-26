@@ -65,6 +65,8 @@
   let pendingCaseAction = null;
   let caseActionHandlersBound = false;
   let unsupportedFileReturnToView = false;
+  const AUTO_REFRESH_MS = 30000;
+  let autoRefreshTimeout = null;
   const OFFICIAL_AREA_OPTIONS = ['Area 01', 'Area 1A', 'Area 02', 'Area 03', 'Area 04', 'Area 05', 'Area 06'];
   const OFFICIAL_SECTOR_OPTIONS = ['PWD', 'Senior Citizen', 'Student', 'Indigenous People', 'Single Parent'];
 
@@ -72,6 +74,13 @@
     if (!refreshBtn) return;
     refreshBtn.classList.toggle('is-loading', !!on);
     refreshBtn.disabled = !!on;
+  }
+
+  function scheduleAutoRefresh() {
+    if (autoRefreshTimeout) window.clearTimeout(autoRefreshTimeout);
+    autoRefreshTimeout = window.setTimeout(() => {
+      loadList();
+    }, AUTO_REFRESH_MS);
   }
 
   function esc(v) {
@@ -1057,6 +1066,7 @@ fields.push({ label: 'Address', value: participant?.address || '-', fullWidth: t
   });
 
   refreshBtn?.addEventListener('click', () => {
+    scheduleAutoRefresh();
     loadList();
   });
 
@@ -1086,5 +1096,6 @@ fields.push({ label: 'Address', value: participant?.address || '-', fullWidth: t
 
   initCaseActionFlow();
   loadList();
+  scheduleAutoRefresh();
 })();
 

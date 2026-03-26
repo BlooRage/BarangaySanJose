@@ -152,6 +152,7 @@ if (!empty($_SESSION['user_id']) && isset($conn) && $conn instanceof mysqli) {
     $stmt->execute();
     $result = $stmt->get_result();
     if ($row = $result->fetch_assoc()) {
+      $row = pii_decrypt_resident_row($row) ?? $row;
       $residentId = $row['resident_id'] ?? '';
       $fullName = trim(
         $row['firstname'] . ' ' .

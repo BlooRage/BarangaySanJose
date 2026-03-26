@@ -582,6 +582,24 @@ foreach ($appointmentRows as $row) {
             gap: 8px;
         }
 
+        .appointment-settings-unit-input {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .appointment-settings-unit-input .form-control {
+            flex: 1 1 auto;
+            min-width: 0;
+        }
+
+        .appointment-settings-unit-label {
+            color: #4b5563;
+            font-size: 0.95rem;
+            font-weight: 600;
+            white-space: nowrap;
+        }
+
         .appointment-settings-field label {
             color: #374151;
             font-size: 0.92rem;
@@ -627,32 +645,35 @@ foreach ($appointmentRows as $row) {
 
         .appointment-weekday-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
-            gap: 0.7rem;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 0.55rem 1rem;
         }
 
         .appointment-weekday-option {
-            display: grid;
-            justify-items: center;
+            display: flex;
+            align-items: center;
+            justify-content: flex-start;
             gap: 0.6rem;
-            min-height: 118px;
-            padding: 0.95rem 0.55rem;
-            border: 1px solid #e5e7eb;
-            border-radius: 16px;
-            background: #fff;
+            min-height: auto;
+            padding: 0.2rem 0;
+            border: 0;
+            border-radius: 0;
+            background: transparent;
             color: #374151;
-            font-weight: 700;
-            text-align: center;
+            font-weight: 600;
+            text-align: left;
+            cursor: pointer;
         }
 
         .appointment-weekday-option span {
-            font-size: 0.98rem;
-            line-height: 1.15;
+            font-size: 0.96rem;
+            line-height: 1.2;
         }
 
         .appointment-weekday-option input {
             width: 18px;
             height: 18px;
+            margin: 0;
             accent-color: #ea580c;
         }
 
@@ -882,17 +903,20 @@ foreach ($appointmentRows as $row) {
 
                         <div class="appointment-settings-field">
                             <label for="appointmentSlotInterval">Time allotment per appointment</label>
-                            <input
-                                class="form-control"
-                                type="number"
-                                id="appointmentSlotInterval"
-                                name="slot_interval_minutes"
-                                min="<?= (int)($appointmentSettingDefinitions['slot_interval_minutes']['min'] ?? 10) ?>"
-                                max="<?= (int)($appointmentSettingDefinitions['slot_interval_minutes']['max'] ?? 180) ?>"
-                                step="<?= (int)($appointmentSettingDefinitions['slot_interval_minutes']['step'] ?? 5) ?>"
-                                value="<?= htmlspecialchars((string)($appointmentSettings['slot_interval_minutes'] ?? 30), ENT_QUOTES, 'UTF-8') ?>"
-                                required
-                            >
+                            <div class="appointment-settings-unit-input">
+                                <input
+                                    class="form-control"
+                                    type="number"
+                                    id="appointmentSlotInterval"
+                                    name="slot_interval_minutes"
+                                    min="<?= (int)($appointmentSettingDefinitions['slot_interval_minutes']['min'] ?? 10) ?>"
+                                    max="<?= (int)($appointmentSettingDefinitions['slot_interval_minutes']['max'] ?? 180) ?>"
+                                    step="<?= (int)($appointmentSettingDefinitions['slot_interval_minutes']['step'] ?? 5) ?>"
+                                    value="<?= htmlspecialchars((string)($appointmentSettings['slot_interval_minutes'] ?? 30), ENT_QUOTES, 'UTF-8') ?>"
+                                    required
+                                >
+                                <span class="appointment-settings-unit-label">Minutes</span>
+                            </div>
                             <small>Examples: 30, 40, or 60 minutes.</small>
                         </div>
 
@@ -917,7 +941,6 @@ foreach ($appointmentRows as $row) {
                             <div class="appointment-weekday-grid">
                                 <?php foreach ($appointmentAvailableWeekdayOptions as $weekdayValue => $weekdayLabel): ?>
                                     <label class="appointment-weekday-option" for="appointmentClosedWeekday<?= (int)$weekdayValue ?>">
-                                        <span><?= htmlspecialchars($weekdayLabel, ENT_QUOTES, 'UTF-8') ?></span>
                                         <input
                                             type="checkbox"
                                             id="appointmentClosedWeekday<?= (int)$weekdayValue ?>"
@@ -925,6 +948,7 @@ foreach ($appointmentRows as $row) {
                                             value="<?= (int)$weekdayValue ?>"
                                             <?= in_array((int)$weekdayValue, $appointmentClosedWeekdays, true) ? 'checked' : '' ?>
                                         >
+                                        <span><?= htmlspecialchars($weekdayLabel, ENT_QUOTES, 'UTF-8') ?></span>
                                     </label>
                                 <?php endforeach; ?>
                             </div>
@@ -1437,9 +1461,8 @@ foreach ($appointmentRows as $row) {
         let currentPage = 1;
         let activeFilter = "";
         let pendingReviewAction = "";
-        const AUTO_REFRESH_SECONDS = 15;
-        let autoRefreshSecondsLeft = AUTO_REFRESH_SECONDS;
-        let autoRefreshInterval = null;
+        const AUTO_REFRESH_MS = 30000;
+        let autoRefreshTimeout = null;
         let autoRefreshInFlight = false;
 
         const parseIsoDate = (value) => {
@@ -1467,7 +1490,6 @@ foreach ($appointmentRows as $row) {
         async function refreshTableOnly() {
             if (autoRefreshInFlight || !tableBody) return;
             autoRefreshInFlight = true;
-            autoRefreshSecondsLeft = AUTO_REFRESH_SECONDS;
             setRefreshLoading(true);
             try {
                 const response = await fetch(window.location.href, {
@@ -1496,18 +1518,19 @@ foreach ($appointmentRows as $row) {
         }
 
         function triggerRefresh() {
+            scheduleAutoRefresh();
             refreshTableOnly().catch(() => {});
         }
 
-        function startAutoRefresh() {
-            if (autoRefreshInterval) window.clearInterval(autoRefreshInterval);
-            autoRefreshInterval = window.setInterval(() => {
-                if (autoRefreshInFlight) return;
-                autoRefreshSecondsLeft -= 1;
-                if (autoRefreshSecondsLeft <= 0) {
-                    triggerRefresh();
+        function scheduleAutoRefresh() {
+            if (autoRefreshTimeout) window.clearTimeout(autoRefreshTimeout);
+            autoRefreshTimeout = window.setTimeout(() => {
+                if (autoRefreshInFlight) {
+                    scheduleAutoRefresh();
+                    return;
                 }
-            }, 1000);
+                triggerRefresh();
+            }, AUTO_REFRESH_MS);
         }
 
         function renderPagination(total) {
@@ -1782,7 +1805,7 @@ foreach ($appointmentRows as $row) {
         setFilterButtonState("");
         updatePendingBadge();
         renderTable();
-        startAutoRefresh();
+        scheduleAutoRefresh();
     })();
 
     (() => {

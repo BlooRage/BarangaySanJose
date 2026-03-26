@@ -700,12 +700,10 @@
   // ========================
   // AUTO REFRESH + MANUAL REFRESH (60s)
   // ========================
-  const AUTO_REFRESH_SECONDS = 60;
-  let autoRefreshSecondsLeft = AUTO_REFRESH_SECONDS;
-  let autoRefreshInterval = null;
+  const AUTO_REFRESH_MS = 30000;
+  let autoRefreshTimeout = null;
   let autoRefreshInFlight = false;
   const btnRefreshTable = el("btnSectorAppsRefresh");
-  const countdownEl = el("sectorAppsAutoRefreshCountdown");
 
   const setRefreshLoading = (on) => {
     if (!btnRefreshTable) return;
@@ -713,41 +711,28 @@
     btnRefreshTable.disabled = !!on;
   };
 
-  const renderCountdown = () => {
-    if (!countdownEl) return;
-    countdownEl.textContent = autoRefreshSecondsLeft > 0 ? `Auto refresh in ${autoRefreshSecondsLeft}s` : "";
-  };
-
-  const resetCountdown = () => {
-    autoRefreshSecondsLeft = AUTO_REFRESH_SECONDS;
-    renderCountdown();
+  const scheduleAutoRefresh = () => {
+    if (autoRefreshTimeout) clearTimeout(autoRefreshTimeout);
+    autoRefreshTimeout = setTimeout(() => {
+      if (autoRefreshInFlight) {
+        scheduleAutoRefresh();
+        return;
+      }
+      triggerRefresh().catch(() => {});
+    }, AUTO_REFRESH_MS);
   };
 
   const triggerRefresh = async () => {
     if (autoRefreshInFlight) return;
+    scheduleAutoRefresh();
     autoRefreshInFlight = true;
     setRefreshLoading(true);
     try {
-      resetCountdown();
       await loadApps();
     } finally {
       autoRefreshInFlight = false;
       setRefreshLoading(false);
     }
-  };
-
-  const startAutoRefresh = () => {
-    renderCountdown();
-    if (autoRefreshInterval) clearInterval(autoRefreshInterval);
-    autoRefreshInterval = setInterval(() => {
-      if (autoRefreshInFlight) return;
-      autoRefreshSecondsLeft -= 1;
-      if (autoRefreshSecondsLeft <= 0) {
-        triggerRefresh().catch(() => {});
-        return;
-      }
-      renderCountdown();
-    }, 1000);
   };
 
   const wireUI = () => {
@@ -813,6 +798,5 @@
   document.addEventListener("DOMContentLoaded", () => {
     wireUI();
     triggerRefresh().catch(() => {});
-    startAutoRefresh();
   });
 })();

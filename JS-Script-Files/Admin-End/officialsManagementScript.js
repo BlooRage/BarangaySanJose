@@ -25,7 +25,7 @@
     profileApproval: "ALL",
     canManageActions: false,
     pagination: { currentPage: 1, entriesPerPage: 20 },
-    auto: { secondsLeft: 15, interval: null, inFlight: false },
+    auto: { interval: null, inFlight: false },
     accessModal: {
       row: null,
       permissionMap: {},
@@ -37,8 +37,8 @@
   const tbody = el("officialsMgmtTbody");
   const paginationEl = el("officialsMgmtPagination");
   const entriesInput = el("officialsMgmtEntriesInput");
-  const countdownEl = el("officialsMgmtAutoRefreshCountdown");
   const refreshBtn = el("btnOfficialsMgmtRefresh");
+  const AUTO_REFRESH_MS = 30000;
   const revokedBadge = el("revokedOfficialsBadge");
   const searchInput = el("officialsMgmtSearch");
   const lifecycleButtons = Array.from(document.querySelectorAll(".status-filter-btn[data-lifecycle-filter]"));
@@ -389,9 +389,16 @@
     });
   };
 
-  const renderCountdown = () => {
-    if (!countdownEl) return;
-    countdownEl.textContent = state.auto.secondsLeft > 0 ? `Auto refresh in ${state.auto.secondsLeft}s` : "";
+  const scheduleAutoRefresh = () => {
+    if (state.auto.interval) clearTimeout(state.auto.interval);
+    state.auto.interval = window.setTimeout(() => {
+      if (state.auto.inFlight) {
+        scheduleAutoRefresh();
+        return;
+      }
+      scheduleAutoRefresh();
+      load().catch(() => {});
+    }, AUTO_REFRESH_MS);
   };
 
   const setRefreshState = (isLoading) => {
@@ -922,8 +929,6 @@
       }
     } finally {
       state.auto.inFlight = false;
-      state.auto.secondsLeft = 15;
-      renderCountdown();
       setRefreshState(false);
     }
   };
@@ -1001,6 +1006,7 @@
     }
 
     refreshBtn?.addEventListener("click", () => {
+      scheduleAutoRefresh();
       load().catch(() => {});
     });
 
@@ -1134,18 +1140,7 @@
       });
     }
 
-    renderCountdown();
-
-    if (state.auto.interval) clearInterval(state.auto.interval);
-    state.auto.interval = window.setInterval(() => {
-      if (state.auto.inFlight) return;
-      state.auto.secondsLeft -= 1;
-      if (state.auto.secondsLeft <= 0) {
-        load().catch(() => {});
-        return;
-      }
-      renderCountdown();
-    }, 1000);
+    scheduleAutoRefresh();
   };
 
   document.addEventListener("DOMContentLoaded", () => {

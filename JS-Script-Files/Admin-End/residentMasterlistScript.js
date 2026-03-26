@@ -25,7 +25,6 @@ document.addEventListener("DOMContentLoaded", () => {
   const tbody = document.getElementById("tableBody");
   const searchInput = document.getElementById("searchInput");
   const btnRefreshTable = document.getElementById("btnResidentTableRefresh");
-  const countdownEl = document.getElementById("residentAutoRefreshCountdown");
   const entriesPerPageInput = document.getElementById("entriesPerPageInput");
   const paginationEl = document.getElementById("residentPagination");
 
@@ -49,9 +48,8 @@ document.addEventListener("DOMContentLoaded", () => {
     "Denied": "denied"
   };
 
-  const AUTO_REFRESH_SECONDS = 60;
-  let autoRefreshSecondsLeft = AUTO_REFRESH_SECONDS;
-  let autoRefreshInterval = null;
+  const AUTO_REFRESH_MS = 30000;
+  let autoRefreshTimeout = null;
   let autoRefreshInFlight = false;
 
   const setRefreshLoading = (on) => {
@@ -384,14 +382,15 @@ document.addEventListener("DOMContentLoaded", () => {
   // Initial load should go through the same refresh path so the refresh button
   // shows loading state consistently.
 
-  const renderCountdown = () => {
-    if (!countdownEl) return;
-    countdownEl.textContent = autoRefreshSecondsLeft > 0 ? `Auto refresh in ${autoRefreshSecondsLeft}s` : "";
-  };
-
-  const resetCountdown = () => {
-    autoRefreshSecondsLeft = AUTO_REFRESH_SECONDS;
-    renderCountdown();
+  const scheduleAutoRefresh = () => {
+    if (autoRefreshTimeout) clearTimeout(autoRefreshTimeout);
+    autoRefreshTimeout = setTimeout(() => {
+      if (autoRefreshInFlight) {
+        scheduleAutoRefresh();
+        return;
+      }
+      triggerRefresh().catch(() => {});
+    }, AUTO_REFRESH_MS);
   };
 
   const loadTable = async () => {
@@ -408,7 +407,7 @@ document.addEventListener("DOMContentLoaded", () => {
   };
 
   const triggerRefresh = async () => {
-    resetCountdown();
+    scheduleAutoRefresh();
     await loadTable();
   };
 
@@ -420,21 +419,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
   triggerRefresh().catch(() => {});
 
-  const startAutoRefresh = () => {
-    renderCountdown();
-    if (autoRefreshInterval) clearInterval(autoRefreshInterval);
-    autoRefreshInterval = setInterval(() => {
-      if (autoRefreshInFlight) return; // freeze countdown during load
-      autoRefreshSecondsLeft -= 1;
-      if (autoRefreshSecondsLeft <= 0) {
-        triggerRefresh().catch(() => {});
-        return;
-      }
-      renderCountdown();
-    }, 1000);
-  };
-
-  startAutoRefresh();
+  scheduleAutoRefresh();
 
   // ========================
   // FILTER BUTTONS

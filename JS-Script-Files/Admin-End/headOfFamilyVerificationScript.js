@@ -120,9 +120,8 @@ document.addEventListener("DOMContentLoaded", () => {
 
   let inFlight = false;
   let pendingDeclineGroupKey = "";
-  const AUTO_REFRESH_SECONDS = 15;
-  let autoRefreshSecondsLeft = AUTO_REFRESH_SECONDS;
-  let autoRefreshInterval = null;
+  const AUTO_REFRESH_MS = 30000;
+  let autoRefreshTimeout = null;
   const OFFICIAL_AREA_OPTIONS = ["Area 01", "Area 1A", "Area 02", "Area 03", "Area 04", "Area 05", "Area 06"];
   const OFFICIAL_SECTOR_OPTIONS = ["PWD", "Senior Citizen", "Student", "Indigenous People", "Single Parent"];
 
@@ -360,19 +359,19 @@ document.addEventListener("DOMContentLoaded", () => {
   };
 
   const triggerRefresh = () => {
-    autoRefreshSecondsLeft = AUTO_REFRESH_SECONDS;
+    scheduleAutoRefresh();
     fetchRows().catch(() => {});
   };
 
-  const startAutoRefresh = () => {
-    if (autoRefreshInterval) clearInterval(autoRefreshInterval);
-    autoRefreshInterval = window.setInterval(() => {
-      if (inFlight) return;
-      autoRefreshSecondsLeft -= 1;
-      if (autoRefreshSecondsLeft <= 0) {
-        triggerRefresh();
+  const scheduleAutoRefresh = () => {
+    if (autoRefreshTimeout) clearTimeout(autoRefreshTimeout);
+    autoRefreshTimeout = window.setTimeout(() => {
+      if (inFlight) {
+        scheduleAutoRefresh();
+        return;
       }
-    }, 1000);
+      triggerRefresh();
+    }, AUTO_REFRESH_MS);
   };
 
   const openApproveModal = (row) => {
@@ -621,6 +620,6 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   triggerRefresh();
-  startAutoRefresh();
+  scheduleAutoRefresh();
   activateStatusButton(activeStatus);
 });

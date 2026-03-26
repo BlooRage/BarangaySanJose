@@ -858,6 +858,7 @@
   background: rgba(255, 255, 255, 0.55);
   border: 1px solid rgba(138, 92, 31, 0.12);
   border-radius: 1.2rem;
+  box-shadow: none;
   padding: 1rem;
 }
 
@@ -870,8 +871,25 @@
   background: linear-gradient(180deg, #fffefb 0%, #fdf8ef 100%);
   border: 1px solid rgba(138, 92, 31, 0.12);
   border-radius: 1rem;
-  box-shadow: 0 16px 28px rgba(74, 53, 20, 0.07);
+  box-shadow: none;
   padding: 1rem;
+}
+
+.cms-repeater-item .cms-editor-card {
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  padding: 0;
+}
+
+.cms-repeater-item .cms-editor-card-title {
+  color: #212529;
+  font-family: "Geist", sans-serif;
+  font-size: 1rem;
+  font-weight: 600;
+  line-height: 1.5;
+  margin-bottom: 0.5rem !important;
 }
 
 .cms-repeater-item--static .cms-repeater-item-head {

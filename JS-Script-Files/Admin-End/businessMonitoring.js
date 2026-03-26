@@ -12,7 +12,6 @@
   const btnApplyFilter = document.getElementById("btnBusinessFilterApply");
   const btnResetFilter = document.getElementById("btnBusinessFilterReset");
   const btnRefresh = document.getElementById("btnBusinessRefresh");
-  const countdownEl = document.getElementById("businessAutoRefreshCountdown");
   const entriesPerPageInput = document.getElementById("businessEntriesPerPageInput");
   const paginationEl = document.getElementById("businessPagination");
   const filterModalEl = document.getElementById("modalFilter");
@@ -51,13 +50,12 @@
       entriesPerPage: Math.max(1, Number.parseInt(entriesPerPageInput?.value || "20", 10) || 20),
     },
     auto: {
-      secondsLeft: 15,
       interval: null,
       inFlight: false,
     },
   };
 
-  const AUTO_REFRESH_SECONDS = 15;
+  const AUTO_REFRESH_MS = 30000;
   const COLUMN_COUNT = 5;
   const OFFICIAL_AREA_OPTIONS = ["Area 01", "Area 1A", "Area 02", "Area 03", "Area 04", "Area 05", "Area 06"];
   const OFFICIAL_SECTOR_OPTIONS = ["PWD", "Senior Citizen", "Student", "Indigenous People", "Single Parent"];
@@ -494,16 +492,15 @@
     btnRefresh.disabled = !!on;
   }
 
-  function renderCountdown() {
-    if (!countdownEl) return;
-    countdownEl.textContent = state.auto.secondsLeft > 0
-      ? `Auto refresh in ${state.auto.secondsLeft}s`
-      : "";
-  }
-
-  function resetCountdown() {
-    state.auto.secondsLeft = AUTO_REFRESH_SECONDS;
-    renderCountdown();
+  function scheduleAutoRefresh() {
+    if (state.auto.interval) clearTimeout(state.auto.interval);
+    state.auto.interval = setTimeout(() => {
+      if (state.auto.inFlight) {
+        scheduleAutoRefresh();
+        return;
+      }
+      triggerRefresh();
+    }, AUTO_REFRESH_MS);
   }
 
   async function fetchJson(url) {
@@ -545,22 +542,8 @@
   }
 
   function triggerRefresh() {
-    resetCountdown();
+    scheduleAutoRefresh();
     load().catch(() => {});
-  }
-
-  function startAutoRefresh() {
-    renderCountdown();
-    if (state.auto.interval) window.clearInterval(state.auto.interval);
-    state.auto.interval = window.setInterval(() => {
-      if (state.auto.inFlight) return;
-      state.auto.secondsLeft -= 1;
-      if (state.auto.secondsLeft <= 0) {
-        triggerRefresh();
-        return;
-      }
-      renderCountdown();
-    }, 1000);
   }
 
   searchInput?.addEventListener("input", () => {
@@ -620,7 +603,6 @@
     viewModal?.show();
   });
 
-  resetCountdown();
+  scheduleAutoRefresh();
   load().catch(() => {});
-  startAutoRefresh();
 })();

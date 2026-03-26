@@ -3,7 +3,6 @@ document.addEventListener("DOMContentLoaded", () => {
     const btnApplyFilter = document.getElementById("btnApplyFilter");
     const btnResetModal = document.getElementById("btnResetModalFilters");
 	    const btnRefreshTable = document.getElementById("btnArchiveRefresh");
-	    const countdownEl = document.getElementById("archiveAutoRefreshCountdown");
     const entriesPerPageInput = document.getElementById("archiveEntriesPerPageInput");
     const paginationEl = document.getElementById("archivePagination");
 
@@ -13,9 +12,8 @@ document.addEventListener("DOMContentLoaded", () => {
     let currentPage = 1;
     let entriesPerPage = Math.max(1, Number.parseInt(entriesPerPageInput?.value || "20", 10) || 20);
 
-    const AUTO_REFRESH_SECONDS = 15;
-    let autoRefreshSecondsLeft = AUTO_REFRESH_SECONDS;
-	    let autoRefreshInterval = null;
+    const AUTO_REFRESH_MS = 30000;
+	    let autoRefreshTimeout = null;
 	    let autoRefreshInFlight = false;
 
 	    const setRefreshLoading = (on) => {
@@ -83,38 +81,25 @@ document.addEventListener("DOMContentLoaded", () => {
 	            });
 	    }
 
-    const renderCountdown = () => {
-        if (!countdownEl) return;
-        countdownEl.textContent = autoRefreshSecondsLeft > 0 ? `Auto refresh in ${autoRefreshSecondsLeft}s` : "";
-    };
-
-    const resetCountdown = () => {
-        autoRefreshSecondsLeft = AUTO_REFRESH_SECONDS;
-        renderCountdown();
+    const scheduleAutoRefresh = () => {
+        if (autoRefreshTimeout) clearTimeout(autoRefreshTimeout);
+        autoRefreshTimeout = setTimeout(() => {
+            if (autoRefreshInFlight) {
+                scheduleAutoRefresh();
+                return;
+            }
+            triggerRefresh();
+        }, AUTO_REFRESH_MS);
     };
 
     const triggerRefresh = () => {
-        resetCountdown();
+        scheduleAutoRefresh();
         fetchArchivedResidents();
     };
 
     if (btnRefreshTable) {
         btnRefreshTable.addEventListener("click", triggerRefresh);
     }
-
-    const startAutoRefresh = () => {
-        renderCountdown();
-        if (autoRefreshInterval) clearInterval(autoRefreshInterval);
-        autoRefreshInterval = setInterval(() => {
-            if (autoRefreshInFlight) return;
-            autoRefreshSecondsLeft -= 1;
-            if (autoRefreshSecondsLeft <= 0) {
-                triggerRefresh();
-                return;
-            }
-            renderCountdown();
-        }, 1000);
-    };
 
     function applyFiltersAndRender() {
         let filtered = allArchivedResidents;
@@ -227,7 +212,7 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     window.fetchArchivedResidents = fetchArchivedResidents;
-    startAutoRefresh();
+    scheduleAutoRefresh();
 });
 
 function restoreResident(residentId) {

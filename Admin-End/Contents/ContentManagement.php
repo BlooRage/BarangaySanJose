@@ -1160,7 +1160,7 @@ $previewCssAssets = [
     </div>
   </div>
 
-  <div class="modal fade" id="cmsPreviewModal" tabindex="-1" aria-hidden="true">
+  <div class="modal fade" id="cmsPreviewModal" tabindex="-1" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
     <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable">
       <div class="modal-content border-0 shadow-lg">
         <div class="modal-header">
@@ -1175,6 +1175,9 @@ $previewCssAssets = [
               title="CMS Page Preview"
               loading="lazy"></iframe>
           </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Close</button>
         </div>
       </div>
     </div>

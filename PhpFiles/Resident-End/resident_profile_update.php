@@ -1,15 +1,10 @@
 <?php
-if (session_status() === PHP_SESSION_NONE) {
-    session_start();
-}
+require_once __DIR__ . '/../General/security.php';
 
 header('Content-Type: application/json; charset=utf-8');
 
-if (empty($_SESSION['user_id'])) {
-    http_response_code(401);
-    echo json_encode(['success' => false, 'message' => 'Unauthorized']);
-    exit;
-}
+requireAuthenticatedSession(true);
+verifyCsrfToken(true);
 
 require_once __DIR__ . '/../General/connection.php';
 require_once __DIR__ . '/../General/uniqueIDGenerate.php';
@@ -363,6 +358,7 @@ try {
     if (!$current) {
         throw new Exception('Resident profile not found.');
     }
+    $current = pii_decrypt_resident_row($current) ?? $current;
 
     $changes = [];
     $civilDrivenSurnameChange = false;

@@ -56,6 +56,8 @@
     let currentViewCaseId = null;
     let currentDetail = null;
     let pendingComplaintAction = null;
+    const AUTO_REFRESH_MS = 30000;
+    let autoRefreshTimeout = null;
     const OFFICIAL_AREA_OPTIONS = ["Area 01", "Area 1A", "Area 02", "Area 03", "Area 04", "Area 05", "Area 06"];
     const OFFICIAL_SECTOR_OPTIONS = ["PWD", "Senior Citizen", "Student", "Indigenous People", "Single Parent"];
 
@@ -63,6 +65,13 @@
         if (!refreshBtn) return;
         refreshBtn.classList.toggle("is-loading", !!on);
         refreshBtn.disabled = !!on;
+    }
+
+    function scheduleAutoRefresh() {
+        if (autoRefreshTimeout) window.clearTimeout(autoRefreshTimeout);
+        autoRefreshTimeout = window.setTimeout(() => {
+            loadList();
+        }, AUTO_REFRESH_MS);
     }
 
     if (endorseBtn) {
@@ -732,7 +741,10 @@
         renderTable();
     });
 
-    refreshBtn?.addEventListener("click", loadList);
+    refreshBtn?.addEventListener("click", () => {
+        scheduleAutoRefresh();
+        loadList();
+    });
 
     btnComplaintFilterApply?.addEventListener("click", () => {
         modalFilters = collectModalFilters();
@@ -773,6 +785,7 @@
 
     initComplaintActionFlow();
     loadList();
+    scheduleAutoRefresh();
 })();
 
 

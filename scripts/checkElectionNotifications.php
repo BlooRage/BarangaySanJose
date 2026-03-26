@@ -68,6 +68,7 @@ function cronNotifyUser(mysqli $conn, string $userId, string $subject, string $m
     $acct = $stmt->get_result()->fetch_assoc();
     $stmt->close();
     if (!$acct) return;
+    $acct = pii_decrypt_useraccount_row($acct) ?? $acct;
     $email = trim((string)($acct['email'] ?? ''));
     $phone = trim((string)($acct['phone_number'] ?? ''));
     if ($email !== '') cronSendEmail($email, $subject, $message);

@@ -39,6 +39,8 @@
   let currentRequestId = null;
   let currentDetail = null;
   let pendingRequestAction = null;
+  const AUTO_REFRESH_MS = 30000;
+  let autoRefreshTimeout = null;
 
   function esc(v) {
     return String(v ?? '').replace(/[&<>"']/g, (m) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[m]));
@@ -46,6 +48,13 @@
 
   function badge(text, toneClass) {
     return `<span class="status-pill ${esc(toneClass || 'archived')}">${esc(text || '-')}</span>`;
+  }
+
+  function scheduleAutoRefresh() {
+    if (autoRefreshTimeout) window.clearTimeout(autoRefreshTimeout);
+    autoRefreshTimeout = window.setTimeout(() => {
+      loadList();
+    }, AUTO_REFRESH_MS);
   }
 
   function toneForStatus(statusName) {
@@ -328,7 +337,10 @@
   btnRequestActionConfirm?.addEventListener('click', submitRequestAction);
 
   searchInput?.addEventListener('input', applyFilters);
-  refreshBtn?.addEventListener('click', loadList);
+  refreshBtn?.addEventListener('click', () => {
+    scheduleAutoRefresh();
+    loadList();
+  });
   filterButtons.forEach((button) => {
     button.addEventListener('click', () => {
       filterButtons.forEach((btn) => {
@@ -343,4 +355,5 @@
   });
 
   loadList();
+  scheduleAutoRefresh();
 })();

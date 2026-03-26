@@ -1,4 +1,5 @@
 document.addEventListener("DOMContentLoaded", () => {
+    const csrfToken = String(window.RESIDENT_CSRF_TOKEN || "").trim();
     const AUTO_RESIDENCY_DURATION = "Less than 6 months";
     const saveBtn = document.getElementById("btnSaveAddress");
     const reviewBtn = document.getElementById("btnAddressReview");
@@ -576,6 +577,9 @@ document.addEventListener("DOMContentLoaded", () => {
         }
         if (addressSupportTypeEl) {
             formData.append("supporting_address_type", addressSupportTypeEl.value.trim());
+        }
+        if (csrfToken) {
+            formData.append("csrf_token", csrfToken);
         }
         if (addressSupportFileEl) {
             Array.from(addressSupportFileEl.files || []).forEach((file) => {

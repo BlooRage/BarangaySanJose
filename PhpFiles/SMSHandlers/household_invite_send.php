@@ -1,15 +1,10 @@
 <?php
-if (session_status() === PHP_SESSION_NONE) {
-    session_start();
-}
+require_once __DIR__ . '/../General/security.php';
 
 header('Content-Type: application/json; charset=utf-8');
 
-if (empty($_SESSION['user_id'])) {
-    http_response_code(401);
-    echo json_encode(['success' => false, 'message' => 'Unauthorized']);
-    exit;
-}
+requireAuthenticatedSession(true);
+verifyCsrfToken(true);
 
 require_once __DIR__ . "/../General/connection.php";
 require_once __DIR__ . "/../General/sendSMS.php";
@@ -199,32 +194,46 @@ if (!empty($parsedNumbers)) {
         return substr($num, 1);
     }, $parsedNumbers)));
 
-    $placeholders = implode(',', array_fill(0, count($lookupNumbers), '?'));
-    $types = str_repeat('s', count($lookupNumbers));
+    $lookupHashes = array_values(array_unique(array_filter(array_map(static function ($num) {
+        return pii_lookup_hash($num, 'useraccount.phone');
+    }, $lookupNumbers))));
+
+    if ($lookupHashes === []) {
+        http_response_code(400);
+        echo json_encode(['success' => false, 'message' => 'No valid phone numbers were provided.']);
+        exit;
+    }
+
+    $placeholders = implode(',', array_fill(0, count($lookupHashes), '?'));
+    $types = str_repeat('s', count($lookupHashes));
     $sql = "
-        SELECT phone_number, phoneNum_verify
+        SELECT phone_number, phone_lookup_hash, phoneNum_verify
         FROM useraccountstbl
         WHERE role_access = 'Resident'
-          AND phone_number IN ({$placeholders})
+          AND phone_lookup_hash IN ({$placeholders})
     ";
     $stmtLookup = $conn->prepare($sql);
     if ($stmtLookup) {
-        $stmtLookup->bind_param($types, ...$lookupNumbers);
+        $stmtLookup->bind_param($types, ...$lookupHashes);
         $stmtLookup->execute();
         $res = $stmtLookup->get_result();
         $accountMap = [];
         while ($row = $res->fetch_assoc()) {
-            $accountMap[$row['phone_number']] = (int)$row['phoneNum_verify'];
+            $accountMap[(string)$row['phone_lookup_hash']] = [
+                'phone_number' => pii_decrypt_string((string)($row['phone_number'] ?? '')),
+                'phoneNum_verify' => (int)($row['phoneNum_verify'] ?? 0),
+            ];
         }
         $stmtLookup->close();
 
         foreach ($parsedNumbers as $smsNumber) {
             $key = substr($smsNumber, 1);
-            if (!isset($accountMap[$key])) {
+            $lookupHash = pii_lookup_hash($key, 'useraccount.phone');
+            if ($lookupHash === '' || !isset($accountMap[$lookupHash])) {
                 $nonExistingNumbers[] = $smsNumber;
                 continue;
             }
-            if ($accountMap[$key] !== 1) {
+            if ((int)$accountMap[$lookupHash]['phoneNum_verify'] !== 1) {
                 $unverifiedNumbers[] = $smsNumber;
                 continue;
             }

@@ -1,4 +1,5 @@
 document.addEventListener("DOMContentLoaded", () => {
+    const csrfToken = String(window.RESIDENT_CSRF_TOKEN || "").trim();
     const firstName = document.getElementById("editFirstName");
     const middleName = document.getElementById("editMiddleName");
     const lastName = document.getElementById("editLastName");
@@ -980,6 +981,9 @@ document.addEventListener("DOMContentLoaded", () => {
         appendFiles(form, "civil_status_file", civilFile);
         if (civilStatusType && civilStatusType.value.trim() !== "") {
             form.append("civil_status_doc_type", civilStatusType.value.trim());
+        }
+        if (csrfToken) {
+            form.append("csrf_token", csrfToken);
         }
         return form;
     };

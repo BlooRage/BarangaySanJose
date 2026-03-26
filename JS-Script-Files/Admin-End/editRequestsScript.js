@@ -9,7 +9,6 @@ document.addEventListener("DOMContentLoaded", () => {
   const statusButtons = document.querySelectorAll(".status-filter-btn");
   const pendingBadge = document.getElementById("pendingRequestBadge");
   const btnRefreshTable = document.getElementById("btnEditRequestsRefresh");
-  const countdownEl = document.getElementById("editRequestsAutoRefreshCountdown");
   const entriesPerPageInput = document.getElementById("editRequestsEntriesPerPageInput");
   const paginationEl = document.getElementById("editRequestsPagination");
 
@@ -19,9 +18,8 @@ document.addEventListener("DOMContentLoaded", () => {
     btnRefreshTable.disabled = !!on;
   };
 
-  const AUTO_REFRESH_SECONDS = 60;
-  let autoRefreshSecondsLeft = AUTO_REFRESH_SECONDS;
-  let autoRefreshInterval = null;
+  const AUTO_REFRESH_MS = 30000;
+  let autoRefreshTimeout = null;
   let autoRefreshInFlight = false;
 
   let allRequests = [];
@@ -269,18 +267,19 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   };
 
-  const renderCountdown = () => {
-    if (!countdownEl) return;
-    countdownEl.textContent = autoRefreshSecondsLeft > 0 ? `Auto refresh in ${autoRefreshSecondsLeft}s` : "";
-  };
-
-  const resetCountdown = () => {
-    autoRefreshSecondsLeft = AUTO_REFRESH_SECONDS;
-    renderCountdown();
+  const scheduleAutoRefresh = () => {
+    if (autoRefreshTimeout) clearTimeout(autoRefreshTimeout);
+    autoRefreshTimeout = setTimeout(() => {
+      if (autoRefreshInFlight) {
+        scheduleAutoRefresh();
+        return;
+      }
+      triggerRefresh().catch(() => {});
+    }, AUTO_REFRESH_MS);
   };
 
   const triggerRefresh = async () => {
-    resetCountdown();
+    scheduleAutoRefresh();
     await loadRequests();
   };
 
@@ -289,20 +288,6 @@ document.addEventListener("DOMContentLoaded", () => {
       triggerRefresh().catch(() => {});
     });
   }
-
-  const startAutoRefresh = () => {
-    renderCountdown();
-    if (autoRefreshInterval) clearInterval(autoRefreshInterval);
-    autoRefreshInterval = setInterval(() => {
-      if (autoRefreshInFlight) return;
-      autoRefreshSecondsLeft -= 1;
-      if (autoRefreshSecondsLeft <= 0) {
-        triggerRefresh().catch(() => {});
-        return;
-      }
-      renderCountdown();
-    }, 1000);
-  };
 
   const updateRequestStatus = async (requestId, action) => {
     const ok = window.confirm(`Are you sure you want to ${action} this request?`);
@@ -610,5 +595,5 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   loadRequests();
-  startAutoRefresh();
+  scheduleAutoRefresh();
 });

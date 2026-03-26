@@ -8,7 +8,7 @@
     role: "ALL",
     verification: "ALL",
     pagination: { currentPage: 1, entriesPerPage: 20 },
-    auto: { secondsLeft: 15, interval: null, inFlight: false },
+    auto: { interval: null, inFlight: false },
     lock: { selectedUserId: "", busy: false },
   };
 
@@ -16,8 +16,8 @@
   const paginationEl = el("userMasterPagination");
   const pendingBadge = el("pendingUserBadge");
   const entriesInput = el("userMasterEntriesInput");
-  const countdownEl = el("userMasterAutoRefreshCountdown");
   const refreshBtn = el("btnUserMasterRefresh");
+  const AUTO_REFRESH_MS = 30000;
 
   const lockModalEl = el("userLockModal");
   const lockSummaryName = el("userLockSummaryName");
@@ -278,9 +278,16 @@
     renderPagination();
   };
 
-  const renderCountdown = () => {
-    if (!countdownEl) return;
-    countdownEl.textContent = state.auto.secondsLeft > 0 ? `Auto refresh in ${state.auto.secondsLeft}s` : "";
+  const scheduleAutoRefresh = () => {
+    if (state.auto.interval) clearTimeout(state.auto.interval);
+    state.auto.interval = setTimeout(() => {
+      if (state.auto.inFlight) {
+        scheduleAutoRefresh();
+        return;
+      }
+      scheduleAutoRefresh();
+      load().catch(() => {});
+    }, AUTO_REFRESH_MS);
   };
 
   const populateLockModal = (row) => {
@@ -365,8 +372,6 @@
       }
     } finally {
       state.auto.inFlight = false;
-      state.auto.secondsLeft = 15;
-      renderCountdown();
       if (refreshBtn) {
         refreshBtn.classList.remove("is-loading");
         refreshBtn.disabled = false;
@@ -464,6 +469,7 @@
 
     if (refreshBtn) {
       refreshBtn.addEventListener("click", () => {
+        scheduleAutoRefresh();
         load().catch(() => {});
       });
     }
@@ -503,17 +509,7 @@
       });
     }
 
-    renderCountdown();
-    if (state.auto.interval) clearInterval(state.auto.interval);
-    state.auto.interval = setInterval(() => {
-      if (state.auto.inFlight) return;
-      state.auto.secondsLeft -= 1;
-      if (state.auto.secondsLeft <= 0) {
-        load().catch(() => {});
-        return;
-      }
-      renderCountdown();
-    }, 1000);
+    scheduleAutoRefresh();
   };
 
   document.addEventListener("DOMContentLoaded", () => {

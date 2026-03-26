@@ -3,9 +3,8 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/runtimeConfig.php';
 
-// Hosted fallback values mirror the currently deployed Semaphore account.
-// Environment variables and runtime config still take precedence.
-$defaultSemaphoreApiKey = 'ee267d0fbd5c2159bea7d72878c9d4cb';
+// SMS credentials must come from environment variables or runtime config.
+$defaultSemaphoreApiKey = '';
 $defaultSemaphoreSender = 'BrgySanJose';
 
 $SEMAPHORE_API_KEY = trim((string)runtime_env(
