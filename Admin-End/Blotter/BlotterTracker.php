@@ -110,6 +110,7 @@ require_once __DIR__ . "/../includes/admin_guard.php";
         }
 
 
+
         #viewModal .tracker-attachment-actions {
             display: flex;
             flex-wrap: wrap;
@@ -324,7 +325,7 @@ require_once __DIR__ . "/../includes/admin_guard.php";
             </div>
             <div class="modal-footer d-flex justify-content-between flex-wrap gap-2">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
-                <div id="viewModalActionButtons" class="d-none flex-wrap gap-3 ms-auto justify-content-end">
+                <div id="viewModalActionButtons" class="d-none flex-wrap gap-2 ms-auto justify-content-end">
                     <button type="button" class="btn btn-danger d-none" id="btnMarkDropped">Mark as Dropped</button>
                     <button type="button" class="btn btn-primary d-none" id="btnSubjectEndorsement">Subject to Endorsement</button>
                     <button type="button" class="btn btn-success d-none" id="btnMarkResolved">Mark Resolved</button>
@@ -431,5 +432,8 @@ require_once __DIR__ . "/../includes/admin_guard.php";
 <script src="../../JS-Script-Files/Admin-End/blotterTracker.js?v=20260322-1"></script>
 </body>
 </html>
+
+
+
 
 

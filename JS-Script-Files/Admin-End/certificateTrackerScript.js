@@ -49,6 +49,12 @@
   const financeColChecks = Array.from(document.querySelectorAll('[data-finance-col-index]'));
   const btnFinanceColumnsReset = document.getElementById('btnFinanceColumnsReset');
 
+  function setRefreshLoading(on) {
+    if (!btnRefreshList) return;
+    btnRefreshList.classList.toggle('is-loading', !!on);
+    btnRefreshList.disabled = !!on;
+  }
+
   function getOrCreateModalInstance(modalEl, options = {}) {
     if (!modalEl || !window.bootstrap?.Modal) return null;
     if (typeof bootstrap.Modal.getOrCreateInstance === 'function') {
@@ -5178,11 +5184,15 @@
 
   async function load(options = {}) {
     const force = !!options.force;
+    const showRefreshLoading = !!options.showRefreshLoading;
     if (!force && Array.isArray(cachedAllItems) && cachedAllItems.length > 0) {
       renderFromCache();
       return;
     }
 
+    if (showRefreshLoading) {
+      setRefreshLoading(true);
+    }
     tableBody.innerHTML = '<tr><td colspan="8" class="text-center text-muted py-4">Loading...</td></tr>';
     try {
       const params = new URLSearchParams({ action: 'list' });
@@ -5199,6 +5209,10 @@
       renderFromCache();
     } catch (err) {
       tableBody.innerHTML = `<tr><td colspan="8" class="text-center text-danger py-4">${esc(err.message || err)}</td></tr>`;
+    } finally {
+      if (showRefreshLoading) {
+        setRefreshLoading(false);
+      }
     }
   }
 
@@ -6120,6 +6134,8 @@
           'child_sex_display', 'cohabitant_region_select', 'cohabitant_province_select',
           'cohabitant_city_select', 'cohabitant_barangay_select', 'cohabitantSameAddress',
           'cohabitationAgree', 'cohabitation_agree',
+          'birthdate', 'date_of_birth', 'child_dob',
+          'cohabitant_dob', 'cohabitant_birthdate', 'partner_birthdate',
           'preview_full_name', 'cohabitant_full_name',
           'full_unit_number', 'full_house_lot_number', 'full_street_block_name', 'full_subdivision',
           'full_barangay', 'full_area_number', 'cohabitant_full_unit_number',
@@ -6246,6 +6262,7 @@
 
         Object.keys(payload).forEach((key) => {
           const normalized = String(key);
+          if (normalized.startsWith('preview_') || normalized.startsWith('_preview_')) return;
           if (consumedKeys.has(normalized) || technicalKeys.has(normalized)) return;
           const value = payload[key];
           if (value === null || value === undefined) return;
@@ -6948,7 +6965,7 @@
   });
 
   btnRefreshList?.addEventListener('click', () => {
-    load({ force: true });
+    load({ force: true, showRefreshLoading: true });
   });
 
   let searchTimer = null;
@@ -8088,6 +8105,42 @@
       manualSyncBarangayIdPhotoResidentSource();
     }
 
+    function manualClearLinkedResidentFields() {
+      [
+        manualLastName,
+        manualFirstName,
+        manualMiddleName,
+        manualSuffix,
+        manualBirthdate,
+        manualBirthplace,
+        manualSex,
+        manualCivilStatus,
+        manualContactNumber,
+        manualOccupation,
+        manualReligion,
+        manualFullAddress
+      ].forEach((field) => {
+        if (!field) return;
+        field.value = '';
+      });
+
+      if (manualDynamicFields) {
+        [
+          'emergency_last',
+          'emergency_first',
+          'emergency_middle',
+          'emergency_suffix',
+          'emergency_contact',
+          'emergency_address'
+        ].forEach((key) => {
+          const input = manualDynamicFields.querySelector(`[data-manual-field="${key}"]`);
+          if (input) {
+            input.value = '';
+          }
+        });
+      }
+    }
+
     function manualFillFormFromResident(record) {
       const resident = manualNormalizeResident(record);
       if (!resident) return;
@@ -8276,6 +8329,7 @@
         resident_name: String(payload?.resident_name || '').trim(),
         resident_id: String(payload?.resident_id || '').trim(),
         resident_user_id: String(payload?.resident_user_id || '').trim(),
+        payload: { ...payload },
         stage: expectedStage.key,
         fee_amount: config.clearance && feeRows.length
           ? feeRows.reduce((sum, row) => sum + (Number(row.amount) || 0), 0)
@@ -8368,6 +8422,7 @@
       manualSelectedResident = null;
       manualResidentId.value = '';
       manualResidentUserId.value = '';
+      manualClearLinkedResidentFields();
       manualSelectedResidentCard?.classList.add('d-none');
       manualSelectedResidentName.textContent = 'Registered resident';
       manualSelectedResidentMeta.textContent = '';

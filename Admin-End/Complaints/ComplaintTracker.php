@@ -49,6 +49,10 @@ require_once __DIR__ . "/../includes/admin_guard.php";
             vertical-align: middle;
         }
 
+        #table-appData td.complaint-table-empty {
+            text-align: center !important;
+        }
+
         .status-pill.info {
             color: #2049b3;
             background: #d6e2f2;
@@ -89,6 +93,23 @@ require_once __DIR__ . "/../includes/admin_guard.php";
         #viewModal .tracker-form-value {
             line-height: 1.45;
         }
+
+        #viewModal .complaint-intake-editor {
+            display: flex;
+            flex-direction: column;
+            align-items: stretch;
+        }
+
+        #viewModal .complaint-intake-editor textarea {
+            width: 100%;
+            min-height: 132px;
+        }
+
+        #viewModal .complaint-intake-actions {
+            display: flex;
+            justify-content: flex-end;
+        }
+
 
 
     </style>
@@ -252,7 +273,7 @@ require_once __DIR__ . "/../includes/admin_guard.php";
             </div>
             <div class="modal-footer d-flex justify-content-between flex-wrap gap-2">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
-                <div class="d-flex flex-wrap gap-3 ms-auto justify-content-end" id="complaintActionButtons">
+                <div class="d-flex flex-wrap gap-2 ms-auto justify-content-end" id="complaintActionButtons">
                     <button type="button" class="btn btn-danger" id="btnComplaintDrop">Drop Complaint</button>
                     <button type="button" class="btn btn-primary" id="btnComplaintEndorse">Endorse to Blotter</button>
                     <button type="button" class="btn btn-success" id="btnComplaintResolve">Mark Resolved</button>
@@ -316,6 +337,11 @@ require_once __DIR__ . "/../includes/admin_guard.php";
 <script src="../../JS-Script-Files/Admin-End/complaintTracker.js?v=20260322-1"></script>
 </body>
 </html>
+
+
+
+
+
 
 
 

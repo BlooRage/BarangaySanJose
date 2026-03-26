@@ -491,14 +491,6 @@ foreach ($appointmentRows as $row) {
             text-align: left;
         }
 
-        #reviewActionFooter {
-            gap: 1rem !important;
-        }
-
-        #reviewActionFooter .btn {
-            min-width: 118px;
-            padding-inline: 1.25rem;
-        }
 
         #viewModal .tracker-form-section > .tracker-form-grid + .tracker-form-grid,
         #viewModal .tracker-form-section > .tracker-form-grid + .tracker-form-field,

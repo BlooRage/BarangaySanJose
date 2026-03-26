@@ -222,10 +222,10 @@
         return "archived";
     }
 
-    function emptyState(message = "No complaint records found.") {
+    function emptyState(message = "No complaint records found.", toneClass = "text-center text-muted") {
         return `
             <tr>
-                <td colspan="8" class="text-start text-muted py-4">${esc(message)}</td>
+                <td colspan="8" class="complaint-table-empty ${toneClass} py-4">${esc(message)}</td>
             </tr>
         `;
     }
@@ -434,12 +434,13 @@
     }
 
     function renderIntakeNotesEditor(value) {
+        const normalizedValue = String(value ?? "").trim();
         return `
             <div class="tracker-form-field">
                 <p class="tracker-form-label">Intake Notes</p>
-                <div class="tracker-form-value">
-                    <textarea id="complaintIntakeNotes" class="form-control" rows="4" placeholder="Add intake notes...">${esc(value || "")}</textarea>
-                    <div class="mt-2">
+                <div class="tracker-form-value complaint-intake-editor">
+                    <textarea id="complaintIntakeNotes" class="form-control" rows="4" placeholder="Add intake notes...">${esc(normalizedValue)}</textarea>
+                    <div class="complaint-intake-actions mt-2">
                         <button type="button" class="btn btn-sm btn-outline-primary" id="btnSaveComplaintIntakeNotes">Save Intake Notes</button>
                     </div>
                 </div>
@@ -584,7 +585,7 @@
         if (viewModalTitle) {
             viewModalTitle.textContent = "Complaint Details";
         }
-        viewDetailsBody.innerHTML = '<div class="text-muted text-center">Loading complaint details...</div>';
+        viewDetailsBody.innerHTML = '<div class="text-muted">Loading complaint details...</div>';
         setActionButtonsState(null);
         viewModal.show();
 
@@ -680,7 +681,7 @@
             const intakeNotesField = document.getElementById("complaintIntakeNotes");
             const saveIntakeNotesBtn = document.getElementById("btnSaveComplaintIntakeNotes");
             saveIntakeNotesBtn?.addEventListener("click", async () => {
-                const intakeNotes = String(intakeNotesField?.value || "");
+                const intakeNotes = String(intakeNotesField?.value || "").trim();
                 try {
                     if (saveIntakeNotesBtn) saveIntakeNotesBtn.disabled = true;
                     await postJson({
@@ -714,7 +715,7 @@
             syncFilterOptions();
             applyFilters();
         } catch (error) {
-            tableBody.innerHTML = emptyState(error.message || "Failed to load complaint records.");
+            tableBody.innerHTML = emptyState(error.message || "Failed to load complaint records.", "text-center text-danger");
         } finally {
             setRefreshLoading(false);
         }
@@ -773,3 +774,6 @@
     initComplaintActionFlow();
     loadList();
 })();
+
+
+

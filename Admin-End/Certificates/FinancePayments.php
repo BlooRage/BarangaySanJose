@@ -310,7 +310,7 @@ if ($financeSection === 'fees') {
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
   <link rel="stylesheet" href="../../CSS-Styles/Admin-End-CSS/AdminDashboardStyle.css">
   <link rel="stylesheet" href="../../CSS-Styles/Admin-End-CSS/barangayIdAdminNav.css">
-  <link rel="stylesheet" href="../../CSS-Styles/Admin-End-CSS/ResidentMasterlistStyle.css">
+  <link rel="stylesheet" href="../../CSS-Styles/Admin-End-CSS/ResidentMasterlistStyle.css?v=20260227-2">
   <style>
     .finance-fee-shell {
       max-width: 1360px;
@@ -322,6 +322,12 @@ if ($financeSection === 'fees') {
       background: #fff;
       box-shadow: 0 0.125rem 0.5rem rgba(0, 0, 0, 0.06);
     }
+    .finance-fee-card--general-form {
+      border-top-left-radius: 4px;
+      border-top-right-radius: 18px;
+      border-top: 0;
+      box-shadow: 0 0.125rem 0.5rem rgba(0, 0, 0, 0.06), inset 0 8px 0 #fff;
+    }
     .finance-fee-form-note {
       font-size: 0.9rem;
       color: #6c757d;
@@ -329,10 +335,15 @@ if ($financeSection === 'fees') {
     .finance-fee-table th,
     .finance-fee-table td {
       vertical-align: middle;
+      text-align: left;
     }
     .finance-fee-amount {
       font-weight: 700;
       color: #198754;
+    }
+    .finance-fee-table .compact-table-actions {
+      justify-content: flex-end;
+      width: 100%;
     }
     .finance-fee-empty {
       border: 1px dashed #d0d7de;
@@ -606,8 +617,7 @@ if ($financeSection === 'fees') {
         min-width: 118px;
       }
     }
-    #paymentsPanel,
-    #clearanceFeesPanel {
+    #paymentsPanel {
       border-top-left-radius: 0 !important;
     }
     #feeTypesTableBody tr { cursor: default; }
@@ -660,7 +670,7 @@ if ($financeSection === 'fees') {
 
         <div class="row g-4">
           <div class="col-12 col-lg-4">
-            <div class="finance-fee-card p-4 h-100">
+            <div class="finance-fee-card finance-fee-card--general-form p-4 h-100">
               <h4 class="mb-2" style="font-family: 'Charis SIL Bold'; color: #DE710C;">
                 <?= $editingFee ? 'Edit Price' : 'Add New Price' ?>
               </h4>
@@ -695,7 +705,7 @@ if ($financeSection === 'fees') {
 
                   <div class="d-flex flex-wrap gap-2">
                     <button type="submit" class="btn btn-primary">Save Changes</button>
-                    <a href="<?= htmlspecialchars($financeBaseUrl, ENT_QUOTES, 'UTF-8') ?>?section=fees" class="btn btn-outline-secondary">Cancel</a>
+                    <a href="<?= htmlspecialchars($financeBaseUrl, ENT_QUOTES, 'UTF-8') ?>?section=fees" class="btn btn-secondary">Cancel</a>
                   </div>
                 </form>
               <?php else: ?>
@@ -755,9 +765,9 @@ if ($financeSection === 'fees') {
                   No prices are currently saved in <code>generalfeestbl</code>.
                 </div>
               <?php else: ?>
-                <div class="table-responsive">
-                  <table class="table finance-fee-table align-middle">
-                    <thead class="table-light">
+                <div class="table-responsive compact-admin-table-shell">
+                  <table class="table finance-fee-table compact-admin-table compact-admin-table--wide align-middle">
+                    <thead>
                       <tr>
                         <th>Document Type</th>
                         <th>Category</th>
@@ -776,19 +786,19 @@ if ($financeSection === 'fees') {
                             <div class="small text-muted">Document Type ID: <?= (int)($row['document_type_id'] ?? 0) ?></div>
                           </td>
                           <td><?= htmlspecialchars((string)($row['document_category'] ?? 'N/A'), ENT_QUOTES, 'UTF-8') ?></td>
-                          <td class="finance-fee-amount">PHP <?= number_format((float)($row['amount'] ?? 0), 2) ?></td>
+                          <td class="finance-fee-amount">&#8369;<?= number_format((float)($row['amount'] ?? 0), 2) ?></td>
                           <td><?= htmlspecialchars((string)($row['updated_at'] ?? 'N/A'), ENT_QUOTES, 'UTF-8') ?></td>
                           <td class="text-end">
-                            <div class="d-inline-flex flex-wrap gap-2 justify-content-end">
+                            <div class="compact-table-actions">
                               <a href="<?= htmlspecialchars($financeBaseUrl, ENT_QUOTES, 'UTF-8') ?>?section=fees&amp;edit_fee=<?= (int)($row['fee_id'] ?? 0) ?>"
-                                 class="btn btn-sm btn-outline-primary">
+                                 class="btn btn-sm btn-primary">
                                 Edit
                               </a>
                               <form method="post" action="<?= htmlspecialchars($financeBaseUrl, ENT_QUOTES, 'UTF-8') ?>?section=fees" onsubmit="return confirm('Delete this price?');">
                                 <?= csrfTokenField() ?>
                                 <input type="hidden" name="action" value="delete_fee">
                                 <input type="hidden" name="fee_id" value="<?= (int)($row['fee_id'] ?? 0) ?>">
-                                <button type="submit" class="btn btn-sm btn-outline-danger">Delete</button>
+                                <button type="submit" class="btn btn-sm btn-danger">Delete</button>
                               </form>
                             </div>
                           </td>
@@ -804,20 +814,20 @@ if ($financeSection === 'fees') {
       </div><!-- end #generalFeesPanel -->
 
       <!-- ── CLEARANCE FEES PANEL ───────────────────────────────────────────── -->
-      <div id="clearanceFeesPanel" class="d-none bg-white p-4 rounded-4 rounded-tl-0 shadow-sm border">
+      <div id="clearanceFeesPanel" class="d-none bg-white p-4 rounded-4 shadow-sm border resident-masterlist-shell">
         <div class="row g-4">
 
           <!-- Left: fee types table -->
           <div class="col-lg-7">
             <div class="d-flex justify-content-between align-items-center mb-3">
               <h5 class="fw-bold mb-0">Clearance Fee Types</h5>
-              <button class="btn btn-sm btn-outline-secondary" id="btnRefreshFeeTable" title="Refresh">
+              <button class="btn btn-sm btn-secondary" id="btnRefreshFeeTable" title="Refresh">
                 <i class="fa-solid fa-arrows-rotate"></i>
               </button>
             </div>
-            <div class="table-responsive">
-              <table class="table table-sm table-hover align-middle">
-                <thead class="table-light">
+            <div class="table-responsive compact-admin-table-shell">
+              <table class="table align-middle compact-admin-table finance-fee-table">
+                <thead>
                   <tr>
                     <th>#</th>
                     <th>Fee Name</th>
@@ -861,7 +871,7 @@ if ($financeSection === 'fees') {
                 <button type="button" class="btn btn-primary flex-fill" id="feeFormSaveBtn">
                   <i class="fas fa-save me-1"></i>Save
                 </button>
-                <button type="button" class="btn btn-outline-secondary" id="feeFormCancelBtn" title="Reset form">
+                <button type="button" class="btn btn-secondary" id="feeFormCancelBtn" title="Reset form">
                   <i class="fas fa-times"></i>
                 </button>
               </div>
@@ -872,16 +882,16 @@ if ($financeSection === 'fees') {
       </div><!-- end #clearanceFeesPanel -->
 
       <!-- ── PENDING FEE CHANGE REQUESTS PANEL ──────────────────────────── -->
-      <div id="pendingRequestsPanel" class="d-none bg-white p-4 rounded-4 rounded-tl-0 shadow-sm border">
+      <div id="pendingRequestsPanel" class="d-none bg-white p-4 rounded-4 shadow-sm border resident-masterlist-shell">
         <div class="d-flex justify-content-between align-items-center mb-3">
           <h5 class="fw-bold mb-0">Pending Fee Change Requests</h5>
-          <button class="btn btn-sm btn-outline-secondary" id="btnRefreshPendingRequests" title="Refresh">
+          <button class="btn btn-sm btn-secondary" id="btnRefreshPendingRequests" title="Refresh">
             <i class="fa-solid fa-arrows-rotate"></i>
           </button>
         </div>
-        <div class="table-responsive">
-          <table class="table table-sm align-middle">
-            <thead class="table-light">
+        <div class="table-responsive compact-admin-table-shell">
+          <table class="table align-middle compact-admin-table compact-admin-table--wide finance-fee-table">
+            <thead>
               <tr>
                 <th>Type</th>
                 <th>Fee Name</th>
@@ -1257,7 +1267,7 @@ if ($financeSection === 'fees') {
 window.CERT_TRACKER_DEFAULT_STAGE = 'finance';
 </script>
 <script src="../../JS-Script-Files/Shared/barangayIdDigital.js?v=20260321-04"></script>
-<script src="../../JS-Script-Files/Admin-End/certificateTrackerScript.js?v=20260323-14"></script>
+<script src="../../JS-Script-Files/Admin-End/certificateTrackerScript.js?v=20260326-15"></script>
 <?php else: ?>
 <script>
 (function () {
@@ -1350,26 +1360,26 @@ window.CERT_TRACKER_DEFAULT_STAGE = 'finance';
       <tr>
         <td class="text-muted small">${i + 1}</td>
         <td class="fw-semibold">${esc(ft.fee_name)}</td>
-        <td>₱${Number(ft.default_amount).toFixed(2)}</td>
+        <td class="finance-fee-amount">&#8369;${Number(ft.default_amount).toFixed(2)}</td>
         <td>
           <span class="badge ${ft.status === 'approved' ? 'bg-success' : 'bg-secondary'}">
             ${ft.status === 'approved' ? 'Active' : (ft.status || 'Inactive')}
           </span>
         </td>
         <td class="text-end">
-          <button class="btn btn-sm btn-outline-primary me-1 py-0 px-2"
-            onclick="financeEditFee(${ft.fee_type_id},${JSON.stringify(ft.fee_name)},${ft.default_amount},${JSON.stringify(ft.status)})">
-            <i class="fas fa-pen"></i>
-          </button>
-          <button class="btn btn-sm btn-outline-danger py-0 px-2"
-            onclick="financeDeleteFee(${ft.fee_type_id},${JSON.stringify(ft.fee_name)})">
-            <i class="fas fa-trash"></i>
-          </button>
+          <div class="compact-table-actions">
+            <button class="btn btn-sm btn-primary"
+              onclick="financeEditFee(${ft.fee_type_id},${JSON.stringify(ft.fee_name)},${ft.default_amount},${JSON.stringify(ft.status)})">
+              Edit
+            </button>
+            <button class="btn btn-sm btn-danger"
+              onclick="financeDeleteFee(${ft.fee_type_id},${JSON.stringify(ft.fee_name)})">
+              Delete
+            </button>
+          </div>
         </td>
       </tr>`).join('');
   }
-
-  // ── Form helpers ──────────────────────────────────────────────────────────
   function resetForm() {
     document.getElementById('feeFormId').value     = '';
     document.getElementById('feeFormName').value   = '';
@@ -1487,18 +1497,19 @@ window.CERT_TRACKER_DEFAULT_STAGE = 'finance';
       <tr>
         <td><span class="badge bg-secondary">${r.change_type === 'new_type' ? 'New Type' : 'Price Edit'}</span></td>
         <td class="fw-semibold">${esc(r.fee_name)}</td>
-        <td>${r.change_type === 'price_edit' ? '₱' + Number(r.default_amount).toFixed(2) : '—'}</td>
-        <td>₱${Number(r.proposed_amount || r.default_amount).toFixed(2)}</td>
+        <td class="finance-fee-amount">${r.change_type === 'price_edit' ? '&#8369;' + Number(r.default_amount).toFixed(2) : '&mdash;'}</td>
+        <td class="finance-fee-amount">&#8369;${Number(r.proposed_amount || r.default_amount).toFixed(2)}</td>
         <td class="small text-muted">${esc(r.notes || '—')}</td>
         <td class="small">${esc(r.requested_by_user_id || '—')}</td>
         <td class="small text-muted">${esc(r.updated_at || r.created_at || '')}</td>
         <td class="text-end">
-          <button class="btn btn-sm btn-success me-1 py-0 px-2" onclick="financeApproveFcr(${r.fee_type_id})">Approve</button>
-          <button class="btn btn-sm btn-outline-danger py-0 px-2" onclick="financeRejectFcr(${r.fee_type_id})">Reject</button>
+          <div class="compact-table-actions">
+            <button class="btn btn-sm btn-success" onclick="financeApproveFcr(${r.fee_type_id})">Approve</button>
+            <button class="btn btn-sm btn-danger" onclick="financeRejectFcr(${r.fee_type_id})">Reject</button>
+          </div>
         </td>
       </tr>`).join('');
   }
-
   window.financeApproveFcr = async function(id) {
     if (!confirm('Approve this fee change request? The catalog will be updated automatically.')) return;
     try {
@@ -1539,3 +1550,5 @@ window.CERT_TRACKER_DEFAULT_STAGE = 'finance';
 <?php endif; ?>
 </body>
 </html>
+
+
