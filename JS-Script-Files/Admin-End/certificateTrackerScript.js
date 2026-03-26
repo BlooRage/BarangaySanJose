@@ -1734,7 +1734,15 @@
     const cohabitationDuration = takeFirst(remaining, (l) => l === 'cohabitation duration');
     const cohabitationDurationValue = takeFirst(remaining, (l) => l === 'cohabitation duration value');
     const cohabitationDurationUnit = takeFirst(remaining, (l) => l === 'cohabitation duration unit');
+    const cohabitationSameAddress = takeFirst(remaining, (l) => /cohabitation.*same.*address/.test(l));
     const cohabitationAddress = takeFirst(remaining, (l) => l.includes('cohabitation') && (l.includes('address') || l.includes('residence')));
+    const cohabitationHouseNumber = takeFirst(remaining, (l) => /cohabitation house number$/.test(l));
+    const cohabitationStreetName = takeFirst(remaining, (l) => /cohabitation street name$/.test(l));
+    const cohabitationSubdivision = takeFirst(remaining, (l) => /cohabitation subdivision$/.test(l) || /cohabitation subdivision lot$/.test(l));
+    const cohabitationBarangay = takeFirst(remaining, (l) => /cohabitation barangay$/.test(l));
+    const cohabitationMunicipality = takeFirst(remaining, (l) => /cohabitation municipality$/.test(l) || /cohabitation city$/.test(l));
+    const cohabitationProvince = takeFirst(remaining, (l) => /cohabitation province$/.test(l));
+    const cohabitationAreaNumber = takeFirst(remaining, (l) => /cohabitation area number$/.test(l));
     const childFields = takeAll(remaining, (l) => l.includes('child') || l.includes('children'));
 
     const blocks = [];
@@ -1795,10 +1803,20 @@
       || cohabitationDuration
       || cohabitationDurationValue
       || cohabitationDurationUnit
+      || cohabitationSameAddress
       || cohabitationAddress
+      || cohabitationHouseNumber
+      || cohabitationStreetName
+      || cohabitationSubdivision
+      || cohabitationBarangay
+      || cohabitationMunicipality
+      || cohabitationProvince
+      || cohabitationAreaNumber
     );
 
     if (hasCohabitationLayout) {
+      const cohabitationSameAddressValue = String(cohabitationSameAddress?.value || '').trim().toLowerCase();
+      const isCohabitationSameAddress = ['on', 'yes', 'true', '1'].includes(cohabitationSameAddressValue);
       blocks.push(
         subsection('Request Details', [
           renderFieldGrid([{ ...purpose, wide: true }].filter(Boolean), 1),
@@ -1818,7 +1836,16 @@
         ]),
         subsection('Cohabitation Information', [
           renderFieldGrid([cohabitationStart, cohabitationDuration, cohabitationDurationValue, cohabitationDurationUnit].filter(Boolean), 2),
-          renderFieldGrid([cohabitationAddress].filter(Boolean), 1)
+          renderFieldGrid([cohabitationSameAddress].filter(Boolean), 1),
+          ...(
+            isCohabitationSameAddress
+              ? []
+              : [
+                  renderFieldGrid([cohabitationAddress].filter(Boolean), 1),
+                  renderFieldGrid([cohabitationHouseNumber, cohabitationStreetName, cohabitationSubdivision].filter(Boolean), 3),
+                  renderFieldGrid([cohabitationBarangay, cohabitationMunicipality, cohabitationProvince, cohabitationAreaNumber].filter(Boolean), 4)
+                ]
+          )
         ])
       );
       if (childFields.length) {
@@ -6322,6 +6349,11 @@
           'birthdate', 'date_of_birth', 'child_dob',
           'cohabitant_dob', 'cohabitant_birthdate', 'partner_birthdate',
           'preview_full_name', 'cohabitant_full_name',
+          'cohabitant_full_address', 'cohabitant_full_address_display', 'cohabitant_address_system',
+          'cohabitation_full_address', 'cohabitation_full_address_display', 'cohabitation_address_system',
+          'cohabitation_full_unit_number', 'cohabitation_full_house_lot_number',
+          'cohabitation_full_street_block_name', 'cohabitation_full_subdivision',
+          'cohabitation_full_barangay', 'cohabitation_full_area_number',
           'full_unit_number', 'full_house_lot_number', 'full_street_block_name', 'full_subdivision',
           'full_barangay', 'full_area_number', 'cohabitant_full_unit_number',
           'cohabitant_full_house_lot_number', 'cohabitant_full_street_block_name',
@@ -6448,6 +6480,7 @@
         Object.keys(payload).forEach((key) => {
           const normalized = String(key);
           if (normalized.startsWith('preview_') || normalized.startsWith('_preview_')) return;
+          if (normalized.endsWith('_display') || normalized.startsWith('display_')) return;
           if (consumedKeys.has(normalized) || technicalKeys.has(normalized)) return;
           const value = payload[key];
           if (value === null || value === undefined) return;

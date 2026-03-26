@@ -734,26 +734,26 @@ $purposeInputClass = $isRelationshipJailVisitVariant ? 'form-control text-bg-lig
 
                         <div id="cohabitationHouseSystemWrapper" class="form-row pt-0 d-none">
                             <div class="full-width">
-                                <div class="row mb-3">
-                                    <div class="col-md-4">
+                                <div class="form-row form-row--triple">
+                                    <div>
                                         <label class="top-label" for="cohabitationUnitNumber">Unit / Apartment Number</label>
                                         <input type="text" class="form-control" id="cohabitationUnitNumber" name="cohabitation_unit_number">
                                     </div>
-                                    <div class="col-md-4">
+                                    <div>
                                         <label class="top-label" for="cohabitationHouseNumber">House Number <span class="required-asterisk">*</span></label>
                                         <input type="text" class="form-control" id="cohabitationHouseNumber" name="cohabitation_house_number">
                                     </div>
-                                    <div class="col-md-4">
+                                    <div>
                                         <label class="top-label" for="cohabitationStreetName">Street Name <span class="required-asterisk">*</span></label>
                                         <input type="text" class="form-control" id="cohabitationStreetName" name="cohabitation_street_name">
                                     </div>
                                 </div>
-                                <div class="row mb-3">
-                                    <div class="col-md-6">
+                                <div class="form-row two-col-row pt-0">
+                                    <div>
                                         <label class="top-label" for="cohabitationSubdivision">Subdivision</label>
                                         <input type="text" class="form-control" id="cohabitationSubdivision" name="cohabitation_subdivision">
                                     </div>
-                                    <div class="col-md-6">
+                                    <div>
                                         <label class="top-label" for="cohabitationAreaNumber">Area <span class="required-asterisk">*</span></label>
                                         <select class="form-select" id="cohabitationAreaNumber" name="cohabitation_area_number">
                                             <option value="">Select</option>
@@ -770,7 +770,7 @@ $purposeInputClass = $isRelationshipJailVisitVariant ? 'form-control text-bg-lig
                             </div>
                         </div>
 
-                        <div id="cohabitationLocalityRow" class="form-row pt-0 d-none">
+                        <div id="cohabitationLocalityRow" class="form-row form-row--triple pt-0 d-none">
                             <div>
                                 <label class="top-label" for="cohabitationBarangayFixed">Barangay</label>
                                 <input type="text" class="form-control text-bg-light" id="cohabitationBarangayFixed" name="cohabitation_barangay" readonly value="<?php echo htmlspecialchars($applicantBarangay, ENT_QUOTES, 'UTF-8'); ?>">
@@ -787,30 +787,30 @@ $purposeInputClass = $isRelationshipJailVisitVariant ? 'form-control text-bg-lig
 
                         <div id="cohabitationLotBlockSystemWrapper" class="form-row pt-0 d-none">
                             <div class="full-width">
-                                <div class="row mb-3">
-                                    <div class="col-md-3">
+                                <div class="form-row">
+                                    <div>
                                         <label class="top-label" for="cohabitationUnitNumberLot">Unit / Apartment Number</label>
                                         <input type="text" class="form-control" id="cohabitationUnitNumberLot" name="cohabitation_unit_number_lot">
                                     </div>
-                                    <div class="col-md-3">
+                                    <div>
                                         <label class="top-label" for="cohabitationLotNumber">Lot <span class="required-asterisk">*</span></label>
                                         <input type="text" class="form-control" id="cohabitationLotNumber" name="cohabitation_lot_number">
                                     </div>
-                                    <div class="col-md-3">
+                                    <div>
                                         <label class="top-label" for="cohabitationBlockNumber">Block <span class="required-asterisk">*</span></label>
                                         <input type="text" class="form-control" id="cohabitationBlockNumber" name="cohabitation_block_number">
                                     </div>
-                                    <div class="col-md-3">
+                                    <div>
                                         <label class="top-label" for="cohabitationPhaseNumber">Phase <span class="required-asterisk">*</span></label>
                                         <input type="text" class="form-control" id="cohabitationPhaseNumber" name="cohabitation_phase_number">
                                     </div>
                                 </div>
-                                <div class="row mb-3">
-                                    <div class="col-md-6">
+                                <div class="form-row two-col-row pt-0">
+                                    <div>
                                         <label class="top-label" for="cohabitationSubdivisionLot">Subdivision</label>
                                         <input type="text" class="form-control" id="cohabitationSubdivisionLot" name="cohabitation_subdivision_lot">
                                     </div>
-                                    <div class="col-md-6">
+                                    <div>
                                         <label class="top-label" for="cohabitationAreaNumberLot">Area <span class="required-asterisk">*</span></label>
                                         <select class="form-select" id="cohabitationAreaNumberLot" name="cohabitation_area_number_lot">
                                             <option value="">Select</option>
