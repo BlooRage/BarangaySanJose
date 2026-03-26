@@ -46,7 +46,7 @@ if (!isset($baseUrl)) {
   <script>
     window.COUNTRY_STATE_DATA_URL = "../Public-Assets/Data/countries-states.json";
   </script>
-  <script src="../JS-Script-Files/Resident-End/registrationScript.js?v=20260327-25" defer></script>
+  <script src="../JS-Script-Files/Resident-End/registrationScript.js?v=20260213-24" defer></script>
 </head>
 
 <body>
