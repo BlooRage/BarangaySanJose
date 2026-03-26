@@ -270,6 +270,10 @@ if ($needsSchedule) {
     }
 }
 
+if ($action !== 'deny_appointment') {
+    $remarks = '';
+}
+
 $statusName = 'Pending';
 if ($action === 'approve_appointment') {
     $statusName = 'Approved';

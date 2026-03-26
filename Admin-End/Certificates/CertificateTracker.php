@@ -2077,6 +2077,9 @@ if ($certificateLaunchStage === 'release') {
       font-size: .88rem;
       background: #f8fafc;
     }
+    #manualFormAlert {
+      margin-top: 14px;
+    }
     .manual-photo-field {
       border: 1px dashed #cbd5e1;
       border-radius: 18px;
@@ -2473,7 +2476,7 @@ if ($certificateLaunchStage === 'release') {
 
               <div id="manualResidentLookupWrap">
                 <div class="row g-3 align-items-end">
-                  <div class="col-lg-8">
+                  <div class="col-12">
                     <label class="form-label fw-semibold small">Search Registered Resident</label>
                     <div class="input-group">
                       <input type="text" id="manualResidentSearchInput" class="form-control" placeholder="Resident ID, user ID, or resident name">
@@ -2482,8 +2485,8 @@ if ($certificateLaunchStage === 'release') {
                       </button>
                     </div>
                   </div>
-                  <div class="col-lg-4">
-                    <div class="manual-search-empty h-100 d-flex align-items-center" id="manualResidentSearchHint">
+                  <div class="col-12">
+                    <div class="manual-search-empty" id="manualResidentSearchHint">
                       Search a registered resident to auto-fill the form, or switch to walk-in mode to encode an unregistered resident.
                     </div>
                   </div>
@@ -2508,7 +2511,7 @@ if ($certificateLaunchStage === 'release') {
 
             <div class="manual-issuance-card">
               <div class="manual-issuance-card-title">
-                <h6>Document Setup</h6>
+                <h6>1. Document Setup</h6>
                 <span>Choose the form first. The matching fields and next step summary will update automatically.</span>
               </div>
               <div class="row g-3">
@@ -2527,7 +2530,7 @@ if ($certificateLaunchStage === 'release') {
 
             <div class="manual-issuance-card">
               <div class="manual-issuance-card-title">
-                <h6>Personal Basic Information</h6>
+                <h6>2. Personal Basic Information</h6>
                 <span>These fields will be saved with the request and used in the generated document preview.</span>
               </div>
               <div class="row g-3">
@@ -2588,7 +2591,7 @@ if ($certificateLaunchStage === 'release') {
 
             <div class="manual-issuance-card">
               <div class="manual-issuance-card-title">
-                <h6>Document Specific Details</h6>
+                <h6>3. Document Specific Details</h6>
                 <span id="manualSpecificFieldsHint">Select a certificate or clearance type to load its manual encoding fields.</span>
               </div>
               <div id="manualDynamicFields" class="row g-3"></div>

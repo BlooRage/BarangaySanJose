@@ -30,6 +30,130 @@ function normalize_street($value) {
     return normalize_simple($value);
 }
 
+function hp_clean_text($value): string {
+    return trim((string)$value);
+}
+
+function hp_normalize_subdivision_label($value): string {
+    $value = hp_clean_text($value);
+    if ($value === '') {
+        return '';
+    }
+    $value = preg_replace('/\bsubdivision\b/i', '', $value);
+    $value = preg_replace('/\bsubd\.?\b/i', '', $value);
+    $value = trim(preg_replace('/\s+/', ' ', (string)$value));
+    return $value === '' ? '' : $value . ' Subdivision';
+}
+
+function hp_normalize_phase_label($value): string {
+    $value = hp_clean_text($value);
+    if ($value === '') {
+        return '';
+    }
+    $value = preg_replace('/^\s*(phase|ph)\.?\s*/i', '', $value);
+    $value = trim(preg_replace('/\s+/', ' ', (string)$value));
+    return $value === '' ? '' : 'Phase ' . $value;
+}
+
+function hp_normalize_street_label($value): string {
+    $value = hp_clean_text($value);
+    if ($value === '') {
+        return '';
+    }
+    if (!preg_match('/\bst(?:reet)?\.?$/i', $value)) {
+        $value .= ' Street';
+    }
+    return trim(preg_replace('/\s+/', ' ', $value));
+}
+
+function hp_normalize_lot_label($value): string {
+    $value = hp_clean_text($value);
+    if ($value === '') {
+        return '';
+    }
+    $value = preg_replace('/^\s*lot\s*/i', '', $value);
+    $value = trim(preg_replace('/\s+/', ' ', (string)$value));
+    return $value === '' ? '' : 'Lot ' . $value;
+}
+
+function hp_normalize_block_label($value): string {
+    $value = hp_clean_text($value);
+    if ($value === '') {
+        return '';
+    }
+    $value = preg_replace('/^\s*block\s*/i', '', $value);
+    $value = preg_replace('/^\s*blk\.?\s*/i', '', $value);
+    $value = trim(preg_replace('/\s+/', ' ', (string)$value));
+    return $value === '' ? '' : 'Block ' . $value;
+}
+
+function hp_is_lot_block_address(array $row): bool {
+    $houseNumber = hp_clean_text($row['house_number'] ?? '');
+    $phaseNumber = hp_clean_text($row['phase_number'] ?? '');
+    $streetName = hp_clean_text($row['street_name'] ?? '');
+
+    if ($houseNumber !== '' && preg_match('/^\s*lot\b/i', $houseNumber)) {
+        return true;
+    }
+    if ($phaseNumber !== '' && preg_match('/^\s*(block|blk\.?)\b/i', $phaseNumber)) {
+        return true;
+    }
+    if ($streetName !== '' && preg_match('/^\s*(block|blk\.?)\b/i', $streetName)) {
+        return true;
+    }
+
+    return $houseNumber !== '' && $phaseNumber !== '' && $streetName === '';
+}
+
+function hp_build_address_display(array $row): string {
+    $houseNumber = hp_clean_text($row['house_number'] ?? '');
+    $streetName = hp_clean_text($row['street_name'] ?? '');
+    $phaseNumber = hp_clean_text($row['phase_number'] ?? '');
+    $subdivision = hp_normalize_subdivision_label($row['subdivision'] ?? '');
+
+    if (hp_is_lot_block_address($row)) {
+        $leadParts = array_values(array_filter([
+            hp_normalize_lot_label($houseNumber),
+            hp_normalize_block_label($phaseNumber),
+        ], static fn($value) => $value !== ''));
+
+        $tailParts = [];
+        if ($streetName !== '') {
+            if (preg_match('/^\s*(phase|ph)\b/i', $streetName) || preg_match('/^\s*\d+[a-z]?\s*$/i', $streetName)) {
+                $tailParts[] = hp_normalize_phase_label($streetName);
+            } else {
+                $tailParts[] = $streetName;
+            }
+        }
+        if ($subdivision !== '') {
+            $tailParts[] = $subdivision;
+        }
+
+        $addressParts = [];
+        if ($leadParts !== []) {
+            $addressParts[] = implode(' ', $leadParts);
+        }
+        if ($tailParts !== []) {
+            $addressParts[] = implode(', ', $tailParts);
+        }
+
+        return $addressParts ? implode(', ', $addressParts) : '-';
+    }
+
+    $streetLine = trim(implode(' ', array_filter([
+        $houseNumber,
+        hp_normalize_street_label($streetName),
+    ], static fn($value) => $value !== '')));
+
+    $addressParts = array_values(array_filter([
+        $streetLine,
+        $phaseNumber !== '' ? hp_normalize_phase_label($phaseNumber) : '',
+        $subdivision,
+    ], static fn($value) => $value !== ''));
+
+    return $addressParts ? implode(', ', $addressParts) : '-';
+}
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     header('Content-Type: application/json; charset=utf-8');
     http_response_code(405);
@@ -116,14 +240,7 @@ if (isset($_GET['fetch'])) {
 
             $headFullName = trim($fullName);
 
-            $addressParts = [];
-            if ($row['house_number']) $addressParts[] = $row['house_number'];
-            if ($row['street_name']) $addressParts[] = $row['street_name'] . ' Street';
-            if ($row['phase_number']) $addressParts[] = $row['phase_number'];
-            if ($row['subdivision']) $addressParts[] = $row['subdivision'];
-            if ($row['area_number']) $addressParts[] = $row['area_number'];
-
-            $addressDisplay = $addressParts ? implode(', ', $addressParts) : 'ï¿½';
+            $addressDisplay = hp_build_address_display($row);
 
             $adultCount = 0;
             $memberCount = 0;
@@ -242,14 +359,7 @@ if (isset($_GET['fetch'])) {
 
         $headFullName = trim($fullName);
 
-        $addressParts = [];
-        if ($row['house_number']) $addressParts[] = $row['house_number'];
-        if ($row['street_name']) $addressParts[] = $row['street_name'] . ' Street';
-        if ($row['phase_number']) $addressParts[] = $row['phase_number'];
-        if ($row['subdivision']) $addressParts[] = $row['subdivision'];
-        if ($row['area_number']) $addressParts[] = $row['area_number'];
-
-        $addressDisplay = $addressParts ? implode(', ', $addressParts) : '�';
+        $addressDisplay = hp_build_address_display($row);
 
         $key = implode('|', [
             normalize_simple($row['house_number'] ?? ''),
