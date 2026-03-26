@@ -37,26 +37,14 @@ if (!function_exists('resident_guard_normalize_public_path')) {
 
 $userId = $_SESSION['user_id'];
 $hasResidentProfile = false;
-$isResidentVerified = false;
 
 if (isset($conn) && $conn instanceof mysqli) {
-    $residentStatusName = '';
-    $stmt = $conn->prepare("
-        SELECT r.resident_id, COALESCE(s.status_name, '')
-        FROM residentinformationtbl r
-        LEFT JOIN statuslookuptbl s ON r.status_id_resident = s.status_id
-        WHERE r.user_id = ?
-        LIMIT 1
-    ");
+    $stmt = $conn->prepare("SELECT resident_id FROM residentinformationtbl WHERE user_id = ? LIMIT 1");
     if ($stmt) {
         $stmt->bind_param("s", $userId);
         $stmt->execute();
-        $stmt->bind_result($residentId, $residentStatusName);
-        if ($stmt->fetch()) {
-            $hasResidentProfile = !empty($residentId);
-            $statusKey = strtolower((string)preg_replace('/[^a-z0-9]/i', '', (string)$residentStatusName));
-            $isResidentVerified = in_array($statusKey, ['verifiedresident', 'verified', 'approved'], true);
-        }
+        $stmt->store_result();
+        $hasResidentProfile = $stmt->num_rows > 0;
         $stmt->close();
     }
 }

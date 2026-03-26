@@ -351,6 +351,14 @@
   align-items: center;
 }
 
+.cms-detail-header--editor {
+  align-items: center;
+}
+
+.cms-detail-header--editor > .btn {
+  align-self: center;
+}
+
 .cms-detail-copy {
   flex: 1 1 0%;
 }
@@ -522,19 +530,24 @@
 }
 
 .status-pill {
-  border: 1px solid transparent;
-  border-radius: 999px;
+  align-items: center;
+  border: 2px solid transparent;
+  border-radius: 8px;
   display: inline-flex;
-  font-size: 0.78rem;
+  justify-content: center;
+  gap: 6px;
+  font-size: 0.85rem;
   font-weight: 700;
+  letter-spacing: 0;
   line-height: 1;
-  padding: 0.32rem 0.68rem;
+  padding: 6px 15px;
+  width: fit-content;
   white-space: nowrap;
 }
 
 .status-pill.draft {
-  background: rgba(29, 79, 145, 0.12);
-  border-color: rgba(29, 79, 145, 0.18);
+  background: #d6e2f2;
+  border-color: #c0d1e8;
   color: #1d4f91;
 }
 
@@ -545,26 +558,26 @@
 }
 
 .status-pill.approved {
-  background: #dcfce7;
-  border-color: #bbf7d0;
-  color: #166534;
+  background: #d4e8db;
+  border-color: #c0dac9;
+  color: #18613f;
 }
 
 .status-pill.denied {
-  background: #fee2e2;
-  border-color: #fecaca;
-  color: #991b1b;
+  background: #e8cfd3;
+  border-color: #e0bcc2;
+  color: #8f2932;
 }
 
 .status-pill.archived {
   background: #e5e7eb;
-  border-color: #d1d5db;
+  border-color: #d5dbe1;
   color: #374151;
 }
 
 .status-pill.live {
-  background: rgba(222, 113, 12, 0.14);
-  border-color: rgba(222, 113, 12, 0.2);
+  background: #fff3e4;
+  border-color: #f2c89d;
   color: #a24f07;
 }
 
@@ -572,6 +585,13 @@
   color: #3d250c;
   font-family: "Charis SIL Bold", Georgia, serif;
   font-size: 0.98rem;
+}
+
+.cms-request-table-subtitle {
+  color: #75614b;
+  font-size: 0.83rem;
+  line-height: 1.35;
+  margin-top: 0.2rem;
 }
 
 .cms-request-table-meta {
@@ -709,6 +729,10 @@
   gap: 0.75rem;
 }
 
+.cms-editor-actions {
+  justify-content: flex-end;
+}
+
 .cms-request-status,
 .cms-preview-pill,
 .cms-ratio-badge {
@@ -763,6 +787,14 @@
 .cms-editor-group {
   display: grid;
   gap: 1rem;
+}
+
+.cms-editor-form > .row,
+.cms-editor-form > .cms-editor-card,
+.cms-editor-form > .cms-editor-group,
+.cms-editor-form > .cms-editor-actions {
+  margin-inline: auto;
+  width: min(100%, 90rem);
 }
 
 .cms-editor-card {
@@ -847,8 +879,8 @@
 }
 
 .cms-preview-launcher-panel {
-  position: sticky;
-  top: 1.5rem;
+  position: static;
+  top: auto;
 }
 
 .cms-preview-launcher-copy {

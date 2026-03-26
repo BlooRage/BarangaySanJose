@@ -4,7 +4,7 @@ require_once __DIR__ . "/includes/resident_access_guard.php";
 require_once __DIR__ . "/../PhpFiles/Admin-End/contentStore.php";
 require_once __DIR__ . "/../PhpFiles/Admin-End/announcementAudience.php";
 
-$isResidentVerified = false;
+$isResidentNotVerified = false;
 $showNotVerifiedModal = false;
 
 if (isset($conn) && $conn instanceof mysqli) {
@@ -23,13 +23,13 @@ if (isset($conn) && $conn instanceof mysqli) {
     $stmt->bind_result($statusName);
     if ($stmt->fetch()) {
       $statusKey = strtolower((string)preg_replace('/[^a-z0-9]/i', '', (string)$statusName));
-      $isResidentVerified = in_array($statusKey, ['verifiedresident', 'verified', 'approved'], true);
+      $isResidentNotVerified = ($statusKey === 'notverified');
     }
     $stmt->close();
   }
 }
 
-if (!empty($_SESSION['show_not_verified_modal']) && !$isResidentVerified) {
+if (!empty($_SESSION['show_not_verified_modal']) && $isResidentNotVerified) {
   $showNotVerifiedModal = true;
 }
 
@@ -281,29 +281,6 @@ foreach ($announcementItems as $item) {
     .verify-cta-card {
       position: relative;
     }
-    .card-action.is-locked {
-      position: relative;
-      cursor: pointer;
-      border: 1px solid #f5d5b4 !important;
-      background: linear-gradient(180deg, #fffaf5 0%, #fff4e8 100%);
-    }
-    .card-action.is-locked::after {
-      content: "Verification Required";
-      position: absolute;
-      top: 12px;
-      right: 12px;
-      padding: 0.28rem 0.55rem;
-      border-radius: 999px;
-      background: rgba(124, 63, 0, 0.1);
-      color: #8a5308;
-      font-size: 0.7rem;
-      font-weight: 800;
-      letter-spacing: 0.04em;
-      text-transform: uppercase;
-    }
-    .card-action.is-locked:hover {
-      background: linear-gradient(180deg, #fff4e8 0%, #ffe9d3 100%);
-    }
     .verify-cta-close {
       position: absolute;
       top: 8px;
@@ -429,14 +406,14 @@ foreach ($announcementItems as $item) {
         </section>
       <?php endif; ?>
 
-      <?php if (!$isResidentVerified): ?>
+      <?php if ($isResidentNotVerified): ?>
         <div class="verify-cta-card rounded-4 overflow-hidden shadow-sm border-orange-thin bg-white mb-4" id="verifyCtaCard">
           <button type="button" class="verify-cta-close" id="verifyCtaCloseBtn" aria-label="Close">×</button>
           <div class="bg-orange text-center py-2">
             <h3 class="text-white fw-bold mb-0">ACCOUNT VERIFICATION</h3>
           </div>
           <div class="verify-cta-body p-3 p-md-4 text-center">
-            <p class="text-muted mb-2">Upload your supporting documents to unlock resident-only modules. You may also request your desired document through a walk-in visit at the barangay.</p>
+            <p class="text-muted mb-2">Want to access most modules? Verify now.</p>
             <a href="DocumentUpload" class="btn btn-primary px-4">Verify Now</a>
           </div>
         </div>
@@ -448,8 +425,8 @@ foreach ($announcementItems as $item) {
 
         <div class="col-12 col-md-4 col-lg-3">
           <div id="card-serviceRequest-certificates"
-               class="card-action h-100 p-4 rounded-4 text-center d-flex flex-column align-items-center justify-content-center border-0 shadow-sm <?= !$isResidentVerified ? 'is-locked' : '' ?>"
-               <?= !$isResidentVerified ? 'data-verify-required="1" data-target-url="Certificates/CertificatesLandingPage"' : 'onclick="location.href=\'Certificates/CertificatesLandingPage\'"' ?>>
+               class="card-action h-100 p-4 rounded-4 text-center d-flex flex-column align-items-center justify-content-center border-0 shadow-sm"
+               onclick="location.href='Certificates/CertificatesLandingPage'">
             <i class="fa-solid fa-file-lines fa-2xl mb-3"></i><br>
             <span class="fw-bold small">CERTIFICATE REQUEST</span>
           </div>
@@ -466,8 +443,8 @@ foreach ($announcementItems as $item) {
 
         <div class="col-12 col-md-4 col-lg-3">
           <div id="card-serviceRequest-brgyId"
-               class="card-action h-100 p-4 rounded-4 text-center d-flex flex-column align-items-center justify-content-center border-0 shadow-sm <?= !$isResidentVerified ? 'is-locked' : '' ?>"
-               <?= !$isResidentVerified ? 'data-verify-required="1" data-target-url="BarangayId/BarangayIdLandingPage"' : 'onclick="location.href=\'BarangayId/BarangayIdLandingPage\'"' ?>>
+               class="card-action h-100 p-4 rounded-4 text-center d-flex flex-column align-items-center justify-content-center border-0 shadow-sm"
+               onclick="location.href='BarangayId/BarangayIdLandingPage'">
             <i class="fa-solid fa-id-card fa-2xl mb-3"></i><br>
             <span class="fw-bold small">BARANGAY ID</span>
           </div>
@@ -493,8 +470,8 @@ foreach ($announcementItems as $item) {
 
         <div class="col-12 col-md-4 col-lg-3">
           <div id="card-serviceRequest-transactions"
-               class="card-action h-100 p-4 rounded-4 text-center d-flex flex-column align-items-center justify-content-center border-0 shadow-sm <?= !$isResidentVerified ? 'is-locked' : '' ?>"
-               <?= !$isResidentVerified ? 'data-verify-required="1" data-target-url="resident_transactions"' : 'onclick="location.href=\'resident_transactions\'"' ?>>
+               class="card-action h-100 p-4 rounded-4 text-center d-flex flex-column align-items-center justify-content-center border-0 shadow-sm"
+               onclick="location.href='resident_transactions'">
             <i class="fa-solid fa-money-check-dollar fa-2xl mb-3"></i><br>
             <span class="fw-bold small">TRANSACTIONS</span>
           </div>
@@ -523,20 +500,19 @@ foreach ($announcementItems as $item) {
     </main>
   </div>
 
-  <div class="modal fade" id="notVerifiedResidentModal" tabindex="-1" aria-hidden="true">
+  <div class="modal fade" id="notVerifiedResidentModal" tabindex="-1" data-bs-backdrop="static" data-bs-keyboard="false" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
       <div class="modal-content">
         <div class="modal-header border-0 pb-0 bg-white">
           <h5 class="modal-title w-100 text-center text-dark">Resident Verification</h5>
-          <button type="button" class="btn-close position-absolute end-0 top-0 m-3" data-bs-dismiss="modal" aria-label="Close"></button>
         </div>
         <hr class="my-0">
         <div class="modal-body text-center">
-          <p class="mb-2">You must be a verified resident to access this module.</p>
-          <p class="text-muted mb-0">Upload supporting documents to continue online, or request your desired document through a walk-in visit at the barangay.</p>
+          You are not yet a verified resident, which means you cannot access most modules.
         </div>
-        <div class="modal-footer border-0 pt-0 d-flex gap-2 justify-content-center">
-          <a href="DocumentUpload" class="btn btn-primary px-4">Verify Now</a>
+        <div class="modal-footer border-0 pt-0 d-flex gap-2">
+          <a href="DocumentUpload" class="btn btn-primary flex-fill">Verify Now</a>
+          <button type="button" class="btn btn-secondary flex-fill" data-bs-dismiss="modal">Later</button>
         </div>
       </div>
     </div>
@@ -554,19 +530,13 @@ foreach ($announcementItems as $item) {
 
     document.addEventListener("DOMContentLoaded", () => {
       const shouldShow = <?= $showNotVerifiedModal ? 'true' : 'false' ?>;
+      if (!shouldShow || !window.bootstrap?.Modal) return;
+
       const modalEl = document.getElementById("notVerifiedResidentModal");
-      if (!modalEl || !window.bootstrap?.Modal) return;
+      if (!modalEl) return;
 
-      const modal = bootstrap.Modal.getOrCreateInstance(modalEl);
-      if (shouldShow) {
-        modal.show();
-      }
-
-      document.querySelectorAll("[data-verify-required='1']").forEach((card) => {
-        card.addEventListener("click", () => {
-          modal.show();
-        });
-      });
+      const modal = new bootstrap.Modal(modalEl);
+      modal.show();
     });
 
     const verifyCtaCard = document.getElementById("verifyCtaCard");
