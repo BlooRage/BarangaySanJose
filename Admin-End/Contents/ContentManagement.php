@@ -39,22 +39,6 @@ $createAnnouncementUrl = appUrl('Admin-End/Contents/CreateContent.php') . '?type
 $faqToolUrl = appUrl('Admin-End/Contents/CreateContent.php') . '?type=faq';
 $reportsUrl = appUrl('Admin-End/Reports/Reports.php') . '?module=certificate_issuance';
 
-$sharedRules = [
-    'Any image file may be uploaded regardless of ratio, but it should be cropped using the current live ratio of that section before saving.',
-    'Banner titles, banner messages, and rich text sections use Summernote.',
-    'Every content update keeps a current preview ready in the View Preview window before it can be submitted.',
-    'Submitting, approving, denying, and auto-approving always require confirmation.',
-    'SuperAdmin and the appointed Barangay Secretary can approve or deny requests, and they can auto-approve their own changes.',
-];
-
-$sharedFlow = [
-    'User edits text or image content.',
-    'System keeps the updated design ready in the View Preview window.',
-    'User confirms and submits the change request.',
-    'SuperAdmin or the appointed Barangay Secretary reviews the request.',
-    'Approver confirms the approve or deny action before the change is finalized.',
-];
-
 $contentModules = [
     'requests' => [
         'label' => 'Content Change Request',
@@ -179,44 +163,6 @@ $editorMeta = [
         'quick_links' => [
             ['label' => 'Open Request Queue', 'href' => appUrl('Admin-End/Contents/ContentManagement.php') . '?module=requests'],
         ],
-    ],
-];
-
-$generalModules = [
-    [
-        'title' => 'Announcements',
-        'status' => 'Live Module',
-        'icon' => 'fa-bullhorn',
-        'summary' => 'Manage the public news feed, announcements, SMS and email delivery, FAQ items, and the news page banner.',
-        'meta' => 'News Feed, Public Announcements, SMS and Email, FAQs, Tracker',
-        'details' => [
-            [
-                'title' => 'News Page Banner Fields',
-                'items' => [
-                    'Banner Image',
-                    'Banner Title',
-                    'Banner Message',
-                ],
-            ],
-        ],
-        'note' => 'Use the News Page editor for the banner and the Announcements tools for the actual news feed content.',
-        'primary_label' => 'Edit News Page',
-        'primary_href' => appUrl('Admin-End/Contents/ContentManagement.php') . '?module=announcements',
-        'secondary_label' => 'Open Content Tools',
-        'secondary_href' => $canManageAnnouncements ? $contentToolsUrl : '',
-    ],
-    [
-        'title' => 'Reports',
-        'status' => 'Live Module',
-        'icon' => 'fa-chart-column',
-        'summary' => 'Open the reporting workspace for certificate, clearance, finance, resident, appointment, blotter, and complaint modules.',
-        'meta' => 'Certificate, Clearance, Financial, Residents, Appointments, Blotter, Complaints',
-        'details' => [],
-        'note' => '',
-        'primary_label' => 'Open Reports',
-        'primary_href' => $canViewReports ? $reportsUrl : '',
-        'secondary_label' => '',
-        'secondary_href' => '',
     ],
 ];
 
@@ -663,14 +609,13 @@ function cms_render_request_table(array $requests, string $emptyMessage, string 
             <th>Updated</th>
             <th>Submitted</th>
             <th>Reviewed</th>
-            <th>Notes</th>
-            <th class="text-end">Actions</th>
+            <th>Actions</th>
           </tr>
         </thead>
         <tbody>
           <?php if (!$requests): ?>
             <tr>
-              <td colspan="8" class="text-center text-muted py-4"><?= htmlspecialchars($emptyMessage) ?></td>
+              <td colspan="7" class="text-center text-muted py-4"><?= htmlspecialchars($emptyMessage) ?></td>
             </tr>
           <?php else: ?>
             <?php foreach ($requests as $request): ?>
@@ -693,8 +638,6 @@ function cms_render_request_table(array $requests, string $emptyMessage, string 
               <tr>
                 <td>
                   <div class="cms-request-table-primary"><?= htmlspecialchars($pageLabel) ?></div>
-                  <div class="cms-request-table-meta">Request ID: <?= htmlspecialchars($requestId) ?></div>
-                  <div class="cms-request-table-meta">Page Key: <?= htmlspecialchars($pageKey) ?></div>
                 </td>
                 <td>
                   <div class="cms-request-table-primary"><?= htmlspecialchars((string)($request['created_by_label'] ?? '-')) ?></div>
@@ -719,22 +662,7 @@ function cms_render_request_table(array $requests, string $emptyMessage, string 
                 <td><?= htmlspecialchars(cms_format_datetime((string)($request['submitted_at'] ?? ''))) ?></td>
                 <td><?= htmlspecialchars(cms_format_datetime((string)($request['reviewed_at'] ?? ''))) ?></td>
                 <td>
-                  <?php if ($reviewNote !== ''): ?>
-                    <div class="cms-request-table-note"><?= nl2br(htmlspecialchars($reviewNote), false) ?></div>
-                  <?php else: ?>
-                    <span class="text-muted">No notes yet.</span>
-                  <?php endif; ?>
-                  <?php if ($status === 'archived' && $archivedAt !== ''): ?>
-                    <div class="cms-request-table-meta mt-2">
-                      Archived <?= htmlspecialchars(cms_format_datetime($archivedAt)) ?>
-                      <?php if ($archivedByLabel !== ''): ?>
-                        by <?= htmlspecialchars($archivedByLabel) ?>
-                      <?php endif; ?>
-                    </div>
-                  <?php endif; ?>
-                </td>
-                <td class="text-end">
-                  <div class="compact-table-actions justify-content-end cms-request-table-actions">
+                  <div class="compact-table-actions cms-request-table-actions">
                     <a href="<?= htmlspecialchars(cms_nav_url($pageKey, $requestId)) ?>" class="btn btn-primary btn-sm compact-table-btn">View</a>
                     <?php if ($canRestore): ?>
                       <?= cms_render_request_action_form('restore_request', $requestId, 'Restore', 'btn-success', 'Restore this archived content request?') ?>
@@ -789,37 +717,18 @@ $previewCssAssets = [
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
   <link href="../../summernote-0.9.0-dist/summernote-lite.min.css?v=20260307-2" rel="stylesheet">
   <link rel="stylesheet" href="../../CSS-Styles/Admin-End-CSS/AdminDashboardStyle.css">
+  <link rel="stylesheet" href="../../CSS-Styles/Admin-End-CSS/ResidentMasterlistStyle.css?v=20260321-2">
   <link rel="stylesheet" href="../../CSS-Styles/Admin-End-CSS/ContentNavigator.css?v=20260325-7">
 </head>
 <body>
   <div class="d-flex flex-column flex-md-row" style="min-height: 100vh;">
     <?php include __DIR__ . '/../includes/sidebar.php'; ?>
 
-    <main id="main-display" class="flex-grow-1 p-3 p-md-4 p-xl-5 cms-page-bg">
-      <section class="cms-hero-card mb-4">
-        <div class="cms-hero-copy">
-          <div class="cms-kicker">Content Management System</div>
-          <div class="d-flex flex-wrap align-items-center gap-2">
-            <h2 class="cms-page-title mb-0">Content Management System</h2>
-            <span class="cms-status-pill <?= htmlspecialchars(cms_status_class((string)($selectedModule['status'] ?? 'Navigation'))) ?>">
-              <?= htmlspecialchars((string)($selectedModule['status'] ?? 'Navigation')) ?>
-            </span>
-          </div>
-          <p class="cms-page-subtitle mb-0">
-            Build the content request, preview, and approval flow for the public pages from one CMS workspace.
-          </p>
-        </div>
-        <div class="cms-hero-actions">
-          <?php if ($canManageAnnouncements): ?>
-            <a href="<?= htmlspecialchars($contentToolsUrl) ?>" class="btn btn-warning text-white fw-semibold">
-              <i class="fa-solid fa-layer-group me-2"></i>Open Content Tools
-            </a>
-          <?php endif; ?>
-          <a href="<?= htmlspecialchars(cms_nav_url('requests')) ?>" class="btn btn-outline-light fw-semibold">
-            <i class="fa-solid fa-code-compare me-2"></i>Open Request Queue
-          </a>
-        </div>
-      </section>
+    <main id="main-display" class="flex-grow-1 p-3 p-md-4 p-xl-5 bg-light cms-page-root">
+      <h2 class="mb-4" style="font-family: 'Charis SIL Bold'; color: #DE710C;">
+        Content Management System
+      </h2>
+      <hr><br>
 
       <?php if (is_array($flash) && !empty($flash['message'])): ?>
         <div class="alert alert-<?= htmlspecialchars((string)($flash['type'] ?? 'info')) ?> shadow-sm border-0 mb-4">
@@ -827,91 +736,19 @@ $previewCssAssets = [
         </div>
       <?php endif; ?>
 
-      <section class="cms-rule-strip mb-4">
-        <?php foreach ($sharedRules as $rule): ?>
-          <div class="cms-rule-chip">
-            <i class="fa-solid fa-check"></i>
-            <span><?= htmlspecialchars($rule) ?></span>
-          </div>
-        <?php endforeach; ?>
-      </section>
-
-      <section class="cms-section-card mb-4">
-        <div class="cms-section-heading">
-          <h3 class="cms-section-title mb-0">General Modules</h3>
-        </div>
-        <div class="row g-3">
-          <?php foreach ($generalModules as $moduleCard): ?>
-            <div class="col-12 col-xl-6">
-              <article class="cms-module-card cms-module-card--live h-100">
-                <div class="cms-module-card-head">
-                  <div class="cms-module-icon">
-                    <i class="fa-solid <?= htmlspecialchars((string)$moduleCard['icon']) ?>"></i>
-                  </div>
-                  <div>
-                    <div class="d-flex flex-wrap align-items-center gap-2">
-                      <h4 class="cms-module-title mb-0"><?= htmlspecialchars((string)$moduleCard['title']) ?></h4>
-                      <span class="cms-status-pill <?= htmlspecialchars(cms_status_class((string)$moduleCard['status'])) ?>">
-                        <?= htmlspecialchars((string)$moduleCard['status']) ?>
-                      </span>
-                    </div>
-                    <p class="cms-module-summary mb-0"><?= htmlspecialchars((string)$moduleCard['summary']) ?></p>
-                  </div>
-                </div>
-                <div class="cms-module-meta"><?= htmlspecialchars((string)$moduleCard['meta']) ?></div>
-                <?php if (!empty($moduleCard['details'])): ?>
-                  <div class="cms-module-detail-stack">
-                    <?php foreach ((array)$moduleCard['details'] as $detailBlock): ?>
-                      <div class="cms-module-detail-card">
-                        <h5 class="cms-module-detail-title"><?= htmlspecialchars((string)($detailBlock['title'] ?? '')) ?></h5>
-                        <ul class="cms-module-detail-list">
-                          <?php foreach ((array)($detailBlock['items'] ?? []) as $detailItem): ?>
-                            <li><?= htmlspecialchars((string)$detailItem) ?></li>
-                          <?php endforeach; ?>
-                        </ul>
-                      </div>
-                    <?php endforeach; ?>
-                  </div>
-                <?php endif; ?>
-                <?php if (!empty($moduleCard['note'])): ?>
-                  <p class="cms-module-note mb-0"><?= htmlspecialchars((string)$moduleCard['note']) ?></p>
-                <?php endif; ?>
-                <div class="cms-module-actions">
-                  <?php if ($moduleCard['primary_href'] !== ''): ?>
-                    <a href="<?= htmlspecialchars((string)$moduleCard['primary_href']) ?>" class="btn btn-outline-primary btn-sm fw-semibold">
-                      <?= htmlspecialchars((string)$moduleCard['primary_label']) ?>
-                    </a>
-                  <?php else: ?>
-                    <span class="cms-access-note">Access depends on current module permissions.</span>
-                  <?php endif; ?>
-                  <?php if ($moduleCard['secondary_href'] !== '' && $moduleCard['secondary_label'] !== ''): ?>
-                    <a href="<?= htmlspecialchars((string)$moduleCard['secondary_href']) ?>" class="btn btn-link btn-sm fw-semibold text-decoration-none">
-                      <?= htmlspecialchars((string)$moduleCard['secondary_label']) ?>
-                    </a>
-                  <?php endif; ?>
-                </div>
-              </article>
-            </div>
-          <?php endforeach; ?>
-        </div>
-      </section>
-
       <section class="cms-section-card mb-4">
         <div class="cms-section-heading">
           <h3 class="cms-section-title mb-0">Content Management Module</h3>
         </div>
         <div class="cms-nav-grid">
           <?php foreach ($contentModules as $moduleKey => $module): ?>
+            <?php if ($moduleKey === 'requests') { continue; } ?>
             <a href="<?= htmlspecialchars(cms_nav_url($moduleKey)) ?>" class="cms-nav-link <?= $selectedModuleKey === $moduleKey ? 'is-active' : '' ?>">
               <span class="cms-nav-link-icon">
                 <i class="fa-solid <?= htmlspecialchars((string)$module['icon']) ?>"></i>
               </span>
               <span class="cms-nav-link-copy">
                 <span class="cms-nav-link-title"><?= htmlspecialchars((string)$module['label']) ?></span>
-                <span class="cms-nav-link-meta"><?= htmlspecialchars((string)$module['summary']) ?></span>
-              </span>
-              <span class="cms-nav-link-status <?= htmlspecialchars(cms_status_class((string)$module['status'])) ?>">
-                <?= htmlspecialchars((string)$module['status']) ?>
               </span>
             </a>
           <?php endforeach; ?>
@@ -920,127 +757,64 @@ $previewCssAssets = [
 
       <?php if ($selectedModuleKey === 'requests'): ?>
         <section class="cms-section-card mb-4">
-          <div class="cms-detail-header">
+          <div class="cms-detail-header cms-detail-header--request">
             <div class="cms-detail-icon">
               <i class="fa-solid <?= htmlspecialchars((string)$selectedModule['icon']) ?>"></i>
             </div>
             <div class="cms-detail-copy">
-              <div class="d-flex flex-wrap align-items-center gap-2 mb-2">
-                <h3 class="cms-section-title mb-0"><?= htmlspecialchars((string)$selectedModule['title']) ?></h3>
-                <span class="cms-status-pill <?= htmlspecialchars(cms_status_class((string)$selectedModule['status'])) ?>">
-                  <?= htmlspecialchars((string)$selectedModule['status']) ?>
-                </span>
-              </div>
-              <p class="cms-detail-summary mb-0"><?= htmlspecialchars((string)$selectedModule['summary']) ?></p>
+              <h3 class="cms-section-title mb-0"><?= htmlspecialchars((string)$selectedModule['title']) ?></h3>
             </div>
           </div>
 
-          <div class="cms-stat-grid mb-4">
-            <article class="cms-stat-card">
-              <span class="cms-stat-label">My Drafts</span>
-              <span class="cms-stat-value"><?= (int)$draftCount ?></span>
+          <article class="cms-detail-panel cms-request-panel mb-4">
+            <h4 class="cms-detail-panel-title">My Content Requests</h4>
+            <?= cms_render_request_table(
+              $myActiveRequests,
+              'No active CMS requests yet. Start from any page editor to save a draft or submit changes.',
+              $currentUserId,
+              $canReviewContent,
+              $requestVersionMeta
+            ) ?>
+          </article>
+
+          <?php if ($canReviewContent): ?>
+            <article class="cms-detail-panel cms-request-panel mb-4">
+              <h4 class="cms-detail-panel-title">Review Queue</h4>
+              <?= cms_render_request_table(
+                $reviewQueue,
+                'No pending content requests to review right now.',
+                $currentUserId,
+                true,
+                $requestVersionMeta
+              ) ?>
             </article>
-            <article class="cms-stat-card">
-              <span class="cms-stat-label">My Pending</span>
-              <span class="cms-stat-value"><?= (int)$myPendingCount ?></span>
+          <?php endif; ?>
+
+          <article class="cms-detail-panel cms-request-panel mb-4">
+            <h4 class="cms-detail-panel-title"><?= $canReviewContent ? 'Archived Requests' : 'My Archived Requests' ?></h4>
+            <?= cms_render_request_table(
+              $archivedRequests,
+              $canReviewContent
+                ? 'No archived CMS requests are available right now.'
+                : 'You do not have any archived CMS requests right now.',
+              $currentUserId,
+              $canReviewContent,
+              $requestVersionMeta
+            ) ?>
+          </article>
+
+          <?php if ($canReviewContent): ?>
+            <article class="cms-detail-panel cms-request-panel">
+              <h4 class="cms-detail-panel-title">Approved Version History</h4>
+              <?= cms_render_request_table(
+                $approvedHistoryRequests,
+                'No approved content versions are available yet.',
+                $currentUserId,
+                true,
+                $requestVersionMeta
+              ) ?>
             </article>
-            <article class="cms-stat-card">
-              <span class="cms-stat-label">My Approved</span>
-              <span class="cms-stat-value"><?= (int)$myApprovedCount ?></span>
-            </article>
-            <article class="cms-stat-card">
-              <span class="cms-stat-label">My Denied</span>
-              <span class="cms-stat-value"><?= (int)$myDeniedCount ?></span>
-            </article>
-            <article class="cms-stat-card">
-              <span class="cms-stat-label">My Archived</span>
-              <span class="cms-stat-value"><?= (int)$myArchivedCount ?></span>
-            </article>
-            <?php if ($canReviewContent): ?>
-              <article class="cms-stat-card cms-stat-card--accent">
-                <span class="cms-stat-label">Pending Review</span>
-                <span class="cms-stat-value"><?= (int)$pendingReviewCount ?></span>
-              </article>
-            <?php endif; ?>
-          </div>
-
-          <div class="row g-4">
-            <div class="col-12 col-xl-7">
-              <article class="cms-detail-panel mb-4">
-                <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
-                  <h4 class="cms-detail-panel-title mb-0">My Content Requests</h4>
-                  <a href="<?= htmlspecialchars(cms_nav_url('home')) ?>" class="btn btn-outline-primary btn-sm fw-semibold">Start New Page Edit</a>
-                </div>
-                <?= cms_render_request_table(
-                  $myActiveRequests,
-                  'No active CMS requests yet. Start from any page editor to save a draft or submit changes.',
-                  $currentUserId,
-                  $canReviewContent,
-                  $requestVersionMeta
-                ) ?>
-              </article>
-
-              <article class="cms-detail-panel mb-4">
-                <h4 class="cms-detail-panel-title"><?= $canReviewContent ? 'Archived Requests' : 'My Archived Requests' ?></h4>
-                <?= cms_render_request_table(
-                  $archivedRequests,
-                  $canReviewContent
-                    ? 'No archived CMS requests are available right now.'
-                    : 'You do not have any archived CMS requests right now.',
-                  $currentUserId,
-                  $canReviewContent,
-                  $requestVersionMeta
-                ) ?>
-              </article>
-
-              <?php if ($canReviewContent): ?>
-                <article class="cms-detail-panel mb-4">
-                  <h4 class="cms-detail-panel-title">Approved Version History</h4>
-                  <?= cms_render_request_table(
-                    $approvedHistoryRequests,
-                    'No approved content versions are available yet.',
-                    $currentUserId,
-                    true,
-                    $requestVersionMeta
-                  ) ?>
-                </article>
-              <?php endif; ?>
-
-              <?php if ($canReviewContent): ?>
-                <article class="cms-detail-panel">
-                  <h4 class="cms-detail-panel-title">Review Queue</h4>
-                  <?= cms_render_request_table(
-                    $reviewQueue,
-                    'No pending content requests to review right now.',
-                    $currentUserId,
-                    true,
-                    $requestVersionMeta
-                  ) ?>
-                </article>
-              <?php endif; ?>
-            </div>
-
-            <div class="col-12 col-xl-5">
-              <article class="cms-detail-panel mb-4">
-                <h4 class="cms-detail-panel-title">Shared Workflow</h4>
-                <ol class="cms-flow-list">
-                  <?php foreach ($sharedFlow as $step): ?>
-                    <li><?= htmlspecialchars($step) ?></li>
-                  <?php endforeach; ?>
-                </ol>
-              </article>
-
-              <article class="cms-detail-panel">
-                <h4 class="cms-detail-panel-title">Review Permissions</h4>
-                <ul class="cms-detail-list">
-                  <li>SuperAdmin can approve, deny, and auto-approve changes.</li>
-                  <li>The appointed Barangay Secretary can also approve, deny, and auto-approve changes.</li>
-                  <li>Creators can continue editing draft and denied requests from the page editor.</li>
-                  <li>Pending requests remain read-only until they are reviewed.</li>
-                </ul>
-              </article>
-            </div>
-          </div>
+          <?php endif; ?>
         </section>
       <?php else: ?>
         <?php
@@ -1368,15 +1142,6 @@ $previewCssAssets = [
                   </div>
                 </article>
               <?php endif; ?>
-
-              <article class="cms-detail-panel mb-4">
-                <h4 class="cms-detail-panel-title">Shared Workflow</h4>
-                <ol class="cms-flow-list">
-                  <?php foreach ($sharedFlow as $step): ?>
-                    <li><?= htmlspecialchars($step) ?></li>
-                  <?php endforeach; ?>
-                </ol>
-              </article>
 
               <?php if ($moduleLinks): ?>
                 <article class="cms-detail-panel mb-4">
