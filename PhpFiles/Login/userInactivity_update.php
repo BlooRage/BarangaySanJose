@@ -10,10 +10,6 @@ require_once __DIR__ . '/../General/security.php';
 require __DIR__ . '/../General/connection.php';
 require_once __DIR__ . '/redirectDestination.php';
 
-if (session_status() === PHP_SESSION_NONE) {
-  session_start();
-}
-
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
   echo json_encode(['success' => false, 'error' => 'Invalid request']);
   exit;
@@ -100,6 +96,9 @@ if ((int)$user['status_id_account'] === (int)$inactiveStatusId) {
 
 // Create real login session
 unset($_SESSION['pending_user_id'], $_SESSION['pending_verify']);
+
+// Prevent session fixation when an inactive account finishes verification.
+session_regenerate_id(true);
 
 $_SESSION['user_id']   = $user_id;
 $_SESSION['role']      = $user['role_access'];

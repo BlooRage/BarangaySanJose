@@ -1,6 +1,14 @@
 <?php
 require_once __DIR__ . '/../General/officialInviteCommon.php';
 
+if (!function_exists('redirectDestinationInternalUrl')) {
+    function redirectDestinationInternalUrl(string $path): string
+    {
+        $path = '/' . ltrim($path, '/');
+        return rtrim(appRootPath(), '/') . $path;
+    }
+}
+
 if (!function_exists('resolveUnifiedProfileRedirect')) {
     function resolveUnifiedProfileRedirect(mysqli $conn, ?string $userId, ?string $role): string
     {
@@ -43,10 +51,10 @@ if (!function_exists('resolveUnifiedProfileRedirect')) {
                     $profileData = $stmt->get_result()->fetch_assoc();
                     $stmt->close();
                     if (!$profileData) {
-                        return appUrl('/Resident-End/resident_registration.php');
+                        return redirectDestinationInternalUrl('/Resident-End/resident_registration.php');
                     }
                 }
-                return appUrl('/Resident-End/resident_dashboard.php');
+                return redirectDestinationInternalUrl('/Resident-End/resident_dashboard.php');
 
             case 'Official':
             case 'Officials':
@@ -99,7 +107,7 @@ if (!function_exists('resolveUnifiedProfileRedirect')) {
                     }
                 }
 
-                return appUrl('/Admin-End/AdminDashboard.php');
+                return redirectDestinationInternalUrl('/Admin-End/AdminDashboard.php');
 
             default:
                 return appUrl('/logout');
