@@ -41,12 +41,12 @@ if (!function_exists('db_fail_response')) {
     }
 }
 
-$defaultDbHost = '';
-$defaultDbHostLocal = '127.0.0.1';
+$defaultDbHost = 'srv1986.hstgr.io';
+$defaultDbHostLocal = 'srv1986.hstgr.io';
 $defaultDbHostHosted = 'localhost';
-$defaultDbUser = '';
-$defaultDbPass = '';
-$defaultDbName = '';
+$defaultDbUser = 'u682055666_thesiscaps';
+$defaultDbPass = 'ThesisCaps123.';
+$defaultDbName = 'u682055666_testingBrgySJ';
 $defaultDbPort = 3306;
 
 if (!function_exists('db_request_host_name')) {

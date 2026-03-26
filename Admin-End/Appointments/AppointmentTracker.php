@@ -936,6 +936,8 @@ foreach ($appointmentRows as $row) {
                             <small>Residents can book from tomorrow up to this many days ahead, still within the current year.</small>
                         </div>
 
+                        <hr>
+
                         <div class="appointment-settings-field">
                             <label>Closed for appointments</label>
                             <div class="appointment-weekday-grid">
@@ -954,6 +956,8 @@ foreach ($appointmentRows as $row) {
                             </div>
                             <small>Checked days stay closed every week. Leave a day unchecked to keep it open for appointments.</small>
                         </div>
+
+                        <hr>
 
                         <div class="appointment-settings-field">
                             <label class="appointment-settings-toggle" for="appointmentLunchBreakEnabled">
@@ -994,6 +998,8 @@ foreach ($appointmentRows as $row) {
                             </div>
                             <small>Any slot that overlaps this time range is removed from the available appointment schedule.</small>
                         </div>
+
+                        <hr>
 
                         <div class="appointment-settings-field">
                             <label for="appointmentUnavailableDatePicker">Unavailable dates</label>
