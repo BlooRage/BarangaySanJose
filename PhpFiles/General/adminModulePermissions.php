@@ -34,7 +34,7 @@ if (!function_exists('amp_get_permission_catalog')) {
                     [
                         'key' => 'appointments',
                         'label' => 'Appointments',
-                        'path' => 'Admin-End/Appointments/AppointmentTracker.php',
+                        'path' => 'Admin-End/Appointments/AppointmentTracker.php?tool=tracker',
                     ],
                 ],
             ],

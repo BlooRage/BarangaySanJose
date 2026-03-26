@@ -392,6 +392,163 @@
   line-height: 1;
 }
 
+.compact-admin-table-shell {
+  background: #fff;
+  border: 1px solid #eceff3;
+  border-radius: 0.95rem;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding-bottom: 4px;
+}
+
+.compact-admin-table {
+  border-collapse: separate;
+  border-spacing: 0;
+  margin-bottom: 0;
+  width: 100%;
+}
+
+.compact-admin-table--wide {
+  min-width: 1040px;
+}
+
+.compact-admin-table--wide th:last-child,
+.compact-admin-table--wide td:last-child {
+  white-space: nowrap;
+}
+
+.compact-admin-table thead th {
+  background: #f7f8fa;
+  border-bottom: 1px solid #e5e7eb;
+  color: #111827;
+  font-size: 0.95rem;
+  font-weight: 700;
+  line-height: 1.2;
+  padding: 0.52rem 0.85rem;
+}
+
+.compact-admin-table tbody td {
+  background: #fff;
+  border-bottom: 1px solid #eceff3;
+  color: #1f2937;
+  font-size: 0.94rem;
+  padding: 0.45rem 0.85rem;
+  vertical-align: middle;
+}
+
+.compact-admin-table tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+.compact-admin-table tbody tr:hover td {
+  background: #fcfcfd;
+}
+
+.compact-admin-table .compact-table-actions {
+  align-items: center;
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  justify-content: flex-end;
+}
+
+.compact-admin-table .compact-table-btn,
+.compact-admin-table tbody .btn.btn-sm {
+  font-size: 0.76rem;
+  line-height: 1.15;
+  padding: 0.24rem 0.54rem;
+}
+
+.compact-admin-table .compact-table-btn.btn-primary {
+  background: #0d6efd;
+  border-color: #0d6efd;
+  color: #fff;
+}
+
+.compact-admin-table .compact-table-btn.btn-primary:hover {
+  background: #0b5ed7;
+  border-color: #0b5ed7;
+  color: #fff;
+}
+
+.compact-admin-table-shell::-webkit-scrollbar {
+  height: 8px;
+}
+
+.compact-admin-table-shell::-webkit-scrollbar-thumb {
+  background: rgba(108, 117, 125, 0.45);
+  border-radius: 999px;
+}
+
+.status-pill {
+  border: 1px solid transparent;
+  border-radius: 999px;
+  display: inline-flex;
+  font-size: 0.78rem;
+  font-weight: 700;
+  line-height: 1;
+  padding: 0.32rem 0.68rem;
+  white-space: nowrap;
+}
+
+.status-pill.draft {
+  background: rgba(29, 79, 145, 0.12);
+  border-color: rgba(29, 79, 145, 0.18);
+  color: #1d4f91;
+}
+
+.status-pill.pending {
+  background: #f4e8b7;
+  border-color: #e9db9f;
+  color: #6c5a06;
+}
+
+.status-pill.approved {
+  background: #dcfce7;
+  border-color: #bbf7d0;
+  color: #166534;
+}
+
+.status-pill.denied {
+  background: #fee2e2;
+  border-color: #fecaca;
+  color: #991b1b;
+}
+
+.status-pill.archived {
+  background: #e5e7eb;
+  border-color: #d1d5db;
+  color: #374151;
+}
+
+.status-pill.live {
+  background: rgba(222, 113, 12, 0.14);
+  border-color: rgba(222, 113, 12, 0.2);
+  color: #a24f07;
+}
+
+.cms-request-table-primary {
+  color: #3d250c;
+  font-family: "Charis SIL Bold", Georgia, serif;
+  font-size: 0.98rem;
+}
+
+.cms-request-table-meta {
+  color: #75614b;
+  font-size: 0.83rem;
+}
+
+.cms-request-table-note {
+  color: #4c3a29;
+  font-size: 0.9rem;
+  line-height: 1.45;
+  white-space: pre-line;
+}
+
+.cms-request-table-actions {
+  min-width: 15rem;
+}
+
 .cms-request-stack {
   display: grid;
   gap: 1rem;
@@ -492,6 +649,11 @@
 .cms-request-status.is-approved {
   background: rgba(37, 99, 72, 0.13);
   color: #166534;
+}
+
+.cms-request-status.is-archived {
+  background: rgba(55, 65, 81, 0.12);
+  color: #374151;
 }
 
 .cms-request-status.is-live-version {
@@ -601,17 +763,37 @@
   margin-bottom: 0.2rem;
 }
 
-.cms-preview-panel {
+.cms-preview-launcher-panel {
   position: sticky;
   top: 1.5rem;
 }
 
+.cms-preview-launcher-copy {
+  flex: 1 1 auto;
+}
+
+.cms-preview-open-btn {
+  min-width: 12rem;
+}
+
+.cms-preview-stage {
+  background: #ffffff;
+  border: 1px solid rgba(31, 41, 55, 0.12);
+  border-radius: 0.85rem;
+  overflow: hidden;
+  position: relative;
+  width: 100%;
+}
+
+.cms-preview-stage--modal {
+  height: min(82vh, 56rem);
+}
+
 .cms-preview-frame {
   background: #ffffff;
-  border: 1px solid rgba(138, 92, 31, 0.15);
-  border-radius: 1rem;
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.6);
-  min-height: 46rem;
+  border: 0;
+  display: block;
+  height: 100%;
   width: 100%;
 }
 
@@ -714,7 +896,7 @@
     grid-template-columns: 1fr;
   }
 
-  .cms-preview-panel {
+  .cms-preview-launcher-panel {
     position: static;
   }
 }
@@ -754,5 +936,9 @@
   .cms-repeater-item-head,
   .cms-image-picker-actions {
     flex-direction: column;
+  }
+
+  .cms-preview-open-btn {
+    width: 100%;
   }
 }

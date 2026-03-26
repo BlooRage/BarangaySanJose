@@ -213,16 +213,13 @@ $ownerFullAddress = htmlspecialchars(implode(', ', $ownerFullAddressParts), ENT_
                 </div>
                 <div class="form-row">
                     <div class="full-width">
-                        <div class="d-flex align-items-center justify-content-start gap-3 app-type-row">
+                        <div class="d-flex align-items-center justify-content-start gap-3 flex-wrap app-type-row">
                             <p class="if-building-note mb-0">APPLICATION TYPE:</p>
-                            <div class="check-item">
-                                <input type="radio" id="app_new" name="application_type" value="New" class="clearance-radio" required>
-                                <label class="app-type-label" for="app_new">New Application</label>
-                            </div>
-                            <div class="check-item">
-                                <input type="radio" id="app_renewal" name="application_type" value="Renewal" class="clearance-radio" required>
-                                <label class="app-type-label" for="app_renewal">Renewal</label>
-                            </div>
+                            <select id="applicationTypeSelect" name="application_type" class="form-select app-type-select" required>
+                                <option value="">Select application type</option>
+                                <option value="New">New Application</option>
+                                <option value="Renewal">Renewal</option>
+                            </select>
                         </div>
                     </div>
                 </div>
@@ -249,8 +246,23 @@ $ownerFullAddress = htmlspecialchars(implode(', ', $ownerFullAddressParts), ENT_
                         <input type="hidden" id="todaPodaLocationValue" name="location_of_toda_poda" value="">
                     </div>
                     <div class="input-stack">
-                        <label class="top-label">Make <span class="required-asterisk">*</span></label>
-                        <input type="text" name="vehicle_make" required>
+                        <label class="top-label" for="vehicleMakeSelect">Make <span class="required-asterisk">*</span></label>
+                        <select id="vehicleMakeSelect" name="vehicle_make" class="form-select" required>
+                            <option value="">Select make</option>
+                            <option value="Rusi">Rusi</option>
+                            <option value="Yamaha">Yamaha</option>
+                            <option value="Kawasaki">Kawasaki</option>
+                            <option value="Honda">Honda</option>
+                            <option value="Others">Others</option>
+                        </select>
+                    </div>
+                </div>
+                <div id="vehicleMakeOtherRow" class="form-row d-none">
+                    <div class="full-width">
+                        <div class="input-stack">
+                            <label class="top-label" for="vehicleMakeOther">Other Make <span class="required-asterisk">*</span></label>
+                            <input type="text" id="vehicleMakeOther" name="vehicle_make_other" value="" placeholder="Please specify make" disabled>
+                        </div>
                     </div>
                 </div>
                 <div id="otherTodaPodaLocationRow" class="form-row d-none">

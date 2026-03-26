@@ -60,6 +60,57 @@
     return existing || new bootstrap.Modal(modalEl, options);
   }
 
+  function runAfterModalHidden(modalEl, callback) {
+    if (typeof callback !== 'function') return;
+    if (!modalEl || !modalEl.classList.contains('show')) {
+      try {
+        callback();
+      } catch (err) {
+        console.error('Modal follow-up callback failed:', err);
+      }
+      return;
+    }
+
+    let done = false;
+    let fallbackTimer = 0;
+    const finish = () => {
+      if (done) return;
+      done = true;
+      if (fallbackTimer) {
+        window.clearTimeout(fallbackTimer);
+      }
+      modalEl.removeEventListener('hidden.bs.modal', finish);
+      try {
+        callback();
+      } catch (err) {
+        console.error('Modal follow-up callback failed:', err);
+      }
+    };
+
+    modalEl.addEventListener('hidden.bs.modal', finish, { once: true });
+    fallbackTimer = window.setTimeout(finish, 700);
+  }
+
+  function handoffToFeeTagging(requestId, options = {}, sourceModalEl = null, sourceModal = null) {
+    if (!requestId) return;
+    const openNow = () => {
+      try {
+        openFeeTaggingModal(requestId, options);
+      } catch (err) {
+        console.error('Failed to open fee tagging modal:', err);
+        alert('Unable to open the Tag Fees modal. Please try again.');
+      }
+    };
+
+    if (sourceModalEl && sourceModalEl.classList.contains('show') && sourceModal) {
+      runAfterModalHidden(sourceModalEl, openNow);
+      sourceModal.hide();
+      return;
+    }
+
+    openNow();
+  }
+
   let feeTypeCatalogCache = null;
   let feeTypeCatalogPromise = null;
   let feeTaggingLoadToken = 0;
@@ -1201,8 +1252,56 @@
   function composeBarangayAddress(address, locality = 'BARANGAY SAN JOSE, RODRIGUEZ, RIZAL') {
     const suffix = String(locality || '').trim();
     const cleaned = stripAreaFromAddress(String(address || '').trim()).replace(/^[,\s]+|[,\s]+$/g, '');
-    if (suffix) return suffix;
-    return cleaned || '-';
+    if (!cleaned) {
+      return suffix || '-';
+    }
+    if (!suffix) {
+      return cleaned;
+    }
+    if (cleaned.toLowerCase().endsWith(suffix.toLowerCase())) {
+      return cleaned;
+    }
+    return `${cleaned}, ${suffix}`;
+  }
+
+  function composeLocalityAddress(address, locality = 'SAN JOSE, RODRIGUEZ, RIZAL') {
+    const suffix = String(locality || '').trim();
+    const cleaned = stripAreaFromAddress(String(address || '').trim()).replace(/^[,\s]+|[,\s]+$/g, '');
+    if (!cleaned) {
+      return suffix || '-';
+    }
+    if (!suffix) {
+      return cleaned;
+    }
+    if (cleaned.toLowerCase().endsWith(suffix.toLowerCase())) {
+      return cleaned;
+    }
+    return `${cleaned}, ${suffix}`;
+  }
+
+  function pickMostSpecificAddress(...candidates) {
+    let fallback = '';
+    let best = '';
+    let bestScore = -1;
+
+    candidates.flat().forEach((candidate) => {
+      const text = String(candidate || '').trim();
+      if (!text) return;
+      if (!fallback) fallback = text;
+
+      const stripped = stripAreaFromAddress(text);
+      let score = stripped.length;
+      if (/\d/.test(stripped)) score += 20;
+      if (/\b(unit|lot|blk|block|phase|street|st\\.?|subdivision)\b/i.test(stripped)) score += 15;
+      if (stripped.includes(',')) score += 8;
+
+      if (score > bestScore) {
+        best = text;
+        bestScore = score;
+      }
+    });
+
+    return best || fallback;
   }
 
   function buildCohabitantAddress(payload, applicantAddress = '') {
@@ -2359,7 +2458,7 @@
     return normalizePreviewDocKey(row?.document_type || '') === 'firsttimejobseeker';
   }
 
-  function requestNeedsFeeTagging(row) {
+  function requestRequiresFeeTagging(row) {
     if (!row || isFirstTimeJobSeekerRow(row)) {
       return false;
     }
@@ -2382,6 +2481,23 @@
       'commercialbuildingpermit',
       'tricyclepermit'
     ].some((token) => docToken.includes(token));
+  }
+
+  function requestNeedsFeeTagging(row) {
+    if (!requestRequiresFeeTagging(row)) {
+      return false;
+    }
+    if (Array.isArray(row?.clearance_fees)) {
+      return row.clearance_fees.length === 0;
+    }
+    const rawCount = String(row?.clearance_fee_count ?? '').trim();
+    if (rawCount !== '') {
+      const parsedCount = Number.parseInt(rawCount, 10);
+      if (Number.isFinite(parsedCount)) {
+        return parsedCount <= 0;
+      }
+    }
+    return true;
   }
 
   function requestNeedsManualIssuedUpload(row) {
@@ -2498,13 +2614,16 @@
       payload.location,
       businessAddressFromFields
     ]);
-    const operatorAddressRaw = firstNonEmpty([
+    const residentialAddressRaw = pickMostSpecificAddress(
+      getPersonal('Full Address', ''),
       payload.owner_full_address,
+      payload.applicant_full_address,
       payload.full_address,
       payload.full_address_display,
       payload.address,
+      payload.complete_address,
       residentProfile.full_address
-    ]);
+    );
     const previewAmount = (() => {
       const raw = String(firstNonEmpty([
         row.amount,
@@ -2643,7 +2762,7 @@
         residentProfile.full_address
       ])
     );
-    const generalPermitRemarks = firstNonEmpty([payload.remarks, payload.ownership_type]);
+    const generalPermitRemarks = firstNonEmpty([payload.remarks, payload.remark]);
     const knownPayloadKeys = new Set([
       'action', 'csrf_token', 'redirect', 'document_type',
       'last_name', 'lastname', 'first_name', 'firstname', 'middle_name', 'middlename', 'suffix', 'suffix_name',
@@ -2785,7 +2904,7 @@
         row.contact_number,
         residentProfile.phone_number
       ]), ''),
-      fullAddress: upperText(stripAreaFromAddress(getPersonal('Full Address', '') || residentProfile.full_address || payload.applicant_full_address || payload.full_address || payload.full_address_display || payload.address || payload.complete_address || '-'), '-'),
+      fullAddress: upperText(stripAreaFromAddress(residentialAddressRaw || '-'), '-'),
       purpose: upperText(residencyPurposeText, '-'),
       businessName: upperText(stripTemplateTokens(businessName || ''), ''),
       businessType: upperText(stripTemplateTokens(firstNonEmpty([payload.business_type, payload.businessType])), ''),
@@ -2803,9 +2922,32 @@
         payload.business_operator_name,
         fullNameFromRow(row)
       ])), ''),
-      operatorAddress: upperText(stripTemplateTokens(composeBarangayAddress(operatorAddressRaw || residentProfile.full_address || payload.full_address || '')), ''),
+      operatorAddress: upperText(stripTemplateTokens(composeLocalityAddress(pickMostSpecificAddress(
+        payload.owner_full_address,
+        payload.applicant_full_address,
+        payload.operator_address,
+        residentialAddressRaw,
+        residentProfile.full_address,
+        payload.full_address,
+        payload.full_address_display,
+        payload.address,
+        payload.complete_address
+      ))), ''),
       amount: upperText(previewAmount, ''),
+      issuedAt: upperText(stripTemplateTokens(firstNonEmpty([
+        payload.issued_at,
+        payload.issuedAt,
+        'BARANGAY SAN JOSE'
+      ])), 'BARANGAY SAN JOSE'),
+      issuedOn: upperText(previewDateText(firstNonEmpty([
+        row.finance_decision_at,
+        row.release_timestamp,
+        row.completed_at,
+        row.ready_at,
+        row.submitted_at
+      ])), ''),
       issuedDate: firstNonEmpty([
+        row.finance_decision_at,
         row.release_timestamp,
         row.completed_at,
         row.ready_at,
@@ -2833,10 +2975,10 @@
       birthdate: upperText(previewBornOnDate(applicantBirthdateRaw), ''),
       birthplace: upperText(firstNonEmpty([payload.birthplace, payload.place_of_birth, payload.child_birthplace]), ''),
       location: upperText(generalPermitLocation || firstNonEmpty([payload.location, payload.complete_address, payload.address, payload.full_address, residentProfile.full_address]), ''),
-      applicantResidenceAddress: upperText(firstNonEmpty([payload.full_address, payload.full_address_display, payload.address, residentProfile.full_address]), ''),
+      applicantResidenceAddress: upperText(residentialAddressRaw, ''),
       cohabitantResidenceAddress: upperText(buildCohabitantAddress(payload, firstNonEmpty([payload.full_address, payload.full_address_display, residentProfile.full_address])), ''),
       cohabitationResidenceAddress: upperText(buildCohabitationAddress(payload, firstNonEmpty([payload.full_address, payload.full_address_display, residentProfile.full_address])), ''),
-      remarks: upperText(generalPermitRemarks || firstNonEmpty([payload.remarks, payload.remark, row.status_remarks, row.status_reason]), ''),
+      remarks: upperText(generalPermitRemarks, ''),
       fatherName: upperText(fatherName, ''),
       motherName: upperText(motherName, ''),
       cohabitantName: upperText(cohabitantName, ''),
@@ -2976,7 +3118,7 @@
       <div class="doc-to-block"><strong>Address</strong><strong>:</strong><div><strong>${esc(safe(fullAddress))}</strong><br><strong>BARANGAY SAN JOSE, MONTALBAN, RIZAL</strong></div></div>
       <div class="doc-to-block"><strong>Birthday</strong><strong>:</strong><strong>${esc(safe(birthdate, '${Birthdate}'))}</strong></div>
       <div class="doc-to-block"><strong>Birthplace</strong><strong>:</strong><strong>${esc(safe(birthplace, '${Birthplace}'))}</strong></div>
-      <div class="doc-to-block"><strong>Remarks</strong><strong>:</strong><strong>${previewEditable('remarks', safe(remarks, '${REMARKS}'), '${REMARKS}')}</strong></div>
+      <div class="doc-to-block"><strong>Remarks</strong><strong>:</strong><strong>${previewEditable('remarks', templateSafe(remarks, '${REMARKS}'), '${REMARKS}')}</strong></div>
       <div class="doc-to-block"><strong>Purpose</strong><strong>:</strong><strong>${esc(safe(purpose, '${PURPOSE}'))}</strong></div>
     `;
 
@@ -2986,16 +3128,17 @@
         : 'at the office of the Punong Barangay, Barangay San Jose, Montalban, Rizal';
       return `Issued this <strong>${esc(issuedDateWord)}</strong> ${officeText}`;
     };
+    const buildSharedIssuedMetaRows = (ctcValue = '_____') => ([
+      { label: 'CTC No.:', value: ctcValue },
+      { label: 'Issued at:', value: generalClearanceIssuedAt || '_____' },
+      { label: 'Issued On:', value: generalClearanceIssuedOn || '_____' },
+      { label: 'OR No.:', value: safe(state.orNumber, '_____') },
+    ]);
 
     let contentHtml = '';
     let titleHtml = '<div class="doc-preview-goodmoral-office"><div>TANGGAPAN NG PUNONG BARANGAY</div><div>BARANGAY CERTIFICATION</div></div>';
     let issuedLine = buildIssuedLine();
-    let metaHtml = renderPreviewMetaRows([
-      { label: 'CTC No.:', value: '_____' },
-      { label: 'Issued at:', value: '_____' },
-      { label: 'Issued On:', value: '_____' },
-      { label: 'OR No.:', value: esc(safe(state.orNumber, '_____')) },
-    ]);
+    let metaHtml = renderPreviewMetaRows(buildSharedIssuedMetaRows());
 
     if (isIndigency) {
       const indigencyPurpose = safe(purpose || requestFor, 'PURPOSE');
@@ -3272,12 +3415,7 @@
         </p>
       `;
       issuedLine = buildIssuedLine();
-      metaHtml = renderPreviewMetaRows([
-        { label: 'CTC No.:', value: '_____' },
-        { label: 'Issued at:', value: '_____' },
-        { label: 'Issued On:', value: '_____' },
-        { label: 'OR No.:', value: esc(safe(state.orNumber, '_____')) },
-      ]);
+      metaHtml = renderPreviewMetaRows(buildSharedIssuedMetaRows());
     } else if (isCohabitation && !cohabitationHasChildren) {
       titleHtml = '<div class="doc-preview-goodmoral-office"><div>TANGGAPAN NG PUNONG BARANGAY</div><div>CERTIFICATE OF COHABITATION</div></div>';
       contentHtml = `
@@ -3297,12 +3435,7 @@
           This certification is being issued upon the request of both parties for whatever legal purpose it may serve them.
         </p>
       `;
-      metaHtml = renderPreviewMetaRows([
-        { label: 'CTC No.:', value: '_____' },
-        { label: 'Issued at:', value: '_____' },
-        { label: 'Issued On:', value: '_____' },
-        { label: 'OR No.:', value: esc(safe(state.orNumber, '_____')) },
-      ]);
+      metaHtml = renderPreviewMetaRows(buildSharedIssuedMetaRows());
     } else if (isCohabitation && cohabitationHasChildren) {
       titleHtml = '<div class="doc-preview-goodmoral-office"><div>TANGGAPAN NG PUNONG BARANGAY</div><div>CERTIFICATE OF COHABITATION</div></div>';
       contentHtml = `
@@ -3312,19 +3445,14 @@
         </p>
         <div class="doc-to-block"><strong>Name</strong><strong>:</strong><div><div><strong>${esc(safe(fullName, '-'))}</strong>, ${esc(safe(age, '-'))} y/o</div><div><strong>${esc(safe(cohabitantName, '-'))}</strong>, ${esc(safe(cohabitantAge, '-'))} y/o</div></div></div>
         <div class="doc-to-block"><strong>Address</strong><strong>:</strong><div><strong>${esc(safe(fullAddress, '-'))}</strong><br><strong>BARANGAY SAN JOSE, MONTALBAN, RIZAL</strong></div></div>
-        <div class="doc-to-block"><strong>Remarks</strong><strong>:</strong><strong>${previewEditable('remarks', safe(remarks, '-'), 'Remarks')}</strong></div>
+        <div class="doc-to-block"><strong>Remarks</strong><strong>:</strong><strong>${previewEditable('remarks', templateSafe(remarks, '${REMARKS}'), '${REMARKS}')}</strong></div>
         <div class="doc-to-block"><strong>Purpose</strong><strong>:</strong><strong>${esc(`COHABITATION SINCE ${safe(cohabitationStartDate || cohabitationDuration, '-')}`)}</strong></div>
         <div class="doc-to-block"><strong>Name of Children</strong><strong>:</strong><span>${esc(safe(cohabitationChildrenList, '-'))}</span></div>
         <p>
           This clearance is being issued pursuant to Barangay Revenue Code ORDINANCE NO. 11 – 2019
         </p>
       `;
-      metaHtml = renderPreviewMetaRows([
-        { label: 'CTC No.:', value: '_____' },
-        { label: 'Issued at:', value: '_____' },
-        { label: 'Issued On:', value: '_____' },
-        { label: 'OR No.:', value: esc(safe(state.orNumber, '_____')) },
-      ]);
+      metaHtml = renderPreviewMetaRows(buildSharedIssuedMetaRows());
     } else if (isResidency) {
       titleHtml = '<div class="doc-preview-goodmoral-office"><div>TANGGAPAN NG PUNONG BARANGAY</div><div>BARANGAY CERTIFICATION</div></div>';
       contentHtml = `
@@ -3337,12 +3465,7 @@
           This clearance is being issued pursuant to Barangay Revenue Code ORDINANCE NO. 11 – 2019
         </p>
       `;
-      metaHtml = renderPreviewMetaRows([
-        { label: 'CTC No.:', value: '_____' },
-        { label: 'Issued at:', value: '_____' },
-        { label: 'Issued On:', value: '_____' },
-        { label: 'OR No.:', value: esc(safe(state.orNumber, '_____')) },
-      ]);
+      metaHtml = renderPreviewMetaRows(buildSharedIssuedMetaRows());
     } else if (isFirstTimeJobSeeker) {
       titleHtml = `
         <div class="doc-preview-goodmoral-office doc-preview-ftjs-office">
@@ -5629,6 +5752,10 @@
         return;
       }
 
+      updateCachedRequestRecord(requestId, {
+        clearance_fees: taggedFees,
+        clearance_fee_count: taggedFees.length
+      });
       if (feeTagBody) feeTagBody.innerHTML = renderFeeTaggingForm(row, feeTypes, taggedFees);
       bindFeeTaggingTable();
       if (submitBtn) submitBtn.disabled = false;
@@ -5704,7 +5831,9 @@
       }
       updateCachedRequestRecord(requestId, {
         ...(data?.request && typeof data.request === 'object' ? data.request : {}),
-        fee_amount: Number.isFinite(Number(data?.total)) ? Number(data.total) : null
+        fee_amount: Number.isFinite(Number(data?.total)) ? Number(data.total) : null,
+        clearance_fees: fees,
+        clearance_fee_count: fees.length
       });
       const feeTagModal = document.getElementById('feeTaggingModal');
       if (feeTagModal) bootstrap.Modal.getInstance(feeTagModal)?.hide();
@@ -6441,11 +6570,10 @@
             if (action === 'open_fee_tagging') {
               if (viewModalEl && viewModalEl.classList.contains('show') && viewModal) {
                 preserveViewStateOnNextHide = false;
-                viewModal.hide();
+                handoffToFeeTagging(actionId, { openPreviewOnSave: true }, viewModalEl, viewModal);
+                return;
               }
-              window.setTimeout(() => {
-                openFeeTaggingModal(actionId, { openPreviewOnSave: true });
-              }, 160);
+              handoffToFeeTagging(actionId, { openPreviewOnSave: true });
               return;
             }
             if (action === 'approve_clearance_with_fees') {
@@ -6642,29 +6770,28 @@
         actionCancelBtn.disabled = true;
       }
       suppressActionReturn = true;
-      actionModal.hide();
-      window.setTimeout(() => {
-        openFeeTaggingModal(currentRequestId, {
-          openPreviewOnSave: true,
-          returnState: {
-            kind: 'action',
-            actionType: 'personnel_approve',
-            requestId: currentRequestId,
-            businessApprovalType: selectedApprovalType,
-            plateNumber: selectedPlateNumber
-          }
-        });
-      }, 160);
+      handoffToFeeTagging(currentRequestId, {
+        openPreviewOnSave: true,
+        returnState: {
+          kind: 'action',
+          actionType: 'personnel_approve',
+          requestId: currentRequestId,
+          businessApprovalType: selectedApprovalType,
+          plateNumber: selectedPlateNumber
+        }
+      }, actionModalEl, actionModal);
       return;
     }
 
     if ((actionType.value || '') === 'personnel_approve' && String(actionForm?.dataset?.docKey || '') !== 'firsttimejobseeker') {
       const rid = currentRequestId;
+      let selectedApprovalType = '';
+      let selectedPlateNumber = '';
       if (String(actionForm?.dataset?.docKey || '') === 'businessclearance') {
-        const selectedApprovalType = encodeBusinessApprovalTypes(
+        selectedApprovalType = encodeBusinessApprovalTypes(
           actionForm?.dataset?.businessApprovalType || actionBusinessApproval?.value || ''
         );
-        const selectedPlateNumber = String(
+        selectedPlateNumber = String(
           actionForm?.dataset?.businessPlateNumber || actionPlate?.value || ''
         ).trim().toUpperCase();
         if (!selectedApprovalType) {
@@ -6698,19 +6825,16 @@
           actionCancelBtn.disabled = true;
         }
         suppressActionReturn = true;
-        actionModal.hide();
-        window.setTimeout(() => {
-          openFeeTaggingModal(rid, {
-            openPreviewOnSave: true,
-            returnState: {
-              kind: 'action',
-              actionType: 'personnel_approve',
-              requestId: rid,
-              businessApprovalType: selectedApprovalType,
-              plateNumber: selectedPlateNumber
-            }
-          });
-        }, 160);
+        handoffToFeeTagging(rid, {
+          openPreviewOnSave: true,
+          returnState: {
+            kind: 'action',
+            actionType: 'personnel_approve',
+            requestId: rid,
+            businessApprovalType: selectedApprovalType,
+            plateNumber: selectedPlateNumber
+          }
+        }, actionModalEl, actionModal);
         return;
       }
       if (actionSubmitBtn) {
@@ -6777,6 +6901,34 @@
     if ((currentAction === 'personnel_approve_confirm' || currentAction === 'interview_pass_confirm')
       && viewPreviewState && typeof viewPreviewState === 'object') {
       fd.append('edited_preview', JSON.stringify(viewPreviewState));
+    }
+
+    if (apiAction === 'personnel_approve' && requestRequiresFeeTagging(currentRow)) {
+      let clearanceFeeSnapshot = Array.isArray(currentRow?.clearance_fees)
+        ? currentRow.clearance_fees
+        : [];
+      if (!clearanceFeeSnapshot.length && currentRequestId) {
+        try {
+          clearanceFeeSnapshot = await fetchTaggedClearanceFees(currentRequestId);
+          updateCachedRequestRecord(currentRequestId, {
+            clearance_fees: clearanceFeeSnapshot,
+            clearance_fee_count: clearanceFeeSnapshot.length
+          });
+        } catch (err) {
+          console.warn('Failed to refresh tagged clearance fees before approval:', err);
+        }
+      }
+      if (Array.isArray(clearanceFeeSnapshot) && clearanceFeeSnapshot.length) {
+        const normalizedSnapshot = clearanceFeeSnapshot
+          .map((fee) => ({
+            fee_name: String(firstNonEmpty([fee?.fee_name, fee?.fee_type]) || '').trim(),
+            amount: Number(fee?.amount) || 0
+          }))
+          .filter((fee) => fee.fee_name !== '');
+        if (normalizedSnapshot.length) {
+          fd.append('clearance_fee_snapshot', JSON.stringify(normalizedSnapshot));
+        }
+      }
     }
 
     if (currentAction === 'finance_verify' && actionForm?.dataset?.verifyMode === 'gcash') {

@@ -17,6 +17,9 @@ if (!isset($baseUrl)) {
 $allowUnregistered = false;
 require_once __DIR__ . "/../includes/resident_access_guard.php";
 require_once __DIR__ . "/../../PhpFiles/GET/getResidentProfile.php";
+require_once __DIR__ . "/../../PhpFiles/General/appointmentCouncilMembers.php";
+require_once __DIR__ . "/../../PhpFiles/General/appointmentSettings.php";
+require_once __DIR__ . "/../../PhpFiles/General/appointmentTimeSlots.php";
 
 $userId = (string)($_SESSION['user_id'] ?? '');
 $data = getResidentProfileData($conn, $userId);
@@ -52,6 +55,7 @@ $fullAddress = implode(', ', array_filter([
 ], static fn($part) => trim((string)$part) !== ''));
 
 $formValues = [
+    'official_user_id' => trim((string)($_GET['official_user_id'] ?? '')),
     'subject' => '',
     'subject_other' => '',
     'appointment_date' => '',
@@ -62,8 +66,29 @@ $feedbackType = !empty($_GET['success']) ? 'success' : (!empty($_GET['error']) ?
 $feedbackMessage = !empty($_GET['success'])
     ? (string)$_GET['success']
     : (!empty($_GET['error']) ? (string)$_GET['error'] : '');
-$minAppointmentDate = date('Y-m-d', strtotime('+1 day'));
-$maxAppointmentDate = date('Y-12-31');
+$appointmentSettings = aps_settings_load($conn);
+$bookingLimits = aps_booking_date_limits($appointmentSettings);
+$minAppointmentDate = (string)($bookingLimits['min_date'] ?? '');
+$maxAppointmentDate = (string)($bookingLimits['max_date'] ?? '');
+$councilMemberOptions = apcm_fetch_council_members($conn);
+$hasCouncilMemberOptions = $councilMemberOptions !== [];
+$appointmentTimeSlots = ats_allotted_times($appointmentSettings);
+$availableWeekdayLabels = aps_weekdays_label($appointmentSettings['available_weekdays'] ?? []);
+$disabledWeekdays = aps_disabled_weekdays($appointmentSettings);
+$unavailableDates = aps_normalize_unavailable_dates($appointmentSettings['unavailable_dates'] ?? []);
+$firstAvailableAppointmentDate = aps_first_available_booking_date($appointmentSettings);
+$hasAvailableAppointmentDates = !empty($bookingLimits['has_window']) && $firstAvailableAppointmentDate !== null;
+$hasAppointmentAvailability = $hasCouncilMemberOptions && $hasAvailableAppointmentDates && $appointmentTimeSlots !== [];
+$slotIntervalMinutes = (int)($appointmentSettings['slot_interval_minutes'] ?? 30);
+$bookingWindowDays = (int)($appointmentSettings['booking_window_days'] ?? 365);
+$lunchBreakEnabled = aps_has_lunch_break($appointmentSettings);
+$lunchBreakLabel = aps_lunch_break_label($appointmentSettings);
+$unavailableDatesCount = count($unavailableDates);
+$unavailableDatesSummary = aps_unavailable_dates_label($unavailableDates, 4);
+$firstAvailableAppointmentDateLabel = $firstAvailableAppointmentDate !== null
+    ? date('F j, Y', strtotime($firstAvailableAppointmentDate))
+    : 'No available date configured';
+$maxAppointmentDateLabel = $maxAppointmentDate !== '' ? date('F j, Y', strtotime($maxAppointmentDate)) : 'No maximum date available';
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -180,7 +205,15 @@ $maxAppointmentDate = date('Y-12-31');
 
             <div class="appointment-guide">
                 <div class="appointment-guide-title">Before You Submit</div>
-                <p class="appointment-guide-text">Choose a future date within the current year and a time between 9:01 AM and 4:59 PM. If you select <strong>Other</strong> as the subject, include a short specific description.</p>
+                <p class="appointment-guide-text">Choose the barangay council member you want to meet, then pick one of the available dates on <strong><?= htmlspecialchars($availableWeekdayLabels, ENT_QUOTES, 'UTF-8') ?></strong>. Appointments use <strong><?= htmlspecialchars((string)$slotIntervalMinutes, ENT_QUOTES, 'UTF-8') ?>-minute</strong> time allotments<?php if ($lunchBreakEnabled): ?> with lunch time blocked from <strong><?= htmlspecialchars($lunchBreakLabel, ENT_QUOTES, 'UTF-8') ?></strong><?php endif; ?> and can be scheduled up to <strong><?= htmlspecialchars((string)$bookingWindowDays, ENT_QUOTES, 'UTF-8') ?> days ahead</strong>, capped through <strong><?= htmlspecialchars($maxAppointmentDateLabel, ENT_QUOTES, 'UTF-8') ?></strong>. If you select <strong>Other</strong> as the subject, include a short specific description.</p>
+                <?php if ($unavailableDatesCount > 0): ?>
+                    <p class="appointment-guide-text mt-2">Blocked dates are also disabled in the calendar, including <strong><?= htmlspecialchars($unavailableDatesSummary, ENT_QUOTES, 'UTF-8') ?></strong>.</p>
+                <?php endif; ?>
+                <?php if ($hasAvailableAppointmentDates): ?>
+                    <p class="appointment-guide-text mt-2">Earliest available date: <strong><?= htmlspecialchars($firstAvailableAppointmentDateLabel, ENT_QUOTES, 'UTF-8') ?></strong>.</p>
+                <?php else: ?>
+                    <p class="appointment-guide-text mt-2 text-danger">No appointment dates are currently available based on the saved appointment settings.</p>
+                <?php endif; ?>
             </div>
 
             <form class="page-form" method="POST" action="<?= htmlspecialchars(appUrl('/PhpFiles/Resident-End/submitAppointment.php'), ENT_QUOTES, 'UTF-8') ?>">
@@ -240,6 +273,34 @@ $maxAppointmentDate = date('Y-12-31');
 
                         <h2 class="section-title text-center text-dark">Appointment Details</h2>
 
+                        <div class="form-row">
+                            <div class="full-width">
+                                <label class="top-label">Barangay Council Member <span class="required-asterisk">*</span></label>
+                                <select
+                                    class="form-select"
+                                    name="official_user_id"
+                                    id="appointmentCouncilMember"
+                                    required
+                                    <?php echo $hasCouncilMemberOptions ? '' : 'disabled'; ?>
+                                >
+                                    <option value="">Select council member</option>
+                                    <?php foreach ($councilMemberOptions as $member): ?>
+                                        <option
+                                            value="<?php echo htmlspecialchars((string)($member['user_id'] ?? ''), ENT_QUOTES, 'UTF-8'); ?>"
+                                            <?php echo $formValues['official_user_id'] === (string)($member['user_id'] ?? '') ? 'selected' : ''; ?>
+                                        >
+                                            <?php echo htmlspecialchars((string)($member['option_label'] ?? $member['full_name'] ?? ''), ENT_QUOTES, 'UTF-8'); ?>
+                                        </option>
+                                    <?php endforeach; ?>
+                                </select>
+                                <?php if ($hasCouncilMemberOptions): ?>
+                                    <div class="text-muted small mt-1">Appointments are routed to currently serving barangay council members only.</div>
+                                <?php else: ?>
+                                    <div class="text-danger small mt-1">No active barangay council members are currently available for appointments. Please contact the barangay office.</div>
+                                <?php endif; ?>
+                            </div>
+                        </div>
+
                         <div class="form-row two-col-row">
                             <div>
                                 <label class="top-label">Subject of Appointment <span class="required-asterisk">*</span></label>
@@ -268,12 +329,19 @@ $maxAppointmentDate = date('Y-12-31');
                         <div class="form-row two-col-row">
                             <div>
                                 <label class="top-label">Date of Appointment <span class="required-asterisk">*</span></label>
-                                <input type="date" class="form-control" id="appointmentDate" name="appointment_date" min="<?php echo htmlspecialchars($minAppointmentDate, ENT_QUOTES, 'UTF-8'); ?>" max="<?php echo htmlspecialchars($maxAppointmentDate, ENT_QUOTES, 'UTF-8'); ?>" data-year-end="<?php echo htmlspecialchars($maxAppointmentDate, ENT_QUOTES, 'UTF-8'); ?>" value="<?php echo htmlspecialchars($formValues['appointment_date'], ENT_QUOTES, 'UTF-8'); ?>" required>
+                                <input type="date" class="form-control" id="appointmentDate" name="appointment_date" min="<?php echo htmlspecialchars($minAppointmentDate, ENT_QUOTES, 'UTF-8'); ?>" max="<?php echo htmlspecialchars($maxAppointmentDate, ENT_QUOTES, 'UTF-8'); ?>" data-year-end="<?php echo htmlspecialchars($maxAppointmentDate, ENT_QUOTES, 'UTF-8'); ?>" data-date-disabled-weekdays="<?php echo htmlspecialchars(implode(',', $disabledWeekdays), ENT_QUOTES, 'UTF-8'); ?>" data-date-disabled-dates="<?php echo htmlspecialchars(implode(',', $unavailableDates), ENT_QUOTES, 'UTF-8'); ?>" data-available-weekdays="<?php echo htmlspecialchars($availableWeekdayLabels, ENT_QUOTES, 'UTF-8'); ?>" data-date-modal-style="calendar" placeholder="Select date" value="<?php echo htmlspecialchars($formValues['appointment_date'], ENT_QUOTES, 'UTF-8'); ?>" required>
                                 <div id="appointmentDateError" class="text-danger small mt-1 d-none" aria-live="polite"></div>
                             </div>
                             <div>
                                 <label class="top-label">Time of Appointment <span class="required-asterisk">*</span></label>
-                                <input type="time" class="form-control" id="appointmentTime" name="appointment_time" value="<?php echo htmlspecialchars($formValues['appointment_time'], ENT_QUOTES, 'UTF-8'); ?>" required>
+                                <select class="form-select" id="appointmentTime" name="appointment_time" required>
+                                    <option value="">Select allotted time</option>
+                                    <?php foreach ($appointmentTimeSlots as $slotValue => $slotLabel): ?>
+                                        <option value="<?php echo htmlspecialchars($slotValue, ENT_QUOTES, 'UTF-8'); ?>" <?php echo $formValues['appointment_time'] === $slotValue ? 'selected' : ''; ?>>
+                                            <?php echo htmlspecialchars($slotLabel, ENT_QUOTES, 'UTF-8'); ?>
+                                        </option>
+                                    <?php endforeach; ?>
+                                </select>
                                 <div id="appointmentTimeError" class="text-danger small mt-1 d-none" aria-live="polite"></div>
                             </div>
                         </div>
@@ -290,7 +358,7 @@ $maxAppointmentDate = date('Y-12-31');
                                 <input type="checkbox" required>I hereby certify that the above information is true and correct to the best of my knowledge and belief.
                             </label>
 
-                            <button type="submit" class="submit-btn">SUBMIT</button>
+                            <button type="submit" class="submit-btn" <?php echo $hasAppointmentAvailability ? '' : 'disabled'; ?>>SUBMIT</button>
                         </div>
             </form>
         </main>
@@ -330,32 +398,58 @@ $maxAppointmentDate = date('Y-12-31');
             const appointmentDateError = document.getElementById("appointmentDateError");
             const appointmentTimeInput = document.getElementById("appointmentTime");
             const appointmentTimeError = document.getElementById("appointmentTimeError");
+            const appointmentCouncilMemberInput = document.getElementById("appointmentCouncilMember");
             const appointmentSubjectInput = document.getElementById("appointmentSubject");
             const appointmentSubjectOtherInput = document.getElementById("appointmentSubjectOther");
             const appointmentSubjectOtherError = document.getElementById("appointmentSubjectOtherError");
             const appointmentFeedbackData = document.getElementById("appointmentFeedbackData");
             const appointmentSuccessModalEl = document.getElementById("appointmentSuccessModal");
             const appointmentSuccessMessage = document.getElementById("appointmentSuccessMessage");
+            const allottedAppointmentTimes = new Set(<?= json_encode(array_keys($appointmentTimeSlots), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?>);
+            const hasConfiguredAppointmentAvailability = <?= $hasAppointmentAvailability ? 'true' : 'false' ?>;
             if (!form || !submitBtn) return;
 
             const today = new Date();
-            const todayIso = today.toISOString().split("T")[0];
             const todayDisplay = today.toLocaleDateString(undefined, {
                 year: "numeric",
                 month: "long",
                 day: "numeric",
             });
-            const currentYear = today.getFullYear();
-            const endOfYearIso = appointmentDateInput?.dataset.yearEnd || `${currentYear}-12-31`;
+            const minAllowedIso = String(appointmentDateInput?.min || "").trim();
+            const maxAllowedIso = String(appointmentDateInput?.max || "").trim();
+            const availableWeekdaysLabel = String(appointmentDateInput?.dataset.availableWeekdays || "").trim();
+            const disabledWeekdays = new Set(
+                String(appointmentDateInput?.dataset.dateDisabledWeekdays || "")
+                    .split(",")
+                    .map((value) => value.trim())
+                    .filter((value) => value !== "")
+            );
+            const disabledDates = new Set(
+                String(appointmentDateInput?.dataset.dateDisabledDates || "")
+                    .split(",")
+                    .map((value) => value.trim())
+                    .filter((value) => value !== "")
+            );
+
+            const parseIsoDate = (value) => {
+                const text = String(value || "").trim();
+                const match = text.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+                if (!match) return null;
+                return new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]));
+            };
 
             const validateAppointmentDate = () => {
                 if (!appointmentDateInput) return true;
 
                 const value = String(appointmentDateInput.value || "").trim();
-                const isTodayOrPast = value !== "" && value <= todayIso;
-                const isOutsideCurrentYear = value !== "" && value > endOfYearIso;
+                const parsedDate = parseIsoDate(value);
+                const weekday = parsedDate ? String(parsedDate.getDay()) : "";
+                const isBeforeMin = value !== "" && minAllowedIso !== "" && value < minAllowedIso;
+                const isAfterMax = value !== "" && maxAllowedIso !== "" && value > maxAllowedIso;
+                const isUnavailableDate = value !== "" && disabledDates.has(value);
+                const isUnavailableWeekday = value !== "" && weekday !== "" && disabledWeekdays.has(weekday);
 
-                if (isTodayOrPast) {
+                if (isBeforeMin) {
                     const msg = `Incorrect Input. Date must be after ${todayDisplay}`;
                     appointmentDateInput.setCustomValidity(msg);
                     if (appointmentDateError) {
@@ -365,8 +459,30 @@ $maxAppointmentDate = date('Y-12-31');
                     return false;
                 }
 
-                if (isOutsideCurrentYear) {
-                    const msg = `Incorrect Input. Date must be within ${currentYear}`;
+                if (isAfterMax) {
+                    const msg = "Incorrect Input. Date is outside the current booking window";
+                    appointmentDateInput.setCustomValidity(msg);
+                    if (appointmentDateError) {
+                        appointmentDateError.textContent = msg;
+                        appointmentDateError.classList.remove("d-none");
+                    }
+                    return false;
+                }
+
+                if (isUnavailableWeekday) {
+                    const msg = availableWeekdaysLabel
+                        ? `Incorrect Input. Appointments are only available on ${availableWeekdaysLabel}`
+                        : "Incorrect Input. The selected date is not available";
+                    appointmentDateInput.setCustomValidity(msg);
+                    if (appointmentDateError) {
+                        appointmentDateError.textContent = msg;
+                        appointmentDateError.classList.remove("d-none");
+                    }
+                    return false;
+                }
+
+                if (isUnavailableDate) {
+                    const msg = "Incorrect Input. The selected date is unavailable for appointments";
                     appointmentDateInput.setCustomValidity(msg);
                     if (appointmentDateError) {
                         appointmentDateError.textContent = msg;
@@ -389,7 +505,14 @@ $maxAppointmentDate = date('Y-12-31');
                 const value = String(appointmentDateInput.value || "").trim();
                 if (value === "") return;
 
-                if (value > endOfYearIso) {
+                const parsedDate = parseIsoDate(value);
+                const weekday = parsedDate ? String(parsedDate.getDay()) : "";
+                if (
+                    (minAllowedIso !== "" && value < minAllowedIso)
+                    || (maxAllowedIso !== "" && value > maxAllowedIso)
+                    || disabledDates.has(value)
+                    || (weekday !== "" && disabledWeekdays.has(weekday))
+                ) {
                     appointmentDateInput.value = "";
                 }
             };
@@ -399,12 +522,10 @@ $maxAppointmentDate = date('Y-12-31');
 
                 const value = String(appointmentTimeInput.value || "").trim();
                 const hasValue = value !== "";
-                const minAllowed = "09:01";
-                const maxAllowed = "16:59";
-                const isOutOfRange = hasValue && (value < minAllowed || value > maxAllowed);
+                const isInvalidSlot = hasValue && !allottedAppointmentTimes.has(value);
 
-                if (isOutOfRange) {
-                    const msg = "Incorrect Input. Time must be between 9:01 AM and 4:59 PM";
+                if (isInvalidSlot) {
+                    const msg = "Incorrect Input. Please choose one of the allotted appointment times";
                     appointmentTimeInput.setCustomValidity(msg);
                     if (appointmentTimeError) {
                         appointmentTimeError.textContent = msg;
@@ -452,11 +573,15 @@ $maxAppointmentDate = date('Y-12-31');
                 validateSubjectOther();
                 validateAppointmentDate();
                 validateAppointmentTime();
-                submitBtn.disabled = !form.checkValidity();
+                const hasCouncilMemberSelection = !appointmentCouncilMemberInput || !appointmentCouncilMemberInput.disabled;
+                const hasAppointmentWindow = minAllowedIso !== "" && maxAllowedIso !== "";
+                submitBtn.disabled = !hasConfiguredAppointmentAvailability || !hasCouncilMemberSelection || !hasAppointmentWindow || !form.checkValidity();
             };
 
             form.addEventListener("input", updateState);
             form.addEventListener("change", updateState);
+            appointmentCouncilMemberInput?.addEventListener("input", updateState);
+            appointmentCouncilMemberInput?.addEventListener("change", updateState);
             appointmentDateInput?.addEventListener("input", updateState);
             appointmentDateInput?.addEventListener("change", () => {
                 enforceCurrentYearDate();

@@ -29,6 +29,11 @@ if ($officialTransitionTool === '' || in_array($officialTransitionTool, ['tracke
     $officialTransitionTool = 'current_term';
 }
 
+$appointmentTool = strtolower(trim((string)($_GET['tool'] ?? 'tracker')));
+if (!in_array($appointmentTool, ['tracker', 'settings'], true)) {
+    $appointmentTool = 'tracker';
+}
+
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
@@ -66,6 +71,8 @@ if (!function_exists('appUrl')) {
 $isResidentMgmtActive = in_array($current, $residentMgmtPages);
 $isHouseholdProfilingActive = in_array($current, $householdProfilingPages);
 $isAppointmentActive = in_array($current, $appointmentPages);
+$isAppointmentTrackerActive = $current === 'AppointmentTracker.php' && $appointmentTool === 'tracker';
+$isAppointmentSettingsActive = $current === 'AppointmentTracker.php' && $appointmentTool === 'settings';
 $isFinanceActive = in_array($current, $financePages);
 $isBlotterActive = in_array($current, $blotterPages);
 $isComplaintActive = in_array($current, $complaintPages);
@@ -527,12 +534,29 @@ if (!empty($_SESSION['user_id']) && isset($conn) && $conn instanceof mysqli) {
 
       <?php if ($sbCan('appointments')): ?>
       <li class="mb-1 mt-2 text-muted small fw-semibold px-2">Office of the Barangay</li>
-      <li class="mb-2">
-        <a href="<?= htmlspecialchars(appUrl('Admin-End/Appointments/AppointmentTracker.php')) ?>"
-           class="btn btn-toggle d-flex align-items-center gap-2 rounded <?= $isAppointmentActive ? 'active' : '' ?>"
-           style="<?= $isAppointmentActive ? 'outline: none; box-shadow: none;' : '' ?>">
+      <li class="mb-1">
+        <button class="btn btn-toggle d-flex align-items-center gap-2 rounded <?= $isAppointmentActive ? '' : 'collapsed' ?>"
+                data-bs-toggle="collapse"
+                data-bs-target="#appointments-collapse"
+                aria-expanded="<?= $isAppointmentActive ? 'true' : 'false' ?>">
           <i class="fas fa-calendar-check"></i> Appointments
-        </a>
+        </button>
+        <div class="collapse <?= $isAppointmentActive ? 'show' : '' ?>" id="appointments-collapse">
+          <ul class="btn-toggle-nav list-unstyled fw-normal pb-1 small">
+            <li>
+              <a href="<?= htmlspecialchars(appUrl('Admin-End/Appointments/AppointmentTracker.php?tool=tracker')) ?>"
+                 class="link-dark rounded <?= $isAppointmentTrackerActive ? 'active' : '' ?>">
+                Tracker
+              </a>
+            </li>
+            <li>
+              <a href="<?= htmlspecialchars(appUrl('Admin-End/Appointments/AppointmentTracker.php?tool=settings')) ?>"
+                 class="link-dark rounded <?= $isAppointmentSettingsActive ? 'active' : '' ?>">
+                Settings
+              </a>
+            </li>
+          </ul>
+        </div>
       </li>
       <?php endif; ?>
 

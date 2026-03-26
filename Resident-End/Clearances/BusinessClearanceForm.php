@@ -190,16 +190,13 @@ $ownerFullAddress = htmlspecialchars(implode(', ', $ownerFullAddressParts), ENT_
                 </div>
                 <div class="form-row">
                     <div class="full-width">
-                        <div class="d-flex align-items-center justify-content-start gap-3 app-type-row">
+                        <div class="d-flex align-items-center justify-content-start gap-3 flex-wrap app-type-row">
                             <p class="if-building-note mb-0">APPLICATION TYPE:</p>
-                            <div class="check-item">
-                                <input type="radio" id="app_new" name="application_type" value="New" class="clearance-radio" required>
-                                <label class="app-type-label" for="app_new">New Application</label>
-                            </div>
-                            <div class="check-item">
-                                <input type="radio" id="app_renewal" name="application_type" value="Renewal" class="clearance-radio" required>
-                                <label class="app-type-label" for="app_renewal">Renewal</label>
-                            </div>
+                            <select id="applicationTypeSelect" name="application_type" class="form-select app-type-select" required>
+                                <option value="">Select application type</option>
+                                <option value="New">New Application</option>
+                                <option value="Renewal">Renewal</option>
+                            </select>
                         </div>
                     </div>
                 </div>

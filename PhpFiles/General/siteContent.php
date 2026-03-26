@@ -109,7 +109,7 @@ if (!function_exists('cms_content_page_label')) {
 if (!function_exists('cms_content_request_statuses')) {
     function cms_content_request_statuses(): array
     {
-        return ['draft', 'pending', 'approved', 'denied'];
+        return ['draft', 'pending', 'approved', 'denied', 'archived'];
     }
 }
 
@@ -481,6 +481,19 @@ if (!function_exists('cms_content_ensure_schema')) {
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
         ");
 
+        if (!cms_content_column_exists($conn, $requestsTable, 'archived_from_status')) {
+            $conn->query("ALTER TABLE {$requestsTable} ADD COLUMN archived_from_status VARCHAR(20) DEFAULT NULL AFTER status");
+        }
+        if (!cms_content_column_exists($conn, $requestsTable, 'archived_by_user_id')) {
+            $conn->query("ALTER TABLE {$requestsTable} ADD COLUMN archived_by_user_id VARCHAR(20) DEFAULT NULL AFTER reviewed_by_label");
+        }
+        if (!cms_content_column_exists($conn, $requestsTable, 'archived_by_label')) {
+            $conn->query("ALTER TABLE {$requestsTable} ADD COLUMN archived_by_label VARCHAR(190) DEFAULT NULL AFTER archived_by_user_id");
+        }
+        if (!cms_content_column_exists($conn, $requestsTable, 'archived_at')) {
+            $conn->query("ALTER TABLE {$requestsTable} ADD COLUMN archived_at DATETIME DEFAULT NULL AFTER reviewed_at");
+        }
+
         $defaults = cms_content_default_payloads();
         foreach ($defaults as $pageKey => $payload) {
             $pageLabel = cms_content_page_label($pageKey);
@@ -691,6 +704,35 @@ if (!function_exists('cms_content_request_is_editable_by')) {
     }
 }
 
+if (!function_exists('cms_content_request_is_archivable_by')) {
+    function cms_content_request_is_archivable_by(array $request, string $userId, bool $canReview, bool $isLiveVersion = false): bool
+    {
+        $status = strtolower(trim((string)($request['status'] ?? 'draft')));
+        if ($status === 'archived') {
+            return false;
+        }
+        if (!in_array($status, ['draft', 'pending', 'approved', 'denied'], true)) {
+            return false;
+        }
+        if ($status === 'approved' && $isLiveVersion) {
+            return false;
+        }
+
+        return $canReview || cms_content_request_is_owned_by($request, $userId);
+    }
+}
+
+if (!function_exists('cms_content_request_is_restorable_by')) {
+    function cms_content_request_is_restorable_by(array $request, string $userId, bool $canReview): bool
+    {
+        if (strtolower(trim((string)($request['status'] ?? 'draft'))) !== 'archived') {
+            return false;
+        }
+
+        return $canReview || cms_content_request_is_owned_by($request, $userId);
+    }
+}
+
 if (!function_exists('cms_content_requests')) {
     function cms_content_requests(mysqli $conn): array
     {
@@ -713,14 +755,18 @@ if (!function_exists('cms_content_requests')) {
                 'page_label' => trim((string)($row['page_label'] ?? cms_content_page_label($pageKey))),
                 'content' => cms_content_normalize_payload($pageKey, cms_content_decode_json((string)($row['content_json'] ?? ''))),
                 'status' => strtolower(trim((string)($row['status'] ?? 'draft'))),
+                'archived_from_status' => strtolower(trim((string)($row['archived_from_status'] ?? ''))),
                 'created_by_user_id' => trim((string)($row['created_by_user_id'] ?? '')),
                 'created_by_label' => trim((string)($row['created_by_label'] ?? '')),
                 'created_by_role' => trim((string)($row['created_by_role'] ?? '')),
                 'reviewed_by_user_id' => trim((string)($row['reviewed_by_user_id'] ?? '')),
                 'reviewed_by_label' => trim((string)($row['reviewed_by_label'] ?? '')),
+                'archived_by_user_id' => trim((string)($row['archived_by_user_id'] ?? '')),
+                'archived_by_label' => trim((string)($row['archived_by_label'] ?? '')),
                 'review_note' => trim((string)($row['review_note'] ?? '')),
                 'submitted_at' => trim((string)($row['submitted_at'] ?? '')),
                 'reviewed_at' => trim((string)($row['reviewed_at'] ?? '')),
+                'archived_at' => trim((string)($row['archived_at'] ?? '')),
                 'created_at' => trim((string)($row['created_at'] ?? '')),
                 'updated_at' => trim((string)($row['updated_at'] ?? '')),
             ];
@@ -751,7 +797,7 @@ if (!function_exists('cms_content_request')) {
 if (!function_exists('cms_content_request_sort_timestamp')) {
     function cms_content_request_sort_timestamp(array $request): int
     {
-        foreach (['reviewed_at', 'updated_at', 'submitted_at', 'created_at'] as $field) {
+        foreach (['archived_at', 'reviewed_at', 'updated_at', 'submitted_at', 'created_at'] as $field) {
             $value = trim((string)($request[$field] ?? ''));
             if ($value === '') {
                 continue;
@@ -787,6 +833,19 @@ if (!function_exists('cms_content_payloads_match')) {
         }
 
         return hash_equals($leftSignature, cms_content_payload_signature($pageKey, $right));
+    }
+}
+
+if (!function_exists('cms_content_append_audit_note')) {
+    function cms_content_append_audit_note(?string $existingNote, string $entry): string
+    {
+        $existing = trim((string)$existingNote);
+        $entry = trim($entry);
+        if ($entry === '') {
+            return $existing;
+        }
+
+        return $existing === '' ? $entry : ($existing . "\n" . $entry);
     }
 }
 
@@ -950,6 +1009,90 @@ if (!function_exists('cms_content_resolve_payload_images')) {
     }
 }
 
+if (!function_exists('cms_content_archive_request')) {
+    function cms_content_archive_request(mysqli $conn, string $requestId, string $archivedByUserId = '', string $archivedByLabel = ''): bool
+    {
+        cms_content_ensure_schema($conn);
+        $request = cms_content_request($conn, $requestId);
+        if (!$request) {
+            return false;
+        }
+
+        $currentStatus = strtolower(trim((string)($request['status'] ?? 'draft')));
+        if ($currentStatus === 'archived' || !in_array($currentStatus, ['draft', 'pending', 'approved', 'denied'], true)) {
+            return false;
+        }
+
+        $table = cms_content_requests_table();
+        $auditNote = cms_content_append_audit_note(
+            (string)($request['review_note'] ?? ''),
+            'Archived by ' . ($archivedByLabel !== '' ? $archivedByLabel : 'System') . ' on ' . date('F d, Y g:i A') . '.'
+        );
+        $stmt = $conn->prepare("
+            UPDATE {$table}
+            SET status = 'archived',
+                archived_from_status = ?,
+                archived_by_user_id = NULLIF(?, ''),
+                archived_by_label = NULLIF(?, ''),
+                archived_at = NOW(),
+                review_note = ?
+            WHERE request_id = ?
+            LIMIT 1
+        ");
+        if (!$stmt) {
+            return false;
+        }
+        $stmt->bind_param('sssss', $currentStatus, $archivedByUserId, $archivedByLabel, $auditNote, $requestId);
+        $ok = $stmt->execute();
+        $stmt->close();
+        return $ok;
+    }
+}
+
+if (!function_exists('cms_content_restore_request')) {
+    function cms_content_restore_request(mysqli $conn, string $requestId, string $restoredByLabel = ''): bool
+    {
+        cms_content_ensure_schema($conn);
+        $request = cms_content_request($conn, $requestId);
+        if (!$request) {
+            return false;
+        }
+
+        if (strtolower(trim((string)($request['status'] ?? 'draft'))) !== 'archived') {
+            return false;
+        }
+
+        $restoreStatus = strtolower(trim((string)($request['archived_from_status'] ?? 'draft')));
+        if ($restoreStatus === '' || $restoreStatus === 'archived' || !in_array($restoreStatus, cms_content_request_statuses(), true)) {
+            $restoreStatus = 'draft';
+        }
+
+        $table = cms_content_requests_table();
+        $auditNote = cms_content_append_audit_note(
+            (string)($request['review_note'] ?? ''),
+            'Restored from archive by ' . ($restoredByLabel !== '' ? $restoredByLabel : 'System') . ' on ' . date('F d, Y g:i A') . '.'
+        );
+        $stmt = $conn->prepare("
+            UPDATE {$table}
+            SET status = ?,
+                archived_from_status = NULL,
+                archived_by_user_id = NULL,
+                archived_by_label = NULL,
+                archived_at = NULL,
+                review_note = ?
+            WHERE request_id = ?
+            LIMIT 1
+        ");
+        if (!$stmt) {
+            return false;
+        }
+        $stmt->bind_param('sss', $restoreStatus, $auditNote, $requestId);
+        $ok = $stmt->execute();
+        $stmt->close();
+        return $ok;
+    }
+}
+
 if (!function_exists('cms_content_upsert_request')) {
     function cms_content_upsert_request(
         mysqli $conn,
@@ -987,7 +1130,8 @@ if (!function_exists('cms_content_upsert_request')) {
                 UPDATE {$table}
                 SET page_key = ?, page_label = ?, content_json = ?, status = ?, created_by_role = ?,
                     review_note = ?, reviewed_by_user_id = NULLIF(?, ''), reviewed_by_label = NULLIF(?, ''),
-                    submitted_at = ?, reviewed_at = ?
+                    submitted_at = ?, reviewed_at = ?, archived_from_status = NULL,
+                    archived_by_user_id = NULL, archived_by_label = NULL, archived_at = NULL
                 WHERE request_id = ?
                 LIMIT 1
             ");

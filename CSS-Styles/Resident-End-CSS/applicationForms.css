@@ -356,6 +356,11 @@ body {
     gap: 12px;
 }
 
+.app-type-select {
+    width: min(100%, 320px);
+    min-width: 220px;
+}
+
 .clearance-radio {
     width: 18px;
     height: 18px;

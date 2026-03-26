@@ -110,6 +110,7 @@ $reviewTimestampSelect = isset($appointmentColumns['review_timestamp'])
 $remarksSelect = isset($appointmentColumns['appointment_remarks'])
     ? 'a.appointment_remarks'
     : 'NULL';
+$hasAssignedOfficial = isset($appointmentColumns['user_id_official_assigned']);
 $residentNotesSelect = isset($appointmentColumns['resident_notes'])
     ? 'a.resident_notes'
     : 'NULL';
@@ -119,6 +120,24 @@ $statusJoin = rat_table_exists($conn, 'statuslookuptbl')
 $statusSelect = rat_table_exists($conn, 'statuslookuptbl')
     ? "COALESCE(s.status_name, 'Pending') AS status_name"
     : "'Pending' AS status_name";
+$officialJoin = '';
+$officialNameSelect = "'-' AS official_name";
+if ($hasAssignedOfficial && rat_table_exists($conn, 'officialinformationtbl')) {
+    $officialJoin = "
+        LEFT JOIN officialinformationtbl oi
+            ON a.user_id_official_assigned COLLATE utf8mb4_general_ci = oi.user_id COLLATE utf8mb4_general_ci
+    ";
+    $officialNameSelect = "TRIM(CONCAT_WS(' ', oi.firstname, oi.middlename, oi.lastname, oi.suffix)) AS official_name";
+
+    if (rat_table_exists($conn, 'barangaycounciltbl')) {
+        $officialJoin .= "
+            LEFT JOIN barangaycounciltbl bc
+                ON bc.current_official_id = oi.official_id
+               AND bc.is_active = 1
+        ";
+        $officialNameSelect = "TRIM(CONCAT_WS(' - ', CONCAT_WS(' ', oi.firstname, oi.middlename, oi.lastname, oi.suffix), NULLIF(bc.seat_name, ''))) AS official_name";
+    }
+}
 $requestTimestampSelect = isset($appointmentColumns['request_timestamp']) ? 'a.request_timestamp' : 'NULL';
 $orderByTimestamp = isset($appointmentColumns['request_timestamp']) ? 'a.request_timestamp DESC, ' : '';
 
@@ -142,9 +161,10 @@ $sql = "
         {$remarksSelect} AS appointment_remarks,
         {$residentNotesSelect} AS resident_notes,
         {$statusSelect},
-        '-' AS official_name
+        {$officialNameSelect}
     FROM appointmentstbl a
     {$statusJoin}
+    {$officialJoin}
     WHERE {$residentUserColumn} = ?
     ORDER BY {$orderByTimestamp} a.appointment_id DESC
 ";

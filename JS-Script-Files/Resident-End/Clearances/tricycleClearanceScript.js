@@ -1,8 +1,7 @@
 document.addEventListener("DOMContentLoaded", () => {
     const form = document.querySelector("form");
     const submitBtn = form?.querySelector(".submit-btn");
-    const appNew = document.getElementById("app_new");
-    const appRenewal = document.getElementById("app_renewal");
+    const applicationTypeSelect = document.getElementById("applicationTypeSelect");
     const requestPurpose = document.getElementById("tricycleRequestPurpose");
     const documentUploadSection = document.getElementById("documentUploadSection");
     const bodyNumberInput = document.getElementById("bodyNumber");
@@ -12,6 +11,9 @@ document.addEventListener("DOMContentLoaded", () => {
     const crNumberInput = document.getElementById("crNumber");
     const plateNumberInput = document.getElementById("plateNumber");
     const franchiseeSelect = document.getElementById("franchiseeSelect");
+    const vehicleMakeSelect = document.getElementById("vehicleMakeSelect");
+    const vehicleMakeOtherRow = document.getElementById("vehicleMakeOtherRow");
+    const vehicleMakeOtherInput = document.getElementById("vehicleMakeOther");
     const todaPodaLocationInput = document.getElementById("todaPodaLocation");
     const todaPodaLocationValueInput = document.getElementById("todaPodaLocationValue");
     const otherTodaPodaLocationRow = document.getElementById("otherTodaPodaLocationRow");
@@ -166,7 +168,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     const updateRequestPurpose = () => {
         if (!requestPurpose) return;
-        requestPurpose.value = appRenewal?.checked === true
+        requestPurpose.value = String(applicationTypeSelect?.value || "").trim() === "Renewal"
             ? "Tricycle Permit - Renewal"
             : "Tricycle Permit - New Application";
     };
@@ -218,12 +220,14 @@ document.addEventListener("DOMContentLoaded", () => {
     };
 
     const updateState = () => {
-        const isNew = appNew?.checked === true;
-        const isRenewal = appRenewal?.checked === true;
+        const applicationType = String(applicationTypeSelect?.value || "").trim();
+        const isNew = applicationType === "New";
+        const isRenewal = applicationType === "Renewal";
         const docsEnabled = isNew || isRenewal;
         const isVehicleNamedToOwner = vehicleNamedYes?.checked === true;
         const needsDeedOfSale = docsEnabled && vehicleNamedNo?.checked === true;
         const isOtherFranchisee = normalizeFranchisee(franchiseeSelect?.value) === "OTHERS";
+        const isOtherVehicleMake = String(vehicleMakeSelect?.value || "").trim() === "Others";
 
         updateRequestPurpose();
         updateTodaPodaLocation();
@@ -232,7 +236,25 @@ document.addEventListener("DOMContentLoaded", () => {
             documentUploadSection.classList.toggle("d-none", !docsEnabled);
         }
 
+        if (vehicleMakeOtherRow) {
+            vehicleMakeOtherRow.classList.toggle("d-none", !isOtherVehicleMake);
+        }
+        if (vehicleMakeOtherInput) {
+            const shouldFocusVehicleMakeOther = isOtherVehicleMake && vehicleMakeOtherInput.dataset.active !== "true";
+            vehicleMakeOtherInput.disabled = !isOtherVehicleMake;
+            setRequired(vehicleMakeOtherInput, isOtherVehicleMake);
+            vehicleMakeOtherInput.dataset.active = isOtherVehicleMake ? "true" : "false";
+            if (!isOtherVehicleMake) {
+                vehicleMakeOtherInput.value = "";
+            } else if (shouldFocusVehicleMakeOther) {
+                window.requestAnimationFrame(() => {
+                    vehicleMakeOtherInput.focus();
+                });
+            }
+        }
+
         setRequired(franchiseeSelect, true);
+        setRequired(vehicleMakeSelect, true);
         setRequired(otherTodaPodaLocationInput, isOtherFranchisee);
         setRequired(orVehicleFile, docsEnabled);
         setRequired(crVehicleFile, docsEnabled);
@@ -310,11 +332,11 @@ document.addEventListener("DOMContentLoaded", () => {
         pattern: "Location is required when franchisee is Others."
     });
 
-    appNew?.addEventListener("change", updateState);
-    appRenewal?.addEventListener("change", updateState);
+    applicationTypeSelect?.addEventListener("change", updateState);
     vehicleNamedYes?.addEventListener("change", updateState);
     vehicleNamedNo?.addEventListener("change", updateState);
     franchiseeSelect?.addEventListener("change", updateState);
+    vehicleMakeSelect?.addEventListener("change", updateState);
     otherTodaPodaLocationInput?.addEventListener("input", () => {
         if (todaPodaLocationValueInput) {
             todaPodaLocationValueInput.value = String(otherTodaPodaLocationInput.value || "").trim();

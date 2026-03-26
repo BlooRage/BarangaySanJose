@@ -1004,6 +1004,7 @@ function rp_report_customize_config(string $module): array {
         'appointments' => [
             'sections' => [
                 'summary' => 'Overall Summary',
+                'charts' => 'Graphs',
                 'status' => 'Status Breakdown',
                 'purpose' => 'Purpose Breakdown',
                 'area' => 'Requests by Area',
@@ -1051,6 +1052,7 @@ function rp_report_customize_config(string $module): array {
         'blotter' => [
             'sections' => [
                 'summary' => 'Overall Summary',
+                'charts' => 'Graphs',
                 'type' => 'Complaint Type Breakdown',
                 'status' => 'Status Breakdown',
                 'area' => 'Cases by Area',
@@ -1098,6 +1100,7 @@ function rp_report_customize_config(string $module): array {
         'complaints' => [
             'sections' => [
                 'summary' => 'Overall Summary',
+                'charts' => 'Graphs',
                 'type' => 'Complaint Type Breakdown',
                 'origin' => 'Origin',
                 'kind' => 'Subject Kind',
@@ -1921,6 +1924,7 @@ $blot = [];
 if ($module === 'blotter' && rp_table_exists($conn, 'casereportstbl')) {
     $df = $conn->real_escape_string($dateFrom);
     $dt = $conn->real_escape_string($dateTo);
+    $caseDateExpr = rp_first_existing_datetime_expr($conn, 'casereportstbl', 'c', ['report_timestamp', 'created_at']);
     $caseResidentParts = rp_column_exists($conn, 'casereportstbl', 'resident_user_id')
         ? rp_user_resident_parts($conn, 'c.resident_user_id', 'blt')
         : ['joins' => '', 'sector_expr' => 'NULL', 'area_expr' => 'NULL'];
@@ -1928,7 +1932,7 @@ if ($module === 'blotter' && rp_table_exists($conn, 'casereportstbl')) {
     $caseAreaExpr = $caseResidentParts['area_expr'];
     $caseSectorExpr = $caseResidentParts['sector_expr'];
     $complaintTypeExpr = "COALESCE(NULLIF(TRIM(c.complaint_type), ''), 'Not specified')";
-    $blotterFilterClauses = ["DATE(c.created_at) BETWEEN '{$df}' AND '{$dt}'"];
+    $blotterFilterClauses = ["DATE({$caseDateExpr}) BETWEEN '{$df}' AND '{$dt}'"];
     if ($reportFilterTypes !== []) {
         $blotterFilterClauses[] = "{$complaintTypeExpr} IN (" . rp_sql_in_list($conn, $reportFilterTypes) . ")";
     }
@@ -1943,7 +1947,7 @@ if ($module === 'blotter' && rp_table_exists($conn, 'casereportstbl')) {
         SELECT {$complaintTypeExpr} AS value
         FROM casereportstbl c
         " . ($caseJoin !== '' ? "\n        {$caseJoin}" : '') . "
-        WHERE DATE(c.created_at) BETWEEN '{$df}' AND '{$dt}'
+        WHERE DATE({$caseDateExpr}) BETWEEN '{$df}' AND '{$dt}'
         GROUP BY {$complaintTypeExpr}
         ORDER BY {$complaintTypeExpr} ASC
     "), 'value');
@@ -1952,7 +1956,7 @@ if ($module === 'blotter' && rp_table_exists($conn, 'casereportstbl')) {
             SELECT {$caseAreaExpr} AS value
             FROM casereportstbl c
             {$caseJoin}
-            WHERE DATE(c.created_at) BETWEEN '{$df}' AND '{$dt}'
+            WHERE DATE({$caseDateExpr}) BETWEEN '{$df}' AND '{$dt}'
               AND {$caseAreaExpr} IS NOT NULL
               AND {$caseAreaExpr} <> ''
             GROUP BY {$caseAreaExpr}
@@ -1964,7 +1968,7 @@ if ($module === 'blotter' && rp_table_exists($conn, 'casereportstbl')) {
             SELECT {$caseSectorExpr} AS sector_membership
             FROM casereportstbl c
             {$caseJoin}
-            WHERE DATE(c.created_at) BETWEEN '{$df}' AND '{$dt}'
+            WHERE DATE({$caseDateExpr}) BETWEEN '{$df}' AND '{$dt}'
               AND {$caseSectorExpr} IS NOT NULL
               AND {$caseSectorExpr} <> ''
         "));
@@ -2027,10 +2031,10 @@ if ($module === 'blotter' && rp_table_exists($conn, 'casereportstbl')) {
     }
 
     $blot['trend'] = rp_safe_query($conn, "
-        SELECT DATE_FORMAT(c.created_at,'%Y-%m') AS month, COUNT(*) AS total
+        SELECT DATE_FORMAT({$caseDateExpr},'%Y-%m') AS month, COUNT(*) AS total
         FROM casereportstbl c
         " . ($caseJoin !== '' ? "\n        {$caseJoin}" : '') . "
-        WHERE c.created_at >= DATE_SUB(NOW(), INTERVAL 12 MONTH)" . ($reportFilterTypes !== [] ? " AND {$complaintTypeExpr} IN (" . rp_sql_in_list($conn, $reportFilterTypes) . ")" : '') . ($reportFilterAreas !== [] && $caseAreaExpr !== 'NULL' ? " AND {$caseAreaExpr} IN (" . rp_sql_in_list($conn, $reportFilterAreas) . ")" : '') . ($reportFilterSectors !== [] && $caseSectorExpr !== 'NULL' ? " AND " . rp_csv_contains_any_expr($conn, $caseSectorExpr, $reportFilterSectors) : '') . "
+        WHERE {$caseDateExpr} >= DATE_SUB(NOW(), INTERVAL 12 MONTH)" . ($reportFilterTypes !== [] ? " AND {$complaintTypeExpr} IN (" . rp_sql_in_list($conn, $reportFilterTypes) . ")" : '') . ($reportFilterAreas !== [] && $caseAreaExpr !== 'NULL' ? " AND {$caseAreaExpr} IN (" . rp_sql_in_list($conn, $reportFilterAreas) . ")" : '') . ($reportFilterSectors !== [] && $caseSectorExpr !== 'NULL' ? " AND " . rp_csv_contains_any_expr($conn, $caseSectorExpr, $reportFilterSectors) : '') . "
         GROUP BY month ORDER BY month ASC
     ");
 }
@@ -2194,7 +2198,8 @@ $moduleLabels = [
 ];
 $currentLabel = $moduleLabels[$module]['label'];
 $isPrintView  = ($_GET['format'] ?? '') === 'print';
-$shouldAutoPrint = $isPrintView && (($_GET['autoprint'] ?? '1') !== '0');
+$isPdfDownloadView = $isPrintView && strtolower(trim((string)($_GET['download'] ?? ''))) === 'pdf';
+$shouldAutoPrint = $isPrintView && !$isPdfDownloadView && (($_GET['autoprint'] ?? '1') !== '0');
 $reportLeftLogo = '../../Images/San_Jose_LOGO.jpg';
 $reportRightLogo = '../../Images/Montalban_Logo.png';
 $reportChartTypeOptions = [
@@ -2321,7 +2326,13 @@ $reportLayoutStateUrl = $baseUrl . '?' . http_build_query($reportLayoutStateQuer
   <link rel="stylesheet" href="../../CSS-Styles/Admin-End-CSS/ResidentMasterlistStyle.css">
   <?php endif; ?>
   <style>
-    @page { size: letter portrait; margin: 1in; }
+    :root {
+      --rp-letter-width: 8.5in;
+      --rp-letter-height: 11in;
+      --rp-page-margin: 0.5in;
+      --rp-screen-page-gap: 18px;
+    }
+    @page { size: letter portrait; margin: 0; }
     * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
     /* ── Page shell ─────────────────────────────────────────────────────────── */
     .reports-shell { max-width: 1200px; margin: 0 auto; }
@@ -2468,14 +2479,56 @@ $reportLayoutStateUrl = $baseUrl . '?' . http_build_query($reportLayoutStateQuer
       border: 1.5px solid #2f2f2f;
       border-radius: 0;
       box-sizing: border-box;
-      max-width: 8.27in;
-      min-height: 10.75in;
+      width: min(100%, var(--rp-letter-width));
+      max-width: var(--rp-letter-width);
+      min-height: var(--rp-letter-height);
       margin: 0 auto;
       padding: 34px 36px 40px;
       box-shadow: 0 14px 28px rgba(15, 23, 42, 0.08);
       font-size: 13px;
       line-height: 1.45;
       color: #1a1a1a;
+    }
+    .rp-doc--source { display: none !important; }
+    .rp-print-pages {
+      display: grid;
+      gap: var(--rp-screen-page-gap);
+      justify-content: center;
+    }
+    .rp-print-page {
+      width: var(--rp-letter-width);
+      min-height: var(--rp-letter-height);
+      box-sizing: border-box;
+      padding: var(--rp-page-margin);
+      background: #fff;
+      border: 1.5px solid #2f2f2f;
+      box-shadow: 0 14px 28px rgba(15, 23, 42, 0.08);
+      overflow: hidden;
+    }
+    .rp-print-page-content {
+      display: flex;
+      flex-direction: column;
+      gap: 14pt;
+    }
+    .rp-pagination-stage {
+      position: fixed;
+      left: -200vw;
+      top: 0;
+      visibility: hidden;
+      pointer-events: none;
+      width: var(--rp-letter-width);
+      z-index: -1;
+    }
+    .rp-page-block {
+      width: 100%;
+      box-sizing: border-box;
+      min-width: 0;
+    }
+    .rp-page-block--scaled {
+      overflow: hidden;
+    }
+    .rp-page-block-scale {
+      transform-origin: top left;
     }
 
     /* Header */
@@ -2730,8 +2783,17 @@ $reportLayoutStateUrl = $baseUrl . '?' . http_build_query($reportLayoutStateQuer
       .rp-letterhead-barangay { font-size: 20pt !important; margin-top: 4pt !important; }
       .rp-letterhead-line { margin-top: 6pt !important; }
       .rp-doc-header .rp-report-title { font-size: 11pt !important; }
-      .rp-section { margin-top: 14pt !important; page-break-inside: avoid; }
-      .rp-section-label { font-size: 9pt !important; padding: 3pt 8pt !important; }
+      .rp-section {
+        margin-top: 14pt !important;
+        page-break-inside: auto !important;
+        break-inside: auto !important;
+      }
+      .rp-section-label {
+        font-size: 9pt !important;
+        padding: 3pt 8pt !important;
+        page-break-after: avoid !important;
+        break-after: avoid-page !important;
+      }
       .rp-summary td, .rp-table th, .rp-table td { font-size: 9pt !important; padding: 4pt 6pt !important; }
       .rp-table th { white-space: normal !important; word-break: break-word !important; vertical-align: bottom !important; }
       .rp-table--issuance-breakdown { table-layout: fixed !important; width: 100% !important; }
@@ -2739,18 +2801,63 @@ $reportLayoutStateUrl = $baseUrl . '?' . http_build_query($reportLayoutStateQuer
       .rp-table--issuance-breakdown td { font-size: 6.5pt !important; padding: 2pt 2pt !important; white-space: normal !important; word-break: break-word !important; overflow-wrap: break-word !important; vertical-align: top !important; }
       .rp-breakdown-document-type { width: 20% !important; }
       .rp-table tr { page-break-inside: avoid; }
-      .rp-two-col, .rp-three-col, .rp-chart-grid { display: grid; grid-template-columns: 1fr; gap: 14pt; }
+      .rp-two-col, .rp-three-col, .rp-chart-grid {
+        display: block !important;
+      }
+      .rp-two-col > *,
+      .rp-three-col > *,
+      .rp-chart-grid > * {
+        margin-top: 14pt !important;
+      }
+      .rp-two-col > *:first-child,
+      .rp-three-col > *:first-child,
+      .rp-chart-grid > *:first-child {
+        margin-top: 0 !important;
+      }
+      .rp-two-col > div,
+      .rp-three-col > div,
+      .rp-chart-card {
+        page-break-inside: avoid !important;
+        break-inside: avoid-page !important;
+      }
       .rp-chart-card { page-break-inside: avoid; break-inside: avoid; }
       .rp-chart-wrap { min-height: 180pt; }
       .rp-footer { margin-top: 24pt !important; }
       .rp-sig-grid { gap: 32pt !important; }
+      .rp-print-pages {
+        display: block !important;
+        gap: 0 !important;
+      }
+      .rp-print-page {
+        width: auto !important;
+        min-height: auto !important;
+        padding: var(--rp-page-margin) !important;
+        border: none !important;
+        box-shadow: none !important;
+        page-break-after: always !important;
+        break-after: page !important;
+      }
+      .rp-print-page:last-child {
+        page-break-after: auto !important;
+        break-after: auto !important;
+      }
+      .rp-pagination-stage,
+      #reportPdfExportStatus {
+        display: none !important;
+      }
     }
 
     /* Standalone print view — applied directly (no @media wrapper needed) */
     <?php if ($isPrintView): ?>
     html, body { margin: 0; padding: 0; background: #fff; font-family: Arial, Helvetica, sans-serif; }
-    .rp-doc { border: none !important; border-radius: 0 !important; padding: 0 !important;
-              box-shadow: none !important; max-width: 100% !important; font-size: 10pt !important; min-height: auto !important; }
+    @media screen {
+      html, body { background: #dfe4ea; }
+      body { padding: 18px 0 28px; }
+      .rp-print-page {
+        border-color: #b8c2cc !important;
+        box-shadow: 0 18px 34px rgba(15, 23, 42, 0.14) !important;
+      }
+    }
     .rp-doc-header { padding-bottom: 0 !important; margin-bottom: 14pt !important; }
     .rp-letterhead { grid-template-columns: 74pt 1fr 74pt !important; gap: 8pt !important; }
     .rp-letterhead-logo { width: 64pt !important; height: 64pt !important; }
@@ -2759,8 +2866,17 @@ $reportLayoutStateUrl = $baseUrl . '?' . http_build_query($reportLayoutStateQuer
     .rp-letterhead-barangay { font-size: 20pt !important; margin-top: 4pt !important; }
     .rp-letterhead-line { margin-top: 6pt !important; }
     .rp-doc-header .rp-report-title { font-size: 11pt !important; }
-    .rp-section { margin-top: 14pt !important; page-break-inside: avoid; }
-    .rp-section-label { font-size: 9pt !important; padding: 3pt 8pt !important; }
+    .rp-section {
+      margin-top: 14pt !important;
+      page-break-inside: auto !important;
+      break-inside: auto !important;
+    }
+    .rp-section-label {
+      font-size: 9pt !important;
+      padding: 3pt 8pt !important;
+      page-break-after: avoid !important;
+      break-after: avoid-page !important;
+    }
     .rp-summary td, .rp-table th, .rp-table td { font-size: 9pt !important; padding: 4pt 6pt !important; }
     .rp-table th { white-space: normal !important; word-break: break-word !important; vertical-align: bottom !important; }
     .rp-table--issuance-breakdown { table-layout: fixed !important; width: 100% !important; }
@@ -2768,7 +2884,25 @@ $reportLayoutStateUrl = $baseUrl . '?' . http_build_query($reportLayoutStateQuer
     .rp-table--issuance-breakdown td { font-size: 6.5pt !important; padding: 2pt 2pt !important; white-space: normal !important; word-break: break-word !important; overflow-wrap: break-word !important; vertical-align: top !important; }
     .rp-breakdown-document-type { width: 20% !important; }
     .rp-table tr { page-break-inside: avoid; }
-    .rp-two-col, .rp-three-col, .rp-chart-grid { display: grid; grid-template-columns: 1fr; gap: 14pt; }
+    .rp-two-col, .rp-three-col, .rp-chart-grid {
+      display: block !important;
+    }
+    .rp-two-col > *,
+    .rp-three-col > *,
+    .rp-chart-grid > * {
+      margin-top: 14pt !important;
+    }
+    .rp-two-col > *:first-child,
+    .rp-three-col > *:first-child,
+    .rp-chart-grid > *:first-child {
+      margin-top: 0 !important;
+    }
+    .rp-two-col > div,
+    .rp-three-col > div,
+    .rp-chart-card {
+      page-break-inside: avoid !important;
+      break-inside: avoid-page !important;
+    }
     .rp-chart-card { page-break-inside: avoid; break-inside: avoid; }
     .rp-chart-wrap { min-height: 180pt; }
     .rp-footer { margin-top: 24pt !important; }
@@ -2777,7 +2911,7 @@ $reportLayoutStateUrl = $baseUrl . '?' . http_build_query($reportLayoutStateQuer
   </style>
 </head>
 <?php if ($isPrintView): ?>
-<body<?= $shouldAutoPrint ? ' onload="window.setTimeout(function(){ window.print(); }, 350);"' : '' ?>>
+<body>
 <?php else: /* ── Full admin layout ── */ ?>
 <body>
 <div class="d-flex flex-column flex-md-row" style="min-height: 100vh;">
@@ -2787,7 +2921,7 @@ $reportLayoutStateUrl = $baseUrl . '?' . http_build_query($reportLayoutStateQuer
     <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-4">
       <h2 class="mb-0" style="font-family: 'Charis SIL Bold'; color: #DE710C;">Reports</h2>
       <div class="d-flex gap-2 d-print-none">
-        <button class="btn btn-outline-secondary btn-sm" onclick="window.print()">
+        <button class="btn btn-outline-secondary btn-sm" onclick="openReportPrintView()">
           <i class="fas fa-print me-1"></i>Print
         </button>
         <button class="btn btn-danger btn-sm" id="btnDownloadPdf" onclick="downloadPdf()">
@@ -3095,6 +3229,9 @@ $reportLayoutStateUrl = $baseUrl . '?' . http_build_query($reportLayoutStateQuer
 $shouldLoadIssuanceCharts = false;
 $shouldLoadFinancialCharts = false;
 $shouldLoadResidentCharts = false;
+$shouldLoadAppointmentCharts = false;
+$shouldLoadBlotterCharts = false;
+$shouldLoadComplaintCharts = false;
 $financialTypeRevenueChartData = [];
 $financialAreaRevenueChartData = [];
 $residentGenderChartData = [];
@@ -3102,6 +3239,22 @@ $residentAgeChartData = [];
 $residentAreaChartData = [];
 $residentSectorChartData = [];
 $residentMonthlyChartData = [];
+$appointmentStatusChartData = [];
+$appointmentPurposeChartData = [];
+$appointmentAreaChartData = [];
+$appointmentSectorChartData = [];
+$appointmentTrendChartData = [];
+$blotterTypeChartData = [];
+$blotterStatusChartData = [];
+$blotterAreaChartData = [];
+$blotterSectorChartData = [];
+$blotterTrendChartData = [];
+$complaintTypeChartData = [];
+$complaintOriginChartData = [];
+$complaintKindChartData = [];
+$complaintAreaChartData = [];
+$complaintSectorChartData = [];
+$complaintTrendChartData = [];
 if ($issuanceModuleConfig !== null):
   $issuanceSummary = $issuanceReport['summary'] ?? [];
   $issuanceRows = $issuanceReport['rows'] ?? [];
@@ -3604,20 +3757,25 @@ if ($issuanceModuleConfig !== null):
 // ══════════════════════════════════════════════════════════════════════════════
 elseif ($module === 'financial'):
   $kpi = $fin['kpi'] ?? [];
+  $financialVisibleSections = array_values(array_filter(
+    $visibleReportSections,
+    static function (string $sectionKey) use ($fin): bool {
+      return !($sectionKey === 'or_log' && empty($fin['or_log']));
+    }
+  ));
+  $showFinancialSection = static fn(string $key): bool => in_array($key, $financialVisibleSections, true);
   $financialTypeRevenueChartData = array_values(array_filter($fin['by_type'] ?? [], static function (array $row): bool {
     return (float)($row['total'] ?? 0) > 0;
   }));
-  $financialAreaRevenueChartData = array_values(array_filter($fin['by_area'] ?? [], static function (array $row): bool {
-    return (float)($row['amount'] ?? 0) > 0;
-  }));
-  $shouldLoadFinancialCharts = $showReportSection('charts') && (
+  $financialAreaRevenueChartData = array_values($fin['by_area'] ?? []);
+  $shouldLoadFinancialCharts = $showFinancialSection('charts') && (
     $financialTypeRevenueChartData !== []
     || $financialAreaRevenueChartData !== []
   );
-  $financialSectionLabel = static fn(string $key): string => rp_section_heading($reportCustomizeConfig['sections'] ?? [], $visibleReportSections, $key);
+  $financialSectionLabel = static fn(string $key): string => rp_section_heading($reportCustomizeConfig['sections'] ?? [], $financialVisibleSections, $key);
 ?>
         <!-- I. Summary -->
-        <?php if ($showReportSection('summary')): ?>
+        <?php if ($showFinancialSection('summary')): ?>
         <div class="rp-section">
           <div class="rp-section-label"><?= htmlspecialchars($financialSectionLabel('summary')) ?></div>
           <table class="rp-summary">
@@ -3632,7 +3790,7 @@ elseif ($module === 'financial'):
         </div>
         <?php endif; ?>
 
-        <?php if ($showReportSection('charts')): ?>
+        <?php if ($showFinancialSection('charts')): ?>
         <div class="rp-section">
           <div class="rp-section-label"><?= htmlspecialchars($financialSectionLabel('charts')) ?></div>
           <?php if ($financialTypeRevenueChartData === [] && $financialAreaRevenueChartData === []): ?>
@@ -3659,7 +3817,7 @@ elseif ($module === 'financial'):
         <?php endif; ?>
 
         <!-- II. By Document Type -->
-        <?php if ($showReportSection('type')): ?>
+        <?php if ($showFinancialSection('type')): ?>
         <div class="rp-section">
           <div class="rp-section-label"><?= htmlspecialchars($financialSectionLabel('type')) ?></div>
           <?php if (empty($fin['by_type'])): ?>
@@ -3696,7 +3854,7 @@ elseif ($module === 'financial'):
         <?php endif; ?>
 
         <!-- III. Payment Method Breakdown -->
-        <?php if ($showReportSection('payment_method')): ?>
+        <?php if ($showFinancialSection('payment_method')): ?>
         <div class="rp-section">
           <div class="rp-section-label"><?= htmlspecialchars($financialSectionLabel('payment_method')) ?></div>
           <?php if (empty($fin['by_method'])): ?>
@@ -3730,9 +3888,9 @@ elseif ($module === 'financial'):
         <?php endif; ?>
 
         <!-- IV. Area + Department Breakdown -->
-        <?php if ($showReportSection('area') || $showReportSection('sector')): ?>
+        <?php if ($showFinancialSection('area') || $showFinancialSection('sector')): ?>
         <div class="rp-two-col" style="margin-top:22px;">
-          <?php if ($showReportSection('area')): ?>
+          <?php if ($showFinancialSection('area')): ?>
           <div>
             <div class="rp-section-label"><?= htmlspecialchars($financialSectionLabel('area')) ?></div>
             <?php if (empty($fin['by_area'])): ?>
@@ -3755,7 +3913,7 @@ elseif ($module === 'financial'):
             <?php endif; ?>
           </div>
           <?php endif; ?>
-          <?php if ($showReportSection('sector')): ?>
+          <?php if ($showFinancialSection('sector')): ?>
           <div>
             <div class="rp-section-label"><?= htmlspecialchars($financialSectionLabel('sector')) ?></div>
             <?php if (empty($fin['by_department'])): ?>
@@ -3782,7 +3940,7 @@ elseif ($module === 'financial'):
         <?php endif; ?>
 
         <!-- VI. Daily Collection Log -->
-        <?php if ($showReportSection('daily')): ?>
+        <?php if ($showFinancialSection('daily')): ?>
         <div class="rp-section">
           <div class="rp-section-label"><?= htmlspecialchars($financialSectionLabel('daily')) ?></div>
           <?php if (empty($fin['daily_log'])): ?>
@@ -3818,12 +3976,9 @@ elseif ($module === 'financial'):
         <?php endif; ?>
 
         <!-- VII. OR Number Log -->
-        <?php if ($showReportSection('or_log')): ?>
+        <?php if ($showFinancialSection('or_log')): ?>
         <div class="rp-section">
           <div class="rp-section-label"><?= htmlspecialchars($financialSectionLabel('or_log')) ?></div>
-          <?php if (empty($fin['or_log'])): ?>
-            <p class="rp-empty">No OR records in this period.</p>
-          <?php else: ?>
           <table class="rp-table">
             <thead>
               <tr><th class="<?= htmlspecialchars(trim($reportColumnClass('identifier'))) ?>">#</th><th class="<?= htmlspecialchars(trim($reportColumnClass('identifier'))) ?>">OR Number</th><th class="<?= htmlspecialchars(trim($reportColumnClass('identifier'))) ?>">Cert. No.</th><th class="<?= htmlspecialchars(trim($reportColumnClass('resident'))) ?>">Resident</th><th class="<?= htmlspecialchars(trim($reportColumnClass('type'))) ?>">Document Type</th><th class="<?= htmlspecialchars(trim($reportColumnClass('payment'))) ?>">Method</th><th class="text-end<?= htmlspecialchars($reportColumnClass('revenue')) ?>">Amount</th><th class="<?= htmlspecialchars(trim($reportColumnClass('date'))) ?>">Date Verified</th></tr>
@@ -3855,7 +4010,6 @@ elseif ($module === 'financial'):
               </tr>
             </tfoot>
           </table>
-          <?php endif; ?>
         </div>
         <?php endif; ?>
 
@@ -4239,11 +4393,39 @@ elseif ($module === 'residents'):
 elseif ($module === 'appointments'):
   $kpi   = $appt['kpi'] ?? [];
   $total = (int)($kpi['total'] ?? 0);
+  $appointmentSectionLabel = static fn(string $key): string => rp_section_heading($reportCustomizeConfig['sections'] ?? [], $visibleReportSections, $key);
+  $appointmentStatusChartData = array_values(array_filter($appt['by_status'] ?? [], static function (array $row): bool {
+    return (int)($row['total'] ?? 0) > 0;
+  }));
+  $appointmentPurposeChartData = array_values(array_filter($appt['by_purpose'] ?? [], static function (array $row): bool {
+    return (int)($row['total'] ?? 0) > 0;
+  }));
+  $appointmentAreaChartData = array_values(array_filter($appt['by_area'] ?? [], static function (array $row): bool {
+    return (int)($row['total'] ?? 0) > 0;
+  }));
+  $appointmentSectorChartData = array_values(array_filter($appt['by_sector'] ?? [], static function (array $row): bool {
+    return (int)($row['total'] ?? 0) > 0;
+  }));
+  $appointmentTrendChartData = array_values(array_filter(array_map(static function (array $row): array {
+    $monthValue = (string)($row['month'] ?? '');
+    return [
+      'label' => $monthValue !== '' ? date('F Y', strtotime($monthValue . '-01')) : 'Unspecified',
+      'total' => (int)($row['total'] ?? 0),
+    ];
+  }, $appt['trend'] ?? []), static function (array $row): bool {
+    return (int)($row['total'] ?? 0) > 0;
+  }));
+  $shouldLoadAppointmentCharts = $showReportSection('charts') && (
+    $appointmentStatusChartData !== []
+    || $appointmentPurposeChartData !== []
+    || $appointmentAreaChartData !== []
+    || $appointmentSectorChartData !== []
+    || $appointmentTrendChartData !== []
+  );
 ?>
-        <!-- I. Summary -->
         <?php if ($showReportSection('summary')): ?>
         <div class="rp-section">
-          <div class="rp-section-label">I. Overall Summary</div>
+          <div class="rp-section-label"><?= htmlspecialchars($appointmentSectionLabel('summary')) ?></div>
           <table class="rp-summary">
             <tbody>
               <tr><td>Total Appointment Requests</td><td><?= number_format($total) ?></td></tr>
@@ -4256,12 +4438,68 @@ elseif ($module === 'appointments'):
         </div>
         <?php endif; ?>
 
-        <!-- II. By Status + III. By Purpose — side by side -->
+        <?php if ($showReportSection('charts')): ?>
+        <div class="rp-section">
+          <div class="rp-section-label"><?= htmlspecialchars($appointmentSectionLabel('charts')) ?></div>
+          <?php if ($appointmentStatusChartData === [] && $appointmentPurposeChartData === [] && $appointmentAreaChartData === [] && $appointmentSectorChartData === [] && $appointmentTrendChartData === []): ?>
+            <p class="rp-empty">No chart data is available for the selected filters.</p>
+          <?php else: ?>
+          <div class="rp-chart-grid">
+            <?php if ($appointmentStatusChartData !== []): ?>
+            <div class="rp-chart-card">
+              <div class="rp-subsection-title">Status Breakdown</div>
+              <div class="rp-chart-wrap">
+                <canvas id="appointmentStatusChart"></canvas>
+              </div>
+              <div class="rp-chart-note"><?= htmlspecialchars($reportChartTypeOptions[$reportChartType] ?? 'Bar Chart') ?> view of appointment request status totals.</div>
+            </div>
+            <?php endif; ?>
+            <?php if ($appointmentPurposeChartData !== []): ?>
+            <div class="rp-chart-card">
+              <div class="rp-subsection-title">Purpose Breakdown</div>
+              <div class="rp-chart-wrap">
+                <canvas id="appointmentPurposeChart"></canvas>
+              </div>
+              <div class="rp-chart-note"><?= htmlspecialchars($reportChartTypeOptions[$reportChartType] ?? 'Bar Chart') ?> view of appointment request purposes.</div>
+            </div>
+            <?php endif; ?>
+            <?php if ($appointmentAreaChartData !== []): ?>
+            <div class="rp-chart-card">
+              <div class="rp-subsection-title">Requests by Area</div>
+              <div class="rp-chart-wrap">
+                <canvas id="appointmentAreaChart"></canvas>
+              </div>
+              <div class="rp-chart-note"><?= htmlspecialchars($reportChartTypeOptions[$reportChartType] ?? 'Bar Chart') ?> view of appointment requests by area.</div>
+            </div>
+            <?php endif; ?>
+            <?php if ($appointmentSectorChartData !== []): ?>
+            <div class="rp-chart-card">
+              <div class="rp-subsection-title">Requests by Sector Membership</div>
+              <div class="rp-chart-wrap">
+                <canvas id="appointmentSectorChart"></canvas>
+              </div>
+              <div class="rp-chart-note"><?= htmlspecialchars($reportChartTypeOptions[$reportChartType] ?? 'Bar Chart') ?> view of appointment requests by sector membership.</div>
+            </div>
+            <?php endif; ?>
+            <?php if ($appointmentTrendChartData !== []): ?>
+            <div class="rp-chart-card">
+              <div class="rp-subsection-title">Monthly Trend</div>
+              <div class="rp-chart-wrap">
+                <canvas id="appointmentTrendChart"></canvas>
+              </div>
+              <div class="rp-chart-note"><?= htmlspecialchars($reportChartTypeOptions[$reportChartType] ?? 'Bar Chart') ?> view of monthly appointment requests for the last 12 months.</div>
+            </div>
+            <?php endif; ?>
+          </div>
+          <?php endif; ?>
+        </div>
+        <?php endif; ?>
+
         <?php if ($showReportSection('status') || $showReportSection('purpose')): ?>
         <div class="rp-two-col" style="margin-top:22px;">
           <?php if ($showReportSection('status')): ?>
           <div>
-            <div class="rp-section-label">II. Status Breakdown</div>
+            <div class="rp-section-label"><?= htmlspecialchars($appointmentSectionLabel('status')) ?></div>
             <?php if (empty($appt['by_status'])): ?>
               <p class="rp-empty">No data.</p>
             <?php else: ?>
@@ -4283,7 +4521,7 @@ elseif ($module === 'appointments'):
           <?php endif; ?>
           <?php if ($showReportSection('purpose')): ?>
           <div>
-            <div class="rp-section-label">III. Purpose Breakdown (Top 20)</div>
+            <div class="rp-section-label"><?= htmlspecialchars($appointmentSectionLabel('purpose')) ?> (Top 20)</div>
             <?php if (empty($appt['by_purpose'])): ?>
               <p class="rp-empty">No data.</p>
             <?php else: $purpTotal = array_sum(array_column($appt['by_purpose'],'total')); ?>
@@ -4306,12 +4544,11 @@ elseif ($module === 'appointments'):
         </div>
         <?php endif; ?>
 
-        <!-- IV. Area + Sector Breakdown -->
         <?php if ($showReportSection('area') || $showReportSection('sector')): ?>
         <div class="rp-two-col" style="margin-top:22px;">
           <?php if ($showReportSection('area')): ?>
           <div>
-            <div class="rp-section-label">IV. Requests by Area</div>
+            <div class="rp-section-label"><?= htmlspecialchars($appointmentSectionLabel('area')) ?></div>
             <?php if (empty($appt['by_area'])): ?>
               <p class="rp-empty">No area-linked appointment data.</p>
             <?php else: $appointmentAreaTotal = array_sum(array_column($appt['by_area'], 'total')); ?>
@@ -4333,7 +4570,7 @@ elseif ($module === 'appointments'):
           <?php endif; ?>
           <?php if ($showReportSection('sector')): ?>
           <div>
-            <div class="rp-section-label">V. Requests by Sector Membership</div>
+            <div class="rp-section-label"><?= htmlspecialchars($appointmentSectionLabel('sector')) ?></div>
             <?php if (empty($appt['by_sector'])): ?>
               <p class="rp-empty">No sector-linked appointment data.</p>
             <?php else: $appointmentSectorTotal = array_sum(array_column($appt['by_sector'], 'total')); ?>
@@ -4356,10 +4593,9 @@ elseif ($module === 'appointments'):
         </div>
         <?php endif; ?>
 
-        <!-- VI. Monthly Trend -->
         <?php if ($showReportSection('trend')): ?>
         <div class="rp-section">
-          <div class="rp-section-label">VI. Monthly Trend (Last 12 Months)</div>
+          <div class="rp-section-label"><?= htmlspecialchars($appointmentSectionLabel('trend')) ?> (Last 12 Months)</div>
           <?php if (empty($appt['trend'])): ?>
             <p class="rp-empty">No trend data.</p>
           <?php else:
@@ -4391,11 +4627,39 @@ elseif ($module === 'appointments'):
 elseif ($module === 'blotter'):
   $kpi   = $blot['kpi'] ?? [];
   $total = (int)($kpi['total'] ?? 0);
+  $blotterSectionLabel = static fn(string $key): string => rp_section_heading($reportCustomizeConfig['sections'] ?? [], $visibleReportSections, $key);
+  $blotterTypeChartData = array_values(array_filter($blot['by_type'] ?? [], static function (array $row): bool {
+    return (int)($row['total'] ?? 0) > 0;
+  }));
+  $blotterStatusChartData = array_values(array_filter($blot['by_status'] ?? [], static function (array $row): bool {
+    return (int)($row['total'] ?? 0) > 0;
+  }));
+  $blotterAreaChartData = array_values(array_filter($blot['by_area'] ?? [], static function (array $row): bool {
+    return (int)($row['total'] ?? 0) > 0;
+  }));
+  $blotterSectorChartData = array_values(array_filter($blot['by_sector'] ?? [], static function (array $row): bool {
+    return (int)($row['total'] ?? 0) > 0;
+  }));
+  $blotterTrendChartData = array_values(array_filter(array_map(static function (array $row): array {
+    $monthValue = (string)($row['month'] ?? '');
+    return [
+      'label' => $monthValue !== '' ? date('F Y', strtotime($monthValue . '-01')) : 'Unspecified',
+      'total' => (int)($row['total'] ?? 0),
+    ];
+  }, $blot['trend'] ?? []), static function (array $row): bool {
+    return (int)($row['total'] ?? 0) > 0;
+  }));
+  $shouldLoadBlotterCharts = $showReportSection('charts') && (
+    $blotterTypeChartData !== []
+    || $blotterStatusChartData !== []
+    || $blotterAreaChartData !== []
+    || $blotterSectorChartData !== []
+    || $blotterTrendChartData !== []
+  );
 ?>
-        <!-- I. Summary -->
         <?php if ($showReportSection('summary')): ?>
         <div class="rp-section">
-          <div class="rp-section-label">I. Overall Summary</div>
+          <div class="rp-section-label"><?= htmlspecialchars($blotterSectionLabel('summary')) ?></div>
           <table class="rp-summary">
             <tbody>
               <tr><td>Total Cases Filed</td><td><?= number_format($total) ?></td></tr>
@@ -4408,12 +4672,68 @@ elseif ($module === 'blotter'):
         </div>
         <?php endif; ?>
 
-        <!-- II. By Complaint Type + III. By Status — side by side -->
+        <?php if ($showReportSection('charts')): ?>
+        <div class="rp-section">
+          <div class="rp-section-label"><?= htmlspecialchars($blotterSectionLabel('charts')) ?></div>
+          <?php if ($blotterTypeChartData === [] && $blotterStatusChartData === [] && $blotterAreaChartData === [] && $blotterSectorChartData === [] && $blotterTrendChartData === []): ?>
+            <p class="rp-empty">No chart data is available for the selected filters.</p>
+          <?php else: ?>
+          <div class="rp-chart-grid">
+            <?php if ($blotterTypeChartData !== []): ?>
+            <div class="rp-chart-card">
+              <div class="rp-subsection-title">Complaint Type Breakdown</div>
+              <div class="rp-chart-wrap">
+                <canvas id="blotterTypeChart"></canvas>
+              </div>
+              <div class="rp-chart-note"><?= htmlspecialchars($reportChartTypeOptions[$reportChartType] ?? 'Bar Chart') ?> view of blotter cases by complaint type.</div>
+            </div>
+            <?php endif; ?>
+            <?php if ($blotterStatusChartData !== []): ?>
+            <div class="rp-chart-card">
+              <div class="rp-subsection-title">Status Breakdown</div>
+              <div class="rp-chart-wrap">
+                <canvas id="blotterStatusChart"></canvas>
+              </div>
+              <div class="rp-chart-note"><?= htmlspecialchars($reportChartTypeOptions[$reportChartType] ?? 'Bar Chart') ?> view of blotter case statuses.</div>
+            </div>
+            <?php endif; ?>
+            <?php if ($blotterAreaChartData !== []): ?>
+            <div class="rp-chart-card">
+              <div class="rp-subsection-title">Cases by Area</div>
+              <div class="rp-chart-wrap">
+                <canvas id="blotterAreaChart"></canvas>
+              </div>
+              <div class="rp-chart-note"><?= htmlspecialchars($reportChartTypeOptions[$reportChartType] ?? 'Bar Chart') ?> view of blotter cases by area.</div>
+            </div>
+            <?php endif; ?>
+            <?php if ($blotterSectorChartData !== []): ?>
+            <div class="rp-chart-card">
+              <div class="rp-subsection-title">Cases by Sector Membership</div>
+              <div class="rp-chart-wrap">
+                <canvas id="blotterSectorChart"></canvas>
+              </div>
+              <div class="rp-chart-note"><?= htmlspecialchars($reportChartTypeOptions[$reportChartType] ?? 'Bar Chart') ?> view of blotter cases by sector membership.</div>
+            </div>
+            <?php endif; ?>
+            <?php if ($blotterTrendChartData !== []): ?>
+            <div class="rp-chart-card">
+              <div class="rp-subsection-title">Monthly Trend</div>
+              <div class="rp-chart-wrap">
+                <canvas id="blotterTrendChart"></canvas>
+              </div>
+              <div class="rp-chart-note"><?= htmlspecialchars($reportChartTypeOptions[$reportChartType] ?? 'Bar Chart') ?> view of monthly blotter case filings for the last 12 months.</div>
+            </div>
+            <?php endif; ?>
+          </div>
+          <?php endif; ?>
+        </div>
+        <?php endif; ?>
+
         <?php if ($showReportSection('type') || $showReportSection('status')): ?>
         <div class="rp-two-col" style="margin-top:22px;">
           <?php if ($showReportSection('type')): ?>
           <div>
-            <div class="rp-section-label">II. Complaint Type Breakdown (Top 20)</div>
+            <div class="rp-section-label"><?= htmlspecialchars($blotterSectionLabel('type')) ?> (Top 20)</div>
             <?php if (empty($blot['by_type'])): ?>
               <p class="rp-empty">No data.</p>
             <?php else: ?>
@@ -4435,7 +4755,7 @@ elseif ($module === 'blotter'):
           <?php endif; ?>
           <?php if ($showReportSection('status')): ?>
           <div>
-            <div class="rp-section-label">III. Status Breakdown</div>
+            <div class="rp-section-label"><?= htmlspecialchars($blotterSectionLabel('status')) ?></div>
             <?php if (empty($blot['by_status'])): ?>
               <p class="rp-empty">No data.</p>
             <?php else: ?>
@@ -4458,12 +4778,11 @@ elseif ($module === 'blotter'):
         </div>
         <?php endif; ?>
 
-        <!-- IV. Area + Sector Breakdown -->
         <?php if ($showReportSection('area') || $showReportSection('sector')): ?>
         <div class="rp-two-col" style="margin-top:22px;">
           <?php if ($showReportSection('area')): ?>
           <div>
-            <div class="rp-section-label">IV. Cases by Area</div>
+            <div class="rp-section-label"><?= htmlspecialchars($blotterSectionLabel('area')) ?></div>
             <?php if (empty($blot['by_area'])): ?>
               <p class="rp-empty">No area-linked case data.</p>
             <?php else: $blotterAreaTotal = array_sum(array_column($blot['by_area'], 'total')); ?>
@@ -4485,7 +4804,7 @@ elseif ($module === 'blotter'):
           <?php endif; ?>
           <?php if ($showReportSection('sector')): ?>
           <div>
-            <div class="rp-section-label">V. Cases by Sector Membership</div>
+            <div class="rp-section-label"><?= htmlspecialchars($blotterSectionLabel('sector')) ?></div>
             <?php if (empty($blot['by_sector'])): ?>
               <p class="rp-empty">No sector-linked case data.</p>
             <?php else: $blotterSectorTotal = array_sum(array_column($blot['by_sector'], 'total')); ?>
@@ -4508,10 +4827,9 @@ elseif ($module === 'blotter'):
         </div>
         <?php endif; ?>
 
-        <!-- VI. Monthly Trend -->
         <?php if ($showReportSection('trend')): ?>
         <div class="rp-section">
-          <div class="rp-section-label">VI. Monthly Trend (Last 12 Months)</div>
+          <div class="rp-section-label"><?= htmlspecialchars($blotterSectionLabel('trend')) ?> (Last 12 Months)</div>
           <?php if (empty($blot['trend'])): ?>
             <p class="rp-empty">No trend data.</p>
           <?php else: $tTotal = array_sum(array_column($blot['trend'],'total')); ?>
@@ -4538,11 +4856,43 @@ elseif ($module === 'blotter'):
 elseif ($module === 'complaints'):
   $kpi   = $comp['kpi'] ?? [];
   $total = (int)($kpi['total'] ?? 0);
+  $complaintSectionLabel = static fn(string $key): string => rp_section_heading($reportCustomizeConfig['sections'] ?? [], $visibleReportSections, $key);
+  $complaintTypeChartData = array_values(array_filter($comp['by_type'] ?? [], static function (array $row): bool {
+    return (int)($row['total'] ?? 0) > 0;
+  }));
+  $complaintOriginChartData = array_values(array_filter($comp['by_origin'] ?? [], static function (array $row): bool {
+    return (int)($row['total'] ?? 0) > 0;
+  }));
+  $complaintKindChartData = array_values(array_filter($comp['by_kind'] ?? [], static function (array $row): bool {
+    return (int)($row['total'] ?? 0) > 0;
+  }));
+  $complaintAreaChartData = array_values(array_filter($comp['by_area'] ?? [], static function (array $row): bool {
+    return (int)($row['total'] ?? 0) > 0;
+  }));
+  $complaintSectorChartData = array_values(array_filter($comp['by_sector'] ?? [], static function (array $row): bool {
+    return (int)($row['total'] ?? 0) > 0;
+  }));
+  $complaintTrendChartData = array_values(array_filter(array_map(static function (array $row): array {
+    $monthValue = (string)($row['month'] ?? '');
+    return [
+      'label' => $monthValue !== '' ? date('F Y', strtotime($monthValue . '-01')) : 'Unspecified',
+      'total' => (int)($row['total'] ?? 0),
+    ];
+  }, $comp['trend'] ?? []), static function (array $row): bool {
+    return (int)($row['total'] ?? 0) > 0;
+  }));
+  $shouldLoadComplaintCharts = $showReportSection('charts') && (
+    $complaintTypeChartData !== []
+    || $complaintOriginChartData !== []
+    || $complaintKindChartData !== []
+    || $complaintAreaChartData !== []
+    || $complaintSectorChartData !== []
+    || $complaintTrendChartData !== []
+  );
 ?>
-        <!-- I. Summary -->
         <?php if ($showReportSection('summary')): ?>
         <div class="rp-section">
-          <div class="rp-section-label">I. Overall Summary</div>
+          <div class="rp-section-label"><?= htmlspecialchars($complaintSectionLabel('summary')) ?></div>
           <table class="rp-summary">
             <tbody>
               <tr><td>Total Complaints Filed</td><td><?= number_format($total) ?></td></tr>
@@ -4555,10 +4905,75 @@ elseif ($module === 'complaints'):
         </div>
         <?php endif; ?>
 
-        <!-- II. Complaint Type Breakdown -->
+        <?php if ($showReportSection('charts')): ?>
+        <div class="rp-section">
+          <div class="rp-section-label"><?= htmlspecialchars($complaintSectionLabel('charts')) ?></div>
+          <?php if ($complaintTypeChartData === [] && $complaintOriginChartData === [] && $complaintKindChartData === [] && $complaintAreaChartData === [] && $complaintSectorChartData === [] && $complaintTrendChartData === []): ?>
+            <p class="rp-empty">No chart data is available for the selected filters.</p>
+          <?php else: ?>
+          <div class="rp-chart-grid">
+            <?php if ($complaintTypeChartData !== []): ?>
+            <div class="rp-chart-card">
+              <div class="rp-subsection-title">Complaint Type Breakdown</div>
+              <div class="rp-chart-wrap">
+                <canvas id="complaintTypeChart"></canvas>
+              </div>
+              <div class="rp-chart-note"><?= htmlspecialchars($reportChartTypeOptions[$reportChartType] ?? 'Bar Chart') ?> view of complaints by complaint type.</div>
+            </div>
+            <?php endif; ?>
+            <?php if ($complaintOriginChartData !== []): ?>
+            <div class="rp-chart-card">
+              <div class="rp-subsection-title">By Origin</div>
+              <div class="rp-chart-wrap">
+                <canvas id="complaintOriginChart"></canvas>
+              </div>
+              <div class="rp-chart-note"><?= htmlspecialchars($reportChartTypeOptions[$reportChartType] ?? 'Bar Chart') ?> view of complaints by origin.</div>
+            </div>
+            <?php endif; ?>
+            <?php if ($complaintKindChartData !== []): ?>
+            <div class="rp-chart-card">
+              <div class="rp-subsection-title">By Subject Kind</div>
+              <div class="rp-chart-wrap">
+                <canvas id="complaintKindChart"></canvas>
+              </div>
+              <div class="rp-chart-note"><?= htmlspecialchars($reportChartTypeOptions[$reportChartType] ?? 'Bar Chart') ?> view of complaints by subject kind.</div>
+            </div>
+            <?php endif; ?>
+            <?php if ($complaintAreaChartData !== []): ?>
+            <div class="rp-chart-card">
+              <div class="rp-subsection-title">Complaints by Area</div>
+              <div class="rp-chart-wrap">
+                <canvas id="complaintAreaChart"></canvas>
+              </div>
+              <div class="rp-chart-note"><?= htmlspecialchars($reportChartTypeOptions[$reportChartType] ?? 'Bar Chart') ?> view of complaints by area.</div>
+            </div>
+            <?php endif; ?>
+            <?php if ($complaintSectorChartData !== []): ?>
+            <div class="rp-chart-card">
+              <div class="rp-subsection-title">Complaints by Sector Membership</div>
+              <div class="rp-chart-wrap">
+                <canvas id="complaintSectorChart"></canvas>
+              </div>
+              <div class="rp-chart-note"><?= htmlspecialchars($reportChartTypeOptions[$reportChartType] ?? 'Bar Chart') ?> view of complaints by sector membership.</div>
+            </div>
+            <?php endif; ?>
+            <?php if ($complaintTrendChartData !== []): ?>
+            <div class="rp-chart-card">
+              <div class="rp-subsection-title">Monthly Trend</div>
+              <div class="rp-chart-wrap">
+                <canvas id="complaintTrendChart"></canvas>
+              </div>
+              <div class="rp-chart-note"><?= htmlspecialchars($reportChartTypeOptions[$reportChartType] ?? 'Bar Chart') ?> view of monthly complaints filed for the last 12 months.</div>
+            </div>
+            <?php endif; ?>
+          </div>
+          <?php endif; ?>
+        </div>
+        <?php endif; ?>
+
         <?php if ($showReportSection('type')): ?>
         <div class="rp-section">
-          <div class="rp-section-label">II. Complaint Type Breakdown</div>
+          <div class="rp-section-label"><?= htmlspecialchars($complaintSectionLabel('type')) ?></div>
           <?php if (empty($comp['by_type'])): ?>
             <p class="rp-empty">No complaint type data for the selected filters.</p>
           <?php else: ?>
@@ -4579,12 +4994,11 @@ elseif ($module === 'complaints'):
         </div>
         <?php endif; ?>
 
-        <!-- III. By Origin + IV. By Subject Kind — side by side -->
         <?php if ($showReportSection('origin') || $showReportSection('kind')): ?>
         <div class="rp-two-col" style="margin-top:22px;">
           <?php if ($showReportSection('origin')): ?>
           <div>
-            <div class="rp-section-label">III. By Origin</div>
+            <div class="rp-section-label"><?= htmlspecialchars($complaintSectionLabel('origin')) ?></div>
             <?php if (empty($comp['by_origin'])): ?>
               <p class="rp-empty">No data.</p>
             <?php else: ?>
@@ -4606,7 +5020,7 @@ elseif ($module === 'complaints'):
           <?php endif; ?>
           <?php if ($showReportSection('kind')): ?>
           <div>
-            <div class="rp-section-label">IV. By Subject Kind</div>
+            <div class="rp-section-label"><?= htmlspecialchars($complaintSectionLabel('kind')) ?></div>
             <?php if (empty($comp['by_kind'])): ?>
               <p class="rp-empty">No data.</p>
             <?php else: $kindTotal = array_sum(array_column($comp['by_kind'],'total')); ?>
@@ -4629,12 +5043,11 @@ elseif ($module === 'complaints'):
         </div>
         <?php endif; ?>
 
-        <!-- V. Area + Sector Breakdown -->
         <?php if ($showReportSection('area') || $showReportSection('sector')): ?>
         <div class="rp-two-col" style="margin-top:22px;">
           <?php if ($showReportSection('area')): ?>
           <div>
-            <div class="rp-section-label">V. Complaints by Area</div>
+            <div class="rp-section-label"><?= htmlspecialchars($complaintSectionLabel('area')) ?></div>
             <?php if (empty($comp['by_area'])): ?>
               <p class="rp-empty">No area-linked complaint data.</p>
             <?php else: $complaintAreaTotal = array_sum(array_column($comp['by_area'], 'total')); ?>
@@ -4656,7 +5069,7 @@ elseif ($module === 'complaints'):
           <?php endif; ?>
           <?php if ($showReportSection('sector')): ?>
           <div>
-            <div class="rp-section-label">VI. Complaints by Sector Membership</div>
+            <div class="rp-section-label"><?= htmlspecialchars($complaintSectionLabel('sector')) ?></div>
             <?php if (empty($comp['by_sector'])): ?>
               <p class="rp-empty">No sector-linked complaint data.</p>
             <?php else: $complaintSectorTotal = array_sum(array_column($comp['by_sector'], 'total')); ?>
@@ -4679,10 +5092,9 @@ elseif ($module === 'complaints'):
         </div>
         <?php endif; ?>
 
-        <!-- VII. Monthly Trend -->
         <?php if ($showReportSection('trend')): ?>
         <div class="rp-section">
-          <div class="rp-section-label">VII. Monthly Trend (Last 12 Months)</div>
+          <div class="rp-section-label"><?= htmlspecialchars($complaintSectionLabel('trend')) ?> (Last 12 Months)</div>
           <?php if (empty($comp['trend'])): ?>
             <p class="rp-empty">No trend data.</p>
           <?php else:
@@ -4738,8 +5150,144 @@ elseif ($module === 'complaints'):
 
 </div><!-- /.rp-doc -->
 
-<?php if ($shouldLoadIssuanceCharts || $shouldLoadFinancialCharts || $shouldLoadResidentCharts): ?>
+<?php if ($shouldLoadIssuanceCharts || $shouldLoadFinancialCharts || $shouldLoadResidentCharts || $shouldLoadAppointmentCharts || $shouldLoadBlotterCharts || $shouldLoadComplaintCharts): ?>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+<?php if ($isPrintView): ?>
+<script>
+if (window.Chart && window.Chart.defaults) {
+  window.Chart.defaults.animation = false;
+}
+</script>
+<?php endif; ?>
+<script>
+window.__rpChartHelpers = (() => {
+  if (typeof Chart === 'undefined') {
+    return null;
+  }
+
+  const palette = ['#DE710C', '#2563EB', '#16A34A', '#DC2626', '#7C3AED', '#0891B2', '#CA8A04', '#DB2777', '#4F46E5', '#059669'];
+  const colorsFor = (count) => Array.from({ length: count }, (_, index) => palette[index % palette.length]);
+  const wrapLabel = (label, maxChars = 18) => {
+    const text = String(label ?? '').trim();
+    if (text === '' || text.length <= maxChars) {
+      return text;
+    }
+
+    const words = text.split(/\s+/);
+    const lines = [];
+    let current = '';
+    for (const word of words) {
+      const next = current === '' ? word : `${current} ${word}`;
+      if (next.length > maxChars && current !== '') {
+        lines.push(current);
+        current = word;
+      } else {
+        current = next;
+      }
+    }
+    if (current !== '') {
+      lines.push(current);
+    }
+    return lines.length > 1 ? lines : text;
+  };
+
+  const renderCategoricalChart = (source, chartType = 'bar') => {
+    const canvas = document.getElementById(source.canvasId);
+    if (!canvas || !Array.isArray(source.labels) || source.labels.length === 0) {
+      return;
+    }
+
+    const entries = source.labels.map((label, index) => ({
+      label: String(label ?? '').trim(),
+      value: Number(source.values[index] || 0),
+    })).filter((entry) => entry.label !== '' && Number.isFinite(entry.value) && entry.value > 0);
+
+    if (!entries.length) {
+      return;
+    }
+
+    const colors = colorsFor(entries.length);
+    const labels = chartType === 'pie'
+      ? entries.map((entry) => entry.label)
+      : entries.map((entry) => wrapLabel(entry.label, source.maxLabelChars ?? 18));
+    const values = entries.map((entry) => entry.value);
+    const config = chartType === 'pie'
+      ? {
+          type: 'pie',
+          data: {
+            labels,
+            datasets: [{
+              label: source.title,
+              data: values,
+              backgroundColor: colors,
+              borderColor: '#ffffff',
+              borderWidth: 2,
+            }],
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+              legend: {
+                position: 'bottom',
+              },
+            },
+          },
+        }
+      : {
+          type: 'bar',
+          data: {
+            labels,
+            datasets: [{
+              label: source.datasetLabel || source.title || 'Count',
+              data: values,
+              backgroundColor: colors,
+              borderColor: colors,
+              borderWidth: 1,
+              borderRadius: 8,
+            }],
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+              x: {
+                ticks: {
+                  autoSkip: false,
+                  maxRotation: 0,
+                  minRotation: 0,
+                  font: {
+                    size: 10,
+                  },
+                },
+              },
+              y: {
+                beginAtZero: true,
+                ticks: {
+                  precision: 0,
+                },
+              },
+            },
+            plugins: {
+              legend: {
+                display: false,
+              },
+            },
+          },
+        };
+
+    new Chart(canvas.getContext('2d'), config);
+  };
+
+  const initCategoricalCharts = (sources, chartType = 'bar') => {
+    sources.forEach((source) => renderCategoricalChart(source, chartType));
+  };
+
+  return {
+    initCategoricalCharts,
+  };
+})();
+</script>
 <?php endif; ?>
 <?php if ($shouldLoadIssuanceCharts): ?>
 <script>
@@ -4905,7 +5453,9 @@ elseif ($module === 'complaints'):
       canvasId: 'financialAreaRevenueChart',
       labels: <?= json_encode(array_map(static fn(array $row): string => (string)($row['area'] ?? ''), $financialAreaRevenueChartData), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>,
       values: <?= json_encode(array_map(static fn(array $row): float => (float)($row['amount'] ?? 0), $financialAreaRevenueChartData), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>,
-      title: 'By Area Revenue Stream'
+      title: 'By Area Revenue Stream',
+      includeZeroValues: true,
+      preserveOrder: true
     }
   ];
 
@@ -4959,11 +5509,17 @@ elseif ($module === 'complaints'):
       return;
     }
 
-    const entries = source.labels.map((label, index) => ({
+    let entries = source.labels.map((label, index) => ({
       label: String(label ?? '').trim(),
       value: Number(source.values[index] || 0),
-    })).filter((entry) => entry.label !== '' && Number.isFinite(entry.value) && entry.value > 0)
-      .sort((left, right) => right.value - left.value);
+    })).filter((entry) => (
+      entry.label !== ''
+      && Number.isFinite(entry.value)
+      && (source.includeZeroValues ? entry.value >= 0 : entry.value > 0)
+    ));
+    if (!source.preserveOrder) {
+      entries = entries.sort((left, right) => right.value - left.value);
+    }
     if (!entries.length) {
       return;
     }
@@ -5209,7 +5765,620 @@ elseif ($module === 'complaints'):
 </script>
 <?php endif; ?>
 
+<?php if ($shouldLoadAppointmentCharts): ?>
+<script>
+(() => {
+  const helpers = window.__rpChartHelpers;
+  if (!helpers) {
+    return;
+  }
+
+  const chartType = <?= json_encode($reportChartType, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
+  const sources = [
+    {
+      canvasId: 'appointmentStatusChart',
+      labels: <?= json_encode(array_map(static fn(array $row): string => (string)($row['status'] ?? ''), $appointmentStatusChartData), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>,
+      values: <?= json_encode(array_map(static fn(array $row): int => (int)($row['total'] ?? 0), $appointmentStatusChartData), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>,
+      title: 'Status Breakdown',
+      datasetLabel: 'Appointment Requests',
+    },
+    {
+      canvasId: 'appointmentPurposeChart',
+      labels: <?= json_encode(array_map(static fn(array $row): string => (string)($row['purpose'] ?? ''), $appointmentPurposeChartData), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>,
+      values: <?= json_encode(array_map(static fn(array $row): int => (int)($row['total'] ?? 0), $appointmentPurposeChartData), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>,
+      title: 'Purpose Breakdown',
+      datasetLabel: 'Appointment Requests',
+      maxLabelChars: 22,
+    },
+    {
+      canvasId: 'appointmentAreaChart',
+      labels: <?= json_encode(array_map(static fn(array $row): string => (string)($row['area'] ?? ''), $appointmentAreaChartData), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>,
+      values: <?= json_encode(array_map(static fn(array $row): int => (int)($row['total'] ?? 0), $appointmentAreaChartData), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>,
+      title: 'Requests by Area',
+      datasetLabel: 'Appointment Requests',
+    },
+    {
+      canvasId: 'appointmentSectorChart',
+      labels: <?= json_encode(array_map(static fn(array $row): string => (string)($row['sector'] ?? ''), $appointmentSectorChartData), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>,
+      values: <?= json_encode(array_map(static fn(array $row): int => (int)($row['total'] ?? 0), $appointmentSectorChartData), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>,
+      title: 'Requests by Sector Membership',
+      datasetLabel: 'Appointment Requests',
+      maxLabelChars: 22,
+    },
+    {
+      canvasId: 'appointmentTrendChart',
+      labels: <?= json_encode(array_map(static fn(array $row): string => (string)($row['label'] ?? ''), $appointmentTrendChartData), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>,
+      values: <?= json_encode(array_map(static fn(array $row): int => (int)($row['total'] ?? 0), $appointmentTrendChartData), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>,
+      title: 'Monthly Trend',
+      datasetLabel: 'Requests Filed',
+      maxLabelChars: 14,
+    }
+  ];
+
+  const initCharts = () => helpers.initCategoricalCharts(sources, chartType);
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initCharts, { once: true });
+  } else {
+    initCharts();
+  }
+})();
+</script>
+<?php endif; ?>
+
+<?php if ($shouldLoadBlotterCharts): ?>
+<script>
+(() => {
+  const helpers = window.__rpChartHelpers;
+  if (!helpers) {
+    return;
+  }
+
+  const chartType = <?= json_encode($reportChartType, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
+  const sources = [
+    {
+      canvasId: 'blotterTypeChart',
+      labels: <?= json_encode(array_map(static fn(array $row): string => (string)($row['complaint_type'] ?? ''), $blotterTypeChartData), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>,
+      values: <?= json_encode(array_map(static fn(array $row): int => (int)($row['total'] ?? 0), $blotterTypeChartData), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>,
+      title: 'Complaint Type Breakdown',
+      datasetLabel: 'Cases Filed',
+      maxLabelChars: 22,
+    },
+    {
+      canvasId: 'blotterStatusChart',
+      labels: <?= json_encode(array_map(static fn(array $row): string => (string)($row['status'] ?? ''), $blotterStatusChartData), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>,
+      values: <?= json_encode(array_map(static fn(array $row): int => (int)($row['total'] ?? 0), $blotterStatusChartData), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>,
+      title: 'Status Breakdown',
+      datasetLabel: 'Cases Filed',
+    },
+    {
+      canvasId: 'blotterAreaChart',
+      labels: <?= json_encode(array_map(static fn(array $row): string => (string)($row['area'] ?? ''), $blotterAreaChartData), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>,
+      values: <?= json_encode(array_map(static fn(array $row): int => (int)($row['total'] ?? 0), $blotterAreaChartData), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>,
+      title: 'Cases by Area',
+      datasetLabel: 'Cases Filed',
+    },
+    {
+      canvasId: 'blotterSectorChart',
+      labels: <?= json_encode(array_map(static fn(array $row): string => (string)($row['sector'] ?? ''), $blotterSectorChartData), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>,
+      values: <?= json_encode(array_map(static fn(array $row): int => (int)($row['total'] ?? 0), $blotterSectorChartData), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>,
+      title: 'Cases by Sector Membership',
+      datasetLabel: 'Cases Filed',
+      maxLabelChars: 22,
+    },
+    {
+      canvasId: 'blotterTrendChart',
+      labels: <?= json_encode(array_map(static fn(array $row): string => (string)($row['label'] ?? ''), $blotterTrendChartData), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>,
+      values: <?= json_encode(array_map(static fn(array $row): int => (int)($row['total'] ?? 0), $blotterTrendChartData), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>,
+      title: 'Monthly Trend',
+      datasetLabel: 'Cases Filed',
+      maxLabelChars: 14,
+    }
+  ];
+
+  const initCharts = () => helpers.initCategoricalCharts(sources, chartType);
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initCharts, { once: true });
+  } else {
+    initCharts();
+  }
+})();
+</script>
+<?php endif; ?>
+
+<?php if ($shouldLoadComplaintCharts): ?>
+<script>
+(() => {
+  const helpers = window.__rpChartHelpers;
+  if (!helpers) {
+    return;
+  }
+
+  const chartType = <?= json_encode($reportChartType, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
+  const sources = [
+    {
+      canvasId: 'complaintTypeChart',
+      labels: <?= json_encode(array_map(static fn(array $row): string => (string)($row['complaint_type'] ?? ''), $complaintTypeChartData), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>,
+      values: <?= json_encode(array_map(static fn(array $row): int => (int)($row['total'] ?? 0), $complaintTypeChartData), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>,
+      title: 'Complaint Type Breakdown',
+      datasetLabel: 'Complaints Filed',
+      maxLabelChars: 22,
+    },
+    {
+      canvasId: 'complaintOriginChart',
+      labels: <?= json_encode(array_map(static fn(array $row): string => ucwords(str_replace('_', ' ', (string)($row['origin'] ?? ''))), $complaintOriginChartData), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>,
+      values: <?= json_encode(array_map(static fn(array $row): int => (int)($row['total'] ?? 0), $complaintOriginChartData), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>,
+      title: 'By Origin',
+      datasetLabel: 'Complaints Filed',
+    },
+    {
+      canvasId: 'complaintKindChart',
+      labels: <?= json_encode(array_map(static fn(array $row): string => (string)($row['kind'] ?? ''), $complaintKindChartData), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>,
+      values: <?= json_encode(array_map(static fn(array $row): int => (int)($row['total'] ?? 0), $complaintKindChartData), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>,
+      title: 'By Subject Kind',
+      datasetLabel: 'Complaints Filed',
+    },
+    {
+      canvasId: 'complaintAreaChart',
+      labels: <?= json_encode(array_map(static fn(array $row): string => (string)($row['area'] ?? ''), $complaintAreaChartData), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>,
+      values: <?= json_encode(array_map(static fn(array $row): int => (int)($row['total'] ?? 0), $complaintAreaChartData), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>,
+      title: 'Complaints by Area',
+      datasetLabel: 'Complaints Filed',
+    },
+    {
+      canvasId: 'complaintSectorChart',
+      labels: <?= json_encode(array_map(static fn(array $row): string => (string)($row['sector'] ?? ''), $complaintSectorChartData), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>,
+      values: <?= json_encode(array_map(static fn(array $row): int => (int)($row['total'] ?? 0), $complaintSectorChartData), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>,
+      title: 'Complaints by Sector Membership',
+      datasetLabel: 'Complaints Filed',
+      maxLabelChars: 22,
+    },
+    {
+      canvasId: 'complaintTrendChart',
+      labels: <?= json_encode(array_map(static fn(array $row): string => (string)($row['label'] ?? ''), $complaintTrendChartData), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>,
+      values: <?= json_encode(array_map(static fn(array $row): int => (int)($row['total'] ?? 0), $complaintTrendChartData), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>,
+      title: 'Monthly Trend',
+      datasetLabel: 'Complaints Filed',
+      maxLabelChars: 14,
+    }
+  ];
+
+  const initCharts = () => helpers.initCategoricalCharts(sources, chartType);
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initCharts, { once: true });
+  } else {
+    initCharts();
+  }
+})();
+</script>
+<?php endif; ?>
+
 <?php if ($isPrintView): ?>
+<script>
+window.__reportPaginationReady = (() => {
+  const LETTER_WIDTH_PX = Math.round(8.5 * 96);
+  const LETTER_HEIGHT_PX = Math.round(11 * 96);
+  const PAGE_MARGIN_PX = Math.round(0.5 * 96);
+  const CONTENT_HEIGHT_PX = LETTER_HEIGHT_PX - (PAGE_MARGIN_PX * 2);
+  const BLOCK_GAP_PX = Math.round((14 / 72) * 96);
+
+  const nextFrame = () => new Promise((resolve) => window.requestAnimationFrame(() => resolve()));
+  const wait = (ms) => new Promise((resolve) => window.setTimeout(resolve, ms));
+
+  const copyCanvasBitmap = (sourceCanvas, targetCanvas) => {
+    if (!(sourceCanvas instanceof HTMLCanvasElement) || !(targetCanvas instanceof HTMLCanvasElement)) {
+      return;
+    }
+    targetCanvas.width = sourceCanvas.width;
+    targetCanvas.height = sourceCanvas.height;
+    if (sourceCanvas.clientWidth > 0) {
+      targetCanvas.style.width = `${sourceCanvas.clientWidth}px`;
+    }
+    if (sourceCanvas.clientHeight > 0) {
+      targetCanvas.style.height = `${sourceCanvas.clientHeight}px`;
+    }
+    const ctx = targetCanvas.getContext('2d');
+    if (!ctx) {
+      return;
+    }
+    try {
+      ctx.drawImage(sourceCanvas, 0, 0);
+    } catch (err) {
+      console.warn('Unable to copy report chart canvas:', err);
+    }
+  };
+
+  const cloneNodeWithCanvases = (sourceNode) => {
+    const clone = sourceNode.cloneNode(true);
+    if (sourceNode instanceof HTMLCanvasElement && clone instanceof HTMLCanvasElement) {
+      copyCanvasBitmap(sourceNode, clone);
+      return clone;
+    }
+
+    const sourceCanvases = Array.from(sourceNode.querySelectorAll('canvas'));
+    const cloneCanvases = Array.from(clone.querySelectorAll('canvas'));
+    sourceCanvases.forEach((canvas, index) => {
+      copyCanvasBitmap(canvas, cloneCanvases[index]);
+    });
+    return clone;
+  };
+
+  const createBlockWrapper = (nodes, options = {}) => {
+    const wrapper = document.createElement('section');
+    wrapper.className = 'rp-page-block';
+    if (options.kind) {
+      wrapper.classList.add(`rp-page-block--${options.kind}`);
+    }
+    if (options.sectionId) {
+      wrapper.dataset.sectionId = options.sectionId;
+    }
+    if (options.includeLabel && options.labelNode) {
+      wrapper.appendChild(cloneNodeWithCanvases(options.labelNode));
+    }
+    nodes.forEach((node) => {
+      wrapper.appendChild(cloneNodeWithCanvases(node));
+    });
+    return wrapper;
+  };
+
+  const createPage = (container) => {
+    const pageEl = document.createElement('section');
+    pageEl.className = 'rp-print-page';
+    const contentEl = document.createElement('div');
+    contentEl.className = 'rp-print-page-content';
+    pageEl.appendChild(contentEl);
+    container.appendChild(pageEl);
+    return {
+      el: pageEl,
+      content: contentEl,
+      count: 0,
+    };
+  };
+
+  const applyScaleToBlock = (blockNode, naturalHeight, scale) => {
+    if (!Number.isFinite(scale) || scale <= 0 || scale >= 0.999) {
+      return blockNode;
+    }
+
+    const inner = document.createElement('div');
+    inner.className = 'rp-page-block-scale';
+    while (blockNode.firstChild) {
+      inner.appendChild(blockNode.firstChild);
+    }
+
+    blockNode.appendChild(inner);
+    blockNode.classList.add('rp-page-block--scaled');
+    blockNode.style.height = `${Math.ceil(naturalHeight * scale)}px`;
+    blockNode.style.minHeight = `${Math.ceil(naturalHeight * scale)}px`;
+    inner.style.transform = `scale(${scale})`;
+    inner.style.width = `${(100 / scale).toFixed(4)}%`;
+
+    return blockNode;
+  };
+
+  const buildBlockDefinitions = (sourceDoc) => {
+    const defs = [];
+    const header = sourceDoc.querySelector(':scope > .rp-doc-header');
+    if (header) {
+      defs.push({
+        type: 'header',
+        blockType: 'header',
+        build: () => createBlockWrapper([header], { kind: 'header' }),
+      });
+    }
+
+    const sections = Array.from(sourceDoc.querySelectorAll(':scope > .rp-section'));
+    sections.forEach((section, sectionIndex) => {
+      const label = section.querySelector(':scope > .rp-section-label');
+      const children = Array.from(section.children).filter((child) => child !== label);
+      const sectionId = `section-${sectionIndex}`;
+      let sectionBlockIndex = 0;
+
+      children.forEach((child) => {
+        if (child.matches('.rp-two-col, .rp-three-col, .rp-chart-grid')) {
+          const blockType = child.classList.contains('rp-chart-grid') ? 'chart' : 'table';
+          Array.from(child.children)
+            .filter((item) => item.nodeType === 1)
+            .forEach((item) => {
+              const localIndex = sectionBlockIndex;
+              defs.push({
+                type: 'section',
+                blockType,
+                sectionId,
+                indexInSection: localIndex,
+                build: (includeLabel) => createBlockWrapper([item], {
+                  includeLabel,
+                  labelNode: label,
+                  sectionId,
+                  kind: blockType,
+                }),
+              });
+              sectionBlockIndex += 1;
+            });
+          return;
+        }
+
+        const blockType = child.matches('.rp-summary, .rp-table') ? 'table' : 'content';
+        const localIndex = sectionBlockIndex;
+        defs.push({
+          type: 'section',
+          blockType,
+          sectionId,
+          indexInSection: localIndex,
+          build: (includeLabel) => createBlockWrapper([child], {
+            includeLabel,
+            labelNode: label,
+            sectionId,
+            kind: blockType,
+          }),
+        });
+        sectionBlockIndex += 1;
+      });
+    });
+
+    const footer = sourceDoc.querySelector(':scope > .rp-footer');
+    if (footer) {
+      defs.push({
+        type: 'footer',
+        blockType: 'footer',
+        build: () => createBlockWrapper([footer], { kind: 'footer' }),
+      });
+    }
+
+    return defs;
+  };
+
+  const paginateReport = async () => {
+    const sourceDoc = document.querySelector('.rp-doc');
+    if (!sourceDoc) {
+      return null;
+    }
+
+    await nextFrame();
+    await wait(160);
+    await nextFrame();
+
+    const pageContainer = document.createElement('div');
+    pageContainer.className = 'rp-print-pages';
+    pageContainer.style.visibility = 'hidden';
+    sourceDoc.insertAdjacentElement('afterend', pageContainer);
+
+    const stage = document.createElement('div');
+    stage.className = 'rp-pagination-stage';
+    const measurePage = document.createElement('section');
+    measurePage.className = 'rp-print-page';
+    const measureContent = document.createElement('div');
+    measureContent.className = 'rp-print-page-content';
+    measurePage.appendChild(measureContent);
+    stage.appendChild(measurePage);
+    document.body.appendChild(stage);
+
+    const readHeight = (node) => {
+      measureContent.replaceChildren(node);
+      return Math.ceil(Math.max(
+        node.getBoundingClientRect().height || 0,
+        measureContent.scrollHeight || 0,
+        measureContent.offsetHeight || 0
+      ));
+    };
+
+    const tryAppend = (page, node) => {
+      page.content.appendChild(node);
+      if (page.content.scrollHeight <= CONTENT_HEIGHT_PX + 1) {
+        page.count += 1;
+        return true;
+      }
+      node.remove();
+      return false;
+    };
+
+    const continueFitThreshold = (blockType) => {
+      if (blockType === 'chart') return 0.84;
+      if (blockType === 'table') return 0.9;
+      return 0.88;
+    };
+
+    const blocks = buildBlockDefinitions(sourceDoc);
+    const shownSectionLabels = new Set();
+    let page = createPage(pageContainer);
+
+    for (const block of blocks) {
+      const isSectionBlock = block.type === 'section';
+      const markLabelShown = () => {
+        if (isSectionBlock && block.sectionId && includeLabel) {
+          shownSectionLabels.add(block.sectionId);
+        }
+      };
+      let includeLabel = isSectionBlock && block.sectionId ? !shownSectionLabels.has(block.sectionId) : false;
+      let node = block.build(includeLabel);
+      let naturalHeight = readHeight(node);
+
+      if (tryAppend(page, node)) {
+        markLabelShown();
+        continue;
+      }
+
+      const remainingHeight = Math.max(0, CONTENT_HEIGHT_PX - page.content.scrollHeight - (page.count > 0 ? BLOCK_GAP_PX : 0));
+      const continueScale = remainingHeight > 0 ? (remainingHeight / Math.max(naturalHeight, 1)) : 0;
+      if (page.count > 0 && continueScale >= continueFitThreshold(block.blockType) && continueScale < 1) {
+        node = block.build(includeLabel);
+        naturalHeight = readHeight(node);
+        node = applyScaleToBlock(node, naturalHeight, continueScale);
+        if (tryAppend(page, node)) {
+          markLabelShown();
+          continue;
+        }
+      }
+
+      page = createPage(pageContainer);
+      includeLabel = isSectionBlock && block.sectionId ? !shownSectionLabels.has(block.sectionId) : false;
+      node = block.build(includeLabel);
+      naturalHeight = readHeight(node);
+
+      if (!tryAppend(page, node)) {
+        const fullPageScale = CONTENT_HEIGHT_PX / Math.max(naturalHeight, 1);
+        node = block.build(includeLabel);
+        naturalHeight = readHeight(node);
+        node = applyScaleToBlock(node, naturalHeight, Math.min(1, fullPageScale));
+        tryAppend(page, node);
+      }
+      markLabelShown();
+    }
+
+    stage.remove();
+    sourceDoc.classList.add('rp-doc--source');
+    pageContainer.style.visibility = '';
+    return pageContainer;
+  };
+
+  return (async () => {
+    const container = await paginateReport();
+    if (<?= $shouldAutoPrint ? 'true' : 'false' ?>) {
+      await nextFrame();
+      await wait(220);
+      window.print();
+    }
+    return container;
+  })();
+})();
+</script>
+<?php if ($isPdfDownloadView): ?>
+<script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
+<script>
+(() => {
+  const statusId = 'reportPdfExportStatus';
+  const setStatus = (message, tone = 'info') => {
+    let status = document.getElementById(statusId);
+    if (!status) {
+      status = document.createElement('div');
+      status.id = statusId;
+      status.style.position = 'fixed';
+      status.style.right = '18px';
+      status.style.bottom = '18px';
+      status.style.zIndex = '9999';
+      status.style.maxWidth = '320px';
+      status.style.padding = '12px 14px';
+      status.style.borderRadius = '12px';
+      status.style.boxShadow = '0 14px 28px rgba(15, 23, 42, 0.18)';
+      status.style.font = '600 14px/1.4 Arial, Helvetica, sans-serif';
+      status.style.background = '#111827';
+      status.style.color = '#fff';
+      document.body.appendChild(status);
+    }
+
+    if (tone === 'error') {
+      status.style.background = '#991b1b';
+    } else if (tone === 'success') {
+      status.style.background = '#166534';
+    } else {
+      status.style.background = '#111827';
+    }
+
+    status.textContent = message;
+  };
+
+  const waitForImages = async (root) => {
+    const images = Array.from(root.querySelectorAll('img'));
+    await Promise.all(images.map((img) => new Promise((resolve) => {
+      if (img.complete) {
+        resolve();
+        return;
+      }
+      img.addEventListener('load', resolve, { once: true });
+      img.addEventListener('error', resolve, { once: true });
+    })));
+  };
+
+  const waitForFonts = async () => {
+    if (document.fonts && typeof document.fonts.ready?.then === 'function') {
+      try {
+        await document.fonts.ready;
+      } catch (err) {
+        console.warn('Report PDF font readiness check failed:', err);
+      }
+    }
+  };
+
+  const nextFrame = () => new Promise((resolve) => window.requestAnimationFrame(() => resolve()));
+
+  const downloadReportPdf = async () => {
+    const renderer = window.html2canvas;
+    const jsPdfNs = window.jspdf;
+    if (typeof renderer !== 'function' || !jsPdfNs?.jsPDF) {
+      setStatus('PDF export support failed to load. Please reload and try again.', 'error');
+      return;
+    }
+
+    try {
+      setStatus('Preparing report PDF…');
+      await window.__reportPaginationReady;
+      const pages = Array.from(document.querySelectorAll('.rp-print-page'));
+      if (!pages.length) {
+        setStatus('Unable to prepare report pages for PDF export.', 'error');
+        return;
+      }
+      await waitForFonts();
+      await waitForImages(document.body);
+      await nextFrame();
+      await new Promise((resolve) => window.setTimeout(resolve, 450));
+
+      const { jsPDF } = jsPdfNs;
+      const pdf = new jsPDF({
+        orientation: 'portrait',
+        unit: 'pt',
+        format: 'letter',
+        compress: true,
+      });
+
+      const pageWidth = pdf.internal.pageSize.getWidth();
+      const pageHeight = pdf.internal.pageSize.getHeight();
+
+      for (let index = 0; index < pages.length; index += 1) {
+        const page = pages[index];
+        page.style.boxShadow = 'none';
+        page.style.border = 'none';
+        const canvas = await renderer(page, {
+          backgroundColor: '#ffffff',
+          scale: Math.max(2, Math.min(3, window.devicePixelRatio || 2)),
+          useCORS: true,
+          logging: false,
+          scrollX: 0,
+          scrollY: 0,
+          width: page.scrollWidth,
+          height: page.scrollHeight,
+          windowWidth: page.scrollWidth,
+          windowHeight: page.scrollHeight
+        });
+
+        if (index > 0) {
+          pdf.addPage('letter', 'portrait');
+        }
+        pdf.addImage(canvas.toDataURL('image/jpeg', 0.96), 'JPEG', 0, 0, pageWidth, pageHeight, undefined, 'FAST');
+      }
+
+      const filenameBase = <?= json_encode(strtolower(preg_replace('/[^A-Za-z0-9]+/', '-', $currentLabel) ?: 'report'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
+      const periodSuffix = <?= json_encode(($module !== 'residents')
+          ? (trim($dateFrom) !== '' && trim($dateTo) !== '' ? ('_' . preg_replace('/[^0-9-]/', '', $dateFrom) . '_to_' . preg_replace('/[^0-9-]/', '', $dateTo)) : '')
+          : ('_' . date('Y-m-d')), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
+      const filename = `${filenameBase}${periodSuffix || ''}.pdf`;
+
+      setStatus('Downloading PDF…');
+      pdf.save(filename);
+      setStatus('PDF download started. You can close this tab.', 'success');
+    } catch (err) {
+      console.error('Report PDF export failed:', err);
+      setStatus('PDF export failed. Please try again.', 'error');
+    }
+  };
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', downloadReportPdf, { once: true });
+  } else {
+    downloadReportPdf();
+  }
+})();
+</script>
+<?php endif; ?>
 </body>
 </html>
 <?php exit; ?>
@@ -5222,10 +6391,23 @@ elseif ($module === 'complaints'):
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 <script>
+function openReportPrintView() {
+  const url = new URL(window.location.href);
+  url.searchParams.set('format', 'print');
+  url.searchParams.set('autoprint', '1');
+  url.searchParams.delete('download');
+  const popup = window.open(url.toString(), '_blank', 'width=1100,height=900,scrollbars=yes');
+  if (!popup) {
+    alert('Please allow popups for this site, then click Print again.');
+  }
+}
+
 function downloadPdf() {
   const url = new URL(window.location.href);
   url.searchParams.set('format', 'print');
-  const popup = window.open(url.toString(), '_blank', 'width=900,height=720,scrollbars=yes');
+  url.searchParams.set('autoprint', '0');
+  url.searchParams.set('download', 'pdf');
+  const popup = window.open(url.toString(), '_blank', 'width=1100,height=900,scrollbars=yes');
   if (!popup) {
     alert('Please allow popups for this site, then click Download PDF again.');
   }

@@ -212,14 +212,30 @@ function dra_send_invoice_deferred(mysqli $conn, array $request, float $amount, 
     if ($amount <= 0.0 || $orNumber === '') {
         return;
     }
-    register_shutdown_function(static function () use ($conn, $request, $amount, $orNumber): void {
+    $requestId = trim((string)($request['request_id'] ?? ''));
+    $feeBreakdown = [];
+    if ($requestId !== '' && dr_is_clearance_document_type((string)($request['document_type'] ?? ''))) {
+        foreach (dr_get_clearance_fees_for_request($conn, $requestId) as $feeRow) {
+            $label = trim((string)($feeRow['fee_type'] ?? $feeRow['fee_name'] ?? ''));
+            $feeAmount = (float)($feeRow['amount'] ?? 0);
+            if ($label === '' || $feeAmount < 0) {
+                continue;
+            }
+            $feeBreakdown[] = [
+                'label' => $label,
+                'amount' => $feeAmount,
+            ];
+        }
+    }
+    register_shutdown_function(static function () use ($conn, $request, $amount, $orNumber, $feeBreakdown): void {
         try {
             $baseDir = realpath(__DIR__ . '/../../') ?: dirname(__DIR__, 2);
             require_once $baseDir . '/PhpFiles/General/invoiceGenerator.php';
 
             $requestWithPayment = array_merge($request, [
-                'amount'   => $amount,
+                'amount' => $amount,
                 'or_number' => $orNumber,
+                'fee_breakdown' => $feeBreakdown,
             ]);
 
             $relPath = dr_generate_invoice_pdf($requestWithPayment, $baseDir);
@@ -1126,10 +1142,67 @@ function dra_compose_barangay_address(string $address, string $locality = 'Baran
     $suffix = trim($locality);
     $clean = dra_strip_area_from_address($address);
     $clean = trim((string)(preg_replace('/\s+/u', ' ', $clean) ?? $clean), " \t\n\r\0\x0B,");
-    if ($suffix !== '') {
-        return $suffix;
+    if ($clean === '') {
+        return $suffix !== '' ? $suffix : '-';
     }
-    return $clean !== '' ? $clean : '-';
+    if ($suffix === '') {
+        return $clean;
+    }
+    if (strtolower(substr($clean, -strlen($suffix))) === strtolower($suffix)) {
+        return $clean;
+    }
+    return $clean . ', ' . $suffix;
+}
+
+function dra_compose_locality_address(string $address, string $locality = 'San Jose, Rodriguez, Rizal'): string {
+    $suffix = trim($locality);
+    $clean = dra_strip_area_from_address($address);
+    $clean = trim((string)(preg_replace('/\s+/u', ' ', $clean) ?? $clean), " \t\n\r\0\x0B,");
+    if ($clean === '') {
+        return $suffix !== '' ? $suffix : '-';
+    }
+    if ($suffix === '') {
+        return $clean;
+    }
+    if (strtolower(substr($clean, -strlen($suffix))) === strtolower($suffix)) {
+        return $clean;
+    }
+    return $clean . ', ' . $suffix;
+}
+
+function dra_pick_most_specific_address(array $candidates): string {
+    $fallback = '';
+    $best = '';
+    $bestScore = -1;
+
+    foreach ($candidates as $candidate) {
+        $text = trim((string)$candidate);
+        if ($text === '') {
+            continue;
+        }
+        if ($fallback === '') {
+            $fallback = $text;
+        }
+
+        $stripped = dra_strip_area_from_address($text);
+        $score = mb_strlen($stripped);
+        if (preg_match('/\d/', $stripped)) {
+            $score += 20;
+        }
+        if (preg_match('/\b(unit|lot|blk|block|phase|street|st\\.?|subdivision)\b/i', $stripped)) {
+            $score += 15;
+        }
+        if (str_contains($stripped, ',')) {
+            $score += 8;
+        }
+
+        if ($score > $bestScore) {
+            $best = $text;
+            $bestScore = $score;
+        }
+    }
+
+    return $best !== '' ? $best : $fallback;
 }
 
 function dra_join_address_parts(array $parts): string {
@@ -1753,6 +1826,8 @@ function dra_generate_issued_document(array $requestRow): ?string {
         (string)($requestRow['release_timestamp'] ?? ''),
         (string)($requestRow['completed_at'] ?? ''),
         (string)($requestRow['ready_at'] ?? ''),
+        (string)($requestRow['finance_decision_at'] ?? ''),
+        (string)($requestRow['payment_submitted_at'] ?? ''),
         (string)($requestRow['submitted_at'] ?? ''),
         (string)($requestRow['request_timestamp'] ?? ''),
     ] as $candidateIssuedDate) {
@@ -1768,6 +1843,7 @@ function dra_generate_issued_document(array $requestRow): ?string {
         $issuedDateObj = new DateTime();
     }
     $issuedAt = $issuedDateObj->format('F j, Y');
+    $issuedOnFooter = strtoupper($issuedAt);
     $day = (int)$issuedDateObj->format('j');
     $monthUpper = strtoupper($issuedDateObj->format('F'));
     $yearNum = $issuedDateObj->format('Y');
@@ -1777,6 +1853,10 @@ function dra_generate_issued_document(array $requestRow): ?string {
     $issuedOfficeSentence = 'Issued this ' . $issuedAsDocx . ' at the office of the Punong Barangay, Barangay San Jose, Montalban, Rizal';
     $issuedOfficeSentenceWrapped = 'Issued this ' . $issuedAsDocx . ' at the office of the Punong Barangay, Barangay' . "\n" . 'San Jose, Montalban, Rizal';
     $payload = dra_decode_request_payload($requestRow);
+    $issuedAtFooter = strtoupper($stripTemplateTokens((string)($payload['issued_at'] ?? $payload['issuedAt'] ?? '')));
+    if ($issuedAtFooter === '') {
+        $issuedAtFooter = 'BARANGAY SAN JOSE';
+    }
     if ($isBarangayId) {
         dra_ensure_barangay_id_generated_fields($conn, $requestId, $requestRow, $payload, $issuedDateObj);
     }
@@ -1795,7 +1875,17 @@ function dra_generate_issued_document(array $requestRow): ?string {
         trim((string)($requestRow['resident_id'] ?? ''))
     );
     $residentDbAddress = trim((string)($residentProfileForAddress['full_address'] ?? ''));
-    $applicantResidenceAddress = $residentDbAddress !== '' ? $residentDbAddress : trim((string)($payload['full_address'] ?? $payload['full_address_display'] ?? ''));
+    $resolvedResidentialAddress = dra_pick_most_specific_address([
+        $payload['owner_full_address'] ?? '',
+        $payload['applicant_full_address'] ?? '',
+        $residentDbAddress,
+        $payload['full_address'] ?? '',
+        $payload['full_address_display'] ?? '',
+        $payload['address'] ?? '',
+    ]);
+    $applicantResidenceAddress = $resolvedResidentialAddress !== ''
+        ? $resolvedResidentialAddress
+        : trim((string)($payload['full_address'] ?? $payload['full_address_display'] ?? ''));
     if ($applicantResidenceAddress === '') {
         $applicantResidenceAddress = 'Barangay San Jose, Rodriguez, Rizal';
     }
@@ -1803,7 +1893,7 @@ function dra_generate_issued_document(array $requestRow): ?string {
     $applicantAddressWithBarangay = dra_compose_barangay_address($applicantResidenceAddress);
     $cohabitantResidenceAddress = $stripTemplateTokens(dra_build_cohabitant_address($payload, $applicantResidenceAddress));
     $cohabitationResidenceAddress = $stripTemplateTokens(dra_build_cohabitation_address($payload, $applicantResidenceAddress));
-    $address = $residentDbAddress !== '' ? $residentDbAddress : trim((string)($payload['full_address'] ?? 'Barangay San Jose, Rodriguez, Rizal'));
+    $address = $resolvedResidentialAddress !== '' ? $resolvedResidentialAddress : trim((string)($payload['full_address'] ?? 'Barangay San Jose, Rodriguez, Rizal'));
     $address = dra_strip_area_from_address($address);
     if ($address === '') {
         $address = 'Barangay San Jose, Rodriguez, Rizal';
@@ -2100,7 +2190,7 @@ function dra_generate_issued_document(array $requestRow): ?string {
             $monthsResidency = trim((string)($payload['months_of_residency'] ?? ''));
             $birthdateValue = trim((string)($payload['birthdate'] ?? $payload['date_of_birth'] ?? $payload['child_dob'] ?? $payload['birthDate'] ?? ''));
             $birthplaceValue = trim((string)($payload['birthplace'] ?? $payload['place_of_birth'] ?? $payload['child_birthplace'] ?? ''));
-            $remarksValue = trim((string)($payload['remarks'] ?? $requestRow['status_remarks'] ?? $requestRow['status_reason'] ?? ''));
+            $remarksValue = trim((string)($payload['remarks'] ?? ''));
             $cohabitationDurationValue = trim((string)($payload['cohabitation_duration'] ?? ''));
             $cohabitationChildrenCount = max(0, min(5, (int)trim((string)($payload['cohabitation_children_count'] ?? '0'))));
             $cohabitationChildNames = [];
@@ -2187,17 +2277,10 @@ function dra_generate_issued_document(array $requestRow): ?string {
                 }
                 $childrenListValue[] = trim($childName . ($childAge !== '' ? ', ' . $childAge . ' y/o' : ''));
             }
-            $issuedDateObj = new DateTime();
-            $issuedDateWord = $issuedDateObj->format('F j, Y');
-            $day = (int)$issuedDateObj->format('j');
-            $monthUpper = strtoupper($issuedDateObj->format('F'));
-            $yearNum = $issuedDateObj->format('Y');
-            $v = $day % 100;
-            $suffix = ($v >= 11 && $v <= 13) ? 'th' : (($day % 10 === 1) ? 'st' : (($day % 10 === 2) ? 'nd' : (($day % 10 === 3) ? 'rd' : 'th')));
-            $issuedAsDocx = $day . $suffix . ' day of ' . $monthUpper . ' ' . $yearNum;
+            $issuedDateWord = $issuedAt;
 
             $cacheSignature = sha1(dr_safe_json([
-                'cache_version' => 32,
+                'cache_version' => 33,
                 'preview' => $previewMode ? 1 : 0,
                 'request_id' => $requestId,
                 'document_type' => $docType,
@@ -2219,6 +2302,7 @@ function dra_generate_issued_document(array $requestRow): ?string {
                 'submitted_at' => (string)($requestRow['submitted_at'] ?? ''),
                 'review_timestamp' => (string)($requestRow['review_timestamp'] ?? ''),
                 'release_timestamp' => (string)($requestRow['release_timestamp'] ?? ''),
+                'finance_decision_at' => (string)($requestRow['finance_decision_at'] ?? ''),
                 'template_file' => $templateFile,
                 'template_mtime' => @filemtime($templatePath) ?: 0,
             ]));
@@ -2249,7 +2333,7 @@ function dra_generate_issued_document(array $requestRow): ?string {
             $template->setValue('GOVERNMENT_OFFICE', $normalizeOptionalText($governmentOffice));
             $template->setValue('GOVERNMENT_POSITION', $normalizeOptionalText($governmentPosition));
             $template->setValue('GOVERNMENT_OFFICIAL', $normalizeOptionalText($governmentOfficial));
-            $template->setValue('ISSUED_AT', $normalizeText($issuedDateWord));
+            $template->setValue('ISSUED_AT', $normalizeText($issuedAtFooter));
             $template->setValue('ISSUED_DATE_WORD', $normalizeText($issuedAsDocx));
             $template->setValue('CERTIFICATE_NUMBER', $normalizeText($certNo));
             $template->setValue('OR_NUMBER', $normalizeText($orNo));
@@ -2788,10 +2872,7 @@ function dra_generate_issued_document(array $requestRow): ?string {
                 if ($generalLocation === '') {
                     $generalLocation = '-';
                 }
-                $remarksText = strtoupper($stripTemplateTokens((string)($payload['remarks'] ?? $payload['ownership_type'] ?? '')));
-                if ($remarksText === '') {
-                    $remarksText = '-';
-                }
+                $remarksText = strtoupper($stripTemplateTokens((string)($payload['remarks'] ?? '')));
                 $purposeText = strtoupper($stripTemplateTokens($generalPermitPurpose));
                 if ($purposeText === '') {
                     $purposeText = strtoupper($stripTemplateTokens((string)($payload['request_purpose'] ?? $purpose)));
@@ -2922,9 +3003,9 @@ function dra_generate_issued_document(array $requestRow): ?string {
                     }
                 }
 
-                // The source General Clearance PDF includes a literal ${ISSUED_DATE_WORD} token,
-                // so we redraw that paragraph using the template's indented, justified styling.
-                $writeIssuedParagraph = static function (
+                // Redraw the body paragraphs below the info table so they use
+                // justified text with a first-line indent.
+                $writeJustifiedParagraph = static function (
                     \setasign\Fpdi\Fpdi $pdfInstance,
                     array $segments,
                     float $y,
@@ -3028,12 +3109,31 @@ function dra_generate_issued_document(array $requestRow): ?string {
                     }
                 };
 
+                $noteBlockX = 15.0;
+                $noteBlockY = 124.2;
+                $noteBlockW = $pageWidth - 28.0;
+                $noteBlockH = 14.0;
+                $pdf->Rect($noteBlockX, $noteBlockY, $noteBlockW, $noteBlockH, 'F');
+                $writeJustifiedParagraph(
+                    $pdf,
+                    [
+                        ['text' => 'This clearance is being issued pursuant to Barangay Revenue Code ORDINANCE NO. 11 - 2019', 'bold' => false],
+                    ],
+                    126.0,
+                    5.4,
+                    24.0,
+                    22.0,
+                    12.0,
+                    'Arial',
+                    12.0
+                );
+
                 $issuedBlockX = 15.0;
                 $issuedBlockY = 144.6;
                 $issuedBlockW = $pageWidth - 28.0;
                 $issuedBlockH = 15.0;
                 $pdf->Rect($issuedBlockX, $issuedBlockY, $issuedBlockW, $issuedBlockH, 'F');
-                $writeIssuedParagraph(
+                $writeJustifiedParagraph(
                     $pdf,
                     [
                         ['text' => 'Issued this ', 'bold' => false],
@@ -3057,8 +3157,8 @@ function dra_generate_issued_document(array $requestRow): ?string {
 
                 $footerRows = [
                     ['label' => 'CTC No.', 'value' => $clearanceNumber],
-                    ['label' => 'Issued at', 'value' => ''],
-                    ['label' => 'Issued On', 'value' => ''],
+                    ['label' => 'Issued at', 'value' => $issuedAtFooter],
+                    ['label' => 'Issued On', 'value' => $issuedOnFooter],
                     ['label' => 'Amount', 'value' => $amountText],
                     ['label' => 'OR No.', 'value' => $orNumberText],
                 ];
@@ -3448,7 +3548,19 @@ function dra_generate_issued_document(array $requestRow): ?string {
                     $businessAddress = $applicantResidenceAddress;
                 }
                 $operatorName = strtoupper($stripTemplateTokens($fullName !== '' ? $fullName : 'RESIDENT'));
-                $operatorAddress = $applicantAddressWithBarangay !== '' ? $applicantAddressWithBarangay : $applicantResidenceAddress;
+                $operatorResidentialAddress = dra_pick_most_specific_address([
+                    $payload['owner_full_address'] ?? '',
+                    $payload['applicant_full_address'] ?? '',
+                    $payload['operator_address'] ?? '',
+                    $applicantResidenceAddress,
+                    $residentDbAddress,
+                    $payload['full_address'] ?? '',
+                    $payload['full_address_display'] ?? '',
+                    $payload['address'] ?? '',
+                ]);
+                $operatorAddress = strtoupper($stripTemplateTokens(dra_compose_locality_address(
+                    $operatorResidentialAddress !== '' ? $operatorResidentialAddress : $applicantResidenceAddress
+                )));
                 $amountNumeric = $resolveAmountNumeric();
                 $amountText = $amountNumeric === null ? '' : number_format($amountNumeric, 2, '.', ',');
 
@@ -3521,7 +3633,7 @@ function dra_generate_issued_document(array $requestRow): ?string {
                     [$normalizeTop(0.2575), strtoupper($businessName !== '' ? $businessName : '-')],
                     [$normalizeTop(0.2912), strtoupper($businessAddress !== '' ? $businessAddress : '-')],
                     [$normalizeTop(0.3245), strtoupper($operatorName !== '' ? $operatorName : '-')],
-                    [$normalizeTop(0.3580), strtoupper($operatorAddress !== '' ? $operatorAddress : '-')],
+                    [$normalizeTop(0.3580), $operatorAddress !== '' ? $operatorAddress : '-'],
                 ];
                 foreach ($bodyValues as [$topY, $value]) {
                     $fillBox($pdf, $bodyLeft, $topY, $bodyWidth, 6.0, 0.9, 0.45);
@@ -4318,7 +4430,7 @@ function dra_generate_issued_document(array $requestRow): ?string {
             $valueX = 79.0;
             $lineH = 6.2;
 
-            $row = static function (string $label, string $value, bool $valueBold = true) use ($pdf, $indigencyFont, $leftX, $colonX, $valueX, $lineH): void {
+            $row = static function (string $label, string $value, bool $valueBold = true, string $emptyFallback = '-') use ($pdf, $indigencyFont, $leftX, $colonX, $valueX, $lineH): void {
                 $rawLines = preg_split('/\R/u', (string)$value) ?: [];
                 $normalizedLines = [];
                 foreach ($rawLines as $line) {
@@ -4326,7 +4438,7 @@ function dra_generate_issued_document(array $requestRow): ?string {
                 }
                 $value = trim(implode("\n", array_filter($normalizedLines, static fn($line) => $line !== '')));
                 if ($value === '') {
-                    $value = '-';
+                    $value = $emptyFallback;
                 }
                 $pageRight = 198.0;
                 $valueWidth = max(40.0, $pageRight - $valueX);
@@ -4347,7 +4459,7 @@ function dra_generate_issued_document(array $requestRow): ?string {
             $row('Address', $applicantResidenceAddress !== '' ? $applicantResidenceAddress : '-', false);
             $row('Birthday', $birthdateValue !== '' ? $birthdateValue : '-', false);
             $row('Birthplace', $birthplaceValue !== '' ? $birthplaceValue : '-', false);
-            $row('Remarks', $remarksValue !== '' ? $remarksValue : '-', false);
+            $row('Remarks', $remarksValue, false, '');
             $row('Purpose', $requestPurpose !== '' ? $requestPurpose : '-', false);
             $pdf->Ln(4);
         } elseif ($isRelationshipJailVisit) {
@@ -4417,7 +4529,7 @@ function dra_generate_issued_document(array $requestRow): ?string {
             $valueX = 79.0;
             $lineH = 6.2;
 
-            $row = static function (string $label, string $value, bool $valueBold = true) use ($pdf, $indigencyFont, $leftX, $colonX, $valueX, $lineH): void {
+            $row = static function (string $label, string $value, bool $valueBold = true, string $emptyFallback = '-') use ($pdf, $indigencyFont, $leftX, $colonX, $valueX, $lineH): void {
                 $lines = preg_split('/\R/u', (string)$value) ?: [(string)$value];
                 $lines = array_map(static function (string $line): string {
                     $line = (string)(preg_replace('/\s+/u', ' ', $line) ?? $line);
@@ -4425,7 +4537,7 @@ function dra_generate_issued_document(array $requestRow): ?string {
                 }, $lines);
                 $value = trim(implode("\n", $lines));
                 if ($value === '') {
-                    $value = '-';
+                    $value = $emptyFallback;
                 }
                 $pageRight = 198.0;
                 $valueWidth = max(40.0, $pageRight - $valueX);
@@ -4461,7 +4573,7 @@ function dra_generate_issued_document(array $requestRow): ?string {
             $row('Name', $nameValue, true);
             $row('Address', ($address !== '' ? $address : '-'), true);
             $row('', 'BARANGAY SAN JOSE, MONTALBAN, RIZAL', true);
-            $row('Remarks', $remarksValue !== '' ? $remarksValue : '-', true);
+            $row('Remarks', $remarksValue, true, '');
             $purposeLine = 'COHABITATION SINCE ' . ($cohabitationSinceValue !== '' ? $cohabitationSinceValue : '-');
             $row('Purpose', $purposeLine, true);
             $row('Name of Children', !empty($children) ? implode('; ', $children) : '-', false);
@@ -4640,11 +4752,21 @@ function dra_generate_issued_document(array $requestRow): ?string {
             $pdf->SetXY($labelX, $metaY);
             $pdf->Cell($labelW, 6, 'Issued at:', 0, 0, 'L');
             $pdf->Line($lineX1, $metaY + 5, $lineX2, $metaY + 5);
+            if ($issuedAtFooter !== '') {
+                $pdf->SetXY($lineX1, $metaY);
+                $pdf->SetFont($indigencyFont, '', 11);
+                $pdf->Cell($lineX2 - $lineX1, 6, $issuedAtFooter, 0, 0, 'L');
+            }
             $metaY += 8;
             $pdf->SetFont($indigencyFont, 'B', 12);
             $pdf->SetXY($labelX, $metaY);
             $pdf->Cell($labelW, 6, 'Issued On:', 0, 0, 'L');
             $pdf->Line($lineX1, $metaY + 5, $lineX2, $metaY + 5);
+            if ($issuedOnFooter !== '') {
+                $pdf->SetXY($lineX1, $metaY);
+                $pdf->SetFont($indigencyFont, '', 11);
+                $pdf->Cell($lineX2 - $lineX1, 6, $issuedOnFooter, 0, 0, 'L');
+            }
             $metaY += 8;
             $pdf->SetXY($labelX, $metaY);
             $pdf->Cell($labelW, 6, 'OR No.:', 0, 0, 'L');
@@ -4669,10 +4791,20 @@ function dra_generate_issued_document(array $requestRow): ?string {
             $pdf->SetXY($labelX, $metaY);
             $pdf->Cell($labelW, 6, 'Issued at:', 0, 0, 'L');
             $pdf->Line($lineX1, $metaY + 5, $lineX2, $metaY + 5);
+            if ($issuedAtFooter !== '') {
+                $pdf->SetXY($lineX1, $metaY);
+                $pdf->SetFont($indigencyFont, '', 11);
+                $pdf->Cell($lineX2 - $lineX1, 6, $issuedAtFooter, 0, 0, 'L');
+            }
             $metaY += 7;
             $pdf->SetXY($labelX, $metaY);
             $pdf->Cell($labelW, 6, 'Issued On:', 0, 0, 'L');
             $pdf->Line($lineX1, $metaY + 5, $lineX2, $metaY + 5);
+            if ($issuedOnFooter !== '') {
+                $pdf->SetXY($lineX1, $metaY);
+                $pdf->SetFont($indigencyFont, '', 11);
+                $pdf->Cell($lineX2 - $lineX1, 6, $issuedOnFooter, 0, 0, 'L');
+            }
             $metaY += 7;
             $pdf->SetXY($labelX, $metaY);
             $pdf->Cell($labelW, 6, 'OR No.:', 0, 0, 'L');
@@ -4696,10 +4828,20 @@ function dra_generate_issued_document(array $requestRow): ?string {
             $pdf->SetXY($labelX, $metaY);
             $pdf->Cell($labelW, 6, 'Issued at:', 0, 0, 'L');
             $pdf->Line($lineX1, $metaY + 5, $lineX2, $metaY + 5);
+            if ($issuedAtFooter !== '') {
+                $pdf->SetXY($lineX1, $metaY);
+                $pdf->SetFont($indigencyFont, '', 11);
+                $pdf->Cell($lineX2 - $lineX1, 6, $issuedAtFooter, 0, 0, 'L');
+            }
             $metaY += 7;
             $pdf->SetXY($labelX, $metaY);
             $pdf->Cell($labelW, 6, 'Issued On:', 0, 0, 'L');
             $pdf->Line($lineX1, $metaY + 5, $lineX2, $metaY + 5);
+            if ($issuedOnFooter !== '') {
+                $pdf->SetXY($lineX1, $metaY);
+                $pdf->SetFont($indigencyFont, '', 11);
+                $pdf->Cell($lineX2 - $lineX1, 6, $issuedOnFooter, 0, 0, 'L');
+            }
             $metaY += 7;
             $pdf->SetXY($labelX, $metaY);
             $pdf->Cell($labelW, 6, 'OR No.:', 0, 0, 'L');
@@ -4723,10 +4865,20 @@ function dra_generate_issued_document(array $requestRow): ?string {
             $pdf->SetXY($labelX, $metaY);
             $pdf->Cell($labelW, 6, 'Issued at:', 0, 0, 'L');
             $pdf->Line($lineX1, $metaY + 5, $lineX2, $metaY + 5);
+            if ($issuedAtFooter !== '') {
+                $pdf->SetXY($lineX1, $metaY);
+                $pdf->SetFont($indigencyFont, '', 11);
+                $pdf->Cell($lineX2 - $lineX1, 6, $issuedAtFooter, 0, 0, 'L');
+            }
             $metaY += 7;
             $pdf->SetXY($labelX, $metaY);
             $pdf->Cell($labelW, 6, 'Issued On:', 0, 0, 'L');
             $pdf->Line($lineX1, $metaY + 5, $lineX2, $metaY + 5);
+            if ($issuedOnFooter !== '') {
+                $pdf->SetXY($lineX1, $metaY);
+                $pdf->SetFont($indigencyFont, '', 11);
+                $pdf->Cell($lineX2 - $lineX1, 6, $issuedOnFooter, 0, 0, 'L');
+            }
             $metaY += 7;
             $pdf->SetXY($labelX, $metaY);
             $pdf->Cell($labelW, 6, 'OR No.:', 0, 0, 'L');
@@ -4750,10 +4902,20 @@ function dra_generate_issued_document(array $requestRow): ?string {
             $pdf->SetXY($labelX, $metaY);
             $pdf->Cell($labelW, 6, 'Issued at:', 0, 0, 'L');
             $pdf->Line($lineX1, $metaY + 5, $lineX2, $metaY + 5);
+            if ($issuedAtFooter !== '') {
+                $pdf->SetXY($lineX1, $metaY);
+                $pdf->SetFont($indigencyFont, '', 11);
+                $pdf->Cell($lineX2 - $lineX1, 6, $issuedAtFooter, 0, 0, 'L');
+            }
             $metaY += 7;
             $pdf->SetXY($labelX, $metaY);
             $pdf->Cell($labelW, 6, 'Issued On:', 0, 0, 'L');
             $pdf->Line($lineX1, $metaY + 5, $lineX2, $metaY + 5);
+            if ($issuedOnFooter !== '') {
+                $pdf->SetXY($lineX1, $metaY);
+                $pdf->SetFont($indigencyFont, '', 11);
+                $pdf->Cell($lineX2 - $lineX1, 6, $issuedOnFooter, 0, 0, 'L');
+            }
             $metaY += 7;
             $pdf->SetXY($labelX, $metaY);
             $pdf->Cell($labelW, 6, 'OR No.:', 0, 0, 'L');
@@ -6989,6 +7151,30 @@ if ($action === 'personnel_approve') {
             $editedPreview = $decoded;
         }
     }
+    $clearanceFeeSnapshot = [];
+    $clearanceFeeSnapshotRaw = trim((string)($_POST['clearance_fee_snapshot'] ?? ''));
+    if ($clearanceFeeSnapshotRaw !== '') {
+        $decodedFeeSnapshot = json_decode($clearanceFeeSnapshotRaw, true);
+        if (is_array($decodedFeeSnapshot)) {
+            foreach ($decodedFeeSnapshot as $feeRow) {
+                if (!is_array($feeRow)) {
+                    continue;
+                }
+                $feeName = trim((string)($feeRow['fee_name'] ?? $feeRow['fee_type'] ?? ''));
+                if ($feeName === '') {
+                    continue;
+                }
+                $feeAmount = (float)($feeRow['amount'] ?? 0);
+                if ($feeAmount < 0) {
+                    $feeAmount = 0.0;
+                }
+                $clearanceFeeSnapshot[] = [
+                    'fee_name' => $feeName,
+                    'amount' => $feeAmount,
+                ];
+            }
+        }
+    }
     if (!empty($editedPreview)) {
         dra_apply_preview_edits($conn, $requestId, $row, $editedPreview);
         $row = dr_fetch_request($conn, $requestId) ?? $row;
@@ -7007,6 +7193,28 @@ if ($action === 'personnel_approve') {
     }
     if (!$isFirstTimeJobSeeker && $isClearanceDoc) {
         $taggedFees = dr_get_clearance_fees_for_request($conn, $requestId);
+        if (!$taggedFees && !empty($clearanceFeeSnapshot)) {
+            $clearanceId = dr_get_clearance_id_for_request($conn, $requestId);
+            if ($clearanceId) {
+                $deleteFeeStmt = $conn->prepare("DELETE FROM clearancefeestbl WHERE clearance_id=?");
+                if ($deleteFeeStmt) {
+                    $deleteFeeStmt->bind_param('i', $clearanceId);
+                    $deleteFeeStmt->execute();
+                    $deleteFeeStmt->close();
+                }
+                $insertFeeStmt = $conn->prepare("INSERT INTO clearancefeestbl (clearance_id, fee_type, amount) VALUES (?, ?, ?)");
+                if ($insertFeeStmt) {
+                    foreach ($clearanceFeeSnapshot as $snapshotFee) {
+                        $feeName = (string)$snapshotFee['fee_name'];
+                        $feeAmount = (float)$snapshotFee['amount'];
+                        $insertFeeStmt->bind_param('isd', $clearanceId, $feeName, $feeAmount);
+                        $insertFeeStmt->execute();
+                    }
+                    $insertFeeStmt->close();
+                }
+            }
+            $taggedFees = dr_get_clearance_fees_for_request($conn, $requestId);
+        }
         if (!$taggedFees) {
             dr_respond_json(422, ['success' => false, 'message' => 'Please tag the applicable fees before approving this request.']);
         }

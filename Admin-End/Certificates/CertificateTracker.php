@@ -1330,10 +1330,15 @@ if ($certificateLaunchStage === 'release') {
       line-height: 1.18;
     }
     #viewModal .doc-preview-paper.doc-preview-paper--generalclearance .doc-preview-generalclearance-note {
-      width: 84%;
-      margin: 20px auto 0;
-      text-align: center !important;
-      line-height: 1.38;
+      display: block;
+      width: calc(100% - 108px);
+      margin: 20px 0 0 54px;
+      font-size: 12pt;
+      text-align: justify !important;
+      text-justify: inter-word;
+      text-align-last: left;
+      line-height: 1.4;
+      text-indent: 48px;
     }
     #viewModal .doc-preview-paper.doc-preview-paper--generalclearance .doc-preview-generalclearance-note-nowrap {
       white-space: nowrap;
@@ -3331,6 +3336,6 @@ if ($certificateLaunchStage === 'release') {
 </script>
 <script src="../../JS-Script-Files/Admin-End/tableColumnsGeneric.js?v=20260215-1"></script>
 <script src="../../JS-Script-Files/Shared/barangayIdDigital.js?v=20260324-01"></script>
-<script src="../../JS-Script-Files/Admin-End/certificateTrackerScript.js?v=20260323-14"></script>
+<script src="../../JS-Script-Files/Admin-End/certificateTrackerScript.js?v=20260325-07"></script>
 </body>
 </html>

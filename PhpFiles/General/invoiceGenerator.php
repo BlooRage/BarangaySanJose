@@ -44,6 +44,7 @@ if (!function_exists('dr_generate_invoice_pdf')) {
         $certNumber   = trim((string)($requestData['certificate_number'] ?? ''));
         $amount       = isset($requestData['amount']) ? (float)$requestData['amount'] : 0.0;
         $paymentMethod = trim((string)($requestData['payment_method'] ?? ''));
+        $feeBreakdown = is_array($requestData['fee_breakdown'] ?? null) ? $requestData['fee_breakdown'] : [];
 
         // Only generate for paid requests.
         if ($amount <= 0.0 || $orNumber === '') {
@@ -149,20 +150,45 @@ if (!function_exists('dr_generate_invoice_pdf')) {
             $pdf->Cell($amountW, 7, 'AMOUNT', 1, 1, 'C', true);
             $pdf->SetTextColor(0, 0, 0);
 
-            // ── Line item row ─────────────────────────────────────────────────
-            $pdf->SetFont('Arial', '', 9);
-            $description = $documentType;
-            if ($purpose !== '') {
-                $description .= ' - ' . $purpose;
+            $lineItems = [];
+            foreach ($feeBreakdown as $feeRow) {
+                $label = trim((string)($feeRow['label'] ?? $feeRow['fee_type'] ?? $feeRow['fee_name'] ?? ''));
+                $lineAmount = isset($feeRow['amount']) ? (float)$feeRow['amount'] : 0.0;
+                if ($label === '' || $lineAmount < 0) {
+                    continue;
+                }
+                $lineItems[] = [
+                    'description' => $label,
+                    'amount' => $lineAmount,
+                ];
             }
-            // Truncate description if too long for the cell.
-            if (mb_strlen($description) > 75) {
-                $description = mb_substr($description, 0, 72) . '...';
+            if (!$lineItems) {
+                $description = $documentType;
+                if ($purpose !== '') {
+                    $description .= ' - ' . $purpose;
+                }
+                $lineItems[] = [
+                    'description' => $description,
+                    'amount' => $amount,
+                ];
             }
+
+            // ── Line item rows ────────────────────────────────────────────────
             $pdf->SetFillColor(255, 255, 255);
-            $pdf->Cell($descW, 7, $description, 1, 0, 'L', true);
-            $pdf->SetFont('Arial', '', 9);
-            $pdf->Cell($amountW, 7, 'PHP ' . number_format($amount, 2), 1, 1, 'R', true);
+            foreach ($lineItems as $lineItem) {
+                $description = trim((string)($lineItem['description'] ?? ''));
+                if ($description === '') {
+                    $description = $documentType !== '' ? $documentType : 'Payment';
+                }
+                if (mb_strlen($description) > 75) {
+                    $description = mb_substr($description, 0, 72) . '...';
+                }
+                $lineAmount = (float)($lineItem['amount'] ?? 0);
+
+                $pdf->SetFont('Arial', '', 9);
+                $pdf->Cell($descW, 7, $description, 1, 0, 'L', true);
+                $pdf->Cell($amountW, 7, 'PHP ' . number_format($lineAmount, 2), 1, 1, 'R', true);
+            }
 
             // ── Total row ─────────────────────────────────────────────────────
             $pdf->SetFont('Arial', 'B', 9);

@@ -1201,6 +1201,21 @@ if ($action === 'submit_request') {
             dr_respond_json(422, ['success' => false, 'message' => 'Application type is required.']);
         }
 
+        $vehicleMake = trim((string)($_POST['vehicle_make'] ?? ''));
+        $vehicleMakeOther = trim((string)($_POST['vehicle_make_other'] ?? ''));
+        $allowedVehicleMakes = ['Rusi', 'Yamaha', 'Kawasaki', 'Honda', 'Others'];
+        if (!in_array($vehicleMake, $allowedVehicleMakes, true)) {
+            dr_respond_json(422, ['success' => false, 'message' => 'Valid vehicle make is required.']);
+        }
+        if ($vehicleMake === 'Others') {
+            if ($vehicleMakeOther === '') {
+                dr_respond_json(422, ['success' => false, 'message' => 'Please specify the vehicle make.']);
+            }
+            $vehicleMake = $vehicleMakeOther;
+        }
+        $_POST['vehicle_make'] = $vehicleMake;
+        unset($_POST['vehicle_make_other']);
+
         $franchiseeMatrix = [
             'PRIVATE - FAMILY USE' => ['franchisee' => 'Private - FAMILY USE', 'location' => ''],
             'PRIVATE - DELIVERY USE' => ['franchisee' => 'Private - DELIVERY USE', 'location' => ''],
@@ -2221,16 +2236,50 @@ if ($action === 'download_invoice') {
         exit('Request not found.');
     }
 
-    $invoicePublicPath = trim((string)($row['invoice_file_path'] ?? ''));
-    if ($invoicePublicPath === '') {
-        http_response_code(404);
-        exit('Invoice not available for this request.');
-    }
-
     $baseDir = realpath(__DIR__ . '/../../');
     if ($baseDir === false) {
         http_response_code(500);
         exit('Path resolution failed.');
+    }
+
+    $resolvedAmount = is_numeric((string)($row['amount'] ?? null))
+        ? (float)$row['amount']
+        : (is_numeric((string)($row['fee_amount'] ?? null)) ? (float)$row['fee_amount'] : 0.0);
+    $resolvedOrNumber = trim((string)($row['or_number'] ?? ''));
+    $invoicePublicPath = trim((string)($row['invoice_file_path'] ?? ''));
+
+    if ($resolvedAmount > 0.0 && $resolvedOrNumber !== '') {
+        require_once $baseDir . '/PhpFiles/General/invoiceGenerator.php';
+        $feeBreakdown = [];
+        if (dr_is_clearance_document_type((string)($row['document_type'] ?? ''))) {
+            foreach (dr_get_clearance_fees_for_request($conn, $requestId) as $feeRow) {
+                $label = trim((string)($feeRow['fee_type'] ?? $feeRow['fee_name'] ?? ''));
+                $feeAmount = (float)($feeRow['amount'] ?? 0);
+                if ($label === '' || $feeAmount < 0) {
+                    continue;
+                }
+                $feeBreakdown[] = [
+                    'label' => $label,
+                    'amount' => $feeAmount,
+                ];
+            }
+        }
+        $regeneratedPath = dr_generate_invoice_pdf(array_merge($row, [
+            'amount' => $resolvedAmount,
+            'or_number' => $resolvedOrNumber,
+            'fee_breakdown' => $feeBreakdown,
+        ]), $baseDir);
+        if (is_string($regeneratedPath) && trim($regeneratedPath) !== '') {
+            $invoicePublicPath = trim($regeneratedPath);
+            $safeRelPath = $conn->real_escape_string($invoicePublicPath);
+            $safeReqId = $conn->real_escape_string($requestId);
+            $conn->query("UPDATE documentrequesttbl SET invoice_file_path = '{$safeRelPath}' WHERE request_id = '{$safeReqId}'");
+        }
+    }
+
+    if ($invoicePublicPath === '') {
+        http_response_code(404);
+        exit('Invoice not available for this request.');
     }
 
     $relative = '/' . ltrim(dr_strip_legacy_base($invoicePublicPath), '/');

@@ -3,8 +3,7 @@
   const submitBtn = form?.querySelector(".submit-btn");
   const ownerTypeSelect = document.getElementById("ownerTypeSelect");
   const renterOwnerDetails = document.getElementById("renterOwnerDetails");
-  const appNew = document.getElementById("app_new");
-  const appRenewal = document.getElementById("app_renewal");
+  const applicationTypeSelect = document.getElementById("applicationTypeSelect");
   const documentUploadSection = document.getElementById("documentUploadSection");
   const businessSameAddress = document.getElementById("businessSameAddress");
   const businessAddressSystemRow = document.getElementById("businessAddressSystemRow");
@@ -163,12 +162,15 @@
   };
 
   const updateState = () => {
-    const isNewApp = appNew?.checked === true;
-    const isRenewal = appRenewal?.checked === true;
+    const applicationType = String(applicationTypeSelect?.value || "").trim();
+    const isNewApp = applicationType === "New";
+    const isRenewal = applicationType === "Renewal";
     const isSameAddress = businessSameAddress?.checked === true;
     const businessSystem = (businessAddressSystem?.value || '').trim();
     if (businessRequestPurpose) {
-      businessRequestPurpose.value = isRenewal ? "Business Permit - Renewal" : "Business Permit - New Application";
+      businessRequestPurpose.value = isRenewal
+        ? "Business Permit - Renewal"
+        : "Business Permit - New Application";
     }
     if (documentUploadSection) {
       documentUploadSection.classList.toggle("d-none", !(isNewApp || isRenewal));

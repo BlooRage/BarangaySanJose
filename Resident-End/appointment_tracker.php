@@ -411,7 +411,7 @@ require_once __DIR__ . '/includes/resident_access_guard.php';
             <div class="col-md-6"><strong>Appointment ID:</strong><div id="appointmentViewId" class="text-muted"></div></div>
             <div class="col-md-6"><strong>Status:</strong><div id="appointmentViewStatus"></div></div>
             <div class="col-md-6"><strong>Subject:</strong><div id="appointmentViewSubject" class="text-muted"></div></div>
-            <div class="col-md-6"><strong>Assigned Official:</strong><div id="appointmentViewOfficial" class="text-muted"></div></div>
+            <div class="col-md-6"><strong>Council Member:</strong><div id="appointmentViewOfficial" class="text-muted"></div></div>
             <div class="col-md-6"><strong>Preferred Schedule:</strong><div id="appointmentViewPreferred" class="text-muted"></div></div>
             <div class="col-md-6"><strong>Confirmed Schedule:</strong><div id="appointmentViewConfirmed" class="text-muted"></div></div>
             <div class="col-md-6"><strong>Requested At:</strong><div id="appointmentViewRequested" class="text-muted"></div></div>

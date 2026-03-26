@@ -57,8 +57,44 @@ $currentUserLabel = cms_content_current_user_display($conn, $currentUserId, $cur
 $canReview = cms_content_can_review($conn, $currentUserId, $currentRole);
 $request = $requestId !== '' ? cms_content_request($conn, $requestId) : null;
 
-if (!in_array($action, ['save_draft', 'submit_request', 'auto_approve', 'approve_request', 'deny_request', 'revert_to_this_version', 'revert_to_previous_version'], true)) {
+if (!in_array($action, ['save_draft', 'submit_request', 'auto_approve', 'approve_request', 'deny_request', 'revert_to_this_version', 'revert_to_previous_version', 'archive_request', 'restore_request'], true)) {
     cms_action_redirect($redirectModule, 'Invalid content action.', 'warning', $requestId);
+}
+
+if ($action === 'archive_request') {
+    if (!$request) {
+        cms_action_redirect('requests', 'Content request not found.', 'warning');
+    }
+
+    $status = strtolower(trim((string)($request['status'] ?? 'draft')));
+    $liveRequest = $status === 'approved' ? cms_content_live_request($conn, (string)($request['page_key'] ?? '')) : null;
+    $isLiveApprovedRequest = $liveRequest && (string)($liveRequest['request_id'] ?? '') === (string)$request['request_id'];
+    if (!cms_content_request_is_archivable_by($request, $currentUserId, $canReview, $isLiveApprovedRequest)) {
+        $message = $isLiveApprovedRequest
+            ? 'The current live approved version cannot be archived.'
+            : 'You do not have permission to archive this content request.';
+        cms_action_redirect('requests', $message, 'warning', $requestId);
+    }
+
+    if (!cms_content_archive_request($conn, $requestId, $currentUserId, $currentUserLabel)) {
+        cms_action_redirect('requests', 'Unable to archive the selected content request.', 'danger', $requestId);
+    }
+
+    cms_action_redirect('requests', 'Content request archived.', 'success');
+}
+
+if ($action === 'restore_request') {
+    if (!$request) {
+        cms_action_redirect('requests', 'Content request not found.', 'warning');
+    }
+    if (!cms_content_request_is_restorable_by($request, $currentUserId, $canReview)) {
+        cms_action_redirect('requests', 'You do not have permission to restore this content request.', 'warning', $requestId);
+    }
+    if (!cms_content_restore_request($conn, $requestId, $currentUserLabel)) {
+        cms_action_redirect('requests', 'Unable to restore the selected content request.', 'danger', $requestId);
+    }
+
+    cms_action_redirect('requests', 'Content request restored.', 'success', $requestId);
 }
 
 if (in_array($action, ['revert_to_this_version', 'revert_to_previous_version'], true)) {

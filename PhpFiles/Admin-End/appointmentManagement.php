@@ -1,6 +1,9 @@
 <?php
 require_once __DIR__ . "/../General/security.php";
 require_once __DIR__ . "/../General/connection.php";
+require_once __DIR__ . "/../General/appointmentCouncilMembers.php";
+require_once __DIR__ . "/../General/appointmentSettings.php";
+require_once __DIR__ . "/../General/appointmentTimeSlots.php";
 
 requireRoleSession(['SuperAdmin', 'Official', 'Officials', 'Personnel', 'Personnels', 'Admin', 'Employee'], false);
 verifyCsrfToken(false);
@@ -168,7 +171,7 @@ function am_ensure_status_id(mysqli $conn, string $name, string $type): int
     return $statusId;
 }
 
-function am_validate_schedule(string $date, string $time): string
+function am_validate_schedule(string $date, string $time, array $appointmentSettings): string
 {
     if ($date === '' || $time === '') {
         throw new Exception('Confirmed date and time are required for this action.');
@@ -176,20 +179,29 @@ function am_validate_schedule(string $date, string $time): string
 
     $timezone = new DateTimeZone(date_default_timezone_get() ?: 'Asia/Manila');
     $now = new DateTimeImmutable('now', $timezone);
-    $minDate = $now->modify('+1 day')->format('Y-m-d');
-    $yearEnd = $now->format('Y-12-31');
+    $bookingLimits = aps_booking_date_limits($appointmentSettings, $now);
+    $minDate = (string)($bookingLimits['min_date'] ?? '');
+    $maxDate = (string)($bookingLimits['max_date'] ?? '');
 
     $schedule = DateTimeImmutable::createFromFormat('Y-m-d H:i', $date . ' ' . $time, $timezone);
     if (!$schedule || $schedule->format('Y-m-d') !== $date || $schedule->format('H:i') !== $time) {
         throw new Exception('Confirmed appointment date or time is invalid.');
     }
 
-    if ($date < $minDate || $date > $yearEnd) {
-        throw new Exception('Confirmed appointment date must be after today and within the current year.');
+    if (empty($bookingLimits['has_window']) || aps_first_available_booking_date($appointmentSettings, $now) === null) {
+        throw new Exception('No appointment dates are currently available based on the saved appointment settings.');
     }
 
-    if ($time < '09:01' || $time > '16:59') {
-        throw new Exception('Confirmed appointment time must be between 9:01 AM and 4:59 PM.');
+    if ($date < $minDate || $date > $maxDate) {
+        throw new Exception('Confirmed appointment date is outside the current booking window.');
+    }
+
+    if (!aps_is_date_available($appointmentSettings, $date)) {
+        throw new Exception('The selected appointment date is unavailable for official appointments.');
+    }
+
+    if (!ats_is_valid_time($time, $appointmentSettings)) {
+        throw new Exception('Please select one of the allotted appointment times.');
     }
 
     return $schedule->format('Y-m-d H:i:s');
@@ -233,17 +245,26 @@ if ($officialUserId !== '' && !isset($appointmentColumns['user_id_official_assig
     ]);
 }
 
-if ($officialUserId !== '' && !am_account_exists($conn, $officialUserId)) {
-    am_redirect_with_message('error', 'Selected official account could not be found.', [
+$needsSchedule = in_array($action, ['approve_appointment', 'reschedule_appointment'], true);
+$councilMembersByUserId = apcm_fetch_council_members_by_user_id($conn);
+$appointmentSettings = aps_settings_load($conn);
+
+if ($needsSchedule && $officialUserId === '') {
+    am_redirect_with_message('error', 'Please select the barangay council member for this appointment.', [
         'appointment_id' => $appointmentId,
     ]);
 }
 
-$needsSchedule = in_array($action, ['approve_appointment', 'reschedule_appointment'], true);
+if ($officialUserId !== '' && !isset($councilMembersByUserId[$officialUserId])) {
+    am_redirect_with_message('error', 'Selected barangay council member could not be found.', [
+        'appointment_id' => $appointmentId,
+    ]);
+}
+
 $confirmedScheduleTimestamp = null;
 if ($needsSchedule) {
     try {
-        $confirmedScheduleTimestamp = am_validate_schedule($confirmedDate, $confirmedTime);
+        $confirmedScheduleTimestamp = am_validate_schedule($confirmedDate, $confirmedTime, $appointmentSettings);
     } catch (Throwable $e) {
         am_redirect_with_message('error', $e->getMessage(), ['appointment_id' => $appointmentId]);
     }

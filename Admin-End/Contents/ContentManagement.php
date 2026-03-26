@@ -42,14 +42,14 @@ $reportsUrl = appUrl('Admin-End/Reports/Reports.php') . '?module=certificate_iss
 $sharedRules = [
     'Any image file may be uploaded regardless of ratio, but it should be cropped using the current live ratio of that section before saving.',
     'Banner titles, banner messages, and rich text sections use Summernote.',
-    'Every content update shows a live preview before it can be submitted.',
+    'Every content update keeps a current preview ready in the View Preview window before it can be submitted.',
     'Submitting, approving, denying, and auto-approving always require confirmation.',
     'SuperAdmin and the appointed Barangay Secretary can approve or deny requests, and they can auto-approve their own changes.',
 ];
 
 $sharedFlow = [
     'User edits text or image content.',
-    'System shows a preview of the updated design.',
+    'System keeps the updated design ready in the View Preview window.',
     'User confirms and submits the change request.',
     'SuperAdmin or the appointed Barangay Secretary reviews the request.',
     'Approver confirms the approve or deny action before the change is finalized.',
@@ -231,6 +231,13 @@ $allRequests = cms_content_requests($conn);
 $myRequests = array_values(array_filter($allRequests, static function (array $request) use ($currentUserId): bool {
     return cms_content_request_is_owned_by($request, $currentUserId);
 }));
+$myActiveRequests = array_values(array_filter($myRequests, static function (array $request): bool {
+    return strtolower((string)($request['status'] ?? 'draft')) !== 'archived';
+}));
+$archivedRequests = array_values(array_filter($allRequests, static function (array $request) use ($currentUserId, $canReviewContent): bool {
+    return strtolower((string)($request['status'] ?? 'draft')) === 'archived'
+        && cms_content_request_is_viewable_by($request, $currentUserId, $canReviewContent);
+}));
 $reviewQueue = array_values(array_filter($allRequests, static function (array $request) use ($canReviewContent): bool {
     return $canReviewContent && strtolower((string)($request['status'] ?? 'draft')) === 'pending';
 }));
@@ -238,9 +245,16 @@ $draftCount = count(array_filter($myRequests, static fn(array $request): bool =>
 $myPendingCount = count(array_filter($myRequests, static fn(array $request): bool => strtolower((string)($request['status'] ?? '')) === 'pending'));
 $myApprovedCount = count(array_filter($myRequests, static fn(array $request): bool => strtolower((string)($request['status'] ?? '')) === 'approved'));
 $myDeniedCount = count(array_filter($myRequests, static fn(array $request): bool => strtolower((string)($request['status'] ?? '')) === 'denied'));
+$myArchivedCount = count(array_filter($myRequests, static fn(array $request): bool => strtolower((string)($request['status'] ?? '')) === 'archived'));
 $pendingReviewCount = count($reviewQueue);
 $approvedHistoryRequests = array_values(array_filter($allRequests, static fn(array $request): bool => strtolower((string)($request['status'] ?? '')) === 'approved'));
 usort($approvedHistoryRequests, static function (array $left, array $right): int {
+    return cms_content_request_sort_timestamp($right) <=> cms_content_request_sort_timestamp($left);
+});
+usort($myActiveRequests, static function (array $left, array $right): int {
+    return cms_content_request_sort_timestamp($right) <=> cms_content_request_sort_timestamp($left);
+});
+usort($archivedRequests, static function (array $left, array $right): int {
     return cms_content_request_sort_timestamp($right) <=> cms_content_request_sort_timestamp($left);
 });
 
@@ -310,6 +324,7 @@ if (in_array($selectedModuleKey, cms_content_editable_page_keys(), true)) {
                 $editorReadOnlyMessage = match ($editorStatus) {
                     'pending' => 'This request is already pending review. You can preview it here, and authorized reviewers can approve or deny it from the request queue.',
                     'approved' => 'This approved request is read-only. Start a new edit from the current live content when you need another change.',
+                    'archived' => 'This request is archived. You can review it here and restore it from the request tracker when needed.',
                     default => 'This request is read-only.',
                 };
             }
@@ -355,8 +370,20 @@ function cms_request_status_class(string $status): string
     return match (strtolower(trim($status))) {
         'pending' => 'is-pending',
         'approved' => 'is-approved',
+        'archived' => 'is-archived',
         'denied' => 'is-denied',
         default => 'is-draft',
+    };
+}
+
+function cms_request_table_status_class(string $status): string
+{
+    return match (strtolower(trim($status))) {
+        'pending' => 'pending',
+        'approved' => 'approved',
+        'archived' => 'archived',
+        'denied' => 'denied',
+        default => 'draft',
     };
 }
 
@@ -373,6 +400,22 @@ function cms_format_datetime(?string $value): string
     }
 
     return date('F d, Y g:i A', $timestamp);
+}
+
+function cms_render_request_action_form(string $action, string $requestId, string $label, string $buttonClass, string $confirmMessage): string
+{
+    ob_start();
+    ?>
+    <form method="post" action="../../PhpFiles/Admin-End/siteContentActions.php" class="d-inline" data-confirm="<?= htmlspecialchars($confirmMessage, ENT_QUOTES, 'UTF-8') ?>">
+      <?= csrfTokenField() ?>
+      <input type="hidden" name="action" value="<?= htmlspecialchars($action, ENT_QUOTES, 'UTF-8') ?>">
+      <input type="hidden" name="request_id" value="<?= htmlspecialchars($requestId, ENT_QUOTES, 'UTF-8') ?>">
+      <button type="submit" class="btn btn-sm compact-table-btn <?= htmlspecialchars($buttonClass, ENT_QUOTES, 'UTF-8') ?>">
+        <?= htmlspecialchars($label) ?>
+      </button>
+    </form>
+    <?php
+    return (string)ob_get_clean();
 }
 
 function cms_render_text_field(string $fieldKey, string $label, string $value = '', string $placeholder = '', string $help = '', bool $itemField = false): string
@@ -606,94 +649,117 @@ function cms_render_contact_tile_item(array $item): string
     return (string)ob_get_clean();
 }
 
-function cms_render_request_card(array $request, bool $canReviewContent, array $versionMeta = []): string
+function cms_render_request_table(array $requests, string $emptyMessage, string $currentUserId, bool $canReviewContent, array $requestVersionMeta = []): string
 {
-    $status = strtolower(trim((string)($request['status'] ?? 'draft')));
-    $requestId = (string)($request['request_id'] ?? '');
-    $pageKey = (string)($request['page_key'] ?? 'home');
-    $reviewNote = trim((string)($request['review_note'] ?? ''));
-    $isLiveVersion = (bool)($versionMeta['is_live'] ?? false);
-    $canRevertToThis = $canReviewContent && $status === 'approved' && (bool)($versionMeta['can_revert_to_this'] ?? false);
-    $canRevertToPrevious = $canReviewContent && $status === 'approved' && (bool)($versionMeta['can_revert_to_previous'] ?? false);
     ob_start();
     ?>
-    <article class="cms-request-card">
-      <div class="cms-request-card-head">
-        <div>
-          <div class="d-flex flex-wrap align-items-center gap-2">
-            <h4 class="cms-request-title mb-0"><?= htmlspecialchars((string)($request['page_label'] ?? cms_content_page_label($pageKey))) ?></h4>
-            <span class="cms-request-status <?= htmlspecialchars(cms_request_status_class($status)) ?>">
-              <?= htmlspecialchars(ucfirst($status)) ?>
-            </span>
-            <?php if ($isLiveVersion): ?>
-              <span class="cms-request-status is-live-version">Current Live Version</span>
-            <?php endif; ?>
-          </div>
-          <p class="cms-request-meta mb-0">
-            Request ID: <?= htmlspecialchars($requestId) ?> |
-            Created by: <?= htmlspecialchars((string)($request['created_by_label'] ?? '-')) ?>
-          </p>
-        </div>
-        <a href="<?= htmlspecialchars(cms_nav_url($pageKey, $requestId)) ?>" class="btn btn-outline-primary btn-sm fw-semibold">
-          Open
-        </a>
-      </div>
-      <div class="cms-request-grid">
-        <div>
-          <span class="cms-request-label">Last Updated</span>
-          <div class="cms-request-value"><?= htmlspecialchars(cms_format_datetime((string)($request['updated_at'] ?? ''))) ?></div>
-        </div>
-        <div>
-          <span class="cms-request-label">Submitted</span>
-          <div class="cms-request-value"><?= htmlspecialchars(cms_format_datetime((string)($request['submitted_at'] ?? ''))) ?></div>
-        </div>
-        <div>
-          <span class="cms-request-label">Reviewed</span>
-          <div class="cms-request-value"><?= htmlspecialchars(cms_format_datetime((string)($request['reviewed_at'] ?? ''))) ?></div>
-        </div>
-      </div>
-      <?php if ($reviewNote !== ''): ?>
-        <div class="cms-request-note">
-          <strong>Review Note:</strong> <?= htmlspecialchars($reviewNote) ?>
-        </div>
-      <?php endif; ?>
-      <?php if ($canReviewContent && $status === 'pending'): ?>
-        <div class="cms-request-actions">
-          <form method="post" action="../../PhpFiles/Admin-End/siteContentActions.php" class="d-inline" data-confirm="Approve and publish this content request?">
-            <?= csrfTokenField() ?>
-            <input type="hidden" name="action" value="approve_request">
-            <input type="hidden" name="request_id" value="<?= htmlspecialchars($requestId, ENT_QUOTES, 'UTF-8') ?>">
-            <button type="submit" class="btn btn-success btn-sm fw-semibold">Approve</button>
-          </form>
-          <form method="post" action="../../PhpFiles/Admin-End/siteContentActions.php" class="d-inline" data-confirm="Deny this content request?">
-            <?= csrfTokenField() ?>
-            <input type="hidden" name="action" value="deny_request">
-            <input type="hidden" name="request_id" value="<?= htmlspecialchars($requestId, ENT_QUOTES, 'UTF-8') ?>">
-            <button type="submit" class="btn btn-outline-danger btn-sm fw-semibold">Deny</button>
-          </form>
-        </div>
-      <?php endif; ?>
-      <?php if ($canRevertToThis || $canRevertToPrevious): ?>
-        <div class="cms-request-actions">
-          <?php if ($canRevertToThis): ?>
-            <form method="post" action="../../PhpFiles/Admin-End/siteContentActions.php" class="d-inline" data-confirm="Revert the live page to this approved version?">
-              <?= csrfTokenField() ?>
-              <input type="hidden" name="action" value="revert_to_this_version">
-              <input type="hidden" name="request_id" value="<?= htmlspecialchars($requestId, ENT_QUOTES, 'UTF-8') ?>">
-              <button type="submit" class="btn btn-outline-warning btn-sm fw-semibold">Revert to This Version</button>
-            </form>
+    <div class="table-responsive compact-admin-table-shell">
+      <table class="table align-middle mb-0 compact-admin-table compact-admin-table--wide cms-request-table">
+        <thead>
+          <tr class="table-light">
+            <th>Request Info</th>
+            <th>Created By</th>
+            <th>Status</th>
+            <th>Updated</th>
+            <th>Submitted</th>
+            <th>Reviewed</th>
+            <th>Notes</th>
+            <th class="text-end">Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          <?php if (!$requests): ?>
+            <tr>
+              <td colspan="8" class="text-center text-muted py-4"><?= htmlspecialchars($emptyMessage) ?></td>
+            </tr>
+          <?php else: ?>
+            <?php foreach ($requests as $request): ?>
+              <?php
+                $status = strtolower(trim((string)($request['status'] ?? 'draft')));
+                $requestId = (string)($request['request_id'] ?? '');
+                $pageKey = (string)($request['page_key'] ?? 'home');
+                $pageLabel = (string)($request['page_label'] ?? cms_content_page_label($pageKey));
+                $reviewNote = trim((string)($request['review_note'] ?? ''));
+                $archivedFromStatus = trim((string)($request['archived_from_status'] ?? ''));
+                $archivedAt = trim((string)($request['archived_at'] ?? ''));
+                $archivedByLabel = trim((string)($request['archived_by_label'] ?? ''));
+                $versionMeta = $requestVersionMeta[$requestId] ?? [];
+                $isLiveVersion = (bool)($versionMeta['is_live'] ?? false);
+                $canRestoreLive = $canReviewContent && $status === 'approved' && (bool)($versionMeta['can_revert_to_this'] ?? false);
+                $canRestorePrevious = $canReviewContent && $status === 'approved' && (bool)($versionMeta['can_revert_to_previous'] ?? false);
+                $canArchive = cms_content_request_is_archivable_by($request, $currentUserId, $canReviewContent, $isLiveVersion);
+                $canRestore = cms_content_request_is_restorable_by($request, $currentUserId, $canReviewContent);
+              ?>
+              <tr>
+                <td>
+                  <div class="cms-request-table-primary"><?= htmlspecialchars($pageLabel) ?></div>
+                  <div class="cms-request-table-meta">Request ID: <?= htmlspecialchars($requestId) ?></div>
+                  <div class="cms-request-table-meta">Page Key: <?= htmlspecialchars($pageKey) ?></div>
+                </td>
+                <td>
+                  <div class="cms-request-table-primary"><?= htmlspecialchars((string)($request['created_by_label'] ?? '-')) ?></div>
+                  <?php if (trim((string)($request['created_by_role'] ?? '')) !== ''): ?>
+                    <div class="cms-request-table-meta"><?= htmlspecialchars((string)$request['created_by_role']) ?></div>
+                  <?php endif; ?>
+                </td>
+                <td>
+                  <div class="d-flex flex-wrap gap-2">
+                    <span class="status-pill <?= htmlspecialchars(cms_request_table_status_class($status)) ?>">
+                      <?= htmlspecialchars(ucfirst($status)) ?>
+                    </span>
+                    <?php if ($isLiveVersion): ?>
+                      <span class="status-pill live">Current Live</span>
+                    <?php endif; ?>
+                    <?php if ($status === 'archived' && $archivedFromStatus !== ''): ?>
+                      <span class="status-pill <?= htmlspecialchars(cms_request_table_status_class($archivedFromStatus)) ?>">From <?= htmlspecialchars(ucfirst($archivedFromStatus)) ?></span>
+                    <?php endif; ?>
+                  </div>
+                </td>
+                <td><?= htmlspecialchars(cms_format_datetime((string)($request['updated_at'] ?? ''))) ?></td>
+                <td><?= htmlspecialchars(cms_format_datetime((string)($request['submitted_at'] ?? ''))) ?></td>
+                <td><?= htmlspecialchars(cms_format_datetime((string)($request['reviewed_at'] ?? ''))) ?></td>
+                <td>
+                  <?php if ($reviewNote !== ''): ?>
+                    <div class="cms-request-table-note"><?= nl2br(htmlspecialchars($reviewNote), false) ?></div>
+                  <?php else: ?>
+                    <span class="text-muted">No notes yet.</span>
+                  <?php endif; ?>
+                  <?php if ($status === 'archived' && $archivedAt !== ''): ?>
+                    <div class="cms-request-table-meta mt-2">
+                      Archived <?= htmlspecialchars(cms_format_datetime($archivedAt)) ?>
+                      <?php if ($archivedByLabel !== ''): ?>
+                        by <?= htmlspecialchars($archivedByLabel) ?>
+                      <?php endif; ?>
+                    </div>
+                  <?php endif; ?>
+                </td>
+                <td class="text-end">
+                  <div class="compact-table-actions justify-content-end cms-request-table-actions">
+                    <a href="<?= htmlspecialchars(cms_nav_url($pageKey, $requestId)) ?>" class="btn btn-primary btn-sm compact-table-btn">View</a>
+                    <?php if ($canRestore): ?>
+                      <?= cms_render_request_action_form('restore_request', $requestId, 'Restore', 'btn-success', 'Restore this archived content request?') ?>
+                    <?php endif; ?>
+                    <?php if ($canRestoreLive): ?>
+                      <?= cms_render_request_action_form('revert_to_this_version', $requestId, 'Restore Live', 'btn-warning text-white', 'Restore the live page to this approved version?') ?>
+                    <?php endif; ?>
+                    <?php if ($canRestorePrevious): ?>
+                      <?= cms_render_request_action_form('revert_to_previous_version', $requestId, 'Restore Previous', 'btn-warning text-white', 'Restore the live page to the previous approved version?') ?>
+                    <?php endif; ?>
+                    <?php if ($canReviewContent && $status === 'pending'): ?>
+                      <?= cms_render_request_action_form('approve_request', $requestId, 'Approve', 'btn-success', 'Approve and publish this content request?') ?>
+                      <?= cms_render_request_action_form('deny_request', $requestId, 'Deny', 'btn-danger', 'Deny this content request?') ?>
+                    <?php endif; ?>
+                    <?php if ($canArchive): ?>
+                      <?= cms_render_request_action_form('archive_request', $requestId, 'Archive', 'btn-outline-danger', 'Archive this content request? You can restore it later from the tracker.') ?>
+                    <?php endif; ?>
+                  </div>
+                </td>
+              </tr>
+            <?php endforeach; ?>
           <?php endif; ?>
-          <?php if ($canRevertToPrevious): ?>
-            <form method="post" action="../../PhpFiles/Admin-End/siteContentActions.php" class="d-inline" data-confirm="Revert the live page to the previous approved version?">
-              <?= csrfTokenField() ?>
-              <input type="hidden" name="action" value="revert_to_previous_version">
-              <input type="hidden" name="request_id" value="<?= htmlspecialchars($requestId, ENT_QUOTES, 'UTF-8') ?>">
-              <button type="submit" class="btn btn-outline-warning btn-sm fw-semibold">Revert to Previous Version</button>
-            </form>
-          <?php endif; ?>
-        </div>
-      <?php endif; ?>
-    </article>
+        </tbody>
+      </table>
+    </div>
     <?php
     return (string)ob_get_clean();
 }
@@ -723,7 +789,7 @@ $previewCssAssets = [
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
   <link href="../../summernote-0.9.0-dist/summernote-lite.min.css?v=20260307-2" rel="stylesheet">
   <link rel="stylesheet" href="../../CSS-Styles/Admin-End-CSS/AdminDashboardStyle.css">
-  <link rel="stylesheet" href="../../CSS-Styles/Admin-End-CSS/ContentNavigator.css?v=20260325-2">
+  <link rel="stylesheet" href="../../CSS-Styles/Admin-End-CSS/ContentNavigator.css?v=20260325-7">
 </head>
 <body>
   <div class="d-flex flex-column flex-md-row" style="min-height: 100vh;">
@@ -886,6 +952,10 @@ $previewCssAssets = [
               <span class="cms-stat-label">My Denied</span>
               <span class="cms-stat-value"><?= (int)$myDeniedCount ?></span>
             </article>
+            <article class="cms-stat-card">
+              <span class="cms-stat-label">My Archived</span>
+              <span class="cms-stat-value"><?= (int)$myArchivedCount ?></span>
+            </article>
             <?php if ($canReviewContent): ?>
               <article class="cms-stat-card cms-stat-card--accent">
                 <span class="cms-stat-label">Pending Review</span>
@@ -901,44 +971,51 @@ $previewCssAssets = [
                   <h4 class="cms-detail-panel-title mb-0">My Content Requests</h4>
                   <a href="<?= htmlspecialchars(cms_nav_url('home')) ?>" class="btn btn-outline-primary btn-sm fw-semibold">Start New Page Edit</a>
                 </div>
-                <?php if ($myRequests): ?>
-                  <div class="cms-request-stack">
-                    <?php foreach ($myRequests as $request): ?>
-                      <?= cms_render_request_card($request, $canReviewContent, $requestVersionMeta[(string)($request['request_id'] ?? '')] ?? []) ?>
-                    <?php endforeach; ?>
-                  </div>
-                <?php else: ?>
-                  <p class="cms-empty-state mb-0">No CMS requests yet. Start from any page editor to save a draft or submit changes.</p>
-                <?php endif; ?>
+                <?= cms_render_request_table(
+                  $myActiveRequests,
+                  'No active CMS requests yet. Start from any page editor to save a draft or submit changes.',
+                  $currentUserId,
+                  $canReviewContent,
+                  $requestVersionMeta
+                ) ?>
+              </article>
+
+              <article class="cms-detail-panel mb-4">
+                <h4 class="cms-detail-panel-title"><?= $canReviewContent ? 'Archived Requests' : 'My Archived Requests' ?></h4>
+                <?= cms_render_request_table(
+                  $archivedRequests,
+                  $canReviewContent
+                    ? 'No archived CMS requests are available right now.'
+                    : 'You do not have any archived CMS requests right now.',
+                  $currentUserId,
+                  $canReviewContent,
+                  $requestVersionMeta
+                ) ?>
               </article>
 
               <?php if ($canReviewContent): ?>
                 <article class="cms-detail-panel mb-4">
                   <h4 class="cms-detail-panel-title">Approved Version History</h4>
-                  <?php if ($approvedHistoryRequests): ?>
-                    <div class="cms-request-stack">
-                      <?php foreach ($approvedHistoryRequests as $request): ?>
-                        <?= cms_render_request_card($request, true, $requestVersionMeta[(string)($request['request_id'] ?? '')] ?? []) ?>
-                      <?php endforeach; ?>
-                    </div>
-                  <?php else: ?>
-                    <p class="cms-empty-state mb-0">No approved content versions are available yet.</p>
-                  <?php endif; ?>
+                  <?= cms_render_request_table(
+                    $approvedHistoryRequests,
+                    'No approved content versions are available yet.',
+                    $currentUserId,
+                    true,
+                    $requestVersionMeta
+                  ) ?>
                 </article>
               <?php endif; ?>
 
               <?php if ($canReviewContent): ?>
                 <article class="cms-detail-panel">
                   <h4 class="cms-detail-panel-title">Review Queue</h4>
-                  <?php if ($reviewQueue): ?>
-                    <div class="cms-request-stack">
-                      <?php foreach ($reviewQueue as $request): ?>
-                        <?= cms_render_request_card($request, true, $requestVersionMeta[(string)($request['request_id'] ?? '')] ?? []) ?>
-                      <?php endforeach; ?>
-                    </div>
-                  <?php else: ?>
-                    <p class="cms-empty-state mb-0">No pending content requests to review right now.</p>
-                  <?php endif; ?>
+                  <?= cms_render_request_table(
+                    $reviewQueue,
+                    'No pending content requests to review right now.',
+                    $currentUserId,
+                    true,
+                    $requestVersionMeta
+                  ) ?>
                 </article>
               <?php endif; ?>
             </div>
@@ -1252,19 +1329,24 @@ $previewCssAssets = [
             </div>
 
             <div class="col-12 col-xxl-5">
-              <article class="cms-detail-panel cms-preview-panel mb-4">
-                <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
-                  <div>
-                    <h4 class="cms-detail-panel-title mb-1">Live Preview</h4>
-                    <p class="cms-field-help mb-0">The preview updates as you edit, so users can review the design before submitting.</p>
+              <article class="cms-detail-panel mb-4 cms-preview-launcher-panel">
+                <div class="cms-detail-header">
+                  <span class="cms-detail-icon"><i class="fa-solid fa-display"></i></span>
+                  <div class="cms-preview-launcher-copy">
+                    <h4 class="cms-detail-panel-title mb-1">Preview</h4>
+                    <p class="cms-detail-summary mb-0">Open the current page in a desktop-sized preview window.</p>
                   </div>
-                  <span class="cms-preview-pill">Preview</span>
                 </div>
-                <iframe
-                  id="cmsPreviewFrame"
-                  class="cms-preview-frame"
-                  title="CMS Page Preview"
-                  loading="lazy"></iframe>
+                <div class="cms-detail-actions mt-3">
+                  <button
+                    type="button"
+                    class="btn btn-outline-primary fw-semibold cms-preview-open-btn"
+                    data-bs-toggle="modal"
+                    data-bs-target="#cmsPreviewModal"
+                    data-cms-open-preview>
+                    View Preview
+                  </button>
+                </div>
               </article>
 
               <?php if ($editorReviewAvailable): ?>
@@ -1364,6 +1446,26 @@ $previewCssAssets = [
         <div class="modal-footer">
           <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
           <button type="button" class="btn btn-primary" id="cmsCropSaveBtn">Save Crop</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal fade" id="cmsPreviewModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable">
+      <div class="modal-content border-0 shadow-lg">
+        <div class="modal-header">
+          <h5 class="modal-title">Page Preview</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+          <div class="cms-preview-stage cms-preview-stage--modal" id="cmsPreviewStage">
+            <iframe
+              id="cmsPreviewFrame"
+              class="cms-preview-frame"
+              title="CMS Page Preview"
+              loading="lazy"></iframe>
+          </div>
         </div>
       </div>
     </div>
@@ -1652,30 +1754,156 @@ $previewCssAssets = [
           .replace(/'/g, "&#039;");
       }
 
+      function joinPreviewAssetPath(path) {
+        return String(previewAssetBase || "").replace(/\/+$/, "") + "/" + String(path || "").replace(/^\/+/, "");
+      }
+
+      function buildPreviewNavbar(pageKey) {
+        if (!pageKey || pageKey === "login") {
+          return "";
+        }
+
+        const normalizedPageKey = pageKey === "announcements" ? "news" : pageKey;
+        const logoUrl = joinPreviewAssetPath("Images/San_Jose_LOGO.jpg");
+        const navItems = [
+          { key: "home", label: "Home" },
+          { key: "government", label: "Government" },
+          { key: "services", label: "Services" },
+          { key: "news", label: "News" },
+          { key: "faq", label: "FAQ" },
+          { key: "contact", label: "Contact" }
+        ].map(function (item) {
+          const isActive = item.key === normalizedPageKey;
+          return [
+            '<li class="nav-item mx-lg-3">',
+            '  <a class="nav-link' + (isActive ? " active" : "") + '"' + (isActive ? ' aria-current="page"' : "") + ' href="#">' + escapeHtml(item.label) + "</a>",
+            "</li>"
+          ].join("");
+        }).join("");
+
+        const navbarClass = normalizedPageKey === "home"
+          ? "navbar navbar-expand-xl align-items-center navbarMain navbar-dark"
+          : "navbar navbar-expand-xl align-items-center navbar-light bg-white shadow-sm";
+        const navbarId = normalizedPageKey === "home" ? ' id="mainNavbar"' : "";
+
+        return [
+          '<div class="navbarWrapper">',
+          '  <nav' + navbarId + ' class="' + navbarClass + '">',
+          '    <div class="container-fluid align-items-center px-4">',
+          '      <a id="navbarBrand" class="navbar-brand" href="#">',
+          '        <img src="' + escapeHtml(logoUrl) + '" alt="Logo" id="navbarLogo" class="d-inline-block align-text-center">',
+          "        Barangay San Jose",
+          "      </a>",
+          '      <button class="navbar-toggler" type="button" aria-label="Toggle navigation">',
+          '        <span class="navbar-toggler-icon"></span>',
+          "      </button>",
+          '      <div class="collapse navbar-collapse show" id="navbarNav">',
+          '        <ul id="navbarLinks" class="navbar-nav ms-auto">',
+          navItems,
+          '          <li class="nav-item">',
+          '            <a class="nav-link btn btn-orange text-white px-4 ms-2" href="#">Login</a>',
+          "          </li>",
+          "        </ul>",
+          "      </div>",
+          "    </div>",
+          "  </nav>",
+          "</div>"
+        ].join("");
+      }
+
+      function buildPreviewFooter(pageKey) {
+        if (!pageKey || pageKey === "login") {
+          return "";
+        }
+
+        const logoUrl = joinPreviewAssetPath("Images/San_Jose_LOGO.jpg");
+        return [
+          '<div class="footerWrapper">',
+          '  <footer id="footer">',
+          '    <div class="container">',
+          '      <div class="row">',
+          '        <div class="col-8">',
+          '          <img src="' + escapeHtml(logoUrl) + '" alt="Logo" id="footerLogo" class="imgfluid rounded-circle p-3">',
+          "        </div>",
+          '        <div class="col">',
+          '          <div class="footerText">',
+          "            <h5>Quick Links</h5>",
+          '            <ul class="list-unstyled">',
+          '              <li><a id="footerLink" class="link-offset-2 link-underline-light link-underline-opacity-0 link-underline-opacity-75-hover" href="#">Facebook</a></li>',
+          '              <li><a id="footerLink" class="link-offset-2 link-underline-light link-underline-opacity-0 link-underline-opacity-75-hover" href="#">Contact Us</a></li>',
+          "            </ul>",
+          "          </div>",
+          "        </div>",
+          '        <div class="col">',
+          '          <div class="footerText">',
+          "            <h5>Barangay Info</h5>",
+          '            <ul class="list-unstyled">',
+          '              <li><a id="footerLink" class="link-offset-2 link-underline-light link-underline-opacity-0 link-underline-opacity-75-hover" href="#">Privacy Policy</a></li>',
+          '              <li><a id="footerLink" class="link-offset-2 link-underline-light link-underline-opacity-0 link-underline-opacity-75-hover" href="#">Terms &amp; Conditions</a></li>',
+          '              <li><a id="footerLink" class="link-offset-2 link-underline-light link-underline-opacity-0 link-underline-opacity-75-hover" href="#">Disclaimers</a></li>',
+          "            </ul>",
+          "          </div>",
+          "        </div>",
+          "      </div>",
+          "    </div>",
+          "  </footer>",
+          "</div>"
+        ].join("");
+      }
+
+      function buildPreviewSiteShell(pageKey, innerMarkup) {
+        if (!pageKey || pageKey === "login") {
+          return innerMarkup;
+        }
+        return '<div class="cms-preview-site-shell">' + buildPreviewNavbar(pageKey) + innerMarkup + buildPreviewFooter(pageKey) + "</div>";
+      }
+
+      function buildPreviewBehaviorScript(pageKey) {
+        if (pageKey !== "home") {
+          return "";
+        }
+
+        return [
+          "<script>",
+          "(function(){",
+          "  var navbar=document.getElementById('mainNavbar');",
+          "  if(!navbar){return;}",
+          "  function updateNavbarState(){",
+          "    var top=window.pageYOffset||document.documentElement.scrollTop||document.body.scrollTop||0;",
+          "    navbar.classList.toggle('navbar--scrolled', top>20);",
+          "  }",
+          "  window.addEventListener('scroll', updateNavbarState, { passive: true });",
+          "  updateNavbarState();",
+          "})();",
+          "<\/script>"
+        ].join("");
+      }
+
       function buildPreviewDocument(pageKey, payload) {
         const template = document.getElementById("cms-preview-template-" + pageKey);
         if (!template) {
           return "";
         }
         const payloadJson = JSON.stringify(payload).replace(/<\//g, "<\\/");
+        const pageMarkup = buildPreviewSiteShell(pageKey, template.innerHTML);
 
         const cssLinks = [previewCssAssets.bootstrap];
         switch (pageKey) {
           case "home":
-            cssLinks.push(previewCssAssets.home);
+            cssLinks.push(previewCssAssets.navbar, previewCssAssets.home);
             break;
           case "announcements":
-            cssLinks.push(previewCssAssets.guest, previewCssAssets.news);
+            cssLinks.push(previewCssAssets.news, previewCssAssets.guest, previewCssAssets.navbar);
             break;
           case "government":
           case "services":
-            cssLinks.push(previewCssAssets.guest);
+            cssLinks.push(previewCssAssets.guest, previewCssAssets.navbar);
             break;
           case "faq":
-            cssLinks.push(previewCssAssets.guest, previewCssAssets.faq);
+            cssLinks.push(previewCssAssets.faq, previewCssAssets.guest, previewCssAssets.navbar);
             break;
           case "contact":
-            cssLinks.push(previewCssAssets.guest, previewCssAssets.contact);
+            cssLinks.push(previewCssAssets.contact, previewCssAssets.guest, previewCssAssets.navbar);
             break;
           case "login":
             cssLinks.push(previewCssAssets.login);
@@ -1694,20 +1922,28 @@ $previewCssAssets = [
           '<meta name="viewport" content="width=device-width, initial-scale=1.0">',
           headMarkup,
           "<style>",
-          "body{margin:0;background:#ffffff;overflow:auto;}",
+          "body{margin:0;background:#ffffff;overflow-x:hidden;overflow-y:auto;}",
           ".cms-preview-doc{min-height:100vh;}",
           ".cms-preview-doc *{pointer-events:none !important;}",
+          "body a,body button,body input,body textarea,body select{pointer-events:none !important;}",
+          ".cms-preview-site-shell .navbar-toggler{display:none !important;}",
+          ".cms-preview-site-shell .navbar-collapse{display:flex !important;flex-basis:auto !important;}",
+          ".cms-preview-site-shell #navbarLinks{flex-direction:row !important;align-items:center !important;}",
+          ".cms-preview-site-shell #navbarLinks .nav-item{margin:0 0.9rem !important;}",
+          ".cms-preview-site-shell #navbarLinks .nav-item:last-child{margin-right:0 !important;}",
+          ".cms-preview-site-shell #navbarLinks .nav-link.btn{margin-left:0.75rem !important;}",
           ".cms-runtime-richtext p:last-child{margin-bottom:0;}",
           ".login-signup-container{margin:32px auto;}",
           ".bannerText h1,.bannerText p{color:#ffffff !important;}",
           "</style>",
           "</head>",
           '<body data-cms-page="' + escapeHtml(pageKey) + '" data-cms-asset-base="' + escapeHtml(previewAssetBase) + '">',
-          template.innerHTML,
+          pageMarkup,
           "<script>",
           "window.CMS_PREVIEW_PAYLOAD = " + payloadJson + ";",
           "<\/script>",
           '<script src="' + escapeHtml(previewRuntimeJs) + '"><\/script>',
+          buildPreviewBehaviorScript(pageKey),
           "</body>",
           "</html>"
         ].join("");
@@ -1762,6 +1998,17 @@ $previewCssAssets = [
           }
           previewFrame.srcdoc = buildPreviewDocument(selectedPageKey, payload);
         }, 180);
+      }
+
+      function renderPreviewNow() {
+        if (!previewFrame || !selectedPageKey) {
+          return;
+        }
+        const payload = serializePayload();
+        if (payloadInput) {
+          payloadInput.value = JSON.stringify(payload);
+        }
+        previewFrame.srcdoc = buildPreviewDocument(selectedPageKey, payload);
       }
 
       function applyToolbarTooltips() {
@@ -2117,6 +2364,13 @@ $previewCssAssets = [
           if (input) {
             input.click();
           }
+          return;
+        }
+
+        const previewButton = event.target.closest("[data-cms-open-preview]");
+        if (previewButton) {
+          window.clearTimeout(previewTimer);
+          renderPreviewNow();
           return;
         }
 

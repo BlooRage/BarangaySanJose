@@ -1,6 +1,9 @@
 <?php
 require_once __DIR__ . "/../General/security.php";
 require_once __DIR__ . "/../General/connection.php";
+require_once __DIR__ . "/../General/appointmentCouncilMembers.php";
+require_once __DIR__ . "/../General/appointmentSettings.php";
+require_once __DIR__ . "/../General/appointmentTimeSlots.php";
 require_once __DIR__ . "/../General/uniqueIDGenerate.php";
 require_once __DIR__ . "/../GET/getResidentProfile.php";
 
@@ -154,9 +157,20 @@ if ($userId === '' || empty($residentinformationtbl)) {
 
 $subject = strtolower(trim((string)($_POST['subject'] ?? '')));
 $subjectOther = trim((string)($_POST['subject_other'] ?? ''));
+$officialUserId = trim((string)($_POST['official_user_id'] ?? ''));
 $appointmentDate = trim((string)($_POST['appointment_date'] ?? ''));
 $appointmentTime = trim((string)($_POST['appointment_time'] ?? ''));
 $purpose = trim((string)($_POST['purpose'] ?? ''));
+$councilMembersByUserId = apcm_fetch_council_members_by_user_id($conn);
+$appointmentSettings = aps_settings_load($conn);
+
+if ($councilMembersByUserId === []) {
+    appointmentRedirectWithMessage('error', 'No active barangay council members are currently available for appointments.');
+}
+
+if ($officialUserId === '' || !isset($councilMembersByUserId[$officialUserId])) {
+    appointmentRedirectWithMessage('error', 'Please select a valid barangay council member for your appointment.');
+}
 
 $allowedSubjects = ['follow_up', 'consultation', 'event_coordination', 'other'];
 if (!in_array($subject, $allowedSubjects, true)) {
@@ -173,20 +187,29 @@ if ($appointmentDate === '' || $appointmentTime === '' || $purpose === '') {
 
 $timezone = new DateTimeZone(date_default_timezone_get() ?: 'Asia/Manila');
 $now = new DateTimeImmutable('now', $timezone);
-$minAppointmentDate = $now->modify('+1 day')->format('Y-m-d');
-$yearEnd = $now->format('Y-12-31');
+$bookingLimits = aps_booking_date_limits($appointmentSettings, $now);
+$minAppointmentDate = (string)($bookingLimits['min_date'] ?? '');
+$maxAppointmentDate = (string)($bookingLimits['max_date'] ?? '');
+
+if (empty($bookingLimits['has_window']) || aps_first_available_booking_date($appointmentSettings, $now) === null) {
+    appointmentRedirectWithMessage('error', 'No appointment dates are currently available based on the saved appointment settings.');
+}
 
 $schedule = DateTimeImmutable::createFromFormat('Y-m-d H:i', $appointmentDate . ' ' . $appointmentTime, $timezone);
 if (!$schedule || $schedule->format('Y-m-d') !== $appointmentDate || $schedule->format('H:i') !== $appointmentTime) {
     appointmentRedirectWithMessage('error', 'Appointment date or time is invalid.');
 }
 
-if ($appointmentDate < $minAppointmentDate || $appointmentDate > $yearEnd) {
-    appointmentRedirectWithMessage('error', 'Date of appointment must be after today and within the current year.');
+if ($appointmentDate < $minAppointmentDate || $appointmentDate > $maxAppointmentDate) {
+    appointmentRedirectWithMessage('error', 'Date of appointment is outside the current booking window.');
 }
 
-if ($appointmentTime < '09:01' || $appointmentTime > '16:59') {
-    appointmentRedirectWithMessage('error', 'Time of appointment must be between 9:01 AM and 4:59 PM.');
+if (!aps_is_date_available($appointmentSettings, $appointmentDate)) {
+    appointmentRedirectWithMessage('error', 'The selected appointment date is unavailable for official appointments.');
+}
+
+if (!ats_is_valid_time($appointmentTime, $appointmentSettings)) {
+    appointmentRedirectWithMessage('error', 'Please select one of the allotted appointment times.');
 }
 
 $firstName = trim((string)($residentinformationtbl['firstname'] ?? ''));
@@ -215,6 +238,10 @@ $residentUserId = $userId !== '' ? $userId : null;
 $preferredScheduleTimestamp = $schedule->format('Y-m-d H:i:s');
 $appointmentColumns = appointmentGetTableColumns($conn, 'appointmentstbl');
 
+if (!isset($appointmentColumns['user_id_official_assigned'])) {
+    appointmentRedirectWithMessage('error', 'The appointment module is missing the council member assignment field. Please run the latest appointment migration first.');
+}
+
 $conn->begin_transaction();
 try {
     $insertColumns = [
@@ -222,6 +249,7 @@ try {
         'user_id_resident',
         'name',
         'contact_number',
+        'user_id_official_assigned',
         'subject',
         'subject_other',
         'purpose',
@@ -231,11 +259,12 @@ try {
         $residentUserId,
         $residentName,
         $contactNumber,
+        $officialUserId,
         $subjectLabel,
         $normalizedSubjectOther,
         $purpose,
     ];
-    $bindTypes = 'sssssss';
+    $bindTypes = 'ssssssss';
 
     if (isset($appointmentColumns['preferred_schedule_timestamp'])) {
         $insertColumns[] = 'preferred_schedule_timestamp';
