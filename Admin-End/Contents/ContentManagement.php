@@ -668,10 +668,10 @@ function cms_render_request_table(array $requests, string $emptyMessage, string 
                       <?= cms_render_request_action_form('restore_request', $requestId, 'Restore', 'btn-success', 'Restore this archived content request?') ?>
                     <?php endif; ?>
                     <?php if ($canRestoreLive): ?>
-                      <?= cms_render_request_action_form('revert_to_this_version', $requestId, 'Restore Live', 'btn-warning text-white', 'Restore the live page to this approved version?') ?>
+                      <?= cms_render_request_action_form('revert_to_this_version', $requestId, 'Restore Live', 'btn-warning', 'Restore the live page to this approved version?') ?>
                     <?php endif; ?>
                     <?php if ($canRestorePrevious): ?>
-                      <?= cms_render_request_action_form('revert_to_previous_version', $requestId, 'Restore Previous', 'btn-warning text-white', 'Restore the live page to the previous approved version?') ?>
+                      <?= cms_render_request_action_form('revert_to_previous_version', $requestId, 'Restore Previous', 'btn-warning', 'Restore the live page to the previous approved version?') ?>
                     <?php endif; ?>
                     <?php if ($canReviewContent && $status === 'pending'): ?>
                       <?= cms_render_request_action_form('approve_request', $requestId, 'Approve', 'btn-success', 'Approve and publish this content request?') ?>
@@ -818,28 +818,22 @@ $previewCssAssets = [
         </section>
       <?php else: ?>
         <?php
-        $moduleNotes = (array)($editorMeta[$selectedModuleKey]['notes'] ?? []);
-        $moduleLinks = (array)($editorMeta[$selectedModuleKey]['quick_links'] ?? []);
         $selectedRequestStatus = strtolower(trim((string)($editorRequest['status'] ?? '')));
         ?>
         <section class="cms-section-card">
-          <div class="cms-detail-header">
+          <div class="cms-detail-header cms-detail-header--editor">
             <div class="cms-detail-icon">
               <i class="fa-solid <?= htmlspecialchars((string)$selectedModule['icon']) ?>"></i>
             </div>
             <div class="cms-detail-copy">
               <div class="d-flex flex-wrap align-items-center gap-2 mb-2">
                 <h3 class="cms-section-title mb-0"><?= htmlspecialchars((string)$selectedModule['title']) ?></h3>
-                <span class="cms-status-pill <?= htmlspecialchars(cms_status_class((string)$selectedModule['status'])) ?>">
-                  <?= htmlspecialchars((string)$selectedModule['status']) ?>
-                </span>
                 <?php if ($editorRequest): ?>
                   <span class="cms-request-status <?= htmlspecialchars(cms_request_status_class($selectedRequestStatus)) ?>">
                     <?= htmlspecialchars(ucfirst($selectedRequestStatus)) ?> Request
                   </span>
                 <?php endif; ?>
               </div>
-              <p class="cms-detail-summary mb-1"><?= htmlspecialchars((string)($editorMeta[$selectedModuleKey]['subtitle'] ?? $selectedModule['summary'])) ?></p>
               <?php if ($editorRequest): ?>
                 <p class="cms-request-meta mb-0">
                   Request ID: <?= htmlspecialchars((string)$editorRequest['request_id']) ?> |
@@ -847,6 +841,14 @@ $previewCssAssets = [
                 </p>
               <?php endif; ?>
             </div>
+            <button
+              type="button"
+              class="btn btn-outline-primary fw-semibold btn-sm ms-auto"
+              data-bs-toggle="modal"
+              data-bs-target="#cmsPreviewModal"
+              data-cms-open-preview>
+              View Preview
+            </button>
           </div>
 
           <?php if ($editorReadOnlyMessage !== ''): ?>
@@ -855,9 +857,27 @@ $previewCssAssets = [
             </div>
           <?php endif; ?>
 
-          <div class="row g-4">
-            <div class="col-12 col-xxl-7">
-              <form id="cmsEditorForm" method="post" action="../../PhpFiles/Admin-End/siteContentActions.php" class="cms-editor-form">
+          <?php if ($editorReviewAvailable): ?>
+            <article class="cms-detail-panel mb-4">
+              <h4 class="cms-detail-panel-title">Review Actions</h4>
+              <div class="cms-detail-actions">
+                <form method="post" action="../../PhpFiles/Admin-End/siteContentActions.php" data-confirm="Approve and publish this content request?">
+                  <?= csrfTokenField() ?>
+                  <input type="hidden" name="action" value="approve_request">
+                  <input type="hidden" name="request_id" value="<?= htmlspecialchars((string)$editorRequest['request_id'], ENT_QUOTES, 'UTF-8') ?>">
+                  <button type="submit" class="btn btn-success btn-sm fw-semibold">Approve</button>
+                </form>
+                <form method="post" action="../../PhpFiles/Admin-End/siteContentActions.php" data-confirm="Deny this content request?">
+                  <?= csrfTokenField() ?>
+                  <input type="hidden" name="action" value="deny_request">
+                  <input type="hidden" name="request_id" value="<?= htmlspecialchars((string)$editorRequest['request_id'], ENT_QUOTES, 'UTF-8') ?>">
+                  <button type="submit" class="btn btn-outline-danger btn-sm fw-semibold">Deny</button>
+                </form>
+              </div>
+            </article>
+          <?php endif; ?>
+
+          <form id="cmsEditorForm" method="post" action="../../PhpFiles/Admin-End/siteContentActions.php" class="cms-editor-form">
                 <?= csrfTokenField() ?>
                 <input type="hidden" name="action" id="cmsActionInput" value="save_draft">
                 <input type="hidden" name="page_key" value="<?= htmlspecialchars($selectedModuleKey, ENT_QUOTES, 'UTF-8') ?>">
@@ -896,12 +916,6 @@ $previewCssAssets = [
                     </div>
                     <div class="col-12">
                       <?= cms_render_richtext_field('history_message_html', 'Our History', (string)($editorPayload['history_message_html'] ?? ''), 'Write the history section here...') ?>
-                    </div>
-                    <div class="col-12">
-                      <article class="cms-editor-card">
-                        <h5 class="cms-editor-card-title mb-2">Meet the Council</h5>
-                        <p class="cms-field-help mb-0">Images and names in this section are based on the approved Government page and are shown in the preview automatically.</p>
-                      </article>
                     </div>
                   </div>
                 <?php elseif ($selectedModuleKey === 'government'): ?>
@@ -1099,77 +1113,7 @@ $previewCssAssets = [
                     <span class="cms-access-note">This request is read-only from the page editor.</span>
                   <?php endif; ?>
                 </div>
-              </form>
-            </div>
-
-            <div class="col-12 col-xxl-5">
-              <article class="cms-detail-panel mb-4 cms-preview-launcher-panel">
-                <div class="cms-detail-header">
-                  <span class="cms-detail-icon"><i class="fa-solid fa-display"></i></span>
-                  <div class="cms-preview-launcher-copy">
-                    <h4 class="cms-detail-panel-title mb-1">Preview</h4>
-                    <p class="cms-detail-summary mb-0">Open the current page in a desktop-sized preview window.</p>
-                  </div>
-                </div>
-                <div class="cms-detail-actions mt-3">
-                  <button
-                    type="button"
-                    class="btn btn-outline-primary fw-semibold cms-preview-open-btn"
-                    data-bs-toggle="modal"
-                    data-bs-target="#cmsPreviewModal"
-                    data-cms-open-preview>
-                    View Preview
-                  </button>
-                </div>
-              </article>
-
-              <?php if ($editorReviewAvailable): ?>
-                <article class="cms-detail-panel mb-4">
-                  <h4 class="cms-detail-panel-title">Review Actions</h4>
-                  <div class="cms-detail-actions">
-                    <form method="post" action="../../PhpFiles/Admin-End/siteContentActions.php" data-confirm="Approve and publish this content request?">
-                      <?= csrfTokenField() ?>
-                      <input type="hidden" name="action" value="approve_request">
-                      <input type="hidden" name="request_id" value="<?= htmlspecialchars((string)$editorRequest['request_id'], ENT_QUOTES, 'UTF-8') ?>">
-                      <button type="submit" class="btn btn-success btn-sm fw-semibold">Approve</button>
-                    </form>
-                    <form method="post" action="../../PhpFiles/Admin-End/siteContentActions.php" data-confirm="Deny this content request?">
-                      <?= csrfTokenField() ?>
-                      <input type="hidden" name="action" value="deny_request">
-                      <input type="hidden" name="request_id" value="<?= htmlspecialchars((string)$editorRequest['request_id'], ENT_QUOTES, 'UTF-8') ?>">
-                      <button type="submit" class="btn btn-outline-danger btn-sm fw-semibold">Deny</button>
-                    </form>
-                  </div>
-                </article>
-              <?php endif; ?>
-
-              <?php if ($moduleLinks): ?>
-                <article class="cms-detail-panel mb-4">
-                  <h4 class="cms-detail-panel-title">Quick Links</h4>
-                  <div class="cms-detail-actions">
-                    <?php foreach ($moduleLinks as $link): ?>
-                      <?php if (!empty($link['href'])): ?>
-                        <a href="<?= htmlspecialchars((string)$link['href']) ?>" class="btn btn-outline-primary btn-sm fw-semibold">
-                          <?= htmlspecialchars((string)$link['label']) ?>
-                        </a>
-                      <?php endif; ?>
-                    <?php endforeach; ?>
-                  </div>
-                </article>
-              <?php endif; ?>
-
-              <?php if ($moduleNotes): ?>
-                <article class="cms-detail-panel">
-                  <h4 class="cms-detail-panel-title">Module Notes</h4>
-                  <ul class="cms-detail-list">
-                    <?php foreach ($moduleNotes as $note): ?>
-                      <li><?= htmlspecialchars((string)$note) ?></li>
-                    <?php endforeach; ?>
-                  </ul>
-                </article>
-              <?php endif; ?>
-            </div>
-          </div>
+          </form>
         </section>
       <?php endif; ?>
     </main>
