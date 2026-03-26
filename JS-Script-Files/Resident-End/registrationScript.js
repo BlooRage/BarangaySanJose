@@ -413,12 +413,20 @@ function isActuallyVisible(el) {
   }
 
   function isStepValid(stepIndex) {
-    const fields = sections[stepIndex].querySelectorAll("input, select, textarea");
+    const section = sections[stepIndex];
+    if (!section) return true;
+    const fields = section.querySelectorAll("input, select, textarea");
     return [...fields].every((field) => validateField(field, false));
   }
 
   function updateNextButtonState() {
+    if (!sections.length) return;
+    if (currentStep < 0 || currentStep >= sections.length) {
+      currentStep = Math.min(Math.max(currentStep, 0), sections.length - 1);
+    }
+
     const currentSection = sections[currentStep];
+    if (!currentSection) return;
     const nextBtn = currentSection.querySelector(".next-btn");
     if (!nextBtn) return;
 
