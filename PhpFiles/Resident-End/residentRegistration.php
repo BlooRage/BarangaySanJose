@@ -5,6 +5,7 @@ include "../General/connection.php";
 require_once "../General/uniqueIDGenerate.php";
 require_once "../General/audit.php";
 require_once "../General/residentTransaction.php";
+require_once __DIR__ . "/../General/uploadLimits.php";
 require_once __DIR__ . "/../../composer-email-handler/vendor/autoload.php";
 require_once __DIR__ . "/pdfMergeSupport.php";
 
@@ -317,6 +318,9 @@ function moveUploadedFileWithDocName(string $tmpName, string $dir, string $docTy
     $tmpSize = @filesize($tmpName);
     if ($tmpSize === false || (int)$tmpSize <= 0) {
         throw new Exception("Uploaded file is empty.");
+    }
+    if ((int)$tmpSize > app_upload_limit_bytes('resident')) {
+        throw new Exception(app_upload_limit_error('resident', 'Uploaded file'));
     }
 
     $index = 0;

@@ -28,7 +28,7 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST' && (string)($_POST['action'
     try {
         $slotInterval = trim((string)($_POST['slot_interval_minutes'] ?? ''));
         $bookingWindowDays = trim((string)($_POST['booking_window_days'] ?? ''));
-        $availableWeekdays = $_POST['available_weekdays'] ?? [];
+        $closedWeekdays = $_POST['closed_weekdays'] ?? [];
         $lunchBreakEnabled = isset($_POST['lunch_break_enabled']) ? '1' : '0';
         $lunchStartTime = trim((string)($_POST['lunch_start_time'] ?? ''));
         $lunchEndTime = trim((string)($_POST['lunch_end_time'] ?? ''));
@@ -40,8 +40,14 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST' && (string)($_POST['action'
         if ($bookingWindowDays === '' || filter_var($bookingWindowDays, FILTER_VALIDATE_INT) === false) {
             throw new RuntimeException('Booking window must be a whole number.');
         }
-        if (!is_array($availableWeekdays) || $availableWeekdays === []) {
-            throw new RuntimeException('Select at least one available weekday.');
+        if (!is_array($closedWeekdays)) {
+            throw new RuntimeException('Closed appointment days are invalid.');
+        }
+
+        $closedWeekdayValues = aps_normalize_closed_weekdays($closedWeekdays);
+        $availableWeekdays = aps_available_weekdays_from_closed($closedWeekdayValues);
+        if ($availableWeekdays === []) {
+            throw new RuntimeException('At least one weekday must remain open for appointments.');
         }
 
         $slotIntervalValue = (int)$slotInterval;
@@ -141,6 +147,8 @@ $appointmentSlotsSummary = $appointmentSlotLabels !== []
 $appointmentAvailableWeekdayOptions = aps_weekday_options();
 $appointmentAvailableWeekdayShortOptions = aps_weekday_short_options();
 $appointmentAvailableWeekdayLabels = aps_weekdays_label($appointmentSettings['available_weekdays'] ?? []);
+$appointmentClosedWeekdays = aps_closed_weekdays($appointmentSettings);
+$appointmentClosedWeekdayLabels = aps_closed_weekdays_label($appointmentSettings);
 $appointmentDisabledWeekdays = aps_disabled_weekdays($appointmentSettings);
 $appointmentUnavailableDates = aps_normalize_unavailable_dates($appointmentSettings['unavailable_dates'] ?? []);
 $appointmentUnavailableDatesCsv = implode(',', $appointmentUnavailableDates);
@@ -619,20 +627,27 @@ foreach ($appointmentRows as $row) {
 
         .appointment-weekday-grid {
             display: grid;
-            grid-template-columns: repeat(7, minmax(0, 1fr));
+            grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
             gap: 0.7rem;
         }
 
         .appointment-weekday-option {
             display: grid;
             justify-items: center;
-            gap: 0.35rem;
-            padding: 0.75rem 0.35rem;
+            gap: 0.6rem;
+            min-height: 118px;
+            padding: 0.95rem 0.55rem;
             border: 1px solid #e5e7eb;
             border-radius: 16px;
             background: #fff;
             color: #374151;
             font-weight: 700;
+            text-align: center;
+        }
+
+        .appointment-weekday-option span {
+            font-size: 0.98rem;
+            line-height: 1.15;
         }
 
         .appointment-weekday-option input {
@@ -856,7 +871,7 @@ foreach ($appointmentRows as $row) {
 
         <?php if ($isAppointmentSettingsView): ?>
         <div id="div-tableContainer" class="bg-white p-4 rounded-4 shadow-sm border appointment-tracker-shell appointment-settings-shell">
-            <p class="appointment-settings-lead">Adjust the appointment slot length, available weekdays, lunch break, blocked dates, and how far ahead residents can book. Changes here apply to the resident form and the admin approval flow.</p>
+            <p class="appointment-settings-lead">Adjust the appointment slot length, weekly closed days, lunch break, blocked dates, and how far ahead residents can book. Changes here apply to the resident form and the admin approval flow.</p>
 
             <div class="appointment-settings-grid">
                 <section class="appointment-settings-card">
@@ -898,22 +913,22 @@ foreach ($appointmentRows as $row) {
                         </div>
 
                         <div class="appointment-settings-field">
-                            <label>Available dates for official appointments</label>
+                            <label>Closed for appointments</label>
                             <div class="appointment-weekday-grid">
                                 <?php foreach ($appointmentAvailableWeekdayOptions as $weekdayValue => $weekdayLabel): ?>
-                                    <label class="appointment-weekday-option" for="appointmentWeekday<?= (int)$weekdayValue ?>">
-                                        <span><?= htmlspecialchars((string)($appointmentAvailableWeekdayShortOptions[$weekdayValue] ?? substr($weekdayLabel, 0, 1)), ENT_QUOTES, 'UTF-8') ?></span>
+                                    <label class="appointment-weekday-option" for="appointmentClosedWeekday<?= (int)$weekdayValue ?>">
+                                        <span><?= htmlspecialchars($weekdayLabel, ENT_QUOTES, 'UTF-8') ?></span>
                                         <input
                                             type="checkbox"
-                                            id="appointmentWeekday<?= (int)$weekdayValue ?>"
-                                            name="available_weekdays[]"
+                                            id="appointmentClosedWeekday<?= (int)$weekdayValue ?>"
+                                            name="closed_weekdays[]"
                                             value="<?= (int)$weekdayValue ?>"
-                                            <?= in_array((int)$weekdayValue, $appointmentSettings['available_weekdays'] ?? [], true) ? 'checked' : '' ?>
+                                            <?= in_array((int)$weekdayValue, $appointmentClosedWeekdays, true) ? 'checked' : '' ?>
                                         >
-                                        <small><?= htmlspecialchars($weekdayLabel, ENT_QUOTES, 'UTF-8') ?></small>
                                     </label>
                                 <?php endforeach; ?>
                             </div>
+                            <small>Checked days stay closed every week. Leave a day unchecked to keep it open for appointments.</small>
                         </div>
 
                         <div class="appointment-settings-field">
@@ -998,7 +1013,8 @@ foreach ($appointmentRows as $row) {
                     <h5>Current Appointment Rules</h5>
                     <ul class="appointment-settings-list">
                         <li>Residents can only set appointments with currently serving barangay council members.</li>
-                        <li>Available weekdays: <?= htmlspecialchars($appointmentAvailableWeekdayLabels, ENT_QUOTES, 'UTF-8') ?>.</li>
+                        <li>Open weekdays: <?= htmlspecialchars($appointmentAvailableWeekdayLabels, ENT_QUOTES, 'UTF-8') ?>.</li>
+                        <li>Closed weekdays: <?= htmlspecialchars($appointmentClosedWeekdayLabels, ENT_QUOTES, 'UTF-8') ?>.</li>
                         <li>Lunch break: <?= htmlspecialchars($appointmentLunchBreakLabel, ENT_QUOTES, 'UTF-8') ?>.</li>
                         <li>Unavailable dates: <?= htmlspecialchars($appointmentUnavailableDatesSummary, ENT_QUOTES, 'UTF-8') ?>.</li>
                         <li>Residents can book from tomorrow up to <?= htmlspecialchars((string)($appointmentSettings['booking_window_days'] ?? 365), ENT_QUOTES, 'UTF-8') ?> days ahead.</li>

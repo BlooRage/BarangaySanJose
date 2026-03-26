@@ -1871,8 +1871,8 @@ function ann_decode_faq_items(?string $json): array
             onImageUpload: async function (files) {
               for (const file of files) {
                 if (!file) continue;
-                if (file.size > 25 * 1024 * 1024) {
-                  alert("Image must be 25MB or less.");
+                if (file.size > 50 * 1024 * 1024) {
+                  alert("Image must be 50MB or less.");
                   continue;
                 }
                 try {
@@ -2993,7 +2993,6 @@ function ann_decode_faq_items(?string $json): array
   <script src="../../JS-Script-Files/Admin-End/tableColumnsGeneric.js?v=20260215-1"></script>
 </body>
 </html>
-
 
 
 

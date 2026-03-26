@@ -2,6 +2,7 @@
 $allowUnregistered = false;
 require_once __DIR__ . "/includes/resident_access_guard.php";
 require_once "../PhpFiles/GET/getResidentProfile.php";
+require_once "../PhpFiles/General/uploadLimits.php";
 
 $data = getResidentProfileData($conn, $_SESSION['user_id']);
 $residentinformationtbl = $data['residentinformationtbl'] ?? [];
@@ -203,14 +204,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && (string)($_POST['action'] ?? '') ==
         if (!isset($_FILES['profile_image']) || !is_array($_FILES['profile_image'])) {
             throw new RuntimeException('Please select an image to upload.');
         }
-        $err = (int)($_FILES['profile_image']['error'] ?? UPLOAD_ERR_NO_FILE);
-        if ($err !== UPLOAD_ERR_OK) throw new RuntimeException('Please select an image to upload.');
+        $uploadError = app_upload_validate_file($_FILES['profile_image'], 'resident', 'Image', true);
+        if ($uploadError !== null) throw new RuntimeException($uploadError);
         $tmpName = (string)($_FILES['profile_image']['tmp_name'] ?? '');
         if ($tmpName === '' || !is_uploaded_file($tmpName)) throw new RuntimeException('Invalid upload source.');
         $size = @filesize($tmpName);
         if ($size === false || (int)$size <= 0) throw new RuntimeException('Uploaded image is empty.');
-        $maxBytes = 5 * 1024 * 1024; // 5MB
-        if ((int)$size > $maxBytes) throw new RuntimeException('Image must be 5MB or below.');
 
         $origName = (string)($_FILES['profile_image']['name'] ?? '');
         $ext = strtolower((string)pathinfo($origName, PATHINFO_EXTENSION));
@@ -1895,7 +1894,7 @@ if ($residentId !== '' && isset($conn) && $conn instanceof mysqli) {
                             <div class="fw-bold mb-1">Upload Requirements</div>
                             <ul class="mb-0 ps-3">
                                 <li>Accepted formats: JPG, JPEG, PNG, WEBP</li>
-                                <li>Maximum file size: 5MB</li>
+                                <li>Maximum file size: 25MB</li>
                                 <li>Use a clear 2x2-style portrait image for review</li>
                                 <li>Change will be submitted as a pending edit request</li>
                             </ul>

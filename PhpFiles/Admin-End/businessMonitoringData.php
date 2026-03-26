@@ -53,45 +53,85 @@ function bm_normalize_public_file_path(string $rawPath): string
     return str_starts_with($pathText, '/UnifiedFileAttachment/') ? $pathText : '';
 }
 
+function bm_extract_public_file_paths($value): array
+{
+    $paths = [];
+
+    if (is_array($value)) {
+        foreach ($value as $item) {
+            foreach (bm_extract_public_file_paths($item) as $path) {
+                $paths[] = $path;
+            }
+        }
+        return $paths;
+    }
+
+    $normalizedPath = bm_normalize_public_file_path((string)$value);
+    if ($normalizedPath !== '') {
+        $paths[] = $normalizedPath;
+    }
+
+    return $paths;
+}
+
 function bm_extract_submitted_documents(array $payload): array
 {
     $docs = [];
     $seen = [];
     $fieldMap = [
-        'business_reg_file_path' => [
+        'business_reg_file_paths' => [
             'label' => bm_business_registration_label((string)($payload['business_reg_type'] ?? '')),
+            'fallback_fields' => ['business_reg_file_path'],
         ],
-        'proof_address_file_path' => [
+        'proof_address_file_paths' => [
             'label' => bm_proof_of_business_address_label((string)($payload['proof_address_type'] ?? '')),
+            'fallback_fields' => ['proof_address_file_path'],
         ],
-        'business_photo_file_path' => [
+        'business_photo_file_paths' => [
             'label' => 'Establishment Photo',
+            'fallback_fields' => ['business_photo_file_path'],
         ],
-        'renewal_business_reg_file_path' => [
+        'renewal_business_reg_file_paths' => [
             'label' => bm_business_registration_label((string)($payload['renewal_business_reg_type'] ?? ''), true),
+            'fallback_fields' => ['renewal_business_reg_file_path'],
         ],
-        'renewal_proof_address_file_path' => [
+        'renewal_proof_address_file_paths' => [
             'label' => bm_proof_of_business_address_label((string)($payload['renewal_proof_address_type'] ?? ''), true),
+            'fallback_fields' => ['renewal_proof_address_file_path'],
+        ],
+        'renewal_business_photo_file_paths' => [
+            'label' => 'Updated Establishment Photo',
+            'fallback_fields' => ['renewal_business_photo_file_path'],
         ],
     ];
 
     foreach ($fieldMap as $field => $config) {
-        $normalizedPath = bm_normalize_public_file_path((string)($payload[$field] ?? ''));
-        if ($normalizedPath === '') {
-            continue;
+        $paths = bm_extract_public_file_paths($payload[$field] ?? []);
+        foreach (($config['fallback_fields'] ?? []) as $fallbackField) {
+            $paths = array_merge($paths, bm_extract_public_file_paths($payload[$fallbackField] ?? ''));
         }
-        $publicUrl = appUrl($normalizedPath);
-        if (isset($seen[$publicUrl])) {
-            continue;
-        }
-        $seen[$publicUrl] = true;
+        $paths = array_values(array_unique($paths));
 
-        $docs[] = [
-            'label' => (string)($config['label'] ?? 'Submitted Document'),
-            'path' => $normalizedPath,
-            'url' => $publicUrl,
-            'name' => basename($normalizedPath),
-        ];
+        $pathCount = count($paths);
+        foreach ($paths as $index => $normalizedPath) {
+            $publicUrl = appUrl($normalizedPath);
+            if (isset($seen[$publicUrl])) {
+                continue;
+            }
+            $seen[$publicUrl] = true;
+
+            $label = (string)($config['label'] ?? 'Submitted Document');
+            if ($pathCount > 1) {
+                $label .= ' Attachment ' . ($index + 1);
+            }
+
+            $docs[] = [
+                'label' => $label,
+                'path' => $normalizedPath,
+                'url' => $publicUrl,
+                'name' => basename($normalizedPath),
+            ];
+        }
     }
 
     return $docs;

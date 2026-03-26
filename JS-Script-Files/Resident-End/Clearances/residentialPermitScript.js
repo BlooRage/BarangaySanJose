@@ -20,6 +20,9 @@ document.addEventListener("DOMContentLoaded", () => {
     const proofAddressNumberRow = document.getElementById("proofAddressNumberRow");
     const proofAddressNumber = document.getElementById("proofAddressNumber");
     const proofAddressNumberError = document.getElementById("proofAddressNumberError");
+    const sitePhotoFile = document.getElementById("sitePhotoFile");
+    const sitePhotoDropzone = document.getElementById("sitePhotoDropzone");
+    const sitePhotoSelectedFile = document.getElementById("sitePhotoSelectedFile");
     if (!form || !submitBtn) return;
 
     const setWrapperState = (wrapper, enabled) => {
@@ -154,6 +157,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
         setRequired(proofAddressType, true);
         setRequired(proofAddressFile, true);
+        setRequired(sitePhotoFile, true);
         updateNumberRow(proofAddressType, proofAddressNumberRow, proofAddressNumber);
 
         setEnabled(lotBarangayRow, true);
@@ -179,7 +183,13 @@ document.addEventListener("DOMContentLoaded", () => {
         renderFile(proofAddressFile, proofAddressSelectedFile);
         updateState();
     });
+    sitePhotoFile?.addEventListener("change", () => {
+        renderFile(sitePhotoFile, sitePhotoSelectedFile);
+        updateState();
+    });
     bindDropzone(proofAddressDropzone, proofAddressFile, proofAddressSelectedFile);
+    bindDropzone(sitePhotoDropzone, sitePhotoFile, sitePhotoSelectedFile);
     updateState();
     renderFile(proofAddressFile, proofAddressSelectedFile);
+    renderFile(sitePhotoFile, sitePhotoSelectedFile);
 });

@@ -4,6 +4,7 @@ declare(strict_types=1);
 require_once __DIR__ . '/../General/security.php';
 require_once __DIR__ . '/../General/connection.php';
 require_once __DIR__ . '/../General/documentRequestWorkflow.php';
+require_once __DIR__ . '/../General/uploadLimits.php';
 
 requireRoleSession(['Resident'], true);
 
@@ -171,17 +172,13 @@ function dr_allowed_extension(string $name): bool {
 
 function dr_save_upload(array $file, string $folder, ?array $allowedExtensions = null): array {
     $errorCode = (int)($file['error'] ?? UPLOAD_ERR_NO_FILE);
-    if ($errorCode !== UPLOAD_ERR_OK) {
-        if ($errorCode === UPLOAD_ERR_NO_FILE) {
-            return ['path' => null, 'error' => 'Please attach the required file.'];
-        }
-        if ($errorCode === UPLOAD_ERR_INI_SIZE || $errorCode === UPLOAD_ERR_FORM_SIZE) {
-            return ['path' => null, 'error' => 'Uploaded file is too large. Please choose a smaller file.'];
-        }
-        if ($errorCode === UPLOAD_ERR_PARTIAL) {
-            return ['path' => null, 'error' => 'Upload was interrupted. Please try again.'];
-        }
-        return ['path' => null, 'error' => 'Unable to read uploaded file. Please try again.'];
+    if ($errorCode === UPLOAD_ERR_NO_FILE) {
+        return ['path' => null, 'error' => 'Please attach the required file.'];
+    }
+
+    $validationError = app_upload_validate_file($file, 'resident', 'File');
+    if ($validationError !== null) {
+        return ['path' => null, 'error' => $validationError];
     }
 
     $orig = (string)($file['name'] ?? '');
@@ -373,8 +370,9 @@ function dr_convert_upload_to_pdf(array $file, string $folder, int $index = 1): 
     if ($errorCode === UPLOAD_ERR_NO_FILE) {
         return ['path' => null, 'error' => null];
     }
-    if ($errorCode !== UPLOAD_ERR_OK) {
-        return ['path' => null, 'error' => 'Unable to read uploaded file. Please try again.'];
+    $validationError = app_upload_validate_file($file, 'resident', 'Attachment');
+    if ($validationError !== null) {
+        return ['path' => null, 'error' => $validationError];
     }
 
     $orig = (string)($file['name'] ?? '');
@@ -452,6 +450,41 @@ function dr_convert_upload_to_pdf(array $file, string $folder, int $index = 1): 
 
     @chmod($targetPath, 0664);
     return ['path' => '/UnifiedFileAttachment/' . trim($folder, '/') . '/' . $targetName, 'error' => null];
+}
+
+function dr_collect_pdf_upload_paths(array $files, string $folder, string $label, bool $required = true, int $maxFiles = 3): array {
+    $paths = [];
+
+    if (!isset($files['name']) || !is_array($files['name'])) {
+        if ($required) {
+            return ['paths' => [], 'error' => 'At least one ' . strtolower($label) . ' attachment is required.'];
+        }
+        return ['paths' => [], 'error' => null];
+    }
+
+    $fileCount = min($maxFiles, count($files['name']));
+    for ($i = 0; $i < $fileCount; $i++) {
+        $entry = [
+            'name' => $files['name'][$i] ?? '',
+            'type' => $files['type'][$i] ?? '',
+            'tmp_name' => $files['tmp_name'][$i] ?? '',
+            'error' => $files['error'][$i] ?? UPLOAD_ERR_NO_FILE,
+            'size' => $files['size'][$i] ?? 0,
+        ];
+        $converted = dr_convert_upload_to_pdf($entry, $folder, $i + 1);
+        if (!empty($converted['error'])) {
+            return ['paths' => [], 'error' => $label . ' attachment ' . ($i + 1) . ': ' . $converted['error']];
+        }
+        if (!empty($converted['path'])) {
+            $paths[] = (string)$converted['path'];
+        }
+    }
+
+    if ($required && !$paths) {
+        return ['paths' => [], 'error' => 'At least one ' . strtolower($label) . ' attachment is required.'];
+    }
+
+    return ['paths' => $paths, 'error' => null];
 }
 
 function dr_document_type_token(string $value): string {
@@ -1149,13 +1182,50 @@ if ($action === 'submit_request') {
 
         $uploadSets = $applicationType === 'Renewal'
             ? [
-                ['field' => 'renewal_business_reg_file', 'folder' => 'DocumentRequests/BusinessClearance/BusinessRegistrations', 'message' => 'Updated business registration'],
-                ['field' => 'renewal_proof_address_file', 'folder' => 'DocumentRequests/BusinessClearance/ProofOfAddress', 'message' => 'Updated proof of business address'],
+                [
+                    'field' => 'renewal_business_reg_files',
+                    'folder' => 'DocumentRequests/BusinessClearance/BusinessRegistrations',
+                    'label' => 'Updated business registration',
+                    'path_field' => 'renewal_business_reg_file_path',
+                    'paths_field' => 'renewal_business_reg_file_paths',
+                ],
+                [
+                    'field' => 'renewal_proof_address_files',
+                    'folder' => 'DocumentRequests/BusinessClearance/ProofOfAddress',
+                    'label' => 'Updated proof of business address',
+                    'path_field' => 'renewal_proof_address_file_path',
+                    'paths_field' => 'renewal_proof_address_file_paths',
+                ],
+                [
+                    'field' => 'renewal_business_photo_files',
+                    'folder' => 'DocumentRequests/BusinessClearance/BusinessPhotos',
+                    'label' => 'Updated picture of establishment or business',
+                    'path_field' => 'renewal_business_photo_file_path',
+                    'paths_field' => 'renewal_business_photo_file_paths',
+                ],
             ]
             : [
-                ['field' => 'business_reg_file', 'folder' => 'DocumentRequests/BusinessClearance/BusinessRegistrations', 'message' => 'Business registration'],
-                ['field' => 'proof_address_file', 'folder' => 'DocumentRequests/BusinessClearance/ProofOfAddress', 'message' => 'Proof of business address'],
-                ['field' => 'business_photo_file', 'folder' => 'DocumentRequests/BusinessClearance/BusinessPhotos', 'message' => 'Picture of establishment or business'],
+                [
+                    'field' => 'business_reg_files',
+                    'folder' => 'DocumentRequests/BusinessClearance/BusinessRegistrations',
+                    'label' => 'Business registration',
+                    'path_field' => 'business_reg_file_path',
+                    'paths_field' => 'business_reg_file_paths',
+                ],
+                [
+                    'field' => 'proof_address_files',
+                    'folder' => 'DocumentRequests/BusinessClearance/ProofOfAddress',
+                    'label' => 'Proof of business address',
+                    'path_field' => 'proof_address_file_path',
+                    'paths_field' => 'proof_address_file_paths',
+                ],
+                [
+                    'field' => 'business_photo_files',
+                    'folder' => 'DocumentRequests/BusinessClearance/BusinessPhotos',
+                    'label' => 'Picture of establishment or business',
+                    'path_field' => 'business_photo_file_path',
+                    'paths_field' => 'business_photo_file_paths',
+                ],
             ];
 
         $requiredFieldMap = $applicationType === 'Renewal'
@@ -1181,11 +1251,17 @@ if ($action === 'submit_request') {
         }
 
         foreach ($uploadSets as $uploadSet) {
-            $upload = dr_save_upload($_FILES[$uploadSet['field']] ?? [], $uploadSet['folder'], ['jpg', 'jpeg', 'png', 'pdf']);
-            if (!empty($upload['error'])) {
-                dr_respond_json(422, ['success' => false, 'message' => $uploadSet['message'] . ': ' . $upload['error']]);
+            $converted = dr_collect_pdf_upload_paths(
+                $_FILES[$uploadSet['field']] ?? [],
+                $uploadSet['folder'],
+                $uploadSet['label']
+            );
+            if (!empty($converted['error'])) {
+                dr_respond_json(422, ['success' => false, 'message' => (string)$converted['error']]);
             }
-            $_POST[$uploadSet['field'] . '_path'] = (string)($upload['path'] ?? '');
+            $paths = is_array($converted['paths'] ?? null) ? $converted['paths'] : [];
+            $_POST[$uploadSet['paths_field']] = $paths;
+            $_POST[$uploadSet['path_field']] = (string)($paths[0] ?? '');
         }
     }
 
@@ -1259,11 +1335,26 @@ if ($action === 'submit_request') {
         }
         $_POST['vehicle_named_to_owner'] = $vehicleNamedToOwner;
 
+        $saveOptionalTricycleUpload = static function (string $field, string $folder, string $message) {
+            $errorCode = (int)(($_FILES[$field]['error'] ?? UPLOAD_ERR_NO_FILE));
+            if ($errorCode === UPLOAD_ERR_NO_FILE) {
+                return '';
+            }
+
+            $upload = dr_save_upload($_FILES[$field] ?? [], $folder, ['jpg', 'jpeg', 'png', 'pdf']);
+            if (!empty($upload['error'])) {
+                dr_respond_json(422, ['success' => false, 'message' => $message . ': ' . $upload['error']]);
+            }
+            return (string)($upload['path'] ?? '');
+        };
+
         $requiredUploads = [
             ['field' => 'or_vehicle_file', 'folder' => 'DocumentRequests/TricyclePermit/VehicleOR', 'message' => 'O.R. of the vehicle'],
-            ['field' => 'cr_vehicle_file', 'folder' => 'DocumentRequests/TricyclePermit/VehicleCR', 'message' => 'C.R. of the vehicle'],
-            ['field' => 'toda_poda_cert_file', 'folder' => 'DocumentRequests/TricyclePermit/TodaPodaCertification', 'message' => 'TODA / PODA certification'],
         ];
+        if ($applicationType !== 'Renewal') {
+            $requiredUploads[] = ['field' => 'cr_vehicle_file', 'folder' => 'DocumentRequests/TricyclePermit/VehicleCR', 'message' => 'C.R. of the vehicle'];
+            $requiredUploads[] = ['field' => 'toda_poda_cert_file', 'folder' => 'DocumentRequests/TricyclePermit/TodaPodaCertification', 'message' => 'TODA / PODA certification'];
+        }
         foreach ($requiredUploads as $uploadSet) {
             $upload = dr_save_upload($_FILES[$uploadSet['field']] ?? [], $uploadSet['folder'], ['jpg', 'jpeg', 'png', 'pdf']);
             if (!empty($upload['error'])) {
@@ -1272,33 +1363,49 @@ if ($action === 'submit_request') {
             $_POST[$uploadSet['field'] . '_path'] = (string)($upload['path'] ?? '');
         }
 
-        $authorizationUploadError = (int)(($_FILES['authorization_vehicle_file']['error'] ?? UPLOAD_ERR_NO_FILE));
-        if ($authorizationUploadError !== UPLOAD_ERR_NO_FILE) {
-            $authorizationUpload = dr_save_upload($_FILES['authorization_vehicle_file'] ?? [], 'DocumentRequests/TricyclePermit/VehicleAuthorization', ['jpg', 'jpeg', 'png', 'pdf']);
-            if (!empty($authorizationUpload['error'])) {
-                dr_respond_json(422, ['success' => false, 'message' => 'Authorization of vehicle: ' . $authorizationUpload['error']]);
-            }
-            $_POST['authorization_vehicle_file_path'] = (string)($authorizationUpload['path'] ?? '');
-        } else {
-            $_POST['authorization_vehicle_file_path'] = '';
+        if ($applicationType === 'Renewal') {
+            $_POST['cr_vehicle_file_path'] = $saveOptionalTricycleUpload(
+                'cr_vehicle_file',
+                'DocumentRequests/TricyclePermit/VehicleCR',
+                'C.R. of the vehicle'
+            );
+            $_POST['toda_poda_cert_file_path'] = $saveOptionalTricycleUpload(
+                'toda_poda_cert_file',
+                'DocumentRequests/TricyclePermit/TodaPodaCertification',
+                'TODA / PODA certification'
+            );
         }
 
+        $_POST['authorization_vehicle_file_path'] = $saveOptionalTricycleUpload(
+            'authorization_vehicle_file',
+            'DocumentRequests/TricyclePermit/VehicleAuthorization',
+            'Authorization of vehicle'
+        );
+
         if ($vehicleNamedToOwner === 'no') {
-            $deedUpload = dr_save_upload($_FILES['deed_of_sale_file'] ?? [], 'DocumentRequests/TricyclePermit/DeedOfSale', ['jpg', 'jpeg', 'png', 'pdf']);
-            if (!empty($deedUpload['error'])) {
-                dr_respond_json(422, ['success' => false, 'message' => 'Notarized deed of sale: ' . $deedUpload['error']]);
+            if ($applicationType === 'Renewal') {
+                $_POST['deed_of_sale_file_path'] = $saveOptionalTricycleUpload(
+                    'deed_of_sale_file',
+                    'DocumentRequests/TricyclePermit/DeedOfSale',
+                    'Notarized deed of sale'
+                );
+            } else {
+                $deedUpload = dr_save_upload($_FILES['deed_of_sale_file'] ?? [], 'DocumentRequests/TricyclePermit/DeedOfSale', ['jpg', 'jpeg', 'png', 'pdf']);
+                if (!empty($deedUpload['error'])) {
+                    dr_respond_json(422, ['success' => false, 'message' => 'Notarized deed of sale: ' . $deedUpload['error']]);
+                }
+                $_POST['deed_of_sale_file_path'] = (string)($deedUpload['path'] ?? '');
             }
-            $_POST['deed_of_sale_file_path'] = (string)($deedUpload['path'] ?? '');
         } else {
             $_POST['deed_of_sale_file_path'] = '';
         }
 
         if ($applicationType === 'Renewal') {
-            $clearanceUpload = dr_save_upload($_FILES['last_year_clearance_file'] ?? [], 'DocumentRequests/TricyclePermit/PreviousBarangayClearance', ['jpg', 'jpeg', 'png', 'pdf']);
-            if (!empty($clearanceUpload['error'])) {
-                dr_respond_json(422, ['success' => false, 'message' => 'Barangay clearance from previous year: ' . $clearanceUpload['error']]);
-            }
-            $_POST['last_year_clearance_file_path'] = (string)($clearanceUpload['path'] ?? '');
+            $_POST['last_year_clearance_file_path'] = $saveOptionalTricycleUpload(
+                'last_year_clearance_file',
+                'DocumentRequests/TricyclePermit/PreviousBarangayClearance',
+                'Barangay clearance from previous year'
+            );
         } else {
             $_POST['last_year_clearance_file_path'] = '';
         }
@@ -1326,6 +1433,7 @@ if ($action === 'submit_request') {
             'requires_ownership_type' => true,
             'requires_sec_certificate' => false,
             'requires_sec_for_ownership' => true,
+            'site_photo_label' => 'Picture of establishment / property',
         ];
     } elseif (in_array($documentTypeToken, [
         'barangayclearanceforwaterpermit',
@@ -1340,6 +1448,7 @@ if ($action === 'submit_request') {
             'requires_ownership_type' => true,
             'requires_sec_certificate' => false,
             'requires_sec_for_ownership' => true,
+            'site_photo_label' => 'Picture of establishment / property',
         ];
     } elseif (in_array($documentTypeToken, [
         'barangayclearanceforresidentialpermit',
@@ -1357,6 +1466,7 @@ if ($action === 'submit_request') {
             'requires_ownership_type' => false,
             'requires_sec_certificate' => false,
             'requires_sec_for_ownership' => false,
+            'site_photo_label' => 'Picture of residence / property',
         ];
     } elseif (in_array($documentTypeToken, [
         'barangayclearanceforcommercialpermit',
@@ -1374,6 +1484,7 @@ if ($action === 'submit_request') {
             'requires_ownership_type' => false,
             'requires_sec_certificate' => true,
             'requires_sec_for_ownership' => false,
+            'site_photo_label' => 'Picture of establishment / property',
         ];
     }
 
@@ -1451,6 +1562,16 @@ if ($action === 'submit_request') {
             dr_respond_json(422, ['success' => false, 'message' => 'Proof of address: ' . $proofUpload['error']]);
         }
         $_POST['proof_address_file_path'] = (string)($proofUpload['path'] ?? '');
+
+        $sitePhotoUpload = dr_save_upload(
+            $_FILES['site_photo_file'] ?? [],
+            'DocumentRequests/' . $generalPermitConfig['folder'] . '/SitePhotos',
+            ['jpg', 'jpeg', 'png', 'pdf']
+        );
+        if (!empty($sitePhotoUpload['error'])) {
+            dr_respond_json(422, ['success' => false, 'message' => ($generalPermitConfig['site_photo_label'] ?? 'Picture of establishment / property') . ': ' . $sitePhotoUpload['error']]);
+        }
+        $_POST['site_photo_file_path'] = (string)($sitePhotoUpload['path'] ?? '');
 
         $secCertificateError = (int)(($_FILES['sec_certificate_file']['error'] ?? UPLOAD_ERR_NO_FILE));
         if ($needsSecCertificate) {

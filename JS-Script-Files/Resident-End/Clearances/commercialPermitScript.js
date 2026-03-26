@@ -20,6 +20,9 @@ document.addEventListener("DOMContentLoaded", () => {
     const proofAddressNumberRow = document.getElementById("proofAddressNumberRow");
     const proofAddressNumber = document.getElementById("proofAddressNumber");
     const proofAddressNumberError = document.getElementById("proofAddressNumberError");
+    const sitePhotoFile = document.getElementById("sitePhotoFile");
+    const sitePhotoDropzone = document.getElementById("sitePhotoDropzone");
+    const sitePhotoSelectedFile = document.getElementById("sitePhotoSelectedFile");
     const secCertificateFile = document.getElementById("secCertificateFile");
     const secCertificateDropzone = document.getElementById("secCertificateDropzone");
     const secCertificateSelectedFile = document.getElementById("secCertificateSelectedFile");
@@ -157,6 +160,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
         setRequired(proofAddressType, true);
         setRequired(proofAddressFile, true);
+        setRequired(sitePhotoFile, true);
         setRequired(secCertificateFile, true);
         updateNumberRow(proofAddressType, proofAddressNumberRow, proofAddressNumber);
 
@@ -183,13 +187,19 @@ document.addEventListener("DOMContentLoaded", () => {
         renderFile(proofAddressFile, proofAddressSelectedFile);
         updateState();
     });
+    sitePhotoFile?.addEventListener("change", () => {
+        renderFile(sitePhotoFile, sitePhotoSelectedFile);
+        updateState();
+    });
     secCertificateFile?.addEventListener("change", () => {
         renderFile(secCertificateFile, secCertificateSelectedFile);
         updateState();
     });
     bindDropzone(proofAddressDropzone, proofAddressFile, proofAddressSelectedFile);
+    bindDropzone(sitePhotoDropzone, sitePhotoFile, sitePhotoSelectedFile);
     bindDropzone(secCertificateDropzone, secCertificateFile, secCertificateSelectedFile);
     updateState();
     renderFile(proofAddressFile, proofAddressSelectedFile);
+    renderFile(sitePhotoFile, sitePhotoSelectedFile);
     renderFile(secCertificateFile, secCertificateSelectedFile);
 });

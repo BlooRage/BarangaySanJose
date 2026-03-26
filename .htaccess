@@ -1,6 +1,19 @@
 Options -Indexes
 Options -MultiViews
 
+# Upload ceiling high enough for app-level resident/admin file limits.
+<IfModule mod_php.c>
+php_value upload_max_filesize 64M
+php_value post_max_size 256M
+php_value max_file_uploads 40
+</IfModule>
+
+<IfModule mod_php_module>
+php_value upload_max_filesize 64M
+php_value post_max_size 256M
+php_value max_file_uploads 40
+</IfModule>
+
 <IfModule mod_rewrite.c>
 RewriteEngine On
 

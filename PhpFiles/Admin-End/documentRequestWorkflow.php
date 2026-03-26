@@ -5,6 +5,7 @@ require_once __DIR__ . '/../General/security.php';
 require_once __DIR__ . '/../General/connection.php';
 require_once __DIR__ . '/../General/documentRequestWorkflow.php';
 require_once __DIR__ . '/../General/audit.php';
+require_once __DIR__ . '/../General/uploadLimits.php';
 
 requireRoleSession(['SuperAdmin', 'Official', 'Officials', 'Personnel', 'Personnels', 'Admin', 'Employee'], true);
 
@@ -187,6 +188,60 @@ function dra_is_finance_user(mysqli $conn, string $userId): bool {
         || strpos($position, 'finance') !== false
         || ($role === 'employee' && strpos($department, 'finance') !== false)
     );
+}
+
+function dra_resolve_official_display_name(mysqli $conn, string $userId): string {
+    $userId = trim($userId);
+    if ($userId === '' || !dr_table_exists($conn, 'officialinformationtbl')) {
+        return $userId;
+    }
+
+    $hasSuffix = dr_column_exists($conn, 'officialinformationtbl', 'suffix');
+    $sql = $hasSuffix
+        ? "SELECT TRIM(CONCAT_WS(' ', NULLIF(firstname, ''), NULLIF(middlename, ''), NULLIF(lastname, ''), NULLIF(suffix, ''))) AS full_name FROM officialinformationtbl WHERE user_id = ? LIMIT 1"
+        : "SELECT TRIM(CONCAT_WS(' ', NULLIF(firstname, ''), NULLIF(middlename, ''), NULLIF(lastname, ''))) AS full_name FROM officialinformationtbl WHERE user_id = ? LIMIT 1";
+    $stmt = $conn->prepare($sql);
+    if (!$stmt) {
+        return $userId;
+    }
+
+    $stmt->bind_param('s', $userId);
+    $stmt->execute();
+    $row = $stmt->get_result()->fetch_assoc();
+    $stmt->close();
+
+    $fullName = trim((string)($row['full_name'] ?? ''));
+    return $fullName !== '' ? $fullName : $userId;
+}
+
+function dra_record_clearance_inspection(mysqli $conn, array $requestRow, string $inspectorUserId, string $remarks): void {
+    $requestId = trim((string)($requestRow['request_id'] ?? ''));
+    if ($requestId === ''
+        || !dr_requires_clearance_inspection((string)($requestRow['document_type'] ?? ''))
+        || !dr_table_exists($conn, 'clearanceinspectiontbl')) {
+        return;
+    }
+
+    dr_ensure_clearance_row_for_request($conn, $requestRow);
+    $clearanceId = dr_get_clearance_id_for_request($conn, $requestId);
+    if (!$clearanceId) {
+        return;
+    }
+
+    $inspectorName = dra_resolve_official_display_name($conn, $inspectorUserId);
+    $inspectedAt = dr_now();
+    $inspectionRemarks = trim($remarks);
+    $stmt = $conn->prepare(
+        "INSERT INTO clearanceinspectiontbl (clearance_id, inspector_name, date_inspected, remarks, inspector_signature_path)
+         VALUES (?, ?, ?, ?, NULL)"
+    );
+    if (!$stmt) {
+        return;
+    }
+
+    $stmt->bind_param('isss', $clearanceId, $inspectorName, $inspectedAt, $inspectionRemarks);
+    $stmt->execute();
+    $stmt->close();
 }
 
 function dra_send_notification_deferred(mysqli $conn, array $request, string $subject, string $message): void {
@@ -5568,24 +5623,30 @@ function dra_backfill_payment_verified_to_ready(mysqli $conn): void {
     }
 }
 
-function dra_save_upload(array $file, string $folder): ?string {
-    if (($file['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_OK) {
-        return null;
+function dra_save_upload(array $file, string $folder): array {
+    $errorCode = (int)($file['error'] ?? UPLOAD_ERR_NO_FILE);
+    if ($errorCode === UPLOAD_ERR_NO_FILE) {
+        return ['path' => null, 'error' => null];
+    }
+
+    $validationError = app_upload_validate_file($file, 'admin', 'Issued file');
+    if ($validationError !== null) {
+        return ['path' => null, 'error' => $validationError];
     }
     $orig = (string)($file['name'] ?? '');
     $ext = strtolower(pathinfo($orig, PATHINFO_EXTENSION));
     if (!in_array($ext, ['pdf', 'jpg', 'jpeg', 'png', 'webp'], true)) {
-        return null;
+        return ['path' => null, 'error' => 'Unsupported issued file type.'];
     }
 
     $tmp = (string)($file['tmp_name'] ?? '');
     if (!is_uploaded_file($tmp)) {
-        return null;
+        return ['path' => null, 'error' => 'Invalid upload source.'];
     }
 
     $baseDir = realpath(__DIR__ . '/../../');
     if ($baseDir === false) {
-        return null;
+        return ['path' => null, 'error' => 'Server path resolution failed.'];
     }
 
     $targetDir = $baseDir . '/UnifiedFileAttachment/' . trim($folder, '/');
@@ -5596,10 +5657,10 @@ function dra_save_upload(array $file, string $folder): ?string {
     $name = date('YmdHis') . '_' . bin2hex(random_bytes(8)) . '.' . $ext;
     $target = $targetDir . '/' . $name;
     if (!move_uploaded_file($tmp, $target)) {
-        return null;
+        return ['path' => null, 'error' => 'Unable to save the issued file.'];
     }
 
-    return '/UnifiedFileAttachment/' . trim($folder, '/') . '/' . $name;
+    return ['path' => '/UnifiedFileAttachment/' . trim($folder, '/') . '/' . $name, 'error' => null];
 }
 
 function dra_resident_profile_snapshot(mysqli $conn, string $residentUserId, string $residentId): array {
@@ -6448,10 +6509,11 @@ if ($action === 'create_manual_request') {
         $resolvedFeeAmount = (float)$defaultFee;
     }
 
-    $initialStage = DR_STAGE_FOR_PAYMENT;
+    $requiresInspection = !$isFirstTimeJobSeeker && dr_requires_clearance_inspection($documentType);
+    $initialStage = $requiresInspection ? DR_STAGE_FOR_INSPECTION : DR_STAGE_FOR_PAYMENT;
     if ($isFirstTimeJobSeeker) {
         $initialStage = DR_STAGE_FOR_INTERVIEW;
-    } elseif ($resolvedFeeAmount !== null && $resolvedFeeAmount <= 0.0) {
+    } elseif (!$requiresInspection && $resolvedFeeAmount !== null && $resolvedFeeAmount <= 0.0) {
         $initialStage = DR_STAGE_READY_FOR_CLAIM;
     }
 
@@ -7321,9 +7383,10 @@ if ($action === 'personnel_approve') {
         $defaultFee = dr_get_clearance_fee_total_for_request($conn, $requestId);
     }
     $isFreeDocument = ($defaultFee !== null && (float)$defaultFee <= 0.0);
+    $requiresInspection = !$isFirstTimeJobSeeker && dr_requires_clearance_inspection((string)($row['document_type'] ?? ''));
     $nextStage = $isFirstTimeJobSeeker
         ? DR_STAGE_FOR_INTERVIEW
-        : ($isFreeDocument ? DR_STAGE_READY_FOR_CLAIM : DR_STAGE_FOR_PAYMENT);
+        : ($requiresInspection ? DR_STAGE_FOR_INSPECTION : ($isFreeDocument ? DR_STAGE_READY_FOR_CLAIM : DR_STAGE_FOR_PAYMENT));
     $patch = [
         'status_reason' => null,
         'personnel_user_id' => $currentUserId,
@@ -7331,7 +7394,7 @@ if ($action === 'personnel_approve') {
         'fee_amount' => $defaultFee,
     ];
 
-    if ($isFreeDocument && !$isFirstTimeJobSeeker) {
+    if ($isFreeDocument && !$isFirstTimeJobSeeker && !$requiresInspection) {
         $verificationCode = trim((string)($row['verification_code'] ?? ''));
         if ($verificationCode === '') {
             $verificationCode = strtoupper(bin2hex(random_bytes(8)));
@@ -7348,7 +7411,7 @@ if ($action === 'personnel_approve') {
         dr_respond_json(500, ['success' => false, 'message' => 'Unable to approve request.']);
     }
 
-    if ($isFreeDocument && !$isFirstTimeJobSeeker) {
+    if ($isFreeDocument && !$isFirstTimeJobSeeker && !$requiresInspection) {
         $issuedPath = dra_generate_issued_document_safe($updated);
         if (is_string($issuedPath) && trim($issuedPath) !== '') {
             $updated = dr_update_stage($conn, $requestId, (string)($updated['stage'] ?? $nextStage), [
@@ -7380,7 +7443,10 @@ if ($action === 'personnel_approve') {
     } else {
         $notificationTitle = 'Document Request Approved for Payment';
         $notificationMessage = dra_request_notice($updated, $requestId, 'approved and is now waiting for payment.');
-        if ($isFreeDocument) {
+        if ($requiresInspection) {
+            $notificationTitle = 'Document Request Approved for Inspection';
+            $notificationMessage = dra_request_notice($updated, $requestId, 'approved and is now pending inspection.');
+        } elseif ($isFreeDocument) {
             $notificationTitle = 'Document Request Approved for Release';
             $notificationMessage = dra_request_notice($updated, $requestId, 'approved and is now for release.');
         }
@@ -7504,6 +7570,135 @@ if ($action === 'interview_fail') {
     );
 
     try { insertUnifiedAuditLog($conn, $currentUserId, $currentUserRole, 'Document Requests', 'document_request', $requestId, 'Interview Fail', 'stage', DR_STAGE_FOR_INTERVIEW, DR_STAGE_INTERVIEW_FAILED, $reason); } catch (Throwable $__e) {}
+    dr_respond_json(200, ['success' => true, 'request' => $updated]);
+}
+
+if ($action === 'inspection_pass') {
+    if (!dr_requires_clearance_inspection((string)($row['document_type'] ?? ''))) {
+        dr_respond_json(422, ['success' => false, 'message' => 'Inspection approval is not available for this request type.']);
+    }
+    $currentStage = strtolower(trim((string)($row['stage'] ?? '')));
+    if ($currentStage !== DR_STAGE_FOR_INSPECTION) {
+        dr_respond_json(422, ['success' => false, 'message' => 'Request is not currently waiting for inspection approval.']);
+    }
+
+    dr_ensure_clearance_fee_types_table($conn);
+    dr_ensure_clearance_row_for_request($conn, $row);
+    $taggedFees = dr_get_clearance_fees_for_request($conn, $requestId);
+    if (!$taggedFees) {
+        dr_respond_json(422, ['success' => false, 'message' => 'Please tag the applicable fees before completing inspection.']);
+    }
+
+    $resolvedFeeAmount = 0.0;
+    foreach ($taggedFees as $taggedFee) {
+        $resolvedFeeAmount += (float)($taggedFee['amount'] ?? 0);
+    }
+
+    $isFreeDocument = ($resolvedFeeAmount <= 0.0);
+    $nextStage = $isFreeDocument ? DR_STAGE_READY_FOR_CLAIM : DR_STAGE_FOR_PAYMENT;
+    $patch = [
+        'status_reason' => null,
+        'personnel_user_id' => $currentUserId,
+        'personnel_decision_at' => dr_now(),
+        'fee_amount' => $resolvedFeeAmount,
+    ];
+
+    if ($isFreeDocument) {
+        $verificationCode = trim((string)($row['verification_code'] ?? ''));
+        if ($verificationCode === '') {
+            $verificationCode = strtoupper(bin2hex(random_bytes(8)));
+        }
+        $patch['verification_code'] = $verificationCode;
+        $patch['qr_code_path'] = '/UnifiedFileAttachment/IssuedDocuments/QR/qr_' . preg_replace('/[^A-Za-z0-9_-]/', '', $requestId) . '.png';
+        $patch['ready_at'] = dr_now();
+    }
+
+    $updated = dr_update_stage($conn, $requestId, $nextStage, $patch);
+    if (!$updated) {
+        dr_respond_json(500, ['success' => false, 'message' => 'Unable to mark inspection as passed.']);
+    }
+
+    dra_record_clearance_inspection(
+        $conn,
+        $updated,
+        $currentUserId,
+        $isFreeDocument ? 'Inspection passed. Request cleared for release.' : 'Inspection passed. Request cleared for payment.'
+    );
+
+    if ($isFreeDocument) {
+        $issuedPath = dra_generate_issued_document_safe($updated);
+        if (is_string($issuedPath) && trim($issuedPath) !== '') {
+            $updated = dr_update_stage($conn, $requestId, (string)($updated['stage'] ?? $nextStage), [
+                'issued_file_path' => (string)$issuedPath,
+            ]) ?? $updated;
+        } else {
+            $baseDir = realpath(__DIR__ . '/../../');
+            if ($baseDir === false) {
+                $baseDir = dirname(__DIR__, 2);
+            }
+            dr_respond_json(500, [
+                'success' => false,
+                'message' => 'Inspection was marked as passed, but the issued document could not be generated. ' . dra_issued_document_diagnostics($baseDir, (array)$updated),
+            ]);
+        }
+    }
+
+    $notificationTitle = $isFreeDocument
+        ? 'Inspection Passed - Document Ready for Release'
+        : 'Inspection Passed - Payment Required';
+    $notificationMessage = $isFreeDocument
+        ? dra_request_notice($updated, $requestId, 'passed inspection and is now for release.')
+        : dra_request_notice($updated, $requestId, 'passed inspection and is now waiting for payment.');
+    dra_send_notification_deferred(
+        $conn,
+        $updated,
+        $notificationTitle,
+        $notificationMessage
+    );
+
+    try { insertUnifiedAuditLog($conn, $currentUserId, $currentUserRole, 'Document Requests', 'document_request', $requestId, 'Inspection Pass', 'stage', DR_STAGE_FOR_INSPECTION, $nextStage, (string)($row['document_type'] ?? '')); } catch (Throwable $__e) {}
+    dr_respond_json(200, ['success' => true, 'request' => $updated]);
+}
+
+if ($action === 'inspection_fail') {
+    if (!dr_requires_clearance_inspection((string)($row['document_type'] ?? ''))) {
+        dr_respond_json(422, ['success' => false, 'message' => 'Inspection rejection is not available for this request type.']);
+    }
+    $currentStage = strtolower(trim((string)($row['stage'] ?? '')));
+    if ($currentStage !== DR_STAGE_FOR_INSPECTION) {
+        dr_respond_json(422, ['success' => false, 'message' => 'Request is not currently waiting for inspection review.']);
+    }
+
+    $reason = trim((string)($_POST['reason'] ?? ''));
+    if ($reason === '') {
+        dr_respond_json(422, ['success' => false, 'message' => 'Inspection failure reason is required.']);
+    }
+
+    $updated = dr_update_stage($conn, $requestId, DR_STAGE_INSPECTION_FAILED, [
+        'status_reason' => $reason,
+        'personnel_user_id' => $currentUserId,
+        'personnel_decision_at' => dr_now(),
+    ]);
+
+    if (!$updated) {
+        dr_respond_json(500, ['success' => false, 'message' => 'Unable to mark inspection as failed.']);
+    }
+
+    dra_record_clearance_inspection(
+        $conn,
+        $updated,
+        $currentUserId,
+        'Inspection failed. Reason: ' . $reason
+    );
+
+    dra_send_notification_deferred(
+        $conn,
+        $updated,
+        'Inspection Failed',
+        dra_request_notice($updated, $requestId, 'did not pass inspection. Reason: ' . $reason)
+    );
+
+    try { insertUnifiedAuditLog($conn, $currentUserId, $currentUserRole, 'Document Requests', 'document_request', $requestId, 'Inspection Fail', 'stage', DR_STAGE_FOR_INSPECTION, DR_STAGE_INSPECTION_FAILED, $reason); } catch (Throwable $__e) {}
     dr_respond_json(200, ['success' => true, 'request' => $updated]);
 }
 
@@ -7720,11 +7915,16 @@ if ($action === 'mark_ready') {
     if ($verificationCode === '') {
         $verificationCode = strtoupper(bin2hex(random_bytes(8)));
     }
-    $issuedPath = dra_save_upload($_FILES['issued_file'] ?? [], 'IssuedDocuments');
-    if ($requiresManualIssuedUpload && ($issuedPath === null || trim((string)$issuedPath) === '')) {
+    $issuedUpload = dra_save_upload($_FILES['issued_file'] ?? [], 'IssuedDocuments');
+    $issuedPath = trim((string)($issuedUpload['path'] ?? ''));
+    $issuedUploadError = trim((string)($issuedUpload['error'] ?? ''));
+    if ($issuedUploadError !== '') {
+        dr_respond_json(422, ['success' => false, 'message' => $issuedUploadError]);
+    }
+    if ($requiresManualIssuedUpload && $issuedPath === '') {
         dr_respond_json(422, ['success' => false, 'message' => 'Please upload the prepared Barangay ID file before marking this request ready.']);
     }
-    if ($issuedPath === null) {
+    if ($issuedPath === '') {
         // Auto-generate issued document when manual upload is not provided.
         $issuedPath = dra_generate_issued_document_safe(array_merge((array)$row, [
             'verification_code' => $verificationCode,

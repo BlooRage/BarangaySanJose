@@ -90,6 +90,222 @@ if ($ownerIsLotBlockSystem) {
 }
 
 $ownerFullAddress = htmlspecialchars(implode(', ', $ownerFullAddressParts), ENT_QUOTES, 'UTF-8');
+
+function tcTableExists(mysqli $conn, string $table): bool {
+    $tableSafe = preg_replace('/[^a-zA-Z0-9_]/', '', $table);
+    if ($tableSafe === '') {
+        return false;
+    }
+
+    $tableEsc = $conn->real_escape_string($tableSafe);
+    $result = $conn->query("SHOW TABLES LIKE '{$tableEsc}'");
+    return $result instanceof mysqli_result && $result->num_rows > 0;
+}
+
+function tcColumnExists(mysqli $conn, string $table, string $column): bool {
+    $tableSafe = preg_replace('/[^a-zA-Z0-9_]/', '', $table);
+    if ($tableSafe === '') {
+        return false;
+    }
+
+    $columnEsc = $conn->real_escape_string($column);
+    $result = $conn->query("SHOW COLUMNS FROM {$tableSafe} LIKE '{$columnEsc}'");
+    return $result instanceof mysqli_result && $result->num_rows > 0;
+}
+
+function tcHistoryVehicleKey(array $record): string {
+    $plateNumber = strtoupper((string)preg_replace('/[^a-zA-Z0-9]/', '', (string)($record['plate_number'] ?? '')));
+    if ($plateNumber !== '') {
+        return 'plate:' . $plateNumber;
+    }
+
+    $chassisNumber = strtoupper((string)preg_replace('/[^a-zA-Z0-9]/', '', (string)($record['chassis_number'] ?? '')));
+    if ($chassisNumber !== '') {
+        return 'chassis:' . $chassisNumber;
+    }
+
+    $bodyNumber = preg_replace('/\D+/', '', (string)($record['body_number'] ?? ''));
+    if ($bodyNumber !== null && $bodyNumber !== '') {
+        return 'body:' . $bodyNumber;
+    }
+
+    $motorNumber = preg_replace('/\D+/', '', (string)($record['motor_number'] ?? ''));
+    if ($motorNumber !== null && $motorNumber !== '') {
+        return 'motor:' . $motorNumber;
+    }
+
+    return '';
+}
+
+function tcHistoryLabel(array $record, string $submittedAt): string {
+    $primary = trim((string)($record['plate_number'] ?? ''));
+    if ($primary !== '') {
+        $primary = 'Plate ' . $primary;
+    } else {
+        $bodyNumber = trim((string)($record['body_number'] ?? ''));
+        if ($bodyNumber !== '') {
+            $primary = 'Body No. ' . $bodyNumber;
+        } else {
+            $primary = trim((string)($record['vehicle_make'] ?? 'Tricycle record'));
+        }
+    }
+
+    $parts = [];
+    $franchisee = trim((string)($record['franchisee'] ?? ''));
+    if ($franchisee !== '') {
+        $parts[] = $franchisee;
+    }
+    $applicationType = trim((string)($record['application_type'] ?? ''));
+    if ($applicationType !== '') {
+        $parts[] = $applicationType;
+    }
+    if ($submittedAt !== '') {
+        try {
+            $parts[] = (new DateTime($submittedAt))->format('M j, Y');
+        } catch (Throwable $e) {
+            // Ignore date formatting errors and keep the label readable.
+        }
+    }
+
+    if ($parts) {
+        $primary .= ' - ' . implode(' | ', $parts);
+    }
+
+    return $primary;
+}
+
+function tcNormalizeTricycleHistory(array $payload, string $requestId, string $submittedAt): ?array {
+    $record = [
+        'request_id' => $requestId,
+        'application_type' => trim((string)($payload['application_type'] ?? '')),
+        'franchisee' => trim((string)($payload['franchisee'] ?? $payload['vehicle_franchise'] ?? $payload['_preview_franchisee'] ?? '')),
+        'location_of_toda_poda' => trim((string)($payload['location_of_toda_poda'] ?? $payload['location'] ?? $payload['_preview_toda_poda_location'] ?? '')),
+        'vehicle_make' => trim((string)($payload['vehicle_make'] ?? $payload['type_of_vehicle'] ?? $payload['_preview_vehicle_type'] ?? '')),
+        'plate_number' => trim((string)($payload['plate_number'] ?? $payload['vehicle_plate_number'] ?? $payload['_preview_plate_number'] ?? '')),
+        'body_number' => trim((string)($payload['body_number'] ?? $payload['_preview_body_number'] ?? '')),
+        'chassis_number' => trim((string)($payload['chassis_number'] ?? '')),
+        'motor_number' => trim((string)($payload['motor_number'] ?? '')),
+        'or_number' => trim((string)($payload['or_number'] ?? '')),
+        'cr_number' => trim((string)($payload['cr_number'] ?? $payload['registration_number'] ?? $payload['_preview_registration_number'] ?? '')),
+        'vehicle_named_to_owner' => strtolower(trim((string)($payload['vehicle_named_to_owner'] ?? ''))),
+    ];
+
+    if (
+        $record['franchisee'] === '' &&
+        $record['vehicle_make'] === '' &&
+        $record['plate_number'] === '' &&
+        $record['body_number'] === '' &&
+        $record['chassis_number'] === '' &&
+        $record['motor_number'] === ''
+    ) {
+        return null;
+    }
+
+    $record['label'] = tcHistoryLabel($record, $submittedAt);
+    return $record;
+}
+
+function tcFetchTricycleRenewalHistory(mysqli $conn, string $residentUserId): array {
+    if ($residentUserId === '' || !tcTableExists($conn, 'documentrequesttbl')) {
+        return [];
+    }
+
+    $dateColumn = '';
+    foreach (['submitted_at', 'request_timestamp', 'created_at', 'updated_at'] as $candidate) {
+        if (tcColumnExists($conn, 'documentrequesttbl', $candidate)) {
+            $dateColumn = $candidate;
+            break;
+        }
+    }
+    $dateSelect = $dateColumn !== '' ? "d.{$dateColumn} AS submitted_at" : "'' AS submitted_at";
+
+    $docTypes = [
+        'barangay clearance for tricycle permit',
+        'clearance for tricycle permit',
+        'tricycle permit',
+        'tricycle clearance',
+        'for tricycle permit',
+    ];
+
+    $sql = "
+        SELECT d.request_id, d.request_details, {$dateSelect}
+        FROM documentrequesttbl d
+        WHERE d.resident_user_id = ?
+          AND LOWER(COALESCE(d.document_type, '')) IN (?, ?, ?, ?, ?)
+    ";
+    $types = 'ssssss';
+    $params = [$residentUserId, $docTypes[0], $docTypes[1], $docTypes[2], $docTypes[3], $docTypes[4]];
+
+    $canFilterByTransactions = tcTableExists($conn, 'residenttransactiontbl')
+        && tcColumnExists($conn, 'residenttransactiontbl', 'resident_user_id')
+        && tcColumnExists($conn, 'residenttransactiontbl', 'source_type')
+        && tcColumnExists($conn, 'residenttransactiontbl', 'source_id');
+    if ($canFilterByTransactions) {
+        $sql .= "
+          AND EXISTS (
+              SELECT 1
+              FROM residenttransactiontbl t
+              WHERE t.resident_user_id = ?
+                AND t.source_type = 'DOCUMENT_REQUEST'
+                AND t.source_id = d.request_id
+          )
+        ";
+        $types .= 's';
+        $params[] = $residentUserId;
+    }
+
+    if ($dateColumn !== '') {
+        $sql .= " ORDER BY d.{$dateColumn} DESC, d.request_id DESC";
+    } else {
+        $sql .= " ORDER BY d.request_id DESC";
+    }
+    $sql .= " LIMIT 50";
+
+    $stmt = $conn->prepare($sql);
+    if (!$stmt) {
+        return [];
+    }
+
+    $bindValues = [$types];
+    foreach ($params as $index => $value) {
+        $bindValues[] = &$params[$index];
+    }
+    call_user_func_array([$stmt, 'bind_param'], $bindValues);
+    $stmt->execute();
+    $result = $stmt->get_result();
+
+    $recordsByVehicle = [];
+    while ($row = $result ? $result->fetch_assoc() : null) {
+        $payload = json_decode((string)($row['request_details'] ?? ''), true);
+        if (!is_array($payload)) {
+            continue;
+        }
+
+        $record = tcNormalizeTricycleHistory(
+            $payload,
+            (string)($row['request_id'] ?? ''),
+            trim((string)($row['submitted_at'] ?? ''))
+        );
+        if (!$record) {
+            continue;
+        }
+
+        $vehicleKey = tcHistoryVehicleKey($record);
+        if ($vehicleKey === '') {
+            $vehicleKey = 'request:' . (string)($record['request_id'] ?? '');
+        }
+        if (isset($recordsByVehicle[$vehicleKey])) {
+            continue;
+        }
+
+        $recordsByVehicle[$vehicleKey] = $record;
+    }
+    $stmt->close();
+
+    return array_values($recordsByVehicle);
+}
+
+$tricycleRenewalHistory = tcFetchTricycleRenewalHistory($conn, $userId);
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -224,6 +440,31 @@ $ownerFullAddress = htmlspecialchars(implode(', ', $ownerFullAddressParts), ENT_
                     </div>
                 </div>
                 <h2 class="section-title text-center text-dark">Vehicle Information</h2>
+                <div id="renewalTricycleHistoryRow" class="form-row d-none">
+                    <div class="full-width">
+                        <div class="input-stack">
+                            <label class="top-label" for="renewalTricycleHistorySelect">Previous Tricycle Transaction</label>
+                            <select
+                                id="renewalTricycleHistorySelect"
+                                name="renewal_source_request_id"
+                                class="form-select"
+                                <?= empty($tricycleRenewalHistory) ? 'disabled' : '' ?>
+                            >
+                                <option value="">
+                                    <?= empty($tricycleRenewalHistory)
+                                        ? 'No previous tricycle permit transactions found'
+                                        : 'Select the same vehicle from your previous transactions' ?>
+                                </option>
+                                <?php foreach ($tricycleRenewalHistory as $historyRecord): ?>
+                                    <option value="<?= htmlspecialchars((string)($historyRecord['request_id'] ?? ''), ENT_QUOTES, 'UTF-8') ?>">
+                                        <?= htmlspecialchars((string)($historyRecord['label'] ?? ''), ENT_QUOTES, 'UTF-8') ?>
+                                    </option>
+                                <?php endforeach; ?>
+                            </select>
+                            <p class="text-muted small mb-0">Select the same vehicle to auto-fill this renewal form.</p>
+                        </div>
+                    </div>
+                </div>
                 <div class="form-row vehicle-row--tricycle-top">
                     <div class="input-stack">
                         <label class="top-label" for="franchiseeSelect">Franchisee <span class="required-asterisk">*</span></label>
@@ -312,6 +553,7 @@ $ownerFullAddress = htmlspecialchars(implode(', ', $ownerFullAddressParts), ENT_
                 <div id="documentUploadSection" class="d-none">
                     <h2 class="section-title text-center text-dark">Document Upload</h2>
                     <p class="form-subtitle">Accepted: PDF, JPG, JPEG, PNG</p>
+                    <p id="renewalUploadGuidance" class="text-muted small mb-3 d-none">For renewal, only the updated O.R. of the vehicle is required. The other uploads are optional.</p>
                     <div class="form-row">
                         <div class="full-width">
                             <div class="d-flex align-items-center justify-content-start gap-3 app-type-row">
@@ -329,7 +571,7 @@ $ownerFullAddress = htmlspecialchars(implode(', ', $ownerFullAddressParts), ENT_
                     </div>
                     <div class="form-row two-col-row">
                         <div class="input-stack">
-                            <label class="top-label" for="orVehicleFile">O.R. of the Vehicle <span class="required-asterisk">*</span></label>
+                            <label class="top-label" for="orVehicleFile"><span id="orVehicleLabelText">O.R. of the Vehicle</span> <span id="orVehicleRequiredMark" class="required-asterisk">*</span></label>
                             <label class="upload-dropzone" id="orVehicleDropzone" for="orVehicleFile">
                                 <i class="fa-solid fa-cloud-arrow-up"></i>
                                 <span>Drag file here or click to upload</span>
@@ -339,7 +581,7 @@ $ownerFullAddress = htmlspecialchars(implode(', ', $ownerFullAddressParts), ENT_
                             <div id="orVehicleSelectedFile" class="selected-files small text-muted mt-2"></div>
                         </div>
                         <div class="input-stack">
-                            <label class="top-label" for="crVehicleFile">C.R. of the Vehicle <span class="required-asterisk">*</span></label>
+                            <label class="top-label" for="crVehicleFile">C.R. of the Vehicle <span id="crVehicleRequiredMark" class="required-asterisk">*</span></label>
                             <label class="upload-dropzone" id="crVehicleDropzone" for="crVehicleFile">
                                 <i class="fa-solid fa-cloud-arrow-up"></i>
                                 <span>Drag file here or click to upload</span>
@@ -351,7 +593,7 @@ $ownerFullAddress = htmlspecialchars(implode(', ', $ownerFullAddressParts), ENT_
                     </div>
                     <div class="form-row two-col-row">
                         <div class="input-stack">
-                            <label class="top-label" for="todaPodaCertFile">TODA / PODA Certification <span class="required-asterisk">*</span></label>
+                            <label class="top-label" for="todaPodaCertFile">TODA / PODA Certification <span id="todaPodaRequiredMark" class="required-asterisk">*</span></label>
                             <label class="upload-dropzone" id="todaPodaCertDropzone" for="todaPodaCertFile">
                                 <i class="fa-solid fa-cloud-arrow-up"></i>
                                 <span>Drag file here or click to upload</span>
@@ -374,7 +616,7 @@ $ownerFullAddress = htmlspecialchars(implode(', ', $ownerFullAddressParts), ENT_
                     <div id="deedOfSaleRow" class="form-row d-none">
                         <div class="full-width">
                             <div class="input-stack">
-                                <label class="top-label" for="deedOfSaleFile">Notarized Deed of Sale <span class="required-asterisk">*</span></label>
+                                <label class="top-label" for="deedOfSaleFile">Notarized Deed of Sale <span id="deedOfSaleRequiredMark" class="required-asterisk">*</span></label>
                                 <label class="upload-dropzone" id="deedOfSaleDropzone" for="deedOfSaleFile">
                                     <i class="fa-solid fa-cloud-arrow-up"></i>
                                     <span>Drag file here or click to upload</span>
@@ -390,7 +632,7 @@ $ownerFullAddress = htmlspecialchars(implode(', ', $ownerFullAddressParts), ENT_
                         <div class="full-width">
                             <div class="row mb-3">
                                 <div class="col-md-12 d-none" id="lastYearClearanceCol">
-                                    <label class="top-label" for="lastYearClearanceFile">Barangay Clearance from Previous Year <span class="required-asterisk">*</span></label>
+                                    <label class="top-label" for="lastYearClearanceFile">Barangay Clearance from Previous Year <span id="lastYearClearanceRequiredMark" class="required-asterisk">*</span></label>
                                     <label class="upload-dropzone" id="lastYearClearanceDropzone" for="lastYearClearanceFile">
                                         <i class="fa-solid fa-cloud-arrow-up"></i>
                                         <span>Drag file here or click to upload</span>
@@ -417,6 +659,7 @@ $ownerFullAddress = htmlspecialchars(implode(', ', $ownerFullAddressParts), ENT_
 </div>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script id="tricycleRenewalHistoryData" type="application/json"><?= htmlspecialchars((string)json_encode($tricycleRenewalHistory, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES), ENT_NOQUOTES, 'UTF-8') ?></script>
     <script src="../../JS-Script-Files/Resident-End/formValidationHighlight.js"></script>
     <script src="../../JS-Script-Files/Resident-End/Clearances/tricycleClearanceScript.js"></script>
 </body>

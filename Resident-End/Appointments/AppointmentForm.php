@@ -74,6 +74,8 @@ $councilMemberOptions = apcm_fetch_council_members($conn);
 $hasCouncilMemberOptions = $councilMemberOptions !== [];
 $appointmentTimeSlots = ats_allotted_times($appointmentSettings);
 $availableWeekdayLabels = aps_weekdays_label($appointmentSettings['available_weekdays'] ?? []);
+$closedWeekdays = aps_closed_weekdays($appointmentSettings);
+$closedWeekdayLabels = aps_closed_weekdays_label($appointmentSettings);
 $disabledWeekdays = aps_disabled_weekdays($appointmentSettings);
 $unavailableDates = aps_normalize_unavailable_dates($appointmentSettings['unavailable_dates'] ?? []);
 $firstAvailableAppointmentDate = aps_first_available_booking_date($appointmentSettings);
@@ -206,6 +208,9 @@ $maxAppointmentDateLabel = $maxAppointmentDate !== '' ? date('F j, Y', strtotime
             <div class="appointment-guide">
                 <div class="appointment-guide-title">Before You Submit</div>
                 <p class="appointment-guide-text">Choose the barangay council member you want to meet, then pick one of the available dates on <strong><?= htmlspecialchars($availableWeekdayLabels, ENT_QUOTES, 'UTF-8') ?></strong>. Appointments use <strong><?= htmlspecialchars((string)$slotIntervalMinutes, ENT_QUOTES, 'UTF-8') ?>-minute</strong> time allotments<?php if ($lunchBreakEnabled): ?> with lunch time blocked from <strong><?= htmlspecialchars($lunchBreakLabel, ENT_QUOTES, 'UTF-8') ?></strong><?php endif; ?> and can be scheduled up to <strong><?= htmlspecialchars((string)$bookingWindowDays, ENT_QUOTES, 'UTF-8') ?> days ahead</strong>, capped through <strong><?= htmlspecialchars($maxAppointmentDateLabel, ENT_QUOTES, 'UTF-8') ?></strong>. If you select <strong>Other</strong> as the subject, include a short specific description.</p>
+                <?php if ($closedWeekdays !== []): ?>
+                    <p class="appointment-guide-text mt-2">Weekly appointment closures are set for <strong><?= htmlspecialchars($closedWeekdayLabels, ENT_QUOTES, 'UTF-8') ?></strong>.</p>
+                <?php endif; ?>
                 <?php if ($unavailableDatesCount > 0): ?>
                     <p class="appointment-guide-text mt-2">Blocked dates are also disabled in the calendar, including <strong><?= htmlspecialchars($unavailableDatesSummary, ENT_QUOTES, 'UTF-8') ?></strong>.</p>
                 <?php endif; ?>

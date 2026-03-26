@@ -18,6 +18,7 @@ if (!isset($baseUrl)) {
 $allowUnregistered = false;
 require_once __DIR__ . "/../includes/resident_access_guard.php";
 require_once __DIR__ . "/../../PhpFiles/GET/getResidentProfile.php";
+require_once __DIR__ . "/../../PhpFiles/General/uploadLimits.php";
 
 $userId = (string)($_SESSION['user_id'] ?? '');
 $data = getResidentProfileData($conn, $userId);
@@ -90,6 +91,193 @@ if ($ownerIsLotBlockSystem) {
 }
 
 $ownerFullAddress = htmlspecialchars(implode(', ', $ownerFullAddressParts), ENT_QUOTES, 'UTF-8');
+
+function bcTableExists(mysqli $conn, string $table): bool {
+    $tableSafe = preg_replace('/[^a-zA-Z0-9_]/', '', $table);
+    if ($tableSafe === '') {
+        return false;
+    }
+
+    $tableEsc = $conn->real_escape_string($tableSafe);
+    $result = $conn->query("SHOW TABLES LIKE '{$tableEsc}'");
+    return $result instanceof mysqli_result && $result->num_rows > 0;
+}
+
+function bcColumnExists(mysqli $conn, string $table, string $column): bool {
+    $tableSafe = preg_replace('/[^a-zA-Z0-9_]/', '', $table);
+    if ($tableSafe === '') {
+        return false;
+    }
+
+    $columnEsc = $conn->real_escape_string($column);
+    $result = $conn->query("SHOW COLUMNS FROM {$tableSafe} LIKE '{$columnEsc}'");
+    return $result instanceof mysqli_result && $result->num_rows > 0;
+}
+
+function bcTruthy($value): bool {
+    return in_array(strtolower(trim((string)$value)), ['1', 'true', 'yes', 'on'], true);
+}
+
+function bcHistoryLabel(string $businessName, string $submittedAt, string $applicationType): string {
+    $label = trim($businessName);
+    $parts = [];
+
+    if ($submittedAt !== '') {
+        try {
+            $parts[] = (new DateTime($submittedAt))->format('M j, Y');
+        } catch (Throwable $e) {
+            // Ignore date formatting errors and keep the label readable.
+        }
+    }
+    if ($applicationType !== '') {
+        $parts[] = $applicationType;
+    }
+
+    if ($parts) {
+        $label .= ' - ' . implode(' | ', $parts);
+    }
+
+    return $label;
+}
+
+function bcNormalizeBusinessHistory(array $payload, string $requestId, string $submittedAt): ?array {
+    $businessName = trim((string)($payload['business_name'] ?? $payload['b_name'] ?? ''));
+    if ($businessName === '') {
+        return null;
+    }
+
+    $applicationType = trim((string)($payload['application_type'] ?? ''));
+    $ownerType = trim((string)($payload['owner_type'] ?? ''));
+
+    return [
+        'request_id' => $requestId,
+        'label' => bcHistoryLabel($businessName, $submittedAt, $applicationType),
+        'business_name' => $businessName,
+        'application_type' => $applicationType,
+        'business_type' => trim((string)($payload['business_type'] ?? '')),
+        'initial_operation_date' => trim((string)($payload['initial_operation_date'] ?? $payload['b_date'] ?? '')),
+        'business_contact_number' => trim((string)($payload['business_contact_number'] ?? $payload['b_contact_1'] ?? '')),
+        'owner_type' => $ownerType,
+        'business_same_address' => bcTruthy($payload['business_same_address'] ?? ''),
+        'business_address_system' => trim((string)($payload['business_address_system'] ?? '')),
+        'business_unit_number' => trim((string)($payload['business_unit_number'] ?? '')),
+        'business_street_number' => trim((string)($payload['business_street_number'] ?? $payload['business_house_number'] ?? '')),
+        'business_street_name' => trim((string)($payload['business_street_name'] ?? '')),
+        'business_subdivision' => trim((string)($payload['business_subdivision'] ?? '')),
+        'business_lot_number' => trim((string)($payload['business_lot_number'] ?? '')),
+        'business_block_number' => trim((string)($payload['business_block_number'] ?? '')),
+        'business_phase_number' => trim((string)($payload['business_phase_number'] ?? '')),
+        'business_subdivision_block' => trim((string)($payload['business_subdivision_block'] ?? '')),
+        'business_barangay' => trim((string)($payload['business_barangay'] ?? 'San Jose')),
+        'business_city' => trim((string)($payload['business_city'] ?? 'Rodriguez (Montalban)')),
+        'business_province' => trim((string)($payload['business_province'] ?? 'Rizal')),
+        'business_reg_type' => trim((string)($payload['renewal_business_reg_type'] ?? $payload['business_reg_type'] ?? '')),
+        'proof_address_type' => trim((string)($payload['renewal_proof_address_type'] ?? $payload['proof_address_type'] ?? '')),
+        'proof_address_number' => trim((string)($payload['renewal_proof_address_number'] ?? $payload['proof_address_number'] ?? '')),
+        'renter_owner_last_name' => trim((string)($payload['ro_ln'] ?? '')),
+        'renter_owner_first_name' => trim((string)($payload['ro_fn'] ?? '')),
+        'renter_owner_middle_name' => trim((string)($payload['ro_mn'] ?? '')),
+        'renter_owner_suffix' => trim((string)($payload['ro_sfx'] ?? '')),
+    ];
+}
+
+function bcFetchBusinessRenewalHistory(mysqli $conn, string $residentUserId): array {
+    if ($residentUserId === '' || !bcTableExists($conn, 'documentrequesttbl')) {
+        return [];
+    }
+
+    $dateColumn = '';
+    foreach (['submitted_at', 'request_timestamp', 'created_at', 'updated_at'] as $candidate) {
+        if (bcColumnExists($conn, 'documentrequesttbl', $candidate)) {
+            $dateColumn = $candidate;
+            break;
+        }
+    }
+    $dateSelect = $dateColumn !== '' ? "d.{$dateColumn} AS submitted_at" : "'' AS submitted_at";
+
+    $docTypes = [
+        'barangay clearance for business permit',
+        'barangay business clearance',
+        'business clearance',
+    ];
+
+    $sql = "
+        SELECT d.request_id, d.request_details, {$dateSelect}
+        FROM documentrequesttbl d
+        WHERE d.resident_user_id = ?
+          AND LOWER(COALESCE(d.document_type, '')) IN (?, ?, ?)
+    ";
+    $types = 'ssss';
+    $params = [$residentUserId, $docTypes[0], $docTypes[1], $docTypes[2]];
+
+    $canFilterByTransactions = bcTableExists($conn, 'residenttransactiontbl')
+        && bcColumnExists($conn, 'residenttransactiontbl', 'resident_user_id')
+        && bcColumnExists($conn, 'residenttransactiontbl', 'source_type')
+        && bcColumnExists($conn, 'residenttransactiontbl', 'source_id');
+    if ($canFilterByTransactions) {
+        $sql .= "
+          AND EXISTS (
+              SELECT 1
+              FROM residenttransactiontbl t
+              WHERE t.resident_user_id = ?
+                AND t.source_type = 'DOCUMENT_REQUEST'
+                AND t.source_id = d.request_id
+          )
+        ";
+        $types .= 's';
+        $params[] = $residentUserId;
+    }
+
+    if ($dateColumn !== '') {
+        $sql .= " ORDER BY d.{$dateColumn} DESC, d.request_id DESC";
+    } else {
+        $sql .= " ORDER BY d.request_id DESC";
+    }
+    $sql .= " LIMIT 50";
+
+    $stmt = $conn->prepare($sql);
+    if (!$stmt) {
+        return [];
+    }
+
+    $bindValues = [$types];
+    foreach ($params as $index => $value) {
+        $bindValues[] = &$params[$index];
+    }
+    call_user_func_array([$stmt, 'bind_param'], $bindValues);
+    $stmt->execute();
+    $result = $stmt->get_result();
+
+    $recordsByBusiness = [];
+    while ($row = $result ? $result->fetch_assoc() : null) {
+        $payload = json_decode((string)($row['request_details'] ?? ''), true);
+        if (!is_array($payload)) {
+            continue;
+        }
+
+        $record = bcNormalizeBusinessHistory(
+            $payload,
+            (string)($row['request_id'] ?? ''),
+            trim((string)($row['submitted_at'] ?? ''))
+        );
+        if (!$record) {
+            continue;
+        }
+
+        $businessKey = strtolower(preg_replace('/\s+/', ' ', trim((string)$record['business_name'])));
+        if ($businessKey === '' || isset($recordsByBusiness[$businessKey])) {
+            continue;
+        }
+        $recordsByBusiness[$businessKey] = $record;
+    }
+    $stmt->close();
+
+    return array_values($recordsByBusiness);
+}
+
+$businessRenewalHistory = bcFetchBusinessRenewalHistory($conn, $userId);
+$residentUploadLimitBytes = app_upload_limit_bytes('resident');
+$residentUploadLimitLabel = app_upload_limit_label('resident');
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -105,7 +293,7 @@ $ownerFullAddress = htmlspecialchars(implode(', ', $ownerFullAddressParts), ENT_
     <link rel="stylesheet" href="../../CSS-Styles/Resident-End-CSS/applicationForms.css">
     <style>
         body {
-            background: #fffdfb;
+            background: #e8e4e4;
         }
         #div-mainDisplay {
             background: #ffffff !important;
@@ -141,6 +329,37 @@ $ownerFullAddress = htmlspecialchars(implode(', ', $ownerFullAddressParts), ENT_
         input[type="date"]::-webkit-date-and-time-value {
             color: #212529;
         }
+        .business-upload-group {
+            display: flex;
+            flex-direction: column;
+            gap: 32px;
+            margin-top: 8px;
+        }
+        .business-upload-section {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+        .business-upload-note {
+            margin: 0;
+            font-size: 0.95rem;
+            color: #6c757d;
+        }
+        .business-attachment-stack {
+            display: flex;
+            flex-direction: column;
+            gap: 14px;
+        }
+        .business-attachment-stack > div {
+            margin-bottom: 0 !important;
+        }
+        .business-upload-button {
+            align-self: flex-start;
+        }
+        .business-upload-inline-field {
+            width: 100%;
+            max-width: none;
+        }
     </style>
 </head>
 <body>
@@ -155,11 +374,11 @@ $ownerFullAddress = htmlspecialchars(implode(', ', $ownerFullAddressParts), ENT_
             </div>
             <p class="form-subtitle">All fields marked with <span class="required-asterisk">*</span> are required</p>
 
-            <form class="page-form" action="<?= htmlspecialchars($baseUrl) ?>/PhpFiles/Resident-End/documentRequestWorkflow.php" method="POST" enctype="multipart/form-data">
+            <form class="page-form" action="<?= htmlspecialchars($baseUrl) ?>/PhpFiles/Resident-End/documentRequestWorkflow.php" method="POST" enctype="multipart/form-data" data-upload-limit-bytes="<?= (int)$residentUploadLimitBytes ?>" data-upload-limit-label="<?= htmlspecialchars($residentUploadLimitLabel, ENT_QUOTES, 'UTF-8') ?>">
                 <input type="hidden" name="action" value="submit_request">
                 <input type="hidden" name="document_type" value="Barangay Clearance for Business Permit">
                 <input type="hidden" name="redirect" value="1">
-                <input type="hidden" name="request_purpose" id="businessRequestPurpose" value="Business Permit - New Application">
+                <input type="hidden" name="request_purpose" id="businessRequestPurpose" value="">
                 
                 <h2 class="section-title text-center text-dark">Applicant Information</h2>
                 <div class="form-row">
@@ -200,8 +419,34 @@ $ownerFullAddress = htmlspecialchars(implode(', ', $ownerFullAddressParts), ENT_
                         </div>
                     </div>
                 </div>
+                <fieldset id="applicationTypeDependentFields" class="border-0 p-0 m-0 d-none" disabled>
                 <h2 class="section-title text-center text-dark">Business Details</h2>
-                <div class="form-row"><div class="full-width"><div class="input-stack"><label class="top-label">Name of Business <span class="required-asterisk">*</span></label><input type="text" name="business_name" required></div></div></div>
+                <div id="renewalBusinessHistoryRow" class="form-row d-none">
+                    <div class="full-width">
+                        <div class="input-stack">
+                            <label class="top-label" for="renewalBusinessHistorySelect">Previous Business Transaction</label>
+                            <select
+                                id="renewalBusinessHistorySelect"
+                                name="renewal_source_request_id"
+                                class="form-select"
+                                <?= empty($businessRenewalHistory) ? 'disabled' : '' ?>
+                            >
+                                <option value="">
+                                    <?= empty($businessRenewalHistory)
+                                        ? 'No previous business permit transactions found'
+                                        : 'Select the same business from your previous transactions' ?>
+                                </option>
+                                <?php foreach ($businessRenewalHistory as $historyRecord): ?>
+                                    <option value="<?= htmlspecialchars((string)($historyRecord['request_id'] ?? ''), ENT_QUOTES, 'UTF-8') ?>">
+                                        <?= htmlspecialchars((string)($historyRecord['label'] ?? ''), ENT_QUOTES, 'UTF-8') ?>
+                                    </option>
+                                <?php endforeach; ?>
+                            </select>
+                            <p class="business-upload-note">Select a previous business permit transaction to auto-fill this renewal form.</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="form-row"><div class="full-width"><div class="input-stack"><label class="top-label" for="businessName">Name of Business <span class="required-asterisk">*</span></label><input type="text" id="businessName" name="business_name" required></div></div></div>
                 <div class="form-row">
                     <div class="full-width">
                         <label class="top-label check-item">
@@ -295,11 +540,12 @@ $ownerFullAddress = htmlspecialchars(implode(', ', $ownerFullAddressParts), ENT_
                     <div>
                         <label class="top-label">Date of Initial Operation <span class="required-asterisk">*</span></label>
                         <input
-                            type="text"
+                            type="date"
+                            class="form-control"
+                            id="initialOperationDate"
                             name="initial_operation_date"
                             placeholder="Select date"
-                            onfocus="this.type='date'"
-                            onblur="if(!this.value){this.type='text'}"
+                            data-date-modal-style="calendar"
                             required
                         >
                     </div>
@@ -328,117 +574,273 @@ $ownerFullAddress = htmlspecialchars(implode(', ', $ownerFullAddressParts), ENT_
 
                 <div id="documentUploadSection" class="d-none">
                     <h2 class="section-title text-center text-dark">Document Upload</h2>
-                    <p class="form-subtitle">Accepted: PDF, JPG, JPEG, PNG</p>
+                    <p class="form-subtitle">Accepted: PDF, JPG, JPEG, PNG. Uploaded files are saved as PDF.</p>
 
-                    <div id="documentUploadNew">
-                    <div class="form-row">
-                        <div class="full-width">
-                            <div class="row mb-3">
-                                <div class="col-md-6">
-                                    <label class="top-label" for="businessRegType">Business Registration <span class="required-asterisk">*</span></label>
-                                    <select id="businessRegType" name="business_reg_type" class="form-select">
-                                        <option value="">Select</option>
-                                        <option value="dti">DTI Certificate (For sole proprietors)</option>
-                                        <option value="sec">SEC Certificate (For corporations)</option>
-                                    </select>
+                    <div id="documentUploadNew" class="business-upload-group">
+                        <div class="business-upload-section">
+                            <label class="top-label" for="businessRegType">Business Registration <span class="required-asterisk">*</span></label>
+                            <select id="businessRegType" name="business_reg_type" class="form-select business-upload-inline-field">
+                                <option value="">Select</option>
+                                <option value="dti">DTI Certificate (For sole proprietors)</option>
+                                <option value="sec">SEC Certificate (For corporations)</option>
+                            </select>
+                        </div>
+
+                        <div class="business-upload-section">
+                            <label class="top-label" for="businessRegFile1">Upload Business Registration <span class="required-asterisk">*</span></label>
+                            <p class="business-upload-note">Attach up to 3 files.</p>
+                            <div id="businessRegAttachmentRows" class="business-attachment-stack">
+                                <div data-business-attachment-row="business-reg-1">
+                                    <label class="top-label" for="businessRegFile1">Attachment 1 <span class="required-asterisk">*</span></label>
+                                    <label class="upload-dropzone" data-upload-input="businessRegFile1" for="businessRegFile1">
+                                        <i class="fa-solid fa-upload"></i>
+                                        <div id="businessRegFile1Prompt">Drag and drop business registration or click to upload</div>
+                                        <small id="businessRegFile1Meta">JPG, JPEG, PNG, or PDF. Saved as PDF.</small>
+                                        <input type="file" class="form-control upload-dropzone-input" id="businessRegFile1" name="business_reg_files[]" accept=".pdf,.jpg,.jpeg,.png">
+                                    </label>
                                 </div>
-                                <div class="col-md-6">
-                                    <label class="top-label" for="businessRegFile">Upload Business Registration <span class="required-asterisk">*</span></label>
-                                    <input type="file" id="businessRegFile" name="business_reg_file" class="form-control" accept=".pdf,.jpg,.jpeg,.png">
+                                <div class="d-none" data-business-attachment-row="business-reg-2">
+                                    <label class="top-label" for="businessRegFile2">Attachment 2</label>
+                                    <label class="upload-dropzone" data-upload-input="businessRegFile2" for="businessRegFile2">
+                                        <i class="fa-solid fa-upload"></i>
+                                        <div id="businessRegFile2Prompt">Drag and drop additional attachment or click to upload</div>
+                                        <small id="businessRegFile2Meta">JPG, JPEG, PNG, or PDF. Saved as PDF.</small>
+                                        <input type="file" class="form-control upload-dropzone-input" id="businessRegFile2" name="business_reg_files[]" accept=".pdf,.jpg,.jpeg,.png" disabled>
+                                    </label>
+                                </div>
+                                <div class="d-none" data-business-attachment-row="business-reg-3">
+                                    <label class="top-label" for="businessRegFile3">Attachment 3</label>
+                                    <label class="upload-dropzone" data-upload-input="businessRegFile3" for="businessRegFile3">
+                                        <i class="fa-solid fa-upload"></i>
+                                        <div id="businessRegFile3Prompt">Drag and drop additional attachment or click to upload</div>
+                                        <small id="businessRegFile3Meta">JPG, JPEG, PNG, or PDF. Saved as PDF.</small>
+                                        <input type="file" class="form-control upload-dropzone-input" id="businessRegFile3" name="business_reg_files[]" accept=".pdf,.jpg,.jpeg,.png" disabled>
+                                    </label>
                                 </div>
                             </div>
+                            <button type="button" class="btn btn-outline-secondary btn-sm business-upload-button" id="addBusinessRegAttachmentBtn">Add Attachment</button>
                         </div>
-                    </div>
 
-                    <div class="form-row">
-                        <div class="full-width">
-                            <div class="row mb-3">
-                                <div class="col-md-6">
-                                    <label class="top-label" for="proofAddressType">Proof of Business Address <span class="required-asterisk">*</span></label>
-                                    <select id="proofAddressType" name="proof_address_type" class="form-select">
-                                        <option value="">Select</option>
-                                        <option value="lease">Contract of Lease</option>
-                                        <option value="tct">Transfer Certificate of Title</option>
-                                        <option value="tax_declaration">Tax Declaration</option>
-                                    </select>
-                                </div>
-                                <div class="col-md-6">
-                                    <label class="top-label" for="proofAddressFile">Upload Proof of Address <span class="required-asterisk">*</span></label>
-                                    <input type="file" id="proofAddressFile" name="proof_address_file" class="form-control" accept=".pdf,.jpg,.jpeg,.png">
-                                </div>
-                            </div>
+                        <div class="business-upload-section">
+                            <label class="top-label" for="proofAddressType">Proof of Business Address <span class="required-asterisk">*</span></label>
+                            <select id="proofAddressType" name="proof_address_type" class="form-select business-upload-inline-field">
+                                <option value="">Select</option>
+                                <option value="lease">Contract of Lease</option>
+                                <option value="tct">Transfer Certificate of Title</option>
+                                <option value="tax_declaration">Tax Declaration</option>
+                            </select>
                         </div>
-                    </div>
-                    <div id="proofAddressNumberRow" class="form-row d-none">
-                        <div class="full-width">
+
+                        <div id="proofAddressNumberRow" class="business-upload-section d-none">
                             <div class="input-stack">
-                                <label class="top-label" for="proofAddressNumber">Document Number <span class="required-asterisk">*</span></label>
-                                <input type="text" id="proofAddressNumber" name="proof_address_number" placeholder="Enter document number">
+                                <label class="top-label" for="proofAddressNumber">Tax Declaration / Certificate Title ID <span class="required-asterisk">*</span></label>
+                                <input type="text" id="proofAddressNumber" name="proof_address_number" class="form-control business-upload-inline-field" placeholder="Enter ID number">
                                 <div id="proofAddressNumberError" class="text-danger small d-none">Invalid document number</div>
                             </div>
                         </div>
-                    </div>
 
-                    <div class="form-row">
-                        <div class="full-width">
-                            <label class="top-label" for="businessPhotoFile">Picture of Establishment or Business <span class="required-asterisk">*</span></label>
-                            <label class="upload-dropzone" id="businessPhotoDropzone" for="businessPhotoFile">
-                                <i class="fa-solid fa-cloud-arrow-up"></i>
-                                <span>Drag files here or click to upload</span>
-                            </label>
-                            <input type="file" id="businessPhotoFile" name="business_photo_file" class="visually-hidden" accept=".pdf,.jpg,.jpeg,.png">
-                            <div id="businessPhotoSelectedFile" class="selected-files small text-muted mt-2"></div>
+                        <div class="business-upload-section">
+                            <label class="top-label" for="proofAddressFile1">Upload Proof of Address <span class="required-asterisk">*</span></label>
+                            <p class="business-upload-note">Attach up to 3 files.</p>
+                            <div id="proofAddressAttachmentRows" class="business-attachment-stack">
+                                <div data-business-attachment-row="proof-address-1">
+                                    <label class="top-label" for="proofAddressFile1">Attachment 1 <span class="required-asterisk">*</span></label>
+                                    <label class="upload-dropzone" data-upload-input="proofAddressFile1" for="proofAddressFile1">
+                                        <i class="fa-solid fa-upload"></i>
+                                        <div id="proofAddressFile1Prompt">Drag and drop proof of address or click to upload</div>
+                                        <small id="proofAddressFile1Meta">JPG, JPEG, PNG, or PDF. Saved as PDF.</small>
+                                        <input type="file" class="form-control upload-dropzone-input" id="proofAddressFile1" name="proof_address_files[]" accept=".pdf,.jpg,.jpeg,.png">
+                                    </label>
+                                </div>
+                                <div class="d-none" data-business-attachment-row="proof-address-2">
+                                    <label class="top-label" for="proofAddressFile2">Attachment 2</label>
+                                    <label class="upload-dropzone" data-upload-input="proofAddressFile2" for="proofAddressFile2">
+                                        <i class="fa-solid fa-upload"></i>
+                                        <div id="proofAddressFile2Prompt">Drag and drop additional attachment or click to upload</div>
+                                        <small id="proofAddressFile2Meta">JPG, JPEG, PNG, or PDF. Saved as PDF.</small>
+                                        <input type="file" class="form-control upload-dropzone-input" id="proofAddressFile2" name="proof_address_files[]" accept=".pdf,.jpg,.jpeg,.png" disabled>
+                                    </label>
+                                </div>
+                                <div class="d-none" data-business-attachment-row="proof-address-3">
+                                    <label class="top-label" for="proofAddressFile3">Attachment 3</label>
+                                    <label class="upload-dropzone" data-upload-input="proofAddressFile3" for="proofAddressFile3">
+                                        <i class="fa-solid fa-upload"></i>
+                                        <div id="proofAddressFile3Prompt">Drag and drop additional attachment or click to upload</div>
+                                        <small id="proofAddressFile3Meta">JPG, JPEG, PNG, or PDF. Saved as PDF.</small>
+                                        <input type="file" class="form-control upload-dropzone-input" id="proofAddressFile3" name="proof_address_files[]" accept=".pdf,.jpg,.jpeg,.png" disabled>
+                                    </label>
+                                </div>
+                            </div>
+                            <button type="button" class="btn btn-outline-secondary btn-sm business-upload-button" id="addProofAddressAttachmentBtn">Add Attachment</button>
+                        </div>
+
+                        <div class="business-upload-section">
+                            <label class="top-label" for="businessPhotoFile1">Picture of Establishment or Business <span class="required-asterisk">*</span></label>
+                            <p class="business-upload-note">Attach up to 3 files.</p>
+                            <div id="businessPhotoAttachmentRows" class="business-attachment-stack">
+                                <div data-business-attachment-row="business-photo-1">
+                                    <label class="top-label" for="businessPhotoFile1">Attachment 1 <span class="required-asterisk">*</span></label>
+                                    <label class="upload-dropzone" data-upload-input="businessPhotoFile1" for="businessPhotoFile1">
+                                        <i class="fa-solid fa-upload"></i>
+                                        <div id="businessPhotoFile1Prompt">Drag and drop establishment photo or click to upload</div>
+                                        <small id="businessPhotoFile1Meta">JPG, JPEG, PNG, or PDF. Saved as PDF.</small>
+                                        <input type="file" class="form-control upload-dropzone-input" id="businessPhotoFile1" name="business_photo_files[]" accept=".pdf,.jpg,.jpeg,.png">
+                                    </label>
+                                </div>
+                                <div class="d-none" data-business-attachment-row="business-photo-2">
+                                    <label class="top-label" for="businessPhotoFile2">Attachment 2</label>
+                                    <label class="upload-dropzone" data-upload-input="businessPhotoFile2" for="businessPhotoFile2">
+                                        <i class="fa-solid fa-upload"></i>
+                                        <div id="businessPhotoFile2Prompt">Drag and drop additional attachment or click to upload</div>
+                                        <small id="businessPhotoFile2Meta">JPG, JPEG, PNG, or PDF. Saved as PDF.</small>
+                                        <input type="file" class="form-control upload-dropzone-input" id="businessPhotoFile2" name="business_photo_files[]" accept=".pdf,.jpg,.jpeg,.png" disabled>
+                                    </label>
+                                </div>
+                                <div class="d-none" data-business-attachment-row="business-photo-3">
+                                    <label class="top-label" for="businessPhotoFile3">Attachment 3</label>
+                                    <label class="upload-dropzone" data-upload-input="businessPhotoFile3" for="businessPhotoFile3">
+                                        <i class="fa-solid fa-upload"></i>
+                                        <div id="businessPhotoFile3Prompt">Drag and drop additional attachment or click to upload</div>
+                                        <small id="businessPhotoFile3Meta">JPG, JPEG, PNG, or PDF. Saved as PDF.</small>
+                                        <input type="file" class="form-control upload-dropzone-input" id="businessPhotoFile3" name="business_photo_files[]" accept=".pdf,.jpg,.jpeg,.png" disabled>
+                                    </label>
+                                </div>
+                            </div>
+                            <button type="button" class="btn btn-outline-secondary btn-sm business-upload-button" id="addBusinessPhotoAttachmentBtn">Add Attachment</button>
                         </div>
                     </div>
-                    </div>
 
-                    <div id="documentUploadRenewal" class="d-none">
-                        <div class="form-row">
-                            <div class="full-width">
-                                <div class="row mb-3">
-                                    <div class="col-md-6">
-                                        <label class="top-label" for="renewalBusinessRegType">Updated Business Registration <span class="required-asterisk">*</span></label>
-                                        <select id="renewalBusinessRegType" name="renewal_business_reg_type" class="form-select">
-                                            <option value="">Select</option>
-                                            <option value="dti">DTI Certificate (For sole proprietors)</option>
-                                            <option value="sec">SEC Certificate (For corporations)</option>
-                                        </select>
-                                    </div>
-                                    <div class="col-md-6">
-                                        <label class="top-label" for="renewalBusinessRegFile">Upload Business Registration <span class="required-asterisk">*</span></label>
-                                        <input type="file" id="renewalBusinessRegFile" name="renewal_business_reg_file" class="form-control" accept=".pdf,.jpg,.jpeg,.png">
-                                    </div>
+                    <div id="documentUploadRenewal" class="business-upload-group d-none">
+                        <div class="business-upload-section">
+                            <label class="top-label" for="renewalBusinessRegType">Updated Business Registration <span class="required-asterisk">*</span></label>
+                            <select id="renewalBusinessRegType" name="renewal_business_reg_type" class="form-select business-upload-inline-field">
+                                <option value="">Select</option>
+                                <option value="dti">DTI Certificate (For sole proprietors)</option>
+                                <option value="sec">SEC Certificate (For corporations)</option>
+                            </select>
+                        </div>
+
+                        <div class="business-upload-section">
+                            <label class="top-label" for="renewalBusinessRegFile1">Upload Business Registration <span class="required-asterisk">*</span></label>
+                            <p class="business-upload-note">Attach up to 3 files.</p>
+                            <div id="renewalBusinessRegAttachmentRows" class="business-attachment-stack">
+                                <div data-business-attachment-row="renewal-business-reg-1">
+                                    <label class="top-label" for="renewalBusinessRegFile1">Attachment 1 <span class="required-asterisk">*</span></label>
+                                    <label class="upload-dropzone" data-upload-input="renewalBusinessRegFile1" for="renewalBusinessRegFile1">
+                                        <i class="fa-solid fa-upload"></i>
+                                        <div id="renewalBusinessRegFile1Prompt">Drag and drop updated business registration or click to upload</div>
+                                        <small id="renewalBusinessRegFile1Meta">JPG, JPEG, PNG, or PDF. Saved as PDF.</small>
+                                        <input type="file" class="form-control upload-dropzone-input" id="renewalBusinessRegFile1" name="renewal_business_reg_files[]" accept=".pdf,.jpg,.jpeg,.png">
+                                    </label>
                                 </div>
+                                <div class="d-none" data-business-attachment-row="renewal-business-reg-2">
+                                    <label class="top-label" for="renewalBusinessRegFile2">Attachment 2</label>
+                                    <label class="upload-dropzone" data-upload-input="renewalBusinessRegFile2" for="renewalBusinessRegFile2">
+                                        <i class="fa-solid fa-upload"></i>
+                                        <div id="renewalBusinessRegFile2Prompt">Drag and drop additional attachment or click to upload</div>
+                                        <small id="renewalBusinessRegFile2Meta">JPG, JPEG, PNG, or PDF. Saved as PDF.</small>
+                                        <input type="file" class="form-control upload-dropzone-input" id="renewalBusinessRegFile2" name="renewal_business_reg_files[]" accept=".pdf,.jpg,.jpeg,.png" disabled>
+                                    </label>
+                                </div>
+                                <div class="d-none" data-business-attachment-row="renewal-business-reg-3">
+                                    <label class="top-label" for="renewalBusinessRegFile3">Attachment 3</label>
+                                    <label class="upload-dropzone" data-upload-input="renewalBusinessRegFile3" for="renewalBusinessRegFile3">
+                                        <i class="fa-solid fa-upload"></i>
+                                        <div id="renewalBusinessRegFile3Prompt">Drag and drop additional attachment or click to upload</div>
+                                        <small id="renewalBusinessRegFile3Meta">JPG, JPEG, PNG, or PDF. Saved as PDF.</small>
+                                        <input type="file" class="form-control upload-dropzone-input" id="renewalBusinessRegFile3" name="renewal_business_reg_files[]" accept=".pdf,.jpg,.jpeg,.png" disabled>
+                                    </label>
+                                </div>
+                            </div>
+                            <button type="button" class="btn btn-outline-secondary btn-sm business-upload-button" id="addRenewalBusinessRegAttachmentBtn">Add Attachment</button>
+                        </div>
+
+                        <div class="business-upload-section">
+                            <label class="top-label" for="renewalProofAddressType">Updated Business Address <span class="required-asterisk">*</span></label>
+                            <select id="renewalProofAddressType" name="renewal_proof_address_type" class="form-select business-upload-inline-field">
+                                <option value="">Select</option>
+                                <option value="lease">Contract of Lease</option>
+                                <option value="tct">Transfer Certificate of Title</option>
+                                <option value="tax_declaration">Tax Declaration</option>
+                            </select>
+                        </div>
+
+                        <div id="renewalProofAddressNumberRow" class="business-upload-section d-none">
+                            <div class="input-stack">
+                                <label class="top-label" for="renewalProofAddressNumber">Updated Tax Declaration / Certificate Title ID <span class="required-asterisk">*</span></label>
+                                <input type="text" id="renewalProofAddressNumber" name="renewal_proof_address_number" class="form-control business-upload-inline-field" placeholder="Enter ID number">
+                                <div id="renewalProofAddressNumberError" class="text-danger small d-none">Invalid document number</div>
                             </div>
                         </div>
 
-                        <div class="form-row">
-                            <div class="full-width">
-                                <div class="row mb-3">
-                                    <div class="col-md-6">
-                                        <label class="top-label" for="renewalProofAddressType">Updated Business Address <span class="required-asterisk">*</span></label>
-                                        <select id="renewalProofAddressType" name="renewal_proof_address_type" class="form-select">
-                                            <option value="">Select</option>
-                                            <option value="lease">Contract of Lease</option>
-                                            <option value="tct">Transfer Certificate of Title</option>
-                                            <option value="tax_declaration">Tax Declaration</option>
-                                        </select>
-                                    </div>
-                                    <div class="col-md-6">
-                                        <label class="top-label" for="renewalProofAddressFile">Upload Proof of Address <span class="required-asterisk">*</span></label>
-                                        <input type="file" id="renewalProofAddressFile" name="renewal_proof_address_file" class="form-control" accept=".pdf,.jpg,.jpeg,.png">
-                                    </div>
+                        <div class="business-upload-section">
+                            <label class="top-label" for="renewalProofAddressFile1">Upload Proof of Address <span class="required-asterisk">*</span></label>
+                            <p class="business-upload-note">Attach up to 3 files.</p>
+                            <div id="renewalProofAddressAttachmentRows" class="business-attachment-stack">
+                                <div data-business-attachment-row="renewal-proof-address-1">
+                                    <label class="top-label" for="renewalProofAddressFile1">Attachment 1 <span class="required-asterisk">*</span></label>
+                                    <label class="upload-dropzone" data-upload-input="renewalProofAddressFile1" for="renewalProofAddressFile1">
+                                        <i class="fa-solid fa-upload"></i>
+                                        <div id="renewalProofAddressFile1Prompt">Drag and drop updated proof of address or click to upload</div>
+                                        <small id="renewalProofAddressFile1Meta">JPG, JPEG, PNG, or PDF. Saved as PDF.</small>
+                                        <input type="file" class="form-control upload-dropzone-input" id="renewalProofAddressFile1" name="renewal_proof_address_files[]" accept=".pdf,.jpg,.jpeg,.png">
+                                    </label>
+                                </div>
+                                <div class="d-none" data-business-attachment-row="renewal-proof-address-2">
+                                    <label class="top-label" for="renewalProofAddressFile2">Attachment 2</label>
+                                    <label class="upload-dropzone" data-upload-input="renewalProofAddressFile2" for="renewalProofAddressFile2">
+                                        <i class="fa-solid fa-upload"></i>
+                                        <div id="renewalProofAddressFile2Prompt">Drag and drop additional attachment or click to upload</div>
+                                        <small id="renewalProofAddressFile2Meta">JPG, JPEG, PNG, or PDF. Saved as PDF.</small>
+                                        <input type="file" class="form-control upload-dropzone-input" id="renewalProofAddressFile2" name="renewal_proof_address_files[]" accept=".pdf,.jpg,.jpeg,.png" disabled>
+                                    </label>
+                                </div>
+                                <div class="d-none" data-business-attachment-row="renewal-proof-address-3">
+                                    <label class="top-label" for="renewalProofAddressFile3">Attachment 3</label>
+                                    <label class="upload-dropzone" data-upload-input="renewalProofAddressFile3" for="renewalProofAddressFile3">
+                                        <i class="fa-solid fa-upload"></i>
+                                        <div id="renewalProofAddressFile3Prompt">Drag and drop additional attachment or click to upload</div>
+                                        <small id="renewalProofAddressFile3Meta">JPG, JPEG, PNG, or PDF. Saved as PDF.</small>
+                                        <input type="file" class="form-control upload-dropzone-input" id="renewalProofAddressFile3" name="renewal_proof_address_files[]" accept=".pdf,.jpg,.jpeg,.png" disabled>
+                                    </label>
                                 </div>
                             </div>
+                            <button type="button" class="btn btn-outline-secondary btn-sm business-upload-button" id="addRenewalProofAddressAttachmentBtn">Add Attachment</button>
                         </div>
-                        <div id="renewalProofAddressNumberRow" class="form-row d-none">
-                            <div class="full-width">
-                                <div class="input-stack">
-                                    <label class="top-label" for="renewalProofAddressNumber">Document Number <span class="required-asterisk">*</span></label>
-                                    <input type="text" id="renewalProofAddressNumber" name="renewal_proof_address_number" placeholder="Enter document number">
-                                    <div id="renewalProofAddressNumberError" class="text-danger small d-none">Invalid document number</div>
+
+                        <div class="business-upload-section">
+                            <label class="top-label" for="renewalBusinessPhotoFile1">Updated Picture of Establishment or Business <span class="required-asterisk">*</span></label>
+                            <p class="business-upload-note">Attach up to 3 files.</p>
+                            <div id="renewalBusinessPhotoAttachmentRows" class="business-attachment-stack">
+                                <div data-business-attachment-row="renewal-business-photo-1">
+                                    <label class="top-label" for="renewalBusinessPhotoFile1">Attachment 1 <span class="required-asterisk">*</span></label>
+                                    <label class="upload-dropzone" data-upload-input="renewalBusinessPhotoFile1" for="renewalBusinessPhotoFile1">
+                                        <i class="fa-solid fa-upload"></i>
+                                        <div id="renewalBusinessPhotoFile1Prompt">Drag and drop updated establishment photo or click to upload</div>
+                                        <small id="renewalBusinessPhotoFile1Meta">JPG, JPEG, PNG, or PDF. Saved as PDF.</small>
+                                        <input type="file" class="form-control upload-dropzone-input" id="renewalBusinessPhotoFile1" name="renewal_business_photo_files[]" accept=".pdf,.jpg,.jpeg,.png">
+                                    </label>
+                                </div>
+                                <div class="d-none" data-business-attachment-row="renewal-business-photo-2">
+                                    <label class="top-label" for="renewalBusinessPhotoFile2">Attachment 2</label>
+                                    <label class="upload-dropzone" data-upload-input="renewalBusinessPhotoFile2" for="renewalBusinessPhotoFile2">
+                                        <i class="fa-solid fa-upload"></i>
+                                        <div id="renewalBusinessPhotoFile2Prompt">Drag and drop additional attachment or click to upload</div>
+                                        <small id="renewalBusinessPhotoFile2Meta">JPG, JPEG, PNG, or PDF. Saved as PDF.</small>
+                                        <input type="file" class="form-control upload-dropzone-input" id="renewalBusinessPhotoFile2" name="renewal_business_photo_files[]" accept=".pdf,.jpg,.jpeg,.png" disabled>
+                                    </label>
+                                </div>
+                                <div class="d-none" data-business-attachment-row="renewal-business-photo-3">
+                                    <label class="top-label" for="renewalBusinessPhotoFile3">Attachment 3</label>
+                                    <label class="upload-dropzone" data-upload-input="renewalBusinessPhotoFile3" for="renewalBusinessPhotoFile3">
+                                        <i class="fa-solid fa-upload"></i>
+                                        <div id="renewalBusinessPhotoFile3Prompt">Drag and drop additional attachment or click to upload</div>
+                                        <small id="renewalBusinessPhotoFile3Meta">JPG, JPEG, PNG, or PDF. Saved as PDF.</small>
+                                        <input type="file" class="form-control upload-dropzone-input" id="renewalBusinessPhotoFile3" name="renewal_business_photo_files[]" accept=".pdf,.jpg,.jpeg,.png" disabled>
+                                    </label>
                                 </div>
                             </div>
+                            <button type="button" class="btn btn-outline-secondary btn-sm business-upload-button" id="addRenewalBusinessPhotoAttachmentBtn">Add Attachment</button>
                         </div>
                     </div>
                 </div>
@@ -460,9 +862,27 @@ $ownerFullAddress = htmlspecialchars(implode(', ', $ownerFullAddressParts), ENT_
                     </div>
                     <button type="submit" class="submit-btn">SUBMIT</button>
                 </div>
+                </fieldset>
             </form>
     </main>
 </div>
+    <div class="modal fade" id="businessUploadValidationModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="businessUploadValidationModalTitle">Upload Error</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <p class="mb-0 text-dark" id="businessUploadValidationModalMessage">Please choose a valid file.</p>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-primary" data-bs-dismiss="modal">OK</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    <script id="businessRenewalHistoryData" type="application/json"><?= htmlspecialchars((string)json_encode($businessRenewalHistory, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES), ENT_NOQUOTES, 'UTF-8') ?></script>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script src="../../JS-Script-Files/Resident-End/formValidationHighlight.js"></script>
     <script src="../../JS-Script-Files/Resident-End/dateFieldModal.js"></script>

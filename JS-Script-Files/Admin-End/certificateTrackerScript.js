@@ -1135,6 +1135,12 @@
         <button class="btn btn-sm btn-success" data-view-action="interview_pass" data-id="${id}">Pass Interview</button>
       `;
     }
+    if (stage === 'for_inspection' && requestRequiresInspection(row)) {
+      return `
+        <button class="btn btn-sm btn-danger" data-view-action="inspection_fail" data-id="${id}">Fail Inspection</button>
+        <button class="btn btn-sm btn-success" data-view-action="inspection_pass" data-id="${id}">Pass Inspection</button>
+      `;
+    }
     if (stage === 'payment_submitted') {
       if (!isFinancePaymentsPage) {
         return proofBtn || '<span class="text-muted small">No actions</span>';
@@ -2462,6 +2468,35 @@
 
   function isFirstTimeJobSeekerRow(row) {
     return normalizePreviewDocKey(row?.document_type || '') === 'firsttimejobseeker';
+  }
+
+  function requestRequiresInspection(row) {
+    if (!row || isFirstTimeJobSeekerRow(row)) {
+      return false;
+    }
+    const docToken = String(row?.document_type || '').toLowerCase().replace(/[^a-z0-9]+/g, '');
+    if (!docToken) {
+      return false;
+    }
+    return [
+      'barangayclearanceforbusinesspermit',
+      'clearanceforbusinesspermit',
+      'businesspermit',
+      'barangaybusinessclearance',
+      'businessclearance',
+      'barangayclearanceforelectricalpermit',
+      'clearanceforelectricalpermit',
+      'electricalpermit',
+      'barangayclearanceforwaterpermit',
+      'clearanceforwaterpermit',
+      'waterpermit',
+      'barangayclearanceforresidentialbuildingpermit',
+      'clearanceforresidentialbuildingpermit',
+      'residentialbuildingpermit',
+      'barangayclearanceforcommercialbuildingpermit',
+      'clearanceforcommercialbuildingpermit',
+      'commercialbuildingpermit'
+    ].includes(docToken);
   }
 
   function requestRequiresFeeTagging(row) {
@@ -4803,7 +4838,7 @@
       return 'unpaid';
     }
     const stage = String(row?.stage || '').toLowerCase();
-    if (stage.includes('rejected') || stage === 'interview_failed') return 'denied';
+    if (stage.includes('rejected') || stage === 'interview_failed' || stage === 'inspection_failed') return 'denied';
     if (stage === 'completed' || stage === 'ready_for_claim' || stage === 'payment_verified') return 'verified';
     return 'pending';
   }
@@ -5424,7 +5459,7 @@
       modalTitle.textContent = 'Approved | Tick Selection';
     }
     if (actionPrompt) {
-      actionPrompt.textContent = 'Choose the approval type for this Barangay Clearance for Business Permit. After this, you will tag the fees before reviewing the initial document preview.';
+      actionPrompt.textContent = 'Choose the approval type for this Barangay Clearance for Business Permit. After this, you will tag the fees before reviewing the initial document preview for inspection approval.';
       actionPrompt.classList.remove('d-none');
     }
     if (actionBusinessApprovalWrap) {
@@ -5510,6 +5545,7 @@
     const docKey = normalizePreviewDocKey(row?.document_type || '');
     const isFirstTimeJobSeeker = isFirstTimeJobSeekerRow(row);
     const needsFeeTagging = requestNeedsFeeTagging(row);
+    const needsInspection = requestRequiresInspection(row);
     const needsManualIssuedUpload = requestNeedsManualIssuedUpload(row);
     const isBarangayIdRequest = docKey === 'barangayid';
     if (actionForm) {
@@ -5541,6 +5577,8 @@
       interview_pass: 'Review Interview Result',
       interview_pass_confirm: 'Confirm Interview Approval',
       interview_fail: 'Fail Interview',
+      inspection_pass: 'Pass Inspection',
+      inspection_fail: 'Fail Inspection',
       finance_verify: isWalkInFlow ? 'Record Walk-in Payment' : 'Verify Payment / Walk-in Payment',
       finance_reject: 'Reject Payment',
       mark_ready: 'Mark Ready for Claim',
@@ -5562,16 +5600,16 @@
         : (isBarangayIdRequest
             ? 'Click Review Application to inspect the submitted Barangay ID details. Once everything is correct, proceed to approve the request for release.'
         : (needsFeeTagging
-            ? `Tag the applicable fees for the ${docName} first. After confirming the fees, the initial document preview will open so you can save and approve it for payment.`
-            : `Click View Document to check the document that will be issued and edit it if there are necessary changes in the details. Once everything is correct, proceed to verify the ${docName}.`));
+            ? `Tag the applicable fees for the ${docName} first. After confirming the fees, the initial document preview will open so you can save and approve it for ${needsInspection ? 'inspection' : 'payment'}.`
+            : `Click View Document to check the document that will be issued and edit it if there are necessary changes in the details. Once everything is correct, proceed to ${needsInspection ? `approve the ${docName} for inspection` : `verify the ${docName}`}.`));
       actionPrompt.classList.remove('d-none');
     }
     if (type === 'personnel_approve_confirm' && actionPrompt) {
       actionPrompt.textContent = isBarangayIdRequest
         ? 'Please confirm that you thoroughly checked the submitted Barangay ID application. This will approve the request and move it directly to release.'
         : (needsFeeTagging
-            ? `Please confirm that you thoroughly checked the resident's data. This will save the ${docName} and approve it for payment.`
-            : `Please confirm that you thoroughly checked the resident's data to issue a ${docName}.`);
+            ? `Please confirm that you thoroughly checked the resident's data. This will save the ${docName} and approve it for ${needsInspection ? 'inspection' : 'payment'}.`
+            : `Please confirm that you thoroughly checked the resident's data to ${needsInspection ? `approve the ${docName} for inspection` : `issue a ${docName}`}.`);
       actionPrompt.classList.remove('d-none');
     }
     if (type === 'mark_completed_confirm' && actionPrompt) {
@@ -5592,6 +5630,14 @@
     }
     if (type === 'interview_fail' && actionPrompt) {
       actionPrompt.textContent = 'Please provide the reason why the resident did not pass the interview.';
+      actionPrompt.classList.remove('d-none');
+    }
+    if (type === 'inspection_pass' && actionPrompt) {
+      actionPrompt.textContent = 'Please confirm that the request passed inspection. Requests with tagged fees will move to payment, while zero-fee requests will move directly to release.';
+      actionPrompt.classList.remove('d-none');
+    }
+    if (type === 'inspection_fail' && actionPrompt) {
+      actionPrompt.textContent = 'Please provide the reason why the request did not pass inspection.';
       actionPrompt.classList.remove('d-none');
     }
     if (actionSubmitBtn) {
@@ -5615,6 +5661,14 @@
         actionSubmitBtn.classList.add('btn-success');
       } else if (type === 'interview_fail') {
         actionSubmitBtn.textContent = 'Fail Interview';
+        actionSubmitBtn.classList.remove('btn-primary', 'btn-success');
+        actionSubmitBtn.classList.add('btn-danger');
+      } else if (type === 'inspection_pass') {
+        actionSubmitBtn.textContent = 'Pass Inspection';
+        actionSubmitBtn.classList.remove('btn-danger', 'btn-primary');
+        actionSubmitBtn.classList.add('btn-success');
+      } else if (type === 'inspection_fail') {
+        actionSubmitBtn.textContent = 'Fail Inspection';
         actionSubmitBtn.classList.remove('btn-primary', 'btn-success');
         actionSubmitBtn.classList.add('btn-danger');
       } else if (type === 'mark_completed_confirm') {
@@ -5646,12 +5700,14 @@
       type === 'interview_pass' ||
       type === 'interview_pass_confirm' ||
       type === 'interview_fail' ||
+      type === 'inspection_pass' ||
+      type === 'inspection_fail' ||
       type === 'mark_completed_confirm'
     ) {
       actionForm?.querySelector('.modal-footer')?.classList.add('action-split');
     }
 
-    if (type === 'personnel_reject' || type === 'finance_reject' || type === 'interview_fail') {
+    if (type === 'personnel_reject' || type === 'finance_reject' || type === 'interview_fail' || type === 'inspection_fail') {
       actionReasonWrap.classList.remove('d-none');
       actionReason.required = true;
     }

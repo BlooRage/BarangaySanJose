@@ -2,6 +2,7 @@
 require_once __DIR__ . "/../PhpFiles/General/security.php";
 
 require_once __DIR__ . "/../PhpFiles/General/connection.php";
+require_once __DIR__ . "/../PhpFiles/General/uploadLimits.php";
 require_once __DIR__ . '/includes/admin_guard.php';
 require_once __DIR__ . "/../PhpFiles/General/officialInviteCommon.php";
 
@@ -107,9 +108,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && (string)($_POST['action'] ?? '') ==
         if (!isset($_FILES['profile_image']) || !is_array($_FILES['profile_image'])) {
             throw new RuntimeException('Please choose an image file.');
         }
-        $err = (int)($_FILES['profile_image']['error'] ?? UPLOAD_ERR_NO_FILE);
-        if ($err !== UPLOAD_ERR_OK) {
-            throw new RuntimeException('Please choose an image file.');
+        $uploadError = app_upload_validate_file($_FILES['profile_image'], 'admin', 'Image', true);
+        if ($uploadError !== null) {
+            throw new RuntimeException($uploadError);
         }
         $tmpName = (string)($_FILES['profile_image']['tmp_name'] ?? '');
         if ($tmpName === '' || !is_uploaded_file($tmpName)) {

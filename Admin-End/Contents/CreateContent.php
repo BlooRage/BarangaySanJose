@@ -448,7 +448,7 @@ $sharedMeta = [
   <script src="../../summernote-0.9.0-dist/summernote-lite.min.js?v=20260307-2"></script>
   <script>
     (function () {
-      const MAX_IMAGE_SIZE_BYTES = 25 * 1024 * 1024;
+      const MAX_IMAGE_SIZE_BYTES = 50 * 1024 * 1024;
       const contentType = <?= json_encode($contentType) ?>;
 
       const sharedContentFields = document.getElementById("sharedContentFields");
@@ -582,7 +582,7 @@ $sharedMeta = [
               for (const file of files) {
                 if (!file) continue;
                 if (file.size > MAX_IMAGE_SIZE_BYTES) {
-                  alert('Image must be 25MB or less.');
+                  alert('Image must be 50MB or less.');
                   continue;
                 }
                 try {
@@ -870,7 +870,7 @@ $sharedMeta = [
               for (const file of files) {
                 if (!file) continue;
                 if (file.size > MAX_IMAGE_SIZE_BYTES) {
-                  alert("Image must be 25MB or less.");
+                  alert("Image must be 50MB or less.");
                   continue;
                 }
                 try {
@@ -1067,7 +1067,6 @@ $sharedMeta = [
   </script>
 </body>
 </html>
-
 
 
 

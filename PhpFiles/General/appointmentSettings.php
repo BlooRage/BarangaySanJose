@@ -108,8 +108,17 @@ if (!function_exists('aps_weekday_short_options')) {
     }
 }
 
-if (!function_exists('aps_normalize_weekdays')) {
-    function aps_normalize_weekdays($value): array
+if (!function_exists('aps_all_weekdays')) {
+    function aps_all_weekdays(): array
+    {
+        $weekdays = array_map('intval', array_keys(aps_weekday_options()));
+        sort($weekdays, SORT_NUMERIC);
+        return $weekdays;
+    }
+}
+
+if (!function_exists('aps_normalize_weekday_selection')) {
+    function aps_normalize_weekday_selection($value, bool $fallbackToAll = true): array
     {
         $source = is_array($value) ? $value : explode(',', (string)$value);
         $normalized = [];
@@ -123,15 +132,57 @@ if (!function_exists('aps_normalize_weekdays')) {
             $normalized[(int)$weekday] = true;
         }
 
-        if ($normalized === []) {
-            foreach (array_keys(aps_weekday_options()) as $weekday) {
+        if ($normalized === [] && $fallbackToAll) {
+            foreach (aps_all_weekdays() as $weekday) {
                 $normalized[(int)$weekday] = true;
             }
         }
 
-        $weekdays = array_keys($normalized);
+        $weekdays = array_map('intval', array_keys($normalized));
         sort($weekdays, SORT_NUMERIC);
         return $weekdays;
+    }
+}
+
+if (!function_exists('aps_normalize_weekdays')) {
+    function aps_normalize_weekdays($value): array
+    {
+        return aps_normalize_weekday_selection($value, true);
+    }
+}
+
+if (!function_exists('aps_normalize_closed_weekdays')) {
+    function aps_normalize_closed_weekdays($value): array
+    {
+        return aps_normalize_weekday_selection($value, false);
+    }
+}
+
+if (!function_exists('aps_available_weekdays_from_closed')) {
+    function aps_available_weekdays_from_closed($value): array
+    {
+        $closed = array_fill_keys(aps_normalize_closed_weekdays($value), true);
+        $available = [];
+        foreach (aps_all_weekdays() as $weekday) {
+            if (!isset($closed[$weekday])) {
+                $available[] = $weekday;
+            }
+        }
+        return $available;
+    }
+}
+
+if (!function_exists('aps_closed_weekdays')) {
+    function aps_closed_weekdays(array $settings): array
+    {
+        $available = array_fill_keys(aps_normalize_weekdays($settings['available_weekdays'] ?? []), true);
+        $closed = [];
+        foreach (aps_all_weekdays() as $weekday) {
+            if (!isset($available[$weekday])) {
+                $closed[] = $weekday;
+            }
+        }
+        return $closed;
     }
 }
 
@@ -318,17 +369,37 @@ if (!function_exists('aps_schedule_end_time')) {
 }
 
 if (!function_exists('aps_weekdays_label')) {
-    function aps_weekdays_label(array $weekdays): string
+    function aps_weekdays_label(array $weekdays, string $emptyLabel = 'No available days selected'): string
     {
         $options = aps_weekday_options();
         $labels = [];
-        foreach (aps_normalize_weekdays($weekdays) as $weekday) {
+        foreach (aps_normalize_weekday_selection($weekdays, false) as $weekday) {
             if (isset($options[$weekday])) {
                 $labels[] = $options[$weekday];
             }
         }
 
-        return $labels !== [] ? implode(', ', $labels) : 'No available days selected';
+        return $labels !== [] ? implode(', ', $labels) : $emptyLabel;
+    }
+}
+
+if (!function_exists('aps_closed_weekdays_label')) {
+    function aps_closed_weekdays_label(array $settings, string $emptyLabel = 'None'): string
+    {
+        $closedWeekdays = aps_closed_weekdays($settings);
+        if ($closedWeekdays === []) {
+            return $emptyLabel;
+        }
+
+        $labels = [];
+        $options = aps_weekday_options();
+        foreach ($closedWeekdays as $weekday) {
+            if (isset($options[$weekday])) {
+                $labels[] = $options[$weekday];
+            }
+        }
+
+        return $labels !== [] ? implode(', ', $labels) : $emptyLabel;
     }
 }
 
@@ -409,14 +480,7 @@ if (!function_exists('aps_unavailable_dates_label')) {
 if (!function_exists('aps_disabled_weekdays')) {
     function aps_disabled_weekdays(array $settings): array
     {
-        $allowed = array_fill_keys(aps_normalize_weekdays($settings['available_weekdays'] ?? []), true);
-        $disabled = [];
-        foreach (array_keys(aps_weekday_options()) as $weekday) {
-            if (!isset($allowed[$weekday])) {
-                $disabled[] = (int)$weekday;
-            }
-        }
-        return $disabled;
+        return aps_closed_weekdays($settings);
     }
 }
 

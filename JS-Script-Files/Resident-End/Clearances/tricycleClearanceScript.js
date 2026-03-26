@@ -1,9 +1,13 @@
 document.addEventListener("DOMContentLoaded", () => {
-    const form = document.querySelector("form");
+    const form = document.querySelector("form.page-form") || document.querySelector("form");
     const submitBtn = form?.querySelector(".submit-btn");
     const applicationTypeSelect = document.getElementById("applicationTypeSelect");
     const requestPurpose = document.getElementById("tricycleRequestPurpose");
+    const renewalTricycleHistoryRow = document.getElementById("renewalTricycleHistoryRow");
+    const renewalTricycleHistorySelect = document.getElementById("renewalTricycleHistorySelect");
+    const tricycleRenewalHistoryDataEl = document.getElementById("tricycleRenewalHistoryData");
     const documentUploadSection = document.getElementById("documentUploadSection");
+    const renewalUploadGuidance = document.getElementById("renewalUploadGuidance");
     const bodyNumberInput = document.getElementById("bodyNumber");
     const chassisNumberInput = document.getElementById("chassisNumber");
     const motorNumberInput = document.getElementById("motorNumber");
@@ -30,12 +34,39 @@ document.addEventListener("DOMContentLoaded", () => {
     const lastYearClearanceCol = document.getElementById("lastYearClearanceCol");
     const lastYearClearanceFile = document.getElementById("lastYearClearanceFile");
     const lastYearClearanceSelectedFile = document.getElementById("lastYearClearanceSelectedFile");
+    const orVehicleLabelText = document.getElementById("orVehicleLabelText");
+    const orVehicleRequiredMark = document.getElementById("orVehicleRequiredMark");
+    const crVehicleRequiredMark = document.getElementById("crVehicleRequiredMark");
+    const todaPodaRequiredMark = document.getElementById("todaPodaRequiredMark");
+    const deedOfSaleRequiredMark = document.getElementById("deedOfSaleRequiredMark");
+    const lastYearClearanceRequiredMark = document.getElementById("lastYearClearanceRequiredMark");
+
     if (!form || !submitBtn) return;
+
+    const tricycleRenewalHistory = (() => {
+        if (!tricycleRenewalHistoryDataEl) return [];
+        try {
+            const parsed = JSON.parse(tricycleRenewalHistoryDataEl.textContent || "[]");
+            return Array.isArray(parsed) ? parsed : [];
+        } catch (error) {
+            return [];
+        }
+    })();
+    const tricycleRenewalHistoryByRequestId = new Map(
+        tricycleRenewalHistory
+            .filter((record) => record && typeof record === "object" && String(record.request_id || "").trim() !== "")
+            .map((record) => [String(record.request_id).trim(), record])
+    );
 
     const setRequired = (el, required) => {
         if (!el) return;
         if (required) el.setAttribute("required", "required");
         else el.removeAttribute("required");
+    };
+
+    const setRequiredMarkerVisible = (markerEl, visible) => {
+        if (!markerEl) return;
+        markerEl.classList.toggle("d-none", !visible);
     };
 
     const wireFileDisplay = (inputId, outputId) => {
@@ -72,6 +103,8 @@ document.addEventListener("DOMContentLoaded", () => {
     };
 
     const normalizeFranchisee = (value) => String(value || "").trim().replace(/\s+/g, " ").toUpperCase();
+    const normalizeSimpleValue = (value) => String(value || "").trim().toLowerCase();
+    const knownVehicleMakes = ["Rusi", "Yamaha", "Kawasaki", "Honda"];
 
     const franchiseeLocationMap = {
         "PRIVATE - FAMILY USE": "",
@@ -219,6 +252,75 @@ document.addEventListener("DOMContentLoaded", () => {
         clearErrorState(otherTodaPodaLocationInput, otherTodaPodaLocationError);
     };
 
+    const setFieldValue = (input, value) => {
+        if (!input) return;
+        input.value = String(value ?? "");
+    };
+
+    const setRadioSelection = (value) => {
+        const normalizedValue = normalizeSimpleValue(value);
+        if (vehicleNamedYes) {
+            vehicleNamedYes.checked = normalizedValue === "yes";
+        }
+        if (vehicleNamedNo) {
+            vehicleNamedNo.checked = normalizedValue === "no";
+        }
+    };
+
+    const setMatchingSelectValue = (selectEl, targetValue, normalizer = (value) => String(value || "").trim()) => {
+        if (!selectEl) return "";
+        const normalizedTarget = normalizer(targetValue);
+        const match = Array.from(selectEl.options).find((option) => normalizer(option.value) === normalizedTarget);
+        selectEl.value = match ? match.value : "";
+        return selectEl.value;
+    };
+
+    const applyRenewalHistoryRecord = (record) => {
+        if (!record || typeof record !== "object") return;
+
+        setMatchingSelectValue(franchiseeSelect, record.franchisee, normalizeFranchisee);
+
+        const vehicleMake = String(record.vehicle_make || "").trim();
+        const matchedVehicleMake = Array.from(vehicleMakeSelect?.options || []).find(
+            (option) => normalizeSimpleValue(option.value) === normalizeSimpleValue(vehicleMake)
+        );
+        if (vehicleMakeSelect) {
+            vehicleMakeSelect.value = matchedVehicleMake
+                ? matchedVehicleMake.value
+                : (vehicleMake !== "" ? "Others" : "");
+        }
+
+        setFieldValue(plateNumberInput, String(record.plate_number || "").toUpperCase());
+        setFieldValue(bodyNumberInput, record.body_number);
+        setFieldValue(chassisNumberInput, record.chassis_number);
+        setFieldValue(motorNumberInput, record.motor_number);
+        setFieldValue(orNumberInput, record.or_number);
+        setFieldValue(crNumberInput, record.cr_number);
+        setRadioSelection(record.vehicle_named_to_owner);
+
+        enforcePlateLimit(plateNumberInput);
+        normalizeNumber(bodyNumberInput);
+        normalizeChassis(chassisNumberInput);
+        normalizeNumber(motorNumberInput);
+        normalizeNumber(orNumberInput);
+        normalizeNumber(crNumberInput);
+
+        updateState();
+
+        if (vehicleMakeSelect?.value === "Others") {
+            setFieldValue(vehicleMakeOtherInput, vehicleMake);
+        }
+
+        if (normalizeFranchisee(franchiseeSelect?.value) === "OTHERS") {
+            setFieldValue(otherTodaPodaLocationInput, record.location_of_toda_poda);
+            if (todaPodaLocationValueInput) {
+                todaPodaLocationValueInput.value = String(record.location_of_toda_poda || "").trim();
+            }
+        }
+
+        updateState();
+    };
+
     const updateState = () => {
         const applicationType = String(applicationTypeSelect?.value || "").trim();
         const isNew = applicationType === "New";
@@ -232,9 +334,24 @@ document.addEventListener("DOMContentLoaded", () => {
         updateRequestPurpose();
         updateTodaPodaLocation();
 
+        renewalTricycleHistoryRow?.classList.toggle("d-none", !isRenewal);
+        if (renewalTricycleHistorySelect) {
+            renewalTricycleHistorySelect.disabled = !isRenewal || tricycleRenewalHistoryByRequestId.size === 0;
+        }
+
         if (documentUploadSection) {
             documentUploadSection.classList.toggle("d-none", !docsEnabled);
         }
+        renewalUploadGuidance?.classList.toggle("d-none", !isRenewal);
+
+        if (orVehicleLabelText) {
+            orVehicleLabelText.textContent = isRenewal ? "Updated O.R. of the Vehicle" : "O.R. of the Vehicle";
+        }
+        setRequiredMarkerVisible(orVehicleRequiredMark, docsEnabled);
+        setRequiredMarkerVisible(crVehicleRequiredMark, isNew);
+        setRequiredMarkerVisible(todaPodaRequiredMark, isNew);
+        setRequiredMarkerVisible(deedOfSaleRequiredMark, isNew && needsDeedOfSale);
+        setRequiredMarkerVisible(lastYearClearanceRequiredMark, false);
 
         if (vehicleMakeOtherRow) {
             vehicleMakeOtherRow.classList.toggle("d-none", !isOtherVehicleMake);
@@ -257,9 +374,9 @@ document.addEventListener("DOMContentLoaded", () => {
         setRequired(vehicleMakeSelect, true);
         setRequired(otherTodaPodaLocationInput, isOtherFranchisee);
         setRequired(orVehicleFile, docsEnabled);
-        setRequired(crVehicleFile, docsEnabled);
-        setRequired(todaPodaCertFile, docsEnabled);
-        setRequired(lastYearClearanceFile, isRenewal);
+        setRequired(crVehicleFile, isNew);
+        setRequired(todaPodaCertFile, isNew);
+        setRequired(lastYearClearanceFile, false);
         setRequired(vehicleNamedYes, docsEnabled);
         setRequired(vehicleNamedNo, docsEnabled);
 
@@ -268,7 +385,7 @@ document.addEventListener("DOMContentLoaded", () => {
         }
         if (deedOfSaleFile) {
             deedOfSaleFile.disabled = !needsDeedOfSale;
-            setRequired(deedOfSaleFile, needsDeedOfSale);
+            setRequired(deedOfSaleFile, isNew && needsDeedOfSale);
             if (!needsDeedOfSale) {
                 clearFileInput(deedOfSaleFile, document.getElementById("deedOfSaleSelectedFile"));
             }
@@ -337,6 +454,11 @@ document.addEventListener("DOMContentLoaded", () => {
     vehicleNamedNo?.addEventListener("change", updateState);
     franchiseeSelect?.addEventListener("change", updateState);
     vehicleMakeSelect?.addEventListener("change", updateState);
+    renewalTricycleHistorySelect?.addEventListener("change", () => {
+        const selectedRequestId = String(renewalTricycleHistorySelect.value || "").trim();
+        if (selectedRequestId === "") return;
+        applyRenewalHistoryRecord(tricycleRenewalHistoryByRequestId.get(selectedRequestId));
+    });
     otherTodaPodaLocationInput?.addEventListener("input", () => {
         if (todaPodaLocationValueInput) {
             todaPodaLocationValueInput.value = String(otherTodaPodaLocationInput.value || "").trim();

@@ -13,6 +13,7 @@ if (empty($_SESSION['user_id'])) {
 
 require_once __DIR__ . '/../General/connection.php';
 require_once __DIR__ . '/../General/residentTransaction.php';
+require_once __DIR__ . '/../General/uploadLimits.php';
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     http_response_code(405);
@@ -243,6 +244,9 @@ function moveUploadedFileWithDocName(string $tmpName, string $dir, string $docTy
     $tmpSize = @filesize($tmpName);
     if ($tmpSize === false || (int)$tmpSize <= 0) {
         throw new Exception("Uploaded file is empty.");
+    }
+    if ((int)$tmpSize > app_upload_limit_bytes('resident')) {
+        throw new Exception(app_upload_limit_error('resident', 'Uploaded file'));
     }
 
     $index = 0;

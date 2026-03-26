@@ -4,6 +4,7 @@ session_start();
 require_once "../General/connection.php";
 require_once "../General/security.php";
 require_once "../General/uniqueIDGenerate.php";
+require_once "../General/uploadLimits.php";
 
 requireRoleSession(['SuperAdmin', 'Official', 'Officials', 'Personnel', 'Personnels', 'Admin', 'Employee']);
 verifyCsrfToken(false);
@@ -89,7 +90,7 @@ function normalizeTimeValue(?string $value): ?string {
 
 function describeUploadError(int $errorCode): string {
     return match ($errorCode) {
-        UPLOAD_ERR_INI_SIZE, UPLOAD_ERR_FORM_SIZE => 'Narrative file is too large.',
+        UPLOAD_ERR_INI_SIZE, UPLOAD_ERR_FORM_SIZE => app_upload_limit_error('admin', 'Narrative file'),
         UPLOAD_ERR_PARTIAL => 'Narrative file upload was interrupted. Please try again.',
         UPLOAD_ERR_NO_FILE => 'Narrative file is required.',
         UPLOAD_ERR_NO_TMP_DIR => 'Server upload temp directory is missing.',
@@ -368,6 +369,11 @@ if ($narrativeMethod === 'file') {
     if (!isset($_FILES['narrative_file']) || $uploadError !== UPLOAD_ERR_OK) {
         http_response_code(400);
         exit(describeUploadError($uploadError));
+    }
+    $validationError = app_upload_validate_file($_FILES['narrative_file'], 'admin', 'Narrative file', true);
+    if ($validationError !== null) {
+        http_response_code(400);
+        exit($validationError);
     }
 
     $allowedExtensions = ['pdf', 'jpg', 'jpeg', 'png', 'webp'];

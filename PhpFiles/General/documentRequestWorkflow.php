@@ -624,6 +624,33 @@ function dr_canonical_document_type_key(string $value): string {
     return preg_replace('/[^a-z0-9]+/', '', $raw);
 }
 
+function dr_requires_clearance_inspection(string $documentType): bool {
+    $token = dr_canonical_document_type_key($documentType);
+    if ($token === '') {
+        return false;
+    }
+
+    return in_array($token, [
+        'barangayclearanceforbusinesspermit',
+        'clearanceforbusinesspermit',
+        'businesspermit',
+        'barangaybusinessclearance',
+        'businessclearance',
+        'barangayclearanceforelectricalpermit',
+        'clearanceforelectricalpermit',
+        'electricalpermit',
+        'barangayclearanceforwaterpermit',
+        'clearanceforwaterpermit',
+        'waterpermit',
+        'barangayclearanceforresidentialbuildingpermit',
+        'clearanceforresidentialbuildingpermit',
+        'residentialbuildingpermit',
+        'barangayclearanceforcommercialbuildingpermit',
+        'clearanceforcommercialbuildingpermit',
+        'commercialbuildingpermit',
+    ], true);
+}
+
 function dr_document_type_name_variants(string $documentType): array {
     $doc = trim($documentType);
     if ($doc === '') return [];

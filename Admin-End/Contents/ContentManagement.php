@@ -1727,7 +1727,7 @@ $previewCssAssets = [
       const cropRatioLabelEl = document.getElementById("cmsCropRatioLabel");
       const cropSaveBtn = document.getElementById("cmsCropSaveBtn");
       const cropModal = cropModalEl ? new bootstrap.Modal(cropModalEl) : null;
-      const MAX_IMAGE_SIZE_BYTES = 25 * 1024 * 1024;
+      const MAX_IMAGE_SIZE_BYTES = 50 * 1024 * 1024;
       let previewTimer = null;
       let cropTargetPicker = null;
       let cropSourceImage = null;
@@ -2107,7 +2107,7 @@ $previewCssAssets = [
                   continue;
                 }
                 if (file.size > MAX_IMAGE_SIZE_BYTES) {
-                  window.alert("Image must be 25MB or less.");
+                  window.alert("Image must be 50MB or less.");
                   continue;
                 }
                 try {
@@ -2212,7 +2212,7 @@ $previewCssAssets = [
           return;
         }
         if (file.size > MAX_IMAGE_SIZE_BYTES) {
-          window.alert("Image must be 25MB or less.");
+          window.alert("Image must be 50MB or less.");
           return;
         }
 

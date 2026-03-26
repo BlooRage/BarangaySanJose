@@ -1,5 +1,6 @@
 <?php
 require_once __DIR__ . "/../../Admin-End/includes/admin_guard.php";
+require_once __DIR__ . "/../General/uploadLimits.php";
 
 header("Content-Type: application/json");
 
@@ -16,10 +17,10 @@ if (!isset($_FILES["image"])) {
 }
 
 $file = $_FILES["image"];
-$errorCode = (int)($file["error"] ?? UPLOAD_ERR_NO_FILE);
-if ($errorCode !== UPLOAD_ERR_OK) {
+$validationError = app_upload_validate_file($file, 'admin', 'Image', true);
+if ($validationError !== null) {
   http_response_code(400);
-  echo json_encode(["success" => false, "message" => "Upload failed."]);
+  echo json_encode(["success" => false, "message" => $validationError]);
   exit;
 }
 
@@ -27,14 +28,6 @@ $tmpPath = (string)($file["tmp_name"] ?? "");
 if ($tmpPath === "" || !is_uploaded_file($tmpPath)) {
   http_response_code(400);
   echo json_encode(["success" => false, "message" => "Invalid upload source."]);
-  exit;
-}
-
-$maxBytes = 25 * 1024 * 1024; // 25MB
-$size = (int)($file["size"] ?? 0);
-if ($size <= 0 || $size > $maxBytes) {
-  http_response_code(400);
-  echo json_encode(["success" => false, "message" => "Image must be 25MB or less."]);
   exit;
 }
 

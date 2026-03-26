@@ -317,6 +317,17 @@ $fullAddress = htmlspecialchars(implode(', ', $fullAddressParts), ENT_QUOTES, 'U
                             </div>
                         </div>
                     </div>
+                    <div class="form-row">
+                        <div class="full-width">
+                            <label class="top-label" for="sitePhotoFile">Picture of Establishment / Property <span class="required-asterisk">*</span></label>
+                            <label class="upload-dropzone" id="sitePhotoDropzone" for="sitePhotoFile">
+                                <i class="fa-solid fa-cloud-arrow-up"></i>
+                                <span>Drag file here or click to upload</span>
+                            </label>
+                            <input type="file" id="sitePhotoFile" name="site_photo_file" class="visually-hidden" accept=".pdf,.jpg,.jpeg,.png">
+                            <div id="sitePhotoSelectedFile" class="selected-files small text-muted mt-2">No file selected</div>
+                        </div>
+                    </div>
                     <div id="secCertificateWrapper" class="form-row d-none">
                         <div class="full-width">
                             <label class="top-label" for="secCertificateFile">Upload SEC Certificate (for Partnership or Company) <span class="required-asterisk">*</span></label>

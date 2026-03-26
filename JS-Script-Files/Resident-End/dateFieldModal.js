@@ -104,7 +104,7 @@
           border-radius: 18px;
         }
         .resident-date-modal--calendar .modal-dialog {
-          max-width: 420px;
+          max-width: 760px;
         }
         .resident-date-modal-preview {
           margin: 0 0 12px;
@@ -125,6 +125,12 @@
           justify-content: space-between;
           gap: 10px;
         }
+        .resident-date-calendar-controls {
+          flex: 1;
+          display: grid;
+          gap: 8px;
+          justify-items: center;
+        }
         .resident-date-calendar-nav {
           width: 38px;
           height: 38px;
@@ -141,12 +147,40 @@
           border-color: #cbd5e1;
           color: #1e293b;
         }
+        .resident-date-calendar-nav:disabled {
+          cursor: not-allowed;
+          background: #f8fafc;
+          border-color: #e5e7eb;
+          color: #cbd5e1;
+        }
         .resident-date-calendar-title {
           flex: 1;
           text-align: center;
           font-size: 1rem;
           font-weight: 700;
           color: #0f172a;
+        }
+        .resident-date-calendar-picker {
+          display: flex;
+          flex-wrap: wrap;
+          justify-content: center;
+          gap: 8px;
+          width: min(100%, 320px);
+        }
+        .resident-date-calendar-select {
+          flex: 1 1 140px;
+          min-width: 0;
+          border: 1px solid #dbe3ef;
+          border-radius: 10px;
+          background-color: #fff;
+          color: #0f172a;
+          font-size: 0.95rem;
+          font-weight: 600;
+          box-shadow: none;
+        }
+        .resident-date-calendar-select:focus {
+          border-color: #fb923c;
+          box-shadow: 0 0 0 0.2rem rgba(249, 115, 22, 0.12);
         }
         .resident-date-calendar-weekdays,
         .resident-date-calendar-grid {
@@ -156,12 +190,15 @@
         }
         .resident-date-calendar-weekday {
           text-align: center;
-          font-size: 0.72rem;
+          min-height: 30px;
+          display: flex;
+          align-items: flex-end;
+          justify-content: center;
+          padding: 0 2px 2px;
+          font-size: 0.7rem;
           font-weight: 700;
-          text-transform: uppercase;
-          letter-spacing: 0.04em;
+          line-height: 1.15;
           color: #64748b;
-          padding-bottom: 2px;
         }
         .resident-date-calendar-day {
           min-height: 42px;
@@ -264,17 +301,40 @@
                 <div class="resident-date-calendar-shell">
                   <div class="resident-date-calendar-toolbar">
                     <button type="button" class="resident-date-calendar-nav" id="residentDateCalendarPrev" aria-label="Previous month">&lsaquo;</button>
-                    <div class="resident-date-calendar-title" id="residentDateCalendarTitle">Month Year</div>
+                    <div class="resident-date-calendar-controls">
+                      <div class="resident-date-calendar-title" id="residentDateCalendarTitle">Month Year</div>
+                      <div class="resident-date-calendar-picker">
+                        <label class="visually-hidden" for="residentDateCalendarMonth">Month</label>
+                        <select class="form-select resident-date-calendar-select" id="residentDateCalendarMonth">
+                          <option value="1">January</option>
+                          <option value="2">February</option>
+                          <option value="3">March</option>
+                          <option value="4">April</option>
+                          <option value="5">May</option>
+                          <option value="6">June</option>
+                          <option value="7">July</option>
+                          <option value="8">August</option>
+                          <option value="9">September</option>
+                          <option value="10">October</option>
+                          <option value="11">November</option>
+                          <option value="12">December</option>
+                        </select>
+                        <label class="visually-hidden" for="residentDateCalendarYear">Year</label>
+                        <select class="form-select resident-date-calendar-select" id="residentDateCalendarYear">
+                          <option value="">Year</option>
+                        </select>
+                      </div>
+                    </div>
                     <button type="button" class="resident-date-calendar-nav" id="residentDateCalendarNext" aria-label="Next month">&rsaquo;</button>
                   </div>
                   <div class="resident-date-calendar-weekdays">
-                    <div class="resident-date-calendar-weekday">S</div>
-                    <div class="resident-date-calendar-weekday">M</div>
-                    <div class="resident-date-calendar-weekday">T</div>
-                    <div class="resident-date-calendar-weekday">W</div>
-                    <div class="resident-date-calendar-weekday">T</div>
-                    <div class="resident-date-calendar-weekday">F</div>
-                    <div class="resident-date-calendar-weekday">S</div>
+                    <div class="resident-date-calendar-weekday">Sunday</div>
+                    <div class="resident-date-calendar-weekday">Monday</div>
+                    <div class="resident-date-calendar-weekday">Tuesday</div>
+                    <div class="resident-date-calendar-weekday">Wednesday</div>
+                    <div class="resident-date-calendar-weekday">Thursday</div>
+                    <div class="resident-date-calendar-weekday">Friday</div>
+                    <div class="resident-date-calendar-weekday">Saturday</div>
                   </div>
                   <div class="resident-date-calendar-grid" id="residentDateCalendarGrid"></div>
                 </div>
@@ -305,6 +365,8 @@
     const daySelect = document.getElementById("residentDateModalDay");
     const yearSelect = document.getElementById("residentDateModalYear");
     const calendarTitle = document.getElementById("residentDateCalendarTitle");
+    const calendarMonthSelect = document.getElementById("residentDateCalendarMonth");
+    const calendarYearSelect = document.getElementById("residentDateCalendarYear");
     const calendarGrid = document.getElementById("residentDateCalendarGrid");
     const calendarPrevBtn = document.getElementById("residentDateCalendarPrev");
     const calendarNextBtn = document.getElementById("residentDateCalendarNext");
@@ -544,9 +606,87 @@
       setModalError("");
     }
 
+    function clampCalendarCursor() {
+      if (!activeInput) return;
+
+      const minParsed = parseIsoDate(String(activeInput.getAttribute("min") || "").trim());
+      const maxParsed = parseIsoDate(String(activeInput.getAttribute("max") || "").trim());
+      if (minParsed) {
+        const beforeMin = calendarCursorYear < minParsed.year
+          || (calendarCursorYear === minParsed.year && calendarCursorMonth < minParsed.month);
+        if (beforeMin) {
+          calendarCursorYear = minParsed.year;
+          calendarCursorMonth = minParsed.month;
+        }
+      }
+      if (maxParsed) {
+        const afterMax = calendarCursorYear > maxParsed.year
+          || (calendarCursorYear === maxParsed.year && calendarCursorMonth > maxParsed.month);
+        if (afterMax) {
+          calendarCursorYear = maxParsed.year;
+          calendarCursorMonth = maxParsed.month;
+        }
+      }
+    }
+
+    function populateCalendarYears() {
+      if (!calendarYearSelect || !activeInput) return;
+
+      const minIso = String(activeInput.getAttribute("min") || "").trim();
+      const maxIso = String(activeInput.getAttribute("max") || "").trim();
+      const minYear = parseIsoDate(minIso)?.year ?? (new Date().getFullYear() - 120);
+      const maxYear = parseIsoDate(maxIso)?.year ?? (new Date().getFullYear() + 10);
+      const currentValue = String(calendarYearSelect.value || "");
+      calendarYearSelect.innerHTML = "";
+      for (let year = maxYear; year >= minYear; year -= 1) {
+        const option = document.createElement("option");
+        option.value = String(year);
+        option.textContent = String(year);
+        calendarYearSelect.appendChild(option);
+      }
+      if (currentValue && calendarYearSelect.querySelector(`option[value="${currentValue}"]`)) {
+        calendarYearSelect.value = currentValue;
+      }
+    }
+
+    function syncCalendarSelectors() {
+      if (!calendarMonthSelect || !calendarYearSelect || !activeInput) return;
+
+      clampCalendarCursor();
+      populateCalendarYears();
+
+      const minParsed = parseIsoDate(String(activeInput.getAttribute("min") || "").trim());
+      const maxParsed = parseIsoDate(String(activeInput.getAttribute("max") || "").trim());
+
+      Array.from(calendarMonthSelect.options).forEach((option) => {
+        const month = Number(option.value || 0);
+        let disabled = false;
+        if (month > 0 && minParsed && calendarCursorYear === minParsed.year && month < minParsed.month) {
+          disabled = true;
+        }
+        if (month > 0 && maxParsed && calendarCursorYear === maxParsed.year && month > maxParsed.month) {
+          disabled = true;
+        }
+        option.disabled = disabled;
+      });
+
+      calendarMonthSelect.value = String(calendarCursorMonth);
+      calendarYearSelect.value = String(calendarCursorYear);
+
+      const atMinMonth = !!minParsed
+        && calendarCursorYear === minParsed.year
+        && calendarCursorMonth === minParsed.month;
+      const atMaxMonth = !!maxParsed
+        && calendarCursorYear === maxParsed.year
+        && calendarCursorMonth === maxParsed.month;
+      if (calendarPrevBtn) calendarPrevBtn.disabled = atMinMonth;
+      if (calendarNextBtn) calendarNextBtn.disabled = atMaxMonth;
+    }
+
     function renderCalendar() {
       if (!activeInput || !calendarGrid) return;
 
+      clampCalendarCursor();
       const todayIso = getTodayIso();
       const minIso = String(activeInput.getAttribute("min") || "").trim();
       const maxIso = String(activeInput.getAttribute("max") || "").trim();
@@ -557,6 +697,7 @@
       const firstWeekday = new Date(calendarCursorYear, calendarCursorMonth - 1, 1).getDay();
       const daysInCurrentMonth = new Date(calendarCursorYear, calendarCursorMonth, 0).getDate();
       calendarTitle.textContent = formatMonthYear(calendarCursorYear, calendarCursorMonth);
+      syncCalendarSelectors();
       calendarGrid.innerHTML = "";
 
       for (let cellIndex = 0; cellIndex < 42; cellIndex += 1) {
@@ -611,6 +752,10 @@
     }
 
     function openForInput(input, proxy) {
+      if (!(input instanceof HTMLInputElement) || input.matches(":disabled")) {
+        return;
+      }
+
       activeInput = input;
       activeProxy = proxy;
 
@@ -658,6 +803,20 @@
       const next = shiftMonth(calendarCursorYear, calendarCursorMonth, 1);
       calendarCursorYear = next.year;
       calendarCursorMonth = next.month;
+      renderCalendar();
+    });
+
+    calendarMonthSelect?.addEventListener("change", () => {
+      const nextMonth = Number(calendarMonthSelect.value || 0);
+      if (!nextMonth) return;
+      calendarCursorMonth = nextMonth;
+      renderCalendar();
+    });
+
+    calendarYearSelect?.addEventListener("change", () => {
+      const nextYear = Number(calendarYearSelect.value || 0);
+      if (!nextYear) return;
+      calendarCursorYear = nextYear;
       renderCalendar();
     });
 
@@ -744,7 +903,7 @@
       setModalError("");
     });
 
-    document.querySelectorAll('input[type="date"]:not([readonly]):not([disabled]):not([data-date-modal-ignore])').forEach((input) => {
+    document.querySelectorAll('input[type="date"]:not([readonly]):not([data-date-modal-ignore])').forEach((input) => {
       if (input.dataset.dateModalApplied === "1") return;
       input.dataset.dateModalApplied = "1";
 
