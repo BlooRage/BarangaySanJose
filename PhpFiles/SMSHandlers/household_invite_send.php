@@ -13,6 +13,7 @@ if (empty($_SESSION['user_id'])) {
 
 require_once __DIR__ . "/../General/connection.php";
 require_once __DIR__ . "/../General/sendSMS.php";
+require_once __DIR__ . "/../General/uniqueIDGenerate.php";
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     http_response_code(405);
@@ -136,18 +137,13 @@ $stmt->fetch();
 $stmt->close();
 
 if (!$householdId) {
-    $ins = $conn->prepare("
-        INSERT INTO householdtbl (head_resident_id, status_id)
-        VALUES (?, ?)
-    ");
-    $ins->bind_param("si", $residentId, $householdStatusId);
-    if (!$ins->execute()) {
+    try {
+        $householdId = insertHouseholdRecord($conn, $residentId, $householdStatusId);
+    } catch (RuntimeException $e) {
         http_response_code(500);
         echo json_encode(['success' => false, 'message' => 'Failed to create household.']);
         exit;
     }
-    $householdId = $ins->insert_id;
-    $ins->close();
 }
 
 // Ensure head is registered as household member
@@ -261,18 +257,13 @@ if ($maxUses <= 0) {
 }
 
 // Create invite record
-$inviteStmt = $conn->prepare("
-    INSERT INTO householdinvitetbl
-        (household_id, code_hash, expires_at, max_uses, uses_count, created_by_resident_id, status_id)
-    VALUES (?, ?, ?, ?, 0, ?, ?)
-");
-$inviteStmt->bind_param("issisi", $householdId, $codeHash, $expiresAt, $maxUses, $residentId, $inviteActiveStatusId);
-if (!$inviteStmt->execute()) {
+try {
+    insertHouseholdInvite($conn, (int)$householdId, $codeHash, $expiresAt, $maxUses, $residentId, $inviteActiveStatusId);
+} catch (RuntimeException $e) {
     http_response_code(500);
     echo json_encode(['success' => false, 'message' => 'Failed to create invite code.']);
     exit;
 }
-$inviteStmt->close();
 
 $sentCount = 0;
 $failedNumbers = [];

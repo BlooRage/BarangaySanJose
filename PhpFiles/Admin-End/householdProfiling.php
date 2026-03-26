@@ -154,6 +154,16 @@ function hp_build_address_display(array $row): string {
     return $addressParts ? implode(', ', $addressParts) : '-';
 }
 
+function hp_decrypt_household_head_row(array $row): array {
+    $row = pii_decrypt_resident_row($row) ?? $row;
+    $row = pii_decrypt_resident_address_row($row) ?? $row;
+    return pii_decrypt_assoc($row, ['house_number', 'occupation_display']);
+}
+
+function hp_decrypt_household_member_row(array $row): array {
+    return pii_decrypt_assoc($row, ['last_name', 'first_name', 'middle_name', 'suffix', 'birthdate']);
+}
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     header('Content-Type: application/json; charset=utf-8');
     http_response_code(405);
@@ -177,8 +187,12 @@ if (isset($_GET['fetch'])) {
         if (empty($birthdate)) {
             return null;
         }
-        $dob = new DateTime($birthdate);
-        return (new DateTime())->diff($dob)->y;
+        try {
+            $dob = new DateTime((string)$birthdate);
+            return (new DateTime())->diff($dob)->y;
+        } catch (Exception $e) {
+            return null;
+        }
     };
 
     /* ===============================
@@ -232,6 +246,7 @@ if (isset($_GET['fetch'])) {
     if ($mode === 'heads') {
         $rows = [];
         while ($row = $result->fetch_assoc()) {
+            $row = hp_decrypt_household_head_row($row);
             $fullName =
                 $row['firstname'] . ' ' .
                 ($row['middlename'] ? $row['middlename'][0] . '. ' : '') .
@@ -272,6 +287,7 @@ if (isset($_GET['fetch'])) {
             $otherRes = $otherStmt->get_result();
 
             while ($m = $otherRes->fetch_assoc()) {
+                $m = hp_decrypt_household_member_row($m);
                 $mFullName =
                     $m['first_name'] . ' ' .
                     ($m['middle_name'] ? $m['middle_name'][0] . '. ' : '') .
@@ -347,6 +363,7 @@ if (isset($_GET['fetch'])) {
     $groups = [];
 
     while ($row = $result->fetch_assoc()) {
+        $row = hp_decrypt_household_head_row($row);
 
         /* ===============================
            FORMAT NAME & ADDRESS
@@ -418,6 +435,7 @@ if (isset($_GET['fetch'])) {
         $otherRes = $otherStmt->get_result();
 
         while ($m = $otherRes->fetch_assoc()) {
+            $m = hp_decrypt_household_member_row($m);
             $mFullName =
                 $m['first_name'] . ' ' .
                 ($m['middle_name'] ? $m['middle_name'][0] . '. ' : '') .

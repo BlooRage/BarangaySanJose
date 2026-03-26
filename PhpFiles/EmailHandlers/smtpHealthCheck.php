@@ -24,7 +24,9 @@ if ($res->num_rows === 0) {
   echo json_encode(['success' => false, 'message' => 'User not found.']);
   exit;
 }
-$email = ($res->fetch_assoc())['email'] ?? '';
+$row = $res->fetch_assoc();
+$row = $row ? (pii_decrypt_useraccount_row($row) ?? $row) : [];
+$email = $row['email'] ?? '';
 if ($email === '') {
   http_response_code(400);
   echo json_encode(['success' => false, 'message' => 'No email on file.']);

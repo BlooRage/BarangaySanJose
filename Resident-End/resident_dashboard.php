@@ -457,8 +457,8 @@ foreach ($announcementItems as $item) {
 
         <div class="col-12 col-md-4 col-lg-3">
           <div id="card-serviceRequest-clearances"
-               class="card-action h-100 p-4 rounded-4 text-center d-flex flex-column align-items-center justify-content-center border-0 shadow-sm <?= !$isResidentVerified ? 'is-locked' : '' ?>"
-               <?= !$isResidentVerified ? 'data-verify-required="1" data-target-url="Clearances/ClearancesLandingPage"' : 'onclick="location.href=\'Clearances/ClearancesLandingPage\'"' ?>>
+               class="card-action h-100 p-4 rounded-4 text-center d-flex flex-column align-items-center justify-content-center border-0 shadow-sm"
+               onclick="location.href='Clearances/ClearancesLandingPage'">
             <i class="fa-solid fa-clipboard-check fa-2xl mb-3"></i><br>
             <span class="fw-bold small">CLEARANCES</span>
           </div>

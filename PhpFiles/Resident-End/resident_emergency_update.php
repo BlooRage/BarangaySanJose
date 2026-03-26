@@ -12,6 +12,7 @@ if (empty($_SESSION['user_id'])) {
 }
 
 require_once __DIR__ . '/../General/connection.php';
+require_once __DIR__ . '/../General/uniqueIDGenerate.php';
 require_once __DIR__ . '/../General/residentTransaction.php';
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
@@ -229,25 +230,20 @@ $changes = [
     'address' => $address,
 ];
 
-$stmt = $conn->prepare("
-    INSERT INTO resident_edit_requesttbl
-        (resident_id, user_id, request_type, status_id, requested_changes)
-    VALUES (?, ?, 'emergency', ?, ?)
-");
-if (!$stmt) {
-    http_response_code(500);
-    echo json_encode(['success' => false, 'message' => 'Failed to prepare edit request.']);
-    exit;
-}
 $changesJson = json_encode($changes, JSON_UNESCAPED_SLASHES);
-$stmt->bind_param("ssis", $residentId, $userId, $pendingStatusId, $changesJson);
-if (!$stmt->execute()) {
+$requestId = insertResidentEditRequest(
+    $conn,
+    (string)$residentId,
+    (string)$userId,
+    'emergency',
+    (int)$pendingStatusId,
+    $changesJson
+);
+if ($requestId <= 0) {
     http_response_code(500);
     echo json_encode(['success' => false, 'message' => 'Failed to submit edit request.']);
     exit;
 }
-$requestId = (int)$stmt->insert_id;
-$stmt->close();
 
 createResidentTransaction(
     $conn,

@@ -12,6 +12,7 @@ if (empty($_SESSION['user_id'])) {
 }
 
 require_once __DIR__ . '/../General/connection.php';
+require_once __DIR__ . '/../General/uniqueIDGenerate.php';
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     http_response_code(405);
@@ -94,17 +95,12 @@ if ($dup->num_rows > 0) {
 }
 $dup->close();
 
-$ins = $conn->prepare("
-    INSERT INTO householdmemberinfotbl
-        (fam_head_id, last_name, first_name, middle_name, suffix, birthdate)
-    VALUES (?, ?, ?, ?, ?, ?)
-");
-$ins->bind_param("ssssss", $residentId, $lastName, $firstName, $middleName, $suffix, $birthdate);
-if (!$ins->execute()) {
+try {
+    insertHouseholdMemberInfo($conn, $residentId, $lastName, $firstName, $middleName, $suffix, $birthdate);
+} catch (RuntimeException $e) {
     echo json_encode(['success' => false, 'message' => 'Failed to add member.']);
     exit;
 }
-$ins->close();
 
 echo json_encode(['success' => true]);
 ?>

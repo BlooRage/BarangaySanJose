@@ -1,6 +1,9 @@
 <?php
 $allowUnregistered = false;
 require_once __DIR__ . "/../includes/resident_access_guard.php";
+$lockedClearanceAttrs = !$isResidentVerified
+    ? 'disabled aria-disabled="true" title="Verify your resident account first to unlock this clearance."'
+    : '';
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -52,6 +55,12 @@ require_once __DIR__ . "/../includes/resident_access_guard.php";
             <p class="page-description">
                 Welcome to the Barangay San Jose Online Clearance Application. Please select the clearance you need from the options below to begin your application. Make sure the details you provide are complete and accurate to avoid processing delays.
             </p>
+
+            <?php if (!$isResidentVerified): ?>
+                <div class="alert alert-warning border-0 shadow-sm mb-4" role="alert">
+                    Business Clearance is available for your current account status. The other clearance types will unlock after resident verification.
+                </div>
+            <?php endif; ?>
 
             <p class="section-label">List of clearances:</p>
 
@@ -169,6 +178,7 @@ require_once __DIR__ . "/../includes/resident_access_guard.php";
                                 </ul>
                                 <p class='mt-2 mb-0 text-muted small'>If the vehicle is not named after the owner, upload a notarized deed of sale.</p>
                             "
+                            <?= $lockedClearanceAttrs ?>
                         >
                             Apply Now
                         </button>
@@ -215,6 +225,7 @@ require_once __DIR__ . "/../includes/resident_access_guard.php";
                                     </li>
                                 </ul>
                             "
+                            <?= $lockedClearanceAttrs ?>
                         >
                             Apply Now
                         </button>
@@ -261,6 +272,7 @@ require_once __DIR__ . "/../includes/resident_access_guard.php";
                                     </li>
                                 </ul>
                             "
+                            <?= $lockedClearanceAttrs ?>
                         >
                             Apply Now
                         </button>
@@ -307,6 +319,7 @@ require_once __DIR__ . "/../includes/resident_access_guard.php";
                                     </li>
                                 </ul>
                             "
+                            <?= $lockedClearanceAttrs ?>
                         >
                             Apply Now
                         </button>
@@ -354,6 +367,7 @@ require_once __DIR__ . "/../includes/resident_access_guard.php";
                                     </li>
                                 </ul>
                             "
+                            <?= $lockedClearanceAttrs ?>
                         >
                             Apply Now
                         </button>

@@ -27,7 +27,7 @@
       -webkit-overflow-scrolling: touch;
     }
     .user-masterlist-shell .user-masterlist-table {
-      min-width: 1100px;
+      min-width: 1280px;
     }
     .user-masterlist-shell .user-masterlist-table th:nth-child(2),
     .user-masterlist-shell .user-masterlist-table td:nth-child(2) {
@@ -42,6 +42,42 @@
     .user-masterlist-shell td:nth-child(6),
     .user-masterlist-shell td:nth-child(7) {
       white-space: nowrap;
+    }
+    .user-masterlist-shell .user-masterlist-table th:last-child,
+    .user-masterlist-shell .user-masterlist-table td:last-child {
+      min-width: 160px;
+      white-space: nowrap;
+    }
+    .user-lock-summary-card {
+      border: 1px solid #ece7df;
+      border-radius: 16px;
+      padding: 16px 18px;
+      background: #faf8f4;
+    }
+    .user-lock-summary-card .summary-label {
+      font-size: 0.75rem;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      color: #7b7280;
+    }
+    .user-lock-summary-card .summary-value {
+      font-weight: 700;
+      color: #2f3640;
+    }
+    .user-lock-option {
+      border: 1px solid #e7dfd4;
+      border-radius: 14px;
+      padding: 12px 14px;
+      background: #fff;
+    }
+    .user-lock-option:has(input:checked) {
+      border-color: #de710c;
+      box-shadow: 0 0 0 2px rgba(222, 113, 12, 0.12);
+      background: #fffaf5;
+    }
+    .user-lock-option input[type="radio"] {
+      margin-top: 0.15rem;
     }
   </style>
 </head>
@@ -102,10 +138,11 @@
                 <th>Account Verification</th>
                 <th>Created</th>
                 <th>Last Login</th>
+                <th>Action</th>
               </tr>
             </thead>
             <tbody id="userMasterTbody">
-              <tr><td colspan="9" class="text-center text-muted py-4">Loading...</td></tr>
+              <tr><td colspan="10" class="text-center text-muted py-4">Loading...</td></tr>
             </tbody>
           </table>
         </div>
@@ -120,10 +157,81 @@
           </nav>
         </div>
       </div>
+
+      <div class="modal fade" id="userLockModal" tabindex="-1" aria-labelledby="userLockModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+          <div class="modal-content border-0 shadow-lg">
+            <div class="modal-header">
+              <h5 class="modal-title" id="userLockModalLabel">Manage Account Lock</h5>
+              <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+              <div id="userLockFeedback" class="alert d-none mb-3" role="alert"></div>
+
+              <div class="user-lock-summary-card mb-3">
+                <div class="summary-label">User</div>
+                <div class="summary-value" id="userLockSummaryName">—</div>
+                <div class="text-muted small" id="userLockSummaryMeta">—</div>
+                <div class="mt-3">
+                  <div class="summary-label">Current Status</div>
+                  <div class="summary-value" id="userLockCurrentStatus">—</div>
+                </div>
+                <div class="mt-3">
+                  <div class="summary-label">Current Reason</div>
+                  <div class="text-muted small mb-0" id="userLockCurrentReason">No lock reason saved.</div>
+                </div>
+              </div>
+
+              <div class="mb-3">
+                <label class="form-label fw-semibold d-block">Lock Type</label>
+                <div class="d-grid gap-2">
+                  <label class="user-lock-option">
+                    <div class="d-flex gap-2">
+                      <input class="form-check-input" type="radio" name="userLockMode" id="userLockModeTemporary" value="temporary" checked>
+                      <div>
+                        <div class="fw-semibold">Temporary lock</div>
+                        <div class="text-muted small">Set the exact date and time when the account should unlock automatically.</div>
+                      </div>
+                    </div>
+                  </label>
+                  <label class="user-lock-option">
+                    <div class="d-flex gap-2">
+                      <input class="form-check-input" type="radio" name="userLockMode" id="userLockModePermanent" value="permanent">
+                      <div>
+                        <div class="fw-semibold">Permanent lock</div>
+                        <div class="text-muted small">Keep the account locked until a SuperAdmin unlocks it manually.</div>
+                      </div>
+                    </div>
+                  </label>
+                </div>
+              </div>
+
+              <div class="mb-3" id="userLockUntilWrapper">
+                <label for="userLockUntil" class="form-label fw-semibold">Lock Until</label>
+                <input type="datetime-local" class="form-control" id="userLockUntil">
+                <div class="form-text">Use Manila time when choosing the unlock schedule.</div>
+              </div>
+
+              <div class="mb-0">
+                <label for="userLockReason" class="form-label fw-semibold">Reason</label>
+                <textarea class="form-control" id="userLockReason" rows="3" maxlength="255" placeholder="Optional note for the audit log and future admins."></textarea>
+                <div class="form-text">Optional, up to 255 characters.</div>
+              </div>
+            </div>
+            <div class="modal-footer justify-content-between">
+              <button type="button" class="btn btn-outline-success d-none" id="btnUserUnlockAccount">Unlock Account</button>
+              <div class="d-flex gap-2 ms-auto">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                <button type="button" class="btn btn-danger" id="btnUserSaveLock">Apply Lock</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
     </main>
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-  <script src="../JS-Script-Files/Admin-End/userMasterlistScript.js?v=20260222-2"></script>
+  <script src="../JS-Script-Files/Admin-End/userMasterlistScript.js?v=20260327-1"></script>
 </body>
 </html>

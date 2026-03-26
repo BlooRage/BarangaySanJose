@@ -196,11 +196,7 @@ function dra_resolve_official_display_name(mysqli $conn, string $userId): string
         return $userId;
     }
 
-    $hasSuffix = dr_column_exists($conn, 'officialinformationtbl', 'suffix');
-    $sql = $hasSuffix
-        ? "SELECT TRIM(CONCAT_WS(' ', NULLIF(firstname, ''), NULLIF(middlename, ''), NULLIF(lastname, ''), NULLIF(suffix, ''))) AS full_name FROM officialinformationtbl WHERE user_id = ? LIMIT 1"
-        : "SELECT TRIM(CONCAT_WS(' ', NULLIF(firstname, ''), NULLIF(middlename, ''), NULLIF(lastname, ''))) AS full_name FROM officialinformationtbl WHERE user_id = ? LIMIT 1";
-    $stmt = $conn->prepare($sql);
+    $stmt = $conn->prepare("SELECT firstname, middlename, lastname, suffix FROM officialinformationtbl WHERE user_id = ? LIMIT 1");
     if (!$stmt) {
         return $userId;
     }
@@ -209,8 +205,14 @@ function dra_resolve_official_display_name(mysqli $conn, string $userId): string
     $stmt->execute();
     $row = $stmt->get_result()->fetch_assoc();
     $stmt->close();
+    $row = $row ? (pii_decrypt_official_row($row) ?? $row) : null;
 
-    $fullName = trim((string)($row['full_name'] ?? ''));
+    $fullName = trim(implode(' ', array_values(array_filter([
+        (string)($row['firstname'] ?? ''),
+        (string)($row['middlename'] ?? ''),
+        (string)($row['lastname'] ?? ''),
+        (string)($row['suffix'] ?? ''),
+    ], static fn($value) => trim((string)$value) !== ''))));
     return $fullName !== '' ? $fullName : $userId;
 }
 
@@ -227,19 +229,30 @@ function dra_record_clearance_inspection(mysqli $conn, array $requestRow, string
     if (!$clearanceId) {
         return;
     }
+    $inspectionId = dr_generate_clearance_inspection_id($clearanceId);
+    if ($inspectionId === '') {
+        return;
+    }
 
     $inspectorName = dra_resolve_official_display_name($conn, $inspectorUserId);
     $inspectedAt = dr_now();
     $inspectionRemarks = trim($remarks);
     $stmt = $conn->prepare(
-        "INSERT INTO clearanceinspectiontbl (clearance_id, inspector_name, date_inspected, remarks, inspector_signature_path)
-         VALUES (?, ?, ?, ?, NULL)"
+        "INSERT INTO clearanceinspectiontbl (inspection_id, clearance_id, inspector_name, date_inspected, remarks, inspector_signature_path)
+         VALUES (?, ?, ?, ?, ?, NULL)
+         ON DUPLICATE KEY UPDATE
+            clearance_id = VALUES(clearance_id),
+            inspector_name = VALUES(inspector_name),
+            date_inspected = VALUES(date_inspected),
+            remarks = VALUES(remarks),
+            inspector_signature_path = VALUES(inspector_signature_path),
+            updated_at = CURRENT_TIMESTAMP"
     );
     if (!$stmt) {
         return;
     }
 
-    $stmt->bind_param('isss', $clearanceId, $inspectorName, $inspectedAt, $inspectionRemarks);
+    $stmt->bind_param('sssss', $inspectionId, $clearanceId, $inspectorName, $inspectedAt, $inspectionRemarks);
     $stmt->execute();
     $stmt->close();
 }
@@ -332,6 +345,7 @@ function dra_send_invoice_email(mysqli $conn, array $request, float $amount, str
     $stmt->execute();
     $acct = $stmt->get_result()->fetch_assoc();
     $stmt->close();
+    $acct = $acct ? (pii_decrypt_useraccount_row($acct) ?? $acct) : null;
 
     $email = trim((string)($acct['email'] ?? ''));
     if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
@@ -5835,6 +5849,10 @@ function dra_resident_profile_snapshot(mysqli $conn, string $residentUserId, str
         $cache[$cacheKey] = $empty;
         return $empty;
     }
+    $row = pii_decrypt_resident_row($row) ?? $row;
+    $row = pii_decrypt_useraccount_row($row) ?? $row;
+    $row = pii_decrypt_resident_address_row($row) ?? $row;
+    $row = pii_decrypt_emergency_contact_row($row) ?? $row;
 
     $birthdate = trim((string)($row['birthdate'] ?? ''));
     $age = '';
@@ -6124,7 +6142,6 @@ if ($action === 'search_manual_residents') {
         dr_respond_json(200, ['success' => true, 'items' => []]);
     }
 
-    $like = '%' . $search . '%';
     $sql = "
         SELECT
             r.resident_id,
@@ -6190,32 +6207,22 @@ if ($action === 'search_manual_residents') {
                 LIMIT 1
             )
         WHERE (s.status_name <> 'Archived' OR s.status_name IS NULL)
-          AND (
-            r.resident_id LIKE ?
-            OR r.user_id LIKE ?
-            OR r.firstname LIKE ?
-            OR r.middlename LIKE ?
-            OR r.lastname LIKE ?
-            OR CONCAT_WS(' ', r.firstname, r.middlename, r.lastname, r.suffix) LIKE ?
-            OR u.phone_number LIKE ?
-            OR a.street_number LIKE ?
-            OR a.street_name LIKE ?
-            OR a.subdivision LIKE ?
-            OR a.area_number LIKE ?
-          )
         ORDER BY r.resident_id DESC
-        LIMIT 12
+        LIMIT 200
     ";
     $stmt = $conn->prepare($sql);
     if (!$stmt) {
         dr_respond_json(500, ['success' => false, 'message' => 'Failed to prepare resident search query.']);
     }
-    $stmt->bind_param('sssssssssss', $like, $like, $like, $like, $like, $like, $like, $like, $like, $like, $like);
     $stmt->execute();
     $result = $stmt->get_result();
 
     $items = [];
     while ($row = $result->fetch_assoc()) {
+        $row = pii_decrypt_resident_row($row) ?? $row;
+        $row = pii_decrypt_useraccount_row($row) ?? $row;
+        $row = pii_decrypt_resident_address_row($row) ?? $row;
+        $row = pii_decrypt_emergency_contact_row($row) ?? $row;
         $occupationDetail = trim((string)($row['occupation_detail'] ?? ''));
         $occupation = ((int)($row['occupation'] ?? 0) === 1)
             ? ($occupationDetail !== '' ? $occupationDetail : 'Employed')
@@ -6264,6 +6271,23 @@ if ($action === 'search_manual_residents') {
         ];
     }
     $stmt->close();
+    if ($search !== '') {
+        $items = array_values(array_filter($items, static function (array $item) use ($search): bool {
+            return pii_search_match($item, [
+                'resident_id',
+                'resident_user_id',
+                'firstname',
+                'middlename',
+                'lastname',
+                'suffix',
+                'full_name',
+                'contact_number',
+                'full_address',
+                'resident_status',
+            ], $search);
+        }));
+    }
+    $items = array_slice($items, 0, 12);
 
     dr_respond_json(200, ['success' => true, 'items' => $items]);
 }
@@ -6487,20 +6511,17 @@ if ($action === 'create_manual_request') {
 
         $deleteFeesStmt = $conn->prepare("DELETE FROM clearancefeestbl WHERE clearance_id=?");
         if ($deleteFeesStmt) {
-            $deleteFeesStmt->bind_param('i', $clearanceId);
+            $deleteFeesStmt->bind_param('s', $clearanceId);
             $deleteFeesStmt->execute();
             $deleteFeesStmt->close();
         }
 
-        $insertFeeStmt = $conn->prepare("INSERT INTO clearancefeestbl (clearance_id, fee_type, amount) VALUES (?, ?, ?)");
-        if ($insertFeeStmt) {
-            foreach ($cleanFees as $feeRow) {
-                $feeName = (string)$feeRow['fee_name'];
-                $feeAmount = (float)$feeRow['amount'];
-                $insertFeeStmt->bind_param('isd', $clearanceId, $feeName, $feeAmount);
-                $insertFeeStmt->execute();
+        foreach ($cleanFees as $feeRow) {
+            $feeName = (string)$feeRow['fee_name'];
+            $feeAmount = (float)$feeRow['amount'];
+            if (!dr_insert_clearance_fee($conn, $clearanceId, $feeName, $feeAmount)) {
+                dr_respond_json(500, ['success' => false, 'message' => 'Failed to save one of the linked clearance fee records for this manual issuance request.']);
             }
-            $insertFeeStmt->close();
         }
     }
 
@@ -7360,19 +7381,16 @@ if ($action === 'personnel_approve') {
             if ($clearanceId) {
                 $deleteFeeStmt = $conn->prepare("DELETE FROM clearancefeestbl WHERE clearance_id=?");
                 if ($deleteFeeStmt) {
-                    $deleteFeeStmt->bind_param('i', $clearanceId);
+                    $deleteFeeStmt->bind_param('s', $clearanceId);
                     $deleteFeeStmt->execute();
                     $deleteFeeStmt->close();
                 }
-                $insertFeeStmt = $conn->prepare("INSERT INTO clearancefeestbl (clearance_id, fee_type, amount) VALUES (?, ?, ?)");
-                if ($insertFeeStmt) {
-                    foreach ($clearanceFeeSnapshot as $snapshotFee) {
-                        $feeName = (string)$snapshotFee['fee_name'];
-                        $feeAmount = (float)$snapshotFee['amount'];
-                        $insertFeeStmt->bind_param('isd', $clearanceId, $feeName, $feeAmount);
-                        $insertFeeStmt->execute();
+                foreach ($clearanceFeeSnapshot as $snapshotFee) {
+                    $feeName = (string)$snapshotFee['fee_name'];
+                    $feeAmount = (float)$snapshotFee['amount'];
+                    if (!dr_insert_clearance_fee($conn, $clearanceId, $feeName, $feeAmount)) {
+                        dr_respond_json(500, ['success' => false, 'message' => 'Failed to restore one of the clearance fee rows for this request.']);
                     }
-                    $insertFeeStmt->close();
                 }
             }
             $taggedFees = dr_get_clearance_fees_for_request($conn, $requestId);
@@ -8057,17 +8075,22 @@ if ($action === 'save_fee_type') {
         if (!$stmt) dr_respond_json(500, ['success' => false, 'message' => 'DB error.']);
         $stmt->bind_param('sdsi', $feeName, $defaultAmount, $status, $feeTypeId);
     } else {
+        $generatedFeeTypeId = GenerateClearanceFeeTypeID($conn);
+        if ($generatedFeeTypeId === false) {
+            dr_respond_json(500, ['success' => false, 'message' => 'Failed to generate fee type ID.']);
+        }
+        $generatedFeeTypeIdInt = (int)$generatedFeeTypeId;
         $stmt = $conn->prepare(
-            "INSERT INTO clearancefeetypetbl (fee_name, default_amount, status) VALUES (?, ?, ?)"
+            "INSERT INTO clearancefeetypetbl (fee_type_id, fee_name, default_amount, status) VALUES (?, ?, ?, ?)"
         );
         if (!$stmt) dr_respond_json(500, ['success' => false, 'message' => 'DB error.']);
-        $stmt->bind_param('sds', $feeName, $defaultAmount, $status);
+        $stmt->bind_param('isds', $generatedFeeTypeIdInt, $feeName, $defaultAmount, $status);
     }
     if (!$stmt->execute()) {
         $stmt->close();
         dr_respond_json(409, ['success' => false, 'message' => 'Fee name already exists or DB error.']);
     }
-    $newId = $feeTypeId > 0 ? $feeTypeId : (int)$conn->insert_id;
+    $newId = $feeTypeId > 0 ? $feeTypeId : $generatedFeeTypeIdInt;
     $stmt->close();
     try { insertUnifiedAuditLog($conn, $currentUserId, $currentUserRole, 'Fee Management', 'fee_type', (string)$newId, $feeTypeId > 0 ? 'Update Fee Type' : 'Add Fee Type', 'fee_name', null, $feeName, '₱' . number_format($defaultAmount, 2) . ' | ' . $status); } catch (Throwable $__e) {}
     dr_respond_json(200, ['success' => true, 'fee_type_id' => $newId]);
@@ -8106,19 +8129,24 @@ if ($action === 'submit_fee_change_request') {
     }
 
     if ($requestType === 'add_type') {
+        $generatedFeeTypeId = GenerateClearanceFeeTypeID($conn);
+        if ($generatedFeeTypeId === false) {
+            dr_respond_json(500, ['success' => false, 'message' => 'Failed to generate fee type ID.']);
+        }
+        $generatedFeeTypeIdInt = (int)$generatedFeeTypeId;
         // Insert new pending row
         $stmt = $conn->prepare(
             "INSERT INTO clearancefeetypetbl
-             (fee_name, default_amount, proposed_amount, status, change_type, notes, requested_by_user_id)
-             VALUES (?, ?, ?, 'pending', 'new_type', ?, ?)"
+             (fee_type_id, fee_name, default_amount, proposed_amount, status, change_type, notes, requested_by_user_id)
+             VALUES (?, ?, ?, ?, 'pending', 'new_type', ?, ?)"
         );
         if (!$stmt) dr_respond_json(500, ['success' => false, 'message' => 'DB error.']);
-        $stmt->bind_param('ssdss', $proposedFeeName, $proposedAmount, $proposedAmount, $notes, $userId);
+        $stmt->bind_param('isddss', $generatedFeeTypeIdInt, $proposedFeeName, $proposedAmount, $proposedAmount, $notes, $userId);
         if (!$stmt->execute()) {
             $stmt->close();
             dr_respond_json(409, ['success' => false, 'message' => 'Fee name already exists or DB error.']);
         }
-        $newFeeId = (string)$conn->insert_id;
+        $newFeeId = (string)$generatedFeeTypeIdInt;
         $stmt->close();
         try { insertUnifiedAuditLog($conn, $currentUserId, $currentUserRole, 'Fee Management', 'fee_type', $newFeeId, 'Request New Fee Type', 'fee_name', null, $proposedFeeName, '₱' . number_format($proposedAmount, 2) . ($notes ? ' | ' . $notes : '')); } catch (Throwable $__e) {}
         dr_respond_json(200, ['success' => true]);
@@ -8332,18 +8360,15 @@ if ($action === 'tag_clearance_fees') {
 
     // Replace all existing fees for this clearance
     $delStmt = $conn->prepare("DELETE FROM clearancefeestbl WHERE clearance_id=?");
-    if ($delStmt) { $delStmt->bind_param('i', $clearanceId); $delStmt->execute(); $delStmt->close(); }
+    if ($delStmt) { $delStmt->bind_param('s', $clearanceId); $delStmt->execute(); $delStmt->close(); }
 
     $total = 0.0;
     if (!empty($cleanFees)) {
-        $insStmt = $conn->prepare("INSERT INTO clearancefeestbl (clearance_id, fee_type, amount) VALUES (?, ?, ?)");
-        if ($insStmt) {
-            foreach ($cleanFees as $fee) {
-                $insStmt->bind_param('isd', $clearanceId, $fee['fee_name'], $fee['amount']);
-                $insStmt->execute();
-                $total += $fee['amount'];
+        foreach ($cleanFees as $fee) {
+            if (!dr_insert_clearance_fee($conn, $clearanceId, (string)$fee['fee_name'], (float)$fee['amount'])) {
+                dr_respond_json(500, ['success' => false, 'message' => 'Failed to save one of the tagged clearance fees.']);
             }
-            $insStmt->close();
+            $total += $fee['amount'];
         }
     }
 

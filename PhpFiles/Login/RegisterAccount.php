@@ -60,8 +60,8 @@ try {
     }
 
     // ===== Get POST Data =====
-    $PhoneNumber = trim($_POST['RPhoneNumber'] ?? '');
-    $Email       = trim($_POST['REmail'] ?? '');
+    $PhoneNumber = pii_normalize_phone10(trim($_POST['RPhoneNumber'] ?? ''));
+    $Email       = pii_normalize_email(trim($_POST['REmail'] ?? ''));
     $Password    = $_POST['RPassword'] ?? '';
 
     // ===== Validation =====
@@ -143,17 +143,22 @@ try {
     }
 
     // ===== Check Existing Phone/Email =====
-    $stmt = $conn->prepare("SELECT phone_number, email FROM useraccountstbl WHERE phone_number = ? OR email = ?");
+    $lookup = pii_prepare_useraccount_contacts($Email, $PhoneNumber);
+    $stmt = $conn->prepare("
+        SELECT phone_lookup_hash, email_lookup_hash
+        FROM useraccountstbl
+        WHERE phone_lookup_hash = ? OR email_lookup_hash = ?
+    ");
     if (!$stmt) throw new Exception("Database error: " . $conn->error);
-    $stmt->bind_param("ss", $PhoneNumber, $Email);
+    $stmt->bind_param("ss", $lookup['phone_lookup_hash'], $lookup['email_lookup_hash']);
     $stmt->execute();
     $result = $stmt->get_result();
 
     $existingPhone = false;
     $existingEmail = false;
     while ($row = $result->fetch_assoc()) {
-        if ($row['phone_number'] === $PhoneNumber) $existingPhone = true;
-        if ($row['email'] === $Email) $existingEmail = true;
+        if ((string)($row['phone_lookup_hash'] ?? '') === (string)$lookup['phone_lookup_hash']) $existingPhone = true;
+        if ((string)($row['email_lookup_hash'] ?? '') === (string)$lookup['email_lookup_hash']) $existingEmail = true;
     }
     $stmt->close();
 
@@ -189,17 +194,19 @@ try {
     // ===== Insert into useraccountstbl =====
     $stmt = $conn->prepare("
         INSERT INTO useraccountstbl
-(user_id, phone_number, phoneNum_verify, email, email_verify, password_hash, role_access, account_created, last_login, status_id_account)
-VALUES (?, ?, 1, ?, 0, ?, ?, ?, ?, ?)
+(user_id, phone_number, phone_lookup_hash, phoneNum_verify, email, email_lookup_hash, email_verify, password_hash, role_access, account_created, last_login, status_id_account)
+VALUES (?, ?, ?, 1, ?, ?, 0, ?, ?, ?, ?, ?)
 
     ");
     if (!$stmt) throw new Exception("Database error: " . $conn->error);
 
     $stmt->bind_param(
-        "sssssssi",
+        "sssssssssi",
         $UserID,
-        $PhoneNumber,
-        $Email,
+        $lookup['phone_number'],
+        $lookup['phone_lookup_hash'],
+        $lookup['email'],
+        $lookup['email_lookup_hash'],
         $PasswordHash,
         $RoleAccess,
         $AccountCreated,

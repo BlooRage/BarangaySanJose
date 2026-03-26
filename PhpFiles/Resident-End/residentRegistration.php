@@ -770,25 +770,39 @@ try {
     ");
     if (!$stmt) throw new Exception("Prepare failed (resident insert): " . $conn->error);
 
+    $residentEncrypted = pii_encrypt_field_map([
+        'lastname' => $lastName,
+        'firstname' => $firstName,
+        'middlename' => $middleName,
+        'suffix' => $suffix,
+        'birthdate' => $dob,
+        'birthplace' => $birthplace,
+        'baranagayresidency' => $barangayResidencyMonthYear,
+        'civil_status' => $civil,
+        'family_role' => $familyRole,
+        'occupation_detail' => $occupationDetail,
+        'religion' => $religion,
+    ]);
+
     $stmt->bind_param(
         "ssssssssssssiiisssii",
         $resident_id,
         $user_id,
-        $lastName,
-        $firstName,
-        $middleName,
-        $suffix,
+        $residentEncrypted['lastname'],
+        $residentEncrypted['firstname'],
+        $residentEncrypted['middlename'],
+        $residentEncrypted['suffix'],
         $sex,
-        $dob,
-        $birthplace,
-        $barangayResidencyMonthYear,
-        $civil,
-        $familyRole,
+        $residentEncrypted['birthdate'],
+        $residentEncrypted['birthplace'],
+        $residentEncrypted['baranagayresidency'],
+        $residentEncrypted['civil_status'],
+        $residentEncrypted['family_role'],
         $isHead,
         $voter,
         $occupation,
-        $occupationDetail,
-        $religion,
+        $residentEncrypted['occupation_detail'],
+        $residentEncrypted['religion'],
         $sector,
         $privacy,
         $residentStatusId
@@ -805,19 +819,30 @@ try {
     ");
     if (!$stmt2) throw new Exception("Prepare failed (address insert): " . $conn->error);
 
+    $addressEncrypted = pii_encrypt_field_map([
+        'unit_number' => $unitNumber,
+        'street_number' => $houseNumber,
+        'street_name' => $streetName,
+        'phase_number' => $phaseNumber,
+        'subdivision' => $subd,
+        'house_type' => $houseType,
+        'house_ownership' => $ownership,
+        'residency_duration' => $duration,
+    ]);
+
     $stmt2->bind_param(
         "sssssssssssi",
         $addressId,
         $resident_id,
-        $unitNumber,
-        $houseNumber,
-        $streetName,
-        $phaseNumber,
-        $subd,
+        $addressEncrypted['unit_number'],
+        $addressEncrypted['street_number'],
+        $addressEncrypted['street_name'],
+        $addressEncrypted['phase_number'],
+        $addressEncrypted['subdivision'],
         $area,
-        $houseType,
-        $ownership,
-        $duration,
+        $addressEncrypted['house_type'],
+        $addressEncrypted['house_ownership'],
+        $addressEncrypted['residency_duration'],
         $addressStatusId
     );
 
@@ -953,32 +978,22 @@ try {
 
             $docTypeId = getDocumentTypeId($conn, $idType);
             $remarks = "idSingle";
-            $ins = $conn->prepare("
-                INSERT INTO unifiedfileattachmenttbl
-                (source_type, source_id, document_type_id, file_name, file_path, file_type, user_id_uploaded_by, status_id_verify, remarks, id_number)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            ");
-            if (!$ins) throw new Exception("Prepare failed (insert passport): " . $conn->error);
             $idNumber = $uploadedIdNumber;
-            $ins->bind_param(
-                "ssissssiss",
-                $sourceType,
-                $resident_id,
-                $docTypeId,
-                $moved['file_name'],
-                $moved['file_path'],
-                $ext,
-                $user_id,
-                $statusVerifyId,
-                $remarks,
-                $idNumber
-            );
-            if (!$ins->execute()) throw new Exception("Passport attachment insert failed: " . $ins->error);
-            $newAttachmentId = (int)$ins->insert_id;
+            $newAttachmentId = insertUnifiedFileAttachment($conn, [
+                'source_type' => $sourceType,
+                'source_id' => $resident_id,
+                'document_type_id' => $docTypeId,
+                'file_name' => $moved['file_name'],
+                'file_path' => $moved['file_path'],
+                'file_type' => $ext,
+                'user_id_uploaded_by' => $user_id,
+                'status_id_verify' => $statusVerifyId,
+                'remarks' => $remarks,
+                'id_number' => $idNumber,
+            ], 'passport attachment');
             if ($newAttachmentId > 0) {
                 $proofAttachmentIds[] = $newAttachmentId;
             }
-            $ins->close();
         } else {
             // Standard ID: requires front + back and stores a merged PDF.
             $savedIdFiles = [];
@@ -1038,31 +1053,21 @@ try {
             $remarks = "idMerged";
             $fileType = "pdf";
             $mergedPathDb = toDbWebPath($mergedPath);
-            $ins = $conn->prepare("
-                INSERT INTO unifiedfileattachmenttbl
-                (source_type, source_id, document_type_id, file_name, file_path, file_type, user_id_uploaded_by, status_id_verify, remarks, id_number)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            ");
-            if (!$ins) throw new Exception("Prepare failed (insert merged ID): " . $conn->error);
-            $ins->bind_param(
-                "ssissssiss",
-                $sourceType,
-                $resident_id,
-                $docTypeId,
-                $mergedFileName,
-                $mergedPathDb,
-                $fileType,
-                $user_id,
-                $statusVerifyId,
-                $remarks,
-                $uploadedIdNumber
-            );
-            if (!$ins->execute()) throw new Exception("Merged ID attachment insert failed: " . $ins->error);
-            $newAttachmentId = (int)$ins->insert_id;
+            $newAttachmentId = insertUnifiedFileAttachment($conn, [
+                'source_type' => $sourceType,
+                'source_id' => $resident_id,
+                'document_type_id' => $docTypeId,
+                'file_name' => $mergedFileName,
+                'file_path' => $mergedPathDb,
+                'file_type' => $fileType,
+                'user_id_uploaded_by' => $user_id,
+                'status_id_verify' => $statusVerifyId,
+                'remarks' => $remarks,
+                'id_number' => $uploadedIdNumber,
+            ], 'merged ID attachment');
             if ($newAttachmentId > 0) {
                 $proofAttachmentIds[] = $newAttachmentId;
             }
-            $ins->close();
         }
     }
 
@@ -1083,31 +1088,21 @@ try {
         $docTypeId = getDocumentTypeId($conn, "2x2 Picture");
         $remarks = "2x2";
         $idNumber = null;
-        $ins = $conn->prepare("
-            INSERT INTO unifiedfileattachmenttbl
-            (source_type, source_id, document_type_id, file_name, file_path, file_type, user_id_uploaded_by, status_id_verify, remarks, id_number)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        ");
-        if (!$ins) throw new Exception("Prepare failed (insert 2x2): " . $conn->error);
-        $ins->bind_param(
-            "ssissssiss",
-            $sourceType,
-            $resident_id,
-            $docTypeId,
-            $moved['file_name'],
-            $moved['file_path'],
-            $ext,
-            $user_id,
-            $statusVerifyId,
-            $remarks,
-            $idNumber
-        );
-        if (!$ins->execute()) throw new Exception("2x2 attachment insert failed: " . $ins->error);
-        $newAttachmentId = (int)$ins->insert_id;
+        $newAttachmentId = insertUnifiedFileAttachment($conn, [
+            'source_type' => $sourceType,
+            'source_id' => $resident_id,
+            'document_type_id' => $docTypeId,
+            'file_name' => $moved['file_name'],
+            'file_path' => $moved['file_path'],
+            'file_type' => $ext,
+            'user_id_uploaded_by' => $user_id,
+            'status_id_verify' => $statusVerifyId,
+            'remarks' => $remarks,
+            'id_number' => $idNumber,
+        ], '2x2 attachment');
         if ($newAttachmentId > 0) {
             $proofAttachmentIds[] = $newAttachmentId;
         }
-        $ins->close();
     }
 
     if ($hasDocumentProof) {
@@ -1134,31 +1129,21 @@ try {
             $moved = moveUploadedFileWithDocName($tmpName, $uploadDirDocs, $documentType, $user_id, $ext);
             $remarks = "document";
             $idNumber = null;
-            $ins = $conn->prepare("
-                INSERT INTO unifiedfileattachmenttbl
-                (source_type, source_id, document_type_id, file_name, file_path, file_type, user_id_uploaded_by, status_id_verify, remarks, id_number)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            ");
-            if (!$ins) throw new Exception("Prepare failed (insert document): " . $conn->error);
-            $ins->bind_param(
-                "ssissssiss",
-                $sourceType,
-                $resident_id,
-                $docTypeId,
-                $moved['file_name'],
-                $moved['file_path'],
-                $ext,
-                $user_id,
-                $statusVerifyId,
-                $remarks,
-                $idNumber
-            );
-            if (!$ins->execute()) throw new Exception("Document attachment insert failed: " . $ins->error);
-            $newAttachmentId = (int)$ins->insert_id;
+            $newAttachmentId = insertUnifiedFileAttachment($conn, [
+                'source_type' => $sourceType,
+                'source_id' => $resident_id,
+                'document_type_id' => $docTypeId,
+                'file_name' => $moved['file_name'],
+                'file_path' => $moved['file_path'],
+                'file_type' => $ext,
+                'user_id_uploaded_by' => $user_id,
+                'status_id_verify' => $statusVerifyId,
+                'remarks' => $remarks,
+                'id_number' => $idNumber,
+            ], 'document attachment');
             if ($newAttachmentId > 0) {
                 $proofAttachmentIds[] = $newAttachmentId;
             }
-            $ins->close();
         }
     }
 
@@ -1321,28 +1306,18 @@ try {
 	            $fileType = "pdf";
 	            $mergedPathDb = toDbWebPath($mergedPath);
 	            $idNumber = null;
-	            $ins = $conn->prepare("
-	                INSERT INTO unifiedfileattachmenttbl
-	                (source_type, source_id, document_type_id, file_name, file_path, file_type, user_id_uploaded_by, status_id_verify, remarks, id_number)
-	                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-	            ");
-	            if (!$ins) throw new Exception("Prepare failed (insert merged sector ID): " . $conn->error);
-	            $ins->bind_param(
-	                "ssissssiss",
-	                $sourceType,
-	                $resident_id,
-	                $docTypeId,
-	                $mergedFileName,
-	                $mergedPathDb,
-	                $fileType,
-	                $user_id,
-	                $statusVerifyId,
-	                $remarks,
-	                $idNumber
-	            );
-	            if (!$ins->execute()) throw new Exception("Merged sector ID attachment insert failed: " . $ins->error);
-	            $newAttachmentId = (int)$ins->insert_id;
-	            $ins->close();
+	            $newAttachmentId = insertUnifiedFileAttachment($conn, [
+	                'source_type' => $sourceType,
+	                'source_id' => $resident_id,
+	                'document_type_id' => $docTypeId,
+	                'file_name' => $mergedFileName,
+	                'file_path' => $mergedPathDb,
+	                'file_type' => $fileType,
+	                'user_id_uploaded_by' => $user_id,
+	                'status_id_verify' => $statusVerifyId,
+	                'remarks' => $remarks,
+	                'id_number' => $idNumber,
+	            ], 'merged sector ID attachment');
 
             if ($newAttachmentId > 0) {
                 $sectorAttachmentIds[] = $newAttachmentId;
@@ -1382,28 +1357,18 @@ try {
 	            $moved = moveUploadedFileWithDocName($tmpName, $uploadDirDocs, $docTypeValue, $user_id, $ext);
 	            $remarks = "sector:" . $sectorKey;
 	            $idNumber = null;
-	            $ins = $conn->prepare("
-	                INSERT INTO unifiedfileattachmenttbl
-	                (source_type, source_id, document_type_id, file_name, file_path, file_type, user_id_uploaded_by, status_id_verify, remarks, id_number)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            ");
-            if (!$ins) throw new Exception("Prepare failed (insert sector document): " . $conn->error);
-            $ins->bind_param(
-                "ssissssiss",
-                $sourceType,
-                $resident_id,
-                $docTypeId,
-                $moved['file_name'],
-                $moved['file_path'],
-                $ext,
-                $user_id,
-                $statusVerifyId,
-                $remarks,
-                $idNumber
-            );
-            if (!$ins->execute()) throw new Exception("Sector document attachment insert failed: " . $ins->error);
-            $newAttachmentId = (int)$ins->insert_id;
-            $ins->close();
+	            $newAttachmentId = insertUnifiedFileAttachment($conn, [
+	                'source_type' => $sourceType,
+	                'source_id' => $resident_id,
+	                'document_type_id' => $docTypeId,
+	                'file_name' => $moved['file_name'],
+	                'file_path' => $moved['file_path'],
+	                'file_type' => $ext,
+	                'user_id_uploaded_by' => $user_id,
+	                'status_id_verify' => $statusVerifyId,
+	                'remarks' => $remarks,
+	                'id_number' => $idNumber,
+	            ], 'sector document attachment');
 
             if ($newAttachmentId > 0) {
                 $sectorAttachmentIds[] = $newAttachmentId;
@@ -1514,26 +1479,9 @@ try {
         }
     }
 
-    $stmtE = $conn->prepare("
-      INSERT INTO emergencycontacttbl
-      (user_id, last_name, first_name, middle_name, suffix, phone_number, relationship, address)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-      ON DUPLICATE KEY UPDATE
-        last_name=VALUES(last_name),
-        first_name=VALUES(first_name),
-        middle_name=VALUES(middle_name),
-        suffix=VALUES(suffix),
-        phone_number=VALUES(phone_number),
-        relationship=VALUES(relationship),
-        address=VALUES(address),
-        updated_at=CURRENT_TIMESTAMP
-    ");
-    if (!$stmtE) throw new Exception('Prepare failed (emergency upsert): ' . $conn->error);
-
-    $stmtE->bind_param("ssssssss", $user_id, $eLast, $eFirst, $eMid, $eSuffix, $ePhone, $eRel, $eAddr);
-
-    if (!$stmtE->execute()) throw new Exception("Emergency contact save failed: " . $stmtE->error);
-    $stmtE->close();
+    if (UpsertEmergencyContactRecord($conn, $user_id, $eLast, $eFirst, $eMid, $eSuffix, $ePhone, $eRel, $eAddr) === false) {
+        throw new Exception('Emergency contact save failed.');
+    }
 
     $uploadedAnyProof = $hasIdProof || $hasDocumentProof || $hasPicture || $hasAnySectorProof;
     $finalResidentStatusId = $uploadedAnyProof

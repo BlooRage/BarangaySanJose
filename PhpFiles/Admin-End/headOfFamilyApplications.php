@@ -2,6 +2,7 @@
 session_start();
 require_once "../General/connection.php";
 require_once "../General/security.php";
+require_once "../General/uniqueIDGenerate.php";
 
 requireRoleSession(['SuperAdmin', 'Official', 'Officials', 'Personnel', 'Personnels', 'Admin', 'Employee']);
 
@@ -157,7 +158,7 @@ function hof_build_address_display(array $row): string {
 function ensure_head_verification_table(mysqli $conn): void {
     $sql = "
         CREATE TABLE IF NOT EXISTS householdheadverificationtbl (
-            verification_id INT AUTO_INCREMENT PRIMARY KEY,
+            verification_id INT NOT NULL PRIMARY KEY,
             group_key VARCHAR(255) NOT NULL,
             address_id VARCHAR(100) DEFAULT NULL,
             address_display VARCHAR(255) DEFAULT NULL,
@@ -172,6 +173,7 @@ function ensure_head_verification_table(mysqli $conn): void {
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
     ";
     $conn->query($sql);
+    idg_ensure_numeric_generated_key($conn, 'householdheadverificationtbl', 'verification_id', 'INT NOT NULL');
 }
 
 function fetch_head_rows(mysqli $conn): array {
@@ -269,11 +271,16 @@ function upsert_decision(
     ?string $decidedByUserId
 ): void {
     ensure_head_verification_table($conn);
+    $verificationId = GenerateHouseholdHeadVerificationID($conn);
+    if ($verificationId === false) {
+        throw new Exception('Failed to generate household verification ID.');
+    }
+    $verificationIdInt = (int)$verificationId;
     $sql = "
         INSERT INTO householdheadverificationtbl
-            (group_key, address_id, address_display, area_number, selected_resident_id, decision_status, remarks, decided_by_user_id, decided_at)
+            (verification_id, group_key, address_id, address_display, area_number, selected_resident_id, decision_status, remarks, decided_by_user_id, decided_at)
         VALUES
-            (?, ?, ?, ?, ?, ?, ?, ?, NOW())
+            (?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())
         ON DUPLICATE KEY UPDATE
             address_id = VALUES(address_id),
             address_display = VALUES(address_display),
@@ -286,7 +293,7 @@ function upsert_decision(
     ";
     $stmt = $conn->prepare($sql);
     if (!$stmt) throw new Exception('Failed to save decision.');
-    $stmt->bind_param("ssssssss", $groupKey, $addressId, $addressDisplay, $areaNumber, $selectedResidentId, $decisionStatus, $remarks, $decidedByUserId);
+    $stmt->bind_param("issssssss", $verificationIdInt, $groupKey, $addressId, $addressDisplay, $areaNumber, $selectedResidentId, $decisionStatus, $remarks, $decidedByUserId);
     if (!$stmt->execute()) {
         $stmt->close();
         throw new Exception('Failed to save decision.');

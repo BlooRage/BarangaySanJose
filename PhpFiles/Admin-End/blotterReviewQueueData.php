@@ -2,10 +2,12 @@
 session_start();
 
 require_once "../General/connection.php";
+require_once "../General/caseUserAccountForeignKeys.php";
 require_once "../General/security.php";
 require_once "../General/uniqueIDGenerate.php";
 
 requireRoleSession(['SuperAdmin', 'Official', 'Officials', 'Personnel', 'Personnels', 'Admin', 'Employee']);
+cuafk_ensure_case_useraccount_foreign_keys($conn);
 
 header('Content-Type: application/json; charset=utf-8');
 

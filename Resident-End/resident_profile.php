@@ -3,6 +3,7 @@ $allowUnregistered = false;
 require_once __DIR__ . "/includes/resident_access_guard.php";
 require_once "../PhpFiles/GET/getResidentProfile.php";
 require_once "../PhpFiles/General/uploadLimits.php";
+require_once "../PhpFiles/General/uniqueIDGenerate.php";
 
 $data = getResidentProfileData($conn, $_SESSION['user_id']);
 $residentinformationtbl = $data['residentinformationtbl'] ?? [];
@@ -242,19 +243,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && (string)($_POST['action'] ?? '') ==
         if ($statusIdVerify === null) throw new RuntimeException('Document verification status is missing.');
 
         $changesJson = json_encode(['profile_image' => '2x2 Picture'], JSON_UNESCAPED_SLASHES);
-        $reqIns = $conn->prepare("
-            INSERT INTO resident_edit_requesttbl
-                (resident_id, user_id, request_type, status_id, requested_changes)
-            VALUES (?, ?, 'profile', ?, ?)
-        ");
-        if (!$reqIns) throw new RuntimeException('Failed to create edit request.');
-        $reqIns->bind_param("ssis", $residentId, $userId, $pendingRequestStatusId, $changesJson);
-        if (!$reqIns->execute()) {
-            $reqIns->close();
-            throw new RuntimeException('Failed to create edit request.');
-        }
-        $requestId = (int)$reqIns->insert_id;
-        $reqIns->close();
+        $requestId = insertResidentEditRequest(
+            $conn,
+            (string)$residentId,
+            (string)$userId,
+            'profile',
+            (int)$pendingRequestStatusId,
+            $changesJson
+        );
         if ($requestId <= 0) throw new RuntimeException('Failed to create edit request.');
 
         $docTypeId = getDocumentTypeIdByCategory($conn, '2x2 Picture', 'EditRequest');
@@ -263,31 +259,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && (string)($_POST['action'] ?? '') ==
         $remarks = 'edit_request_profile_image';
         $idNumber = null;
         $filePathDb = toDbWebPath($target);
-        $ins = $conn->prepare("
-            INSERT INTO unifiedfileattachmenttbl
-                (source_type, source_id, document_type_id, file_name, file_path, file_type, user_id_uploaded_by, status_id_verify, remarks, id_number)
-            VALUES
-                (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        ");
-        if (!$ins) throw new RuntimeException('Failed to save uploaded image.');
-        $ins->bind_param(
-            "ssissssiss",
-            $sourceType,
-            $sourceId,
-            $docTypeId,
-            $fileName,
-            $filePathDb,
-            $ext,
-            $userId,
-            $statusIdVerify,
-            $remarks,
-            $idNumber
-        );
-        if (!$ins->execute()) {
-            $ins->close();
-            throw new RuntimeException('Failed to save uploaded image.');
-        }
-        $ins->close();
+        insertUnifiedFileAttachment($conn, [
+            'source_type' => $sourceType,
+            'source_id' => $sourceId,
+            'document_type_id' => $docTypeId,
+            'file_name' => $fileName,
+            'file_path' => $filePathDb,
+            'file_type' => $ext,
+            'user_id_uploaded_by' => $userId,
+            'status_id_verify' => $statusIdVerify,
+            'remarks' => $remarks,
+            'id_number' => $idNumber,
+        ], 'uploaded image');
         rp_set_image_flash('success', 'Profile image change request submitted for review.');
     } catch (Throwable $e) {
         rp_set_image_flash('danger', $e->getMessage());

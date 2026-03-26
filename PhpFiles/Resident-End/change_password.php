@@ -125,12 +125,7 @@ try {
     $conn->begin_transaction();
 
     // Save old hash to history if possible.
-    $insHistory = $conn->prepare("INSERT INTO userpasswordhistorytbl (user_id, old_pw_hash) VALUES (?, ?)");
-    if ($insHistory) {
-        $insHistory->bind_param('ss', $userId, $currentHash);
-        $insHistory->execute();
-        $insHistory->close();
-    }
+    insertPasswordHistoryEntry($conn, $userId, (string)$currentHash);
 
     $newHash = password_hash($newPassword, PASSWORD_DEFAULT);
     $up = $conn->prepare("UPDATE useraccountstbl SET password_hash = ?, last_password_changed = NOW() WHERE user_id = ?");

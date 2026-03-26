@@ -54,7 +54,7 @@ function dr_ensure_request_support_tables(mysqli $conn): void {
 
     $conn->query("
         CREATE TABLE IF NOT EXISTS unifiedfileattachmenttbl (
-            attachment_id BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT,
+            attachment_id BIGINT(20) UNSIGNED NOT NULL,
             source_type VARCHAR(50) NOT NULL,
             source_id VARCHAR(12) NOT NULL,
             document_type_id INT(11) NOT NULL,
@@ -79,6 +79,8 @@ function dr_ensure_request_support_tables(mysqli $conn): void {
             CONSTRAINT fk_ufa_verify_status FOREIGN KEY (status_id_verify) REFERENCES statuslookuptbl (status_id)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
     ");
+
+    idg_ensure_numeric_generated_key($conn, 'unifiedfileattachmenttbl', 'attachment_id', 'BIGINT(20) UNSIGNED NOT NULL');
 }
 
 function dr_submit_bootstrap_needed(mysqli $conn): bool {
@@ -639,6 +641,7 @@ function dr_fetch_resident_birth_snapshot(mysqli $conn, string $residentId, stri
     $stmt->execute();
     $row = $stmt->get_result()->fetch_assoc();
     $stmt->close();
+    $row = pii_decrypt_resident_row($row) ?? $row;
 
     return [
         'birthdate' => trim((string)($row['birthdate'] ?? '')),
@@ -673,6 +676,8 @@ function dr_fetch_resident_barangay_id_snapshot(mysqli $conn, string $residentId
     $stmt->execute();
     $row = $stmt->get_result()->fetch_assoc();
     $stmt->close();
+    $row = pii_decrypt_resident_row($row) ?? $row;
+    $row = pii_decrypt_assoc($row, ['emergency_address']);
 
     return [
         'birthdate' => trim((string)($row['birthdate'] ?? '')),
@@ -975,34 +980,23 @@ function dr_create_request_attachment(
     $idNumber = null;
     $sourceType = 'DocumentRequest';
     $sourceId = $residentId;
-    $stmt = $conn->prepare("
-        INSERT INTO unifiedfileattachmenttbl
-        (source_type, source_id, document_type_id, file_name, file_path, file_type, user_id_uploaded_by, status_id_verify, remarks, id_number)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    ");
-    if (!$stmt) {
-        error_log('[documentRequestWorkflow][attachment] prepare failed: ' . $conn->error);
-        return null;
+    try {
+        $insertId = insertUnifiedFileAttachment($conn, [
+            'source_type' => $sourceType,
+            'source_id' => $sourceId,
+            'document_type_id' => $docTypeId,
+            'file_name' => $fileName,
+            'file_path' => $webPath,
+            'file_type' => $fileType,
+            'user_id_uploaded_by' => $userId,
+            'status_id_verify' => $statusId,
+            'remarks' => $remarks,
+            'id_number' => $idNumber,
+        ], 'document request payload');
+    } catch (Throwable $e) {
+        error_log('[documentRequestWorkflow][attachment] insert failed: ' . $e->getMessage());
+        $insertId = 0;
     }
-    $stmt->bind_param(
-        'ssissssiss',
-        $sourceType,
-        $sourceId,
-        $docTypeId,
-        $fileName,
-        $webPath,
-        $fileType,
-        $userId,
-        $statusId,
-        $remarks,
-        $idNumber
-    );
-    $ok = $stmt->execute();
-    $insertId = $ok ? (int)$stmt->insert_id : 0;
-    if (!$ok) {
-        error_log('[documentRequestWorkflow][attachment] insert failed: ' . $stmt->error);
-    }
-    $stmt->close();
 
     if ($insertId <= 0 && file_exists($diskPath)) {
         @unlink($diskPath);
@@ -1334,6 +1328,49 @@ if ($action === 'submit_request') {
             dr_respond_json(422, ['success' => false, 'message' => 'Please indicate whether the vehicle is named after the owner.']);
         }
         $_POST['vehicle_named_to_owner'] = $vehicleNamedToOwner;
+
+        $tricycleFieldRules = [
+            'plate_number' => [
+                'required' => 'Plate number is required.',
+                'invalid' => 'Plate number must be up to 7 letters and numbers.',
+                'pattern' => '/^[A-Za-z0-9]{1,7}$/',
+            ],
+            'body_number' => [
+                'required' => 'Body number is required.',
+                'invalid' => 'Body number must be up to 8 letters and numbers.',
+                'pattern' => '/^[A-Za-z0-9]{1,8}$/',
+            ],
+            'chassis_number' => [
+                'required' => 'Chassis number is required.',
+                'invalid' => 'Chassis number must follow the format XXXX-XXXXXXXXXXX.',
+                'pattern' => '/^[A-Za-z0-9]{4}-[A-Za-z0-9]{11}$/',
+            ],
+            'motor_number' => [
+                'required' => 'Motor number is required.',
+                'invalid' => 'Motor number must be up to 20 letters and numbers.',
+                'pattern' => '/^[A-Za-z0-9]{1,20}$/',
+            ],
+            'or_number' => [
+                'required' => 'O.R. number is required.',
+                'invalid' => 'O.R. number must be up to 20 letters and numbers.',
+                'pattern' => '/^[A-Za-z0-9]{1,20}$/',
+            ],
+            'cr_number' => [
+                'required' => 'C.R. number is required.',
+                'invalid' => 'C.R. number must be up to 20 letters and numbers.',
+                'pattern' => '/^[A-Za-z0-9]{1,20}$/',
+            ],
+        ];
+        foreach ($tricycleFieldRules as $field => $rule) {
+            $value = strtoupper(trim((string)($_POST[$field] ?? '')));
+            if ($value === '') {
+                dr_respond_json(422, ['success' => false, 'message' => (string)$rule['required']]);
+            }
+            if (!preg_match((string)$rule['pattern'], $value)) {
+                dr_respond_json(422, ['success' => false, 'message' => (string)$rule['invalid']]);
+            }
+            $_POST[$field] = $value;
+        }
 
         $saveOptionalTricycleUpload = static function (string $field, string $folder, string $message) {
             $errorCode = (int)(($_FILES[$field]['error'] ?? UPLOAD_ERR_NO_FILE));
@@ -2411,10 +2448,15 @@ if ($action === 'download_invoice') {
         exit('Invoice file not found.');
     }
 
+    $disposition = strtolower(trim((string)($_GET['disposition'] ?? 'attachment')));
+    $contentDisposition = in_array($disposition, ['inline', 'view', 'open'], true)
+        ? 'inline'
+        : 'attachment';
+
     $safeId   = preg_replace('/[^A-Za-z0-9_-]/', '', $requestId);
-    $filename = 'Invoice_' . $safeId . '.pdf';
+    $filename = 'Official_Receipt_' . $safeId . '.pdf';
     header('Content-Type: application/pdf');
-    header('Content-Disposition: attachment; filename="' . $filename . '"');
+    header('Content-Disposition: ' . $contentDisposition . '; filename="' . $filename . '"');
     header('Content-Length: ' . filesize($absolute));
     readfile($absolute);
     exit;

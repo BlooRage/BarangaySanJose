@@ -1,6 +1,8 @@
 <?php
 declare(strict_types=1);
 
+require_once __DIR__ . '/uniqueIDGenerate.php';
+
 /**
  * Shared admin-module permission catalog and helpers.
  *
@@ -47,8 +49,8 @@ if (!function_exists('amp_get_permission_catalog')) {
                         'children' => [
                             [
                                 'key' => 'resident_masterlist',
-                                'label' => 'Masterlist',
-                                'path' => 'Admin-End/ResidentMasterlist.php',
+                                'label' => 'Resident Tracker',
+                                'path' => 'Admin-End/ResidentTracker.php',
                             ],
                             [
                                 'key' => 'resident_edit_requests',
@@ -185,9 +187,9 @@ if (!function_exists('amp_get_permission_catalog')) {
                                 'path' => 'Admin-End/Certificates/FinancePayments.php',
                             ],
                             [
-                                'key' => 'finance_cashbook',
-                                'label' => 'Cashbook',
-                                'path' => 'Admin-End/Certificates/FinancePayments.php?section=cashbook',
+                                'key' => 'finance_create_transaction',
+                                'label' => 'Create Transaction',
+                                'path' => 'Admin-End/Certificates/FinancePayments.php?section=create',
                             ],
                             [
                                 'key' => 'finance_fee_management',
@@ -512,9 +514,80 @@ if (!function_exists('amp_storage_role_for_admin_display')) {
             'barangay police',
             'desk officer',
             'area oic',
+            'barangay treasurer',
         ];
 
         return in_array($position, $personnelPositions, true) ? 'Personnel' : 'Official';
+    }
+}
+
+if (!function_exists('amp_get_personnel_position_labels')) {
+    function amp_get_personnel_position_labels(): array
+    {
+        return [
+            'Department Public Assistance Desk',
+            'Department Secretary',
+            'Department OIC (Officer In Charge)',
+            'Barangay Police',
+            'Desk Officer',
+            'Area OIC',
+            'Barangay Treasurer',
+        ];
+    }
+}
+
+if (!function_exists('amp_is_personnel_position')) {
+    function amp_is_personnel_position(string $positionAccess): bool
+    {
+        $normalized = strtolower(trim($positionAccess));
+        if ($normalized === '') {
+            return false;
+        }
+
+        foreach (amp_get_personnel_position_labels() as $label) {
+            if ($normalized === strtolower(trim($label))) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+}
+
+if (!function_exists('amp_row_uses_personnel_role_profile')) {
+    function amp_row_uses_personnel_role_profile(array $row): bool
+    {
+        $role = amp_normalize_storage_role((string)($row['account_role_access'] ?? $row['info_role_access'] ?? ''));
+        if ($role === 'SuperAdmin') {
+            return false;
+        }
+
+        $positionAccess = trim((string)($row['position_access'] ?? ''));
+        return $role === 'Personnel' || amp_is_personnel_position($positionAccess);
+    }
+}
+
+if (!function_exists('amp_normalize_profile_scope_value')) {
+    function amp_normalize_profile_scope_value(string $value): string
+    {
+        $value = str_replace(["\r", "\n", "\t"], ' ', $value);
+        $value = preg_replace('/\s+/', ' ', $value) ?? $value;
+        return strtolower(trim($value));
+    }
+}
+
+if (!function_exists('amp_get_personnel_role_profile_scope')) {
+    function amp_get_personnel_role_profile_scope(string $department, string $positionAccess): array
+    {
+        $departmentLabel = trim((string)(preg_replace('/\s+/', ' ', str_replace(["\r", "\n", "\t"], ' ', $department)) ?? $department));
+        $positionLabel = trim((string)(preg_replace('/\s+/', ' ', str_replace(["\r", "\n", "\t"], ' ', $positionAccess)) ?? $positionAccess));
+
+        return [
+            'department_key' => amp_normalize_profile_scope_value($departmentLabel),
+            'position_key' => amp_normalize_profile_scope_value($positionLabel),
+            'department_label' => $departmentLabel,
+            'position_label' => $positionLabel,
+        ];
     }
 }
 
@@ -562,7 +635,7 @@ if (!function_exists('amp_ensure_permission_storage')) {
 
         $conn->query("
             CREATE TABLE IF NOT EXISTS officialmodulepermissionstbl (
-                permission_id INT NOT NULL AUTO_INCREMENT,
+                permission_id INT NOT NULL,
                 official_id VARCHAR(20) NOT NULL,
                 user_id VARCHAR(20) DEFAULT NULL,
                 permission_key VARCHAR(120) NOT NULL,
@@ -580,7 +653,7 @@ if (!function_exists('amp_ensure_permission_storage')) {
 
         $conn->query("
             CREATE TABLE IF NOT EXISTS officialaccessprofiletbl (
-                access_profile_id INT NOT NULL AUTO_INCREMENT,
+                access_profile_id INT NOT NULL,
                 official_id VARCHAR(20) NOT NULL,
                 user_id VARCHAR(20) DEFAULT NULL,
                 permissions_initialized TINYINT(1) NOT NULL DEFAULT 0,
@@ -594,7 +667,7 @@ if (!function_exists('amp_ensure_permission_storage')) {
 
         $conn->query("
             CREATE TABLE IF NOT EXISTS officialseatmodulepermissionstbl (
-                seat_permission_id INT NOT NULL AUTO_INCREMENT,
+                seat_permission_id INT NOT NULL,
                 council_id INT NOT NULL,
                 permission_key VARCHAR(120) NOT NULL,
                 is_allowed TINYINT(1) NOT NULL DEFAULT 1,
@@ -610,7 +683,7 @@ if (!function_exists('amp_ensure_permission_storage')) {
 
         $conn->query("
             CREATE TABLE IF NOT EXISTS officialseataccessprofiletbl (
-                seat_access_profile_id INT NOT NULL AUTO_INCREMENT,
+                seat_access_profile_id INT NOT NULL,
                 council_id INT NOT NULL,
                 permissions_initialized TINYINT(1) NOT NULL DEFAULT 0,
                 created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -619,6 +692,48 @@ if (!function_exists('amp_ensure_permission_storage')) {
                 UNIQUE KEY uniq_seat_access_profile_council (council_id)
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
         ");
+
+        $conn->query("
+            CREATE TABLE IF NOT EXISTS personnelrolemodulepermissionstbl (
+                role_permission_id INT NOT NULL,
+                department_key VARCHAR(160) NOT NULL DEFAULT '',
+                position_key VARCHAR(160) NOT NULL DEFAULT '',
+                department_label VARCHAR(160) DEFAULT NULL,
+                position_label VARCHAR(160) DEFAULT NULL,
+                permission_key VARCHAR(120) NOT NULL,
+                is_allowed TINYINT(1) NOT NULL DEFAULT 1,
+                granted_by_user_id VARCHAR(20) DEFAULT NULL,
+                created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                PRIMARY KEY (role_permission_id),
+                UNIQUE KEY uniq_personnel_role_permission (department_key, position_key, permission_key),
+                KEY idx_personnel_role_scope (department_key, position_key),
+                KEY idx_personnel_role_permission_key (permission_key),
+                KEY idx_personnel_role_allowed (is_allowed)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
+        ");
+
+        $conn->query("
+            CREATE TABLE IF NOT EXISTS personnelroleaccessprofiletbl (
+                role_access_profile_id INT NOT NULL,
+                department_key VARCHAR(160) NOT NULL DEFAULT '',
+                position_key VARCHAR(160) NOT NULL DEFAULT '',
+                department_label VARCHAR(160) DEFAULT NULL,
+                position_label VARCHAR(160) DEFAULT NULL,
+                permissions_initialized TINYINT(1) NOT NULL DEFAULT 0,
+                created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                PRIMARY KEY (role_access_profile_id),
+                UNIQUE KEY uniq_personnel_role_profile (department_key, position_key)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
+        ");
+
+        idg_ensure_numeric_generated_key($conn, 'officialmodulepermissionstbl', 'permission_id', 'INT NOT NULL');
+        idg_ensure_numeric_generated_key($conn, 'officialaccessprofiletbl', 'access_profile_id', 'INT NOT NULL');
+        idg_ensure_numeric_generated_key($conn, 'officialseatmodulepermissionstbl', 'seat_permission_id', 'INT NOT NULL');
+        idg_ensure_numeric_generated_key($conn, 'officialseataccessprofiletbl', 'seat_access_profile_id', 'INT NOT NULL');
+        idg_ensure_numeric_generated_key($conn, 'personnelrolemodulepermissionstbl', 'role_permission_id', 'INT NOT NULL');
+        idg_ensure_numeric_generated_key($conn, 'personnelroleaccessprofiletbl', 'role_access_profile_id', 'INT NOT NULL');
     }
 }
 
@@ -745,25 +860,29 @@ if (!function_exists('amp_replace_official_module_permissions')) {
             return;
         }
 
-        $insertStmt = $conn->prepare("
-            INSERT INTO officialmodulepermissionstbl
-                (official_id, user_id, permission_key, is_allowed, granted_by_user_id)
-            VALUES
-                (?, NULLIF(?, ''), ?, 1, NULLIF(?, ''))
-        ");
-        if (!$insertStmt) {
-            throw new RuntimeException('Failed to save official module permissions.');
-        }
-
         foreach ($permissionKeys as $permissionKey) {
             $permissionKey = trim((string)$permissionKey);
             if ($permissionKey === '') {
                 continue;
             }
-            $insertStmt->bind_param('ssss', $officialId, $userId, $permissionKey, $grantedByUserId);
+            $permissionId = GenerateTenDigitMetaID($conn, 'officialmodulepermissionstbl', 'permission_id');
+            if ($permissionId === false) {
+                throw new RuntimeException('Failed to generate official permission ID.');
+            }
+            $insertStmt = $conn->prepare("
+                INSERT INTO officialmodulepermissionstbl
+                    (permission_id, official_id, user_id, permission_key, is_allowed, granted_by_user_id)
+                VALUES
+                    (?, ?, NULLIF(?, ''), ?, 1, NULLIF(?, ''))
+            ");
+            if (!$insertStmt) {
+                throw new RuntimeException('Failed to save official module permissions.');
+            }
+            $permissionIdInt = (int)$permissionId;
+            $insertStmt->bind_param('issss', $permissionIdInt, $officialId, $userId, $permissionKey, $grantedByUserId);
             $insertStmt->execute();
+            $insertStmt->close();
         }
-        $insertStmt->close();
     }
 }
 
@@ -778,8 +897,8 @@ if (!function_exists('amp_upsert_official_access_profile')) {
         }
 
         $stmt = $conn->prepare("
-            INSERT INTO officialaccessprofiletbl (official_id, user_id, permissions_initialized)
-            VALUES (?, NULLIF(?, ''), 1)
+            INSERT INTO officialaccessprofiletbl (access_profile_id, official_id, user_id, permissions_initialized)
+            VALUES (?, ?, NULLIF(?, ''), 1)
             ON DUPLICATE KEY UPDATE
                 user_id = VALUES(user_id),
                 permissions_initialized = 1,
@@ -788,7 +907,12 @@ if (!function_exists('amp_upsert_official_access_profile')) {
         if (!$stmt) {
             throw new RuntimeException('Failed to save official access profile metadata.');
         }
-        $stmt->bind_param('ss', $officialId, $userId);
+        $accessProfileId = GenerateTenDigitMetaID($conn, 'officialaccessprofiletbl', 'access_profile_id');
+        if ($accessProfileId === false) {
+            throw new RuntimeException('Failed to generate official access profile ID.');
+        }
+        $accessProfileIdInt = (int)$accessProfileId;
+        $stmt->bind_param('iss', $accessProfileIdInt, $officialId, $userId);
         $stmt->execute();
         $stmt->close();
     }
@@ -842,25 +966,29 @@ if (!function_exists('amp_replace_seat_module_permissions')) {
             return;
         }
 
-        $insertStmt = $conn->prepare("
-            INSERT INTO officialseatmodulepermissionstbl
-                (council_id, permission_key, is_allowed, granted_by_user_id)
-            VALUES
-                (?, ?, 1, NULLIF(?, ''))
-        ");
-        if (!$insertStmt) {
-            throw new RuntimeException('Failed to save seat module permissions.');
-        }
-
         foreach ($permissionKeys as $permissionKey) {
             $permissionKey = trim((string)$permissionKey);
             if ($permissionKey === '') {
                 continue;
             }
-            $insertStmt->bind_param('iss', $councilId, $permissionKey, $grantedByUserId);
+            $seatPermissionId = GenerateTenDigitMetaID($conn, 'officialseatmodulepermissionstbl', 'seat_permission_id');
+            if ($seatPermissionId === false) {
+                throw new RuntimeException('Failed to generate seat permission ID.');
+            }
+            $insertStmt = $conn->prepare("
+                INSERT INTO officialseatmodulepermissionstbl
+                    (seat_permission_id, council_id, permission_key, is_allowed, granted_by_user_id)
+                VALUES
+                    (?, ?, ?, 1, NULLIF(?, ''))
+            ");
+            if (!$insertStmt) {
+                throw new RuntimeException('Failed to save seat module permissions.');
+            }
+            $seatPermissionIdInt = (int)$seatPermissionId;
+            $insertStmt->bind_param('iiss', $seatPermissionIdInt, $councilId, $permissionKey, $grantedByUserId);
             $insertStmt->execute();
+            $insertStmt->close();
         }
-        $insertStmt->close();
     }
 }
 
@@ -874,8 +1002,8 @@ if (!function_exists('amp_upsert_seat_access_profile')) {
         }
 
         $stmt = $conn->prepare("
-            INSERT INTO officialseataccessprofiletbl (council_id, permissions_initialized)
-            VALUES (?, 1)
+            INSERT INTO officialseataccessprofiletbl (seat_access_profile_id, council_id, permissions_initialized)
+            VALUES (?, ?, 1)
             ON DUPLICATE KEY UPDATE
                 permissions_initialized = 1,
                 updated_at = CURRENT_TIMESTAMP
@@ -883,7 +1011,12 @@ if (!function_exists('amp_upsert_seat_access_profile')) {
         if (!$stmt) {
             throw new RuntimeException('Failed to save seat access profile metadata.');
         }
-        $stmt->bind_param('i', $councilId);
+        $seatAccessProfileId = GenerateTenDigitMetaID($conn, 'officialseataccessprofiletbl', 'seat_access_profile_id');
+        if ($seatAccessProfileId === false) {
+            throw new RuntimeException('Failed to generate seat access profile ID.');
+        }
+        $seatAccessProfileIdInt = (int)$seatAccessProfileId;
+        $stmt->bind_param('ii', $seatAccessProfileIdInt, $councilId);
         $stmt->execute();
         $stmt->close();
     }
@@ -920,12 +1053,208 @@ if (!function_exists('amp_get_protected_label')) {
     }
 }
 
+if (!function_exists('amp_has_saved_personnel_role_access_profile')) {
+    function amp_has_saved_personnel_role_access_profile(mysqli $conn, string $department, string $positionAccess): bool
+    {
+        amp_ensure_permission_storage($conn);
+
+        $scope = amp_get_personnel_role_profile_scope($department, $positionAccess);
+        $stmt = $conn->prepare("
+            SELECT 1
+            FROM personnelroleaccessprofiletbl
+            WHERE department_key = ?
+              AND position_key = ?
+              AND permissions_initialized = 1
+            LIMIT 1
+        ");
+        if (!$stmt) {
+            return false;
+        }
+        $stmt->bind_param('ss', $scope['department_key'], $scope['position_key']);
+        $stmt->execute();
+        $row = $stmt->get_result()->fetch_row();
+        $stmt->close();
+
+        return $row !== null;
+    }
+}
+
+if (!function_exists('amp_upsert_personnel_role_access_profile')) {
+    function amp_upsert_personnel_role_access_profile(mysqli $conn, string $department, string $positionAccess): void
+    {
+        amp_ensure_permission_storage($conn);
+
+        $scope = amp_get_personnel_role_profile_scope($department, $positionAccess);
+        $stmt = $conn->prepare("
+            INSERT INTO personnelroleaccessprofiletbl
+                (role_access_profile_id, department_key, position_key, department_label, position_label, permissions_initialized)
+            VALUES
+                (?, ?, ?, NULLIF(?, ''), NULLIF(?, ''), 1)
+            ON DUPLICATE KEY UPDATE
+                department_label = VALUES(department_label),
+                position_label = VALUES(position_label),
+                permissions_initialized = 1,
+                updated_at = CURRENT_TIMESTAMP
+        ");
+        if (!$stmt) {
+            throw new RuntimeException('Failed to save personnel role access profile metadata.');
+        }
+        $roleAccessProfileId = GenerateTenDigitMetaID($conn, 'personnelroleaccessprofiletbl', 'role_access_profile_id');
+        if ($roleAccessProfileId === false) {
+            throw new RuntimeException('Failed to generate personnel role access profile ID.');
+        }
+        $roleAccessProfileIdInt = (int)$roleAccessProfileId;
+        $stmt->bind_param(
+            'issss',
+            $roleAccessProfileIdInt,
+            $scope['department_key'],
+            $scope['position_key'],
+            $scope['department_label'],
+            $scope['position_label']
+        );
+        $stmt->execute();
+        $stmt->close();
+    }
+}
+
+if (!function_exists('amp_replace_personnel_role_module_permissions')) {
+    function amp_replace_personnel_role_module_permissions(mysqli $conn, string $department, string $positionAccess, array $permissionKeys, string $grantedByUserId): void
+    {
+        amp_ensure_permission_storage($conn);
+
+        $scope = amp_get_personnel_role_profile_scope($department, $positionAccess);
+        $deleteStmt = $conn->prepare("
+            DELETE FROM personnelrolemodulepermissionstbl
+            WHERE department_key = ?
+              AND position_key = ?
+        ");
+        if ($deleteStmt) {
+            $deleteStmt->bind_param('ss', $scope['department_key'], $scope['position_key']);
+            $deleteStmt->execute();
+            $deleteStmt->close();
+        }
+
+        if (!$permissionKeys) {
+            return;
+        }
+
+        foreach ($permissionKeys as $permissionKey) {
+            $permissionKey = trim((string)$permissionKey);
+            if ($permissionKey === '') {
+                continue;
+            }
+            $rolePermissionId = GenerateTenDigitMetaID($conn, 'personnelrolemodulepermissionstbl', 'role_permission_id');
+            if ($rolePermissionId === false) {
+                throw new RuntimeException('Failed to generate personnel role permission ID.');
+            }
+            $insertStmt = $conn->prepare("
+                INSERT INTO personnelrolemodulepermissionstbl
+                    (role_permission_id, department_key, position_key, department_label, position_label, permission_key, is_allowed, granted_by_user_id)
+                VALUES
+                    (?, ?, ?, NULLIF(?, ''), NULLIF(?, ''), ?, 1, NULLIF(?, ''))
+            ");
+            if (!$insertStmt) {
+                throw new RuntimeException('Failed to save personnel role module permissions.');
+            }
+            $rolePermissionIdInt = (int)$rolePermissionId;
+            $insertStmt->bind_param(
+                'issssss',
+                $rolePermissionIdInt,
+                $scope['department_key'],
+                $scope['position_key'],
+                $scope['department_label'],
+                $scope['position_label'],
+                $permissionKey,
+                $grantedByUserId
+            );
+            $insertStmt->execute();
+            $insertStmt->close();
+        }
+    }
+}
+
+if (!function_exists('amp_delete_personnel_role_access_profile')) {
+    function amp_delete_personnel_role_access_profile(mysqli $conn, string $department, string $positionAccess): void
+    {
+        amp_ensure_permission_storage($conn);
+
+        $scope = amp_get_personnel_role_profile_scope($department, $positionAccess);
+
+        $deletePermissions = $conn->prepare("
+            DELETE FROM personnelrolemodulepermissionstbl
+            WHERE department_key = ?
+              AND position_key = ?
+        ");
+        if ($deletePermissions) {
+            $deletePermissions->bind_param('ss', $scope['department_key'], $scope['position_key']);
+            $deletePermissions->execute();
+            $deletePermissions->close();
+        }
+
+        $deleteProfile = $conn->prepare("
+            DELETE FROM personnelroleaccessprofiletbl
+            WHERE department_key = ?
+              AND position_key = ?
+        ");
+        if ($deleteProfile) {
+            $deleteProfile->bind_param('ss', $scope['department_key'], $scope['position_key']);
+            $deleteProfile->execute();
+            $deleteProfile->close();
+        }
+    }
+}
+
+if (!function_exists('amp_get_effective_permission_keys_for_personnel_role')) {
+    function amp_get_effective_permission_keys_for_personnel_role(mysqli $conn, string $department, string $positionAccess): array
+    {
+        amp_ensure_permission_storage($conn);
+
+        $scope = amp_get_personnel_role_profile_scope($department, $positionAccess);
+        $permissions = [];
+
+        $stmt = $conn->prepare("
+            SELECT permission_key
+            FROM personnelrolemodulepermissionstbl
+            WHERE department_key = ?
+              AND position_key = ?
+              AND is_allowed = 1
+        ");
+        if ($stmt) {
+            $stmt->bind_param('ss', $scope['department_key'], $scope['position_key']);
+            $stmt->execute();
+            $res = $stmt->get_result();
+            while ($permRow = $res->fetch_assoc()) {
+                $key = trim((string)($permRow['permission_key'] ?? ''));
+                if ($key !== '') {
+                    $permissions[$key] = true;
+                }
+            }
+            $stmt->close();
+        }
+
+        if (!$permissions && !amp_has_saved_personnel_role_access_profile($conn, $department, $positionAccess)) {
+            foreach (amp_get_default_admin_permission_keys() as $key) {
+                $permissions[$key] = true;
+            }
+        }
+
+        foreach (array_keys($permissions) as $key) {
+            if (amp_is_admin_only_permission($key)) {
+                unset($permissions[$key]);
+            }
+        }
+
+        return $permissions;
+    }
+}
+
 if (!function_exists('amp_get_effective_permission_keys_for_row')) {
     function amp_get_effective_permission_keys_for_row(mysqli $conn, array $row): array
     {
         amp_ensure_permission_storage($conn);
 
         $displayRole = amp_storage_role_to_display_role((string)($row['account_role_access'] ?? $row['info_role_access'] ?? ''));
+        $protectedCode = amp_get_protected_code($row);
         $officialId = trim((string)($row['official_id'] ?? ''));
         $hasSavedProfile = amp_has_saved_access_profile($conn, $officialId);
         $permissions = [];
@@ -952,11 +1281,19 @@ if (!function_exists('amp_get_effective_permission_keys_for_row')) {
         }
 
         if (!$permissions && !$hasSavedProfile) {
-            $defaultKeys = $displayRole === 'SuperAdmin'
-                ? amp_get_all_leaf_permission_keys()
-                : amp_get_default_admin_permission_keys();
-            foreach ($defaultKeys as $key) {
-                $permissions[$key] = true;
+            if ($displayRole !== 'SuperAdmin' && amp_row_uses_personnel_role_profile($row) && $protectedCode !== 'IT_SUPERADMIN') {
+                $permissions = amp_get_effective_permission_keys_for_personnel_role(
+                    $conn,
+                    (string)($row['department'] ?? ''),
+                    (string)($row['position_access'] ?? '')
+                );
+            } else {
+                $defaultKeys = $displayRole === 'SuperAdmin'
+                    ? amp_get_all_leaf_permission_keys()
+                    : amp_get_default_admin_permission_keys();
+                foreach ($defaultKeys as $key) {
+                    $permissions[$key] = true;
+                }
             }
         }
 
@@ -968,7 +1305,6 @@ if (!function_exists('amp_get_effective_permission_keys_for_row')) {
             }
         }
 
-        $protectedCode = amp_get_protected_code($row);
         if ($protectedCode === 'IT_SUPERADMIN') {
             foreach (amp_get_it_superadmin_locked_permission_keys() as $key) {
                 $permissions[$key] = true;
@@ -1106,6 +1442,7 @@ if (!function_exists('amp_resolve_request_permission_key')) {
         return match ($current) {
             'AdminDashboard.php' => 'dashboard',
             'AppointmentTracker.php' => 'appointments',
+            'ResidentTracker.php' => 'resident_masterlist',
             'ResidentMasterlist.php' => 'resident_masterlist',
             'EditRequests.php' => 'resident_edit_requests',
             'ResidentArchive.php' => 'resident_archive',
@@ -1142,7 +1479,7 @@ if (!function_exists('amp_resolve_request_permission_key')) {
             'OfficialTransitions.php' => 'official_transition',
             'AuditLogs.php' => 'audit_logs',
             'FinancePayments.php' => match (strtolower(trim((string)($_GET['section'] ?? 'tracker')))) {
-                'cashbook' => 'finance_cashbook',
+                'create' => 'finance_create_transaction',
                 'fees' => 'finance_fee_management',
                 default => 'finance_payment_tracker',
             },

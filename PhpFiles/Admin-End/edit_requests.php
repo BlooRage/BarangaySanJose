@@ -216,7 +216,7 @@ function fetchLatestAddress(mysqli $conn, string $residentId): ?array {
     $res = $stmt->get_result();
     $row = $res ? $res->fetch_assoc() : null;
     $stmt->close();
-    return $row ?: null;
+    return $row ? (pii_decrypt_resident_address_row($row) ?? $row) : null;
 }
 
 if ($_SERVER['REQUEST_METHOD'] === 'GET' && isset($_GET['fetch'])) {
@@ -228,7 +228,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && isset($_GET['fetch'])) {
         SELECT
             r.request_id,
             r.resident_id,
-            CONCAT(ri.firstname, ' ', ri.lastname) AS resident_name,
+            ri.firstname,
+            ri.lastname,
             r.request_type,
             r.status_id,
             s.status_name,
@@ -249,6 +250,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && isset($_GET['fetch'])) {
 
     $requests = [];
     while ($row = $result->fetch_assoc()) {
+        $row = pii_decrypt_assoc($row, ['firstname', 'lastname']);
+        $row['resident_name'] = trim((string)($row['firstname'] ?? '') . ' ' . (string)($row['lastname'] ?? ''));
         $requests[] = $row;
     }
     $result->free();
@@ -316,6 +319,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && isset($_GET['view'])) {
     $stmt->execute();
     $row = $stmt->get_result()->fetch_assoc();
     $stmt->close();
+    $row = $row ? (pii_decrypt_resident_row($row) ?? $row) : null;
 
     if (!$row) {
         http_response_code(404);
@@ -342,6 +346,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && isset($_GET['view'])) {
         $stmt->execute();
         $emergency = $stmt->get_result()->fetch_assoc();
         $stmt->close();
+        $emergency = $emergency ? (pii_decrypt_emergency_contact_row($emergency) ?? $emergency) : null;
     }
 
     $reviewedByName = null;
@@ -357,6 +362,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && isset($_GET['view'])) {
             $stmt->execute();
             $reviewer = $stmt->get_result()->fetch_assoc();
             $stmt->close();
+            $reviewer = $reviewer ? (pii_decrypt_official_row($reviewer) ?? $reviewer) : null;
             if ($reviewer) {
                 $reviewedByName = trim(
                     $reviewer['firstname'] . ' ' .
@@ -524,7 +530,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 foreach ($allowed as $key => $col) {
                     if (array_key_exists($key, $changes)) {
                         $set[] = "{$col} = ?";
-                        $params[] = $changes[$key];
+                        $params[] = in_array($col, pii_resident_fields(), true)
+                            ? pii_encrypt_string((string)$changes[$key])
+                            : $changes[$key];
                         $types .= 's';
                     }
                 }
@@ -595,15 +603,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $stmtMarkOld->close();
                 }
                 $newAddress = [
-                    'unit_number' => (string)($changes['unit_number'] ?? $latest['unit_number']),
-                    'street_number' => (string)($changes['street_number'] ?? $latest['street_number']),
-                    'street_name' => (string)($changes['street_name'] ?? $latest['street_name']),
-                    'phase_number' => (string)($changes['phase_number'] ?? $latest['phase_number']),
-                    'subdivision' => (string)($changes['subdivision'] ?? $latest['subdivision']),
+                    'unit_number' => pii_encrypt_string((string)($changes['unit_number'] ?? $latest['unit_number'])),
+                    'street_number' => pii_encrypt_string((string)($changes['street_number'] ?? $latest['street_number'])),
+                    'street_name' => pii_encrypt_string((string)($changes['street_name'] ?? $latest['street_name'])),
+                    'phase_number' => pii_encrypt_string((string)($changes['phase_number'] ?? $latest['phase_number'])),
+                    'subdivision' => pii_encrypt_string((string)($changes['subdivision'] ?? $latest['subdivision'])),
                     'area_number' => (string)($changes['area_number'] ?? $latest['area_number']),
-                    'house_type' => (string)($changes['house_type'] ?? $latest['house_type']),
-                    'house_ownership' => (string)($changes['house_ownership'] ?? $latest['house_ownership']),
-                    'residency_duration' => (string)($changes['residency_duration'] ?? $latest['residency_duration']),
+                    'house_type' => pii_encrypt_string((string)($changes['house_type'] ?? $latest['house_type'])),
+                    'house_ownership' => pii_encrypt_string((string)($changes['house_ownership'] ?? $latest['house_ownership'])),
+                    'residency_duration' => pii_encrypt_string((string)($changes['residency_duration'] ?? $latest['residency_duration'])),
                 ];
                 $newAddressId = GenerateAddressID($conn, $newAddress['area_number']);
 
@@ -713,23 +721,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     }
                 }
 
-                $stmt = $conn->prepare("
-                    INSERT INTO emergencycontacttbl
-                        (user_id, last_name, first_name, middle_name, suffix, phone_number, relationship, address)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-                    ON DUPLICATE KEY UPDATE
-                        last_name = VALUES(last_name),
-                        first_name = VALUES(first_name),
-                        middle_name = VALUES(middle_name),
-                        suffix = VALUES(suffix),
-                        phone_number = VALUES(phone_number),
-                        relationship = VALUES(relationship),
-                        address = VALUES(address)
-                ");
                 $middleName = $changes['middle_name'] ?? null;
                 $suffix = $changes['suffix'] ?? null;
-                $stmt->bind_param(
-                    "ssssssss",
+                if (UpsertEmergencyContactRecord(
+                    $conn,
                     $row['user_id'],
                     $changes['last_name'],
                     $changes['first_name'],
@@ -738,11 +733,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $changes['phone_number'],
                     $changes['relationship'],
                     $changes['address']
-                );
-                if (!$stmt->execute()) {
+                ) === false) {
                     throw new Exception('Failed to update emergency contact.');
                 }
-                $stmt->close();
             }
         }
 

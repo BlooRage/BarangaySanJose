@@ -7,6 +7,8 @@ ini_set('display_errors', '0');
 ini_set('log_errors', '1');
 error_reporting(E_ALL);
 
+require_once __DIR__ . '/../General/uniqueIDGenerate.php';
+
 function cem_read_payload(): array
 {
     $payload = json_decode(file_get_contents('php://input'), true);
@@ -80,7 +82,7 @@ function cem_get_user_account(mysqli $conn, string $userId): array
     if (!$row) {
         throw new Exception('Account not found.');
     }
-    return $row;
+    return pii_decrypt_useraccount_row($row) ?? [];
 }
 
 function cem_insert_sms_otp(mysqli $conn, string $userId, string $recipientPhone10, string $purpose, string $otpCode, int $ttlMinutes = 5): void
@@ -121,21 +123,7 @@ function cem_insert_sms_otp(mysqli $conn, string $userId, string $recipientPhone
     $expiryTime = date('Y-m-d H:i:s', strtotime("+{$ttlMinutes} minutes"));
 
     $STATUS_PENDING = 6;
-    $stmt = $conn->prepare("
-        INSERT INTO otprequesttbl
-            (user_id, recipient, purpose, otp_code_hash, otp_expiry, request_timestamp, status_id_otp)
-        VALUES
-            (?, ?, ?, ?, ?, ?, ?)
-    ");
-    if (!$stmt) {
-        throw new Exception('Failed to prepare OTP insert.');
-    }
-    $stmt->bind_param('ssssssi', $userId, $recipientPhone10, $purpose, $otpHash, $expiryTime, $requestTime, $STATUS_PENDING);
-    if (!$stmt->execute()) {
-        $stmt->close();
-        throw new Exception('Failed to store OTP.');
-    }
-    $stmt->close();
+    insertOtpRequest($conn, $userId, $recipientPhone10, $purpose, $otpHash, $expiryTime, $requestTime, $STATUS_PENDING);
 }
 
 function cem_verify_latest_sms_otp(mysqli $conn, string $userId, string $recipientPhone10, string $purpose, string $otpInput): void

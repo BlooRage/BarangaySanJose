@@ -34,9 +34,10 @@ try {
     }
 
     // Ensure phone isn't already used by another account
-    $chk = $conn->prepare("SELECT user_id FROM useraccountstbl WHERE phone_number = ? AND user_id <> ? LIMIT 1");
+    $phoneHash = pii_lookup_hash($newPhone10, 'useraccount.phone');
+    $chk = $conn->prepare("SELECT user_id FROM useraccountstbl WHERE phone_lookup_hash = ? AND user_id <> ? LIMIT 1");
     if ($chk) {
-        $chk->bind_param('ss', $newPhone10, $userId);
+        $chk->bind_param('ss', $phoneHash, $userId);
         $chk->execute();
         $res = $chk->get_result();
         $exists = $res && $res->num_rows > 0;
@@ -70,4 +71,3 @@ try {
 } catch (Throwable $e) {
     cpn_json(500, ['success' => false, 'message' => 'Server error. Please try again.']);
 }
-

@@ -2,6 +2,7 @@
 session_start();
 require_once "../General/connection.php";
 require_once "../General/security.php";
+require_once "../General/uniqueIDGenerate.php";
 
 requireRoleSession(['SuperAdmin', 'Official', 'Officials', 'Personnel', 'Personnels', 'Admin', 'Employee']);
 
@@ -15,7 +16,7 @@ if (!isset($_GET['fetch'])) {
 
 $createSql = "
     CREATE TABLE IF NOT EXISTS householdheadverificationtbl (
-        verification_id INT AUTO_INCREMENT PRIMARY KEY,
+        verification_id INT NOT NULL PRIMARY KEY,
         group_key VARCHAR(255) NOT NULL,
         address_id VARCHAR(100) DEFAULT NULL,
         address_display VARCHAR(255) DEFAULT NULL,
@@ -30,6 +31,7 @@ $createSql = "
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
 ";
 $conn->query($createSql);
+idg_ensure_numeric_generated_key($conn, 'householdheadverificationtbl', 'verification_id', 'INT NOT NULL');
 
 $q = trim((string)($_GET['q'] ?? ''));
 $limit = (int)($_GET['limit'] ?? 300);
@@ -107,4 +109,3 @@ echo json_encode([
     'success' => true,
     'data' => $rows,
 ]);
-

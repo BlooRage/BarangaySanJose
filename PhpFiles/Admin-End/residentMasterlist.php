@@ -638,7 +638,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_resident_statu
             $conn,
             $actorUserId,
             $actorRole,
-            'Resident Masterlist',
+            'Resident Tracker',
             'Resident',
             (string)$residentId,
             'RESIDENT_STATUS_UPDATE',
@@ -872,9 +872,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['resident_id'])) {
     $emMiddle = $_POST['emergencyMiddleName'] ?? '';
     $emLast   = $_POST['emergencyLastName'] ?? '';
     $emSuffix = $_POST['emergencySuffix'] ?? '';
-    $emPhone  = $_POST['emergencyPhoneNumber'] ?? '';
+    $emPhone  = pii_normalize_phone10((string)($_POST['emergencyPhoneNumber'] ?? ''));
     $emRel    = $_POST['emergencyRelationship'] ?? '';
     $emAddr   = $_POST['emergencyAddress'] ?? '';
+
+    $residentEncrypted = pii_encrypt_field_map([
+        'firstname' => $firstName,
+        'middlename' => $middleName,
+        'lastname' => $lastName,
+        'suffix' => $suffix,
+        'birthdate' => $birthdate,
+        'civil_status' => $civilStatus,
+        'occupation_detail' => $occupationDetail,
+        'religion' => $religion,
+    ]);
 
     // -----------------------
     // Update residentinformationtbl
@@ -890,10 +901,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['resident_id'])) {
 
     $stmt->bind_param(
         "sssssssiissss",
-        $firstName, $middleName, $lastName, $suffix,
-        $birthdate, $sex, $civilStatus, $voterStatus,
-        $occupation, $occupationDetail,
-        $religion, $sectorMembership,
+        $residentEncrypted['firstname'], $residentEncrypted['middlename'], $residentEncrypted['lastname'], $residentEncrypted['suffix'],
+        $residentEncrypted['birthdate'], $sex, $residentEncrypted['civil_status'], $voterStatus,
+        $occupation, $residentEncrypted['occupation_detail'],
+        $residentEncrypted['religion'], $sectorMembership,
         $residentId
     );
 
@@ -904,6 +915,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['resident_id'])) {
     // Update emergencycontacttbl
     // -----------------------
     if ($userId !== '') {
+        $emergencyEncrypted = pii_encrypt_field_map([
+            'first_name' => $emFirst,
+            'middle_name' => $emMiddle,
+            'last_name' => $emLast,
+            'suffix' => $emSuffix,
+            'phone_number' => $emPhone,
+            'relationship' => $emRel,
+            'address' => $emAddr,
+        ]);
         $stmt = $conn->prepare("
             UPDATE emergencycontacttbl
             SET first_name = ?, middle_name = ?, last_name = ?, suffix = ?,
@@ -913,8 +933,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['resident_id'])) {
 
         $stmt->bind_param(
             "ssssssss",
-            $emFirst, $emMiddle, $emLast, $emSuffix,
-            $emPhone, $emRel, $emAddr, $userId
+            $emergencyEncrypted['first_name'], $emergencyEncrypted['middle_name'], $emergencyEncrypted['last_name'], $emergencyEncrypted['suffix'],
+            $emergencyEncrypted['phone_number'], $emergencyEncrypted['relationship'], $emergencyEncrypted['address'], $userId
         );
 
         $stmt->execute();
@@ -933,7 +953,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['resident_id'])) {
         $stmt->close();
     }
 
-    header("Location: " . appUrl('/Admin-End/ResidentMasterlist.php'));
+    header("Location: " . appUrl('/Admin-End/ResidentTracker.php'));
     exit;
 }
 
@@ -945,6 +965,8 @@ if (isset($_GET['fetch'])) {
     header('Content-Type: application/json; charset=utf-8');
 
     $search = trim($_GET['search'] ?? '');
+    $mode = strtolower(trim((string)($_GET['mode'] ?? 'tracker')));
+    $verifiedOnly = $mode === 'masterlist';
 
     $sql = "
         SELECT
@@ -973,6 +995,8 @@ if (isset($_GET['fetch'])) {
             r.religion,
             r.sector_membership,
             s.status_name AS status,
+            ua.phone_number AS contact_number,
+            ua.email AS email_address,
 
             (
                 SELECT uf.file_path
@@ -1008,13 +1032,6 @@ if (isset($_GET['fetch'])) {
             a.house_type,
             a.residency_duration,
 
-            CONCAT(
-                e.first_name, ' ',
-                IFNULL(CONCAT(LEFT(e.middle_name, 1), '. '), ''),
-                e.last_name,
-                IF(e.suffix IS NOT NULL AND e.suffix != '', CONCAT(' ', e.suffix), '')
-            ) AS emergency_full_name,
-
             e.first_name AS emergency_first_name,
             e.last_name AS emergency_last_name,
             e.middle_name AS emergency_middle_name,
@@ -1025,6 +1042,7 @@ if (isset($_GET['fetch'])) {
 
         FROM residentinformationtbl r
         LEFT JOIN statuslookuptbl s ON r.status_id_resident = s.status_id
+        LEFT JOIN useraccountstbl ua ON ua.user_id = r.user_id
         LEFT JOIN residentaddresstbl a
             ON a.address_id = (
                 SELECT a2.address_id
@@ -1036,10 +1054,12 @@ if (isset($_GET['fetch'])) {
         LEFT JOIN emergencycontacttbl e ON e.user_id = r.user_id
     ";
 
-    if ($search !== '') {
-        $sql .= " WHERE
-            (s.status_name <> 'Archived' OR s.status_name IS NULL)
-            AND (
+    $whereClauses = ["(s.status_name <> 'Archived' OR s.status_name IS NULL)"];
+    if ($verifiedOnly) {
+        $whereClauses[] = "LOWER(REPLACE(COALESCE(s.status_name, ''), ' ', '')) IN ('verifiedresident', 'verified', 'approved')";
+    }
+    if ($search !== '' && !pii_is_enabled()) {
+        $whereClauses[] = "(
               r.resident_id LIKE ?
               OR r.user_id LIKE ?
               OR r.firstname LIKE ?
@@ -1051,17 +1071,15 @@ if (isset($_GET['fetch'])) {
               OR a.subdivision LIKE ?
               OR a.area_number LIKE ?
               OR a.unit_number LIKE ?
-            )
-        ";
-    } else {
-        $sql .= " WHERE (s.status_name <> 'Archived' OR s.status_name IS NULL)";
+            )";
     }
+    $sql .= " WHERE " . implode(" AND ", $whereClauses);
 
     $sql .= " ORDER BY r.resident_id DESC";
 
     $stmt = $conn->prepare($sql);
 
-    if ($search !== '') {
+    if ($search !== '' && !pii_is_enabled()) {
         $like = "%$search%";
         $stmt->bind_param(
             "sssssssssss",
@@ -1084,6 +1102,51 @@ if (isset($_GET['fetch'])) {
 
     $data = [];
     while ($row = $result->fetch_assoc()) {
+        $row = pii_decrypt_resident_row($row) ?? $row;
+        $row = pii_decrypt_assoc($row, [
+            'contact_number',
+            'email_address',
+            'unit_number',
+            'house_number',
+            'street_name',
+            'phase_number',
+            'subdivision',
+            'house_ownership',
+            'house_type',
+            'residency_duration',
+            'emergency_first_name',
+            'emergency_last_name',
+            'emergency_middle_name',
+            'emergency_suffix',
+            'emergency_contact_number',
+            'emergency_relationship',
+            'emergency_address',
+        ]);
+        if ($search !== '' && pii_is_enabled() && !pii_search_match($row, [
+            'resident_id',
+            'user_id',
+            'firstname',
+            'lastname',
+            'middlename',
+            'house_number',
+            'street_name',
+            'phase_number',
+            'subdivision',
+            'area_number',
+            'unit_number',
+            'email_address',
+            'contact_number',
+        ], $search)) {
+            continue;
+        }
+
+        $row['emergency_full_name'] = trim(
+            (string)($row['emergency_first_name'] ?? '') . ' ' .
+            (!empty($row['emergency_middle_name']) ? substr((string)$row['emergency_middle_name'], 0, 1) . '. ' : '') .
+            (string)($row['emergency_last_name'] ?? '') .
+            (!empty($row['emergency_suffix']) ? ' ' . (string)$row['emergency_suffix'] : '')
+        );
+
         $fullName =
             $row['firstname'] . ' ' .
             ($row['middlename'] ? $row['middlename'][0] . '. ' : '') .
@@ -1354,7 +1417,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_document_statu
 	            $conn,
 	            $actorUserId,
 	            $actorRole,
-	            'Resident Masterlist',
+	            'Resident Tracker',
 	            'UnifiedFileAttachment',
 	            (string)$attachmentId,
 	            'DOCUMENT_STATUS_UPDATE',
@@ -1447,7 +1510,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_document_statu
 	                            $conn,
 	                            $actorUserId,
 	                            $actorRole,
-	                            'Resident Masterlist',
+	                            'Resident Tracker',
 	                            'Resident',
 	                            (string)$residentId,
 	                            'RESIDENT_FIELD_UPDATE',
@@ -1477,7 +1540,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_document_statu
 	                        $conn,
 	                        $actorUserId,
 	                        $actorRole,
-	                        'Resident Masterlist',
+	                        'Resident Tracker',
 	                        'Resident',
 	                        (string)$residentId,
 	                        'RESIDENT_FIELD_UPDATE',

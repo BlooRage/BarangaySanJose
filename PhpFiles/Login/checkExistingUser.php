@@ -27,12 +27,14 @@ $response = [
 ];
 
 if ($phone) {
-    $stmt = $conn->prepare("SELECT user_id FROM useraccountstbl WHERE phone_number = ?");
+    $phone = pii_normalize_phone10($phone);
+    $phoneHash = pii_lookup_hash($phone, 'useraccount.phone');
+    $stmt = $conn->prepare("SELECT user_id FROM useraccountstbl WHERE phone_lookup_hash = ?");
     if (!$stmt) {
         echo json_encode(['success' => false, 'error' => 'Query failed']);
         exit;
     }
-    $stmt->bind_param("s", $phone);
+    $stmt->bind_param("s", $phoneHash);
     $stmt->execute();
     $stmt->store_result();
     $response['phoneExists'] = $stmt->num_rows > 0;
@@ -40,12 +42,14 @@ if ($phone) {
 }
 
 if ($email) {
-    $stmt = $conn->prepare("SELECT user_id FROM useraccountstbl WHERE email = ?");
+    $email = pii_normalize_email($email);
+    $emailHash = pii_lookup_hash($email, 'useraccount.email');
+    $stmt = $conn->prepare("SELECT user_id FROM useraccountstbl WHERE email_lookup_hash = ?");
     if (!$stmt) {
         echo json_encode(['success' => false, 'error' => 'Query failed']);
         exit;
     }
-    $stmt->bind_param("s", $email);
+    $stmt->bind_param("s", $emailHash);
     $stmt->execute();
     $stmt->store_result();
     $response['emailExists'] = $stmt->num_rows > 0;

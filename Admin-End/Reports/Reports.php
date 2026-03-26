@@ -441,6 +441,153 @@ function rp_user_resident_parts(mysqli $conn, string $userIdExpr, string $prefix
     ];
 }
 
+function rp_fetch_document_financial_rows(mysqli $conn, string $dateFrom, string $dateTo): array {
+    if (!rp_table_exists($conn, 'documentrequesttbl') || !rp_table_exists($conn, 'financetransactiontbl')) {
+        return [];
+    }
+
+    $financeDateExpr = rp_first_existing_datetime_expr($conn, 'financetransactiontbl', 'ft', ['finance_decision_at', 'payment_timestamp', 'created_at']);
+    if ($financeDateExpr === 'NULL') {
+        return [];
+    }
+
+    $residentParts = rp_document_request_resident_parts($conn, 'd', 'fin');
+    $residentJoin = $residentParts['joins'] !== '' ? "\n        {$residentParts['joins']}" : '';
+    $areaExpr = $residentParts['area_expr'] !== 'NULL' ? $residentParts['area_expr'] : "'Unspecified'";
+    $sectorExpr = $residentParts['sector_expr'] !== 'NULL' ? $residentParts['sector_expr'] : "''";
+    $df = $conn->real_escape_string($dateFrom);
+    $dt = $conn->real_escape_string($dateTo);
+
+    return rp_safe_query($conn, "
+        SELECT
+            'document' AS record_source,
+            d.request_id AS source_id,
+            COALESCE(NULLIF(TRIM(d.document_type), ''), 'Unspecified') AS document_type,
+            COALESCE({$areaExpr}, 'Unspecified') AS area_number,
+            COALESCE({$sectorExpr}, '') AS sector_membership,
+            TRIM(CONCAT_WS(
+                ' ',
+                NULLIF(TRIM(COALESCE(ft.applicant_firstname, '')), ''),
+                NULLIF(TRIM(COALESCE(ft.applicant_middleInitial, '')), ''),
+                NULLIF(TRIM(COALESCE(ft.applicant_lastname, '')), '')
+            )) AS resident_name,
+            COALESCE(NULLIF(TRIM(d.certificate_number), ''), '—') AS certificate_number,
+            COALESCE(ft.transaction_amount, 0) AS transaction_amount,
+            COALESCE(NULLIF(TRIM(ft.payment_method), ''), 'unspecified') AS payment_method,
+            COALESCE(NULLIF(TRIM(ft.or_number), ''), '') AS or_number,
+            {$financeDateExpr} AS finance_event_at,
+            '' AS department_handle
+        FROM documentrequesttbl d
+        INNER JOIN financetransactiontbl ft ON ft.request_id = d.request_id" . $residentJoin . "
+        WHERE LOWER(COALESCE(d.stage, '')) IN ('payment_verified', 'ready_for_claim', 'completed')
+          AND COALESCE(ft.transaction_amount, 0) > 0
+          AND DATE({$financeDateExpr}) BETWEEN '{$df}' AND '{$dt}'
+        ORDER BY {$financeDateExpr} ASC, d.request_id ASC
+    ");
+}
+
+function rp_fetch_manual_financial_rows(mysqli $conn, string $dateFrom, string $dateTo): array {
+    if (!rp_table_exists($conn, 'manualfinancetransactiontbl')) {
+        return [];
+    }
+
+    $requiredColumns = [
+        'transaction_id',
+        'transaction_name',
+        'transaction_description',
+        'department_handle',
+        'transaction_amount',
+        'or_number_receipt',
+    ];
+    foreach ($requiredColumns as $column) {
+        if (!rp_column_exists($conn, 'manualfinancetransactiontbl', $column)) {
+            return [];
+        }
+    }
+
+    $manualDateExpr = rp_first_existing_datetime_expr($conn, 'manualfinancetransactiontbl', 'mt', ['created_at', 'updated_at']);
+    if ($manualDateExpr === 'NULL') {
+        return [];
+    }
+
+    $df = $conn->real_escape_string($dateFrom);
+    $dt = $conn->real_escape_string($dateTo);
+
+    return rp_safe_query($conn, "
+        SELECT
+            'manual' AS record_source,
+            mt.transaction_id AS source_id,
+            COALESCE(NULLIF(TRIM(mt.transaction_description), ''), 'Manual Finance Transaction') AS document_type,
+            'Unspecified' AS area_number,
+            '' AS sector_membership,
+            COALESCE(NULLIF(TRIM(mt.transaction_name), ''), '—') AS resident_name,
+            'Manual' AS certificate_number,
+            COALESCE(mt.transaction_amount, 0) AS transaction_amount,
+            'unspecified' AS payment_method,
+            COALESCE(NULLIF(TRIM(mt.or_number_receipt), ''), '') AS or_number,
+            {$manualDateExpr} AS finance_event_at,
+            COALESCE(NULLIF(TRIM(mt.department_handle), ''), 'Unspecified') AS department_handle
+        FROM manualfinancetransactiontbl mt
+        WHERE COALESCE(mt.transaction_amount, 0) > 0
+          AND DATE({$manualDateExpr}) BETWEEN '{$df}' AND '{$dt}'
+        ORDER BY {$manualDateExpr} ASC, mt.transaction_id ASC
+    ");
+}
+
+function rp_fetch_financial_collection_rows(mysqli $conn, string $dateFrom, string $dateTo): array {
+    $rows = array_merge(
+        rp_fetch_document_financial_rows($conn, $dateFrom, $dateTo),
+        rp_fetch_manual_financial_rows($conn, $dateFrom, $dateTo)
+    );
+
+    usort($rows, static function (array $left, array $right): int {
+        $leftDate = (string)($left['finance_event_at'] ?? '');
+        $rightDate = (string)($right['finance_event_at'] ?? '');
+        if ($leftDate !== $rightDate) {
+            return strcmp($leftDate, $rightDate);
+        }
+        return strcmp((string)($left['source_id'] ?? ''), (string)($right['source_id'] ?? ''));
+    });
+
+    return $rows;
+}
+
+function rp_financial_payment_method_key(string $method): string {
+    $normalized = strtolower(trim($method));
+    return $normalized !== '' ? $normalized : 'unspecified';
+}
+
+function rp_financial_department_value(array $row): string {
+    $department = trim((string)($row['department_handle'] ?? ''));
+    if ($department !== '') {
+        return $department;
+    }
+    return rp_financial_department_label((string)($row['document_type'] ?? ''));
+}
+
+function rp_financial_matches_filters(array $row, array $typeFilters, array $areaFilters, array $sectorFilters): bool {
+    $documentType = trim((string)($row['document_type'] ?? ''));
+    if ($typeFilters !== [] && !in_array($documentType, $typeFilters, true)) {
+        return false;
+    }
+
+    $areaValue = trim((string)($row['area_number'] ?? ''));
+    $areaValue = $areaValue !== '' ? $areaValue : 'Unspecified';
+    if ($areaFilters !== [] && !in_array($areaValue, $areaFilters, true)) {
+        return false;
+    }
+
+    $sectorLabels = array_values(array_intersect(
+        array_unique(array_map('rp_normalize_sector_label', rp_parse_csv_values((string)($row['sector_membership'] ?? '')))),
+        array_keys(rp_official_sector_options())
+    ));
+    if ($sectorFilters !== [] && array_intersect($sectorLabels, $sectorFilters) === []) {
+        return false;
+    }
+
+    return true;
+}
+
 function rp_parse_csv_values(string $value): array {
     return array_values(array_filter(array_map(
         static fn(string $item): string => trim($item),
@@ -889,12 +1036,12 @@ function rp_report_customize_config(string $module): array {
             'sections' => [
                 'summary' => 'Overall Summary',
                 'charts' => 'Revenue Stream Graphs',
-                'type' => 'Revenue by Document Type',
-                'payment_method' => 'Payment Method Breakdown',
+                'type' => 'Revenue by Payment Type',
+                'payment_method' => 'Payment Type Breakdown',
                 'area' => 'Revenue by Area',
                 'sector' => 'Revenue by Department',
                 'daily' => 'Daily Collection Log',
-                'or_log' => 'Official Receipt Log',
+                'or_log' => 'Official Receipt (OR) Log',
             ],
             'columns' => [
                 'identifier' => $sharedColumns['identifier'],
@@ -905,18 +1052,18 @@ function rp_report_customize_config(string $module): array {
                 'count' => $sharedColumns['count'],
                 'percentage' => $sharedColumns['percentage'],
                 'revenue' => $sharedColumns['revenue'],
-                'payment' => $sharedColumns['payment'],
+                'payment' => 'Payment Type',
                 'resident' => $sharedColumns['resident'],
                 'channel' => 'GCash / Walk-in',
             ],
             'column_groups' => [
                 [
-                    'label' => 'Revenue by Document Type',
+                    'label' => 'Revenue by Payment Type',
                     'sections' => ['type'],
-                    'columns' => ['type', 'count'],
+                    'columns' => ['payment', 'count'],
                 ],
                 [
-                    'label' => 'Payment Method Breakdown',
+                    'label' => 'Payment Type Breakdown',
                     'sections' => ['payment_method'],
                     'columns' => ['payment', 'count', 'percentage', 'revenue'],
                 ],
@@ -998,54 +1145,6 @@ function rp_report_customize_config(string $module): array {
                     'label' => 'Monthly Registration Count',
                     'sections' => ['monthly'],
                     'columns' => ['date', 'count'],
-                ],
-            ],
-        ],
-        'appointments' => [
-            'sections' => [
-                'summary' => 'Overall Summary',
-                'charts' => 'Graphs',
-                'status' => 'Status Breakdown',
-                'purpose' => 'Purpose Breakdown',
-                'area' => 'Requests by Area',
-                'sector' => 'Requests by Sector Membership',
-                'trend' => 'Monthly Trend',
-            ],
-            'columns' => [
-                'date' => $sharedColumns['date'],
-                'type' => 'Purpose',
-                'status' => $sharedColumns['status'],
-                'area' => $sharedColumns['area'],
-                'sector' => $sharedColumns['sector'],
-                'count' => $sharedColumns['count'],
-                'percentage' => $sharedColumns['percentage'],
-                'result' => 'Completed / Completion Rate',
-            ],
-            'column_groups' => [
-                [
-                    'label' => 'Status Breakdown',
-                    'sections' => ['status'],
-                    'columns' => ['status', 'count', 'percentage'],
-                ],
-                [
-                    'label' => 'Purpose Breakdown',
-                    'sections' => ['purpose'],
-                    'columns' => ['type', 'count', 'percentage'],
-                ],
-                [
-                    'label' => 'Requests by Area',
-                    'sections' => ['area'],
-                    'columns' => ['area', 'count', 'percentage'],
-                ],
-                [
-                    'label' => 'Requests by Sector Membership',
-                    'sections' => ['sector'],
-                    'columns' => ['sector', 'count', 'percentage'],
-                ],
-                [
-                    'label' => 'Monthly Trend',
-                    'sections' => ['trend'],
-                    'columns' => ['date', 'count', 'result', 'percentage'],
                 ],
             ],
         ],
@@ -1158,7 +1257,7 @@ function rp_report_customize_config(string $module): array {
 }
 
 // ── Module routing ────────────────────────────────────────────────────────────
-$allowedModules = ['certificate_issuance', 'clearance_issuance', 'financial', 'residents', 'appointments', 'blotter', 'complaints'];
+$allowedModules = ['certificate_issuance', 'clearance_issuance', 'financial', 'residents', 'blotter', 'complaints'];
 $module = strtolower(trim((string)($_GET['module'] ?? 'certificate_issuance')));
 if ($module === 'document_requests') {
     $module = 'certificate_issuance';
@@ -1239,6 +1338,7 @@ if (!empty($_SESSION['user_id']) && isset($conn) && $conn instanceof mysqli) {
         $pStmt->execute();
         $pRow = $pStmt->get_result()->fetch_assoc();
         if ($pRow) {
+            $pRow = pii_decrypt_official_row($pRow) ?? $pRow;
             $preparedByName = trim($pRow['firstname'] . ' ' . $pRow['lastname']);
         }
         $pStmt->close();
@@ -1462,162 +1562,185 @@ if ($issuanceModuleConfig !== null && rp_table_exists($conn, 'documentrequesttbl
 // MODULE: FINANCIAL
 // ═══════════════════════════════════════════════════════════════════════════════
 $fin = [];
-if ($module === 'financial' && rp_table_exists($conn, 'documentrequesttbl') && rp_table_exists($conn, 'financetransactiontbl')) {
-    $df = $conn->real_escape_string($dateFrom);
-    $dt = $conn->real_escape_string($dateTo);
-    $residentParts = rp_document_request_resident_parts($conn, 'd', 'fin');
-    $financeRollup = rp_finance_rollup_subquery($conn, 'ft');
-    $residentJoin = $residentParts['joins'] !== '' ? $residentParts['joins'] : '';
-    $areaExpr = $residentParts['area_expr'];
-    $sectorExpr = $residentParts['sector_expr'];
-    $docTypeExpr = "COALESCE(NULLIF(TRIM(d.document_type), ''), 'Unspecified')";
-    $financeDateExpr = "NULLIF(f.finance_event_at, '0000-00-00 00:00:00')";
-    $financialDateFilter = $financeDateExpr !== 'NULL'
-        ? "DATE({$financeDateExpr}) BETWEEN '{$df}' AND '{$dt}'"
-        : '1 = 0';
-    $financialCollectedFilter = "LOWER(d.stage) IN ('payment_verified', 'ready_for_claim', 'completed') AND COALESCE(f.transaction_amount, 0) > 0";
-    $financialFilterClauses = [$financialCollectedFilter, $financialDateFilter];
-    if ($reportFilterTypes !== []) {
-        $financialFilterClauses[] = "{$docTypeExpr} IN (" . rp_sql_in_list($conn, $reportFilterTypes) . ")";
-    }
-    if ($reportFilterAreas !== [] && $areaExpr !== 'NULL') {
-        $financialFilterClauses[] = "{$areaExpr} IN (" . rp_sql_in_list($conn, $reportFilterAreas) . ")";
-    }
-    if ($reportFilterSectors !== [] && $sectorExpr !== 'NULL') {
-        $financialFilterClauses[] = rp_csv_contains_any_expr($conn, $sectorExpr, $reportFilterSectors);
-    }
-    $financialWhere = implode(' AND ', $financialFilterClauses);
-    $reportFilterOptions['type'] = rp_options_from_rows(rp_safe_query($conn, "
-        SELECT {$docTypeExpr} AS value
-        FROM documentrequesttbl d
-        INNER JOIN {$financeRollup} f ON f.request_id = d.request_id
-        " . ($residentJoin !== '' ? "\n        {$residentJoin}" : '') . "
-        WHERE {$financialCollectedFilter}
-          AND {$financialDateFilter}
-        GROUP BY {$docTypeExpr}
-        ORDER BY {$docTypeExpr} ASC
-    "), 'value', 'rp_document_type_label');
-    if ($areaExpr !== 'NULL') {
-        $reportFilterOptions['area'] = rp_options_from_rows(rp_safe_query($conn, "
-            SELECT {$areaExpr} AS value
-            FROM documentrequesttbl d
-            INNER JOIN {$financeRollup} f ON f.request_id = d.request_id
-            {$residentJoin}
-            WHERE {$financialCollectedFilter}
-              AND {$financialDateFilter}
-              AND {$areaExpr} IS NOT NULL
-              AND {$areaExpr} <> ''
-            GROUP BY {$areaExpr}
-            ORDER BY {$areaExpr} ASC
-        "), 'value');
-    }
-    if ($sectorExpr !== 'NULL') {
-        $reportFilterOptions['sector'] = rp_sector_options_from_rows(rp_safe_query($conn, "
-            SELECT {$sectorExpr} AS sector_membership
-            FROM documentrequesttbl d
-            INNER JOIN {$financeRollup} f ON f.request_id = d.request_id
-            {$residentJoin}
-            WHERE {$financialCollectedFilter}
-              AND {$financialDateFilter}
-              AND {$sectorExpr} IS NOT NULL
-              AND {$sectorExpr} <> ''
-        "));
+if ($module === 'financial') {
+    $financialSourceRows = rp_fetch_financial_collection_rows($conn, $dateFrom, $dateTo);
+    $reportFilterOptions['type'] = rp_options_from_rows($financialSourceRows, 'document_type', 'rp_document_type_label');
+
+    $filteredFinancialRows = array_values(array_filter(
+        $financialSourceRows,
+        static function (array $row) use ($reportFilterTypes, $reportFilterAreas, $reportFilterSectors): bool {
+            return rp_financial_matches_filters($row, $reportFilterTypes, $reportFilterAreas, $reportFilterSectors);
+        }
+    ));
+
+    $kpi = [
+        'total_issued' => 0,
+        'total_collections' => 0.0,
+        'gcash_total' => 0.0,
+        'walkin_total' => 0.0,
+        'unspecified_total' => 0.0,
+        'or_count' => 0,
+    ];
+    $dailyLog = [];
+    $typeRollup = [];
+    $methodRollup = [];
+    $areaRollup = [];
+    $departmentRollup = [];
+    $orLog = [];
+
+    foreach ($filteredFinancialRows as $row) {
+        $amount = (float)($row['transaction_amount'] ?? 0);
+        $methodKey = rp_financial_payment_method_key((string)($row['payment_method'] ?? ''));
+        $orNumber = trim((string)($row['or_number'] ?? ''));
+        $documentType = trim((string)($row['document_type'] ?? ''));
+        $documentType = $documentType !== '' ? $documentType : 'Unspecified';
+        $areaLabel = trim((string)($row['area_number'] ?? ''));
+        $areaLabel = $areaLabel !== '' ? $areaLabel : 'Unspecified';
+        $departmentLabel = rp_financial_department_value($row);
+        $departmentLabel = $departmentLabel !== '' ? $departmentLabel : 'Unspecified';
+        $eventAt = trim((string)($row['finance_event_at'] ?? ''));
+        $collectionDate = $eventAt !== '' ? substr($eventAt, 0, 10) : '';
+
+        $kpi['total_issued']++;
+        $kpi['total_collections'] += $amount;
+        if ($methodKey === 'gcash') {
+            $kpi['gcash_total'] += $amount;
+        } elseif (in_array($methodKey, ['barangay', 'walk_in', 'walkin', 'cash'], true)) {
+            $kpi['walkin_total'] += $amount;
+        } else {
+            $kpi['unspecified_total'] += $amount;
+        }
+        if ($orNumber !== '') {
+            $kpi['or_count']++;
+        }
+
+        if ($collectionDate !== '') {
+            if (!isset($dailyLog[$collectionDate])) {
+                $dailyLog[$collectionDate] = [
+                    'collection_date' => $collectionDate,
+                    'count' => 0,
+                    'total' => 0.0,
+                    'gcash' => 0.0,
+                    'walkin' => 0.0,
+                    'unspecified' => 0.0,
+                ];
+            }
+            $dailyLog[$collectionDate]['count']++;
+            $dailyLog[$collectionDate]['total'] += $amount;
+            if ($methodKey === 'gcash') {
+                $dailyLog[$collectionDate]['gcash'] += $amount;
+            } elseif (in_array($methodKey, ['barangay', 'walk_in', 'walkin', 'cash'], true)) {
+                $dailyLog[$collectionDate]['walkin'] += $amount;
+            } else {
+                $dailyLog[$collectionDate]['unspecified'] += $amount;
+            }
+        }
+
+        if (!isset($typeRollup[$documentType])) {
+            $typeRollup[$documentType] = [
+                'document_type' => $documentType,
+                'count' => 0,
+                'total' => 0.0,
+            ];
+        }
+        $typeRollup[$documentType]['count']++;
+        $typeRollup[$documentType]['total'] += $amount;
+
+        if (!isset($methodRollup[$methodKey])) {
+            $methodRollup[$methodKey] = [
+                'method' => $methodKey,
+                'total' => 0,
+                'amount' => 0.0,
+            ];
+        }
+        $methodRollup[$methodKey]['total']++;
+        $methodRollup[$methodKey]['amount'] += $amount;
+
+        if (!isset($areaRollup[$areaLabel])) {
+            $areaRollup[$areaLabel] = [
+                'area' => $areaLabel,
+                'total' => 0,
+                'amount' => 0.0,
+            ];
+        }
+        $areaRollup[$areaLabel]['total']++;
+        $areaRollup[$areaLabel]['amount'] += $amount;
+
+        if (!isset($departmentRollup[$departmentLabel])) {
+            $departmentRollup[$departmentLabel] = [
+                'department' => $departmentLabel,
+                'total' => 0,
+                'amount' => 0.0,
+            ];
+        }
+        $departmentRollup[$departmentLabel]['total']++;
+        $departmentRollup[$departmentLabel]['amount'] += $amount;
+
+        if ($orNumber !== '') {
+            $orLog[] = [
+                'or_number' => $orNumber,
+                'certificate_number' => trim((string)($row['certificate_number'] ?? '')) ?: '—',
+                'resident_name' => trim((string)($row['resident_name'] ?? '')),
+                'document_type' => $documentType,
+                'fee_amount' => $amount,
+                'payment_method' => rp_payment_method_label($methodKey),
+                'finance_decision_at' => $eventAt,
+            ];
+        }
     }
 
-    $fin['kpi'] = rp_safe_query($conn, "
-        SELECT
-          COUNT(*) AS total_issued,
-          SUM(COALESCE(f.transaction_amount, 0)) AS total_collections,
-          SUM(CASE WHEN LOWER(COALESCE(f.payment_method, ''))='gcash' THEN COALESCE(f.transaction_amount, 0) ELSE 0 END) AS gcash_total,
-          SUM(CASE WHEN LOWER(COALESCE(f.payment_method, '')) IN ('barangay', 'walk_in', 'walkin', 'cash') THEN COALESCE(f.transaction_amount, 0) ELSE 0 END) AS walkin_total,
-          SUM(CASE WHEN COALESCE(f.or_number, '') <> '' THEN 1 ELSE 0 END) AS or_count
-        FROM documentrequesttbl d
-        INNER JOIN {$financeRollup} f ON f.request_id = d.request_id
-        " . ($residentJoin !== '' ? "\n        {$residentJoin}" : '') . "
-        WHERE {$financialWhere}
-    ");
-    $fin['kpi'] = $fin['kpi'][0] ?? [];
+    ksort($dailyLog);
+    $fin['kpi'] = $kpi;
+    $fin['daily_log'] = array_values($dailyLog);
 
-    $fin['daily_log'] = rp_safe_query($conn, "
-        SELECT
-          DATE({$financeDateExpr}) AS collection_date,
-          COUNT(*) AS count,
-          SUM(COALESCE(f.transaction_amount, 0)) AS total,
-          SUM(CASE WHEN LOWER(COALESCE(f.payment_method, ''))='gcash' THEN COALESCE(f.transaction_amount, 0) ELSE 0 END) AS gcash,
-          SUM(CASE WHEN LOWER(COALESCE(f.payment_method, '')) IN ('barangay', 'walk_in', 'walkin', 'cash') THEN COALESCE(f.transaction_amount, 0) ELSE 0 END) AS walkin
-        FROM documentrequesttbl d
-        INNER JOIN {$financeRollup} f ON f.request_id = d.request_id
-        " . ($residentJoin !== '' ? "\n        {$residentJoin}" : '') . "
-        WHERE {$financialWhere}
-        GROUP BY collection_date ORDER BY collection_date ASC
-    ");
+    $fin['by_type'] = array_values($typeRollup);
+    usort($fin['by_type'], static function (array $left, array $right): int {
+        $amountCompare = (float)($right['total'] ?? 0) <=> (float)($left['total'] ?? 0);
+        if ($amountCompare !== 0) {
+            return $amountCompare;
+        }
+        return strcmp((string)($left['document_type'] ?? ''), (string)($right['document_type'] ?? ''));
+    });
 
-    $fin['by_type'] = rp_safe_query($conn, "
-        SELECT
-          {$docTypeExpr} AS document_type,
-          COUNT(*) AS count,
-          SUM(COALESCE(f.transaction_amount, 0)) AS total
-        FROM documentrequesttbl d
-        INNER JOIN {$financeRollup} f ON f.request_id = d.request_id
-        " . ($residentJoin !== '' ? "\n        {$residentJoin}" : '') . "
-        WHERE {$financialWhere}
-        GROUP BY {$docTypeExpr}
-        ORDER BY total DESC
-    ");
-    $fin['by_department'] = $fin['by_type'] !== []
-        ? rp_financial_department_rollup_rows($fin['by_type'])
+    $fin['by_method'] = array_values($methodRollup);
+    usort($fin['by_method'], static function (array $left, array $right): int {
+        $amountCompare = (float)($right['amount'] ?? 0) <=> (float)($left['amount'] ?? 0);
+        if ($amountCompare !== 0) {
+            return $amountCompare;
+        }
+        return (int)($right['total'] ?? 0) <=> (int)($left['total'] ?? 0);
+    });
+
+    $finAreaRows = array_values($areaRollup);
+    usort($finAreaRows, static function (array $left, array $right): int {
+        $countCompare = (int)($right['total'] ?? 0) <=> (int)($left['total'] ?? 0);
+        if ($countCompare !== 0) {
+            return $countCompare;
+        }
+        return (float)($right['amount'] ?? 0) <=> (float)($left['amount'] ?? 0);
+    });
+    $fin['by_area'] = $finAreaRows !== []
+        ? rp_complete_area_rollup_rows($finAreaRows, 'area', ['total' => 0, 'amount' => 0.0])
         : [];
 
-    $fin['by_method'] = rp_safe_query($conn, "
-        SELECT
-          COALESCE(NULLIF(TRIM(LOWER(COALESCE(f.payment_method, ''))), ''), 'unspecified') AS method,
-          COUNT(*) AS total,
-          SUM(COALESCE(f.transaction_amount, 0)) AS amount
-        FROM documentrequesttbl d
-        INNER JOIN {$financeRollup} f ON f.request_id = d.request_id
-        " . ($residentJoin !== '' ? "\n        {$residentJoin}" : '') . "
-        WHERE {$financialWhere}
-        GROUP BY method
-        ORDER BY amount DESC, total DESC
-    ");
+    $fin['by_department'] = array_values($departmentRollup);
+    usort($fin['by_department'], static function (array $left, array $right): int {
+        $amountCompare = (float)($right['amount'] ?? 0) <=> (float)($left['amount'] ?? 0);
+        if ($amountCompare !== 0) {
+            return $amountCompare;
+        }
+        return strcmp((string)($left['department'] ?? ''), (string)($right['department'] ?? ''));
+    });
 
-    if ($areaExpr !== 'NULL') {
-        $finAreaRows = rp_safe_query($conn, "
-            SELECT
-              COALESCE({$areaExpr}, 'Unspecified') AS area,
-              COUNT(*) AS total,
-              SUM(COALESCE(f.transaction_amount, 0)) AS amount
-            FROM documentrequesttbl d
-            INNER JOIN {$financeRollup} f ON f.request_id = d.request_id
-            {$residentJoin}
-            WHERE {$financialWhere}
-            GROUP BY area
-            ORDER BY total DESC, amount DESC
-        ");
-        $fin['by_area'] = $finAreaRows !== []
-            ? rp_complete_area_rollup_rows($finAreaRows, 'area', ['total' => 0, 'amount' => 0.0])
-            : [];
-    }
-
-    $fin['or_log'] = rp_safe_query($conn, "
-        SELECT f.or_number, d.certificate_number,
-          TRIM(CONCAT_WS(' ',
-            NULLIF(TRIM(COALESCE(f.applicant_firstname,'')), ''),
-            NULLIF(TRIM(COALESCE(f.applicant_middleInitial,'')), ''),
-            NULLIF(TRIM(COALESCE(f.applicant_lastname,'')), '')
-          )) AS resident_name,
-          COALESCE(NULLIF(TRIM(d.document_type), ''),'—') AS document_type,
-          COALESCE(f.transaction_amount, 0) AS fee_amount,
-          UPPER(COALESCE(f.payment_method,'—')) AS payment_method,
-          {$financeDateExpr} AS finance_decision_at
-        FROM documentrequesttbl d
-        INNER JOIN {$financeRollup} f ON f.request_id = d.request_id
-        " . ($residentJoin !== '' ? "\n        {$residentJoin}" : '') . "
-        WHERE {$financialWhere}
-          AND COALESCE(f.or_number, '') <> ''
-        ORDER BY {$financeDateExpr} ASC
-        LIMIT 500
-    ");
+    usort($orLog, static function (array $left, array $right): int {
+        $dateCompare = strcmp((string)($left['finance_decision_at'] ?? ''), (string)($right['finance_decision_at'] ?? ''));
+        if ($dateCompare !== 0) {
+            return $dateCompare;
+        }
+        return strcmp((string)($left['or_number'] ?? ''), (string)($right['or_number'] ?? ''));
+    });
+    $fin['or_log'] = array_slice($orLog, 0, 500);
+    $fin['or_log_total'] = array_sum(array_map(static fn(array $row): float => (float)($row['fee_amount'] ?? 0), $fin['or_log']));
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -2192,7 +2315,6 @@ $moduleLabels = [
     'clearance_issuance' => ['label' => 'Clearance Issuance Report', 'icon' => 'fa-stamp'],
     'financial'         => ['label' => 'Financial / Collections', 'icon' => 'fa-peso-sign'],
     'residents'         => ['label' => 'Residents', 'icon' => 'fa-users'],
-    'appointments'      => ['label' => 'Appointments', 'icon' => 'fa-calendar-check'],
     'blotter'           => ['label' => 'Blotter & Cases', 'icon' => 'fa-gavel'],
     'complaints'        => ['label' => 'Complaints & Grievances', 'icon' => 'fa-comments'],
 ];
@@ -3764,8 +3886,8 @@ elseif ($module === 'financial'):
     }
   ));
   $showFinancialSection = static fn(string $key): bool => in_array($key, $financialVisibleSections, true);
-  $financialTypeRevenueChartData = array_values(array_filter($fin['by_type'] ?? [], static function (array $row): bool {
-    return (float)($row['total'] ?? 0) > 0;
+  $financialTypeRevenueChartData = array_values(array_filter($fin['by_method'] ?? [], static function (array $row): bool {
+    return (float)($row['amount'] ?? 0) > 0;
   }));
   $financialAreaRevenueChartData = array_values($fin['by_area'] ?? []);
   $shouldLoadFinancialCharts = $showFinancialSection('charts') && (
@@ -3784,6 +3906,7 @@ elseif ($module === 'financial'):
               <tr><td>Total Collections</td><td>&#8369;<?= number_format((float)($kpi['total_collections']??0),2) ?></td></tr>
               <tr><td>&nbsp;&nbsp;&nbsp; ↳ GCash Collections</td><td>&#8369;<?= number_format((float)($kpi['gcash_total']??0),2) ?> &nbsp;<span class="pct">(<?= rp_pct((float)($kpi['gcash_total']??0),(float)($kpi['total_collections']??0)) ?>)</span></td></tr>
               <tr><td>&nbsp;&nbsp;&nbsp; ↳ Walk-in / Barangay Collections</td><td>&#8369;<?= number_format((float)($kpi['walkin_total']??0),2) ?> &nbsp;<span class="pct">(<?= rp_pct((float)($kpi['walkin_total']??0),(float)($kpi['total_collections']??0)) ?>)</span></td></tr>
+              <tr><td>&nbsp;&nbsp;&nbsp; ↳ Unspecified / Manual Entry</td><td>&#8369;<?= number_format((float)($kpi['unspecified_total']??0),2) ?> &nbsp;<span class="pct">(<?= rp_pct((float)($kpi['unspecified_total']??0),(float)($kpi['total_collections']??0)) ?>)</span></td></tr>
               <tr><td>Official Receipts (OR) Issued</td><td><?= number_format((int)($kpi['or_count']??0)) ?></td></tr>
             </tbody>
           </table>
@@ -3798,11 +3921,11 @@ elseif ($module === 'financial'):
           <?php else: ?>
           <div class="rp-chart-grid">
             <div class="rp-chart-card">
-              <div class="rp-subsection-title">By Document Request Revenue Stream</div>
+              <div class="rp-subsection-title">By Payment Type Revenue Stream</div>
               <div class="rp-chart-wrap">
                 <canvas id="financialTypeRevenueChart"></canvas>
               </div>
-              <div class="rp-chart-note">Bar graph view of revenue by document request type.</div>
+              <div class="rp-chart-note">Bar graph view of revenue by payment type.</div>
             </div>
             <div class="rp-chart-card">
               <div class="rp-subsection-title">By Area Revenue Stream</div>
@@ -3816,24 +3939,24 @@ elseif ($module === 'financial'):
         </div>
         <?php endif; ?>
 
-        <!-- II. By Document Type -->
+        <!-- II. By Payment Type -->
         <?php if ($showFinancialSection('type')): ?>
         <div class="rp-section">
           <div class="rp-section-label"><?= htmlspecialchars($financialSectionLabel('type')) ?></div>
-          <?php if (empty($fin['by_type'])): ?>
+          <?php if (empty($fin['by_method'])): ?>
             <p class="rp-empty">No data for the selected period.</p>
           <?php else: ?>
           <table class="rp-table">
-            <thead><tr><th class="<?= htmlspecialchars(trim($reportColumnClass('type'))) ?>">Document Type</th><th class="text-end">Price</th><th class="text-center<?= htmlspecialchars($reportColumnClass('count')) ?>">No. of Documents Requested</th><th class="text-end">Total</th></tr></thead>
+            <thead><tr><th class="<?= htmlspecialchars(trim($reportColumnClass('payment'))) ?>">Payment Type</th><th class="text-end">Average Amount</th><th class="text-center<?= htmlspecialchars($reportColumnClass('count')) ?>">No. of Transactions</th><th class="text-end">Total</th></tr></thead>
             <tbody>
               <?php
-              foreach ($fin['by_type'] as $r):
-                $cnt = (int)$r['count'];
-                $amt = (float)$r['total'];
+              foreach ($fin['by_method'] as $r):
+                $cnt = (int)$r['total'];
+                $amt = (float)$r['amount'];
                 $unitPrice = $cnt > 0 ? $amt / $cnt : 0.0;
               ?>
               <tr>
-                <td class="<?= htmlspecialchars(trim($reportColumnClass('type'))) ?>"><?= htmlspecialchars(rp_document_type_label((string)$r['document_type'])) ?></td>
+                <td class="<?= htmlspecialchars(trim($reportColumnClass('payment'))) ?>"><?= htmlspecialchars(rp_payment_method_label((string)$r['method'])) ?></td>
                 <td class="text-end">&#8369;<?= number_format($unitPrice, 2) ?></td>
                 <td class="text-center<?= htmlspecialchars($reportColumnClass('count')) ?>"><?= number_format($cnt) ?></td>
                 <td class="text-end">&#8369;<?= number_format($amt,2) ?></td>
@@ -3842,7 +3965,7 @@ elseif ($module === 'financial'):
             </tbody>
             <tfoot>
               <tr>
-                <td class="<?= htmlspecialchars(trim($reportColumnClass('type'))) ?>"><strong>TOTAL</strong></td>
+                <td class="<?= htmlspecialchars(trim($reportColumnClass('payment'))) ?>"><strong>TOTAL</strong></td>
                 <td class="text-end"></td>
                 <td class="text-center<?= htmlspecialchars($reportColumnClass('count')) ?>"><?= number_format((int)($kpi['total_issued']??0)) ?></td>
                 <td class="text-end">&#8369;<?= number_format((float)($kpi['total_collections']??0),2) ?></td>
@@ -3853,16 +3976,16 @@ elseif ($module === 'financial'):
         </div>
         <?php endif; ?>
 
-        <!-- III. Payment Method Breakdown -->
+        <!-- III. Payment Type Breakdown -->
         <?php if ($showFinancialSection('payment_method')): ?>
         <div class="rp-section">
           <div class="rp-section-label"><?= htmlspecialchars($financialSectionLabel('payment_method')) ?></div>
           <?php if (empty($fin['by_method'])): ?>
-            <p class="rp-empty">No payment method data for this period.</p>
+            <p class="rp-empty">No payment type data for this period.</p>
           <?php else: $methodCountTotal = array_sum(array_column($fin['by_method'], 'total')); ?>
           <table class="rp-table">
             <thead>
-              <tr><th class="<?= htmlspecialchars(trim($reportColumnClass('payment'))) ?>">Payment Method</th><th class="text-center<?= htmlspecialchars($reportColumnClass('count')) ?>">Transactions</th><th class="text-center<?= htmlspecialchars($reportColumnClass('percentage')) ?>">%</th><th class="text-end<?= htmlspecialchars($reportColumnClass('revenue')) ?>">Amount Collected</th></tr>
+              <tr><th class="<?= htmlspecialchars(trim($reportColumnClass('payment'))) ?>">Payment Type</th><th class="text-center<?= htmlspecialchars($reportColumnClass('count')) ?>">Transactions</th><th class="text-center<?= htmlspecialchars($reportColumnClass('percentage')) ?>">%</th><th class="text-end<?= htmlspecialchars($reportColumnClass('revenue')) ?>">Amount Collected</th></tr>
             </thead>
             <tbody>
               <?php foreach ($fin['by_method'] as $r): ?>
@@ -3948,7 +4071,7 @@ elseif ($module === 'financial'):
           <?php else: ?>
           <table class="rp-table">
             <thead>
-              <tr><th class="<?= htmlspecialchars(trim($reportColumnClass('date'))) ?>">Date</th><th class="text-center<?= htmlspecialchars($reportColumnClass('count')) ?>">Transactions</th><th class="text-end<?= htmlspecialchars($reportColumnClass('channel')) ?>">GCash</th><th class="text-end<?= htmlspecialchars($reportColumnClass('channel')) ?>">Walk-in</th><th class="text-end">Total</th></tr>
+              <tr><th class="<?= htmlspecialchars(trim($reportColumnClass('date'))) ?>">Date</th><th class="text-center<?= htmlspecialchars($reportColumnClass('count')) ?>">Transactions</th><th class="text-end<?= htmlspecialchars($reportColumnClass('channel')) ?>">GCash</th><th class="text-end<?= htmlspecialchars($reportColumnClass('channel')) ?>">Walk-in</th><th class="text-end<?= htmlspecialchars($reportColumnClass('channel')) ?>">Unspecified</th><th class="text-end">Total</th></tr>
             </thead>
             <tbody>
               <?php foreach ($fin['daily_log'] as $r): ?>
@@ -3957,6 +4080,7 @@ elseif ($module === 'financial'):
                 <td class="text-center<?= htmlspecialchars($reportColumnClass('count')) ?>"><?= number_format((int)$r['count']) ?></td>
                 <td class="text-end<?= htmlspecialchars($reportColumnClass('channel')) ?>">&#8369;<?= number_format((float)$r['gcash'],2) ?></td>
                 <td class="text-end<?= htmlspecialchars($reportColumnClass('channel')) ?>">&#8369;<?= number_format((float)$r['walkin'],2) ?></td>
+                <td class="text-end<?= htmlspecialchars($reportColumnClass('channel')) ?>">&#8369;<?= number_format((float)($r['unspecified'] ?? 0),2) ?></td>
                 <td class="text-end"><strong>&#8369;<?= number_format((float)$r['total'],2) ?></strong></td>
               </tr>
               <?php endforeach; ?>
@@ -3967,6 +4091,7 @@ elseif ($module === 'financial'):
                 <td class="text-center<?= htmlspecialchars($reportColumnClass('count')) ?>"><?= number_format((int)($kpi['total_issued']??0)) ?></td>
                 <td class="text-end<?= htmlspecialchars($reportColumnClass('channel')) ?>">&#8369;<?= number_format((float)($kpi['gcash_total']??0),2) ?></td>
                 <td class="text-end<?= htmlspecialchars($reportColumnClass('channel')) ?>">&#8369;<?= number_format((float)($kpi['walkin_total']??0),2) ?></td>
+                <td class="text-end<?= htmlspecialchars($reportColumnClass('channel')) ?>">&#8369;<?= number_format((float)($kpi['unspecified_total']??0),2) ?></td>
                 <td class="text-end">&#8369;<?= number_format((float)($kpi['total_collections']??0),2) ?></td>
               </tr>
             </tfoot>
@@ -3981,7 +4106,7 @@ elseif ($module === 'financial'):
           <div class="rp-section-label"><?= htmlspecialchars($financialSectionLabel('or_log')) ?></div>
           <table class="rp-table">
             <thead>
-              <tr><th class="<?= htmlspecialchars(trim($reportColumnClass('identifier'))) ?>">#</th><th class="<?= htmlspecialchars(trim($reportColumnClass('identifier'))) ?>">OR Number</th><th class="<?= htmlspecialchars(trim($reportColumnClass('identifier'))) ?>">Cert. No.</th><th class="<?= htmlspecialchars(trim($reportColumnClass('resident'))) ?>">Resident</th><th class="<?= htmlspecialchars(trim($reportColumnClass('type'))) ?>">Document Type</th><th class="<?= htmlspecialchars(trim($reportColumnClass('payment'))) ?>">Method</th><th class="text-end<?= htmlspecialchars($reportColumnClass('revenue')) ?>">Amount</th><th class="<?= htmlspecialchars(trim($reportColumnClass('date'))) ?>">Date Verified</th></tr>
+              <tr><th class="<?= htmlspecialchars(trim($reportColumnClass('identifier'))) ?>">#</th><th class="<?= htmlspecialchars(trim($reportColumnClass('identifier'))) ?>">OR Number</th><th class="<?= htmlspecialchars(trim($reportColumnClass('identifier'))) ?>">Cert./Ref.</th><th class="<?= htmlspecialchars(trim($reportColumnClass('resident'))) ?>">Resident</th><th class="<?= htmlspecialchars(trim($reportColumnClass('type'))) ?>">Document Type</th><th class="<?= htmlspecialchars(trim($reportColumnClass('payment'))) ?>">Payment Type</th><th class="text-end<?= htmlspecialchars($reportColumnClass('revenue')) ?>">Amount</th><th class="<?= htmlspecialchars(trim($reportColumnClass('date'))) ?>">Transaction Date</th></tr>
             </thead>
             <tbody>
               <?php $i = 1; foreach ($fin['or_log'] as $r): ?>
@@ -4005,7 +4130,7 @@ elseif ($module === 'financial'):
                 <td class="<?= htmlspecialchars(trim($reportColumnClass('resident'))) ?>"></td>
                 <td class="<?= htmlspecialchars(trim($reportColumnClass('type'))) ?>"></td>
                 <td class="<?= htmlspecialchars(trim($reportColumnClass('payment'))) ?>"></td>
-                <td class="text-end<?= htmlspecialchars($reportColumnClass('revenue')) ?>">&#8369;<?= number_format((float)($kpi['total_collections']??0),2) ?></td>
+                <td class="text-end<?= htmlspecialchars($reportColumnClass('revenue')) ?>">&#8369;<?= number_format((float)($fin['or_log_total'] ?? 0),2) ?></td>
                 <td class="<?= htmlspecialchars(trim($reportColumnClass('date'))) ?>"></td>
               </tr>
             </tfoot>
@@ -5445,9 +5570,9 @@ window.__rpChartHelpers = (() => {
   const sources = [
     {
       canvasId: 'financialTypeRevenueChart',
-      labels: <?= json_encode(array_map(static fn(array $row): string => rp_document_type_label((string)($row['document_type'] ?? '')), $financialTypeRevenueChartData), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>,
-      values: <?= json_encode(array_map(static fn(array $row): float => (float)($row['total'] ?? 0), $financialTypeRevenueChartData), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>,
-      title: 'By Document Request Revenue Stream'
+      labels: <?= json_encode(array_map(static fn(array $row): string => rp_payment_method_label((string)($row['method'] ?? '')), $financialTypeRevenueChartData), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>,
+      values: <?= json_encode(array_map(static fn(array $row): float => (float)($row['amount'] ?? 0), $financialTypeRevenueChartData), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>,
+      title: 'By Payment Type Revenue Stream'
     },
     {
       canvasId: 'financialAreaRevenueChart',

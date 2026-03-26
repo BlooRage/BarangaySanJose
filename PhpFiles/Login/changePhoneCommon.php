@@ -9,6 +9,8 @@ ini_set('display_errors', '0');
 ini_set('log_errors', '1');
 error_reporting(E_ALL);
 
+require_once __DIR__ . '/../General/uniqueIDGenerate.php';
+
 function cpn_read_payload(): array
 {
     $payload = json_decode(file_get_contents('php://input'), true);
@@ -71,7 +73,7 @@ function cpn_get_user_account(mysqli $conn, string $userId): array
     if (!$row) {
         throw new Exception('Account not found.');
     }
-    return $row;
+    return pii_decrypt_useraccount_row($row) ?? [];
 }
 
 function cpn_insert_otp(mysqli $conn, string $userId, string $recipient, string $purpose, string $otpCode, int $ttlMinutes = 5): array
@@ -115,21 +117,7 @@ function cpn_insert_otp(mysqli $conn, string $userId, string $recipient, string 
 
     $STATUS_PENDING = 6;
 
-    $stmt = $conn->prepare("
-        INSERT INTO otprequesttbl
-            (user_id, recipient, purpose, otp_code_hash, otp_expiry, request_timestamp, status_id_otp)
-        VALUES
-            (?, ?, ?, ?, ?, ?, ?)
-    ");
-    if (!$stmt) {
-        throw new Exception('Failed to prepare OTP insert.');
-    }
-    $stmt->bind_param('ssssssi', $userId, $recipient, $purpose, $otpHash, $expiryTime, $requestTime, $STATUS_PENDING);
-    if (!$stmt->execute()) {
-        $stmt->close();
-        throw new Exception('Failed to store OTP.');
-    }
-    $stmt->close();
+    insertOtpRequest($conn, $userId, $recipient, $purpose, $otpHash, $expiryTime, $requestTime, $STATUS_PENDING);
 
     return ['expires_at' => $expiryTime];
 }
@@ -197,4 +185,3 @@ function cpn_verify_latest_otp(mysqli $conn, string $userId, string $recipient, 
         $up->close();
     }
 }
-

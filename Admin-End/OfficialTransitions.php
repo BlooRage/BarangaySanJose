@@ -86,6 +86,7 @@ if (!function_exists('ot_ensure_transition_schema')) {
         }
 
         $columnDefinitions = [
+            'council_id' => "ALTER TABLE officialtransitionstbl ADD COLUMN council_id INT DEFAULT NULL AFTER transition_id",
             'proclamation_date' => "ALTER TABLE officialtransitionstbl ADD COLUMN proclamation_date DATE DEFAULT NULL AFTER batch_label",
             'next_election_date' => "ALTER TABLE officialtransitionstbl ADD COLUMN next_election_date DATE DEFAULT NULL AFTER proclamation_date",
         ];
@@ -135,6 +136,44 @@ if (!function_exists('ot_ignored_transition_seat_sql')) {
             ot_ignored_transition_seat_names()
         );
         return 'LOWER(TRIM(' . $field . ')) NOT IN (' . implode(', ', $values) . ')';
+    }
+}
+
+if (!function_exists('ot_page_decrypt_official_row')) {
+    function ot_page_decrypt_official_row(array $row): array
+    {
+        $row = pii_decrypt_official_row($row) ?? $row;
+        $row = pii_decrypt_useraccount_row($row) ?? $row;
+        return pii_decrypt_assoc($row, ['firstname', 'middlename', 'lastname', 'suffix']);
+    }
+}
+
+if (!function_exists('ot_page_format_official_name')) {
+    function ot_page_format_official_name(array $row, bool $lastNameFirst = false): string
+    {
+        $first = trim((string)($row['firstname'] ?? ''));
+        $middle = trim((string)($row['middlename'] ?? ''));
+        $last = trim((string)($row['lastname'] ?? ''));
+        $suffix = trim((string)($row['suffix'] ?? ''));
+
+        if ($lastNameFirst) {
+            $parts = [];
+            if ($last !== '') {
+                $parts[] = $last . ',';
+            }
+            if ($first !== '') {
+                $parts[] = $first;
+            }
+            if ($middle !== '') {
+                $parts[] = $middle;
+            }
+            if ($suffix !== '') {
+                $parts[] = $suffix;
+            }
+            return trim(implode(' ', $parts), " ,");
+        }
+
+        return trim(implode(' ', array_filter([$first, $middle, $last, $suffix], static fn($value): bool => trim((string)$value) !== '')));
     }
 }
 
@@ -281,6 +320,7 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST' && in_array((string)($_POST
         $stmt->execute();
         $targetRow = $stmt->get_result()->fetch_assoc();
         $stmt->close();
+        $targetRow = $targetRow ? ot_page_decrypt_official_row($targetRow) : null;
 
         if (!$targetRow) {
             throw new RuntimeException('Council seat not found.');
@@ -363,12 +403,13 @@ if ($hasCouncilTbl) {
         SELECT bc.council_id, bc.seat_name, bc.selection_method, bc.seat_group,
                bc.sort_order, bc.term_start, bc.term_end,
                bc.current_official_id,
+               oi.firstname,
+               oi.lastname,
+               oi.middlename,
+               oi.suffix,
                COALESCE(oi.position_access, oi.role_access) AS current_position_access,
                oi.department,
                oi.area_number,
-               CONCAT(oi.lastname, ', ', oi.firstname,
-                      IFNULL(CONCAT(' ', oi.middlename),''),
-                      IFNULL(CONCAT(' ', oi.suffix),''))  AS current_official_name,
                COALESCE(sa.status_name,'')                 AS account_status
         FROM barangaycounciltbl bc
         LEFT JOIN officialinformationtbl oi
@@ -380,7 +421,11 @@ if ($hasCouncilTbl) {
         ORDER BY bc.sort_order, bc.council_id
     ");
     if ($csRes instanceof mysqli_result) {
-        while ($r = $csRes->fetch_assoc()) $councilSeats[] = $r;
+        while ($r = $csRes->fetch_assoc()) {
+            $r = ot_page_decrypt_official_row($r);
+            $r['current_official_name'] = ot_page_format_official_name($r, true);
+            $councilSeats[] = $r;
+        }
         $csRes->close();
     }
 }
@@ -423,7 +468,9 @@ $aoRes = $conn->query("
     ORDER BY oi.lastname, oi.firstname
 ");
 if ($aoRes instanceof mysqli_result) {
-    while ($r = $aoRes->fetch_assoc()) $activeOfficials[] = $r;
+    while ($r = $aoRes->fetch_assoc()) {
+        $activeOfficials[] = ot_page_decrypt_official_row($r);
+    }
     $aoRes->close();
 }
 
@@ -578,6 +625,7 @@ if ($hasCouncilTbl) {
         $kgStmt->execute();
         $kgRes = $kgStmt->get_result();
         while ($row = $kgRes->fetch_assoc()) {
+            $row = ot_page_decrypt_official_row($row);
             if (!ot_is_managed_transition_seat((string)($row['seat_name'] ?? ''))) {
                 continue;
             }
@@ -1764,7 +1812,7 @@ if ($hasCouncilTbl) {
           — <span id="outgoingOfficialPosition"></span>
         </div>
 
-        <!-- Current saved official preview -->
+        <!-- Current transition draft preview -->
         <div id="candidatesList" class="mb-3">
           <div class="text-center text-muted py-3"><i class="fas fa-spinner fa-spin me-2"></i> Loading…</div>
         </div>
@@ -1774,20 +1822,21 @@ if ($hasCouncilTbl) {
           <p class="fw-semibold mb-2 small">Incoming Official Information</p>
           <div class="row g-2">
             <div class="col-12 col-md-5">
-              <label for="formerOfficialMode" class="form-label small fw-semibold mb-1">Former Official?</label>
+              <label for="formerOfficialMode" class="form-label small fw-semibold mb-1">Existing Official Record?</label>
               <select class="form-select form-select-sm" id="formerOfficialMode">
                 <option value="" selected>— Select option —</option>
                 <option value="new">No, this is a new official</option>
-                <option value="former">Yes, search former official</option>
+                <option value="former">Use former official</option>
+                <option value="active">Use active official</option>
               </select>
-              <div class="small text-muted mt-2">Choose Yes only if this person previously served and you want to reactivate the old account.</div>
+              <div class="small text-muted mt-2">Choose an existing record if this person already has a system profile. Pick a new official only for first-time onboarding.</div>
             </div>
             <div class="col-12" id="linkedIdWrap" style="display:none;">
-              <label for="linkedOfficialSearch" class="form-label small fw-semibold mb-1" id="linkedIdLabel">Search Former Officials</label>
-              <div class="small text-muted mb-2">If this person previously served, search them here to auto-fill the details and reactivate the old account.</div>
+              <label for="linkedOfficialSearch" class="form-label small fw-semibold mb-1" id="linkedIdLabel">Search Official Records</label>
+              <div class="small text-muted mb-2" id="linkedIdHelp">Search an existing official record to auto-fill the identity and account details.</div>
               <input type="hidden" id="newCandidateLinkedId" value="">
               <input type="text" class="form-control form-control-sm" id="linkedOfficialSearch"
-                     placeholder="Search former official by name, ID, or position">
+                     placeholder="Search official by name, ID, or position">
               <div id="linkedOfficialSelected" class="small text-success fw-semibold mt-2 d-none"></div>
               <div id="linkedOfficialSearchResults" class="border rounded mt-2 bg-white d-none" style="max-height: 220px; overflow-y: auto;"></div>
             </div>
@@ -1857,7 +1906,7 @@ if ($hasCouncilTbl) {
             </div>
             <div class="col-12">
               <div class="small text-muted">
-                This position accepts one official only. The information here will be saved when you click <span class="fw-semibold">Continue to Access Review</span>.
+                This position accepts one official only. Nothing is stored in a separate incoming-official table. Review the encoded details first, then complete the transition.
               </div>
             </div>
           </div>
@@ -1866,7 +1915,7 @@ if ($hasCouncilTbl) {
       <div class="modal-footer justify-content-between">
         <button class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">Close</button>
         <button class="btn btn-warning btn-sm" id="btnMarkPendingDecision">
-          <i class="fas fa-key me-1"></i> Continue to Access Review
+          <i class="fas fa-key me-1"></i> Review and Continue
         </button>
       </div>
     </div>
@@ -1891,7 +1940,7 @@ if ($hasCouncilTbl) {
 
         <div class="alert alert-info py-2 small mb-3">
           <i class="fas fa-info-circle me-1"></i>
-          Review the saved official access record for this position. When you finish here, the system will process the account immediately and send onboarding access when needed.
+          Review the official details for this position. When you finish here, the system will process the account immediately and send onboarding access when needed.
         </div>
 
         <!-- Encoded official preview -->
@@ -1905,6 +1954,19 @@ if ($hasCouncilTbl) {
           <label class="form-label fw-semibold">Access Action</label>
           <div id="winnerOutcomeSummary" class="border rounded p-3 bg-light text-muted">
             The system will determine the access action after the official information is loaded.
+          </div>
+          <div id="winnerActingOptions" class="border rounded p-3 mt-3 bg-light d-none">
+            <div class="form-check">
+              <input class="form-check-input" type="checkbox" id="winnerUseActingReplacement">
+              <label class="form-check-label fw-semibold" for="winnerUseActingReplacement">
+                Treat this as a temporary acting replacement
+              </label>
+            </div>
+            <div class="small text-muted mt-1 mb-2">
+              Leave this unchecked for a permanent position change. Turn it on when the selected active official is only covering the seat temporarily.
+            </div>
+            <label for="winnerActingUntilDate" class="form-label small fw-semibold mb-1">Acting Until Date</label>
+            <input type="date" class="form-control form-control-sm" id="winnerActingUntilDate" disabled>
           </div>
         </div>
       </div>

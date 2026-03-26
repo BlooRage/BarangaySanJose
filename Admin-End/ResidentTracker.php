@@ -5,7 +5,7 @@
     
   <link rel="icon" href="../Images/favicon_sanjose.png?v=20260211">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Resident Masterlist</title>
+    <title>Resident Tracker</title>
 
     <script src="https://kit.fontawesome.com/3482e00999.js" crossorigin="anonymous"></script>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
@@ -116,7 +116,7 @@ if (isset($conn) && $conn instanceof mysqli) {
     <!-- MAIN CONTENT -->
     <main id="main-display" class="flex-grow-1 p-3 p-md-4 p-xl-5 bg-light">
         <h2 class="mb-4" style="font-family: 'Charis SIL Bold'; color: #DE710C; ">
-            Resident Masterlist
+            Resident Tracker
         </h2>
         <hr><br>
 
@@ -124,8 +124,17 @@ if (isset($conn) && $conn instanceof mysqli) {
 
 	            <!-- FILTER BUTTONS + SEARCH -->
 	            <div class="admin-list-toolbar mb-3 pt-2 flex-wrap">
+	                <!-- Status Filter Buttons -->
 	                <div class="admin-list-tabs">
-	                    <span class="badge text-bg-success px-3 py-2">Verified Residents Only</span>
+	                    <button class="btn btn-outline-primary btn-sm status-filter-btn" data-filter="ALL">&nbsp;&nbsp;All&nbsp;&nbsp;</button>
+	                    <button class="btn btn-outline-secondary btn-sm status-filter-btn fw-semibold" data-filter="VerifiedResident">&nbsp;&nbsp;Verified&nbsp;&nbsp;</button>
+	                    <button class="btn btn-outline-secondary btn-sm status-filter-btn fw-semibold" data-filter="NotVerified">&nbsp;&nbsp;Not Verified&nbsp;&nbsp;</button>
+	                    <button class="btn btn-outline-secondary btn-sm status-filter-btn fw-semibold has-notif" data-filter="PendingVerification">
+	                        &nbsp;&nbsp;Pending
+	                        <?php if ($pendingCount > 0): ?>
+	                            <span class="pending-count-badge"><?= $pendingCount ?></span>
+	                        <?php endif; ?>
+	                    </button>
 	                </div>
 	
 	                <div class="admin-list-actions">
@@ -923,14 +932,14 @@ if (isset($conn) && $conn instanceof mysqli) {
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 <script>
   window.RESIDENT_LIST_OPTIONS = {
-    mode: "masterlist"
+    mode: "tracker"
   };
   window.ADMIN_TABLE_COLUMNS_CONFIG = {
     tableSelector: "#table-appData",
     modalId: "modalTableColumns",
     listId: "tableColumnsList",
     resetBtnId: "btnTableColumnsReset",
-    storageKey: "admin_cols_resident_masterlist_readonly_v1"
+    storageKey: "admin_cols_resident_tracker_v1"
   };
 </script>
 <script src="../JS-Script-Files/Admin-End/tableColumnsGeneric.js?v=20260215-1"></script>

@@ -1,5 +1,6 @@
 <?php
 require_once __DIR__ . '/runtimeConfig.php';
+require_once __DIR__ . '/piiCrypto.php';
 
 // Use Asia/Manila (UTC+08:00) for PHP date/time functions.
 date_default_timezone_set('Asia/Manila');
@@ -167,3 +168,6 @@ $conn->set_charset('utf8mb4');
 // Force MySQL session timezone to UTC+08:00.
 // This affects NOW(), CURRENT_TIMESTAMP, and timestamp defaults for this connection.
 $conn->query("SET time_zone = '+08:00'");
+
+// Ensure the app can persist encrypted PII and hashed lookup indexes.
+pii_ensure_core_schema($conn);

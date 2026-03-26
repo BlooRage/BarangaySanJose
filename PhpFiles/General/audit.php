@@ -1,6 +1,8 @@
 <?php
 declare(strict_types=1);
 
+require_once __DIR__ . '/uniqueIDGenerate.php';
+
 /**
  * Best-effort audit logging.
  * If the table doesn't exist or schema differs, this function must not break the main workflow.
@@ -19,6 +21,41 @@ function auditClamp(?string $value, int $maxLen = 2000): ?string {
     return strlen($s) > $maxLen ? substr($s, 0, $maxLen) : $s;
 }
 
+function auditEnsureTable(mysqli $conn): void {
+    static $done = false;
+    if ($done) {
+        return;
+    }
+    $done = true;
+
+    $conn->query("
+        CREATE TABLE IF NOT EXISTS unifiedauditlogstbl (
+            audit_id VARCHAR(16) NOT NULL,
+            user_id VARCHAR(12),
+            role_access VARCHAR(64) NOT NULL,
+            module_affected VARCHAR(128) NOT NULL,
+            target_type VARCHAR(64) NOT NULL,
+            target_id VARCHAR(64) NOT NULL,
+            action_type VARCHAR(64) NOT NULL,
+            field_changed VARCHAR(128),
+            old_value TEXT,
+            new_value TEXT,
+            remarks TEXT,
+            action_timestamp TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            status_id_audit INT,
+            PRIMARY KEY (audit_id),
+            KEY idx_audit_ts (action_timestamp),
+            KEY idx_audit_user (user_id),
+            KEY idx_audit_module (module_affected),
+            KEY idx_audit_target (target_type, target_id),
+            KEY idx_audit_action (action_type),
+            KEY idx_audit_status (status_id_audit)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+    ");
+
+    idg_ensure_string_generated_key($conn, 'unifiedauditlogstbl', 'audit_id', 16);
+}
+
 function insertUnifiedAuditLog(
     mysqli $conn,
     ?string $userId,
@@ -33,11 +70,18 @@ function insertUnifiedAuditLog(
     ?string $remarks = null,
     ?int $statusIdAudit = null
 ): void {
+    auditEnsureTable($conn);
+
+    $auditId = GenerateUnifiedAuditLogID($conn, $userId, $roleAccess);
+    if ($auditId === false || $auditId === '') {
+        return;
+    }
+
     $stmt = $conn->prepare("
         INSERT INTO unifiedauditlogstbl
-            (user_id, role_access, module_affected, target_type, target_id, action_type, field_changed, old_value, new_value, remarks, status_id_audit)
+            (audit_id, user_id, role_access, module_affected, target_type, target_id, action_type, field_changed, old_value, new_value, remarks, status_id_audit)
         VALUES
-            (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     ");
     if (!$stmt) {
         return;
@@ -61,7 +105,8 @@ function insertUnifiedAuditLog(
     $statusIdStr = $statusIdAudit !== null ? (string)$statusIdAudit : null;
 
     $stmt->bind_param(
-        "sssssssssss",
+        "ssssssssssss",
+        $auditId,
         $userId,
         $roleAccess,
         $moduleAffected,

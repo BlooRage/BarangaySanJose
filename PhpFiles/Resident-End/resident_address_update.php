@@ -602,21 +602,15 @@ $allowedExt = ['jpg', 'jpeg', 'png', 'webp', 'pdf'];
 $conn->begin_transaction();
 
 try {
-    $stmt = $conn->prepare("
-        INSERT INTO resident_edit_requesttbl
-            (resident_id, user_id, request_type, status_id, requested_changes)
-        VALUES (?, ?, 'address', ?, ?)
-    ");
-    if (!$stmt) {
-        throw new Exception('Failed to prepare edit request.');
-    }
     $changesJson = json_encode($changes, JSON_UNESCAPED_SLASHES);
-    $stmt->bind_param("ssis", $residentId, $userId, $pendingStatusId, $changesJson);
-    if (!$stmt->execute()) {
-        throw new Exception('Failed to submit edit request.');
-    }
-    $requestId = (int)$stmt->insert_id;
-    $stmt->close();
+    $requestId = insertResidentEditRequest(
+        $conn,
+        (string)$residentId,
+        (string)$userId,
+        'address',
+        (int)$pendingStatusId,
+        $changesJson
+    );
 
     $docTypeId = getDocumentTypeId($conn, $supportingAddressType);
     $remarks = 'edit_request_supporting:address';
@@ -630,34 +624,21 @@ try {
         }
 
         $moved = moveUploadedFileWithDocName($supportingFile['tmp_name'], $uploadDir, $supportingAddressType, $userId, $ext);
-        $ins = $conn->prepare("
-            INSERT INTO unifiedfileattachmenttbl
-                (source_type, source_id, document_type_id, file_name, file_path, file_type, user_id_uploaded_by, status_id_verify, remarks, id_number)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        ");
-        if (!$ins) {
-            throw new Exception('Failed to prepare supporting document attachment.');
-        }
         $sourceType = 'ResidentEditRequest';
         $sourceId = (string)$requestId;
         $idNumber = null;
-        $ins->bind_param(
-            "ssissssiss",
-            $sourceType,
-            $sourceId,
-            $docTypeId,
-            $moved['file_name'],
-            $moved['file_path'],
-            $ext,
-            $userId,
-            $statusVerifyId,
-            $remarks,
-            $idNumber
-        );
-        if (!$ins->execute()) {
-            throw new Exception('Failed to save supporting document attachment.');
-        }
-        $ins->close();
+        insertUnifiedFileAttachment($conn, [
+            'source_type' => $sourceType,
+            'source_id' => $sourceId,
+            'document_type_id' => $docTypeId,
+            'file_name' => $moved['file_name'],
+            'file_path' => $moved['file_path'],
+            'file_type' => $ext,
+            'user_id_uploaded_by' => $userId,
+            'status_id_verify' => $statusVerifyId,
+            'remarks' => $remarks,
+            'id_number' => $idNumber,
+        ], 'supporting document attachment');
     }
 
     createResidentTransaction(

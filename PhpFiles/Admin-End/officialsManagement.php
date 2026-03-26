@@ -75,6 +75,27 @@ function managementAudienceFromRow(array $row): string {
     );
 }
 
+function officialsManagementDecryptRow(array $row): array
+{
+    $row = pii_decrypt_assoc($row, ['firstname', 'middlename', 'lastname', 'suffix']);
+    return pii_decrypt_useraccount_row($row) ?? $row;
+}
+
+function officialsManagementMatchesSearch(array $row, string $needle): bool
+{
+    return pii_search_match($row, [
+        'official_id',
+        'user_id',
+        'firstname',
+        'middlename',
+        'lastname',
+        'department',
+        'position_access',
+        'email',
+        'phone_number',
+    ], $needle);
+}
+
 function permissionStateFromAccountStatus(string $statusName): string {
     $k = strtolower(trim($statusName));
     if (
@@ -163,49 +184,11 @@ function ensureActorCanModifyTarget(string $actorUserId, string $actorProtectedC
 }
 
 function replaceOfficialModulePermissions(mysqli $conn, string $officialId, string $userId, array $permissionKeys, string $grantedByUserId): void {
-    $deleteStmt = $conn->prepare("DELETE FROM officialmodulepermissionstbl WHERE official_id = ?");
-    if ($deleteStmt) {
-        $deleteStmt->bind_param('s', $officialId);
-        $deleteStmt->execute();
-        $deleteStmt->close();
-    }
-
-    if (!$permissionKeys) {
-        return;
-    }
-
-    $insertStmt = $conn->prepare("
-        INSERT INTO officialmodulepermissionstbl
-            (official_id, user_id, permission_key, is_allowed, granted_by_user_id)
-        VALUES
-            (?, ?, ?, 1, ?)
-    ");
-    if (!$insertStmt) {
-        throw new Exception('Failed to save module permissions.');
-    }
-
-    foreach ($permissionKeys as $permissionKey) {
-        $insertStmt->bind_param('ssss', $officialId, $userId, $permissionKey, $grantedByUserId);
-        $insertStmt->execute();
-    }
-    $insertStmt->close();
+    amp_replace_official_module_permissions($conn, $officialId, $userId, $permissionKeys, $grantedByUserId);
 }
 
 function upsertOfficialAccessProfile(mysqli $conn, string $officialId, string $userId): void {
-    $stmt = $conn->prepare("
-        INSERT INTO officialaccessprofiletbl (official_id, user_id, permissions_initialized)
-        VALUES (?, ?, 1)
-        ON DUPLICATE KEY UPDATE
-            user_id = VALUES(user_id),
-            permissions_initialized = 1,
-            updated_at = CURRENT_TIMESTAMP
-    ");
-    if (!$stmt) {
-        throw new Exception('Failed to save access profile metadata.');
-    }
-    $stmt->bind_param('ss', $officialId, $userId);
-    $stmt->execute();
-    $stmt->close();
+    amp_upsert_official_access_profile($conn, $officialId, $userId);
 }
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
@@ -750,26 +733,13 @@ try {
 
     $params = [];
     $types = '';
-    if ($q !== '') {
-        $sql .= "
-            WHERE (
-                oi.official_id LIKE ?
-                OR oi.user_id LIKE ?
-                OR oi.firstname LIKE ?
-                OR oi.lastname LIKE ?
-                OR oi.department LIKE ?
-                OR {$positionField} LIKE ?
-                OR ua.email LIKE ?
-            )
-        ";
-        $like = '%' . $q . '%';
-        $params = [$like, $like, $like, $like, $like, $like, $like];
-        $types = 'sssssss';
-    }
 
-    $sql .= " ORDER BY oi.official_id DESC LIMIT ?";
-    $params[] = $limit;
-    $types .= 'i';
+    $sql .= " ORDER BY oi.official_id DESC";
+    if ($q === '') {
+        $sql .= " LIMIT ?";
+        $params[] = $limit;
+        $types .= 'i';
+    }
 
     $stmt = $conn->prepare($sql);
     if (!$stmt) throw new Exception('Prepare failed: ' . $conn->error);
@@ -787,6 +757,11 @@ try {
     $rows = [];
     $actorUserId = (string)($_SESSION['user_id'] ?? '');
     while ($row = $res->fetch_assoc()) {
+        $row = officialsManagementDecryptRow($row);
+        if ($q !== '' && !officialsManagementMatchesSearch($row, $q)) {
+            continue;
+        }
+
         $role = normalizeRole((string)($row['account_role_access'] ?? $row['info_role_access'] ?? ''));
         if (!in_array($role, ['Official', 'Personnel', 'SuperAdmin'], true)) {
             continue;
@@ -848,6 +823,10 @@ try {
         ];
     }
     $stmt->close();
+
+    if ($q !== '') {
+        $rows = array_slice($rows, 0, $limit);
+    }
 
     if ($permissionFilter === 'Active' || $permissionFilter === 'Revoked') {
         $rows = array_values(array_filter($rows, static function ($r) use ($permissionFilter) {

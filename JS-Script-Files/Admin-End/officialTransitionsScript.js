@@ -169,11 +169,8 @@
     const s   = r.status;
     const btns = [];
 
-    if (['Open', 'CandidateEncoding', 'PendingDecision', 'Decided'].includes(s)) {
-      btns.push(`<button class="btn btn-xs btn-outline-primary py-0 px-2" onclick="otOpenCandidates('${esc(tid)}')" title="Set access handover"><i class="fas fa-user-plus me-1"></i>Set Access</button>`);
-    }
-    if (s === 'PendingDecision' || s === 'Decided') {
-      btns.push(`<button class="btn btn-xs btn-success py-0 px-2" onclick="otOpenWinner('${esc(tid)}')" title="Finalize access"><i class="fas fa-key"></i></button>`);
+    if (s !== 'Completed' && s !== 'Cancelled') {
+      btns.push(`<button class="btn btn-xs btn-outline-primary py-0 px-2" onclick="otOpenCandidates('${esc(tid)}')" title="Encode and complete transition"><i class="fas fa-user-plus me-1"></i>Set Access</button>`);
     }
     if (s !== 'Completed' && s !== 'Cancelled') {
       btns.push(`<button class="btn btn-xs btn-outline-danger py-0 px-2" onclick="otCancelTransition('${esc(tid)}')" title="Cancel"><i class="fas fa-times"></i></button>`);
@@ -530,18 +527,29 @@
   // ══════════════════════════════════════════════════════════════════════════
   // CANDIDATES MODAL
   // ══════════════════════════════════════════════════════════════════════════
-  window.otOpenCandidates = function (transitionId) {
-    document.getElementById('candidatesTransitionId').value = transitionId;
+  const transitionDrafts = new Map();
+  const transitionMetaCache = new Map();
+
+  function clearAccessIdentityFields() {
     if (lastNameEl) lastNameEl.value = '';
     if (firstNameEl) firstNameEl.value = '';
     if (middleNameEl) middleNameEl.value = '';
     if (suffixEl) suffixEl.value = '';
     if (emailEl) emailEl.value = '';
     if (mobileEl) mobileEl.value = '';
+  }
+
+  function clearAccessForm() {
+    clearAccessIdentityFields();
     if (linkedOfficialCache) linkedOfficialCache.clear();
     setFormerOfficialMode('');
     const notesEl = document.getElementById('newCandidateNotes');
     if (notesEl) notesEl.value = '';
+  }
+
+  window.otOpenCandidates = function (transitionId) {
+    document.getElementById('candidatesTransitionId').value = transitionId;
+    clearAccessForm();
     getModal('modalCandidates')?.show();
     loadCandidates(transitionId);
   };
@@ -556,6 +564,7 @@
     if (!data.success) { listEl.innerHTML = '<p class="text-danger">Failed to load official records.</p>'; return; }
 
     const t   = data.transition || {};
+    transitionMetaCache.set(String(transitionId || ''), t);
     const pos = t.position || transitionId;
     if (posLabel) posLabel.textContent = pos;
     document.getElementById('candidatesTransitionStatus').value = t.status || '';
@@ -568,26 +577,26 @@
       outInfo.classList.add('d-none');
     }
 
-    const currentOfficial = (data.candidates || [])[0] || null;
+    const currentOfficial = transitionDrafts.get(String(transitionId || '')) || null;
     if (!currentOfficial) {
-      listEl.innerHTML = '<p class="text-muted small text-center py-2 mb-0">No incoming official information is saved yet for this position. Fill out the form below, then click Continue to Access Review.</p>';
+      listEl.innerHTML = '<p class="text-muted small text-center py-2 mb-0">No incoming official is staged yet for this transition. Fill out the form below, review it, then complete the transition.</p>';
       return;
     }
 
     await applyEncodedOfficialToForm(currentOfficial);
 
-    const typePill = candidateTypePill(currentOfficial.linked_official_id ? 'ReturningOfficial' : 'New');
+    const typePill = candidateTypePill(currentOfficial.candidate_type || (currentOfficial.linked_official_id ? 'ReturningOfficial' : 'New'));
     const displayName = formatAccessEntryName(currentOfficial);
     const emailLine = String(currentOfficial.candidate_email || '').trim();
     const mobileLine = formatMobileDisplay(currentOfficial.candidate_mobile || currentOfficial.candidate_contact || '');
     listEl.innerHTML = `
       <div class="border rounded p-3 bg-light">
-        <div class="fw-semibold text-muted small mb-2">Currently Saved Official</div>
+        <div class="fw-semibold text-muted small mb-2">Current Transition Draft</div>
         <div class="fw-semibold">${esc(displayName)} ${typePill}</div>
         ${emailLine ? `<div class="text-muted small">${esc(emailLine)}</div>` : ''}
         ${mobileLine ? `<div class="text-muted small">${esc(mobileLine)}</div>` : ''}
         ${currentOfficial.notes ? `<div class="text-muted small fst-italic mt-1">${esc(currentOfficial.notes)}</div>` : ''}
-        <div class="small text-muted mt-2">Editing the form below will replace this saved official when you continue to access review.</div>
+        <div class="small text-muted mt-2">Editing the form below will replace this in-page draft until you complete the transition.</div>
       </div>`;
   }
 
@@ -637,9 +646,14 @@
     return normalized.length === 10 && normalized.startsWith('9');
   }
 
+  function usesExistingOfficialMode(mode) {
+    return mode === 'former' || mode === 'active';
+  }
+
   const linkedIdWrap  = document.getElementById('linkedIdWrap');
   const linkedIdInput = document.getElementById('newCandidateLinkedId');
   const linkedIdLabel = document.getElementById('linkedIdLabel');
+  const linkedIdHelp = document.getElementById('linkedIdHelp');
   const linkedSearchInput = document.getElementById('linkedOfficialSearch');
   const linkedSearchResults = document.getElementById('linkedOfficialSearchResults');
   const linkedSelectedEl = document.getElementById('linkedOfficialSelected');
@@ -651,8 +665,33 @@
   const suffixEl      = document.getElementById('newCandidateSuffix');
   const emailEl       = document.getElementById('newCandidateEmail');
   const mobileEl      = document.getElementById('newCandidateMobile');
+  const winnerActingOptionsEl = document.getElementById('winnerActingOptions');
+  const winnerUseActingReplacementEl = document.getElementById('winnerUseActingReplacement');
+  const winnerActingUntilDateEl = document.getElementById('winnerActingUntilDate');
   const linkedOfficialCache = new Map();
   let linkedSearchTimer = null;
+
+  function getTransitionMeta(transitionId) {
+    return transitionMetaCache.get(String(transitionId || '')) || {};
+  }
+
+  function getExistingOfficialModeConfig(mode) {
+    if (mode === 'active') {
+      return {
+        label: 'Search Active Officials',
+        help: 'Search an active official record to move or temporarily assign that account to this position.',
+        placeholder: 'Search active official by name, ID, or position',
+        selectedPrefix: 'Active official selected',
+      };
+    }
+
+    return {
+      label: 'Search Former Officials',
+      help: 'Search a former official record to auto-fill the details and reactivate the previous account.',
+      placeholder: 'Search former official by name, ID, or position',
+      selectedPrefix: 'Former official selected',
+    };
+  }
 
   function setAccessFormFromOfficial(officialId) {
     const official = linkedOfficialCache.get(String(officialId || ''))
@@ -666,7 +705,7 @@
     if (emailEl) emailEl.value = String(official.email || '').trim();
 
     const normalizedMobile = normalizeMobileDigits(official.phone_number || official.candidate_mobile || official.candidate_contact || '');
-    if (mobileEl && normalizedMobile) mobileEl.value = normalizedMobile.slice(-10);
+    if (mobileEl) mobileEl.value = normalizedMobile ? normalizedMobile.slice(-10) : '';
   }
 
   function linkedOfficialDisplayName(official) {
@@ -690,11 +729,16 @@
 
   function setFormerOfficialMode(mode = '') {
     if (formerOfficialModeEl) formerOfficialModeEl.value = mode;
-    const isFormer = mode === 'former';
+    const usesExistingRecord = usesExistingOfficialMode(mode);
     const isNew = mode === 'new';
-    if (linkedIdWrap) linkedIdWrap.style.display = isFormer ? '' : 'none';
+    if (linkedIdWrap) linkedIdWrap.style.display = usesExistingRecord ? '' : 'none';
     if (newOfficialFieldsWrap) newOfficialFieldsWrap.style.display = isNew ? '' : 'none';
-    if (!isFormer) {
+    if (usesExistingRecord) {
+      const cfg = getExistingOfficialModeConfig(mode);
+      if (linkedIdLabel) linkedIdLabel.textContent = cfg.label;
+      if (linkedIdHelp) linkedIdHelp.textContent = cfg.help;
+      if (linkedSearchInput) linkedSearchInput.placeholder = cfg.placeholder;
+    } else {
       clearLinkedOfficialUi();
     }
   }
@@ -728,11 +772,13 @@
   function selectLinkedOfficial(officialId) {
     const official = linkedOfficialCache.get(String(officialId || ''));
     if (!official) return;
+    const mode = formerOfficialModeEl?.value || 'former';
+    const cfg = getExistingOfficialModeConfig(mode);
 
     if (linkedIdInput) linkedIdInput.value = String(officialId);
     if (linkedSearchInput) linkedSearchInput.value = linkedOfficialDisplayName(official);
     if (linkedSelectedEl) {
-      linkedSelectedEl.textContent = `Former official selected: ${linkedOfficialDisplayName(official)}`;
+      linkedSelectedEl.textContent = `${cfg.selectedPrefix}: ${linkedOfficialDisplayName(official)}`;
       linkedSelectedEl.classList.remove('d-none');
     }
     if (linkedSearchResults) linkedSearchResults.classList.add('d-none');
@@ -750,7 +796,7 @@
 
     const linkedOfficialId = String(entry.linked_official_id || '').trim();
     if (linkedOfficialId) {
-      setFormerOfficialMode('former');
+      setFormerOfficialMode(String(entry.linked_source_mode || 'former'));
       await populateLinkedOfficialSelect();
       selectLinkedOfficial(linkedOfficialId);
     } else {
@@ -760,29 +806,50 @@
 
   async function populateLinkedOfficialSelect(query = '') {
     linkedOfficialCache.clear();
+    const mode = formerOfficialModeEl?.value || '';
+    const transitionId = document.getElementById('candidatesTransitionId')?.value || '';
+    const transitionMeta = getTransitionMeta(transitionId);
+    const outgoingOfficialId = String(transitionMeta.outgoing_official_id || '').trim();
+    let officials = [];
 
-    const data = await apiFetch({ action: 'fetch_inactive_officials', q: query });
-    const officials = (data.data || []).filter((row) => Number(row.can_return || 0) === 1);
-
-    if (linkedIdLabel) linkedIdLabel.textContent = 'Search Former Officials';
-    if (linkedSearchInput) linkedSearchInput.placeholder = 'Search former official by name, ID, or position';
+    if (mode === 'active') {
+      const qLower = String(query || '').trim().toLowerCase();
+      officials = (window.OT_DATA?.activeOfficials || []).filter((row) => {
+        const officialId = String(row.official_id || '').trim();
+        if (!officialId || officialId === outgoingOfficialId) return false;
+        if (!qLower) return true;
+        const haystack = [
+          row.official_id,
+          row.firstname,
+          row.lastname,
+          row.position,
+          row.department,
+        ].join(' ').toLowerCase();
+        return haystack.includes(qLower);
+      });
+    } else {
+      const data = await apiFetch({ action: 'fetch_inactive_officials', q: query });
+      officials = (data.data || []).filter((row) => Number(row.can_return || 0) === 1);
+    }
 
     officials.forEach((o) => {
       const officialId = String(o.official_id || '').trim();
       if (!officialId) return;
       linkedOfficialCache.set(officialId, o);
     });
-    renderLinkedOfficialResults(officials, 'ReturningOfficial', query);
+    renderLinkedOfficialResults(officials, mode === 'active' ? 'ActiveOfficial' : 'ReturningOfficial', query);
     return officials;
   }
 
   linkedSearchInput?.addEventListener('input', () => {
-    if ((formerOfficialModeEl?.value || '') !== 'former') return;
+    const mode = formerOfficialModeEl?.value || '';
+    if (!usesExistingOfficialMode(mode)) return;
     if (linkedIdInput) linkedIdInput.value = '';
     if (linkedSelectedEl) {
       linkedSelectedEl.textContent = '';
       linkedSelectedEl.classList.add('d-none');
     }
+    clearAccessIdentityFields();
     clearTimeout(linkedSearchTimer);
     linkedSearchTimer = setTimeout(() => {
       populateLinkedOfficialSelect(linkedSearchInput.value.trim());
@@ -790,14 +857,18 @@
   });
 
   linkedSearchInput?.addEventListener('focus', () => {
-    if ((formerOfficialModeEl?.value || '') !== 'former') return;
+    const mode = formerOfficialModeEl?.value || '';
+    if (!usesExistingOfficialMode(mode)) return;
     populateLinkedOfficialSelect(linkedSearchInput.value.trim());
   });
 
   formerOfficialModeEl?.addEventListener('change', () => {
     const mode = formerOfficialModeEl.value || '';
+    if (linkedOfficialCache) linkedOfficialCache.clear();
+    clearLinkedOfficialUi();
+    clearAccessIdentityFields();
     setFormerOfficialMode(mode);
-    if (mode === 'former') {
+    if (usesExistingOfficialMode(mode)) {
       populateLinkedOfficialSelect();
       linkedSearchInput?.focus();
     }
@@ -814,8 +885,10 @@
     const notes        = document.getElementById('newCandidateNotes').value.trim();
     const linkedId     = linkedIdInput?.value || '';
     const selectedMode = formerOfficialModeEl?.value || '';
-    const isFormerOfficial = selectedMode === 'former';
-    const type         = linkedId ? 'ReturningOfficial' : 'New';
+    const usesExistingRecord = selectedMode === 'former' || selectedMode === 'active';
+    const type = selectedMode === 'active'
+      ? 'ActiveOfficial'
+      : linkedId ? 'ReturningOfficial' : 'New';
     const lastName     = lastNameEl?.value.trim() || '';
     const firstName    = firstNameEl?.value.trim() || '';
     const middleName   = middleNameEl?.value.trim() || '';
@@ -823,49 +896,45 @@
     const email        = emailEl?.value.trim() || '';
     const mobile       = normalizeMobileDigits(mobileEl?.value || '');
 
-    if (!selectedMode) { showToast('Choose first whether this is a former official or a new official.', 'warning'); formerOfficialModeEl?.focus(); return null; }
-    if (isFormerOfficial && !linkedId) { showToast('Search and select the former official first, or choose No if this is a new official.', 'warning'); linkedSearchInput?.focus(); return null; }
+    if (!selectedMode) { showToast('Choose first whether to use an existing official record or create a new one.', 'warning'); formerOfficialModeEl?.focus(); return null; }
+    if (usesExistingRecord && !linkedId) {
+      showToast(selectedMode === 'active'
+        ? 'Search and select the active official first, or choose a different option.'
+        : 'Search and select the former official first, or choose a different option.', 'warning');
+      linkedSearchInput?.focus();
+      return null;
+    }
     if (!lastName || !firstName) { showToast('Last name and first name are required.', 'warning'); return null; }
     if (!emailEl?.checkValidity() || !email) { showToast('Enter a valid email address.', 'warning'); emailEl?.focus(); return null; }
     if (!isValidPhilippineMobile(mobile)) { showToast('Mobile number must be a valid 10-digit Philippine mobile number.', 'warning'); mobileEl?.focus(); return null; }
 
-    const params = {
-      action: 'add_candidate',
-      transition_id:         transitionId,
-      candidate_type:        type,
-      candidate_first_name:  firstName,
-      candidate_last_name:   lastName,
-      candidate_middle_name: middleName,
-      candidate_suffix:      suffix,
-      candidate_email:       email,
-      candidate_mobile:      mobile,
+    const candidateNameParts = [`${lastName}, ${firstName}`.trim()];
+    if (middleName) candidateNameParts.push(middleName);
+    if (suffix) candidateNameParts.push(suffix);
+
+    const draft = {
+      transition_id: String(transitionId || ''),
+      candidate_type: type,
+      candidate_name: candidateNameParts.join(' ').trim(),
+      candidate_contact: mobile ? `+63${mobile}` : '',
+      linked_official_id: linkedId,
+      linked_source_mode: selectedMode,
+      linked_resident_id: '',
       notes,
+      candidate_first_name: firstName,
+      candidate_last_name: lastName,
+      candidate_middle_name: middleName,
+      candidate_suffix: suffix,
+      candidate_email: email,
+      candidate_mobile: mobile,
     };
-    if (linkedId) params.linked_official_id = linkedId;
 
-    const data = await apiFetch(params, 'POST');
-    if (data.success) {
-      if (showSuccessToast) {
-        showToast(data.message || 'Official information saved.');
-      }
-      return data;
-    } else {
-      showToast(data.message || 'Failed.', 'error');
-      return null;
+    transitionDrafts.set(String(transitionId || ''), draft);
+    if (showSuccessToast) {
+      showToast('Official information prepared for final review.');
     }
+    return draft;
   }
-
-  window.otRemoveCandidate = async function (upcomingId, transitionId) {
-    if (!confirm('Remove this official from the list?')) return;
-    const data = await apiFetch({ action: 'remove_candidate', upcoming_id: upcomingId }, 'POST');
-    if (data.success) {
-      showToast('Official removed.');
-      loadCandidates(transitionId);
-      loadTransitions();
-    } else {
-      showToast(data.message || 'Failed.', 'error');
-    }
-  };
 
   document.getElementById('btnMarkPendingDecision')?.addEventListener('click', async () => {
     const transitionId = document.getElementById('candidatesTransitionId').value;
@@ -878,40 +947,51 @@
     const saveData = await saveCurrentOfficialInformation();
     if (!saveData) {
       btn.disabled = false;
-      btn.innerHTML = '<i class="fas fa-key me-1"></i> Continue to Access Review';
+      btn.innerHTML = '<i class="fas fa-key me-1"></i> Review and Continue';
       return;
     }
 
-    const data = await apiFetch({ action: 'mark_pending_decision', transition_id: transitionId }, 'POST');
     btn.disabled = false;
-    btn.innerHTML = '<i class="fas fa-key me-1"></i> Continue to Access Review';
+    btn.innerHTML = '<i class="fas fa-key me-1"></i> Review and Continue';
 
-    if (data.success) {
-      showToast('Official information saved. Continue with the final access action.');
-      getModal('modalCandidates')?.hide();
-      loadTransitions();
-      updateStats();
-      setTimeout(() => {
-        if (typeof window.otOpenWinner === 'function') {
-          window.otOpenWinner(transitionId);
-        }
-      }, 180);
-    } else {
-      loadCandidates(transitionId);
-      showToast(data.message || 'Failed.', 'error');
-    }
+    showToast('Official information prepared. Review it, then complete the transition.');
+    loadCandidates(transitionId);
+    getModal('modalCandidates')?.hide();
+    setTimeout(() => {
+      if (typeof window.otOpenWinner === 'function') {
+        window.otOpenWinner(transitionId);
+      }
+    }, 180);
   });
 
   // ══════════════════════════════════════════════════════════════════════════
   // SELECT WINNER MODAL
   // ══════════════════════════════════════════════════════════════════════════
-  function getAutoOutcomeMeta(currentOfficial) {
-    const isFormerOfficial = Boolean(String(currentOfficial?.linked_official_id || '').trim());
-    if (isFormerOfficial) {
+  function getAutoOutcomeMeta(currentOfficial, transitionMeta = {}) {
+    const mode = String(currentOfficial?.linked_source_mode || '').trim();
+    const hasLinkedOfficial = Boolean(String(currentOfficial?.linked_official_id || '').trim());
+
+    if (mode === 'active' && hasLinkedOfficial) {
+      const actingReplacement = !!winnerUseActingReplacementEl?.checked;
+      if (actingReplacement) {
+        return {
+          outcome: 'ActingReplacement',
+          label: 'Temporary Acting Replacement',
+          description: 'The selected active official will temporarily cover this position, the outgoing account will be suspended, and the acting assignment will remain in place until you end it or reach the acting-until date.',
+        };
+      }
+      return {
+        outcome: 'PositionChange',
+        label: 'Direct Position Change',
+        description: 'The selected active official will be moved into this position and the system will automatically open a follow-up transition for the vacated seat.',
+      };
+    }
+
+    if (mode === 'former' && hasLinkedOfficial) {
       return {
         outcome: 'Reactivated',
         label: 'Returning Former Official',
-        description: 'The matched account will be reactivated, the saved contact details will be updated, and a fresh onboarding access link will be sent.',
+        description: 'The matched account will be reactivated, the encoded contact details will be updated, and a fresh onboarding access link will be sent.',
       };
     }
 
@@ -922,38 +1002,27 @@
     };
   }
 
-  window.otOpenWinner = function (transitionId) {
-    document.getElementById('winnerTransitionId').value = transitionId;
-    document.getElementById('winnerOutcome').value      = '';
-    const summaryEl = document.getElementById('winnerOutcomeSummary');
-    if (summaryEl) {
-      summaryEl.innerHTML = 'The system will determine the access action after the official information is loaded.';
-    }
-    getModal('modalSelectWinner')?.show();
-    loadWinnerCandidates(transitionId);
-  };
-
-  async function loadWinnerCandidates(transitionId) {
-    const listEl = document.getElementById('winnerCandidatesList');
-    listEl.innerHTML = '<div class="text-center text-muted py-3"><i class="fas fa-spinner fa-spin me-2"></i></div>';
-    listEl.dataset.selectedCandidateId = '';
-
-    const data = await apiFetch({ action: 'fetch_candidates', transition_id: transitionId });
-    const currentOfficial = (data.candidates || [])[0] || null;
-
-    if (!currentOfficial) {
-      listEl.innerHTML = '<p class="text-muted small text-center">No official information is saved yet. Go back and complete the access setup first.</p>';
-      return;
-    }
-
-    listEl.dataset.selectedCandidateId = String(currentOfficial.upcoming_id || '');
-
-    const outcomeMeta = getAutoOutcomeMeta(currentOfficial);
-    const mappedOutcome = outcomeMeta.outcome;
+  function syncWinnerOutcomeState(transitionId) {
+    const currentOfficial = transitionDrafts.get(String(transitionId || '')) || null;
+    const transitionMeta = getTransitionMeta(transitionId);
     const winnerOutcomeEl = document.getElementById('winnerOutcome');
     const winnerOutcomeSummaryEl = document.getElementById('winnerOutcomeSummary');
+    const mode = String(currentOfficial?.linked_source_mode || '').trim();
+    const usingActiveOfficial = mode === 'active' && String(currentOfficial?.linked_official_id || '').trim() !== '';
+
+    if (winnerActingOptionsEl) {
+      winnerActingOptionsEl.classList.toggle('d-none', !usingActiveOfficial);
+    }
+    if (winnerActingUntilDateEl) {
+      winnerActingUntilDateEl.disabled = !usingActiveOfficial || !winnerUseActingReplacementEl?.checked;
+      if (!usingActiveOfficial) {
+        winnerActingUntilDateEl.value = '';
+      }
+    }
+
+    const outcomeMeta = getAutoOutcomeMeta(currentOfficial, transitionMeta);
     if (winnerOutcomeEl) {
-      winnerOutcomeEl.value = mappedOutcome;
+      winnerOutcomeEl.value = outcomeMeta.outcome;
     }
     if (winnerOutcomeSummaryEl) {
       winnerOutcomeSummaryEl.innerHTML = `
@@ -961,44 +1030,95 @@
         <div class="small text-muted mt-1">${esc(outcomeMeta.description)}</div>
       `;
     }
+  }
+
+  window.otOpenWinner = function (transitionId) {
+    document.getElementById('winnerTransitionId').value = transitionId;
+    document.getElementById('winnerOutcome').value      = '';
+    const summaryEl = document.getElementById('winnerOutcomeSummary');
+    if (summaryEl) {
+      summaryEl.innerHTML = 'The system will determine the access action after the official information is loaded.';
+    }
+    if (winnerUseActingReplacementEl) winnerUseActingReplacementEl.checked = false;
+    if (winnerActingUntilDateEl) {
+      winnerActingUntilDateEl.value = '';
+      winnerActingUntilDateEl.disabled = true;
+    }
+    if (winnerActingOptionsEl) winnerActingOptionsEl.classList.add('d-none');
+    getModal('modalSelectWinner')?.show();
+    loadWinnerCandidates(transitionId);
+  };
+
+  async function loadWinnerCandidates(transitionId) {
+    const listEl = document.getElementById('winnerCandidatesList');
+    listEl.innerHTML = '<div class="text-center text-muted py-3"><i class="fas fa-spinner fa-spin me-2"></i></div>';
+    const currentOfficial = transitionDrafts.get(String(transitionId || '')) || null;
+
+    if (!currentOfficial) {
+      listEl.innerHTML = '<p class="text-muted small text-center">No official information is ready yet. Go back and complete the access setup first.</p>';
+      return;
+    }
+
+    syncWinnerOutcomeState(transitionId);
 
     const emailLine = String(currentOfficial.candidate_email || '').trim();
     const mobileLine = formatMobileDisplay(currentOfficial.candidate_mobile || currentOfficial.candidate_contact || '');
     listEl.innerHTML = `
       <div class="border rounded p-3 bg-light">
-        <div class="fw-semibold small text-muted mb-2">Saved Official Record</div>
-        <div class="fw-semibold">${esc(formatAccessEntryName(currentOfficial))} ${candidateTypePill(currentOfficial.linked_official_id ? 'ReturningOfficial' : 'New')}</div>
+        <div class="fw-semibold small text-muted mb-2">Transition Review</div>
+        <div class="fw-semibold">${esc(formatAccessEntryName(currentOfficial))} ${candidateTypePill(currentOfficial.candidate_type || (currentOfficial.linked_official_id ? 'ReturningOfficial' : 'New'))}</div>
         ${emailLine ? `<small class="text-muted d-block">${esc(emailLine)}</small>` : ''}
         ${mobileLine ? `<small class="text-muted d-block">${esc(mobileLine)}</small>` : ''}
         ${currentOfficial.notes ? `<small class="text-muted fst-italic d-block mt-1">${esc(currentOfficial.notes)}</small>` : ''}
       </div>`;
   }
 
+  winnerUseActingReplacementEl?.addEventListener('change', () => {
+    const transitionId = document.getElementById('winnerTransitionId')?.value || '';
+    if (winnerActingUntilDateEl) {
+      winnerActingUntilDateEl.disabled = !winnerUseActingReplacementEl.checked;
+      if (!winnerUseActingReplacementEl.checked) {
+        winnerActingUntilDateEl.value = '';
+      }
+    }
+    if (transitionId) {
+      syncWinnerOutcomeState(transitionId);
+    }
+  });
+
   document.getElementById('btnCompleteTransition')?.addEventListener('click', async () => {
     const transitionId = document.getElementById('winnerTransitionId').value;
     const outcome      = document.getElementById('winnerOutcome').value;
-    const listEl       = document.getElementById('winnerCandidatesList');
-    const selectedRadio= document.querySelector('input[name="winnerCandidate"]:checked');
-    const selectedCandidateId = listEl?.dataset.selectedCandidateId || selectedRadio?.value || 0;
+    const draft        = transitionDrafts.get(String(transitionId || '')) || null;
 
     if (!outcome) { showToast('The access action could not be determined. Re-open the first modal and complete the official information.', 'warning'); return; }
-    if (!selectedCandidateId) { showToast('Complete the official information first.', 'warning'); return; }
+    if (!draft) { showToast('Complete the official information first.', 'warning'); return; }
 
     const btn = document.getElementById('btnCompleteTransition');
     btn.disabled = true;
     btn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i> Processing…';
 
-    const data = await apiFetch({
+    const params = {
       action:               'complete_transition',
       transition_id:        transitionId,
-      selected_candidate_id: selectedCandidateId,
       outcome,
-    }, 'POST');
+      acting_until_date:    outcome === 'ActingReplacement' ? (winnerActingUntilDateEl?.value || '') : '',
+      linked_official_id:   draft.linked_official_id || '',
+      notes:                draft.notes || '',
+      candidate_first_name: draft.candidate_first_name || '',
+      candidate_last_name:  draft.candidate_last_name || '',
+      candidate_middle_name:draft.candidate_middle_name || '',
+      candidate_suffix:     draft.candidate_suffix || '',
+      candidate_email:      draft.candidate_email || '',
+      candidate_mobile:     draft.candidate_mobile || '',
+    };
+    const data = await apiFetch(params, 'POST');
 
     btn.disabled = false;
     btn.innerHTML = '<i class="fas fa-check-circle me-1"></i> Complete and Notify';
 
     if (data.success) {
+      transitionDrafts.delete(String(transitionId || ''));
       showToast(data.message || 'Access setup completed.');
       if (data.invite_link && data.invite_email_sent === false) {
         window.prompt('Invite email was not sent automatically. Copy the onboarding link and send it manually:', String(data.invite_link));
@@ -1019,6 +1139,7 @@
     if (reason === null) return; // user dismissed
     const data = await apiFetch({ action: 'cancel_transition', transition_id: transitionId, reason: reason || '' }, 'POST');
     if (data.success) {
+      transitionDrafts.delete(String(transitionId || ''));
       showToast('Transition cancelled.');
       loadTransitions();
       updateStats();

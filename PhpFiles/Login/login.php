@@ -4,11 +4,13 @@ ini_set('log_errors', 1);
 error_reporting(E_ALL);
 
 require_once "../General/security.php";
+require_once "../General/userAccountLocks.php";
 require_once __DIR__ . "/redirectDestination.php";
 header('Content-Type: application/json');
 date_default_timezone_set('Asia/Manila');
 
 require '../General/connection.php';
+ual_ensure_lock_columns($conn);
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     echo json_encode(['success' => false, 'error' => 'Invalid request']);
@@ -36,11 +38,11 @@ $digits = preg_replace('/\D/', '', $userInput);
 $normalizedPhone = substr($digits, -10);
 
 if (filter_var($userInput, FILTER_VALIDATE_EMAIL)) {
-    $email = $userInput;
+    $email = pii_normalize_email($userInput);
     $phone = null;
 } else {
     $email = null;
-    $phone = $normalizedPhone;
+    $phone = pii_normalize_phone10($normalizedPhone);
 }
 
 /* =============================
@@ -48,6 +50,7 @@ if (filter_var($userInput, FILTER_VALIDATE_EMAIL)) {
    (Added phone_number + email for masking/flows)
 ============================= */
 if ($email) {
+    $emailHash = pii_lookup_hash($email, 'useraccount.email');
     $stmt = $conn->prepare("
         SELECT
             user_id,
@@ -57,17 +60,22 @@ if ($email) {
             failed_logins,
             status_id_account,
             lock_start,
+            lock_until,
+            lock_type,
+            lock_reason,
+            locked_by_user_id,
             role_access
         FROM useraccountstbl
-        WHERE email = ?
+        WHERE email_lookup_hash = ?
         LIMIT 1
     ");
     if (!$stmt) {
         echo json_encode(['success' => false, 'error' => 'Unable to process login right now.']);
         exit;
     }
-    $stmt->bind_param('s', $email);
+    $stmt->bind_param('s', $emailHash);
 } else {
+    $phoneHash = pii_lookup_hash($phone, 'useraccount.phone');
     $stmt = $conn->prepare("
         SELECT
             user_id,
@@ -77,21 +85,26 @@ if ($email) {
             failed_logins,
             status_id_account,
             lock_start,
+            lock_until,
+            lock_type,
+            lock_reason,
+            locked_by_user_id,
             role_access
         FROM useraccountstbl
-        WHERE RIGHT(phone_number,10) = ?
+        WHERE phone_lookup_hash = ?
         LIMIT 1
     ");
     if (!$stmt) {
         echo json_encode(['success' => false, 'error' => 'Unable to process login right now.']);
         exit;
     }
-    $stmt->bind_param('s', $phone);
+    $stmt->bind_param('s', $phoneHash);
 }
 
 $stmt->execute();
 $result   = $stmt->get_result();
 $userData = $result->fetch_assoc();
+$userData = $userData ? pii_decrypt_useraccount_row($userData) : null;
 
 if (!$userData) {
     echo json_encode(['success' => false, 'error' => 'Account cannot be found.']);
@@ -101,26 +114,15 @@ if (!$userData) {
 /* =============================
    LOAD STATUS IDS (case-insensitive)
 ============================= */
-$statusStmt = $conn->prepare("
-    SELECT status_id, status_name
-    FROM statuslookuptbl
-    WHERE status_type = 'UserAccount'
-");
-$statusStmt->execute();
-$statusResult = $statusStmt->get_result();
-
-$statuses = [];
-while ($row = $statusResult->fetch_assoc()) {
-    $key = strtolower(trim($row['status_name']));
-    $statuses[$key] = $row['status_id'];
-}
-$statusStmt->close();
+$statuses = ual_load_status_ids($conn);
 
 $lockedStatusId      = $statuses['locked'] ?? null;
 $activeStatusId      = $statuses['active'] ?? null;
 $inactiveStatusId    = $statuses['inactive'] ?? null;       // ✅ added
 $deactivatedStatusId = $statuses['deactivated'] ?? null;
 $deletedStatusId     = $statuses['deleted'] ?? null;
+
+ual_release_expired_locks($conn, $lockedStatusId, $activeStatusId, $lockDuration);
 
 /* =============================
    ACCOUNT STATUS CHECK (Deactivated/Deleted)
@@ -138,13 +140,18 @@ if ($deletedStatusId !== null && (int)$userData['status_id_account'] === (int)$d
    LOCK CHECK
 ============================= */
 if ($lockedStatusId !== null && (int)$userData['status_id_account'] === (int)$lockedStatusId) {
-    $lockStart = strtotime($userData['lock_start'] ?? '1970-01-01');
+    $lockState = ual_get_lock_state($userData, $lockDuration);
 
-    // still locked
-    if (time() - $lockStart < $lockDuration) {
+    if (!$lockState['is_expired']) {
+        $errorMessage = 'Account is locked.';
+        if ($lockState['is_permanent']) {
+            $errorMessage = 'Account is locked permanently. Please contact the barangay office.';
+        } elseif (!empty($lockState['lock_until_ts'])) {
+            $errorMessage = 'Account is locked until ' . date('F j, Y g:i A', (int)$lockState['lock_until_ts']) . '.';
+        }
         echo json_encode([
             'success' => false,
-            'error'   => 'Account is locked. Please try again later.'
+            'error'   => $errorMessage
         ]);
         exit;
     }
@@ -153,7 +160,13 @@ if ($lockedStatusId !== null && (int)$userData['status_id_account'] === (int)$lo
     if ($activeStatusId !== null) {
         $unlock = $conn->prepare("
             UPDATE useraccountstbl
-            SET status_id_account = ?, failed_logins = 0, lock_start = NULL
+            SET status_id_account = ?,
+                failed_logins = 0,
+                lock_start = NULL,
+                lock_until = NULL,
+                lock_type = NULL,
+                lock_reason = NULL,
+                locked_by_user_id = NULL
             WHERE user_id = ?
         ");
         $unlock->bind_param('is', $activeStatusId, $userData['user_id']);
@@ -164,7 +177,12 @@ if ($lockedStatusId !== null && (int)$userData['status_id_account'] === (int)$lo
     } else {
         $unlock = $conn->prepare("
             UPDATE useraccountstbl
-            SET failed_logins = 0, lock_start = NULL
+            SET failed_logins = 0,
+                lock_start = NULL,
+                lock_until = NULL,
+                lock_type = NULL,
+                lock_reason = NULL,
+                locked_by_user_id = NULL
             WHERE user_id = ?
         ");
         $unlock->bind_param('s', $userData['user_id']);
@@ -185,23 +203,33 @@ if (!password_verify($password, $userData['password_hash'])) {
 
         // lock account
         if ($lockedStatusId !== null) {
+            $lockUntil = date('Y-m-d H:i:s', time() + $lockDuration);
             $updateStmt = $conn->prepare("
                 UPDATE useraccountstbl
                 SET failed_logins = 0,
                     status_id_account = ?,
-                    lock_start = NOW()
+                    lock_start = NOW(),
+                    lock_until = ?,
+                    lock_type = 'temporary',
+                    lock_reason = 'Failed login attempts',
+                    locked_by_user_id = NULL
                 WHERE user_id = ?
             ");
-            $updateStmt->bind_param('is', $lockedStatusId, $userData['user_id']);
+            $updateStmt->bind_param('iss', $lockedStatusId, $lockUntil, $userData['user_id']);
             $updateStmt->execute();
         } else {
+            $lockUntil = date('Y-m-d H:i:s', time() + $lockDuration);
             $updateStmt = $conn->prepare("
                 UPDATE useraccountstbl
                 SET failed_logins = 0,
-                    lock_start = NOW()
+                    lock_start = NOW(),
+                    lock_until = ?,
+                    lock_type = 'temporary',
+                    lock_reason = 'Failed login attempts',
+                    locked_by_user_id = NULL
                 WHERE user_id = ?
             ");
-            $updateStmt->bind_param('s', $userData['user_id']);
+            $updateStmt->bind_param('ss', $lockUntil, $userData['user_id']);
             $updateStmt->execute();
         }
 
@@ -212,7 +240,12 @@ if (!password_verify($password, $userData['password_hash'])) {
     // update failed logins only
     $updateStmt = $conn->prepare("
         UPDATE useraccountstbl
-        SET failed_logins = ?, lock_start = NULL
+        SET failed_logins = ?,
+            lock_start = NULL,
+            lock_until = NULL,
+            lock_type = NULL,
+            lock_reason = NULL,
+            locked_by_user_id = NULL
         WHERE user_id = ?
     ");
     $updateStmt->bind_param('is', $failedLogins, $userData['user_id']);
@@ -259,6 +292,10 @@ if ($activeStatusId !== null) {
         SET failed_logins = 0,
             status_id_account = ?,
             lock_start = NULL,
+            lock_until = NULL,
+            lock_type = NULL,
+            lock_reason = NULL,
+            locked_by_user_id = NULL,
             last_login = NOW()
         WHERE user_id = ?
     ");
@@ -269,6 +306,10 @@ if ($activeStatusId !== null) {
         UPDATE useraccountstbl
         SET failed_logins = 0,
             lock_start = NULL,
+            lock_until = NULL,
+            lock_type = NULL,
+            lock_reason = NULL,
+            locked_by_user_id = NULL,
             last_login = NOW()
         WHERE user_id = ?
     ");

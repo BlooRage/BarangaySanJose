@@ -70,7 +70,58 @@ function otGetOfficialUser(mysqli $conn, string $officialId): ?array {
     $stmt->execute();
     $row = $stmt->get_result()->fetch_assoc();
     $stmt->close();
+    $row = $row ? (pii_decrypt_official_row($row) ?? $row) : null;
+    $row = $row ? (pii_decrypt_useraccount_row($row) ?? $row) : null;
+    if ($row && otTableExists($conn, 'barangaycounciltbl')) {
+        $seatStmt = $conn->prepare("
+            SELECT council_id
+            FROM barangaycounciltbl
+            WHERE current_official_id = ?
+            LIMIT 1
+        ");
+        if ($seatStmt) {
+            $seatStmt->bind_param('s', $officialId);
+            $seatStmt->execute();
+            $seatRow = $seatStmt->get_result()->fetch_assoc();
+            $seatStmt->close();
+            $row['council_id'] = (int)($seatRow['council_id'] ?? 0);
+        }
+    }
     return $row ?: null;
+}
+
+function otFormatOfficialName(array $row, bool $lastNameFirst = false): string
+{
+    $first = trim((string)($row['firstname'] ?? ''));
+    $middle = trim((string)($row['middlename'] ?? ''));
+    $last = trim((string)($row['lastname'] ?? ''));
+    $suffix = trim((string)($row['suffix'] ?? ''));
+
+    if ($lastNameFirst) {
+        $parts = [];
+        if ($last !== '') {
+            $parts[] = $last . ',';
+        }
+        if ($first !== '') {
+            $parts[] = $first;
+        }
+        if ($middle !== '') {
+            $parts[] = $middle;
+        }
+        if ($suffix !== '') {
+            $parts[] = $suffix;
+        }
+        return trim(implode(' ', $parts), " ,");
+    }
+
+    return trim(implode(' ', array_filter([$first, $middle, $last, $suffix], static fn($value): bool => trim((string)$value) !== '')));
+}
+
+function otDecryptOfficialContactRow(array $row): array
+{
+    $row = pii_decrypt_official_row($row) ?? $row;
+    $row = pii_decrypt_useraccount_row($row) ?? $row;
+    return pii_decrypt_assoc($row, ['firstname', 'middlename', 'lastname', 'suffix']);
 }
 
 function otSendEmail(string $email, string $subject, string $body): void {
@@ -151,6 +202,7 @@ function otNotifyUser(mysqli $conn, string $userId, string $subject, string $mes
     $acct = $stmt->get_result()->fetch_assoc();
     $stmt->close();
     if (!$acct) return;
+    $acct = pii_decrypt_useraccount_row($acct) ?? $acct;
     $email = trim((string)($acct['email'] ?? ''));
     $phone = trim((string)($acct['phone_number'] ?? ''));
     otSendEmail($email, $subject, $message);
@@ -183,6 +235,7 @@ function otEnsureTransitionFields(mysqli $conn): void {
     $done = true;
 
     $columnDefinitions = [
+        'council_id' => "ALTER TABLE officialtransitionstbl ADD COLUMN council_id INT DEFAULT NULL AFTER transition_id",
         'proclamation_date' => "ALTER TABLE officialtransitionstbl ADD COLUMN proclamation_date DATE DEFAULT NULL AFTER batch_label",
         'next_election_date' => "ALTER TABLE officialtransitionstbl ADD COLUMN next_election_date DATE DEFAULT NULL AFTER proclamation_date",
     ];
@@ -274,11 +327,11 @@ function otHasConfiguredTermSchedule(mysqli $conn): bool {
     return $cached;
 }
 
-if (otTableExists($conn, 'upcomingofficialstbl')) {
-    otEnsureUpcomingOfficialFields($conn);
-}
 if (otTableExists($conn, 'officialtransitionstbl')) {
     otEnsureTransitionFields($conn);
+}
+if (otTableExists($conn, 'upcomingofficialstbl')) {
+    otEnsureUpcomingOfficialFields($conn);
 }
 
 function otNormalizeDateOrNull(string $value): ?string {
@@ -360,6 +413,7 @@ function otAssertContactIsAvailable(mysqli $conn, string $email, string $phone10
     $email = strtolower(trim($email));
     $phone10 = oi_normalize_phone10($phone10);
     $excludeUserId = trim($excludeUserId);
+    $prepared = pii_prepare_useraccount_contacts($email, $phone10);
 
     if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
         throw new RuntimeException('A valid email address is required.');
@@ -372,25 +426,25 @@ function otAssertContactIsAvailable(mysqli $conn, string $email, string $phone10
         $stmt = $conn->prepare("
             SELECT user_id
             FROM useraccountstbl
-            WHERE (email = ? OR phone_number = ?)
+            WHERE (email_lookup_hash = ? OR phone_lookup_hash = ?)
               AND user_id <> ?
             LIMIT 1
         ");
         if (!$stmt) {
             throw new RuntimeException('Unable to validate email and mobile number.');
         }
-        $stmt->bind_param('sss', $email, $phone10, $excludeUserId);
+        $stmt->bind_param('sss', $prepared['email_lookup_hash'], $prepared['phone_lookup_hash'], $excludeUserId);
     } else {
         $stmt = $conn->prepare("
             SELECT user_id
             FROM useraccountstbl
-            WHERE email = ? OR phone_number = ?
+            WHERE email_lookup_hash = ? OR phone_lookup_hash = ?
             LIMIT 1
         ");
         if (!$stmt) {
             throw new RuntimeException('Unable to validate email and mobile number.');
         }
-        $stmt->bind_param('ss', $email, $phone10);
+        $stmt->bind_param('ss', $prepared['email_lookup_hash'], $prepared['phone_lookup_hash']);
     }
 
     $stmt->execute();
@@ -518,13 +572,20 @@ function otCreateOfficialInvite(mysqli $conn, array $invitePayload, string $acto
         }
     }
 
+    $inviteContact = pii_prepare_official_invite_contacts($email, $phone10);
+    $inviteName = pii_encrypt_field_map([
+        'firstname' => $firstname,
+        'middlename' => $middlename,
+        'lastname' => $lastname,
+        'suffix' => $suffix,
+    ]);
     $stmt = $conn->prepare("
         INSERT INTO officialinvitetbl
-            (invite_code, invite_token_hash, invite_email, invite_phone, firstname, middlename, lastname, suffix,
+            (invite_code, invite_token_hash, invite_email, invite_email_lookup_hash, invite_phone, invite_phone_lookup_hash, firstname, middlename, lastname, suffix,
              role_access, position_access, department, employment_status, area_number, status, onboarding_step,
              invited_by_user_id, user_id, expires_at)
         VALUES
-            (?, ?, ?, ?, ?, NULLIF(?, ''), ?, NULLIF(?, ''),
+            (?, ?, ?, ?, ?, ?, ?, NULLIF(?, ''), ?, NULLIF(?, ''),
              ?, NULLIF(?, ''), ?, NULLIF(?, ''), ?, 'Pending', 'password',
              ?, NULLIF(?, ''), ?)
     ");
@@ -532,15 +593,17 @@ function otCreateOfficialInvite(mysqli $conn, array $invitePayload, string $acto
         throw new RuntimeException('Failed to create onboarding invite.');
     }
     $stmt->bind_param(
-        'ssssssssssssssss',
+        'ssssssssssssssssss',
         $inviteCode,
         $token['hash'],
-        $email,
-        $phone10,
-        $firstname,
-        $middlename,
-        $lastname,
-        $suffix,
+        $inviteContact['invite_email'],
+        $inviteContact['invite_email_lookup_hash'],
+        $inviteContact['invite_phone'],
+        $inviteContact['invite_phone_lookup_hash'],
+        $inviteName['firstname'],
+        $inviteName['middlename'],
+        $inviteName['lastname'],
+        $inviteName['suffix'],
         $roleAccess,
         $positionAccess,
         $department,
@@ -560,28 +623,36 @@ function otCreateOfficialInvite(mysqli $conn, array $invitePayload, string $acto
 
     $inviteLink = appBaseUrl() . appUrl('/official-onboarding?invite=' . urlencode($token['raw']));
     $fullName = trim($firstname . ' ' . ($middlename !== '' ? $middlename . ' ' : '') . $lastname . ($suffix !== '' ? ' ' . $suffix : ''));
-    $subject = 'Barangay San Jose Official Onboarding Access';
-    $body = "Dear " . ($fullName !== '' ? $fullName : 'Official') . ",\n\n"
-        . "Your account access for Barangay San Jose is ready.\n"
-        . "Position: " . ($positionAccess !== '' ? $positionAccess : $roleAccess) . "\n"
-        . "Department: " . ($department !== '' ? $department : 'Office of the Barangay') . "\n\n"
-        . "Open this one-time onboarding access link:\n{$inviteLink}\n\n"
-        . "This link expires in 48 hours.\n\n"
-        . "Barangay San Jose";
-
-    $emailSent = otSendOnboardingInviteEmail(
-        $email,
-        $fullName,
-        $positionAccess !== '' ? $positionAccess : $roleAccess,
-        $inviteLink
-    );
-    $smsSent = otSendSMS($phone10, 'Barangay San Jose: Your official onboarding access is ready. Please check your email for the one-time invite link.');
 
     return [
         'invite_id' => $inviteId,
         'invite_link' => $inviteLink,
-        'email_sent' => $emailSent,
-        'sms_sent' => $smsSent,
+        'delivery' => [
+            'email' => $email,
+            'phone_number' => $phone10,
+            'full_name' => $fullName,
+            'role_name' => $positionAccess !== '' ? $positionAccess : $roleAccess,
+        ],
+    ];
+}
+
+function otDeliverOnboardingInvite(array $invite): array
+{
+    $inviteLink = trim((string)($invite['invite_link'] ?? ''));
+    $delivery = is_array($invite['delivery'] ?? null) ? $invite['delivery'] : [];
+    $email = strtolower(trim((string)($delivery['email'] ?? '')));
+    $phone10 = oi_normalize_phone10((string)($delivery['phone_number'] ?? ''));
+    $fullName = trim((string)($delivery['full_name'] ?? ''));
+    $roleName = trim((string)($delivery['role_name'] ?? ''));
+
+    return [
+        'email_sent' => $inviteLink !== '' && otSendOnboardingInviteEmail(
+            $email,
+            $fullName,
+            $roleName !== '' ? $roleName : 'Official',
+            $inviteLink
+        ),
+        'sms_sent' => $phone10 !== '' && otSendSMS($phone10, 'Barangay San Jose: Your official onboarding access is ready. Please check your email for the one-time invite link.'),
     ];
 }
 
@@ -606,20 +677,23 @@ function otCreateIncomingOfficialShell(mysqli $conn, array $transition, array $c
     }
 
     $passwordHash = password_hash(bin2hex(random_bytes(16)), PASSWORD_DEFAULT);
+    $accountContact = pii_prepare_useraccount_contacts($email, $phone10);
     $accountStmt = $conn->prepare("
         INSERT INTO useraccountstbl
-            (user_id, phone_number, phoneNum_verify, email, email_verify, password_hash, status_id_account, role_access, account_created, last_login, updated_at)
+            (user_id, phone_number, phone_lookup_hash, phoneNum_verify, email, email_lookup_hash, email_verify, password_hash, status_id_account, role_access, account_created, last_login, updated_at)
         VALUES
-            (?, ?, 0, ?, 0, ?, ?, ?, NOW(), NOW(), NOW())
+            (?, ?, ?, 0, ?, ?, 0, ?, ?, ?, NOW(), NOW(), NOW())
     ");
     if (!$accountStmt) {
         throw new RuntimeException('Failed to prepare incoming official account creation.');
     }
     $accountStmt->bind_param(
-        'ssssss',
+        'ssssssss',
         $userId,
-        $phone10,
-        $email,
+        $accountContact['phone_number'],
+        $accountContact['phone_lookup_hash'],
+        $accountContact['email'],
+        $accountContact['email_lookup_hash'],
         $passwordHash,
         $activeStatusId,
         $assignment['account_role']
@@ -634,33 +708,52 @@ function otCreateIncomingOfficialShell(mysqli $conn, array $transition, array $c
     $effectiveDate = otResolveEffectiveDate($transition);
     $termEndDate = otResolveTermEndDate($transition) ?? '';
     $batchLabel = trim((string)($transition['batch_label'] ?? ''));
-    $officialStmt = $conn->prepare("
-        INSERT INTO officialinformationtbl
-            (user_id, lastname, firstname, middlename, suffix, birthdate, sex, civil_status, contact_number, email,
-             area_access, department, selection_method, term_start, term_end, batch_label, area_number,
-             role_access, position_access, status_id_employment, date_hired)
-        VALUES
-            (?, ?, ?, NULLIF(?, ''), NULLIF(?, ''), '1900-01-01', 'Other', 'Single', ?, ?,
-             ?, ?, NULLIF(?, ''), ?, NULLIF(?, ''), NULLIF(?, ''), NULLIF(?, ''),
-             ?, NULLIF(?, ''), ?, ?)
-    ");
-    if (!$officialStmt) {
-        throw new RuntimeException('Failed to prepare the incoming official profile.');
+    $officialId = GenerateOfficialPersonnelID($conn, $userId);
+    if ($officialId === false || trim((string)$officialId) === '') {
+        throw new RuntimeException('Failed to generate the incoming official ID.');
     }
     $lastname = trim((string)($candidate['candidate_last_name'] ?? ''));
     $firstname = trim((string)($candidate['candidate_first_name'] ?? ''));
     $middlename = trim((string)($candidate['candidate_middle_name'] ?? ''));
     $suffix = trim((string)($candidate['candidate_suffix'] ?? ''));
     $selectionMethod = (string)$assignment['selection_method'];
+    $officialIdentity = pii_encrypt_field_map([
+        'lastname' => $lastname,
+        'firstname' => $firstname,
+        'middlename' => $middlename,
+        'suffix' => $suffix,
+        'birthdate' => '1900-01-01',
+        'sex' => 'Other',
+        'civil_status' => 'Single',
+        'contact_number' => $phone10,
+        'email' => $email,
+    ]);
+    $officialStmt = $conn->prepare("
+        INSERT INTO officialinformationtbl
+            (official_id, user_id, lastname, firstname, middlename, suffix, birthdate, sex, civil_status, contact_number, email,
+             area_access, department, selection_method, term_start, term_end, batch_label, area_number,
+             role_access, position_access, status_id_employment, date_hired)
+        VALUES
+            (?, ?, ?, ?, NULLIF(?, ''), NULLIF(?, ''), ?, ?, ?, ?, ?,
+             ?, ?, NULLIF(?, ''), ?, NULLIF(?, ''), NULLIF(?, ''), NULLIF(?, ''),
+             ?, NULLIF(?, ''), ?, ?)
+    ");
+    if (!$officialStmt) {
+        throw new RuntimeException('Failed to prepare the incoming official profile.');
+    }
     $officialStmt->bind_param(
-        'ssssssssssssssssis',
+        'ssssssssssssssssssssis',
+        $officialId,
         $userId,
-        $lastname,
-        $firstname,
-        $middlename,
-        $suffix,
-        $phone10,
-        $email,
+        $officialIdentity['lastname'],
+        $officialIdentity['firstname'],
+        $officialIdentity['middlename'],
+        $officialIdentity['suffix'],
+        $officialIdentity['birthdate'],
+        $officialIdentity['sex'],
+        $officialIdentity['civil_status'],
+        $officialIdentity['contact_number'],
+        $officialIdentity['email'],
         $assignment['area_access'],
         $assignment['department'],
         $selectionMethod,
@@ -678,7 +771,6 @@ function otCreateIncomingOfficialShell(mysqli $conn, array $transition, array $c
         $officialStmt->close();
         throw new RuntimeException('Failed to create the incoming official profile: ' . $error);
     }
-    $officialId = (string)$conn->insert_id;
     $officialStmt->close();
 
     $invite = otCreateOfficialInvite($conn, [
@@ -701,8 +793,7 @@ function otCreateIncomingOfficialShell(mysqli $conn, array $transition, array $c
         'user_id' => $userId,
         'invite_id' => (int)($invite['invite_id'] ?? 0),
         'invite_link' => (string)($invite['invite_link'] ?? ''),
-        'email_sent' => (bool)($invite['email_sent'] ?? false),
-        'sms_sent' => (bool)($invite['sms_sent'] ?? false),
+        'invite_delivery' => is_array($invite['delivery'] ?? null) ? $invite['delivery'] : null,
         'email' => $email,
         'phone_number' => $phone10,
         'position_access' => $assignment['position_access'],
@@ -730,9 +821,10 @@ if ($action === 'fetch_council_seats') {
             bc.term_end,
             bc.is_active,
             bc.current_official_id,
-            CONCAT(oi.lastname, ', ', oi.firstname,
-                   IFNULL(CONCAT(' ', oi.middlename),''),
-                   IFNULL(CONCAT(' ', oi.suffix),''))     AS current_official_name,
+            oi.firstname,
+            oi.lastname,
+            oi.middlename,
+            oi.suffix,
             COALESCE(sa.status_name,'')                    AS account_status
         FROM barangaycounciltbl bc
         LEFT JOIN officialinformationtbl oi
@@ -751,6 +843,8 @@ if ($action === 'fetch_council_seats') {
             if (!otIsManagedTransitionSeat((string)($row['seat_name'] ?? ''))) {
                 continue;
             }
+            $row = otDecryptOfficialContactRow($row);
+            $row['current_official_name'] = otFormatOfficialName($row, true);
             if (!$hasConfiguredTermSchedule) {
                 $row['current_official_id'] = '';
                 $row['current_official_name'] = '';
@@ -778,70 +872,61 @@ if ($action === 'fetch_transitions') {
     $limit  = min(max((int)($_GET['limit'] ?? 100), 1), 500);
     $offset = max((int)($_GET['offset'] ?? 0), 0);
 
-    $where = [];
+    $where = [
+        "t.status NOT IN ('Completed','Cancelled')",
+        otIgnoredTransitionSeatSql($conn, 't.position'),
+    ];
     $params = [];
     $types  = '';
 
-    $where[] = "t.status NOT IN ('Completed','Cancelled')";
-    $where[] = otIgnoredTransitionSeatSql($conn, 't.position');
-    if ($q !== '') {
-        $like = '%' . $q . '%';
-        $where[] = "(t.transition_id LIKE ? OR t.position LIKE ? OR t.batch_label LIKE ? OR CONCAT(oi.lastname,' ',oi.firstname) LIKE ?)";
-        $params = array_merge($params, [$like, $like, $like, $like]);
-        $types .= 'ssss';
-    }
     if ($type !== '') {
         $where[] = "t.transition_type = ?";
         $params[] = $type;
         $types .= 's';
     }
 
-    $whereClause = $where ? ('WHERE ' . implode(' AND ', $where)) : '';
-
+    $whereClause = 'WHERE ' . implode(' AND ', $where);
     $sql = "
         SELECT t.*,
                COALESCE(t.proclamation_date, t.effective_date) AS proclamation_date,
                COALESCE(t.next_election_date, t.election_date) AS next_election_date,
                bc.sort_order,
-               CONCAT(oi.lastname, ', ', oi.firstname, IFNULL(CONCAT(' ', oi.middlename),''), IFNULL(CONCAT(' ', oi.suffix),'')) AS outgoing_name,
+               oi.firstname,
+               oi.lastname,
+               oi.middlename,
+               oi.suffix,
                COALESCE(oi.position_access, oi.role_access) AS outgoing_position
         FROM officialtransitionstbl t
         LEFT JOIN officialinformationtbl oi ON oi.official_id = t.outgoing_official_id
         LEFT JOIN barangaycounciltbl bc ON bc.council_id = t.council_id
         {$whereClause}
         ORDER BY COALESCE(bc.sort_order, 9999) ASC, t.created_at DESC
-        LIMIT ? OFFSET ?
     ";
-    $params[] = $limit;
-    $params[] = $offset;
-    $types .= 'ii';
 
     $stmt = $conn->prepare($sql);
     if (!$stmt) otError('Query prepare failed: ' . $conn->error);
-
-    $refs = [$types];
-    foreach ($params as $k => $v) $refs[] = &$params[$k];
-    call_user_func_array([$stmt, 'bind_param'], $refs);
+    if ($types !== '') {
+        $refs = [$types];
+        foreach ($params as $k => $v) {
+            $refs[] = &$params[$k];
+        }
+        call_user_func_array([$stmt, 'bind_param'], $refs);
+    }
     $stmt->execute();
-    $rows = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+    $res = $stmt->get_result();
+    $filteredRows = [];
+    while ($row = $res->fetch_assoc()) {
+        $row = otDecryptOfficialContactRow($row);
+        $row['outgoing_name'] = otFormatOfficialName($row, true);
+        if ($q !== '' && !pii_search_match($row, ['transition_id', 'position', 'batch_label', 'outgoing_name'], $q)) {
+            continue;
+        }
+        $filteredRows[] = $row;
+    }
     $stmt->close();
 
-    // Total count
-    $countSql = "SELECT COUNT(*) AS cnt FROM officialtransitionstbl t LEFT JOIN officialinformationtbl oi ON oi.official_id = t.outgoing_official_id {$whereClause}";
-    $countTypes = substr($types, 0, -2);
-    $countParams = array_slice($params, 0, -2);
-    $countStmt = $conn->prepare($countSql);
-    $total = 0;
-    if ($countStmt) {
-        if ($countTypes !== '' && $countParams) {
-            $crefs = [$countTypes];
-            foreach ($countParams as $k => $v) $crefs[] = &$countParams[$k];
-            call_user_func_array([$countStmt, 'bind_param'], $crefs);
-        }
-        $countStmt->execute();
-        $total = (int)($countStmt->get_result()->fetch_assoc()['cnt'] ?? 0);
-        $countStmt->close();
-    }
+    $total = count($filteredRows);
+    $rows = array_slice($filteredRows, $offset, $limit);
 
     otJson(['success' => true, 'data' => $rows, 'total' => $total]);
 }
@@ -858,7 +943,6 @@ if ($action === 'fetch_inactive_officials') {
                oi.lastname,
                oi.middlename,
                oi.suffix,
-               CONCAT(oi.lastname, ', ', oi.firstname) AS full_name,
                COALESCE(oi.position_access, oi.role_access) AS position,
                oi.department,
                ua.email,
@@ -874,31 +958,30 @@ if ($action === 'fetch_inactive_officials') {
         LEFT JOIN statuslookuptbl se ON se.status_id = oi.status_id_employment
         WHERE sa.status_name IN ('Inactive','Suspended','Revoked','Disabled')
     ";
-    $params = [];
-    $types  = '';
-    if ($q !== '') {
-        $like = '%' . $q . '%';
-        $sql .= " AND (oi.official_id LIKE ? OR oi.firstname LIKE ? OR oi.lastname LIKE ? OR COALESCE(oi.position_access,oi.role_access) LIKE ?)";
-        $params = [$like, $like, $like, $like];
-        $types  = 'ssss';
-    }
     $sql .= " ORDER BY oi.lastname, oi.firstname LIMIT 100";
 
     $stmt = $conn->prepare($sql);
     if (!$stmt) otError('Query failed.');
-    if ($types !== '') {
-        $refs = [$types];
-        foreach ($params as $k => $v) $refs[] = &$params[$k];
-        call_user_func_array([$stmt, 'bind_param'], $refs);
-    }
     $stmt->execute();
-    $rows = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+    $res = $stmt->get_result();
+    $rows = [];
+    while ($row = $res->fetch_assoc()) {
+        $row = otDecryptOfficialContactRow($row);
+        $row['full_name'] = otFormatOfficialName($row, true);
+        if ($q !== '' && !pii_search_match($row, ['official_id', 'full_name', 'position', 'department', 'email', 'phone_number'], $q)) {
+            continue;
+        }
+        $rows[] = $row;
+    }
     $stmt->close();
+    if ($q !== '') {
+        $rows = array_slice($rows, 0, 100);
+    }
     otJson(['success' => true, 'data' => $rows]);
 }
 
 // ════════════════════════════════════════════════════════════════════════════
-// FETCH: candidates for a transition
+// FETCH: transition details for access setup
 // ════════════════════════════════════════════════════════════════════════════
 if ($action === 'fetch_candidates') {
     if (!otTableExists($conn, 'officialtransitionstbl')) {
@@ -907,23 +990,31 @@ if ($action === 'fetch_candidates') {
     $transitionId = trim((string)($_GET['transition_id'] ?? ''));
     if ($transitionId === '') otError('Missing transition_id.');
 
-    $stmt = $conn->prepare("SELECT * FROM upcomingofficialstbl WHERE transition_id = ? ORDER BY upcoming_id ASC");
-    if (!$stmt) otError('Query failed.');
-    $stmt->bind_param('s', $transitionId);
-    $stmt->execute();
-    $candidates = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
-    $stmt->close();
-
-    $tStmt = $conn->prepare("SELECT t.*, CONCAT(oi.lastname,', ',oi.firstname) AS outgoing_name, COALESCE(oi.position_access,oi.role_access) AS outgoing_position FROM officialtransitionstbl t LEFT JOIN officialinformationtbl oi ON oi.official_id = t.outgoing_official_id WHERE t.transition_id = ? LIMIT 1");
+    $tStmt = $conn->prepare("
+        SELECT t.*,
+               oi.firstname,
+               oi.lastname,
+               oi.middlename,
+               oi.suffix,
+               COALESCE(oi.position_access,oi.role_access) AS outgoing_position
+        FROM officialtransitionstbl t
+        LEFT JOIN officialinformationtbl oi ON oi.official_id = t.outgoing_official_id
+        WHERE t.transition_id = ?
+        LIMIT 1
+    ");
     $transition = null;
     if ($tStmt) {
         $tStmt->bind_param('s', $transitionId);
         $tStmt->execute();
         $transition = $tStmt->get_result()->fetch_assoc();
         $tStmt->close();
+        if ($transition) {
+            $transition = otDecryptOfficialContactRow($transition);
+            $transition['outgoing_name'] = otFormatOfficialName($transition, true);
+        }
     }
 
-    otJson(['success' => true, 'candidates' => $candidates, 'transition' => $transition]);
+    otJson(['success' => true, 'candidates' => [], 'transition' => $transition]);
 }
 
 // ════════════════════════════════════════════════════════════════════════════
@@ -1231,189 +1322,21 @@ if ($action === 'delete_schedule') {
 }
 
 // ════════════════════════════════════════════════════════════════════════════
-// POST: save encoded official information
-// ════════════════════════════════════════════════════════════════════════════
-if ($action === 'add_candidate') {
-    otEnsureUpcomingOfficialFields($conn);
-
-    $transitionId      = trim((string)($_POST['transition_id']       ?? ''));
-    $linkedOfficialId  = trim((string)($_POST['linked_official_id']  ?? ''));
-    $linkedResidentId  = trim((string)($_POST['linked_resident_id']  ?? ''));
-    $notes             = trim((string)($_POST['notes']               ?? ''));
-    $candidateFirstName= trim((string)($_POST['candidate_first_name']?? ''));
-    $candidateLastName = trim((string)($_POST['candidate_last_name'] ?? ''));
-    $candidateMiddle   = trim((string)($_POST['candidate_middle_name'] ?? ''));
-    $candidateSuffix   = trim((string)($_POST['candidate_suffix']    ?? ''));
-    $candidateEmail    = trim((string)($_POST['candidate_email']     ?? ''));
-    $candidateMobile   = preg_replace('/[^0-9]/', '', (string)($_POST['candidate_mobile'] ?? ''));
-
-    if ($transitionId  === '') otError('Missing transition_id.');
-    if ($candidateLastName === '' || $candidateFirstName === '') {
-        otError('Last name and first name are required.');
-    }
-    if ($candidateEmail === '' || !filter_var($candidateEmail, FILTER_VALIDATE_EMAIL)) {
-        otError('A valid email address is required.');
-    }
-    if ($candidateMobile === '' || strlen($candidateMobile) !== 10 || $candidateMobile[0] !== '9') {
-        otError('Mobile number must be a valid 10-digit Philippine mobile number.');
-    }
-
-    $candidateType = $linkedOfficialId !== '' ? 'ReturningOfficial' : 'New';
-
-    $candidateName = trim($candidateLastName . ', ' . $candidateFirstName);
-    if ($candidateMiddle !== '') {
-        $candidateName .= ' ' . $candidateMiddle;
-    }
-    if ($candidateSuffix !== '') {
-        $candidateName .= ' ' . $candidateSuffix;
-    }
-    $candidateContact = '+63' . $candidateMobile;
-
-    $existingId = 0;
-    $existingStmt = $conn->prepare("
-        SELECT upcoming_id
-        FROM upcomingofficialstbl
-        WHERE transition_id = ?
-        ORDER BY is_selected DESC, upcoming_id ASC
-        LIMIT 1
-    ");
-    if ($existingStmt) {
-        $existingStmt->bind_param('s', $transitionId);
-        $existingStmt->execute();
-        $existingId = (int)($existingStmt->get_result()->fetch_assoc()['upcoming_id'] ?? 0);
-        $existingStmt->close();
-    }
-
-    if ($existingId > 0) {
-        $stmt = $conn->prepare("
-            UPDATE upcomingofficialstbl
-            SET candidate_type = ?,
-                candidate_name = ?,
-                candidate_contact = NULLIF(?, ''),
-                linked_official_id = NULLIF(?, ''),
-                linked_resident_id = NULLIF(?, ''),
-                notes = NULLIF(?, ''),
-                encoded_by = ?,
-                candidate_first_name = NULLIF(?, ''),
-                candidate_last_name = NULLIF(?, ''),
-                candidate_middle_name = NULLIF(?, ''),
-                candidate_suffix = NULLIF(?, ''),
-                candidate_email = NULLIF(?, ''),
-                candidate_mobile = NULLIF(?, ''),
-                is_selected = 1
-            WHERE upcoming_id = ?
-            LIMIT 1
-        ");
-        if (!$stmt) otError('Update failed: ' . $conn->error);
-        $stmt->bind_param('sssssssssssssi',
-            $candidateType, $candidateName, $candidateContact,
-            $linkedOfficialId, $linkedResidentId, $notes, $actorId,
-            $candidateFirstName, $candidateLastName, $candidateMiddle,
-            $candidateSuffix, $candidateEmail, $candidateMobile, $existingId
-        );
-        if (!$stmt->execute()) otError('Failed to save official information: ' . $stmt->error);
-        $stmt->close();
-        $newId = $existingId;
-        $message = 'Official information updated.';
-        $auditAction = 'update_candidate';
-        $oldValue = 'Existing encoded official';
-    } else {
-        $stmt = $conn->prepare("
-            INSERT INTO upcomingofficialstbl
-                (transition_id, candidate_type, candidate_name, candidate_contact,
-                 linked_official_id, linked_resident_id, notes, encoded_by,
-                 candidate_first_name, candidate_last_name, candidate_middle_name,
-                 candidate_suffix, candidate_email, candidate_mobile, is_selected)
-            VALUES (?, ?, ?, NULLIF(?,''), NULLIF(?,''), NULLIF(?,''), NULLIF(?,''), ?,
-                    NULLIF(?,''), NULLIF(?,''), NULLIF(?,''), NULLIF(?,''), NULLIF(?,''), NULLIF(?,''), 1)
-        ");
-        if (!$stmt) otError('Insert failed: ' . $conn->error);
-        $stmt->bind_param('ssssssssssssss',
-            $transitionId, $candidateType, $candidateName, $candidateContact,
-            $linkedOfficialId, $linkedResidentId, $notes, $actorId,
-            $candidateFirstName, $candidateLastName, $candidateMiddle,
-            $candidateSuffix, $candidateEmail, $candidateMobile
-        );
-        if (!$stmt->execute()) otError('Failed to save official information: ' . $stmt->error);
-        $newId = $conn->insert_id;
-        $stmt->close();
-        $message = 'Official information saved.';
-        $auditAction = 'add_candidate';
-        $oldValue = null;
-    }
-
-    $cleanupStmt = $conn->prepare("DELETE FROM upcomingofficialstbl WHERE transition_id = ? AND upcoming_id <> ?");
-    if ($cleanupStmt) {
-        $cleanupStmt->bind_param('si', $transitionId, $newId);
-        $cleanupStmt->execute();
-        $cleanupStmt->close();
-    }
-
-    // Update transition status to CandidateEncoding if still Open
-    $conn->query("UPDATE officialtransitionstbl SET status='CandidateEncoding' WHERE transition_id='{$conn->real_escape_string($transitionId)}' AND status='Open'");
-
-    insertUnifiedAuditLog($conn, $actorId, $actorRole,
-        'OfficialTransitions', 'candidate', (string)$newId,
-        $auditAction, 'candidate_name', $oldValue, $candidateName,
-        "Transition: {$transitionId} | Type: {$candidateType}"
-    );
-
-    otJson(['success' => true, 'message' => $message, 'upcoming_id' => $newId]);
-}
-
-// ════════════════════════════════════════════════════════════════════════════
-// POST: remove access entry
-// ════════════════════════════════════════════════════════════════════════════
-if ($action === 'remove_candidate') {
-    $upcomingId = (int)($_POST['upcoming_id'] ?? 0);
-    if ($upcomingId <= 0) otError('Invalid access entry ID.');
-
-    $row = $conn->query("SELECT candidate_name, transition_id FROM upcomingofficialstbl WHERE upcoming_id = {$upcomingId} LIMIT 1")->fetch_assoc();
-    if (!$row) otError('Official record not found.');
-
-    $conn->query("DELETE FROM upcomingofficialstbl WHERE upcoming_id = {$upcomingId}");
-
-    insertUnifiedAuditLog($conn, $actorId, $actorRole,
-        'OfficialTransitions', 'candidate', (string)$upcomingId,
-        'remove_candidate', 'candidate_name', (string)$row['candidate_name'], null,
-        "Transition: {$row['transition_id']}"
-    );
-
-    otJson(['success' => true, 'message' => 'Official removed.']);
-}
-
-// ════════════════════════════════════════════════════════════════════════════
-// POST: mark transition as pending decision
-// ════════════════════════════════════════════════════════════════════════════
-if ($action === 'mark_pending_decision') {
-    $transitionId = trim((string)($_POST['transition_id'] ?? ''));
-    if ($transitionId === '') otError('Missing transition_id.');
-
-    $count = (int)$conn->query("SELECT COUNT(*) AS c FROM upcomingofficialstbl WHERE transition_id='{$conn->real_escape_string($transitionId)}'")->fetch_assoc()['c'];
-    if ($count === 0) otError('Complete the official information before continuing.');
-
-    $stmt = $conn->prepare("UPDATE officialtransitionstbl SET status='PendingDecision' WHERE transition_id=? AND status IN ('CandidateEncoding','Open')");
-    if (!$stmt) otError('Update failed.');
-    $stmt->bind_param('s', $transitionId);
-    $stmt->execute();
-    $stmt->close();
-
-    insertUnifiedAuditLog($conn, $actorId, $actorRole,
-        'OfficialTransitions', 'transition', $transitionId,
-        'mark_pending_decision', 'status', 'CandidateEncoding', 'PendingDecision', null
-    );
-
-    otJson(['success' => true, 'message' => 'Transition marked as ready for decision.']);
-}
-
-// ════════════════════════════════════════════════════════════════════════════
-// POST: complete transition (select winner + process)
+// POST: complete transition (process incoming official directly)
 // ════════════════════════════════════════════════════════════════════════════
 if ($action === 'complete_transition') {
-    $transitionId  = trim((string)($_POST['transition_id']    ?? ''));
-    $candidateId   = (int)($_POST['selected_candidate_id']    ?? 0);
-    $outcome       = trim((string)($_POST['outcome']          ?? ''));
-    $actingUntil   = trim((string)($_POST['acting_until_date']?? ''));
+    $transitionId      = trim((string)($_POST['transition_id'] ?? ''));
+    $outcome           = trim((string)($_POST['outcome'] ?? ''));
+    $actingUntil       = trim((string)($_POST['acting_until_date'] ?? ''));
+    $linkedOfficialId  = trim((string)($_POST['linked_official_id'] ?? ''));
+    $linkedResidentId  = trim((string)($_POST['linked_resident_id'] ?? ''));
+    $notes             = trim((string)($_POST['notes'] ?? ''));
+    $candidateFirstName= trim((string)($_POST['candidate_first_name'] ?? ''));
+    $candidateLastName = trim((string)($_POST['candidate_last_name'] ?? ''));
+    $candidateMiddle   = trim((string)($_POST['candidate_middle_name'] ?? ''));
+    $candidateSuffix   = trim((string)($_POST['candidate_suffix'] ?? ''));
+    $candidateEmail    = strtolower(trim((string)($_POST['candidate_email'] ?? '')));
+    $candidateMobile   = preg_replace('/[^0-9]/', '', (string)($_POST['candidate_mobile'] ?? ''));
 
     if ($transitionId === '') otError('Missing transition_id.');
     if ($outcome === '')      otError('Outcome is required.');
@@ -1438,20 +1361,60 @@ if ($action === 'complete_transition') {
     $termEndDateSql = $termEndDate ?? '';
     $batchLabel = trim((string)($transition['batch_label'] ?? ''));
     $completionMessage = 'Transition completed successfully.';
+    $completionInviteLink = '';
+    $completionInviteEmailSent = null;
+    $completionInviteSmsSent = null;
+    $linkedInviteId = 0;
+    $pendingInviteDelivery = null;
+    $pendingUserNotifications = [];
 
-    // ── Load selected candidate (required for most outcomes) ─────────────────
     $candidate = null;
-    if ($outcome !== 'NoSuccessor' && $candidateId > 0) {
-        $cStmt = $conn->prepare("SELECT * FROM upcomingofficialstbl WHERE upcoming_id = ? AND transition_id = ? LIMIT 1");
-        if ($cStmt) {
-            $cStmt->bind_param('is', $candidateId, $transitionId);
-            $cStmt->execute();
-            $candidate = $cStmt->get_result()->fetch_assoc();
-            $cStmt->close();
-        }
+    $candidateName = trim($candidateLastName . ', ' . $candidateFirstName);
+    if ($candidateMiddle !== '') {
+        $candidateName .= ' ' . $candidateMiddle;
     }
-    if (!in_array($outcome, ['ReElected', 'NoSuccessor'], true) && !$candidate) {
-        otError('Selected official information was not found for this transition.');
+    if ($candidateSuffix !== '') {
+        $candidateName .= ' ' . $candidateSuffix;
+    }
+    $candidateContact = $candidateMobile !== '' ? '+63' . $candidateMobile : '';
+
+    if (!in_array($outcome, ['ReElected', 'NoSuccessor'], true)) {
+        if ($candidateLastName === '' || $candidateFirstName === '') {
+            otError('Last name and first name are required.');
+        }
+        if ($candidateEmail === '' || !filter_var($candidateEmail, FILTER_VALIDATE_EMAIL)) {
+            otError('A valid email address is required.');
+        }
+        if ($candidateMobile === '' || strlen($candidateMobile) !== 10 || $candidateMobile[0] !== '9') {
+            otError('Mobile number must be a valid 10-digit Philippine mobile number.');
+        }
+        if (in_array($outcome, ['Reactivated', 'PositionChange', 'ActingReplacement'], true) && $linkedOfficialId === '') {
+            if ($outcome === 'Reactivated') {
+                otError('Select the former official record before completing this transition.');
+            } else {
+                otError('Select the active official record before completing this transition.');
+            }
+        }
+        if ($outcome === 'NewPerson' && $linkedOfficialId !== '') {
+            otError('Clear the existing official selection before completing a brand new onboarding.');
+        }
+
+        $candidate = [
+            'candidate_type' => in_array($outcome, ['PositionChange', 'ActingReplacement'], true)
+                ? 'ActiveOfficial'
+                : ($linkedOfficialId !== '' ? 'ReturningOfficial' : 'New'),
+            'candidate_name' => $candidateName,
+            'candidate_contact' => $candidateContact,
+            'linked_official_id' => $linkedOfficialId,
+            'linked_resident_id' => $linkedResidentId,
+            'notes' => $notes,
+            'candidate_first_name' => $candidateFirstName,
+            'candidate_last_name' => $candidateLastName,
+            'candidate_middle_name' => $candidateMiddle,
+            'candidate_suffix' => $candidateSuffix,
+            'candidate_email' => $candidateEmail,
+            'candidate_mobile' => $candidateMobile,
+        ];
     }
 
     // ── Position uniqueness check (skip for ReElected & NoSuccessor) ─────────
@@ -1578,16 +1541,18 @@ if ($action === 'complete_transition') {
                 $subject = 'System Access Update — Official Transition';
                 $msg     = "Dear {$outName},\n\nYour Barangay San Jose system account has been updated following the official transition for {$position}. Your employment status has been recorded as: {$newEmpStatus}.\n\nIf you have concerns, please contact the IT Administrator.\n\nBarangay San Jose";
             }
-            if ($outUserId !== '') otNotifyUser($conn, $outUserId, $subject, $msg);
+            if ($outUserId !== '') {
+                $pendingUserNotifications[] = [
+                    'user_id' => $outUserId,
+                    'subject' => $subject,
+                    'message' => $msg,
+                ];
+            }
         }
 
         // ── Process incoming (winner) ─────────────────────────────────────────
         $incomingOfficialId = null;
         $incomingUserId = '';
-        $linkedInviteId = 0;
-        $completionInviteLink = '';
-        $completionInviteEmailSent = null;
-        $completionInviteSmsSent = null;
 
         if ($outcome === 'Reactivated' && $candidate) {
             $linkedId = (string)($candidate['linked_official_id'] ?? '');
@@ -1605,12 +1570,15 @@ if ($action === 'complete_transition') {
                         ['Official/Personnel Management', 'Employment', 'OfficialEmployment', 'UserAccount'],
                         [$assignment['employment_status'], 'Regular', 'Active']
                     );
+                    $candidateContact = pii_prepare_useraccount_contacts($candidateEmail, $candidatePhone);
 
                     $upStmt = $conn->prepare("
                         UPDATE useraccountstbl
                         SET status_id_account = ?,
                             email = ?,
+                            email_lookup_hash = ?,
                             phone_number = ?,
+                            phone_lookup_hash = ?,
                             role_access = ?,
                             updated_at = NOW()
                         WHERE user_id = ?
@@ -1618,9 +1586,41 @@ if ($action === 'complete_transition') {
                     ");
                     if ($upStmt) {
                         $activeStatusValue = (string)$activeStatusId;
-                        $upStmt->bind_param('sssss', $activeStatusValue, $candidateEmail, $candidatePhone, $assignment['account_role'], $retUserId);
+                        $upStmt->bind_param(
+                            'sssssss',
+                            $activeStatusValue,
+                            $candidateContact['email'],
+                            $candidateContact['email_lookup_hash'],
+                            $candidateContact['phone_number'],
+                            $candidateContact['phone_lookup_hash'],
+                            $assignment['account_role'],
+                            $retUserId
+                        );
                         $upStmt->execute();
                         $upStmt->close();
+                    }
+
+                    $upContactStmt = $conn->prepare("
+                        UPDATE officialinformationtbl
+                        SET contact_number = ?,
+                            email = ?,
+                            last_updated = CURRENT_TIMESTAMP
+                        WHERE official_id = ?
+                        LIMIT 1
+                    ");
+                    if ($upContactStmt) {
+                        $officialContact = pii_encrypt_field_map([
+                            'contact_number' => $candidatePhone,
+                            'email' => $candidateEmail,
+                        ]);
+                        $upContactStmt->bind_param(
+                            'sss',
+                            $officialContact['contact_number'],
+                            $officialContact['email'],
+                            $linkedId
+                        );
+                        $upContactStmt->execute();
+                        $upContactStmt->close();
                     }
 
                     $upProfile = $conn->prepare("
@@ -1676,8 +1676,7 @@ if ($action === 'complete_transition') {
                     ], $actorId);
                     $linkedInviteId = (int)($invite['invite_id'] ?? 0);
                     $completionInviteLink = (string)($invite['invite_link'] ?? '');
-                    $completionInviteEmailSent = (bool)($invite['email_sent'] ?? false);
-                    $completionInviteSmsSent = (bool)($invite['sms_sent'] ?? false);
+                    $pendingInviteDelivery = $invite;
                     $incomingOfficialId = $linkedId;
                     $incomingUserId = $retUserId;
                     $completionMessage = 'Transition completed. The reactivated official account was updated.';
@@ -1724,12 +1723,13 @@ if ($action === 'complete_transition') {
                 $vacOfficialData = $previousOfficialData;
                 if ($vacOfficialData) {
                     $vacTransId  = otGenerateTransitionId($conn);
+                    $vacCouncilId = (int)($vacOfficialData['council_id'] ?? 0);
                     $vacPosition = (string)($vacOfficialData['position'] ?? '');
                     $vacDept     = (string)($vacOfficialData['department'] ?? '');
                     $vacArea     = (string)($vacOfficialData['area_number'] ?? '');
-                    $autoStmt = $conn->prepare("INSERT INTO officialtransitionstbl (transition_id, transition_type, position, department, area_number, status, created_by, reason) VALUES (?, 'Replacement', NULLIF(?,''), NULLIF(?,''), NULLIF(?,''), 'Open', ?, 'Auto-opened: official moved to another position')");
+                    $autoStmt = $conn->prepare("INSERT INTO officialtransitionstbl (transition_id, council_id, transition_type, position, department, area_number, status, created_by, reason) VALUES (?, NULLIF(?,0), 'Replacement', NULLIF(?,''), NULLIF(?,''), NULLIF(?,''), 'Open', ?, 'Auto-opened: official moved to another position')");
                     if ($autoStmt) {
-                        $autoStmt->bind_param('sssss', $vacTransId, $vacPosition, $vacDept, $vacArea, $actorId);
+                        $autoStmt->bind_param('sissss', $vacTransId, $vacCouncilId, $vacPosition, $vacDept, $vacArea, $actorId);
                         $autoStmt->execute();
                         $autoStmt->close();
                     }
@@ -1760,38 +1760,14 @@ if ($action === 'complete_transition') {
             $incomingUserId = (string)($newIncoming['user_id'] ?? '');
             $linkedInviteId = (int)($newIncoming['invite_id'] ?? 0);
             $completionInviteLink = (string)($newIncoming['invite_link'] ?? '');
-            $completionInviteEmailSent = (bool)($newIncoming['email_sent'] ?? false);
-            $completionInviteSmsSent = (bool)($newIncoming['sms_sent'] ?? false);
+            $pendingInviteDelivery = [
+                'invite_link' => $completionInviteLink,
+                'delivery' => is_array($newIncoming['invite_delivery'] ?? null) ? $newIncoming['invite_delivery'] : null,
+            ];
             $completionMessage = 'Transition completed. Onboarding access was prepared for the proclaimed official.';
         } elseif ($outcome === 'ReElected') {
             $incomingOfficialId = $outgoingId;
             $incomingUserId = (string)($outgoing['user_id'] ?? '');
-        }
-
-        if ($completionInviteEmailSent !== null || $completionInviteSmsSent !== null) {
-            $deliveryParts = [];
-            if ($completionInviteEmailSent !== null) {
-                $deliveryParts[] = $completionInviteEmailSent ? 'email sent' : 'email not sent';
-            }
-            if ($completionInviteSmsSent !== null) {
-                $deliveryParts[] = $completionInviteSmsSent ? 'SMS sent' : 'SMS not sent';
-            }
-            if ($deliveryParts) {
-                $completionMessage .= ' Delivery status: ' . implode(', ', $deliveryParts) . '.';
-            }
-        }
-
-        // ── Mark selected candidate ───────────────────────────────────────────
-        if ($candidateId > 0 && $outcome !== 'NoSuccessor') {
-            $conn->query("UPDATE upcomingofficialstbl SET is_selected = 0 WHERE transition_id = '{$conn->real_escape_string($transitionId)}'");
-            $candidateUpdateParts = ["is_selected = 1"];
-            if ($incomingOfficialId !== null && $incomingOfficialId !== '') {
-                $candidateUpdateParts[] = "linked_official_id = '{$conn->real_escape_string((string)$incomingOfficialId)}'";
-            }
-            if ($linkedInviteId > 0) {
-                $candidateUpdateParts[] = "linked_invite_id = {$linkedInviteId}";
-            }
-            $conn->query("UPDATE upcomingofficialstbl SET " . implode(', ', $candidateUpdateParts) . " WHERE upcoming_id = {$candidateId}");
         }
 
         // ── Update transition record ──────────────────────────────────────────
@@ -1801,7 +1777,6 @@ if ($action === 'complete_transition') {
             UPDATE officialtransitionstbl
             SET status                = 'Completed',
                 outcome               = ?,
-                selected_candidate_id = NULLIF(?,0),
                 incoming_official_id  = NULLIF(?,''),
                 is_acting             = ?,
                 acting_until_date     = ?,
@@ -1810,8 +1785,8 @@ if ($action === 'complete_transition') {
             WHERE transition_id = ?
         ");
         if ($upTrans) {
-            $upTrans->bind_param('siisss',
-                $outcome, $candidateId, $incomingOfficialId,
+            $upTrans->bind_param('ssiss',
+                $outcome, $incomingOfficialId,
                 $isActing, $actingDate, $transitionId
             );
             $upTrans->execute();
@@ -1846,10 +1821,36 @@ if ($action === 'complete_transition') {
         otError($e->getMessage());
     }
 
+    foreach ($pendingUserNotifications as $notification) {
+        otNotifyUser(
+            $conn,
+            (string)($notification['user_id'] ?? ''),
+            (string)($notification['subject'] ?? ''),
+            (string)($notification['message'] ?? '')
+        );
+    }
+    if (is_array($pendingInviteDelivery)) {
+        $deliveryStatus = otDeliverOnboardingInvite($pendingInviteDelivery);
+        $completionInviteEmailSent = (bool)($deliveryStatus['email_sent'] ?? false);
+        $completionInviteSmsSent = (bool)($deliveryStatus['sms_sent'] ?? false);
+    }
+    if ($completionInviteEmailSent !== null || $completionInviteSmsSent !== null) {
+        $deliveryParts = [];
+        if ($completionInviteEmailSent !== null) {
+            $deliveryParts[] = $completionInviteEmailSent ? 'email sent' : 'email not sent';
+        }
+        if ($completionInviteSmsSent !== null) {
+            $deliveryParts[] = $completionInviteSmsSent ? 'SMS sent' : 'SMS not sent';
+        }
+        if ($deliveryParts) {
+            $completionMessage .= ' Delivery status: ' . implode(', ', $deliveryParts) . '.';
+        }
+    }
+
     insertUnifiedAuditLog($conn, $actorId, $actorRole,
         'OfficialTransitions', 'transition', $transitionId,
         'complete_transition', 'outcome', null, $outcome,
-        "Outgoing: {$outgoingId} | Candidate: {$candidateId}"
+        "Outgoing: {$outgoingId}" . ($candidateName !== '' ? " | Incoming: {$candidateName}" : '')
     );
 
     otJson([
@@ -1942,20 +1943,39 @@ if ($action === 'change_credentials') {
     $userId   = (string)($official['user_id'] ?? '');
     if ($userId === '') otError('No linked user account.');
 
+    $finalEmail = $newEmail !== '' ? strtolower($newEmail) : strtolower(trim((string)($official['email'] ?? '')));
+    $finalPhone = $newPhone !== '' ? oi_normalize_phone10($newPhone) : oi_normalize_phone10((string)($official['phone_number'] ?? ''));
+    if ($newEmail !== '' || $newPhone !== '') {
+        otAssertContactIsAvailable($conn, $finalEmail, $finalPhone, $userId);
+    }
+
     $setParts = ['updated_at = NOW()'];
     $params   = [];
     $types    = '';
+    $officialContactChanges = [];
 
     if ($newEmail !== '') {
         if (!filter_var($newEmail, FILTER_VALIDATE_EMAIL)) otError('Invalid email address.');
         $setParts[] = 'email = ?';
-        $params[]   = $newEmail;
+        $setParts[] = 'email_lookup_hash = ?';
+        $preparedEmail = pii_prepare_useraccount_contacts($newEmail, (string)($official['phone_number'] ?? ''));
+        $params[]   = $preparedEmail['email'];
+        $params[]   = $preparedEmail['email_lookup_hash'];
         $types     .= 's';
+        $types     .= 's';
+        $officialContactChanges['email'] = pii_encrypt_string($newEmail);
     }
     if ($newPhone !== '') {
+        $normalizedPhone = oi_normalize_phone10($newPhone);
+        if (!oi_is_valid_phone10($normalizedPhone)) otError('Invalid mobile number.');
         $setParts[] = 'phone_number = ?';
-        $params[]   = $newPhone;
+        $setParts[] = 'phone_lookup_hash = ?';
+        $preparedPhone = pii_prepare_useraccount_contacts((string)($official['email'] ?? ''), $normalizedPhone);
+        $params[]   = $preparedPhone['phone_number'];
+        $params[]   = $preparedPhone['phone_lookup_hash'];
         $types     .= 's';
+        $types     .= 's';
+        $officialContactChanges['contact_number'] = pii_encrypt_string($normalizedPhone);
     }
     if ($forcePasswordReset) {
         // Set a flag or blank the password hash to force reset — implementation depends on auth flow
@@ -1974,6 +1994,31 @@ if ($action === 'change_credentials') {
     call_user_func_array([$stmt, 'bind_param'], $refs);
     $stmt->execute();
     $stmt->close();
+
+    if ($officialContactChanges !== []) {
+        $officialSetParts = [];
+        $officialParams = [];
+        $officialTypes = '';
+        foreach ($officialContactChanges as $field => $value) {
+            $officialSetParts[] = $field . ' = ?';
+            $officialParams[] = $value;
+            $officialTypes .= 's';
+        }
+        $officialSetParts[] = 'last_updated = CURRENT_TIMESTAMP';
+        $officialParams[] = $officialId;
+        $officialTypes .= 's';
+        $officialSql = 'UPDATE officialinformationtbl SET ' . implode(', ', $officialSetParts) . ' WHERE official_id = ? LIMIT 1';
+        $officialStmt = $conn->prepare($officialSql);
+        if ($officialStmt) {
+            $officialRefs = [$officialTypes];
+            foreach ($officialParams as $k => $value) {
+                $officialRefs[] = &$officialParams[$k];
+            }
+            call_user_func_array([$officialStmt, 'bind_param'], $officialRefs);
+            $officialStmt->execute();
+            $officialStmt->close();
+        }
+    }
 
     insertUnifiedAuditLog($conn, $actorId, $actorRole,
         'OfficialTransitions', 'official', $officialId,

@@ -1,10 +1,11 @@
 <?php
 require_once __DIR__ . '/../../PhpFiles/General/connection.php';
 require_once __DIR__ . '/../includes/admin_guard.php';
+require_once __DIR__ . '/../../PhpFiles/General/uniqueIDGenerate.php';
 
 $financeBaseUrl = appUrl('/Admin-End/Certificates/FinancePayments.php');
 $financeSection = strtolower(trim((string)($_GET['section'] ?? 'tracker')));
-if (!in_array($financeSection, ['tracker', 'fees', 'cashbook'], true)) {
+if (!in_array($financeSection, ['tracker', 'fees', 'create'], true)) {
   $financeSection = 'tracker';
 }
 
@@ -97,52 +98,303 @@ function fp_fetch_document_type(mysqli $conn, int $documentTypeId): ?array
   return $row;
 }
 
-function fp_fetch_cashbook_entries(mysqli $conn, string $dateFrom, string $dateTo): array
+function fp_table_exists(mysqli $conn, string $table): bool
 {
-  $rows = [];
-  $stmt = $conn->prepare("
-    SELECT
-      dr.request_id,
-      COALESCE(dr.document_type, 'Unknown') AS document_type,
-      dr.or_number,
-      dr.certificate_number,
-      COALESCE(dr.fee_amount, 0) AS amount,
-      COALESCE(dr.payment_method, '') AS payment_method,
-      dr.finance_decision_at,
-      dr.finance_user_id,
-      TRIM(CONCAT_WS(' ',
-        NULLIF(TRIM(COALESCE(ft.applicant_firstname, '')), ''),
-        NULLIF(TRIM(COALESCE(ft.applicant_middleInitial, '')), ''),
-        NULLIF(TRIM(COALESCE(ft.applicant_lastname, '')), '')
-      )) AS applicant_name
-    FROM documentrequesttbl dr
-    LEFT JOIN financetransactiontbl ft ON ft.request_id = dr.request_id
-    WHERE dr.or_number IS NOT NULL
-      AND dr.or_number != ''
-      AND DATE(dr.finance_decision_at) BETWEEN ? AND ?
-    ORDER BY dr.finance_decision_at DESC
-  ");
-  if (!$stmt) return [];
-  $stmt->bind_param('ss', $dateFrom, $dateTo);
-  $stmt->execute();
-  $result = $stmt->get_result();
-  while ($row = $result->fetch_assoc()) {
-    $rows[] = $row;
+  $tableSafe = preg_replace('/[^a-zA-Z0-9_]/', '', $table);
+  if ($tableSafe === '') {
+    return false;
   }
-  $stmt->close();
+
+  $tableEsc = $conn->real_escape_string($tableSafe);
+  $res = $conn->query("SHOW TABLES LIKE '{$tableEsc}'");
+  return $res instanceof mysqli_result && $res->num_rows > 0;
+}
+
+function fp_column_exists(mysqli $conn, string $table, string $column): bool
+{
+  $tableSafe = preg_replace('/[^a-zA-Z0-9_]/', '', $table);
+  if ($tableSafe === '') {
+    return false;
+  }
+
+  $columnEsc = $conn->real_escape_string($column);
+  $res = $conn->query("SHOW COLUMNS FROM {$tableSafe} LIKE '{$columnEsc}'");
+  return $res instanceof mysqli_result && $res->num_rows > 0;
+}
+
+function fp_ensure_manual_transactions_table(mysqli $conn): void
+{
+  static $done = false;
+  if ($done) {
+    return;
+  }
+
+  $conn->query("
+    CREATE TABLE IF NOT EXISTS manualfinancetransactiontbl (
+      transaction_id VARCHAR(10) NOT NULL,
+      transaction_name VARCHAR(191) NOT NULL,
+      resident_address VARCHAR(255) NOT NULL,
+      resident_phone_number VARCHAR(40) DEFAULT NULL,
+      resident_email VARCHAR(191) DEFAULT NULL,
+      transaction_description TEXT NOT NULL,
+      department_handle VARCHAR(120) NOT NULL,
+      transaction_amount DECIMAL(12,2) NOT NULL DEFAULT 0.00,
+      or_number_receipt VARCHAR(80) NOT NULL,
+      created_by_user_id VARCHAR(12) DEFAULT NULL,
+      created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      PRIMARY KEY (transaction_id),
+      UNIQUE KEY uq_manual_finance_or_number (or_number_receipt),
+      KEY idx_manual_finance_department (department_handle),
+      KEY idx_manual_finance_created_by (created_by_user_id),
+      KEY idx_manual_finance_created_at (created_at)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
+  ");
+
+  if (fp_table_exists($conn, 'manualfinancetransactiontbl') && !fp_column_exists($conn, 'manualfinancetransactiontbl', 'updated_at')) {
+    $conn->query("ALTER TABLE manualfinancetransactiontbl ADD COLUMN updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP AFTER created_at");
+  }
+  if (fp_table_exists($conn, 'manualfinancetransactiontbl') && !fp_column_exists($conn, 'manualfinancetransactiontbl', 'resident_address')) {
+    $conn->query("ALTER TABLE manualfinancetransactiontbl ADD COLUMN resident_address VARCHAR(255) NOT NULL DEFAULT '' AFTER transaction_name");
+  }
+  if (fp_table_exists($conn, 'manualfinancetransactiontbl') && !fp_column_exists($conn, 'manualfinancetransactiontbl', 'resident_phone_number')) {
+    $conn->query("ALTER TABLE manualfinancetransactiontbl ADD COLUMN resident_phone_number VARCHAR(40) DEFAULT NULL AFTER resident_address");
+  }
+  if (fp_table_exists($conn, 'manualfinancetransactiontbl') && !fp_column_exists($conn, 'manualfinancetransactiontbl', 'resident_email')) {
+    $conn->query("ALTER TABLE manualfinancetransactiontbl ADD COLUMN resident_email VARCHAR(191) DEFAULT NULL AFTER resident_phone_number");
+  }
+
+  $done = true;
+}
+
+function fp_fetch_department_options(mysqli $conn): array
+{
+  $options = [
+    'Office of the Barangay',
+    'Barangay Certificate Issuance',
+    'Baranagay Monitoring',
+    'Barangay Treasurers Office',
+    'Barangay Peace and Order',
+    'Barangay Finance Office',
+  ];
+
+  if (fp_table_exists($conn, 'officialinformationtbl') && fp_column_exists($conn, 'officialinformationtbl', 'department')) {
+    $result = $conn->query("
+      SELECT DISTINCT department
+      FROM officialinformationtbl
+      WHERE department IS NOT NULL AND TRIM(department) <> ''
+      ORDER BY department ASC
+    ");
+    if ($result instanceof mysqli_result) {
+      while ($row = $result->fetch_assoc()) {
+        $value = trim((string)($row['department'] ?? ''));
+        if ($value !== '' && !in_array($value, $options, true)) {
+          $options[] = $value;
+        }
+      }
+      $result->close();
+    }
+  }
+
+  sort($options);
+  return $options;
+}
+
+function fp_or_number_exists(mysqli $conn, string $orNumber): bool
+{
+  $orNumber = strtoupper(trim($orNumber));
+  if ($orNumber === '') {
+    return false;
+  }
+
+  if (fp_table_exists($conn, 'financetransactiontbl') && fp_column_exists($conn, 'financetransactiontbl', 'or_number')) {
+    $stmt = $conn->prepare("SELECT 1 FROM financetransactiontbl WHERE UPPER(TRIM(or_number)) = ? LIMIT 1");
+    if ($stmt) {
+      $stmt->bind_param('s', $orNumber);
+      $stmt->execute();
+      $exists = $stmt->get_result()->fetch_row() !== null;
+      $stmt->close();
+      if ($exists) {
+        return true;
+      }
+    }
+  }
+
+  if (fp_table_exists($conn, 'manualfinancetransactiontbl') && fp_column_exists($conn, 'manualfinancetransactiontbl', 'or_number_receipt')) {
+    $stmt = $conn->prepare("SELECT 1 FROM manualfinancetransactiontbl WHERE UPPER(TRIM(or_number_receipt)) = ? LIMIT 1");
+    if ($stmt) {
+      $stmt->bind_param('s', $orNumber);
+      $stmt->execute();
+      $exists = $stmt->get_result()->fetch_row() !== null;
+      $stmt->close();
+      if ($exists) {
+        return true;
+      }
+    }
+  }
+
+  return false;
+}
+
+function fp_fetch_manual_transactions(mysqli $conn, int $limit = 20): array
+{
+  fp_ensure_manual_transactions_table($conn);
+
+  $rows = [];
+  $limit = max(1, min(100, $limit));
+  $canJoinOfficials = fp_table_exists($conn, 'officialinformationtbl');
+  $hasSuffix = $canJoinOfficials && fp_column_exists($conn, 'officialinformationtbl', 'suffix');
+  $selectCreator = $canJoinOfficials
+    ? (
+      $hasSuffix
+        ? "TRIM(CONCAT_WS(' ', NULLIF(oi.firstname, ''), NULLIF(oi.middlename, ''), NULLIF(oi.lastname, ''), NULLIF(oi.suffix, ''))) AS created_by_name"
+        : "TRIM(CONCAT_WS(' ', NULLIF(oi.firstname, ''), NULLIF(oi.middlename, ''), NULLIF(oi.lastname, ''))) AS created_by_name"
+    )
+    : "'' AS created_by_name";
+  $joinCreator = $canJoinOfficials
+    ? "LEFT JOIN officialinformationtbl oi ON oi.user_id = mt.created_by_user_id"
+    : '';
+
+  $sql = "
+    SELECT
+      mt.transaction_id,
+      mt.transaction_name,
+      mt.resident_address,
+      mt.resident_phone_number,
+      mt.resident_email,
+      mt.transaction_description,
+      mt.department_handle,
+      mt.transaction_amount,
+      mt.or_number_receipt,
+      mt.created_by_user_id,
+      mt.created_at,
+      {$selectCreator}
+    FROM manualfinancetransactiontbl mt
+    {$joinCreator}
+    ORDER BY mt.created_at DESC, mt.transaction_id DESC
+    LIMIT {$limit}
+  ";
+
+  $result = $conn->query($sql);
+  if ($result instanceof mysqli_result) {
+    while ($row = $result->fetch_assoc()) {
+      $rows[] = $row;
+    }
+    $result->close();
+  }
+
   return $rows;
+}
+
+function fp_format_datetime(?string $value): string
+{
+  $value = trim((string)$value);
+  if ($value === '') {
+    return '-';
+  }
+  $ts = strtotime($value);
+  if ($ts === false) {
+    return $value;
+  }
+  return date('M j, Y g:i A', $ts);
 }
 
 if ($financeSection === 'fees' || $_SERVER['REQUEST_METHOD'] === 'POST') {
   fp_ensure_general_fees_table($conn);
 }
 
+if ($financeSection === 'create' || trim((string)($_POST['action'] ?? '')) === 'create_manual_transaction') {
+  fp_ensure_manual_transactions_table($conn);
+}
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
   verifyCsrfToken(false);
   $action = trim((string)($_POST['action'] ?? ''));
+  $redirectSection = 'fees';
 
   try {
-    if ($action === 'add_fee') {
+    if ($action === 'create_manual_transaction') {
+      $redirectSection = 'create';
+      $transactionName = trim((string)($_POST['transaction_name'] ?? ''));
+      $residentAddress = trim((string)($_POST['resident_address'] ?? ''));
+      $residentPhoneNumber = trim((string)($_POST['resident_phone_number'] ?? ''));
+      $residentEmail = trim((string)($_POST['resident_email'] ?? ''));
+      $transactionDescription = trim((string)($_POST['transaction_description'] ?? ''));
+      $departmentHandle = trim((string)($_POST['department_handle'] ?? ''));
+      $orNumberReceipt = strtoupper(trim((string)($_POST['or_number_receipt'] ?? '')));
+      $createdByUserId = trim((string)($_SESSION['user_id'] ?? ''));
+      $departmentOptions = fp_fetch_department_options($conn);
+
+      if ($transactionName === '') {
+        throw new RuntimeException('Name is required.');
+      }
+      if ($residentAddress === '') {
+        throw new RuntimeException('Address is required.');
+      }
+      if ($residentEmail !== '' && !filter_var($residentEmail, FILTER_VALIDATE_EMAIL)) {
+        throw new RuntimeException('Please enter a valid email address.');
+      }
+      if ($transactionDescription === '') {
+        throw new RuntimeException('Description of transaction is required.');
+      }
+      if ($departmentHandle === '') {
+        throw new RuntimeException('Barangay department handle is required.');
+      }
+      if (!in_array($departmentHandle, $departmentOptions, true)) {
+        throw new RuntimeException('Please choose a valid barangay department handle.');
+      }
+
+      $amount = fp_parse_amount($_POST['transaction_amount'] ?? null);
+      if ($amount <= 0) {
+        throw new RuntimeException('Amount must be greater than zero.');
+      }
+      if ($orNumberReceipt === '') {
+        throw new RuntimeException('OR number receipt is required.');
+      }
+      if (fp_or_number_exists($conn, $orNumberReceipt)) {
+        throw new RuntimeException('OR number receipt already exists.');
+      }
+
+      $transactionId = GenerateTransactionID($conn, 'manualfinancetransactiontbl', 'transaction_id');
+      $insertStmt = $conn->prepare("
+        INSERT INTO manualfinancetransactiontbl (
+          transaction_id,
+          transaction_name,
+          resident_address,
+          resident_phone_number,
+          resident_email,
+          transaction_description,
+          department_handle,
+          transaction_amount,
+          or_number_receipt,
+          created_by_user_id
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ");
+      if (!$insertStmt) {
+        error_log('[FinancePayments][create_manual_transaction][prepare] ' . $conn->error);
+        throw new RuntimeException('Failed to prepare the transaction insert statement.');
+      }
+      $insertStmt->bind_param(
+        'sssssssdss',
+        $transactionId,
+        $transactionName,
+        $residentAddress,
+        $residentPhoneNumber,
+        $residentEmail,
+        $transactionDescription,
+        $departmentHandle,
+        $amount,
+        $orNumberReceipt,
+        $createdByUserId
+      );
+      if (!$insertStmt->execute()) {
+        $insertStmt->close();
+        throw new RuntimeException('Failed to create the transaction.');
+      }
+      $insertStmt->close();
+
+      fp_set_flash('success', 'Transaction created successfully.');
+    } elseif ($action === 'add_fee') {
       $documentTypeId = (int)($_POST['document_type_id'] ?? 0);
       if ($documentTypeId <= 0) {
         throw new RuntimeException('Please choose a document type.');
@@ -226,28 +478,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     fp_set_flash('danger', $e->getMessage());
   }
 
-  fp_redirect($financeBaseUrl, 'fees');
+  fp_redirect($financeBaseUrl, $redirectSection);
 }
 
-$feeFlash = fp_take_flash();
+$pageFlash = fp_take_flash();
 $feeRows = [];
 $availableFeeDocuments = [];
 $editingFee = null;
-
-$cashbookEntries   = [];
-$cashbookTotal     = 0.0;
-$cashbookDateFrom  = date('Y-m-d');
-$cashbookDateTo    = date('Y-m-d');
-
-if ($financeSection === 'cashbook') {
-  $cashbookDateFrom = trim((string)($_GET['date_from'] ?? date('Y-m-d')));
-  $cashbookDateTo   = trim((string)($_GET['date_to']   ?? date('Y-m-d')));
-  if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $cashbookDateFrom)) $cashbookDateFrom = date('Y-m-d');
-  if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $cashbookDateTo))   $cashbookDateTo   = date('Y-m-d');
-  if ($cashbookDateFrom > $cashbookDateTo)                      $cashbookDateTo   = $cashbookDateFrom;
-  $cashbookEntries = fp_fetch_cashbook_entries($conn, $cashbookDateFrom, $cashbookDateTo);
-  $cashbookTotal   = (float)array_sum(array_column($cashbookEntries, 'amount'));
-}
+$manualDepartmentOptions = [];
+$manualTransactionRows = [];
 
 if ($financeSection === 'fees') {
   $feeRowsResult = $conn->query("
@@ -298,6 +537,9 @@ if ($financeSection === 'fees') {
       }
     }
   }
+} elseif ($financeSection === 'create') {
+  $manualDepartmentOptions = fp_fetch_department_options($conn);
+  $manualTransactionRows = fp_fetch_manual_transactions($conn, 25);
 }
 ?>
 <!DOCTYPE html>
@@ -350,6 +592,25 @@ if ($financeSection === 'fees') {
       border-radius: 16px;
       background: #f8fafc;
       padding: 16px;
+      color: #6b7280;
+    }
+    .manual-transaction-id {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+      font-weight: 700;
+      color: #14532d;
+    }
+    .manual-transaction-desc {
+      white-space: pre-line;
+      color: #475569;
+    }
+    .manual-transaction-meta {
+      margin-top: 0.2rem;
+      font-size: 0.84rem;
+      color: #64748b;
+      line-height: 1.35;
+    }
+    .manual-transaction-created {
+      font-size: 0.84rem;
       color: #6b7280;
     }
     .certificate-tracker-shell {
@@ -621,12 +882,10 @@ if ($financeSection === 'fees') {
       border-top-left-radius: 0 !important;
     }
     #feeTypesTableBody tr { cursor: default; }
-    .cashbook-table th, .cashbook-table td { font-size: .88rem; }
     @media print {
       body { background: #fff !important; }
       #main-display { padding: 0 !important; }
       .d-print-none, aside, header, #dashboard-sidebar, #admin-mobile-header { display: none !important; }
-      .cashbook-shell { max-width: 100% !important; }
       .finance-fee-card { box-shadow: none !important; border: none !important; }
     }
   </style>
@@ -662,9 +921,9 @@ if ($financeSection === 'fees') {
         </li>
       </ul>
       <div id="generalFeesPanel" class="finance-fee-shell">
-        <?php if ($feeFlash): ?>
-          <div class="alert alert-<?= htmlspecialchars((string)($feeFlash['type'] ?? 'info'), ENT_QUOTES, 'UTF-8') ?> rounded-4 shadow-sm">
-            <?= htmlspecialchars((string)($feeFlash['message'] ?? ''), ENT_QUOTES, 'UTF-8') ?>
+        <?php if ($pageFlash): ?>
+          <div class="alert alert-<?= htmlspecialchars((string)($pageFlash['type'] ?? 'info'), ENT_QUOTES, 'UTF-8') ?> rounded-4 shadow-sm">
+            <?= htmlspecialchars((string)($pageFlash['message'] ?? ''), ENT_QUOTES, 'UTF-8') ?>
           </div>
         <?php endif; ?>
 
@@ -910,98 +1169,162 @@ if ($financeSection === 'fees') {
         </div>
       </div>
 
-    <?php elseif ($financeSection === 'cashbook'): ?>
-      <div class="cashbook-shell finance-fee-shell">
-        <div class="finance-fee-card p-4">
-          <div class="d-flex flex-wrap justify-content-between align-items-start gap-3 mb-4 d-print-none">
-            <div>
-              <h4 class="mb-1" style="font-family: 'Charis SIL Bold'; color: #DE710C;">Cashbook</h4>
-              <p class="text-muted mb-0 small">Daily collection log of all verified payments with issued OR numbers.</p>
+    <?php elseif ($financeSection === 'create'): ?>
+      <div class="finance-fee-shell">
+        <?php if ($pageFlash): ?>
+          <div class="alert alert-<?= htmlspecialchars((string)($pageFlash['type'] ?? 'info'), ENT_QUOTES, 'UTF-8') ?> rounded-4 shadow-sm">
+            <?= htmlspecialchars((string)($pageFlash['message'] ?? ''), ENT_QUOTES, 'UTF-8') ?>
+          </div>
+        <?php endif; ?>
+
+        <div class="d-flex flex-wrap justify-content-between align-items-center gap-3 mb-4">
+          <div>
+            <h4 class="mb-1" style="font-family: 'Charis SIL Bold'; color: #DE710C;">Create Transaction</h4>
+            <p class="text-muted mb-0 small">Record a manual finance transaction with the name, description, department handle, amount, and OR number receipt.</p>
+          </div>
+          <a href="<?= htmlspecialchars($financeBaseUrl, ENT_QUOTES, 'UTF-8') ?>" class="btn btn-outline-secondary btn-sm">
+            <i class="fas fa-arrow-left me-1"></i>Back to Payment Tracker
+          </a>
+        </div>
+
+        <div class="row g-4">
+          <div class="col-12 col-lg-5">
+            <div class="finance-fee-card p-4 h-100">
+              <h5 class="fw-bold mb-3">New Finance Transaction</h5>
+              <form method="post" action="<?= htmlspecialchars($financeBaseUrl, ENT_QUOTES, 'UTF-8') ?>?section=create" class="d-grid gap-3">
+                <?= csrfTokenField() ?>
+                <input type="hidden" name="action" value="create_manual_transaction">
+
+                <div>
+                  <label class="form-label fw-semibold">Name</label>
+                  <input type="text" name="transaction_name" class="form-control" placeholder="Enter payer or transaction name" required>
+                </div>
+
+                <div>
+                  <label class="form-label fw-semibold">Address</label>
+                  <textarea name="resident_address" class="form-control" rows="3" placeholder="Enter resident address" required></textarea>
+                </div>
+
+                <div>
+                  <label class="form-label fw-semibold">Resident Phone Number <span class="text-muted fw-normal">(optional)</span></label>
+                  <input type="text" name="resident_phone_number" class="form-control" placeholder="Enter resident phone number">
+                </div>
+
+                <div>
+                  <label class="form-label fw-semibold">Email <span class="text-muted fw-normal">(optional)</span></label>
+                  <input type="email" name="resident_email" class="form-control" placeholder="Enter resident email">
+                </div>
+
+                <div>
+                  <label class="form-label fw-semibold">Description of Transaction</label>
+                  <textarea name="transaction_description" class="form-control" rows="4" placeholder="Describe the transaction" required></textarea>
+                </div>
+
+                <div>
+                  <label class="form-label fw-semibold">Barangay Department Handle</label>
+                  <select name="department_handle" class="form-select" required>
+                    <option value="">Select department</option>
+                    <?php foreach ($manualDepartmentOptions as $departmentOption): ?>
+                      <option value="<?= htmlspecialchars((string)$departmentOption, ENT_QUOTES, 'UTF-8') ?>">
+                        <?= htmlspecialchars((string)$departmentOption, ENT_QUOTES, 'UTF-8') ?>
+                      </option>
+                    <?php endforeach; ?>
+                  </select>
+                </div>
+
+                <div>
+                  <label class="form-label fw-semibold">Amount</label>
+                  <input type="number" name="transaction_amount" class="form-control" min="0.01" step="0.01" placeholder="0.00" required>
+                </div>
+
+                <div>
+                  <label class="form-label fw-semibold">OR Number Receipt</label>
+                  <input type="text" name="or_number_receipt" class="form-control" placeholder="Enter OR number" required>
+                </div>
+
+                <button type="submit" class="btn btn-success">
+                  <i class="fas fa-plus-circle me-1"></i>Create Transaction
+                </button>
+              </form>
             </div>
-            <button class="btn btn-outline-dark btn-sm" onclick="window.print()">
-              <i class="fas fa-print me-1"></i>Print
-            </button>
           </div>
 
-          <!-- Date range filter -->
-          <form method="get" action="" class="d-flex flex-wrap gap-2 align-items-end mb-4 d-print-none">
-            <input type="hidden" name="section" value="cashbook">
-            <div>
-              <label class="form-label fw-semibold small mb-1">Date From</label>
-              <input type="date" name="date_from" class="form-control form-control-sm"
-                     value="<?= htmlspecialchars($cashbookDateFrom, ENT_QUOTES, 'UTF-8') ?>">
-            </div>
-            <div>
-              <label class="form-label fw-semibold small mb-1">Date To</label>
-              <input type="date" name="date_to" class="form-control form-control-sm"
-                     value="<?= htmlspecialchars($cashbookDateTo, ENT_QUOTES, 'UTF-8') ?>">
-            </div>
-            <button type="submit" class="btn btn-primary btn-sm align-self-end">Apply</button>
-            <?php if ($cashbookDateFrom !== date('Y-m-d') || $cashbookDateTo !== date('Y-m-d')): ?>
-              <a href="?section=cashbook" class="btn btn-outline-secondary btn-sm align-self-end">Today</a>
-            <?php endif; ?>
-          </form>
+          <div class="col-12 col-lg-7">
+            <div class="finance-fee-card p-4 h-100">
+              <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+                <div>
+                  <h5 class="fw-bold mb-1">Recent Transactions</h5>
+                  <p class="text-muted small mb-0">Latest manual finance transactions recorded in the system.</p>
+                </div>
+                <span class="badge bg-success"><?= count($manualTransactionRows) ?> record<?= count($manualTransactionRows) === 1 ? '' : 's' ?></span>
+              </div>
 
-          <!-- Print-only header -->
-          <div class="d-none d-print-block mb-3">
-            <h5 class="fw-bold">Barangay San Jose — Collection Register</h5>
-            <div class="small">Period: <?= htmlspecialchars($cashbookDateFrom, ENT_QUOTES, 'UTF-8') ?> to <?= htmlspecialchars($cashbookDateTo, ENT_QUOTES, 'UTF-8') ?></div>
-            <div class="small text-muted">Printed: <?= date('Y-m-d H:i') ?></div>
+              <?php if (!$manualTransactionRows): ?>
+                <div class="finance-fee-empty text-center py-5">
+                  <i class="fas fa-receipt fa-2x mb-3 d-block text-muted"></i>
+                  No manual finance transactions yet.
+                </div>
+              <?php else: ?>
+                <div class="table-responsive compact-admin-table-shell">
+                  <table class="table align-middle compact-admin-table finance-fee-table">
+                    <thead>
+                      <tr class="table-light">
+                        <th>ID</th>
+                        <th>Name</th>
+                        <th>Description</th>
+                        <th>Department</th>
+                        <th>Amount</th>
+                        <th>OR Receipt</th>
+                        <th>Created</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <?php foreach ($manualTransactionRows as $transactionRow): ?>
+                        <?php
+                        $residentAddress = trim((string)($transactionRow['resident_address'] ?? ''));
+                        $residentPhoneNumber = trim((string)($transactionRow['resident_phone_number'] ?? ''));
+                        $residentEmail = trim((string)($transactionRow['resident_email'] ?? ''));
+                        $createdByName = trim((string)($transactionRow['created_by_name'] ?? ''));
+                        $createdByUserId = trim((string)($transactionRow['created_by_user_id'] ?? ''));
+                        $createdByLabel = $createdByName !== '' ? $createdByName : ($createdByUserId !== '' ? $createdByUserId : '');
+                        ?>
+                        <tr>
+                          <td class="manual-transaction-id"><?= htmlspecialchars((string)($transactionRow['transaction_id'] ?? ''), ENT_QUOTES, 'UTF-8') ?></td>
+                          <td>
+                            <div class="fw-semibold"><?= htmlspecialchars((string)($transactionRow['transaction_name'] ?? ''), ENT_QUOTES, 'UTF-8') ?></div>
+                            <?php if ($residentAddress !== ''): ?>
+                              <div class="manual-transaction-meta"><?= htmlspecialchars($residentAddress, ENT_QUOTES, 'UTF-8') ?></div>
+                            <?php endif; ?>
+                            <?php if ($residentPhoneNumber !== '' || $residentEmail !== ''): ?>
+                              <div class="manual-transaction-meta">
+                                <?php if ($residentPhoneNumber !== ''): ?>
+                                  <?= htmlspecialchars($residentPhoneNumber, ENT_QUOTES, 'UTF-8') ?>
+                                <?php endif; ?>
+                                <?php if ($residentPhoneNumber !== '' && $residentEmail !== ''): ?> | <?php endif; ?>
+                                <?php if ($residentEmail !== ''): ?>
+                                  <?= htmlspecialchars($residentEmail, ENT_QUOTES, 'UTF-8') ?>
+                                <?php endif; ?>
+                              </div>
+                            <?php endif; ?>
+                          </td>
+                          <td class="manual-transaction-desc"><?= htmlspecialchars((string)($transactionRow['transaction_description'] ?? ''), ENT_QUOTES, 'UTF-8') ?></td>
+                          <td><?= htmlspecialchars((string)($transactionRow['department_handle'] ?? ''), ENT_QUOTES, 'UTF-8') ?></td>
+                          <td class="finance-fee-amount">₱<?= number_format((float)($transactionRow['transaction_amount'] ?? 0), 2) ?></td>
+                          <td class="fw-semibold"><?= htmlspecialchars((string)($transactionRow['or_number_receipt'] ?? ''), ENT_QUOTES, 'UTF-8') ?></td>
+                          <td>
+                            <div><?= htmlspecialchars(fp_format_datetime((string)($transactionRow['created_at'] ?? '')), ENT_QUOTES, 'UTF-8') ?></div>
+                            <?php if ($createdByLabel !== ''): ?>
+                              <div class="manual-transaction-created">By <?= htmlspecialchars($createdByLabel, ENT_QUOTES, 'UTF-8') ?></div>
+                            <?php endif; ?>
+                          </td>
+                        </tr>
+                      <?php endforeach; ?>
+                    </tbody>
+                  </table>
+                </div>
+              <?php endif; ?>
+            </div>
           </div>
-
-          <?php if (!$cashbookEntries): ?>
-            <div class="finance-fee-empty text-center py-5">
-              <i class="fas fa-book-open fa-2x mb-3 d-block text-muted"></i>
-              No verified payments found for the selected date range.
-            </div>
-          <?php else: ?>
-            <div class="table-responsive">
-              <table class="table table-sm table-bordered align-middle finance-fee-table cashbook-table">
-                <thead class="table-light">
-                  <tr>
-                    <th>#</th>
-                    <th>Date &amp; Time</th>
-                    <th>OR Number</th>
-                    <th>Certificate No.</th>
-                    <th>Resident / Applicant</th>
-                    <th>Document Type</th>
-                    <th>Method</th>
-                    <th class="text-end">Amount</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <?php foreach ($cashbookEntries as $i => $entry): ?>
-                    <?php $method = strtolower((string)($entry['payment_method'] ?? '')); ?>
-                    <tr>
-                      <td class="text-muted small"><?= $i + 1 ?></td>
-                      <td class="small"><?= htmlspecialchars((string)($entry['finance_decision_at'] ?? ''), ENT_QUOTES, 'UTF-8') ?></td>
-                      <td class="fw-semibold"><?= htmlspecialchars((string)($entry['or_number'] ?? ''), ENT_QUOTES, 'UTF-8') ?></td>
-                      <td class="small text-muted"><?= htmlspecialchars((string)($entry['certificate_number'] ?? '—'), ENT_QUOTES, 'UTF-8') ?></td>
-                      <td>
-                        <div class="fw-semibold small"><?= htmlspecialchars((string)($entry['applicant_name'] ?? ''), ENT_QUOTES, 'UTF-8') ?></div>
-                        <div class="text-muted" style="font-size:.73rem"><?= htmlspecialchars((string)($entry['request_id'] ?? ''), ENT_QUOTES, 'UTF-8') ?></div>
-                      </td>
-                      <td class="small"><?= htmlspecialchars((string)($entry['document_type'] ?? ''), ENT_QUOTES, 'UTF-8') ?></td>
-                      <td>
-                        <span class="badge <?= $method === 'gcash' ? 'bg-primary' : 'bg-secondary' ?>">
-                          <?= $method === 'gcash' ? 'GCash' : ($method === 'barangay' ? 'Walk-in' : htmlspecialchars(ucfirst($method), ENT_QUOTES, 'UTF-8')) ?>
-                        </span>
-                      </td>
-                      <td class="text-end finance-fee-amount">₱<?= number_format((float)($entry['amount'] ?? 0), 2) ?></td>
-                    </tr>
-                  <?php endforeach; ?>
-                </tbody>
-                <tfoot class="table-light fw-bold">
-                  <tr>
-                    <td colspan="7" class="text-end">
-                      Total Collections (<?= count($cashbookEntries) ?> transaction<?= count($cashbookEntries) === 1 ? '' : 's' ?>)
-                    </td>
-                    <td class="text-end finance-fee-amount">₱<?= number_format($cashbookTotal, 2) ?></td>
-                  </tr>
-                </tfoot>
-              </table>
-            </div>
-          <?php endif; ?>
         </div>
       </div>
 
@@ -1016,6 +1339,11 @@ if ($financeSection === 'fees') {
           </div>
 
           <div class="admin-list-actions">
+            <?php if (!isset($sbCan) || !is_callable($sbCan) || $sbCan('finance_create_transaction')): ?>
+            <a href="<?= htmlspecialchars($financeBaseUrl, ENT_QUOTES, 'UTF-8') ?>?section=create" class="btn btn-success btn-sm">
+              <i class="fas fa-plus-circle me-1"></i>Create Transaction
+            </a>
+            <?php endif; ?>
             <div class="input-group admin-search">
               <input type="text" id="searchInput" class="form-control" placeholder="Request ID, resident ID, name, document">
               <span class="input-group-text bg-white"><i class="fas fa-search"></i></span>
@@ -1061,7 +1389,7 @@ if ($financeSection === 'fees') {
   </main>
 </div>
 
-<?php if ($financeSection === 'tracker' || $financeSection === 'cashbook'): ?>
+<?php if ($financeSection === 'tracker'): ?>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 <?php endif; ?>
 <?php if ($financeSection === 'tracker'): ?>
@@ -1550,5 +1878,3 @@ window.CERT_TRACKER_DEFAULT_STAGE = 'finance';
 <?php endif; ?>
 </body>
 </html>
-
-

@@ -12,6 +12,7 @@ if (empty($_SESSION['user_id'])) {
 }
 
 require_once __DIR__ . '/../General/connection.php';
+require_once __DIR__ . '/../General/uniqueIDGenerate.php';
 require_once __DIR__ . '/../General/residentTransaction.php';
 require_once __DIR__ . '/../General/uploadLimits.php';
 
@@ -639,18 +640,15 @@ try {
 
     $requestId = 0;
     if ($profileChanges) {
-        $stmt = $conn->prepare("
-            INSERT INTO resident_edit_requesttbl
-                (resident_id, user_id, request_type, status_id, requested_changes)
-            VALUES (?, ?, 'profile', ?, ?)
-        ");
         $changesJson = json_encode($profileChanges, JSON_UNESCAPED_SLASHES);
-        $stmt->bind_param("ssis", $residentId, $userId, $pendingStatusId, $changesJson);
-        if (!$stmt->execute()) {
-            throw new Exception('Failed to submit profile edit request.');
-        }
-        $requestId = (int)$stmt->insert_id;
-        $stmt->close();
+        $requestId = insertResidentEditRequest(
+            $conn,
+            (string)$residentId,
+            (string)$userId,
+            'profile',
+            (int)$pendingStatusId,
+            $changesJson
+        );
     }
 
     // Store files under a folder named by user_id (not resident_id).
@@ -678,31 +676,21 @@ try {
                 throw new Exception('Invalid file type for ID photo.');
             }
             $moved = moveUploadedFileWithDocName($nameIdFile['tmp_name'], $uploadDir, $nameIdType, $userId, $ext);
-            $ins = $conn->prepare("
-                INSERT INTO unifiedfileattachmenttbl
-                    (source_type, source_id, document_type_id, file_name, file_path, file_type, user_id_uploaded_by, status_id_verify, remarks, id_number)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            ");
             $sourceType = "ResidentEditRequest";
             $sourceId = (string)$requestId;
             $idNumber = null;
-            $ins->bind_param(
-                "ssissssiss",
-                $sourceType,
-                $sourceId,
-                $docTypeId,
-                $moved['file_name'],
-                $moved['file_path'],
-                $ext,
-                $userId,
-                $statusVerifyId,
-                $remarks,
-                $idNumber
-            );
-            if (!$ins->execute()) {
-                throw new Exception('Failed to save ID attachment.');
-            }
-            $ins->close();
+            insertUnifiedFileAttachment($conn, [
+                'source_type' => $sourceType,
+                'source_id' => $sourceId,
+                'document_type_id' => $docTypeId,
+                'file_name' => $moved['file_name'],
+                'file_path' => $moved['file_path'],
+                'file_type' => $ext,
+                'user_id_uploaded_by' => $userId,
+                'status_id_verify' => $statusVerifyId,
+                'remarks' => $remarks,
+                'id_number' => $idNumber,
+            ], 'ID attachment');
         }
     }
 
@@ -719,31 +707,21 @@ try {
                 throw new Exception('Invalid file type for civil status document.');
             }
             $moved = moveUploadedFileWithDocName($civilFile['tmp_name'], $uploadDir, $docTypeName, $userId, $ext);
-            $ins = $conn->prepare("
-                INSERT INTO unifiedfileattachmenttbl
-                    (source_type, source_id, document_type_id, file_name, file_path, file_type, user_id_uploaded_by, status_id_verify, remarks, id_number)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            ");
             $sourceType = "ResidentEditRequest";
             $sourceId = (string)$requestId;
             $idNumber = null;
-            $ins->bind_param(
-                "ssissssiss",
-                $sourceType,
-                $sourceId,
-                $docTypeId,
-                $moved['file_name'],
-                $moved['file_path'],
-                $ext,
-                $userId,
-                $statusVerifyId,
-                $remarks,
-                $idNumber
-            );
-            if (!$ins->execute()) {
-                throw new Exception('Failed to save civil status attachment.');
-            }
-            $ins->close();
+            insertUnifiedFileAttachment($conn, [
+                'source_type' => $sourceType,
+                'source_id' => $sourceId,
+                'document_type_id' => $docTypeId,
+                'file_name' => $moved['file_name'],
+                'file_path' => $moved['file_path'],
+                'file_type' => $ext,
+                'user_id_uploaded_by' => $userId,
+                'status_id_verify' => $statusVerifyId,
+                'remarks' => $remarks,
+                'id_number' => $idNumber,
+            ], 'civil status attachment');
         }
     }
 
@@ -760,31 +738,21 @@ try {
                 throw new Exception('Invalid file type for supporting document.');
             }
             $moved = moveUploadedFileWithDocName($supportingFile['tmp_name'], $uploadDir, $docTypeName, $userId, $ext);
-            $ins = $conn->prepare("
-                INSERT INTO unifiedfileattachmenttbl
-                    (source_type, source_id, document_type_id, file_name, file_path, file_type, user_id_uploaded_by, status_id_verify, remarks, id_number)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            ");
             $sourceType = "ResidentEditRequest";
             $sourceId = (string)$requestId;
             $idNumber = null;
-            $ins->bind_param(
-                "ssissssiss",
-                $sourceType,
-                $sourceId,
-                $docTypeId,
-                $moved['file_name'],
-                $moved['file_path'],
-                $ext,
-                $userId,
-                $statusVerifyId,
-                $remarks,
-                $idNumber
-            );
-            if (!$ins->execute()) {
-                throw new Exception('Failed to save supporting document attachment.');
-            }
-            $ins->close();
+            insertUnifiedFileAttachment($conn, [
+                'source_type' => $sourceType,
+                'source_id' => $sourceId,
+                'document_type_id' => $docTypeId,
+                'file_name' => $moved['file_name'],
+                'file_path' => $moved['file_path'],
+                'file_type' => $ext,
+                'user_id_uploaded_by' => $userId,
+                'status_id_verify' => $statusVerifyId,
+                'remarks' => $remarks,
+                'id_number' => $idNumber,
+            ], 'supporting document attachment');
         }
     }
 
@@ -801,31 +769,21 @@ try {
                 throw new Exception('Invalid file type for supporting document.');
             }
             $moved = moveUploadedFileWithDocName($supportingFile['tmp_name'], $uploadDir, $docTypeName, $userId, $ext);
-            $ins = $conn->prepare("
-                INSERT INTO unifiedfileattachmenttbl
-                    (source_type, source_id, document_type_id, file_name, file_path, file_type, user_id_uploaded_by, status_id_verify, remarks, id_number)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            ");
             $sourceType = "ResidentEditRequest";
             $sourceId = (string)$requestId;
             $idNumber = null;
-            $ins->bind_param(
-                "ssissssiss",
-                $sourceType,
-                $sourceId,
-                $docTypeId,
-                $moved['file_name'],
-                $moved['file_path'],
-                $ext,
-                $userId,
-                $statusVerifyId,
-                $remarks,
-                $idNumber
-            );
-            if (!$ins->execute()) {
-                throw new Exception('Failed to save supporting document attachment.');
-            }
-            $ins->close();
+            insertUnifiedFileAttachment($conn, [
+                'source_type' => $sourceType,
+                'source_id' => $sourceId,
+                'document_type_id' => $docTypeId,
+                'file_name' => $moved['file_name'],
+                'file_path' => $moved['file_path'],
+                'file_type' => $ext,
+                'user_id_uploaded_by' => $userId,
+                'status_id_verify' => $statusVerifyId,
+                'remarks' => $remarks,
+                'id_number' => $idNumber,
+            ], 'supporting document attachment');
         }
     }
 
@@ -842,31 +800,21 @@ try {
                 throw new Exception('Invalid file type for supporting document.');
             }
             $moved = moveUploadedFileWithDocName($supportingFile['tmp_name'], $uploadDir, $docTypeName, $userId, $ext);
-            $ins = $conn->prepare("
-                INSERT INTO unifiedfileattachmenttbl
-                    (source_type, source_id, document_type_id, file_name, file_path, file_type, user_id_uploaded_by, status_id_verify, remarks, id_number)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            ");
             $sourceType = "ResidentEditRequest";
             $sourceId = (string)$requestId;
             $idNumber = null;
-            $ins->bind_param(
-                "ssissssiss",
-                $sourceType,
-                $sourceId,
-                $docTypeId,
-                $moved['file_name'],
-                $moved['file_path'],
-                $ext,
-                $userId,
-                $statusVerifyId,
-                $remarks,
-                $idNumber
-            );
-            if (!$ins->execute()) {
-                throw new Exception('Failed to save supporting document attachment.');
-            }
-            $ins->close();
+            insertUnifiedFileAttachment($conn, [
+                'source_type' => $sourceType,
+                'source_id' => $sourceId,
+                'document_type_id' => $docTypeId,
+                'file_name' => $moved['file_name'],
+                'file_path' => $moved['file_path'],
+                'file_type' => $ext,
+                'user_id_uploaded_by' => $userId,
+                'status_id_verify' => $statusVerifyId,
+                'remarks' => $remarks,
+                'id_number' => $idNumber,
+            ], 'supporting document attachment');
         }
     }
 
@@ -884,31 +832,21 @@ try {
                 throw new Exception('Invalid file type for student proof document.');
             }
             $moved = moveUploadedFileWithDocName($studentStatusFile['tmp_name'], $uploadDir, $docTypeName, $userId, $ext);
-            $ins = $conn->prepare("
-                INSERT INTO unifiedfileattachmenttbl
-                    (source_type, source_id, document_type_id, file_name, file_path, file_type, user_id_uploaded_by, status_id_verify, remarks, id_number)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            ");
             $sourceType = "ResidentEditRequest";
             $sourceId = (string)$requestId;
             $idNumber = null;
-            $ins->bind_param(
-                "ssissssiss",
-                $sourceType,
-                $sourceId,
-                $docTypeId,
-                $moved['file_name'],
-                $moved['file_path'],
-                $ext,
-                $userId,
-                $statusVerifyId,
-                $remarks,
-                $idNumber
-            );
-            if (!$ins->execute()) {
-                throw new Exception('Failed to save student proof attachment.');
-            }
-            $ins->close();
+            insertUnifiedFileAttachment($conn, [
+                'source_type' => $sourceType,
+                'source_id' => $sourceId,
+                'document_type_id' => $docTypeId,
+                'file_name' => $moved['file_name'],
+                'file_path' => $moved['file_path'],
+                'file_type' => $ext,
+                'user_id_uploaded_by' => $userId,
+                'status_id_verify' => $statusVerifyId,
+                'remarks' => $remarks,
+                'id_number' => $idNumber,
+            ], 'student proof attachment');
         }
     }
 
@@ -955,32 +893,21 @@ try {
 
                 $moved = moveUploadedFileWithDocName($sectorUploadFile['tmp_name'], $uploadDir, $sectorDocType, $userId, $ext);
                 foreach ($markers as $marker) {
-                    $ins = $conn->prepare("
-                        INSERT INTO unifiedfileattachmenttbl
-                            (source_type, source_id, document_type_id, file_name, file_path, file_type, user_id_uploaded_by, status_id_verify, remarks, id_number)
-                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                    ");
                     $sourceType = "ResidentProfiling";
                     $sourceId = (string)$residentId;
                     $idNumber = null;
-                    $ins->bind_param(
-                        "ssissssiss",
-                        $sourceType,
-                        $sourceId,
-                        $docTypeId,
-                        $moved['file_name'],
-                        $moved['file_path'],
-                        $ext,
-                        $userId,
-                        $statusVerifyId,
-                        $marker,
-                        $idNumber
-                    );
-                    if (!$ins->execute()) {
-                        throw new Exception('Failed to save sector membership attachment.');
-                    }
-                    $newAttachmentId = (int)$ins->insert_id;
-                    $ins->close();
+                    $newAttachmentId = insertUnifiedFileAttachment($conn, [
+                        'source_type' => $sourceType,
+                        'source_id' => $sourceId,
+                        'document_type_id' => $docTypeId,
+                        'file_name' => $moved['file_name'],
+                        'file_path' => $moved['file_path'],
+                        'file_type' => $ext,
+                        'user_id_uploaded_by' => $userId,
+                        'status_id_verify' => $statusVerifyId,
+                        'remarks' => $marker,
+                        'id_number' => $idNumber,
+                    ], 'sector membership attachment');
                     if ($newAttachmentId > 0) {
                         $attachmentIds[] = $newAttachmentId;
                         $markerBase = strtolower(trim((string)explode(';', $marker, 2)[0]));
@@ -1012,33 +939,22 @@ try {
                 "System-generated note for Student sector removal.\nResident ID: {$residentId}\nUser ID: {$userId}\nTimestamp: " . date('Y-m-d H:i:s')
             );
             foreach ($markers as $marker) {
-                $ins = $conn->prepare("
-                    INSERT INTO unifiedfileattachmenttbl
-                        (source_type, source_id, document_type_id, file_name, file_path, file_type, user_id_uploaded_by, status_id_verify, remarks, id_number)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                ");
                 $sourceType = "ResidentProfiling";
                 $sourceId = (string)$residentId;
                 $idNumber = null;
                 $fileType = 'txt';
-                $ins->bind_param(
-                    "ssissssiss",
-                    $sourceType,
-                    $sourceId,
-                    $docTypeId,
-                    $placeholder['file_name'],
-                    $placeholder['file_path'],
-                    $fileType,
-                    $userId,
-                    $statusVerifyId,
-                    $marker,
-                    $idNumber
-                );
-                if (!$ins->execute()) {
-                    throw new Exception('Failed to save sector membership placeholder attachment.');
-                }
-                $newAttachmentId = (int)$ins->insert_id;
-                $ins->close();
+                $newAttachmentId = insertUnifiedFileAttachment($conn, [
+                    'source_type' => $sourceType,
+                    'source_id' => $sourceId,
+                    'document_type_id' => $docTypeId,
+                    'file_name' => $placeholder['file_name'],
+                    'file_path' => $placeholder['file_path'],
+                    'file_type' => $fileType,
+                    'user_id_uploaded_by' => $userId,
+                    'status_id_verify' => $statusVerifyId,
+                    'remarks' => $marker,
+                    'id_number' => $idNumber,
+                ], 'sector membership placeholder attachment');
                 if ($newAttachmentId > 0) {
                     $attachmentIds[] = $newAttachmentId;
                     $markerBase = strtolower(trim((string)explode(';', $marker, 2)[0]));

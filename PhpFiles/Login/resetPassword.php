@@ -1,13 +1,14 @@
 <?php
 require_once __DIR__ . '/../General/security.php';
 require '../General/connection.php';
+require '../General/uniqueIDGenerate.php';
 
 header('Content-Type: application/json');
 
 $RESET_VERIFY_TTL_SECONDS = 10 * 60; // 10 minutes
 
-$email       = $_POST['email'] ?? '';
-$phone       = $_POST['phone'] ?? '';
+$email       = pii_normalize_email((string)($_POST['email'] ?? ''));
+$phone       = pii_normalize_phone10((string)($_POST['phone'] ?? ''));
 $newPassword = $_POST['newPassword'] ?? '';
 
 $response = ['success' => false];
@@ -42,9 +43,11 @@ if (
 $stmt = $conn->prepare("
     SELECT user_id, password_hash
     FROM useraccountstbl
-    WHERE email = ? AND phone_number = ?
+    WHERE email_lookup_hash = ? AND phone_lookup_hash = ?
 ");
-$stmt->bind_param("ss", $email, $phone);
+$emailHash = pii_lookup_hash($email, 'useraccount.email');
+$phoneHash = pii_lookup_hash($phone, 'useraccount.phone');
+$stmt->bind_param("ss", $emailHash, $phoneHash);
 $stmt->execute();
 $stmt->bind_result($userId, $currentHash);
 
@@ -104,14 +107,7 @@ while ($stmt->fetch()) {
 }
 $stmt->close();
 
-
-$stmt = $conn->prepare("
-    INSERT INTO userpasswordhistorytbl (user_id, old_pw_hash)
-    VALUES (?, ?)
-");
-$stmt->bind_param("ss", $userId, $currentHash);
-$stmt->execute();
-$stmt->close();
+insertPasswordHistoryEntry($conn, (string)$userId, (string)$currentHash);
 
 
 $hashedPassword = password_hash($newPassword, PASSWORD_DEFAULT);

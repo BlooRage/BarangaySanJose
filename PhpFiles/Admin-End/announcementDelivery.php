@@ -156,6 +156,7 @@ function ann_delivery_fetch_resident_recipients(mysqli $conn, string $areaFilter
   $stmt->execute();
   $result = $stmt->get_result();
   while ($row = $result->fetch_assoc()) {
+    $row = pii_decrypt_useraccount_row($row) ?? $row;
     if (!ann_delivery_is_verified_resident_status($row['status_name'] ?? null)) {
       continue;
     }
@@ -182,6 +183,7 @@ function ann_delivery_fetch_staff_recipients(mysqli $conn, string $targetGroup, 
   $stmt->execute();
   $result = $stmt->get_result();
   while ($row = $result->fetch_assoc()) {
+    $row = pii_decrypt_useraccount_row($row) ?? $row;
     if (!ann_delivery_staff_group_matches($row['account_role_access'] ?? '', $row['info_role_access'] ?? '', $targetGroup)) {
       continue;
     }

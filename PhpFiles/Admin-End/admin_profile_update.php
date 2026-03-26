@@ -97,6 +97,15 @@ if ($section === 'personal') {
         echo json_encode(['success' => false, 'message' => 'Birthdate is invalid.']);
         exit;
     }
+    $personalEncrypted = pii_encrypt_field_map([
+        'lastname' => $lastName,
+        'firstname' => $firstName,
+        'middlename' => $middleName,
+        'suffix' => $suffix,
+        'birthdate' => $birthdate,
+        'sex' => $sex,
+        'civil_status' => $civilStatus,
+    ]);
 
     $stmt = $conn->prepare("UPDATE officialinformationtbl SET lastname=?, firstname=?, middlename=?, suffix=?, birthdate=?, sex=?, civil_status=?, department=?, position_access=?, last_updated=CURRENT_TIMESTAMP WHERE user_id=? LIMIT 1");
     if (!$stmt) {
@@ -104,7 +113,19 @@ if ($section === 'personal') {
         echo json_encode(['success' => false, 'message' => 'Failed to prepare update.']);
         exit;
     }
-    $stmt->bind_param('ssssssssss', $lastName, $firstName, $middleName, $suffix, $birthdate, $sex, $civilStatus, $department, $positionAccess, $userId);
+    $stmt->bind_param(
+        'ssssssssss',
+        $personalEncrypted['lastname'],
+        $personalEncrypted['firstname'],
+        $personalEncrypted['middlename'],
+        $personalEncrypted['suffix'],
+        $personalEncrypted['birthdate'],
+        $personalEncrypted['sex'],
+        $personalEncrypted['civil_status'],
+        $department,
+        $positionAccess,
+        $userId
+    );
     $ok = $stmt->execute();
     $stmt->close();
     if (!$ok) {
@@ -133,6 +154,12 @@ if ($section === 'emergency') {
         echo json_encode(['success' => false, 'message' => 'Emergency contact number must be 9XXXXXXXXX.']);
         exit;
     }
+    $emergencyEncrypted = pii_encrypt_field_map([
+        'emergency_contact_name' => $name,
+        'emergency_contact_relationship' => $relationship,
+        'emergency_contact_phone' => $phone10,
+        'emergency_contact_address' => $address,
+    ]);
 
     $stmt = $conn->prepare("UPDATE officialinformationtbl SET emergency_contact_name=?, emergency_contact_relationship=?, emergency_contact_phone=?, emergency_contact_address=?, last_updated=CURRENT_TIMESTAMP WHERE user_id=? LIMIT 1");
     if (!$stmt) {
@@ -140,7 +167,14 @@ if ($section === 'emergency') {
         echo json_encode(['success' => false, 'message' => 'Failed to prepare emergency update.']);
         exit;
     }
-    $stmt->bind_param('sssss', $name, $relationship, $phone10, $address, $userId);
+    $stmt->bind_param(
+        'sssss',
+        $emergencyEncrypted['emergency_contact_name'],
+        $emergencyEncrypted['emergency_contact_relationship'],
+        $emergencyEncrypted['emergency_contact_phone'],
+        $emergencyEncrypted['emergency_contact_address'],
+        $userId
+    );
     $ok = $stmt->execute();
     $stmt->close();
     if (!$ok) {
@@ -181,6 +215,16 @@ if ($section === 'address') {
         $house = '';
         $street = '';
     }
+    $addressEncrypted = pii_encrypt_field_map([
+        'address_mode' => $addressMode,
+        'house_number' => $house,
+        'street_name' => $street,
+        'block_number' => $block,
+        'lot_number' => $lot,
+        'barangay' => $barangay,
+        'municipality_city' => $city,
+        'province' => $province,
+    ]);
 
     $stmt = $conn->prepare("UPDATE officialinformationtbl SET address_mode=?, house_number=?, street_name=?, block_number=?, lot_number=?, barangay=?, municipality_city=?, province=?, last_updated=CURRENT_TIMESTAMP WHERE user_id=? LIMIT 1");
     if (!$stmt) {
@@ -188,7 +232,18 @@ if ($section === 'address') {
         echo json_encode(['success' => false, 'message' => 'Failed to prepare address update.']);
         exit;
     }
-    $stmt->bind_param('sssssssss', $addressMode, $house, $street, $block, $lot, $barangay, $city, $province, $userId);
+    $stmt->bind_param(
+        'sssssssss',
+        $addressEncrypted['address_mode'],
+        $addressEncrypted['house_number'],
+        $addressEncrypted['street_name'],
+        $addressEncrypted['block_number'],
+        $addressEncrypted['lot_number'],
+        $addressEncrypted['barangay'],
+        $addressEncrypted['municipality_city'],
+        $addressEncrypted['province'],
+        $userId
+    );
     $ok = $stmt->execute();
     $stmt->close();
     if (!$ok) {

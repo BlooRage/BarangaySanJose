@@ -85,7 +85,7 @@ function oi_find_invite_by_token(mysqli $conn, string $rawToken): ?array
     while ($row = $q->fetch_assoc()) {
         $hash = (string)($row['invite_token_hash'] ?? '');
         if ($hash !== '' && password_verify($rawToken, $hash)) {
-            return $row;
+            return pii_decrypt_official_invite_row($row) ?? $row;
         }
     }
     return null;
@@ -106,7 +106,7 @@ function oi_find_active_invite_by_user(mysqli $conn, string $userId): ?array
     $stmt->execute();
     $row = $stmt->get_result()->fetch_assoc();
     $stmt->close();
-    return $row ?: null;
+    return $row ? (pii_decrypt_official_invite_row($row) ?? $row) : null;
 }
 
 function oi_get_account(mysqli $conn, string $userId): ?array
@@ -122,7 +122,7 @@ function oi_get_account(mysqli $conn, string $userId): ?array
     $stmt->execute();
     $row = $stmt->get_result()->fetch_assoc();
     $stmt->close();
-    return $row ?: null;
+    return $row ? (pii_decrypt_useraccount_row($row) ?? $row) : null;
 }
 
 function oi_send_email_otp(string $email, string $otp): bool
@@ -166,7 +166,7 @@ function oi_get_official_info(mysqli $conn, string $userId): ?array
     $stmt->execute();
     $row = $stmt->get_result()->fetch_assoc();
     $stmt->close();
-    return $row ?: null;
+    return $row ? (pii_decrypt_official_row($row) ?? $row) : null;
 }
 
 function oi_non_empty(?string $v): bool
@@ -468,15 +468,27 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if (empty($errors) && $invite) {
             $email = (string)$invite['invite_email'];
             $phone10 = oi_normalize_phone10((string)$invite['invite_phone']);
+            $preparedContacts = pii_prepare_useraccount_contacts($email, $phone10);
             $roleAccess = in_array((string)$invite['role_access'], ['Official', 'Officials', 'Personnel', 'Personnels', 'SuperAdmin', 'Admin', 'Employee'], true)
                 ? (string)$invite['role_access']
                 : 'Official';
             $linkedUserId = trim((string)($invite['user_id'] ?? ''));
 
             if ($linkedUserId !== '') {
-                $dup = $conn->prepare("SELECT user_id FROM useraccountstbl WHERE (email = ? OR phone_number = ?) AND user_id <> ? LIMIT 1");
+                $dup = $conn->prepare("
+                    SELECT user_id
+                    FROM useraccountstbl
+                    WHERE (email_lookup_hash = ? OR phone_lookup_hash = ?)
+                      AND user_id <> ?
+                    LIMIT 1
+                ");
                 if ($dup) {
-                    $dup->bind_param("sss", $email, $phone10, $linkedUserId);
+                    $dup->bind_param(
+                        "sss",
+                        $preparedContacts['email_lookup_hash'],
+                        $preparedContacts['phone_lookup_hash'],
+                        $linkedUserId
+                    );
                     $dup->execute();
                     $hit = $dup->get_result()->fetch_assoc();
                     $dup->close();
@@ -501,7 +513,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                             $upUser = $conn->prepare("
                                 UPDATE useraccountstbl
                                 SET phone_number = ?,
+                                    phone_lookup_hash = ?,
                                     email = ?,
+                                    email_lookup_hash = ?,
                                     password_hash = ?,
                                     role_access = ?,
                                     updated_at = NOW()
@@ -511,7 +525,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                             if (!$upUser) {
                                 throw new RuntimeException('Failed to prepare account update.');
                             }
-                            $upUser->bind_param("sssss", $phone10, $email, $passwordHash, $roleAccess, $linkedUserId);
+                            $upUser->bind_param(
+                                "sssssss",
+                                $preparedContacts['phone_number'],
+                                $preparedContacts['phone_lookup_hash'],
+                                $preparedContacts['email'],
+                                $preparedContacts['email_lookup_hash'],
+                                $passwordHash,
+                                $roleAccess,
+                                $linkedUserId
+                            );
                             if (!$upUser->execute()) {
                                 $upUser->close();
                                 throw new RuntimeException('Failed to update account.');
@@ -527,7 +550,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                                 LIMIT 1
                             ");
                             if ($upOfficial) {
-                                $upOfficial->bind_param("sss", $phone10, $email, $linkedUserId);
+                                $officialEmail = pii_encrypt_string($email);
+                                $officialPhone = pii_encrypt_string($phone10);
+                                $upOfficial->bind_param("sss", $officialPhone, $officialEmail, $linkedUserId);
                                 $upOfficial->execute();
                                 $upOfficial->close();
                             }
@@ -579,9 +604,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     }
                 }
             } else {
-                $dup = $conn->prepare("SELECT user_id FROM useraccountstbl WHERE email = ? OR phone_number = ? LIMIT 1");
+                $dup = $conn->prepare("
+                    SELECT user_id
+                    FROM useraccountstbl
+                    WHERE email_lookup_hash = ? OR phone_lookup_hash = ?
+                    LIMIT 1
+                ");
                 if ($dup) {
-                    $dup->bind_param("ss", $email, $phone10);
+                    $dup->bind_param(
+                        "ss",
+                        $preparedContacts['email_lookup_hash'],
+                        $preparedContacts['phone_lookup_hash']
+                    );
                     $dup->execute();
                     $hit = $dup->get_result()->fetch_assoc();
                     $dup->close();
@@ -605,12 +639,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                             $passwordHash = password_hash($password, PASSWORD_DEFAULT);
                             $ins = $conn->prepare("
                                 INSERT INTO useraccountstbl
-                                    (user_id, phone_number, phoneNum_verify, email, email_verify, password_hash, role_access, account_created, status_id_account)
+                                    (user_id, phone_number, phone_lookup_hash, phoneNum_verify, email, email_lookup_hash, email_verify, password_hash, role_access, account_created, status_id_account)
                                 VALUES
-                                    (?, ?, 0, ?, 0, ?, ?, NOW(), ?)
+                                    (?, ?, ?, 0, ?, ?, 0, ?, ?, NOW(), ?)
                             ");
                             if (!$ins) throw new RuntimeException('Failed to prepare account creation.');
-                            $ins->bind_param("sssssi", $userId, $phone10, $email, $passwordHash, $roleAccess, $activeStatusId);
+                            $ins->bind_param(
+                                "sssssssi",
+                                $userId,
+                                $preparedContacts['phone_number'],
+                                $preparedContacts['phone_lookup_hash'],
+                                $preparedContacts['email'],
+                                $preparedContacts['email_lookup_hash'],
+                                $passwordHash,
+                                $roleAccess,
+                                $activeStatusId
+                            );
                             if (!$ins->execute()) {
                                 $ins->close();
                                 throw new RuntimeException('Failed to create account.');
@@ -788,12 +832,31 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 if ($positionAccess === '') {
                     $positionAccess = $roleAccess;
                 }
+                $officialId = GenerateOfficialPersonnelID($conn, $loggedUserId);
+                if ($officialId === false || trim((string)$officialId) === '') {
+                    throw new RuntimeException('Failed to generate official ID.');
+                }
+                $officialEncrypted = pii_encrypt_field_map([
+                    'lastname' => $lastname,
+                    'firstname' => $firstname,
+                    'middlename' => $middlename,
+                    'suffix' => $suffix,
+                    'birthdate' => $birthdate,
+                    'sex' => $sex,
+                    'civil_status' => $civil,
+                    'contact_number' => $phone10,
+                    'email' => $email,
+                    'emergency_contact_name' => $emergencyName,
+                    'emergency_contact_relationship' => $emergencyRelationship,
+                    'emergency_contact_phone' => $emergencyPhone,
+                    'emergency_contact_address' => $emergencyAddress,
+                ]);
 
                 $stmt = $conn->prepare("
                     INSERT INTO officialinformationtbl
-                        (user_id, lastname, firstname, middlename, suffix, birthdate, sex, civil_status, contact_number, email, role_access, position_access, department, area_number, status_id_employment, date_hired, emergency_contact_name, emergency_contact_relationship, emergency_contact_phone, emergency_contact_address)
+                        (official_id, user_id, lastname, firstname, middlename, suffix, birthdate, sex, civil_status, contact_number, email, role_access, position_access, department, area_number, status_id_employment, date_hired, emergency_contact_name, emergency_contact_relationship, emergency_contact_phone, emergency_contact_address)
                     VALUES
-                        (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURDATE(), ?, ?, ?, ?)
+                        (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURDATE(), ?, ?, ?, ?)
                     ON DUPLICATE KEY UPDATE
                         lastname = VALUES(lastname),
                         firstname = VALUES(firstname),
@@ -819,26 +882,27 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     throw new RuntimeException('Failed to save official profile.');
                 }
                 $stmt->bind_param(
-                    "ssssssssssssssissss",
+                    "sssssssssssssssissss",
+                    $officialId,
                     $loggedUserId,
-                    $lastname,
-                    $firstname,
-                    $middlename,
-                    $suffix,
-                    $birthdate,
-                    $sex,
-                    $civil,
-                    $phone10,
-                    $email,
+                    $officialEncrypted['lastname'],
+                    $officialEncrypted['firstname'],
+                    $officialEncrypted['middlename'],
+                    $officialEncrypted['suffix'],
+                    $officialEncrypted['birthdate'],
+                    $officialEncrypted['sex'],
+                    $officialEncrypted['civil_status'],
+                    $officialEncrypted['contact_number'],
+                    $officialEncrypted['email'],
                     $roleAccess,
                     $positionAccess,
                     $department,
                     $areaNumber,
                     $employmentStatusId,
-                    $emergencyName,
-                    $emergencyRelationship,
-                    $emergencyPhone,
-                    $emergencyAddress
+                    $officialEncrypted['emergency_contact_name'],
+                    $officialEncrypted['emergency_contact_relationship'],
+                    $officialEncrypted['emergency_contact_phone'],
+                    $officialEncrypted['emergency_contact_address']
                 );
                 if (!$stmt->execute()) {
                     $stmt->close();
@@ -917,6 +981,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $houseNumber = '';
                     $streetName = '';
                 }
+                $addressEncrypted = pii_encrypt_field_map([
+                    'address_mode' => $addressMode,
+                    'house_number' => $houseNumber,
+                    'street_name' => $streetName,
+                    'block_number' => $blockNumber,
+                    'lot_number' => $lotNumber,
+                    'barangay' => $barangay,
+                    'municipality_city' => $municipalityCity,
+                    'province' => $province,
+                ]);
 
                 $stmt = $conn->prepare("
                     UPDATE officialinformationtbl
@@ -937,14 +1011,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 }
                 $stmt->bind_param(
                     "sssssssss",
-                    $addressMode,
-                    $houseNumber,
-                    $streetName,
-                    $blockNumber,
-                    $lotNumber,
-                    $barangay,
-                    $municipalityCity,
-                    $province,
+                    $addressEncrypted['address_mode'],
+                    $addressEncrypted['house_number'],
+                    $addressEncrypted['street_name'],
+                    $addressEncrypted['block_number'],
+                    $addressEncrypted['lot_number'],
+                    $addressEncrypted['barangay'],
+                    $addressEncrypted['municipality_city'],
+                    $addressEncrypted['province'],
                     $loggedUserId
                 );
                 if (!$stmt->execute()) {

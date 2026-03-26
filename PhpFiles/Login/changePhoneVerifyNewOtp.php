@@ -42,9 +42,10 @@ try {
     cpn_verify_latest_otp($conn, $userId, $newPhone10, 'change_phone_new_phone', $otp);
 
     // Ensure phone isn't already used by another account (re-check at commit time)
-    $chk = $conn->prepare("SELECT user_id FROM useraccountstbl WHERE phone_number = ? AND user_id <> ? LIMIT 1");
+    $phoneHash = pii_lookup_hash($newPhone10, 'useraccount.phone');
+    $chk = $conn->prepare("SELECT user_id FROM useraccountstbl WHERE phone_lookup_hash = ? AND user_id <> ? LIMIT 1");
     if ($chk) {
-        $chk->bind_param('ss', $newPhone10, $userId);
+        $chk->bind_param('ss', $phoneHash, $userId);
         $chk->execute();
         $res = $chk->get_result();
         $exists = $res && $res->num_rows > 0;
@@ -54,11 +55,12 @@ try {
         }
     }
 
-    $up = $conn->prepare("UPDATE useraccountstbl SET phone_number = ?, phoneNum_verify = 1 WHERE user_id = ?");
+    $prepared = pii_prepare_useraccount_contacts('', $newPhone10);
+    $up = $conn->prepare("UPDATE useraccountstbl SET phone_number = ?, phone_lookup_hash = ?, phoneNum_verify = 1 WHERE user_id = ?");
     if (!$up) {
         throw new Exception('Failed to prepare phone update.');
     }
-    $up->bind_param('ss', $newPhone10, $userId);
+    $up->bind_param('sss', $prepared['phone_number'], $prepared['phone_lookup_hash'], $userId);
     if (!$up->execute()) {
         $up->close();
         throw new Exception('Failed to update phone number.');
@@ -93,4 +95,3 @@ try {
 } catch (Throwable $e) {
     cpn_json(500, ['success' => false, 'message' => 'Server error. Please try again.']);
 }
-

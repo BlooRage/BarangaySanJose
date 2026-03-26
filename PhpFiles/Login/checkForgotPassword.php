@@ -6,8 +6,8 @@ require_once __DIR__ . '/../General/security.php';
 require '../General/connection.php';
 header('Content-Type: application/json');
 
-$phone = $_POST['phone'] ?? '';
-$email = $_POST['email'] ?? '';
+$phone = pii_normalize_phone10((string)($_POST['phone'] ?? ''));
+$email = pii_normalize_email((string)($_POST['email'] ?? ''));
 
 if (!$phone || !$email) {
     echo json_encode([
@@ -38,10 +38,12 @@ if (!preg_match('/^[0-9]{10}$/', $phone)) {
 $stmt = $conn->prepare("
     SELECT user_id 
     FROM useraccountstbl 
-    WHERE email = ? AND phone_number = ?
+    WHERE email_lookup_hash = ? AND phone_lookup_hash = ?
     LIMIT 1
 ");
-$stmt->bind_param("ss", $email, $phone);
+$emailHash = pii_lookup_hash($email, 'useraccount.email');
+$phoneHash = pii_lookup_hash($phone, 'useraccount.phone');
+$stmt->bind_param("ss", $emailHash, $phoneHash);
 $stmt->execute();
 $stmt->store_result();
 

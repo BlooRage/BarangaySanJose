@@ -1,6 +1,7 @@
 <?php
 
 require_once __DIR__ . '/runtimeConfig.php';
+require_once __DIR__ . '/piiCrypto.php';
 
 function applyBaselineSecurityHeaders(): void
 {

@@ -2,6 +2,7 @@
 declare(strict_types=1);
 
 require_once __DIR__ . '/security.php';
+require_once __DIR__ . '/uniqueIDGenerate.php';
 
 if (!function_exists('oi_normalize_phone10')) {
     function oi_normalize_phone10(string $raw): string
@@ -126,21 +127,7 @@ if (!function_exists('oi_insert_otp')) {
         $expiryTime = date('Y-m-d H:i:s', strtotime("+{$ttlMinutes} minutes"));
         $statusPending = 6;
 
-        $stmt = $conn->prepare("
-            INSERT INTO otprequesttbl
-                (user_id, recipient, purpose, otp_code_hash, otp_expiry, request_timestamp, status_id_otp)
-            VALUES
-                (?, ?, ?, ?, ?, ?, ?)
-        ");
-        if (!$stmt) {
-            throw new RuntimeException('Failed to prepare OTP insert.');
-        }
-        $stmt->bind_param('ssssssi', $userId, $recipient, $purpose, $otpHash, $expiryTime, $requestTime, $statusPending);
-        if (!$stmt->execute()) {
-            $stmt->close();
-            throw new RuntimeException('Failed to store OTP.');
-        }
-        $stmt->close();
+        insertOtpRequest($conn, $userId, $recipient, $purpose, $otpHash, $expiryTime, $requestTime, $statusPending);
         return $expiryTime;
     }
 }

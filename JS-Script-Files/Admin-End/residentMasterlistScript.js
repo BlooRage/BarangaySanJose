@@ -1,4 +1,10 @@
 document.addEventListener("DOMContentLoaded", () => {
+  const listOpts = window.RESIDENT_LIST_OPTIONS || {};
+  const listMode = String(listOpts.mode || "tracker").trim().toLowerCase() === "masterlist"
+    ? "masterlist"
+    : "tracker";
+  const isMasterlistMode = listMode === "masterlist";
+
   if (window.bootstrap?.Modal) {
     document.addEventListener("show.bs.modal", (event) => {
       const current = event.target;
@@ -25,14 +31,22 @@ document.addEventListener("DOMContentLoaded", () => {
 
   const statusDisplayMap = {
     "VerifiedResident": "Verified Resident",
+    "Verified": "Verified Resident",
+    "Approved": "Verified Resident",
     "PendingVerification": "Pending Verification",
-    "NotVerified": "Not Verified"
+    "NotVerified": "Not Verified",
+    "Rejected": "Not Verified",
+    "Denied": "Not Verified"
   };
 
   const statusPillClassMap = {
     "VerifiedResident": "approved",
+    "Verified": "approved",
+    "Approved": "approved",
     "PendingVerification": "pending",
-    "NotVerified": "denied"
+    "NotVerified": "denied",
+    "Rejected": "denied",
+    "Denied": "denied"
   };
 
   const AUTO_REFRESH_SECONDS = 60;
@@ -257,6 +271,10 @@ document.addEventListener("DOMContentLoaded", () => {
 
   function setResidentStatusActionsVisibility(status) {
     if (!residentStatusActionsEl) return;
+    if (isMasterlistMode) {
+      residentStatusActionsEl.classList.add("d-none");
+      return;
+    }
     const isPendingVerification = status === "PendingVerification";
     residentStatusActionsEl.classList.toggle("d-none", !isPendingVerification);
   }
@@ -312,7 +330,11 @@ document.addEventListener("DOMContentLoaded", () => {
   // FETCH RESIDENTS
   // ========================
   function fetchResidents(search = "") {
-    const url = `../PhpFiles/Admin-End/residentMasterlist.php?fetch=true&search=${encodeURIComponent(search)}`;
+    const params = new URLSearchParams();
+    params.set("fetch", "1");
+    params.set("search", search);
+    params.set("mode", listMode);
+    const url = `../PhpFiles/Admin-End/residentMasterlist.php?${params.toString()}`;
     return fetch(url, { headers: { "Accept": "application/json" } })
       .then(async (res) => {
         const contentType = String(res.headers.get("content-type") || "").toLowerCase();
@@ -481,12 +503,19 @@ document.addEventListener("DOMContentLoaded", () => {
 
     pageRows.forEach(row => {
       const tr = document.createElement("tr");
-      const canArchive = row.status !== "NotVerified" && row.status !== "PendingVerification";
-      const canViewDocs = row.status === "PendingVerification";
+      const canArchive = !isMasterlistMode && row.status !== "NotVerified" && row.status !== "PendingVerification";
+      const canViewDocs = !isMasterlistMode && row.status === "PendingVerification";
       const statusPillClass = statusPillClassMap[row.status] || "";
       const age = computeAgeFromBirthdate(row.birthdate);
       const sex = String(row.sex ?? "").trim() || "—";
       const areaNumber = String(row.area_number ?? "").trim() || "—";
+      const actionButtons = isMasterlistMode
+        ? '<button type="button" class="btn btn-primary btn-sm text-white resident-table-btn viewEntryBtn">View</button>'
+        : `
+            <button type="button" class="btn btn-primary btn-sm text-white resident-table-btn viewEntryBtn">View</button>
+            ${canViewDocs ? `<button type="button" class="btn btn-info btn-sm text-white resident-table-btn viewDocsBtn">Documents</button>` : ""}
+            ${canArchive ? `<button type="button" class="btn btn-warning btn-sm text-dark resident-table-btn archiveEntryBtn">Archive</button>` : ""}
+          `;
       tr.innerHTML = `
         <td class="fw-bold">${row.resident_id}</td>
         <td>${row.full_name}</td>
@@ -496,9 +525,7 @@ document.addEventListener("DOMContentLoaded", () => {
         <td><span class="status-pill ${statusPillClass}">${statusDisplayMap[row.status] ?? "UNSET"}</span></td>
         <td>
           <div class="resident-table-actions">
-            <button type="button" class="btn btn-primary btn-sm text-white resident-table-btn viewEntryBtn">View</button>
-            ${canViewDocs ? `<button type="button" class="btn btn-info btn-sm text-white resident-table-btn viewDocsBtn">Documents</button>` : ""}
-            ${canArchive ? `<button type="button" class="btn btn-warning btn-sm text-dark resident-table-btn archiveEntryBtn">Archive</button>` : ""}
+            ${actionButtons}
           </div>
         </td>
       `;
@@ -1076,6 +1103,10 @@ function openViewEntry(data) {
   document.getElementById("txt-modalReligion").innerText = data.religion ?? "—";
   document.getElementById("txt-modalSectorMembership").innerText = data.sector_membership ?? "—";
   renderSectorProofStatuses(data, []);
+
+  // Contact Info
+  document.getElementById("txt-modalContactNumber").innerText = data.contact_number ?? "—";
+  document.getElementById("txt-modalEmailAddress").innerText = data.email_address ?? "—";
 
   // Emergency Info
   document.getElementById("txt-modalEmergencyFullName").innerText = data.emergency_full_name ?? "—";

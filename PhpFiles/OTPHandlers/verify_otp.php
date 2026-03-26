@@ -98,17 +98,19 @@ if ($purpose === 'signup') {
 
 // Bind forgot-password flow to a verified server-side session.
 if ($purpose === 'forgot') {
+    $phoneLookupHash = pii_lookup_hash($recipient, 'useraccount.phone');
     $acctStmt = $conn->prepare("
         SELECT user_id, email, phone_number
         FROM useraccountstbl
-        WHERE phone_number = ?
+        WHERE phone_lookup_hash = ?
         LIMIT 1
     ");
     if ($acctStmt) {
-        $acctStmt->bind_param("s", $recipient);
+        $acctStmt->bind_param("s", $phoneLookupHash);
         $acctStmt->execute();
         $acctRes = $acctStmt->get_result();
         if ($acctRow = $acctRes->fetch_assoc()) {
+            $acctRow = pii_decrypt_useraccount_row($acctRow) ?? $acctRow;
             $_SESSION['password_reset_verified'] = [
                 'user_id' => (string)$acctRow['user_id'],
                 'email' => (string)$acctRow['email'],

@@ -2,18 +2,18 @@
 session_start();
 require_once "../General/connection.php";
 require_once "../General/security.php";
+require_once "../General/audit.php";
+require_once "../General/adminModulePermissions.php";
+require_once "../General/userAccountLocks.php";
 
 requireRoleSession(['SuperAdmin']);
 
 header('Content-Type: application/json; charset=utf-8');
 
-if (!isset($_GET['fetch_user_masterlist'])) {
-    http_response_code(404);
-    echo json_encode(['success' => false, 'message' => 'Not found']);
-    exit;
-}
+ual_ensure_lock_columns($conn);
 
-function normalizeRole(string $role): string {
+function normalizeRole(string $role): string
+{
     $k = strtolower(trim($role));
     if ($k === 'officials' || $k === 'official') return 'Official';
     if ($k === 'personnels' || $k === 'personnel') return 'Personnel';
@@ -21,6 +21,368 @@ function normalizeRole(string $role): string {
     if ($k === 'superadmin') return 'SuperAdmin';
     if ($k === 'resident') return 'Resident';
     return trim($role) !== '' ? trim($role) : 'Unknown';
+}
+
+function userMasterlistDisplayName(array $row): string
+{
+    $mkName = static function ($fn, $mn, $ln, $suf): string {
+        $fn = trim((string)$fn);
+        $mn = trim((string)$mn);
+        $ln = trim((string)$ln);
+        $suf = trim((string)$suf);
+        if ($fn === '' && $ln === '') return '';
+        $mi = $mn !== '' ? substr($mn, 0, 1) . '. ' : '';
+        return trim($fn . ' ' . $mi . $ln . ($suf !== '' ? ' ' . $suf : ''));
+    };
+
+    $nameOfficial = $mkName($row['o_firstname'] ?? '', $row['o_middlename'] ?? '', $row['o_lastname'] ?? '', $row['o_suffix'] ?? '');
+    $nameResident = $mkName($row['r_firstname'] ?? '', $row['r_middlename'] ?? '', $row['r_lastname'] ?? '', $row['r_suffix'] ?? '');
+    return $nameOfficial !== '' ? $nameOfficial : ($nameResident !== '' ? $nameResident : '—');
+}
+
+function userMasterlistDecryptRow(array $row): array
+{
+    $row = pii_decrypt_useraccount_row($row) ?? $row;
+    return pii_decrypt_assoc($row, [
+        'r_firstname',
+        'r_middlename',
+        'r_lastname',
+        'r_suffix',
+        'o_firstname',
+        'o_middlename',
+        'o_lastname',
+        'o_suffix',
+    ]);
+}
+
+function userMasterlistMatchesSearch(array $row, string $needle): bool
+{
+    $row['display_name'] = userMasterlistDisplayName($row);
+    return pii_search_match($row, [
+        'user_id',
+        'display_name',
+        'email',
+        'phone_number',
+        'role_access',
+        'account_role_access',
+        'info_role_access',
+    ], $needle);
+}
+
+function parseLockUntilInput(string $rawValue): ?DateTimeImmutable
+{
+    $value = trim($rawValue);
+    if ($value === '') {
+        return null;
+    }
+
+    $tz = new DateTimeZone('Asia/Manila');
+    $formats = ['Y-m-d\TH:i', 'Y-m-d\TH:i:s', 'Y-m-d H:i:s', 'Y-m-d H:i'];
+    foreach ($formats as $format) {
+        $dt = DateTimeImmutable::createFromFormat($format, $value, $tz);
+        if ($dt instanceof DateTimeImmutable && $dt->format($format) === $value) {
+            return $dt;
+        }
+    }
+
+    return null;
+}
+
+function loadUserMasterlistTarget(mysqli $conn, string $userId): ?array
+{
+    $stmt = $conn->prepare("
+        SELECT
+            ua.user_id,
+            ua.email,
+            ua.phone_number,
+            ua.role_access AS account_role_access,
+            ua.status_id_account,
+            ua.lock_start,
+            ua.lock_until,
+            ua.lock_type,
+            ua.lock_reason,
+            ua.locked_by_user_id,
+            oi.role_access AS info_role_access,
+            oi.position_access,
+            oi.official_id
+        FROM useraccountstbl ua
+        LEFT JOIN officialinformationtbl oi ON oi.user_id COLLATE utf8mb4_general_ci = ua.user_id COLLATE utf8mb4_general_ci
+        WHERE ua.user_id = ?
+        LIMIT 1
+    ");
+    if (!$stmt) {
+        return null;
+    }
+
+    $stmt->bind_param('s', $userId);
+    $stmt->execute();
+    $row = $stmt->get_result()->fetch_assoc();
+    $stmt->close();
+
+    return $row ? userMasterlistDecryptRow($row) : null;
+}
+
+function currentStatusLabel(array $row, ?int $lockedStatusId): string
+{
+    $statusName = trim((string)($row['account_status'] ?? ''));
+    $statusId = (int)($row['status_id_account'] ?? 0);
+    if ($lockedStatusId !== null && $statusId === (int)$lockedStatusId) {
+        return ual_lock_status_label(ual_get_lock_state($row));
+    }
+    return $statusName !== '' ? $statusName : ('Status #' . (string)($row['status_id_account'] ?? ''));
+}
+
+function currentLockability(array $row, string $actorUserId, ?int $activeStatusId, ?int $lockedStatusId): array
+{
+    $userId = (string)($row['user_id'] ?? '');
+    if ($userId === '' || $actorUserId === '') {
+        return [false, 'Unable to verify the current account.'];
+    }
+    if ($actorUserId === $userId) {
+        return [false, 'You cannot change the lock state of your own account.'];
+    }
+
+    if (amp_get_protected_code($row) === 'IT_SUPERADMIN') {
+        return [false, 'The protected IT SuperAdmin account cannot be locked from this page.'];
+    }
+
+    $statusId = (int)($row['status_id_account'] ?? 0);
+    if ($lockedStatusId !== null && $statusId === (int)$lockedStatusId) {
+        if ($activeStatusId === null) {
+            return [false, 'Active status is not configured, so locked accounts cannot be restored yet.'];
+        }
+        return [true, ''];
+    }
+
+    if ($activeStatusId !== null && $statusId !== (int)$activeStatusId) {
+        return [false, 'Only active accounts can be manually locked from this page.'];
+    }
+
+    if ($lockedStatusId === null) {
+        return [false, 'Locked status is not configured yet.'];
+    }
+
+    return [true, ''];
+}
+
+$statusIds = ual_load_status_ids($conn);
+$lockedStatusId = $statusIds['locked'] ?? null;
+$activeStatusId = $statusIds['active'] ?? null;
+$deactivatedStatusId = $statusIds['deactivated'] ?? null;
+$deletedStatusId = $statusIds['deleted'] ?? null;
+
+ual_release_expired_locks($conn, $lockedStatusId, $activeStatusId);
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
+    try {
+        $action = trim((string)($_POST['action'] ?? ''));
+        $actorUserId = trim((string)($_SESSION['user_id'] ?? ''));
+        $actorRole = trim((string)($_SESSION['role'] ?? ''));
+        $userId = trim((string)($_POST['user_id'] ?? ''));
+        if ($userId === '') {
+            throw new Exception('User account is required.');
+        }
+
+        $target = loadUserMasterlistTarget($conn, $userId);
+        if (!$target) {
+            throw new Exception('User account cannot be found.');
+        }
+
+        $targetStatusStmt = $conn->prepare("
+            SELECT COALESCE(sa.status_name, CONCAT('Status #', ua.status_id_account)) AS account_status
+            FROM useraccountstbl ua
+            LEFT JOIN statuslookuptbl sa ON sa.status_id = ua.status_id_account
+            WHERE ua.user_id = ?
+            LIMIT 1
+        ");
+        if (!$targetStatusStmt) {
+            throw new Exception('Unable to load account status.');
+        }
+        $targetStatusStmt->bind_param('s', $userId);
+        $targetStatusStmt->execute();
+        $statusRow = $targetStatusStmt->get_result()->fetch_assoc();
+        $targetStatusStmt->close();
+        if ($statusRow) {
+            $target['account_status'] = (string)($statusRow['account_status'] ?? '');
+        }
+
+        [$canManage, $manageReason] = currentLockability($target, $actorUserId, $activeStatusId, $lockedStatusId);
+        if (!$canManage) {
+            throw new Exception($manageReason !== '' ? $manageReason : 'This account cannot be updated here.');
+        }
+
+        $targetRole = normalizeRole((string)($target['account_role_access'] ?? ''));
+        if ($action === 'lock_account') {
+            if ($lockedStatusId === null) {
+                throw new Exception('Locked status is not configured yet.');
+            }
+
+            $currentStatusId = (int)($target['status_id_account'] ?? 0);
+            if (
+                ($activeStatusId !== null && $currentStatusId !== (int)$activeStatusId)
+                && ($currentStatusId !== (int)$lockedStatusId)
+            ) {
+                throw new Exception('Only active accounts can be locked from this page.');
+            }
+
+            if ($deactivatedStatusId !== null && $currentStatusId === (int)$deactivatedStatusId) {
+                throw new Exception('Deactivated accounts cannot be manually locked.');
+            }
+            if ($deletedStatusId !== null && $currentStatusId === (int)$deletedStatusId) {
+                throw new Exception('Deleted accounts cannot be manually locked.');
+            }
+
+            if ($targetRole === 'SuperAdmin' && amp_count_active_superadmins_excluding($conn, $userId) <= 0) {
+                throw new Exception('At least one active SuperAdmin account must remain.');
+            }
+
+            $lockMode = strtolower(trim((string)($_POST['lock_mode'] ?? '')));
+            if (!in_array($lockMode, ['temporary', 'permanent'], true)) {
+                throw new Exception('Select whether the lock is temporary or permanent.');
+            }
+
+            $lockReason = trim((string)($_POST['lock_reason'] ?? ''));
+            if (function_exists('mb_strlen') && mb_strlen($lockReason, 'UTF-8') > 255) {
+                throw new Exception('Lock reason must be 255 characters or fewer.');
+            }
+            if (!function_exists('mb_strlen') && strlen($lockReason) > 255) {
+                throw new Exception('Lock reason must be 255 characters or fewer.');
+            }
+
+            $lockUntilSql = null;
+            $lockUntilHuman = '';
+            if ($lockMode === 'temporary') {
+                $lockUntil = parseLockUntilInput((string)($_POST['lock_until'] ?? ''));
+                if (!$lockUntil) {
+                    throw new Exception('Choose a valid lock end date and time.');
+                }
+
+                $now = new DateTimeImmutable('now', new DateTimeZone('Asia/Manila'));
+                if ($lockUntil <= $now) {
+                    throw new Exception('The lock end date and time must be in the future.');
+                }
+
+                $lockUntilSql = $lockUntil->format('Y-m-d H:i:s');
+                $lockUntilHuman = $lockUntil->format('F j, Y g:i A');
+            }
+
+            $oldStatusLabel = currentStatusLabel($target, $lockedStatusId);
+
+            $update = $conn->prepare("
+                UPDATE useraccountstbl
+                SET status_id_account = ?,
+                    failed_logins = 0,
+                    lock_start = NOW(),
+                    lock_until = ?,
+                    lock_type = ?,
+                    lock_reason = NULLIF(?, ''),
+                    locked_by_user_id = ?,
+                    updated_at = NOW()
+                WHERE user_id = ?
+                LIMIT 1
+            ");
+            if (!$update) {
+                throw new Exception('Failed to apply the account lock.');
+            }
+
+            $update->bind_param('isssss', $lockedStatusId, $lockUntilSql, $lockMode, $lockReason, $actorUserId, $userId);
+            $update->execute();
+            $update->close();
+
+            $newStatusLabel = $lockMode === 'permanent'
+                ? 'Locked permanently'
+                : ('Locked until ' . $lockUntilHuman);
+
+            insertUnifiedAuditLog(
+                $conn,
+                $actorUserId,
+                $actorRole,
+                'User Masterlist',
+                'UserAccount',
+                $userId,
+                'USER_ACCOUNT_LOCK',
+                'status_id_account / lock_type / lock_until',
+                $oldStatusLabel,
+                $newStatusLabel,
+                $lockReason !== '' ? $lockReason : null,
+                null
+            );
+
+            echo json_encode([
+                'success' => true,
+                'message' => $lockMode === 'permanent'
+                    ? 'Account locked permanently.'
+                    : 'Account locked until ' . $lockUntilHuman . '.',
+            ]);
+            exit;
+        }
+
+        if ($action === 'unlock_account') {
+            if ($activeStatusId === null) {
+                throw new Exception('Active status is not configured yet.');
+            }
+
+            $currentStatusId = (int)($target['status_id_account'] ?? 0);
+            if ($lockedStatusId === null || $currentStatusId !== (int)$lockedStatusId) {
+                throw new Exception('Only locked accounts can be unlocked from this page.');
+            }
+
+            $oldStatusLabel = currentStatusLabel($target, $lockedStatusId);
+
+            $update = $conn->prepare("
+                UPDATE useraccountstbl
+                SET status_id_account = ?,
+                    failed_logins = 0,
+                    lock_start = NULL,
+                    lock_until = NULL,
+                    lock_type = NULL,
+                    lock_reason = NULL,
+                    locked_by_user_id = NULL,
+                    updated_at = NOW()
+                WHERE user_id = ?
+                LIMIT 1
+            ");
+            if (!$update) {
+                throw new Exception('Failed to unlock the account.');
+            }
+            $update->bind_param('is', $activeStatusId, $userId);
+            $update->execute();
+            $update->close();
+
+            insertUnifiedAuditLog(
+                $conn,
+                $actorUserId,
+                $actorRole,
+                'User Masterlist',
+                'UserAccount',
+                $userId,
+                'USER_ACCOUNT_UNLOCK',
+                'status_id_account / lock_type / lock_until',
+                $oldStatusLabel,
+                'Active',
+                null,
+                null
+            );
+
+            echo json_encode([
+                'success' => true,
+                'message' => 'Account unlocked successfully.',
+            ]);
+            exit;
+        }
+
+        throw new Exception('Invalid action.');
+    } catch (Exception $e) {
+        http_response_code(400);
+        echo json_encode(['success' => false, 'message' => $e->getMessage()]);
+        exit;
+    }
+}
+
+if (!isset($_GET['fetch_user_masterlist'])) {
+    http_response_code(404);
+    echo json_encode(['success' => false, 'message' => 'Not found']);
+    exit;
 }
 
 try {
@@ -41,6 +403,12 @@ try {
             ua.role_access,
             ua.account_created,
             ua.last_login,
+            ua.status_id_account,
+            ua.lock_start,
+            ua.lock_until,
+            ua.lock_type,
+            ua.lock_reason,
+            ua.locked_by_user_id,
             COALESCE(sa.status_name, CONCAT('Status #', ua.status_id_account)) AS account_status,
             ri.firstname AS r_firstname,
             ri.middlename AS r_middlename,
@@ -49,7 +417,9 @@ try {
             oi.firstname AS o_firstname,
             oi.middlename AS o_middlename,
             oi.lastname AS o_lastname,
-            oi.suffix AS o_suffix
+            oi.suffix AS o_suffix,
+            oi.role_access AS info_role_access,
+            oi.position_access
         FROM useraccountstbl ua
         LEFT JOIN statuslookuptbl sa ON sa.status_id = ua.status_id_account
         LEFT JOIN residentinformationtbl ri ON ri.user_id COLLATE utf8mb4_general_ci = ua.user_id COLLATE utf8mb4_general_ci
@@ -58,27 +428,12 @@ try {
 
     $params = [];
     $types = '';
-    if ($q !== '') {
-        $sql .= "
-            WHERE (
-                ua.user_id LIKE ?
-                OR ua.email LIKE ?
-                OR ua.phone_number LIKE ?
-                OR ua.role_access LIKE ?
-                OR ri.firstname LIKE ?
-                OR ri.lastname LIKE ?
-                OR oi.firstname LIKE ?
-                OR oi.lastname LIKE ?
-            )
-        ";
-        $like = '%' . $q . '%';
-        $params = [$like, $like, $like, $like, $like, $like, $like, $like];
-        $types = 'ssssssss';
+    $sql .= " ORDER BY ua.account_created DESC, ua.user_id DESC";
+    if ($q === '') {
+        $sql .= " LIMIT ?";
+        $params[] = $limit;
+        $types .= 'i';
     }
-
-    $sql .= " ORDER BY ua.account_created DESC, ua.user_id DESC LIMIT ?";
-    $params[] = $limit;
-    $types .= 'i';
 
     $stmt = $conn->prepare($sql);
     if (!$stmt) throw new Exception('Prepare failed: ' . $conn->error);
@@ -95,21 +450,14 @@ try {
 
     $rows = [];
     $pendingCount = 0;
+    $actorUserId = trim((string)($_SESSION['user_id'] ?? ''));
     while ($row = $res->fetch_assoc()) {
-        $mkName = static function ($fn, $mn, $ln, $suf): string {
-            $fn = trim((string)$fn);
-            $mn = trim((string)$mn);
-            $ln = trim((string)$ln);
-            $suf = trim((string)$suf);
-            if ($fn === '' && $ln === '') return '';
-            $mi = $mn !== '' ? substr($mn, 0, 1) . '. ' : '';
-            return trim($fn . ' ' . $mi . $ln . ($suf !== '' ? ' ' . $suf : ''));
-        };
+        $row = userMasterlistDecryptRow($row);
+        if ($q !== '' && !userMasterlistMatchesSearch($row, $q)) {
+            continue;
+        }
 
-        $nameOfficial = $mkName($row['o_firstname'] ?? '', $row['o_middlename'] ?? '', $row['o_lastname'] ?? '', $row['o_suffix'] ?? '');
-        $nameResident = $mkName($row['r_firstname'] ?? '', $row['r_middlename'] ?? '', $row['r_lastname'] ?? '', $row['r_suffix'] ?? '');
-        $displayName = $nameOfficial !== '' ? $nameOfficial : ($nameResident !== '' ? $nameResident : '—');
-
+        $displayName = userMasterlistDisplayName($row);
         $normalizedRole = normalizeRole((string)($row['role_access'] ?? ''));
         $isVerified = ((int)($row['email_verify'] ?? 0) === 1) && ((int)($row['phoneNum_verify'] ?? 0) === 1);
         $verification = $isVerified ? 'Verified' : 'Pending';
@@ -128,6 +476,18 @@ try {
             continue;
         }
 
+        $isLocked = $lockedStatusId !== null && (int)($row['status_id_account'] ?? 0) === (int)$lockedStatusId;
+        $lockState = $isLocked ? ual_get_lock_state($row) : [
+            'type' => '',
+            'lock_until' => '',
+            'reason' => '',
+            'locked_by_user_id' => '',
+            'is_permanent' => false,
+            'is_expired' => false,
+        ];
+
+        [$canManageLock, $manageLockDisabledReason] = currentLockability($row, $actorUserId, $activeStatusId, $lockedStatusId);
+
         $rows[] = [
             'user_id' => (string)$row['user_id'],
             'display_name' => $displayName,
@@ -135,12 +495,24 @@ try {
             'phone_number' => (string)$row['phone_number'],
             'role_access' => $normalizedRole,
             'account_status' => (string)$row['account_status'],
+            'account_status_display' => $isLocked ? ual_lock_status_label($lockState) : (string)$row['account_status'],
             'verification_status' => $verification,
             'account_created' => (string)($row['account_created'] ?? ''),
             'last_login' => (string)($row['last_login'] ?? ''),
+            'is_locked' => $isLocked,
+            'lock_type' => (string)($lockState['type'] ?? ''),
+            'lock_until' => (string)($lockState['lock_until'] ?? ''),
+            'lock_reason' => (string)($lockState['reason'] ?? ''),
+            'locked_by_user_id' => (string)($lockState['locked_by_user_id'] ?? ''),
+            'can_manage_lock' => $canManageLock,
+            'manage_lock_disabled_reason' => $manageLockDisabledReason,
         ];
     }
     $stmt->close();
+
+    if ($q !== '') {
+        $rows = array_slice($rows, 0, $limit);
+    }
 
     echo json_encode([
         'success' => true,

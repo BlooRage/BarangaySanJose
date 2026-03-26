@@ -2,7 +2,7 @@
 $current = basename($_SERVER['PHP_SELF']);
 
 // Group pages by section
-$residentMgmtPages = ['ResidentMasterlist.php', 'ResidentArchive.php', 'EditRequests.php', 'SectorMembershipVerification.php', 'AddResident.php'];
+$residentMgmtPages = ['ResidentTracker.php', 'ResidentMasterlist.php', 'ResidentArchive.php', 'EditRequests.php', 'SectorMembershipVerification.php', 'AddResident.php'];
 $householdProfilingPages = ['HouseholdProfiling.php', 'HeadOfTheFamilyVerification.php'];
 $appointmentPages = ['AppointmentTracker.php', 'AppointmentRequestVerification.php'];
 $certPages = ['CertificateTracker.php'];
@@ -13,8 +13,8 @@ $contentMgmtPages = ['Contents.php', 'CreateContent.php'];
 $areaManagementPages = ['AreaStatistics.php', 'AreaProfile.php'];
 $reportPages = ['Reports.php'];
 $userMgmtPages = ['UserMasterlist.php'];
-$personnelMgmtPages = ['PersonnelTracker.php', 'OfficialInvites.php'];
-$adminMgmtPages = ['UserMasterlist.php', 'PersonnelTracker.php', 'OfficialInvites.php', 'AuditLogs.php'];
+$personnelMgmtPages = ['PersonnelTracker.php', 'OfficialInvites.php', 'PersonnelRoleAccess.php'];
+$adminMgmtPages = ['UserMasterlist.php', 'PersonnelTracker.php', 'OfficialInvites.php', 'PersonnelRoleAccess.php', 'AuditLogs.php'];
 $barangayOfficialMgmtPages = ['OfficialsManagement.php', 'OfficialTransitions.php'];
 $officialTransitionPages = ['OfficialTransitions.php'];
 
@@ -220,9 +220,9 @@ $isCertificateIndigencyActive = $isCertificateIssuanceSectionActive
         || $certificateFilterDocumentKey === 'certificateofindigency'
         || $certificateFilterDocumentKey === 'indigency'
     );
+$isFinanceCreateActive = $current === 'FinancePayments.php' && $financeSection === 'create';
 $isFinanceFeesActive = $current === 'FinancePayments.php' && $financeSection === 'fees';
-$isFinanceCashbookActive = $current === 'FinancePayments.php' && $financeSection === 'cashbook';
-$isFinanceTrackerActive = $current === 'FinancePayments.php' && !in_array($financeSection, ['fees', 'cashbook'], true);
+$isFinanceTrackerActive = $current === 'FinancePayments.php' && !in_array($financeSection, ['fees', 'create'], true);
 $contentCreateType = strtolower(trim((string)($_GET['type'] ?? 'page')));
 if (!in_array($contentCreateType, ['page', 'delivery', 'faq'], true)) {
     $contentCreateType = 'page';
@@ -284,7 +284,7 @@ $sbIdIssuanceKeys = [
 ];
 $sbFinanceKeys = [
     'finance_payment_tracker',
-    'finance_cashbook',
+    'finance_create_transaction',
     'finance_fee_management',
 ];
 $sbBlotterKeys = [
@@ -409,6 +409,7 @@ if (!empty($_SESSION['user_id']) && isset($conn) && $conn instanceof mysqli) {
         $stmtInfo->bind_param("s", $_SESSION['user_id']);
         $stmtInfo->execute();
         $info = $stmtInfo->get_result()->fetch_assoc();
+        $info = $info ? (pii_decrypt_official_row($info) ?? $info) : null;
         if ($info) {
             $fullName = trim(
                 $info['firstname'] . ' ' .
@@ -574,9 +575,15 @@ if (!empty($_SESSION['user_id']) && isset($conn) && $conn instanceof mysqli) {
           <ul class="btn-toggle-nav list-unstyled fw-normal pb-1 small">
             <?php if ($sbCan('resident_masterlist')): ?>
             <li>
+              <a href="<?= htmlspecialchars(appUrl('Admin-End/ResidentTracker.php')) ?>"
+                 class="link-dark rounded <?= in_array($current, ['ResidentTracker.php', 'AddResident.php'], true) ? 'active' : '' ?>">
+                Resident Tracker
+              </a>
+            </li>
+            <li>
               <a href="<?= htmlspecialchars(appUrl('Admin-End/ResidentMasterlist.php')) ?>"
-                 class="link-dark rounded <?= in_array($current, ['ResidentMasterlist.php', 'AddResident.php'], true) ? 'active' : '' ?>">
-                Masterlist
+                 class="link-dark rounded <?= $current == 'ResidentMasterlist.php' ? 'active' : '' ?>">
+                Resident Masterlist
               </a>
             </li>
             <?php endif; ?>
@@ -804,11 +811,11 @@ if (!empty($_SESSION['user_id']) && isset($conn) && $conn instanceof mysqli) {
               </a>
             </li>
             <?php endif; ?>
-            <?php if ($sbCan('finance_cashbook')): ?>
+            <?php if ($sbCan('finance_create_transaction')): ?>
             <li>
-              <a href="<?= htmlspecialchars(appUrl('Admin-End/Certificates/FinancePayments.php')) ?>?section=cashbook"
-                 class="link-dark rounded <?= $isFinanceCashbookActive ? 'active' : '' ?>">
-                Cashbook
+              <a href="<?= htmlspecialchars(appUrl('Admin-End/Certificates/FinancePayments.php')) ?>?section=create"
+                 class="link-dark rounded <?= $isFinanceCreateActive ? 'active' : '' ?>">
+                Create Transaction
               </a>
             </li>
             <?php endif; ?>
@@ -1091,7 +1098,7 @@ if (!empty($_SESSION['user_id']) && isset($conn) && $conn instanceof mysqli) {
         </a>
       </li>
       <?php endif; ?>
-      <?php if ($sbCan('personnel_invite')): ?>
+      <?php if ($isSuperAdminSidebar): ?>
       <li class="mb-1">
         <button class="btn btn-toggle d-flex align-items-center gap-2 rounded <?= $isPersonnelMgmtActive ? 'active' : '' ?> <?= $isPersonnelMgmtActive ? '' : 'collapsed' ?>"
                 data-bs-toggle="collapse"
@@ -1111,6 +1118,12 @@ if (!empty($_SESSION['user_id']) && isset($conn) && $conn instanceof mysqli) {
               <a href="<?= htmlspecialchars(appUrl('Admin-End/OfficialInvites.php')) ?>"
                  class="link-dark rounded <?= $current == 'OfficialInvites.php' ? 'active' : '' ?>">
                 Personnel Invite
+              </a>
+            </li>
+            <li>
+              <a href="<?= htmlspecialchars(appUrl('Admin-End/PersonnelRoleAccess.php')) ?>"
+                 class="link-dark rounded <?= $current == 'PersonnelRoleAccess.php' ? 'active' : '' ?>">
+                Role Based Permissions
               </a>
             </li>
           </ul>

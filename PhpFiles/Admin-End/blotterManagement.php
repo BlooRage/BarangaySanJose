@@ -2,12 +2,14 @@
 session_start();
 
 require_once "../General/connection.php";
+require_once "../General/caseUserAccountForeignKeys.php";
 require_once "../General/security.php";
 require_once "../General/uniqueIDGenerate.php";
 require_once "../General/uploadLimits.php";
 
 requireRoleSession(['SuperAdmin', 'Official', 'Officials', 'Personnel', 'Personnels', 'Admin', 'Employee']);
 verifyCsrfToken(false);
+cuafk_ensure_case_useraccount_foreign_keys($conn);
 
 function str_field($value): ?string {
     $value = trim((string)$value);

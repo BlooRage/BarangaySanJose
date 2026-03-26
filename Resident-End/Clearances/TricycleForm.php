@@ -124,12 +124,12 @@ function tcHistoryVehicleKey(array $record): string {
         return 'chassis:' . $chassisNumber;
     }
 
-    $bodyNumber = preg_replace('/\D+/', '', (string)($record['body_number'] ?? ''));
+    $bodyNumber = strtoupper((string)preg_replace('/[^a-zA-Z0-9]/', '', (string)($record['body_number'] ?? '')));
     if ($bodyNumber !== null && $bodyNumber !== '') {
         return 'body:' . $bodyNumber;
     }
 
-    $motorNumber = preg_replace('/\D+/', '', (string)($record['motor_number'] ?? ''));
+    $motorNumber = strtoupper((string)preg_replace('/[^a-zA-Z0-9]/', '', (string)($record['motor_number'] ?? '')));
     if ($motorNumber !== null && $motorNumber !== '') {
         return 'motor:' . $motorNumber;
     }
@@ -518,36 +518,37 @@ $tricycleRenewalHistory = tcFetchTricycleRenewalHistory($conn, $userId);
                 <div class="form-row two-col-row">
                     <div class="input-stack">
                         <label class="top-label">Plate Number <span class="required-asterisk">*</span></label>
-                        <input type="text" id="plateNumber" name="plate_number" required>
+                        <input type="text" id="plateNumber" name="plate_number" pattern="[A-Za-z0-9]{1,7}" title="Up to 7 letters and numbers" placeholder="Up to 7 letters and numbers" maxlength="7" required>
+                        <div id="plateNumberError" class="text-danger small d-none">Plate number must be up to 7 letters and numbers.</div>
                     </div>
                     <div class="input-stack">
                         <label class="top-label">Body Number <span class="required-asterisk">*</span></label>
-                        <input type="text" id="bodyNumber" name="body_number" inputmode="numeric" pattern="\d+" title="Numbers only" placeholder="Numbers only" required>
-                        <div id="bodyNumberError" class="text-danger small d-none">Numbers only.</div>
+                        <input type="text" id="bodyNumber" name="body_number" pattern="[A-Za-z0-9]{1,8}" title="Up to 8 letters and numbers" placeholder="Up to 8 letters and numbers" maxlength="8" required>
+                        <div id="bodyNumberError" class="text-danger small d-none">Body number must be up to 8 letters and numbers.</div>
                     </div>
                 </div>
                 <div class="form-row two-col-row">
                     <div class="input-stack">
                         <label class="top-label">Chassis Number <span class="required-asterisk">*</span></label>
-                        <input type="text" id="chassisNumber" name="chassis_number" pattern="[A-Za-z0-9]{6}-[A-Za-z0-9]{6}" title="Format like AB1234-CD5678" placeholder="XXXXXX-XXXXXX" required>
-                        <div id="chassisNumberError" class="text-danger small d-none">Invalid chassis number.</div>
+                        <input type="text" id="chassisNumber" name="chassis_number" pattern="[A-Za-z0-9]{4}-[A-Za-z0-9]{11}" title="Format like ABCD-12345678901" placeholder="XXXX-XXXXXXXXXXX" maxlength="16" required>
+                        <div id="chassisNumberError" class="text-danger small d-none">Chassis number must follow the format XXXX-XXXXXXXXXXX.</div>
                     </div>
                     <div class="input-stack">
                         <label class="top-label">Motor Number <span class="required-asterisk">*</span></label>
-                        <input type="text" id="motorNumber" name="motor_number" inputmode="numeric" pattern="\d+" title="Numbers only" placeholder="Numbers only" required>
-                        <div id="motorNumberError" class="text-danger small d-none">Numbers only.</div>
+                        <input type="text" id="motorNumber" name="motor_number" pattern="[A-Za-z0-9]{1,20}" title="Up to 20 letters and numbers" placeholder="Up to 20 letters and numbers" maxlength="20" required>
+                        <div id="motorNumberError" class="text-danger small d-none">Motor number must be up to 20 letters and numbers.</div>
                     </div>
                 </div>
                 <div class="form-row two-col-row">
                     <div class="input-stack">
                         <label class="top-label">O.R. Number <span class="required-asterisk">*</span></label>
-                        <input type="text" id="orNumber" name="or_number" inputmode="numeric" pattern="\d{7,12}" title="7 to 12 digits" placeholder="7 to 12 digits" required>
-                        <div id="orNumberError" class="text-danger small d-none">O.R. number must be 7 to 12 digits.</div>
+                        <input type="text" id="orNumber" name="or_number" pattern="[A-Za-z0-9]{1,20}" title="Up to 20 letters and numbers" placeholder="Up to 20 letters and numbers" maxlength="20" required>
+                        <div id="orNumberError" class="text-danger small d-none">O.R. number must be up to 20 letters and numbers.</div>
                     </div>
                     <div class="input-stack">
                         <label class="top-label">C.R. Number <span class="required-asterisk">*</span></label>
-                        <input type="text" id="crNumber" name="cr_number" inputmode="numeric" pattern="\d{7,12}" title="7 to 12 digits" placeholder="7 to 12 digits" required>
-                        <div id="crNumberError" class="text-danger small d-none">C.R. number must be 7 to 12 digits.</div>
+                        <input type="text" id="crNumber" name="cr_number" pattern="[A-Za-z0-9]{1,20}" title="Up to 20 letters and numbers" placeholder="Up to 20 letters and numbers" maxlength="20" required>
+                        <div id="crNumberError" class="text-danger small d-none">C.R. number must be up to 20 letters and numbers.</div>
                     </div>
                 </div>
                 <div id="documentUploadSection" class="d-none">

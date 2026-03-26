@@ -3,6 +3,7 @@ require_once __DIR__ . "/../PhpFiles/General/security.php";
 
 require_once __DIR__ . "/../PhpFiles/General/connection.php";
 require_once __DIR__ . "/../PhpFiles/General/uploadLimits.php";
+require_once __DIR__ . "/../PhpFiles/General/uniqueIDGenerate.php";
 require_once __DIR__ . '/includes/admin_guard.php';
 require_once __DIR__ . "/../PhpFiles/General/officialInviteCommon.php";
 
@@ -170,33 +171,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && (string)($_POST['action'] ?? '') ==
         $remarks = 'Admin profile image';
         $idNumber = null;
 
-        $ins = $conn->prepare("
-            INSERT INTO unifiedfileattachmenttbl
-                (source_type, source_id, document_type_id, file_name, file_path, file_type, user_id_uploaded_by, status_id_verify, remarks, id_number)
-            VALUES
-                (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        ");
-        if (!$ins) {
-            throw new RuntimeException('Failed to save uploaded image.');
-        }
-        $ins->bind_param(
-            "ssissssiss",
-            $sourceType,
-            $sourceId,
-            $docTypeId,
-            $fileName,
-            $filePathDb,
-            $ext,
-            $userId,
-            $statusIdVerify,
-            $remarks,
-            $idNumber
-        );
-        if (!$ins->execute()) {
-            $ins->close();
-            throw new RuntimeException('Failed to save uploaded image.');
-        }
-        $ins->close();
+        insertUnifiedFileAttachment($conn, [
+            'source_type' => $sourceType,
+            'source_id' => $sourceId,
+            'document_type_id' => $docTypeId,
+            'file_name' => $fileName,
+            'file_path' => $filePathDb,
+            'file_type' => $ext,
+            'user_id_uploaded_by' => $userId,
+            'status_id_verify' => $statusIdVerify,
+            'remarks' => $remarks,
+            'id_number' => $idNumber,
+        ], 'uploaded image');
 
         ap_set_flash('success', 'Profile image updated.');
     } catch (Throwable $e) {
@@ -212,6 +198,7 @@ if ($userId !== '') {
         $stmtAcc->execute();
         $account = $stmtAcc->get_result()->fetch_assoc() ?: null;
         $stmtAcc->close();
+        $account = $account ? (pii_decrypt_useraccount_row($account) ?? $account) : null;
     }
 
     $stmtProf = $conn->prepare("SELECT * FROM officialinformationtbl WHERE user_id = ? LIMIT 1");
@@ -220,6 +207,7 @@ if ($userId !== '') {
         $stmtProf->execute();
         $profile = $stmtProf->get_result()->fetch_assoc() ?: null;
         $stmtProf->close();
+        $profile = $profile ? (pii_decrypt_official_row($profile) ?? $profile) : null;
     }
 }
 

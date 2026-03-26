@@ -13,11 +13,82 @@ if (!isset($_GET['fetch_audit_logs'])) {
     exit;
 }
 
+function auditLogsFormatName($fn, $mn, $ln, $suf): string
+{
+    $fn = trim((string)$fn);
+    $mn = trim((string)$mn);
+    $ln = trim((string)$ln);
+    $suf = trim((string)$suf);
+    if ($fn === '' && $ln === '') {
+        return '';
+    }
+
+    $mid = $mn !== '' ? (substr($mn, 0, 1) . '. ') : '';
+    $name = trim($fn . ' ' . $mid . $ln);
+    if ($suf !== '') {
+        $name .= ' ' . $suf;
+    }
+    return trim($name);
+}
+
+function auditLogsDecryptRow(array $row): array
+{
+    $row = pii_decrypt_assoc($row, [
+        'o_firstname',
+        'o_middlename',
+        'o_lastname',
+        'o_suffix',
+        'r_firstname',
+        'r_middlename',
+        'r_lastname',
+        'r_suffix',
+        'old_value',
+        'new_value',
+        'remarks',
+    ]);
+
+    $officialName = auditLogsFormatName(
+        $row['o_firstname'] ?? '',
+        $row['o_middlename'] ?? '',
+        $row['o_lastname'] ?? '',
+        $row['o_suffix'] ?? ''
+    );
+    $residentName = auditLogsFormatName(
+        $row['r_firstname'] ?? '',
+        $row['r_middlename'] ?? '',
+        $row['r_lastname'] ?? '',
+        $row['r_suffix'] ?? ''
+    );
+
+    $row['display_name'] = $officialName !== '' ? $officialName : ($residentName !== '' ? $residentName : '');
+    return $row;
+}
+
+function auditLogsMatchesSearch(array $row, string $needle): bool
+{
+    return pii_search_match($row, [
+        'audit_id',
+        'user_id',
+        'display_name',
+        'role_access',
+        'module_affected',
+        'target_type',
+        'target_id',
+        'action_type',
+        'field_changed',
+        'old_value',
+        'new_value',
+        'remarks',
+        'action_timestamp',
+    ], $needle);
+}
+
 try {
     $q = trim((string)($_GET['q'] ?? ''));
     $limit = (int)($_GET['limit'] ?? 200);
     if ($limit <= 0) $limit = 200;
     if ($limit > 500) $limit = 500;
+    $queryLimit = $q !== '' ? 500 : $limit;
 
     $bindParams = static function (mysqli_stmt $stmt, string $types, array $params): void {
         if ($types === '') return;
@@ -58,34 +129,9 @@ try {
             ON ri.user_id COLLATE utf8mb4_general_ci = a.user_id COLLATE utf8mb4_general_ci
     ";
 
-    $params = [];
-    $types = '';
-    if ($q !== '') {
-        $sql .= "
-            WHERE
-                a.user_id LIKE ?
-                OR a.role_access LIKE ?
-                OR a.module_affected LIKE ?
-                OR a.target_type LIKE ?
-                OR a.target_id LIKE ?
-                OR a.action_type LIKE ?
-                OR a.field_changed LIKE ?
-                OR a.old_value LIKE ?
-                OR a.new_value LIKE ?
-                OR a.remarks LIKE ?
-                OR oi.firstname LIKE ?
-                OR oi.lastname LIKE ?
-                OR ri.firstname LIKE ?
-                OR ri.lastname LIKE ?
-        ";
-        $like = '%' . $q . '%';
-        $params = array_fill(0, 14, $like);
-        $types = str_repeat('s', 14);
-    }
-
     $sql .= " ORDER BY a.action_timestamp DESC, a.audit_id DESC LIMIT ?";
-    $params[] = $limit;
-    $types .= 'i';
+    $params = [$queryLimit];
+    $types = 'i';
 
     $stmt = $conn->prepare($sql);
     if (!$stmt) {
@@ -99,21 +145,10 @@ try {
     $res = $stmt->get_result();
     $rows = [];
     while ($row = $res->fetch_assoc()) {
-        $formatName = static function ($fn, $mn, $ln, $suf): string {
-            $fn = trim((string)$fn);
-            $mn = trim((string)$mn);
-            $ln = trim((string)$ln);
-            $suf = trim((string)$suf);
-            if ($fn === '' && $ln === '') return '';
-            $mid = $mn !== '' ? (substr($mn, 0, 1) . '. ') : '';
-            $name = trim($fn . ' ' . $mid . $ln);
-            if ($suf !== '') $name .= ' ' . $suf;
-            return trim($name);
-        };
-
-        $officialName = $formatName($row['o_firstname'] ?? '', $row['o_middlename'] ?? '', $row['o_lastname'] ?? '', $row['o_suffix'] ?? '');
-        $residentName = $formatName($row['r_firstname'] ?? '', $row['r_middlename'] ?? '', $row['r_lastname'] ?? '', $row['r_suffix'] ?? '');
-        $row['display_name'] = $officialName !== '' ? $officialName : ($residentName !== '' ? $residentName : '');
+        $row = auditLogsDecryptRow($row);
+        if ($q !== '' && !auditLogsMatchesSearch($row, $q)) {
+            continue;
+        }
 
         unset(
             $row['o_firstname'], $row['o_middlename'], $row['o_lastname'], $row['o_suffix'],
@@ -122,6 +157,10 @@ try {
         $rows[] = $row;
     }
     $stmt->close();
+
+    if ($q !== '' && count($rows) > $limit) {
+        $rows = array_slice($rows, 0, $limit);
+    }
 
     echo json_encode(['success' => true, 'data' => $rows]);
 } catch (Exception $e) {

@@ -22,6 +22,7 @@ if ($ur->num_rows === 0) {
 }
 
 $user = $ur->fetch_assoc();
+$user = pii_decrypt_useraccount_row($user) ?? $user;
 $email = $user['email'];
 
 if ((int)$user['email_verify'] === 1) {

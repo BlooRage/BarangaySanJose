@@ -165,37 +165,27 @@ document.addEventListener("DOMContentLoaded", () => {
         run();
     };
 
-    const enforcePlateLimit = (input) => {
+    const normalizeAlphaNumeric = (input, maxLength) => {
         if (!input) return;
-        const value = (input.value || "").toUpperCase();
-        let count = 0;
-        let result = "";
-        for (const char of value) {
-            if (/[a-zA-Z0-9]/.test(char)) {
-                if (count >= 7) continue;
-                count += 1;
-                result += char;
-                continue;
-            }
-            if (char === "-" || char === " ") {
-                result += char;
-            }
-        }
-        if (result !== value) {
-            input.value = result;
+        const normalized = String(input.value || "")
+            .replace(/[^a-zA-Z0-9]/g, "")
+            .toUpperCase()
+            .slice(0, maxLength);
+        if (input.value !== normalized) {
+            input.value = normalized;
         }
     };
 
-    const normalizeNumber = (input) => {
-        if (!input) return;
-        input.value = input.value.replace(/[\s-]+/g, "");
-    };
+    const normalizePlateNumber = (input) => normalizeAlphaNumeric(input, 7);
+    const normalizeBodyNumber = (input) => normalizeAlphaNumeric(input, 8);
+    const normalizeIdentifier = (input) => normalizeAlphaNumeric(input, 20);
 
     const normalizeChassis = (input) => {
         if (!input) return;
         const raw = (input.value || "").replace(/[^a-zA-Z0-9]/g, "").toUpperCase();
-        const first = raw.slice(0, 6);
-        const second = raw.slice(6, 12);
+        const trimmed = raw.slice(0, 15);
+        const first = trimmed.slice(0, 4);
+        const second = trimmed.slice(4, 15);
         input.value = second.length > 0 ? `${first}-${second}` : first;
     };
 
@@ -298,12 +288,12 @@ document.addEventListener("DOMContentLoaded", () => {
         setFieldValue(crNumberInput, record.cr_number);
         setRadioSelection(record.vehicle_named_to_owner);
 
-        enforcePlateLimit(plateNumberInput);
-        normalizeNumber(bodyNumberInput);
+        normalizePlateNumber(plateNumberInput);
+        normalizeBodyNumber(bodyNumberInput);
         normalizeChassis(chassisNumberInput);
-        normalizeNumber(motorNumberInput);
-        normalizeNumber(orNumberInput);
-        normalizeNumber(crNumberInput);
+        normalizeIdentifier(motorNumberInput);
+        normalizeIdentifier(orNumberInput);
+        normalizeIdentifier(crNumberInput);
 
         updateState();
 
@@ -420,30 +410,30 @@ document.addEventListener("DOMContentLoaded", () => {
     form.addEventListener("input", updateState);
     form.addEventListener("change", updateState);
 
-    plateNumberInput?.addEventListener("input", () => {
-        enforcePlateLimit(plateNumberInput);
-    });
-
+    bindValidation(plateNumberInput, document.getElementById("plateNumberError"), {
+        required: "Plate number is required.",
+        pattern: "Plate number must be up to 7 letters and numbers."
+    }, normalizePlateNumber);
     bindValidation(bodyNumberInput, document.getElementById("bodyNumberError"), {
         required: "Body number is required.",
-        pattern: "Numbers only."
-    });
+        pattern: "Body number must be up to 8 letters and numbers."
+    }, normalizeBodyNumber);
     bindValidation(chassisNumberInput, document.getElementById("chassisNumberError"), {
         required: "Chassis number is required.",
-        pattern: "Invalid chassis number."
+        pattern: "Chassis number must follow the format XXXX-XXXXXXXXXXX."
     }, normalizeChassis);
     bindValidation(motorNumberInput, document.getElementById("motorNumberError"), {
         required: "Motor number is required.",
-        pattern: "Numbers only."
-    });
+        pattern: "Motor number must be up to 20 letters and numbers."
+    }, normalizeIdentifier);
     bindValidation(orNumberInput, document.getElementById("orNumberError"), {
         required: "O.R. number is required.",
-        pattern: "O.R. number must be 7 to 12 digits."
-    }, normalizeNumber);
+        pattern: "O.R. number must be up to 20 letters and numbers."
+    }, normalizeIdentifier);
     bindValidation(crNumberInput, document.getElementById("crNumberError"), {
         required: "C.R. number is required.",
-        pattern: "C.R. number must be 7 to 12 digits."
-    }, normalizeNumber);
+        pattern: "C.R. number must be up to 20 letters and numbers."
+    }, normalizeIdentifier);
     bindValidation(otherTodaPodaLocationInput, otherTodaPodaLocationError, {
         required: "Location is required when franchisee is Others.",
         pattern: "Location is required when franchisee is Others."

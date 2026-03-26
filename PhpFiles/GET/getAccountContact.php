@@ -24,6 +24,7 @@ $stmt->bind_param("s", $user_id);
 $stmt->execute();
 $row = $stmt->get_result()->fetch_assoc();
 $stmt->close();
+$row = $row ? (pii_decrypt_useraccount_row($row) ?? $row) : [];
 
 $phone = $row['phone_number'] ?? '';
 $email = $row['email'] ?? '';

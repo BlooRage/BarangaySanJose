@@ -10,6 +10,31 @@ requireRoleSession(['Resident'], false);
 
 require_once __DIR__ . "/../../PhpFiles/General/connection.php";
 
+if (!function_exists('resident_guard_normalize_public_path')) {
+    function resident_guard_normalize_public_path(string $path): string
+    {
+        $path = trim(str_replace("\\", "/", $path));
+        if ($path === '') {
+            return '';
+        }
+
+        $path = preg_replace('#/+#', '/', $path) ?: $path;
+        $path = rtrim($path, '/');
+        if ($path === '') {
+            return '';
+        }
+
+        $rootPath = function_exists('appRootPath') ? appRootPath() : '';
+        if ($rootPath !== '' && strpos($path, $rootPath . '/') === 0) {
+            $path = substr($path, strlen($rootPath));
+        } elseif ($rootPath !== '' && $path === $rootPath) {
+            $path = '/';
+        }
+
+        return preg_replace('/\.php$/i', '', $path) ?? $path;
+    }
+}
+
 $userId = $_SESSION['user_id'];
 $hasResidentProfile = false;
 $isResidentVerified = false;
@@ -54,11 +79,14 @@ if ($hasResidentProfile && $allowUnregistered) {
 $allowUnverifiedResident = $allowUnverifiedResident ?? false;
 
 if (!$isResidentVerified) {
-    $scriptPath = str_replace("\\", "/", (string)($_SERVER['SCRIPT_NAME'] ?? ''));
+    $scriptPath = resident_guard_normalize_public_path((string)($_SERVER['SCRIPT_NAME'] ?? ''));
     $allowedForUnverified = [
         '/Resident-End/resident_dashboard.php',
         '/Resident-End/resident_profile.php',
         '/Resident-End/DocumentUpload.php',
+        '/Resident-End/Clearances/ClearancesLandingPage.php',
+        '/Resident-End/Clearances/BusinessClearanceForm.php',
+        '/Resident-End/document_requests.php',
         '/Resident-End/Announcements/AnnouncementsLandingPage.php',
         '/Resident-End/Appointments/AppointmentsLandingPage.php',
         '/Resident-End/Appointments/AppointmentForm.php',
@@ -67,6 +95,7 @@ if (!$isResidentVerified) {
         '/Resident-End/appointment_tracker.php',
         '/Resident-End/complaint_tracker.php',
     ];
+    $allowedForUnverified = array_map('resident_guard_normalize_public_path', $allowedForUnverified);
 
     if (!$allowUnverifiedResident && !in_array($scriptPath, $allowedForUnverified, true)) {
         $_SESSION['show_not_verified_modal'] = true;

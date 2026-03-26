@@ -54,41 +54,7 @@ $positionsByRole = [
     ],
 ];
 $areaRequiredPositions = ['Barangay Police', 'Desk Officer', 'Area OIC'];
-$employmentStatusOptions = [
-    'Regular',
-    'Full-Time',
-    'Part-Time',
-    'Suspended',
-    'Terminated',
-    'Regular Government Officials',
-    'Contract/Fixed-term',
-    'Probationary',
-];
 $personnelPositionAccessOptions = $positionsByRole['Personnel'];
-$empRes = $conn->prepare("
-    SELECT DISTINCT status_name
-    FROM statuslookuptbl
-    WHERE status_type = 'Official/Personnel Management'
-      AND status_name IS NOT NULL
-      AND TRIM(status_name) <> ''
-    ORDER BY status_name ASC
-");
-if ($empRes) {
-    $empRes->execute();
-    $empRows = $empRes->get_result();
-    while ($er = $empRows->fetch_assoc()) {
-        $v = trim((string)($er['status_name'] ?? ''));
-        if ($v !== '' && !in_array($v, $employmentStatusOptions, true)) {
-            $employmentStatusOptions[] = $v;
-        }
-    }
-    $empRes->close();
-}
-sort($employmentStatusOptions);
-$personnelEmploymentStatusOptions = array_values(array_filter(
-    $employmentStatusOptions,
-    static fn (string $status): bool => strcasecmp(trim($status), 'Regular Government Officials') !== 0
-));
 $deptRes = $conn->query("
     SELECT DISTINCT department
     FROM officialinformationtbl
@@ -145,7 +111,7 @@ function fetch_invite_by_id(mysqli $conn, int $inviteId): ?array {
     $stmt->execute();
     $row = $stmt->get_result()->fetch_assoc();
     $stmt->close();
-    return $row ?: null;
+    return $row ? (pii_decrypt_official_invite_row($row) ?? $row) : null;
 }
 
 function verify_actor_password_or_fail(mysqli $conn, string $actorUserId, bool $isSuperAdminActor, string $actorPassword): void {
@@ -248,10 +214,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             exit;
         }
 
-        $exists = $conn->prepare("SELECT user_id FROM useraccountstbl WHERE email = ? OR phone_number = ? LIMIT 1");
+        $contactLookup = pii_prepare_useraccount_contacts($email, $phone10);
+        $exists = $conn->prepare("
+            SELECT user_id
+            FROM useraccountstbl
+            WHERE email_lookup_hash = ? OR phone_lookup_hash = ?
+            LIMIT 1
+        ");
         $hasExisting = false;
         if ($exists) {
-            $exists->bind_param("ss", $email, $phone10);
+            $exists->bind_param("ss", $contactLookup['email_lookup_hash'], $contactLookup['phone_lookup_hash']);
             $exists->execute();
             $hit = $exists->get_result()->fetch_assoc();
             $exists->close();
@@ -277,12 +249,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $roleAccess = 'Personnel';
         $positionAccess = trim((string)($_POST['position_access'] ?? ''));
         $department = trim((string)($_POST['department'] ?? ''));
-        $employmentStatus = trim((string)($_POST['employment_status'] ?? ''));
+        $employmentStatus = 'Regular';
         $areaNumber = trim((string)($_POST['area_number'] ?? ''));
         $actorPassword = (string)($_POST['actor_password'] ?? '');
 
-        if ($lastName === '' || $firstName === '' || $email === '' || $department === '' || $employmentStatus === '') {
-            set_invite_flash('danger', 'Last name, first name, email, department, and employment status are required.');
+        if ($lastName === '' || $firstName === '' || $email === '' || $department === '') {
+            set_invite_flash('danger', 'Last name, first name, email, and department are required.');
             redirect_self();
         }
         if (!preg_match('/^[A-Za-z][A-Za-z .\'-]{0,99}$/', $lastName) || !preg_match('/^[A-Za-z][A-Za-z .\'-]{0,99}$/', $firstName)) {
@@ -341,9 +313,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         verify_sender_password_for_invite_or_fail($conn, $actorUserId, $actorPassword);
 
-        $exists = $conn->prepare("SELECT user_id FROM useraccountstbl WHERE email = ? OR phone_number = ? LIMIT 1");
+        $contactLookup = pii_prepare_useraccount_contacts($email, $phone10);
+        $exists = $conn->prepare("
+            SELECT user_id
+            FROM useraccountstbl
+            WHERE email_lookup_hash = ? OR phone_lookup_hash = ?
+            LIMIT 1
+        ");
         if ($exists) {
-            $exists->bind_param("ss", $email, $phone10);
+            $exists->bind_param("ss", $contactLookup['email_lookup_hash'], $contactLookup['phone_lookup_hash']);
             $exists->execute();
             $hit = $exists->get_result()->fetch_assoc();
             $exists->close();
@@ -368,24 +346,33 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
             $stmt = $conn->prepare("
                 INSERT INTO officialinvitetbl
-                    (invite_code, invite_token_hash, invite_email, invite_phone, firstname, middlename, lastname, suffix, role_access, position_access, department, employment_status, area_number, status, onboarding_step, invited_by_user_id, expires_at)
+                    (invite_code, invite_token_hash, invite_email, invite_email_lookup_hash, invite_phone, invite_phone_lookup_hash, firstname, middlename, lastname, suffix, role_access, position_access, department, employment_status, area_number, status, onboarding_step, invited_by_user_id, expires_at)
                 VALUES
-                    (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'Pending', 'password', ?, ?)
+                    (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'Pending', 'password', ?, ?)
             ");
             if (!$stmt) {
                 set_invite_flash('danger', 'Failed to create invite.');
                 redirect_self();
             }
+            $inviteContact = pii_prepare_official_invite_contacts($email, $phone10);
+            $inviteName = pii_encrypt_field_map([
+                'firstname' => $firstName,
+                'middlename' => $middleName,
+                'lastname' => $lastName,
+                'suffix' => $suffix,
+            ]);
             $stmt->bind_param(
-                "sssssssssssssss",
+                "sssssssssssssssss",
                 $inviteCode,
                 $token['hash'],
-                $email,
-                $phone10,
-                $firstName,
-                $middleName,
-                $lastName,
-                $suffix,
+                $inviteContact['invite_email'],
+                $inviteContact['invite_email_lookup_hash'],
+                $inviteContact['invite_phone'],
+                $inviteContact['invite_phone_lookup_hash'],
+                $inviteName['firstname'],
+                $inviteName['middlename'],
+                $inviteName['lastname'],
+                $inviteName['suffix'],
                 $roleAccess,
                 $positionAccess,
                 $department,
@@ -516,7 +503,7 @@ $q = $conn->query("
 ");
 if ($q) {
     while ($row = $q->fetch_assoc()) {
-        $rows[] = $row;
+        $rows[] = pii_decrypt_official_invite_row($row) ?? $row;
     }
 }
 
@@ -738,15 +725,6 @@ function oi_status_pill_class(string $value, string $type = 'generic'): string {
                                     <?php endforeach; ?>
                                 </select>
                                 <div class="invite-help" id="departmentHelp">Assign the personnel account to the department where this person will work.</div>
-                            </div>
-                            <div class="col-md-6">
-                                <label class="form-label">Employment Status <span class="invite-required">*</span></label>
-                                <select class="form-select" name="employment_status" required>
-                                    <option value="">Select Employment Status</option>
-                                    <?php foreach ($personnelEmploymentStatusOptions as $emp): ?>
-                                        <option value="<?= htmlspecialchars((string)$emp, ENT_QUOTES, 'UTF-8') ?>"><?= htmlspecialchars((string)$emp, ENT_QUOTES, 'UTF-8') ?></option>
-                                    <?php endforeach; ?>
-                                </select>
                             </div>
                             <div class="col-md-6" id="areaNumberGroup">
                                 <label class="form-label">Area Number <span class="invite-required">*</span></label>

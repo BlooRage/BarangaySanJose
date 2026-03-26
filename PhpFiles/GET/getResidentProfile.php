@@ -122,6 +122,8 @@ function getResidentProfileData(mysqli $conn, string $userId): array {
         $stmt->execute();
         $result = $stmt->get_result();
         if ($row = $result->fetch_assoc()) {
+            $row = pii_decrypt_resident_row($row) ?? $row;
+            $row = pii_decrypt_assoc($row, ['email', 'phone_number', 'emergency_first_name', 'emergency_middle_name', 'emergency_last_name', 'emergency_suffix', 'emergency_contact', 'emergency_relationship', 'emergency_address']);
             $residentId = $row['resident_id'];
 
             $birthdateFormatted = '';
@@ -201,6 +203,7 @@ function getResidentProfileData(mysqli $conn, string $userId): array {
             $stmtAddr->execute();
             $addr = $stmtAddr->get_result()->fetch_assoc();
 	            if ($addr) {
+                    $addr = pii_decrypt_resident_address_row($addr) ?? $addr;
 	                $residentaddresstbl = [
 	                    'unit_number' => $addr['unit_number'] ?? '',
 	                    'street_number' => $addr['street_number'] ?? '',

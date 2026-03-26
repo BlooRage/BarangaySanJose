@@ -2,6 +2,7 @@
 header('Content-Type: application/json');
 require_once '../General/connection.php';
 require_once '../General/sendSMS.php';
+require_once '../General/uniqueIDGenerate.php';
 
 // ===== Validate input =====
 if (!isset($_POST['recipient']) || !isset($_POST['purpose'])) {
@@ -39,33 +40,10 @@ $expiry_time  = date('Y-m-d H:i:s', strtotime('+5 minutes'));
 $STATUS_PENDING = 6;
 
 // ===== Insert OTP Request =====
-$stmt = $conn->prepare("
-    INSERT INTO otprequesttbl
-    (user_id, recipient, purpose, otp_code_hash, otp_expiry, request_timestamp, status_id_otp)
-    VALUES (?, ?, ?, ?, ?, ?, ?)
-");
-
-if (!$stmt) {
-    echo json_encode(['success' => false, 'error' => 'Unable to prepare OTP request.']);
-    exit;
-}
-
-$stmt->bind_param(
-    "ssssssi",
-    $user_id,
-    $recipient_db,   // ðŸ”¥ ALWAYS 10 DIGITS
-    $purpose,
-    $otp_hash,
-    $expiry_time,
-    $request_time,
-    $STATUS_PENDING
-);
-
-$executed = $stmt->execute();
-$otp_id = $executed ? (int)$stmt->insert_id : 0;
-$stmt->close();
-
-if (!$executed) {
+$otp_id = 0;
+try {
+    $otp_id = insertOtpRequest($conn, $user_id, $recipient_db, $purpose, $otp_hash, $expiry_time, $request_time, $STATUS_PENDING);
+} catch (Throwable $e) {
     echo json_encode(['success' => false, 'error' => 'Unable to store OTP request.']);
     exit;
 }

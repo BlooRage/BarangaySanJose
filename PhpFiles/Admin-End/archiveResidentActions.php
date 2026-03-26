@@ -4,8 +4,11 @@ header('Content-Type: application/json; charset=utf-8');
 
 require_once "../General/connection.php";
 require_once "../General/security.php";
+require_once "../General/caseUserAccountForeignKeys.php";
 
 requireRoleSession(['SuperAdmin', 'Official', 'Officials', 'Personnel', 'Personnels', 'Admin', 'Employee']);
+
+cuafk_ensure_case_useraccount_foreign_keys($conn, true);
 
 $raw = file_get_contents("php://input");
 $body = json_decode($raw, true);

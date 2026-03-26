@@ -4,6 +4,7 @@ declare(strict_types=1);
 require_once __DIR__ . '/connection.php';
 require_once __DIR__ . '/residentTransaction.php';
 require_once __DIR__ . '/sendSMS.php';
+require_once __DIR__ . '/uniqueIDGenerate.php';
 require_once __DIR__ . '/../EmailHandlers/emailSender.php';
 
 const DR_STAGE_SUBMITTED = 'submitted';
@@ -125,6 +126,154 @@ function dr_get_column_type(mysqli $conn, string $table, string $column, string 
     return $fallback;
 }
 
+function dr_request_child_id_config(string $table): ?array {
+    $normalized = strtolower(trim($table));
+    $config = [
+        'barangayidrequesttbl' => ['column' => 'barangay_id', 'department' => 'Issuance'],
+        'issuancerequesttbl' => ['column' => 'certificate_id', 'department' => 'Issuance'],
+        'certificatesrequesttbl' => ['column' => 'certificate_id', 'department' => 'Issuance'],
+        'issuancerequeststbl' => ['column' => 'certificate_id', 'department' => 'Issuance'],
+        'clearancerequesttbl' => ['column' => 'clearance_id', 'department' => 'Monitoring'],
+    ];
+
+    return $config[$normalized] ?? null;
+}
+
+function dr_request_child_id_column(string $table): ?string {
+    $config = dr_request_child_id_config($table);
+    return $config['column'] ?? null;
+}
+
+function dr_request_child_department(string $table): ?string {
+    $config = dr_request_child_id_config($table);
+    return $config['department'] ?? null;
+}
+
+function dr_constraint_exists(mysqli $conn, string $table, string $constraintName): bool {
+    $stmt = $conn->prepare("
+        SELECT COUNT(*)
+        FROM information_schema.KEY_COLUMN_USAGE
+        WHERE TABLE_SCHEMA = DATABASE()
+          AND TABLE_NAME = ?
+          AND CONSTRAINT_NAME = ?
+    ");
+    if (!$stmt) {
+        return false;
+    }
+    $stmt->bind_param('ss', $table, $constraintName);
+    $stmt->execute();
+    $stmt->bind_result($count);
+    $stmt->fetch();
+    $stmt->close();
+    return (int)$count > 0;
+}
+
+function dr_drop_constraint_if_exists(mysqli $conn, string $table, string $constraintName): void {
+    if (!dr_table_exists($conn, $table) || !dr_constraint_exists($conn, $table, $constraintName)) {
+        return;
+    }
+    $tableSafe = preg_replace('/[^a-zA-Z0-9_]/', '', $table);
+    $constraintSafe = preg_replace('/[^a-zA-Z0-9_]/', '', $constraintName);
+    if ($tableSafe === '' || $constraintSafe === '') {
+        return;
+    }
+    $conn->query("ALTER TABLE {$tableSafe} DROP FOREIGN KEY {$constraintSafe}");
+}
+
+function dr_ensure_generated_request_child_id(mysqli $conn, string $table): void {
+    $idColumn = dr_request_child_id_column($table);
+    if ($idColumn === null || !dr_table_exists($conn, $table)) {
+        return;
+    }
+    idg_ensure_string_generated_key($conn, $table, $idColumn, 10);
+}
+
+function dr_ensure_clearance_link_columns(mysqli $conn): void {
+    if (!dr_table_exists($conn, 'clearancerequesttbl')) {
+        return;
+    }
+
+    dr_drop_constraint_if_exists($conn, 'clearanceinspectiontbl', 'fk_inspection_clearance');
+    dr_drop_constraint_if_exists($conn, 'clearancefeestbl', 'fk_clearancefee_clearance');
+
+    dr_ensure_generated_request_child_id($conn, 'clearancerequesttbl');
+    if (dr_table_exists($conn, 'clearanceinspectiontbl')) {
+        idg_ensure_string_generated_key($conn, 'clearanceinspectiontbl', 'inspection_id', 9);
+        idg_ensure_string_generated_key($conn, 'clearanceinspectiontbl', 'clearance_id', 10);
+    }
+    if (dr_table_exists($conn, 'clearancefeestbl')) {
+        idg_ensure_numeric_generated_key($conn, 'clearancefeestbl', 'clearance_fee_id', 'BIGINT(20) UNSIGNED NOT NULL');
+        idg_ensure_string_generated_key($conn, 'clearancefeestbl', 'clearance_id', 10);
+    }
+
+    if (dr_table_exists($conn, 'clearanceinspectiontbl') && !dr_constraint_exists($conn, 'clearanceinspectiontbl', 'fk_inspection_clearance')) {
+        $conn->query("
+            ALTER TABLE clearanceinspectiontbl
+            ADD CONSTRAINT fk_inspection_clearance
+            FOREIGN KEY (clearance_id) REFERENCES clearancerequesttbl(clearance_id)
+            ON DELETE CASCADE ON UPDATE CASCADE
+        ");
+    }
+    if (dr_table_exists($conn, 'clearancefeestbl') && !dr_constraint_exists($conn, 'clearancefeestbl', 'fk_clearancefee_clearance')) {
+        $conn->query("
+            ALTER TABLE clearancefeestbl
+            ADD CONSTRAINT fk_clearancefee_clearance
+            FOREIGN KEY (clearance_id) REFERENCES clearancerequesttbl(clearance_id)
+            ON DELETE CASCADE ON UPDATE CASCADE
+        ");
+    }
+}
+
+function dr_find_request_child_id_by_request(mysqli $conn, string $table, string $requestId): ?string {
+    $idColumn = dr_request_child_id_column($table);
+    $requestId = trim($requestId);
+    if ($idColumn === null || $requestId === '' || !dr_table_exists($conn, $table) || !dr_column_exists($conn, $table, 'request_id')) {
+        return null;
+    }
+
+    $stmt = $conn->prepare("SELECT {$idColumn} FROM {$table} WHERE request_id = ? LIMIT 1");
+    if (!$stmt) {
+        return null;
+    }
+    $stmt->bind_param('s', $requestId);
+    $stmt->execute();
+    $stmt->bind_result($resolvedId);
+    $found = $stmt->fetch();
+    $stmt->close();
+
+    return $found ? trim((string)$resolvedId) : null;
+}
+
+function dr_resolve_request_child_id(mysqli $conn, string $table, string $requestId): ?string {
+    $existingId = dr_find_request_child_id_by_request($conn, $table, $requestId);
+    if ($existingId !== null && $existingId !== '') {
+        return $existingId;
+    }
+
+    $idColumn = dr_request_child_id_column($table);
+    $department = dr_request_child_department($table);
+    if ($idColumn === null || $department === null) {
+        return null;
+    }
+
+    dr_ensure_generated_request_child_id($conn, $table);
+    $generatedId = GenerateDepartmentScopedID($conn, $table, $idColumn, $department);
+    if (!is_string($generatedId) || trim($generatedId) === '') {
+        return null;
+    }
+
+    return trim($generatedId);
+}
+
+function dr_generate_clearance_inspection_id(string $clearanceId): string {
+    $digits = preg_replace('/\D+/', '', $clearanceId);
+    $digits = $digits === null ? '' : trim($digits);
+    if ($digits === '') {
+        return '';
+    }
+    return str_pad(substr($digits, -9), 9, '0', STR_PAD_LEFT);
+}
+
 function dr_ensure_document_request_extensions(mysqli $conn): void {
     $columnsToEnsure = [
         "resident_name VARCHAR(191) DEFAULT NULL AFTER resident_id",
@@ -220,7 +369,7 @@ function dr_ensure_request_child_tables(mysqli $conn): void {
 
     $conn->query("
         CREATE TABLE IF NOT EXISTS barangayidrequesttbl (
-            barangay_id BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT,
+            barangay_id VARCHAR(10) NOT NULL,
             request_id {$requestIdType} NOT NULL,
             id_details LONGTEXT DEFAULT NULL,
             created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -232,7 +381,7 @@ function dr_ensure_request_child_tables(mysqli $conn): void {
 
     $conn->query("
         CREATE TABLE IF NOT EXISTS issuancerequesttbl (
-            certificate_id BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT,
+            certificate_id VARCHAR(10) NOT NULL,
             request_id {$requestIdType} NOT NULL,
             certificate_type VARCHAR(120) NOT NULL,
             certificate_details LONGTEXT DEFAULT NULL,
@@ -248,7 +397,7 @@ function dr_ensure_request_child_tables(mysqli $conn): void {
 
     $conn->query("
         CREATE TABLE IF NOT EXISTS certificatesrequesttbl (
-            certificate_id BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT,
+            certificate_id VARCHAR(10) NOT NULL,
             request_id {$requestIdType} NOT NULL,
             certificate_type VARCHAR(120) NOT NULL,
             certificate_details LONGTEXT DEFAULT NULL,
@@ -264,7 +413,7 @@ function dr_ensure_request_child_tables(mysqli $conn): void {
 
     $conn->query("
         CREATE TABLE IF NOT EXISTS clearancerequesttbl (
-            clearance_id BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT,
+            clearance_id VARCHAR(10) NOT NULL,
             request_id {$requestIdType} NOT NULL,
             clearance_type VARCHAR(120) DEFAULT NULL,
             application_type VARCHAR(120) DEFAULT NULL,
@@ -278,8 +427,8 @@ function dr_ensure_request_child_tables(mysqli $conn): void {
 
     $conn->query("
         CREATE TABLE IF NOT EXISTS clearanceinspectiontbl (
-            inspection_id BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT,
-            clearance_id BIGINT(20) UNSIGNED NOT NULL,
+            inspection_id VARCHAR(9) NOT NULL,
+            clearance_id VARCHAR(10) NOT NULL,
             inspector_name VARCHAR(191) DEFAULT NULL,
             date_inspected DATETIME DEFAULT NULL,
             remarks TEXT DEFAULT NULL,
@@ -293,8 +442,8 @@ function dr_ensure_request_child_tables(mysqli $conn): void {
 
     $conn->query("
         CREATE TABLE IF NOT EXISTS clearancefeestbl (
-            clearance_fee_id BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT,
-            clearance_id BIGINT(20) UNSIGNED NOT NULL,
+            clearance_fee_id BIGINT(20) UNSIGNED NOT NULL,
+            clearance_id VARCHAR(10) NOT NULL,
             fee_type VARCHAR(120) NOT NULL,
             amount DECIMAL(12,2) NOT NULL DEFAULT 0.00,
             created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -337,6 +486,11 @@ function dr_ensure_request_child_tables(mysqli $conn): void {
     if (dr_table_exists($conn, 'financetransactiontbl') && !dr_column_exists($conn, 'financetransactiontbl', 'finance_decision_at')) {
         $conn->query("ALTER TABLE financetransactiontbl ADD COLUMN finance_decision_at DATETIME DEFAULT NULL AFTER payment_timestamp");
     }
+
+    dr_ensure_generated_request_child_id($conn, 'barangayidrequesttbl');
+    dr_ensure_generated_request_child_id($conn, 'issuancerequesttbl');
+    dr_ensure_generated_request_child_id($conn, 'certificatesrequesttbl');
+    dr_ensure_clearance_link_columns($conn);
 
     $done = true;
 }
@@ -1769,6 +1923,7 @@ function dr_send_notification(mysqli $conn, array $request, string $subject, str
     $stmt->execute();
     $acct = $stmt->get_result()->fetch_assoc();
     $stmt->close();
+    $acct = $acct ? (pii_decrypt_useraccount_row($acct) ?? $acct) : null;
     if (!$acct) {
         return;
     }
@@ -1887,7 +2042,7 @@ function dr_ensure_named_certificate_request_table(mysqli $conn, string $table, 
 
     $conn->query("
         CREATE TABLE IF NOT EXISTS {$tableSafe} (
-            certificate_id BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT,
+            certificate_id VARCHAR(10) NOT NULL,
             request_id {$requestIdType} NOT NULL,
             certificate_type VARCHAR(120) NOT NULL,
             certificate_details LONGTEXT DEFAULT NULL,
@@ -1928,6 +2083,8 @@ function dr_ensure_named_certificate_request_table(mysqli $conn, string $table, 
             $conn->query("ALTER TABLE {$tableSafe} ADD COLUMN {$definition}");
         }
     }
+
+    dr_ensure_generated_request_child_id($conn, $tableSafe);
 
     $hasUniqueRequest = false;
     $hasTypeIndex = false;
@@ -2006,6 +2163,13 @@ function dr_upsert_certificate_request_into_table(mysqli $conn, string $table, s
         return;
     }
 
+    $idColumn = dr_request_child_id_column($table);
+    $childId = $idColumn !== null ? dr_resolve_request_child_id($conn, $table, $requestId) : null;
+    if ($idColumn === null || $childId === null || $childId === '') {
+        error_log("[documentRequestWorkflow][issuance] failed to resolve generated ID for {$table} | request_id=" . $requestId);
+        return;
+    }
+
     $duplicateUpdates = [
         'certificate_type = VALUES(certificate_type)',
         'certificate_details = VALUES(certificate_details)',
@@ -2015,8 +2179,8 @@ function dr_upsert_certificate_request_into_table(mysqli $conn, string $table, s
     }
 
     $stmt = $conn->prepare("
-        INSERT INTO {$table} (request_id, certificate_type, certificate_details)
-        VALUES (?, ?, ?)
+        INSERT INTO {$table} ({$idColumn}, request_id, certificate_type, certificate_details)
+        VALUES (?, ?, ?, ?)
         ON DUPLICATE KEY UPDATE
             " . implode(",\n            ", $duplicateUpdates) . "
     ");
@@ -2024,7 +2188,7 @@ function dr_upsert_certificate_request_into_table(mysqli $conn, string $table, s
         error_log("[documentRequestWorkflow][issuance] prepare failed for {$table}: " . $conn->error);
         return;
     }
-    $stmt->bind_param('sss', $requestId, $certificateType, $certificateDetails);
+    $stmt->bind_param('ssss', $childId, $requestId, $certificateType, $certificateDetails);
     if (!$stmt->execute()) {
         error_log("[documentRequestWorkflow][issuance] upsert failed in {$table}: " . $stmt->error . ' | request_id=' . $requestId);
     }
@@ -2058,7 +2222,7 @@ function dr_ensure_named_clearance_request_table(mysqli $conn, string $table, st
 
     $conn->query("
         CREATE TABLE IF NOT EXISTS {$tableSafe} (
-            clearance_id BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT,
+            clearance_id VARCHAR(10) NOT NULL,
             request_id {$requestIdType} NOT NULL,
             clearance_type VARCHAR(120) DEFAULT NULL,
             application_type VARCHAR(120) DEFAULT NULL,
@@ -2096,6 +2260,8 @@ function dr_ensure_named_clearance_request_table(mysqli $conn, string $table, st
             $conn->query("ALTER TABLE {$tableSafe} ADD COLUMN {$definition}");
         }
     }
+
+    dr_ensure_clearance_link_columns($conn);
 
     $hasUniqueRequest = false;
     $idxRes = $conn->query("SHOW INDEX FROM {$tableSafe}");
@@ -2158,10 +2324,17 @@ function dr_upsert_clearance_request_into_table(
         return;
     }
 
-    $insertCols = ['request_id', 'clearance_type'];
-    $placeholders = ['?', '?'];
-    $types = 'ss';
-    $params = [$requestId, $clearanceType];
+    $idColumn = dr_request_child_id_column($table);
+    $childId = $idColumn !== null ? dr_resolve_request_child_id($conn, $table, $requestId) : null;
+    if ($idColumn === null || $childId === null || $childId === '') {
+        error_log("[documentRequestWorkflow][clearance] failed to resolve generated ID for {$table} | request_id=" . $requestId);
+        return;
+    }
+
+    $insertCols = [$idColumn, 'request_id', 'clearance_type'];
+    $placeholders = ['?', '?', '?'];
+    $types = 'sss';
+    $params = [$childId, $requestId, $clearanceType];
     $duplicateUpdates = ['clearance_type = VALUES(clearance_type)'];
 
     if (dr_column_exists($conn, $table, 'application_type')) {
@@ -2227,14 +2400,20 @@ function dr_upsert_barangay_id_request(mysqli $conn, string $requestId, string $
         return;
     }
 
+    $barangayId = dr_resolve_request_child_id($conn, 'barangayidrequesttbl', $requestId);
+    if ($barangayId === null || $barangayId === '') {
+        error_log('[documentRequestWorkflow][barangayid] failed to resolve generated ID | request_id=' . $requestId);
+        return;
+    }
+
     $duplicateUpdates = ['id_details = VALUES(id_details)'];
     if (dr_column_exists($conn, 'barangayidrequesttbl', 'updated_at')) {
         $duplicateUpdates[] = 'updated_at = CURRENT_TIMESTAMP';
     }
 
     $sql = "
-        INSERT INTO barangayidrequesttbl (request_id, id_details)
-        VALUES (?, ?)
+        INSERT INTO barangayidrequesttbl (barangay_id, request_id, id_details)
+        VALUES (?, ?, ?)
         ON DUPLICATE KEY UPDATE
             " . implode(",\n            ", $duplicateUpdates) . "
     ";
@@ -2243,7 +2422,7 @@ function dr_upsert_barangay_id_request(mysqli $conn, string $requestId, string $
         error_log('[documentRequestWorkflow][barangayid] prepare failed: ' . $conn->error);
         return;
     }
-    $stmt->bind_param('ss', $requestId, $idDetails);
+    $stmt->bind_param('sss', $barangayId, $requestId, $idDetails);
     if (!$stmt->execute()) {
         error_log('[documentRequestWorkflow][barangayid] upsert failed: ' . $stmt->error . ' | request_id=' . $requestId);
     }
@@ -2567,16 +2746,23 @@ function dr_upsert_issuance_identifiers(mysqli $conn, string $requestId, ?string
             continue;
         }
 
+        $idColumn = dr_request_child_id_column($table);
+        $childId = $idColumn !== null ? dr_resolve_request_child_id($conn, $table, $requestId) : null;
+        if ($idColumn === null || $childId === null || $childId === '') {
+            error_log("[documentRequestWorkflow][issuance] identifier upsert failed to resolve generated ID for {$table} | request_id=" . $requestId);
+            continue;
+        }
+
         $hasCertNumber = dr_column_exists($conn, $table, 'certificate_number');
         $hasVerificationCode = dr_column_exists($conn, $table, 'verification_code');
         if (!$hasCertNumber && !$hasVerificationCode) {
             continue;
         }
 
-        $insertCols = ['request_id', 'certificate_type', 'certificate_details'];
-        $placeholders = ['?', '?', "JSON_OBJECT('source','issuance_identifiers_upsert')"];
-        $types = 'ss';
-        $params = [$requestId, $certType];
+        $insertCols = [$idColumn, 'request_id', 'certificate_type', 'certificate_details'];
+        $placeholders = ['?', '?', '?', "JSON_OBJECT('source','issuance_identifiers_upsert')"];
+        $types = 'sss';
+        $params = [$childId, $requestId, $certType];
         $duplicateUpdates = [];
 
         if ($hasCertNumber) {
@@ -2733,7 +2919,7 @@ function dr_ensure_clearance_fee_types_table(mysqli $conn): void {
     // Create table with full schema if it doesn't exist yet
     $conn->query("
         CREATE TABLE IF NOT EXISTS clearancefeetypetbl (
-            fee_type_id          BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT,
+            fee_type_id          BIGINT(20) UNSIGNED NOT NULL,
             fee_name             VARCHAR(120) NOT NULL,
             default_amount       DECIMAL(12,2) NOT NULL DEFAULT 0.00,
             proposed_amount      DECIMAL(12,2) DEFAULT NULL,
@@ -2751,6 +2937,7 @@ function dr_ensure_clearance_fee_types_table(mysqli $conn): void {
             KEY idx_clearancefeetypes_status (status)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
     ");
+    idg_ensure_numeric_generated_key($conn, 'clearancefeetypetbl', 'fee_type_id', 'BIGINT(20) UNSIGNED NOT NULL');
     // Upgrade existing table: add columns introduced in the merged schema
     // These are safe to run on a table that already has the columns (ignored by MariaDB/MySQL)
     $conn->query("ALTER TABLE clearancefeetypetbl ADD COLUMN IF NOT EXISTS proposed_amount DECIMAL(12,2) DEFAULT NULL");
@@ -2765,14 +2952,38 @@ function dr_ensure_clearance_fee_types_table(mysqli $conn): void {
     @$conn->query("UPDATE clearancefeetypetbl SET status='rejected' WHERE is_active=0");
     // Add status index if missing
     $conn->query("ALTER TABLE clearancefeetypetbl ADD KEY IF NOT EXISTS idx_clearancefeetypes_status (status)");
-    // Seed common fee types if none exist yet
-    $conn->query("
-        INSERT IGNORE INTO clearancefeetypetbl (fee_name, default_amount, status) VALUES
-            ('Application Fee', 100.00, 'approved'),
-            ('Inspection Fee',  200.00, 'approved'),
-            ('Processing Fee',   50.00, 'approved'),
-            ('Clearance Fee',   150.00, 'approved')
-    ");
+    $countRes = $conn->query("SELECT COUNT(*) AS c FROM clearancefeetypetbl");
+    $existingCount = 0;
+    if ($countRes instanceof mysqli_result) {
+        $countRow = $countRes->fetch_assoc();
+        $existingCount = (int)($countRow['c'] ?? 0);
+    }
+
+    if ($existingCount <= 0) {
+        $seedRows = [
+            ['Application Fee', 100.00],
+            ['Inspection Fee', 200.00],
+            ['Processing Fee', 50.00],
+            ['Clearance Fee', 150.00],
+        ];
+
+        $stmt = $conn->prepare("
+            INSERT INTO clearancefeetypetbl (fee_type_id, fee_name, default_amount, status)
+            VALUES (?, ?, ?, 'approved')
+        ");
+        if ($stmt) {
+            foreach ($seedRows as [$seedName, $seedAmount]) {
+                $generatedId = GenerateClearanceFeeTypeID($conn);
+                if ($generatedId === false) {
+                    continue;
+                }
+                $seedId = (int)$generatedId;
+                $stmt->bind_param('isd', $seedId, $seedName, $seedAmount);
+                $stmt->execute();
+            }
+            $stmt->close();
+        }
+    }
 }
 
 function dr_get_clearance_fees_for_request(mysqli $conn, string $requestId): array {
@@ -2804,7 +3015,7 @@ function dr_get_clearance_fee_total_for_request(mysqli $conn, string $requestId)
     return $total;
 }
 
-function dr_get_clearance_id_for_request(mysqli $conn, string $requestId): ?int {
+function dr_get_clearance_id_for_request(mysqli $conn, string $requestId): ?string {
     $requestId = trim($requestId);
     if ($requestId === '' || !dr_table_exists($conn, 'clearancerequesttbl')) {
         return null;
@@ -2816,5 +3027,40 @@ function dr_get_clearance_id_for_request(mysqli $conn, string $requestId): ?int 
     $stmt->bind_result($cid);
     $found = $stmt->fetch();
     $stmt->close();
-    return ($found && $cid) ? (int)$cid : null;
+    $resolvedId = trim((string)$cid);
+    return ($found && $resolvedId !== '') ? $resolvedId : null;
+}
+
+function dr_insert_clearance_fee(mysqli $conn, string $clearanceId, string $feeType, float $amount): bool {
+    $clearanceId = trim($clearanceId);
+    $feeType = trim($feeType);
+    if ($clearanceId === '' || $feeType === '' || !dr_table_exists($conn, 'clearancefeestbl')) {
+        return false;
+    }
+
+    dr_ensure_clearance_link_columns($conn);
+    $clearanceFeeId = GenerateClearanceFeeID($conn);
+    if ($clearanceFeeId === false) {
+        error_log('[documentRequestWorkflow][clearancefee] failed to generate clearance fee ID for clearance_id=' . $clearanceId);
+        return false;
+    }
+
+    $clearanceFeeIdInt = (int)$clearanceFeeId;
+    $stmt = $conn->prepare("
+        INSERT INTO clearancefeestbl (clearance_fee_id, clearance_id, fee_type, amount)
+        VALUES (?, ?, ?, ?)
+    ");
+    if (!$stmt) {
+        error_log('[documentRequestWorkflow][clearancefee] prepare failed: ' . $conn->error);
+        return false;
+    }
+
+    $stmt->bind_param('issd', $clearanceFeeIdInt, $clearanceId, $feeType, $amount);
+    $ok = $stmt->execute();
+    if (!$ok) {
+        error_log('[documentRequestWorkflow][clearancefee] insert failed: ' . $stmt->error . ' | clearance_id=' . $clearanceId);
+    }
+    $stmt->close();
+
+    return $ok;
 }

@@ -22,7 +22,7 @@ if (!is_array($old) || empty($old['verified']) || empty($old['verified_at']) || 
 }
 
 $payload = cem_read_payload();
-$newEmail = trim((string)($payload['new_email'] ?? ''));
+$newEmail = pii_normalize_email((string)($payload['new_email'] ?? ''));
 
 if ($newEmail === '' || !filter_var($newEmail, FILTER_VALIDATE_EMAIL)) {
     cem_json(400, ['success' => false, 'message' => 'Please enter a valid email address.']);
@@ -37,9 +37,10 @@ try {
     }
 
     // Ensure email isn't already used by another account.
-    $chk = $conn->prepare("SELECT user_id FROM useraccountstbl WHERE email = ? AND user_id <> ? LIMIT 1");
+    $emailHash = pii_lookup_hash($newEmail, 'useraccount.email');
+    $chk = $conn->prepare("SELECT user_id FROM useraccountstbl WHERE email_lookup_hash = ? AND user_id <> ? LIMIT 1");
     if ($chk) {
-        $chk->bind_param('ss', $newEmail, $userId);
+        $chk->bind_param('ss', $emailHash, $userId);
         $chk->execute();
         $res = $chk->get_result();
         $exists = $res && $res->num_rows > 0;
@@ -59,9 +60,10 @@ try {
     $conn->begin_transaction();
 
     // Update email + mark unverified until link click
-    $up = $conn->prepare("UPDATE useraccountstbl SET email = ?, email_verify = 0 WHERE user_id = ? LIMIT 1");
+    $prepared = pii_prepare_useraccount_contacts($newEmail, '');
+    $up = $conn->prepare("UPDATE useraccountstbl SET email = ?, email_lookup_hash = ?, email_verify = 0 WHERE user_id = ? LIMIT 1");
     if (!$up) throw new Exception('Failed to prepare email update.');
-    $up->bind_param('ss', $newEmail, $userId);
+    $up->bind_param('sss', $prepared['email'], $prepared['email_lookup_hash'], $userId);
     if (!$up->execute()) {
         $up->close();
         throw new Exception('Failed to update email.');
@@ -109,9 +111,10 @@ try {
         // Best-effort revert so user doesn't get stuck with a wrong/unreachable email.
         try {
             $conn->begin_transaction();
-            $rev = $conn->prepare("UPDATE useraccountstbl SET email = ? WHERE user_id = ? LIMIT 1");
+            $revertPrepared = pii_prepare_useraccount_contacts($oldEmail, '');
+            $rev = $conn->prepare("UPDATE useraccountstbl SET email = ?, email_lookup_hash = ? WHERE user_id = ? LIMIT 1");
             if ($rev) {
-                $rev->bind_param('ss', $oldEmail, $userId);
+                $rev->bind_param('sss', $revertPrepared['email'], $revertPrepared['email_lookup_hash'], $userId);
                 $rev->execute();
                 $rev->close();
             }
