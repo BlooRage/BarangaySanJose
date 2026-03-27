@@ -173,18 +173,9 @@ function superadminManagementDisabledReason(mysqli $conn, string $actorUserId, a
 
 function ensureActorCanModifyTarget(string $actorUserId, string $actorProtectedCode, array $targetAccount): void {
     $targetProtectedCode = amp_get_protected_code($targetAccount);
-    $targetUserId = (string)($targetAccount['user_id'] ?? '');
 
     if ($targetProtectedCode === 'BARANGAY_CAPTAIN') {
         throw new Exception('The Barangay Captain account is managed through official transitions.');
-    }
-
-    if ($targetProtectedCode === 'IT_SUPERADMIN' && $actorUserId !== $targetUserId) {
-        throw new Exception('The protected IT SuperAdmin account cannot be modified by other users.');
-    }
-
-    if ($actorProtectedCode === 'BARANGAY_CAPTAIN' && $targetProtectedCode === 'IT_SUPERADMIN' && $actorUserId !== $targetUserId) {
-        throw new Exception('The Barangay Captain cannot remove or change the protected IT SuperAdmin account.');
     }
 }
 
@@ -1335,8 +1326,6 @@ try {
         $editAccessDisabledReason = '';
         if ($protectedCode === 'BARANGAY_CAPTAIN') {
             $editAccessDisabledReason = 'The Barangay Captain account is managed through official transitions.';
-        } elseif ($protectedCode === 'IT_SUPERADMIN' && $actorUserId !== (string)($row['user_id'] ?? '')) {
-            $editAccessDisabledReason = 'The protected IT SuperAdmin account cannot be modified by other users.';
         } else {
             $editAccessDisabledReason = amp_get_superadmin_management_disabled_reason($conn, $actorUserId, $displayRole);
         }

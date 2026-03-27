@@ -12,9 +12,9 @@ $complaintPages = ['ComplaintForm.php', 'ComplaintTracker.php'];
 $contentMgmtPages = ['Contents.php', 'CreateContent.php'];
 $areaManagementPages = ['AreaStatistics.php', 'AreaProfile.php'];
 $reportPages = ['Reports.php'];
-$userMgmtPages = ['UserMasterlist.php'];
+$userMgmtPages = ['UserMasterlist.php', 'UserArchive.php'];
 $personnelMgmtPages = ['PersonnelTracker.php', 'OfficialInvites.php', 'PersonnelRoleAccess.php'];
-$adminMgmtPages = ['UserMasterlist.php', 'PersonnelTracker.php', 'OfficialInvites.php', 'PersonnelRoleAccess.php', 'AuditLogs.php'];
+$adminMgmtPages = ['UserMasterlist.php', 'UserArchive.php', 'PersonnelTracker.php', 'OfficialInvites.php', 'PersonnelRoleAccess.php', 'AuditLogs.php'];
 $barangayOfficialMgmtPages = ['OfficialsManagement.php', 'OfficialTransitions.php'];
 $officialTransitionPages = ['OfficialTransitions.php'];
 
@@ -375,7 +375,7 @@ $sbModuleAttentionCounts = [
     'blotter_tools' => $sbCan('blotter_review_queue') ? $sbCount('blotter_review_queue') : 0,
     'complaint_tools' => $sbCan('complaint_tracker') ? $sbCount('complaint_tracker') : 0,
     'content_management' => $sbCanReviewContent ? $sbCount('content_change_request') : 0,
-    'user_management' => $sbCan('user_masterlist') ? $sbCount('user_management') : 0,
+    'user_management' => ($sbCan('user_masterlist') || $sbCan('user_archive')) ? $sbCount('user_management') : 0,
 ];
 $sbModuleCount = static function (string $key) use (&$sbModuleAttentionCounts): int {
     return max(0, (int)($sbModuleAttentionCounts[$key] ?? 0));
@@ -1291,16 +1291,34 @@ if (!empty($_SESSION['user_id']) && isset($conn) && $conn instanceof mysqli) {
 
       <?php if ($isSuperAdminSidebar && $sbHasAny($sbAdminKeys)): ?>
       <li class="mb-1 mt-2 text-muted small fw-semibold px-2">Admin Management</li>
-      <?php if ($sbCan('user_masterlist')): ?>
+      <?php if ($sbCan('user_masterlist') || $sbCan('user_archive')): ?>
       <li class="mb-1">
-        <a href="<?= htmlspecialchars(appUrl('Admin-End/UserMasterlist.php')) ?>"
-           class="btn btn-toggle sidebar-direct-link rounded <?= $current == 'UserMasterlist.php' ? 'active' : '' ?>"
-           style="<?= $current == 'UserMasterlist.php' ? 'outline: none; box-shadow: none;' : '' ?>">
-          <span class="sidebar-icon-wrap">
-            <i class="fas fa-users-cog"></i>
-          </span>
-          <span class="sidebar-button-label">User Management</span>
-        </a>
+        <button class="btn btn-toggle d-flex align-items-center gap-2 rounded <?= $isUserMgmtActive ? 'active' : '' ?> <?= $isUserMgmtActive ? '' : 'collapsed' ?>"
+                data-bs-toggle="collapse"
+                data-bs-target="#usermanagement-collapse"
+                aria-expanded="<?= $isUserMgmtActive ? 'true' : 'false' ?>">
+          <i class="fas fa-users-cog"></i> User Management
+        </button>
+        <div class="collapse <?= $isUserMgmtActive ? 'show' : '' ?>" id="usermanagement-collapse">
+          <ul class="btn-toggle-nav list-unstyled fw-normal pb-1 small">
+            <?php if ($sbCan('user_masterlist')): ?>
+            <li>
+              <a href="<?= htmlspecialchars(appUrl('Admin-End/UserMasterlist.php')) ?>"
+                 class="link-dark rounded <?= $current == 'UserMasterlist.php' ? 'active' : '' ?>">
+                User Masterlist
+              </a>
+            </li>
+            <?php endif; ?>
+            <?php if ($sbCan('user_archive')): ?>
+            <li>
+              <a href="<?= htmlspecialchars(appUrl('Admin-End/UserArchive.php')) ?>"
+                 class="link-dark rounded <?= $current == 'UserArchive.php' ? 'active' : '' ?>">
+                User Archive
+              </a>
+            </li>
+            <?php endif; ?>
+          </ul>
+        </div>
       </li>
       <?php endif; ?>
       <?php if ($isSuperAdminSidebar): ?>

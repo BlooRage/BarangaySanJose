@@ -11,6 +11,7 @@ requireRoleSession(['SuperAdmin']);
 header('Content-Type: application/json; charset=utf-8');
 
 ual_ensure_lock_columns($conn);
+$archiveSupport = ual_ensure_archive_support($conn);
 
 function normalizeRole(string $role): string
 {
@@ -102,6 +103,8 @@ function loadUserMasterlistTarget(mysqli $conn, string $userId): ?array
             ua.lock_type,
             ua.lock_reason,
             ua.locked_by_user_id,
+            ua.archived_at,
+            ua.archived_prev_status_id,
             oi.role_access AS info_role_access,
             oi.position_access,
             oi.official_id
@@ -148,10 +151,6 @@ function currentLockability(mysqli $conn, array $row, string $actorUserId, ?int 
         return [false, $superadminManageReason];
     }
 
-    if (amp_get_protected_code($row) === 'IT_SUPERADMIN') {
-        return [false, 'The protected IT SuperAdmin account cannot be locked from this page.'];
-    }
-
     $statusId = (int)($row['status_id_account'] ?? 0);
     if ($lockedStatusId !== null && $statusId === (int)$lockedStatusId) {
         if ($activeStatusId === null) {
@@ -171,9 +170,62 @@ function currentLockability(mysqli $conn, array $row, string $actorUserId, ?int 
     return [true, ''];
 }
 
-$statusIds = ual_load_status_ids($conn);
+function currentArchiveability(
+    mysqli $conn,
+    array $row,
+    string $actorUserId,
+    ?int $activeStatusId,
+    ?int $lockedStatusId,
+    ?int $archivedStatusId,
+    ?int $deletedStatusId
+): array {
+    $userId = trim((string)($row['user_id'] ?? ''));
+    if ($userId === '' || $actorUserId === '') {
+        return [false, 'Unable to verify the current account.'];
+    }
+    if ($actorUserId === $userId) {
+        return [false, 'You cannot archive your own account.'];
+    }
+    if ($archivedStatusId === null) {
+        return [false, 'Archived status is not configured yet.'];
+    }
+
+    $targetDisplayRole = amp_storage_role_to_display_role((string)($row['account_role_access'] ?? $row['info_role_access'] ?? $row['role_access'] ?? ''));
+    $superadminManageReason = amp_get_superadmin_management_disabled_reason($conn, $actorUserId, $targetDisplayRole);
+    if ($superadminManageReason !== '') {
+        return [false, $superadminManageReason];
+    }
+
+    $statusId = (int)($row['status_id_account'] ?? 0);
+    if ($statusId === (int)$archivedStatusId) {
+        return [false, 'This account is already archived.'];
+    }
+    if ($deletedStatusId !== null && $statusId === (int)$deletedStatusId) {
+        return [false, 'Deleted accounts cannot be archived.'];
+    }
+
+    if (
+        $targetDisplayRole === 'SuperAdmin'
+        && $activeStatusId !== null
+        && $statusId === (int)$activeStatusId
+        && amp_count_active_superadmins_excluding($conn, $userId) <= 0
+    ) {
+        return [false, 'At least one active SuperAdmin account must remain.'];
+    }
+
+    if ($lockedStatusId !== null && $statusId === (int)$lockedStatusId) {
+        return [true, ''];
+    }
+
+    return [true, ''];
+}
+
+$statusIds = is_array($archiveSupport['status_ids'] ?? null)
+    ? $archiveSupport['status_ids']
+    : ual_load_status_ids($conn);
 $lockedStatusId = $statusIds['locked'] ?? null;
 $activeStatusId = $statusIds['active'] ?? null;
+$archivedStatusId = isset($archiveSupport['archived_status_id']) ? (int)$archiveSupport['archived_status_id'] : ($statusIds['archived'] ?? null);
 $deactivatedStatusId = $statusIds['deactivated'] ?? null;
 $deletedStatusId = $statusIds['deleted'] ?? null;
 
@@ -377,6 +429,82 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
             exit;
         }
 
+        if ($action === 'archive_account') {
+            [$canArchive, $archiveReason] = currentArchiveability(
+                $conn,
+                $target,
+                $actorUserId,
+                $activeStatusId,
+                $lockedStatusId,
+                $archivedStatusId,
+                $deletedStatusId
+            );
+            if (!$canArchive) {
+                throw new Exception($archiveReason !== '' ? $archiveReason : 'This account cannot be archived here.');
+            }
+
+            if ($archivedStatusId === null) {
+                throw new Exception('Archived status is not configured yet.');
+            }
+
+            $currentStatusId = (int)($target['status_id_account'] ?? 0);
+            $restoreStatusId = $currentStatusId;
+            if ($lockedStatusId !== null && $restoreStatusId === (int)$lockedStatusId) {
+                $restoreStatusId = $activeStatusId ?? $restoreStatusId;
+            }
+            if ($archivedStatusId !== null && $restoreStatusId === (int)$archivedStatusId) {
+                $restoreStatusId = $activeStatusId ?? $restoreStatusId;
+            }
+            if ($deletedStatusId !== null && $restoreStatusId === (int)$deletedStatusId) {
+                $restoreStatusId = $activeStatusId ?? $restoreStatusId;
+            }
+
+            $oldStatusLabel = currentStatusLabel($target, $lockedStatusId);
+
+            $update = $conn->prepare("
+                UPDATE useraccountstbl
+                SET status_id_account = ?,
+                    failed_logins = 0,
+                    lock_start = NULL,
+                    lock_until = NULL,
+                    lock_type = NULL,
+                    lock_reason = NULL,
+                    locked_by_user_id = NULL,
+                    archived_at = NOW(),
+                    archived_prev_status_id = ?,
+                    updated_at = NOW()
+                WHERE user_id = ?
+                LIMIT 1
+            ");
+            if (!$update) {
+                throw new Exception('Failed to archive the account.');
+            }
+            $update->bind_param('iis', $archivedStatusId, $restoreStatusId, $userId);
+            $update->execute();
+            $update->close();
+
+            insertUnifiedAuditLog(
+                $conn,
+                $actorUserId,
+                $actorRole,
+                'User Masterlist',
+                'UserAccount',
+                $userId,
+                'USER_ACCOUNT_ARCHIVE',
+                'status_id_account',
+                $oldStatusLabel,
+                'Archived',
+                null,
+                $archivedStatusId
+            );
+
+            echo json_encode([
+                'success' => true,
+                'message' => 'Account archived successfully.',
+            ]);
+            exit;
+        }
+
         throw new Exception('Invalid action.');
     } catch (Exception $e) {
         http_response_code(400);
@@ -434,6 +562,20 @@ try {
 
     $params = [];
     $types = '';
+    $whereClauses = [];
+    if ($archivedStatusId !== null) {
+        $whereClauses[] = "ua.status_id_account <> ?";
+        $params[] = $archivedStatusId;
+        $types .= 'i';
+    }
+    if ($deletedStatusId !== null) {
+        $whereClauses[] = "ua.status_id_account <> ?";
+        $params[] = $deletedStatusId;
+        $types .= 'i';
+    }
+    if ($whereClauses !== []) {
+        $sql .= " WHERE " . implode(" AND ", $whereClauses);
+    }
     $sql .= " ORDER BY ua.account_created DESC, ua.user_id DESC";
     if ($q === '') {
         $sql .= " LIMIT ?";
@@ -444,12 +586,14 @@ try {
     $stmt = $conn->prepare($sql);
     if (!$stmt) throw new Exception('Prepare failed: ' . $conn->error);
 
-    $refs = [];
-    $refs[] = $types;
-    foreach ($params as $k => $v) {
-        $refs[] = &$params[$k];
+    if ($types !== '') {
+        $refs = [];
+        $refs[] = $types;
+        foreach ($params as $k => $v) {
+            $refs[] = &$params[$k];
+        }
+        call_user_func_array([$stmt, 'bind_param'], $refs);
     }
-    call_user_func_array([$stmt, 'bind_param'], $refs);
 
     $stmt->execute();
     $res = $stmt->get_result();
@@ -493,6 +637,15 @@ try {
         ];
 
         [$canManageLock, $manageLockDisabledReason] = currentLockability($conn, $row, $actorUserId, $activeStatusId, $lockedStatusId);
+        [$canArchiveAccount, $archiveAccountDisabledReason] = currentArchiveability(
+            $conn,
+            $row,
+            $actorUserId,
+            $activeStatusId,
+            $lockedStatusId,
+            $archivedStatusId,
+            $deletedStatusId
+        );
 
         $rows[] = [
             'user_id' => (string)$row['user_id'],
@@ -512,6 +665,8 @@ try {
             'locked_by_user_id' => (string)($lockState['locked_by_user_id'] ?? ''),
             'can_manage_lock' => $canManageLock,
             'manage_lock_disabled_reason' => $manageLockDisabledReason,
+            'can_archive_account' => $canArchiveAccount,
+            'archive_account_disabled_reason' => $archiveAccountDisabledReason,
         ];
     }
     $stmt->close();
