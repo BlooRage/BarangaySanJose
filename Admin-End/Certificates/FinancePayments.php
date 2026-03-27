@@ -1614,18 +1614,34 @@ window.CERT_TRACKER_DEFAULT_STAGE = 'finance';
 (function () {
   'use strict';
 
+  const feesTabs = document.getElementById('feesTabs');
+  if (!feesTabs) {
+    return;
+  }
+
   const API = (function () {
     const base = window.location.pathname.replace(/\/[^/]*$/, '');
     return base.replace(/\/Admin-End\/Certificates$/, '') + '/PhpFiles/Admin-End/documentRequestWorkflow.php';
   })();
 
   // ── Page tab switching ────────────────────────────────────────────────────
-  const tabGeneralFees      = document.getElementById('tabGeneralFees');
-  const tabClearanceFees    = document.getElementById('tabClearanceFees');
-  const tabPendingRequests  = document.getElementById('tabPendingRequests');
-  const generalFeesPanel    = document.getElementById('generalFeesPanel');
-  const feesPanel           = document.getElementById('clearanceFeesPanel');
+  const tabGeneralFees       = document.getElementById('tabGeneralFees');
+  const tabClearanceFees     = document.getElementById('tabClearanceFees');
+  const tabPendingRequests   = document.getElementById('tabPendingRequests');
+  const generalFeesPanel     = document.getElementById('generalFeesPanel');
+  const feesPanel            = document.getElementById('clearanceFeesPanel');
   const pendingRequestsPanel = document.getElementById('pendingRequestsPanel');
+  const feeTypesTableBody    = document.getElementById('feeTypesTableBody');
+  const pendingRequestsBody  = document.getElementById('pendingRequestsBody');
+  const feeFormId            = document.getElementById('feeFormId');
+  const feeFormName          = document.getElementById('feeFormName');
+  const feeFormAmount        = document.getElementById('feeFormAmount');
+  const feeFormActive        = document.getElementById('feeFormActive');
+  const feeFormTitle         = document.getElementById('feeFormTitle');
+  const feeFormSaveBtn       = document.getElementById('feeFormSaveBtn');
+  const feeFormCancelBtn     = document.getElementById('feeFormCancelBtn');
+  const btnRefreshFeeTable   = document.getElementById('btnRefreshFeeTable');
+  const btnRefreshPendingRequests = document.getElementById('btnRefreshPendingRequests');
   let feesLoaded = false;
   let pendingLoaded = false;
 
@@ -1645,7 +1661,9 @@ window.CERT_TRACKER_DEFAULT_STAGE = 'finance';
     feesPanel.classList.remove('d-none');
     generalFeesPanel.classList.add('d-none');
     pendingRequestsPanel.classList.add('d-none');
-    if (!feesLoaded) { feesLoaded = true; loadFeeTypes(); }
+    if (!feesLoaded) {
+      loadFeeTypes();
+    }
   }
 
   function showPendingTab() {
@@ -1655,7 +1673,9 @@ window.CERT_TRACKER_DEFAULT_STAGE = 'finance';
     pendingRequestsPanel.classList.remove('d-none');
     generalFeesPanel.classList.add('d-none');
     feesPanel.classList.add('d-none');
-    if (!pendingLoaded) { pendingLoaded = true; loadPendingRequests(); }
+    if (!pendingLoaded) {
+      loadPendingRequests();
+    }
   }
 
   tabGeneralFees.addEventListener('click', showGeneralTab);
@@ -1675,74 +1695,108 @@ window.CERT_TRACKER_DEFAULT_STAGE = 'finance';
     el.classList.toggle('d-none', !msg);
   }
 
+  function getFeeStatusMeta(status) {
+    switch (String(status || '').toLowerCase()) {
+      case 'approved':
+        return { badgeClass: 'bg-success', label: 'Active' };
+      case 'pending':
+        return { badgeClass: 'bg-warning text-dark', label: 'Pending' };
+      case 'rejected':
+      default:
+        return { badgeClass: 'bg-secondary', label: 'Inactive' };
+    }
+  }
+
   // ── Load & render fee types ───────────────────────────────────────────────
   async function loadFeeTypes() {
-    const tbody = document.getElementById('feeTypesTableBody');
-    if (!tbody) return;
-    tbody.innerHTML = '<tr><td colspan="5" class="text-center text-muted py-3"><i class="fas fa-spinner fa-spin me-1"></i>Loading…</td></tr>';
+    if (!feeTypesTableBody) return;
+    feeTypesTableBody.innerHTML = '<tr><td colspan="5" class="text-center text-muted py-3"><i class="fas fa-spinner fa-spin me-1"></i>Loading…</td></tr>';
     try {
-      const res  = await fetch(`${API}?action=list_fee_types`);
+      const res  = await fetch(`${API}?action=list_fee_types&scope=all`);
       const data = await res.json();
       if (!data.success) throw new Error(data.message || 'Failed to load.');
-      renderFeeTable(data.fee_types || []);
+      const rows = Array.isArray(data.fee_types)
+        ? data.fee_types.filter((ft) => String(ft?.status || '').toLowerCase() !== 'pending')
+        : [];
+      feesLoaded = true;
+      renderFeeTable(rows);
     } catch (e) {
-      tbody.innerHTML = `<tr><td colspan="5" class="text-danger text-center py-3">${esc(e.message)}</td></tr>`;
+      feesLoaded = false;
+      feeTypesTableBody.innerHTML = `<tr><td colspan="5" class="text-danger text-center py-3">${esc(e.message)}</td></tr>`;
     }
   }
 
   function renderFeeTable(rows) {
-    const tbody = document.getElementById('feeTypesTableBody');
-    if (!tbody) return;
+    if (!feeTypesTableBody) return;
     if (!rows.length) {
-      tbody.innerHTML = '<tr><td colspan="5" class="text-muted text-center py-3">No fee types yet. Add one using the form.</td></tr>';
+      feeTypesTableBody.innerHTML = '<tr><td colspan="5" class="text-muted text-center py-3">No fee types yet. Add one using the form.</td></tr>';
       return;
     }
-    tbody.innerHTML = rows.map((ft, i) => `
+    feeTypesTableBody.innerHTML = rows.map((ft, i) => {
+      const amount = Number(ft.default_amount || 0).toFixed(2);
+      const status = getFeeStatusMeta(ft.status);
+      return `
       <tr>
         <td class="text-muted small">${i + 1}</td>
         <td class="fw-semibold">${esc(ft.fee_name)}</td>
-        <td class="finance-fee-amount">&#8369;${Number(ft.default_amount).toFixed(2)}</td>
+        <td class="finance-fee-amount">&#8369;${amount}</td>
         <td>
-          <span class="badge ${ft.status === 'approved' ? 'bg-success' : 'bg-secondary'}">
-            ${ft.status === 'approved' ? 'Active' : (ft.status || 'Inactive')}
+          <span class="badge ${status.badgeClass}">
+            ${status.label}
           </span>
         </td>
         <td class="text-end">
           <div class="compact-table-actions">
-            <button class="btn btn-sm btn-primary"
-              onclick="financeEditFee(${ft.fee_type_id},${JSON.stringify(ft.fee_name)},${ft.default_amount},${JSON.stringify(ft.status)})">
+            <button type="button"
+              class="btn btn-sm btn-primary js-finance-edit-fee"
+              data-fee-id="${Number(ft.fee_type_id || 0)}"
+              data-fee-name="${esc(ft.fee_name)}"
+              data-fee-amount="${amount}"
+              data-fee-status="${esc(ft.status || '')}">
               Edit
             </button>
-            <button class="btn btn-sm btn-danger"
-              onclick="financeDeleteFee(${ft.fee_type_id},${JSON.stringify(ft.fee_name)})">
+            <button type="button"
+              class="btn btn-sm btn-danger js-finance-delete-fee"
+              data-fee-id="${Number(ft.fee_type_id || 0)}"
+              data-fee-name="${esc(ft.fee_name)}">
               Delete
             </button>
           </div>
         </td>
-      </tr>`).join('');
+      </tr>`;
+    }).join('');
   }
+
   function resetForm() {
-    document.getElementById('feeFormId').value     = '';
-    document.getElementById('feeFormName').value   = '';
-    document.getElementById('feeFormAmount').value = '0.00';
-    document.getElementById('feeFormActive').checked = true;
-    document.getElementById('feeFormTitle').innerHTML =
+    feeFormId.value = '';
+    feeFormName.value = '';
+    feeFormAmount.value = '0.00';
+    feeFormActive.checked = true;
+    feeFormTitle.innerHTML =
       '<i class="fas fa-plus-circle me-1 text-primary"></i>Add Fee Type';
     showFormError('');
   }
 
-  window.financeEditFee = function (id, name, amount, status) {
-    document.getElementById('feeFormId').value     = id;
-    document.getElementById('feeFormName').value   = name;
-    document.getElementById('feeFormAmount').value = Number(amount).toFixed(2);
-    document.getElementById('feeFormActive').checked = status === 'approved';
-    document.getElementById('feeFormTitle').innerHTML =
+  async function refreshFeePanels() {
+    const refreshTasks = [loadPendingRequests()];
+    if (feesLoaded || !feesPanel.classList.contains('d-none')) {
+      refreshTasks.push(loadFeeTypes());
+    }
+    await Promise.all(refreshTasks);
+  }
+
+  function financeEditFee(id, name, amount, status) {
+    feeFormId.value = id;
+    feeFormName.value = name;
+    feeFormAmount.value = Number(amount || 0).toFixed(2);
+    feeFormActive.checked = String(status || '').toLowerCase() === 'approved';
+    feeFormTitle.innerHTML =
       '<i class="fas fa-pen me-1 text-warning"></i>Edit Fee Type';
     showFormError('');
-    document.getElementById('feeFormName').focus();
-  };
+    feeFormName.focus();
+  }
 
-  window.financeDeleteFee = async function (id, name) {
+  async function financeDeleteFee(id, name) {
     if (!confirm(`Delete fee type "${name}"?\n\nThis cannot be undone.`)) return;
     try {
       const body = new FormData();
@@ -1751,25 +1805,28 @@ window.CERT_TRACKER_DEFAULT_STAGE = 'finance';
       const res  = await fetch(API, { method: 'POST', body });
       const data = await res.json();
       if (!data.success) throw new Error(data.message || 'Delete failed.');
-      await loadFeeTypes();
+      await refreshFeePanels();
     } catch (e) {
       alert(e.message);
     }
-  };
+  }
 
   // ── Save (create / update) ────────────────────────────────────────────────
   async function saveFeeType() {
-    const id     = document.getElementById('feeFormId').value.trim();
-    const name   = document.getElementById('feeFormName').value.trim();
-    const amount = parseFloat(document.getElementById('feeFormAmount').value) || 0;
-    const active = document.getElementById('feeFormActive').checked;
+    const id = feeFormId.value.trim();
+    const name = feeFormName.value.trim();
+    const amount = parseFloat(feeFormAmount.value) || 0;
+    const active = feeFormActive.checked;
     showFormError('');
-    if (!name) { showFormError('Fee name is required.'); document.getElementById('feeFormName').focus(); return; }
+    if (!name) {
+      showFormError('Fee name is required.');
+      feeFormName.focus();
+      return;
+    }
 
-    const saveBtn = document.getElementById('feeFormSaveBtn');
-    saveBtn.disabled = true;
-    const origHtml = saveBtn.innerHTML;
-    saveBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Saving…';
+    feeFormSaveBtn.disabled = true;
+    const origHtml = feeFormSaveBtn.innerHTML;
+    feeFormSaveBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Saving…';
 
     try {
       const body = new FormData();
@@ -1782,37 +1839,62 @@ window.CERT_TRACKER_DEFAULT_STAGE = 'finance';
       const data = await res.json();
       if (!data.success) throw new Error(data.message || 'Save failed.');
       resetForm();
-      await loadFeeTypes();
+      await refreshFeePanels();
     } catch (e) {
       showFormError(e.message);
     } finally {
-      saveBtn.disabled = false;
-      saveBtn.innerHTML = origHtml;
+      feeFormSaveBtn.disabled = false;
+      feeFormSaveBtn.innerHTML = origHtml;
     }
   }
 
   // ── Wire buttons ──────────────────────────────────────────────────────────
-  document.getElementById('feeFormSaveBtn').addEventListener('click', saveFeeType);
-  document.getElementById('feeFormCancelBtn').addEventListener('click', resetForm);
-  document.getElementById('btnRefreshFeeTable').addEventListener('click', loadFeeTypes);
+  feeFormSaveBtn.addEventListener('click', saveFeeType);
+  feeFormCancelBtn.addEventListener('click', resetForm);
+  btnRefreshFeeTable.addEventListener('click', () => {
+    feesLoaded = false;
+    loadFeeTypes();
+  });
 
   // Allow Enter key in fee name field to save
-  document.getElementById('feeFormName').addEventListener('keydown', (e) => {
+  feeFormName.addEventListener('keydown', (e) => {
     if (e.key === 'Enter') { e.preventDefault(); saveFeeType(); }
+  });
+
+  feeTypesTableBody.addEventListener('click', (event) => {
+    const editBtn = event.target.closest('.js-finance-edit-fee');
+    if (editBtn) {
+      financeEditFee(
+        editBtn.dataset.feeId || '',
+        editBtn.dataset.feeName || '',
+        editBtn.dataset.feeAmount || '0',
+        editBtn.dataset.feeStatus || ''
+      );
+      return;
+    }
+
+    const deleteBtn = event.target.closest('.js-finance-delete-fee');
+    if (deleteBtn) {
+      financeDeleteFee(
+        deleteBtn.dataset.feeId || '',
+        deleteBtn.dataset.feeName || ''
+      );
+    }
   });
 
   // ── Pending Fee Change Requests ───────────────────────────────────────────
   async function loadPendingRequests() {
-    const tbody = document.getElementById('pendingRequestsBody');
-    if (!tbody) return;
-    tbody.innerHTML = '<tr><td colspan="8" class="text-center text-muted py-3"><i class="fas fa-spinner fa-spin me-1"></i>Loading…</td></tr>';
+    if (!pendingRequestsBody) return;
+    pendingRequestsBody.innerHTML = '<tr><td colspan="8" class="text-center text-muted py-3"><i class="fas fa-spinner fa-spin me-1"></i>Loading…</td></tr>';
     try {
       const res  = await fetch(`${API}?action=list_fee_change_requests&scope=all_pending`);
       const data = await res.json();
       if (!data.success) throw new Error(data.message || 'Failed.');
+      pendingLoaded = true;
       renderPendingRequests(data.requests || data.fee_types || []);
     } catch (e) {
-      tbody.innerHTML = `<tr><td colspan="8" class="text-danger text-center py-3">${esc(e.message)}</td></tr>`;
+      pendingLoaded = false;
+      pendingRequestsBody.innerHTML = `<tr><td colspan="8" class="text-danger text-center py-3">${esc(e.message)}</td></tr>`;
     }
   }
 
@@ -1829,12 +1911,11 @@ window.CERT_TRACKER_DEFAULT_STAGE = 'finance';
 
   function renderPendingRequests(rows) {
     updatePendingBadge(rows.length);
-    const tbody = document.getElementById('pendingRequestsBody');
     if (!rows.length) {
-      tbody.innerHTML = '<tr><td colspan="8" class="text-muted text-center py-3">No pending requests.</td></tr>';
+      pendingRequestsBody.innerHTML = '<tr><td colspan="8" class="text-muted text-center py-3">No pending requests.</td></tr>';
       return;
     }
-    tbody.innerHTML = rows.map(r => `
+    pendingRequestsBody.innerHTML = rows.map(r => `
       <tr>
         <td><span class="badge bg-secondary">${r.change_type === 'new_type' ? 'New Type' : 'Price Edit'}</span></td>
         <td class="fw-semibold">${esc(r.fee_name)}</td>
@@ -1845,13 +1926,14 @@ window.CERT_TRACKER_DEFAULT_STAGE = 'finance';
         <td class="small text-muted">${esc(r.updated_at || r.created_at || '')}</td>
         <td class="text-end">
           <div class="compact-table-actions">
-            <button class="btn btn-sm btn-success" onclick="financeApproveFcr(${r.fee_type_id})">Approve</button>
-            <button class="btn btn-sm btn-danger" onclick="financeRejectFcr(${r.fee_type_id})">Reject</button>
+            <button type="button" class="btn btn-sm btn-success js-finance-approve-fcr" data-fee-id="${Number(r.fee_type_id || 0)}">Approve</button>
+            <button type="button" class="btn btn-sm btn-danger js-finance-reject-fcr" data-fee-id="${Number(r.fee_type_id || 0)}">Reject</button>
           </div>
         </td>
       </tr>`).join('');
   }
-  window.financeApproveFcr = async function(id) {
+
+  async function financeApproveFcr(id) {
     if (!confirm('Approve this fee change request? The catalog will be updated automatically.')) return;
     try {
       const fd = new FormData();
@@ -1861,12 +1943,11 @@ window.CERT_TRACKER_DEFAULT_STAGE = 'finance';
       const res  = await fetch(API, { method: 'POST', body: fd });
       const data = await res.json();
       if (!data.success) throw new Error(data.message || 'Approve failed.');
-      pendingLoaded = false;
-      await loadPendingRequests();
+      await refreshFeePanels();
     } catch (e) { alert(e.message); }
-  };
+  }
 
-  window.financeRejectFcr = async function(id) {
+  async function financeRejectFcr(id) {
     const reviewNotes = prompt('Reason for rejection (optional):') ?? '';
     try {
       const fd = new FormData();
@@ -1877,12 +1958,24 @@ window.CERT_TRACKER_DEFAULT_STAGE = 'finance';
       const res  = await fetch(API, { method: 'POST', body: fd });
       const data = await res.json();
       if (!data.success) throw new Error(data.message || 'Reject failed.');
-      pendingLoaded = false;
-      await loadPendingRequests();
+      await refreshFeePanels();
     } catch (e) { alert(e.message); }
-  };
+  }
 
-  document.getElementById('btnRefreshPendingRequests').addEventListener('click', () => {
+  pendingRequestsBody.addEventListener('click', (event) => {
+    const approveBtn = event.target.closest('.js-finance-approve-fcr');
+    if (approveBtn) {
+      financeApproveFcr(approveBtn.dataset.feeId || '');
+      return;
+    }
+
+    const rejectBtn = event.target.closest('.js-finance-reject-fcr');
+    if (rejectBtn) {
+      financeRejectFcr(rejectBtn.dataset.feeId || '');
+    }
+  });
+
+  btnRefreshPendingRequests.addEventListener('click', () => {
     pendingLoaded = false;
     loadPendingRequests();
   });
