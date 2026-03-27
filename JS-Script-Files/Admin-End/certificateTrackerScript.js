@@ -1215,25 +1215,57 @@
     return String(fallback || '').trim();
   }
 
-  function formatPersonNameFnMiLn(first, middle, last) {
+  function formatPersonNameFnMiLn(first, middle, last, suffix = '') {
     const f = String(first || '').trim();
     const m = String(middle || '').trim();
     const l = String(last || '').trim();
+    const s = String(suffix || '').trim();
     const mi = m ? `${m.charAt(0).toUpperCase()}.` : '';
-    return [f, mi, l].filter(Boolean).join(' ').trim();
+    return [f, mi, l, s].filter(Boolean).join(' ').trim();
   }
 
   function fullNameFromRow(row) {
     const payload = row && row.payload && typeof row.payload === 'object' ? row.payload : {};
-    const fallbackName = firstNonEmpty([row.full_name, row.resident_full_name, row.resident_name, '']);
+    const residentProfile = row && row.resident_profile && typeof row.resident_profile === 'object'
+      ? row.resident_profile
+      : {};
+    const fallbackName = firstNonEmptyName([
+      row.full_name,
+      row.resident_full_name,
+      row.resident_name,
+      payload._preview_full_name,
+      payload.resident_name,
+      ''
+    ]);
     if (fallbackName) {
       return fallbackName;
     }
 
-    const first = firstNonEmpty([payload.first_name, payload.firstname]);
-    const middle = firstNonEmpty([payload.middle_name, payload.middlename]);
-    const last = firstNonEmpty([payload.last_name, payload.lastname]);
-    const ordered = formatPersonNameFnMiLn(first, middle, last);
+    const first = firstNonEmptyName([
+      payload.first_name,
+      payload.firstname,
+      residentProfile.first_name,
+      residentProfile.firstname
+    ]);
+    const middle = firstNonEmptyName([
+      payload.middle_name,
+      payload.middlename,
+      residentProfile.middle_name,
+      residentProfile.middlename
+    ]);
+    const last = firstNonEmptyName([
+      payload.last_name,
+      payload.lastname,
+      residentProfile.last_name,
+      residentProfile.lastname
+    ]);
+    const suffix = firstNonEmptyName([
+      payload.suffix,
+      payload.suffix_name,
+      residentProfile.suffix,
+      residentProfile.suffix_name
+    ]);
+    const ordered = formatPersonNameFnMiLn(first, middle, last, suffix);
     if (ordered.length) return ordered;
     return '-';
   }

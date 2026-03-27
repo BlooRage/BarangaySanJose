@@ -1408,8 +1408,18 @@ function dra_h(string $v): string {
 
 function dra_is_protected_request_value($value): bool {
     $text = trim((string)$value);
-    return $text !== ''
-        && function_exists('pii_is_encrypted_value')
+    if ($text === '') {
+        return false;
+    }
+
+    if (function_exists('pii_cipher_prefix')) {
+        $prefix = (string)pii_cipher_prefix();
+        if ($prefix !== '' && strpos($text, $prefix) !== false) {
+            return true;
+        }
+    }
+
+    return function_exists('pii_is_encrypted_value')
         && pii_is_encrypted_value($text);
 }
 
@@ -1423,10 +1433,22 @@ function dra_format_full_name_from_payload(array $payload): string {
 }
 
 function dra_hydrate_request_resident_name(mysqli $conn, array &$row, array $payload = []): void {
+    foreach (['resident_name', 'full_name', 'resident_full_name'] as $nameField) {
+        if (dra_is_protected_request_value($row[$nameField] ?? '')) {
+            $row[$nameField] = '';
+        }
+    }
+
     $residentName = trim((string)($row['resident_name'] ?? ''));
-    if (dra_is_protected_request_value($residentName)) {
-        $residentName = '';
-        $row['resident_name'] = '';
+
+    if ($residentName === '') {
+        foreach (['full_name', 'resident_full_name'] as $nameField) {
+            $candidate = trim((string)($row[$nameField] ?? ''));
+            if ($candidate !== '' && !dra_is_protected_request_value($candidate)) {
+                $residentName = $candidate;
+                break;
+            }
+        }
     }
 
     if ($residentName === '') {
@@ -1450,6 +1472,7 @@ function dra_hydrate_request_resident_name(mysqli $conn, array &$row, array $pay
     if ($residentName !== '') {
         $row['resident_name'] = $residentName;
         $row['full_name'] = $residentName;
+        $row['resident_full_name'] = $residentName;
     }
 }
 
