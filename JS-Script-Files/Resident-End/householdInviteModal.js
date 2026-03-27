@@ -8,6 +8,7 @@ document.addEventListener("DOMContentLoaded", () => {
             ? bootstrap.Modal.getOrCreateInstance(householdInviteModalEl)
             : null;
     let pendingBirthdateModalRestore = false;
+    let birthdateWindowFocusHandlerBound = false;
     const restoreHouseholdInviteModal = () => {
         window.setTimeout(() => {
             if (!pendingBirthdateModalRestore) return;
@@ -173,11 +174,20 @@ document.addEventListener("DOMContentLoaded", () => {
         const isValidPersonName = (value) => {
             const trimmed = String(value || "").trim();
             if (!trimmed) return false;
-            try {
-                return /^[\p{L}\s'.-]+$/u.test(trimmed);
-            } catch (_error) {
-                return /^[A-Za-zÀ-ÖØ-öø-ÿĀ-žÑñ\s'.-]+$/.test(trimmed);
+            for (const char of trimmed.normalize("NFC")) {
+                if (/\d/.test(char)) {
+                    return false;
+                }
+                if (/[\s'.-]/.test(char)) {
+                    continue;
+                }
+                const upper = char.toLocaleUpperCase();
+                const lower = char.toLocaleLowerCase();
+                if (upper === lower) {
+                    return false;
+                }
             }
+            return true;
         };
 
         const touched = new Set();
@@ -256,6 +266,10 @@ document.addEventListener("DOMContentLoaded", () => {
             });
             birthdateField.addEventListener("click", () => {
                 pendingBirthdateModalRestore = true;
+                if (!birthdateWindowFocusHandlerBound) {
+                    birthdateWindowFocusHandlerBound = true;
+                    window.addEventListener("focus", restoreHouseholdInviteModal);
+                }
             });
             birthdateField.addEventListener("change", () => {
                 validateNames(true);
