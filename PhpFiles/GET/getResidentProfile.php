@@ -1,6 +1,7 @@
 <?php
 require_once __DIR__ . '/../General/security.php';
 require_once __DIR__ . "/../General/connection.php";
+require_once __DIR__ . '/../General/residentSeniorCitizenSync.php';
 
 requireAuthenticatedSession(true);
 
@@ -125,6 +126,13 @@ function getResidentProfileData(mysqli $conn, string $userId): array {
             $row = pii_decrypt_resident_row($row) ?? $row;
             $row = pii_decrypt_assoc($row, ['email', 'phone_number', 'emergency_first_name', 'emergency_middle_name', 'emergency_last_name', 'emergency_suffix', 'emergency_contact', 'emergency_relationship', 'emergency_address']);
             $residentId = $row['resident_id'];
+
+            if ($residentId !== '') {
+                $seniorSync = resident_sync_auto_senior_citizen($conn, (string)$residentId, $row);
+                if (!empty($seniorSync['sector_membership'])) {
+                    $row['sector_membership'] = (string)$seniorSync['sector_membership'];
+                }
+            }
 
             $birthdateFormatted = '';
             $age = '';

@@ -1375,8 +1375,10 @@ function dr_sync_transaction(mysqli $conn, array $request): void {
     if (isset($request['fee_amount']) && $request['fee_amount'] !== null && $request['fee_amount'] !== '' && is_numeric((string)$request['fee_amount'])) {
         $requestFee = (float)$request['fee_amount'];
     }
-    $configuredFee = dr_get_fee_amount_for_document_type($conn, $docType);
-    $effectiveFee = $requestFee !== null ? $requestFee : $configuredFee;
+    $configuredFee = dr_get_effective_document_fee_amount($conn, $docType, $request);
+    $effectiveFee = $requestFee !== null
+        ? dr_get_effective_document_fee_amount($conn, $docType, $request, (float)$requestFee)
+        : $configuredFee;
 
     // Free documents must not exist in finance transactions.
     $isFreeDocument = ($effectiveFee !== null && (float)$effectiveFee <= 0.0);
@@ -1418,10 +1420,8 @@ function dr_sync_transaction(mysqli $conn, array $request): void {
     }
 
     $txAmount = isset($request['amount']) ? (float)$request['amount'] : null;
-    if (($txAmount === null || $txAmount <= 0.0) && $requestFee !== null && (float)$requestFee > 0.0) {
-        $txAmount = (float)$requestFee;
-    } elseif (($txAmount === null || $txAmount <= 0.0) && $configuredFee !== null && (float)$configuredFee > 0.0) {
-        $txAmount = (float)$configuredFee;
+    if (($txAmount === null || $txAmount <= 0.0) && $effectiveFee !== null && (float)$effectiveFee > 0.0) {
+        $txAmount = (float)$effectiveFee;
     }
     $txOr = trim((string)($request['or_number'] ?? ''));
     if ($txOr === '') {
@@ -1871,11 +1871,23 @@ function dr_prune_free_document_finance_transactions(mysqli $conn, int $limit = 
 
     while ($row = $res->fetch_assoc()) {
         $requestId = trim((string)($row['request_id'] ?? ''));
-        $docType = trim((string)($row['document_type'] ?? ''));
-        if ($requestId === '' || $docType === '') {
+        if ($requestId === '') {
             continue;
         }
-        $fee = dr_get_fee_amount_for_document_type($conn, $docType);
+        $requestRow = dr_fetch_request($conn, $requestId);
+        if (!$requestRow) {
+            continue;
+        }
+        $storedFee = null;
+        if (isset($requestRow['fee_amount']) && $requestRow['fee_amount'] !== null && $requestRow['fee_amount'] !== '' && is_numeric((string)$requestRow['fee_amount'])) {
+            $storedFee = (float)$requestRow['fee_amount'];
+        }
+        $fee = dr_get_effective_document_fee_amount(
+            $conn,
+            (string)($requestRow['document_type'] ?? ''),
+            $requestRow,
+            $storedFee
+        );
         if ($fee === null || (float)$fee > 0.0) {
             continue;
         }
@@ -2008,6 +2020,170 @@ function dr_get_user_id_from_resident_id(mysqli $conn, string $residentId): ?str
     $ok = $stmt->fetch();
     $stmt->close();
     return $ok ? (string)$userId : null;
+}
+
+function dr_normalize_sector_membership_key(string $value): string {
+    $normalized = strtolower(trim($value));
+    $normalized = preg_replace('/[^a-z]/', '', $normalized);
+    $map = [
+        'pwd' => 'pwd',
+        'personwithdisability' => 'pwd',
+        'personswithdisability' => 'pwd',
+        'personswithdisabilities' => 'pwd',
+        'senior' => 'seniorcitizen',
+        'seniorcitizen' => 'seniorcitizen',
+        'seniorcitizens' => 'seniorcitizen',
+    ];
+    return $map[$normalized] ?? $normalized;
+}
+
+function dr_parse_sector_membership_csv(string $csv): array {
+    $out = [];
+    $parts = array_map('trim', explode(',', $csv));
+    foreach ($parts as $part) {
+        $value = dr_normalize_sector_membership_key($part);
+        if ($value === '' || in_array($value, ['none', 'na'], true)) {
+            continue;
+        }
+        $out[$value] = true;
+    }
+    return array_keys($out);
+}
+
+function dr_is_verified_sector_status_name(string $statusName): bool {
+    $statusKey = strtolower(trim($statusName));
+    $statusKey = preg_replace('/[\s_-]+/', '', $statusKey);
+    if ($statusKey === '') {
+        return false;
+    }
+    return in_array($statusKey, ['verified', 'approved', 'verifiedresident', 'completed'], true)
+        || strpos($statusKey, 'verified') !== false
+        || strpos($statusKey, 'approved') !== false
+        || strpos($statusKey, 'complete') !== false;
+}
+
+function dr_resident_has_certificate_payment_exemption(mysqli $conn, ?string $residentId, ?string $residentUserId = null): bool {
+    static $cache = [];
+
+    $residentId = trim((string)$residentId);
+    $residentUserId = trim((string)$residentUserId);
+    if ($residentId === '' && $residentUserId !== '') {
+        $residentId = trim((string)(dr_get_resident_id($conn, $residentUserId) ?? ''));
+    }
+    if ($residentId === '') {
+        return false;
+    }
+    if (array_key_exists($residentId, $cache)) {
+        return $cache[$residentId];
+    }
+
+    $targetKeys = [
+        'pwd' => true,
+        'seniorcitizen' => true,
+    ];
+    $foundNormalizedTarget = false;
+
+    if (dr_table_exists($conn, 'residentsectormembershiptbl')) {
+        $stmt = $conn->prepare("
+            SELECT
+                rsm.sector_key,
+                COALESCE(s.status_name, '') AS status_name,
+                COALESCE(rsm.updated_at, rsm.upload_timestamp, rsm.created_at) AS status_ts,
+                COALESCE(rsm.latest_attachment_id, 0) AS latest_attachment_id
+            FROM residentsectormembershiptbl rsm
+            LEFT JOIN statuslookuptbl s
+                ON s.status_id = rsm.sector_status_id
+            WHERE rsm.resident_id = ?
+            ORDER BY status_ts DESC, latest_attachment_id DESC
+        ");
+        if ($stmt) {
+            $stmt->bind_param('s', $residentId);
+            $stmt->execute();
+            $res = $stmt->get_result();
+            $seenSectorKeys = [];
+            while ($res && ($row = $res->fetch_assoc())) {
+                $sectorKey = dr_normalize_sector_membership_key((string)($row['sector_key'] ?? ''));
+                if ($sectorKey === '' || !isset($targetKeys[$sectorKey]) || isset($seenSectorKeys[$sectorKey])) {
+                    continue;
+                }
+                $seenSectorKeys[$sectorKey] = true;
+                $foundNormalizedTarget = true;
+                if (dr_is_verified_sector_status_name((string)($row['status_name'] ?? ''))) {
+                    $stmt->close();
+                    $cache[$residentId] = true;
+                    return true;
+                }
+            }
+            $stmt->close();
+        }
+    }
+
+    if ($foundNormalizedTarget) {
+        $cache[$residentId] = false;
+        return false;
+    }
+
+    if (!dr_table_exists($conn, 'residentinformationtbl') || !dr_column_exists($conn, 'residentinformationtbl', 'sector_membership')) {
+        $cache[$residentId] = false;
+        return false;
+    }
+
+    $stmt = $conn->prepare("SELECT sector_membership FROM residentinformationtbl WHERE resident_id = ? LIMIT 1");
+    if (!$stmt) {
+        $cache[$residentId] = false;
+        return false;
+    }
+
+    $stmt->bind_param('s', $residentId);
+    $stmt->execute();
+    $stmt->bind_result($sectorMembershipCsv);
+    $sectorMembershipCsv = null;
+    $stmt->fetch();
+    $stmt->close();
+
+    foreach (dr_parse_sector_membership_csv((string)$sectorMembershipCsv) as $sectorKey) {
+        if (isset($targetKeys[$sectorKey])) {
+            $cache[$residentId] = true;
+            return true;
+        }
+    }
+
+    $cache[$residentId] = false;
+    return false;
+}
+
+function dr_request_has_certificate_payment_exemption(mysqli $conn, array $requestRow, ?string $documentType = null): bool {
+    $documentType = trim((string)($documentType ?? $requestRow['document_type'] ?? ''));
+    if (!dr_is_issuance_document_type($documentType)) {
+        return false;
+    }
+    return dr_resident_has_certificate_payment_exemption(
+        $conn,
+        (string)($requestRow['resident_id'] ?? ''),
+        (string)($requestRow['resident_user_id'] ?? ($requestRow['user_id'] ?? ''))
+    );
+}
+
+function dr_get_effective_document_fee_amount(mysqli $conn, string $documentType, array $requestRow = [], ?float $baseFee = null): ?float {
+    $documentType = trim($documentType);
+    if ($documentType === '') {
+        return $baseFee;
+    }
+    if (dr_is_barangay_id_document_type($documentType)) {
+        return 0.0;
+    }
+
+    $resolvedFee = $baseFee;
+    if ($resolvedFee === null) {
+        $resolvedFee = dr_get_fee_amount_for_document_type($conn, $documentType);
+    }
+    if ($resolvedFee === null) {
+        return null;
+    }
+    if ((float)$resolvedFee > 0.0 && dr_request_has_certificate_payment_exemption($conn, $requestRow, $documentType)) {
+        return 0.0;
+    }
+    return (float)$resolvedFee;
 }
 
 function dr_ensure_certificate_request_table(mysqli $conn): void {

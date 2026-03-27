@@ -10,6 +10,7 @@ require_once __DIR__ . '/../General/connection.php';
 require_once __DIR__ . '/../General/uniqueIDGenerate.php';
 require_once __DIR__ . '/../General/residentTransaction.php';
 require_once __DIR__ . '/../General/uploadLimits.php';
+require_once __DIR__ . '/../General/residentSeniorCitizenSync.php';
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     http_response_code(405);
@@ -359,6 +360,14 @@ try {
         throw new Exception('Resident profile not found.');
     }
     $current = pii_decrypt_resident_row($current) ?? $current;
+    $seniorSync = resident_sync_auto_senior_citizen($conn, $residentId, [
+        'resident_id' => $residentId,
+        'birthdate' => (string)($current['birthdate'] ?? ''),
+        'sector_membership' => (string)($current['sector_membership'] ?? ''),
+    ]);
+    if (array_key_exists('sector_membership', $seniorSync)) {
+        $current['sector_membership'] = (string)$seniorSync['sector_membership'];
+    }
 
     $changes = [];
     $civilDrivenSurnameChange = false;
