@@ -398,52 +398,22 @@ $serializedRow = $requestRow ? [
             margin: 0;
             border-radius: 30px;
             box-shadow: 0 26px 64px rgba(28, 56, 112, 0.14);
-            --bid-body-size: clamp(11.7px, 0.4rem + 0.88vw, 16.1px);
-            --bid-label-size: var(--bid-body-size);
-            --bid-field-size: var(--bid-body-size);
-            --bid-name-size: clamp(15.6px, 0.62rem + 1.34vw, 24.2px);
-            --bid-address-size: var(--bid-body-size);
-            --bid-meta-size: var(--bid-body-size);
-            --bid-cardno-size: clamp(11.4px, 0.4rem + 1vw, 17.4px);
-            --bid-cardno-back-size: clamp(11.9px, 0.42rem + 1.08vw, 18.5px);
-            --bid-emergency-size: var(--bid-body-size);
-            --bid-note-size: clamp(8.8px, 0.32rem + 0.62vw, 11.9px);
         }
         .digital-id-viewer__card-stage .barangay-id-card__label,
-        .digital-id-viewer__card-stage .barangay-id-card__field,
-        .digital-id-viewer__card-stage .barangay-id-card__note {
+        .digital-id-viewer__card-stage .barangay-id-card__field--name,
+        .digital-id-viewer__card-stage .barangay-id-card__field--address,
+        .digital-id-viewer__card-stage .barangay-id-card__field--birthplace,
+        .digital-id-viewer__card-stage .barangay-id-card__field--meta,
+        .digital-id-viewer__card-stage .barangay-id-card__field--emergency {
+            font-size: clamp(10.8px, 0.34rem + 0.58vw, 14.4px);
             line-height: 1.08;
         }
         .digital-id-viewer__card-stage .barangay-id-card__note {
+            font-size: clamp(9.2px, 0.3rem + 0.46vw, 11.6px);
             line-height: 1.18;
         }
-        @container barangay-id-card (max-width: 500px) {
-            .digital-id-viewer__card-stage .barangay-id-card {
-                --bid-body-size: clamp(10.2px, 2.78cqw, 13.9px);
-                --bid-label-size: var(--bid-body-size);
-                --bid-field-size: var(--bid-body-size);
-                --bid-name-size: clamp(13.5px, 3.78cqw, 19.2px);
-                --bid-address-size: var(--bid-body-size);
-                --bid-meta-size: var(--bid-body-size);
-                --bid-cardno-size: clamp(9.8px, 2.84cqw, 14.1px);
-                --bid-cardno-back-size: clamp(10.3px, 3.02cqw, 15px);
-                --bid-emergency-size: var(--bid-body-size);
-                --bid-note-size: clamp(8.4px, 2.3cqw, 10.6px);
-            }
-        }
-        @container barangay-id-card (min-width: 760px) {
-            .digital-id-viewer__card-stage .barangay-id-card {
-                --bid-body-size: clamp(12.1px, 0.44rem + 0.86vw, 16.5px);
-                --bid-label-size: var(--bid-body-size);
-                --bid-field-size: var(--bid-body-size);
-                --bid-name-size: clamp(16.8px, 0.66rem + 1.18vw, 24.7px);
-                --bid-address-size: var(--bid-body-size);
-                --bid-meta-size: var(--bid-body-size);
-                --bid-cardno-size: clamp(11.9px, 0.44rem + 0.84vw, 17.7px);
-                --bid-cardno-back-size: clamp(12.4px, 0.46rem + 0.9vw, 18.8px);
-                --bid-emergency-size: var(--bid-body-size);
-                --bid-note-size: clamp(9px, 0.34rem + 0.54vw, 12.1px);
-            }
+        .digital-id-viewer__card-stage .barangay-id-card__field--cardno {
+            font-size: clamp(11.6px, 0.38rem + 0.76vw, 16.2px);
         }
         .digital-id-viewer__card-stage .barangay-id-card__bg {
             border-radius: 30px;
@@ -603,37 +573,6 @@ $serializedRow = $requestRow ? [
                 min-width: 0;
             }
         }
-        @media (max-width: 1160px) {
-            body:not(.digital-id-embed) {
-                padding-top: 64px;
-            }
-            #div-sidebarWrapper {
-                position: fixed !important;
-                top: 0;
-                left: 0;
-                height: 100vh !important;
-                width: 280px;
-                z-index: 1060;
-                transform: translateX(-100%);
-                transition: transform 0.28s ease;
-                box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0);
-            }
-            #div-sidebarWrapper.show {
-                transform: translateX(0);
-                box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.25);
-            }
-        }
-        @media (min-width: 1161px) {
-            body:not(.digital-id-embed) {
-                padding-top: 0;
-            }
-            #mobile-header {
-                display: none !important;
-            }
-            #div-sidebarWrapper {
-                transform: none !important;
-            }
-        }
     </style>
 </head>
 <body class="<?= $embedMode ? 'digital-id-embed' : '' ?>">
@@ -651,17 +590,8 @@ $serializedRow = $requestRow ? [
         </section>
     </main>
 <?php else: ?>
-    <div class="d-flex min-vh-100 digital-id-page">
+    <div class="d-flex digital-id-page">
         <?php include __DIR__ . '/../includes/resident_sidebar.php'; ?>
-        <header id="mobile-header">
-            <div class="d-flex align-items-center px-3 py-2 shadow-sm bg-white">
-                <button class="btn" id="btn-burger" type="button" aria-label="Open sidebar">
-                    <i class="fa-solid fa-bars fa-lg"></i>
-                </button>
-                <img src="<?= htmlspecialchars($baseUrl) ?>/Images/San_Jose_LOGO.jpg" alt="Logo" style="width:32px;height:32px">
-                <span class="logo-name">Barangay San Jose</span>
-            </div>
-        </header>
         <main id="div-mainDisplay" class="flex-grow-1 p-4 p-md-5">
             <div class="digital-id-main">
                 <section class="digital-id-card-shell p-4 p-md-5">
@@ -864,10 +794,6 @@ $serializedRow = $requestRow ? [
                 .catch(() => {});
         })();
     </script>
-<?php endif; ?>
-<?php if (!$embedMode): ?>
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-<script src="<?= htmlspecialchars($baseUrl) ?>/JS-Script-Files/Resident-End/profileSidebar.js"></script>
 <?php endif; ?>
 </body>
 </html>
