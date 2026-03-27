@@ -1073,33 +1073,14 @@ function dra_fetch_request_for_modal_fast(mysqli $conn, string $requestId): ?arr
         }
     }
 
-    $payload = json_decode((string)($row['request_details'] ?? '{}'), true);
-    if (!is_array($payload)) {
-        $payload = [];
-    }
+    $payload = dr_decode_request_payload($row);
     if (trim((string)($row['purpose'] ?? '')) === '') {
         $payloadPurpose = trim((string)($payload['request_purpose'] ?? $payload['purpose'] ?? ''));
         if ($payloadPurpose !== '') {
             $row['purpose'] = $payloadPurpose;
         }
     }
-    if (trim((string)($row['resident_name'] ?? '')) === '') {
-        $payloadResidentName = trim((string)($payload['resident_name'] ?? ''));
-        if ($payloadResidentName !== '') {
-            $row['resident_name'] = $payloadResidentName;
-        }
-    }
-    if (trim((string)($row['resident_name'] ?? '')) === '') {
-        $resolvedResidentName = dra_resolve_resident_display_name(
-            $conn,
-            (string)($row['resident_user_id'] ?? ''),
-            (string)($row['resident_id'] ?? '')
-        );
-        if ($resolvedResidentName !== '') {
-            $row['resident_name'] = $resolvedResidentName;
-            $row['full_name'] = $resolvedResidentName;
-        }
-    }
+    dra_hydrate_request_resident_name($conn, $row, $payload);
 
     unset(
         $row['_issuance_certificate_type'],
@@ -1425,6 +1406,13 @@ function dra_h(string $v): string {
     return htmlspecialchars($v, ENT_QUOTES, 'UTF-8');
 }
 
+function dra_is_protected_request_value($value): bool {
+    $text = trim((string)$value);
+    return $text !== ''
+        && function_exists('pii_is_encrypted_value')
+        && pii_is_encrypted_value($text);
+}
+
 function dra_format_full_name_from_payload(array $payload): string {
     $last = trim((string)($payload['last_name'] ?? $payload['lastname'] ?? ''));
     $first = trim((string)($payload['first_name'] ?? $payload['firstname'] ?? ''));
@@ -1432,6 +1420,37 @@ function dra_format_full_name_from_payload(array $payload): string {
     $mi = $middle !== '' ? strtoupper(substr($middle, 0, 1)) . '.' : '';
     $parts = array_filter([$first, $mi, $last], fn($x) => trim((string)$x) !== '');
     return trim(implode(' ', $parts));
+}
+
+function dra_hydrate_request_resident_name(mysqli $conn, array &$row, array $payload = []): void {
+    $residentName = trim((string)($row['resident_name'] ?? ''));
+    if (dra_is_protected_request_value($residentName)) {
+        $residentName = '';
+        $row['resident_name'] = '';
+    }
+
+    if ($residentName === '') {
+        $payloadResidentName = trim((string)($payload['resident_name'] ?? ''));
+        if ($payloadResidentName === '') {
+            $payloadResidentName = dra_format_full_name_from_payload($payload);
+        }
+        if ($payloadResidentName !== '' && !dra_is_protected_request_value($payloadResidentName)) {
+            $residentName = $payloadResidentName;
+        }
+    }
+
+    if ($residentName === '') {
+        $residentName = dra_resolve_resident_display_name(
+            $conn,
+            (string)($row['resident_user_id'] ?? ''),
+            (string)($row['resident_id'] ?? '')
+        );
+    }
+
+    if ($residentName !== '') {
+        $row['resident_name'] = $residentName;
+        $row['full_name'] = $residentName;
+    }
 }
 
 function dra_strip_area_from_address(string $address): string {
@@ -6953,18 +6972,6 @@ if ($action === 'list') {
             }
         }
 
-        if (!$isFinanceList && trim((string)($row['resident_name'] ?? '')) === '') {
-            $resolvedResidentName = dra_resolve_resident_display_name(
-                $conn,
-                (string)($row['resident_user_id'] ?? ''),
-                (string)($row['resident_id'] ?? '')
-            );
-            if ($resolvedResidentName !== '') {
-                $row['resident_name'] = $resolvedResidentName;
-                $row['full_name'] = $resolvedResidentName;
-            }
-        }
-
         if (trim((string)($row['stage'] ?? '')) === '') {
             dr_sync_stage_from_status_lookup($conn, $row);
         }
@@ -6976,8 +6983,8 @@ if ($action === 'list') {
             // Keep finance list response lean; detailed request payload is not needed on initial list render.
             $row['payload'] = [];
         } else {
-            $payload = json_decode((string)($row['request_details'] ?? $row['payload_json'] ?? '{}'), true);
-            $row['payload'] = is_array($payload) ? $payload : [];
+            $payload = dr_decode_request_payload($row);
+            $row['payload'] = $payload;
             if (trim((string)($row['document_type'] ?? '')) === '') {
                 $payloadDocType = trim((string)($row['payload']['document_type'] ?? ''));
                 if ($payloadDocType !== '') {
@@ -6990,13 +6997,8 @@ if ($action === 'list') {
                     $row['purpose'] = $payloadPurpose;
                 }
             }
-            if (trim((string)($row['resident_name'] ?? '')) === '') {
-                $payloadResidentName = trim((string)($row['payload']['resident_name'] ?? ''));
-                if ($payloadResidentName !== '') {
-                    $row['resident_name'] = $payloadResidentName;
-                }
-            }
         }
+        dra_hydrate_request_resident_name($conn, $row, $row['payload']);
         // Keep list payload light to avoid per-row profile queries (major latency source).
         // Full resident profile is loaded on-demand from resident masterlist endpoint when needed.
         $row['resident_profile'] = [];
@@ -7063,8 +7065,8 @@ if ($action === 'get_request') {
         dr_respond_json(404, ['success' => false, 'message' => 'Request not found.']);
     }
 
-    $payload = json_decode((string)($row['request_details'] ?? $row['payload_json'] ?? '{}'), true);
-    $row['payload'] = is_array($payload) ? $payload : [];
+    $row['payload'] = dr_decode_request_payload($row);
+    dra_hydrate_request_resident_name($conn, $row, $row['payload']);
 
     $residentUserId = trim((string)($row['resident_user_id'] ?? ''));
     $residentId = trim((string)($row['resident_id'] ?? ''));

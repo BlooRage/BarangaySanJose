@@ -121,6 +121,16 @@ if ($certificateLaunchStage === 'release') {
       font-size: 0.96rem;
       vertical-align: middle;
     }
+    .certificate-tracker-shell #feeTaggingRows tr[data-fee-row] td[data-fee-toggle] {
+      cursor: pointer;
+    }
+    .certificate-tracker-shell #feeTaggingRows tr[data-fee-row]:hover td[data-fee-toggle] {
+      background: #f8fbff;
+    }
+    .certificate-tracker-shell #feeTaggingRows tr[data-fee-row] input,
+    .certificate-tracker-shell #feeTaggingRows tr[data-fee-row] button {
+      cursor: auto;
+    }
     .certificate-tracker-shell .compact-admin-table .compact-table-btn.btn-danger {
       color: #fff;
       border-color: #dc3545;
@@ -3356,6 +3366,6 @@ if ($certificateLaunchStage === 'release') {
 </script>
 <script src="../../JS-Script-Files/Admin-End/tableColumnsGeneric.js?v=20260215-1"></script>
 <script src="../../JS-Script-Files/Shared/barangayIdDigital.js?v=20260328-03"></script>
-<script src="../../JS-Script-Files/Admin-End/certificateTrackerScript.js?v=20260328-03"></script>
+<script src="../../JS-Script-Files/Admin-End/certificateTrackerScript.js?v=20260328-06"></script>
 </body>
 </html>

@@ -756,10 +756,28 @@ function dr_is_barangay_id_document_type(string $documentType): bool {
         || strpos($doc, 'barangay id') !== false;
 }
 
+function dr_decode_request_payload_value($value) {
+    if (is_array($value)) {
+        foreach ($value as $key => $item) {
+            $value[$key] = dr_decode_request_payload_value($item);
+        }
+        return $value;
+    }
+
+    if (is_string($value) && function_exists('pii_is_encrypted_value') && pii_is_encrypted_value($value)) {
+        return pii_decrypt_string($value);
+    }
+
+    return $value;
+}
+
 function dr_decode_request_payload(array $requestRow): array {
     $raw = (string)($requestRow['request_details'] ?? $requestRow['payload_json'] ?? '{}');
     $payload = json_decode($raw, true);
-    return is_array($payload) ? $payload : [];
+    if (!is_array($payload)) {
+        return [];
+    }
+    return dr_decode_request_payload_value($payload);
 }
 
 function dr_parse_datetime_value(string $value, bool $endOfDayForDateOnly = false): ?DateTimeImmutable {
@@ -1491,10 +1509,7 @@ function dr_request_status_column(mysqli $conn): ?string {
 }
 
 function dr_hydrate_request_derived_fields(mysqli $conn, array &$row, bool $includeIssuanceMeta = true): void {
-    $payload = json_decode((string)($row['request_details'] ?? '{}'), true);
-    if (!is_array($payload)) {
-        $payload = [];
-    }
+    $payload = dr_decode_request_payload($row);
 
     $requestId = trim((string)($row['request_id'] ?? ''));
     $issuanceMeta = ['certificate_type' => '', 'certificate_number' => '', 'verification_code' => ''];

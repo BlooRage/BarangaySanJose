@@ -407,9 +407,9 @@
       renderedFeeNames.add(feeName);
       const isChecked = Object.prototype.hasOwnProperty.call(taggedMap, feeName);
       const amt = isChecked ? taggedMap[feeName] : ft.default_amount;
-      html += `<tr data-fee-row>
-        <td><input type="checkbox" class="fee-tag-check" ${isChecked ? 'checked' : ''}></td>
-        <td><span class="fee-tag-name">${esc(feeName)}</span></td>
+      html += `<tr data-fee-row class="fee-tag-option-row">
+        <td data-fee-toggle><input type="checkbox" class="fee-tag-check" ${isChecked ? 'checked' : ''}></td>
+        <td data-fee-toggle><span class="fee-tag-name">${esc(feeName)}</span></td>
         <td><input type="number" class="form-control form-control-sm fee-tag-amount" value="${Number(amt).toFixed(2)}" min="0" step="0.01"></td>
         <td></td>
       </tr>`;
@@ -418,20 +418,19 @@
     taggedFees.forEach((fee) => {
       const feeName = String(fee?.fee_type || '').trim();
       if (!feeName || renderedFeeNames.has(feeName)) return;
-      html += `<tr data-fee-row>
-        <td><input type="checkbox" class="fee-tag-check" checked></td>
-        <td><span class="fee-tag-name">${esc(feeName)}</span></td>
+      html += `<tr data-fee-row class="fee-tag-option-row">
+        <td data-fee-toggle><input type="checkbox" class="fee-tag-check" checked></td>
+        <td data-fee-toggle><span class="fee-tag-name">${esc(feeName)}</span></td>
         <td><input type="number" class="form-control form-control-sm fee-tag-amount" value="${Number(fee.amount || 0).toFixed(2)}" min="0" step="0.01"></td>
         <td></td>
       </tr>`;
     });
 
     if (!activeFeeTypes.length && !taggedFees.length) {
-      html += `<tr><td colspan="4" class="text-center text-muted py-3">No saved fee types yet. You can add a custom fee below.</td></tr>`;
+      html += `<tr><td colspan="4" class="text-center text-muted py-3">No saved fee types yet.</td></tr>`;
     }
 
     html += `</tbody></table></div>`;
-    html += `<button type="button" class="btn btn-outline-secondary btn-sm mb-3" id="feeTagAddCustom"><i class="fas fa-plus me-1"></i>Add Custom Fee</button>`;
     html += `<div class="d-flex justify-content-between align-items-center fw-bold border-top pt-2"><span>Total</span><span id="feeTaggingTotal" class="text-primary">₱0.00</span></div>`;
 
     return html;
@@ -460,26 +459,17 @@
       });
     }
 
-    const addCustomBtn = document.getElementById('feeTagAddCustom');
-    if (addCustomBtn) {
-      addCustomBtn.addEventListener('click', () => {
-        const tbody = document.getElementById('feeTaggingRows');
-        if (!tbody) return;
-        const tr = document.createElement('tr');
-        tr.setAttribute('data-fee-row', '');
-        tr.innerHTML = `
-          <td><input type="checkbox" class="fee-tag-check" checked></td>
-          <td><input type="text" class="form-control form-control-sm fee-tag-name-input" placeholder="Fee name" style="min-width:120px"></td>
-          <td><input type="number" class="form-control form-control-sm fee-tag-amount" value="0.00" min="0" step="0.01"></td>
-          <td><button type="button" class="btn btn-sm btn-outline-danger fee-tag-remove-row" title="Remove"><i class="fas fa-times"></i></button></td>`;
-        tbody.appendChild(tr);
-        tr.querySelector('.fee-tag-remove-row').addEventListener('click', () => {
-          tr.remove();
-          updateFeeTagTotal();
-        });
-        tr.querySelector('.fee-tag-amount').addEventListener('input', updateFeeTagTotal);
-        tr.querySelector('.fee-tag-check').addEventListener('change', updateFeeTagTotal);
-        updateFeeTagTotal();
+    const tbody = document.getElementById('feeTaggingRows');
+    if (tbody) {
+      tbody.addEventListener('click', (event) => {
+        const row = event.target.closest('tr[data-fee-row]');
+        if (!row || !tbody.contains(row)) return;
+        if (!event.target.closest('td[data-fee-toggle]')) return;
+        if (event.target.closest('input, button, a, label, select, textarea')) return;
+        const checkbox = row.querySelector('.fee-tag-check');
+        if (!checkbox || checkbox.disabled) return;
+        checkbox.checked = !checkbox.checked;
+        checkbox.dispatchEvent(new Event('change', { bubbles: true }));
       });
     }
 
@@ -1182,6 +1172,7 @@
     for (const value of values) {
       if (value === null || value === undefined) continue;
       const s = String(value).trim();
+      if (looksLikeProtectedValue(s)) continue;
       if (s !== '') return s;
     }
     return '';
@@ -1206,11 +1197,18 @@
     return /^[0-9]{6}[A-Z][0-9]{5}$/i.test(s);
   }
 
+  function looksLikeProtectedValue(value) {
+    const s = String(value || '').trim();
+    if (!s) return false;
+    return /^pii:v\d+:/i.test(s);
+  }
+
   function firstNonEmptyName(values, fallback = '') {
     for (const value of values) {
       if (value === null || value === undefined) continue;
       const s = String(value).trim();
       if (!s) continue;
+      if (looksLikeProtectedValue(s)) continue;
       if (looksLikeOfficialId(s)) continue;
       return s;
     }
@@ -1227,22 +1225,17 @@
 
   function fullNameFromRow(row) {
     const payload = row && row.payload && typeof row.payload === 'object' ? row.payload : {};
+    const fallbackName = firstNonEmpty([row.full_name, row.resident_full_name, row.resident_name, '']);
+    if (fallbackName) {
+      return fallbackName;
+    }
+
     const first = firstNonEmpty([payload.first_name, payload.firstname]);
     const middle = firstNonEmpty([payload.middle_name, payload.middlename]);
     const last = firstNonEmpty([payload.last_name, payload.lastname]);
     const ordered = formatPersonNameFnMiLn(first, middle, last);
     if (ordered.length) return ordered;
-    const fallbackName = firstNonEmpty([row.full_name, row.resident_full_name, row.resident_name, '']);
-    if (!fallbackName) return '-';
-
-    const parts = fallbackName.split(/\s+/).filter(Boolean);
-    if (parts.length >= 3) {
-      const f = parts[0];
-      const l = parts[parts.length - 1];
-      const m = parts.slice(1, parts.length - 1).join(' ');
-      return formatPersonNameFnMiLn(f, m, l);
-    }
-    return fallbackName;
+    return '-';
   }
 
   function stripAreaFromAddress(address) {
@@ -6425,7 +6418,7 @@
               const value = payload[key];
               if (value === null || value === undefined) continue;
               const text = String(value).trim();
-              if (text === '') continue;
+              if (text === '' || looksLikeProtectedValue(text)) continue;
               consumedKeys.add(String(key));
               return text;
             }
@@ -6437,7 +6430,7 @@
               const value = residentProfile[key];
               if (value === null || value === undefined) continue;
               const text = String(value).trim();
-              if (text === '') continue;
+              if (text === '' || looksLikeProtectedValue(text)) continue;
               return text;
             }
             return '';
@@ -9498,8 +9491,12 @@
           <td>₱${Number(ft.default_amount).toFixed(2)}</td>
           <td><span class="badge ${ft.status === 'approved' ? 'bg-success' : 'bg-secondary'}">${ft.status === 'approved' ? 'Active' : esc(ft.status)}</span></td>
           <td class="text-end">
-            <button class="btn btn-sm btn-warning py-0 px-2"
-              onclick="fcrSelectEditFee(${ft.fee_type_id},${JSON.stringify(ft.fee_name)},${ft.default_amount})">
+            <button
+              type="button"
+              class="btn btn-sm btn-warning py-0 px-2 fcr-edit-select-btn"
+              data-fee-type-id="${esc(ft.fee_type_id)}"
+              data-fee-name="${esc(ft.fee_name)}"
+              data-fee-amount="${esc(Number(ft.default_amount).toFixed(2))}">
               Request Edit
             </button>
           </td>
@@ -9518,6 +9515,16 @@
       showEditSuccess('');
       document.getElementById('fcrEditProposedAmount').focus();
     };
+
+    document.getElementById('fcrEditCatalogBody')?.addEventListener('click', (event) => {
+      const trigger = event.target.closest('.fcr-edit-select-btn');
+      if (!trigger) return;
+      window.fcrSelectEditFee(
+        trigger.getAttribute('data-fee-type-id') || '',
+        trigger.getAttribute('data-fee-name') || '',
+        trigger.getAttribute('data-fee-amount') || '0'
+      );
+    });
 
     document.getElementById('fcrEditCancelBtn').addEventListener('click', () => {
       document.getElementById('fcrEditFormWrap').classList.add('d-none');
