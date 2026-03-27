@@ -798,15 +798,13 @@ if ($residentId !== '' && isset($conn) && $conn instanceof mysqli) {
                                     <div id="householdAdultCount" class="fw-semibold">0</div>
                                 </div>
                             </div>
-                            <?php if ($isHeadOfFamily): ?>
                             <div id="householdPendingRequestsWrap" class="mb-3 d-none">
                                 <div class="d-flex justify-content-between align-items-center mb-2">
-                                    <div class="text-muted small">Pending Member Requests</div>
+                                    <div class="text-muted small">Pending Member Verification Requests</div>
                                     <div id="householdPendingRequestCount" class="fw-semibold">0</div>
                                 </div>
                                 <div id="householdPendingRequestsList" class="border rounded bg-light"></div>
                             </div>
-                            <?php endif; ?>
                             <div id="householdMembersGrid" class="row g-3"></div>
                             <div id="householdMembersEmpty" class="text-muted small mt-2 d-none">
                                 No household members yet.

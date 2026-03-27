@@ -63,41 +63,23 @@ if ($residentId === '') {
 
 $headVerification = hhv_get_resident_head_verification($conn, $residentId);
 $pendingMemberRequests = [];
+hmv_ensure_request_table($conn);
+$usesStatusLookup = hmv_request_uses_status_lookup($conn);
+$hasSubmittedByUserId = hmv_has_request_column($conn, 'submitted_by_user_id');
+$currentUserId = (string)($_SESSION['user_id'] ?? '');
 
-if ($isCurrentResidentHead) {
-    hmv_ensure_request_table($conn);
-    $usesStatusLookup = hmv_request_uses_status_lookup($conn);
-    if ($usesStatusLookup) {
-        $pendingStatusId = getStatusId($conn, 'PendingReview', 'HouseholdMember');
-        if ($pendingStatusId !== null) {
-            $stmt = $conn->prepare("
-                SELECT
-                    request_id,
-                    last_name,
-                    first_name,
-                    middle_name,
-                    suffix,
-                    birthdate,
-                    submitted_at
-                FROM householdmemberverificationtbl
-                WHERE fam_head_id COLLATE utf8mb4_general_ci = ? COLLATE utf8mb4_general_ci
-                  AND status_id = ?
-                ORDER BY submitted_at DESC, request_id DESC
-            ");
-            if ($stmt) {
-                $stmt->bind_param("si", $residentId, $pendingStatusId);
-                $stmt->execute();
-                $res = $stmt->get_result();
-                while ($row = $res->fetch_assoc()) {
-                    $pendingMemberRequests[] = $row;
-                }
-                $stmt->close();
-            }
-        }
-    } elseif (hmv_has_request_column($conn, 'status')) {
+if ($usesStatusLookup) {
+    $pendingStatusId = getStatusId($conn, 'PendingReview', 'HouseholdMember');
+    if ($pendingStatusId !== null) {
+        $whereSql = $hasSubmittedByUserId
+            ? "submitted_by_user_id COLLATE utf8mb4_general_ci = ? COLLATE utf8mb4_general_ci"
+            : "fam_head_id COLLATE utf8mb4_general_ci = ? COLLATE utf8mb4_general_ci";
+        $lookupValue = $hasSubmittedByUserId ? $currentUserId : $residentId;
         $stmt = $conn->prepare("
             SELECT
                 request_id,
+                fam_head_id,
+                " . ($hasSubmittedByUserId ? "submitted_by_user_id" : "''") . " AS submitted_by_user_id,
                 last_name,
                 first_name,
                 middle_name,
@@ -105,12 +87,12 @@ if ($isCurrentResidentHead) {
                 birthdate,
                 submitted_at
             FROM householdmemberverificationtbl
-            WHERE fam_head_id COLLATE utf8mb4_general_ci = ? COLLATE utf8mb4_general_ci
-              AND status = 'PendingReview'
+            WHERE {$whereSql}
+              AND status_id = ?
             ORDER BY submitted_at DESC, request_id DESC
         ");
         if ($stmt) {
-            $stmt->bind_param("s", $residentId);
+            $stmt->bind_param("si", $lookupValue, $pendingStatusId);
             $stmt->execute();
             $res = $stmt->get_result();
             while ($row = $res->fetch_assoc()) {
@@ -118,6 +100,36 @@ if ($isCurrentResidentHead) {
             }
             $stmt->close();
         }
+    }
+} elseif (hmv_has_request_column($conn, 'status')) {
+    $whereSql = $hasSubmittedByUserId
+        ? "submitted_by_user_id COLLATE utf8mb4_general_ci = ? COLLATE utf8mb4_general_ci"
+        : "fam_head_id COLLATE utf8mb4_general_ci = ? COLLATE utf8mb4_general_ci";
+    $lookupValue = $hasSubmittedByUserId ? $currentUserId : $residentId;
+    $stmt = $conn->prepare("
+        SELECT
+            request_id,
+            fam_head_id,
+            " . ($hasSubmittedByUserId ? "submitted_by_user_id" : "''") . " AS submitted_by_user_id,
+            last_name,
+            first_name,
+            middle_name,
+            suffix,
+            birthdate,
+            submitted_at
+        FROM householdmemberverificationtbl
+        WHERE {$whereSql}
+          AND status = 'PendingReview'
+        ORDER BY submitted_at DESC, request_id DESC
+    ");
+    if ($stmt) {
+        $stmt->bind_param("s", $lookupValue);
+        $stmt->execute();
+        $res = $stmt->get_result();
+        while ($row = $res->fetch_assoc()) {
+            $pendingMemberRequests[] = $row;
+        }
+        $stmt->close();
     }
 }
 
