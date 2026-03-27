@@ -7,16 +7,23 @@ document.addEventListener("DOMContentLoaded", () => {
         householdInviteModalEl && window.bootstrap?.Modal
             ? bootstrap.Modal.getOrCreateInstance(householdInviteModalEl)
             : null;
+    const householdMemberSubmitSuccessModalEl = document.getElementById("householdMemberSubmitSuccessModal");
+    const getHouseholdMemberSubmitSuccessModal = () =>
+        householdMemberSubmitSuccessModalEl && window.bootstrap?.Modal
+            ? bootstrap.Modal.getOrCreateInstance(householdMemberSubmitSuccessModalEl)
+            : null;
     let pendingBirthdateModalRestore = false;
     let birthdateWindowFocusHandlerBound = false;
     const restoreHouseholdInviteModal = () => {
         window.setTimeout(() => {
             if (!pendingBirthdateModalRestore) return;
-            pendingBirthdateModalRestore = false;
             const modalInstance = getHouseholdInviteModal();
             if (modalInstance) {
                 modalInstance.show();
             }
+            window.setTimeout(() => {
+                pendingBirthdateModalRestore = false;
+            }, 250);
         }, 150);
     };
     const normalizePhone = (value) => {
@@ -276,6 +283,12 @@ document.addEventListener("DOMContentLoaded", () => {
                 restoreHouseholdInviteModal();
             });
             birthdateField.addEventListener("blur", restoreHouseholdInviteModal);
+            birthdateField.addEventListener("focusout", restoreHouseholdInviteModal);
+            document.addEventListener("visibilitychange", () => {
+                if (!document.hidden) {
+                    restoreHouseholdInviteModal();
+                }
+            });
         }
         if (birthCertificateField) {
             birthCertificateField.addEventListener("change", () => validateNames(true));
@@ -331,8 +344,8 @@ document.addEventListener("DOMContentLoaded", () => {
                     throw new Error(data.message || "Failed to add member.");
                 }
                 if (result) {
-                    result.className = "small mt-2 text-success";
-                    result.textContent = data.message || "Household member verification request submitted.";
+                    result.className = "small mt-2";
+                    result.textContent = "";
                 }
                 const fields = ["hmLastName", "hmFirstName", "hmMiddleName", "hmSuffix", "hmBirthdate", "hmBirthCertificate"];
                 fields.forEach((id) => {
@@ -341,6 +354,12 @@ document.addEventListener("DOMContentLoaded", () => {
                 });
                 touched.clear();
                 validateNames(false);
+                const successMessageEl = document.getElementById("householdMemberSubmitSuccessMessage");
+                if (successMessageEl) {
+                    successMessageEl.textContent = data.message || "Household member verification request submitted. Please wait for admin review.";
+                }
+                getHouseholdInviteModal()?.hide();
+                getHouseholdMemberSubmitSuccessModal()?.show();
             } catch (err) {
                 if (result) {
                     result.className = "small mt-2 text-danger";

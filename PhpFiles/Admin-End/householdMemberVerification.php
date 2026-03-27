@@ -67,13 +67,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && isset($_GET['fetch_member_requests']
                 req.middle_name,
                 req.suffix,
                 req.birthdate,
-                req.status,
+                req.status_id,
                 req.attachment_id,
                 req.review_remarks,
                 req.submitted_at,
                 req.reviewed_at,
                 req.reviewed_by_user_id,
                 req.approved_household_member_id,
+                reqs.status_name AS request_status,
                 head.firstname AS head_firstname,
                 head.middlename AS head_middlename,
                 head.lastname AS head_lastname,
@@ -85,12 +86,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && isset($_GET['fetch_member_requests']
             FROM householdmemberverificationtbl req
             LEFT JOIN residentinformationtbl head
                 ON head.resident_id = req.fam_head_id
+            LEFT JOIN statuslookuptbl reqs
+                ON reqs.status_id = req.status_id
             LEFT JOIN unifiedfileattachmenttbl uf
                 ON uf.attachment_id = req.attachment_id
             LEFT JOIN statuslookuptbl s
                 ON s.status_id = uf.status_id_verify
             ORDER BY
-                CASE req.status
+                CASE COALESCE(reqs.status_name, '')
                     WHEN 'PendingReview' THEN 0
                     WHEN 'Rejected' THEN 1
                     ELSE 2
@@ -131,7 +134,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && isset($_GET['fetch_member_requests']
                 'middle_name' => (string)($row['middle_name'] ?? ''),
                 'suffix' => (string)($row['suffix'] ?? ''),
                 'birthdate' => (string)($row['birthdate'] ?? ''),
-                'status' => (string)($row['status'] ?? 'PendingReview'),
+                'status' => (string)($row['request_status'] ?? 'PendingReview'),
+                'status_id' => (int)($row['status_id'] ?? 0),
                 'attachment_id' => (int)($row['attachment_id'] ?? 0),
                 'review_remarks' => (string)($row['review_remarks'] ?? ''),
                 'submitted_at' => (string)($row['submitted_at'] ?? ''),
@@ -177,7 +181,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         echo json_encode(['success' => false, 'message' => 'Household member verification request not found.']);
         exit;
     }
-    if ((string)($request['status'] ?? '') !== 'PendingReview') {
+    $pendingRequestStatusId = hmv_get_household_member_status_id($conn, 'PendingReview');
+    $activeRequestStatusId = hmv_get_household_member_status_id($conn, 'Active');
+    $rejectedRequestStatusId = hmv_get_household_member_status_id($conn, 'Rejected');
+    if ($pendingRequestStatusId === null || $activeRequestStatusId === null || $rejectedRequestStatusId === null) {
+        http_response_code(500);
+        echo json_encode(['success' => false, 'message' => 'Household member status setup is incomplete.']);
+        exit;
+    }
+    if ((int)($request['status_id'] ?? 0) !== $pendingRequestStatusId) {
         http_response_code(409);
         echo json_encode(['success' => false, 'message' => 'This household member verification request has already been reviewed.']);
         exit;
@@ -217,7 +229,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
             $update = $conn->prepare("
                 UPDATE householdmemberverificationtbl
-                SET status = 'Approved',
+                SET status_id = ?,
                     approved_household_member_id = ?,
                     reviewed_by_user_id = ?,
                     review_remarks = ?,
@@ -228,7 +240,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             if (!$update) {
                 throw new RuntimeException('Failed to approve household member verification request.');
             }
-            $update->bind_param('issi', $memberId, $reviewedByUserId, $reviewRemarks, $requestId);
+            $update->bind_param('iissi', $activeRequestStatusId, $memberId, $reviewedByUserId, $reviewRemarks, $requestId);
             if (!$update->execute()) {
                 $error = $update->error;
                 $update->close();
@@ -252,7 +264,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         } else {
             $update = $conn->prepare("
                 UPDATE householdmemberverificationtbl
-                SET status = 'Rejected',
+                SET status_id = ?,
                     reviewed_by_user_id = ?,
                     review_remarks = ?,
                     reviewed_at = NOW()
@@ -262,7 +274,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             if (!$update) {
                 throw new RuntimeException('Failed to reject household member verification request.');
             }
-            $update->bind_param('ssi', $reviewedByUserId, $reviewRemarks, $requestId);
+            $update->bind_param('issi', $rejectedRequestStatusId, $reviewedByUserId, $reviewRemarks, $requestId);
             if (!$update->execute()) {
                 $error = $update->error;
                 $update->close();

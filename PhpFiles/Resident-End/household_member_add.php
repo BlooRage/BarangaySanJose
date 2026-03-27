@@ -136,6 +136,12 @@ $dup->close();
 
 hmv_ensure_request_table($conn);
 
+$pendingRequestStatusId = hmv_get_household_member_status_id($conn, 'PendingReview');
+if ($pendingRequestStatusId === null) {
+    echo json_encode(['success' => false, 'message' => 'Household member status setup is incomplete.']);
+    exit;
+}
+
 $pendingDup = $conn->prepare("
     SELECT request_id
     FROM householdmemberverificationtbl
@@ -145,11 +151,11 @@ $pendingDup = $conn->prepare("
       AND (middle_name <=> ?)
       AND (suffix <=> ?)
       AND birthdate = ?
-      AND status = 'PendingReview'
+      AND status_id = ?
     LIMIT 1
 ");
 if ($pendingDup) {
-    $pendingDup->bind_param("ssssss", $residentId, $lastName, $firstName, $middleName, $suffix, $birthdate);
+    $pendingDup->bind_param("ssssssi", $residentId, $lastName, $firstName, $middleName, $suffix, $birthdate, $pendingRequestStatusId);
     $pendingDup->execute();
     $pendingDup->store_result();
     if ($pendingDup->num_rows > 0) {
@@ -189,15 +195,15 @@ try {
 
     $insertRequest = $conn->prepare("
         INSERT INTO householdmemberverificationtbl
-            (request_id, fam_head_id, submitted_by_user_id, last_name, first_name, middle_name, suffix, birthdate, status)
+            (request_id, fam_head_id, submitted_by_user_id, last_name, first_name, middle_name, suffix, birthdate, status_id)
         VALUES
-            (?, ?, ?, ?, ?, ?, ?, ?, 'PendingReview')
+            (?, ?, ?, ?, ?, ?, ?, ?, ?)
     ");
     if (!$insertRequest) {
         throw new RuntimeException('Failed to prepare household member verification request.');
     }
     $currentUserId = (string)$_SESSION['user_id'];
-    $insertRequest->bind_param("isssssss", $requestId, $residentId, $currentUserId, $lastName, $firstName, $middleName, $suffix, $birthdate);
+    $insertRequest->bind_param("isssssssi", $requestId, $residentId, $currentUserId, $lastName, $firstName, $middleName, $suffix, $birthdate, $pendingRequestStatusId);
     if (!$insertRequest->execute()) {
         $error = $insertRequest->error;
         $insertRequest->close();
