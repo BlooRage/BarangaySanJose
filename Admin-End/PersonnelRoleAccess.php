@@ -274,7 +274,7 @@ $personnelRolePermissionCatalog = pra_filter_catalog_for_personnel_roles(amp_get
           <i class="fas fa-list me-1"></i> Tracker
         </a>
         <a href="<?= htmlspecialchars(appUrl('Admin-End/OfficialInvites.php')) ?>" class="btn btn-outline-secondary btn-sm">
-          <i class="fas fa-user-plus me-1"></i> Personnel Invite
+          <i class="fas fa-user-plus me-1"></i> Account Invite
         </a>
         <a href="<?= htmlspecialchars(appUrl('Admin-End/PersonnelRoleAccess.php')) ?>" class="btn btn-primary btn-sm">
           <i class="fas fa-shield-halved me-1"></i> Role Based Permissions

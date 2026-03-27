@@ -343,7 +343,7 @@ if (!function_exists('amp_get_permission_catalog')) {
                             ],
                             [
                                 'key' => 'personnel_invite',
-                                'label' => 'Personnel Invite',
+                                'label' => 'Account Invite',
                                 'path' => 'Admin-End/OfficialInvites.php',
                                 'admin_only' => true,
                             ],

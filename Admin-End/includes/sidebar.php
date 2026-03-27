@@ -1117,7 +1117,7 @@ if (!empty($_SESSION['user_id']) && isset($conn) && $conn instanceof mysqli) {
             <li>
               <a href="<?= htmlspecialchars(appUrl('Admin-End/OfficialInvites.php')) ?>"
                  class="link-dark rounded <?= $current == 'OfficialInvites.php' ? 'active' : '' ?>">
-                Personnel Invite
+                Account Invite
               </a>
             </li>
             <li>
