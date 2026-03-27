@@ -542,6 +542,13 @@
   box-shadow: 0 10px 28px rgba(166, 94, 10, 0.05);
 }
 
+.announcement-faq-summary-card {
+  border-color: #f0dfcb;
+  border-radius: 18px;
+  background: #fff;
+  box-shadow: none;
+}
+
 .announcement-faq-header {
   display: flex;
   justify-content: space-between;
