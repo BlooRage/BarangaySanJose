@@ -1,6 +1,21 @@
 <?php
 require_once __DIR__ . "/includes/admin_guard.php";
 require_once __DIR__ . "/../PhpFiles/General/connection.php";
+require_once __DIR__ . "/../PhpFiles/General/appointmentCouncilMembers.php";
+
+$appointmentAccess = apcm_get_appointment_admin_scope(
+    $conn,
+    trim((string)($_SESSION['user_id'] ?? '')),
+    trim((string)($_SESSION['role'] ?? ''))
+);
+if (empty($appointmentAccess['can_access_tracker'])) {
+    http_response_code(403);
+    exit('Access denied.');
+}
+if (empty($appointmentAccess['can_view_all_tracker'])) {
+    header('Location: ' . appUrl('/Admin-End/Appointments/AppointmentTracker.php?tool=tracker'));
+    exit;
+}
 
 function ar_first_existing_col(array $cols, array $candidates): ?string {
     foreach ($candidates as $candidate) {

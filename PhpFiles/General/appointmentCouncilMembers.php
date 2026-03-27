@@ -194,3 +194,122 @@ if (!function_exists('apcm_fetch_council_members_by_user_id')) {
         return $members;
     }
 }
+
+if (!function_exists('apcm_normalize_session_role')) {
+    function apcm_normalize_session_role(string $role): string
+    {
+        $normalized = strtolower(trim($role));
+        if ($normalized === 'superadmin') {
+            return 'superadmin';
+        }
+        if ($normalized === 'personnel' || $normalized === 'personnels') {
+            return 'personnel';
+        }
+        if ($normalized === 'secretary') {
+            return 'secretary';
+        }
+        return 'official';
+    }
+}
+
+if (!function_exists('apcm_personnel_position_labels')) {
+    function apcm_personnel_position_labels(): array
+    {
+        return [
+            'department public assistance desk',
+            'department secretary',
+            'department oic (officer in charge)',
+            'barangay police',
+            'desk officer',
+            'area oic',
+            'barangay treasurer',
+        ];
+    }
+}
+
+if (!function_exists('apcm_is_personnel_position')) {
+    function apcm_is_personnel_position(string $positionAccess): bool
+    {
+        $normalized = strtolower(trim($positionAccess));
+        if ($normalized === '') {
+            return false;
+        }
+
+        return in_array($normalized, apcm_personnel_position_labels(), true);
+    }
+}
+
+if (!function_exists('apcm_is_barangay_secretary_position')) {
+    function apcm_is_barangay_secretary_position(string $positionAccess): bool
+    {
+        $normalized = strtolower(trim($positionAccess));
+        return in_array($normalized, ['barangay secretary', 'secretary'], true);
+    }
+}
+
+if (!function_exists('apcm_current_official_position')) {
+    function apcm_current_official_position(mysqli $conn, string $userId): string
+    {
+        $userId = trim($userId);
+        if ($userId === '' || !apcm_table_exists($conn, 'officialinformationtbl')) {
+            return '';
+        }
+
+        $selectPosition = apcm_column_exists($conn, 'officialinformationtbl', 'position_access')
+            ? 'COALESCE(position_access, role_access)'
+            : 'role_access';
+        $stmt = $conn->prepare("
+            SELECT {$selectPosition} AS position_access
+            FROM officialinformationtbl
+            WHERE user_id = ?
+            LIMIT 1
+        ");
+        if (!$stmt) {
+            return '';
+        }
+
+        $stmt->bind_param('s', $userId);
+        $stmt->execute();
+        $row = $stmt->get_result()->fetch_assoc();
+        $stmt->close();
+
+        return trim((string)($row['position_access'] ?? ''));
+    }
+}
+
+if (!function_exists('apcm_get_appointment_admin_scope')) {
+    function apcm_get_appointment_admin_scope(mysqli $conn, string $userId, string $sessionRole = ''): array
+    {
+        $userId = trim($userId);
+        $normalizedRole = apcm_normalize_session_role($sessionRole);
+        $positionAccess = apcm_current_official_position($conn, $userId);
+
+        $isSuperAdmin = $normalizedRole === 'superadmin';
+        $isBarangaySecretary = !$isSuperAdmin
+            && (
+                $normalizedRole === 'secretary'
+                || apcm_is_barangay_secretary_position($positionAccess)
+            );
+        $isPersonnel = !$isSuperAdmin
+            && !$isBarangaySecretary
+            && (
+                $normalizedRole === 'personnel'
+                || apcm_is_personnel_position($positionAccess)
+            );
+        $canAccessTracker = !$isPersonnel;
+        $canViewAllTracker = $isSuperAdmin || $isBarangaySecretary;
+
+        return [
+            'user_id' => $userId,
+            'position_access' => $positionAccess,
+            'is_superadmin' => $isSuperAdmin,
+            'is_barangay_secretary' => $isBarangaySecretary,
+            'is_personnel' => $isPersonnel,
+            'can_access_tracker' => $canAccessTracker,
+            'can_view_all_tracker' => $canViewAllTracker,
+            'can_manage_all_tracker' => $canViewAllTracker,
+            'can_access_settings' => $canViewAllTracker,
+            'scoped_official_user_id' => $canViewAllTracker ? '' : $userId,
+        ];
+    }
+}

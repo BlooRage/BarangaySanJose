@@ -42,6 +42,7 @@ if (!function_exists('appUrl')) {
     require_once __DIR__ . '/../../PhpFiles/General/security.php';
 }
 require_once __DIR__ . '/../../PhpFiles/General/adminModulePermissions.php';
+require_once __DIR__ . '/../../PhpFiles/General/appointmentCouncilMembers.php';
 require_once __DIR__ . '/../../PhpFiles/General/siteContent.php';
 $sbAttentionHelperPath = __DIR__ . '/../../PhpFiles/General/adminSidebarAttention.php';
 if (file_exists($sbAttentionHelperPath)) {
@@ -272,6 +273,15 @@ $sbHasAny = static function (array $keys) use (&$sbAllowedPermissions): bool {
 
 $sbSidebarUserId = trim((string)($_SESSION['user_id'] ?? ''));
 $sbSidebarRole = trim((string)($_SESSION['role'] ?? ''));
+$sbAppointmentAccess = [
+    'can_access_tracker' => true,
+    'can_access_settings' => true,
+];
+if (isset($conn) && $conn instanceof mysqli && $sbSidebarUserId !== '') {
+    $sbAppointmentAccess = apcm_get_appointment_admin_scope($conn, $sbSidebarUserId, $sbSidebarRole);
+}
+$sbCanAccessAppointmentTracker = $sbCan('appointments') && !empty($sbAppointmentAccess['can_access_tracker']);
+$sbCanAccessAppointmentSettings = $sbCanAccessAppointmentTracker && !empty($sbAppointmentAccess['can_access_settings']);
 $sbCanReviewContent = false;
 if (isset($conn) && $conn instanceof mysqli && function_exists('cms_content_can_review')) {
     $sbCanReviewContent = cms_content_can_review($conn, $sbSidebarUserId, $sbSidebarRole);
@@ -693,7 +703,7 @@ if (!empty($_SESSION['user_id']) && isset($conn) && $conn instanceof mysqli) {
       </li>
       <?php endif; ?>
 
-      <?php if ($sbCan('appointments')): ?>
+      <?php if ($sbCanAccessAppointmentTracker): ?>
       <li class="mb-1 mt-2 text-muted small fw-semibold px-2">Office of the Barangay</li>
       <li class="mb-1">
         <button type="button"
@@ -717,12 +727,14 @@ if (!empty($_SESSION['user_id']) && isset($conn) && $conn instanceof mysqli) {
                 <?= $sbRenderAttentionBadge($sbCount('appointments_tracker')) ?>
               </a>
             </li>
+            <?php if ($sbCanAccessAppointmentSettings): ?>
             <li>
               <a href="<?= htmlspecialchars(appUrl('Admin-End/Appointments/AppointmentTracker.php?tool=settings')) ?>"
                  class="link-dark rounded sidebar-subnav-link <?= $isAppointmentSettingsActive ? 'active' : '' ?>">
                 <span class="sidebar-subnav-text">Settings</span>
               </a>
             </li>
+            <?php endif; ?>
           </ul>
         </div>
       </li>

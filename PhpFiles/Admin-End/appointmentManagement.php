@@ -225,6 +225,17 @@ $confirmedTime = trim((string)($_POST['confirmed_time'] ?? ''));
 $remarks = trim((string)($_POST['appointment_remarks'] ?? ''));
 $reviewedByUserId = trim((string)($_SESSION['user_id'] ?? ''));
 $reviewedByOfficialUserId = am_official_profile_exists($conn, $reviewedByUserId) ? $reviewedByUserId : '';
+$appointmentAccess = apcm_get_appointment_admin_scope($conn, $reviewedByUserId, (string)($_SESSION['role'] ?? ''));
+
+if (empty($appointmentAccess['can_access_tracker'])) {
+    am_redirect_with_message('error', 'Appointment tracker access is not available for your account.', [
+        'appointment_id' => $appointmentId,
+    ]);
+}
+
+if (empty($appointmentAccess['can_manage_all_tracker']) && $reviewedByUserId !== '') {
+    $officialUserId = $reviewedByUserId;
+}
 
 if (!in_array($action, ['approve_appointment', 'reschedule_appointment', 'deny_appointment'], true)) {
     am_redirect_with_message('error', 'Unknown appointment action.');
@@ -292,12 +303,13 @@ try {
 $conn->begin_transaction();
 try {
     $existsStmt = $conn->prepare("
-        SELECT appointment_id
+        SELECT a.appointment_id
+             , " . (isset($appointmentColumns['user_id_official_assigned']) ? "a.user_id_official_assigned" : "NULL") . " AS official_user_id
              , COALESCE(s.status_name, 'Pending') AS status_name
-        FROM appointmentstbl
+        FROM appointmentstbl a
         LEFT JOIN statuslookuptbl s
-            ON s.status_id = appointmentstbl.appointment_status_id
-        WHERE appointment_id = ?
+            ON s.status_id = a.appointment_status_id
+        WHERE a.appointment_id = ?
         LIMIT 1
     ");
     if (!$existsStmt) {
@@ -315,6 +327,13 @@ try {
     $currentStatusName = strtolower(trim((string)($existingRow['status_name'] ?? 'pending')));
     if ($currentStatusName !== '' && !str_contains($currentStatusName, 'pending')) {
         throw new Exception('This appointment has already been reviewed and can no longer be changed.');
+    }
+
+    if (empty($appointmentAccess['can_manage_all_tracker'])) {
+        $assignedOfficialUserId = trim((string)($existingRow['official_user_id'] ?? ''));
+        if ($reviewedByUserId === '' || $assignedOfficialUserId === '' || strcasecmp($assignedOfficialUserId, $reviewedByUserId) !== 0) {
+            throw new Exception('You can only review appointments assigned to your account.');
+        }
     }
 
     $setClauses = ['appointment_status_id = ?'];

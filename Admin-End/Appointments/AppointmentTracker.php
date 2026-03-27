@@ -6,12 +6,24 @@ require_once __DIR__ . "/../../PhpFiles/General/appointmentTimeSlots.php";
 require_once __DIR__ . "/../../PhpFiles/General/audit.php";
 require_once __DIR__ . "/../includes/admin_guard.php";
 
+$appointmentCurrentUserId = trim((string)($_SESSION['user_id'] ?? ''));
+$appointmentCurrentRole = trim((string)($_SESSION['role'] ?? ''));
+$appointmentAccess = apcm_get_appointment_admin_scope($conn, $appointmentCurrentUserId, $appointmentCurrentRole);
+if (empty($appointmentAccess['can_access_tracker'])) {
+    http_response_code(403);
+    exit('Access denied.');
+}
+
 $appointmentTool = strtolower(trim((string)($_GET['tool'] ?? 'tracker')));
 if (!in_array($appointmentTool, ['tracker', 'settings'], true)) {
     $appointmentTool = 'tracker';
 }
 $isAppointmentSettingsView = $appointmentTool === 'settings';
 $isAppointmentTrackerView = !$isAppointmentSettingsView;
+if ($isAppointmentSettingsView && empty($appointmentAccess['can_access_settings'])) {
+    header('Location: ' . appUrl('/Admin-End/Appointments/AppointmentTracker.php?tool=tracker&error=' . rawurlencode('Only SuperAdmin or the Barangay Secretary can manage appointment settings.')));
+    exit;
+}
 
 $appointmentSettingDefinitions = aps_settings_definitions();
 $appointmentTimezone = new DateTimeZone(date_default_timezone_get() ?: 'Asia/Manila');
@@ -346,6 +358,7 @@ $appointmentSuccessMessage = at_flash_message('success');
 $appointmentErrorMessage = at_flash_message('error');
 $highlightAppointmentId = at_flash_message('appointment_id');
 $officialOptions = [];
+$scopedOfficialUserId = trim((string)($appointmentAccess['scoped_official_user_id'] ?? ''));
 
 if (!$conn->query("SHOW TABLES LIKE 'appointmentstbl'")->num_rows) {
     $loadError = 'Appointment table is not available. Run the appointment migration first.';
@@ -380,99 +393,134 @@ if (!$conn->query("SHOW TABLES LIKE 'appointmentstbl'")->num_rows) {
             : "TRIM(CONCAT_WS(' ', official.firstname, official.middlename, official.lastname, official.suffix)) AS official_name")
         : "NULL AS official_name";
 
-    $sql = "
-        SELECT
-            a.appointment_id,
-            a.name,
-            a.contact_number,
-            a.subject,
-            a.subject_other,
-            a.purpose,
-            {$preferredScheduleSelect} AS preferred_schedule_timestamp,
-            {$confirmedScheduleSelect} AS confirmed_schedule_timestamp,
-            a.request_timestamp,
-            a.resident_notes,
-            a.appointment_remarks,
-            {$reviewTimestampSelect} AS review_timestamp,
-            COALESCE(s.status_name, 'Pending') AS status_name,
-            staff.user_id AS staff_user_id,
-            CONCAT_WS(' ', staff.firstname, staff.lastname) AS staff_name,
-            {$assignedOfficialSelect} AS official_user_id,
-            {$assignedOfficialNameSelect}
-        FROM appointmentstbl a
-        LEFT JOIN statuslookuptbl s
-            ON a.appointment_status_id = s.status_id
-        LEFT JOIN officialinformationtbl staff
-            ON a.user_id_employee_staff = staff.user_id
-        {$assignedOfficialJoin}
-        ORDER BY a.request_timestamp DESC, a.appointment_id DESC
-    ";
-
-    $result = $conn->query($sql);
-    if ($result instanceof mysqli_result) {
-        while ($row = $result->fetch_assoc()) {
-            $rawStatusName = (string)($row['status_name'] ?? 'Pending');
-            $statusName = at_status_label($rawStatusName);
-            $isRescheduled = at_is_rescheduled($rawStatusName);
-            $subject = at_value($row, 'subject', '-');
-            $subjectOther = at_value($row, 'subject_other', '');
-            if (strcasecmp($subject, 'Other') === 0 && $subjectOther !== '') {
-                $subject = 'Other: ' . $subjectOther;
-            }
-
-            $preferredScheduleTimestamp = at_value($row, 'preferred_schedule_timestamp', '');
-            $confirmedScheduleTimestamp = at_value($row, 'confirmed_schedule_timestamp', '');
-            $preferredAppointmentDate = at_format_date($row['preferred_schedule_timestamp'] ?? null);
-            $preferredAppointmentTime = at_format_time($row['preferred_schedule_timestamp'] ?? null);
-            $confirmedAppointmentDate = at_format_date($row['confirmed_schedule_timestamp'] ?? null);
-            $confirmedAppointmentTime = at_format_time($row['confirmed_schedule_timestamp'] ?? null);
-            $scheduleDisplay = trim($preferredAppointmentDate . ' ' . $preferredAppointmentTime);
-            $scheduleSubtitle = '';
-
-            if ($confirmedScheduleTimestamp !== '') {
-                $scheduleDisplay = trim($confirmedAppointmentDate . ' ' . $confirmedAppointmentTime);
-                if ($isRescheduled && $preferredScheduleTimestamp !== '') {
-                    $scheduleSubtitle = 'Preferred: ' . trim($preferredAppointmentDate . ' ' . $preferredAppointmentTime);
-                }
-            }
-
-            $appointmentRows[] = [
-                'appointment_id' => at_value($row, 'appointment_id', '-'),
-                'request_timestamp' => at_value($row, 'request_timestamp', ''),
-                'request_timestamp_display' => at_format_datetime($row['request_timestamp'] ?? null),
-                'resident_name' => at_middle_initial_name(at_value($row, 'name', '')),
-                'contact_number' => at_value($row, 'contact_number', '-'),
-                'subject' => $subject,
-                'purpose' => at_value($row, 'purpose', '-'),
-                'preferred_schedule_timestamp' => $preferredScheduleTimestamp,
-                'preferred_appointment_date' => $preferredAppointmentDate,
-                'preferred_appointment_time' => $preferredAppointmentTime,
-                'confirmed_schedule_timestamp' => $confirmedScheduleTimestamp,
-                'confirmed_appointment_date' => $confirmedAppointmentDate,
-                'confirmed_appointment_time' => $confirmedAppointmentTime,
-                'schedule_display' => $scheduleDisplay !== '' ? $scheduleDisplay : '-',
-                'schedule_subtitle' => $scheduleSubtitle,
-                'status_name' => $statusName,
-                'status_key' => at_status_key($statusName),
-                'status_pill' => at_status_pill($statusName),
-                'status_subtitle' => $isRescheduled ? 'Rescheduled' : '',
-                'staff_name' => at_value($row, 'staff_name', '-'),
-                'official_user_id' => at_value($row, 'official_user_id', ''),
-                'official_name' => at_value($row, 'official_name', '-'),
-                'resident_notes' => at_value($row, 'resident_notes', '-'),
-                'appointment_remarks' => at_value($row, 'appointment_remarks', '-'),
-                'review_timestamp_display' => at_format_datetime($row['review_timestamp'] ?? null),
-            ];
+    if (empty($appointmentAccess['can_view_all_tracker'])) {
+        if (!$hasAssignedOfficial) {
+            $loadError = 'Assigned-official tracking is unavailable for this appointments module.';
+        } elseif ($scopedOfficialUserId === '') {
+            $loadError = 'Your account is missing the official assignment required to view appointment records.';
         }
-        $result->free();
-    } else {
-        $loadError = 'Unable to load appointment records.';
+    }
+
+    if ($loadError === '') {
+        $scopeWhere = '';
+        $bindTypes = '';
+        $bindValues = [];
+        if (empty($appointmentAccess['can_view_all_tracker'])) {
+            $scopeWhere = "
+        WHERE a.user_id_official_assigned COLLATE utf8mb4_general_ci = ?
+            ";
+            $bindTypes = 's';
+            $bindValues[] = $scopedOfficialUserId;
+        }
+
+        $sql = "
+            SELECT
+                a.appointment_id,
+                a.name,
+                a.contact_number,
+                a.subject,
+                a.subject_other,
+                a.purpose,
+                {$preferredScheduleSelect} AS preferred_schedule_timestamp,
+                {$confirmedScheduleSelect} AS confirmed_schedule_timestamp,
+                a.request_timestamp,
+                a.resident_notes,
+                a.appointment_remarks,
+                {$reviewTimestampSelect} AS review_timestamp,
+                COALESCE(s.status_name, 'Pending') AS status_name,
+                staff.user_id AS staff_user_id,
+                CONCAT_WS(' ', staff.firstname, staff.lastname) AS staff_name,
+                {$assignedOfficialSelect} AS official_user_id,
+                {$assignedOfficialNameSelect}
+            FROM appointmentstbl a
+            LEFT JOIN statuslookuptbl s
+                ON a.appointment_status_id = s.status_id
+            LEFT JOIN officialinformationtbl staff
+                ON a.user_id_employee_staff = staff.user_id
+            {$assignedOfficialJoin}{$scopeWhere}
+            ORDER BY a.request_timestamp DESC, a.appointment_id DESC
+        ";
+
+        $stmt = $conn->prepare($sql);
+        if ($stmt) {
+            if ($bindTypes !== '') {
+                $stmt->bind_param($bindTypes, ...$bindValues);
+            }
+            $stmt->execute();
+            $result = $stmt->get_result();
+            while ($row = $result->fetch_assoc()) {
+                $rawStatusName = (string)($row['status_name'] ?? 'Pending');
+                $statusName = at_status_label($rawStatusName);
+                $isRescheduled = at_is_rescheduled($rawStatusName);
+                $subject = at_value($row, 'subject', '-');
+                $subjectOther = at_value($row, 'subject_other', '');
+                if (strcasecmp($subject, 'Other') === 0 && $subjectOther !== '') {
+                    $subject = 'Other: ' . $subjectOther;
+                }
+
+                $preferredScheduleTimestamp = at_value($row, 'preferred_schedule_timestamp', '');
+                $confirmedScheduleTimestamp = at_value($row, 'confirmed_schedule_timestamp', '');
+                $preferredAppointmentDate = at_format_date($row['preferred_schedule_timestamp'] ?? null);
+                $preferredAppointmentTime = at_format_time($row['preferred_schedule_timestamp'] ?? null);
+                $confirmedAppointmentDate = at_format_date($row['confirmed_schedule_timestamp'] ?? null);
+                $confirmedAppointmentTime = at_format_time($row['confirmed_schedule_timestamp'] ?? null);
+                $scheduleDisplay = trim($preferredAppointmentDate . ' ' . $preferredAppointmentTime);
+                $scheduleSubtitle = '';
+
+                if ($confirmedScheduleTimestamp !== '') {
+                    $scheduleDisplay = trim($confirmedAppointmentDate . ' ' . $confirmedAppointmentTime);
+                    if ($isRescheduled && $preferredScheduleTimestamp !== '') {
+                        $scheduleSubtitle = 'Preferred: ' . trim($preferredAppointmentDate . ' ' . $preferredAppointmentTime);
+                    }
+                }
+
+                $appointmentRows[] = [
+                    'appointment_id' => at_value($row, 'appointment_id', '-'),
+                    'request_timestamp' => at_value($row, 'request_timestamp', ''),
+                    'request_timestamp_display' => at_format_datetime($row['request_timestamp'] ?? null),
+                    'resident_name' => at_middle_initial_name(at_value($row, 'name', '')),
+                    'contact_number' => at_value($row, 'contact_number', '-'),
+                    'subject' => $subject,
+                    'purpose' => at_value($row, 'purpose', '-'),
+                    'preferred_schedule_timestamp' => $preferredScheduleTimestamp,
+                    'preferred_appointment_date' => $preferredAppointmentDate,
+                    'preferred_appointment_time' => $preferredAppointmentTime,
+                    'confirmed_schedule_timestamp' => $confirmedScheduleTimestamp,
+                    'confirmed_appointment_date' => $confirmedAppointmentDate,
+                    'confirmed_appointment_time' => $confirmedAppointmentTime,
+                    'schedule_display' => $scheduleDisplay !== '' ? $scheduleDisplay : '-',
+                    'schedule_subtitle' => $scheduleSubtitle,
+                    'status_name' => $statusName,
+                    'status_key' => at_status_key($statusName),
+                    'status_pill' => at_status_pill($statusName),
+                    'status_subtitle' => $isRescheduled ? 'Rescheduled' : '',
+                    'staff_name' => at_value($row, 'staff_name', '-'),
+                    'official_user_id' => at_value($row, 'official_user_id', ''),
+                    'official_name' => at_value($row, 'official_name', '-'),
+                    'resident_notes' => at_value($row, 'resident_notes', '-'),
+                    'appointment_remarks' => at_value($row, 'appointment_remarks', '-'),
+                    'review_timestamp_display' => at_format_datetime($row['review_timestamp'] ?? null),
+                ];
+            }
+            $result->free();
+            $stmt->close();
+        } else {
+            $loadError = 'Unable to load appointment records.';
+        }
     }
 }
 
 foreach (apcm_fetch_council_members($conn) as $member) {
+    $memberUserId = trim((string)($member['user_id'] ?? ''));
+    if (
+        empty($appointmentAccess['can_manage_all_tracker'])
+        && $appointmentCurrentUserId !== ''
+        && strcasecmp($memberUserId, $appointmentCurrentUserId) !== 0
+    ) {
+        continue;
+    }
     $officialOptions[] = [
-        'user_id' => trim((string)($member['user_id'] ?? '')),
+        'user_id' => $memberUserId,
         'full_name' => trim((string)($member['full_name'] ?? '')),
         'position_access' => trim((string)($member['position_access'] ?? '')),
         'department' => trim((string)($member['department'] ?? '')),
