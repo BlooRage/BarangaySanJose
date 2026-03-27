@@ -42,7 +42,6 @@ if (!function_exists('appUrl')) {
     require_once __DIR__ . '/../../PhpFiles/General/security.php';
 }
 require_once __DIR__ . '/../../PhpFiles/General/adminModulePermissions.php';
-require_once __DIR__ . '/../../PhpFiles/General/siteContent.php';
 
 if ((!isset($conn) || !($conn instanceof mysqli)) && file_exists(__DIR__ . '/../../PhpFiles/General/connection.php')) {
     require_once __DIR__ . '/../../PhpFiles/General/connection.php';
@@ -244,11 +243,7 @@ $isContentCreateSectionActive = $current === 'CreateContent.php';
 $isContentToolsSectionActive = $current === 'Contents.php';
 $isContentNavigatorActive = $current === 'ContentManagement.php';
 $isContentChangeRequestActive = $current === 'ContentManagement.php'
-    && $contentManagementModule === 'requests'
-    && $contentRequestsView === 'my_requests';
-$isCmsToolsActive = $current === 'ContentManagement.php'
-    && $contentManagementModule === 'requests'
-    && in_array($contentRequestsView, ['review_queue', 'archived_requests', 'approved_history'], true);
+    && $contentManagementModule === 'requests';
 
 $sbAllowedPermissions = [];
 if (isset($conn) && $conn instanceof mysqli && !empty($_SESSION['user_id'])) {
@@ -268,16 +263,6 @@ $sbCan = static function (string $key) use (&$sbAllowedPermissions): bool {
 $sbHasAny = static function (array $keys) use (&$sbAllowedPermissions): bool {
     return amp_permission_keys_have_any($sbAllowedPermissions, $keys);
 };
-$sbCanReviewContent = false;
-if (isset($conn) && $conn instanceof mysqli && !empty($_SESSION['user_id'])) {
-    $sbCanReviewContent = cms_content_can_review(
-        $conn,
-        (string)$_SESSION['user_id'],
-        (string)($_SESSION['role'] ?? '')
-    );
-} elseif ($isSuperAdminSidebar) {
-    $sbCanReviewContent = true;
-}
 
 $sbResidentProfilingKeys = [
     'resident_masterlist',
@@ -483,17 +468,6 @@ if (!empty($_SESSION['user_id']) && isset($conn) && $conn instanceof mysqli) {
 <style>
   #admin-mobile-header {
     display: none;
-  }
-
-  .sidebar-subtoggle {
-    font-size: 0.88rem;
-    justify-content: space-between;
-    padding: 0.35rem 0.5rem 0.35rem 0.65rem;
-    width: 100%;
-  }
-
-  .btn-toggle-nav-sub {
-    padding-left: 0.95rem;
   }
 
   @media screen and (orientation: portrait) and (max-width: 1024px) {
@@ -958,40 +932,6 @@ if (!empty($_SESSION['user_id']) && isset($conn) && $conn instanceof mysqli) {
                  class="link-dark rounded <?= $isContentChangeRequestActive ? 'active' : '' ?>">
                 Content Change Request
               </a>
-            </li>
-            <li class="mt-1">
-              <button class="btn btn-toggle sidebar-subtoggle d-flex align-items-center rounded <?= $isCmsToolsActive ? '' : 'collapsed' ?>"
-                      data-bs-toggle="collapse"
-                      data-bs-target="#cms-tools-collapse"
-                      aria-expanded="<?= $isCmsToolsActive ? 'true' : 'false' ?>">
-                <span>CMS Tools</span>
-              </button>
-              <div class="collapse <?= $isCmsToolsActive ? 'show' : '' ?>" id="cms-tools-collapse">
-                <ul class="btn-toggle-nav btn-toggle-nav-sub list-unstyled fw-normal pb-1 small">
-                  <?php if ($sbCanReviewContent): ?>
-                  <li>
-                    <a href="<?= htmlspecialchars(appUrl('Admin-End/Contents/ContentManagement.php')) ?>?module=requests&amp;requests_view=review_queue"
-                       class="link-dark rounded <?= ($current === 'ContentManagement.php' && $contentManagementModule === 'requests' && $contentRequestsView === 'review_queue') ? 'active' : '' ?>">
-                      Review Queue
-                    </a>
-                  </li>
-                  <?php endif; ?>
-                  <li>
-                    <a href="<?= htmlspecialchars(appUrl('Admin-End/Contents/ContentManagement.php')) ?>?module=requests&amp;requests_view=archived_requests"
-                       class="link-dark rounded <?= ($current === 'ContentManagement.php' && $contentManagementModule === 'requests' && $contentRequestsView === 'archived_requests') ? 'active' : '' ?>">
-                      Archived Requests
-                    </a>
-                  </li>
-                  <?php if ($sbCanReviewContent): ?>
-                  <li>
-                    <a href="<?= htmlspecialchars(appUrl('Admin-End/Contents/ContentManagement.php')) ?>?module=requests&amp;requests_view=approved_history"
-                       class="link-dark rounded <?= ($current === 'ContentManagement.php' && $contentManagementModule === 'requests' && $contentRequestsView === 'approved_history') ? 'active' : '' ?>">
-                      Approved Version History
-                    </a>
-                  </li>
-                  <?php endif; ?>
-                </ul>
-              </div>
             </li>
             <li>
               <a href="<?= htmlspecialchars(appUrl('Admin-End/Contents/ContentManagement.php')) ?>?module=home"
