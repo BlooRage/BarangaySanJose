@@ -63,6 +63,13 @@
     return labelMap[normalized] || "Pending";
   };
 
+  const statusPillClass = (status) => {
+    const normalized = fmtStatus(status);
+    if (normalized === "Approved") return "approved";
+    if (normalized === "Rejected") return "denied";
+    return "pending";
+  };
+
   const formatDate = (value) => {
     const raw = String(value || "").trim();
     if (!raw) return "-";
@@ -169,7 +176,7 @@
         <td>${escapeHtml(row.head_full_name || "-")}</td>
         <td>${escapeHtml(row.member_full_name || "-")}</td>
         <td>${escapeHtml(formatBirthdate(row.birthdate))}</td>
-        <td>${escapeHtml(statusLabel(row.status))}</td>
+        <td><span class="status-pill ${escapeHtml(statusPillClass(row.status))}">${escapeHtml(statusLabel(row.status))}</span></td>
         <td>${escapeHtml(formatDate(row.submitted_at))}</td>
         <td><button class="btn btn-outline-primary btn-sm" data-request-id="${escapeHtml(row.request_id)}">View</button></td>
       </tr>
@@ -186,7 +193,9 @@
     if (el("hmvModalMiddleName")) el("hmvModalMiddleName").textContent = row.middle_name || "-";
     if (el("hmvModalSuffix")) el("hmvModalSuffix").textContent = row.suffix || "-";
     if (el("hmvModalBirthdate")) el("hmvModalBirthdate").textContent = formatBirthdate(row.birthdate);
-    if (el("hmvModalStatus")) el("hmvModalStatus").textContent = statusLabel(row.status);
+    if (el("hmvModalStatus")) {
+      el("hmvModalStatus").innerHTML = `<span class="status-pill ${escapeHtml(statusPillClass(row.status))}">${escapeHtml(statusLabel(row.status))}</span>`;
+    }
     renderDocumentPreview(row);
 
     const isPending = fmtStatus(row.status) === "PendingReview";
