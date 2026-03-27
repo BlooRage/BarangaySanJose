@@ -6773,10 +6773,12 @@
     });
 
     tableBody.querySelectorAll('button[data-issued-id]').forEach((btn) => {
-      btn.addEventListener('click', () => {
+      btn.addEventListener('click', async () => {
         const id = String(btn.getAttribute('data-issued-id') || '');
         if (!id) return;
-        const row = itemById.get(id);
+        let row = itemById.get(id);
+        row = await ensureRowDetails(row);
+        if (!row) return;
         const stageKey = resolveWorkflowStage(row);
         const allowPrint = stageKey === 'ready_for_claim';
         const issuedUrl = issuedDocumentUrl(id, row);
@@ -9468,6 +9470,5 @@
     document.getElementById('fcrListRefreshBtn').addEventListener('click', loadFcrList);
   })();
 })();
-
 
 
