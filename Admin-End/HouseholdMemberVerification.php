@@ -335,7 +335,7 @@ require_once __DIR__ . "/includes/admin_guard.php";
                 </div>
             </div>
             <div class="modal-footer border-0">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-outline-secondary" id="btnHmvReturnToReview">Return</button>
                 <button type="button" class="btn btn-primary" id="btnHmvConfirmAction">Confirm</button>
             </div>
         </div>
@@ -353,6 +353,6 @@ require_once __DIR__ . "/includes/admin_guard.php";
   };
 </script>
 <script src="../JS-Script-Files/Admin-End/tableColumnsGeneric.js?v=20260215-1"></script>
-<script src="../JS-Script-Files/Admin-End/householdMemberVerificationScript.js?v=20260328-03"></script>
+<script src="../JS-Script-Files/Admin-End/householdMemberVerificationScript.js?v=20260328-04"></script>
 </body>
 </html>

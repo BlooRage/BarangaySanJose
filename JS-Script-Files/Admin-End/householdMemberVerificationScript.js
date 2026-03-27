@@ -18,6 +18,7 @@
   const confirmRemarksWrapEl = el("hmvActionConfirmRemarksWrap");
   const confirmRemarksEl = el("hmvActionConfirmRemarks");
   const confirmActionBtn = el("btnHmvConfirmAction");
+  const returnToReviewBtn = el("btnHmvReturnToReview");
 
   if (!bodyEl) return;
 
@@ -27,6 +28,8 @@
     search: "",
     active: null,
     pendingAction: "",
+    reopenReviewAfterConfirmClose: false,
+    pendingConfirmOpen: false,
     modalFilters: {
       dateFrom: "",
       dateTo: "",
@@ -239,6 +242,7 @@
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok || !data.success) throw new Error(data.message || "Failed to review request.");
+      state.reopenReviewAfterConfirmClose = false;
       confirmModal?.hide();
       modal?.hide();
       await fetchRows();
@@ -271,11 +275,25 @@
       confirmActionBtn.classList.remove("btn-primary", "btn-danger", "btn-success");
       confirmActionBtn.classList.add(isReject ? "btn-danger" : "btn-success");
     }
+    state.pendingConfirmOpen = true;
+    state.reopenReviewAfterConfirmClose = false;
+    modal?.hide();
+  };
+
+  modalEl?.addEventListener("hidden.bs.modal", () => {
+    if (!state.pendingConfirmOpen) return;
+    state.pendingConfirmOpen = false;
     confirmModal?.show();
-    if (isReject) {
+    if (state.pendingAction === "reject_member_request") {
       window.setTimeout(() => confirmRemarksEl?.focus(), 150);
     }
-  };
+  });
+
+  confirmModalEl?.addEventListener("hidden.bs.modal", () => {
+    if (!state.reopenReviewAfterConfirmClose) return;
+    state.reopenReviewAfterConfirmClose = false;
+    modal?.show();
+  });
 
   document.querySelectorAll(".hmv-filter-btn").forEach((button) => {
     button.addEventListener("click", () => {
@@ -321,6 +339,10 @@
   el("btnHmvApprove")?.addEventListener("click", () => openActionConfirm("approve_member_request"));
   el("btnHmvReject")?.addEventListener("click", () => openActionConfirm("reject_member_request"));
   confirmActionBtn?.addEventListener("click", () => submitReview(state.pendingAction));
+  returnToReviewBtn?.addEventListener("click", () => {
+    state.reopenReviewAfterConfirmClose = true;
+    confirmModal?.hide();
+  });
 
   fetchRows();
 })();
