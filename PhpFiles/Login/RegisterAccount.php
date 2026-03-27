@@ -1,6 +1,5 @@
 <?php
 require_once __DIR__ . "/../General/security.php";
-require_once __DIR__ . "/redirectDestination.php";
 
 header('Content-Type: application/json');
 require_once __DIR__ . '/../General/connection.php';
@@ -223,6 +222,8 @@ VALUES (?, ?, ?, 1, ?, ?, 0, ?, ?, ?, ?, ?)
     $_SESSION['status'] = 'Active';
     $_SESSION['logged_in'] = true;
     $_SESSION['last_activity'] = time();
+
+    require_once __DIR__ . "/redirectDestination.php";
 
     echo json_encode([
         "success" => true,
