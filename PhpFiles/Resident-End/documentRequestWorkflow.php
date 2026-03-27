@@ -1911,7 +1911,7 @@ if ($action === 'submit_request') {
     $requestDetailsToken = dr_request_details_token($documentTypeRaw, $documentType);
     $requestDetailsJsonRequired = dr_request_details_requires_json($conn);
     $requestDetailsValue = $payloadJson;
-    $defaultValidity = date('Y-m-d H:i:s', strtotime('+1 year'));
+    $defaultValidity = date('Y-m-d H:i:s', strtotime('+2 years'));
 
     $setIfColumn = function (string $column, string $type, $value) use (&$values, &$types, &$params, $conn) {
         if (!dr_has_column($conn, 'documentrequesttbl', $column)) {

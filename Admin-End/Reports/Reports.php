@@ -3075,9 +3075,6 @@ $reportLayoutStateUrl = $baseUrl . '?' . http_build_query($reportLayoutStateQuer
     <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-4">
       <h2 class="mb-0" style="font-family: 'Charis SIL Bold'; color: #DE710C;">Reports</h2>
       <div class="d-flex gap-2 d-print-none">
-        <button class="btn btn-outline-secondary btn-sm" onclick="openReportPrintView()">
-          <i class="fas fa-print me-1"></i>Print
-        </button>
         <button class="btn btn-danger btn-sm" id="btnDownloadPdf" onclick="downloadPdf()">
           <i class="fas fa-file-pdf me-1"></i>Download PDF
         </button>
@@ -6613,17 +6610,6 @@ window.__reportPaginationReady = (() => {
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 <script>
-function openReportPrintView() {
-  const url = new URL(window.location.href);
-  url.searchParams.set('format', 'print');
-  url.searchParams.set('autoprint', '1');
-  url.searchParams.delete('download');
-  const popup = window.open(url.toString(), '_blank', 'width=1100,height=900,scrollbars=yes');
-  if (!popup) {
-    alert('Please allow popups for this site, then click Print again.');
-  }
-}
-
 function downloadPdf() {
   const url = new URL(window.location.href);
   url.searchParams.set('format', 'print');

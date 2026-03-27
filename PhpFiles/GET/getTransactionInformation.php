@@ -202,12 +202,19 @@ if ($fullName === '') {
 }
 
 $address = ti_value($payload, ['applicant_full_address', 'owner_full_address', 'full_address', 'full_address_display', 'address', 'complete_address'], 'Barangay San Jose, Rodriguez, Rizal');
+$documentType = (string)($row['document_type'] ?? 'Certificate Request');
 $purpose = trim((string)($row['purpose'] ?? ''));
 if ($purpose === '') {
     $purpose = ti_value($payload, ['request_purpose', 'purpose'], '-');
 }
 
 $validity = trim((string)($row['document_validity'] ?? ''));
+if (dr_is_barangay_id_document_type($documentType)) {
+    $barangayIdValidUntil = dr_barangay_id_valid_until_datetime($row);
+    if ($barangayIdValidUntil instanceof DateTimeImmutable) {
+        $validity = $barangayIdValidUntil->format('Y-m-d H:i:s');
+    }
+}
 if ($validity === '') {
     $validity = trim((string)($row['completed_at'] ?? $row['ready_at'] ?? $row['release_timestamp'] ?? ''));
 }
@@ -222,7 +229,7 @@ ti_json(200, [
         'status' => ti_stage_label((string)($row['stage'] ?? 'submitted')),
         'status_raw' => (string)($row['stage'] ?? 'submitted'),
         'reason' => (string)($row['status_remarks'] ?? ''),
-        'document_type' => (string)($row['document_type'] ?? 'Certificate Request'),
+        'document_type' => $documentType,
         'full_name' => $fullName,
         'purpose' => $purpose,
         'address' => $address,

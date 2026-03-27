@@ -24,7 +24,7 @@ function bm_non_empty(array $values): string
 {
     foreach ($values as $value) {
         $text = trim(preg_replace('/\s+/', ' ', (string)$value) ?? '');
-        if ($text !== '') {
+        if ($text !== '' && !bm_is_protected_value($text)) {
             return $text;
         }
     }
@@ -32,10 +32,34 @@ function bm_non_empty(array $values): string
     return '';
 }
 
+function bm_is_protected_value($value): bool
+{
+    $text = trim((string)$value);
+    if ($text === '') {
+        return false;
+    }
+
+    if (function_exists('pii_cipher_prefix') && strpos($text, pii_cipher_prefix()) !== false) {
+        return true;
+    }
+
+    return function_exists('pii_is_encrypted_value') && pii_is_encrypted_value($text);
+}
+
 function bm_decode_payload(array $row): array
 {
+    if (function_exists('dr_decode_request_payload')) {
+        return dr_decode_request_payload($row);
+    }
+
     $payload = json_decode((string)($row['request_details'] ?? '{}'), true);
-    return is_array($payload) ? $payload : [];
+    if (!is_array($payload)) {
+        return [];
+    }
+
+    return function_exists('dr_decode_request_payload_value')
+        ? dr_decode_request_payload_value($payload)
+        : $payload;
 }
 
 function bm_normalize_public_file_path(string $rawPath): string
@@ -162,12 +186,24 @@ function bm_proof_of_business_address_label(string $type, bool $updated = false)
 
 function bm_person_name(array $payload, string $prefix): string
 {
-    $first = trim((string)($payload[$prefix . 'fn'] ?? ''));
-    $middle = trim((string)($payload[$prefix . 'mn'] ?? ''));
-    $last = trim((string)($payload[$prefix . 'ln'] ?? ''));
-    $suffix = trim((string)($payload[$prefix . 'suffix'] ?? ''));
+    return bm_join_person_name(
+        $payload[$prefix . 'fn'] ?? '',
+        $payload[$prefix . 'mn'] ?? '',
+        $payload[$prefix . 'ln'] ?? '',
+        $payload[$prefix . 'suffix'] ?? ''
+    );
+}
 
-    return trim(implode(' ', array_filter([$first, $middle, $last, $suffix], static fn($value) => $value !== '')));
+function bm_join_person_name($first, $middle, $last, $suffix): string
+{
+    $parts = [
+        trim((string)$first),
+        trim((string)$middle),
+        trim((string)$last),
+        trim((string)$suffix),
+    ];
+
+    return trim(implode(' ', array_filter($parts, static fn($value) => $value !== '' && !bm_is_protected_value($value))));
 }
 
 function bm_format_timestamp(string $value): string
@@ -273,12 +309,18 @@ $extraSelects = [];
 $extraJoins = [];
 if (dr_table_exists($conn, 'residentinformationtbl')) {
     if (dr_column_exists($conn, 'documentrequesttbl', 'resident_user_id')) {
-        $extraSelects[] = "TRIM(CONCAT_WS(' ', NULLIF(riu.firstname, ''), NULLIF(riu.middlename, ''), NULLIF(riu.lastname, ''), NULLIF(riu.suffix, ''))) AS _resident_name_by_user";
+        $extraSelects[] = "riu.firstname AS _riu_firstname";
+        $extraSelects[] = "riu.middlename AS _riu_middlename";
+        $extraSelects[] = "riu.lastname AS _riu_lastname";
+        $extraSelects[] = "riu.suffix AS _riu_suffix";
         $extraSelects[] = "NULLIF(riu.sector_membership, '') AS _sector_membership_by_user";
         $extraJoins[] = 'LEFT JOIN residentinformationtbl riu ON riu.user_id = d.resident_user_id';
     }
     if (dr_column_exists($conn, 'documentrequesttbl', 'resident_id')) {
-        $extraSelects[] = "TRIM(CONCAT_WS(' ', NULLIF(rir.firstname, ''), NULLIF(rir.middlename, ''), NULLIF(rir.lastname, ''), NULLIF(rir.suffix, ''))) AS _resident_name_by_resident";
+        $extraSelects[] = "rir.firstname AS _rir_firstname";
+        $extraSelects[] = "rir.middlename AS _rir_middlename";
+        $extraSelects[] = "rir.lastname AS _rir_lastname";
+        $extraSelects[] = "rir.suffix AS _rir_suffix";
         $extraSelects[] = "NULLIF(rir.sector_membership, '') AS _sector_membership_by_resident";
         $extraJoins[] = 'LEFT JOIN residentinformationtbl rir ON rir.resident_id = d.resident_id';
     }
@@ -345,6 +387,20 @@ $result = $stmt->get_result();
 $items = [];
 
 while ($row = $result->fetch_assoc()) {
+    if (function_exists('pii_decrypt_assoc')) {
+        $row = pii_decrypt_assoc($row, [
+            '_riu_firstname',
+            '_riu_middlename',
+            '_riu_lastname',
+            '_riu_suffix',
+            '_rir_firstname',
+            '_rir_middlename',
+            '_rir_lastname',
+            '_rir_suffix',
+            'resident_name',
+        ]) ?? $row;
+    }
+
     $payload = bm_decode_payload($row);
     if (!bm_is_business_monitoring_request($row, $payload)) {
         continue;
@@ -363,11 +419,29 @@ while ($row = $result->fetch_assoc()) {
         $row['submitted_at'] ?? '',
         $row['request_timestamp'] ?? '',
     ]);
+    $residentNameByUser = bm_join_person_name(
+        $row['_riu_firstname'] ?? '',
+        $row['_riu_middlename'] ?? '',
+        $row['_riu_lastname'] ?? '',
+        $row['_riu_suffix'] ?? ''
+    );
+    $residentNameByResident = bm_join_person_name(
+        $row['_rir_firstname'] ?? '',
+        $row['_rir_middlename'] ?? '',
+        $row['_rir_lastname'] ?? '',
+        $row['_rir_suffix'] ?? ''
+    );
     $applicantName = bm_non_empty([
         $row['resident_name'] ?? '',
-        $row['_resident_name_by_user'] ?? '',
-        $row['_resident_name_by_resident'] ?? '',
+        $residentNameByUser,
+        $residentNameByResident,
         $payload['resident_name'] ?? '',
+        bm_join_person_name(
+            $payload['first_name'] ?? $payload['firstname'] ?? '',
+            $payload['middle_name'] ?? $payload['middlename'] ?? '',
+            $payload['last_name'] ?? $payload['lastname'] ?? '',
+            $payload['suffix'] ?? ''
+        ),
     ]);
     $ownerType = bm_non_empty([
         $payload['owner_type'] ?? '',

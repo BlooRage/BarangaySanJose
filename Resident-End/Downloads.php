@@ -16,6 +16,7 @@ if (!isset($baseUrl)) {
 
 $allowUnregistered = false;
 require_once __DIR__ . '/includes/resident_access_guard.php';
+require_once __DIR__ . '/../PhpFiles/General/documentRequestWorkflow.php';
 
 $residentUserId = (string)($_SESSION['user_id'] ?? '');
 $workflowEndpoint = $baseUrl . '/PhpFiles/Resident-End/documentRequestWorkflow.php';
@@ -108,13 +109,21 @@ if (isset($conn) && $conn instanceof mysqli) {
 
                 $purpose = trim((string)($payload['request_purpose'] ?? $payload['purpose'] ?? ''));
                 $invoicePath = trim((string)($row['invoice_file_path'] ?? ''));
+                $validUntilValue = (string)($row['document_validity'] ?? '');
+                if (dr_is_barangay_id_document_type($documentType)) {
+                    $barangayIdValidUntil = dr_barangay_id_valid_until_datetime($row);
+                    if ($barangayIdValidUntil instanceof DateTimeImmutable) {
+                        $validUntilValue = $barangayIdValidUntil->format('Y-m-d H:i:s');
+                    }
+                }
+
                 $downloadItems[] = [
                     'request_id' => (string)($row['request_id'] ?? ''),
                     'document_type' => $documentType,
                     'purpose' => $purpose !== '' ? $purpose : '-',
                     'submitted_at' => downloads_format_datetime((string)($row['request_timestamp'] ?? '')),
                     'released_at' => downloads_format_datetime((string)($row['release_timestamp'] ?? '')),
-                    'valid_until' => downloads_format_datetime((string)($row['document_validity'] ?? '')),
+                    'valid_until' => downloads_format_datetime($validUntilValue),
                     'invoice_path' => $invoicePath,
                 ];
             }

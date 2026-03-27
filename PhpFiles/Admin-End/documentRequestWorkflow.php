@@ -6625,7 +6625,7 @@ if ($action === 'create_manual_request') {
     $setIfColumn('request_timestamp', 's', $now);
     $setIfColumn('review_timestamp', 's', null);
     $setIfColumn('release_timestamp', 's', null);
-    $setIfColumn('document_validity', 's', date('Y-m-d H:i:s', strtotime('+1 year')));
+    $setIfColumn('document_validity', 's', date('Y-m-d H:i:s', strtotime('+2 years')));
     $setIfColumn('qr_code_path', 's', '');
     $setIfColumn('issued_file_path', 's', null);
     $setIfColumn('stage', 's', DR_STAGE_SUBMITTED);

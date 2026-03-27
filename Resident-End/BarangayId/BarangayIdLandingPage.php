@@ -291,25 +291,21 @@ if ($pendingRequestId === '') {
         .apply-btn {
             min-width: 180px;
         }
-        .digital-id-btn {
-            background: #fff4e7;
-            color: #8a4b00;
-            border: 1px solid #f2c28a;
-        }
-        .digital-id-btn:hover {
-            background: #fc8d3d;
-            border-color: #fc8d3d;
-            color: #fff;
-        }
+        .digital-id-btn,
         .lost-report-btn {
-            background: #ffffff;
-            color: #8a4b00;
-            border: 1px dashed #e3a768;
+            background: linear-gradient(135deg, #ff9a3d 0%, #de710c 100%);
+            color: #fff;
+            border: 1px solid #c76007;
+            box-shadow: 0 10px 24px rgba(222, 113, 12, 0.22);
         }
-        .lost-report-btn:hover {
-            background: #fff6eb;
-            border-color: #de710c;
-            color: #8a4b00;
+        .digital-id-btn:hover,
+        .digital-id-btn:focus-visible,
+        .lost-report-btn:hover,
+        .lost-report-btn:focus-visible {
+            background: linear-gradient(135deg, #ffae58 0%, #c85c00 100%);
+            border-color: #b35300;
+            color: #fff;
+            box-shadow: 0 14px 28px rgba(200, 92, 0, 0.26);
         }
         .apply-note {
             max-width: 780px;

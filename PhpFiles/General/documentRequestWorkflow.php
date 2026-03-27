@@ -846,20 +846,7 @@ function dr_barangay_id_lost_reported_at(array $requestRow): string {
     return trim((string)($payload['barangay_id_lost_reported_at'] ?? ''));
 }
 
-function dr_barangay_id_valid_until_datetime(array $requestRow): ?DateTimeImmutable {
-    $payload = dr_decode_request_payload($requestRow);
-    $candidates = [
-        (string)($payload['barangay_id_valid_until'] ?? ''),
-        (string)($payload['valid_until'] ?? ''),
-        (string)($requestRow['document_validity'] ?? ''),
-    ];
-    foreach ($candidates as $candidate) {
-        $resolved = dr_parse_datetime_value($candidate, true);
-        if ($resolved instanceof DateTimeImmutable) {
-            return $resolved;
-        }
-    }
-
+function dr_barangay_id_issued_at_datetime(array $requestRow): ?DateTimeImmutable {
     foreach ([
         (string)($requestRow['completed_at'] ?? ''),
         (string)($requestRow['release_timestamp'] ?? ''),
@@ -869,11 +856,54 @@ function dr_barangay_id_valid_until_datetime(array $requestRow): ?DateTimeImmuta
     ] as $issuedCandidate) {
         $issuedAt = dr_parse_datetime_value($issuedCandidate);
         if ($issuedAt instanceof DateTimeImmutable) {
-            return $issuedAt->modify('+2 years')->setTime(23, 59, 59);
+            return $issuedAt;
         }
     }
 
     return null;
+}
+
+function dr_barangay_id_is_legacy_one_year_valid_until(DateTimeImmutable $resolvedValidUntil, ?DateTimeImmutable $issuedAt): bool {
+    if (!$issuedAt instanceof DateTimeImmutable) {
+        return false;
+    }
+
+    $legacyValidUntil = $issuedAt->modify('+1 year')->setTime(23, 59, 59);
+    $policyValidUntil = $issuedAt->modify('+2 years')->setTime(23, 59, 59);
+    $legacyDelta = abs($resolvedValidUntil->getTimestamp() - $legacyValidUntil->getTimestamp());
+    $policyDelta = abs($resolvedValidUntil->getTimestamp() - $policyValidUntil->getTimestamp());
+
+    return $legacyDelta <= 86400 && $policyDelta > 86400;
+}
+
+function dr_barangay_id_valid_until_datetime(array $requestRow): ?DateTimeImmutable {
+    $payload = dr_decode_request_payload($requestRow);
+    $issuedAt = dr_barangay_id_issued_at_datetime($requestRow);
+    $policyValidUntil = $issuedAt instanceof DateTimeImmutable
+        ? $issuedAt->modify('+2 years')->setTime(23, 59, 59)
+        : null;
+
+    $explicitCandidates = [
+        (string)($payload['barangay_id_valid_until'] ?? ''),
+        (string)($payload['valid_until'] ?? ''),
+    ];
+    foreach ($explicitCandidates as $candidate) {
+        $resolved = dr_parse_datetime_value($candidate, true);
+        if ($resolved instanceof DateTimeImmutable) {
+            if ($policyValidUntil instanceof DateTimeImmutable
+                && dr_barangay_id_is_legacy_one_year_valid_until($resolved, $issuedAt)) {
+                return $policyValidUntil;
+            }
+            return $resolved;
+        }
+    }
+
+    if ($policyValidUntil instanceof DateTimeImmutable) {
+        return $policyValidUntil;
+    }
+
+    $storedValidity = dr_parse_datetime_value((string)($requestRow['document_validity'] ?? ''), true);
+    return $storedValidity instanceof DateTimeImmutable ? $storedValidity : null;
 }
 
 function dr_resident_barangay_id_state(mysqli $conn, string $residentUserId, string $residentId = ''): array {
