@@ -3,8 +3,8 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/runtimeConfig.php';
 
-// SMS credentials must come from environment variables or runtime config.
-$defaultSemaphoreApiKey = '';
+// SMS credentials prefer environment/runtime config, with app fallbacks kept here.
+$defaultSemaphoreApiKey = 'ee267d0fbd5c2159bea7d72878c9d4cb';
 $defaultSemaphoreSender = 'BrgySanJose';
 
 $SEMAPHORE_API_KEY = trim((string)runtime_env(

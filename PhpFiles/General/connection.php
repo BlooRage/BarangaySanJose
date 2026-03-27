@@ -41,6 +41,7 @@ if (!function_exists('db_fail_response')) {
     }
 }
 
+// Database credentials prefer environment/runtime config, with app fallbacks kept here.
 $defaultDbHost = 'srv1986.hstgr.io';
 $defaultDbHostLocal = 'srv1986.hstgr.io';
 $defaultDbHostHosted = 'localhost';

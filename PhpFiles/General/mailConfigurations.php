@@ -20,12 +20,12 @@ if (!function_exists('mail_config_value')) {
     }
 }
 
-// Mail credentials must come from environment variables or runtime config.
-$defaultMailHost = '';
-$defaultMailUsername = '';
-$defaultMailPassword = '';
+// Mail credentials prefer environment/runtime config, with app fallbacks kept here.
+$defaultMailHost = 'smtp.hostinger.com';
+$defaultMailUsername = 'official@barangaysanjose-montalban.com';
+$defaultMailPassword = 'SanJose.Brgy@2025!';
 $defaultMailPort = 465;
-$defaultMailFromEmail = '';
+$defaultMailFromEmail = 'official@barangaysanjose-montalban.com';
 $defaultMailFromName = 'Barangay San Jose';
 
 $mailHost = trim((string)runtime_env('MAIL_HOST', runtime_config('mail.host', $defaultMailHost)));
