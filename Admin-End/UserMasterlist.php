@@ -126,9 +126,6 @@
               <i class="fa-solid fa-arrows-rotate"></i>
               <span class="visually-hidden">Refresh</span>
             </button>
-            <a href="<?= htmlspecialchars(appUrl('Admin-End/UserArchive.php')) ?>" class="btn btn-outline-dark">
-              User Archive
-            </a>
           </div>
         </div>
 
