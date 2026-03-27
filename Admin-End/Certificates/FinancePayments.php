@@ -485,6 +485,7 @@ $pageFlash = fp_take_flash();
 $feeRows = [];
 $availableFeeDocuments = [];
 $editingFee = null;
+$pendingFeeChangeCount = 0;
 $manualDepartmentOptions = [];
 $manualTransactionRows = [];
 
@@ -526,6 +527,18 @@ if ($financeSection === 'fees') {
       $availableFeeDocuments[] = $row;
     }
     $availableDocsResult->close();
+  }
+
+  if (fp_table_exists($conn, 'clearancefeetypetbl') && fp_column_exists($conn, 'clearancefeetypetbl', 'status')) {
+    $pendingCountResult = $conn->query("
+      SELECT COUNT(*) AS total
+      FROM clearancefeetypetbl
+      WHERE status = 'pending'
+    ");
+    if ($pendingCountResult instanceof mysqli_result) {
+      $pendingFeeChangeCount = (int)(($pendingCountResult->fetch_assoc() ?: [])['total'] ?? 0);
+      $pendingCountResult->close();
+    }
   }
 
   $editFeeId = (int)($_GET['edit_fee'] ?? 0);
@@ -916,7 +929,7 @@ if ($financeSection === 'fees') {
         <li class="nav-item">
           <button class="nav-link fw-semibold" id="tabPendingRequests" type="button">
             <i class="fas fa-bell me-1"></i>Pending Requests
-            <span id="pendingRequestsBadge" class="badge bg-danger ms-1 d-none">0</span>
+            <span id="pendingRequestsBadge" class="pending-count-badge <?= $pendingFeeChangeCount > 0 ? '' : 'd-none' ?>"><?= (int)$pendingFeeChangeCount ?></span>
           </button>
         </li>
       </ul>
