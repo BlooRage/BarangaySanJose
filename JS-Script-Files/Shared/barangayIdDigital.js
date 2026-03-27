@@ -239,6 +239,7 @@
         --bid-cardno-back-size: clamp(10.4px, 0.36rem + 0.92vw, 16.4px);
         --bid-emergency-size: clamp(8.8px, 0.31rem + 0.66vw, 12.4px);
         --bid-note-size: clamp(7.2px, 0.24rem + 0.44vw, 9.8px);
+        --bid-photo-bleed: 4%;
       }
       .barangay-id-card__bg {
         position: absolute;
@@ -343,6 +344,14 @@
       }
       .barangay-id-card__photo img {
         object-fit: cover;
+        object-position: center center;
+        width: calc(100% + var(--bid-photo-bleed));
+        height: calc(100% + var(--bid-photo-bleed));
+        max-width: none;
+        margin-top: calc(var(--bid-photo-bleed) * -0.5);
+        margin-left: calc(var(--bid-photo-bleed) * -0.5);
+        border-radius: 0 !important;
+        box-shadow: none !important;
       }
       .barangay-id-card__qr img {
         object-fit: fill;
