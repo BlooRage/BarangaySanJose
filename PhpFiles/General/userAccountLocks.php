@@ -68,6 +68,32 @@ if (!function_exists('ual_ensure_lock_columns')) {
     }
 }
 
+if (!function_exists('ual_ensure_archive_columns')) {
+    function ual_ensure_archive_columns(mysqli $conn): void
+    {
+        static $done = false;
+        if ($done) {
+            return;
+        }
+        $done = true;
+
+        if (!ual_table_exists($conn, 'useraccountstbl')) {
+            return;
+        }
+
+        $columnSql = [
+            'archived_at' => "ALTER TABLE useraccountstbl ADD COLUMN archived_at DATETIME NULL DEFAULT NULL AFTER updated_at",
+            'archived_prev_status_id' => "ALTER TABLE useraccountstbl ADD COLUMN archived_prev_status_id INT NULL DEFAULT NULL AFTER archived_at",
+        ];
+
+        foreach ($columnSql as $columnName => $sql) {
+            if (!ual_column_exists($conn, 'useraccountstbl', $columnName)) {
+                $conn->query($sql);
+            }
+        }
+    }
+}
+
 if (!function_exists('ual_load_status_ids')) {
     function ual_load_status_ids(mysqli $conn): array
     {
@@ -89,6 +115,52 @@ if (!function_exists('ual_load_status_ids')) {
         $stmt->close();
 
         return $statusIds;
+    }
+}
+
+if (!function_exists('ual_ensure_useraccount_status')) {
+    function ual_ensure_useraccount_status(mysqli $conn, string $statusName): ?int
+    {
+        $normalized = strtolower(trim($statusName));
+        if ($normalized === '') {
+            return null;
+        }
+
+        $statusIds = ual_load_status_ids($conn);
+        if (isset($statusIds[$normalized])) {
+            return (int)$statusIds[$normalized];
+        }
+
+        $canonicalName = trim($statusName);
+        $stmt = $conn->prepare("
+            INSERT INTO statuslookuptbl (status_name, status_type)
+            VALUES (?, 'UserAccount')
+        ");
+        if (!$stmt) {
+            return null;
+        }
+
+        $stmt->bind_param('s', $canonicalName);
+        $stmt->execute();
+        $stmt->close();
+
+        $statusIds = ual_load_status_ids($conn);
+        return isset($statusIds[$normalized]) ? (int)$statusIds[$normalized] : null;
+    }
+}
+
+if (!function_exists('ual_ensure_archive_support')) {
+    function ual_ensure_archive_support(mysqli $conn): array
+    {
+        ual_ensure_archive_columns($conn);
+
+        $archivedStatusId = ual_ensure_useraccount_status($conn, 'Archived');
+        $statusIds = ual_load_status_ids($conn);
+
+        return [
+            'status_ids' => $statusIds,
+            'archived_status_id' => $archivedStatusId ?? ($statusIds['archived'] ?? null),
+        ];
     }
 }
 

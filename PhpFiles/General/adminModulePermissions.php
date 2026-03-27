@@ -323,6 +323,12 @@ if (!function_exists('amp_get_permission_catalog')) {
                                 'path' => 'Admin-End/UserMasterlist.php',
                                 'admin_only' => true,
                             ],
+                            [
+                                'key' => 'user_archive',
+                                'label' => 'User Archive',
+                                'path' => 'Admin-End/UserArchive.php',
+                                'admin_only' => true,
+                            ],
                         ],
                     ],
                     [
@@ -460,6 +466,7 @@ if (!function_exists('amp_get_it_superadmin_locked_permission_keys')) {
         return [
             'dashboard',
             'user_masterlist',
+            'user_archive',
             'officials_management',
             'personnel_invite',
             'official_transition',
@@ -1468,6 +1475,7 @@ if (!function_exists('amp_resolve_request_permission_key')) {
                 default => 'reports_certificate_issuance',
             },
             'UserMasterlist.php' => 'user_masterlist',
+            'UserArchive.php' => 'user_archive',
             'OfficialsManagement.php' => 'officials_management',
             'OfficialInvites.php' => 'personnel_invite',
             'OfficialTransitions.php' => 'official_transition',

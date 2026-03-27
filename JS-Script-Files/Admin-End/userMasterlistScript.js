@@ -259,6 +259,10 @@
         ? `<button type="button" class="btn btn-sm btn-outline-danger" data-action="manage-lock" data-user-id="${escapeHtml(row.user_id)}">${row.is_locked ? "Manage Lock" : "Lock Account"}</button>`
         : `<button type="button" class="btn btn-sm btn-outline-secondary" disabled title="${escapeHtml(row.manage_lock_disabled_reason || "Unavailable")}">${row.is_locked ? "Locked" : "Unavailable"}</button>`;
 
+      const archiveButton = row.can_archive_account
+        ? `<button type="button" class="btn btn-sm btn-outline-dark" data-action="archive-account" data-user-id="${escapeHtml(row.user_id)}">Archive</button>`
+        : `<button type="button" class="btn btn-sm btn-outline-secondary" disabled title="${escapeHtml(row.archive_account_disabled_reason || "Archive unavailable")}">Archive</button>`;
+
       return `
         <tr>
           <td>${escapeHtml(safe(row.user_id))}</td>
@@ -270,7 +274,12 @@
           <td>${statusPillHtml(row.verification_status, verificationTone)}</td>
           <td>${escapeHtml(formatDateTime(row.account_created))}</td>
           <td>${escapeHtml(formatDateTime(row.last_login))}</td>
-          <td>${manageButton}</td>
+          <td>
+            <div class="user-masterlist-actions">
+              ${manageButton}
+              ${archiveButton}
+            </div>
+          </td>
         </tr>
       `;
     }).join("");
@@ -428,6 +437,45 @@
     }
   };
 
+  const submitArchiveAction = async (userId) => {
+    const row = findRow(userId);
+    if (!row || state.auto.inFlight || state.lock.busy) return;
+
+    const confirmed = window.confirm(`Archive ${safe(row.display_name)}? You can permanently delete the account later from User Archive.`);
+    if (!confirmed) return;
+
+    const formData = new FormData();
+    formData.set("action", "archive_account");
+    formData.set("user_id", row.user_id);
+
+    if (refreshBtn) {
+      refreshBtn.classList.add("is-loading");
+      refreshBtn.disabled = true;
+    }
+
+    try {
+      const res = await fetch("../PhpFiles/Admin-End/userMasterlist.php", {
+        method: "POST",
+        body: formData,
+        headers: { Accept: "application/json" },
+      });
+      const data = await res.json().catch(() => null);
+      if (!res.ok || !data?.success) {
+        throw new Error(data?.message || "Unable to archive the account.");
+      }
+
+      await load();
+      window.alert(data.message || "Account archived successfully.");
+    } catch (err) {
+      window.alert(err?.message || "Unable to archive the account.");
+    } finally {
+      if (refreshBtn) {
+        refreshBtn.classList.remove("is-loading");
+        refreshBtn.disabled = false;
+      }
+    }
+  };
+
   const wire = () => {
     document.querySelectorAll(".status-filter-btn").forEach((btn) => {
       btn.addEventListener("click", () => {
@@ -477,12 +525,18 @@
     if (tbody) {
       tbody.addEventListener("click", (event) => {
         const button = event.target.closest('[data-action="manage-lock"]');
-        if (!button) return;
+        if (button) {
+          const row = findRow(button.dataset.userId || "");
+          if (!row) return;
+          populateLockModal(row);
+          if (lockModal) lockModal.show();
+          return;
+        }
 
-        const row = findRow(button.dataset.userId || "");
-        if (!row) return;
-        populateLockModal(row);
-        if (lockModal) lockModal.show();
+        const archiveButton = event.target.closest('[data-action="archive-account"]');
+        if (!archiveButton) return;
+
+        submitArchiveAction(archiveButton.dataset.userId || "").catch(() => {});
       });
     }
 

@@ -10,6 +10,7 @@ date_default_timezone_set('Asia/Manila');
 
 require '../General/connection.php';
 ual_ensure_lock_columns($conn);
+ual_ensure_archive_support($conn);
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     echo json_encode(['success' => false, 'error' => 'Invalid request']);
@@ -94,6 +95,7 @@ $statuses = ual_load_status_ids($conn);
 $lockedStatusId      = $statuses['locked'] ?? null;
 $activeStatusId      = $statuses['active'] ?? null;
 $inactiveStatusId    = $statuses['inactive'] ?? null;       // ✅ added
+$archivedStatusId    = $statuses['archived'] ?? null;
 $deactivatedStatusId = $statuses['deactivated'] ?? null;
 $deletedStatusId     = $statuses['deleted'] ?? null;
 
@@ -104,6 +106,10 @@ ual_release_expired_locks($conn, $lockedStatusId, $activeStatusId, $lockDuration
 ============================= */
 if ($deactivatedStatusId !== null && (int)$userData['status_id_account'] === (int)$deactivatedStatusId) {
     echo json_encode(['success' => false, 'error' => 'Account Deactivated.']);
+    exit;
+}
+if ($archivedStatusId !== null && (int)$userData['status_id_account'] === (int)$archivedStatusId) {
+    echo json_encode(['success' => false, 'error' => 'Account Archived.']);
     exit;
 }
 if ($deletedStatusId !== null && (int)$userData['status_id_account'] === (int)$deletedStatusId) {

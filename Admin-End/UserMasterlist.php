@@ -45,8 +45,12 @@
     }
     .user-masterlist-shell .user-masterlist-table th:last-child,
     .user-masterlist-shell .user-masterlist-table td:last-child {
-      min-width: 160px;
-      white-space: nowrap;
+      min-width: 250px;
+    }
+    .user-masterlist-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
     }
     .user-lock-summary-card {
       border: 1px solid #ece7df;
@@ -122,6 +126,9 @@
               <i class="fa-solid fa-arrows-rotate"></i>
               <span class="visually-hidden">Refresh</span>
             </button>
+            <a href="<?= htmlspecialchars(appUrl('Admin-End/UserArchive.php')) ?>" class="btn btn-outline-dark">
+              User Archive
+            </a>
           </div>
         </div>
 
@@ -232,6 +239,6 @@
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-  <script src="../JS-Script-Files/Admin-End/userMasterlistScript.js?v=20260327-1"></script>
+  <script src="../JS-Script-Files/Admin-End/userMasterlistScript.js?v=20260327-2"></script>
 </body>
 </html>
