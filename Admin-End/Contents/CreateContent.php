@@ -303,17 +303,6 @@ $sharedMeta = [
           <div class="col-12">
             <?php if ($isFaqType): ?>
             <section class="announcement-section-card announcement-faq-shell mb-4">
-              <div class="announcement-faq-header">
-                <div class="announcement-faq-controls">
-                  <label for="faqQuestionTarget" class="form-label mb-0 fw-semibold">Question count</label>
-                  <select id="faqQuestionTarget" class="form-select form-select-sm announcement-faq-target-select" aria-label="FAQ question count">
-                    <?php for ($i = 1; $i <= 20; $i++): ?>
-                      <option value="<?= $i ?>"><?= $i ?></option>
-                    <?php endfor; ?>
-                  </select>
-                  <span id="faqItemCount" class="announcement-faq-count">0 / 20 Questions</span>
-                </div>
-              </div>
               <div id="faqItemsContainer" class="announcement-faq-list"></div>
             </section>
             <?php endif; ?>

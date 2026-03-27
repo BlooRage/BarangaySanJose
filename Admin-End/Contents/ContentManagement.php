@@ -1116,19 +1116,6 @@ $previewCssAssets = [
                     </div>
                     <div class="col-12">
                       <section class="announcement-section-card announcement-faq-shell">
-                        <article class="cms-editor-card announcement-faq-summary-card">
-                          <div class="announcement-faq-header">
-                            <div class="announcement-faq-controls">
-                              <label for="cmsFaqQuestionTarget" class="form-label mb-0 fw-semibold">Question count</label>
-                              <select id="cmsFaqQuestionTarget" class="form-select form-select-sm announcement-faq-target-select" aria-label="FAQ question count">
-                                <?php for ($i = 1; $i <= 20; $i++): ?>
-                                  <option value="<?= $i ?>"><?= $i ?></option>
-                                <?php endfor; ?>
-                              </select>
-                              <span id="cmsFaqItemCount" class="announcement-faq-count">0 / 20 Questions</span>
-                            </div>
-                          </div>
-                        </article>
                         <div id="cmsFaqItemsContainer" class="announcement-faq-list cms-repeater-stack" data-cms-repeater="faq_items">
                           <?php
                           $faqItems = (array)($editorPayload['faq_items'] ?? []);
