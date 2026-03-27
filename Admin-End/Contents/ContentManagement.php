@@ -1116,21 +1116,19 @@ $previewCssAssets = [
                     </div>
                     <div class="col-12">
                       <section class="announcement-section-card announcement-faq-shell">
-                        <div class="announcement-faq-header">
-                          <div>
-                            <h5 class="announcement-section-title mb-1">FAQ Entries</h5>
-                            <p class="announcement-editor-helper mb-0">Create one FAQ content item with up to 20 questions and answers. These will be saved together and tracked as one FAQ page entry.</p>
+                        <article class="cms-editor-card announcement-faq-summary-card">
+                          <div class="announcement-faq-header">
+                            <div class="announcement-faq-controls">
+                              <label for="cmsFaqQuestionTarget" class="form-label mb-0 fw-semibold">Question count</label>
+                              <select id="cmsFaqQuestionTarget" class="form-select form-select-sm announcement-faq-target-select" aria-label="FAQ question count">
+                                <?php for ($i = 1; $i <= 20; $i++): ?>
+                                  <option value="<?= $i ?>"><?= $i ?></option>
+                                <?php endfor; ?>
+                              </select>
+                              <span id="cmsFaqItemCount" class="announcement-faq-count">0 / 20 Questions</span>
+                            </div>
                           </div>
-                          <div class="announcement-faq-controls">
-                            <label for="cmsFaqQuestionTarget" class="form-label mb-0 fw-semibold">Questions</label>
-                            <select id="cmsFaqQuestionTarget" class="form-select form-select-sm announcement-faq-target-select" aria-label="FAQ question count">
-                              <?php for ($i = 1; $i <= 20; $i++): ?>
-                                <option value="<?= $i ?>"><?= $i ?></option>
-                              <?php endfor; ?>
-                            </select>
-                            <span id="cmsFaqItemCount" class="announcement-faq-count">0 / 20 Questions</span>
-                          </div>
-                        </div>
+                        </article>
                         <div id="cmsFaqItemsContainer" class="announcement-faq-list cms-repeater-stack" data-cms-repeater="faq_items">
                           <?php
                           $faqItems = (array)($editorPayload['faq_items'] ?? []);

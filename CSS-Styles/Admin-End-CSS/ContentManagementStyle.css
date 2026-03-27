@@ -542,44 +542,48 @@
   box-shadow: 0 10px 28px rgba(166, 94, 10, 0.05);
 }
 
+.announcement-faq-summary-card {
+  border-color: #f0dfcb;
+  border-radius: 18px;
+  background: #fff;
+  box-shadow: none;
+}
+
 .announcement-faq-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  gap: 1rem;
   padding-bottom: 0.9rem;
   border-bottom: 1px dashed #efdfcd;
 }
 
-.announcement-faq-header > div:first-child {
-  flex: 1 1 520px;
+.announcement-faq-controls {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.45rem;
+  width: min(100%, 560px);
 }
 
-.announcement-faq-header .announcement-section-title {
-  margin-bottom: 0.2rem !important;
-  font-size: 1.05rem;
-  font-family: 'Charis SIL Bold', serif;
-  color: #7f4300;
+.announcement-faq-kicker {
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #8c6b45;
 }
 
-.announcement-faq-header .announcement-editor-helper {
+.announcement-faq-controls .announcement-card-title {
+  width: 100%;
+  margin-bottom: 0 !important;
+}
+
+.announcement-faq-controls .announcement-editor-helper {
   max-width: 980px;
   font-size: 0.94rem;
   line-height: 1.5;
   color: #6f6256;
 }
 
-.announcement-faq-controls {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: 0.45rem;
-  min-width: 170px;
-}
-
 .announcement-faq-controls .form-label {
   margin: 0;
-  align-self: flex-start;
   font-size: 0.82rem;
   font-weight: 700;
   letter-spacing: 0.04em;
@@ -616,14 +620,22 @@
   gap: 1rem;
 }
 
+.announcement-faq-list .announcement-faq-item,
 .announcement-faq-list .cms-repeater-item[data-cms-faq-item] {
-  padding: 1rem 1rem 1.1rem;
-  border: 1px solid #f0dfcb;
-  border-radius: 18px;
-  background: linear-gradient(180deg, #fffdf9 0%, #ffffff 100%);
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
   box-shadow: none;
 }
 
+.announcement-faq-list .announcement-faq-item + .announcement-faq-item,
+.announcement-faq-list .cms-repeater-item[data-cms-faq-item] + .cms-repeater-item[data-cms-faq-item] {
+  padding-top: 1rem;
+  border-top: 1px dashed #efdfcd;
+}
+
+.announcement-faq-list .announcement-faq-item-head,
 .announcement-faq-list .cms-repeater-item[data-cms-faq-item] .cms-repeater-item-head {
   display: flex;
   justify-content: space-between;
@@ -634,12 +646,14 @@
   border-bottom: 1px dashed #efdfcd;
 }
 
+.announcement-faq-list .announcement-faq-item .announcement-card-title,
 .announcement-faq-list .cms-repeater-item[data-cms-faq-item] .cms-repeater-title {
   font-size: 0.98rem;
   font-family: 'Charis SIL Bold', serif;
   color: #8c4d0b;
 }
 
+.announcement-faq-list .announcement-faq-item-actions,
 .announcement-faq-list .cms-repeater-item[data-cms-faq-item] .cms-repeater-item-head > div:last-child {
   display: flex;
   align-items: center;
@@ -647,6 +661,7 @@
   flex-shrink: 0;
 }
 
+.announcement-faq-list .announcement-faq-item .btn,
 .announcement-faq-list .cms-repeater-item[data-cms-faq-item] .btn {
   min-width: 92px;
   padding: 0.42rem 0.72rem;
@@ -655,6 +670,7 @@
   font-weight: 600;
 }
 
+.announcement-faq-list .announcement-faq-item .form-label,
 .announcement-faq-list .cms-repeater-item[data-cms-faq-item] .form-label {
   margin-bottom: 0.4rem;
   font-size: 0.88rem;
@@ -662,6 +678,7 @@
   color: #2b3138;
 }
 
+.announcement-faq-list .announcement-faq-item .form-control,
 .announcement-faq-list .cms-repeater-item[data-cms-faq-item] .form-control {
   min-height: 52px;
   border-radius: 16px;
@@ -676,6 +693,7 @@
   box-shadow: 0 0 0 0.18rem rgba(222, 113, 12, 0.12);
 }
 
+.announcement-faq-list .announcement-faq-item .note-editor.note-frame,
 .announcement-faq-list .cms-repeater-item[data-cms-faq-item] .note-editor.note-frame {
   margin-top: 0.15rem;
   border: 1px solid #eadfd3;
@@ -683,11 +701,13 @@
   overflow: hidden;
 }
 
+.announcement-faq-list .announcement-faq-item .note-toolbar,
 .announcement-faq-list .cms-repeater-item[data-cms-faq-item] .note-toolbar {
   background: #fdf9f3;
   border-bottom-color: #eadfd3;
 }
 
+.announcement-faq-list .announcement-faq-item .note-editing-area .note-editable,
 .announcement-faq-list .cms-repeater-item[data-cms-faq-item] .note-editing-area .note-editable {
   min-height: 210px;
   padding: 0.95rem 1rem;
@@ -2585,8 +2605,8 @@ body .dropdown-menu.note-check {
     padding: 1rem;
   }
 
-  .announcement-faq-header .announcement-section-title {
-    font-size: 1rem;
+  .announcement-faq-controls .announcement-card-title {
+    font-size: 0.96rem;
   }
 
   .announcement-faq-controls {
@@ -2597,14 +2617,17 @@ body .dropdown-menu.note-check {
     width: 100%;
   }
 
+  .announcement-faq-list .announcement-faq-item-head,
   .announcement-faq-list .cms-repeater-item[data-cms-faq-item] .cms-repeater-item-head {
     flex-direction: column;
   }
 
+  .announcement-faq-list .announcement-faq-item-actions,
   .announcement-faq-list .cms-repeater-item[data-cms-faq-item] .cms-repeater-item-head > div:last-child {
     width: 100%;
   }
 
+  .announcement-faq-list .announcement-faq-item .btn,
   .announcement-faq-list .cms-repeater-item[data-cms-faq-item] .btn {
     flex: 1 1 0;
     min-width: 0;
