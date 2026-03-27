@@ -7027,10 +7027,22 @@ if ($action === 'get_request') {
 
     $residentUserId = trim((string)($row['resident_user_id'] ?? ''));
     $residentId = trim((string)($row['resident_id'] ?? ''));
+    if ($residentUserId === '') {
+        $residentUserId = trim((string)($row['payload']['resident_user_id'] ?? $row['payload']['user_id'] ?? ''));
+    }
+    if ($residentId === '') {
+        $residentId = trim((string)($row['payload']['resident_id'] ?? ''));
+    }
     $row['resident_profile'] = ($residentUserId !== '' || $residentId !== '')
         ? dra_resident_profile_snapshot($conn, $residentUserId, $residentId)
         : [];
     if (is_array($row['payload']) && is_array($row['resident_profile']) && !empty($row['resident_profile'])) {
+        if (trim((string)($row['payload']['id_picture_path'] ?? '')) === '') {
+            $row['payload']['id_picture_path'] = trim((string)($row['resident_profile']['id_picture_path'] ?? ''));
+        }
+        if (trim((string)($row['payload']['id_picture_url'] ?? '')) === '') {
+            $row['payload']['id_picture_url'] = trim((string)($row['resident_profile']['id_picture_url'] ?? ''));
+        }
         $residentBirthdate = trim((string)($row['resident_profile']['birthdate'] ?? ''));
         $residentAge = trim((string)($row['resident_profile']['age'] ?? ''));
         if (trim((string)($row['payload']['birthdate'] ?? '')) === '' && $residentBirthdate !== '') {
