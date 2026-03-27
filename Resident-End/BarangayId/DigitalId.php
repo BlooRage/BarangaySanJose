@@ -49,6 +49,38 @@ if (!function_exists('drd_public_asset_path')) {
     }
 }
 
+if (!function_exists('drd_resolve_request_qr_preview_url')) {
+    function drd_resolve_request_qr_preview_url(string $baseUrl, array $requestRow): string
+    {
+        $storedPath = trim((string)($requestRow['qr_code_path'] ?? ''));
+        if ($storedPath !== '') {
+            return drd_public_asset_path($baseUrl, $storedPath);
+        }
+
+        $requestId = trim((string)($requestRow['request_id'] ?? ''));
+        if ($requestId === '') {
+            return '';
+        }
+
+        $verificationCode = trim((string)($requestRow['verification_code'] ?? ''));
+        if ($verificationCode === '') {
+            $verificationCode = $requestId;
+        }
+
+        $predictedPublicPath = '/UnifiedFileAttachment/IssuedDocuments/QR/qr_' . preg_replace('/[^A-Za-z0-9_-]/', '', $requestId) . '.png';
+        $projectRoot = realpath(__DIR__ . '/../../');
+        if ($projectRoot !== false) {
+            $predictedDiskPath = $projectRoot . $predictedPublicPath;
+            if (is_file($predictedDiskPath)) {
+                return drd_public_asset_path($baseUrl, $predictedPublicPath);
+            }
+        }
+
+        $verificationUrl = appBaseUrl() . appUrl('/transactions?request_id=' . rawurlencode($requestId) . '&vc=' . rawurlencode($verificationCode));
+        return 'https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=' . rawurlencode($verificationUrl);
+    }
+}
+
 if (!function_exists('drd_resolve_resident_2x2_picture_path')) {
     function drd_resolve_resident_2x2_picture_path(mysqli $conn, string $residentId): string
     {
@@ -124,6 +156,7 @@ $requestRow = null;
 $payload = [];
 $resolvedProfileImageUrl = '';
 $resolvedProfileImagePath = '';
+$resolvedQrCodeUrl = '';
 
 if ($requestId === '') {
     $errorMessage = 'Missing request ID.';
@@ -163,6 +196,11 @@ if ($requestId === '') {
         }
         if ($resolvedProfileImageUrl !== '') {
             $payload['id_picture_url'] = $resolvedProfileImageUrl;
+        }
+        $resolvedQrCodeUrl = drd_resolve_request_qr_preview_url($baseUrl, $requestRow);
+        if ($resolvedQrCodeUrl !== '') {
+            $payload['qr_code_path'] = $resolvedQrCodeUrl;
+            $requestRow['qr_code_path'] = $resolvedQrCodeUrl;
         }
     }
 }
@@ -360,6 +398,22 @@ $serializedRow = $requestRow ? [
             margin: 0;
             border-radius: 30px;
             box-shadow: 0 26px 64px rgba(28, 56, 112, 0.14);
+        }
+        .digital-id-viewer__card-stage .barangay-id-card__label,
+        .digital-id-viewer__card-stage .barangay-id-card__field--name,
+        .digital-id-viewer__card-stage .barangay-id-card__field--address,
+        .digital-id-viewer__card-stage .barangay-id-card__field--birthplace,
+        .digital-id-viewer__card-stage .barangay-id-card__field--meta,
+        .digital-id-viewer__card-stage .barangay-id-card__field--emergency {
+            font-size: clamp(10.8px, 0.34rem + 0.58vw, 14.4px);
+            line-height: 1.08;
+        }
+        .digital-id-viewer__card-stage .barangay-id-card__note {
+            font-size: clamp(9.2px, 0.3rem + 0.46vw, 11.6px);
+            line-height: 1.18;
+        }
+        .digital-id-viewer__card-stage .barangay-id-card__field--cardno {
+            font-size: clamp(11.6px, 0.38rem + 0.76vw, 16.2px);
         }
         .digital-id-viewer__card-stage .barangay-id-card__bg {
             border-radius: 30px;
