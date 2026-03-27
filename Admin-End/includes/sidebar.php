@@ -42,6 +42,11 @@ if (!function_exists('appUrl')) {
     require_once __DIR__ . '/../../PhpFiles/General/security.php';
 }
 require_once __DIR__ . '/../../PhpFiles/General/adminModulePermissions.php';
+require_once __DIR__ . '/../../PhpFiles/General/siteContent.php';
+$sbAttentionHelperPath = __DIR__ . '/../../PhpFiles/General/adminSidebarAttention.php';
+if (file_exists($sbAttentionHelperPath)) {
+    require_once $sbAttentionHelperPath;
+}
 
 if ((!isset($conn) || !($conn instanceof mysqli)) && file_exists(__DIR__ . '/../../PhpFiles/General/connection.php')) {
     require_once __DIR__ . '/../../PhpFiles/General/connection.php';
@@ -264,6 +269,36 @@ $sbHasAny = static function (array $keys) use (&$sbAllowedPermissions): bool {
     return amp_permission_keys_have_any($sbAllowedPermissions, $keys);
 };
 
+$sbAttentionCounts = function_exists('sbatt_default_counts') ? sbatt_default_counts() : [];
+if (isset($conn) && $conn instanceof mysqli && function_exists('sbatt_get_counts')) {
+    $sbAttentionCounts = sbatt_get_counts($conn, 45);
+}
+if (!$sbCanReviewContent) {
+    $sbAttentionCounts['content_change_request'] = 0;
+}
+
+$sbCount = static function (string $key) use (&$sbAttentionCounts): int {
+    return max(0, (int)($sbAttentionCounts[$key] ?? 0));
+};
+$sbModuleCount = static function (string $key) use (&$sbAttentionCounts): int {
+    return max(0, (int)($sbAttentionCounts[$key] ?? 0));
+};
+$sbRenderAttentionBadge = static function (int $count): string {
+    if ($count <= 0) {
+        return '';
+    }
+
+    $display = $count > 99 ? '99+' : (string)$count;
+    return '<span class="sidebar-attention-badge" aria-label="' . htmlspecialchars($display . ' items need attention', ENT_QUOTES, 'UTF-8') . '">' . htmlspecialchars($display, ENT_QUOTES, 'UTF-8') . '</span>';
+};
+$sbRenderAttentionDot = static function (int $count): string {
+    if ($count <= 0) {
+        return '';
+    }
+
+    return '<span class="sidebar-attention-dot" aria-hidden="true"></span>';
+};
+
 $sbResidentProfilingKeys = [
     'resident_masterlist',
     'resident_edit_requests',
@@ -323,6 +358,28 @@ $sbAdminKeys = [
     'official_transition',
     'audit_logs',
 ];
+
+$sbModuleAttentionCounts = [
+    'appointments' => $sbCan('appointments') ? $sbCount('appointments_tracker') : 0,
+    'resident_profiling' =>
+        ($sbCan('resident_masterlist') ? $sbCount('resident_tracker') : 0)
+        + ($sbCan('resident_edit_requests') ? $sbCount('edit_requests') : 0)
+        + ($sbCan('resident_sector_membership_verification') ? $sbCount('sector_membership_verification') : 0),
+    'household_profiling' => $sbCan('head_of_family_verification') ? $sbCount('head_of_family_verification') : 0,
+    'certificate_issuance' => $sbCan('certificate_issuance') ? $sbCount('certificate_issuance') : 0,
+    'id_issuance' => $sbCan('id_issuance_tracker') ? $sbCount('id_issuance_tracker') : 0,
+    'clearance_issuance' => $sbCan('clearance_issuance') ? $sbCount('clearance_issuance') : 0,
+    'finance_transactions' =>
+        ($sbCan('finance_payment_tracker') ? $sbCount('finance_payment_tracker') : 0)
+        + ($sbCan('finance_fee_management') ? $sbCount('finance_fee_management') : 0),
+    'blotter_tools' => $sbCan('blotter_review_queue') ? $sbCount('blotter_review_queue') : 0,
+    'complaint_tools' => $sbCan('complaint_tracker') ? $sbCount('complaint_tracker') : 0,
+    'content_management' => $sbCanReviewContent ? $sbCount('content_change_request') : 0,
+    'user_management' => $sbCan('user_masterlist') ? $sbCount('user_management') : 0,
+];
+$sbModuleCount = static function (string $key) use (&$sbModuleAttentionCounts): int {
+    return max(0, (int)($sbModuleAttentionCounts[$key] ?? 0));
+};
 
 $adminDisplayName = "Admin User";
 $adminPosition = "Administrator";
@@ -465,6 +522,67 @@ if (!empty($_SESSION['user_id']) && isset($conn) && $conn instanceof mysqli) {
 <script src="<?= htmlspecialchars(appUrl('JS-Script-Files/modalHandler.js'), ENT_QUOTES, 'UTF-8') ?>"></script>
 
 <style>
+  #dashboard-sidebar .btn-toggle,
+  #dashboard-sidebar .sidebar-direct-link {
+    width: 100%;
+  }
+
+  #dashboard-sidebar .sidebar-button-label,
+  #dashboard-sidebar .sidebar-subnav-text {
+    min-width: 0;
+  }
+
+  #dashboard-sidebar .sidebar-icon-wrap {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.2rem;
+    min-width: 1.2rem;
+  }
+
+  #dashboard-sidebar .sidebar-attention-dot {
+    position: absolute;
+    top: -0.18rem;
+    right: -0.22rem;
+    width: 0.58rem;
+    height: 0.58rem;
+    border-radius: 999px;
+    background: #dc3545;
+    border: 2px solid #fff;
+    box-shadow: 0 0 0 1px rgba(220, 53, 69, 0.14);
+  }
+
+  #dashboard-sidebar .sidebar-attention-badge {
+    margin-left: auto;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 1.4rem;
+    height: 1.4rem;
+    padding: 0 0.38rem;
+    border-radius: 999px;
+    background: #dc3545;
+    color: #fff;
+    font-size: 0.72rem;
+    font-weight: 700;
+    line-height: 1;
+    flex: 0 0 auto;
+  }
+
+  #dashboard-sidebar .sidebar-subnav-link {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+  }
+
+  #dashboard-sidebar .sidebar-direct-link {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+
   #admin-mobile-header {
     display: none;
   }
@@ -545,20 +663,25 @@ if (!empty($_SESSION['user_id']) && isset($conn) && $conn instanceof mysqli) {
                 data-bs-toggle="collapse"
                 data-bs-target="#appointments-collapse"
                 aria-expanded="<?= $isAppointmentActive ? 'true' : 'false' ?>">
-          <i class="fas fa-calendar-check"></i> Appointments
+          <span class="sidebar-icon-wrap">
+            <i class="fas fa-calendar-check"></i>
+            <?= $sbRenderAttentionDot($sbModuleCount('appointments')) ?>
+          </span>
+          <span class="sidebar-button-label">Appointments</span>
         </button>
         <div class="collapse <?= $isAppointmentActive ? 'show' : '' ?>" id="appointments-collapse">
           <ul class="btn-toggle-nav list-unstyled fw-normal pb-1 small">
             <li>
               <a href="<?= htmlspecialchars(appUrl('Admin-End/Appointments/AppointmentTracker.php?tool=tracker')) ?>"
-                 class="link-dark rounded <?= $isAppointmentTrackerActive ? 'active' : '' ?>">
-                Tracker
+                 class="link-dark rounded sidebar-subnav-link <?= $isAppointmentTrackerActive ? 'active' : '' ?>">
+                <span class="sidebar-subnav-text">Tracker</span>
+                <?= $sbRenderAttentionBadge($sbCount('appointments_tracker')) ?>
               </a>
             </li>
             <li>
               <a href="<?= htmlspecialchars(appUrl('Admin-End/Appointments/AppointmentTracker.php?tool=settings')) ?>"
-                 class="link-dark rounded <?= $isAppointmentSettingsActive ? 'active' : '' ?>">
-                Settings
+                 class="link-dark rounded sidebar-subnav-link <?= $isAppointmentSettingsActive ? 'active' : '' ?>">
+                <span class="sidebar-subnav-text">Settings</span>
               </a>
             </li>
           </ul>
@@ -574,45 +697,52 @@ if (!empty($_SESSION['user_id']) && isset($conn) && $conn instanceof mysqli) {
                 data-bs-toggle="collapse"
                 data-bs-target="#resident-mgmt-collapse"
                 aria-expanded="<?= $isResidentMgmtActive ? 'true' : 'false' ?>">
-          <i class="fas fa-user-group"></i> Resident Profiling
+          <span class="sidebar-icon-wrap">
+            <i class="fas fa-user-group"></i>
+            <?= $sbRenderAttentionDot($sbModuleCount('resident_profiling')) ?>
+          </span>
+          <span class="sidebar-button-label">Resident Profiling</span>
         </button>
         <div class="collapse <?= $isResidentMgmtActive ? 'show' : '' ?>" id="resident-mgmt-collapse">
           <ul class="btn-toggle-nav list-unstyled fw-normal pb-1 small">
             <?php if ($sbCan('resident_masterlist')): ?>
             <li>
               <a href="<?= htmlspecialchars(appUrl('Admin-End/ResidentTracker.php')) ?>"
-                 class="link-dark rounded <?= in_array($current, ['ResidentTracker.php', 'AddResident.php'], true) ? 'active' : '' ?>">
-                Resident Tracker
+                 class="link-dark rounded sidebar-subnav-link <?= in_array($current, ['ResidentTracker.php', 'AddResident.php'], true) ? 'active' : '' ?>">
+                <span class="sidebar-subnav-text">Resident Tracker</span>
+                <?= $sbRenderAttentionBadge($sbCount('resident_tracker')) ?>
               </a>
             </li>
             <li>
               <a href="<?= htmlspecialchars(appUrl('Admin-End/ResidentMasterlist.php')) ?>"
-                 class="link-dark rounded <?= $current == 'ResidentMasterlist.php' ? 'active' : '' ?>">
-                Resident Masterlist
+                 class="link-dark rounded sidebar-subnav-link <?= $current == 'ResidentMasterlist.php' ? 'active' : '' ?>">
+                <span class="sidebar-subnav-text">Resident Masterlist</span>
               </a>
             </li>
             <?php endif; ?>
             <?php if ($sbCan('resident_edit_requests')): ?>
             <li>
               <a href="<?= htmlspecialchars(appUrl('Admin-End/EditRequests.php')) ?>"
-                 class="link-dark rounded <?= $current == 'EditRequests.php' ? 'active' : '' ?>">
-                Edit Requests
+                 class="link-dark rounded sidebar-subnav-link <?= $current == 'EditRequests.php' ? 'active' : '' ?>">
+                <span class="sidebar-subnav-text">Edit Requests</span>
+                <?= $sbRenderAttentionBadge($sbCount('edit_requests')) ?>
               </a>
             </li>
             <?php endif; ?>
             <?php if ($sbCan('resident_archive')): ?>
             <li>
               <a href="<?= htmlspecialchars(appUrl('Admin-End/ResidentArchive.php')) ?>"
-                 class="link-dark rounded <?= $current == 'ResidentArchive.php' ? 'active' : '' ?>">
-                Resident Archive
+                 class="link-dark rounded sidebar-subnav-link <?= $current == 'ResidentArchive.php' ? 'active' : '' ?>">
+                <span class="sidebar-subnav-text">Resident Archive</span>
               </a>
             </li>
             <?php endif; ?>
             <?php if ($sbCan('resident_sector_membership_verification')): ?>
             <li>
               <a href="<?= htmlspecialchars(appUrl('Admin-End/SectorMembershipVerification.php')) ?>"
-                 class="link-dark rounded <?= $current == 'SectorMembershipVerification.php' ? 'active' : '' ?>">
-                Sector Membership Verification
+                 class="link-dark rounded sidebar-subnav-link <?= $current == 'SectorMembershipVerification.php' ? 'active' : '' ?>">
+                <span class="sidebar-subnav-text">Sector Membership Verification</span>
+                <?= $sbRenderAttentionBadge($sbCount('sector_membership_verification')) ?>
               </a>
             </li>
             <?php endif; ?>
@@ -626,23 +756,28 @@ if (!empty($_SESSION['user_id']) && isset($conn) && $conn instanceof mysqli) {
                 data-bs-toggle="collapse"
                 data-bs-target="#household-profiling-collapse"
                 aria-expanded="<?= $isHouseholdProfilingActive ? 'true' : 'false' ?>">
-          <i class="fas fa-house"></i> Household Profiling
+          <span class="sidebar-icon-wrap">
+            <i class="fas fa-house"></i>
+            <?= $sbRenderAttentionDot($sbModuleCount('household_profiling')) ?>
+          </span>
+          <span class="sidebar-button-label">Household Profiling</span>
         </button>
         <div class="collapse <?= $isHouseholdProfilingActive ? 'show' : '' ?>" id="household-profiling-collapse">
           <ul class="btn-toggle-nav list-unstyled fw-normal pb-1 small">
             <?php if ($sbCan('household_profiling_main')): ?>
             <li>
               <a href="<?= htmlspecialchars(appUrl('Admin-End/HouseholdProfiling.php')) ?>"
-                 class="link-dark rounded <?= $current == 'HouseholdProfiling.php' ? 'active' : '' ?>">
-                Household Profiling
+                 class="link-dark rounded sidebar-subnav-link <?= $current == 'HouseholdProfiling.php' ? 'active' : '' ?>">
+                <span class="sidebar-subnav-text">Household Profiling</span>
               </a>
             </li>
             <?php endif; ?>
             <?php if ($sbCan('head_of_family_verification')): ?>
             <li>
               <a href="<?= htmlspecialchars(appUrl('Admin-End/HeadOfTheFamilyVerification.php')) ?>"
-                 class="link-dark rounded <?= $current == 'HeadOfTheFamilyVerification.php' ? 'active' : '' ?>">
-                Head of the Family Verification
+                 class="link-dark rounded sidebar-subnav-link <?= $current == 'HeadOfTheFamilyVerification.php' ? 'active' : '' ?>">
+                <span class="sidebar-subnav-text">Head of the Family Verification</span>
+                <?= $sbRenderAttentionBadge($sbCount('head_of_family_verification')) ?>
               </a>
             </li>
             <?php endif; ?>
@@ -736,9 +871,14 @@ if (!empty($_SESSION['user_id']) && isset($conn) && $conn instanceof mysqli) {
       <?php if ($sbCan('certificate_issuance')): ?>
       <li class="mb-2">
         <a href="<?= htmlspecialchars(appUrl('Admin-End/Certificates/CertificateTracker.php?filter_document=__certificates__')) ?>"
-           class="btn btn-toggle d-flex align-items-center gap-2 rounded <?= $isCertificateIssuanceSectionActive ? 'active' : '' ?>"
+           class="btn btn-toggle sidebar-direct-link rounded <?= $isCertificateIssuanceSectionActive ? 'active' : '' ?>"
            style="<?= $isCertificateIssuanceSectionActive ? 'outline: none; box-shadow: none;' : '' ?>">
-          <i class="fas fa-file-circle-check"></i> Certificate Issuance
+          <span class="sidebar-icon-wrap">
+            <i class="fas fa-file-circle-check"></i>
+            <?= $sbRenderAttentionDot($sbModuleCount('certificate_issuance')) ?>
+          </span>
+          <span class="sidebar-button-label">Certificate Issuance</span>
+          <?= $sbRenderAttentionBadge($sbCount('certificate_issuance')) ?>
         </a>
       </li>
       <?php endif; ?>
@@ -748,7 +888,11 @@ if (!empty($_SESSION['user_id']) && isset($conn) && $conn instanceof mysqli) {
                 data-bs-toggle="collapse"
                 data-bs-target="#id-issuance-collapse"
                 aria-expanded="<?= $isIdIssuanceActive ? 'true' : 'false' ?>">
-          <i class="fas fa-id-card"></i> ID Issuance
+          <span class="sidebar-icon-wrap">
+            <i class="fas fa-id-card"></i>
+            <?= $sbRenderAttentionDot($sbModuleCount('id_issuance')) ?>
+          </span>
+          <span class="sidebar-button-label">ID Issuance</span>
         </button>
 
         <div class="collapse <?= $isIdIssuanceActive ? 'show' : '' ?>" id="id-issuance-collapse">
@@ -756,16 +900,17 @@ if (!empty($_SESSION['user_id']) && isset($conn) && $conn instanceof mysqli) {
             <?php if ($sbCan('id_issuance_tracker')): ?>
             <li>
               <a href="<?= htmlspecialchars(appUrl('Admin-End/Certificates/CertificateTracker.php?entry=id_issuance')) ?>"
-                 class="link-dark rounded <?= $isIdIssuanceTrackerActive ? 'active' : '' ?>">
-                Tracker
+                 class="link-dark rounded sidebar-subnav-link <?= $isIdIssuanceTrackerActive ? 'active' : '' ?>">
+                <span class="sidebar-subnav-text">Tracker</span>
+                <?= $sbRenderAttentionBadge($sbCount('id_issuance_tracker')) ?>
               </a>
             </li>
             <?php endif; ?>
             <?php if ($sbCan('id_issuance_manual')): ?>
             <li>
               <a href="<?= htmlspecialchars(appUrl('Admin-End/Certificates/CertificateTracker.php?tab=manual&document=barangay_id')) ?>"
-                 class="link-dark rounded <?= $isIdIssuanceManualActive ? 'active' : '' ?>">
-                Manual Issuance
+                 class="link-dark rounded sidebar-subnav-link <?= $isIdIssuanceManualActive ? 'active' : '' ?>">
+                <span class="sidebar-subnav-text">Manual Issuance</span>
               </a>
             </li>
             <?php endif; ?>
@@ -780,9 +925,14 @@ if (!empty($_SESSION['user_id']) && isset($conn) && $conn instanceof mysqli) {
       <?php if ($sbCan('clearance_issuance')): ?>
       <li class="mb-2">
         <a href="<?= htmlspecialchars(appUrl('Admin-End/Certificates/CertificateTracker.php?filter_document=__clearances__')) ?>"
-           class="btn btn-toggle d-flex align-items-center gap-2 rounded <?= $isClearanceIssuanceSectionActive ? 'active' : '' ?>"
+           class="btn btn-toggle sidebar-direct-link rounded <?= $isClearanceIssuanceSectionActive ? 'active' : '' ?>"
            style="<?= $isClearanceIssuanceSectionActive ? 'outline: none; box-shadow: none;' : '' ?>">
-          <i class="fas fa-stamp"></i> Clearance Issuance
+          <span class="sidebar-icon-wrap">
+            <i class="fas fa-stamp"></i>
+            <?= $sbRenderAttentionDot($sbModuleCount('clearance_issuance')) ?>
+          </span>
+          <span class="sidebar-button-label">Clearance Issuance</span>
+          <?= $sbRenderAttentionBadge($sbCount('clearance_issuance')) ?>
         </a>
       </li>
       <?php endif; ?>
@@ -804,31 +954,37 @@ if (!empty($_SESSION['user_id']) && isset($conn) && $conn instanceof mysqli) {
                 data-bs-toggle="collapse"
                 data-bs-target="#finance-collapse"
                 aria-expanded="<?= $isFinanceActive ? 'true' : 'false' ?>">
-          <i class="fas fa-money-check-alt"></i> Finance Transactions
+          <span class="sidebar-icon-wrap">
+            <i class="fas fa-money-check-alt"></i>
+            <?= $sbRenderAttentionDot($sbModuleCount('finance_transactions')) ?>
+          </span>
+          <span class="sidebar-button-label">Finance Transactions</span>
         </button>
         <div class="collapse <?= $isFinanceActive ? 'show' : '' ?>" id="finance-collapse">
           <ul class="btn-toggle-nav list-unstyled fw-normal pb-1 small">
             <?php if ($sbCan('finance_payment_tracker')): ?>
             <li>
               <a href="<?= htmlspecialchars(appUrl('Admin-End/Certificates/FinancePayments.php')) ?>"
-                 class="link-dark rounded <?= $isFinanceTrackerActive ? 'active' : '' ?>">
-                Payment Tracker
+                 class="link-dark rounded sidebar-subnav-link <?= $isFinanceTrackerActive ? 'active' : '' ?>">
+                <span class="sidebar-subnav-text">Payment Tracker</span>
+                <?= $sbRenderAttentionBadge($sbCount('finance_payment_tracker')) ?>
               </a>
             </li>
             <?php endif; ?>
             <?php if ($sbCan('finance_create_transaction')): ?>
             <li>
               <a href="<?= htmlspecialchars(appUrl('Admin-End/Certificates/FinancePayments.php')) ?>?section=create"
-                 class="link-dark rounded <?= $isFinanceCreateActive ? 'active' : '' ?>">
-                Create Transaction
+                 class="link-dark rounded sidebar-subnav-link <?= $isFinanceCreateActive ? 'active' : '' ?>">
+                <span class="sidebar-subnav-text">Create Transaction</span>
               </a>
             </li>
             <?php endif; ?>
             <?php if ($sbCan('finance_fee_management')): ?>
             <li>
               <a href="<?= htmlspecialchars(appUrl('Admin-End/Certificates/FinancePayments.php')) ?>?section=fees"
-                 class="link-dark rounded <?= $isFinanceFeesActive ? 'active' : '' ?>">
-                Fee Management
+                 class="link-dark rounded sidebar-subnav-link <?= $isFinanceFeesActive ? 'active' : '' ?>">
+                <span class="sidebar-subnav-text">Fee Management</span>
+                <?= $sbRenderAttentionBadge($sbCount('finance_fee_management')) ?>
               </a>
             </li>
             <?php endif; ?>
@@ -854,7 +1010,11 @@ if (!empty($_SESSION['user_id']) && isset($conn) && $conn instanceof mysqli) {
                 data-bs-toggle="collapse"
                 data-bs-target="#blotter-tools-collapse"
                 aria-expanded="<?= $isBlotterActive ? 'true' : 'false' ?>">
-          <i class="fas fa-toolbox"></i> e-Blotter Tools
+          <span class="sidebar-icon-wrap">
+            <i class="fas fa-toolbox"></i>
+            <?= $sbRenderAttentionDot($sbModuleCount('blotter_tools')) ?>
+          </span>
+          <span class="sidebar-button-label">e-Blotter Tools</span>
         </button>
 
         <div class="collapse <?= $isBlotterActive ? 'show' : '' ?>" id="blotter-tools-collapse">
@@ -862,16 +1022,17 @@ if (!empty($_SESSION['user_id']) && isset($conn) && $conn instanceof mysqli) {
             <?php if ($sbCan('blotter_tracker')): ?>
             <li>
               <a href="<?= htmlspecialchars(appUrl('Admin-End/Blotter/BlotterTracker.php')) ?>"
-                 class="link-dark rounded <?= $current == 'BlotterTracker.php' ? 'active' : '' ?>">
-                Tracker
+                 class="link-dark rounded sidebar-subnav-link <?= $current == 'BlotterTracker.php' ? 'active' : '' ?>">
+                <span class="sidebar-subnav-text">Tracker</span>
               </a>
             </li>
             <?php endif; ?>
             <?php if ($sbCan('blotter_review_queue')): ?>
             <li>
               <a href="<?= htmlspecialchars(appUrl('Admin-End/Blotter/ReviewQueue.php')) ?>"
-                 class="link-dark rounded <?= $current == 'ReviewQueue.php' ? 'active' : '' ?>">
-                Review Queue
+                 class="link-dark rounded sidebar-subnav-link <?= $current == 'ReviewQueue.php' ? 'active' : '' ?>">
+                <span class="sidebar-subnav-text">Review Queue</span>
+                <?= $sbRenderAttentionBadge($sbCount('blotter_review_queue')) ?>
               </a>
             </li>
             <?php endif; ?>
@@ -898,15 +1059,20 @@ if (!empty($_SESSION['user_id']) && isset($conn) && $conn instanceof mysqli) {
                 data-bs-toggle="collapse"
                 data-bs-target="#complaint-tools-collapse"
                 aria-expanded="<?= $isComplaintActive ? 'true' : 'false' ?>">
-          <i class="fas fa-comments"></i> Complaint Tools
+          <span class="sidebar-icon-wrap">
+            <i class="fas fa-comments"></i>
+            <?= $sbRenderAttentionDot($sbModuleCount('complaint_tools')) ?>
+          </span>
+          <span class="sidebar-button-label">Complaint Tools</span>
         </button>
 
         <div class="collapse <?= $isComplaintActive ? 'show' : '' ?>" id="complaint-tools-collapse">
           <ul class="btn-toggle-nav list-unstyled fw-normal pb-1 small">
             <li>
               <a href="<?= htmlspecialchars(appUrl('Admin-End/Complaints/ComplaintTracker.php')) ?>"
-                 class="link-dark rounded <?= $current == 'ComplaintTracker.php' ? 'active' : '' ?>">
-                Tracker
+                 class="link-dark rounded sidebar-subnav-link <?= $current == 'ComplaintTracker.php' ? 'active' : '' ?>">
+                <span class="sidebar-subnav-text">Tracker</span>
+                <?= $sbRenderAttentionBadge($sbCount('complaint_tracker')) ?>
               </a>
             </li>
           </ul>
@@ -922,50 +1088,89 @@ if (!empty($_SESSION['user_id']) && isset($conn) && $conn instanceof mysqli) {
                 data-bs-toggle="collapse"
                 data-bs-target="#content-management-collapse"
                 aria-expanded="<?= $isContentNavigatorActive ? 'true' : 'false' ?>">
-          <i class="fas fa-sitemap"></i> Content Management
+          <span class="sidebar-icon-wrap">
+            <i class="fas fa-sitemap"></i>
+            <?= $sbRenderAttentionDot($sbModuleCount('content_management')) ?>
+          </span>
+          <span class="sidebar-button-label">Content Management</span>
         </button>
         <div class="collapse <?= $isContentNavigatorActive ? 'show' : '' ?>" id="content-management-collapse">
           <ul class="btn-toggle-nav list-unstyled fw-normal pb-1 small">
             <li>
               <a href="<?= htmlspecialchars(appUrl('Admin-End/Contents/ContentManagement.php')) ?>?module=requests&amp;requests_view=my_requests"
-                 class="link-dark rounded <?= $isContentChangeRequestActive ? 'active' : '' ?>">
-                Content Change Request
+                 class="link-dark rounded sidebar-subnav-link <?= $isContentChangeRequestActive ? 'active' : '' ?>">
+                <span class="sidebar-subnav-text">Content Change Request</span>
               </a>
+            </li>
+            <li class="mt-1">
+              <button class="btn btn-toggle sidebar-subtoggle d-flex align-items-center rounded <?= $isCmsToolsActive ? '' : 'collapsed' ?>"
+                      data-bs-toggle="collapse"
+                      data-bs-target="#cms-tools-collapse"
+                      aria-expanded="<?= $isCmsToolsActive ? 'true' : 'false' ?>">
+                <span>CMS Tools</span>
+              </button>
+              <div class="collapse <?= $isCmsToolsActive ? 'show' : '' ?>" id="cms-tools-collapse">
+                <ul class="btn-toggle-nav btn-toggle-nav-sub list-unstyled fw-normal pb-1 small">
+                  <?php if ($sbCanReviewContent): ?>
+                  <li>
+                    <a href="<?= htmlspecialchars(appUrl('Admin-End/Contents/ContentManagement.php')) ?>?module=requests&amp;requests_view=review_queue"
+                       class="link-dark rounded sidebar-subnav-link <?= ($current === 'ContentManagement.php' && $contentManagementModule === 'requests' && $contentRequestsView === 'review_queue') ? 'active' : '' ?>">
+                      <span class="sidebar-subnav-text">Review Queue</span>
+                      <?= $sbRenderAttentionBadge($sbCount('content_change_request')) ?>
+                    </a>
+                  </li>
+                  <?php endif; ?>
+                  <li>
+                    <a href="<?= htmlspecialchars(appUrl('Admin-End/Contents/ContentManagement.php')) ?>?module=requests&amp;requests_view=archived_requests"
+                       class="link-dark rounded sidebar-subnav-link <?= ($current === 'ContentManagement.php' && $contentManagementModule === 'requests' && $contentRequestsView === 'archived_requests') ? 'active' : '' ?>">
+                      <span class="sidebar-subnav-text">Archived Requests</span>
+                    </a>
+                  </li>
+                  <?php if ($sbCanReviewContent): ?>
+                  <li>
+                    <a href="<?= htmlspecialchars(appUrl('Admin-End/Contents/ContentManagement.php')) ?>?module=requests&amp;requests_view=approved_history"
+                       class="link-dark rounded sidebar-subnav-link <?= ($current === 'ContentManagement.php' && $contentManagementModule === 'requests' && $contentRequestsView === 'approved_history') ? 'active' : '' ?>">
+                      <span class="sidebar-subnav-text">Approved Version History</span>
+                    </a>
+                  </li>
+                  <?php endif; ?>
+                </ul>
+              </div>
             </li>
             <li>
               <a href="<?= htmlspecialchars(appUrl('Admin-End/Contents/ContentManagement.php')) ?>?module=home"
-                 class="link-dark rounded <?= ($current === 'ContentManagement.php' && $contentManagementModule === 'home') ? 'active' : '' ?>">
-                Home Page
+                 class="link-dark rounded sidebar-subnav-link <?= ($current === 'ContentManagement.php' && $contentManagementModule === 'home') ? 'active' : '' ?>">
+                <span class="sidebar-subnav-text">Home Page</span>
               </a>
             </li>
             <li>
               <a href="<?= htmlspecialchars(appUrl('Admin-End/Contents/ContentManagement.php')) ?>?module=government"
-                 class="link-dark rounded <?= ($current === 'ContentManagement.php' && $contentManagementModule === 'government') ? 'active' : '' ?>">
-                Government
+                 class="link-dark rounded sidebar-subnav-link <?= ($current === 'ContentManagement.php' && $contentManagementModule === 'government') ? 'active' : '' ?>">
+                <span class="sidebar-subnav-text">Government</span>
               </a>
             </li>
             <li>
               <a href="<?= htmlspecialchars(appUrl('Admin-End/Contents/ContentManagement.php')) ?>?module=services"
-                 class="link-dark rounded <?= ($current === 'ContentManagement.php' && $contentManagementModule === 'services') ? 'active' : '' ?>">
-                Services
+                 class="link-dark rounded sidebar-subnav-link <?= ($current === 'ContentManagement.php' && $contentManagementModule === 'services') ? 'active' : '' ?>">
+                <span class="sidebar-subnav-text">Services</span>
               </a>
             </li>
             <li>
               <a href="<?= htmlspecialchars(appUrl('Admin-End/Contents/ContentManagement.php')) ?>?module=faq"
-                 class="link-dark rounded <?= ($current === 'ContentManagement.php' && $contentManagementModule === 'faq') ? 'active' : '' ?>">
-                FAQ
+                 class="link-dark rounded sidebar-subnav-link <?= ($current === 'ContentManagement.php' && $contentManagementModule === 'faq') ? 'active' : '' ?>">
+                <span class="sidebar-subnav-text">FAQ</span>
               </a>
             </li>
             <li>
               <a href="<?= htmlspecialchars(appUrl('Admin-End/Contents/ContentManagement.php')) ?>?module=contact"
-                 class="link-dark rounded <?= ($current === 'ContentManagement.php' && $contentManagementModule === 'contact') ? 'active' : '' ?>">
-                Contact
+                 class="link-dark rounded sidebar-subnav-link <?= ($current === 'ContentManagement.php' && $contentManagementModule === 'contact') ? 'active' : '' ?>">
+                <span class="sidebar-subnav-text">Contact</span>
               </a>
             </li>
             <li>
               <a href="<?= htmlspecialchars(appUrl('Admin-End/Contents/ContentManagement.php')) ?>?module=login"
-                 class="link-dark rounded <?= ($current === 'ContentManagement.php' && $contentManagementModule === 'login') ? 'active' : '' ?>">
-                Login
+                 class="link-dark rounded sidebar-subnav-link <?= ($current === 'ContentManagement.php' && $contentManagementModule === 'login') ? 'active' : '' ?>">
+                <span class="sidebar-subnav-text">Login</span>
               </a>
             </li>
           </ul>
@@ -1089,9 +1294,14 @@ if (!empty($_SESSION['user_id']) && isset($conn) && $conn instanceof mysqli) {
       <?php if ($sbCan('user_masterlist')): ?>
       <li class="mb-1">
         <a href="<?= htmlspecialchars(appUrl('Admin-End/UserMasterlist.php')) ?>"
-           class="btn btn-toggle d-flex align-items-center gap-2 rounded <?= $current == 'UserMasterlist.php' ? 'active' : '' ?>"
+           class="btn btn-toggle sidebar-direct-link rounded <?= $current == 'UserMasterlist.php' ? 'active' : '' ?>"
            style="<?= $current == 'UserMasterlist.php' ? 'outline: none; box-shadow: none;' : '' ?>">
-          <i class="fas fa-users-cog"></i> User Management
+          <span class="sidebar-icon-wrap">
+            <i class="fas fa-users-cog"></i>
+            <?= $sbRenderAttentionDot($sbModuleCount('user_management')) ?>
+          </span>
+          <span class="sidebar-button-label">User Management</span>
+          <?= $sbRenderAttentionBadge($sbCount('user_management')) ?>
         </a>
       </li>
       <?php endif; ?>
