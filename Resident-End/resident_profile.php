@@ -4,6 +4,7 @@ require_once __DIR__ . "/includes/resident_access_guard.php";
 require_once "../PhpFiles/GET/getResidentProfile.php";
 require_once "../PhpFiles/General/uploadLimits.php";
 require_once "../PhpFiles/General/uniqueIDGenerate.php";
+require_once "../PhpFiles/Resident-End/householdHeadVerification.php";
 
 $data = getResidentProfileData($conn, $_SESSION['user_id']);
 $residentinformationtbl = $data['residentinformationtbl'] ?? [];
@@ -35,7 +36,10 @@ $isHeadOfFamily = in_array($headOfFamilyNormalized, ['yes', 'true', '1', 'y'], t
 $residentStatusRaw = trim((string)($residentinformationtbl['status_name_resident'] ?? ''));
 $residentStatusKey = strtolower(str_replace([' ', '_', '-'], '', $residentStatusRaw));
 $isResidentVerified = in_array($residentStatusKey, ['verifiedresident', 'verified'], true);
-$canSendHouseholdInvite = $isHeadOfFamily && $isResidentVerified;
+$householdHeadVerification = hhv_get_resident_head_verification($conn, (string)$residentId);
+$canManageHouseholdMembers = $isHeadOfFamily && (bool)($householdHeadVerification['can_manage_members'] ?? false);
+$householdManageMessage = trim((string)($householdHeadVerification['message'] ?? ''));
+$canSendHouseholdInvite = $canManageHouseholdMembers && $isResidentVerified;
 $editStatusKey = $residentStatusKey !== '' ? $residentStatusKey : 'notverified';
 $canEditProfile = !in_array($editStatusKey, ['notverified', 'pendingverification'], true);
 $editBlockMessage = 'Your account must be verified before you can edit your profile, address, or emergency contact.';
@@ -342,6 +346,8 @@ if ($residentId !== '' && isset($conn) && $conn instanceof mysqli) {
       window.RESIDENT_PROFILE_EMAIL_VERIFIED = <?= $emailVerified ? 'true' : 'false' ?>;
       window.RESIDENT_PROFILE_EDIT_ALLOWED = <?= $canEditProfile ? 'true' : 'false' ?>;
       window.RESIDENT_PROFILE_EDIT_BLOCK_MESSAGE = <?= json_encode($editBlockMessage, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) ?>;
+      window.RESIDENT_HOUSEHOLD_CAN_MANAGE = <?= $canManageHouseholdMembers ? 'true' : 'false' ?>;
+      window.RESIDENT_HOUSEHOLD_MANAGE_MESSAGE = <?= json_encode($householdManageMessage, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) ?>;
       window.RESIDENT_PROFILE_AGE = <?= $computedAge !== '' ? (int)$computedAge : 'null' ?>;
       window.RESIDENT_PROFILE_SEX = <?= json_encode((string)($residentinformationtbl['sex'] ?? ''), JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) ?>;
       window.RESIDENT_CSRF_TOKEN = <?= json_encode($residentCsrfToken, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) ?>;
@@ -768,7 +774,7 @@ if ($residentId !== '' && isset($conn) && $conn instanceof mysqli) {
                         <div class="card-header d-flex justify-content-between align-items-center">
                             <strong>HOUSEHOLD INFORMATION</strong>
                             <?php if ($isHeadOfFamily): ?>
-                            <button class="btn btn-success btn-sm" data-bs-toggle="modal" data-bs-target="#householdInviteModal">
+                            <button class="btn btn-success btn-sm" data-bs-toggle="modal" data-bs-target="#householdInviteModal" <?= $canManageHouseholdMembers ? '' : 'disabled' ?>>
                                 Add Household Member
                             </button>
                             <?php else: ?>
@@ -796,6 +802,11 @@ if ($residentId !== '' && isset($conn) && $conn instanceof mysqli) {
                             <div id="householdMembersEmpty" class="text-muted small mt-2 d-none">
                                 No household members yet.
                             </div>
+                            <?php if ($isHeadOfFamily && $householdManageMessage !== ''): ?>
+                            <div id="householdHeadVerificationNotice" class="alert alert-warning small mt-3 mb-0<?= $canManageHouseholdMembers ? ' d-none' : '' ?>">
+                                <?= htmlspecialchars($householdManageMessage, ENT_QUOTES, 'UTF-8') ?>
+                            </div>
+                            <?php endif; ?>
                             <div class="mt-3 text-muted small">
                                 Only the head of the family can add or manage household members.
                             </div>
@@ -858,6 +869,11 @@ if ($residentId !== '' && isset($conn) && $conn instanceof mysqli) {
                     <?php if (!$isResidentVerified): ?>
                         <div class="alert alert-warning small mb-2">
                             Your account must be verified before sending household invite codes via SMS.
+                        </div>
+                    <?php endif; ?>
+                    <?php if ($householdManageMessage !== ''): ?>
+                        <div class="alert alert-warning small mb-2<?= $canManageHouseholdMembers ? ' d-none' : '' ?>" id="householdManageAlert">
+                            <?= htmlspecialchars($householdManageMessage, ENT_QUOTES, 'UTF-8') ?>
                         </div>
                     <?php endif; ?>
                     <div class="mb-3">

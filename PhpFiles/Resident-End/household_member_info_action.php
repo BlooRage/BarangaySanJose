@@ -12,6 +12,7 @@ if (empty($_SESSION['user_id'])) {
 }
 
 require_once __DIR__ . '/../General/connection.php';
+require_once __DIR__ . '/householdHeadVerification.php';
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     http_response_code(405);
@@ -55,6 +56,13 @@ $stmt->close();
 
 if ($residentId === '' || !$isHead) {
     echo json_encode(['success' => false, 'message' => 'Only the head can remove members.']);
+    exit;
+}
+
+$headVerification = hhv_get_resident_head_verification($conn, $residentId);
+if (!$headVerification['can_manage_members']) {
+    http_response_code(403);
+    echo json_encode(['success' => false, 'message' => $headVerification['message'] ?: 'Head of family verification is required before managing members.']);
     exit;
 }
 
