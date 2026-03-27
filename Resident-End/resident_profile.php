@@ -357,7 +357,7 @@ if ($residentId !== '' && isset($conn) && $conn instanceof mysqli) {
   <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons/font/bootstrap-icons.css" rel="stylesheet" />
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
   <script src="../JS-Script-Files/modalHandler.js" defer></script>
-  <script src="../JS-Script-Files/Resident-End/householdMembers.js" defer></script>
+  <script src="../JS-Script-Files/Resident-End/householdMembers.js?v=20260328-1" defer></script>
   <script src="../JS-Script-Files/Resident-End/profileOccupation.js" defer></script>
   <script src="../JS-Script-Files/Resident-End/profileSidebar.js" defer></script>
   <script src="../JS-Script-Files/Resident-End/profileVerifyEmail.js" defer></script>

@@ -88,9 +88,13 @@ document.addEventListener("DOMContentLoaded", () => {
         if (pendingCountEl) {
             pendingCountEl.textContent = String(rows.length);
         }
-        pendingWrapEl.classList.toggle("d-none", rows.length === 0);
+        pendingWrapEl.classList.remove("d-none");
         if (!rows.length) {
-            pendingListEl.innerHTML = "";
+            pendingListEl.innerHTML = `
+                <div class="px-3 py-2 text-muted small">
+                    No pending member verification requests.
+                </div>
+            `;
             return;
         }
 
