@@ -303,17 +303,6 @@ $sharedMeta = [
           <div class="col-12">
             <?php if ($isFaqType): ?>
             <section class="announcement-section-card announcement-faq-shell mb-4">
-              <div class="announcement-faq-header">
-                <div class="announcement-faq-controls">
-                  <label for="faqQuestionTarget" class="form-label mb-0 fw-semibold">Question count</label>
-                  <select id="faqQuestionTarget" class="form-select form-select-sm announcement-faq-target-select" aria-label="FAQ question count">
-                    <?php for ($i = 1; $i <= 20; $i++): ?>
-                      <option value="<?= $i ?>"><?= $i ?></option>
-                    <?php endfor; ?>
-                  </select>
-                  <span id="faqItemCount" class="announcement-faq-count">0 / 20 Questions</span>
-                </div>
-              </div>
               <div id="faqItemsContainer" class="announcement-faq-list"></div>
             </section>
             <?php endif; ?>
@@ -430,6 +419,23 @@ $sharedMeta = [
           </div>
         </div>
       <?php endif; ?>
+      <div class="modal fade" id="appDialogModal" tabindex="-1" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
+        <div class="modal-dialog modal-dialog-centered">
+          <div class="modal-content">
+            <div class="modal-header border-0 pb-0">
+              <h5 class="modal-title" id="appDialogTitle">Notice</h5>
+              <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body pt-2">
+              <p class="mb-0" id="appDialogMessage"></p>
+            </div>
+            <div class="modal-footer border-0 pt-0">
+              <button type="button" class="btn btn-outline-secondary" id="appDialogCancelBtn" data-bs-dismiss="modal">Cancel</button>
+              <button type="button" class="btn btn-primary text-white" id="appDialogConfirmBtn">OK</button>
+            </div>
+          </div>
+        </div>
+      </div>
     </main>
   </div>
 
@@ -471,6 +477,11 @@ $sharedMeta = [
       const faqAddItemBtn = document.getElementById("faqAddItemBtn");
       const faqItemCount = document.getElementById("faqItemCount");
       const faqQuestionTarget = document.getElementById("faqQuestionTarget");
+      const appDialogModalEl = document.getElementById("appDialogModal");
+      const appDialogTitle = document.getElementById("appDialogTitle");
+      const appDialogMessage = document.getElementById("appDialogMessage");
+      const appDialogConfirmBtn = document.getElementById("appDialogConfirmBtn");
+      const appDialogCancelBtn = document.getElementById("appDialogCancelBtn");
       const sharedEditorEl = $("#announcementEditor");
       const publicNewsEditorEl = $("#publicNewsEditor");
       const publicAnnouncementEditorEl = $("#publicAnnouncementEditor");
@@ -484,6 +495,12 @@ $sharedMeta = [
         "How long does barangay document processing take?",
         "What documents are required for barangay services?"
       ];
+      const appDialogModal = appDialogModalEl ? bootstrap.Modal.getOrCreateInstance(appDialogModalEl, {
+        backdrop: "static",
+        keyboard: false
+      }) : null;
+      let appDialogResolver = null;
+      let appDialogResult = false;
       let smsManuallyEdited = false;
       const fullToolbar = [
         ["style", ["style"]],
@@ -514,6 +531,75 @@ $sharedMeta = [
 
       function getEditorCode(editorInstance) {
         return editorInstance && editorInstance.length ? editorInstance.summernote("code") : "";
+      }
+
+      function settleAppDialog(result) {
+        appDialogResult = result;
+        if (appDialogModal) {
+          appDialogModal.hide();
+          return;
+        }
+        if (appDialogResolver) {
+          const resolve = appDialogResolver;
+          appDialogResolver = null;
+          resolve(result);
+        }
+      }
+
+      if (appDialogModalEl) {
+        appDialogModalEl.addEventListener("hidden.bs.modal", function () {
+          if (!appDialogResolver) {
+            return;
+          }
+          const resolve = appDialogResolver;
+          const result = appDialogResult;
+          appDialogResolver = null;
+          appDialogResult = false;
+          resolve(result);
+        });
+      }
+
+      if (appDialogConfirmBtn) {
+        appDialogConfirmBtn.addEventListener("click", function () {
+          settleAppDialog(true);
+        });
+      }
+
+      if (appDialogCancelBtn) {
+        appDialogCancelBtn.addEventListener("click", function () {
+          settleAppDialog(false);
+        });
+      }
+
+      function showAppDialog(options = {}) {
+        if (!appDialogModal || !appDialogTitle || !appDialogMessage || !appDialogConfirmBtn || !appDialogCancelBtn) {
+          if (options.cancelText) {
+            return Promise.resolve(window.confirm(options.message || ""));
+          }
+          window.alert(options.message || "");
+          return Promise.resolve(true);
+        }
+
+        appDialogTitle.textContent = options.title || "Notice";
+        appDialogMessage.textContent = options.message || "";
+        appDialogConfirmBtn.textContent = options.confirmText || "OK";
+        appDialogConfirmBtn.className = "btn " + (options.confirmClass || "btn-primary text-white");
+        appDialogCancelBtn.textContent = options.cancelText || "Cancel";
+        appDialogCancelBtn.classList.toggle("d-none", !options.cancelText);
+        appDialogResult = false;
+
+        return new Promise(function (resolve) {
+          appDialogResolver = resolve;
+          appDialogModal.show();
+        });
+      }
+
+      function showAppAlert(message, title = "Notice") {
+        return showAppDialog({
+          title,
+          message,
+          confirmText: "OK"
+        });
       }
 
       function isDualPlacementSelected() {
@@ -572,14 +658,14 @@ $sharedMeta = [
               for (const file of files) {
                 if (!file) continue;
                 if (file.size > MAX_IMAGE_SIZE_BYTES) {
-                  alert('Image must be 50MB or less.');
+                  showAppAlert('Image must be 50MB or less.');
                   continue;
                 }
                 try {
                   const imageUrl = await uploadEditorImage(file);
                   editorInstance.summernote('insertImage', imageUrl);
                 } catch (err) {
-                  alert(err.message || 'Unable to upload image.');
+                  showAppAlert(err.message || 'Unable to upload image.');
                 }
               }
             }
@@ -860,14 +946,14 @@ $sharedMeta = [
               for (const file of files) {
                 if (!file) continue;
                 if (file.size > MAX_IMAGE_SIZE_BYTES) {
-                  alert("Image must be 50MB or less.");
+                  showAppAlert("Image must be 50MB or less.");
                   continue;
                 }
                 try {
                   const imageUrl = await uploadEditorImage(file);
                   editorInstance.summernote("insertImage", imageUrl);
                 } catch (err) {
-                  alert(err.message || "Unable to upload image.");
+                  showAppAlert(err.message || "Unable to upload image.");
                 }
               }
               updateEditorOutputs();
@@ -911,7 +997,7 @@ $sharedMeta = [
 
       const createForm = document.querySelector("form.announcement-create-shell");
       if (createForm) {
-        createForm.addEventListener("submit", function (event) {
+        createForm.addEventListener("submit", async function (event) {
           if (contentType === "faq") {
             faqItemsContainer?.querySelectorAll('[data-faq-item]').forEach((item) => {
               const editorHost = item.querySelector('.faq-answer-editor');
@@ -923,18 +1009,18 @@ $sharedMeta = [
             const faqItems = collectFaqItems().filter((item) => item.question !== "" || item.answer !== "");
             if (faqItems.length === 0) {
               event.preventDefault();
-              alert("Add at least one FAQ question and answer before saving.");
+              await showAppAlert("Add at least one FAQ question and answer before saving.");
               return;
             }
             if (faqItems.length > faqMaxItems) {
               event.preventDefault();
-              alert("You can only save up to 20 FAQ questions in one content item.");
+              await showAppAlert("You can only save up to 20 FAQ questions in one content item.");
               return;
             }
             const hasIncompleteFaq = faqItems.some((item) => item.question === "" || item.answer === "");
             if (hasIncompleteFaq) {
               event.preventDefault();
-              alert("Complete both the question and answer for every FAQ entry before saving.");
+              await showAppAlert("Complete both the question and answer for every FAQ entry before saving.");
               return;
             }
             return;
@@ -945,7 +1031,7 @@ $sharedMeta = [
           const hasAnnouncementDestination = !!((channelGuestPage && channelGuestPage.checked) || (document.getElementById("channelWebsite") && document.getElementById("channelWebsite").checked));
           if (contentType === "page" && hasAnnouncementPlacement && !hasAnnouncementDestination) {
             event.preventDefault();
-            alert("Select Guest Page or Account Page when Announcements is selected.");
+            await showAppAlert("Select Guest Page or Account Page when Announcements is selected.");
             return;
           }
           if (dualPlacementActive) {
@@ -955,7 +1041,7 @@ $sharedMeta = [
             const publicAnnouncementBody = getPlainTextFromHtml(getEditorCode(publicAnnouncementEditorEl));
             if (publicNewsTitle === "" || publicAnnouncementTitle === "" || publicNewsBody === "" || publicAnnouncementBody === "") {
               event.preventDefault();
-              alert("Fill in both the Main News and Announcements title and body before submitting.");
+              await showAppAlert("Fill in both the Main News and Announcements title and body before submitting.");
               return;
             }
           }
@@ -1042,7 +1128,7 @@ $sharedMeta = [
               return;
             }
             if (faqItemsContainer.querySelectorAll('[data-faq-item]').length <= 1) {
-              alert('At least one FAQ item is required.');
+              showAppAlert('At least one FAQ item is required.');
               return;
             }
             destroyFaqEditor(item);
