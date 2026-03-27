@@ -9,6 +9,7 @@ verifyCsrfToken(true);
 require_once __DIR__ . "/../General/connection.php";
 require_once __DIR__ . "/../General/sendSMS.php";
 require_once __DIR__ . "/../General/uniqueIDGenerate.php";
+require_once __DIR__ . '/../Resident-End/householdHeadVerification.php';
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     http_response_code(405);
@@ -74,6 +75,16 @@ $stmt->close();
 if ($residentId === '' || !$isHead) {
     http_response_code(403);
     echo json_encode(['success' => false, 'message' => 'Only the head of the family can send invites.']);
+    exit;
+}
+
+$headVerification = hhv_get_resident_head_verification($conn, $residentId);
+if (!$headVerification['can_manage_members']) {
+    http_response_code(403);
+    echo json_encode([
+        'success' => false,
+        'message' => $headVerification['message'] ?: 'Head of family verification is required before inviting household members.',
+    ]);
     exit;
 }
 

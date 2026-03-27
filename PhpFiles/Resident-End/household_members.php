@@ -12,6 +12,7 @@ if (empty($_SESSION['user_id'])) {
 }
 
 require_once __DIR__ . '/../General/connection.php';
+require_once __DIR__ . '/householdHeadVerification.php';
 
 function getStatusId(mysqli $conn, string $name, string $type): ?int {
     $stmt = $conn->prepare("
@@ -55,6 +56,8 @@ if ($residentId === '') {
     echo json_encode(['success' => false, 'message' => 'Resident profile not found.']);
     exit;
 }
+
+$headVerification = hhv_get_resident_head_verification($conn, $residentId);
 
 $memberActiveStatusId = getStatusId($conn, 'Active', 'HouseholdMember');
 if ($memberActiveStatusId === null) {
@@ -259,6 +262,9 @@ echo json_encode([
     'members' => $members,
     'has_household' => true,
     'is_head' => $isHead,
+    'can_manage_members' => (bool)($headVerification['can_manage_members'] ?? true),
+    'head_verification_status' => (string)($headVerification['decision_status'] ?? 'NotApplicable'),
+    'head_verification_message' => (string)($headVerification['message'] ?? ''),
     'resident_id' => $residentId,
     'address' => $addressDisplay,
     'minor_count' => $minorCount,

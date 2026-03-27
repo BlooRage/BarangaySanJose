@@ -2,6 +2,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const grid = document.getElementById("householdMembersGrid");
     const empty = document.getElementById("householdMembersEmpty");
     if (!grid) return;
+    let canManageMembers = Boolean(window.RESIDENT_HOUSEHOLD_CAN_MANAGE);
 
     const setJoinButtonState = (hasHousehold) => {
         const joinBtn = document.getElementById("btnJoinHousehold");
@@ -24,6 +25,25 @@ document.addEventListener("DOMContentLoaded", () => {
     const addressEl = document.getElementById("householdAddress");
     const minorEl = document.getElementById("householdMinorCount");
     const adultEl = document.getElementById("householdAdultCount");
+    const householdManageNoticeEl = document.getElementById("householdHeadVerificationNotice");
+    const householdManageAlertEl = document.getElementById("householdManageAlert");
+    const openManageModalBtn = document.querySelector('[data-bs-target="#householdInviteModal"]');
+
+    const syncHouseholdManageUi = () => {
+        const blocked = !canManageMembers;
+        const message = String(window.RESIDENT_HOUSEHOLD_MANAGE_MESSAGE || "");
+        if (openManageModalBtn) {
+            openManageModalBtn.disabled = blocked;
+        }
+        if (householdManageNoticeEl) {
+            householdManageNoticeEl.textContent = message;
+            householdManageNoticeEl.classList.toggle("d-none", !blocked || !message);
+        }
+        if (householdManageAlertEl) {
+            householdManageAlertEl.textContent = message;
+            householdManageAlertEl.classList.toggle("d-none", !blocked || !message);
+        }
+    };
 
     const renderHouseholdInfo = (address, minorCount, adultCount) => {
         if (addressEl) {
@@ -79,6 +99,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 removeBtn.type = "button";
                 removeBtn.className = "btn btn-outline-danger btn-sm";
                 removeBtn.textContent = "Remove";
+                removeBtn.disabled = !canManageMembers;
                 if (member.resident_id) {
                     removeBtn.dataset.residentId = member.resident_id;
                 }
@@ -111,6 +132,10 @@ document.addEventListener("DOMContentLoaded", () => {
             }
             setJoinButtonState(!!data.has_household);
             updateLeaveButtonState(!!data.has_household);
+            canManageMembers = Boolean(data.can_manage_members ?? window.RESIDENT_HOUSEHOLD_CAN_MANAGE);
+            window.RESIDENT_HOUSEHOLD_CAN_MANAGE = canManageMembers;
+            window.RESIDENT_HOUSEHOLD_MANAGE_MESSAGE = String(data.head_verification_message || window.RESIDENT_HOUSEHOLD_MANAGE_MESSAGE || "");
+            syncHouseholdManageUi();
             renderHouseholdInfo(data.address || null, data.minor_count ?? 0, data.adult_count ?? 0);
             renderMembers(data.members || [], !!data.is_head, data.resident_id || "");
         } catch (e) {
@@ -138,6 +163,10 @@ document.addEventListener("DOMContentLoaded", () => {
     };
 
     const handleRemove = async (residentId, infoMemberId) => {
+        if (!canManageMembers) {
+            alert(window.RESIDENT_HOUSEHOLD_MANAGE_MESSAGE || "Head of family verification is still pending.");
+            return;
+        }
         const ok = await confirmAction("Remove this member from the household?");
         if (!ok) return;
         try {
@@ -228,5 +257,6 @@ document.addEventListener("DOMContentLoaded", () => {
         window.clearInterval(refreshTimer);
     }, { once: true });
 
+    syncHouseholdManageUi();
     loadMembers();
 });

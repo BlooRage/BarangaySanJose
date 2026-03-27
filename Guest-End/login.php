@@ -55,7 +55,7 @@ if (!empty($_SESSION['user_id']) && empty($_SESSION['role'])) {
 
     <!-- ✅ OLD ORDER (keep this) -->
     <script src="../JS-Script-Files/loginScripts.js?v=20260327-auth-success-modal2" defer></script>
-    <script src="../JS-Script-Files/modalHandler.js?v=20260320-01" defer></script>
+    <script src="../JS-Script-Files/modalHandler.js?v=20260328-01" defer></script>
   </head>
 
   <body data-cms-page="login" data-cms-endpoint="../PhpFiles/GET/getSiteContent.php" data-cms-asset-base="../">

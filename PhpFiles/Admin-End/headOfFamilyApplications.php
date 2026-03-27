@@ -225,6 +225,30 @@ function fetch_head_rows(mysqli $conn): array {
     $res = $stmt->get_result();
     $rows = [];
     while ($row = $res->fetch_assoc()) {
+        $row = pii_decrypt_resident_row($row) ?? $row;
+        $row = pii_decrypt_resident_address_row($row) ?? $row;
+        $row = pii_decrypt_assoc($row, [
+            'firstname',
+            'middlename',
+            'lastname',
+            'suffix',
+            'birthdate',
+            'birthplace',
+            'baranagayresidency',
+            'civil_status',
+            'family_role',
+            'occupation_detail',
+            'religion',
+            'sector_membership',
+            'house_number',
+            'street_name',
+            'phase_number',
+            'subdivision',
+            'house_type',
+            'house_ownership',
+            'residency_duration',
+        ]) ?? $row;
+
         $row['group_key'] = implode('|', [
             normalize_simple($row['house_number'] ?? ''),
             normalize_street($row['street_name'] ?? ''),
@@ -241,6 +265,56 @@ function fetch_head_rows(mysqli $conn): array {
     return $rows;
 }
 
+function fetch_address_snapshot_by_id(mysqli $conn, string $addressId): ?array {
+    $addressId = trim($addressId);
+    if ($addressId === '') {
+        return null;
+    }
+
+    $stmt = $conn->prepare("
+        SELECT
+            address_id,
+            unit_number,
+            street_number AS house_number,
+            street_name,
+            phase_number,
+            subdivision,
+            area_number,
+            house_type,
+            house_ownership,
+            residency_duration
+        FROM residentaddresstbl
+        WHERE address_id = ?
+        LIMIT 1
+    ");
+    if (!$stmt) {
+        return null;
+    }
+
+    $stmt->bind_param('s', $addressId);
+    $stmt->execute();
+    $row = $stmt->get_result()->fetch_assoc();
+    $stmt->close();
+
+    if (!$row) {
+        return null;
+    }
+
+    $row = pii_decrypt_resident_address_row($row) ?? $row;
+    $row = pii_decrypt_assoc($row, [
+        'house_number',
+        'street_name',
+        'phase_number',
+        'subdivision',
+        'house_type',
+        'house_ownership',
+        'residency_duration',
+    ]) ?? $row;
+
+    $row['address_display'] = hof_build_address_display($row);
+    return $row;
+}
+
 function fetch_decisions(mysqli $conn): array {
     ensure_head_verification_table($conn);
     $map = [];
@@ -252,6 +326,18 @@ function fetch_decisions(mysqli $conn): array {
     ");
     if (!$res) return $map;
     while ($row = $res->fetch_assoc()) {
+        $row = pii_decrypt_assoc($row, ['address_display']) ?? $row;
+        $addressSnapshot = fetch_address_snapshot_by_id($conn, (string)($row['address_id'] ?? ''));
+        if ($addressSnapshot) {
+            $rebuiltDisplay = trim((string)($addressSnapshot['address_display'] ?? ''));
+            if ($rebuiltDisplay !== '' && $rebuiltDisplay !== '-') {
+                $row['address_display'] = $rebuiltDisplay;
+            }
+            $row['address_details'] = $addressSnapshot;
+            if (trim((string)($row['area_number'] ?? '')) === '') {
+                $row['area_number'] = (string)($addressSnapshot['area_number'] ?? '');
+            }
+        }
         $key = trim((string)($row['group_key'] ?? ''));
         if ($key === '') continue;
         $map[$key] = $row;
@@ -477,7 +563,7 @@ if (isset($_GET['fetch'])) {
             'address_id' => $decision['address_id'] ?? '',
             'address_display' => $decision['address_display'] ?? '-',
             'area_number' => $decision['area_number'] ?? '',
-            'address_details' => [
+            'address_details' => $decision['address_details'] ?? [
                 'unit_number' => '',
                 'house_number' => '',
                 'street_name' => '',

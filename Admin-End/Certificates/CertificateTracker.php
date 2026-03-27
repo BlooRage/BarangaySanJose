@@ -16,6 +16,7 @@ if ($certificateLaunchStage === 'release') {
   $barangayIdAdminNavActive = 'release';
 }
 ?>
+
 <!DOCTYPE html>
 <html lang="en">
 <head>

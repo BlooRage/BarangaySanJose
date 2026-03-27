@@ -1,5 +1,7 @@
 document.addEventListener("DOMContentLoaded", () => {
     const csrfToken = String(window.RESIDENT_CSRF_TOKEN || "").trim();
+    const canManageMembers = () => Boolean(window.RESIDENT_HOUSEHOLD_CAN_MANAGE);
+    const manageBlockedMessage = () => String(window.RESIDENT_HOUSEHOLD_MANAGE_MESSAGE || "Head of family verification is still pending.");
     const normalizePhone = (value) => {
         const digits = (value || "").replace(/\D/g, "");
         if (digits.startsWith("63") && digits.length === 12) {
@@ -62,6 +64,14 @@ document.addEventListener("DOMContentLoaded", () => {
     const householdInviteBtn = document.getElementById("btnSendHouseholdInvite");
     if (householdInviteBtn) {
         householdInviteBtn.addEventListener("click", async () => {
+            if (!canManageMembers()) {
+                const result = document.getElementById("householdInviteResult");
+                if (result) {
+                    result.className = "small mt-2 text-danger";
+                    result.textContent = manageBlockedMessage();
+                }
+                return;
+            }
             const result = document.getElementById("householdInviteResult");
             const inputs = document.querySelectorAll(".household-invite-phone");
             inputs.forEach((el) => sanitizePhoneInput(el));
@@ -147,6 +157,10 @@ document.addEventListener("DOMContentLoaded", () => {
         const touched = new Set();
 
         const validateNames = (showErrors) => {
+            if (!canManageMembers()) {
+                addMemberBtn.disabled = true;
+                return false;
+            }
             let valid = true;
             const lastName = document.getElementById("hmLastName");
             const firstName = document.getElementById("hmFirstName");
@@ -194,6 +208,14 @@ document.addEventListener("DOMContentLoaded", () => {
         validateNames(false);
 
         addMemberBtn.addEventListener("click", async () => {
+            if (!canManageMembers()) {
+                const result = document.getElementById("householdMemberAddResult");
+                if (result) {
+                    result.className = "small mt-2 text-danger";
+                    result.textContent = manageBlockedMessage();
+                }
+                return;
+            }
             const result = document.getElementById("householdMemberAddResult");
             const lastName = document.getElementById("hmLastName")?.value.trim() || "";
             const firstName = document.getElementById("hmFirstName")?.value.trim() || "";
@@ -249,7 +271,7 @@ document.addEventListener("DOMContentLoaded", () => {
                     result.textContent = err?.message || "Failed to add member.";
                 }
             } finally {
-                addMemberBtn.disabled = false;
+                validateNames(false);
             }
         });
     }
