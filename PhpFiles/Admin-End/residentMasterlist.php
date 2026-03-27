@@ -1106,6 +1106,7 @@ if (isset($_GET['fetch'])) {
         $row = pii_decrypt_assoc($row, [
             'contact_number',
             'email_address',
+            'occupation_display',
             'unit_number',
             'house_number',
             'street_name',
