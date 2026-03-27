@@ -23,7 +23,9 @@ amp_ensure_permission_storage($conn);
 $currentUserId = trim((string)($_SESSION['user_id'] ?? ''));
 $currentRole = trim((string)($_SESSION['role'] ?? ''));
 $allowedPermissions = amp_get_allowed_permission_keys($conn, $currentUserId, $currentRole);
-if (!amp_permission_key_allowed($allowedPermissions, 'announcements_tracker')) {
+$pageKey = cms_content_normalize_page_key((string)($_POST['page_key'] ?? ''));
+$requiredPermission = $pageKey === 'faq' ? 'announcements_faq' : 'announcements_tracker';
+if (!amp_permission_key_allowed($allowedPermissions, $requiredPermission)) {
     http_response_code(403);
     echo 'Access denied.';
     exit;
@@ -46,7 +48,6 @@ function cms_action_redirect(string $module, string $message, string $type = 'su
 }
 
 $action = strtolower(trim((string)($_POST['action'] ?? '')));
-$pageKey = cms_content_normalize_page_key((string)($_POST['page_key'] ?? ''));
 $requestId = trim((string)($_POST['request_id'] ?? ''));
 $redirectModule = strtolower(trim((string)($_POST['redirect_module'] ?? ($pageKey !== '' ? $pageKey : 'requests'))));
 if ($redirectModule === '' || $redirectModule === 'announcements') {

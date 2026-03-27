@@ -1093,6 +1093,7 @@ function rp_report_customize_config(string $module): array {
             'sections' => [
                 'summary' => 'Overall Summary',
                 'breakdown' => 'Residents Breakdown',
+                'household' => 'Household Data',
                 'charts' => 'Graphs',
                 'tables' => 'Tables (Supporting the Graphs)',
                 'sector' => 'Sector Membership',
@@ -1106,6 +1107,7 @@ function rp_report_customize_config(string $module): array {
                 'area' => $sharedColumns['area'],
                 'sector' => $sharedColumns['sector'],
                 'group' => 'Leading Group / Label',
+                'household' => 'Household Metric',
                 'count' => $sharedColumns['count'],
                 'percentage' => $sharedColumns['percentage'],
                 'type' => 'Dataset / Category',
@@ -1115,6 +1117,11 @@ function rp_report_customize_config(string $module): array {
                     'label' => 'Residents Breakdown',
                     'sections' => ['breakdown'],
                     'columns' => ['area', 'count', 'percentage'],
+                ],
+                [
+                    'label' => 'Household Data',
+                    'sections' => ['household'],
+                    'columns' => ['area', 'household', 'count', 'percentage'],
                 ],
                 [
                     'label' => 'Tables (Supporting the Graphs)',
@@ -1918,6 +1925,31 @@ if ($module === 'residents' && rp_table_exists($conn, 'residentinformationtbl'))
         {$residentFilterSql}
         GROUP BY month ORDER BY month ASC
     ");
+
+    $res['household_kpi'] = rp_safe_query($conn, "
+        SELECT COUNT(DISTINCT ri.resident_id) AS total
+        FROM residentinformationtbl ri
+        JOIN statuslookuptbl s ON s.status_id = ri.status_id_resident
+        " . ($residentAddressJoin !== '' ? "\n        {$residentAddressJoin}" : '') . "
+        WHERE {$residentVerifiedWhere}
+          AND COALESCE(ri.head_of_family, 0) = 1
+        {$residentFilterSql}
+    ");
+    $res['household_kpi'] = $res['household_kpi'][0] ?? [];
+
+    if ($residentAddressJoin !== '') {
+        $res['household_by_area'] = rp_safe_query($conn, "
+            SELECT COALESCE({$residentAreaExpr},'Unspecified') AS area, COUNT(DISTINCT ri.resident_id) AS total
+            FROM residentinformationtbl ri
+            JOIN statuslookuptbl s ON s.status_id = ri.status_id_resident
+            {$residentAddressJoin}
+            WHERE {$residentVerifiedWhere}
+              AND COALESCE(ri.head_of_family, 0) = 1
+            {$residentFilterSql}
+            GROUP BY area ORDER BY total DESC
+        ");
+    }
+    $res['household_by_area_complete'] = rp_complete_area_rollup_rows($res['household_by_area'] ?? [], 'area', ['total' => 0]);
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -3359,6 +3391,7 @@ $financialAreaRevenueChartData = [];
 $residentGenderChartData = [];
 $residentAgeChartData = [];
 $residentAreaChartData = [];
+$residentHouseholdChartData = [];
 $residentSectorChartData = [];
 $residentMonthlyChartData = [];
 $appointmentStatusChartData = [];
@@ -4177,7 +4210,13 @@ elseif ($module === 'residents'):
     ];
   }, $res['monthly_reg'] ?? []));
   $residentMonthlyTotal = array_sum(array_column($residentMonthlyRows, 'total'));
+  $residentHouseholdTotal = (int)($res['household_kpi']['total'] ?? 0);
+  $residentHouseholdRows = $res['household_by_area_complete'] ?? [];
+  $residentHouseholdAreaTotal = array_sum(array_column($residentHouseholdRows, 'total'));
   $residentAreaChartData = $residentAreaTotal > 0 ? $residentAreaRows : [];
+  $residentHouseholdChartData = $residentHouseholdAreaTotal > 0 ? array_values(array_filter($residentHouseholdRows, static function (array $row): bool {
+    return (int)($row['total'] ?? 0) > 0;
+  })) : [];
   $residentSectorChartData = array_values(array_filter($residentSectorRows, static function (array $row): bool {
     return (int)($row['total'] ?? 0) > 0;
   }));
@@ -4214,6 +4253,7 @@ elseif ($module === 'residents'):
   };
   $residentSupportRows = [
     $residentSupportRow('Residents Breakdown', $residentAreaRows, 'area', $residentAreaTotal),
+    $residentSupportRow('Household Data', $residentHouseholdRows, 'area', $residentHouseholdAreaTotal),
     $residentSupportRow('Sector Membership', $residentSectorRows, 'sector', $residentSectorTotal),
     $residentSupportRow('Employed and Unemployed', $residentEmploymentRows, 'employment', $residentEmploymentTotal),
     $residentSupportRow('Gender', $residentGenderRows, 'label', $residentGenderTotal),
@@ -4223,6 +4263,7 @@ elseif ($module === 'residents'):
   $shouldLoadResidentCharts = $showReportSection('charts') && (
     $residentEmploymentChartData !== []
     || $residentAreaChartData !== []
+    || $residentHouseholdChartData !== []
     || $residentGenderChartData !== []
     || $residentAgeChartData !== []
     || $residentSectorChartData !== []
@@ -4235,6 +4276,7 @@ elseif ($module === 'residents'):
           <table class="rp-summary">
             <tbody>
               <tr><td>Total Verified Residents</td><td><?= number_format($total) ?></td></tr>
+              <tr><td>Total Verified Households (HOF)</td><td><?= number_format($residentHouseholdTotal) ?></td></tr>
             </tbody>
           </table>
         </div>
@@ -4271,10 +4313,49 @@ elseif ($module === 'residents'):
         </div>
         <?php endif; ?>
 
+        <?php if ($showReportSection('household')): ?>
+        <div class="rp-section">
+          <div class="rp-section-label"><?= htmlspecialchars($residentSectionLabel('household')) ?></div>
+          <table class="rp-summary" style="margin-bottom:18px;">
+            <tbody>
+              <tr><td>Total Verified Households (HOF)</td><td><?= number_format($residentHouseholdTotal) ?></td></tr>
+            </tbody>
+          </table>
+          <table class="rp-table">
+            <thead>
+              <tr>
+                <th class="<?= htmlspecialchars(trim($reportColumnClass('area'))) ?>">Area</th>
+                <th class="<?= htmlspecialchars(trim($reportColumnClass('household'))) ?>">Household Metric</th>
+                <th class="text-center<?= htmlspecialchars($reportColumnClass('count')) ?>">Count</th>
+                <th class="text-center<?= htmlspecialchars($reportColumnClass('percentage')) ?>">%</th>
+              </tr>
+            </thead>
+            <tbody>
+              <?php foreach ($residentHouseholdRows as $row): ?>
+              <tr>
+                <td class="<?= htmlspecialchars(trim($reportColumnClass('area'))) ?>"><?= htmlspecialchars((string)($row['area'] ?? 'Unspecified')) ?></td>
+                <td class="<?= htmlspecialchars(trim($reportColumnClass('household'))) ?>">Heads of Family</td>
+                <td class="text-center<?= htmlspecialchars($reportColumnClass('count')) ?>"><?= number_format((int)($row['total'] ?? 0)) ?></td>
+                <td class="text-center pct<?= htmlspecialchars($reportColumnClass('percentage')) ?>"><?= rp_pct((int)($row['total'] ?? 0), $residentHouseholdAreaTotal) ?></td>
+              </tr>
+              <?php endforeach; ?>
+            </tbody>
+            <tfoot>
+              <tr>
+                <td class="<?= htmlspecialchars(trim($reportColumnClass('area'))) ?>"><strong>TOTAL</strong></td>
+                <td class="<?= htmlspecialchars(trim($reportColumnClass('household'))) ?>">Heads of Family</td>
+                <td class="text-center<?= htmlspecialchars($reportColumnClass('count')) ?>"><?= number_format($residentHouseholdAreaTotal) ?></td>
+                <td class="text-center<?= htmlspecialchars($reportColumnClass('percentage')) ?>">100%</td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+        <?php endif; ?>
+
         <?php if ($showReportSection('charts')): ?>
         <div class="rp-section">
           <div class="rp-section-label"><?= htmlspecialchars($residentSectionLabel('charts')) ?></div>
-          <?php if ($residentGenderChartData === [] && $residentAgeChartData === [] && $residentAreaChartData === [] && $residentSectorChartData === [] && $residentEmploymentChartData === [] && $residentMonthlyChartData === []): ?>
+          <?php if ($residentGenderChartData === [] && $residentAgeChartData === [] && $residentAreaChartData === [] && $residentHouseholdChartData === [] && $residentSectorChartData === [] && $residentEmploymentChartData === [] && $residentMonthlyChartData === []): ?>
             <p class="rp-empty">No chart data is available for the selected filters.</p>
           <?php else: ?>
           <div class="rp-chart-grid">
@@ -4285,6 +4366,15 @@ elseif ($module === 'residents'):
               </div>
               <div class="rp-chart-note"><?= htmlspecialchars($reportChartTypeOptions[$reportChartType] ?? 'Bar Chart') ?> view of verified residents by area.</div>
             </div>
+            <?php if ($residentHouseholdChartData !== []): ?>
+            <div class="rp-chart-card">
+              <h3>Households by Area</h3>
+              <div class="rp-chart-wrap">
+                <canvas id="residentHouseholdChart"></canvas>
+              </div>
+              <div class="rp-chart-note"><?= htmlspecialchars($reportChartTypeOptions[$reportChartType] ?? 'Bar Chart') ?> view of verified heads of family by area.</div>
+            </div>
+            <?php endif; ?>
             <?php if ($residentSectorChartData !== []): ?>
             <div class="rp-chart-card">
               <h3>Sector Membership</h3>
@@ -5746,6 +5836,13 @@ window.__rpChartHelpers = (() => {
       values: <?= json_encode(array_map(static fn(array $row): int => (int)($row['total'] ?? 0), $residentSectorChartData), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>,
       title: 'Sector Membership',
       datasetLabel: 'Verified Residents',
+    },
+    {
+      canvasId: 'residentHouseholdChart',
+      labels: <?= json_encode(array_map(static fn(array $row): string => (string)($row['area'] ?? ''), $residentHouseholdChartData), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>,
+      values: <?= json_encode(array_map(static fn(array $row): int => (int)($row['total'] ?? 0), $residentHouseholdChartData), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>,
+      title: 'Households by Area',
+      datasetLabel: 'Heads of Family',
     },
     {
       canvasId: 'residentEmploymentChart',

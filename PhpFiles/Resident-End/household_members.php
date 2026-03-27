@@ -33,6 +33,17 @@ function getStatusId(mysqli $conn, string $name, string $type): ?int {
     return $statusId;
 }
 
+function normalizeHouseholdSubdivisionLabel(string $value): string {
+    $value = trim($value);
+    if ($value === '') {
+        return '';
+    }
+
+    $value = preg_replace('/\bsubdivision\b/i', '', $value) ?? $value;
+    $value = trim(preg_replace('/\s+/', ' ', $value) ?? $value);
+    return $value === '' ? '' : $value . ' Subdivision';
+}
+
 if (!isset($conn) || !($conn instanceof mysqli)) {
     http_response_code(500);
     echo json_encode(['success' => false, 'message' => 'Database connection unavailable']);
@@ -199,8 +210,7 @@ if ($headResidentId) {
         $houseNo = trim((string)($addrRow['street_number'] ?? ''));
         $streetName = trim((string)($addrRow['street_name'] ?? ''));
         $phase = trim((string)($addrRow['phase_number'] ?? ''));
-        $subdivision = trim((string)($addrRow['subdivision'] ?? ''));
-        $area = trim((string)($addrRow['area_number'] ?? ''));
+        $subdivision = normalizeHouseholdSubdivisionLabel((string)($addrRow['subdivision'] ?? ''));
 
         $streetDisplay = $streetName;
         if ($streetName !== '' && stripos($streetName, 'block') === false) {
@@ -208,12 +218,11 @@ if ($headResidentId) {
         }
         $parts = [];
         if ($unitNumber !== '') $parts[] = 'Unit ' . $unitNumber;
-        if ($houseNo !== '') $parts[] = $houseNo;
-        if ($streetDisplay !== '') $parts[] = $streetDisplay;
+        $houseStreet = trim(implode(' ', array_filter([$houseNo, $streetDisplay], static fn($v) => trim((string)$v) !== '')));
+        if ($houseStreet !== '') $parts[] = $houseStreet;
         if ($phase !== '') $parts[] = $phase;
         if ($subdivision !== '') $parts[] = $subdivision;
         $parts[] = 'San Jose';
-        if ($area !== '') $parts[] = $area;
         $parts[] = 'Rodriguez';
         $parts[] = 'Rizal';
         $parts[] = '1860';
