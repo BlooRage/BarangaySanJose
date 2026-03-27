@@ -1,42 +1,37 @@
 <?php
-require_once __DIR__ . '/../Admin-End/contentStore.php';
+require_once __DIR__ . '/../General/connection.php';
+require_once __DIR__ . '/../General/siteContent.php';
 
 header('Content-Type: application/json; charset=UTF-8');
 
-$items = announcements_load_all();
+if (!isset($conn) || !($conn instanceof mysqli)) {
+    http_response_code(500);
+    echo json_encode([
+        'success' => false,
+        'message' => 'Database connection unavailable.',
+        'items' => [],
+    ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+    exit;
+}
+
+$page = cms_content_page($conn, 'faq');
 $faqItems = [];
 
-foreach ($items as $item) {
-    $status = strtolower((string)($item['status'] ?? 'draft'));
-    $contentType = strtolower((string)($item['content_type'] ?? 'page'));
-    if ($status !== 'approved' || $contentType !== 'faq') {
+foreach ((array)($page['faq_items'] ?? []) as $faq) {
+    if (!is_array($faq)) {
         continue;
     }
 
-    $decoded = json_decode((string)($item['faq_items_json'] ?? ''), true);
-    if (!is_array($decoded) || $decoded === []) {
-        $decoded = [[
-            'question' => (string)($item['title'] ?? ''),
-            'answer' => trim(strip_tags((string)($item['content_html'] ?? ''))),
-        ]];
+    $question = trim((string)($faq['question'] ?? ''));
+    $answer = trim((string)($faq['answer'] ?? ''));
+    if ($question === '' || $answer === '') {
+        continue;
     }
 
-    foreach ($decoded as $faq) {
-        if (!is_array($faq)) {
-            continue;
-        }
-
-        $question = trim((string)($faq['question'] ?? ''));
-        $answer = trim((string)($faq['answer'] ?? ''));
-        if ($question === '' || $answer === '') {
-            continue;
-        }
-
-        $faqItems[] = [
-            'question' => $question,
-            'answer' => $answer,
-        ];
-    }
+    $faqItems[] = [
+        'question' => $question,
+        'answer' => $answer,
+    ];
 }
 
 echo json_encode([

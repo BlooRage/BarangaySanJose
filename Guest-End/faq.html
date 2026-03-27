@@ -123,16 +123,11 @@
         }
 
         function renderFaqAnswer(answer) {
-            return String(answer || "")
-                .split(/\r?\n\r?\n+/)
-                .map(function (paragraph) {
-                    var clean = paragraph.trim();
-                    if (!clean) {
-                        return "";
-                    }
-                    return "<p>" + escapeHtml(clean).replace(/\r?\n/g, "<br>") + "</p>";
-                })
-                .join("") || "<p>No answer available.</p>";
+            var html = String(answer || "").trim();
+            if (!html) {
+                return "<p>No answer available.</p>";
+            }
+            return html;
         }
 
         function buildFaqMarkup(item, index, sideId, isOpen) {
