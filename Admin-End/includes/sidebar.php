@@ -42,11 +42,11 @@ if (!function_exists('appUrl')) {
     require_once __DIR__ . '/../../PhpFiles/General/security.php';
 }
 require_once __DIR__ . '/../../PhpFiles/General/adminModulePermissions.php';
-<<<<<<< HEAD
 require_once __DIR__ . '/../../PhpFiles/General/siteContent.php';
-require_once __DIR__ . '/../../PhpFiles/General/adminSidebarAttention.php';
-=======
->>>>>>> 1e9f3b23c772081c2007edfafb27206d3fc847dc
+$sbAttentionHelperPath = __DIR__ . '/../../PhpFiles/General/adminSidebarAttention.php';
+if (file_exists($sbAttentionHelperPath)) {
+    require_once $sbAttentionHelperPath;
+}
 
 if ((!isset($conn) || !($conn instanceof mysqli)) && file_exists(__DIR__ . '/../../PhpFiles/General/connection.php')) {
     require_once __DIR__ . '/../../PhpFiles/General/connection.php';
@@ -1103,7 +1103,6 @@ if (!empty($_SESSION['user_id']) && isset($conn) && $conn instanceof mysqli) {
                 <span class="sidebar-subnav-text">Content Change Request</span>
               </a>
             </li>
-<<<<<<< HEAD
             <li class="mt-1">
               <button class="btn btn-toggle sidebar-subtoggle d-flex align-items-center rounded <?= $isCmsToolsActive ? '' : 'collapsed' ?>"
                       data-bs-toggle="collapse"
@@ -1139,8 +1138,6 @@ if (!empty($_SESSION['user_id']) && isset($conn) && $conn instanceof mysqli) {
                 </ul>
               </div>
             </li>
-=======
->>>>>>> 1e9f3b23c772081c2007edfafb27206d3fc847dc
             <li>
               <a href="<?= htmlspecialchars(appUrl('Admin-End/Contents/ContentManagement.php')) ?>?module=home"
                  class="link-dark rounded sidebar-subnav-link <?= ($current === 'ContentManagement.php' && $contentManagementModule === 'home') ? 'active' : '' ?>">
