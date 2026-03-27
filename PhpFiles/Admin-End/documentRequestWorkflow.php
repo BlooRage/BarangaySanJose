@@ -4554,10 +4554,12 @@ function dra_generate_issued_document(array $requestRow): ?string {
         }
 
         if ($isIndigency) {
+            $toY = $pdf->GetY() + 6;
+            $toValueX = 34;
             $pdf->SetFont($indigencyFont, 'B', 12);
-            $pdf->SetXY(22, 78);
-            $pdf->Cell(14, 7, 'TO', 0, 0, 'L');
-            $pdf->Cell(4, 7, ':', 0, 0, 'C');
+            $pdf->SetXY(22, $toY);
+            $pdf->Cell(9, 7, 'TO', 0, 0, 'L');
+            $pdf->Cell(3, 7, ':', 0, 0, 'C');
             $line1 = trim((string)$requestOfficerLine1);
             $line2 = trim((string)$requestOfficerLine2);
             $line3 = trim((string)$requestOfficerLine3);
@@ -4568,15 +4570,15 @@ function dra_generate_issued_document(array $requestRow): ?string {
                 $line3 = (string)($parts[2] ?? '');
             }
             if ($line1 === '' && $line2 === '' && $line3 === '') {
-                $pdf->Line(39, 84, 106, 84);
-                $pdf->Line(39, 90, 106, 90);
-                $pdf->Line(39, 96, 106, 96);
-                $pdf->SetY(96);
+                $pdf->Line($toValueX, $toY + 6, 106, $toY + 6);
+                $pdf->Line($toValueX, $toY + 12, 106, $toY + 12);
+                $pdf->Line($toValueX, $toY + 18, 106, $toY + 18);
+                $pdf->SetY($toY + 18);
             } else {
                 $pdf->SetFont($indigencyFont, 'B', 11);
                 $offLines = [$line1, $line2, $line3];
                 foreach ($offLines as $line) {
-                    $pdf->SetX(39);
+                    $pdf->SetX($toValueX);
                     if ($line === '') {
                         $pdf->Cell(0, 7, '', 0, 1, 'L');
                     } else {
@@ -4596,18 +4598,9 @@ function dra_generate_issued_document(array $requestRow): ?string {
                 [
                     ['text' => 'This is to certify that ', 'bold' => false],
                     ['text' => $fullName, 'bold' => true],
-                    ['text' => ', resident of ' . $address, 'bold' => false],
-                ],
-                7,
-                18,
-                10,
-                $indigencyFont,
-                12
-            );
-            $writeRichParagraph(
-                [
-                    ['text' => 'Barangay San Jose, Rodriguez, Rizal', 'bold' => true],
-                    ['text' => ' belongs to the one of the indigent families of this Barangay. The Income of this family is barely enough to meet their day-to-day needs.', 'bold' => false],
+                    ['text' => ', resident of ', 'bold' => false],
+                    ['text' => $addressWithBarangay !== '' ? $addressWithBarangay : 'Barangay San Jose, Rodriguez, Rizal', 'bold' => true],
+                    ['text' => ' belongs to one of the indigent families of this Barangay. The income of this family is barely enough to meet their day-to-day needs.', 'bold' => false],
                 ],
                 7,
                 18,
@@ -8516,6 +8509,5 @@ if ($action === 'get_clearance_fees') {
 }
 
 dr_respond_json(404, ['success' => false, 'message' => 'Unknown action.']);
-
 
 

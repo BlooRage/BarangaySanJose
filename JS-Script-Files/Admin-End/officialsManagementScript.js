@@ -108,6 +108,13 @@
   const accessPermissionSearch = el("officialsMgmtPermissionSearch");
   const accessPermissionGroups = el("officialsMgmtPermissionGroups");
   const accessSubmitBtn = el("btnOfficialsMgmtAccessSubmit");
+  const confirmModalEl = el("officialsMgmtConfirmModal");
+  const confirmTitleEl = el("officialsMgmtConfirmTitle");
+  const confirmMessageEl = el("officialsMgmtConfirmMessage");
+  const confirmCancelBtn = el("btnOfficialsMgmtConfirmCancel");
+  const confirmOkBtn = el("btnOfficialsMgmtConfirmOk");
+  let confirmResolver = null;
+  let confirmFocusReturnEl = null;
 
   const safe = (value) => {
     const normalized = String(value ?? "").trim();
@@ -166,6 +173,99 @@
     if (!target) return;
     target.textContent = safe(value);
   };
+
+  const closeConfirmModal = (confirmed = false) => {
+    if (!confirmModalEl || !confirmResolver) return;
+
+    const resolve = confirmResolver;
+    const focusTarget = confirmFocusReturnEl;
+
+    confirmResolver = null;
+    confirmFocusReturnEl = null;
+
+    confirmModalEl.classList.remove("show");
+    confirmModalEl.setAttribute("aria-hidden", "true");
+    confirmOkBtn?.classList.remove("btn-danger", "btn-success", "btn-warning", "btn-secondary");
+    confirmOkBtn?.classList.add("btn-primary");
+
+    resolve(confirmed);
+
+    window.setTimeout(() => {
+      if (focusTarget && typeof focusTarget.focus === "function") {
+        focusTarget.focus();
+      }
+    }, 0);
+  };
+
+  const confirmActionModal = ({
+    title = "Confirm Action",
+    message = "",
+    confirmLabel = "Confirm",
+    cancelLabel = "Cancel",
+    confirmTone = "primary",
+  } = {}) => new Promise((resolve) => {
+    if (!confirmModalEl || !confirmTitleEl || !confirmMessageEl || !confirmCancelBtn || !confirmOkBtn) {
+      resolve(window.confirm(message || title));
+      return;
+    }
+
+    if (confirmResolver) {
+      const pendingResolve = confirmResolver;
+      confirmResolver = null;
+      pendingResolve(false);
+    }
+
+    confirmResolver = resolve;
+    confirmFocusReturnEl = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    confirmTitleEl.textContent = String(title || "Confirm Action").trim() || "Confirm Action";
+    confirmMessageEl.textContent = String(message || "").trim() || "Are you sure you want to continue?";
+    confirmCancelBtn.textContent = String(cancelLabel || "Cancel").trim() || "Cancel";
+    confirmOkBtn.textContent = String(confirmLabel || "Confirm").trim() || "Confirm";
+    confirmOkBtn.classList.remove("btn-primary", "btn-danger", "btn-success", "btn-warning", "btn-secondary");
+    confirmOkBtn.classList.add(`btn-${confirmTone || "primary"}`);
+
+    confirmModalEl.classList.add("show");
+    confirmModalEl.setAttribute("aria-hidden", "false");
+
+    window.setTimeout(() => {
+      confirmOkBtn.focus();
+    }, 10);
+  });
+
+  if (confirmCancelBtn) {
+    confirmCancelBtn.addEventListener("click", () => closeConfirmModal(false));
+  }
+  if (confirmOkBtn) {
+    confirmOkBtn.addEventListener("click", () => closeConfirmModal(true));
+  }
+  if (confirmModalEl) {
+    confirmModalEl.addEventListener("keydown", (event) => {
+      if (!confirmResolver) return;
+
+      if (event.key === "Escape") {
+        event.preventDefault();
+        closeConfirmModal(false);
+        return;
+      }
+
+      if (event.key !== "Tab") return;
+
+      const focusable = [confirmCancelBtn, confirmOkBtn].filter((node) => node && !node.disabled);
+      if (!focusable.length) return;
+
+      const activeIndex = focusable.indexOf(document.activeElement);
+      let nextIndex = 0;
+
+      if (event.shiftKey) {
+        nextIndex = activeIndex <= 0 ? focusable.length - 1 : activeIndex - 1;
+      } else {
+        nextIndex = activeIndex === focusable.length - 1 ? 0 : activeIndex + 1;
+      }
+
+      event.preventDefault();
+      focusable[nextIndex].focus();
+    });
+  }
 
   const clearProfileFeedback = () => {
     if (!profileFeedbackEl) return;
@@ -598,6 +698,7 @@
     const id = escapeHtml(safe(row.official_id));
     const approvalState = String(row.profile_approval_state || "");
     const isRevoked = String(row.permission_state || "") === "Revoked";
+    const isProtected = String(row.protected_code || "").trim() !== "";
     let items = "";
 
     items += `<li><button class="dropdown-item officials-action-btn" data-action="manage_access" data-official-id="${id}"><i class="fas fa-list-check me-2"></i>Manage Access</button></li>`;
@@ -616,8 +717,12 @@
     }
 
     items += `<li><hr class="dropdown-divider"></li>`;
-    items += `<li><button class="dropdown-item officials-action-btn" data-action="promote" data-official-id="${id}"><i class="fas fa-arrow-up me-2"></i>Promote</button></li>`;
-    items += `<li><button class="dropdown-item officials-action-btn" data-action="change_department" data-official-id="${id}"><i class="fas fa-building me-2"></i>Change Department</button></li>`;
+    if (isProtected) {
+      items += `<li><span class="dropdown-item-text text-muted small"><i class="fas fa-lock me-2"></i>${escapeHtml(String(row.protected_label || "Protected account"))}: promotion and department change unavailable</span></li>`;
+    } else {
+      items += `<li><button class="dropdown-item officials-action-btn" data-action="promote" data-official-id="${id}"><i class="fas fa-arrow-up me-2"></i>Promote</button></li>`;
+      items += `<li><button class="dropdown-item officials-action-btn" data-action="change_department" data-official-id="${id}"><i class="fas fa-building me-2"></i>Change Department</button></li>`;
+    }
 
     return `
       <div class="dropdown">
@@ -747,6 +852,11 @@
   const openPromoteModal = (officialId) => {
     const row = state.rowsRaw.find((r) => String(r.official_id) === String(officialId));
     if (!row) return;
+    if (String(row.protected_code || "").trim() !== "") {
+      const protectedLabel = String(row.protected_label || "Protected").trim();
+      window.alert(`The ${protectedLabel} account cannot be reassigned through promotion.`);
+      return;
+    }
 
     const positionsByDepartment = opts.positionsByDepartment || {};
     const areaRequiredPositions = opts.areaRequiredPositions || [];
@@ -794,6 +904,11 @@
   const openDepartmentModal = (officialId) => {
     const row = state.rowsRaw.find((r) => String(r.official_id) === String(officialId));
     if (!row) return;
+    if (String(row.protected_code || "").trim() !== "") {
+      const protectedLabel = String(row.protected_label || "Protected").trim();
+      window.alert(`The ${protectedLabel} account cannot be reassigned through department changes.`);
+      return;
+    }
 
     const positionsByDepartment = opts.positionsByDepartment || {};
     const areaRequiredPositions = opts.areaRequiredPositions || [];
@@ -1172,7 +1287,13 @@
           ? "this profile approval"
           : "this account permission";
 
-        if (!window.confirm(`Are you sure you want to ${label} ${target}?`)) return;
+        const confirmed = await confirmActionModal({
+          title: "Confirm Action",
+          message: `Are you sure you want to ${label} ${target}?`,
+          confirmLabel: "Continue",
+          confirmTone: label === "revoke" || label === "reject" ? "danger" : "primary",
+        });
+        if (!confirmed) return;
 
         try {
           btn.disabled = true;
@@ -1426,7 +1547,14 @@
           return;
         }
 
-        if (!window.confirm(`Confirm promotion to: ${newPosition}?`)) return;
+        const promotionSubject = String(el("officialsMgmtPromoteSummary")?.textContent || entitySingular).split(" — ")[0].trim();
+        const promotionConfirmed = await confirmActionModal({
+          title: "Confirm Promotion",
+          message: `Promote ${promotionSubject || entitySingular} to ${newPosition}?`,
+          confirmLabel: "Save Promotion",
+          confirmTone: "primary",
+        });
+        if (!promotionConfirmed) return;
 
         try {
           promoteSubmitBtn.disabled = true;
@@ -1481,7 +1609,14 @@
           return;
         }
 
-        if (!window.confirm(`Change department to: ${newDepartment} — ${newPosition}?`)) return;
+        const departmentSubject = String(el("officialsMgmtDepartmentSummary")?.textContent || entitySingular).trim();
+        const departmentConfirmed = await confirmActionModal({
+          title: "Confirm Department Change",
+          message: `Change department for ${departmentSubject || entitySingular} to ${newDepartment} as ${newPosition}?`,
+          confirmLabel: "Save Department",
+          confirmTone: "primary",
+        });
+        if (!departmentConfirmed) return;
 
         try {
           deptSubmitBtn.disabled = true;

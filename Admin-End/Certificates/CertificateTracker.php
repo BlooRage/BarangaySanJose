@@ -461,7 +461,7 @@ if ($certificateLaunchStage === 'release') {
     }
     #viewModal .doc-preview-paper.doc-preview-paper--indigency {
       font-family: "Times New Roman", Times, serif;
-      padding: 28px 46px 96px;
+      padding: 24px 40px 96px;
     }
     #viewModal .doc-preview-paper.doc-preview-paper--indigency .doc-preview-head-center p {
       font-size: .88rem;
@@ -499,11 +499,11 @@ if ($certificateLaunchStage === 'release') {
       letter-spacing: 0;
     }
     #viewModal .doc-preview-paper.doc-preview-paper--indigency .doc-preview-title--indigency {
-      margin: 14px 0 10px;
+      margin: 10px 0 6px;
       text-align: center;
       font-family: Arial, Helvetica, sans-serif;
       text-transform: uppercase;
-      line-height: 1.2;
+      line-height: 1.15;
     }
     #viewModal .doc-preview-paper.doc-preview-paper--indigency .doc-preview-title--indigency .office {
       font-size: 17px;
@@ -511,26 +511,26 @@ if ($certificateLaunchStage === 'release') {
       letter-spacing: .01em;
     }
     #viewModal .doc-preview-paper.doc-preview-paper--indigency .doc-preview-title--indigency .certificate {
-      margin-top: 4px;
+      margin-top: 2px;
       font-size: 12px;
       font-weight: 800;
       letter-spacing: .01em;
     }
     #viewModal .doc-preview-paper.doc-preview-paper--indigency .doc-preview-body {
       font-family: Arial, Helvetica, sans-serif;
-      font-size: 1.08rem;
-      line-height: 1.75;
+      font-size: 1rem;
+      line-height: 1.62;
     }
     #viewModal .doc-preview-paper.doc-preview-paper--indigency .doc-preview-body p {
-      margin: 0 0 16px;
-      text-indent: 2.5rem;
+      margin: 0 0 14px;
+      text-indent: 2rem;
     }
     #viewModal .doc-preview-paper.doc-preview-paper--indigency .doc-preview-body {
       font-family: Arial, Helvetica, sans-serif;
-      font-size: 1.02rem;
-      line-height: 1.72;
+      font-size: 1rem;
+      line-height: 1.62;
       text-align: justify;
-      margin-top: 4px;
+      margin-top: 0;
     }
     #viewModal .doc-preview-paper.doc-preview-paper--indigency .doc-preview-signature {
       position: absolute;
@@ -577,13 +577,13 @@ if ($certificateLaunchStage === 'release') {
     }
     #viewModal .doc-preview-paper.doc-preview-paper--indigency .doc-to-block {
       display: grid;
-      grid-template-columns: 56px 18px 1fr;
+      grid-template-columns: 34px 10px 1fr;
       align-items: start;
-      margin: 0 0 18px;
-      column-gap: 4px;
+      margin: 0 0 14px;
+      column-gap: 2px;
     }
     #viewModal .doc-preview-paper.doc-preview-paper--indigency .doc-to-lines {
-      padding-top: 2px;
+      padding-top: 0;
     }
     #viewModal .doc-preview-paper.doc-preview-paper--indigency .doc-to-lines .line {
       display: block;

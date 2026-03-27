@@ -4,7 +4,7 @@
   }
 
   const nativeAlert = typeof window.alert === "function" ? window.alert.bind(window) : () => {};
-  const MODAL_VERSION = "20260320-02";
+  const MODAL_VERSION = "20260328-03";
   const MODAL_ID = "universalModal";
   const STYLESHEET_ID = "universalModalStylesheet";
   const OBSERVER_FLAG = "__universalModalObserverBound";
@@ -15,25 +15,57 @@
   const toneMeta = {
     info: {
       title: "Information",
-      icon: "bi bi-info-circle-fill",
       buttonClass: "btn btn-primary modalBtn",
     },
     success: {
       title: "Success",
-      icon: "bi bi-check-circle-fill",
       buttonClass: "btn btn-success modalBtn",
     },
     warning: {
       title: "Warning",
-      icon: "bi bi-exclamation-triangle-fill",
       buttonClass: "btn btn-warning modalBtn",
     },
     danger: {
       title: "Attention",
-      icon: "bi bi-x-circle-fill",
       buttonClass: "btn btn-danger modalBtn",
     },
   };
+
+  function iconMarkupForTone(tone) {
+    const normalizedTone = String(tone || "info").trim().toLowerCase();
+
+    if (normalizedTone === "success") {
+      return `
+        <svg viewBox="0 0 24 24" focusable="false" aria-hidden="true">
+          <path d="M6 12.5 10 16.5 18 8.5" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"></path>
+        </svg>
+      `;
+    }
+
+    if (normalizedTone === "warning") {
+      return `
+        <svg viewBox="0 0 24 24" focusable="false" aria-hidden="true">
+          <path d="M12 6.75v6.5" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"></path>
+          <circle cx="12" cy="16.9" r="1.4" fill="currentColor"></circle>
+        </svg>
+      `;
+    }
+
+    if (normalizedTone === "danger") {
+      return `
+        <svg viewBox="0 0 24 24" focusable="false" aria-hidden="true">
+          <path d="M8 8 16 16M16 8l-8 8" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"></path>
+        </svg>
+      `;
+    }
+
+    return `
+      <svg viewBox="0 0 24 24" focusable="false" aria-hidden="true">
+        <path d="M12 10.1v6.15" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"></path>
+        <circle cx="12" cy="7.15" r="1.35" fill="currentColor"></circle>
+      </svg>
+    `;
+  }
 
   function resolveAssetBase() {
     const scripts = Array.from(document.scripts || []);
@@ -126,7 +158,7 @@
             <hr class="my-3" />
             <div class="modal-body text-center pt-0" id="umBody">
               <div class="uniform-modal__icon" id="umIconWrap" aria-hidden="true">
-                <i id="umIcon" class="bi bi-info-circle-fill"></i>
+                <span id="umIcon" class="uniform-modal__icon-art"></span>
               </div>
               <div class="uniform-modal__copy">
                 <p class="mb-0" id="umMessage"></p>
@@ -238,7 +270,7 @@
     }
 
     contentEl.setAttribute("data-tone", tone);
-    iconEl.className = toneMeta[tone]?.icon || toneMeta.info.icon;
+    iconEl.innerHTML = iconMarkupForTone(tone);
 
     buildButtons(actionsEl, request.buttons, tone);
     activeRequest = request;
