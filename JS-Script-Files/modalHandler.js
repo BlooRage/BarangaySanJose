@@ -4,7 +4,7 @@
   }
 
   const nativeAlert = typeof window.alert === "function" ? window.alert.bind(window) : () => {};
-  const MODAL_VERSION = "20260320-02";
+  const MODAL_VERSION = "20260328-03";
   const MODAL_ID = "universalModal";
   const STYLESHEET_ID = "universalModalStylesheet";
   const OBSERVER_FLAG = "__universalModalObserverBound";
@@ -50,6 +50,42 @@
       buttonClass: "btn btn-danger modalBtn",
     },
   };
+
+  function iconMarkupForTone(tone) {
+    const normalizedTone = String(tone || "info").trim().toLowerCase();
+
+    if (normalizedTone === "success") {
+      return `
+        <svg viewBox="0 0 24 24" focusable="false" aria-hidden="true">
+          <path d="M6 12.5 10 16.5 18 8.5" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"></path>
+        </svg>
+      `;
+    }
+
+    if (normalizedTone === "warning") {
+      return `
+        <svg viewBox="0 0 24 24" focusable="false" aria-hidden="true">
+          <path d="M12 6.75v6.5" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"></path>
+          <circle cx="12" cy="16.9" r="1.4" fill="currentColor"></circle>
+        </svg>
+      `;
+    }
+
+    if (normalizedTone === "danger") {
+      return `
+        <svg viewBox="0 0 24 24" focusable="false" aria-hidden="true">
+          <path d="M8 8 16 16M16 8l-8 8" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"></path>
+        </svg>
+      `;
+    }
+
+    return `
+      <svg viewBox="0 0 24 24" focusable="false" aria-hidden="true">
+        <path d="M12 10.1v6.15" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"></path>
+        <circle cx="12" cy="7.15" r="1.35" fill="currentColor"></circle>
+      </svg>
+    `;
+  }
 
   function resolveAssetBase() {
     const scripts = Array.from(document.scripts || []);

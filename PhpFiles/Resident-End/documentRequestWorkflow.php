@@ -2638,6 +2638,19 @@ if ($action === 'list') {
             if ($it['fee_amount'] === null && $docType !== '' && array_key_exists($docType, $feeMap)) {
                 $it['fee_amount'] = $feeMap[$docType];
             }
+            $baseFee = (isset($it['fee_amount']) && $it['fee_amount'] !== null && $it['fee_amount'] !== '' && is_numeric((string)$it['fee_amount']))
+                ? (float)$it['fee_amount']
+                : null;
+            $it['fee_amount'] = dr_get_effective_document_fee_amount($conn, $docType, $it, $baseFee);
+        }
+        unset($it);
+    } elseif ($items) {
+        foreach ($items as &$it) {
+            $docType = trim((string)($it['document_type'] ?? ''));
+            $baseFee = (isset($it['fee_amount']) && $it['fee_amount'] !== null && $it['fee_amount'] !== '' && is_numeric((string)$it['fee_amount']))
+                ? (float)$it['fee_amount']
+                : null;
+            $it['fee_amount'] = dr_get_effective_document_fee_amount($conn, $docType, $it, $baseFee);
         }
         unset($it);
     }

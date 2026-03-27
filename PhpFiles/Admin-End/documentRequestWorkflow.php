@@ -2195,9 +2195,15 @@ function dra_generate_issued_document(array $requestRow): ?string {
             $taggedClearanceFee = (float)$taggedTotal;
         }
     }
-    $defaultFee = dr_get_fee_amount_for_document_type($conn, $docType);
+    $defaultFee = dr_get_effective_document_fee_amount($conn, $docType, $requestRow);
     $effectiveFee = $requestFee ?? $taggedClearanceFee ?? $defaultFee;
-    $resolveAmountNumeric = static function () use ($requestRow, $requestFee, $taggedClearanceFee, $defaultFee): ?float {
+    if ($effectiveFee !== null) {
+        $effectiveFee = dr_get_effective_document_fee_amount($conn, $docType, $requestRow, (float)$effectiveFee);
+    }
+    $resolveAmountNumeric = static function () use ($requestRow, $requestFee, $taggedClearanceFee, $effectiveFee): ?float {
+        if ($effectiveFee !== null && (float)$effectiveFee <= 0.0) {
+            return 0.0;
+        }
         if (isset($requestRow['amount']) && $requestRow['amount'] !== null && $requestRow['amount'] !== '' && is_numeric((string)$requestRow['amount'])) {
             return (float)$requestRow['amount'];
         }
@@ -2207,8 +2213,8 @@ function dra_generate_issued_document(array $requestRow): ?string {
         if ($taggedClearanceFee !== null) {
             return (float)$taggedClearanceFee;
         }
-        if ($defaultFee !== null) {
-            return (float)$defaultFee;
+        if ($effectiveFee !== null) {
+            return (float)$effectiveFee;
         }
         return null;
     };
@@ -4626,10 +4632,12 @@ function dra_generate_issued_document(array $requestRow): ?string {
         }
 
         if ($isIndigency) {
+            $toY = $pdf->GetY() + 6;
+            $toValueX = 34;
             $pdf->SetFont($indigencyFont, 'B', 12);
-            $pdf->SetXY(22, 78);
-            $pdf->Cell(14, 7, 'TO', 0, 0, 'L');
-            $pdf->Cell(4, 7, ':', 0, 0, 'C');
+            $pdf->SetXY(22, $toY);
+            $pdf->Cell(9, 7, 'TO', 0, 0, 'L');
+            $pdf->Cell(3, 7, ':', 0, 0, 'C');
             $line1 = trim((string)$requestOfficerLine1);
             $line2 = trim((string)$requestOfficerLine2);
             $line3 = trim((string)$requestOfficerLine3);
@@ -4640,15 +4648,15 @@ function dra_generate_issued_document(array $requestRow): ?string {
                 $line3 = (string)($parts[2] ?? '');
             }
             if ($line1 === '' && $line2 === '' && $line3 === '') {
-                $pdf->Line(39, 84, 106, 84);
-                $pdf->Line(39, 90, 106, 90);
-                $pdf->Line(39, 96, 106, 96);
-                $pdf->SetY(96);
+                $pdf->Line($toValueX, $toY + 6, 106, $toY + 6);
+                $pdf->Line($toValueX, $toY + 12, 106, $toY + 12);
+                $pdf->Line($toValueX, $toY + 18, 106, $toY + 18);
+                $pdf->SetY($toY + 18);
             } else {
                 $pdf->SetFont($indigencyFont, 'B', 11);
                 $offLines = [$line1, $line2, $line3];
                 foreach ($offLines as $line) {
-                    $pdf->SetX(39);
+                    $pdf->SetX($toValueX);
                     if ($line === '') {
                         $pdf->Cell(0, 7, '', 0, 1, 'L');
                     } else {
@@ -4668,18 +4676,9 @@ function dra_generate_issued_document(array $requestRow): ?string {
                 [
                     ['text' => 'This is to certify that ', 'bold' => false],
                     ['text' => $fullName, 'bold' => true],
-                    ['text' => ', resident of ' . $address, 'bold' => false],
-                ],
-                7,
-                18,
-                10,
-                $indigencyFont,
-                12
-            );
-            $writeRichParagraph(
-                [
-                    ['text' => 'Barangay San Jose, Rodriguez, Rizal', 'bold' => true],
-                    ['text' => ' belongs to the one of the indigent families of this Barangay. The Income of this family is barely enough to meet their day-to-day needs.', 'bold' => false],
+                    ['text' => ', resident of ', 'bold' => false],
+                    ['text' => $addressWithBarangay !== '' ? $addressWithBarangay : 'Barangay San Jose, Rodriguez, Rizal', 'bold' => true],
+                    ['text' => ' belongs to one of the indigent families of this Barangay. The income of this family is barely enough to meet their day-to-day needs.', 'bold' => false],
                 ],
                 7,
                 18,
@@ -6470,7 +6469,11 @@ if ($action === 'create_manual_request') {
     $isFirstTimeJobSeeker = dra_is_first_time_job_seeker(['document_type' => $documentType]);
     $isClearanceDoc = dr_is_clearance_document_type($documentType);
 
-    $defaultFee = dr_get_fee_amount_for_document_type($conn, $documentType);
+    $defaultFee = dr_get_effective_document_fee_amount($conn, $documentType, [
+        'document_type' => $documentType,
+        'resident_id' => $residentId,
+        'resident_user_id' => $residentUserId,
+    ]);
     if ($isFirstTimeJobSeeker) {
         $defaultFee = 0.0;
     }
@@ -6997,6 +7000,10 @@ if ($action === 'list') {
             } else {
                 $row['fee_amount'] = null;
             }
+            $baseFee = (isset($row['fee_amount']) && $row['fee_amount'] !== null && $row['fee_amount'] !== '' && is_numeric((string)$row['fee_amount']))
+                ? (float)$row['fee_amount']
+                : null;
+            $row['fee_amount'] = dr_get_effective_document_fee_amount($conn, $docTypeForFee, $row, $baseFee);
             unset($row['_doc_type_for_fee']);
         }
         unset($row);
@@ -7046,6 +7053,14 @@ if ($action === 'get_request') {
     } else {
         $row['fee_amount'] = dr_get_fee_amount_for_document_type($conn, (string)($row['document_type'] ?? ''));
     }
+    $row['fee_amount'] = dr_get_effective_document_fee_amount(
+        $conn,
+        (string)($row['document_type'] ?? ''),
+        $row,
+        (isset($row['fee_amount']) && $row['fee_amount'] !== null && $row['fee_amount'] !== '' && is_numeric((string)$row['fee_amount']))
+            ? (float)$row['fee_amount']
+            : null
+    );
 
     dr_respond_json(200, ['success' => true, 'item' => $row]);
 }
@@ -7324,7 +7339,7 @@ if ($action === 'view_issued') {
     $verificationCode = trim((string)($row['verification_code'] ?? ''));
     $qrPublicPath = '/UnifiedFileAttachment/IssuedDocuments/QR/qr_' . preg_replace('/[^A-Za-z0-9_-]/', '', $requestId) . '.png';
     $qrDiskPath = $baseDir . $qrPublicPath;
-    $defaultFee = dr_get_fee_amount_for_document_type($conn, (string)($row['document_type'] ?? ''));
+    $defaultFee = dr_get_effective_document_fee_amount($conn, (string)($row['document_type'] ?? ''), $row);
     $isFreeDocument = ($defaultFee !== null && (float)$defaultFee <= 0.0);
     $qrEligibleStages = $isFreeDocument
         ? [DR_STAGE_READY_FOR_CLAIM, DR_STAGE_COMPLETED]
@@ -7444,7 +7459,7 @@ if ($action === 'personnel_approve') {
         dr_ensure_clearance_row_for_request($conn, $row);
     }
 
-    $defaultFee = dr_get_fee_amount_for_document_type($conn, (string)($row['document_type'] ?? ''));
+    $defaultFee = dr_get_effective_document_fee_amount($conn, (string)($row['document_type'] ?? ''), $row);
     if ($isFirstTimeJobSeeker) {
         $defaultFee = 0.0;
     }
@@ -7809,7 +7824,7 @@ if ($action === 'finance_verify') {
 
     $amountRaw = trim((string)($_POST['amount'] ?? ''));
     $orNumber = trim((string)($_POST['or_number'] ?? ''));
-    $defaultFee = dr_get_fee_amount_for_document_type($conn, (string)($row['document_type'] ?? ''));
+    $defaultFee = dr_get_effective_document_fee_amount($conn, (string)($row['document_type'] ?? ''), $row);
     $taggedFeeTotal = null;
     if (dr_is_clearance_document_type((string)($row['document_type'] ?? ''))) {
         $taggedFees = dr_get_clearance_fees_for_request($conn, $requestId);
@@ -7834,9 +7849,15 @@ if ($action === 'finance_verify') {
         // Fallback only when fee is not configured.
         $resolvedAmount = (float)$amountRaw;
     }
+    if ($resolvedAmount !== null) {
+        $resolvedAmount = dr_get_effective_document_fee_amount($conn, (string)($row['document_type'] ?? ''), $row, (float)$resolvedAmount);
+    }
 
     if ($resolvedAmount === null || $resolvedAmount < 0) {
         dr_respond_json(422, ['success' => false, 'message' => 'Valid amount is required.']);
+    }
+    if ($resolvedAmount <= 0.0) {
+        dr_respond_json(422, ['success' => false, 'message' => 'This request is payment-exempt and should not go through finance verification.']);
     }
     if ($orNumber === '') {
         dr_respond_json(422, ['success' => false, 'message' => 'OR number is required.']);
@@ -7951,6 +7972,10 @@ if ($action === 'finance_reject') {
     if (dr_is_barangay_id_document_type((string)($row['document_type'] ?? ''))) {
         dr_respond_json(422, ['success' => false, 'message' => 'Barangay ID is free and does not go through finance review.']);
     }
+    $effectiveFee = dr_get_effective_document_fee_amount($conn, (string)($row['document_type'] ?? ''), $row);
+    if ($effectiveFee !== null && $effectiveFee <= 0.0) {
+        dr_respond_json(422, ['success' => false, 'message' => 'This request is payment-exempt and should not go through finance review.']);
+    }
     $reason = trim((string)($_POST['reason'] ?? ''));
     if ($reason === '') {
         dr_respond_json(422, ['success' => false, 'message' => 'Rejection reason is required.']);
@@ -7990,12 +8015,15 @@ if ($action === 'mark_ready') {
             $resolvedFeeAmount = (float)$clearanceFeeTotal;
         }
     } else {
-        $defaultFee = dr_get_fee_amount_for_document_type($conn, (string)($row['document_type'] ?? ''));
+        $defaultFee = dr_get_effective_document_fee_amount($conn, (string)($row['document_type'] ?? ''), $row);
         if ($defaultFee !== null) {
             $resolvedFeeAmount = (float)$defaultFee;
         } elseif (isset($row['amount']) && $row['amount'] !== null && $row['amount'] !== '' && is_numeric((string)$row['amount'])) {
             $resolvedFeeAmount = (float)$row['amount'];
         }
+    }
+    if ($resolvedFeeAmount !== null) {
+        $resolvedFeeAmount = dr_get_effective_document_fee_amount($conn, (string)($row['document_type'] ?? ''), $row, (float)$resolvedFeeAmount);
     }
     $isPaidDocument = ($resolvedFeeAmount !== null && $resolvedFeeAmount > 0);
     if ($isPaidDocument && !in_array($currentStage, [DR_STAGE_PAYMENT_VERIFIED, DR_STAGE_READY_FOR_CLAIM, DR_STAGE_COMPLETED], true)) {
@@ -8632,6 +8660,3 @@ if ($action === 'get_clearance_fees') {
 }
 
 dr_respond_json(404, ['success' => false, 'message' => 'Unknown action.']);
-
-
-

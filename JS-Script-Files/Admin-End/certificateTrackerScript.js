@@ -3232,9 +3232,7 @@
       contentHtml = `
         ${toBlock}
         <p>
-          This is to certify that <strong>${esc(safe(fullName, '${FULL_NAME}'))}</strong>, resident of
-          <strong>${esc(safe(fullAddressWithBarangay, '${ADDRESS}'))}</strong>
-          belongs to the one of the indigent families of this Barangay. The Income of this family is barely enough to meet their day-to-day needs.
+          This is to certify that <strong>${esc(safe(fullName, '${FULL_NAME}'))}</strong>, resident of <strong>${esc(safe(fullAddressWithBarangay, '${ADDRESS}'))}</strong> belongs to one of the indigent families of this Barangay. The income of this family is barely enough to meet their day-to-day needs.
         </p>
         <p>
           This certification is being issued upon the request of the above subject in person in connection with his/her application for

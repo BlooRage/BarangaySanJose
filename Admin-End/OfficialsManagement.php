@@ -366,9 +366,53 @@ $officialsMgmtPermissionCatalog = amp_get_permission_catalog();
     #officialsMgmtDepartmentPosition,
     #officialsMgmtPromotePath,
     #officialsMgmtDepartmentPreview,
-    #officialsMgmtProfileSummaryName {
+    #officialsMgmtProfileSummaryName,
+    #officialsMgmtConfirmMessage {
       white-space: normal;
       word-break: break-word;
+    }
+    .officials-confirm-modal {
+      position: fixed;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 1rem;
+      background: rgba(15, 23, 42, 0.58);
+      opacity: 0;
+      visibility: hidden;
+      pointer-events: none;
+      transition: opacity 0.18s ease, visibility 0.18s ease;
+      z-index: 2055;
+    }
+    .officials-confirm-modal.show {
+      opacity: 1;
+      visibility: visible;
+      pointer-events: auto;
+    }
+    .officials-confirm-card {
+      width: min(100%, 30rem);
+      background: #fff;
+      border-radius: 1.1rem;
+      box-shadow: 0 1.5rem 3rem rgba(15, 23, 42, 0.2);
+      padding: 1.35rem;
+    }
+    .officials-confirm-title {
+      font-size: 1.15rem;
+      font-weight: 700;
+      color: #1f2937;
+      margin-bottom: 0.65rem;
+    }
+    #officialsMgmtConfirmMessage {
+      margin: 0;
+      color: #4b5563;
+      white-space: pre-line;
+    }
+    .officials-confirm-actions {
+      display: flex;
+      justify-content: flex-end;
+      gap: 0.75rem;
+      margin-top: 1.25rem;
     }
     @media (max-width: 1199.98px) {
       .officials-masterlist-shell .officials-masterlist-table {
@@ -456,7 +500,8 @@ $officialsMgmtPermissionCatalog = amp_get_permission_catalog();
       #modalOfficialsMgmtPromote .modal-footer,
       #modalOfficialsMgmtDepartment .modal-footer,
       #modalOfficialsMgmtFilter .modal-footer,
-      #modalOfficialsMgmtColumns .modal-footer {
+      #modalOfficialsMgmtColumns .modal-footer,
+      .officials-confirm-actions {
         flex-direction: column-reverse;
         align-items: stretch;
       }
@@ -465,7 +510,8 @@ $officialsMgmtPermissionCatalog = amp_get_permission_catalog();
       #modalOfficialsMgmtPromote .modal-footer .btn,
       #modalOfficialsMgmtDepartment .modal-footer .btn,
       #modalOfficialsMgmtFilter .modal-footer .btn,
-      #modalOfficialsMgmtColumns .modal-footer .btn {
+      #modalOfficialsMgmtColumns .modal-footer .btn,
+      .officials-confirm-actions .btn {
         width: 100%;
       }
     }
@@ -794,6 +840,17 @@ $officialsMgmtPermissionCatalog = amp_get_permission_catalog();
     </div>
   </div>
 
+  <div id="officialsMgmtConfirmModal" class="officials-confirm-modal" role="dialog" aria-modal="true" aria-hidden="true" aria-labelledby="officialsMgmtConfirmTitle" aria-describedby="officialsMgmtConfirmMessage" tabindex="-1">
+    <div class="officials-confirm-card">
+      <div class="officials-confirm-title" id="officialsMgmtConfirmTitle">Confirm Action</div>
+      <p id="officialsMgmtConfirmMessage">Are you sure you want to continue?</p>
+      <div class="officials-confirm-actions">
+        <button type="button" class="btn btn-outline-secondary" id="btnOfficialsMgmtConfirmCancel">Cancel</button>
+        <button type="button" class="btn btn-primary" id="btnOfficialsMgmtConfirmOk">Confirm</button>
+      </div>
+    </div>
+  </div>
+
   <?php if ($isPersonnelManagement): ?>
   <div class="modal fade" id="modalOfficialsMgmtProfile" tabindex="-1" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
     <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable officials-profile-modal-dialog">
@@ -1051,6 +1108,6 @@ $officialsMgmtPermissionCatalog = amp_get_permission_catalog();
     };
   </script>
   <script src="../JS-Script-Files/Admin-End/tableColumnsGeneric.js?v=20260215-1"></script>
-  <script src="../JS-Script-Files/Admin-End/officialsManagementScript.js?v=20260327-2"></script>
+  <script src="../JS-Script-Files/Admin-End/officialsManagementScript.js?v=20260328-2"></script>
 </body>
 </html>
