@@ -127,6 +127,26 @@ if (!function_exists('hmv_generate_request_id')) {
     }
 }
 
+if (!function_exists('hmv_has_request_column')) {
+    function hmv_has_request_column(mysqli $conn, string $columnName): bool
+    {
+        $safeColumn = $conn->real_escape_string($columnName);
+        $res = $conn->query("SHOW COLUMNS FROM householdmemberverificationtbl LIKE '{$safeColumn}'");
+        $exists = $res instanceof mysqli_result && $res->num_rows > 0;
+        if ($res instanceof mysqli_result) {
+            $res->free();
+        }
+        return $exists;
+    }
+}
+
+if (!function_exists('hmv_request_uses_status_lookup')) {
+    function hmv_request_uses_status_lookup(mysqli $conn): bool
+    {
+        return hmv_has_request_column($conn, 'status_id');
+    }
+}
+
 if (!function_exists('hmv_get_status_id')) {
     function hmv_get_status_id(mysqli $conn, string $name, string $type): ?int
     {
