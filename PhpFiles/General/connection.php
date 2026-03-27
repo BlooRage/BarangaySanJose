@@ -18,7 +18,42 @@ if (!function_exists('db_request_expects_json')) {
             return true;
         }
 
+        foreach (headers_list() as $headerLine) {
+            if (stripos($headerLine, 'Content-Type:') !== 0) {
+                continue;
+            }
+            if (stripos($headerLine, 'application/json') !== false) {
+                return true;
+            }
+        }
+
         return false;
+    }
+}
+
+if (!function_exists('db_should_retry_connect_error')) {
+    function db_should_retry_connect_error(string $message): bool
+    {
+        $normalized = strtolower(trim($message));
+        if ($normalized === '') {
+            return true;
+        }
+
+        $nonRetryableFragments = [
+            'access denied',
+            'unknown database',
+            'max_connections_per_hour',
+            'too many connections',
+            'resource',
+        ];
+
+        foreach ($nonRetryableFragments as $fragment) {
+            if (strpos($normalized, $fragment) !== false) {
+                return false;
+            }
+        }
+
+        return true;
     }
 }
 
@@ -33,6 +68,7 @@ if (!function_exists('db_fail_response')) {
             echo json_encode([
                 'success' => false,
                 'message' => $publicMessage,
+                'error' => $publicMessage,
             ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
             exit;
         }
@@ -44,7 +80,7 @@ if (!function_exists('db_fail_response')) {
 // Database credentials prefer environment/runtime config, with app fallbacks kept here.
 $defaultDbHost = 'srv1986.hstgr.io';
 $defaultDbHostLocal = 'srv1986.hstgr.io';
-$defaultDbHostHosted = 'srv1986.hstgr.io';
+$defaultDbHostHosted = 'localhost';
 $defaultDbUser = 'u682055666_thesiscaps';
 $defaultDbPass = 'ThesisCaps123.';
 $defaultDbName = 'u682055666_testingBrgySJ';
@@ -151,6 +187,10 @@ foreach ($hostCandidates as $candidateHost) {
 
     if ($candidateConn instanceof mysqli) {
         @$candidateConn->close();
+    }
+
+    if (!db_should_retry_connect_error($connectError)) {
+        break;
     }
 }
 
