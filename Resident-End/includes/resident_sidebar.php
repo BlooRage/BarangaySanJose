@@ -228,44 +228,17 @@ if ($residentId !== '' && isset($conn) && $conn instanceof mysqli) {
   </a>
 
   <!-- RESIDENT PROFILE -->
-  <div class="sidebar-profile-shell">
-    <button
-      id="btn-sidebarProfileToggle"
-      type="button"
-      class="sidebar-profile-toggle"
-      aria-expanded="false"
-      aria-controls="residentSidebarProfileMenu">
-      <div id="div-sidebarProfile" class="text-center">
-        <img
-          src="<?= htmlspecialchars($profileImage) ?>"
-          alt="Avatar"
-          id="img-sidebarAvatar"
-          onerror="this.onerror=null;this.src='<?= htmlspecialchars($baseUrl, ENT_QUOTES, 'UTF-8') ?>/Images/Profile-Placeholder.png';"
-          class="rounded-circle mb-2 border shadow-sm"
-          width="90"
-          height="90"
-        >
-        <h2 id="txt-sidebarName" class="h6 fw-bold mb-0"><?= htmlspecialchars($displayName) ?></h2>
-      </div>
-      <span class="sidebar-profile-hint">
-        Account menu
-        <span class="sidebar-profile-caret" aria-hidden="true">
-          <i class="fa-solid fa-chevron-down"></i>
-        </span>
-      </span>
-    </button>
-
-    <div id="residentSidebarProfileMenu" class="sidebar-profile-menu">
-      <a class="account-button btn btn-sm w-100"
-         href="<?= htmlspecialchars($baseUrl, ENT_QUOTES, 'UTF-8') ?>/Resident-End/resident_profile">
-        <i class="fa-solid fa-circle-user"></i> Account
-      </a>
-      <a class="btn btn-danger btn-sm w-100 logout-link"
-         href="<?= htmlspecialchars($baseUrl, ENT_QUOTES, 'UTF-8') ?>/logout"
-         data-logout-message="Are you sure you want to logout?">
-        <i class="bi bi-box-arrow-right me-1"></i> Logout
-      </a>
-    </div>
+  <div id="div-sidebarProfile" class="text-center mb-4">
+    <img
+      src="<?= htmlspecialchars($profileImage) ?>"
+      alt="Avatar"
+      id="img-sidebarAvatar"
+      onerror="this.onerror=null;this.src='<?= htmlspecialchars($baseUrl, ENT_QUOTES, 'UTF-8') ?>/Images/Profile-Placeholder.png';"
+      class="rounded-circle mb-2 border shadow-sm"
+      width="90"
+      height="90"
+    >
+    <h2 id="txt-sidebarName" class="h6 fw-bold mb-0"><?= htmlspecialchars($displayName) ?></h2>
   </div>
 
   <!-- NAV LINKS -->
@@ -404,40 +377,6 @@ if ($residentId !== '' && isset($conn) && $conn instanceof mysqli) {
 
 <script>
   document.addEventListener("DOMContentLoaded", () => {
-    const profileToggle = document.getElementById("btn-sidebarProfileToggle");
-    const profileMenu = document.getElementById("residentSidebarProfileMenu");
-
-    if (profileToggle && profileMenu) {
-      const setProfileMenuOpen = (isOpen) => {
-        profileMenu.classList.toggle("is-open", isOpen);
-        profileToggle.setAttribute("aria-expanded", isOpen ? "true" : "false");
-      };
-
-      profileToggle.addEventListener("click", (event) => {
-        event.preventDefault();
-        event.stopPropagation();
-        const shouldOpen = profileToggle.getAttribute("aria-expanded") !== "true";
-        setProfileMenuOpen(shouldOpen);
-      });
-
-      profileMenu.querySelectorAll("a, button").forEach((node) => {
-        node.addEventListener("click", () => setProfileMenuOpen(false));
-      });
-
-      document.addEventListener("click", (event) => {
-        if (profileToggle.contains(event.target) || profileMenu.contains(event.target)) {
-          return;
-        }
-        setProfileMenuOpen(false);
-      });
-
-      document.addEventListener("keydown", (event) => {
-        if (event.key === "Escape") {
-          setProfileMenuOpen(false);
-        }
-      });
-    }
-
     const links = document.querySelectorAll(".logout-link");
     if (!links.length) return;
 

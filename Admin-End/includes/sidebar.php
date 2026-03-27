@@ -1469,7 +1469,11 @@ if (!empty($_SESSION['user_id']) && isset($conn) && $conn instanceof mysqli) {
 
     sidebar.querySelectorAll("a").forEach((link) => {
       link.addEventListener("click", () => {
-        if (portraitMq.matches) sidebar.classList.remove("show");
+        if (!portraitMq.matches) return;
+        if (String(link.getAttribute("data-bs-toggle") || "").toLowerCase() === "dropdown") {
+          return;
+        }
+        sidebar.classList.remove("show");
       });
     });
 

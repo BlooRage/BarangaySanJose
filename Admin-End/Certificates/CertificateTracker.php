@@ -2846,7 +2846,7 @@ if ($certificateLaunchStage === 'release') {
           <div class="manual-photo-controls manual-photo-controls--camera">
             <label for="manualBarangayIdCameraSelect">Camera source</label>
             <select id="manualBarangayIdCameraSelect" class="form-select">
-              <option value="">Detecting available cameras…</option>
+              <option value="">Detecting available cameras...</option>
             </select>
             <p class="manual-photo-control-hint">The camera list becomes selectable after the browser allows camera access.</p>
           </div>
