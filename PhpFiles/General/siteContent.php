@@ -609,7 +609,7 @@ if (!function_exists('cms_content_is_raw_actor_identifier')) {
             return false;
         }
 
-        if (stripos($value, 'pii:') === 0) {
+        if (stripos($value, 'pii:') !== false) {
             return true;
         }
 
