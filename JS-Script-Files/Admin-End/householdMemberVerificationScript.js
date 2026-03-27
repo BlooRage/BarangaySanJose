@@ -11,12 +11,20 @@
   const btnResetFilter = el("btnHmvResetFilter");
   const modalEl = el("modal-householdMemberVerification");
   const modal = modalEl ? bootstrap.Modal.getOrCreateInstance(modalEl) : null;
+  const confirmModalEl = el("hmvActionConfirmModal");
+  const confirmModal = confirmModalEl ? bootstrap.Modal.getOrCreateInstance(confirmModalEl) : null;
+  const confirmTitleEl = el("hmvActionConfirmTitle");
+  const confirmMessageEl = el("hmvActionConfirmMessage");
+  const confirmRemarksWrapEl = el("hmvActionConfirmRemarksWrap");
+  const confirmRemarksEl = el("hmvActionConfirmRemarks");
+  const confirmActionBtn = el("btnHmvConfirmAction");
 
   const state = {
     rows: [],
     filter: "ALL",
     search: "",
     active: null,
+    pendingAction: "",
     modalFilters: {
       dateFrom: "",
       dateTo: "",
@@ -40,7 +48,7 @@
       Rejected: "status-pill denied",
     };
     const labelMap = {
-      PendingReview: "Pending Review",
+      PendingReview: "Pending",
       Approved: "Approved",
       Rejected: "Rejected",
     };
@@ -168,6 +176,15 @@
         <td><button class="btn btn-outline-primary btn-sm" data-request-id="${escapeHtml(row.request_id)}">View</button></td>
       </tr>
     `).join("");
+
+    Array.from(bodyEl.querySelectorAll("tr")).forEach((tableRow, index) => {
+      const headCell = tableRow.children[1];
+      if (!headCell) return;
+      headCell.textContent = String(rows[index]?.head_full_name || "â€”");
+      if (!String(rows[index]?.head_full_name || "").trim()) {
+        headCell.textContent = "-";
+      }
+    });
   };
 
   const openModal = (row) => {
@@ -181,7 +198,6 @@
     el("hmvModalSuffix").textContent = row.suffix || "—";
     el("hmvModalBirthdate").textContent = formatBirthdate(row.birthdate);
     el("hmvModalStatus").innerHTML = statusPillHtml(row.status);
-    el("hmvReviewRemarks").value = row.review_remarks || "";
     renderDocumentPreview(row);
 
     const isPending = fmtStatus(row.status) === "PendingReview";
@@ -217,8 +233,17 @@
   const submitReview = async (action) => {
     const row = state.active;
     if (!row) return;
-    const reviewRemarks = String(el("hmvReviewRemarks")?.value || "").trim();
+    let reviewRemarks = "";
+    if (action === "reject_member_request") {
+      reviewRemarks = String(confirmRemarksEl?.value || "").trim();
+      if (!reviewRemarks) {
+        window.alert("Rejection remarks are required.");
+        confirmRemarksEl?.focus();
+        return;
+      }
+    }
     try {
+      if (confirmActionBtn) confirmActionBtn.disabled = true;
       const res = await fetch("../PhpFiles/Admin-End/householdMemberVerification.php", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -231,10 +256,44 @@
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok || !data.success) throw new Error(data.message || "Failed to review request.");
+      confirmModal?.hide();
       modal?.hide();
       await fetchRows();
     } catch (error) {
       window.alert(error?.message || "Failed to review request.");
+    } finally {
+      if (confirmActionBtn) confirmActionBtn.disabled = false;
+    }
+  };
+
+  const openActionConfirm = (action) => {
+    const row = state.active;
+    if (!row) return;
+    state.pendingAction = action;
+    const isReject = action === "reject_member_request";
+    if (confirmTitleEl) {
+      confirmTitleEl.textContent = isReject ? "Confirm Rejection" : "Confirm Approval";
+    }
+    if (confirmMessageEl) {
+      confirmMessageEl.textContent = isReject
+        ? `Reject household member verification request ${row.request_id}?`
+        : `Approve household member verification request ${row.request_id}?`;
+    }
+    if (confirmRemarksWrapEl) {
+      confirmRemarksWrapEl.classList.toggle("d-none", !isReject);
+    }
+    if (confirmRemarksEl) {
+      confirmRemarksEl.value = isReject ? String(row.review_remarks || "") : "";
+    }
+    if (confirmActionBtn) {
+      confirmActionBtn.textContent = isReject ? "Reject" : "Approve";
+      confirmActionBtn.classList.toggle("btn-danger", isReject);
+      confirmActionBtn.classList.toggle("btn-success", !isReject);
+      confirmActionBtn.classList.remove("btn-primary");
+    }
+    confirmModal?.show();
+    if (isReject) {
+      window.setTimeout(() => confirmRemarksEl?.focus(), 150);
     }
   };
 
@@ -275,8 +334,9 @@
     if (row) openModal(row);
   });
 
-  el("btnHmvApprove")?.addEventListener("click", () => submitReview("approve_member_request"));
-  el("btnHmvReject")?.addEventListener("click", () => submitReview("reject_member_request"));
+  el("btnHmvApprove")?.addEventListener("click", () => openActionConfirm("approve_member_request"));
+  el("btnHmvReject")?.addEventListener("click", () => openActionConfirm("reject_member_request"));
+  confirmActionBtn?.addEventListener("click", () => submitReview(state.pendingAction));
 
   fetchRows();
 })();

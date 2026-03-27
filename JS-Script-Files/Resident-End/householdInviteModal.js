@@ -358,6 +358,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 if (successMessageEl) {
                     successMessageEl.textContent = data.message || "Household member verification request submitted. Please wait for admin review.";
                 }
+                window.dispatchEvent(new CustomEvent("household:updated"));
                 getHouseholdInviteModal()?.hide();
                 getHouseholdMemberSubmitSuccessModal()?.show();
             } catch (err) {

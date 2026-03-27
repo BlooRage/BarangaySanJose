@@ -13,6 +13,7 @@ if (empty($_SESSION['user_id'])) {
 
 require_once __DIR__ . '/../General/connection.php';
 require_once __DIR__ . '/householdHeadVerification.php';
+require_once __DIR__ . '/../General/householdMemberVerification.php';
 
 function getStatusId(mysqli $conn, string $name, string $type): ?int {
     $stmt = $conn->prepare("
@@ -40,17 +41,20 @@ if (!isset($conn) || !($conn instanceof mysqli)) {
 
 // Resolve resident id for current user
 $residentId = '';
+$isCurrentResidentHead = false;
 $stmt = $conn->prepare("
-    SELECT resident_id
+    SELECT resident_id, head_of_family
     FROM residentinformationtbl
     WHERE user_id = ?
     LIMIT 1
 ");
 $stmt->bind_param("s", $_SESSION['user_id']);
 $stmt->execute();
-$stmt->bind_result($residentId);
+$stmt->bind_result($residentId, $headOfFamilyRaw);
 $stmt->fetch();
 $stmt->close();
+$headOfFamilyKey = strtolower(trim((string)$headOfFamilyRaw));
+$isCurrentResidentHead = in_array($headOfFamilyKey, ['yes', 'true', '1', 'y'], true);
 
 if ($residentId === '') {
     echo json_encode(['success' => false, 'message' => 'Resident profile not found.']);
@@ -58,6 +62,75 @@ if ($residentId === '') {
 }
 
 $headVerification = hhv_get_resident_head_verification($conn, $residentId);
+$pendingMemberRequests = [];
+
+if ($isCurrentResidentHead) {
+    hmv_ensure_request_table($conn);
+    $usesStatusLookup = hmv_request_uses_status_lookup($conn);
+    if ($usesStatusLookup) {
+        $pendingStatusId = getStatusId($conn, 'PendingReview', 'HouseholdMember');
+        if ($pendingStatusId !== null) {
+            $stmt = $conn->prepare("
+                SELECT
+                    request_id,
+                    last_name,
+                    first_name,
+                    middle_name,
+                    suffix,
+                    birthdate,
+                    submitted_at
+                FROM householdmemberverificationtbl
+                WHERE fam_head_id COLLATE utf8mb4_general_ci = ? COLLATE utf8mb4_general_ci
+                  AND status_id = ?
+                ORDER BY submitted_at DESC, request_id DESC
+            ");
+            if ($stmt) {
+                $stmt->bind_param("si", $residentId, $pendingStatusId);
+                $stmt->execute();
+                $res = $stmt->get_result();
+                while ($row = $res->fetch_assoc()) {
+                    $pendingMemberRequests[] = $row;
+                }
+                $stmt->close();
+            }
+        }
+    } elseif (hmv_has_request_column($conn, 'status')) {
+        $stmt = $conn->prepare("
+            SELECT
+                request_id,
+                last_name,
+                first_name,
+                middle_name,
+                suffix,
+                birthdate,
+                submitted_at
+            FROM householdmemberverificationtbl
+            WHERE fam_head_id COLLATE utf8mb4_general_ci = ? COLLATE utf8mb4_general_ci
+              AND status = 'PendingReview'
+            ORDER BY submitted_at DESC, request_id DESC
+        ");
+        if ($stmt) {
+            $stmt->bind_param("s", $residentId);
+            $stmt->execute();
+            $res = $stmt->get_result();
+            while ($row = $res->fetch_assoc()) {
+                $pendingMemberRequests[] = $row;
+            }
+            $stmt->close();
+        }
+    }
+}
+
+foreach ($pendingMemberRequests as &$requestRow) {
+    $middle = trim((string)($requestRow['middle_name'] ?? ''));
+    $requestRow['member_name'] = trim(implode(' ', array_filter([
+        (string)($requestRow['first_name'] ?? ''),
+        $middle !== '' ? $middle[0] . '.' : '',
+        (string)($requestRow['last_name'] ?? ''),
+        (string)($requestRow['suffix'] ?? ''),
+    ], static fn($value) => trim((string)$value) !== '')));
+}
+unset($requestRow);
 
 $memberActiveStatusId = getStatusId($conn, 'Active', 'HouseholdMember');
 if ($memberActiveStatusId === null) {
@@ -86,11 +159,13 @@ if (!$householdId) {
         'success' => true,
         'members' => [],
         'has_household' => false,
-        'is_head' => false,
+        'is_head' => $isCurrentResidentHead,
         'resident_id' => $residentId,
         'address' => null,
         'minor_count' => 0,
         'adult_count' => 0,
+        'pending_member_requests' => $pendingMemberRequests,
+        'pending_member_request_count' => count($pendingMemberRequests),
     ]);
     exit;
 }
@@ -269,5 +344,7 @@ echo json_encode([
     'address' => $addressDisplay,
     'minor_count' => $minorCount,
     'adult_count' => $adultCount,
+    'pending_member_requests' => $pendingMemberRequests,
+    'pending_member_request_count' => count($pendingMemberRequests),
 ]);
 ?>
