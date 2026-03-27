@@ -344,7 +344,7 @@ $serializedRow = $requestRow ? [
         .digital-id-viewer__card-stage {
             position: relative;
             z-index: 1;
-            width: min(100%, 980px);
+            width: min(100%, clamp(340px, 76vw, 720px));
             margin: 0 auto;
         }
         .digital-id-viewer__card-stage.is-animating-forward {
@@ -497,6 +497,9 @@ $serializedRow = $requestRow ? [
             .digital-id-viewer__card-stage .barangay-id-card__bg {
                 border-radius: 20px;
             }
+            .digital-id-viewer__card-stage {
+                width: 100%;
+            }
             .digital-id-viewer__badge,
             .digital-id-viewer__badge-group {
                 width: 100%;
@@ -566,7 +569,7 @@ $serializedRow = $requestRow ? [
 <?php endif; ?>
 
 <?php if ($errorMessage === ''): ?>
-    <script src="<?= htmlspecialchars($baseUrl) ?>/JS-Script-Files/Shared/barangayIdDigital.js?v=20260324-01"></script>
+    <script src="<?= htmlspecialchars($baseUrl) ?>/JS-Script-Files/Shared/barangayIdDigital.js?v=20260328-02"></script>
     <script>
         (() => {
             const wrap = document.getElementById('digitalBarangayIdWrap');

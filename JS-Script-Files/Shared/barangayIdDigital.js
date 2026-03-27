@@ -170,6 +170,41 @@
     return `${(mm / PAGE_HEIGHT_MM) * 100}%`;
   }
 
+  function verificationUrl(appBase, row = {}, payload = {}) {
+    const requestId = String(firstNonEmpty([
+      row.request_id,
+      payload.request_id
+    ]) || '').trim();
+    if (!requestId || typeof window === 'undefined' || !window.location || !window.location.origin) {
+      return '';
+    }
+
+    const verificationCode = String(firstNonEmpty([
+      row.verification_code,
+      payload.verification_code,
+      requestId
+    ]) || '').trim();
+    const appOrigin = `${window.location.origin}${appBase}`;
+    return `${appOrigin}/transactions?request_id=${encodeURIComponent(requestId)}&vc=${encodeURIComponent(verificationCode || requestId)}`;
+  }
+
+  function qrPreviewUrl(appBase, row = {}, payload = {}) {
+    const existing = resolvePublicUrl(appBase, firstNonEmpty([
+      row.qr_code_path,
+      payload.qr_code_path
+    ]));
+    if (existing) {
+      return existing;
+    }
+
+    const verifyUrl = verificationUrl(appBase, row, payload);
+    if (!verifyUrl) {
+      return '';
+    }
+
+    return `https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent(verifyUrl)}`;
+  }
+
   function ensureStyles() {
     if (document.getElementById('barangay-id-digital-styles')) return;
     const style = document.createElement('style');
@@ -230,15 +265,15 @@
         border: 1px solid rgba(122, 97, 70, 0.18);
         container-type: inline-size;
         container-name: barangay-id-card;
-        --bid-label-size: clamp(9px, 0.28rem + 0.58vw, 13px);
-        --bid-field-size: clamp(9.5px, 0.34rem + 0.72vw, 13.5px);
-        --bid-name-size: clamp(11.5px, 0.42rem + 0.95vw, 17.5px);
-        --bid-address-size: clamp(8.8px, 0.3rem + 0.62vw, 12.6px);
-        --bid-meta-size: clamp(9px, 0.3rem + 0.68vw, 12.8px);
-        --bid-cardno-size: clamp(10px, 0.34rem + 0.84vw, 15.4px);
-        --bid-cardno-back-size: clamp(10.4px, 0.36rem + 0.92vw, 16.4px);
-        --bid-emergency-size: clamp(8.8px, 0.31rem + 0.66vw, 12.4px);
-        --bid-note-size: clamp(7.2px, 0.24rem + 0.44vw, 9.8px);
+        --bid-label-size: clamp(9.4px, 0.3rem + 0.62vw, 13.8px);
+        --bid-field-size: clamp(10px, 0.36rem + 0.78vw, 14.2px);
+        --bid-name-size: clamp(12px, 0.46rem + 1.02vw, 18.6px);
+        --bid-address-size: clamp(9.1px, 0.31rem + 0.68vw, 13px);
+        --bid-meta-size: clamp(9.4px, 0.32rem + 0.74vw, 13.3px);
+        --bid-cardno-size: clamp(10.4px, 0.36rem + 0.88vw, 15.8px);
+        --bid-cardno-back-size: clamp(10.8px, 0.38rem + 0.96vw, 16.8px);
+        --bid-emergency-size: clamp(9.2px, 0.33rem + 0.72vw, 12.9px);
+        --bid-note-size: clamp(7.6px, 0.26rem + 0.48vw, 10.2px);
         --bid-photo-bleed: 4%;
       }
       .barangay-id-card__bg {
@@ -396,28 +431,28 @@
       }
       @container barangay-id-card (max-width: 500px) {
         .barangay-id-card {
-          --bid-label-size: clamp(8px, 2.1cqw, 11px);
-          --bid-field-size: clamp(8.6px, 2.35cqw, 12px);
-          --bid-name-size: clamp(10px, 2.8cqw, 14px);
-          --bid-address-size: clamp(7.8px, 2.05cqw, 10.8px);
-          --bid-meta-size: clamp(8px, 2.1cqw, 11px);
-          --bid-cardno-size: clamp(8.6px, 2.35cqw, 12.4px);
-          --bid-cardno-back-size: clamp(9px, 2.5cqw, 13px);
-          --bid-emergency-size: clamp(7.9px, 2.05cqw, 10.8px);
-          --bid-note-size: clamp(6.8px, 1.7cqw, 8.8px);
+          --bid-label-size: clamp(8.2px, 2.18cqw, 11.4px);
+          --bid-field-size: clamp(8.9px, 2.46cqw, 12.5px);
+          --bid-name-size: clamp(10.4px, 2.92cqw, 14.8px);
+          --bid-address-size: clamp(8px, 2.14cqw, 11.1px);
+          --bid-meta-size: clamp(8.3px, 2.18cqw, 11.4px);
+          --bid-cardno-size: clamp(8.9px, 2.46cqw, 12.8px);
+          --bid-cardno-back-size: clamp(9.4px, 2.62cqw, 13.6px);
+          --bid-emergency-size: clamp(8.2px, 2.14cqw, 11.2px);
+          --bid-note-size: clamp(7px, 1.82cqw, 9.1px);
         }
       }
       @container barangay-id-card (min-width: 760px) {
         .barangay-id-card {
-          --bid-label-size: clamp(10px, 0.3rem + 0.48vw, 13.6px);
-          --bid-field-size: clamp(10px, 0.36rem + 0.6vw, 14px);
-          --bid-name-size: clamp(12.5px, 0.46rem + 0.84vw, 18.4px);
-          --bid-address-size: clamp(9.4px, 0.32rem + 0.5vw, 13px);
-          --bid-meta-size: clamp(9.4px, 0.32rem + 0.56vw, 13.2px);
-          --bid-cardno-size: clamp(10.6px, 0.38rem + 0.68vw, 15.8px);
-          --bid-cardno-back-size: clamp(11px, 0.4rem + 0.74vw, 16.8px);
-          --bid-emergency-size: clamp(9.5px, 0.33rem + 0.54vw, 13px);
-          --bid-note-size: clamp(7.4px, 0.24rem + 0.36vw, 10px);
+          --bid-label-size: clamp(10.2px, 0.32rem + 0.52vw, 14px);
+          --bid-field-size: clamp(10.4px, 0.38rem + 0.66vw, 14.5px);
+          --bid-name-size: clamp(12.9px, 0.48rem + 0.9vw, 19px);
+          --bid-address-size: clamp(9.6px, 0.34rem + 0.56vw, 13.4px);
+          --bid-meta-size: clamp(9.8px, 0.34rem + 0.62vw, 13.6px);
+          --bid-cardno-size: clamp(10.8px, 0.4rem + 0.72vw, 16.1px);
+          --bid-cardno-back-size: clamp(11.3px, 0.42rem + 0.78vw, 17.1px);
+          --bid-emergency-size: clamp(9.8px, 0.35rem + 0.6vw, 13.4px);
+          --bid-note-size: clamp(7.7px, 0.26rem + 0.4vw, 10.3px);
         }
       }
       .barangay-id-digital__actions {
@@ -525,10 +560,7 @@
       profileImageUrl,
       fallbackProfileImageUrl
     ]));
-    const qrUrl = resolvePublicUrl(appBase, firstNonEmpty([
-      row.qr_code_path,
-      payload.qr_code_path
-    ]));
+    const qrUrl = qrPreviewUrl(appBase, row, payload);
     const resolvedFrontTemplateUrl = frontTemplateUrl || `${appBase}/Resident-End/Certificates/BarangayID/FRONT_EMPTY.png?v=${TEMPLATE_ASSET_VERSION}`;
     const resolvedBackTemplateUrl = backTemplateUrl || `${appBase}/Resident-End/Certificates/BarangayID/BACK_EMPTY.png?v=${TEMPLATE_ASSET_VERSION}`;
     const resolvedTemplateVariant = firstNonEmpty([
