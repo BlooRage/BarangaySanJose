@@ -361,7 +361,7 @@ if ($residentId !== '' && isset($conn) && $conn instanceof mysqli) {
   <script src="../JS-Script-Files/Resident-End/profileOccupation.js" defer></script>
   <script src="../JS-Script-Files/Resident-End/profileSidebar.js" defer></script>
   <script src="../JS-Script-Files/Resident-End/profileVerifyEmail.js" defer></script>
-  <script src="../JS-Script-Files/Resident-End/householdInviteModal.js" defer></script>
+  <script src="../JS-Script-Files/Resident-End/householdInviteModal.js?v=20260328-1" defer></script>
   <script src="../JS-Script-Files/Resident-End/householdJoin.js" defer></script>
   <script src="../JS-Script-Files/Resident-End/profileTabs.js" defer></script>
   <script src="../JS-Script-Files/Resident-End/profileAddress.js" defer></script>
