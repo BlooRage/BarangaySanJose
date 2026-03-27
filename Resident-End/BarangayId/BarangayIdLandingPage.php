@@ -119,19 +119,35 @@ $digitalIdViewUrl = $latestDigitalIdRequestId !== ''
             gap: 12px;
             flex-wrap: wrap;
         }
+        .apply-actions .btn {
+            min-width: 210px;
+            min-height: 58px;
+            padding: 0.9rem 1.5rem !important;
+            border-radius: 14px !important;
+            font-size: 1rem !important;
+            font-weight: 800 !important;
+            line-height: 1.1 !important;
+            box-shadow: 0 14px 28px rgba(138, 75, 0, 0.12);
+            transition: transform 0.18s ease, box-shadow 0.18s ease, background-color 0.18s ease, color 0.18s ease, border-color 0.18s ease;
+        }
+        .apply-actions .btn:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 18px 34px rgba(138, 75, 0, 0.16);
+        }
         .apply-btn {
-            min-width: 180px;
+            min-width: 210px;
         }
         .digital-id-btn {
             min-width: 210px;
-            background: linear-gradient(180deg, #2553be 0%, #143d9d 100%);
-            color: #fff;
-            border: 0;
-            box-shadow: 0 14px 28px rgba(37, 83, 190, 0.18);
+            background: #fff4e7;
+            color: #8a4b00;
+            border: 1px solid #f2c28a;
+            box-shadow: 0 14px 28px rgba(138, 75, 0, 0.1);
         }
         .digital-id-btn:hover {
+            background: #fc8d3d;
+            border-color: #fc8d3d;
             color: #fff;
-            box-shadow: 0 18px 30px rgba(37, 83, 190, 0.22);
         }
         .apply-note {
             margin-top: 10px;
@@ -143,7 +159,7 @@ $digitalIdViewUrl = $latestDigitalIdRequestId !== ''
             margin-top: 10px;
             font-size: 0.92rem;
             font-weight: 600;
-            color: #2150b9;
+            color: #8a4b00;
         }
         .id-sample-img {
             box-shadow: 0 10px 24px rgba(0, 0, 0, 0.18);
