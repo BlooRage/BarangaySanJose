@@ -551,12 +551,36 @@ foreach ($appointmentRows as $row) {
         }
 
         .appointment-settings-card {
-            border: 1px solid #e5e7eb;
+            border: 1px solid #e78924;
             border-radius: 18px;
-            background: #fffdfb;
+            background: #ffffff;
             padding: 1.15rem 1.2rem;
             display: grid;
             gap: 10px;
+        }
+
+        .appointment-settings-summary-card {
+            display: flex;
+            flex-direction: column;
+            justify-content: flex-start;
+            gap: 0.9rem;
+        }
+
+        .appointment-settings-summary-section {
+            display: grid;
+            gap: 0.7rem;
+            align-content: start;
+        }
+
+        .appointment-settings-summary-meta {
+            display: grid;
+            gap: 0.45rem;
+        }
+
+        .appointment-settings-divider {
+            margin: 0;
+            border-color: #e9ecef;
+            opacity: 1;
         }
 
         .appointment-settings-card h5 {
@@ -1034,41 +1058,49 @@ foreach ($appointmentRows as $row) {
                         </div>
 
                         <div class="appointment-settings-actions">
-                            <button type="submit" class="btn btn-primary">Save Settings</button>
+                            <button type="submit" class="btn btn-primary" disabled>Save Settings</button>
                         </div>
                     </form>
                 </section>
 
-                <section class="appointment-settings-card">
-                    <h5>Current Appointment Rules</h5>
-                    <ul class="appointment-settings-list">
-                        <li>Residents can only set appointments with currently serving barangay council members.</li>
-                        <li>Open weekdays: <?= htmlspecialchars($appointmentAvailableWeekdayLabels, ENT_QUOTES, 'UTF-8') ?>.</li>
-                        <li>Closed weekdays: <?= htmlspecialchars($appointmentClosedWeekdayLabels, ENT_QUOTES, 'UTF-8') ?>.</li>
-                        <li>Lunch break: <?= htmlspecialchars($appointmentLunchBreakLabel, ENT_QUOTES, 'UTF-8') ?>.</li>
-                        <li>Unavailable dates: <?= htmlspecialchars($appointmentUnavailableDatesSummary, ENT_QUOTES, 'UTF-8') ?>.</li>
-                        <li>Residents can book from tomorrow up to <?= htmlspecialchars((string)($appointmentSettings['booking_window_days'] ?? 365), ENT_QUOTES, 'UTF-8') ?> days ahead.</li>
-                        <li>Earliest bookable date right now: <?= htmlspecialchars($appointmentFirstAvailableDateLabel, ENT_QUOTES, 'UTF-8') ?>.</li>
-                    </ul>
-                    <hr class="my-2">
-                    <h5>Current Allotted Schedule</h5>
-                    <p><strong>Coverage:</strong> <?= htmlspecialchars($appointmentScheduleCoverageLabel, ENT_QUOTES, 'UTF-8') ?></p>
-                    <p><strong>Interval:</strong> <?= htmlspecialchars((string)($appointmentSettings['slot_interval_minutes'] ?? 30), ENT_QUOTES, 'UTF-8') ?> minutes per appointment slot</p>
-                    <?php if ($appointmentLunchBreakEnabled): ?>
-                        <p><strong>Lunch break excluded:</strong> <?= htmlspecialchars($appointmentLunchBreakLabel, ENT_QUOTES, 'UTF-8') ?></p>
-                    <?php endif; ?>
-                    <div class="appointment-slot-cloud">
-                        <?php foreach ($appointmentSlotLabels as $slotLabel): ?>
-                            <span class="appointment-slot-pill"><?= htmlspecialchars($slotLabel, ENT_QUOTES, 'UTF-8') ?></span>
-                        <?php endforeach; ?>
+                <section class="appointment-settings-card appointment-settings-summary-card">
+                    <div class="appointment-settings-summary-section">
+                        <h5>Current Appointment Rules</h5>
+                        <ul class="appointment-settings-list">
+                            <li>Residents can only set appointments with currently serving barangay council members.</li>
+                            <li>Open weekdays: <?= htmlspecialchars($appointmentAvailableWeekdayLabels, ENT_QUOTES, 'UTF-8') ?>.</li>
+                            <li>Closed weekdays: <?= htmlspecialchars($appointmentClosedWeekdayLabels, ENT_QUOTES, 'UTF-8') ?>.</li>
+                            <li>Lunch break: <?= htmlspecialchars($appointmentLunchBreakLabel, ENT_QUOTES, 'UTF-8') ?>.</li>
+                            <li>Unavailable dates: <?= htmlspecialchars($appointmentUnavailableDatesSummary, ENT_QUOTES, 'UTF-8') ?>.</li>
+                            <li>Residents can book from tomorrow up to <?= htmlspecialchars((string)($appointmentSettings['booking_window_days'] ?? 365), ENT_QUOTES, 'UTF-8') ?> days ahead.</li>
+                            <li>Earliest bookable date right now: <?= htmlspecialchars($appointmentFirstAvailableDateLabel, ENT_QUOTES, 'UTF-8') ?>.</li>
+                        </ul>
+                    </div>
+                    <hr class="appointment-settings-divider">
+                    <div class="appointment-settings-summary-section">
+                        <h5>Current Allotted Schedule</h5>
+                        <div class="appointment-settings-summary-meta">
+                            <p><strong>Coverage:</strong> <?= htmlspecialchars($appointmentScheduleCoverageLabel, ENT_QUOTES, 'UTF-8') ?></p>
+                            <p><strong>Interval:</strong> <?= htmlspecialchars((string)($appointmentSettings['slot_interval_minutes'] ?? 30), ENT_QUOTES, 'UTF-8') ?> minutes per appointment slot</p>
+                            <?php if ($appointmentLunchBreakEnabled): ?>
+                                <p><strong>Lunch break excluded:</strong> <?= htmlspecialchars($appointmentLunchBreakLabel, ENT_QUOTES, 'UTF-8') ?></p>
+                            <?php endif; ?>
+                        </div>
+                        <div class="appointment-slot-cloud">
+                            <?php foreach ($appointmentSlotLabels as $slotLabel): ?>
+                                <span class="appointment-slot-pill"><?= htmlspecialchars($slotLabel, ENT_QUOTES, 'UTF-8') ?></span>
+                            <?php endforeach; ?>
+                        </div>
                     </div>
                     <?php if ($appointmentUnavailableDates !== []): ?>
-                        <hr class="my-2">
-                        <h5>Unavailable Dates</h5>
-                        <div class="appointment-unavailable-list">
-                            <?php foreach ($appointmentUnavailableDates as $isoDate): ?>
-                                <span class="appointment-unavailable-pill"><?= htmlspecialchars(aps_format_date_label($isoDate), ENT_QUOTES, 'UTF-8') ?></span>
-                            <?php endforeach; ?>
+                        <hr class="appointment-settings-divider">
+                        <div class="appointment-settings-summary-section">
+                            <h5>Unavailable Dates</h5>
+                            <div class="appointment-unavailable-list">
+                                <?php foreach ($appointmentUnavailableDates as $isoDate): ?>
+                                    <span class="appointment-unavailable-pill"><?= htmlspecialchars(aps_format_date_label($isoDate), ENT_QUOTES, 'UTF-8') ?></span>
+                                <?php endforeach; ?>
+                            </div>
                         </div>
                     <?php endif; ?>
                 </section>
@@ -1816,6 +1848,8 @@ foreach ($appointmentRows as $row) {
 
     (() => {
         const settingsForm = document.querySelector(".appointment-settings-form");
+        const slotIntervalInput = document.getElementById("appointmentSlotInterval");
+        const bookingWindowInput = document.getElementById("appointmentBookingWindow");
         const lunchBreakToggle = document.getElementById("appointmentLunchBreakEnabled");
         const lunchStartInput = document.getElementById("appointmentLunchStart");
         const lunchEndInput = document.getElementById("appointmentLunchEnd");
@@ -1827,6 +1861,8 @@ foreach ($appointmentRows as $row) {
         if (!settingsForm || !unavailableDatesHidden || !unavailableDatePicker || !unavailableDateAddBtn || !unavailableDateList) {
             return;
         }
+
+        const saveSettingsBtn = settingsForm.querySelector('button[type="submit"]');
 
         const formatDateLabel = (isoDate) => {
             const match = String(isoDate || "").trim().match(/^(\d{4})-(\d{2})-(\d{2})$/);
@@ -1840,18 +1876,52 @@ foreach ($appointmentRows as $row) {
             });
         };
 
-        const getUnavailableDates = () => Array.from(new Set(
-            String(unavailableDatesHidden.value || "")
-                .split(",")
+        const normalizeUnavailableDates = (values) => Array.from(new Set(
+            (Array.isArray(values) ? values : String(values || "").split(","))
                 .map((value) => value.trim())
                 .filter((value) => value !== "")
         )).sort();
 
-        const setUnavailableDates = (dates) => {
-            unavailableDatesHidden.value = dates.join(",");
+        const getUnavailableDates = () => normalizeUnavailableDates(unavailableDatesHidden.value);
+
+        const setUnavailableDates = (dates, notify = false) => {
+            const normalizedValue = normalizeUnavailableDates(dates).join(",");
+            if (unavailableDatesHidden.value === normalizedValue) {
+                return;
+            }
+            unavailableDatesHidden.value = normalizedValue;
+            if (notify) {
+                unavailableDatesHidden.dispatchEvent(new Event("input", { bubbles: true }));
+                unavailableDatesHidden.dispatchEvent(new Event("change", { bubbles: true }));
+            }
         };
 
         const useMultiDatePicker = String(unavailableDatePicker.dataset.dateModalSelection || "").trim().toLowerCase() === "multiple";
+
+        const getSettingsFormState = () => {
+            const lunchBreakEnabled = lunchBreakToggle?.checked === true;
+            return {
+                slot_interval_minutes: String(slotIntervalInput?.value || "").trim(),
+                booking_window_days: String(bookingWindowInput?.value || "").trim(),
+                closed_weekdays: Array.from(settingsForm.querySelectorAll('input[name="closed_weekdays[]"]:checked'))
+                    .map((input) => String(input.value || "").trim())
+                    .filter((value) => value !== "")
+                    .sort(),
+                lunch_break_enabled: lunchBreakEnabled,
+                lunch_start_time: lunchBreakEnabled ? String(lunchStartInput?.value || "").trim() : "",
+                lunch_end_time: lunchBreakEnabled ? String(lunchEndInput?.value || "").trim() : "",
+                unavailable_dates: getUnavailableDates(),
+            };
+        };
+
+        const hasSettingsChanges = () => JSON.stringify(getSettingsFormState()) !== originalSettingsState;
+
+        const updateSaveButtonState = () => {
+            if (!saveSettingsBtn) {
+                return;
+            }
+            saveSettingsBtn.disabled = !hasSettingsChanges();
+        };
 
         const renderUnavailableDates = () => {
             const dates = getUnavailableDates();
@@ -1909,9 +1979,7 @@ foreach ($appointmentRows as $row) {
             const dates = getUnavailableDates();
             if (!dates.includes(isoDate)) {
                 dates.push(isoDate);
-                dates.sort();
-                setUnavailableDates(dates);
-                renderUnavailableDates();
+                setUnavailableDates(dates, true);
             }
 
             unavailableDatePicker.value = "";
@@ -1923,10 +1991,12 @@ foreach ($appointmentRows as $row) {
         });
 
         unavailableDatesHidden.addEventListener("input", () => {
+            setUnavailableDates(getUnavailableDates());
             renderUnavailableDates();
         });
 
         unavailableDatesHidden.addEventListener("change", () => {
+            setUnavailableDates(getUnavailableDates());
             renderUnavailableDates();
         });
 
@@ -1941,15 +2011,22 @@ foreach ($appointmentRows as $row) {
                 return;
             }
 
-            setUnavailableDates(getUnavailableDates().filter((value) => value !== isoDate));
-            renderUnavailableDates();
+            setUnavailableDates(getUnavailableDates().filter((value) => value !== isoDate), true);
         });
 
         lunchBreakToggle?.addEventListener("change", syncLunchBreakInputs);
+        settingsForm.addEventListener("input", updateSaveButtonState);
+        settingsForm.addEventListener("change", updateSaveButtonState);
 
         settingsForm.addEventListener("submit", (event) => {
             syncLunchBreakInputs();
             setUnavailableDates(getUnavailableDates());
+
+            if (!hasSettingsChanges()) {
+                event.preventDefault();
+                updateSaveButtonState();
+                return;
+            }
 
             if (lunchBreakToggle?.checked !== true) {
                 return;
@@ -1982,7 +2059,10 @@ foreach ($appointmentRows as $row) {
         });
 
         syncLunchBreakInputs();
+        setUnavailableDates(getUnavailableDates());
         renderUnavailableDates();
+        const originalSettingsState = JSON.stringify(getSettingsFormState());
+        updateSaveButtonState();
     })();
 </script>
 </body>
