@@ -19,6 +19,8 @@
   const confirmRemarksEl = el("hmvActionConfirmRemarks");
   const confirmActionBtn = el("btnHmvConfirmAction");
 
+  if (!bodyEl) return;
+
   const state = {
     rows: [],
     filter: "ALL",
@@ -40,6 +42,14 @@
     return "PendingReview";
   };
 
+  const escapeHtml = (value) =>
+    String(value ?? "")
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&#39;");
+
   const statusPillHtml = (status) => {
     const normalized = fmtStatus(status);
     const classMap = {
@@ -55,17 +65,9 @@
     return `<span class="${classMap[normalized] || classMap.PendingReview}">${labelMap[normalized] || "Pending"}</span>`;
   };
 
-  const escapeHtml = (value) =>
-    String(value ?? "")
-      .replace(/&/g, "&amp;")
-      .replace(/</g, "&lt;")
-      .replace(/>/g, "&gt;")
-      .replace(/"/g, "&quot;")
-      .replace(/'/g, "&#39;");
-
   const formatDate = (value) => {
     const raw = String(value || "").trim();
-    if (!raw) return "—";
+    if (!raw) return "-";
     const date = new Date(raw);
     if (Number.isNaN(date.getTime())) return raw;
     return date.toLocaleString("en-PH", {
@@ -79,7 +81,7 @@
 
   const formatBirthdate = (value) => {
     const raw = String(value || "").trim();
-    if (!raw) return "—";
+    if (!raw) return "-";
     const date = new Date(raw);
     if (Number.isNaN(date.getTime())) return raw;
     return date.toLocaleDateString("en-PH", { year: "numeric", month: "short", day: "numeric" });
@@ -140,7 +142,6 @@
       const haystack = [
         row.request_id,
         row.head_full_name,
-        row.fam_head_id,
         row.member_full_name,
         row.birthdate,
       ].join(" ").toLowerCase();
@@ -156,7 +157,6 @@
   };
 
   const renderTable = () => {
-    if (!bodyEl) return;
     const rows = filteredRows();
     emptyEl?.classList.toggle("d-none", rows.length > 0);
 
@@ -168,36 +168,27 @@
     bodyEl.innerHTML = rows.map((row) => `
       <tr>
         <td>${escapeHtml(row.request_id)}</td>
-        <td>${escapeHtml(row.head_full_name || "—")}<div class="small text-muted">${escapeHtml(row.fam_head_id || "")}</div></td>
-        <td>${escapeHtml(row.member_full_name || "—")}</td>
+        <td>${escapeHtml(row.head_full_name || "-")}</td>
+        <td>${escapeHtml(row.member_full_name || "-")}</td>
         <td>${escapeHtml(formatBirthdate(row.birthdate))}</td>
         <td>${statusPillHtml(row.status)}</td>
         <td>${escapeHtml(formatDate(row.submitted_at))}</td>
         <td><button class="btn btn-outline-primary btn-sm" data-request-id="${escapeHtml(row.request_id)}">View</button></td>
       </tr>
     `).join("");
-
-    Array.from(bodyEl.querySelectorAll("tr")).forEach((tableRow, index) => {
-      const headCell = tableRow.children[1];
-      if (!headCell) return;
-      headCell.textContent = String(rows[index]?.head_full_name || "â€”");
-      if (!String(rows[index]?.head_full_name || "").trim()) {
-        headCell.textContent = "-";
-      }
-    });
   };
 
   const openModal = (row) => {
     state.active = row;
-    el("hmvModalSubtitle").textContent = `Request ID ${row.request_id}`;
-    el("hmvModalHeadName").textContent = row.head_full_name || "—";
-    el("hmvModalHeadResidentId").textContent = row.fam_head_id || "—";
-    el("hmvModalLastName").textContent = row.last_name || "—";
-    el("hmvModalFirstName").textContent = row.first_name || "—";
-    el("hmvModalMiddleName").textContent = row.middle_name || "—";
-    el("hmvModalSuffix").textContent = row.suffix || "—";
-    el("hmvModalBirthdate").textContent = formatBirthdate(row.birthdate);
-    el("hmvModalStatus").innerHTML = statusPillHtml(row.status);
+    if (el("hmvModalSubtitle")) el("hmvModalSubtitle").textContent = `Request ID ${row.request_id}`;
+    if (el("hmvModalHeadName")) el("hmvModalHeadName").textContent = row.head_full_name || "-";
+    if (el("hmvModalHeadResidentId")) el("hmvModalHeadResidentId").textContent = row.fam_head_id || "-";
+    if (el("hmvModalLastName")) el("hmvModalLastName").textContent = row.last_name || "-";
+    if (el("hmvModalFirstName")) el("hmvModalFirstName").textContent = row.first_name || "-";
+    if (el("hmvModalMiddleName")) el("hmvModalMiddleName").textContent = row.middle_name || "-";
+    if (el("hmvModalSuffix")) el("hmvModalSuffix").textContent = row.suffix || "-";
+    if (el("hmvModalBirthdate")) el("hmvModalBirthdate").textContent = formatBirthdate(row.birthdate);
+    if (el("hmvModalStatus")) el("hmvModalStatus").innerHTML = statusPillHtml(row.status);
     renderDocumentPreview(row);
 
     const isPending = fmtStatus(row.status) === "PendingReview";
@@ -207,9 +198,7 @@
 
   const fetchRows = async () => {
     if (refreshBtn) refreshBtn.classList.add("is-loading");
-    if (bodyEl) {
-      bodyEl.innerHTML = `<tr><td colspan="7" class="text-center text-muted py-4">Loading requests...</td></tr>`;
-    }
+    bodyEl.innerHTML = `<tr><td colspan="7" class="text-center text-muted py-4">Loading requests...</td></tr>`;
     emptyEl?.classList.add("d-none");
     try {
       const res = await fetch("../PhpFiles/Admin-End/householdMemberVerification.php?fetch_member_requests=1", {
@@ -221,9 +210,7 @@
       updatePendingBadge();
       renderTable();
     } catch (error) {
-      if (bodyEl) {
-        bodyEl.innerHTML = `<tr><td colspan="7" class="text-center text-danger py-4">${escapeHtml(error?.message || "Failed to load requests.")}</td></tr>`;
-      }
+      bodyEl.innerHTML = `<tr><td colspan="7" class="text-center text-danger py-4">${escapeHtml(error?.message || "Failed to load requests.")}</td></tr>`;
       emptyEl?.classList.add("d-none");
     } finally {
       if (refreshBtn) refreshBtn.classList.remove("is-loading");
@@ -242,6 +229,7 @@
         return;
       }
     }
+
     try {
       if (confirmActionBtn) confirmActionBtn.disabled = true;
       const res = await fetch("../PhpFiles/Admin-End/householdMemberVerification.php", {
@@ -279,17 +267,14 @@
         ? `Reject household member verification request ${row.request_id}?`
         : `Approve household member verification request ${row.request_id}?`;
     }
-    if (confirmRemarksWrapEl) {
-      confirmRemarksWrapEl.classList.toggle("d-none", !isReject);
-    }
+    confirmRemarksWrapEl?.classList.toggle("d-none", !isReject);
     if (confirmRemarksEl) {
       confirmRemarksEl.value = isReject ? String(row.review_remarks || "") : "";
     }
     if (confirmActionBtn) {
       confirmActionBtn.textContent = isReject ? "Reject" : "Approve";
-      confirmActionBtn.classList.toggle("btn-danger", isReject);
-      confirmActionBtn.classList.toggle("btn-success", !isReject);
-      confirmActionBtn.classList.remove("btn-primary");
+      confirmActionBtn.classList.remove("btn-primary", "btn-danger", "btn-success");
+      confirmActionBtn.classList.add(isReject ? "btn-danger" : "btn-success");
     }
     confirmModal?.show();
     if (isReject) {
@@ -312,12 +297,14 @@
   });
 
   refreshBtn?.addEventListener("click", fetchRows);
+
   btnApplyFilter?.addEventListener("click", () => {
     state.modalFilters.dateFrom = String(filterDateFromEl?.value || "").trim();
     state.modalFilters.dateTo = String(filterDateToEl?.value || "").trim();
     bootstrap.Modal.getOrCreateInstance(el("modalHouseholdMemberVerificationFilter"))?.hide();
     renderTable();
   });
+
   btnResetFilter?.addEventListener("click", () => {
     state.modalFilters.dateFrom = "";
     state.modalFilters.dateTo = "";
@@ -326,7 +313,7 @@
     renderTable();
   });
 
-  bodyEl?.addEventListener("click", (event) => {
+  bodyEl.addEventListener("click", (event) => {
     const target = event.target;
     if (!(target instanceof Element)) return;
     const button = target.closest("button[data-request-id]");

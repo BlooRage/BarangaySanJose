@@ -354,37 +354,5 @@ require_once __DIR__ . "/includes/admin_guard.php";
 </script>
 <script src="../JS-Script-Files/Admin-End/tableColumnsGeneric.js?v=20260215-1"></script>
 <script src="../JS-Script-Files/Admin-End/householdMemberVerificationScript.js?v=20260328-03"></script>
-<script>
-  document.addEventListener("DOMContentLoaded", () => {
-    const tbody = document.getElementById("householdMemberVerificationBody");
-    if (!tbody) return;
-
-    const normalizeHouseholdMemberVerificationTable = () => {
-      Array.from(tbody.querySelectorAll("tr")).forEach((row) => {
-        const headCell = row.children[1];
-        if (headCell) {
-          const primaryText = Array.from(headCell.childNodes)
-            .filter((node) => node.nodeType === Node.TEXT_NODE)
-            .map((node) => node.textContent || "")
-            .join(" ")
-            .trim();
-          headCell.textContent = primaryText || headCell.textContent.trim() || "-";
-        }
-
-        const statusPill = row.children[4]?.querySelector(".status-pill");
-        if (statusPill) {
-          const currentLabel = (statusPill.textContent || "").trim().toLowerCase().replace(/\s+/g, " ");
-          if (currentLabel === "pending review") {
-            statusPill.textContent = "Pending";
-          }
-        }
-      });
-    };
-
-    normalizeHouseholdMemberVerificationTable();
-    const observer = new MutationObserver(() => normalizeHouseholdMemberVerificationTable());
-    observer.observe(tbody, { childList: true, subtree: true });
-  });
-</script>
 </body>
 </html>
