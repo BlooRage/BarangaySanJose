@@ -8123,6 +8123,7 @@ if ($action === 'submit_fee_change_request') {
     dr_ensure_clearance_fee_types_table($conn);
     dr_ensure_general_fees_table($conn);
     $requestType     = trim((string)($_POST['request_type'] ?? ''));
+    $feeCatalogSource = strtolower(trim((string)($_POST['fee_catalog_source'] ?? '')));
     $proposedFeeName = trim((string)($_POST['proposed_fee_name'] ?? ''));
     $proposedAmount  = max(0.0, (float)($_POST['proposed_amount'] ?? 0));
     $notes           = trim((string)($_POST['notes'] ?? ''));
@@ -8158,9 +8159,29 @@ if ($action === 'submit_fee_change_request') {
         dr_respond_json(200, ['success' => true]);
     }
 
-    $documentTypeId = (int)($_POST['fee_type_id'] ?? 0);
-    if ($documentTypeId <= 0) {
+    $feeTypeId = (int)($_POST['fee_type_id'] ?? 0);
+    if ($feeTypeId <= 0) {
         dr_respond_json(400, ['success' => false, 'message' => 'Fee type ID is required for price edit.']);
+    }
+
+    if ($feeCatalogSource !== 'general') {
+        $stmt = $conn->prepare(
+            "UPDATE clearancefeetypetbl
+             SET proposed_amount=?, status='pending', change_type='price_edit',
+                 notes=?, requested_by_user_id=?, reviewed_by_user_id=NULL,
+                 reviewed_at=NULL, review_notes=NULL, updated_at=NOW()
+             WHERE fee_type_id=? AND status='approved'"
+        );
+        if (!$stmt) dr_respond_json(500, ['success' => false, 'message' => 'DB error.']);
+        $stmt->bind_param('dssi', $proposedAmount, $notes, $userId, $feeTypeId);
+        $stmt->execute();
+        $affected = $stmt->affected_rows;
+        $stmt->close();
+        if ($affected === 0) {
+            dr_respond_json(409, ['success' => false, 'message' => 'Fee type not found or already has a pending change.']);
+        }
+        try { insertUnifiedAuditLog($conn, $currentUserId, $currentUserRole, 'Fee Management', 'fee_type', (string)$feeTypeId, 'Request Price Edit', 'proposed_amount', null, 'â‚±' . number_format($proposedAmount, 2), $notes); } catch (Throwable $__e) {}
+        dr_respond_json(200, ['success' => true]);
     }
 
     $catalogStmt = $conn->prepare("
@@ -8175,7 +8196,7 @@ if ($action === 'submit_fee_change_request') {
         LIMIT 1
     ");
     if (!$catalogStmt) dr_respond_json(500, ['success' => false, 'message' => 'DB error.']);
-    $catalogStmt->bind_param('i', $documentTypeId);
+    $catalogStmt->bind_param('i', $feeTypeId);
     $catalogStmt->execute();
     $catalogRow = $catalogStmt->get_result()->fetch_assoc();
     $catalogStmt->close();
@@ -8193,7 +8214,7 @@ if ($action === 'submit_fee_change_request') {
         LIMIT 1
     ");
     if (!$existingStmt) dr_respond_json(500, ['success' => false, 'message' => 'DB error.']);
-    $existingStmt->bind_param('i', $documentTypeId);
+    $existingStmt->bind_param('i', $feeTypeId);
     $existingStmt->execute();
     $existingRow = $existingStmt->get_result()->fetch_assoc();
     $existingStmt->close();
@@ -8231,7 +8252,7 @@ if ($action === 'submit_fee_change_request') {
              VALUES (?, ?, ?, ?, 'pending', 'price_edit', ?, ?, ?)"
         );
         if (!$stmt) dr_respond_json(500, ['success' => false, 'message' => 'DB error.']);
-        $stmt->bind_param('isddssi', $requestRowId, $feeName, $currentAmount, $proposedAmount, $notes, $userId, $documentTypeId);
+        $stmt->bind_param('isddssi', $requestRowId, $feeName, $currentAmount, $proposedAmount, $notes, $userId, $feeTypeId);
         if (!$stmt->execute()) {
             $stmt->close();
             dr_respond_json(409, ['success' => false, 'message' => 'Failed to create the fee change request.']);
@@ -8301,24 +8322,35 @@ if ($action === 'cancel_fee_change_request') {
         if (!$stmt) dr_respond_json(500, ['success' => false, 'message' => 'DB error.']);
         $stmt->bind_param('i', $feeTypeId);
     } else {
-        $currentAmount = 0.0;
         $documentTypeId = (int)($fcr['document_type_id'] ?? 0);
-        $amountStmt = $conn->prepare("SELECT amount FROM generalfeestbl WHERE document_type_id = ? LIMIT 1");
-        if ($amountStmt) {
-            $amountStmt->bind_param('i', $documentTypeId);
-            $amountStmt->execute();
-            $amountRow = $amountStmt->get_result()->fetch_assoc();
-            $currentAmount = (float)($amountRow['amount'] ?? 0);
-            $amountStmt->close();
+        if ($documentTypeId > 0) {
+            $currentAmount = 0.0;
+            $amountStmt = $conn->prepare("SELECT amount FROM generalfeestbl WHERE document_type_id = ? LIMIT 1");
+            if ($amountStmt) {
+                $amountStmt->bind_param('i', $documentTypeId);
+                $amountStmt->execute();
+                $amountRow = $amountStmt->get_result()->fetch_assoc();
+                $currentAmount = (float)($amountRow['amount'] ?? 0);
+                $amountStmt->close();
+            }
+            $stmt = $conn->prepare(
+                "UPDATE clearancefeetypetbl
+                 SET default_amount=?, proposed_amount=NULL, change_type=NULL, status='approved',
+                     notes=NULL, requested_by_user_id=NULL, review_notes=NULL, updated_at=NOW()
+                 WHERE fee_type_id=?"
+            );
+            if (!$stmt) dr_respond_json(500, ['success' => false, 'message' => 'DB error.']);
+            $stmt->bind_param('di', $currentAmount, $feeTypeId);
+        } else {
+            $stmt = $conn->prepare(
+                "UPDATE clearancefeetypetbl
+                 SET proposed_amount=NULL, change_type=NULL, status='approved',
+                     notes=NULL, requested_by_user_id=NULL, review_notes=NULL, updated_at=NOW()
+                 WHERE fee_type_id=?"
+            );
+            if (!$stmt) dr_respond_json(500, ['success' => false, 'message' => 'DB error.']);
+            $stmt->bind_param('i', $feeTypeId);
         }
-        $stmt = $conn->prepare(
-            "UPDATE clearancefeetypetbl
-             SET default_amount=?, proposed_amount=NULL, change_type=NULL, status='approved',
-                 notes=NULL, requested_by_user_id=NULL, review_notes=NULL, updated_at=NOW()
-             WHERE fee_type_id=?"
-        );
-        if (!$stmt) dr_respond_json(500, ['success' => false, 'message' => 'DB error.']);
-        $stmt->bind_param('di', $currentAmount, $feeTypeId);
     }
     $stmt->execute();
     $stmt->close();
@@ -8362,30 +8394,29 @@ if ($action === 'process_fee_change_request') {
             $stmt->bind_param('ssi', $reviewerId, $reviewNotes, $feeTypeId);
         } else {
             $documentTypeId = (int)($fcr['document_type_id'] ?? 0);
-            if ($documentTypeId <= 0) {
-                dr_respond_json(409, ['success' => false, 'message' => 'Missing document type for fee update.']);
-            }
-            $proposedAmount = (float)($fcr['proposed_amount'] ?? 0);
-            $catalogUpdateStmt = $conn->prepare(
-                "UPDATE generalfeestbl
-                 SET amount=?, updated_at=NOW()
-                 WHERE document_type_id=?
-                 LIMIT 1"
-            );
-            if (!$catalogUpdateStmt) dr_respond_json(500, ['success' => false, 'message' => 'DB error.']);
-            $catalogUpdateStmt->bind_param('di', $proposedAmount, $documentTypeId);
-            $catalogUpdateStmt->execute();
-            $catalogAffected = $catalogUpdateStmt->affected_rows;
-            $catalogUpdateStmt->close();
-            if ($catalogAffected === 0) {
-                $catalogInsertStmt = $conn->prepare("INSERT INTO generalfeestbl (document_type_id, amount) VALUES (?, ?)");
-                if (!$catalogInsertStmt) dr_respond_json(500, ['success' => false, 'message' => 'DB error.']);
-                $catalogInsertStmt->bind_param('id', $documentTypeId, $proposedAmount);
-                if (!$catalogInsertStmt->execute()) {
+            if ($documentTypeId > 0) {
+                $proposedAmount = (float)($fcr['proposed_amount'] ?? 0);
+                $catalogUpdateStmt = $conn->prepare(
+                    "UPDATE generalfeestbl
+                     SET amount=?, updated_at=NOW()
+                     WHERE document_type_id=?
+                     LIMIT 1"
+                );
+                if (!$catalogUpdateStmt) dr_respond_json(500, ['success' => false, 'message' => 'DB error.']);
+                $catalogUpdateStmt->bind_param('di', $proposedAmount, $documentTypeId);
+                $catalogUpdateStmt->execute();
+                $catalogAffected = $catalogUpdateStmt->affected_rows;
+                $catalogUpdateStmt->close();
+                if ($catalogAffected === 0) {
+                    $catalogInsertStmt = $conn->prepare("INSERT INTO generalfeestbl (document_type_id, amount) VALUES (?, ?)");
+                    if (!$catalogInsertStmt) dr_respond_json(500, ['success' => false, 'message' => 'DB error.']);
+                    $catalogInsertStmt->bind_param('id', $documentTypeId, $proposedAmount);
+                    if (!$catalogInsertStmt->execute()) {
+                        $catalogInsertStmt->close();
+                        dr_respond_json(500, ['success' => false, 'message' => 'Failed to apply fee change to the catalog.']);
+                    }
                     $catalogInsertStmt->close();
-                    dr_respond_json(500, ['success' => false, 'message' => 'Failed to apply fee change to the catalog.']);
                 }
-                $catalogInsertStmt->close();
             }
             $stmt = $conn->prepare(
                 "UPDATE clearancefeetypetbl
@@ -8408,25 +8439,37 @@ if ($action === 'process_fee_change_request') {
             if (!$stmt) dr_respond_json(500, ['success' => false, 'message' => 'DB error.']);
             $stmt->bind_param('ssi', $reviewerId, $reviewNotes, $feeTypeId);
         } else {
-            $currentAmount = 0.0;
             $documentTypeId = (int)($fcr['document_type_id'] ?? 0);
-            $amountStmt = $conn->prepare("SELECT amount FROM generalfeestbl WHERE document_type_id = ? LIMIT 1");
-            if ($amountStmt) {
-                $amountStmt->bind_param('i', $documentTypeId);
-                $amountStmt->execute();
-                $amountRow = $amountStmt->get_result()->fetch_assoc();
-                $currentAmount = (float)($amountRow['amount'] ?? 0);
-                $amountStmt->close();
+            if ($documentTypeId > 0) {
+                $currentAmount = 0.0;
+                $amountStmt = $conn->prepare("SELECT amount FROM generalfeestbl WHERE document_type_id = ? LIMIT 1");
+                if ($amountStmt) {
+                    $amountStmt->bind_param('i', $documentTypeId);
+                    $amountStmt->execute();
+                    $amountRow = $amountStmt->get_result()->fetch_assoc();
+                    $currentAmount = (float)($amountRow['amount'] ?? 0);
+                    $amountStmt->close();
+                }
+                $stmt = $conn->prepare(
+                    "UPDATE clearancefeetypetbl
+                     SET default_amount=?, proposed_amount=NULL, change_type=NULL, status='approved',
+                         notes=NULL, requested_by_user_id=NULL,
+                         reviewed_by_user_id=?, reviewed_at=NOW(), review_notes=?, updated_at=NOW()
+                     WHERE fee_type_id=?"
+                );
+                if (!$stmt) dr_respond_json(500, ['success' => false, 'message' => 'DB error.']);
+                $stmt->bind_param('dssi', $currentAmount, $reviewerId, $reviewNotes, $feeTypeId);
+            } else {
+                $stmt = $conn->prepare(
+                    "UPDATE clearancefeetypetbl
+                     SET proposed_amount=NULL, change_type=NULL, status='approved',
+                         notes=NULL, requested_by_user_id=NULL,
+                         reviewed_by_user_id=?, reviewed_at=NOW(), review_notes=?, updated_at=NOW()
+                     WHERE fee_type_id=?"
+                );
+                if (!$stmt) dr_respond_json(500, ['success' => false, 'message' => 'DB error.']);
+                $stmt->bind_param('ssi', $reviewerId, $reviewNotes, $feeTypeId);
             }
-            $stmt = $conn->prepare(
-                "UPDATE clearancefeetypetbl
-                 SET default_amount=?, proposed_amount=NULL, change_type=NULL, status='approved',
-                     notes=NULL, requested_by_user_id=NULL,
-                     reviewed_by_user_id=?, reviewed_at=NOW(), review_notes=?, updated_at=NOW()
-                 WHERE fee_type_id=?"
-            );
-            if (!$stmt) dr_respond_json(500, ['success' => false, 'message' => 'DB error.']);
-            $stmt->bind_param('dssi', $currentAmount, $reviewerId, $reviewNotes, $feeTypeId);
         }
     }
     $stmt->execute();
