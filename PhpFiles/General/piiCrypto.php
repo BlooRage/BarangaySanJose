@@ -3,10 +3,21 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/runtimeConfig.php';
 
+if (!function_exists('pii_default_secret_map')) {
+    function pii_default_secret_map(): array
+    {
+        return [
+            'security.pii_key' => 'base64:Ww/sIEHabQg10jTzoOSNI+Wp7rr4DhW1OnbPsvaD/5E=',
+            'security.pii_hash_key' => 'base64:KcXULUj0GKxH/HOI7mZ56xnzO9axxPmkaUmacTm9gXQ=',
+        ];
+    }
+}
+
 if (!function_exists('pii_secret_value')) {
     function pii_secret_value(string $envKey, string $configKey): string
     {
-        return trim((string)runtime_env($envKey, runtime_config($configKey, '')));
+        $defaults = pii_default_secret_map();
+        return trim((string)runtime_env($envKey, runtime_config($configKey, $defaults[$configKey] ?? '')));
     }
 }
 
