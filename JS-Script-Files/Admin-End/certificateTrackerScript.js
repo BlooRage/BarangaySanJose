@@ -568,6 +568,7 @@
   let cachedAllItems = [];
   let itemById = new Map();
   const detailById = new Map();
+  const residentProfileSnapshotByLookup = new Map();
   let viewMode = 'details';
   let viewDetailsHtml = '';
   let viewPreviewState = null;
@@ -4084,18 +4085,21 @@
     }) || null;
   }
 
-  async function openResidentProfileModal(residentId, residentUserId = '', fallbackProfile = null) {
+  async function fetchResidentProfileSnapshot(residentId, residentUserId = '', fallbackProfile = null) {
     const rid = String(residentId || '').trim();
     const uid = String(residentUserId || '').trim();
     const fallbackRid = String(fallbackProfile?.resident_id || '').trim();
     const fallbackUid = String(fallbackProfile?.resident_user_id || fallbackProfile?.user_id || '').trim();
-    const searchToken = rid || uid || fallbackRid || fallbackUid;
-    if (!searchToken || !residentProfileModal) return;
-    if (viewModalEl && viewModalEl.classList.contains('show') && viewModal) {
-      preserveViewStateOnNextHide = true;
-      viewModal.hide();
+    const cacheKey = `${rid || fallbackRid}|${uid || fallbackUid}`;
+    if (cacheKey !== '|' && residentProfileSnapshotByLookup.has(cacheKey)) {
+      return residentProfileSnapshotByLookup.get(cacheKey);
     }
-    residentProfileModal.show();
+
+    const searchToken = rid || uid || fallbackRid || fallbackUid;
+    const fallbackNormalized = manualNormalizeResident(fallbackProfile);
+    if (!searchToken) {
+      return fallbackNormalized;
+    }
 
     try {
       const q = new URLSearchParams({
@@ -4112,9 +4116,74 @@
         const retryRows = await fetchJson(`${residentProfileEndpoint}?${retryQ.toString()}`);
         match = findResidentRow(retryRows, rid, uid);
       }
-      if (!match && fallbackProfile && typeof fallbackProfile === 'object') {
-        match = fallbackProfile;
+
+      const normalized = manualNormalizeResident(match || fallbackProfile);
+      if (cacheKey !== '|' && normalized) {
+        residentProfileSnapshotByLookup.set(cacheKey, normalized);
       }
+      return normalized;
+    } catch (_) {
+      if (cacheKey !== '|' && fallbackNormalized) {
+        residentProfileSnapshotByLookup.set(cacheKey, fallbackNormalized);
+      }
+      return fallbackNormalized;
+    }
+  }
+
+  async function ensureBarangayIdPhotoData(row) {
+    if (!row || typeof row !== 'object') return row;
+    if (normalizePreviewDocKey(row?.document_type || '') !== 'barangayid') {
+      return row;
+    }
+    if (barangayIdRequestHasPhoto(row)) {
+      return row;
+    }
+
+    const fallbackProfile = row.resident_profile && typeof row.resident_profile === 'object'
+      ? row.resident_profile
+      : null;
+    const residentProfile = await fetchResidentProfileSnapshot(
+      row?.resident_id,
+      row?.resident_user_id,
+      fallbackProfile
+    );
+    if (!residentProfile || (!residentProfile.id_picture_url && !residentProfile.id_picture_path)) {
+      return row;
+    }
+
+    const payload = row.payload && typeof row.payload === 'object' ? { ...row.payload } : {};
+    if (!String(payload.id_picture_url || '').trim()) {
+      payload.id_picture_url = String(residentProfile.id_picture_url || '').trim();
+    }
+    if (!String(payload.id_picture_path || '').trim()) {
+      payload.id_picture_path = String(residentProfile.id_picture_path || '').trim();
+    }
+
+    return {
+      ...row,
+      payload,
+      resident_profile: {
+        ...(fallbackProfile || {}),
+        ...residentProfile
+      }
+    };
+  }
+
+  async function openResidentProfileModal(residentId, residentUserId = '', fallbackProfile = null) {
+    const rid = String(residentId || '').trim();
+    const uid = String(residentUserId || '').trim();
+    const fallbackRid = String(fallbackProfile?.resident_id || '').trim();
+    const fallbackUid = String(fallbackProfile?.resident_user_id || fallbackProfile?.user_id || '').trim();
+    const searchToken = rid || uid || fallbackRid || fallbackUid;
+    if (!searchToken || !residentProfileModal) return;
+    if (viewModalEl && viewModalEl.classList.contains('show') && viewModal) {
+      preserveViewStateOnNextHide = true;
+      viewModal.hide();
+    }
+    residentProfileModal.show();
+
+    try {
+      const match = await fetchResidentProfileSnapshot(rid, uid, fallbackProfile);
       if (!match) return;
       fillResidentProfileModal(match);
     } catch (_) {
@@ -5312,7 +5381,7 @@
       return row;
     }
     try {
-      const full = await fetchRequestDetails(id, { force: true });
+      const full = await ensureBarangayIdPhotoData(await fetchRequestDetails(id, { force: true }));
       if (full) {
         itemById.set(id, full);
         if (Array.isArray(cachedAllItems)) {
