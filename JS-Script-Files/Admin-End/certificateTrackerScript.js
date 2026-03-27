@@ -5265,10 +5265,25 @@
     return true;
   }
 
-  async function fetchRequestDetails(requestId) {
+  function barangayIdRequestHasPhoto(row) {
+    if (!row || typeof row !== 'object') return false;
+    const payload = row.payload && typeof row.payload === 'object' ? row.payload : {};
+    const residentProfile = row.resident_profile && typeof row.resident_profile === 'object'
+      ? row.resident_profile
+      : {};
+    return [
+      payload.id_picture_url,
+      payload.id_picture_path,
+      residentProfile.id_picture_url,
+      residentProfile.id_picture_path
+    ].some((value) => String(value || '').trim() !== '');
+  }
+
+  async function fetchRequestDetails(requestId, options = {}) {
     const id = String(requestId || '').trim();
     if (!id) return null;
-    if (detailById.has(id)) {
+    const force = !!(options && options.force);
+    if (!force && detailById.has(id)) {
       return detailById.get(id);
     }
     const q = new URLSearchParams({ action: 'get_request', request_id: id });
@@ -5285,8 +5300,16 @@
     const payloadReady = row.payload && typeof row.payload === 'object' && Object.keys(row.payload).length > 0;
     const profileReady = row.resident_profile && typeof row.resident_profile === 'object' && Object.keys(row.resident_profile).length > 0;
     const hasResidentLink = String(row.resident_user_id || '').trim() !== '' || String(row.resident_id || '').trim() !== '';
+    const payloadResidentLink = payloadReady
+      && (
+        String(row.payload.resident_user_id || row.payload.user_id || '').trim() !== ''
+        || String(row.payload.resident_id || '').trim() !== ''
+      );
     if (!payloadReady) return false;
-    if (hasResidentLink && !profileReady) return false;
+    if ((hasResidentLink || payloadResidentLink) && !profileReady) return false;
+    if (normalizePreviewDocKey(row?.document_type || '') === 'barangayid' && !barangayIdRequestHasPhoto(row)) {
+      return false;
+    }
     return true;
   }
 
@@ -5298,7 +5321,7 @@
       return row;
     }
     try {
-      const full = await fetchRequestDetails(id);
+      const full = await fetchRequestDetails(id, { force: true });
       if (full) {
         itemById.set(id, full);
         if (Array.isArray(cachedAllItems)) {
@@ -9470,5 +9493,4 @@
     document.getElementById('fcrListRefreshBtn').addEventListener('click', loadFcrList);
   })();
 })();
-
 
