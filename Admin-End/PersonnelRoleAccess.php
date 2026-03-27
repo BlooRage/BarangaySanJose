@@ -316,6 +316,9 @@ $personnelRolePermissionCatalog = pra_filter_catalog_for_personnel_roles(amp_get
           </div>
           <div class="role-access-toolbar-meta">
             <div class="small text-muted" id="personnelRoleAccessMeta">Loading permission profiles...</div>
+            <button id="btnPersonnelRoleAccessCreate" class="btn btn-primary btn-sm" type="button">
+              <i class="fas fa-plus me-1"></i> Add Role Profile
+            </button>
             <button id="btnPersonnelRoleAccessRefresh" class="btn btn-outline-secondary btn-sm" type="button">
               <i class="fas fa-arrows-rotate me-1"></i> Refresh
             </button>
@@ -348,14 +351,14 @@ $personnelRolePermissionCatalog = pra_filter_catalog_for_personnel_roles(amp_get
     <div class="modal-dialog modal-dialog-centered modal-xl modal-dialog-scrollable">
       <div class="modal-content p-3">
         <div class="modal-header border-0">
-          <h5 class="modal-title fw-bold">Manage Role Based Permissions</h5>
+          <h5 class="modal-title fw-bold" id="personnelRoleAccessModalTitle">Manage Role Based Permissions</h5>
           <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
         </div>
         <div class="modal-body d-grid gap-3">
           <input type="hidden" id="personnelRoleAccessDepartment">
           <input type="hidden" id="personnelRoleAccessPosition">
 
-          <div class="alert alert-info mb-0">
+          <div class="alert alert-info mb-0" id="personnelRoleAccessModalNotice">
             This profile applies to the selected department position. Saving here updates the default permissions that personnel in this position inherit.
           </div>
 
@@ -401,13 +404,51 @@ $personnelRolePermissionCatalog = pra_filter_catalog_for_personnel_roles(amp_get
     </div>
   </div>
 
+  <div class="modal fade" id="modalPersonnelRoleProfileCreate" tabindex="-1" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content p-3">
+        <div class="modal-header border-0">
+          <h5 class="modal-title fw-bold">Create Role Profile</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body d-grid gap-3">
+          <div class="alert alert-info mb-0">
+            Choose the department and personnel position first. You can save a default permission profile even before anyone is assigned to that role.
+          </div>
+
+          <div>
+            <label for="personnelRoleAccessCreateDepartment" class="form-label small fw-bold mb-1">Department</label>
+            <select id="personnelRoleAccessCreateDepartment" class="form-select">
+              <option value="">Select department</option>
+            </select>
+          </div>
+
+          <div>
+            <label for="personnelRoleAccessCreatePosition" class="form-label small fw-bold mb-1">Position</label>
+            <select id="personnelRoleAccessCreatePosition" class="form-select">
+              <option value="">Select position</option>
+            </select>
+          </div>
+
+          <div class="small text-muted" id="personnelRoleAccessCreateHint">
+            Existing profiles can be reopened here. New profiles start with the current default permissions already checked.
+          </div>
+        </div>
+        <div class="modal-footer border-0">
+          <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button type="button" class="btn btn-primary" id="btnPersonnelRoleAccessCreateContinue">Continue</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
   <script>
     window.PERSONNEL_ROLE_ACCESS_OPTIONS = {
-      apiUrl: "../PhpFiles/Admin-End/personnelRoleAccess.php",
+      apiUrl: <?= json_encode(appUrl('PhpFiles/Admin-End/personnelRoleAccess.php'), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?>,
       permissionCatalog: <?= json_encode($personnelRolePermissionCatalog, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?>
     };
   </script>
-  <script src="../JS-Script-Files/Admin-End/personnelRoleAccessScript.js?v=20260327-1"></script>
+  <script src="../JS-Script-Files/Admin-End/personnelRoleAccessScript.js?v=20260327-2"></script>
 </body>
 </html>
