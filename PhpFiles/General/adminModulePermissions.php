@@ -1554,25 +1554,144 @@ if (!function_exists('amp_force_expired_account_inactive')) {
     }
 }
 
+if (!function_exists('amp_get_oldest_active_superadmin_user_id')) {
+    function amp_get_oldest_active_superadmin_user_id(mysqli $conn): string
+    {
+        $activeId = amp_get_status_id_by_names($conn, 'UserAccount', ['Active']);
+        $inactiveId = amp_get_status_id_by_names($conn, 'UserAccount', ['Inactive', 'Revoked', 'Suspended', 'Disabled']);
+
+        $sql = "
+            SELECT user_id
+            FROM useraccountstbl
+            WHERE role_access = 'SuperAdmin'
+        ";
+        $params = [];
+        $types = '';
+
+        if ($activeId !== null) {
+            $sql .= " AND status_id_account = ?";
+            $types .= 'i';
+            $params[] = (int)$activeId;
+        } elseif ($inactiveId !== null) {
+            $sql .= " AND status_id_account <> ?";
+            $types .= 'i';
+            $params[] = (int)$inactiveId;
+        }
+
+        $sql .= "
+            ORDER BY
+                CASE WHEN account_created IS NULL THEN 1 ELSE 0 END ASC,
+                account_created ASC,
+                user_id ASC
+            LIMIT 1
+        ";
+
+        $stmt = $conn->prepare($sql);
+        if (!$stmt) {
+            return '';
+        }
+
+        if ($types !== '') {
+            $refs = [];
+            $refs[] = $types;
+            foreach ($params as $idx => $value) {
+                $refs[] = &$params[$idx];
+            }
+            call_user_func_array([$stmt, 'bind_param'], $refs);
+        }
+
+        $stmt->execute();
+        $row = $stmt->get_result()->fetch_assoc();
+        $stmt->close();
+
+        return trim((string)($row['user_id'] ?? ''));
+    }
+}
+
+if (!function_exists('amp_is_oldest_active_superadmin')) {
+    function amp_is_oldest_active_superadmin(mysqli $conn, string $userId): bool
+    {
+        $userId = trim($userId);
+        if ($userId === '') {
+            return false;
+        }
+
+        $oldestUserId = amp_get_oldest_active_superadmin_user_id($conn);
+        return $oldestUserId !== '' && strcasecmp($oldestUserId, $userId) === 0;
+    }
+}
+
+if (!function_exists('amp_get_superadmin_management_disabled_reason')) {
+    function amp_get_superadmin_management_disabled_reason(mysqli $conn, string $actorUserId, string $targetDisplayRole): string
+    {
+        if (amp_storage_role_to_display_role($targetDisplayRole) !== 'SuperAdmin') {
+            return '';
+        }
+
+        $actorUserId = trim($actorUserId);
+        if ($actorUserId === '') {
+            return 'Unable to verify the current SuperAdmin account.';
+        }
+
+        $oldestUserId = amp_get_oldest_active_superadmin_user_id($conn);
+        if ($oldestUserId === '') {
+            return 'Only the oldest active SuperAdmin account can manage SuperAdmin accounts, but none is currently eligible.';
+        }
+
+        if (strcasecmp($oldestUserId, $actorUserId) !== 0) {
+            return 'Only the oldest active SuperAdmin account can manage SuperAdmin accounts.';
+        }
+
+        return '';
+    }
+}
+
 if (!function_exists('amp_count_active_superadmins_excluding')) {
     function amp_count_active_superadmins_excluding(mysqli $conn, string $excludeUserId = ''): int
     {
+        $activeId = amp_get_status_id_by_names($conn, 'UserAccount', ['Active']);
         $inactiveId = amp_get_status_id_by_names($conn, 'UserAccount', ['Inactive', 'Revoked', 'Suspended', 'Disabled']);
         $sql = "
             SELECT COUNT(*) AS cnt
             FROM useraccountstbl
             WHERE role_access = 'SuperAdmin'
         ";
-        if ($inactiveId !== null) {
-            $sql .= " AND status_id_account <> " . (int)$inactiveId;
+        $params = [];
+        $types = '';
+
+        if ($activeId !== null) {
+            $sql .= " AND status_id_account = ?";
+            $types .= 'i';
+            $params[] = (int)$activeId;
+        } elseif ($inactiveId !== null) {
+            $sql .= " AND status_id_account <> ?";
+            $types .= 'i';
+            $params[] = (int)$inactiveId;
         }
         if ($excludeUserId !== '') {
-            $safe = $conn->real_escape_string($excludeUserId);
-            $sql .= " AND user_id <> '{$safe}'";
+            $sql .= " AND user_id <> ?";
+            $types .= 's';
+            $params[] = $excludeUserId;
         }
 
-        $res = $conn->query($sql);
-        $row = $res instanceof mysqli_result ? $res->fetch_assoc() : null;
+        $stmt = $conn->prepare($sql);
+        if (!$stmt) {
+            return 0;
+        }
+
+        if ($types !== '') {
+            $refs = [];
+            $refs[] = $types;
+            foreach ($params as $idx => $value) {
+                $refs[] = &$params[$idx];
+            }
+            call_user_func_array([$stmt, 'bind_param'], $refs);
+        }
+
+        $stmt->execute();
+        $row = $stmt->get_result()->fetch_assoc();
+        $stmt->close();
+
         return (int)($row['cnt'] ?? 0);
     }
 }

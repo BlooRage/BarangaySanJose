@@ -132,7 +132,7 @@ function currentStatusLabel(array $row, ?int $lockedStatusId): string
     return $statusName !== '' ? $statusName : ('Status #' . (string)($row['status_id_account'] ?? ''));
 }
 
-function currentLockability(array $row, string $actorUserId, ?int $activeStatusId, ?int $lockedStatusId): array
+function currentLockability(mysqli $conn, array $row, string $actorUserId, ?int $activeStatusId, ?int $lockedStatusId): array
 {
     $userId = (string)($row['user_id'] ?? '');
     if ($userId === '' || $actorUserId === '') {
@@ -140,6 +140,12 @@ function currentLockability(array $row, string $actorUserId, ?int $activeStatusI
     }
     if ($actorUserId === $userId) {
         return [false, 'You cannot change the lock state of your own account.'];
+    }
+
+    $targetDisplayRole = amp_storage_role_to_display_role((string)($row['account_role_access'] ?? $row['info_role_access'] ?? $row['role_access'] ?? ''));
+    $superadminManageReason = amp_get_superadmin_management_disabled_reason($conn, $actorUserId, $targetDisplayRole);
+    if ($superadminManageReason !== '') {
+        return [false, $superadminManageReason];
     }
 
     if (amp_get_protected_code($row) === 'IT_SUPERADMIN') {
@@ -206,7 +212,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
             $target['account_status'] = (string)($statusRow['account_status'] ?? '');
         }
 
-        [$canManage, $manageReason] = currentLockability($target, $actorUserId, $activeStatusId, $lockedStatusId);
+        [$canManage, $manageReason] = currentLockability($conn, $target, $actorUserId, $activeStatusId, $lockedStatusId);
         if (!$canManage) {
             throw new Exception($manageReason !== '' ? $manageReason : 'This account cannot be updated here.');
         }
@@ -486,7 +492,7 @@ try {
             'is_expired' => false,
         ];
 
-        [$canManageLock, $manageLockDisabledReason] = currentLockability($row, $actorUserId, $activeStatusId, $lockedStatusId);
+        [$canManageLock, $manageLockDisabledReason] = currentLockability($conn, $row, $actorUserId, $activeStatusId, $lockedStatusId);
 
         $rows[] = [
             'user_id' => (string)$row['user_id'],

@@ -4,6 +4,7 @@
   const permissionCatalog = Array.isArray(opts.permissionCatalog) ? opts.permissionCatalog : [];
   const apiUrl = String(opts.apiUrl || "../PhpFiles/Admin-End/officialsManagement.php");
   const managementMode = String(opts.managementMode || "official");
+  const isPersonnelManagement = managementMode === "personnel";
   const showLifecycleTabs = Boolean(opts.showLifecycleTabs ?? (managementMode !== "personnel"));
   const entitySingular = String(opts.entitySingular || "Official");
   const entityPluralLower = String(opts.entityPluralLower || "officials");
@@ -26,6 +27,11 @@
     canManageActions: false,
     pagination: { currentPage: 1, entriesPerPage: 20 },
     auto: { interval: null, inFlight: false },
+    profileModal: {
+      row: null,
+      detail: null,
+      busy: false,
+    },
     accessModal: {
       row: null,
       permissionMap: {},
@@ -52,6 +58,45 @@
   const approvalFilterSelect = el("officialsMgmtApprovalFilter");
   const btnFilterApply = el("btnOfficialsMgmtFilterApply");
   const btnFilterReset = el("btnOfficialsMgmtFilterReset");
+
+  const profileModalEl = el("modalOfficialsMgmtProfile");
+  const profileFormEl = el("formOfficialsMgmtProfile");
+  const profileOfficialIdInput = el("officialsMgmtProfileOfficialId");
+  const profileDisplayIdEl = el("officialsMgmtProfileDisplayId");
+  const profileFeedbackEl = el("officialsMgmtProfileFeedback");
+  const profileReadonlyNoticeEl = el("officialsMgmtProfileReadonlyNotice");
+  const profileSummaryNameEl = el("officialsMgmtProfileSummaryName");
+  const profileImageEl = el("officialsMgmtProfileImage");
+  const profileLastNameInput = el("officialsMgmtProfileLastName");
+  const profileFirstNameInput = el("officialsMgmtProfileFirstName");
+  const profileMiddleNameInput = el("officialsMgmtProfileMiddleName");
+  const profileSuffixInput = el("officialsMgmtProfileSuffix");
+  const profileBirthdateInput = el("officialsMgmtProfileBirthdate");
+  const profileSexSelect = el("officialsMgmtProfileSex");
+  const profileCivilStatusSelect = el("officialsMgmtProfileCivilStatus");
+  const profilePhoneInput = el("officialsMgmtProfilePhone");
+  const profileEmailInput = el("officialsMgmtProfileEmail");
+  const profileEmergencyNameInput = el("officialsMgmtProfileEmergencyName");
+  const profileEmergencyRelationshipInput = el("officialsMgmtProfileEmergencyRelationship");
+  const profileEmergencyPhoneInput = el("officialsMgmtProfileEmergencyPhone");
+  const profileEmergencyAddressInput = el("officialsMgmtProfileEmergencyAddress");
+  const profileAddressModeSelect = el("officialsMgmtProfileAddressMode");
+  const profileHouseNumberInput = el("officialsMgmtProfileHouseNumber");
+  const profileStreetNameInput = el("officialsMgmtProfileStreetName");
+  const profileBlockNumberInput = el("officialsMgmtProfileBlockNumber");
+  const profileLotNumberInput = el("officialsMgmtProfileLotNumber");
+  const profileSubdivisionInput = el("officialsMgmtProfileSubdivision");
+  const profileBarangayInput = el("officialsMgmtProfileBarangay");
+  const profileCityInput = el("officialsMgmtProfileCity");
+  const profileProvinceInput = el("officialsMgmtProfileProvince");
+  const profileDisplayRoleEl = el("officialsMgmtProfileDisplayRole");
+  const profilePositionEl = el("officialsMgmtProfilePosition");
+  const profileDepartmentEl = el("officialsMgmtProfileDepartment");
+  const profileAreaEl = el("officialsMgmtProfileArea");
+  const profileDateHiredEl = el("officialsMgmtProfileDateHired");
+  const profileEmploymentStatusEl = el("officialsMgmtProfileEmploymentStatus");
+  const profileAccountStatusEl = el("officialsMgmtProfileAccountStatus");
+  const profileSaveBtn = el("btnOfficialsMgmtProfileSave");
 
   const accessModalEl = el("modalOfficialsMgmtAccess");
   const accessOfficialIdInput = el("officialsMgmtAccessOfficialId");
@@ -107,6 +152,258 @@
     const parsed = new Date(`${value}T00:00:00`);
     if (Number.isNaN(parsed.getTime())) return value;
     return parsed.toLocaleDateString("en-PH", { year: "numeric", month: "short", day: "numeric" });
+  };
+
+  const formatPlainDate = (raw) => {
+    const value = String(raw || "").trim();
+    if (!value) return "—";
+    const parsed = new Date(`${value}T00:00:00`);
+    if (Number.isNaN(parsed.getTime())) return value;
+    return parsed.toLocaleDateString("en-PH", { year: "numeric", month: "short", day: "numeric" });
+  };
+
+  const setText = (target, value) => {
+    if (!target) return;
+    target.textContent = safe(value);
+  };
+
+  const clearProfileFeedback = () => {
+    if (!profileFeedbackEl) return;
+    profileFeedbackEl.className = "alert officials-profile-feedback d-none mb-3";
+    profileFeedbackEl.textContent = "";
+  };
+
+  const setProfileFeedback = (tone, message) => {
+    if (!profileFeedbackEl) return;
+    profileFeedbackEl.className = `alert alert-${tone} officials-profile-feedback mb-3`;
+    profileFeedbackEl.textContent = safe(message);
+  };
+
+  const toggleProfileAddressModeUI = () => {
+    if (!profileModalEl) return;
+    const mode = String(profileAddressModeSelect?.value || "street");
+    profileModalEl.querySelectorAll(".officials-profile-address-street").forEach((node) => {
+      node.classList.toggle("d-none", mode !== "street");
+    });
+    profileModalEl.querySelectorAll(".officials-profile-address-blocklot").forEach((node) => {
+      node.classList.toggle("d-none", mode !== "block_lot");
+    });
+  };
+
+  const setProfileFormDisabled = (disabled) => {
+    if (!profileFormEl) return;
+    const fieldsDisabled = !!disabled || state.profileModal.busy;
+    profileFormEl.classList.toggle("officials-profile-readonly", !!disabled);
+    profileFormEl.querySelectorAll("input, select, textarea").forEach((field) => {
+      if (field === profileOfficialIdInput) return;
+      field.disabled = fieldsDisabled;
+    });
+    if (profileSaveBtn) {
+      profileSaveBtn.disabled = !!disabled || state.profileModal.busy;
+      profileSaveBtn.classList.toggle("d-none", !!disabled);
+    }
+  };
+
+  const resetProfileModalState = () => {
+    state.profileModal.row = null;
+    state.profileModal.detail = null;
+    state.profileModal.busy = false;
+
+    if (profileFormEl) {
+      profileFormEl.reset();
+    }
+    if (profileOfficialIdInput) profileOfficialIdInput.value = "";
+    setText(profileDisplayIdEl, "—");
+    setText(profileSummaryNameEl, "Personnel profile");
+    if (profileImageEl) {
+      profileImageEl.src = "../Images/Profile-Placeholder.png";
+    }
+    [
+      profileDisplayRoleEl,
+      profilePositionEl,
+      profileDepartmentEl,
+      profileAreaEl,
+      profileDateHiredEl,
+      profileEmploymentStatusEl,
+      profileAccountStatusEl,
+    ].forEach((target) => setText(target, "—"));
+    clearProfileFeedback();
+    if (profileReadonlyNoticeEl) {
+      profileReadonlyNoticeEl.classList.add("d-none");
+      profileReadonlyNoticeEl.textContent = "";
+    }
+    if (profileAddressModeSelect) {
+      profileAddressModeSelect.value = "street";
+    }
+    toggleProfileAddressModeUI();
+    setProfileFormDisabled(false);
+  };
+
+  const populateProfileForm = (detail) => {
+    if (!detail) return;
+
+    state.profileModal.detail = detail;
+    if (profileOfficialIdInput) profileOfficialIdInput.value = detail.official_id || "";
+    setText(profileDisplayIdEl, detail.official_id ? `#${detail.official_id}` : "—");
+    setText(profileSummaryNameEl, detail.full_name || detail.user_id || "Personnel profile");
+    if (profileImageEl) {
+      profileImageEl.src = "../Images/Profile-Placeholder.png";
+    }
+
+    if (profileLastNameInput) profileLastNameInput.value = String(detail.lastname || "");
+    if (profileFirstNameInput) profileFirstNameInput.value = String(detail.firstname || "");
+    if (profileMiddleNameInput) profileMiddleNameInput.value = String(detail.middlename || "");
+    if (profileSuffixInput) profileSuffixInput.value = String(detail.suffix || "");
+    if (profileBirthdateInput) profileBirthdateInput.value = String(detail.birthdate || "");
+    if (profileSexSelect) profileSexSelect.value = String(detail.sex || "");
+    if (profileCivilStatusSelect) profileCivilStatusSelect.value = String(detail.civil_status || "");
+    if (profilePhoneInput) profilePhoneInput.value = String(detail.contact_number || "");
+    if (profileEmailInput) profileEmailInput.value = String(detail.email || "");
+    if (profileEmergencyNameInput) profileEmergencyNameInput.value = String(detail.emergency_contact_name || "");
+    if (profileEmergencyRelationshipInput) profileEmergencyRelationshipInput.value = String(detail.emergency_contact_relationship || "");
+    if (profileEmergencyPhoneInput) profileEmergencyPhoneInput.value = String(detail.emergency_contact_phone || "");
+    if (profileEmergencyAddressInput) profileEmergencyAddressInput.value = String(detail.emergency_contact_address || "");
+    if (profileAddressModeSelect) profileAddressModeSelect.value = String(detail.address_mode || "street");
+    if (profileHouseNumberInput) profileHouseNumberInput.value = String(detail.house_number || "");
+    if (profileStreetNameInput) profileStreetNameInput.value = String(detail.street_name || "");
+    if (profileBlockNumberInput) profileBlockNumberInput.value = String(detail.block_number || "");
+    if (profileLotNumberInput) profileLotNumberInput.value = String(detail.lot_number || "");
+    if (profileSubdivisionInput) profileSubdivisionInput.value = String(detail.subdivision || "");
+    if (profileBarangayInput) profileBarangayInput.value = String(detail.barangay || "");
+    if (profileCityInput) profileCityInput.value = String(detail.municipality_city || "");
+    if (profileProvinceInput) profileProvinceInput.value = String(detail.province || "");
+
+    setText(profileDisplayRoleEl, detail.display_role || "—");
+    setText(profilePositionEl, detail.position_access || "—");
+    setText(profileDepartmentEl, detail.department || "—");
+    setText(profileAreaEl, detail.area_number || "—");
+    setText(profileDateHiredEl, formatPlainDate(detail.date_hired));
+    setText(profileEmploymentStatusEl, detail.employment_status || "—");
+    setText(profileAccountStatusEl, detail.account_status || "—");
+
+    clearProfileFeedback();
+    toggleProfileAddressModeUI();
+
+    const canEdit = Boolean(detail.can_edit_profile);
+    if (profileReadonlyNoticeEl) {
+      if (canEdit) {
+        profileReadonlyNoticeEl.classList.add("d-none");
+        profileReadonlyNoticeEl.textContent = "";
+      } else {
+        profileReadonlyNoticeEl.classList.remove("d-none");
+        profileReadonlyNoticeEl.textContent = safe(detail.edit_profile_disabled_reason || "This personnel record is view-only.");
+      }
+    }
+
+    setProfileFormDisabled(!canEdit);
+  };
+
+  const fetchProfileDetail = async (officialId) => {
+    const params = new URLSearchParams();
+    params.set("fetch_official_profile", "1");
+    params.set("official_id", officialId);
+    params.set("mode", managementMode);
+
+    const res = await fetch(`${apiUrl}?${params.toString()}`, {
+      headers: { Accept: "application/json" },
+    });
+    const data = await res.json().catch(() => null);
+    if (!res.ok || !data?.success) {
+      throw new Error(data?.message || "Unable to load personnel profile.");
+    }
+    return data.data || null;
+  };
+
+  const openProfileModal = async (officialId) => {
+    if (!profileModalEl || !isPersonnelManagement) return;
+    const row = state.rowsRaw.find((entry) => String(entry.official_id) === String(officialId));
+    if (!row) return;
+    const requestedOfficialId = String(officialId);
+
+    state.profileModal.row = row;
+    state.profileModal.detail = null;
+    state.profileModal.busy = true;
+
+    if (profileOfficialIdInput) profileOfficialIdInput.value = row.official_id || "";
+    setText(profileDisplayIdEl, row.official_id ? `#${row.official_id}` : "—");
+    setText(profileSummaryNameEl, row.full_name || row.user_id || "Personnel profile");
+    clearProfileFeedback();
+    setProfileFeedback("info", "Loading personnel profile...");
+    setProfileFormDisabled(true);
+
+    bootstrap.Modal.getOrCreateInstance(profileModalEl).show();
+
+    try {
+      const detail = await fetchProfileDetail(requestedOfficialId);
+      if (String(profileOfficialIdInput?.value || "") !== requestedOfficialId) {
+        return;
+      }
+      if (!detail) {
+        throw new Error("Personnel profile is unavailable.");
+      }
+      populateProfileForm(detail);
+    } catch (error) {
+      if (String(profileOfficialIdInput?.value || "") !== requestedOfficialId) {
+        return;
+      }
+      bootstrap.Modal.getInstance(profileModalEl)?.hide();
+      window.alert(error?.message || "Unable to load personnel profile.");
+    } finally {
+      if (String(profileOfficialIdInput?.value || "") !== requestedOfficialId) {
+        return;
+      }
+      state.profileModal.busy = false;
+      const canEdit = Boolean(state.profileModal.detail?.can_edit_profile);
+      setProfileFormDisabled(!canEdit);
+      if (state.profileModal.detail) {
+        clearProfileFeedback();
+      }
+    }
+  };
+
+  const saveProfileInfo = async () => {
+    const officialId = String(profileOfficialIdInput?.value || "");
+    if (!officialId) {
+      throw new Error("Missing personnel record.");
+    }
+
+    const body = new FormData();
+    body.append("action", "update_profile_info");
+    body.append("official_id", officialId);
+    body.append("mode", managementMode);
+    body.append("lastname", String(profileLastNameInput?.value || "").trim());
+    body.append("firstname", String(profileFirstNameInput?.value || "").trim());
+    body.append("middlename", String(profileMiddleNameInput?.value || "").trim());
+    body.append("suffix", String(profileSuffixInput?.value || "").trim());
+    body.append("birthdate", String(profileBirthdateInput?.value || "").trim());
+    body.append("sex", String(profileSexSelect?.value || "").trim());
+    body.append("civil_status", String(profileCivilStatusSelect?.value || "").trim());
+    body.append("contact_number", String(profilePhoneInput?.value || "").trim());
+    body.append("email", String(profileEmailInput?.value || "").trim());
+    body.append("emergency_contact_name", String(profileEmergencyNameInput?.value || "").trim());
+    body.append("emergency_contact_relationship", String(profileEmergencyRelationshipInput?.value || "").trim());
+    body.append("emergency_contact_phone", String(profileEmergencyPhoneInput?.value || "").trim());
+    body.append("emergency_contact_address", String(profileEmergencyAddressInput?.value || "").trim());
+    body.append("address_mode", String(profileAddressModeSelect?.value || "street").trim());
+    body.append("house_number", String(profileHouseNumberInput?.value || "").trim());
+    body.append("street_name", String(profileStreetNameInput?.value || "").trim());
+    body.append("block_number", String(profileBlockNumberInput?.value || "").trim());
+    body.append("lot_number", String(profileLotNumberInput?.value || "").trim());
+    body.append("subdivision", String(profileSubdivisionInput?.value || "").trim());
+    body.append("barangay", String(profileBarangayInput?.value || "").trim());
+    body.append("municipality_city", String(profileCityInput?.value || "").trim());
+    body.append("province", String(profileProvinceInput?.value || "").trim());
+
+    const res = await fetch(apiUrl, {
+      method: "POST",
+      body,
+      headers: { Accept: "application/json" },
+    });
+    const data = await res.json().catch(() => null);
+    if (!res.ok || !data?.success) {
+      throw new Error(data?.message || "Unable to save personnel profile.");
+    }
+    return data;
   };
 
   const buildPermissionMetaMap = () => {
@@ -297,15 +594,7 @@
     addButton(">", Math.min(totalPages, state.pagination.currentPage + 1), state.pagination.currentPage >= totalPages, false);
   };
 
-  const actionButtonHtml = (row) => {
-    if (!state.canManageActions) {
-      return '<span class="text-muted small">SuperAdmin only</span>';
-    }
-
-    if (!row.can_edit_access) {
-      return '<span class="text-muted small">Protected Account</span>';
-    }
-
+  const managementDropdownHtml = (row) => {
     const id = escapeHtml(safe(row.official_id));
     const approvalState = String(row.profile_approval_state || "");
     const isRevoked = String(row.permission_state || "") === "Revoked";
@@ -340,6 +629,34 @@
         </ul>
       </div>
     `;
+  };
+
+  const actionButtonHtml = (row) => {
+    const profileButton = isPersonnelManagement
+      ? `<button type="button" class="btn btn-sm btn-outline-primary officials-action-btn" data-action="view_profile" data-official-id="${escapeHtml(safe(row.official_id))}">${row.can_edit_access ? "View / Edit" : "View"}</button>`
+      : "";
+
+    if (isPersonnelManagement) {
+      if (!state.canManageActions) {
+        return profileButton || '<span class="text-muted small">SuperAdmin only</span>';
+      }
+
+      if (!row.can_edit_access) {
+        return `<div class="d-flex flex-wrap gap-2">${profileButton}</div>`;
+      }
+
+      return `<div class="d-flex flex-wrap gap-2 align-items-center">${profileButton}${managementDropdownHtml(row)}</div>`;
+    }
+
+    if (!state.canManageActions) {
+      return '<span class="text-muted small">SuperAdmin only</span>';
+    }
+
+    if (!row.can_edit_access) {
+      return `<span class="text-muted small">${escapeHtml(String(row.edit_access_disabled_reason || "Protected account"))}</span>`;
+    }
+
+    return managementDropdownHtml(row);
   };
 
   const renderTable = () => {
@@ -797,7 +1114,7 @@
         notices.push(`${row.protected_label} account`);
       }
       if (!row.can_edit_access) {
-        notices.push("This account is locked from access changes by the current SuperAdmin.");
+        notices.push(String(row.edit_access_disabled_reason || "This account is locked from access changes by the current SuperAdmin."));
       } else if (row.protected_code === "IT_SUPERADMIN") {
         notices.push("Protected core admin modules stay enabled for this IT SuperAdmin account.");
       } else if (row.protected_code === "BARANGAY_CAPTAIN") {
@@ -826,6 +1143,12 @@
         const officialId = String(btn.getAttribute("data-official-id") || "");
         if (!action || !officialId) return;
 
+        if (action === "view_profile") {
+          openProfileModal(officialId).catch((error) => {
+            window.alert(error?.message || "Unable to load personnel profile.");
+          });
+          return;
+        }
         if (action === "manage_access") {
           openAccessModal(officialId);
           return;
@@ -1020,6 +1343,54 @@
     accessPermissionSearch?.addEventListener("input", () => {
       state.accessModal.search = accessPermissionSearch.value || "";
       renderAccessPermissionGroups();
+    });
+
+    profileAddressModeSelect?.addEventListener("change", toggleProfileAddressModeUI);
+
+    profileFormEl?.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      if (state.profileModal.busy) return;
+
+      const canEditProfile = Boolean(state.profileModal.detail?.can_edit_profile);
+      if (!canEditProfile) {
+        window.alert(state.profileModal.detail?.edit_profile_disabled_reason || "This personnel record is view-only.");
+        return;
+      }
+
+      try {
+        state.profileModal.busy = true;
+        clearProfileFeedback();
+        setProfileFeedback("info", "Saving personnel profile...");
+        setProfileFormDisabled(false);
+
+        const data = await saveProfileInfo();
+        if (data?.data) {
+          populateProfileForm(data.data);
+          setProfileFeedback("success", data.message || "Personnel profile updated successfully.");
+        }
+
+        const row = state.profileModal.row;
+        if (row && data?.data) {
+          state.profileModal.row = {
+            ...row,
+            full_name: data.data.full_name || row.full_name,
+            email: data.data.email || row.email,
+            phone_number: data.data.contact_number || row.phone_number,
+          };
+        }
+
+        await load();
+      } catch (error) {
+        setProfileFeedback("danger", error?.message || "Unable to save personnel profile.");
+      } finally {
+        state.profileModal.busy = false;
+        const canEditProfile = Boolean(state.profileModal.detail?.can_edit_profile);
+        setProfileFormDisabled(!canEditProfile);
+      }
+    });
+
+    profileModalEl?.addEventListener("hidden.bs.modal", () => {
+      resetProfileModalState();
     });
 
     accessSubmitBtn?.addEventListener("click", async () => {

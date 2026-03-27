@@ -166,6 +166,11 @@ function loadOfficialAccountOrFail(mysqli $conn, string $userId): array {
     return $row;
 }
 
+function superadminManagementDisabledReason(mysqli $conn, string $actorUserId, array $targetAccount): string {
+    $targetDisplayRole = rowDisplayRole((string)($targetAccount['account_role_access'] ?? $targetAccount['info_role_access'] ?? $targetAccount['role_access'] ?? ''));
+    return amp_get_superadmin_management_disabled_reason($conn, $actorUserId, $targetDisplayRole);
+}
+
 function ensureActorCanModifyTarget(string $actorUserId, string $actorProtectedCode, array $targetAccount): void {
     $targetProtectedCode = amp_get_protected_code($targetAccount);
     $targetUserId = (string)($targetAccount['user_id'] ?? '');
@@ -190,6 +195,236 @@ function replaceOfficialModulePermissions(mysqli $conn, string $officialId, stri
 function upsertOfficialAccessProfile(mysqli $conn, string $officialId, string $userId): void {
     amp_upsert_official_access_profile($conn, $officialId, $userId);
 }
+
+function officialsManagementEnsureProfileColumns(mysqli $conn): void {
+    $columnSql = [
+        'position_access' => "ALTER TABLE officialinformationtbl ADD COLUMN position_access VARCHAR(100) DEFAULT NULL AFTER role_access",
+        'area_number' => "ALTER TABLE officialinformationtbl ADD COLUMN area_number VARCHAR(50) NULL AFTER department",
+        'emergency_contact_name' => "ALTER TABLE officialinformationtbl ADD COLUMN emergency_contact_name VARCHAR(255) NULL AFTER email",
+        'emergency_contact_relationship' => "ALTER TABLE officialinformationtbl ADD COLUMN emergency_contact_relationship VARCHAR(255) NULL AFTER emergency_contact_name",
+        'emergency_contact_phone' => "ALTER TABLE officialinformationtbl ADD COLUMN emergency_contact_phone VARCHAR(255) NULL AFTER emergency_contact_relationship",
+        'emergency_contact_address' => "ALTER TABLE officialinformationtbl ADD COLUMN emergency_contact_address VARCHAR(512) NULL AFTER emergency_contact_phone",
+        'house_number' => "ALTER TABLE officialinformationtbl ADD COLUMN house_number VARCHAR(255) NULL AFTER emergency_contact_address",
+        'street_name' => "ALTER TABLE officialinformationtbl ADD COLUMN street_name VARCHAR(255) NULL AFTER house_number",
+        'subdivision' => "ALTER TABLE officialinformationtbl ADD COLUMN subdivision VARCHAR(255) NULL AFTER street_name",
+        'address_mode' => "ALTER TABLE officialinformationtbl ADD COLUMN address_mode VARCHAR(255) NULL AFTER subdivision",
+        'block_number' => "ALTER TABLE officialinformationtbl ADD COLUMN block_number VARCHAR(255) NULL AFTER address_mode",
+        'lot_number' => "ALTER TABLE officialinformationtbl ADD COLUMN lot_number VARCHAR(255) NULL AFTER block_number",
+        'barangay' => "ALTER TABLE officialinformationtbl ADD COLUMN barangay VARCHAR(255) NULL AFTER lot_number",
+        'municipality_city' => "ALTER TABLE officialinformationtbl ADD COLUMN municipality_city VARCHAR(255) NULL AFTER barangay",
+        'province' => "ALTER TABLE officialinformationtbl ADD COLUMN province VARCHAR(255) NULL AFTER municipality_city",
+    ];
+
+    foreach ($columnSql as $column => $sql) {
+        if (!amp_column_exists($conn, 'officialinformationtbl', $column)) {
+            $conn->query($sql);
+        }
+    }
+}
+
+function officialsManagementNormalizePhone10(string $rawPhone): string {
+    $digits = preg_replace('/\D+/', '', $rawPhone);
+    if (strlen($digits) === 11 && str_starts_with($digits, '0')) {
+        $digits = substr($digits, 1);
+    }
+    if (strlen($digits) === 12 && str_starts_with($digits, '63')) {
+        $digits = substr($digits, 2);
+    }
+    return substr($digits, 0, 10);
+}
+
+function officialsManagementFormatPhoneForInput(string $rawPhone): string {
+    $digits = preg_replace('/\D+/', '', $rawPhone);
+    if (strlen($digits) === 10) {
+        return '0' . $digits;
+    }
+    if (strlen($digits) === 11 && str_starts_with($digits, '0')) {
+        return $digits;
+    }
+    if (strlen($digits) === 12 && str_starts_with($digits, '63')) {
+        return '0' . substr($digits, 2);
+    }
+    return trim($rawPhone);
+}
+
+function officialsManagementIsValidDate(string $date): bool {
+    if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $date)) {
+        return false;
+    }
+    $dt = DateTimeImmutable::createFromFormat('Y-m-d', $date);
+    return $dt instanceof DateTimeImmutable && $dt->format('Y-m-d') === $date;
+}
+
+function officialsManagementBuildFullName(array $row): string {
+    return trim(implode(' ', array_values(array_filter([
+        trim((string)($row['firstname'] ?? '')),
+        trim((string)($row['middlename'] ?? '')),
+        trim((string)($row['lastname'] ?? '')),
+        trim((string)($row['suffix'] ?? '')),
+    ], static fn ($value): bool => $value !== ''))));
+}
+
+function officialsManagementAuditProfileSummary(array $row): string {
+    $name = officialsManagementBuildFullName($row);
+    $phone = officialsManagementFormatPhoneForInput((string)($row['contact_number'] ?? ''));
+    $email = trim((string)($row['email'] ?? ''));
+
+    return trim(implode(' / ', array_values(array_filter([
+        $name,
+        $phone,
+        $email,
+    ], static fn ($value): bool => trim((string)$value) !== ''))));
+}
+
+function officialsManagementAssertContactAvailable(mysqli $conn, string $email, string $phone10, string $excludeUserId = ''): void {
+    $prepared = pii_prepare_useraccount_contacts($email, $phone10);
+
+    $clauses = [];
+    $params = [];
+    $types = '';
+
+    if (!empty($prepared['email_lookup_hash'])) {
+        $clauses[] = 'email_lookup_hash = ?';
+        $params[] = $prepared['email_lookup_hash'];
+        $types .= 's';
+    }
+    if (!empty($prepared['phone_lookup_hash'])) {
+        $clauses[] = 'phone_lookup_hash = ?';
+        $params[] = $prepared['phone_lookup_hash'];
+        $types .= 's';
+    }
+
+    if (!$clauses) {
+        return;
+    }
+
+    $sql = 'SELECT user_id FROM useraccountstbl WHERE (' . implode(' OR ', $clauses) . ')';
+    if ($excludeUserId !== '') {
+        $sql .= ' AND user_id <> ?';
+        $params[] = $excludeUserId;
+        $types .= 's';
+    }
+    $sql .= ' LIMIT 1';
+
+    $stmt = $conn->prepare($sql);
+    if (!$stmt) {
+        throw new Exception('Unable to validate contact information.');
+    }
+
+    $refs = [$types];
+    foreach ($params as $idx => $value) {
+        $refs[] = &$params[$idx];
+    }
+    call_user_func_array([$stmt, 'bind_param'], $refs);
+    $stmt->execute();
+    $row = $stmt->get_result()->fetch_assoc();
+    $stmt->close();
+
+    if ($row) {
+        throw new Exception('Email address or mobile number is already assigned to another account.');
+    }
+}
+
+function officialsManagementProfileEditability(mysqli $conn, string $actorUserId, string $actorProtectedCode, array $targetAccount): array {
+    try {
+        ensureActorCanModifyTarget($actorUserId, $actorProtectedCode, $targetAccount);
+    } catch (Exception $e) {
+        return [false, $e->getMessage()];
+    }
+
+    $superadminManageReason = superadminManagementDisabledReason($conn, $actorUserId, $targetAccount);
+    if ($superadminManageReason !== '') {
+        return [false, $superadminManageReason];
+    }
+
+    return [true, ''];
+}
+
+function officialsManagementLoadProfileDetailOrFail(mysqli $conn, string $officialId): array {
+    $stmt = $conn->prepare("
+        SELECT
+            oi.official_id,
+            oi.user_id,
+            oi.lastname,
+            oi.firstname,
+            oi.middlename,
+            oi.suffix,
+            oi.birthdate,
+            oi.sex,
+            oi.civil_status,
+            oi.contact_number,
+            oi.email,
+            oi.department,
+            oi.position_access,
+            oi.area_number,
+            oi.date_hired,
+            oi.emergency_contact_name,
+            oi.emergency_contact_relationship,
+            oi.emergency_contact_phone,
+            oi.emergency_contact_address,
+            oi.house_number,
+            oi.street_name,
+            oi.subdivision,
+            oi.address_mode,
+            oi.block_number,
+            oi.lot_number,
+            oi.barangay,
+            oi.municipality_city,
+            oi.province,
+            ua.phone_number AS account_phone_number,
+            ua.email AS account_email,
+            ua.role_access AS account_role_access,
+            COALESCE(sa.status_name, CONCAT('Status #', ua.status_id_account)) AS account_status,
+            COALESCE(se.status_name, CONCAT('Status #', oi.status_id_employment)) AS employment_status
+        FROM officialinformationtbl oi
+        INNER JOIN useraccountstbl ua
+            ON ua.user_id COLLATE utf8mb4_general_ci = oi.user_id COLLATE utf8mb4_general_ci
+        LEFT JOIN statuslookuptbl sa ON sa.status_id = ua.status_id_account
+        LEFT JOIN statuslookuptbl se ON se.status_id = oi.status_id_employment
+        WHERE oi.official_id = ?
+        LIMIT 1
+    ");
+    if (!$stmt) {
+        throw new Exception('Failed to load personnel profile.');
+    }
+
+    $stmt->bind_param('s', $officialId);
+    $stmt->execute();
+    $row = $stmt->get_result()->fetch_assoc();
+    $stmt->close();
+
+    if (!$row) {
+        throw new Exception('Personnel profile not found.');
+    }
+
+    $row = pii_decrypt_official_row($row) ?? $row;
+    $row = pii_decrypt_assoc($row, ['account_phone_number', 'account_email']);
+
+    $contactNumber = trim((string)($row['contact_number'] ?? ''));
+    $accountPhone = trim((string)($row['account_phone_number'] ?? ''));
+    $email = trim((string)($row['email'] ?? ''));
+    $accountEmail = trim((string)($row['account_email'] ?? ''));
+
+    if ($contactNumber === '') {
+        $contactNumber = $accountPhone;
+    }
+    if ($email === '') {
+        $email = $accountEmail;
+    }
+
+    $row['contact_number'] = officialsManagementFormatPhoneForInput($contactNumber);
+    $row['email'] = $email;
+    $row['emergency_contact_phone'] = officialsManagementFormatPhoneForInput((string)($row['emergency_contact_phone'] ?? ''));
+    $row['address_mode'] = in_array(strtolower(trim((string)($row['address_mode'] ?? ''))), ['street', 'block_lot'], true)
+        ? strtolower(trim((string)($row['address_mode'] ?? '')))
+        : 'street';
+    $row['display_role'] = rowDisplayRole((string)($row['account_role_access'] ?? ''));
+    $row['full_name'] = officialsManagementBuildFullName($row);
+
+    return $row;
+}
+
+officialsManagementEnsureProfileColumns($conn);
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
     try {
@@ -255,10 +490,276 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
             throw new Exception('This record is not available in Official Management.');
         }
         $targetProtectedCode = amp_get_protected_code($targetAccount);
-        $targetDisplayRole = rowDisplayRole((string)($targetAccount['account_role_access'] ?? ''));
+        $targetDisplayRole = rowDisplayRole((string)($targetAccount['account_role_access'] ?? $targetAccount['info_role_access'] ?? $targetAccount['role_access'] ?? ''));
         $oldPermissionMap = amp_get_effective_permission_keys_for_row($conn, $targetAccount);
         $oldPermissionSummary = officialsPermissionSummary($oldPermissionMap);
         ensureActorCanModifyTarget($actorUserId, $actorProtectedCode, $targetAccount);
+        $superadminManageReason = superadminManagementDisabledReason($conn, $actorUserId, $targetAccount);
+        if ($superadminManageReason !== '') {
+            throw new Exception($superadminManageReason);
+        }
+
+        if ($action === 'update_profile_info') {
+            if ($requestedMode !== 'personnel') {
+                throw new Exception('Profile editing is available in Personnel Tracker only.');
+            }
+
+            $targetDetail = officialsManagementLoadProfileDetailOrFail($conn, $officialId);
+
+            $lastName = trim((string)($_POST['lastname'] ?? ''));
+            $firstName = trim((string)($_POST['firstname'] ?? ''));
+            $middleName = trim((string)($_POST['middlename'] ?? ''));
+            $suffix = trim((string)($_POST['suffix'] ?? ''));
+            $birthdate = trim((string)($_POST['birthdate'] ?? ''));
+            $sex = trim((string)($_POST['sex'] ?? ''));
+            $civilStatus = trim((string)($_POST['civil_status'] ?? ''));
+            $contactNumberRaw = trim((string)($_POST['contact_number'] ?? ''));
+            $email = strtolower(trim((string)($_POST['email'] ?? '')));
+            $emergencyName = trim((string)($_POST['emergency_contact_name'] ?? ''));
+            $emergencyRelationship = trim((string)($_POST['emergency_contact_relationship'] ?? ''));
+            $emergencyPhoneRaw = trim((string)($_POST['emergency_contact_phone'] ?? ''));
+            $emergencyAddress = trim((string)($_POST['emergency_contact_address'] ?? ''));
+            $addressMode = strtolower(trim((string)($_POST['address_mode'] ?? 'street')));
+            $houseNumber = trim((string)($_POST['house_number'] ?? ''));
+            $streetName = trim((string)($_POST['street_name'] ?? ''));
+            $subdivision = trim((string)($_POST['subdivision'] ?? ''));
+            $blockNumber = trim((string)($_POST['block_number'] ?? ''));
+            $lotNumber = trim((string)($_POST['lot_number'] ?? ''));
+            $barangay = trim((string)($_POST['barangay'] ?? ''));
+            $municipalityCity = trim((string)($_POST['municipality_city'] ?? ''));
+            $province = trim((string)($_POST['province'] ?? ''));
+
+            if ($lastName === '' || $firstName === '' || $birthdate === '' || $sex === '' || $civilStatus === '' || $contactNumberRaw === '' || $email === '') {
+                throw new Exception('Complete the required personal and contact fields.');
+            }
+
+            $namePattern = '/^[A-Za-z][A-Za-z .\'-]{0,99}$/';
+            if (!preg_match($namePattern, $lastName) || !preg_match($namePattern, $firstName)) {
+                throw new Exception('First name and last name contain invalid characters.');
+            }
+            if ($middleName !== '' && !preg_match($namePattern, $middleName)) {
+                throw new Exception('Middle name contains invalid characters.');
+            }
+            if ($suffix !== '' && !preg_match('/^[A-Za-z0-9 .\'-]{1,20}$/', $suffix)) {
+                throw new Exception('Suffix contains invalid characters.');
+            }
+            if (!officialsManagementIsValidDate($birthdate)) {
+                throw new Exception('Birthdate must be a valid date.');
+            }
+            $birthdateObj = new DateTimeImmutable($birthdate);
+            if ($birthdateObj > new DateTimeImmutable('today')) {
+                throw new Exception('Birthdate cannot be in the future.');
+            }
+            if (!in_array($sex, ['Male', 'Female', 'Other'], true)) {
+                throw new Exception('Select a valid sex value.');
+            }
+            if (!in_array($civilStatus, ['Single', 'Married', 'Widowed', 'Separated'], true)) {
+                throw new Exception('Select a valid civil status.');
+            }
+
+            $contactNumber = officialsManagementNormalizePhone10($contactNumberRaw);
+            if (!preg_match('/^9\d{9}$/', $contactNumber)) {
+                throw new Exception('Mobile number must use the format 09XXXXXXXXX.');
+            }
+            if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+                throw new Exception('Email address is invalid.');
+            }
+
+            $hasEmergencyData = $emergencyName !== '' || $emergencyRelationship !== '' || $emergencyPhoneRaw !== '' || $emergencyAddress !== '';
+            $emergencyPhone = '';
+            if ($hasEmergencyData) {
+                if ($emergencyName === '' || $emergencyRelationship === '' || $emergencyPhoneRaw === '' || $emergencyAddress === '') {
+                    throw new Exception('Complete all emergency contact fields or leave them all blank.');
+                }
+                $emergencyPhone = officialsManagementNormalizePhone10($emergencyPhoneRaw);
+                if (!preg_match('/^9\d{9}$/', $emergencyPhone)) {
+                    throw new Exception('Emergency contact number must use the format 09XXXXXXXXX.');
+                }
+            }
+
+            if (!in_array($addressMode, ['street', 'block_lot'], true)) {
+                $addressMode = 'street';
+            }
+
+            $hasAddressData = $houseNumber !== '' || $streetName !== '' || $subdivision !== '' || $blockNumber !== '' || $lotNumber !== '' || $barangay !== '' || $municipalityCity !== '' || $province !== '';
+            if ($hasAddressData) {
+                if ($barangay === '' || $municipalityCity === '' || $province === '') {
+                    throw new Exception('Barangay, municipality/city, and province are required when saving an address.');
+                }
+                if ($addressMode === 'street' && ($houseNumber === '' || $streetName === '')) {
+                    throw new Exception('House number and street name are required for street-mode addresses.');
+                }
+                if ($addressMode === 'block_lot' && ($blockNumber === '' || $lotNumber === '')) {
+                    throw new Exception('Block number and lot number are required for block/lot addresses.');
+                }
+            } else {
+                $addressMode = 'street';
+            }
+
+            if ($addressMode === 'street') {
+                $blockNumber = '';
+                $lotNumber = '';
+            } else {
+                $houseNumber = '';
+                $streetName = '';
+            }
+
+            officialsManagementAssertContactAvailable($conn, $email, $contactNumber, $userId);
+            $preparedContacts = pii_prepare_useraccount_contacts($email, $contactNumber);
+            $encryptedOfficial = pii_encrypt_field_map([
+                'lastname' => $lastName,
+                'firstname' => $firstName,
+                'middlename' => $middleName,
+                'suffix' => $suffix,
+                'birthdate' => $birthdate,
+                'sex' => $sex,
+                'civil_status' => $civilStatus,
+                'contact_number' => $contactNumber,
+                'email' => $email,
+                'emergency_contact_name' => $emergencyName,
+                'emergency_contact_relationship' => $emergencyRelationship,
+                'emergency_contact_phone' => $emergencyPhone,
+                'emergency_contact_address' => $emergencyAddress,
+                'house_number' => $houseNumber,
+                'street_name' => $streetName,
+                'address_mode' => $hasAddressData ? $addressMode : '',
+                'block_number' => $blockNumber,
+                'lot_number' => $lotNumber,
+                'barangay' => $barangay,
+                'municipality_city' => $municipalityCity,
+                'province' => $province,
+            ]);
+
+            $oldSummary = officialsManagementAuditProfileSummary($targetDetail);
+            $newSummary = officialsManagementAuditProfileSummary([
+                'firstname' => $firstName,
+                'middlename' => $middleName,
+                'lastname' => $lastName,
+                'suffix' => $suffix,
+                'contact_number' => $contactNumber,
+                'email' => $email,
+            ]);
+
+            $conn->begin_transaction();
+            try {
+                $updateAccount = $conn->prepare("
+                    UPDATE useraccountstbl
+                    SET email = ?,
+                        email_lookup_hash = ?,
+                        phone_number = ?,
+                        phone_lookup_hash = ?,
+                        updated_at = NOW()
+                    WHERE user_id = ?
+                    LIMIT 1
+                ");
+                if (!$updateAccount) {
+                    throw new Exception('Failed to prepare user account update.');
+                }
+                $updateAccount->bind_param(
+                    'sssss',
+                    $preparedContacts['email'],
+                    $preparedContacts['email_lookup_hash'],
+                    $preparedContacts['phone_number'],
+                    $preparedContacts['phone_lookup_hash'],
+                    $userId
+                );
+                $updateAccount->execute();
+                $updateAccount->close();
+
+                $updateOfficial = $conn->prepare("
+                    UPDATE officialinformationtbl
+                    SET lastname = ?,
+                        firstname = ?,
+                        middlename = ?,
+                        suffix = ?,
+                        birthdate = ?,
+                        sex = ?,
+                        civil_status = ?,
+                        contact_number = ?,
+                        email = ?,
+                        emergency_contact_name = ?,
+                        emergency_contact_relationship = ?,
+                        emergency_contact_phone = ?,
+                        emergency_contact_address = ?,
+                        house_number = ?,
+                        street_name = ?,
+                        subdivision = ?,
+                        address_mode = ?,
+                        block_number = ?,
+                        lot_number = ?,
+                        barangay = ?,
+                        municipality_city = ?,
+                        province = ?,
+                        last_updated = CURRENT_TIMESTAMP
+                    WHERE official_id = ?
+                    LIMIT 1
+                ");
+                if (!$updateOfficial) {
+                    throw new Exception('Failed to prepare personnel profile update.');
+                }
+                $updateOfficial->bind_param(
+                    'sssssssssssssssssssssss',
+                    $encryptedOfficial['lastname'],
+                    $encryptedOfficial['firstname'],
+                    $encryptedOfficial['middlename'],
+                    $encryptedOfficial['suffix'],
+                    $encryptedOfficial['birthdate'],
+                    $encryptedOfficial['sex'],
+                    $encryptedOfficial['civil_status'],
+                    $encryptedOfficial['contact_number'],
+                    $encryptedOfficial['email'],
+                    $encryptedOfficial['emergency_contact_name'],
+                    $encryptedOfficial['emergency_contact_relationship'],
+                    $encryptedOfficial['emergency_contact_phone'],
+                    $encryptedOfficial['emergency_contact_address'],
+                    $encryptedOfficial['house_number'],
+                    $encryptedOfficial['street_name'],
+                    $subdivision,
+                    $encryptedOfficial['address_mode'],
+                    $encryptedOfficial['block_number'],
+                    $encryptedOfficial['lot_number'],
+                    $encryptedOfficial['barangay'],
+                    $encryptedOfficial['municipality_city'],
+                    $encryptedOfficial['province'],
+                    $officialId
+                );
+                $updateOfficial->execute();
+                $updateOfficial->close();
+
+                $conn->commit();
+            } catch (Throwable $e) {
+                $conn->rollback();
+                throw $e;
+            }
+
+            insertUnifiedAuditLog(
+                $conn,
+                $actorUserId,
+                $actorRole,
+                $auditModuleName,
+                'OfficialProfile',
+                $officialId,
+                'OFFICIAL_PROFILE_INFO_UPDATE',
+                'profile_information',
+                $oldSummary,
+                $newSummary,
+                'Updated personnel profile information.',
+                null
+            );
+
+            $updatedProfile = officialsManagementLoadProfileDetailOrFail($conn, $officialId);
+            [$canEditProfile, $editProfileDisabledReason] = officialsManagementProfileEditability($conn, $actorUserId, $actorProtectedCode, $targetAccount);
+
+            echo json_encode([
+                'success' => true,
+                'message' => 'Personnel profile updated successfully.',
+                'data' => array_merge($updatedProfile, [
+                    'can_edit_profile' => $canEditProfile,
+                    'edit_profile_disabled_reason' => $editProfileDisabledReason,
+                ]),
+            ]);
+            exit;
+        }
 
         $nextStatusId = null;
         $auditAction = '';
@@ -666,6 +1167,46 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
     }
 }
 
+if ($_SERVER['REQUEST_METHOD'] === 'GET' && isset($_GET['fetch_official_profile'])) {
+    try {
+        $officialId = trim((string)($_GET['official_id'] ?? ''));
+        if ($officialId === '') {
+            throw new Exception('Official record is required.');
+        }
+
+        $requestedMode = requestedManagementMode((string)($_GET['mode'] ?? 'official'));
+        if ($requestedMode !== 'personnel') {
+            throw new Exception('Profile viewing is available in Personnel Tracker only.');
+        }
+
+        $actorUserId = (string)($_SESSION['user_id'] ?? '');
+        $actorAccount = $actorUserId !== '' ? amp_get_official_account_by_user_id($conn, $actorUserId) : null;
+        $actorProtectedCode = $actorAccount ? amp_get_protected_code($actorAccount) : '';
+
+        $profile = officialsManagementLoadProfileDetailOrFail($conn, $officialId);
+        $targetAccount = loadOfficialAccountOrFail($conn, (string)($profile['user_id'] ?? ''));
+        $targetAudience = managementAudienceFromRow($targetAccount);
+        if ($targetAudience !== 'personnel') {
+            throw new Exception('This record is not available in Personnel Tracker.');
+        }
+
+        [$canEditProfile, $editProfileDisabledReason] = officialsManagementProfileEditability($conn, $actorUserId, $actorProtectedCode, $targetAccount);
+
+        echo json_encode([
+            'success' => true,
+            'data' => array_merge($profile, [
+                'can_edit_profile' => $canEditProfile,
+                'edit_profile_disabled_reason' => $editProfileDisabledReason,
+            ]),
+        ]);
+        exit;
+    } catch (Exception $e) {
+        http_response_code(400);
+        echo json_encode(['success' => false, 'message' => $e->getMessage()]);
+        exit;
+    }
+}
+
 if (!isset($_GET['fetch_officials_management'])) {
     http_response_code(404);
     echo json_encode(['success' => false, 'message' => 'Not found']);
@@ -791,10 +1332,15 @@ try {
         );
 
         $permissionMap = amp_get_effective_permission_keys_for_row($conn, $row);
-        $canEditAccess = !(
-            $protectedCode === 'BARANGAY_CAPTAIN'
-            || ($protectedCode === 'IT_SUPERADMIN' && $actorUserId !== (string)($row['user_id'] ?? ''))
-        );
+        $editAccessDisabledReason = '';
+        if ($protectedCode === 'BARANGAY_CAPTAIN') {
+            $editAccessDisabledReason = 'The Barangay Captain account is managed through official transitions.';
+        } elseif ($protectedCode === 'IT_SUPERADMIN' && $actorUserId !== (string)($row['user_id'] ?? '')) {
+            $editAccessDisabledReason = 'The protected IT SuperAdmin account cannot be modified by other users.';
+        } else {
+            $editAccessDisabledReason = amp_get_superadmin_management_disabled_reason($conn, $actorUserId, $displayRole);
+        }
+        $canEditAccess = ($editAccessDisabledReason === '');
 
         $rows[] = [
             'official_id' => (string)($row['official_id'] ?? ''),
@@ -820,6 +1366,7 @@ try {
             'permission_keys' => array_keys($permissionMap),
             'locked_permission_keys' => $protectedCode === 'IT_SUPERADMIN' ? amp_get_it_superadmin_locked_permission_keys() : [],
             'can_edit_access' => $canEditAccess,
+            'edit_access_disabled_reason' => $editAccessDisabledReason,
         ];
     }
     $stmt->close();

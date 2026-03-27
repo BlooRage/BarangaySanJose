@@ -313,6 +313,30 @@ $officialsMgmtPermissionCatalog = amp_get_permission_catalog();
     .officials-access-search {
       max-width: 280px;
     }
+    .officials-profile-avatar {
+      width: clamp(120px, 18vw, 170px);
+      height: clamp(120px, 18vw, 170px);
+      object-fit: cover;
+    }
+    .officials-profile-feedback:empty {
+      display: none;
+    }
+    .officials-profile-feedback.d-none {
+      display: none !important;
+    }
+    .officials-profile-readonly .form-control,
+    .officials-profile-readonly .form-select,
+    .officials-profile-readonly textarea {
+      background-color: #f8f9fa;
+    }
+    .officials-profile-system-note {
+      border: 1px dashed #d8c9b6;
+      border-radius: 12px;
+      padding: 12px 14px;
+      background: #fffaf4;
+      color: #6b5a45;
+      font-size: 0.9rem;
+    }
   </style>
 </head>
 <body>
@@ -622,6 +646,234 @@ $officialsMgmtPermissionCatalog = amp_get_permission_catalog();
     </div>
   </div>
 
+  <?php if ($isPersonnelManagement): ?>
+  <div class="modal fade" id="modalOfficialsMgmtProfile" tabindex="-1" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
+    <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable" style="max-width: 1500px; width: 75vw;">
+      <form class="modal-content border-0 rounded-2 p-4" id="formOfficialsMgmtProfile">
+        <div class="modal-header border-0">
+          <h5 class="modal-title">Personnel Details: <span id="officialsMgmtProfileDisplayId" class="text-warning"></span></h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+
+        <div class="modal-body">
+          <input type="hidden" id="officialsMgmtProfileOfficialId">
+          <div id="officialsMgmtProfileFeedback" class="alert officials-profile-feedback d-none mb-3" role="alert"></div>
+          <div id="officialsMgmtProfileReadonlyNotice" class="alert alert-warning d-none mb-3" role="alert"></div>
+
+          <div class="tracker-profile-view">
+            <div class="p-3 rounded-3 mb-3 border-0 bg-white tracker-form-section">
+              <div class="d-flex align-items-center justify-content-between mb-2">
+                <h5 class="fw-bold mb-0 tracker-form-section-title">Personal Information</h5>
+              </div>
+
+              <div class="row g-3 align-items-center">
+                <div class="col-md-3 d-flex flex-column justify-content-center align-items-center">
+                  <img
+                    id="officialsMgmtProfileImage"
+                    src="../Images/Profile-Placeholder.png"
+                    alt="Personnel profile image"
+                    class="img-fluid rounded-circle officials-profile-avatar"
+                  >
+                  <div class="small text-muted mt-3 text-center" id="officialsMgmtProfileSummaryName">Personnel profile</div>
+                </div>
+
+                <div class="col-md-9">
+                  <div class="row g-3">
+                    <div class="col-md-6 col-lg-3">
+                      <label for="officialsMgmtProfileLastName" class="form-label small fw-bold mb-1">Last Name</label>
+                      <input type="text" class="form-control" id="officialsMgmtProfileLastName" maxlength="100" required>
+                    </div>
+                    <div class="col-md-6 col-lg-3">
+                      <label for="officialsMgmtProfileFirstName" class="form-label small fw-bold mb-1">First Name</label>
+                      <input type="text" class="form-control" id="officialsMgmtProfileFirstName" maxlength="100" required>
+                    </div>
+                    <div class="col-md-6 col-lg-3">
+                      <label for="officialsMgmtProfileMiddleName" class="form-label small fw-bold mb-1">Middle Name</label>
+                      <input type="text" class="form-control" id="officialsMgmtProfileMiddleName" maxlength="100">
+                    </div>
+                    <div class="col-md-6 col-lg-3">
+                      <label for="officialsMgmtProfileSuffix" class="form-label small fw-bold mb-1">Suffix</label>
+                      <input type="text" class="form-control" id="officialsMgmtProfileSuffix" maxlength="20">
+                    </div>
+
+                    <div class="col-md-4">
+                      <label for="officialsMgmtProfileBirthdate" class="form-label small fw-bold mb-1">Birthdate</label>
+                      <input type="date" class="form-control" id="officialsMgmtProfileBirthdate" required>
+                    </div>
+                    <div class="col-md-4">
+                      <label for="officialsMgmtProfileSex" class="form-label small fw-bold mb-1">Sex</label>
+                      <select class="form-select" id="officialsMgmtProfileSex" required>
+                        <option value="">Select sex</option>
+                        <option value="Male">Male</option>
+                        <option value="Female">Female</option>
+                        <option value="Other">Other</option>
+                      </select>
+                    </div>
+                    <div class="col-md-4">
+                      <label for="officialsMgmtProfileCivilStatus" class="form-label small fw-bold mb-1">Civil Status</label>
+                      <select class="form-select" id="officialsMgmtProfileCivilStatus" required>
+                        <option value="">Select civil status</option>
+                        <option value="Single">Single</option>
+                        <option value="Married">Married</option>
+                        <option value="Widowed">Widowed</option>
+                        <option value="Separated">Separated</option>
+                      </select>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <hr class="my-2">
+
+            <div class="p-3 rounded-3 mb-3 border-0 bg-white tracker-form-section">
+              <div class="d-flex align-items-center justify-content-between mb-2">
+                <h5 class="fw-bold mb-0 tracker-form-section-title">Contact Information</h5>
+              </div>
+
+              <div class="row g-3">
+                <div class="col-md-6">
+                  <label for="officialsMgmtProfilePhone" class="form-label small fw-bold mb-1">Mobile Number</label>
+                  <input type="text" class="form-control" id="officialsMgmtProfilePhone" maxlength="13" placeholder="09XXXXXXXXX" required>
+                </div>
+                <div class="col-md-6">
+                  <label for="officialsMgmtProfileEmail" class="form-label small fw-bold mb-1">Email Address</label>
+                  <input type="email" class="form-control" id="officialsMgmtProfileEmail" maxlength="255" required>
+                </div>
+              </div>
+            </div>
+
+            <hr class="my-2">
+
+            <div class="p-3 rounded-3 mb-3 border-0 bg-white tracker-form-section">
+              <div class="d-flex align-items-center justify-content-between mb-2">
+                <h5 class="fw-bold mb-0 tracker-form-section-title">Emergency Contact</h5>
+              </div>
+
+              <div class="row g-3">
+                <div class="col-md-4">
+                  <label for="officialsMgmtProfileEmergencyName" class="form-label small fw-bold mb-1">Full Name</label>
+                  <input type="text" class="form-control" id="officialsMgmtProfileEmergencyName" maxlength="150">
+                </div>
+                <div class="col-md-4">
+                  <label for="officialsMgmtProfileEmergencyRelationship" class="form-label small fw-bold mb-1">Relationship</label>
+                  <input type="text" class="form-control" id="officialsMgmtProfileEmergencyRelationship" maxlength="80">
+                </div>
+                <div class="col-md-4">
+                  <label for="officialsMgmtProfileEmergencyPhone" class="form-label small fw-bold mb-1">Mobile Number</label>
+                  <input type="text" class="form-control" id="officialsMgmtProfileEmergencyPhone" maxlength="13" placeholder="09XXXXXXXXX">
+                </div>
+                <div class="col-12">
+                  <label for="officialsMgmtProfileEmergencyAddress" class="form-label small fw-bold mb-1">Address</label>
+                  <textarea class="form-control" id="officialsMgmtProfileEmergencyAddress" rows="3" maxlength="255"></textarea>
+                </div>
+              </div>
+            </div>
+
+            <hr class="my-2">
+
+            <div class="p-3 rounded-3 mb-3 border-0 bg-white tracker-form-section">
+              <div class="d-flex align-items-center justify-content-between mb-2">
+                <h5 class="fw-bold mb-0 tracker-form-section-title">Address Information</h5>
+              </div>
+
+              <div class="row g-3">
+                <div class="col-md-4">
+                  <label for="officialsMgmtProfileAddressMode" class="form-label small fw-bold mb-1">Address Mode</label>
+                  <select class="form-select" id="officialsMgmtProfileAddressMode">
+                    <option value="street">House / Street</option>
+                    <option value="block_lot">Block / Lot</option>
+                  </select>
+                </div>
+                <div class="col-md-4 officials-profile-address-street">
+                  <label for="officialsMgmtProfileHouseNumber" class="form-label small fw-bold mb-1">House Number</label>
+                  <input type="text" class="form-control" id="officialsMgmtProfileHouseNumber" maxlength="50">
+                </div>
+                <div class="col-md-4 officials-profile-address-street">
+                  <label for="officialsMgmtProfileStreetName" class="form-label small fw-bold mb-1">Street Name</label>
+                  <input type="text" class="form-control" id="officialsMgmtProfileStreetName" maxlength="150">
+                </div>
+                <div class="col-md-4 officials-profile-address-blocklot d-none">
+                  <label for="officialsMgmtProfileBlockNumber" class="form-label small fw-bold mb-1">Block Number</label>
+                  <input type="text" class="form-control" id="officialsMgmtProfileBlockNumber" maxlength="50">
+                </div>
+                <div class="col-md-4 officials-profile-address-blocklot d-none">
+                  <label for="officialsMgmtProfileLotNumber" class="form-label small fw-bold mb-1">Lot Number</label>
+                  <input type="text" class="form-control" id="officialsMgmtProfileLotNumber" maxlength="50">
+                </div>
+                <div class="col-md-4">
+                  <label for="officialsMgmtProfileSubdivision" class="form-label small fw-bold mb-1">Subdivision</label>
+                  <input type="text" class="form-control" id="officialsMgmtProfileSubdivision" maxlength="150">
+                </div>
+                <div class="col-md-4">
+                  <label for="officialsMgmtProfileBarangay" class="form-label small fw-bold mb-1">Barangay</label>
+                  <input type="text" class="form-control" id="officialsMgmtProfileBarangay" maxlength="150">
+                </div>
+                <div class="col-md-4">
+                  <label for="officialsMgmtProfileCity" class="form-label small fw-bold mb-1">Municipality / City</label>
+                  <input type="text" class="form-control" id="officialsMgmtProfileCity" maxlength="150">
+                </div>
+                <div class="col-md-4">
+                  <label for="officialsMgmtProfileProvince" class="form-label small fw-bold mb-1">Province</label>
+                  <input type="text" class="form-control" id="officialsMgmtProfileProvince" maxlength="150">
+                </div>
+              </div>
+            </div>
+
+            <hr class="my-2">
+
+            <div class="p-3 rounded-3 mb-2 border-0 bg-white tracker-form-section">
+              <div class="d-flex align-items-center justify-content-between mb-2">
+                <h5 class="fw-bold mb-0 tracker-form-section-title">Assignment Overview</h5>
+              </div>
+
+              <div class="row g-3">
+                <div class="col-md-4">
+                  <label class="form-label small fw-bold mb-1">Display Role</label>
+                  <div class="form-control bg-light" id="officialsMgmtProfileDisplayRole">-</div>
+                </div>
+                <div class="col-md-4">
+                  <label class="form-label small fw-bold mb-1">Position Access</label>
+                  <div class="form-control bg-light" id="officialsMgmtProfilePosition">-</div>
+                </div>
+                <div class="col-md-4">
+                  <label class="form-label small fw-bold mb-1">Department</label>
+                  <div class="form-control bg-light" id="officialsMgmtProfileDepartment">-</div>
+                </div>
+                <div class="col-md-4">
+                  <label class="form-label small fw-bold mb-1">Area Coverage</label>
+                  <div class="form-control bg-light" id="officialsMgmtProfileArea">-</div>
+                </div>
+                <div class="col-md-4">
+                  <label class="form-label small fw-bold mb-1">Date Hired</label>
+                  <div class="form-control bg-light" id="officialsMgmtProfileDateHired">-</div>
+                </div>
+                <div class="col-md-4">
+                  <label class="form-label small fw-bold mb-1">Employment Status</label>
+                  <div class="form-control bg-light" id="officialsMgmtProfileEmploymentStatus">-</div>
+                </div>
+                <div class="col-md-4">
+                  <label class="form-label small fw-bold mb-1">Account Status</label>
+                  <div class="form-control bg-light" id="officialsMgmtProfileAccountStatus">-</div>
+                </div>
+              </div>
+
+              <div class="officials-profile-system-note mt-3">
+                Assignment and access changes stay in the dedicated <strong>Manage Access</strong>, <strong>Promote</strong>, and <strong>Change Department</strong> actions.
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="modal-footer border-0 d-flex justify-content-between flex-wrap gap-2">
+          <button type="button" class="btn btn-secondary px-4" data-bs-dismiss="modal">Close</button>
+          <button type="submit" class="btn btn-primary px-4" id="btnOfficialsMgmtProfileSave">Save Changes</button>
+        </div>
+      </form>
+    </div>
+  </div>
+  <?php endif; ?>
+
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
   <script>
     window.ADMIN_TABLE_COLUMNS_CONFIG = {
@@ -651,6 +903,6 @@ $officialsMgmtPermissionCatalog = amp_get_permission_catalog();
     };
   </script>
   <script src="../JS-Script-Files/Admin-End/tableColumnsGeneric.js?v=20260215-1"></script>
-  <script src="../JS-Script-Files/Admin-End/officialsManagementScript.js?v=20260324-4"></script>
+  <script src="../JS-Script-Files/Admin-End/officialsManagementScript.js?v=20260327-2"></script>
 </body>
 </html>
