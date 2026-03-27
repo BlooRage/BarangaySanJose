@@ -2004,6 +2004,16 @@
   function extractSubmittedDocuments(row, payload) {
     const docs = [];
     const seen = new Set();
+    const skipDocKeys = new Set([
+      'id_picture_url',
+      'id_picture_path',
+      'profile_image_url',
+      'profile_image_path',
+      'barangay_id_photo_url',
+      'barangay_id_photo_path',
+      'barangay_id_photo_capture',
+      'id_picture_data_url'
+    ]);
     const isRelationshipJailVisit = String(payload?.cohabitation_variant || '').trim() === 'relationship_jail_visit'
       || String(payload?.cohabitation_variant || '').trim() === 'conjugal_visit';
     const customLabels = {
@@ -2045,6 +2055,15 @@
 
     if (payload && typeof payload === 'object') {
       Object.keys(payload).forEach((key) => {
+        const normalizedKey = String(key || '').trim().toLowerCase();
+        if (
+          skipDocKeys.has(normalizedKey)
+          || normalizedKey.includes('id_picture')
+          || normalizedKey.includes('profile_image')
+          || normalizedKey.includes('barangay_id_photo')
+        ) {
+          return;
+        }
         const value = payload[key];
         if (Array.isArray(value)) {
           value.forEach((entry, idx) => {
@@ -4700,10 +4719,6 @@
   function openBarangayIdCardModal(row, docUrl, title = 'Digital Barangay ID', returnTarget = '', options = {}) {
     if (!row || !paymentProofModal || !paymentProofWrap) return;
     const requestId = String(row.request_id || '').trim();
-    const payload = row.payload && typeof row.payload === 'object' ? row.payload : {};
-    const residentProfile = row.resident_profile && typeof row.resident_profile === 'object'
-      ? row.resident_profile
-      : {};
     if (!requestId || !window.BarangayIdDigital || typeof window.BarangayIdDigital.render !== 'function') {
       openDocumentModal(docUrl, title, returnTarget, options);
       return;
@@ -4744,31 +4759,7 @@
       openBarangayIdCardModal(row, docUrl, title, returnTarget, options);
     };
 
-    const qrPreviewUrl = barangayIdQrPreviewUrl(row, payload);
-    const sexValue = barangayIdResidentSex(row, payload, residentProfile);
-    const state = window.BarangayIdDigital.createState({
-      appBase,
-      row: {
-        ...row,
-        qr_code_path: qrPreviewUrl,
-        sex: sexValue || row?.sex || ''
-      },
-      payload: {
-        ...payload,
-        qr_code_path: qrPreviewUrl,
-        sex: sexValue || payload.sex || payload.gender || '',
-        gender: sexValue || payload.gender || payload.sex || '',
-        card_sex: sexValue || payload.card_sex || ''
-      },
-      residentProfile: {
-        ...residentProfile,
-        sex: sexValue || residentProfile.sex || ''
-      },
-      frontTemplateUrl: `${appBase}/Resident-End/Certificates/BarangayID/FRONT_EMPTY.png?v=20260324-01`,
-      backTemplateUrl: `${appBase}/Resident-End/Certificates/BarangayID/BACK_EMPTY.png?v=20260324-01`,
-      templateVariant: 'empty',
-      fallbackProfileImageUrl: `${appBase}/Images/Profile-Placeholder.png`,
-    });
+    const state = buildBarangayIdCardModalState(row, options);
     paymentProofWrap.innerHTML = window.BarangayIdDigital.render(state, {
       showIntro: false,
       frontLabel: 'Front Template',
@@ -5334,6 +5325,40 @@
       // Keep lightweight row if details fetch fails.
     }
     return row;
+  }
+
+  function buildBarangayIdCardModalState(row, options = {}) {
+    const payload = row && row.payload && typeof row.payload === 'object' ? row.payload : {};
+    const residentProfile = row && row.resident_profile && typeof row.resident_profile === 'object'
+      ? row.resident_profile
+      : {};
+    const previewState = options && options.previewState && typeof options.previewState === 'object'
+      ? options.previewState
+      : buildPreviewState(row, payload, residentProfile, null);
+    const qrPreviewUrl = barangayIdQrPreviewUrl(row, payload);
+    const frontTemplateUrl = `${appBase}/Resident-End/Certificates/BarangayID/FRONT_EMPTY.png?v=20260324-01`;
+    const backTemplateUrl = `${appBase}/Resident-End/Certificates/BarangayID/BACK_EMPTY.png?v=20260324-01`;
+
+    return {
+      ...(previewState && typeof previewState === 'object' ? previewState : {}),
+      appBase,
+      templateVariant: 'empty',
+      frontTemplateUrl,
+      frontTemplateFallbackUrl: frontTemplateUrl,
+      backTemplateUrl,
+      backTemplateFallbackUrl: backTemplateUrl,
+      qrUrl: resolvePublicUrl(firstNonEmpty([qrPreviewUrl, previewState?.qrUrl])),
+      photoUrl: firstNonEmpty([
+        previewState?.photoUrl,
+        resolvePublicUrl(firstNonEmpty([
+          payload.id_picture_url,
+          payload.id_picture_path,
+          residentProfile.id_picture_url,
+          residentProfile.id_picture_path
+        ])),
+        `${appBase}/Images/Profile-Placeholder.png`
+      ])
+    };
   }
 
   function renderQuickRequestSummary(row) {
@@ -6253,7 +6278,8 @@
                 if (isBarangayIdIssuedDoc) {
                   openBarangayIdCardModal(row, issuedDocUrl, issuedDocumentTitle(row), 'view', {
                     allowPrint: issuedStageKey === 'ready_for_claim',
-                    releaseRequestId: issuedStageKey === 'ready_for_claim' ? String(row.request_id || '') : ''
+                    releaseRequestId: issuedStageKey === 'ready_for_claim' ? String(row.request_id || '') : '',
+                    previewState: viewPreviewState
                   });
                   return;
                 }
@@ -6537,7 +6563,14 @@
                <div class="tracker-form-field">
                  <p class="tracker-form-label">Proof of Residency File</p>
                  <div class="tracker-form-value d-flex justify-content-end">
-                   <button type="button" class="btn btn-sm btn-primary" data-support-doc-url="${esc(proofResidencyUrl)}" data-support-doc-title="${esc(proofResidencyTitle)}">View</button>
+                   <button
+                     type="button"
+                     class="btn btn-sm btn-primary"
+                     data-support-doc-url="${esc(proofResidencyUrl)}"
+                     data-support-doc-title="${esc(proofResidencyTitle)}"
+                     data-support-doc-name="${esc(proofResidencyName || 'Proof of Residency')}"
+                     data-support-doc-inline="0"
+                   >View</button>
                  </div>
                </div>
              </div>`
@@ -6736,7 +6769,9 @@
               viewModal.hide();
             }
             if (normalizePreviewDocKey(row?.document_type || '') === 'barangayid') {
-              openBarangayIdCardModal(row, docUrl, docTitle, 'view');
+              openBarangayIdCardModal(row, docUrl, docTitle, 'view', {
+                previewState: viewPreviewState
+              });
               return;
             }
             openDocumentModal(docUrl, docTitle, 'view');
@@ -6747,8 +6782,9 @@
             const docUrl = String(docBtn.getAttribute('data-support-doc-url') || '').trim();
             const docTitle = String(docBtn.getAttribute('data-support-doc-title') || 'Submitted Attachment Viewer').trim();
             const docName = String(docBtn.getAttribute('data-support-doc-name') || '').trim();
+            const allowInline = String(docBtn.getAttribute('data-support-doc-inline') || '1').trim() !== '0';
             if (!docUrl) return;
-            if (openInlineSubmittedPreview(docUrl, docName || docTitle)) {
+            if (allowInline && openInlineSubmittedPreview(docUrl, docName || docTitle)) {
               return;
             }
             if (!submittedFileModal || !submittedFileWrap || !submittedFileOpenNew) return;
@@ -6808,7 +6844,13 @@
         if (normalizePreviewDocKey(row?.document_type || '') === 'barangayid') {
           openBarangayIdCardModal(row, issuedUrl, issuedDocumentTitle(row), '', {
             allowPrint,
-            releaseRequestId: allowPrint ? id : ''
+            releaseRequestId: allowPrint ? id : '',
+            previewState: buildPreviewState(
+              row,
+              row?.payload && typeof row.payload === 'object' ? row.payload : {},
+              row?.resident_profile && typeof row.resident_profile === 'object' ? row.resident_profile : {},
+              null
+            )
           });
           return;
         }
@@ -9493,4 +9535,3 @@
     document.getElementById('fcrListRefreshBtn').addEventListener('click', loadFcrList);
   })();
 })();
-

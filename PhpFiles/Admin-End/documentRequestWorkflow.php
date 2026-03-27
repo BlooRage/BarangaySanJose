@@ -1174,7 +1174,48 @@ function dra_public_asset_path(string $storedPath): string {
     if ($relative === '') {
         return '';
     }
-    return '/' . ltrim($relative, '/');
+    $publicPath = '/' . ltrim($relative, '/');
+
+    // Local XAMPP setups can point to the production database while uploaded
+    // files only exist on the hosted server. When that happens, prefer the
+    // hosted public asset URL only for files that are missing locally.
+    if (appRequestIsLocalhost() && !dra_public_asset_exists_locally($publicPath)) {
+        $assetBaseUrl = dra_public_asset_base_url();
+        if ($assetBaseUrl !== '') {
+            return rtrim($assetBaseUrl, '/') . $publicPath;
+        }
+    }
+
+    return $publicPath;
+}
+
+function dra_public_asset_base_url(): string {
+    static $cached = null;
+
+    if ($cached !== null) {
+        return $cached;
+    }
+
+    $configured = trim((string)runtime_env(
+        'APP_PUBLIC_ASSET_BASE_URL',
+        runtime_config('app.public_asset_base_url', '')
+    ));
+
+    return $cached = $configured !== '' ? rtrim($configured, '/') : '';
+}
+
+function dra_public_asset_exists_locally(string $publicPath): bool {
+    $normalized = '/' . ltrim(str_replace('\\', '/', trim($publicPath)), '/');
+    if ($normalized === '/') {
+        return false;
+    }
+
+    $projectRoot = realpath(__DIR__ . '/../../');
+    if ($projectRoot === false) {
+        $projectRoot = dirname(__DIR__, 2);
+    }
+
+    return is_file(rtrim(str_replace('\\', '/', $projectRoot), '/') . $normalized);
 }
 
 function dra_resolve_resident_2x2_picture_path(mysqli $conn, string $residentId): string {

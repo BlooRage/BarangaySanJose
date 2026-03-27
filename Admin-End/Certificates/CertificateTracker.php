@@ -3170,15 +3170,7 @@ if ($certificateLaunchStage === 'release') {
           </div>
 
           <div class="row g-3 align-items-center">
-            <div class="col-md-3 d-flex justify-content-center align-items-center">
-              <img id="img-modalIdPicture"
-                   src="../Images/Profile-Placeholder.png"
-                   alt="Resident 2x2 image"
-                   class="img-fluid rounded-circle"
-                   style="width: clamp(120px, 18vw, 170px); height: clamp(120px, 18vw, 170px); object-fit: cover;">
-            </div>
-
-            <div class="col-md-9">
+            <div class="col-12">
               <div class="row g-3">
                 <div class="col-md-12 col-lg-4"><p class="text-muted small mb-0">Full Name:</p><p id="txt-modalName" class="fw-bold mb-0">—</p></div>
                 <div class="col-md-6 col-lg-4"><p class="text-muted small mb-0">Sex:</p><p id="txt-modalSex" class="fw-bold mb-0">—</p></div>
