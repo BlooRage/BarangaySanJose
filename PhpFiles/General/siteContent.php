@@ -601,10 +601,64 @@ if (!function_exists('cms_content_payload_with_context')) {
     }
 }
 
+if (!function_exists('cms_content_is_raw_actor_identifier')) {
+    function cms_content_is_raw_actor_identifier(string $value): bool
+    {
+        $value = trim($value);
+        if ($value === '') {
+            return false;
+        }
+
+        if (stripos($value, 'pii:') === 0) {
+            return true;
+        }
+
+        return (bool)preg_match('/^[a-z0-9:_-]{24,}$/i', $value);
+    }
+}
+
+if (!function_exists('cms_content_safe_actor_fallback')) {
+    function cms_content_safe_actor_fallback(string $fallback, string $role = ''): string
+    {
+        $fallback = trim($fallback);
+        $role = trim($role);
+
+        if ($fallback !== '' && !cms_content_is_raw_actor_identifier($fallback)) {
+            return $fallback;
+        }
+
+        if ($role !== '') {
+            return $role;
+        }
+
+        return 'Unknown User';
+    }
+}
+
+if (!function_exists('cms_content_actor_label')) {
+    function cms_content_actor_label(mysqli $conn, string $label, string $userId = '', string $role = ''): string
+    {
+        $label = trim($label);
+        $userId = trim($userId);
+        $role = trim($role);
+
+        if ($label !== '' && !cms_content_is_raw_actor_identifier($label)) {
+            return $label;
+        }
+
+        if ($userId !== '') {
+            return cms_content_current_user_display($conn, $userId, cms_content_safe_actor_fallback($label, $role));
+        }
+
+        return cms_content_safe_actor_fallback($label, $role);
+    }
+}
+
 if (!function_exists('cms_content_current_user_display')) {
     function cms_content_current_user_display(mysqli $conn, string $userId, string $fallback): string
     {
         $userId = trim($userId);
+        $fallback = cms_content_safe_actor_fallback($fallback);
         if ($userId === '') {
             return $fallback;
         }
@@ -756,6 +810,10 @@ if (!function_exists('cms_content_requests')) {
             if ($pageKey === '') {
                 continue;
             }
+            $createdByUserId = trim((string)($row['created_by_user_id'] ?? ''));
+            $createdByRole = trim((string)($row['created_by_role'] ?? ''));
+            $reviewedByUserId = trim((string)($row['reviewed_by_user_id'] ?? ''));
+            $archivedByUserId = trim((string)($row['archived_by_user_id'] ?? ''));
             $rows[] = [
                 'request_id' => trim((string)($row['request_id'] ?? '')),
                 'page_key' => $pageKey,
@@ -763,13 +821,13 @@ if (!function_exists('cms_content_requests')) {
                 'content' => cms_content_normalize_payload($pageKey, cms_content_decode_json((string)($row['content_json'] ?? ''))),
                 'status' => strtolower(trim((string)($row['status'] ?? 'draft'))),
                 'archived_from_status' => strtolower(trim((string)($row['archived_from_status'] ?? ''))),
-                'created_by_user_id' => trim((string)($row['created_by_user_id'] ?? '')),
-                'created_by_label' => trim((string)($row['created_by_label'] ?? '')),
-                'created_by_role' => trim((string)($row['created_by_role'] ?? '')),
-                'reviewed_by_user_id' => trim((string)($row['reviewed_by_user_id'] ?? '')),
-                'reviewed_by_label' => trim((string)($row['reviewed_by_label'] ?? '')),
-                'archived_by_user_id' => trim((string)($row['archived_by_user_id'] ?? '')),
-                'archived_by_label' => trim((string)($row['archived_by_label'] ?? '')),
+                'created_by_user_id' => $createdByUserId,
+                'created_by_label' => cms_content_actor_label($conn, (string)($row['created_by_label'] ?? ''), $createdByUserId, $createdByRole),
+                'created_by_role' => $createdByRole,
+                'reviewed_by_user_id' => $reviewedByUserId,
+                'reviewed_by_label' => cms_content_actor_label($conn, (string)($row['reviewed_by_label'] ?? ''), $reviewedByUserId),
+                'archived_by_user_id' => $archivedByUserId,
+                'archived_by_label' => cms_content_actor_label($conn, (string)($row['archived_by_label'] ?? ''), $archivedByUserId),
                 'review_note' => trim((string)($row['review_note'] ?? '')),
                 'submitted_at' => trim((string)($row['submitted_at'] ?? '')),
                 'reviewed_at' => trim((string)($row['reviewed_at'] ?? '')),
