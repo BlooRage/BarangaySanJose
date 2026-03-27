@@ -13,6 +13,11 @@ require_once __DIR__ . "/includes/admin_guard.php";
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="../CSS-Styles/Admin-End-CSS/AdminDashboardStyle.css">
     <link rel="stylesheet" href="../CSS-Styles/Admin-End-CSS/ResidentMasterlistStyle.css">
+    <style>
+        .household-member-verification-shell #btnHouseholdMemberVerificationRefresh.is-loading i {
+            animation: adminSpin 900ms linear infinite;
+        }
+    </style>
 </head>
 <body>
 <div class="d-flex flex-column flex-md-row" style="min-height: 100vh;">
@@ -22,7 +27,7 @@ require_once __DIR__ . "/includes/admin_guard.php";
         <h2 class="mb-4" style="font-family: 'Charis SIL Bold'; color: #DE710C;">Household Member Verification</h2>
         <hr><br>
 
-        <div class="bg-white p-4 rounded-4 shadow-sm border resident-masterlist-shell">
+        <div class="bg-white p-4 rounded-4 shadow-sm border resident-masterlist-shell household-member-verification-shell">
             <div class="admin-list-toolbar mb-3 pt-2 flex-wrap">
                 <div class="admin-list-tabs">
                     <button class="btn btn-outline-primary btn-sm status-filter-btn fw-semibold hmv-filter-btn active" data-filter="ALL">&nbsp;&nbsp;All&nbsp;&nbsp;</button>
@@ -38,13 +43,21 @@ require_once __DIR__ . "/includes/admin_guard.php";
                         <input type="text" id="hmvSearchInput" class="form-control" placeholder="Request ID, head, member name">
                         <span class="input-group-text bg-white"><i class="fas fa-search"></i></span>
                     </div>
+                    <button class="btn btn-outline-secondary btn-icon admin-filter" type="button" data-bs-toggle="modal" data-bs-target="#modalHouseholdMemberVerificationFilter" id="filterButton" title="Filter" aria-label="Filter">
+                        <i class="fas fa-filter"></i>
+                        <span class="visually-hidden">Filter</span>
+                    </button>
+                    <button class="btn btn-outline-secondary btn-icon admin-columns" type="button" data-bs-toggle="modal" data-bs-target="#modalHouseholdMemberVerificationColumns" id="btnHouseholdMemberVerificationColumns" title="Columns" aria-label="Columns">
+                        <i class="fa-solid fa-sliders"></i>
+                        <span class="visually-hidden">Columns</span>
+                    </button>
                     <button class="btn btn-outline-secondary btn-icon admin-refresh" type="button" id="btnHouseholdMemberVerificationRefresh" title="Refresh table" aria-label="Refresh table">
                         <i class="fa-solid fa-arrows-rotate"></i>
+                        <span class="visually-hidden">Refresh</span>
                     </button>
                 </div>
             </div>
 
-            <div id="householdMemberVerificationLoading" class="text-muted small mb-2">Loading requests...</div>
             <div id="householdMemberVerificationEmpty" class="text-muted small d-none">No household member verification requests found.</div>
 
             <div class="table-responsive compact-admin-table-shell">
@@ -60,11 +73,59 @@ require_once __DIR__ . "/includes/admin_guard.php";
                             <th>Action</th>
                         </tr>
                     </thead>
-                    <tbody id="householdMemberVerificationBody"></tbody>
+                    <tbody id="householdMemberVerificationBody">
+                        <tr>
+                            <td colspan="7" class="text-center text-muted py-4">Loading requests...</td>
+                        </tr>
+                    </tbody>
                 </table>
             </div>
         </div>
     </main>
+</div>
+
+<div class="modal fade" id="modalHouseholdMemberVerificationFilter" tabindex="-1" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content p-4">
+            <div class="modal-header border-0">
+                <h5 class="modal-title fw-bold">Filter Requests</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <hr>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <label for="hmvFilterDateFrom" class="fw-bold small mb-2">Submitted From</label>
+                    <input type="date" id="hmvFilterDateFrom" class="form-control">
+                </div>
+                <div class="mb-2">
+                    <label for="hmvFilterDateTo" class="fw-bold small mb-2">Submitted To</label>
+                    <input type="date" id="hmvFilterDateTo" class="form-control">
+                </div>
+            </div>
+            <div class="modal-footer border-0">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                <button type="button" class="btn btn-primary" id="btnHmvApplyFilter">Apply Filter</button>
+                <button type="button" class="btn btn-warning" id="btnHmvResetFilter"><i class="fas fa-undo"></i>&nbsp;Reset</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="modalHouseholdMemberVerificationColumns" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered modal-lg">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Columns</h5>
+      </div>
+      <div class="modal-body">
+        <div class="row g-2" id="householdMemberVerificationColumnsList"></div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline-secondary" id="btnHouseholdMemberVerificationColumnsReset">Reset</button>
+        <button type="button" class="btn btn-primary" data-bs-dismiss="modal">Done</button>
+      </div>
+    </div>
+  </div>
 </div>
 
 <div class="modal fade" id="modal-householdMemberVerification" tabindex="-1" data-bs-backdrop="static" data-bs-keyboard="false">
@@ -135,6 +196,16 @@ require_once __DIR__ . "/includes/admin_guard.php";
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+  window.ADMIN_TABLE_COLUMNS_CONFIG = {
+    tableSelector: "#table-householdMemberVerification",
+    modalId: "modalHouseholdMemberVerificationColumns",
+    listId: "householdMemberVerificationColumnsList",
+    resetBtnId: "btnHouseholdMemberVerificationColumnsReset",
+    storageKey: "admin_cols_household_member_verification_v1"
+  };
+</script>
+<script src="../JS-Script-Files/Admin-End/tableColumnsGeneric.js?v=20260215-1"></script>
 <script src="../JS-Script-Files/Admin-End/householdMemberVerificationScript.js"></script>
 </body>
 </html>

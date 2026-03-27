@@ -2,6 +2,11 @@ document.addEventListener("DOMContentLoaded", () => {
     const csrfToken = String(window.RESIDENT_CSRF_TOKEN || "").trim();
     const canManageMembers = () => Boolean(window.RESIDENT_HOUSEHOLD_CAN_MANAGE);
     const manageBlockedMessage = () => String(window.RESIDENT_HOUSEHOLD_MANAGE_MESSAGE || "Head of family verification is still pending.");
+    const householdInviteModalEl = document.getElementById("householdInviteModal");
+    const getHouseholdInviteModal = () =>
+        householdInviteModalEl && window.bootstrap?.Modal
+            ? bootstrap.Modal.getOrCreateInstance(householdInviteModalEl)
+            : null;
     const normalizePhone = (value) => {
         const digits = (value || "").replace(/\D/g, "");
         if (digits.startsWith("63") && digits.length === 12) {
@@ -153,7 +158,7 @@ document.addEventListener("DOMContentLoaded", () => {
         ].filter(Boolean);
         const birthdateField = document.getElementById("hmBirthdate");
         const birthCertificateField = document.getElementById("hmBirthCertificate");
-        const namePattern = /^[A-Za-z\s]+$/;
+        const namePattern = /^[\p{L}\s'.-]+$/u;
 
         const touched = new Set();
 
@@ -226,6 +231,14 @@ document.addEventListener("DOMContentLoaded", () => {
         });
         if (birthdateField) {
             birthdateField.addEventListener("input", () => validateNames(true));
+            birthdateField.addEventListener("change", () => {
+                validateNames(true);
+                window.setTimeout(() => {
+                    if (householdInviteModalEl && !householdInviteModalEl.classList.contains("show")) {
+                        getHouseholdInviteModal()?.show();
+                    }
+                }, 0);
+            });
         }
         if (birthCertificateField) {
             birthCertificateField.addEventListener("change", () => validateNames(true));
