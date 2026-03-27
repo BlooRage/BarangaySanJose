@@ -119,7 +119,7 @@ $editorMeta = [
             'History images stay on their current design and only the history message is editable here.',
         ],
         'quick_links' => [
-            ['label' => 'Open Request Queue', 'href' => appUrl('Admin-End/Contents/ContentManagement.php') . '?module=requests'],
+            ['label' => 'Open Request Queue', 'href' => cms_request_view_url('my_requests')],
         ],
     ],
     'government' => [
@@ -128,14 +128,14 @@ $editorMeta = [
             'Official images are editable here so the Home page council preview stays in sync with the Government page.',
         ],
         'quick_links' => [
-            ['label' => 'Open Request Queue', 'href' => appUrl('Admin-End/Contents/ContentManagement.php') . '?module=requests'],
+            ['label' => 'Open Request Queue', 'href' => cms_request_view_url('my_requests')],
         ],
     ],
     'services' => [
         'subtitle' => 'Service titles stay aligned to the current public cards while each description is editable.',
         'notes' => [],
         'quick_links' => [
-            ['label' => 'Open Request Queue', 'href' => appUrl('Admin-End/Contents/ContentManagement.php') . '?module=requests'],
+            ['label' => 'Open Request Queue', 'href' => cms_request_view_url('my_requests')],
         ],
     ],
     'faq' => [
@@ -145,7 +145,7 @@ $editorMeta = [
         ],
         'quick_links' => [
             ['label' => 'Open FAQ Tool', 'href' => $canManageAnnouncements ? $faqToolUrl : ''],
-            ['label' => 'Open Request Queue', 'href' => appUrl('Admin-End/Contents/ContentManagement.php') . '?module=requests'],
+            ['label' => 'Open Request Queue', 'href' => cms_request_view_url('my_requests')],
         ],
     ],
     'contact' => [
@@ -154,14 +154,14 @@ $editorMeta = [
             'Area hotlines support additional tiles whenever you need to expand the section.',
         ],
         'quick_links' => [
-            ['label' => 'Open Request Queue', 'href' => appUrl('Admin-End/Contents/ContentManagement.php') . '?module=requests'],
+            ['label' => 'Open Request Queue', 'href' => cms_request_view_url('my_requests')],
         ],
     ],
     'login' => [
         'subtitle' => 'The login panel and signup panel images are managed here and update the public login screen.',
         'notes' => [],
         'quick_links' => [
-            ['label' => 'Open Request Queue', 'href' => appUrl('Admin-End/Contents/ContentManagement.php') . '?module=requests'],
+            ['label' => 'Open Request Queue', 'href' => cms_request_view_url('my_requests')],
         ],
     ],
 ];
@@ -194,6 +194,49 @@ $myDeniedCount = count(array_filter($myRequests, static fn(array $request): bool
 $myArchivedCount = count(array_filter($myRequests, static fn(array $request): bool => strtolower((string)($request['status'] ?? '')) === 'archived'));
 $pendingReviewCount = count($reviewQueue);
 $approvedHistoryRequests = array_values(array_filter($allRequests, static fn(array $request): bool => strtolower((string)($request['status'] ?? '')) === 'approved'));
+$requestViewDefinitions = [
+    'my_requests' => [
+        'nav_label' => 'My Requests',
+        'title' => 'My Content Requests',
+        'description' => 'Track your drafts, submitted changes, and active CMS requests from the page editors.',
+        'requests' => $myActiveRequests,
+        'empty_message' => 'No active CMS requests yet. Start from any page editor to save a draft or submit changes.',
+    ],
+];
+if ($canReviewContent) {
+    $requestViewDefinitions['review_queue'] = [
+        'nav_label' => 'Review Queue',
+        'title' => 'Review Queue',
+        'description' => 'Pending CMS requests waiting for approval or denial.',
+        'requests' => $reviewQueue,
+        'empty_message' => 'No pending content requests to review right now.',
+    ];
+}
+$requestViewDefinitions['archived_requests'] = [
+    'nav_label' => 'Archived Requests',
+    'title' => $canReviewContent ? 'Archived Requests' : 'My Archived Requests',
+    'description' => $canReviewContent
+        ? 'Archived CMS requests that remain available for reference.'
+        : 'Your archived CMS requests kept for reference.',
+    'requests' => $archivedRequests,
+    'empty_message' => $canReviewContent
+        ? 'No archived CMS requests are available right now.'
+        : 'You do not have any archived CMS requests right now.',
+];
+if ($canReviewContent) {
+    $requestViewDefinitions['approved_history'] = [
+        'nav_label' => 'Approved Version History',
+        'title' => 'Approved Version History',
+        'description' => 'Approved CMS versions sorted from newest to oldest.',
+        'requests' => $approvedHistoryRequests,
+        'empty_message' => 'No approved content versions are available yet.',
+    ];
+}
+$contentRequestsView = strtolower(trim((string)($_GET['requests_view'] ?? 'my_requests')));
+if (!isset($requestViewDefinitions[$contentRequestsView])) {
+    $contentRequestsView = 'my_requests';
+}
+$selectedRequestView = $requestViewDefinitions[$contentRequestsView];
 usort($approvedHistoryRequests, static function (array $left, array $right): int {
     return cms_content_request_sort_timestamp($right) <=> cms_content_request_sort_timestamp($left);
 });
@@ -203,6 +246,15 @@ usort($myActiveRequests, static function (array $left, array $right): int {
 usort($archivedRequests, static function (array $left, array $right): int {
     return cms_content_request_sort_timestamp($right) <=> cms_content_request_sort_timestamp($left);
 });
+$requestViewDefinitions['my_requests']['requests'] = $myActiveRequests;
+if ($canReviewContent) {
+    $requestViewDefinitions['review_queue']['requests'] = $reviewQueue;
+}
+$requestViewDefinitions['archived_requests']['requests'] = $archivedRequests;
+if ($canReviewContent) {
+    $requestViewDefinitions['approved_history']['requests'] = $approvedHistoryRequests;
+}
+$selectedRequestView = $requestViewDefinitions[$contentRequestsView];
 
 $approvedRequestsByPage = [];
 foreach ($approvedHistoryRequests as $request) {
@@ -300,6 +352,19 @@ function cms_nav_url(string $moduleKey, string $requestId = ''): string
         $query['request_id'] = $requestId;
     }
     return appUrl('Admin-End/Contents/ContentManagement.php') . '?' . http_build_query($query);
+}
+
+function cms_request_view_url(string $requestView = 'my_requests'): string
+{
+    $allowedViews = ['my_requests', 'review_queue', 'archived_requests', 'approved_history'];
+    if (!in_array($requestView, $allowedViews, true)) {
+        $requestView = 'my_requests';
+    }
+
+    return appUrl('Admin-End/Contents/ContentManagement.php') . '?' . http_build_query([
+        'module' => 'requests',
+        'requests_view' => $requestView,
+    ]);
 }
 
 function cms_status_class(string $status): string
@@ -756,65 +821,55 @@ $previewCssAssets = [
       </section>
 
       <?php if ($selectedModuleKey === 'requests'): ?>
-        <section class="cms-section-card mb-4">
-          <div class="cms-detail-header cms-detail-header--request">
-            <div class="cms-detail-icon">
-              <i class="fa-solid <?= htmlspecialchars((string)$selectedModule['icon']) ?>"></i>
-            </div>
-            <div class="cms-detail-copy">
-              <h3 class="cms-section-title mb-0"><?= htmlspecialchars((string)$selectedModule['title']) ?></h3>
+        <section class="bg-white p-4 pt-3 rounded-4 shadow-sm border resident-masterlist-shell cms-request-tracker-shell mb-4">
+          <div class="admin-list-toolbar mb-3 pt-2 flex-wrap">
+            <div class="admin-list-tabs">
+              <?php foreach ($requestViewDefinitions as $requestViewKey => $requestViewMeta): ?>
+                <?php
+                  $isRequestViewActive = $contentRequestsView === $requestViewKey;
+                  $requestViewButtonClass = $requestViewKey === 'my_requests' ? 'btn-outline-primary' : 'btn-outline-secondary';
+                  $requestViewDataFilter = $requestViewKey === 'my_requests' ? '' : strtoupper($requestViewKey);
+                ?>
+                <a
+                  href="<?= htmlspecialchars(cms_request_view_url($requestViewKey)) ?>"
+                  data-filter="<?= htmlspecialchars($requestViewDataFilter, ENT_QUOTES, 'UTF-8') ?>"
+                  class="btn <?= $requestViewButtonClass ?> btn-sm status-filter-btn fw-semibold <?= $requestViewKey === 'review_queue' ? 'has-notif' : '' ?> <?= $isRequestViewActive ? 'active' : '' ?>">
+                  <?= htmlspecialchars((string)$requestViewMeta['nav_label']) ?>
+                  <?php if ($requestViewKey === 'review_queue' && $pendingReviewCount > 0): ?>
+                    <span class="pending-count-badge"><?= (int)$pendingReviewCount ?></span>
+                  <?php endif; ?>
+                </a>
+              <?php endforeach; ?>
             </div>
           </div>
 
-          <article class="cms-detail-panel cms-request-panel mb-4">
-            <h4 class="cms-detail-panel-title">My Content Requests</h4>
-            <?= cms_render_request_table(
-              $myActiveRequests,
-              'No active CMS requests yet. Start from any page editor to save a draft or submit changes.',
-              $currentUserId,
-              $canReviewContent,
-              $requestVersionMeta
-            ) ?>
-          </article>
+          <div class="cms-request-tracker-header mb-3">
+            <div>
+              <h3 class="cms-section-title mb-1"><?= htmlspecialchars((string)$selectedRequestView['title']) ?></h3>
+              <p class="small text-muted mb-0"><?= htmlspecialchars((string)$selectedRequestView['description']) ?></p>
+            </div>
+            <span class="badge rounded-pill text-bg-light border cms-request-tracker-badge">
+              <?= (int)count($selectedRequestView['requests']) ?> <?= count($selectedRequestView['requests']) === 1 ? 'entry' : 'entries' ?>
+            </span>
+          </div>
 
-          <?php if ($canReviewContent): ?>
-            <article class="cms-detail-panel cms-request-panel mb-4">
-              <h4 class="cms-detail-panel-title">Review Queue</h4>
-              <?= cms_render_request_table(
-                $reviewQueue,
-                'No pending content requests to review right now.',
-                $currentUserId,
-                true,
-                $requestVersionMeta
-              ) ?>
-            </article>
-          <?php endif; ?>
+          <?= cms_render_request_table(
+            (array)$selectedRequestView['requests'],
+            (string)$selectedRequestView['empty_message'],
+            $currentUserId,
+            $canReviewContent,
+            $requestVersionMeta
+          ) ?>
 
-          <article class="cms-detail-panel cms-request-panel mb-4">
-            <h4 class="cms-detail-panel-title"><?= $canReviewContent ? 'Archived Requests' : 'My Archived Requests' ?></h4>
-            <?= cms_render_request_table(
-              $archivedRequests,
-              $canReviewContent
-                ? 'No archived CMS requests are available right now.'
-                : 'You do not have any archived CMS requests right now.',
-              $currentUserId,
-              $canReviewContent,
-              $requestVersionMeta
-            ) ?>
-          </article>
-
-          <?php if ($canReviewContent): ?>
-            <article class="cms-detail-panel cms-request-panel">
-              <h4 class="cms-detail-panel-title">Approved Version History</h4>
-              <?= cms_render_request_table(
-                $approvedHistoryRequests,
-                'No approved content versions are available yet.',
-                $currentUserId,
-                true,
-                $requestVersionMeta
-              ) ?>
-            </article>
-          <?php endif; ?>
+          <div class="resident-table-footer mt-3 d-flex flex-wrap justify-content-between align-items-center gap-3">
+            <div class="d-flex align-items-center gap-2">
+              <label class="small text-muted mb-0">Entries</label>
+              <span class="small fw-semibold"><?= (int)count($selectedRequestView['requests']) ?></span>
+              <span class="badge rounded-pill bg-light text-secondary border">
+                Showing <?= (int)count($selectedRequestView['requests']) ?> <?= count($selectedRequestView['requests']) === 1 ? 'request' : 'requests' ?>
+              </span>
+            </div>
+          </div>
         </section>
       <?php else: ?>
         <?php
