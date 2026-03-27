@@ -81,7 +81,7 @@ if (!function_exists('hhv_get_resident_head_verification')) {
         $stmt = $conn->prepare("
             SELECT
                 r.head_of_family,
-                a.street_number AS house_number,
+                a.street_number,
                 a.street_name,
                 a.phase_number,
                 a.subdivision,
@@ -113,6 +113,12 @@ if (!function_exists('hhv_get_resident_head_verification')) {
             $state['can_manage_members'] = false;
             $state['message'] = 'Resident profile not found.';
             return $state;
+        }
+
+        $row = pii_decrypt_resident_row($row) ?? $row;
+        $row = pii_decrypt_resident_address_row($row) ?? $row;
+        if (!array_key_exists('house_number', $row) || trim((string)($row['house_number'] ?? '')) === '') {
+            $row['house_number'] = (string)($row['street_number'] ?? '');
         }
 
         $headRaw = strtolower(trim((string)($row['head_of_family'] ?? '')));
