@@ -1594,7 +1594,7 @@ if ($financeSection === 'fees') {
 <script>
 window.CERT_TRACKER_DEFAULT_STAGE = 'finance';
 </script>
-<script src="../../JS-Script-Files/Shared/barangayIdDigital.js?v=20260321-04"></script>
+<script src="../../JS-Script-Files/Shared/barangayIdDigital.js?v=20260328-01"></script>
 <script src="../../JS-Script-Files/Admin-End/certificateTrackerScript.js?v=20260323-14"></script>
 <?php else: ?>
 <script>
