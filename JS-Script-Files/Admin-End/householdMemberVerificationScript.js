@@ -1,11 +1,14 @@
 (() => {
   const el = (id) => document.getElementById(id);
   const bodyEl = el("householdMemberVerificationBody");
-  const loadingEl = el("householdMemberVerificationLoading");
   const emptyEl = el("householdMemberVerificationEmpty");
   const searchEl = el("hmvSearchInput");
   const pendingBadgeEl = el("pendingHouseholdMemberBadge");
   const refreshBtn = el("btnHouseholdMemberVerificationRefresh");
+  const filterDateFromEl = el("hmvFilterDateFrom");
+  const filterDateToEl = el("hmvFilterDateTo");
+  const btnApplyFilter = el("btnHmvApplyFilter");
+  const btnResetFilter = el("btnHmvResetFilter");
   const modalEl = el("modal-householdMemberVerification");
   const modal = modalEl ? bootstrap.Modal.getOrCreateInstance(modalEl) : null;
 
@@ -14,6 +17,10 @@
     filter: "ALL",
     search: "",
     active: null,
+    modalFilters: {
+      dateFrom: "",
+      dateTo: "",
+    },
   };
 
   const fmtStatus = (status) => {
@@ -87,7 +94,7 @@
       return;
     }
 
-    if (["jpg", "jpeg", "png", "webp"].includes(ext)) {
+    if (["jpg", "jpeg", "png"].includes(ext)) {
       wrap.innerHTML = `<div class="text-center"><img src="${escapeHtml(url)}" alt="Birth Certificate" class="img-fluid rounded border"></div>`;
       return;
     }
@@ -100,11 +107,27 @@
     `;
   };
 
+  const normalizeDateValue = (value) => {
+    const raw = String(value || "").trim();
+    if (!raw) return "";
+    const isoMatch = raw.match(/^(\d{4}-\d{2}-\d{2})/);
+    if (isoMatch) return isoMatch[1];
+    const parsed = new Date(raw);
+    if (Number.isNaN(parsed.getTime())) return "";
+    const year = parsed.getFullYear();
+    const month = String(parsed.getMonth() + 1).padStart(2, "0");
+    const day = String(parsed.getDate()).padStart(2, "0");
+    return `${year}-${month}-${day}`;
+  };
+
   const filteredRows = () => {
     const q = state.search.trim().toLowerCase();
     return state.rows.filter((row) => {
       const status = fmtStatus(row.status);
       if (state.filter !== "ALL" && status !== state.filter) return false;
+      const submittedDate = normalizeDateValue(row.submitted_at);
+      if (state.modalFilters.dateFrom && (!submittedDate || submittedDate < state.modalFilters.dateFrom)) return false;
+      if (state.modalFilters.dateTo && (!submittedDate || submittedDate > state.modalFilters.dateTo)) return false;
       if (!q) return true;
       const haystack = [
         row.request_id,
@@ -127,7 +150,6 @@
   const renderTable = () => {
     if (!bodyEl) return;
     const rows = filteredRows();
-    if (loadingEl) loadingEl.classList.add("d-none");
     emptyEl?.classList.toggle("d-none", rows.length > 0);
 
     if (!rows.length) {
@@ -168,7 +190,11 @@
   };
 
   const fetchRows = async () => {
-    if (loadingEl) loadingEl.classList.remove("d-none");
+    if (refreshBtn) refreshBtn.classList.add("is-loading");
+    if (bodyEl) {
+      bodyEl.innerHTML = `<tr><td colspan="7" class="text-center text-muted py-4">Loading requests...</td></tr>`;
+    }
+    emptyEl?.classList.add("d-none");
     try {
       const res = await fetch("../PhpFiles/Admin-End/householdMemberVerification.php?fetch_member_requests=1", {
         credentials: "same-origin",
@@ -179,11 +205,12 @@
       updatePendingBadge();
       renderTable();
     } catch (error) {
-      if (loadingEl) loadingEl.classList.add("d-none");
       if (bodyEl) {
         bodyEl.innerHTML = `<tr><td colspan="7" class="text-center text-danger py-4">${escapeHtml(error?.message || "Failed to load requests.")}</td></tr>`;
       }
       emptyEl?.classList.add("d-none");
+    } finally {
+      if (refreshBtn) refreshBtn.classList.remove("is-loading");
     }
   };
 
@@ -226,6 +253,19 @@
   });
 
   refreshBtn?.addEventListener("click", fetchRows);
+  btnApplyFilter?.addEventListener("click", () => {
+    state.modalFilters.dateFrom = String(filterDateFromEl?.value || "").trim();
+    state.modalFilters.dateTo = String(filterDateToEl?.value || "").trim();
+    bootstrap.Modal.getOrCreateInstance(el("modalHouseholdMemberVerificationFilter"))?.hide();
+    renderTable();
+  });
+  btnResetFilter?.addEventListener("click", () => {
+    state.modalFilters.dateFrom = "";
+    state.modalFilters.dateTo = "";
+    if (filterDateFromEl) filterDateFromEl.value = "";
+    if (filterDateToEl) filterDateToEl.value = "";
+    renderTable();
+  });
 
   bodyEl?.addEventListener("click", (event) => {
     const button = event.target instanceof HTMLElement ? event.target.closest("button[data-request-id]") : null;
