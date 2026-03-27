@@ -6495,7 +6495,10 @@
         const personalMap = new Map(personalFields.map((f) => [f.label, f.value]));
         const nameGrid = renderFieldGrid(personalFields.filter((f) => ['Last Name', 'First Name', 'Middle Name', 'Suffix'].includes(f.label)), 4);
         const profileGrid = renderFieldGrid(personalFields.filter((f) => ['Birthdate', 'Age', 'Sex', 'Civil Status'].includes(f.label)), 4);
-        const contactGrid = renderFieldGrid(personalFields.filter((f) => ['Contact Number', 'Full Address'].includes(f.label)), 2);
+        const contactFields = personalFields.filter((f) => ['Contact Number', 'Full Address'].includes(f.label));
+        const contactGrid = contactFields.length
+          ? `<div class="tracker-form-grid contact-address-grid">${contactFields.map((f) => formField(f.label, f.value, !!f.raw, !!f.wide)).join('')}</div>`
+          : '';
         const extraGrid = renderFieldGrid(personalFields.filter((f) => ['Religion', 'Occupation'].includes(f.label)), 2);
         const proofResidencyPath = firstNonEmpty([
           residentProfile.proof_residency_path
