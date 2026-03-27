@@ -5,7 +5,6 @@ error_reporting(E_ALL);
 
 require_once "../General/security.php";
 require_once "../General/userAccountLocks.php";
-require_once __DIR__ . "/redirectDestination.php";
 header('Content-Type: application/json');
 date_default_timezone_set('Asia/Manila');
 
@@ -306,6 +305,8 @@ $_SESSION['role']       = $userData['role_access'];
 $_SESSION['logged_in']  = true;
 $_SESSION['last_activity'] = time();
 $_SESSION['show_not_verified_modal'] = true;
+
+require_once __DIR__ . "/redirectDestination.php";
 
 echo json_encode([
     'success'  => true,

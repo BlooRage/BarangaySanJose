@@ -1,6 +1,8 @@
 <?php
 declare(strict_types=1);
 
+require_once __DIR__ . '/runtimeConfig.php';
+
 if (!function_exists('ual_table_exists')) {
     function ual_table_exists(mysqli $conn, string $tableName): bool
     {
@@ -20,6 +22,20 @@ if (!function_exists('ual_column_exists')) {
     }
 }
 
+if (!function_exists('ual_should_auto_ensure_lock_columns')) {
+    function ual_should_auto_ensure_lock_columns(): bool
+    {
+        $default = PHP_SAPI === 'cli';
+        return runtime_bool(
+            runtime_env(
+                'DB_AUTO_ENSURE_LOCK_COLUMNS',
+                runtime_env('APP_AUTO_MIGRATE_LOCK_SCHEMA', runtime_config('db.auto_ensure_lock_columns', $default))
+            ),
+            $default
+        );
+    }
+}
+
 if (!function_exists('ual_ensure_lock_columns')) {
     function ual_ensure_lock_columns(mysqli $conn): void
     {
@@ -28,6 +44,10 @@ if (!function_exists('ual_ensure_lock_columns')) {
             return;
         }
         $done = true;
+
+        if (!ual_should_auto_ensure_lock_columns()) {
+            return;
+        }
 
         if (!ual_table_exists($conn, 'useraccountstbl')) {
             return;

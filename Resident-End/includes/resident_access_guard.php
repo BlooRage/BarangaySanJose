@@ -104,7 +104,8 @@ if ($hasResidentProfile && $allowUnregistered) {
 
 $allowUnverifiedResident = $allowUnverifiedResident ?? false;
 
-if (!$isResidentVerified) {
+// Only apply "not verified yet" routing after the resident has an actual profile record.
+if ($hasResidentProfile && !$isResidentVerified) {
     $scriptPath = resident_guard_normalize_public_path((string)($_SERVER['SCRIPT_NAME'] ?? ''));
     $allowedForUnverified = [
         '/Resident-End/resident_dashboard.php',

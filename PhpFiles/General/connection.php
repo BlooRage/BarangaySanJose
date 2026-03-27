@@ -31,6 +31,20 @@ if (!function_exists('db_request_expects_json')) {
     }
 }
 
+if (!function_exists('db_should_auto_ensure_pii_schema')) {
+    function db_should_auto_ensure_pii_schema(): bool
+    {
+        $default = PHP_SAPI === 'cli';
+        return runtime_bool(
+            runtime_env(
+                'DB_AUTO_ENSURE_PII_SCHEMA',
+                runtime_env('APP_AUTO_MIGRATE_PII_SCHEMA', runtime_config('db.auto_ensure_pii_schema', $default))
+            ),
+            $default
+        );
+    }
+}
+
 if (!function_exists('db_should_retry_connect_error')) {
     function db_should_retry_connect_error(string $message): bool
     {
@@ -210,5 +224,7 @@ $conn->set_charset('utf8mb4');
 // This affects NOW(), CURRENT_TIMESTAMP, and timestamp defaults for this connection.
 $conn->query("SET time_zone = '+08:00'");
 
-// Ensure the app can persist encrypted PII and hashed lookup indexes.
-pii_ensure_core_schema($conn);
+// Schema migration work is opt-in so normal requests do not pay repeated ALTER/CHECK costs.
+if (db_should_auto_ensure_pii_schema()) {
+    pii_ensure_core_schema($conn);
+}
